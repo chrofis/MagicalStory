@@ -11,6 +11,7 @@ import type { GenerationSettings } from './story';
 import storyService from '@/services/storyService';
 import { TestModelsPanel } from './TestModelsPanel';
 import { EntityConsistencyView } from './EntityConsistencyView';
+import { IMAGE_REGENERATION_COST } from '@/constants/credits';
 
 interface StoryTextPrompt {
   batch: number;
@@ -206,7 +207,6 @@ interface StoryDisplayProps {
   onSaveTitleChange?: (title: string) => Promise<void>;
   // Image regeneration with credits
   userCredits?: number;
-  imageRegenerationCost?: number;
   isImpersonating?: boolean;
   onSelectImageVersion?: (pageNumber: number, versionIndex: number) => Promise<void>;
   onSelectCoverVersion?: (coverType: 'frontCover' | 'initialPage' | 'backCover', versionIndex: number) => Promise<void>;
@@ -309,7 +309,6 @@ export function StoryDisplay({
   onSaveTitleChange,
   // Image regeneration with credits
   userCredits = 0,
-  imageRegenerationCost = 5,
   isImpersonating = false,
   onSelectImageVersion,
   onSelectCoverVersion,
@@ -325,7 +324,7 @@ export function StoryDisplay({
     : language;
 
   // Check if user has enough credits (-1 means infinite/unlimited, impersonating admins also bypass)
-  const hasEnoughCredits = isImpersonating || userCredits === -1 || userCredits >= imageRegenerationCost;
+  const hasEnoughCredits = isImpersonating || userCredits === -1 || userCredits >= IMAGE_REGENERATION_COST;
 
   // Check if a page/cover is busy with any image operation (edit, improve, regenerate, char repair)
   const isPageBusy = (pageNumber: number): boolean => {
@@ -1325,10 +1324,12 @@ export function StoryDisplay({
     setEditValue('');
   };
 
-  // Parse story into pages - handle both markdown (## Seite/Page 1) and old format (--- Page 1 ---)
+  // Parse story into pages. Sonnet writes the canonical `## Seite N` / `## Page N`
+  // marker but occasionally drifts to `**Seite N**`, `# Seite N`, `### Page N`, or
+  // `--- Seite N ---`. Match all of those so the split doesn't merge pages.
   const parseStoryPages = (storyText: string) => {
     if (!storyText) return [];
-    const pageMatches = storyText.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Page|Seite)\s+\d+)/i);
+    const pageMatches = storyText.split(/(?:---\s*(?:Page|Seite|Página|Pagina)\s+\d+\s*---|#{1,3}\s*(?:Page|Seite|Página|Pagina)\s+\d+|\*\*\s*(?:Page|Seite|Página|Pagina)\s+\d+\s*\*\*)/i);
     return pageMatches.slice(1).filter(p => p.trim().length > 0);
   };
 
@@ -1336,6 +1337,13 @@ export function StoryDisplay({
   const displayStory = isEditMode ? editedStory : story;
   const storyPages = parseStoryPages(displayStory);
   const hasImages = sceneImages.length > 0;
+  // Canonical page count for rendering. sceneImages comes from /metadata
+  // (length = backend's sceneCount = data.sceneImages.length). storyPages
+  // comes from regex-splitting Sonnet's markdown; broken markers collapse it.
+  // Always use the wider of the two so a parser miss never hides image slots
+  // that actually exist. Distinct from the `totalPages` prop, which carries
+  // the original-declared count from partial-story progress.
+  const pageSlotCount = Math.max(storyPages.length, sceneImages.length);
 
   // Fetch server-rendered text overlay images when textOverlay is enabled
   useEffect(() => {
@@ -1375,14 +1383,14 @@ export function StoryDisplay({
   // For picture book: User can see page N if page N-1 has an image (1:1 text:image)
   // For normal story: User can see page N if scene ceil(N/2) has an image (2:1 text:image)
   const getMaxViewablePage = (): number => {
-    if (!progressiveMode) return storyPages.length;
-    if (storyPages.length === 0) return 0;
+    if (!progressiveMode) return pageSlotCount;
+    if (pageSlotCount === 0) return 0;
 
     // Page 1 is always viewable if we have story text
     let maxPage = 1;
 
     // Check each subsequent page
-    for (let i = 2; i <= storyPages.length; i++) {
+    for (let i = 2; i <= pageSlotCount; i++) {
       // All layouts now use 1:1 mapping - each text page needs its corresponding image
       const imagePageNum = i - 1;
 
@@ -1399,7 +1407,7 @@ export function StoryDisplay({
   };
 
   const maxViewablePage = getMaxViewablePage();
-  const totalProgressivePages = progressiveData?.totalPages || storyPages.length;
+  const totalProgressivePages = progressiveData?.totalPages || pageSlotCount;
   // _totalScenes = number of images to expect (different from totalPages for 2:1 layouts)
   const _totalScenes = progressiveData?.totalScenes || sceneImages.length || Math.ceil(totalProgressivePages / (isPictureBook ? 1 : 2));
   void _totalScenes; // Preserved for future use
@@ -1577,7 +1585,7 @@ export function StoryDisplay({
           ) : isDetecting ? (
             <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : language === 'fr' ? 'Détection...' : 'Detecting...'}</span>
           ) : (
-            <><span className="flex items-center gap-2"><Users size={14} /> {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : 'Fix Character'}</span><span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span></>
+            <><span className="flex items-center gap-2"><Users size={14} /> {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : 'Fix Character'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
           )}
         </button>
         {isOpen && !isRepairing && (
@@ -1712,7 +1720,7 @@ export function StoryDisplay({
                   disabled={!charRepairSelected}
                   className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors"
                 >
-                  {language === 'de' ? 'Reparieren' : 'Repair'} ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
+                  {language === 'de' ? 'Reparieren' : 'Repair'} ({IMAGE_REGENERATION_COST} {language === 'de' ? 'Credits' : 'credits'})
                 </button>
               </div>
             </div>
@@ -4311,7 +4319,7 @@ export function StoryDisplay({
                     {editingPages.has(-1) ? (
                       <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                     ) : (
-                      <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span></>
+                      <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -4327,7 +4335,7 @@ export function StoryDisplay({
                     {improvingPages.has(-1) ? (
                       <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
                     ) : (
-                      <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span></>
+                      <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -4341,7 +4349,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <span className="flex items-center gap-2"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
-                    <span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span>
+                    <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
                 {renderCharRepairButton(-1, bboxOverrides['cover:front'] ?? frontCoverObj?.bboxDetection)}
@@ -4562,7 +4570,7 @@ export function StoryDisplay({
                     {editingPages.has(-2) ? (
                       <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                     ) : (
-                      <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span></>
+                      <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -4578,7 +4586,7 @@ export function StoryDisplay({
                     {improvingPages.has(-2) ? (
                       <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
                     ) : (
-                      <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span></>
+                      <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -4592,7 +4600,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <span className="flex items-center gap-2"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
-                    <span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span>
+                    <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
                 {renderCharRepairButton(-2, bboxOverrides['cover:initial'] ?? initialPageObj?.bboxDetection)}
@@ -4791,8 +4799,9 @@ export function StoryDisplay({
             {title || (storyLang === 'de' ? 'Ihre Geschichte' : storyLang === 'fr' ? 'Votre histoire' : 'Your Story')}
           </h3>
 
-          {storyPages.slice(0, progressiveMode ? maxViewablePage : storyPages.length).map((pageText, index) => {
+          {Array.from({ length: progressiveMode ? maxViewablePage : pageSlotCount }, (_, index) => {
             const pageNumber = index + 1;
+            const pageText = storyPages[index] || '';
             // All layouts now use 1:1 mapping (text page = image page)
             // The difference is only in DISPLAY: Bilderbuch = combined, Kinderbuch = side-by-side
             const sceneNumber = pageNumber;
@@ -4885,7 +4894,7 @@ export function StoryDisplay({
                                   {editingPages.has(pageNumber) ? (
                                     <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                                   ) : (
-                                    <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span></>
+                                    <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
                                 </button>
                               )}
@@ -4901,7 +4910,7 @@ export function StoryDisplay({
                                   {improvingPages.has(pageNumber) ? (
                                     <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
                                   ) : (
-                                    <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span></>
+                                    <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
                                 </button>
                               )}
@@ -4915,7 +4924,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
                                   <span className="flex items-center gap-2"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
-                                  <span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span>
+                                  <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                                 </button>
                               )}
                               {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection ?? (image?.retryHistory?.find((r: any) => r.bboxDetection?.figures)?.bboxDetection as any))}
@@ -5566,7 +5575,7 @@ export function StoryDisplay({
                                   {editingPages.has(pageNumber) ? (
                                     <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                                   ) : (
-                                    <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span></>
+                                    <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
                                 </button>
                               )}
@@ -5582,7 +5591,7 @@ export function StoryDisplay({
                                   {improvingPages.has(pageNumber) ? (
                                     <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
                                   ) : (
-                                    <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span></>
+                                    <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
                                 </button>
                               )}
@@ -5596,7 +5605,7 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
                                   <span className="flex items-center gap-2"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
-                                  <span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span>
+                                  <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                                 </button>
                               )}
                               {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection ?? (image?.retryHistory?.find((r: any) => r.bboxDetection?.figures)?.bboxDetection as any))}
@@ -6239,7 +6248,7 @@ export function StoryDisplay({
                     {editingPages.has(-3) ? (
                       <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                     ) : (
-                      <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span></>
+                      <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -6255,7 +6264,7 @@ export function StoryDisplay({
                     {improvingPages.has(-3) ? (
                       <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
                     ) : (
-                      <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span></>
+                      <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -6269,7 +6278,7 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
                     <span className="flex items-center gap-2"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
-                    <span className="text-[10px] opacity-60">({imageRegenerationCost} Credits)</span>
+                    <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
                 {renderCharRepairButton(-3, bboxOverrides['cover:back'] ?? backCoverObj?.bboxDetection)}
@@ -6611,7 +6620,6 @@ export function StoryDisplay({
           onClose={() => setSceneEditModal(null)}
           onRegenerate={handleRegenerateWithScene}
           isRegenerating={regeneratingPages.has(sceneEditModal.pageNumber)}
-          imageRegenerationCost={imageRegenerationCost}
           characters={characters.map(c => ({ id: c.id, name: c.name }))}
           selectedCharacterIds={sceneEditModal.selectedCharacterIds}
           onCharacterSelectionChange={(ids) => setSceneEditModal({ ...sceneEditModal, selectedCharacterIds: ids })}
@@ -6791,7 +6799,7 @@ export function StoryDisplay({
                   <RefreshCw size={16} />
                   {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
                   <span className="text-xs opacity-80">
-                    ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
+                    ({IMAGE_REGENERATION_COST} {language === 'de' ? 'Credits' : 'credits'})
                   </span>
                 </button>
               </div>
