@@ -5002,10 +5002,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       // Phase 5a-pre-vantage: render ONE backdrop canvas per Visual Bible
       // location vantage and reuse it across every page that uses that vantage.
-      // Runs regardless of singlePassScene — the canvas is shared, so the cost
-      // is bounded by the number of distinct vantages (typically 2-5 per story)
-      // and the win is location consistency across pages.
-      if (modelOverrides.generateEmptyScenes !== false && visualBible?.locations?.length > 0) {
+      // Gated on !runSinglePassScene — when single-pass is on the page is
+      // rendered prose-only, no backdrop reference attached, and generating
+      // vantage canvases would waste budget. Previously this path ran
+      // regardless of the flag and the canvases were attached to ref0 anyway
+      // (per packReferences), partly defeating singlePassScene.
+      if (modelOverrides.generateEmptyScenes !== false && !runSinglePassScene && visualBible?.locations?.length > 0) {
         const { groupPagesByVantage, enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
         const groups = groupPagesByVantage(pageDataArray, visualBible);
         const realGroups = Array.from(groups.entries()).filter(([key]) => key !== '__unassigned__');

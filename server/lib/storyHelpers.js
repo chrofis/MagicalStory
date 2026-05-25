@@ -4756,14 +4756,23 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         header = '**REQUIRED OBJECTS IN THIS SCENE (MUST appear in the image):**';
       }
 
+      // Skip location entries — the location is either visually attached
+      // as the empty-scene / vantage backdrop reference image OR named in
+      // the scene prose. Duplicating the location text description here
+      // wastes ~200 chars per page with no model benefit.
+      const promptObjects = requiredObjects.filter(o => o.type !== 'location');
       requiredObjectsSection = `\n${header}\n`;
-      for (const obj of requiredObjects) {
+      for (const obj of promptObjects) {
         // Note: obj.id exists for Visual Bible tracking but is not included in image prompts
         // as image models don't use these identifiers
         requiredObjectsSection += `* **${obj.name}** (${obj.type}): ${obj.description}\n`;
       }
+      if (promptObjects.length === 0) {
+        // All entries were locations — nothing left to list.
+        requiredObjectsSection = '';
+      }
 
-      log.debug(`[IMAGE PROMPT] Added ${requiredObjects.length} required objects from metadata (skipping full Visual Bible)`);
+      log.debug(`[IMAGE PROMPT] Added ${promptObjects.length} required objects from metadata (skipped ${requiredObjects.length - promptObjects.length} location entries)`);
     }
   }
 

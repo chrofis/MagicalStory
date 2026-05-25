@@ -9583,7 +9583,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           artStyleContext,
           textPositionContext,
         })
-      : `Inpaint task: paint ${charName} into this children's book illustration. Magenta marks (at the ${regionDesc}) show what to repaint — crosshatch over body, solid block over face. Replace ALL magenta with one ${charName} from the reference photo.${actionContext}\n\nMatch the reference's face, hair, skin tone, and build. Preserve framing — do not zoom in or crop. Keep other characters and background unchanged.${clothingContext}${issueContext}${artStyleContext}`;
+      : `Inpaint task: paint ${charName} into this children's book illustration. Magenta marks (at the ${regionDesc}) show what to repaint — crosshatch over body, solid block over face. Replace ALL magenta with ${charName} from the reference photo.${actionContext}\n\nPreserve the exact figure count. Do not add, remove, or duplicate any character — only the marked area is repainted.\n\nMatch the reference's face, hair, skin tone, and build. Preserve framing — do not zoom in or crop. Keep other characters and background unchanged.${clothingContext}${issueContext}${artStyleContext}`;
 
     // Step 7 — send to Grok at the scene's native aspect.
     const sceneAspectStr = closestGrokAspect(sceneMeta.width, sceneMeta.height);

@@ -6,6 +6,8 @@ If you are tempted to return anything that looks like IMAGE 1, stop — return I
 
 Replace the figure under the magenta crosshatch in IMAGE 2 with {charName} from IMAGE 1. The crosshatch traces the exact silhouette — match its shape, size, and pose. Do not paint outside the crosshatch. Do not paint a smaller figure inside it.{actionContext}
 
+Preserve the exact figure count. Do not add, remove, or duplicate any character. Only the figure under the magenta crosshatch is repainted; every other figure in IMAGE 2 is final.
+
 Face: match IMAGE 1 (face shape, eyes, hair, skin tone).
 
 Every pixel outside the crosshatch in IMAGE 2 is final — copy IMAGE 2 verbatim there. Do not re-render other characters, the background, lighting, or colours.{artStyleContext}{clothingContext}{issueContext}{textPositionContext}

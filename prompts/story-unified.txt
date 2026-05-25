@@ -754,7 +754,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "name": "[Name]",
       "pages": [X, Y, Z],
       "type": "[what kind of object]",
-      "description": "[size, color, material, distinctive markings]"
+      "description": "[size, color, material, distinctive markings. If the prop has visible written content, EITHER quote the exact text (e.g. 'with the word HALT painted across') OR say 'illegible' / 'weathered' / 'smudged' / 'blurred'. Never say 'handwritten letters visible' without naming the text — the image model will paint the prop's own name as the text.]"
     }
   ],
   "locations": [
