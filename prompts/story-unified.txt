@@ -168,7 +168,7 @@ METADATA:
   "time": "morning|midday|afternoon|sunset|night",
   "weather": "sunny|cloudy|rainy|snowy|n/a",
   "shot": "close-up|medium|wide|ultra-wide",
-  "framingPattern": "solo-before|solo-after|over-the-shoulder",
+  "framingPattern": "solo-before|solo-after|over-the-shoulder|side",
 <!-- TEXT_OVERLAY_BEGIN -->
   "textPosition": "top-left|top-right|bottom-left|bottom-right|top-full|bottom-full",
   "textZoneDescription": "5–15 words naming the saturated, high-contrast surface in that corner (e.g. 'deep evening sky in rich indigo', 'dark green pine foliage', 'saturated wet cobblestones')",
@@ -238,7 +238,8 @@ The `emptyScenePrompt` MUST MIRROR the SCENE prose's composition geometry — do
 - **Reserved spots for distant composited figures or objects.** If SCENE says *"a tiny mounted figure at far right background in a sliver of pale light"*, the `emptyScenePrompt` says *"leave an open spot at the upper-right background, ~70% frame width, for a small distant figure — the path's vanishing point should land there"*. Name the frame position, don't just say "at the end of the path".
 - **Lighting direction** consistent with `time` + `weather` (e.g., *"late afternoon sunlight rakes in from the upper right, long shadows cast toward the lower left"*).
 - **Dominant diagonals / perspective lines** from SCENE.
-A reader comparing SCENE and `emptyScenePrompt` side by side must see the same geometry described twice — same path direction, same vanishing point, same reserved corners — just with named characters absent from the empty version.
+- **Camera position relative to thresholds.** When SCENE describes a character entering, descending into, or crossing a doorway/stairs/tunnel/threshold, `emptyScenePrompt` names the camera's side and what's visible past the threshold ("camera positioned outside the cellar door looking past the threshold; steep stone steps descend into darkness below the camera line"). Naming only the location ("stone cellar entrance") leaves the renderer free to invert the stairs' direction.
+A reader comparing SCENE and `emptyScenePrompt` side by side must see the same geometry described twice — same path direction, same vanishing point, same reserved corners, same camera POV — just with named characters absent from the empty version.
 
 **Anonymous extras follow the setting.** When the setting is inherently populated — market, street, plaza, square, festival, school, gathering, village, town — include a background crowd (villagers, passersby, onlookers, soldiers, townsfolk) in both the scene prose and `emptyScenePrompt`, unless `shot` is `close-up`. Paint them as atmospheric density and silhouettes — no detailed faces, no individual names. Name a colour mix (at least 3 tunic/coat/dress colours) and at least two garment shapes across the crowd so it reads as a varied populace, not a uniform robed mass. For `close-up` shots, intimate/indoor/domestic settings (bedroom, kitchen, forest clearing, solitary room), or inherently empty outdoor locations (rural path, mountain top): the background stays empty of figures.
 
@@ -271,6 +272,7 @@ A reader comparing SCENE and `emptyScenePrompt` side by side must see the same g
   - Ambient populations: `"empty"`, `"a few passersby"`, `"busy crowd"`, `"dense forest"`
   - Narratively important supporting figures: whenever the page text shows unnamed figures actively doing something to or near a main character (capturing, chasing, guarding, blocking the way, rescuing, watching, reacting), describe them here with count + role + action + placement so the illustrator draws them. Without this, scene expansion will drop them and the image won't match the story.
 - **FRAMING PATTERN** - Set `framingPattern` when the scene involves a weapon in use, combat, capture, restraint, or injury. Aftermath scenes with no people may instead describe a still-life object (split apple, broken arrow, empty chair).
+- **FRAMING PATTERN — camera POV.** Also set `framingPattern` whenever a character moves INTO, descends INTO, climbs INTO, or steps THROUGH a space whose interior or far-side carries plot meaning (descending stairs, doorway into another room, tunnel, cave, threshold). Pick `over-the-shoulder` (camera above/behind, interior visible past the shoulder) or `side` (camera in profile, interior visible to one side). Do NOT pick `solo-before` or `solo-after` for these — the character's body occludes the interior the action is about.
 <!-- TEXT_OVERLAY_BEGIN -->
 - **TEXT POSITION** - Set `textPosition` for every page. Valid values: `top-left`, `top-right`, `bottom-left`, `bottom-right`, `top-full`, `bottom-full`. Pick the corner of the scene that is visually calmest (smooth sky, unbroken wall, open ground, steady water, foliage) — saturation is fine, clutter is not.
 <!-- TEXT_OVERLAY_END -->
@@ -490,6 +492,7 @@ Probes (apply to every character):
     - Glasses dropped or substituted (e.g. `Glasses: schwarze Brille` rendered as bare-eyed, or translated to "dark spectacles").
     - Age word drift (e.g. `Looks: adult` rendered as "middle-aged", "elderly", "ageing").
     Emit ONE fix line per violation, naming the page, the character, the offending phrase, and the verbatim replacement. Example: `Page 1: SCENE: CharacterD described as "dark hair greying at the temples" but CHARACTER DETAILS says "Hair: brown, wavy, shoulder-length, ponytail, side part left" → replace with "brown wavy shoulder-length hair tied in a ponytail with a side part on the left".`
+19c. **Camera-action consistency.** When a character moves INTO, descends INTO, climbs INTO, or steps THROUGH a space whose interior or far-side is named in `emptyScenePrompt` (descending stairs, doorway into another room, tunnel, cave, threshold), `framingPattern` must be `over-the-shoulder` or `side`, and that character's `perspective` must be `back view`, `over-the-shoulder`, or `side` — never `front`. With `framingPattern: solo-*` or `perspective: front`, the character's body occludes the interior the action is about, and the rendered geometry contradicts the action. Emit a fix line for each mismatch, e.g. `Page 3: CharacterA descends cellar stairs (interior named in emptyScenePrompt as 'steep stairs descending into darkness') but framingPattern=solo-before, CharacterA.perspective=front → framingPattern=over-the-shoulder, CharacterA.perspective=back view; also update emptyScenePrompt to name the camera POV ('camera positioned outside the cellar door looking past the threshold').`
 <!-- TEXT_OVERLAY_BEGIN -->
 20. **Text position distribution** — Tally the `textPosition` values across all pages and report each violation:
     - **Parity:** every corner value (`top-left`/`top-right`/`bottom-left`/`bottom-right`) must match page parity (odd=left, even=right). `top-full`/`bottom-full` are valid on any page. List any page where a corner value sits on the wrong side.

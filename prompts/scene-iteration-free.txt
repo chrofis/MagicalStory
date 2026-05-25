@@ -20,7 +20,8 @@ You are an Art Director reviewing scene briefs for children's book illustrations
 13. **MAX {MAX_CHARACTERS_PER_SCENE} FACES** - The hard cap. If MORE than {MAX_CHARACTERS_PER_SCENE} characters need visible faces, you MUST reduce. For each extra character, pick the BEST option based on their role in this scene (see Check 17). Within the cap, use whatever count the page narratively needs.
 14. **NO CLOSED EYES** - Characters must have open eyes. ❌ "eyes closed in concentration" ✅ "focused gaze", "eyes narrowed", "looking intently"
 15. **HONOR PERSPECTIVES** - If the outline lists `perspective: back view` for a character, their `pose` starts with "Back view" and the `imageSummary` says "seen from behind". Same for `side` and `over-the-shoulder`. Don't override.
-16. **DOCUMENT CAST CHANGES** - If you drop or swap a character, list the change in `castChanges` with a one-sentence reason (e.g. "Dropped CharacterB — glance-back geometry impossible with both characters in frame").
+16. **CAMERA-ACTION CONSISTENCY** - When a character moves INTO, descends INTO, climbs INTO, or steps THROUGH a space whose interior or far-side carries plot meaning (descending stairs, doorway into another room, tunnel, cave, threshold), use `framingPattern: over-the-shoulder` or `side` and `perspective: back view`/`over-the-shoulder`/`side` — never `front` with `framingPattern: solo-*`, because the body occludes the interior the action is about. Also name the camera POV in the scene prose ("camera positioned outside the cellar door looking past the threshold").
+17. **DOCUMENT CAST CHANGES** - If you drop or swap a character, list the change in `castChanges` with a one-sentence reason (e.g. "Dropped CharacterB — glance-back geometry impossible with both characters in frame").
 
 ---
 

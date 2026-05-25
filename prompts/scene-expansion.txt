@@ -29,6 +29,8 @@
     - `solo-before`: close-up on the acting character, weapon drawn and aimed forward if applicable, gaze following the weapon's direction. No opponent or target in the frame.
     - `solo-after`: close-up on the character after the moment, no opponent, strong emotion.
     - `over-the-shoulder`: the acting character's back in one front corner (front-left or front-right), target small and soft in the opposite back corner (diagonal composition), 5–10% image height, weapon aim line runs diagonally from foreground to target.
+    - `side`: profile view, character's body axis perpendicular to the camera; the action's target/destination visible on one side of the frame.
+11b. **Camera-action consistency.** When the hint shows a character moving INTO, descending INTO, climbing INTO, or stepping THROUGH a space whose interior or far-side carries plot meaning (descending stairs, doorway into another room, tunnel, cave, threshold), expand the prose so the camera sits OUTSIDE that space and the character is seen from `back view` or in profile — never facing the camera with the interior behind them. Name the camera POV in the prose ("camera positioned outside the cellar door looking past the threshold; steep stairs descend into the dark beyond").
 12. **Never describe** weapons touching a character's body, characters held or bound by another character, or wounds or blood on a character.
 
 ---
