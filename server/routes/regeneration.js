@@ -2305,12 +2305,14 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       grokRefImages: iterResult.grokRefImages || null,
     };
 
+    let iterateNewVersionIndex;
     if (existingImageIndex >= 0) {
       if (sceneImages[existingImageIndex].imageVersions) {
         sceneImages[existingImageIndex].imageVersions.push(newVersion);
       } else {
         sceneImages[existingImageIndex].imageVersions = [newVersion];
       }
+      iterateNewVersionIndex = sceneImages[existingImageIndex].imageVersions.length - 1;
       // Update main fields (but NOT imageData - that would cause duplicate image storage)
       const { imageData: _unusedImg, ...metadataOnly } = newImageData;
       Object.assign(sceneImages[existingImageIndex], metadataOnly);
@@ -2320,6 +2322,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       newImageData.imageVersions = [newVersion];
       sceneImages.push(newImageData);
       sceneImages.sort((a, b) => a.pageNumber - b.pageNumber);
+      iterateNewVersionIndex = 0;
     }
 
     // Update image prompts
@@ -2411,6 +2414,12 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       grokRefImages: iterResult.grokRefImages || null,
       // Bbox detection for the new image (so frontend can display immediately)
       bboxDetection: iterResult.bboxDetection || null,
+      // Canonical version index of the just-pushed version. Client callers
+      // (StoryWizard, useRepairWorkflow) read this to set activeVersion;
+      // without it they kept the OLD active version on the UI after an
+      // iterate, requiring a page refresh to see the regen. The cover
+      // branch above already returns this — scene branch was missing.
+      versionIndex: iterateNewVersionIndex,
       message: previewMismatches.length > 0
         ? `Found ${previewMismatches.length} mismatch(es), regenerated with corrections`
         : 'No mismatches found, regenerated with fresh analysis'
