@@ -959,7 +959,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     // If skipping the plate (single-pass), don't pass the saved background.
     // Otherwise reuse the saved one (no regeneration).
     const effectiveSceneBackground = effSinglePass ? null : savedSceneBackground;
-    log.info(`🧪 [TEST-MODELS] Story ${id}, page ${pageNumber}: testing ${models.length} models (refMode=${effRefMode}, singlePass=${effSinglePass}, plate=${effectiveSceneBackground ? 'reused' : 'none'}${iterativePlacement ? ', iterative-placement' : ''})`);
+    log.info(`🧪 [TEST-MODELS] Story ${id}, page ${pageNumber}: testing ${models?.length || 0} models${composite ? ' + composite' : ''} (refMode=${effRefMode}, singlePass=${effSinglePass}, plate=${effectiveSceneBackground ? 'reused' : 'none'}${iterativePlacement ? ', iterative-placement' : ''})`);
     // Pre-compute applied refs once — same for every model (only the model id varies)
     const refApplied = applyReferenceMode({
       mode: effRefMode,
@@ -1197,6 +1197,40 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           // Partial debug bundle attached by generateStratifiedComposite when
           // a step throws — lets the dev panel still show the anchor plate,
           // depopulate output, etc. produced before the failure.
+          compositeDebug: compErr.partialDebug || null,
+        };
+      }
+    }
+
+    // Cover composite (pageNumber < 0). Covers use a DIFFERENT pipeline than
+    // page scene-composite: generateCoverViaComposite (2×4 cutouts onto the
+    // landmark photo + 2-pass Grok edit), reached via iterateCover with the
+    // compositeCovers flag. On real runs the cover composite path only fires
+    // when a landmark photo resolves; this lets the panel preview what it
+    // would have produced regardless. Result lands under "composite" so the
+    // panel renders it next to the current cover.
+    if (composite && pageNumber < 0) {
+      const compositeStart = Date.now();
+      try {
+        const coverType = getCoverType(pageNumber);
+        const { iterateCover } = require('../lib/coverIterate');
+        const covResult = await iterateCover(coverType, storyData, {
+          compositeCovers: true,
+          usageTracker: () => {}, // test-models doesn't bill credits
+        });
+        results['composite'] = {
+          imageData: covResult.imageData,
+          modelId: covResult.modelId || 'cover-composite',
+          elapsed: Date.now() - compositeStart,
+          usage: covResult.usage || null,
+          compositeDebug: covResult.compositeDebug || null,
+        };
+        log.info(`🧪 [TEST-MODELS] Cover composite complete for ${coverType} in ${Date.now() - compositeStart}ms (modelId=${covResult.modelId})`);
+      } catch (compErr) {
+        log.error(`🧪 [TEST-MODELS] Cover composite failed for page ${pageNumber}: ${compErr.message}`);
+        results['composite'] = {
+          error: compErr.message || 'Cover composite generation failed',
+          modelId: 'cover-composite', elapsed: Date.now() - compositeStart,
           compositeDebug: compErr.partialDebug || null,
         };
       }

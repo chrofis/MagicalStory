@@ -2848,6 +2848,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const streamingExpandedPages = new Map(); // pageNum -> page data (for scene expansion)
     let coversStartedDuringStreaming = false;
 
+    // Landmark-photo barrier. Covers start during streaming (before the landmark
+    // fetch is even kicked off) and resolve their backdrop via
+    // getLandmarkPhotosForScene — which reads loc.photoFetchStatus. Without a
+    // barrier they race ahead of prefetchLandmarkPhotos, see status still
+    // pending, get 0 landmark photos, and the composite cover path silently
+    // falls back to figures-on-white. Pages don't hit this because they only
+    // start after the landmark fetch is awaited. Covers await this promise;
+    // it's resolved once the fetch completes (or is skipped when there's
+    // nothing to fetch). The main flow always reaches the landmark block, so
+    // this never deadlocks.
+    let resolveLandmarksReady;
+    const landmarksReady = new Promise((r) => { resolveLandmarksReady = r; });
+
     // TRIAL MODE: Start avatar styling immediately using pre-defined costumes
     // This runs in parallel with story generation (no need to wait for outline clothing)
     if (inputData.trialMode && !skipImages && artStyle !== 'realistic') {
@@ -3385,6 +3398,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.warn('[STREAM-COVER] Timed out waiting for Visual Bible — skipping cover');
           return null;
         }
+
+        // Wait for landmark photos before resolving the cover backdrop. See the
+        // landmarksReady declaration: covers otherwise race the landmark fetch
+        // and the composite path silently skips for lack of a landmark buffer.
+        await landmarksReady;
 
         // Build per-character clothing requirements from hint.characterClothing
         // hint.characterClothing = { 'Manuel': 'winter', 'Sophie': 'standard', 'Roger': 'costumed:knight' }
@@ -4327,6 +4345,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       landmarkCount = nonVariantLandmarks.length;
       log.info(`🌍 [UNIFIED] Starting background fetch for ${nonVariantLandmarks.length} non-variant landmark photo(s)`);
       landmarkFetchPromise = prefetchLandmarkPhotos(visualBible);
+      // Release the cover barrier once the fetch settles (success or failure) so
+      // covers resolve their backdrop against fully-populated locations.
+      landmarkFetchPromise.finally(() => resolveLandmarksReady());
+    } else {
+      // Nothing to fetch (all variants/curated/none) — covers can proceed now.
+      resolveLandmarksReady();
     }
 
     // Start background reference sheet generation for secondary elements

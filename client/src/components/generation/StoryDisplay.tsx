@@ -4457,6 +4457,29 @@ export function StoryDisplay({
                   );
                 })()}
 
+                {/* Test Models / composite preview (dev only). pageNumber -1 =
+                    frontCover; the test-models endpoint routes negatives through
+                    the cover pipeline (composite → generateCoverViaComposite). */}
+                {developerMode && storyId && (
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setTestModelsPage(testModelsPage === -1 ? null : -1)}
+                      className="w-full mt-2 bg-orange-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-orange-600"
+                    >
+                      <Images size={14} />
+                      Test Models
+                    </button>
+                    {testModelsPage === -1 && (
+                      <TestModelsPanel
+                        storyId={storyId}
+                        pageNumber={-1}
+                        language={language}
+                        onClose={() => setTestModelsPage(null)}
+                      />
+                    )}
+                  </div>
+                )}
+
                 {/* Quality Score */}
                 {(() => {
                   const q = activeQuality(frontCoverObj);
@@ -4704,6 +4727,27 @@ export function StoryDisplay({
                     />
                   );
                 })()}
+
+                {/* Test Models / composite preview (dev only). pageNumber -2 = initialPage. */}
+                {developerMode && storyId && (
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setTestModelsPage(testModelsPage === -2 ? null : -2)}
+                      className="w-full mt-2 bg-orange-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-orange-600"
+                    >
+                      <Images size={14} />
+                      Test Models
+                    </button>
+                    {testModelsPage === -2 && (
+                      <TestModelsPanel
+                        storyId={storyId}
+                        pageNumber={-2}
+                        language={language}
+                        onClose={() => setTestModelsPage(null)}
+                      />
+                    )}
+                  </div>
+                )}
 
                 {/* Quality Score */}
                 {(() => {
@@ -6384,6 +6428,27 @@ export function StoryDisplay({
                     />
                   );
                 })()}
+
+                {/* Test Models / composite preview (dev only). pageNumber -3 = backCover. */}
+                {developerMode && storyId && (
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setTestModelsPage(testModelsPage === -3 ? null : -3)}
+                      className="w-full mt-2 bg-orange-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-orange-600"
+                    >
+                      <Images size={14} />
+                      Test Models
+                    </button>
+                    {testModelsPage === -3 && (
+                      <TestModelsPanel
+                        storyId={storyId}
+                        pageNumber={-3}
+                        language={language}
+                        onClose={() => setTestModelsPage(null)}
+                      />
+                    )}
+                  </div>
+                )}
 
                 {/* Quality Score */}
                 {(() => {
