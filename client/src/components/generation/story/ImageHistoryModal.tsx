@@ -431,6 +431,38 @@ export function ImageHistoryModal({
                       </div>
                     </div>
                   )}
+                  {/* 3a. CHAR-REPAIR PIPELINE OUTPUTS — what Grok returned BEFORE
+                       feathering + the blend mask used to composite it back.
+                       Lets the user see whether a bad final result came from
+                       Grok producing a bad image, or from the feather blend
+                       placing a good image wrong. */}
+                  {((detailVersion as any).charRepairGrokRaw || (detailVersion as any).charRepairBlendMask || (detailVersion as any).charRepairWhiteout) && (
+                    <div>
+                      <div className="text-xs font-medium text-orange-700 mb-1">
+                        {language === 'de' ? 'Char-Repair Pipeline' : 'Char-repair pipeline'}
+                      </div>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {(detailVersion as any).charRepairWhiteout && (
+                          <div className="flex flex-col items-center">
+                            <img src={(detailVersion as any).charRepairWhiteout} alt="Whiteout to Grok" className="h-24 rounded border border-purple-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setLightboxRef((detailVersion as any).charRepairWhiteout)} />
+                            <span className="text-[10px] text-gray-500 mt-0.5">{language === 'de' ? 'Whiteout (Eingabe)' : 'Whiteout (input)'}</span>
+                          </div>
+                        )}
+                        {(detailVersion as any).charRepairGrokRaw && (
+                          <div className="flex flex-col items-center">
+                            <img src={(detailVersion as any).charRepairGrokRaw} alt="Grok raw output" className="h-24 rounded border border-orange-300 bg-gray-50 cursor-pointer hover:opacity-80" onClick={() => setLightboxRef((detailVersion as any).charRepairGrokRaw)} />
+                            <span className="text-[10px] text-gray-500 mt-0.5">{language === 'de' ? 'Grok-Rohausgabe' : 'Grok raw output'}</span>
+                          </div>
+                        )}
+                        {(detailVersion as any).charRepairBlendMask && (
+                          <div className="flex flex-col items-center">
+                            <img src={(detailVersion as any).charRepairBlendMask} alt="Feather blend mask" className="h-24 rounded border border-gray-400 bg-black cursor-pointer hover:opacity-80" onClick={() => setLightboxRef((detailVersion as any).charRepairBlendMask)} />
+                            <span className="text-[10px] text-gray-500 mt-0.5">{language === 'de' ? 'Blend-Maske' : 'Blend mask'}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {(() => {
                     const refs = detailVersion.grokRefImages || (detailVersion.isActive ? sceneLevelGrokRefImages : null);
                     if (!refs || refs.length === 0) return null;

@@ -839,6 +839,12 @@ async function extractInlineImagesToR2(storyId, data) {
               upload(v.inpaintReferenceImages[idx], r2.keyForInpaintRef(storyId, pageNum, i, idx), (url) => { v.inpaintReferenceImages[idx] = url; });
             }
           }
+          // Char-repair pipeline artifacts. Three single images per version:
+          // the raw Grok output (before feathering), the soft blend mask used
+          // to composite back, and the whiteout/crosshatch fed to Grok.
+          upload(v.charRepairGrokRaw,    `stories/${storyId}/debug/p${pageNum}/v${i}/char-repair-grok-raw.jpg`,   (url) => { v.charRepairGrokRaw = url; });
+          upload(v.charRepairBlendMask,  `stories/${storyId}/debug/p${pageNum}/v${i}/char-repair-blend-mask.jpg`, (url) => { v.charRepairBlendMask = url; });
+          upload(v.charRepairWhiteout,   `stories/${storyId}/debug/p${pageNum}/v${i}/char-repair-whiteout.jpg`,   (url) => { v.charRepairWhiteout = url; });
           // Composite-cover 2-pass debug — 4 buffers per attempt (pass1 input/
           // output, pass2 input/output) and the 2 prompts. Saves what was
           // actually sent to Grok edit on each pass so the dev panel can show
@@ -937,6 +943,10 @@ async function extractInlineImagesToR2(storyId, data) {
               upload(v.inpaintReferenceImages[idx], `stories/${storyId}/debug/${pageMarker}/v${i}/inpaint-ref-${idx}.jpg`, (url) => { v.inpaintReferenceImages[idx] = url; });
             }
           }
+          // Char-repair pipeline artifacts — same shape as the page path.
+          upload(v.charRepairGrokRaw,   `stories/${storyId}/debug/${pageMarker}/v${i}/char-repair-grok-raw.jpg`,   (url) => { v.charRepairGrokRaw = url; });
+          upload(v.charRepairBlendMask, `stories/${storyId}/debug/${pageMarker}/v${i}/char-repair-blend-mask.jpg`, (url) => { v.charRepairBlendMask = url; });
+          upload(v.charRepairWhiteout,  `stories/${storyId}/debug/${pageMarker}/v${i}/char-repair-whiteout.jpg`,   (url) => { v.charRepairWhiteout = url; });
           // Composite-cover 2-pass debug (covers go through this path more
           // than pages — composite is currently cover-only). 4 buffers + 2
           // prompts; uploaded the same way as page composite attempts.

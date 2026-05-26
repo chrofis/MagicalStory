@@ -5053,6 +5053,15 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             entityRepairedFor: characterName,
             clothingCategory: repairResult.clothingCategory,
             bboxDetection: carryForwardBbox,
+            // Per-version char-repair pipeline artifacts — dev panel uses these
+            // to show what Grok was given, what it returned BEFORE feathering,
+            // and the soft-edge blend mask used to composite back. Without
+            // persisting them the dev panel only sees the inputs (avatar +
+            // crosshatch); the raw Grok output and feather mask were stored
+            // in the API response and lost on page reload.
+            charRepairGrokRaw: repairResult.grokRawResult || null,
+            charRepairBlendMask: repairResult.blendMask || null,
+            charRepairWhiteout: repairResult.blackoutImage || null,
             ...(isMagicApiMethod && repairResult.cropHistory && { cropHistory: repairResult.cropHistory })
           });
 
