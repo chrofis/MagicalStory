@@ -941,10 +941,20 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
         for (const issue of (evalResult.issues || [])) {
           let pageNumbers = groupPages;
           const desc = String(issue.description || issue.issue || '');
-          const cellMatches = [...desc.matchAll(/\bCell\s+([A-Z])\b/g)]
-            .map(m => cellToPage.get(m[1]))
-            .filter(n => n != null);
-          if (cellMatches.length > 0) pageNumbers = [...new Set(cellMatches)];
+          // Use ONLY the FIRST cell mentioned as the target page. Earlier code
+          // unioned every cell letter in the description — but most issues
+          // name a problematic cell ("Cell B (page -2)") AND one or more
+          // reference cells ("...different from Cell A (page 3) and Cell R").
+          // Stamping all of those into pageNumbers caused the consolidator to
+          // pipe the issue into every mentioned page's repair call. The
+          // page=3 consolidator then received a finding about page -2's cell
+          // B and asked Grok to "fix" page 3 against a description that
+          // wasn't about page 3 at all.
+          const firstCellMatch = desc.match(/\bCell\s+([A-Z])\b/);
+          if (firstCellMatch) {
+            const p = cellToPage.get(firstCellMatch[1]);
+            if (p != null) pageNumbers = [p];
+          }
 
           // Build cell→page mapping for every cell letter mentioned in the issue.
           const cellsMentioned = [...new Set([...desc.matchAll(/\bCell\s+([A-Z])\b/g)].map(m => m[1]))];
