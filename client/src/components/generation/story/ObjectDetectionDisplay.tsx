@@ -12,6 +12,11 @@ interface ObjectDetectionDisplayProps {
   pageNumber?: number;
   // For cover images, specify the cover type to use /dev-image?cover=front|initial|back
   coverType?: 'front' | 'initial' | 'back';
+  // Version of the image being viewed. Sent to the server so the overlay is
+  // drawn on THAT version's image + THAT version's detection — without this
+  // the server falls back to active-version data and the overlay shows boxes
+  // from a different version than the image the user is looking at.
+  versionIndex?: number;
   // Callback when bbox is refreshed (so parent can update state)
   onBboxRefreshed?: (bboxDetection: BboxSceneDetection | null) => void;
 }
@@ -79,6 +84,7 @@ export function ObjectDetectionDisplay({
   storyId,
   pageNumber,
   coverType,
+  versionIndex,
   onBboxRefreshed
 }: ObjectDetectionDisplayProps) {
   const [enlargedImg, setEnlargedImg] = useState<{ src: string; title: string } | null>(null);
@@ -237,8 +243,10 @@ export function ObjectDetectionDisplay({
       if (coverType) {
         params.set('cover', coverType);
       } else {
-        // Server generates overlay on-the-fly from active image + stored bbox detection
+        // Server generates overlay against the requested version's image and
+        // detection (defaults to active when versionIndex is undefined).
         params.set('page', String(pageNumber));
+        if (typeof versionIndex === 'number') params.set('version', String(versionIndex));
       }
 
       const response = await fetch(`/api/stories/${storyId}/dev-image?${params}`, {

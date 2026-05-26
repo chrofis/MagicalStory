@@ -1563,37 +1563,51 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: `Page ${pageNum} not found` });
     }
 
-    // Special handling: bboxOverlay should always be drawn on the ACTIVE image
-    // (not a stored overlay from a previous version). Regenerate on-the-fly.
+    // Special handling: bboxOverlay should always be drawn on the SAME image
+    // it was detected against — caller passes ?version=N to view a specific
+    // version's bbox; without that, we default to the active version. Mixing
+    // scene-level detection (which is whatever was written last) with a
+    // different version's image silently showed stale boxes when the user
+    // browsed the version history.
     if (field === 'bboxOverlay') {
-      const detection = sceneImage.bboxDetection;
+      const requestedVersion = req.query.version != null && String(req.query.version) !== ''
+        ? parseInt(String(req.query.version), 10) : null;
+      const activeVersion = await getActiveVersion(id, pageNum);
+      const versionIdx = Number.isInteger(requestedVersion) ? requestedVersion : activeVersion;
+      // Per-version detection. v0's detection still lives on the scene-level
+      // bboxDetection field (legacy), so fall back there for index 0.
+      const versionEntry = sceneImage.imageVersions?.[versionIdx];
+      const detection = versionEntry?.bboxDetection
+        || (versionIdx === 0 ? sceneImage.bboxDetection : null)
+        || sceneImage.bboxDetection;  // last-resort fallback
       if (!detection) {
-        // Fall back to retryHistory overlay
         const retryEntry = sceneImage.retryHistory?.find(r => r.bboxOverlayImage);
         return res.json({ bboxOverlayImage: retryEntry?.bboxOverlayImage || null });
       }
-      // Get the active image — load from story_images table (blob may have imageData stripped)
-      let activeImageData = sceneImage.imageData;
-      if (!activeImageData) {
-        try {
-          const activeVersion = await getActiveVersion(id, pageNum);
-          const imgRow = await getStoryImage(id, 'scene', pageNum, activeVersion);
-          activeImageData = imgRow?.imageData || null;
-        } catch (dbErr) {
-          log.warn(`⚠️ [DEV-IMAGE] Failed to load active image for page ${pageNum}: ${dbErr.message}`);
-        }
+      // Load THIS version's image bytes (not the active one) so the overlay
+      // is drawn on the image the detection was actually run against.
+      let imageData = null;
+      try {
+        const imgRow = await getStoryImage(id, 'scene', pageNum, versionIdx);
+        imageData = imgRow?.imageData || null;
+      } catch (dbErr) {
+        log.warn(`⚠️ [DEV-IMAGE] Failed to load v${versionIdx} image for page ${pageNum}: ${dbErr.message}`);
       }
-      if (activeImageData) {
+      if (!imageData) {
+        // Fallback: try the blob's top-level imageData (only valid for the
+        // active version since the blob field tracks the active).
+        if (versionIdx === activeVersion) imageData = sceneImage.imageData || null;
+      }
+      if (imageData) {
         try {
           const { createBboxOverlayImage } = require('../lib/images');
-          const overlayImage = await createBboxOverlayImage(activeImageData, detection);
+          const overlayImage = await createBboxOverlayImage(imageData, detection);
           return res.json({ bboxOverlayImage: overlayImage });
         } catch (overlayErr) {
-          log.warn(`⚠️ [DEV-IMAGE] Failed to generate bbox overlay for page ${pageNum}: ${overlayErr.message}`);
-          return res.json({ bboxOverlayImage: sceneImage.bboxOverlayImage || null });
+          log.warn(`⚠️ [DEV-IMAGE] Failed to generate bbox overlay for page ${pageNum} v${versionIdx}: ${overlayErr.message}`);
         }
       }
-      return res.json({ bboxOverlayImage: sceneImage.bboxOverlayImage || null });
+      return res.json({ bboxOverlayImage: null });
     }
 
     let result = {};

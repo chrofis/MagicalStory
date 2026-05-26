@@ -239,6 +239,17 @@ function activeBboxOverlay(image: any): string | null {
   return (v?.bboxOverlayImage as string | undefined) ?? (image?.bboxOverlayImage ?? null);
 }
 
+// Active version index — sent to the server's bboxOverlay endpoint so the
+// overlay is drawn on the same version's image the user is viewing. Without
+// it, server fell back to scene-level detection and produced stale overlays.
+function activeVersionIndex(image: any): number | undefined {
+  const versions = image?.imageVersions;
+  if (!Array.isArray(versions) || versions.length === 0) return undefined;
+  const lastIdx = versions.length - 1;
+  const idx = image?.activeVersion ?? lastIdx;
+  return Math.min(Math.max(0, idx), lastIdx);
+}
+
 // Cover quality panels read score/reasoning from the active version's row,
 // not from the cover ROOT. Pre-2026-05-17 the regen routes were writing
 // each new version's eval data to the cover root too, so the root held the
@@ -5423,6 +5434,7 @@ export function StoryDisplay({
                               language={language}
                               storyId={storyId}
                               pageNumber={image?.pageNumber}
+                              versionIndex={activeVersionIndex(image)}
                               onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [`page:${image?.pageNumber}`]: bbox }))}
                             />
 
@@ -6102,6 +6114,7 @@ export function StoryDisplay({
                               language={language}
                               storyId={storyId}
                               pageNumber={image.pageNumber}
+                              versionIndex={activeVersionIndex(image)}
                               onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [`page:${image.pageNumber}`]: bbox }))}
                             />
 
