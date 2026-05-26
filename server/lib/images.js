@@ -6289,6 +6289,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           evaluation: null,
           modelId: img.preScaleRepairModelId || img.modelId,
           grokRefImages: img.grokRefImages || null,
+          referencePhotos: img.referencePhotos || null,
           prompt: img.prompt || null,
           entityPenalty: 0,
           entityIssues: [],
@@ -6302,6 +6303,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           evaluation: ev || null,
           modelId: img.modelId,
           grokRefImages: img.grokRefImages || null,
+          referencePhotos: img.referencePhotos || null,
           entityPenalty: baseEntityPenalty,
           entityIssues: baseEntityIssues,
           evaluatedAt: new Date().toISOString(),
@@ -6908,6 +6910,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 method: compositeAttempts ? 'composite' : undefined,
                 modelId: result.modelId,
                 grokRefImages: result.grokRefImages || null,
+                referencePhotos: result.referencePhotos || null,
                 // Capture the iterate's actual image prompt — this is the
                 // feedback-augmented prompt that was sent to Grok (built in
                 // iteratePageCore line ~7250 + appended evaluation feedback at
@@ -7028,6 +7031,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             evaluation: ev,
             modelId: repairResult.modelId,
             grokRefImages: repairResult.grokRefImages || null,
+            referencePhotos: repairResult.referencePhotos || null,
             inpaintInstruction: repairResult.inpaintInstruction || null,
             inpaintReferenceImages: repairResult.inpaintReferenceImages || null,
             // Per-version prompt/description for iterate results — passes
@@ -7314,6 +7318,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       description: v.description || img.sceneDescription || null,
       prompt: v.prompt || img.prompt || null,
       grokRefImages: v.grokRefImages || null,
+      referencePhotos: v.referencePhotos || null,
       inpaintInstruction: v.inpaintInstruction || null,
       inpaintReferenceImages: v.inpaintReferenceImages || null,
       textSpaceCoveragePct: v.textSpaceCoveragePct ?? null,

@@ -1649,9 +1649,15 @@ function injectHistoricalLocations(visualBible, historicalLocations) {
     };
 
     if (existingIndex >= 0) {
-      // Update existing entry with photo data if it doesn't have any
+      // Update existing entry with the curated photo when it has none yet.
+      // Accept either inline base64 (legacy) OR an R2 photoUrl (post-migration):
+      // curated historical_locations rows now store photo_url with a NULL
+      // photo_data, so gating on loc.photoData alone silently skipped every
+      // curated photo. The location then fell through to the generic Openverse
+      // fetch (e.g. the Altdorf panorama got a random "Sports Ground" photo
+      // instead of the hand-curated watercolor).
       const existing = visualBible.locations[existingIndex];
-      if (!existing.referencePhotoData && loc.photoData) {
+      if (!existing.referencePhotoData && !existing.referencePhotoUrl && (loc.photoData || loc.photoUrl)) {
         visualBible.locations[existingIndex] = {
           ...existing,
           ...locationEntry,

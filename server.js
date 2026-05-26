@@ -5875,6 +5875,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               imageData: coverData.imageData,
               prompt: coverData.prompt,
               characterPhotos: coverData.referencePhotos || [],
+              // Carry the original render's references onto the pipeline img so
+              // the persisted V1 (original) version records what was actually
+              // sent to the image model. Without these, the version-builder
+              // stores null and the per-version dev panel shows "no avatars" for
+              // the original cover even though the render attached them — the
+              // refs only survived on the top-level cover object, not per-version.
+              referencePhotos: coverData.referencePhotos || [],
+              grokRefImages: coverData.grokRefImages || null,
               sceneCharacters: coverSceneCharacters,
               scene: { outlineExtract: coverData.description },
               evaluationType: 'cover', // Use cover evaluation (includes text checks)
