@@ -216,12 +216,26 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showTextOverlay, forceTextBelow, shareToken, story.pages?.length]);
 
-    // Build image URL helpers — append auth token as query param so owners
-    // can view their own private (unshared) stories. <img> tags can't send
-    // Authorization headers, so we use the ?token= query param fallback that
-    // the optionalAuth middleware supports.
+    // Build image URL helpers — forward BOTH:
+    //   - ?token=<auth_token>  so owners can view their own private stories
+    //     (<img> tags can't send Authorization headers; optionalAuth supports
+    //     ?token= as a fallback).
+    //   - ?key=<signedKey>     so email-link recipients can view stories that
+    //     aren't public — hasValidSignedShareKey validates the key against
+    //     the shareToken. Without forwarding this, image endpoints 404 for
+    //     anyone who isn't logged in even though /api/shared/:token (the
+    //     text-fetch) works fine because SharedStoryViewer forwards it there.
     const authToken = localStorage.getItem('auth_token');
-    const tokenQuery = authToken ? `?token=${encodeURIComponent(authToken)}` : '';
+    const signedKey = (() => {
+      try { return new URLSearchParams(window.location.search).get('key') || ''; }
+      catch { return ''; }
+    })();
+    const tokenQuery = (() => {
+      const parts: string[] = [];
+      if (authToken) parts.push(`token=${encodeURIComponent(authToken)}`);
+      if (signedKey) parts.push(`key=${encodeURIComponent(signedKey)}`);
+      return parts.length ? `?${parts.join('&')}` : '';
+    })();
     const coverImageUrl = (type: string) =>
       `/api/shared/${shareToken}/cover-image/${type}${tokenQuery}`;
     const pageImageUrl = (pageNum: number) =>
