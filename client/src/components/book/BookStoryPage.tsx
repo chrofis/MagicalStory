@@ -2,7 +2,7 @@ import React, { useCallback, useRef } from 'react';
 import { Maximize2 } from 'lucide-react';
 
 interface BookStoryPageProps {
-  imageUrl: string;
+  imageUrl: string | null;
   text: string;
   pageNumber: number;
   textPosition?: string | null;
@@ -39,19 +39,25 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
 
     return (
       <div ref={ref} className="w-full h-full relative bg-white overflow-hidden group">
-        <img
-          src={imageUrl}
-          alt={`Page ${pageNumber}`}
-          className="w-full h-full object-contain"
-          draggable={false}
-        />
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={`Page ${pageNumber}`}
+            className="w-full h-full object-contain"
+            draggable={false}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 text-indigo-300 text-sm font-medium">
+            No image
+          </div>
+        )}
 
         {/* Text overlay — only shown once the server-rendered PNG arrives.
             Rendering the CSS fallback while waiting for the API made the text
             appear briefly in one position and then "jump" to the server
             overlay's position when it loaded — disruptive. We now wait for
             the canonical overlay; the image alone shows during the load. */}
-        {showTextOverlay && trimmedText && overlayImage && (
+        {showTextOverlay && trimmedText && overlayImage && imageUrl && (
           <img
             src={overlayImage}
             alt=""
@@ -70,7 +76,7 @@ const BookStoryPage = React.forwardRef<HTMLDivElement, BookStoryPageProps>(
         )}
 
         {/* Fullscreen button — top-center, only visible on hover so it doesn't block the page-flip corners */}
-        {onImageClick && (
+        {onImageClick && imageUrl && (
           <button
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
@@ -99,7 +105,7 @@ export default BookStoryPage;
 // the visible area — without it users don't realise the text is scrollable.
 
 interface TextBelowPageProps {
-  imageUrl: string;
+  imageUrl: string | null;
   trimmedText: string;
   pageNumber: number;
   onImageClick?: (url: string) => void;
@@ -149,13 +155,19 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
     // don't depend on flex-basis resolution through the flipbook wrapper.
     <div ref={forwardedRef} className="w-full h-full relative bg-white overflow-hidden group">
       <div className="absolute inset-x-0 top-0" style={{ height: '55%' }}>
-        <img
-          src={imageUrl}
-          alt={`Page ${pageNumber}`}
-          className="w-full h-full object-contain"
-          draggable={false}
-        />
-        {onImageClick && (
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={`Page ${pageNumber}`}
+            className="w-full h-full object-contain"
+            draggable={false}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 text-indigo-300 text-sm font-medium">
+            No image
+          </div>
+        )}
+        {onImageClick && imageUrl && (
           <button
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}

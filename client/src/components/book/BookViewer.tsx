@@ -34,6 +34,7 @@ interface SharedStoryPage {
   pageNumber: number;
   text: string;
   textPosition?: string | null;
+  hasImage?: boolean;
 }
 
 interface SharedStoryData {
@@ -286,10 +287,18 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
         case 'story': {
           const storyPage = story.pages[entry.storyPageIdx];
           if (storyPage) {
+            // hasImage=false means no story_images row exists for this page
+            // (failed generation, content-blocked, mid-flight). Don't request
+            // the image — endpoint would 404 and the browser console fills
+            // with noise. BookStoryPage renders text-only with a placeholder
+            // when imageUrl is null.
+            const imageUrl = storyPage.hasImage === false
+              ? null
+              : pageImageUrl(storyPage.pageNumber);
             bookPages.push(
               <BookStoryPage
                 key={`story-${storyPage.pageNumber}`}
-                imageUrl={pageImageUrl(storyPage.pageNumber)}
+                imageUrl={imageUrl}
                 text={storyPage.text}
                 pageNumber={storyPage.pageNumber}
                 textPosition={storyPage.textPosition}

@@ -304,15 +304,30 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
     // missing, or numbering gap) — dropping a page here was hiding 6/14 pages
     // on stories where text parsing missed some markers. Front-end renders an
     // empty text block gracefully; better than the page vanishing.
-    const pages = [];
+    //
+    // Per-page hasImage tells the FE which pages have a persisted story_images
+    // row. Pages without one render as placeholders; the FE skips the image
+    // fetch so the browser doesn't log a 404 per missing page.
     const storyText = data.story || data.storyText || data.generatedStory || '';
     const sceneCount = data.sceneImages?.length || data.totalScenes || data.pages || 10;
+    const sceneRows = await dbQuery(
+      `SELECT DISTINCT page_number FROM story_images
+       WHERE story_id = $1 AND image_type = 'scene'
+         AND (image_data IS NOT NULL OR image_url IS NOT NULL)`,
+      [story.id]
+    );
+    const pagesWithImage = new Set(sceneRows.map(r => r.page_number));
+    const pages = [];
     for (let i = 1; i <= sceneCount; i++) {
       const sceneImg = data.sceneImages?.find(s => Number(s.pageNumber) === i);
+      // Legacy fallback: a few old stories carry imageData inside data.sceneImages
+      // even though they have no story_images row. Surface those too.
+      const hasImage = pagesWithImage.has(i) || !!sceneImg?.imageData;
       pages.push({
         pageNumber: i,
         text: getPageText(storyText, i) || '',
         textPosition: sceneImg?.textPosition || null,
+        hasImage,
       });
     }
 

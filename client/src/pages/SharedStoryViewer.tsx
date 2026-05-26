@@ -14,6 +14,10 @@ interface SharedStoryPage {
   pageNumber: number;
   text: string;
   textPosition?: string | null;
+  // Server says whether the page actually has a persisted image. When false,
+  // skip the image fetch (would 404) and render a placeholder. The page text
+  // can still be displayed.
+  hasImage?: boolean;
 }
 
 interface SharedStoryData {
@@ -347,10 +351,13 @@ export default function SharedStoryViewer() {
       if (idx < 0 || idx >= totalPages) continue;
       const entry = pageList[idx];
       if (entry.type === 'endPage' || entry.type === 'storyText') continue;
-      const img = new Image();
       if (entry.type === 'story') {
-        img.src = `/api/shared/${shareToken}/image/${story.pages[entry.storyPageIdx].pageNumber}${tokenParam}`;
+        const p = story.pages[entry.storyPageIdx];
+        if (p.hasImage === false) continue;  // no row → would 404
+        const img = new Image();
+        img.src = `/api/shared/${shareToken}/image/${p.pageNumber}${tokenParam}`;
       } else {
+        const img = new Image();
         img.src = `/api/shared/${shareToken}/cover-image/${entry.type}${tokenParam}`;
       }
     }
