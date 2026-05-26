@@ -663,7 +663,10 @@ export function StoryDisplay({
         allIssues.push(...cr.issues);
       }
       for (const iss of allIssues) {
-        if (iss.pagesToFix?.includes(pageNum) || iss.pageNumber === pageNum) {
+        // Entity issues store the array as `pageNumbers` (set in
+        // entityConsistency.js). Older runs sometimes used `pagesToFix` or a
+        // singular `pageNumber`; check all three so legacy data still surfaces.
+        if (iss.pageNumbers?.includes(pageNum) || iss.pagesToFix?.includes(pageNum) || iss.pageNumber === pageNum) {
           issues.push({ name: charName, severity: iss.severity, description: iss.description, source: 'character' });
         }
       }
@@ -679,7 +682,10 @@ export function StoryDisplay({
         allIssues.push(...or.issues);
       }
       for (const iss of allIssues) {
-        if (iss.pagesToFix?.includes(pageNum) || iss.pageNumber === pageNum) {
+        // Entity issues store the array as `pageNumbers` (set in
+        // entityConsistency.js). Older runs sometimes used `pagesToFix` or a
+        // singular `pageNumber`; check all three so legacy data still surfaces.
+        if (iss.pageNumbers?.includes(pageNum) || iss.pagesToFix?.includes(pageNum) || iss.pageNumber === pageNum) {
           issues.push({ name: objName, severity: iss.severity, description: iss.description, source: 'object' });
         }
       }
