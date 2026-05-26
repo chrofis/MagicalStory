@@ -26,6 +26,8 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { editWithGrok, GROK_MODELS } = require('./grok');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
+const r2 = require('./r2');
+const { getFacePhoto } = require('./characterPhotos');
 
 // Best-of-N cap: first attempt + N retries. The loop short-circuits on the
 // first valid eval — retries only fire when an attempt fails. If all attempts
@@ -73,43 +75,42 @@ Every cell faces in the same direction as the matching cell in Image 1. Every he
 }
 
 /**
- * Resolve the character's face photo to a base64 data URI.
- * Handles all the shapes that turn up in this codebase: string, object
- * with .data, photos.face / photos.original / photos.body, etc.
+ * Resolve the character's face photo to a base64 data URI (the shape
+ * editWithGrok requires). Uses the canonical getFacePhoto helper to pick the
+ * right field, then bytesFromAnyImage to fetch URLs / decode base64 / etc. —
+ * the same path every other consumer in the codebase uses.
+ *
+ * Async because R2 URLs require an HTTP fetch. Previously this function was
+ * sync and only accepted data URIs / >1000-char base64 strings, which silently
+ * dropped post-R2-migration HTTPS URLs (~80 chars) and threw "No face photo".
  */
-function resolveFacePhoto(character) {
+async function resolveFacePhoto(character) {
   if (!character) return null;
-  const candidates = [
-    character.photos?.face,
-    character.photos?.original,
-    character.photos?.body,
-    character.photos?.bodyNoBg,
-    character.facePhoto,
-  ];
-  for (const c of candidates) {
-    if (!c) continue;
-    if (typeof c === 'string' && c.startsWith('data:')) return c;
-    if (typeof c === 'object' && c.data && c.data.startsWith('data:')) return c.data;
-    if (typeof c === 'string' && c.length > 1000) return `data:image/jpeg;base64,${c}`;
-  }
-  return null;
+  // getFacePhoto returns whatever is in photos.face / photos.original / legacy
+  // thumbnail_url etc. — could be a URL, data URI, or raw base64.
+  let candidate = getFacePhoto(character);
+  if (!candidate && character.facePhoto) candidate = character.facePhoto;
+  if (!candidate) return null;
+  const bytes = await r2.bytesFromAnyImage(candidate);
+  if (!bytes) return null;
+  return `data:image/jpeg;base64,${bytes.toString('base64')}`;
 }
 
 /**
- * Resolve the character's base standard avatar (the Grok-generated single-shot
- * body avatar produced by the clothing-avatars pipeline). This is the body /
- * identity reference fed to the 2×4 generator. No more styled-2×2 middleman.
- *
- * Returns a data URI / R2 URL string, or null when the standard avatar is
- * missing — the caller can fall back to the face photo alone.
+ * Resolve the character's base standard avatar to a data URI. Returns null
+ * when missing — caller falls back to face-photo-only. Same URL-fetch
+ * handling as resolveFacePhoto above.
  */
-function resolveStandardAvatar(character) {
+async function resolveStandardAvatar(character) {
   if (!character?.avatars) return null;
   const v = character.avatars.standard;
-  if (!v) return null;
-  if (typeof v === 'string') return v;
-  if (typeof v === 'object') return v.imageUrl || v.imageData || v.data || null;
-  return null;
+  let candidate = null;
+  if (typeof v === 'string') candidate = v;
+  else if (typeof v === 'object' && v) candidate = v.imageUrl || v.imageData || v.data || null;
+  if (!candidate) return null;
+  const bytes = await r2.bytesFromAnyImage(candidate);
+  if (!bytes) return null;
+  return `data:image/jpeg;base64,${bytes.toString('base64')}`;
 }
 
 /**
@@ -394,11 +395,11 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   } = opts;
 
   const phantom = loadPhantom();
-  const facePhoto = resolveFacePhoto(character);
+  const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) {
     throw new Error(`No face photo for ${character?.name || 'character'}.`);
   }
-  const standardAvatar = resolveStandardAvatar(character);
+  const standardAvatar = await resolveStandardAvatar(character);
   // The standard avatar is the preferred body reference. If it's missing
   // (e.g. avatar generation failed earlier), fall back to face-only —
   // Grok will rebuild the body from the prompt.

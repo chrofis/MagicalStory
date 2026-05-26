@@ -1713,9 +1713,13 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     log.info(`[AVATAR JOB ${jobId}] 📸 Input reference photo: ${photoSizeKB}KB`);
 
     // Resize to 768px so Grok/Gemini get a consistent input size.
+    // bytesFromAnyImage handles all the input shapes (HTTPS URL after R2 migration,
+    // data: URI, raw base64). Doing Buffer.from(url, 'base64') on a URL produces
+    // garbage bytes and sharp throws "Input buffer contains unsupported image format".
     const sharp = require('sharp');
-    const base64Input = referencePhoto.replace(/^data:image\/\w+;base64,/, '');
-    const inputBuffer = Buffer.from(base64Input, 'base64');
+    const r2 = require('../lib/r2');
+    const inputBuffer = await r2.bytesFromAnyImage(referencePhoto);
+    if (!inputBuffer) throw new Error(`Could not load reference photo (got ${typeof referencePhoto}, len=${referencePhoto?.length})`);
     const resizedBuffer = await sharp(inputBuffer)
       .resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 92 })
@@ -2800,9 +2804,11 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     log.info(`👔 [CLOTHING AVATARS] 📸 Input reference photo: ${photoSizeKB}KB, format: ${isPNG ? 'PNG' : 'JPEG'}`);
 
     // Resize reference photo to 768px so the generator gets a consistent input size.
+    // Same URL-vs-base64 fix as the async path above — see avatars.js:1715.
     const sharp = require('sharp');
-    const base64Input = referencePhoto.replace(/^data:image\/\w+;base64,/, '');
-    const inputBuffer = Buffer.from(base64Input, 'base64');
+    const r2 = require('../lib/r2');
+    const inputBuffer = await r2.bytesFromAnyImage(referencePhoto);
+    if (!inputBuffer) throw new Error(`Could not load reference photo (got ${typeof referencePhoto}, len=${referencePhoto?.length})`);
     const resizedBuffer = await sharp(inputBuffer)
       .resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 92 })
