@@ -10,7 +10,7 @@ import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as def
 import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
 import { getAgeCategory, characterService } from '@/services/characterService';
 import type { Character, PhysicalTraits, PhysicalTraitsSource, AgeCategory, ChangedTraits, RelationshipMap, RelationshipTextMap } from '@/types/character';
-import { getDisplayPhoto, getFaceThumb, getStandardAvatar } from '@/utils/characterPhotos';
+import { getDisplayPhoto, getFaceThumb, getStandardAvatar, getAvatarInputPhoto } from '@/utils/characterPhotos';
 import type { CustomRelationshipPair } from '@/constants/relationships';
 
 // Age category options for the dropdown (no age numbers - we already have real age field)
@@ -637,7 +637,8 @@ export function CharacterForm({
 
   // Generate 3 avatar options for user to choose from
   const handleGenerateAvatarOptions = async () => {
-    const bodyPhoto = character.photos?.body || character.photos?.original;
+    // Helper handles legacy top-level fields for characters created pre-normalization.
+    const bodyPhoto = getAvatarInputPhoto(character);
     if (!bodyPhoto) return;
 
     const gender = character.gender === 'female' ? 'female' : 'male';

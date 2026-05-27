@@ -1073,7 +1073,7 @@ export const characterService = {
    */
   needsAvatars(character: Character): boolean {
     // Must have a photo
-    const hasPhoto = !!(character.photos?.original || character.photos?.face || character.photos?.body || character.photos?.bodyNoBg);
+    const hasPhoto = !!getAvatarInputPhoto(character);
     if (!hasPhoto) return false;
 
     // Check if avatars are missing or incomplete
@@ -1105,7 +1105,7 @@ export const characterService = {
 
     try {
       // Check if character has a photo - auto-load full data if missing
-      let hasPhoto = !!(character.photos?.original || character.photos?.face || character.photos?.body || character.photos?.bodyNoBg);
+      let hasPhoto = !!getAvatarInputPhoto(character);
       if (!hasPhoto && character.id) {
         log.info(`📸 No photos in character object for ${character.name} (id: ${character.id}), loading full data...`);
         const fullChar = await characterService.loadFullCharacter(character.id);
@@ -1289,7 +1289,7 @@ export const characterService = {
             return result;
           }
 
-          const hasPhoto = !!(character.photos?.original || character.photos?.face || character.photos?.body || character.photos?.bodyNoBg);
+          const hasPhoto = !!getAvatarInputPhoto(character);
           if (!hasPhoto) {
             result.skipped = true;
             result.skipReason = 'No photo available';
