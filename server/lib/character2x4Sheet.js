@@ -34,17 +34,44 @@ const { getFacePhoto } = require('./characterPhotos');
 // fail, we pick the best and ship it. Two retries = up to 3 Grok calls per pass.
 const MAX_SHEET_RETRIES = 2;
 
-const PHANTOM_PATH = path.resolve(__dirname, '..', 'assets', 'phantom-watercolor.png');
-let phantomCache = null;
+const ASSETS_DIR = path.resolve(__dirname, '..', 'assets');
+const DEFAULT_PHANTOM_PATH = path.join(ASSETS_DIR, 'phantom-watercolor.png');
+// Resolved-file-path → data URL. Each age tier is a distinct reusable asset
+// generated once (scripts/generate-phantom-age-tiers.js) so its proportions
+// can be cached independently.
+const phantomCache = new Map();
 
-function loadPhantom() {
-  if (phantomCache) return phantomCache;
-  if (!fs.existsSync(PHANTOM_PATH)) {
-    throw new Error(`Phantom asset missing at ${PHANTOM_PATH}. Run scripts/test-phantom-generate.js and copy the output here.`);
+// Map a character's declared age to a phantom tier. The phantom's head-to-body
+// ratio leaks into the rendered character despite the "ignore the body" prompt,
+// so the tier must match the character's age (toddler≈4, child≈5.5, teen≈7,
+// adult≈7.5 head-heights). Unknown/unparseable age → null = use the default
+// phantom (no behaviour change).
+function phantomTierForAge(age) {
+  const n = parseInt(age, 10);
+  if (!Number.isFinite(n) || n < 0) return null;
+  if (n <= 4) return 'toddler';
+  if (n <= 11) return 'child';
+  if (n <= 17) return 'teen';
+  return 'adult';
+}
+
+function loadPhantom(age) {
+  const tier = phantomTierForAge(age);
+  const tierPath = tier ? path.join(ASSETS_DIR, `phantom-watercolor-${tier}.png`) : null;
+  // Prefer the age-tier phantom; fall back to the default when its asset
+  // isn't bundled yet, so behaviour is unchanged until the tiers land.
+  const file = (tierPath && fs.existsSync(tierPath)) ? tierPath : DEFAULT_PHANTOM_PATH;
+  if (phantomCache.has(file)) return phantomCache.get(file);
+  if (!fs.existsSync(file)) {
+    throw new Error(`Phantom asset missing at ${file}. Run scripts/test-phantom-generate.js and copy the output here.`);
   }
-  const buf = fs.readFileSync(PHANTOM_PATH);
-  phantomCache = `data:image/png;base64,${buf.toString('base64')}`;
-  return phantomCache;
+  const buf = fs.readFileSync(file);
+  const dataUrl = `data:image/png;base64,${buf.toString('base64')}`;
+  phantomCache.set(file, dataUrl);
+  if (tier) {
+    log.info(`[2x4-SHEET] age ${age}→${tier} phantom${file === DEFAULT_PHANTOM_PATH ? ' (tier asset not bundled — using default)' : ''}`);
+  }
+  return dataUrl;
 }
 
 // The 2×4 sheet is ALWAYS realistic — same surface treatment as the source
@@ -394,7 +421,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     skipQualityEval = false,
   } = opts;
 
-  const phantom = loadPhantom();
+  const phantom = loadPhantom(character?.age);
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) {
     throw new Error(`No face photo for ${character?.name || 'character'}.`);
