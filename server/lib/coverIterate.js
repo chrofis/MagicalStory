@@ -63,10 +63,16 @@ async function iterateCover(coverKey, storyData, options = {}) {
 
   const { buildFullVisualBiblePrompt } = require('./visualBible');
 
-  // Get existing cover data
+  // Get existing cover data. After the R2 migration `imageData` is stripped
+  // from the JSON blob on save (bytes live in story_images + R2 URLs), so
+  // requiring `imageData` to be non-null falsely rejected migrated stories
+  // — including the test-models composite-preview path, which doesn't read
+  // the existing image at all. Just require the cover record to exist; the
+  // few downstream branches that DO need bytes (useOriginalAsReference /
+  // blackoutIssues) rehydrate from story_images on-demand below.
   storyData.coverImages = storyData.coverImages || {};
   const existingCover = storyData.coverImages[coverKey];
-  if (!existingCover?.imageData) {
+  if (!existingCover) {
     throw new Error(`No cover image found for ${coverKey}`);
   }
 
@@ -277,17 +283,40 @@ async function iterateCover(coverKey, storyData, options = {}) {
   deleteFromImageCache(cacheKey);
 
   // --- Build reference images ---
+  // Rehydrate imageData on demand only for the two branches that actually
+  // need the bytes. After R2 migration `existingCover.imageData` is usually
+  // null; the active version's bytes live in story_images. Without this,
+  // blackoutIssueRegions / useOriginalAsReference passed null and downstream
+  // sharp operations threw "Input buffer contains unsupported image format".
   let previousImage = null;
+  const needsImageBytes = blackoutIssues || useOriginalAsReference;
+  let rehydratedCoverBytes = existingCover.imageData;
+  if (needsImageBytes && !rehydratedCoverBytes) {
+    try {
+      const { getActiveVersion, getStoryImage } = require('../services/database');
+      const storyId = storyData.id || storyData.storyId;
+      if (storyId) {
+        const activeIdx = await getActiveVersion(storyId, coverKey);
+        const row = await getStoryImage(storyId, coverKey, null, activeIdx);
+        rehydratedCoverBytes = row?.imageData || null;
+        if (rehydratedCoverBytes) {
+          log.info(`🔄 [COVER-ITERATE] ${coverKey}: Rehydrated active version imageData from story_images (v${activeIdx})`);
+        }
+      }
+    } catch (rehydrateErr) {
+      log.warn(`🔄 [COVER-ITERATE] ${coverKey}: Rehydrate failed: ${rehydrateErr.message}`);
+    }
+  }
   if (blackoutIssues) {
     const fixTargets = existingCover.fixTargets || [];
-    if (fixTargets.length > 0) {
+    if (fixTargets.length > 0 && rehydratedCoverBytes) {
       log.info(`🔄 [COVER-ITERATE] ${coverKey}: Blacking out ${fixTargets.length} issue regions`);
-      previousImage = await blackoutIssueRegions(existingCover.imageData, fixTargets);
+      previousImage = await blackoutIssueRegions(rehydratedCoverBytes, fixTargets);
     } else {
-      previousImage = existingCover.imageData;
+      previousImage = rehydratedCoverBytes;
     }
   } else if (useOriginalAsReference) {
-    previousImage = existingCover.imageData;
+    previousImage = rehydratedCoverBytes;
   }
 
   // --- Build cover references (landmark photos, empty-scene plate, VB grid) ---
@@ -388,7 +417,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
         visualBibleGrid: null,
         grokRefImages: null,
         usage: { cost: 0.04, direct_cost: 0.04 }, // 2 Grok edits
-        previousImage: existingCover.imageData,
+        previousImage: rehydratedCoverBytes,
         previousScore: existingCover.qualityScore || null,
         compositeDebug: compositeResult.debug,
       };
@@ -420,7 +449,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     visualBibleGrid: coverVbGrid ? `data:image/jpeg;base64,${coverVbGrid.toString('base64')}` : null,
     grokRefImages: imageResult.grokRefImages || null,
     usage: imageResult.usage,
-    previousImage: existingCover.imageData,
+    previousImage: rehydratedCoverBytes,
     previousScore: existingCover.qualityScore || null,
   };
 }
