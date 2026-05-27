@@ -1466,6 +1466,7 @@ async function generateSceneComposite(opts) {
           charName: c.name,
           colorName: c.colorName,
           action: c.action,
+          age: c.age,
           aspectRatio: '9:16',
           model: GROK_MODELS.STANDARD,
           usageTracker,

@@ -141,6 +141,9 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       sheetBuf,
       pose,
       flip,
+      // Age drives the phantom-pose head-to-body ratio so young children
+      // aren't rendered with adult proportions (see phantomPoseRender.js).
+      age: character.age != null ? character.age : null,
       action: actionsByChar.get(name.toLowerCase()) || null,
       position: sc.position || 'in the scene',
       // Preserve raw depth flag for downstream stratum split. sizeHint is the
