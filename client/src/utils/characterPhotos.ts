@@ -177,10 +177,23 @@ export function getAvatarInputPhoto(input: CharOrAvatars): string | null {
     || toUrlString(photos?.original);
   if (fromPhotos) return fromPhotos;
   // Legacy top-level fields (pre-normalization characters)
-  return toUrlString(c.body_no_bg_url) || toUrlString(c.bodyNoBgUrl)
+  const legacy = toUrlString(c.body_no_bg_url) || toUrlString(c.bodyNoBgUrl)
     || toUrlString(c.body_photo_url) || toUrlString(c.bodyPhotoUrl)
     || toUrlString(c.thumbnail_url)
     || toUrlString(c.photo_url) || toUrlString(c.photoUrl) || toUrlString(c.photo)
-    || toUrlString(c.facePhoto)
-    || null;
+    || toUrlString(c.facePhoto);
+  if (legacy) return legacy;
+  // Last-resort fallback: characters that lost their raw photo but still have
+  // generated avatars (typical of older accounts — only avatars.standardUrl /
+  // avatars.faceThumbnailsUrl survive). The standard avatar is a full-body
+  // image of the same person in standard clothing — close enough to a raw
+  // photo for avatar-regen-style endpoints to use as input. Without this,
+  // regen 400s on every legacy character.
+  const standardAvatar = getStandardAvatar(c, 'standard') || getStandardAvatar(c, 'winter') || getStandardAvatar(c, 'summer');
+  if (standardAvatar) return standardAvatar;
+  const bodyThumb = getBodyThumb(c, 'standard') || getBodyThumb(c, 'winter') || getBodyThumb(c, 'summer');
+  if (bodyThumb) return bodyThumb;
+  const faceThumb = getFaceThumb(c, 'standard') || getFaceThumb(c, 'winter') || getFaceThumb(c, 'summer');
+  if (faceThumb) return faceThumb;
+  return null;
 }
