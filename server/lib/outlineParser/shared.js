@@ -114,7 +114,16 @@ function parseCharacterClothingBlock(content) {
     // We capture an optional trailing annotations group (depth/perspective/position) up to end-of-line.
     // Annotations after clothing: depth / perspective / position / holds / gazes at / priority.
     // "gazes at" has a space inside the key — regex matches both with and without space.
-    const linePattern = /(?:^|,\s*)[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?[^:\r\n]*):\s*(standard|winter|summer|formal|costumed:(?:\{[^}]*\}|[^\r\n,]+?))((?:\s*,\s*(?:depth|perspective|position|holds|holding|gazes\s+at|gaze|priority)\s*:\s*[^,\r\n]+)*)/gim;
+    // Clothing tokens: bare `standard|winter|summer|formal|costumed` OR
+    // `costumed:type` / `costumed:{type with spaces}`. The cover-hints prompt
+    // (prompts/story-unified.txt §COVER SCENE HINTS) instructs Sonnet to use
+    // bare `costumed`; earlier the regex required `costumed:something`, so
+    // every cover character line that used bare `costumed` failed the match
+    // → characters[] stayed empty → buildCoverSceneFromHint produced nothing
+    // → boilerplate fallback fired on every cover. Making the `:type` suffix
+    // optional fixes that without affecting scene hints that DO carry typed
+    // costumed values.
+    const linePattern = /(?:^|,\s*)[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?[^:\r\n]*):\s*(standard|winter|summer|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+?))?)((?:\s*,\s*(?:depth|perspective|position|holds|holding|gazes\s+at|gaze|priority)\s*:\s*[^,\r\n]+)*)/gim;
     // Annotation keys Claude may slip into the line (e.g. "depth: foreground", "perspective: side", "holds: book", "gazes at: chest", "priority: essential").
     // We never want these mistaken for character names — they should be silently dropped.
     const ANNOTATION_KEYS = new Set(['depth', 'perspective', 'position', 'pose', 'view', 'shot', 'action', 'holds', 'holding', 'gazes', 'gaze', 'priority', 'mood']);
