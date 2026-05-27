@@ -570,6 +570,32 @@ async function isOnCharacterListNow(page: Page): Promise<boolean> {
   return createAnother;
 }
 
+/**
+ * True when the wizard has advanced PAST Step 1 (Characters) — i.e. we're on
+ * Buch / Geschichte / Stil / Übersicht. This is a valid terminal state for the
+ * character-creation loop: after the last character is saved, the wizard often
+ * auto-advances rather than returning to the character list. Callers that wait
+ * for "character list visible after save" must also accept this signal, or
+ * they'll time out polling for a state the wizard already moved past.
+ *
+ * Detection: step-2+ pages have a "Zurück" (back) button that the character
+ * sub-steps never expose. Combined with the absence of the "Charaktere & Rollen"
+ * header (which Step 1's list AND the avatar-wait screen both show), this gives
+ * an unambiguous "we're on a later wizard step" signal.
+ */
+async function isPastCharacterStep(page: Page): Promise<boolean> {
+  // Step 2+ headings — short, specific, unique to each step.
+  const stepHeading = await page.locator(
+    'text=/Wähle ein Buch|Choose a book|Choisis un livre|Wähle einen Geschichtstyp|Choose a story type|Choisis un type|Wähle einen Stil|Choose a style|Choisis un style|Übersicht|Summary|Récapitulatif/i'
+  ).first().isVisible({ timeout: 400 }).catch(() => false);
+  if (!stepHeading) return false;
+  // Make sure we're not still inside a character sub-step that happens to
+  // render one of those headings as a sibling (defensive).
+  const onSubStep = await page.locator('text=/Persönlichkeit|Personality|Personnalité|Beziehungen|Relationships|Relations/i')
+    .first().isVisible({ timeout: 300 }).catch(() => false);
+  return !onSubStep;
+}
+
 async function dismissAvatarWaitIfShown(page: Page): Promise<boolean> {
   // After the final Save, the wizard shows an avatar-generation waiting screen
   // with a single "Weiter ohne zu warten" / "Continue without waiting" button.
@@ -647,40 +673,72 @@ async function createOneCharacterViaWizard(page: Page, char: DemoCharacter, fami
   if (!await advanceSubStep(page, 'relationships')) return;
   // Final auto-step: from relationships, the wizard typically shows the
   // avatar step (avatar ready → "Weiter" calls onSave) or the avatar-wait
-  // screen ("Weiter ohne zu warten"). Click whichever is present. Re-check
-  // isOnCharacterListNow each iteration so we never click a wizard-level
-  // Weiter (Step 2/3 advance) by mistake.
-  for (let i = 0; i < 3; i++) {
-    if (await isOnCharacterListNow(page)) break;
-    // Save button (label: "Speichern", "Charakter trotzdem speichern").
+  // screen ("Weiter ohne zu warten"). Drive the wizard until the character
+  // list reappears or we hit the hard deadline. Re-checks isOnCharacterListNow
+  // before every action so we never click a wizard-level Weiter (Step 2/3
+  // advance) by mistake.
+  await driveToCharacterList(page, char, 90000);
+}
+
+async function driveToCharacterList(page: Page, char: DemoCharacter, deadlineMs: number) {
+  // Poll-until-transition. The duration is API-bound (avatar trigger, server
+  // round-trips) so we wait for the actual state change instead of fixed
+  // timeouts. A 1.2s per-button-kind throttle prevents firing the same click
+  // twice before React commits the post-click state.
+  //
+  // Two valid terminal states:
+  //   (a) on the character list with the "Create another" button — usual
+  //       case after a non-final character was saved
+  //   (b) advanced past Step 1 entirely (Buch / Geschichte / Stil / Übersicht)
+  //       — common after the LAST character was saved; the wizard sometimes
+  //       skips the list and jumps forward. Treating only (a) as success
+  //       caused this loop to time out for ~90s on the final character even
+  //       though the wizard had already moved on. Returning on (b) too is
+  //       the actual fix.
+  const deadline = Date.now() + deadlineMs;
+  let lastSaveAt = 0;
+  let lastWeiterAt = 0;
+  let lastDismissAt = 0;
+
+  while (Date.now() < deadline) {
+    if (await isOnCharacterListNow(page)) return;
+    if (await isPastCharacterStep(page)) {
+      console.log(`      → wizard advanced past Step 1 (treating as success for ${char.name})`);
+      return;
+    }
+
     const saveBtn = page.getByRole('button', { name: SAVE_CHAR_RE }).first();
-    if (await saveBtn.isVisible({ timeout: 800 }).catch(() => false)
+    if (Date.now() - lastSaveAt > 1200
+        && await saveBtn.isVisible({ timeout: 400 }).catch(() => false)
         && await saveBtn.isEnabled().catch(() => false)) {
-      console.log(`      → save (final-${i + 1})`);
+      console.log(`      → save (waiting for list)`);
       await saveBtn.click();
-      await page.waitForTimeout(2500);
+      lastSaveAt = Date.now();
       continue;
     }
-    // Avatar-step "Weiter" (calls onSave) — only fire when we're confidently
-    // INSIDE character edit (not on the list — already checked above).
+
     const weiterBtn = page.getByRole('button', { name: /^(weiter|next|suivant)$/i }).first();
-    if (await weiterBtn.isVisible({ timeout: 800 }).catch(() => false)
+    if (Date.now() - lastWeiterAt > 1200
+        && await weiterBtn.isVisible({ timeout: 400 }).catch(() => false)
         && await weiterBtn.isEnabled().catch(() => false)) {
-      console.log(`      → weiter/save on avatar step (final-${i + 1})`);
+      console.log(`      → weiter/save on avatar step`);
       await weiterBtn.click();
-      await page.waitForTimeout(2500);
+      lastWeiterAt = Date.now();
       continue;
     }
-    // Avatar-wait screen.
-    if (await dismissAvatarWaitIfShown(page)) continue;
-    break;
+
+    if (Date.now() - lastDismissAt > 1200 && await dismissAvatarWaitIfShown(page)) {
+      lastDismissAt = Date.now();
+      continue;
+    }
+
+    // No actionable button visible right now — give the UI a tick to settle.
+    await page.waitForTimeout(500);
   }
-  await page.waitForTimeout(1000);
-  if (!await isOnCharacterListNow(page)) {
-    const shotPath = `test-results/debug-not-on-list-${char.name}-${Date.now()}.png`;
-    await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
-    throw new Error(`Did not land on character list after ${char.name}. Screenshot: ${shotPath}`);
-  }
+
+  const shotPath = `test-results/debug-not-on-list-${char.name}-${Date.now()}.png`;
+  await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
+  throw new Error(`Did not land on character list (or past Step 1) after ${char.name} within ${deadlineMs}ms. Screenshot: ${shotPath}`);
 }
 
 async function setMainRoles(page: Page, family: DemoFamily) {
