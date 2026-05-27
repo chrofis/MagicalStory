@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ProgressBar } from '@/components/common/ProgressBar';
 import type { CoverImages } from '@/types/story';
 import type { Character } from '@/types/character';
+import { getFaceThumb, getBodyThumb, getStandardAvatar } from '@/utils/characterPhotos';
 import {
   CREDITS_PER_PAGE,
   EXAMPLE_STORY_PAGES,
@@ -221,27 +222,28 @@ export function GenerationProgress({
   // Track which rotationIndex we last generated a message for (to avoid double-advancing on re-renders)
   const lastMessageRotationRef = useRef<number>(-1);
 
-  // Get all available avatar URLs for a character (individual face + body crops, no 2x2 grids)
+  // Get all available avatar URLs for a character (individual face + body crops, no 2x2 grids).
+  //
+  // Dual-shape (Phase 1 migration): we read every variant via getFaceThumb /
+  // getBodyThumb / getStandardAvatar, which handle NEW (`faceThumb` / `bodyThumb`
+  // / `standard` as URL string) and OLD (`faceThumbnailsUrl` / `bodyThumbnailsUrl`
+  // / inline objects, `standardUrl`) shapes uniformly. No more direct
+  // `avatars.faceThumbnails` reads — one helper, one source of truth.
   const getAllAvatarUrls = (char: Character): string[] => {
-    const avatars = char.avatars;
     const urls: string[] = [];
-    if (avatars) {
-      // Face thumbnails (individual face crops)
-      if (avatars.faceThumbnails) {
-        for (const url of Object.values(avatars.faceThumbnails)) {
-          if (url && typeof url === 'string') urls.push(url);
-        }
-      }
-      // Body thumbnails (individual full body front crops)
-      if (avatars.bodyThumbnails) {
-        for (const url of Object.values(avatars.bodyThumbnails)) {
-          if (url && typeof url === 'string') urls.push(url);
-        }
-      }
-      // Fallback: standard avatar (2x2 grid, but better than nothing)
-      if (urls.length === 0 && avatars.standard && typeof avatars.standard === 'string') {
-        urls.push(avatars.standard);
-      }
+    const variants: Array<'standard' | 'winter' | 'summer'> = ['standard', 'winter', 'summer'];
+    for (const v of variants) {
+      const face = getFaceThumb(char, v);
+      if (face) urls.push(face);
+    }
+    for (const v of variants) {
+      const body = getBodyThumb(char, v);
+      if (body) urls.push(body);
+    }
+    // Fallback: base standard avatar (2x2 grid, but better than nothing)
+    if (urls.length === 0) {
+      const standard = getStandardAvatar(char, 'standard');
+      if (standard) urls.push(standard);
     }
     // Fallback: uploaded photos
     if (urls.length === 0) {

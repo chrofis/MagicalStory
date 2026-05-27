@@ -175,7 +175,23 @@ function isPhysicalEmpty(physical) {
 
 /**
  * Strip heavy fields from character for metadata storage
- * Keeps only data needed for list views
+ * Keeps only data needed for list views.
+ *
+ * Dual-shape (Phase 1 migration): the standard face thumbnail used for the
+ * list view exists under TWO possible field names depending on whether the
+ * row has been migrated yet:
+ *   NEW (post-migration): avatars.faceThumb.standard         (URL string)
+ *   OLD (pre-migration):  avatars.faceThumbnailsUrl.standard (URL string)
+ *                         avatars.faceThumbnails.standard    (inline string)
+ *
+ * We read NEW first, then OLD. CRITICAL: this drives the list-view SQL —
+ * if the read fails post-migration, every character card loses its avatar.
+ *
+ * Writes still go to the OLD shape (`faceThumbnails`) — that's what the
+ * generation pipeline produces today. The migration script will rewrite
+ * these to the NEW shape (`faceThumb`) on DB rows that have been migrated;
+ * fresh data from new generations continues to land in `faceThumbnails`
+ * until Phase 3 (writer cleanup) runs.
  */
 function createLightCharacter(char) {
   // Remove heavy base64 fields
@@ -183,14 +199,22 @@ function createLightCharacter(char) {
 
   // Keep avatar metadata + only 'standard' faceThumbnail for list display
   if (lightChar.avatars) {
-    const standardThumb = lightChar.avatars.faceThumbnails?.standard;
+    const av = lightChar.avatars;
+    // NEW shape first (faceThumb), then OLD fallbacks (faceThumbnailsUrl, faceThumbnails)
+    const standardThumb = av.faceThumb?.standard
+                        || av.faceThumbnailsUrl?.standard
+                        || av.faceThumbnails?.standard;
     lightChar.avatars = {
-      status: lightChar.avatars.status,
-      stale: lightChar.avatars.stale,
-      generatedAt: lightChar.avatars.generatedAt,
-      hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer),
+      status: av.status,
+      stale: av.stale,
+      generatedAt: av.generatedAt,
+      hasFullAvatars: !!(av.winter || av.standard || av.summer
+                      || av.winterUrl || av.standardUrl || av.summerUrl),
+      // Keep writing under the OLD field name during Phase 1 — the list-view
+      // SQL/UI still reads `faceThumbnails.standard`. Phase 3 will rename
+      // both the write and read sides once all rows are migrated.
       faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
-      clothing: lightChar.avatars.clothing
+      clothing: av.clothing
     };
   }
 

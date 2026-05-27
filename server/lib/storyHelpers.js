@@ -11,7 +11,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { buildVisualBiblePrompt } = require('./visualBible');
-const { getPrimaryPhoto, getFacePhoto } = require('./characterPhotos');
+const { getPrimaryPhoto, getFacePhoto, getStandardAvatar, getFaceThumb, getBodyThumb } = require('./characterPhotos');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
 
@@ -2794,8 +2794,10 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
       }
       // Fall back to unstyled clothing avatar (standard, winter, summer).
       // Usable when inline base64, R2 URL, or prefetched cache bytes exist.
+      // Dual-shape (Phase 1): getStandardAvatar handles NEW (URL on `.standard`)
+      // and OLD (`.standardUrl` / inline / object) shapes uniformly.
       else if (resolvedClothing && resolvedClothing !== 'costumed' && avatars &&
-               (avatars[resolvedClothing] || avatars[`${resolvedClothing}Url`] || avatarBytesCache?.has(`${char.id}:${resolvedClothing}`))) {
+               (getStandardAvatar(avatars, resolvedClothing) || avatarBytesCache?.has(`${char.id}:${resolvedClothing}`))) {
         photoType = `clothing-${resolvedClothing}`;
         // Handle various legacy formats: arrays, {imageData, clothing} objects
         const avatarData = avatars[resolvedClothing];
@@ -2919,8 +2921,11 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
       // older avatar (no thumbnails generated) doesn't have these slots.
       const variantClothing = (actualClothingUsed || resolvedClothing || 'standard');
       const variantBase = variantClothing.startsWith('costumed') ? 'standard' : variantClothing;
-      const faceVariantUrl = avatars?.faceThumbnailsUrl?.[variantBase] || null;
-      const bodyVariantUrl = avatars?.bodyThumbnailsUrl?.[variantBase] || null;
+      // Dual-shape (Phase 1 migration): getFaceThumb/getBodyThumb read NEW
+      // `faceThumb`/`bodyThumb` first, fall back to OLD `faceThumbnailsUrl`/
+      // `faceThumbnails` (and same for body). One helper, one source of truth.
+      const faceVariantUrl = getFaceThumb(avatars, variantBase);
+      const bodyVariantUrl = getBodyThumb(avatars, variantBase);
 
       return {
         name: char.name,
@@ -3882,10 +3887,12 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
     // Legacy behavior: show all available avatars
     const available = [];
 
-    // Standard categories — accept either inline base64 or R2 URL.
-    if (avatars.standard || avatars.standardUrl) available.push('standard');
-    if (avatars.winter   || avatars.winterUrl)   available.push('winter');
-    if (avatars.summer   || avatars.summerUrl)   available.push('summer');
+    // Standard categories — dual-shape (Phase 1): getStandardAvatar reads NEW
+    // `avatars.{variant}` (URL string) first, falls back to OLD `avatars.{variant}Url`
+    // or inline object form. One helper, one source of truth.
+    if (getStandardAvatar(avatars, 'standard')) available.push('standard');
+    if (getStandardAvatar(avatars, 'winter'))   available.push('winter');
+    if (getStandardAvatar(avatars, 'summer'))   available.push('summer');
 
     // Costumed categories
     if (avatars.costumed && typeof avatars.costumed === 'object') {

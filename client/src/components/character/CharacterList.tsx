@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Edit2, Trash2, Check, AlertTriangle, Star, Plus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { Character } from '@/types/character';
+import { getDisplayPhoto } from '@/utils/characterPhotos';
 
 // Character role in story: 'out' = not in story, 'in' = side character, 'main' = main character
 type CharacterRole = 'out' | 'in' | 'main';
@@ -108,21 +109,27 @@ export function CharacterList({
               >
                 {/* Layout: Thumbnail left, Info+Controls right */}
                 <div className="flex gap-3">
-                  {/* Large thumbnail - clickable to edit */}
-                  {(char.avatars?.faceThumbnails?.standard || char.photos?.face || char.photos?.original) && (
-                    <button
-                      onClick={() => onEdit(char)}
-                      className="flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded-full"
-                      title={t.editCharacter}
-                    >
-                      <img
-                    draggable={false}
-                        src={char.avatars?.faceThumbnails?.standard || char.photos?.face || char.photos?.original}
-                        alt={char.name}
-                        className={`w-20 h-20 rounded-full object-cover object-top border-2 border-indigo-200 cursor-pointer hover:border-indigo-400 transition-colors ${isOut ? 'grayscale opacity-50' : ''}`}
-                      />
-                    </button>
-                  )}
+                  {/* Large thumbnail - clickable to edit.
+                      Dual-shape (Phase 1): getDisplayPhoto reads NEW
+                      `faceThumb.standard` first, then OLD shapes, then photos. */}
+                  {(() => {
+                    const photo = getDisplayPhoto(char);
+                    if (!photo) return null;
+                    return (
+                      <button
+                        onClick={() => onEdit(char)}
+                        className="flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded-full"
+                        title={t.editCharacter}
+                      >
+                        <img
+                          draggable={false}
+                          src={photo}
+                          alt={char.name}
+                          className={`w-20 h-20 rounded-full object-cover object-top border-2 border-indigo-200 cursor-pointer hover:border-indigo-400 transition-colors ${isOut ? 'grayscale opacity-50' : ''}`}
+                        />
+                      </button>
+                    );
+                  })()}
 
                   {/* Right side: Name, info, and controls */}
                   <div className="flex-1 min-w-0 flex flex-col justify-between">

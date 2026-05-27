@@ -83,7 +83,7 @@ const {
 const { applyStyledAvatars } = require('../lib/styledAvatars');
 const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
 const { getActiveIndexAfterPush, arrayToDbIndex } = require('../lib/versionManager');
-const { hasPhotos: hasCharacterPhotos } = require('../lib/characterPhotos');
+const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
 const { coverKeyToType, coverTypeToKey, coverLabel } = require('../lib/coverKeys');
 const r2 = require('../lib/r2');
@@ -4565,7 +4565,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       // Check if character has usable avatar data — Phase 2 accepts either
       // inline base64 OR an R2 URL on the base standard slot.
       const hasStyledStandard = !!character.avatars?.styledAvatars?.[artStyle]?.standard;
-      const hasBaseStandard = !!(character.avatars?.standard || character.avatars?.standardUrl);
+      // Dual-shape (Phase 1): getStandardAvatar reads NEW `standard` (URL string)
+      // first, falls back to OLD `standardUrl` / inline form.
+      const hasBaseStandard = !!getStandardAvatar(character, 'standard');
       if (!hasStyledStandard && !hasBaseStandard) {
         log.info(`🔧 [REPAIR-WORKFLOW] Character ${characterName} missing standard avatar, fetching from database...`);
         try {

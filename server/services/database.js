@@ -1244,9 +1244,24 @@ function stripInlineImagesFromStoryData(data) {
       }
     }
     if (c.avatars && typeof c.avatars === 'object') {
-      for (const k of ['standard', 'summer', 'winter']) c.avatars[k] = undefined;
+      // Strip main avatar slots in BOTH shapes — pre-migration the bytes can
+      // live under `standard` (inline) OR `standardUrl` (URL string); post
+      // Phase-2 migration they collapse onto `standard` (URL string). We
+      // null both for consistency (the canonical character row owns these).
+      for (const k of ['standard', 'summer', 'winter']) {
+        c.avatars[k] = undefined;
+        c.avatars[`${k}Url`] = undefined;
+      }
+      // Face / body thumbnail collections, dual-shape:
+      //   OLD inline: faceThumbnails / bodyThumbnails
+      //   OLD R2 URL siblings: faceThumbnailsUrl / bodyThumbnailsUrl
+      //   NEW (Phase 2): faceThumb / bodyThumb
       c.avatars.faceThumbnails = undefined;
       c.avatars.bodyThumbnails = undefined;
+      c.avatars.faceThumbnailsUrl = undefined;
+      c.avatars.bodyThumbnailsUrl = undefined;
+      c.avatars.faceThumb = undefined;
+      c.avatars.bodyThumb = undefined;
       // DO NOT strip c.avatars.styledAvatars — per-story data, no other source.
       // DO NOT strip c.avatars.costumed   — per-story data, no other source.
     }

@@ -17,7 +17,7 @@ const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { buildHairDescription, getHeadBodyRatio } = require('./storyHelpers');
-const { getFacePhoto, getPrimaryPhoto } = require('./characterPhotos');
+const { getFacePhoto, getPrimaryPhoto, getStandardAvatar } = require('./characterPhotos');
 const { normalizeClothingCategory } = require('./clothingCategories');
 const { fetchImageBytes } = require('./r2');
 
@@ -41,8 +41,11 @@ async function resolveAvatarBytes(avatars, category) {
       && inline.imageData.startsWith('data:image')) {
     return inline.imageData;
   }
-  // Fallback to R2.
-  const url = avatars[`${category}Url`];
+  // Dual-shape URL lookup (Phase 1 migration): NEW `avatars.{category}` (URL
+  // string) wins over OLD `avatars.{category}Url`. getStandardAvatar
+  // centralizes the lookup. The inline check above runs first so legacy data
+  // URIs stored on `avatars.{category}` short-circuit before this point.
+  const url = getStandardAvatar(avatars, category);
   if (typeof url !== 'string' || !/^https?:\/\//.test(url)) return null;
   try {
     const buf = await fetchImageBytes(url);
@@ -658,7 +661,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
     if (!originalAvatar) {
       const fallback = getPrimaryPhoto(char);
       if (fallback) {
-        log.error(`❌ [STYLED AVATARS] ${charName}: standard avatar UNRESOLVABLE (avatars.standard=${avatars?.standard ? 'set' : 'null'}, standardUrl=${avatars?.standardUrl ? 'set' : 'null'}) — falling back to raw photo for costumed:${costumeType}. This will leak the raw photo's clothing/background into the costume render.`);
+        log.error(`❌ [STYLED AVATARS] ${charName}: standard avatar UNRESOLVABLE (avatars.standard=${avatars?.standard ? 'set' : 'null'}, standardUrl=${avatars?.standardUrl ? 'set' : 'null'}, resolved=${getStandardAvatar(avatars, 'standard') ? 'set' : 'null'}) — falling back to raw photo for costumed:${costumeType}. This will leak the raw photo's clothing/background into the costume render.`);
         originalAvatar = fallback;
       }
     }
@@ -764,7 +767,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       if (!originalAvatar) {
         const fallback = getPrimaryPhoto(char);
         if (fallback) {
-          log.error(`❌ [STYLED AVATARS] ${charName}: standard avatar UNRESOLVABLE (avatars.standard=${avatars?.standard ? 'set' : 'null'}, standardUrl=${avatars?.standardUrl ? 'set' : 'null'}) — falling back to raw photo for standard fallback. Costume failed AND base avatar missing.`);
+          log.error(`❌ [STYLED AVATARS] ${charName}: standard avatar UNRESOLVABLE (avatars.standard=${avatars?.standard ? 'set' : 'null'}, standardUrl=${avatars?.standardUrl ? 'set' : 'null'}, resolved=${getStandardAvatar(avatars, 'standard') ? 'set' : 'null'}) — falling back to raw photo for standard fallback. Costume failed AND base avatar missing.`);
           originalAvatar = fallback;
         }
       }

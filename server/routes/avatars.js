@@ -1513,14 +1513,21 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         const lightCharacters = characters.map(char => {
           const { body_no_bg_url, body_photo_url, photo_url, thumbnail_url, clothing_avatars, photos, ...lightChar } = char;
           if (lightChar.avatars) {
-            const standardThumb = lightChar.avatars.faceThumbnails?.standard;
+            // Dual-shape (Phase 1 migration): NEW `faceThumb.standard` wins,
+            // OLD `faceThumbnailsUrl.standard` / `faceThumbnails.standard` fall back.
+            // hasFullAvatars also probes both shapes.
+            const av = lightChar.avatars;
+            const standardThumb = av.faceThumb?.standard
+              || av.faceThumbnailsUrl?.standard
+              || av.faceThumbnails?.standard;
             lightChar.avatars = {
-              status: lightChar.avatars.status,
-              stale: lightChar.avatars.stale,
-              generatedAt: lightChar.avatars.generatedAt,
-              hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer),
+              status: av.status,
+              stale: av.stale,
+              generatedAt: av.generatedAt,
+              hasFullAvatars: !!(av.winter || av.standard || av.summer
+                || av.winterUrl || av.standardUrl || av.summerUrl),
               faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
-              clothing: lightChar.avatars.clothing
+              clothing: av.clothing
             };
           }
           return lightChar;

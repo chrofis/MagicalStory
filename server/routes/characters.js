@@ -14,15 +14,21 @@ const { normalizePhysical, stripLegacyPhysicalFields, expandUserHairOverrideForD
 const { normalizeTraits, stripLegacyTraitFields } = require('../lib/characterTraits');
 
 // Reduce a row to the shape the client expects: faceThumbnails /
-// bodyThumbnails objects keyed by slot, holding the R2 URL string. The DB
-// stores the URLs in faceThumbnailsUrl / bodyThumbnailsUrl. <img src=> on
-// the frontend uses the value directly.
+// bodyThumbnails objects keyed by slot, holding the R2 URL string.
+//
+// Dual-shape (Phase 1 migration). The DB row can carry the thumbnails under
+// three names depending on whether the row has been migrated yet:
+//   NEW (post-migration):  faceThumb / bodyThumb        (URL string per slot)
+//   OLD R2 URL siblings:   faceThumbnailsUrl / bodyThumbnailsUrl
+//   OLD inline form:       faceThumbnails / bodyThumbnails
+// We read NEW first, then OLD URL form, then OLD inline. <img src=> on the
+// frontend uses the value directly.
 function mergeThumbs(t) {
   if (!t) return t;
   return {
     id: t.id,
-    faceThumbnails: t.faceThumbnailsUrl || undefined,
-    bodyThumbnails: t.bodyThumbnailsUrl || undefined,
+    faceThumbnails: t.faceThumb || t.faceThumbnailsUrl || t.faceThumbnails || undefined,
+    bodyThumbnails: t.bodyThumb || t.bodyThumbnailsUrl || t.bodyThumbnails || undefined,
   };
 }
 
@@ -70,14 +76,21 @@ router.get('/', authenticateToken, async (req, res) => {
             const lightChars = chars.map(c => {
               const { body_no_bg_url, body_photo_url, photo_url, thumbnail_url, clothing_avatars, photos, ...light } = c;
               if (light.avatars) {
-                const stdThumb = light.avatars.faceThumbnails?.standard
-                  || light.avatars.faceThumbnailsUrl?.standard;
+                // Dual-shape (Phase 1 migration): NEW `faceThumb.standard` wins,
+                // OLD `faceThumbnailsUrl.standard` / `faceThumbnails.standard`
+                // fall back. Same for the hasFullAvatars probe: any of the main
+                // avatar fields (NEW URL strings on .standard/.winter/.summer
+                // OR OLD .standardUrl/.winterUrl/.summerUrl) counts.
+                const av = light.avatars;
+                const stdThumb = av.faceThumb?.standard
+                  || av.faceThumbnailsUrl?.standard
+                  || av.faceThumbnails?.standard;
                 light.avatars = {
-                  status: light.avatars.status, stale: light.avatars.stale, generatedAt: light.avatars.generatedAt,
-                  hasFullAvatars: !!(light.avatars.winter || light.avatars.standard || light.avatars.summer
-                    || light.avatars.winterUrl || light.avatars.standardUrl || light.avatars.summerUrl),
+                  status: av.status, stale: av.stale, generatedAt: av.generatedAt,
+                  hasFullAvatars: !!(av.winter || av.standard || av.summer
+                    || av.winterUrl || av.standardUrl || av.summerUrl),
                   faceThumbnails: stdThumb ? { standard: stdThumb } : undefined,
-                  clothing: light.avatars.clothing
+                  clothing: av.clothing
                 };
               }
               return light;
@@ -125,13 +138,17 @@ router.get('/', authenticateToken, async (req, res) => {
         } = char;
 
         // Also strip faceThumbnails except 'standard' (they're 260-330KB each).
-        // Post-Phase-4 the inline slot is null and the URL lives in
-        // faceThumbnailsUrl.standard — fall back so the client always gets a src.
-        if (lightChar.avatars?.faceThumbnails || lightChar.avatars?.faceThumbnailsUrl) {
-          const standardThumb = lightChar.avatars.faceThumbnails?.standard
-            || lightChar.avatars.faceThumbnailsUrl?.standard;
+        // Dual-shape (Phase 1 migration): NEW `faceThumb.standard` (URL string)
+        // wins, OLD `faceThumbnailsUrl.standard` and inline `faceThumbnails.standard`
+        // fall back. The client always reads `faceThumbnails.standard` (we
+        // continue writing under the OLD field name during Phase 1).
+        const av = lightChar.avatars;
+        if (av?.faceThumb || av?.faceThumbnails || av?.faceThumbnailsUrl) {
+          const standardThumb = av.faceThumb?.standard
+            || av.faceThumbnailsUrl?.standard
+            || av.faceThumbnails?.standard;
           lightChar.avatars = {
-            ...lightChar.avatars,
+            ...av,
             faceThumbnails: standardThumb ? { standard: standardThumb } : undefined
           };
         }
@@ -174,16 +191,21 @@ router.get('/thumbnails', authenticateToken, async (req, res) => {
 
     const characterId = `characters_${req.user.id}`;
 
-    // Extract id + thumbnails (inline) + thumbnail URLs (R2). Post-Phase-4
-    // the inline slots are nulled and the URL fields hold the R2 URL —
-    // mergeThumbs() below picks whichever exists per slot. <img src> accepts
+    // Extract id + all three possible thumbnail shapes per slot. Dual-shape
+    // (Phase 1 migration):
+    //   NEW: faceThumb / bodyThumb              (URL string per variant)
+    //   OLD URL siblings: faceThumbnailsUrl / bodyThumbnailsUrl
+    //   OLD inline:       faceThumbnails / bodyThumbnails
+    // mergeThumbs() below picks whichever exists, NEW wins. <img src> accepts
     // both data: URIs and https URLs interchangeably.
     const result = await dbQuery(`
       SELECT jsonb_agg(
         jsonb_build_object(
           'id', (c->>'id')::bigint,
+          'faceThumb', c->'avatars'->'faceThumb',
           'faceThumbnails', c->'avatars'->'faceThumbnails',
           'faceThumbnailsUrl', c->'avatars'->'faceThumbnailsUrl',
+          'bodyThumb', c->'avatars'->'bodyThumb',
           'bodyThumbnails', c->'avatars'->'bodyThumbnails',
           'bodyThumbnailsUrl', c->'avatars'->'bodyThumbnailsUrl'
         )
@@ -198,8 +220,10 @@ router.get('/thumbnails', authenticateToken, async (req, res) => {
         SELECT jsonb_agg(
           jsonb_build_object(
             'id', (c->>'id')::bigint,
+            'faceThumb', c->'avatars'->'faceThumb',
             'faceThumbnails', c->'avatars'->'faceThumbnails',
             'faceThumbnailsUrl', c->'avatars'->'faceThumbnailsUrl',
+            'bodyThumb', c->'avatars'->'bodyThumb',
             'bodyThumbnails', c->'avatars'->'bodyThumbnails',
             'bodyThumbnailsUrl', c->'avatars'->'bodyThumbnailsUrl'
           )
@@ -642,18 +666,27 @@ router.post('/', authenticateToken, async (req, res) => {
       const lightCharacters = mergedCharacters.map(char => {
         // Strip heavy base64 fields (including photos object which contains face, original, bodyNoBg)
         const { body_no_bg_url, body_photo_url, photo_url, thumbnail_url, clothing_avatars, photos, ...lightChar } = char;
-        // Keep avatar metadata + only 'standard' faceThumbnail for list display
+        // Keep avatar metadata + only 'standard' faceThumbnail for list display.
+        // Dual-shape (Phase 1 migration): NEW `faceThumb.standard` wins, OLD
+        // `faceThumbnailsUrl.standard` / inline `faceThumbnails.standard` fall back.
+        // hasFullAvatars also checks both shapes (NEW URL string on .standard
+        // vs OLD .standardUrl). We continue WRITING under `faceThumbnails`
+        // during Phase 1 — readers (front-end + this file) handle both names.
         if (lightChar.avatars) {
-          const standardThumb = lightChar.avatars.faceThumbnails?.standard;
+          const av = lightChar.avatars;
+          const standardThumb = av.faceThumb?.standard
+            || av.faceThumbnailsUrl?.standard
+            || av.faceThumbnails?.standard;
           lightChar.avatars = {
-            status: lightChar.avatars.status,
-            stale: lightChar.avatars.stale,
-            generatedAt: lightChar.avatars.generatedAt,
-            hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer),
+            status: av.status,
+            stale: av.stale,
+            generatedAt: av.generatedAt,
+            hasFullAvatars: !!(av.winter || av.standard || av.summer
+              || av.winterUrl || av.standardUrl || av.summerUrl),
             // Keep only standard thumbnail for list view (~70KB per char instead of 273KB)
             faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
             // Keep clothing descriptions (small text, needed for display and preservation)
-            clothing: lightChar.avatars.clothing
+            clothing: av.clothing
           };
         }
         return lightChar;

@@ -47,6 +47,7 @@ const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
 const { coverLabel } = require('./coverKeys');
 const { stripDataUriPrefix } = require('./r2');
+const { getStandardAvatar } = require('./characterPhotos');
 
 const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 const XAI_API_URL = 'https://api.x.ai/v1';
@@ -432,8 +433,9 @@ function getCostumedAvatarSrc(c, artStyle) {
     if (typeof v === 'string') return v;
     if (v && typeof v === 'object') return v.imageUrl || v.imageData;
   }
-  // Last resort: avatars.standardUrl
-  return c.avatars?.standardUrl || c.avatars?.standard || null;
+  // Last resort: base standard avatar (dual-shape — NEW `avatars.standard`
+  // (URL string) wins, OLD `avatars.standardUrl` / inline form falls back).
+  return getStandardAvatar(c, 'standard');
 }
 
 async function loadImageAny(src) {

@@ -2,6 +2,7 @@ import { ArrowLeftRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { relationshipTypes, getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship, type CustomRelationshipPair } from '@/constants/relationships';
 import type { Character, RelationshipMap, RelationshipTextMap } from '@/types/character';
+import { getDisplayPhoto } from '@/utils/characterPhotos';
 import type { Language } from '@/types/story';
 
 interface CharacterRelationshipsProps {
@@ -89,8 +90,11 @@ export function CharacterRelationships({
     detailsPlaceholder: language === 'de' ? 'Details...' : language === 'fr' ? 'Détails...' : 'Details...',
   };
 
-  // Get photo for current character (prefer AI-extracted face thumbnail from avatars)
-  const currentPhoto = character.avatars?.faceThumbnails?.standard || character.photos?.face || character.photos?.original;
+  // Get photo for current character (prefer AI-extracted face thumbnail).
+  // Dual-shape (Phase 1): getDisplayPhoto handles NEW `faceThumb.standard`
+  // and OLD `faceThumbnailsUrl.standard` / `faceThumbnails.standard` plus
+  // the uploaded photo fallback in one helper.
+  const currentPhoto = getDisplayPhoto(character);
 
   return (
     <div className="space-y-3">
@@ -116,8 +120,8 @@ export function CharacterRelationships({
           const commentKey = getCommentKey(character.id, otherChar.id);
           const sharedComment = relationshipTexts[commentKey] || '';
 
-          // Get photo for other character (prefer AI-extracted face thumbnail from avatars)
-          const otherPhoto = otherChar.avatars?.faceThumbnails?.standard || otherChar.photos?.face || otherChar.photos?.original;
+          // Get photo for other character (dual-shape via getDisplayPhoto).
+          const otherPhoto = getDisplayPhoto(otherChar);
 
           return (
             <div

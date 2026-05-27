@@ -27,7 +27,7 @@ const { log } = require('../utils/logger');
 const { editWithGrok, GROK_MODELS } = require('./grok');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const r2 = require('./r2');
-const { getFacePhoto } = require('./characterPhotos');
+const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
 
 // Best-of-N cap: first attempt + N retries. The loop short-circuits on the
 // first valid eval — retries only fire when an attempt fails. If all attempts
@@ -113,10 +113,11 @@ Every cell faces in the same direction as the matching cell in Image 1. Every he
  */
 async function resolveFacePhoto(character) {
   if (!character) return null;
-  // getFacePhoto returns whatever is in photos.face / photos.original / legacy
-  // thumbnail_url etc. — could be a URL, data URI, or raw base64.
-  let candidate = getFacePhoto(character);
-  if (!candidate && character.facePhoto) candidate = character.facePhoto;
+  // getFacePhoto is the single source of truth for the face-photo lookup
+  // (handles both photos.face / photos.original and the legacy top-level
+  // thumbnail_url / facePhoto / photo_url fallbacks). Could be a URL, data
+  // URI, or raw base64 — bytesFromAnyImage decodes any of them.
+  const candidate = getFacePhoto(character);
   if (!candidate) return null;
   const bytes = await r2.bytesFromAnyImage(candidate);
   if (!bytes) return null;
@@ -127,13 +128,15 @@ async function resolveFacePhoto(character) {
  * Resolve the character's base standard avatar to a data URI. Returns null
  * when missing — caller falls back to face-photo-only. Same URL-fetch
  * handling as resolveFacePhoto above.
+ *
+ * Dual-shape (Phase 1 migration): getStandardAvatar reads NEW
+ * `avatars.standard` (URL string) first, falls back to OLD `avatars.standardUrl`
+ * or the legacy { imageUrl, imageData } object form. One helper, one source
+ * of truth — no inline string/object branches needed here.
  */
 async function resolveStandardAvatar(character) {
   if (!character?.avatars) return null;
-  const v = character.avatars.standard;
-  let candidate = null;
-  if (typeof v === 'string') candidate = v;
-  else if (typeof v === 'object' && v) candidate = v.imageUrl || v.imageData || v.data || null;
+  const candidate = getStandardAvatar(character, 'standard');
   if (!candidate) return null;
   const bytes = await r2.bytesFromAnyImage(candidate);
   if (!bytes) return null;

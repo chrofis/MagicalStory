@@ -10,6 +10,7 @@ import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as def
 import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
 import { getAgeCategory, characterService } from '@/services/characterService';
 import type { Character, PhysicalTraits, PhysicalTraitsSource, AgeCategory, ChangedTraits, RelationshipMap, RelationshipTextMap } from '@/types/character';
+import { getDisplayPhoto, getFaceThumb, getStandardAvatar } from '@/utils/characterPhotos';
 import type { CustomRelationshipPair } from '@/constants/relationships';
 
 // Age category options for the dropdown (no age numbers - we already have real age field)
@@ -693,8 +694,11 @@ export function CharacterForm({
   const localizedFlaws = defaultFlaws[language] || defaultFlaws.en;
   const localizedChallenges = defaultChallenges[language] || defaultChallenges.en;
 
-  // Get display photo URL - prefer avatar face thumbnail over original photo
-  const displayPhoto = character.avatars?.faceThumbnails?.standard || character.photos?.face || character.photos?.original;
+  // Get display photo URL — prefer avatar face thumbnail over original photo.
+  // Dual-shape (Phase 1 migration): getDisplayPhoto reads NEW `faceThumb.standard`
+  // first, then OLD `faceThumbnailsUrl.standard` / `faceThumbnails.standard`,
+  // then falls back to the uploaded face/original photo.
+  const displayPhoto = getDisplayPhoto(character);
 
   // Step 1: Name entry + Avatar placeholder
   if (step === 'name') {
@@ -1078,11 +1082,15 @@ export function CharacterForm({
   // Step 5: Avatar Review for NEW characters
   if (isNewCharacter && step === 'avatar') {
     const avatarStatus = character.avatars?.status;
-    // Use faceThumbnails.standard for display (lightweight), fall back to full avatars if available
-    const displayAvatar = character.avatars?.faceThumbnails?.standard ||
-                          character.avatars?.standard ||
-                          character.avatars?.winter ||
-                          character.avatars?.summer;
+    // Use face thumbnail for display (lightweight), fall back to full avatars
+    // if available. Dual-shape (Phase 1 migration): getFaceThumb /
+    // getStandardAvatar handle NEW (`faceThumb` / URL string on `standard`)
+    // and OLD (`faceThumbnails` / `faceThumbnailsUrl` / `standardUrl` / inline)
+    // shapes uniformly.
+    const displayAvatar = getFaceThumb(character, 'standard') ||
+                          getStandardAvatar(character, 'standard') ||
+                          getStandardAvatar(character, 'winter') ||
+                          getStandardAvatar(character, 'summer');
     const hasAvatar = !!displayAvatar || character.avatars?.hasFullAvatars;
     const isStillGenerating = isGeneratingAvatar || isRegeneratingAvatarsWithTraits || avatarStatus === 'generating';
     const hasFailed = avatarStatus === 'failed';
@@ -1107,7 +1115,7 @@ export function CharacterForm({
             <div className="relative">
               <img
                     draggable={false}
-                src={displayAvatar}
+                src={displayAvatar || undefined}
                 alt={`${character.name} avatar`}
                 className="w-64 h-80 object-contain rounded-lg bg-white shadow-lg border-2 border-indigo-200 cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => setLightboxImage(displayAvatar || null)}
@@ -2316,12 +2324,18 @@ export function CharacterForm({
           <div className="flex-1 overflow-auto p-4">
             <div className="max-w-4xl mx-auto">
               <div className="flex flex-col md:flex-row gap-6">
-                {/* Left side (or top on mobile): Avatar preview */}
+                {/* Left side (or top on mobile): Avatar preview.
+                    Dual-shape (Phase 1): face-thumb (any shape) then base
+                    standard avatar (any shape) — one helper each. */}
                 <div className="flex-shrink-0 flex justify-center md:justify-start">
-                  {(character.avatars?.faceThumbnails?.standard || character.avatars?.standard) ? (
+                  {(() => {
+                    const avatarSrc = getFaceThumb(character, 'standard')
+                      || getStandardAvatar(character, 'standard');
+                    return avatarSrc;
+                  })() ? (
                     <img
                     draggable={false}
-                      src={character.avatars?.faceThumbnails?.standard || character.avatars?.standard}
+                      src={getFaceThumb(character, 'standard') || getStandardAvatar(character, 'standard') || undefined}
                       alt={`${character.name} avatar`}
                       className="w-48 h-64 object-contain rounded-lg border-2 border-indigo-300 bg-white shadow-lg"
                     />

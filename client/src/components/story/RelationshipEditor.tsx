@@ -2,6 +2,7 @@ import { Heart } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { relationshipTypes, getNotKnownRelationship, isNotKnownRelationship } from '@/constants/relationships';
 import type { Character, RelationshipMap, RelationshipTextMap } from '@/types/character';
+import { getDisplayPhoto } from '@/utils/characterPhotos';
 import type { Language } from '@/types/story';
 
 interface RelationshipEditorProps {
@@ -79,15 +80,21 @@ export function RelationshipEditor({
               >
                 {/* Layout: Character photos on sides, dropdown fills center */}
                 <div className="flex items-center gap-3 md:gap-4 w-full">
-                  {/* Character 1 - Left side */}
+                  {/* Character 1 - Left side.
+                      Dual-shape (Phase 1): getDisplayPhoto reads NEW
+                      `faceThumb.standard` first, then OLD shapes, then photos. */}
                   <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                    {(char1.avatars?.faceThumbnails?.standard || char1.photos?.face || char1.photos?.original) && (
-                      <img
-                        src={char1.avatars?.faceThumbnails?.standard || char1.photos?.face || char1.photos?.original}
-                        alt={char1.name}
-                        className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full object-cover"
-                      />
-                    )}
+                    {(() => {
+                      const photo = getDisplayPhoto(char1);
+                      if (!photo) return null;
+                      return (
+                        <img
+                          src={photo}
+                          alt={char1.name}
+                          className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full object-cover"
+                        />
+                      );
+                    })()}
                     <span className="font-semibold text-xs md:text-sm text-center max-w-[60px] sm:max-w-[80px] md:max-w-[100px] truncate">
                       {char1.name}
                     </span>
@@ -126,15 +133,19 @@ export function RelationshipEditor({
                     )}
                   </div>
 
-                  {/* Character 2 - Right side */}
+                  {/* Character 2 - Right side (dual-shape, see char1 above). */}
                   <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                    {(char2.avatars?.faceThumbnails?.standard || char2.photos?.face || char2.photos?.original) && (
-                      <img
-                        src={char2.avatars?.faceThumbnails?.standard || char2.photos?.face || char2.photos?.original}
-                        alt={char2.name}
-                        className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full object-cover"
-                      />
-                    )}
+                    {(() => {
+                      const photo = getDisplayPhoto(char2);
+                      if (!photo) return null;
+                      return (
+                        <img
+                          src={photo}
+                          alt={char2.name}
+                          className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full object-cover"
+                        />
+                      );
+                    })()}
                     <span className="font-semibold text-xs md:text-sm text-center max-w-[60px] sm:max-w-[80px] md:max-w-[100px] truncate">
                       {char2.name}
                     </span>
