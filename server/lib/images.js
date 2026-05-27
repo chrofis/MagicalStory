@@ -6691,6 +6691,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         repairResult.debug?.avatarSent || repairResult.croppedAvatar || null,
         repairResult.debug?.sceneSent || repairResult.blackoutImage || null,
       ].filter(Boolean),
+      // Char-repair pipeline outputs for the dev-panel "Char-repair pipeline"
+      // section (whiteout input → Grok raw output → feather blend mask). The
+      // manual repair endpoint already persists these; the auto/pipeline path
+      // dropped them (they only went into charFixDetails, not the version), so
+      // the panel showed avatar+crosshatch inputs but no raw/feather.
+      charRepairGrokRaw: repairResult.grokRawResult || repairResult.comparison?.grokRawResult || null,
+      charRepairBlendMask: repairResult.blendMask || repairResult.comparison?.blendMask || null,
+      charRepairWhiteout: repairResult.blackoutImage || repairResult.comparison?.blackoutImage || null,
     };
   };
 
@@ -7051,6 +7059,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             // job_1779382004213_idu0axofe initialPage v1.
             compositeAttempts: repairResult.compositeAttempts || null,
             method: repairResult.method || null,
+            charRepairGrokRaw: repairResult.charRepairGrokRaw || null,
+            charRepairBlendMask: repairResult.charRepairBlendMask || null,
+            charRepairWhiteout: repairResult.charRepairWhiteout || null,
           };
           // Single source of truth for evalScore/entityPenalty/finalScore.
           setVersionScores(newVersion, evScore, evEntityPenalty);
@@ -7332,6 +7343,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // of just inferring from source string.
       method: v.method || null,
       compositeAttempts: v.compositeAttempts || null,
+      charRepairGrokRaw: v.charRepairGrokRaw || null,
+      charRepairBlendMask: v.charRepairBlendMask || null,
+      charRepairWhiteout: v.charRepairWhiteout || null,
     });
     for (const v of versions) {
       imageVersions.push(buildVersionEntry(v));
