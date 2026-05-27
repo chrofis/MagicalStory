@@ -32,6 +32,134 @@ async function _getOrFetch(url) {
   return b64;
 }
 
+// ---------------------------------------------------------------------------
+// Dual-shape readers for the character-photo-fields migration (Phase 1)
+// ---------------------------------------------------------------------------
+// During the staged migration we have rows in BOTH shapes:
+//
+//   OLD shape                          NEW shape (post-migration)
+//   ─────────────                      ────────────────────────────
+//   avatars.standardUrl  (R2 URL)      avatars.standard (URL string)
+//   avatars.standard     (inline /    │      ↑
+//                         object)     │      (URL string only; inline form gone)
+//   avatars.faceThumbnailsUrl.{v}     avatars.faceThumb.{v}
+//   avatars.faceThumbnails.{v}              ↑
+//                                     (URL string, single field)
+//   avatars.bodyThumbnailsUrl.{v}     avatars.bodyThumb.{v}
+//   avatars.bodyThumbnails.{v}
+//
+// These helpers read NEW first, then fall back to OLD. They always return a
+// URL string (or null) — never an object, never a Buffer. Inline data: URIs
+// are returned as-is when that's all there is, so caller can still decode.
+// ---------------------------------------------------------------------------
+
+/**
+ * Pull a usable URL string out of a value that might be:
+ *  - a plain string (URL or data: URI)
+ *  - an object like { url, imageUrl, src, dataUri, imageData, data, image }
+ *  - null / undefined / "" / non-string non-object
+ * Returns a string or null. Never returns the object or Buffer.
+ */
+function _toUrlString(value) {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    const t = value.trim();
+    return t || null;
+  }
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    const keys = ['url', 'imageUrl', 'src', 'dataUri', 'imageData', 'data', 'image'];
+    for (const k of keys) {
+      const v = value[k];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+  }
+  return null;
+}
+
+/**
+ * Get the main avatar URL for a clothing variant.
+ * Reads NEW shape `avatars.{variant}` (URL string), falls back to OLD
+ * shape `avatars.{variant}Url` or `avatars.{variant}` (inline / object).
+ *
+ * @param {Object} character - character object (or an avatars sub-object —
+ *                             we accept both for ergonomics)
+ * @param {string} variant   - 'standard' | 'winter' | 'summer'
+ * @returns {string|null}    - URL string, data: URI, or null
+ */
+function getStandardAvatar(character, variant = 'standard') {
+  if (!character) return null;
+  // Accept either a character or an avatars object directly
+  const avatars = character.avatars && typeof character.avatars === 'object'
+    ? character.avatars
+    : character;
+  if (!avatars || typeof avatars !== 'object') return null;
+  // NEW shape first: avatars.{variant} is a URL string
+  const newVal = _toUrlString(avatars[variant]);
+  if (newVal) return newVal;
+  // OLD shape: avatars.{variant}Url
+  const oldUrl = _toUrlString(avatars[`${variant}Url`]);
+  if (oldUrl) return oldUrl;
+  return null;
+}
+
+/**
+ * Get the face-thumb URL for a clothing variant.
+ * Reads NEW shape `avatars.faceThumb.{variant}`, falls back to OLD shapes
+ * `avatars.faceThumbnailsUrl.{variant}` and `avatars.faceThumbnails.{variant}`.
+ *
+ * @param {Object} character
+ * @param {string} variant - 'standard' | 'winter' | 'summer'
+ * @returns {string|null}
+ */
+function getFaceThumb(character, variant = 'standard') {
+  if (!character) return null;
+  const avatars = character.avatars && typeof character.avatars === 'object'
+    ? character.avatars
+    : character;
+  if (!avatars || typeof avatars !== 'object') return null;
+  // NEW
+  const newVal = _toUrlString(avatars.faceThumb?.[variant]);
+  if (newVal) return newVal;
+  // OLD: URL siblings
+  const oldUrl = _toUrlString(avatars.faceThumbnailsUrl?.[variant]);
+  if (oldUrl) return oldUrl;
+  // OLD: inline form
+  const oldInline = _toUrlString(avatars.faceThumbnails?.[variant]);
+  if (oldInline) return oldInline;
+  return null;
+}
+
+/**
+ * Get the body-thumb URL for a clothing variant.
+ * Reads NEW `avatars.bodyThumb.{variant}` first, falls back to OLD
+ * `avatars.bodyThumbnailsUrl.{variant}` / `avatars.bodyThumbnails.{variant}`.
+ */
+function getBodyThumb(character, variant = 'standard') {
+  if (!character) return null;
+  const avatars = character.avatars && typeof character.avatars === 'object'
+    ? character.avatars
+    : character;
+  if (!avatars || typeof avatars !== 'object') return null;
+  const newVal = _toUrlString(avatars.bodyThumb?.[variant]);
+  if (newVal) return newVal;
+  const oldUrl = _toUrlString(avatars.bodyThumbnailsUrl?.[variant]);
+  if (oldUrl) return oldUrl;
+  const oldInline = _toUrlString(avatars.bodyThumbnails?.[variant]);
+  if (oldInline) return oldInline;
+  return null;
+}
+
+/**
+ * True when the character has at least one main avatar slot resolvable
+ * (any variant, NEW or OLD shape).
+ */
+function hasAnyStandardAvatar(character) {
+  if (!character) return false;
+  return !!(getStandardAvatar(character, 'standard')
+         || getStandardAvatar(character, 'winter')
+         || getStandardAvatar(character, 'summer'));
+}
+
 /**
  * Get a specific photo type from a character
  * @param {Object} character - Character object
@@ -73,14 +201,17 @@ function getPrimaryPhoto(character) {
 function getFacePhoto(character) {
   if (!character) return null;
 
-  // First check normalized photos structure
+  // First check normalized photos structure (NEW shape — post-migration)
   const photos = character.photos;
   if (photos?.face || photos?.original) {
     return photos.face || photos.original;
   }
 
-  // Fallback to legacy fields (for unmigrated data)
-  return character.thumbnail_url || character.photo_url || character.photoUrl || character.photo || null;
+  // Fallback to legacy top-level fields (OLD shape — pre-migration)
+  return character.thumbnail_url
+      || character.facePhoto
+      || character.photo_url || character.photoUrl || character.photo
+      || null;
 }
 
 /**
@@ -190,7 +321,20 @@ function normalizeAllPhotos(characters) {
  */
 async function loadAvatarBytes(avatar, slot) {
   if (!avatar || !slot) return null;
-  return _getOrFetch(avatar[`${slot}Url`]);
+  // Dual-shape: NEW `avatar[slot]` (URL string) wins, OLD `avatar[slotUrl]` falls back.
+  // _toUrlString safely unwraps object/string forms. We only fetch when the value
+  // is an http(s) URL — inline data: URIs are returned directly so we don't try to
+  // fetch them, and we don't return base64 of the data-URI bytes (which the caller
+  // wouldn't know how to decode either way).
+  const candidate = getStandardAvatar(avatar, slot);
+  if (!candidate) return null;
+  if (/^https?:\/\//i.test(candidate)) return _getOrFetch(candidate);
+  // Inline data URI — strip prefix and return raw base64 (matches legacy contract).
+  if (candidate.startsWith('data:')) {
+    const m = candidate.match(/^data:[^;]+;base64,(.*)$/);
+    return m ? m[1] : null;
+  }
+  return null;
 }
 
 /**
@@ -288,4 +432,9 @@ module.exports = {
   loadVbReferenceBytes,
   normalizeAvatarsForResponse,
   normalizeCharacterAvatars,
+  // Phase 1 dual-shape readers
+  getStandardAvatar,
+  getFaceThumb,
+  getBodyThumb,
+  hasAnyStandardAvatar,
 };

@@ -151,8 +151,24 @@ export interface CharacterAvatars {
   standard?: string;
   summer?: string;
   formal?: string;
-  faceThumbnails?: Record<ClothingCategory, string>; // Extracted face thumbnails for display
-  bodyThumbnails?: Record<ClothingCategory, string>; // Extracted body-front thumbnails for display
+  faceThumbnails?: Record<ClothingCategory, string>; // Extracted face thumbnails for display (OLD shape — pre-migration)
+  bodyThumbnails?: Record<ClothingCategory, string>; // Extracted body-front thumbnails for display (OLD shape)
+  // R2-migrated URL siblings of the inline fields above (OLD shape).
+  // Same keying as the inline form; each value is an HTTPS URL string.
+  faceThumbnailsUrl?: Partial<Record<ClothingCategory, string>>;
+  bodyThumbnailsUrl?: Partial<Record<ClothingCategory, string>>;
+  // Canonical NEW shape (post Phase-2 migration): single field per concept,
+  // value is always a URL string. The old `faceThumbnails` / `faceThumbnailsUrl`
+  // pair and the `bodyThumbnails` / `bodyThumbnailsUrl` pair collapse onto
+  // these. Use `getFaceThumb` / `getBodyThumb` from `utils/characterPhotos`
+  // to read either shape uniformly.
+  faceThumb?: Partial<Record<ClothingCategory, string>>;
+  bodyThumb?: Partial<Record<ClothingCategory, string>>;
+  // OLD-shape main avatar URL siblings. NEW shape stores the URL directly on
+  // `standard` / `winter` / `summer` above. Use `getStandardAvatar` to read.
+  standardUrl?: string;
+  winterUrl?: string;
+  summerUrl?: string;
   hasFullAvatars?: boolean; // Flag indicating full avatars exist and can be loaded on-demand
   generatedAt?: string;
   status?: 'pending' | 'generating' | 'complete' | 'failed';
