@@ -186,6 +186,7 @@ METADATA:
 2. Is every person named in `sceneIntent` listed in `characters[]` AND described in the prose with appearance + position?
 3. Does the prose describe ONE continuous moment? Mid-flight projectile + already-fallen victim = two moments. Pick one and rewrite.
 4. Do `background`, `interactions`, and the prose all describe the same temporal moment? A "riderless horse" plus an "aiming at the rider" interaction is contradictory.
+5. Facing vs gaze: any character who gazes at or aims at a `background`-depth target is `back view` (or back view over-the-shoulder), never `front`/`facing camera`. A `front` character may only look at something between them and the camera.
 If any check fails, rewrite the prose AND fix the metadata before returning. Do not return a page with internal contradictions.
 
 **Character fields:**
