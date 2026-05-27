@@ -802,7 +802,16 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
 
   // Mood at the front; landmark behind everything; per-character sentences.
   const moodPhrase = hint.mood ? `${hint.mood[0].toUpperCase()}${hint.mood.slice(1)}.` : '';
-  const sceneStarter = `A wide group portrait set before ${landmarkName}.`;
+  // Scale the composition phrase to the actual cast. "Group portrait" with only
+  // one or two named characters makes the model invent extra strangers to fill
+  // out the "group" — so only say "group" for 3+; otherwise state the exact
+  // count and forbid extra figures.
+  const nChars = sortedDetails.length;
+  const sceneStarter = nChars >= 3
+    ? `A wide group portrait set before ${landmarkName}.`
+    : nChars === 2
+      ? `A portrait of two characters set before ${landmarkName}. Only these two people appear; no other figures, no crowd.`
+      : `A portrait of a single character set before ${landmarkName}. Only this one person appears; no other figures, no crowd.`;
   const lines = [moodPhrase, sceneStarter, ...charSentences].filter(Boolean);
   return lines.join(' ');
 }
