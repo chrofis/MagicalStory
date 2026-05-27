@@ -1,6 +1,7 @@
 import api from './api';
 import type { Character, CharacterAvatars, GeneratedOutfit, AgeCategory, StructuredClothing, PhysicalTraitsSource } from '@/types/character';
 import { createLogger } from './logger';
+import { getAvatarInputPhoto } from '@/utils/characterPhotos';
 
 const log = createLogger('CharacterService');
 
@@ -515,8 +516,9 @@ export const characterService = {
     error?: string;
   }> {
     try {
-      // Auto-load full character data if photos are missing (list view strips photos)
-      const hasPhotos = !!(character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original);
+      // Auto-load full character data if photos are missing (list view strips photos).
+      // Helper accepts legacy top-level fields too.
+      const hasPhotos = !!getAvatarInputPhoto(character);
       if (!hasPhotos && character.id) {
         log.info(`📸 No photos in character object for ${character.name} (id: ${character.id}), loading full data...`);
         const fullChar = await characterService.loadFullCharacter(character.id);
@@ -551,8 +553,11 @@ export const characterService = {
         if (character.physical.other) physicalDescription += `, ${character.physical.other}`;
       }
 
-      // Prefer body with no background for best avatar generation results
-      const inputPhoto = character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original;
+      // Prefer body with no background for best avatar generation results.
+      // Uses the helper so legacy top-level fields (body_no_bg_url / photo_url /
+      // etc.) work for pre-normalization characters — without this, the
+      // server gets `referencePhoto: undefined` and returns 400.
+      const inputPhoto = getAvatarInputPhoto(character);
       log.info(`🎨 Generating clothing avatars for ${character.name || 'unnamed'} (id: ${character.id})`);
 
       // Use async mode to avoid blocking connections
@@ -681,8 +686,9 @@ export const characterService = {
     error?: string;
   }> {
     try {
-      // Auto-load full character data if photos are missing (list view strips photos)
-      const hasPhotos = !!(character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original);
+      // Auto-load full character data if photos are missing (list view strips photos).
+      // Helper accepts legacy top-level fields too.
+      const hasPhotos = !!getAvatarInputPhoto(character);
       if (!hasPhotos && character.id) {
         log.info(`📸 No photos in character object for ${character.name} (id: ${character.id}), loading full data...`);
         const fullChar = await characterService.loadFullCharacter(character.id);
@@ -717,9 +723,10 @@ export const characterService = {
         if (character.physical.other) physicalDescription += `, ${character.physical.other}`;
       }
 
-      // Prefer body with no background for best avatar generation results
-      const inputPhoto = character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original;
-      const photoSource = character.photos?.bodyNoBg ? 'bodyNoBg' : character.photos?.body ? 'body' : character.photos?.face ? 'face' : 'original';
+      // Prefer body with no background for best avatar generation results.
+      // Helper handles dual-shape + legacy top-level field fallbacks.
+      const inputPhoto = getAvatarInputPhoto(character);
+      const photoSource = character.photos?.bodyNoBg ? 'bodyNoBg' : character.photos?.body ? 'body' : character.photos?.face ? 'face' : character.photos?.original ? 'original' : 'legacy';
       const photoSize = inputPhoto ? Math.round(inputPhoto.length / 1024) : 0;
       const isPNG = inputPhoto?.startsWith('data:image/png');
       log.info(`🎨 Generating clothing avatars WITH TRAITS for ${character.name} (id: ${character.id})`);

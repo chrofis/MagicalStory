@@ -152,3 +152,35 @@ export function getDisplayPhoto(input: CharOrAvatars): string | null {
   if (char?.photos?.original) return char.photos.original;
   return null;
 }
+
+/**
+ * Pick the best INPUT photo for avatar generation (clothing avatars, styled
+ * avatars, etc.). Order of preference:
+ *   1. body-no-bg (clean cut-out, preferred — server inpaints cleanest)
+ *   2. body (raw upload with background)
+ *   3. face (head crop)
+ *   4. original (raw upload)
+ *   5. Legacy top-level fields (pre-photos.* normalization)
+ *
+ * Mirrors server-side `getBodyPhoto` in characterPhotos.js but with a wider
+ * fallback chain — call sites need a SOMETHING-not-null to send as
+ * `referencePhoto` to the avatar-generation endpoints; UI thumbnails can use
+ * getDisplayPhoto instead.
+ */
+export function getAvatarInputPhoto(input: CharOrAvatars): string | null {
+  if (!input || typeof input !== 'object') return null;
+  const c = input as Record<string, unknown>;
+  const photos = c.photos as Record<string, unknown> | undefined;
+  const fromPhotos = toUrlString(photos?.bodyNoBg)
+    || toUrlString(photos?.body)
+    || toUrlString(photos?.face)
+    || toUrlString(photos?.original);
+  if (fromPhotos) return fromPhotos;
+  // Legacy top-level fields (pre-normalization characters)
+  return toUrlString(c.body_no_bg_url) || toUrlString(c.bodyNoBgUrl)
+    || toUrlString(c.body_photo_url) || toUrlString(c.bodyPhotoUrl)
+    || toUrlString(c.thumbnail_url)
+    || toUrlString(c.photo_url) || toUrlString(c.photoUrl) || toUrlString(c.photo)
+    || toUrlString(c.facePhoto)
+    || null;
+}
