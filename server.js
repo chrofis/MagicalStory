@@ -7252,7 +7252,7 @@ async function _processStoryJobImpl(jobId) {
 
       // Check landmark_index table first (works for any city worldwide)
       try {
-        const indexedLandmarks = await getIndexedLandmarks(inputData.userLocation.city, 30);
+        const indexedLandmarks = await getIndexedLandmarks(inputData.userLocation, 30);
         if (indexedLandmarks.length > 0) {
           // Convert indexed landmarks to the format expected by linkPreDiscoveredLandmarks
           landmarks = indexedLandmarks.map(l => ({

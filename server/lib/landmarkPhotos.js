@@ -2274,15 +2274,38 @@ async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 2
 }
 
 /**
- * Get indexed landmarks by city name (works for any city worldwide)
- * @param {string} city - City name
- * @param {number} limit - Maximum results (default 30)
+ * Get indexed landmarks by city name (works for any city worldwide).
+ *
+ * Accepts either:
+ *   - a city string (legacy)
+ *   - a location object { city, region, latitude, longitude }
+ *
+ * Lookup order:
+ *   1. exact city name (with diacritic + comma + first-word fallbacks)
+ *   2. when (1) returns 0 and lat/lon are supplied, proximity search at
+ *      20km → 50km → 100km radius (handles unindexed villages like
+ *      Wabern → falls back to nearby Bern landmarks).
+ *
+ * @param {string|Object} cityOrLocation
+ * @param {number} limit
  * @returns {Promise<Array>}
  */
-async function getIndexedLandmarks(city, limit = 30) {
+async function getIndexedLandmarks(cityOrLocation, limit = 30) {
   const pool = getPool();
   if (!pool) {
     log.warn('[LANDMARK-INDEX] Database not available');
+    return [];
+  }
+
+  // Normalize input — accept string (legacy) or { city, latitude, longitude }
+  let city, latitude, longitude;
+  if (typeof cityOrLocation === 'string') {
+    city = cityOrLocation;
+  } else if (cityOrLocation && typeof cityOrLocation === 'object') {
+    city = cityOrLocation.city || '';
+    latitude = typeof cityOrLocation.latitude === 'number' ? cityOrLocation.latitude : null;
+    longitude = typeof cityOrLocation.longitude === 'number' ? cityOrLocation.longitude : null;
+  } else {
     return [];
   }
 
@@ -2312,7 +2335,7 @@ async function getIndexedLandmarks(city, limit = 30) {
       }
     }
 
-    // Last fallback: try just the first word (core city name, e.g. "Bremgarten" from "Bremgarten Aargau")
+    // Last name fallback: try just the first word (core city name, e.g. "Bremgarten" from "Bremgarten Aargau")
     if (result.rows.length === 0 && normalizedCity.includes(' ')) {
       const firstWord = normalizedCity.split(/[\s,]+/)[0];
       result = await pool.query(`
@@ -2324,6 +2347,18 @@ async function getIndexedLandmarks(city, limit = 30) {
       `, [firstWord, limit]);
       if (result.rows.length > 0) {
         log.info(`[LANDMARK-INDEX] First-word match: "${firstWord}" from "${city}" matched ${result.rows.length} landmarks`);
+      }
+    }
+
+    // Proximity fallback: when no name match and lat/lon are known, grow the radius until we find something.
+    // Handles villages like Wabern (no landmarks of its own) → falls back to Bern landmarks ~3km away.
+    if (result.rows.length === 0 && latitude !== null && longitude !== null) {
+      for (const radiusKm of [20, 50, 100]) {
+        const nearby = await getIndexedLandmarksNearLocation(latitude, longitude, radiusKm, limit);
+        if (nearby.length > 0) {
+          log.info(`[LANDMARK-INDEX] Proximity fallback: "${city}" → ${nearby.length} landmarks within ${radiusKm}km of (${latitude}, ${longitude})`);
+          return nearby;
+        }
       }
     }
 

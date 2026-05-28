@@ -166,7 +166,7 @@ export default function TrialWizard() {
   } | null>(null);
 
   // User location (IP-based, for landmark personalization)
-  const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null; latitude?: number | null; longitude?: number | null } | null>(null);
 
   useEffect(() => { trackTrialPageVisit(); }, []);
 

@@ -94,6 +94,8 @@ interface UserLocation {
   city: string | null;
   region: string | null;
   country: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 interface WizardStep3Props {

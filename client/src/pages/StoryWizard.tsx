@@ -335,13 +335,13 @@ export default function StoryWizard() {
     language: string;
     languageLevel: string;
     pages: number;
-    userLocation?: { city: string | null; region: string | null; country: string | null };
+    userLocation?: { city: string | null; region: string | null; country: string | null; latitude?: number | null; longitude?: number | null };
     season?: string;
   } | null>(null);
   const streamAbortRef = useRef<{ abort: () => void } | null>(null);
   const pollCancelledRef = useRef(false);
   // User's location from IP (for story setting personalization)
-  const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null; latitude?: number | null; longitude?: number | null } | null>(null);
   // Season for story setting (auto-calculated from current date, user can override)
   const [season, setSeason] = useState<string>(() => getCurrentSeason());
 

@@ -567,6 +567,7 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
     // Try Gemini with one retry on 503, then fall back to Grok
     let avatarImage = null;
     let safetyBlocked = false;
+    let data = null;
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`;
 
     for (let attempt = 0; attempt < 2 && !avatarImage; attempt++) {
@@ -588,7 +589,7 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
           continue;
         }
 
-        const data = await response.json();
+        data = await response.json();
         if (data.promptFeedback?.blockReason) {
           log.warn(`[TRIAL AVATAR] Blocked by safety: ${data.promptFeedback.blockReason}`);
           safetyBlocked = true;
@@ -646,8 +647,8 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
     const compressed = await compressImageToJPEG(avatarImage, 85, 768);
     const finalImage = compressed || avatarImage;
 
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    const inputTokens = data?.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = data?.usageMetadata?.candidatesTokenCount || 0;
     log.info(`[TRIAL AVATAR] ✅ Generated preview avatar for "${safeName}" (${inputTokens} in / ${outputTokens} out)`);
 
     // If session token provided, save avatar to character in DB
@@ -1662,7 +1663,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     if (userLocation?.city && storyCategory !== 'historical') {
       try {
         const { getIndexedLandmarks } = require('../lib/landmarkPhotos');
-        const landmarks = await getIndexedLandmarks(userLocation.city, 3);
+        const landmarks = await getIndexedLandmarks(userLocation, 3);
         if (landmarks.length > 0) {
           landmarksText = 'At least one scene must take place at one of these real local landmarks: ' + landmarks.map(l => l.name).join(', ') + '.';
           log.debug(`  [LANDMARK] Including ${landmarks.length} landmarks: ${landmarks.map(l => l.name).join(', ')}`);
