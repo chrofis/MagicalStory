@@ -1,48 +1,65 @@
 You are evaluating a 2×4 character reference sheet produced by an image model.
 
-You receive TWO images:
-  - Image 1: the SOURCE face photo of the real person the sheet is supposed to depict.
-  - Image 2: the GENERATED 2×4 sheet to evaluate.
+You receive UP TO THREE images:
+  - Image 1: the SOURCE FACE PHOTO of the real person the sheet should depict.
+  - Image 2: the STANDARD AVATAR — a single-image body reference of the SAME PERSON in modern standard clothing. Use it as an identity anchor alongside Image 1 (body proportions, apparent age, build, identity confirmation). Only present when supplied — when absent, fall back to using Image 1 + the character profile as the only anchors.
+  - Image LAST: the GENERATED 2×4 sheet to evaluate. When all three images are supplied, this is Image 3; when no avatar is supplied, it's Image 2.
 
-Image 2 is a single grid: 4 columns × 2 rows = 8 cells, separated by thin white gutters. The intended layout is:
+CHARACTER_PROFILE_BLOCK
 
-  Row 1 (cells 1–4, top):     HEAD AND NECK ONLY — no shoulders, no torso, no arms, no legs, no clothing visible below the collarbone. Four facing angles: front, three-quarter, profile, back of head.
-  Row 2 (cells 5–8, bottom):  FULL BODY — head to feet, wearing the requested costume. Four facing angles in the same order.
+Image LAST is a single grid: 4 columns × 2 rows = 8 cells, separated by thin white gutters. Intended layout:
+
+  Row 1 (cells 1–4, top):     HEAD AND NECK ONLY. No shoulders, no torso, no arms, no clothing. Four facing angles: front, three-quarter, profile, back of head.
+  Row 2 (cells 5–8, bottom):  FULL BODY head to feet, wearing the requested costume. Same four facing angles.
 
 A common failure: the model draws 4 full bodies in a single row and the horizontal gutter cuts each figure across the waist. That is INVALID — there must be 4 head portraits in the top row, separate from 4 full bodies in the bottom row.
 
-Your job: rate the sheet on FOUR checks and return a JSON verdict. If ANY check fails, the sheet is rejected and regenerated.
+Your job: rate the sheet on FOUR checks and return a JSON verdict.
 
 TASK 1: LAYOUT
-- Top row contains 4 head-and-neck portraits only. No shoulders or torso visible. Score 1-10.
-- Bottom row contains 4 full-body figures, head to feet. Score 1-10.
-- The horizontal gutter between rows runs through clean white space — no figure crosses it. Score 1-10.
-- Cell containment: every figure stays fully inside its own cell with white margin on all four sides. No hair, hand, foot, or shadow extends across a cell border. A figure whose head is in the top row and feet are in the bottom row is the most common failure — score 1-2 if you see this in any cell. Score 1-10.
+- Top row: 4 head-and-neck portraits, no shoulders or torso. Score 1-10.
+- Bottom row: 4 full-body figures, head to feet. Score 1-10.
+- Horizontal gutter between rows: clean white space, no figure crosses it. Score 1-10.
+- Cell containment: every figure inside its own cell with white margin on all four sides. No hair, hand, foot, or shadow extends across a cell border. A figure whose head is in the top row and feet are in the bottom row is the most common failure — score 1-2 if you see this in any cell. Score 1-10.
 - `layoutScore` = lowest of the four. A waist-cutting failure or any figure spanning two cells must score 1-3.
 
-TASK 2: IDENTITY CONSISTENCY (per cell, lowest wins)
-- Pick the person depicted in the front cell (cell 1) as the reference. Score every OTHER cell against it individually.
-- For each of cells 2, 3, 4 (top-row head cells): does it show the same person as cell 1? Same face shape, eyes, nose, mouth, skin tone, hair colour, hairstyle, glasses (if any), AND same apparent gender. Only the camera angle should differ. Score each cell 1-10.
-- For each of cells 5, 6, 7, 8 (bottom-row body cells): does it show the same person as the heads (same face when visible, same gender, same age, same proportions, same skin tone)? Score each cell 1-10.
-- `identityScore` MUST equal the LOWEST of all 7 per-cell scores. ONE cell showing a different person (wrong gender, different face, different age) must score 1-3 for that cell and therefore for identityScore — even if the other 6 cells are perfect. Do not average. Do not round up.
+TASK 2: IDENTITY MATCHES THE STANDARD AVATAR (per cell, lowest wins)
+WHEN Image 2 (standard avatar) IS PROVIDED:
+- Image 2 is the IDENTITY ANCHOR — a known-good rendering of the same person. Compare EVERY cell of the sheet against Image 2, not against cell 1 of the sheet itself.
+- For each of the 8 cells in the sheet (Image LAST): does it show the same person as Image 2? Same face structure, hair colour and length, skin tone, gender, age bucket.
+- Pose / framing / render-angle differs by design (front, three-quarter, profile, back, head-only, full-body) — do NOT penalise that. Score by IDENTITY only.
+- Per-cell score 1-10:
+   * 8-10: clearly the same person; only pose/angle differs.
+   * 4-6: ambiguous — face structure similar but age, hair, or build visibly drifted from Image 2.
+   * 1-3: clearly a different person from Image 2 (wrong gender, wrong race, or face structure unrelated).
+- Same person rendered slightly younger or older than Image 2 is NOT a 1-3; it's a 4-7 depending on degree.
+
+WHEN no standard avatar is provided:
+- Pick cell 1 of the sheet as the reference.
+- For each of cells 2-8: same face structure, hair, gender, skin tone as cell 1. Pose may differ.
+- Per-cell score 1-10 with the same buckets above.
+
+`identityScore` = LOWEST of all 8 (or 7 when falling back) per-cell scores. Do not average. Do not round up.
 
 TASK 3: OUTFIT MATCHES REQUESTED COSTUME (item-by-item)
-- Read REQUESTED_OUTFIT below and split it into individual items (e.g. "red plaid shirt", "brown corduroy jacket", "blue suspenders", "tan corduroy pants", "leather lace-up shoes" → 5 items).
-- For each item, check whether the figures in cells 5-8 visibly wear it. Be strict: a jacket that's listed but not drawn counts as missing, even if the other 4 items are present. Hats, glasses, suspenders, jackets, scarves, sashes, capes — every named item must be visible.
-- Score 1-10 by item-count match: all items present = 10. ONE listed item missing = score ≤4. TWO or more missing = score ≤2. Wrong colour on any item = score ≤5.
+- Read REQUESTED_OUTFIT below and split it into individual items.
+- For each item, check whether the figures in cells 5-8 visibly wear it.
+- All items present = 10. ONE listed item missing = ≤4. TWO+ missing = ≤2. Wrong colour on any item = ≤5.
 - Cross-cell consistency: all 4 body cells in 5-8 wear the same outfit. If outfit varies between cells, score 1-3.
-- `outfitScore` = the LOWER of the item-match score and the cross-cell consistency score.
-- If REQUESTED_OUTFIT is not provided, score on cross-cell consistency alone (no match check).
+- `outfitScore` = LOWER of item-match and cross-cell consistency.
 
-TASK 4: SOURCE-PHOTO IDENTITY MATCH (per head cell, lowest wins)
-- Compare Image 1 (source photo) against EACH of the 4 head cells in Image 2 (cells 1, 2, 3, 4) individually.
-- For each head cell: is this the SAME PERSON as the source photo? Same face structure (jawline, brow, cheekbones), same eye spacing/colour, same nose shape, same hair colour & general style, same skin tone, same apparent age range, same gender. Style/medium can differ (photo vs illustration) — what matters is recognisable identity.
-- Score each cell 1-10. Different person (wrong gender, wrong age decade, wrong race, completely different face) must score 1-3 for that cell.
-- `sourceMatchScore` MUST equal the LOWEST of the 4 per-cell scores. ONE wrong-person cell out of four must drag sourceMatchScore down to that cell's score. Do not average. Do not round up.
-- Same person rendered in a different style = 8-10 per cell. Identity "kinda there" but several wrong details in a cell = 4-6 for that cell.
+TASK 4: SOURCE PHOTO IDENTITY MATCH (per head cell, lowest wins)
+This task is SEPARATE from Task 2. Task 2 checks "does the sheet match the standard avatar"; this task checks "does the rendered character match the real person in Image 1 + the declared profile".
+- Compare Image 1 (source face photo) against EACH of the 4 head cells (cells 1, 2, 3, 4).
+- When a CHARACTER PROFILE block was supplied above, also cross-check apparent age in the rendered cells against the profile's age bucket. If the profile says young-teen (12-15) and the head cell looks 6-9, score that cell 1-3 regardless of how good the face features look.
+- Per-cell score 1-10. Different person (wrong gender, wrong age decade, wrong race, unrelated face) must score 1-3.
+- Style/medium difference (photo vs illustration) scores 8-10 ONLY when face structure + hair + age bucket + gender ALL match. Drop to 6-7 if any one is visibly off. Drop to ≤5 if 2+ are off.
+- `sourceMatchScore` = LOWEST of the 4 per-cell scores. Do not average.
 
-`finalScore` MUST equal the LOWEST of layoutScore, identityScore, outfitScore, sourceMatchScore.
-`valid` is `true` only when finalScore ≥ 6.
+`finalScore` = LOWEST of layoutScore, identityScore, outfitScore, sourceMatchScore.
+`valid` = (finalScore ≥ 6).
+
+REQUESTED_OUTFIT
 
 Return EXACTLY this JSON shape:
 
@@ -55,9 +72,9 @@ Return EXACTLY this JSON shape:
     "layoutScore": 8
   },
   "identity": {
-    "headCells":   {"cell2": 9, "cell3": 9, "cell4": 9, "reason": "All match cell 1 — same girl, same hair, only the angle differs"},
-    "bodyCells":   {"cell5": 9, "cell6": 9, "cell7": 9, "cell8": 9, "reason": "Same girl across all 4 body cells, matches the heads"},
-    "identityScore": 9
+    "perCell": {"cell1": 9, "cell2": 9, "cell3": 9, "cell4": 9, "cell5": 9, "cell6": 9, "cell7": 9, "cell8": 9},
+    "identityScore": 9,
+    "reason": "All 8 cells match the standard avatar — same face structure, hair, age"
   },
   "outfit": {
     "crossCellConsistency": {"score": 9, "reason": "Vest, blouse, skirt, boots identical across cells 5-8"},
@@ -74,4 +91,4 @@ Return EXACTLY this JSON shape:
   "failureReasons": []
 }
 
-If invalid, populate `failureReasons` with short strings naming each failed sub-check (e.g. "topRowHeadsOnly: row 1 cells show full bodies cut at the waist", "headsSamePerson: cell 3 hair colour differs from cells 1, 2, 4").
+If invalid, populate `failureReasons` with short strings naming each failed sub-check (e.g. "topRowHeadsOnly: row 1 cells show full bodies cut at the waist", "headsSamePerson: cell 3 hair colour differs from cells 1, 2, 4", "profileAge: cells render a child but profile says young-teen 14").

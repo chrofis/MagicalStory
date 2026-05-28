@@ -254,7 +254,35 @@ async function quickLayoutCheck(imageData) {
  * @param {string} [sourcePhoto]  source face photo (data URI). When provided,
  *   sent as Image 1 and the source-match task fires; the sheet becomes Image 2.
  */
-async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiKey, sourcePhoto = null, usageTracker = null) {
+/**
+ * Build a concise text profile of the character for the eval prompt's
+ * CHARACTER_PROFILE block. Lets Gemini cross-check apparent age, gender,
+ * hair, etc. — without it the eval has no way to flag "looks like Roger
+ * but rendered as a 10-year-old". Returns "" when no profile data exists
+ * (the prompt then drops the block).
+ */
+function buildCharacterDescription(character) {
+  if (!character) return '';
+  const parts = [];
+  if (character.name) parts.push(`Name: ${character.name}`);
+  if (character.age) parts.push(`Age: ${character.age} years old`);
+  if (character.ageCategory) parts.push(`Age category: ${character.ageCategory}`);
+  if (character.gender) parts.push(`Gender: ${character.gender}`);
+  if (character.height) parts.push(`Height: ${character.height} cm`);
+  if (character.build) parts.push(`Build: ${character.build}`);
+  const phys = character.physical || {};
+  if (phys.hairColor || phys.hairLength || phys.hairStyle) {
+    const hair = [phys.hairColor, phys.hairLength, phys.hairStyle].filter(Boolean).join(', ');
+    if (hair) parts.push(`Hair: ${hair}`);
+  }
+  if (phys.facialHair) parts.push(`Facial hair: ${phys.facialHair}`);
+  if (phys.glasses) parts.push(`Glasses: ${phys.glasses}`);
+  if (phys.distinctiveMarks) parts.push(`Distinctive marks: ${phys.distinctiveMarks}`);
+  return parts.join('\n');
+}
+
+async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiKey, sourcePhoto = null, usageTracker = null, opts = {}) {
+  const { standardAvatar = null, characterDescription = '' } = opts;
   const sheetB64 = imageData.replace(/^data:image\/\w+;base64,/, '');
   const sheetMime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
@@ -263,16 +291,30 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
   if (costumeDescription) {
     prompt = prompt.replace(/REQUESTED_OUTFIT/g, `REQUESTED_OUTFIT: ${costumeDescription}`);
   }
+  // Inject the character profile block, or drop the placeholder when none.
+  if (characterDescription && characterDescription.trim()) {
+    prompt = prompt.replace(/CHARACTER_PROFILE_BLOCK/g,
+      `CHARACTER PROFILE (declared spec for this person — authoritative on age, gender, build):\n${characterDescription.trim()}\n`);
+  } else {
+    prompt = prompt.replace(/CHARACTER_PROFILE_BLOCK\n?/g, '');
+  }
 
-  // Image order matters — the prompt explicitly labels Image 1 = source,
-  // Image 2 = generated sheet. When no sourcePhoto provided, fall back to
-  // sheet-only (Task 4 won't have a baseline; the evaluator should still
-  // return a verdict with sourceMatchScore=null or 10 as documented).
+  // Image order matters — prompt labels Image 1 = source face, Image 2 =
+  // standard avatar (when supplied), Image LAST = generated sheet. The eval
+  // text adapts to "Image 2" vs "Image 3" semantics for the sheet via the
+  // "Image LAST" phrasing in the prompt. When no sourcePhoto provided, falls
+  // back to sheet-only (Task 4 still attempts but has no baseline; Task 2
+  // falls back to cell-1-as-anchor mode documented in the prompt).
   const parts = [];
   if (sourcePhoto) {
     const srcB64 = sourcePhoto.replace(/^data:image\/\w+;base64,/, '');
     const srcMime = sourcePhoto.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
     parts.push({ inline_data: { mime_type: srcMime, data: srcB64 } });
+  }
+  if (standardAvatar) {
+    const avB64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
+    const avMime = standardAvatar.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+    parts.push({ inline_data: { mime_type: avMime, data: avB64 } });
   }
   parts.push({ inline_data: { mime_type: sheetMime, data: sheetB64 } });
   parts.push({ text: prompt });
@@ -480,10 +522,22 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     }
     let verdict = null;
     try {
-      // Pass the source face photo so Task 4 (sourceMatchScore) fires —
-      // catches sheets that are structurally fine but show a different
-      // person than the user uploaded (e.g. Grok hallucinating identity).
-      verdict = await evaluateSheetWithGemini(result.imageData, costumeDescription, process.env.GEMINI_API_KEY, facePhoto, usageTracker);
+      // Pass the source face photo (Image 1) + the standard avatar (Image 2)
+      // + the declared character profile (text). Task 2 now uses Image 2 as
+      // the identity anchor instead of cell 1 — catches drift across the
+      // whole sheet, not just within it. Task 4 cross-checks apparent age
+      // against the profile — catches sheets that look like the source photo
+      // but render the character as the wrong age bucket (e.g. 14-yr-old
+      // profile, sheet renders ~10).
+      const characterProfile = buildCharacterDescription(character);
+      verdict = await evaluateSheetWithGemini(
+        result.imageData,
+        costumeDescription,
+        process.env.GEMINI_API_KEY,
+        facePhoto,
+        usageTracker,
+        { standardAvatar, characterDescription: characterProfile }
+      );
       log.info(`[CHARACTER 2×4]   eval: layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} sourceMatch=${verdict.sourceMatch?.sourceMatchScore} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       // Eval errors no longer get a free score=10. Treat them as score=5
