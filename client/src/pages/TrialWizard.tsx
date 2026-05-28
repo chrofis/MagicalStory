@@ -172,7 +172,20 @@ export default function TrialWizard() {
 
   useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL || '';
-    fetch(`${apiUrl}/api/user/location`).then(r => r.json()).then(setUserLocation).catch(() => {});
+    fetch(`${apiUrl}/api/user/location`).then(r => r.json()).then(loc => {
+      setUserLocation(loc);
+      // Fire-and-forget landmark discovery so the location's landmarks are indexed
+      // by the time this user (or another from the same area) generates next time.
+      // Doesn't block trial generation — trial uses whatever's already indexed and
+      // the proximity fallback.
+      if (loc?.city) {
+        fetch(`${apiUrl}/api/landmarks/discover`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ city: loc.city, country: loc.country })
+        }).catch(() => {});
+      }
+    }).catch(() => {});
   }, []);
 
   const isAdmin = user?.role === 'admin';

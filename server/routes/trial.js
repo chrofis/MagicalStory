@@ -753,9 +753,14 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
     const randomPassword = crypto.randomBytes(32).toString('hex');
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
+    // Consent: the trial wizard requires two consent checkboxes before the photo
+    // upload runs (TrialCharacterStep.tsx). By the time we reach account creation
+    // the user has explicitly ticked both AND uploaded a photo. Persist the
+    // consent timestamp now — there was no user row before this point to bind it
+    // to. If they later claim/sign-in with this account, no re-prompt needed.
     await pool.query(
-      `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, is_trial, anonymous, has_set_password)
-       VALUES ($1, $2, $3, $4, 'user', 1, 0, 0, true, true, false)`,
+      `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, is_trial, anonymous, has_set_password, photo_consent_at)
+       VALUES ($1, $2, $3, $4, 'user', 1, 0, 0, true, true, false, CURRENT_TIMESTAMP)`,
       [userId, `anon_${userId}`, `anon_${userId}@anonymous`, hashedPassword]
     );
 
