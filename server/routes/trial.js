@@ -853,7 +853,11 @@ router.get('/check-status', verifySessionToken, async (req, res) => {
     }
 
     const user = result.rows[0];
-    const trialUsed = user.stories_generated >= user.story_quota;
+    // Mirror the staging bypass from /trial/create-job — on staging we let the
+    // same trial user generate multiple stories, so check-status must never
+    // report trialUsed=true there or the client refuses to start a new run.
+    const isStaging = !!process.env.STAGING_AUTH_PASSWORD;
+    const trialUsed = isStaging ? false : (user.stories_generated >= user.story_quota);
 
     // If trial is used, find their story so we can link to it
     let storyId = null;
@@ -945,10 +949,17 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     const { getPool } = require('../services/database');
     const pool = getPool();
 
-    // Atomic check-and-increment to prevent race condition (two simultaneous requests)
+    // Staging bypasses the 1-trial-per-user cap so we can re-test the trial
+    // flow without burning fresh accounts each time. Detection: staging is the
+    // only environment where STAGING_AUTH_PASSWORD is set (prod leaves it null).
+    const isStaging = !!process.env.STAGING_AUTH_PASSWORD;
+
+    // Atomic check-and-increment to prevent race condition (two simultaneous requests).
+    // On staging we still increment (so counters are accurate) but drop the < 1 cap.
+    const capCondition = isStaging ? '' : 'AND stories_generated < 1';
     const userResult = await pool.query(
       `UPDATE users SET stories_generated = stories_generated + 1
-       WHERE id = $1 AND is_trial = true AND stories_generated < 1
+       WHERE id = $1 AND is_trial = true ${capCondition}
        RETURNING id, stories_generated`,
       [userId]
     );
@@ -960,6 +971,10 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
         return res.status(404).json({ error: 'Account not found' });
       }
       return res.status(409).json({ error: 'Trial story already used', code: 'TRIAL_USED' });
+    }
+
+    if (isStaging && userResult.rows[0].stories_generated > 1) {
+      log.info(`[TRIAL] Staging bypass — user ${userId} now at stories_generated=${userResult.rows[0].stories_generated}`);
     }
 
     // If a prepare-title call is still in flight for this user, wait for it
