@@ -195,6 +195,12 @@ export default function TrialGenerationPage() {
   // Generation state
   const [pageState, setPageState] = useState<PageState>('starting');
   const [progress, setProgress] = useState(0);
+  // Smoothed bar value — guarantees forward motion during the long pre-job wait
+  // when server-side `progress` sits at 0 for ~60s before the story job emits
+  // its first event. Never exceeds the actual server progress when the server
+  // overtakes the curve, and never decreases.
+  const [displayProgress, setDisplayProgress] = useState(0);
+  const generationStartRef = useRef<number | null>(null);
   // Only restore jobId from localStorage if we're recovering from a redirect (no location.state)
   const [jobId, setJobId] = useState<string | null>(
     locationState ? null : storage.getItem('trial_gen_job_id')
@@ -561,6 +567,28 @@ export default function TrialGenerationPage() {
     return () => clearInterval(interval);
   }, [slideshowItems.length]);
 
+  // Smoothed-progress driver. Floors the visible bar with a time-based optimistic
+  // curve so the user sees forward motion immediately, even when the server
+  // hasn't emitted anything yet. Curve: 70 * (1 - e^(-t/60)) — reaches ~38% at
+  // 30s, ~57% at 60s, asymptotes near 70%. Real server progress overtakes once
+  // page-image events start.
+  useEffect(() => {
+    if (pageState !== 'starting' && pageState !== 'generating') return;
+    if (generationStartRef.current === null) generationStartRef.current = Date.now();
+    const tick = () => {
+      const elapsedS = (Date.now() - (generationStartRef.current || Date.now())) / 1000;
+      const optimistic = 70 * (1 - Math.exp(-elapsedS / 60));
+      setDisplayProgress(prev => Math.max(prev, progress, optimistic));
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [pageState, progress]);
+
+  useEffect(() => {
+    if (pageState === 'completed') setDisplayProgress(100);
+  }, [pageState]);
+
   // Scroll to top on mount (mobile)
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -594,15 +622,31 @@ export default function TrialGenerationPage() {
               <div className="w-full flex items-center gap-3 mb-2">
                 <Loader2 className="w-4 h-4 text-indigo-500 animate-spin flex-shrink-0" />
                 <span className="text-sm text-gray-600">{t.creatingStory}</span>
-                <span className="text-xs text-gray-400 ml-auto">{Math.round(progress)}%</span>
+                <span className="text-xs text-gray-400 ml-auto">{Math.round(displayProgress)}%</span>
               </div>
             )}
             {(pageState === 'starting' || pageState === 'generating') && (
               <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden mb-2">
                 <div
                   className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${Math.max(progress, 3)}%` }}
+                  style={{ width: `${Math.max(displayProgress, 3)}%` }}
                 />
+              </div>
+            )}
+
+            {/* Benefits panel — shown during the long pre-job wait. Once page
+                images start arriving (3+ slideshow items: avatar + title + page)
+                the slideshow itself becomes the focal point and the panel hides. */}
+            {(pageState === 'starting' || pageState === 'generating') && slideshowItems.length <= 2 && (
+              <div className="w-full bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 my-3 text-left">
+                <p className="text-amber-800 text-sm font-semibold mb-2">{t.upsellTitle}</p>
+                <ul className="text-amber-700 text-sm space-y-1.5">
+                  {t.upsellFeatures.map((f, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <span className="text-amber-500 font-bold">&#x2022;</span> {f}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 

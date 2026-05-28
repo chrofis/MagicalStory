@@ -1500,12 +1500,22 @@ function linkPreDiscoveredLandmarks(visualBible, availableLandmarks) {
 
     log.debug(`[LANDMARK-LINK] Try: "${location.name}" query="${location.landmarkQuery}"`);
 
+    // Normalize names before comparing: strip parens, punctuation, and collapse
+    // whitespace. Wikidata indexes names like "Holzbrücke (Baden)" with the
+    // disambiguation in parens, but VB writes "Holzbrücke Baden" without —
+    // raw .toLowerCase() comparison drops every Swiss landmark match.
+    const norm = (s) => String(s || '')
+      .toLowerCase()
+      .replace(/[()[\],.]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
     // Try to find a matching pre-discovered landmark
     // Match by name similarity — require strong match to avoid linking
     // unrelated landmarks (e.g. "Forum Romanum" should NOT match "Holzbrücke Baden")
-    const query = location.landmarkQuery.toLowerCase();
+    const query = norm(location.landmarkQuery);
     const preDiscovered = availableLandmarks.find(landmark => {
-      const landmarkName = landmark.name.toLowerCase();
+      const landmarkName = norm(landmark.name);
       // Exact match or one fully contains the other
       if (query === landmarkName) return true;
       if (query.includes(landmarkName) && landmarkName.length >= 5) return true;

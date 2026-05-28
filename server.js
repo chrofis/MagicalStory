@@ -3320,6 +3320,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             pageNumber: page.pageNumber,
             landmarkPhotos: pageLandmarkPhotos,
             visualBibleGrid: trialVbGrid,
+            // Use the pre-rendered empty-scene plate as the background anchor.
+            // The empty-scene block at line 3918 generates these in parallel
+            // with outline streaming; if ready by the time this page renders,
+            // they give the page a real scene + landmark anchor instead of a
+            // text-prompt-only render. Without this the empty scenes get
+            // generated and thrown away.
+            sceneBackground: sceneBackgrounds[page.pageNumber]?.imageData || null,
           });
 
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -3920,8 +3927,35 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const bgLimit = pLimit(5);
           const bgPromises = [];
 
+          // Build pages→landmark-photo lookup once, so each bg can pull its
+          // landmark for the empty-scene render. Without this, empty scenes
+          // get generated WITHOUT the landmark and the page render inherits a
+          // landmark-free background plate.
+          const pageLandmarkLookup = {};
+          for (const loc of (vb.locations || [])) {
+            if (!loc.isRealLandmark || !loc.pages?.length) continue;
+            if (!(loc.referencePhotoUrl || loc.referencePhotoData) || loc.photoFetchStatus !== 'success') continue;
+            for (const pn of loc.pages) {
+              if (!pageLandmarkLookup[pn]) {
+                pageLandmarkLookup[pn] = {
+                  name: loc.name,
+                  photoUrl: loc.referencePhotoUrl || null,
+                  photoData: loc.referencePhotoData || null,
+                  attribution: loc.photoAttribution,
+                  source: loc.photoSource,
+                };
+              }
+            }
+          }
+
           for (const bg of vb.backgrounds) {
             if (!bg.description || !bg.pages?.length) continue;
+            // Pick the first landmark whose `pages` array overlaps this bg's
+            // pages — typically there's only one. Plumbing the photo into the
+            // empty-scene render is the only way to anchor the building's
+            // shape; the scene description alone doesn't carry visual identity.
+            const bgLandmark = bg.pages.map(pn => pageLandmarkLookup[pn]).find(Boolean);
+            const emptySceneLandmarkPhotos = bgLandmark ? [bgLandmark] : [];
             for (const pageNum of bg.pages) {
               bgPromises.push(bgLimit(async () => {
                 try {
@@ -3933,7 +3967,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     ERA_GUARD: '',
                   });
                   const result = await generateImageOnly(emptyPrompt, [], {
-                    landmarkPhotos: [],
+                    landmarkPhotos: emptySceneLandmarkPhotos,
                     skipCache: true
                   });
                   if (result?.imageData) {
@@ -6911,6 +6945,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       );
       if (userResult.rows.length > 0 && userResult.rows[0].email) {
         const user = userResult.rows[0];
+
+        // Trial users start with a placeholder email (anon_<uuid>@anonymous) that
+        // Resend rejects with a validation_error. Skip the send AND the PDF
+        // generation — pointless work that ends in a failed email. The PDF will
+        // be generated and sent when the user provides a real email (claim flow
+        // hooks: trial/link-google for instant verification, verify-email for
+        // typed-in email after clicking the verification link).
+        if (/^anon_.+@anonymous$/i.test(user.email)) {
+          log.info(`[UNIFIED] Deferring story-complete email for anonymous trial user ${userId} — will send on account claim`);
+          return resultData;
+        }
+
         const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
         // Prefer story language over DB default (DB defaults to 'English' for trial users)
         const emailLanguage = inputData.language || user.preferred_language || 'English';

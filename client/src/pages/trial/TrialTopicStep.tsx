@@ -125,17 +125,26 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
   };
 
   const handleThemeSelect = (themeId: string) => {
-    onChange({
-      ...storyInput,
-      storyTheme: themeId,
-    });
+    const next = { ...storyInput, storyTheme: themeId };
+    onChange(next);
+    // Auto-advance when this completes the selection — skips the redundant
+    // summary screen. Adventure: theme alone is enough. Life-challenge: theme
+    // is the second pick after topic.
+    if (next.storyCategory === 'adventure') {
+      onNext();
+    } else if (next.storyCategory === 'life-challenge' && next.storyTopic) {
+      onNext();
+    }
   };
 
   const handleTopicSelect = (topicId: string) => {
-    onChange({
-      ...storyInput,
-      storyTopic: topicId,
-    });
+    const next = { ...storyInput, storyTopic: topicId };
+    onChange(next);
+    // Auto-advance if this completes a life-challenge pick (theme already set).
+    // Otherwise stay on this screen so user can pick the style.
+    if (next.storyCategory === 'life-challenge' && next.storyTheme) {
+      onNext();
+    }
   };
 
   const handleResetCategory = () => {
@@ -174,7 +183,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
           </>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 max-w-2xl mx-auto">
           {trialCategories.map((category) => (
             <button
               key={category.id}

@@ -1354,6 +1354,13 @@ router.post('/link-google', verifySessionToken, async (req, res) => {
 
     log.info(`[TRIAL] Google account linked for user ${userId}: ${normalizedEmail} (${fullCredits} credits)`);
 
+    // Fire the deferred trial-completion email (with PDF). Google verified the
+    // email so we can send immediately. Idempotent.
+    try {
+      const { sendTrialCompletionEmailIfDeferred } = require('../lib/trialEmail');
+      sendTrialCompletionEmailIfDeferred(userId).catch(() => {});
+    } catch (e) { /* non-fatal */ }
+
     res.json({
       success: true,
       token: fullToken,
@@ -1891,14 +1898,39 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       // Uses cropToFrontColumn which detects the actual separator via Python variance analysis
       const { cropToFrontColumn } = require('../lib/grok');
       const avatarSlides = [];
+      // bytesFromAnyImage handles data: URIs, raw base64, and R2 URLs uniformly.
+      const r2 = require('../lib/r2');
       try {
-        for (const [clothingKey, avatarData] of Object.entries(styledAvatarsData)) {
-          const imgData = typeof avatarData === 'object' && avatarData.imageData ? avatarData.imageData : avatarData;
-          if (!imgData || typeof imgData !== 'string' || !imgData.startsWith('data:image')) continue;
-          const base64 = imgData.replace(/^data:image\/\w+;base64,/, '');
-          const buf = Buffer.from(base64, 'base64');
+        // styledAvatarsData is keyed by character name; each entry is
+        //   { standard, winter, summer, costumed: { default: ... } }
+        // Walk both levels (character → clothing) to reach the actual avatar
+        // bytes. The previous one-level loop produced 0 slides every time
+        // because it tried to crop the per-character object as if it were
+        // an image — silently skipped via the `typeof !== 'string'` guard.
+        const pushSlideFromAvatar = async (avatarValue) => {
+          if (!avatarValue) return;
+          // Avatar may be a string (data URI or URL) or an object with .imageData/.imageUrl
+          let src = null;
+          if (typeof avatarValue === 'string') src = avatarValue;
+          else if (typeof avatarValue === 'object') src = avatarValue.imageData || avatarValue.imageUrl || avatarValue.url || null;
+          if (!src || typeof src !== 'string') return;
+          const buf = await r2.bytesFromAnyImage(src);
+          if (!buf) return;
           const cropped = await cropToFrontColumn(buf);
           avatarSlides.push(`data:image/jpeg;base64,${cropped.toString('base64')}`);
+        };
+        for (const perCharAvatars of Object.values(styledAvatarsData)) {
+          if (!perCharAvatars || typeof perCharAvatars !== 'object') continue;
+          for (const [clothingKey, avatarValue] of Object.entries(perCharAvatars)) {
+            // `costumed` is nested one more level (e.g. { default: ..., pirate: ... })
+            if (clothingKey === 'costumed' && avatarValue && typeof avatarValue === 'object' && !avatarValue.imageData && !avatarValue.imageUrl) {
+              for (const costumeAvatar of Object.values(avatarValue)) {
+                await pushSlideFromAvatar(costumeAvatar);
+              }
+            } else {
+              await pushSlideFromAvatar(avatarValue);
+            }
+          }
         }
         if (avatarSlides.length > 0) {
           log.info(`[TRIAL AVATARS] Split ${avatarSlides.length} styled avatars for slideshow`);

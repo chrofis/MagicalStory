@@ -804,6 +804,19 @@ router.post('/set-password', authenticateToken, async (req, res) => {
     const isTrial = userInfo.rows[0]?.is_trial;
 
     if (isTrial) {
+      // Trial users must claim a real email BEFORE setting a password. Without
+      // this guard the trial converts to a "full account" with the placeholder
+      // anon_<uuid>@anonymous email — locked out forever because no one can
+      // log in with that. Force the client to call link-email or link-google
+      // first so the email column holds something the user can actually use.
+      const trialEmail = userInfo.rows[0]?.email || '';
+      if (/^anon_.+@anonymous$/i.test(trialEmail)) {
+        return res.status(400).json({
+          error: 'Please confirm an email address before setting a password.',
+          code: 'EMAIL_REQUIRED_FIRST'
+        });
+      }
+
       // Convert trial → full account with welcome credits
       const { CREDIT_CONFIG } = require('../config/credits');
       const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER;
@@ -966,6 +979,14 @@ router.get('/verify-email/:token', async (req, res) => {
       'UPDATE users SET email_verified = TRUE, anonymous = false WHERE id = $1',
       [user.id]
     );
+
+    // Trial users get their story-complete email (with PDF) deferred until they
+    // confirm a real email. Now is that moment — fire the deferred send. Idempotent.
+    try {
+      const { sendTrialCompletionEmailIfDeferred } = require('../lib/trialEmail');
+      sendTrialCompletionEmailIfDeferred(user.id).catch(() => {});
+    } catch (e) { /* non-fatal */ }
+
 
     // Handle trial user: issue JWT and redirect to /stories
     if (user.is_trial) {
