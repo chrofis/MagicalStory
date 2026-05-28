@@ -2706,9 +2706,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     end: null
   };
 
-  // Clear avatar generation logs for fresh tracking
-  clearStyledAvatarGenerationLog();
-  clearCostumedAvatarGenerationLog();
+  // Clear avatar generation logs for fresh tracking. Skip for trial: the trial
+  // flow generates styled avatars in /api/trial/prepare-title BEFORE the story
+  // job runs. Clearing here wipes those entries before the job result captures
+  // them, so the StoryDisplay "Stilisierte Avatare" dev panel hides for every
+  // trial story. The unified pipeline appends new entries to whatever's already
+  // in the log, so preserving the prepare-title entries is safe.
+  if (!inputData?.trialMode) {
+    clearStyledAvatarGenerationLog();
+    clearCostumedAvatarGenerationLog();
+  }
 
   // Generation logger for debugging
   const genLog = new GenerationLogger();

@@ -292,6 +292,12 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
     const adHocChar = {
       name: characterName,
+      // Pass age through so character2x4Sheet's loadPhantom picks the right
+      // age-tier phantom (toddler/child/teen/adult). Without this it always
+      // hit the default phantom — the age-tier assets shipped but were dead.
+      age: character?.age,
+      gender: character?.gender,
+      physical: character?.physical,
       avatars: { standard: originalAvatar },
       photos: { face: facePhoto || originalAvatar },
     };

@@ -22,6 +22,38 @@ function initTrialRoutes(serverDeps) {
   deps = serverDeps;
 }
 
+// Trait-extraction cache. The trial flow calls extractTraitsWithGemini twice
+// for the same photo — once in generate-preview-avatar, once in
+// create-anonymous-account — which adds ~5-7s to the user-visible "Next"
+// wait. Caching by photo hash collapses the second call to a synchronous
+// lookup. Entries expire after 10 minutes (long enough for a user to fill
+// the form, short enough not to leak memory).
+const TRAIT_CACHE_TTL_MS = 10 * 60 * 1000;
+const traitCache = new Map(); // hash -> { traits, expiresAt }
+function _hashPhoto(photoStr) {
+  // First 8KB is enough to fingerprint — same photo always hashes to same key.
+  const sample = String(photoStr || '').slice(0, 8192);
+  return crypto.createHash('sha256').update(sample).digest('hex');
+}
+function cacheTraits(photoStr, traits) {
+  if (!photoStr || !traits) return;
+  const hash = _hashPhoto(photoStr);
+  traitCache.set(hash, { traits, expiresAt: Date.now() + TRAIT_CACHE_TTL_MS });
+  // Opportunistic GC: prune expired entries when the map gets large.
+  if (traitCache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of traitCache) {
+      if (v.expiresAt < now) traitCache.delete(k);
+    }
+  }
+}
+function getCachedTraits(photoStr) {
+  if (!photoStr) return null;
+  const entry = traitCache.get(_hashPhoto(photoStr));
+  if (!entry || entry.expiresAt < Date.now()) return null;
+  return entry.traits;
+}
+
 // Rate limiters for unauthenticated trial endpoints
 // Explicit MemoryStore refs so admin can call resetAll()
 const { MemoryStore } = rateLimit;
@@ -498,10 +530,21 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
     let hairDescription = '';
     let extractedTraits = null;
     try {
-      const photoDataUri = `data:image/jpeg;base64,${resizedBase64}`;
-      const traitsResult = await extractTraitsWithGemini(photoDataUri);
-      if (traitsResult?.traits) {
-        extractedTraits = traitsResult.traits;
+      // Cache hits avoid a second ~5-7s Gemini call when create-anonymous-account
+      // runs against the same photo a moment later.
+      const cached = getCachedTraits(facePhoto);
+      if (cached) {
+        extractedTraits = cached;
+        log.debug('[TRIAL AVATAR] Trait cache hit');
+      } else {
+        const photoDataUri = `data:image/jpeg;base64,${resizedBase64}`;
+        const traitsResult = await extractTraitsWithGemini(photoDataUri);
+        if (traitsResult?.traits) {
+          extractedTraits = traitsResult.traits;
+          cacheTraits(facePhoto, extractedTraits);
+        }
+      }
+      if (extractedTraits) {
         const { buildHairDescription } = require('../lib/storyHelpers');
         hairDescription = buildHairDescription(extractedTraits);
         if (hairDescription) {
@@ -793,21 +836,32 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
             if (previewAvatar && typeof previewAvatar === 'string' && previewAvatar.startsWith('data:image/')) {
               charData.characters[0].previewAvatar = previewAvatar;
             }
-            // Extract physical traits from face photo (non-blocking, best-effort)
+            // Extract physical traits from face photo (non-blocking, best-effort).
+            // generate-preview-avatar usually ran first and seeded the cache,
+            // saving ~5-7s on the user-visible "Next" wait. Fall back to a
+            // fresh extraction if not cached.
             try {
-              const { extractTraitsWithGemini } = require('./avatars');
-              const photoDataUri = facePhoto.startsWith('data:') ? facePhoto : `data:image/jpeg;base64,${facePhoto}`;
-              const traitsResult = await extractTraitsWithGemini(photoDataUri);
-              if (traitsResult?.traits) {
+              let t = getCachedTraits(facePhoto);
+              if (t) {
+                log.debug('[TRIAL] Trait cache hit — skipping second Gemini extraction');
+              } else {
+                const { extractTraitsWithGemini } = require('./avatars');
+                const photoDataUri = facePhoto.startsWith('data:') ? facePhoto : `data:image/jpeg;base64,${facePhoto}`;
+                const traitsResult = await extractTraitsWithGemini(photoDataUri);
+                if (traitsResult?.traits) {
+                  t = traitsResult.traits;
+                  cacheTraits(facePhoto, t);
+                }
+              }
+              if (t) {
                 const physical = charData.characters[0].physical || {};
-                const t = traitsResult.traits;
                 if (t.hairColor) physical.hairColor = t.hairColor;
                 if (t.eyeColor) physical.eyeColor = t.eyeColor;
                 if (t.skinTone) physical.skinTone = t.skinTone;
                 if (t.apparentAge) physical.apparentAge = t.apparentAge;
                 if (t.detailedHairAnalysis) physical.detailedHairAnalysis = t.detailedHairAnalysis;
                 charData.characters[0].physical = physical;
-                log.debug(`[TRIAL] Extracted physical traits: hair=${physical.hairColor}, eyes=${physical.eyeColor}, skin=${physical.skinTone}`);
+                log.debug(`[TRIAL] Physical traits set: hair=${physical.hairColor}, eyes=${physical.eyeColor}, skin=${physical.skinTone}`);
               }
             } catch (traitErr) {
               log.debug(`[TRIAL] Physical trait extraction failed (non-critical): ${traitErr.message}`);

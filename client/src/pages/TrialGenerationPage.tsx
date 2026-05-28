@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, FormEvent, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Loader2, CheckCircle, BookOpen, Mail, AlertTriangle } from 'lucide-react';
+import { Loader2, CheckCircle, BookOpen, Mail, AlertTriangle, Sparkles } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
 import { signInWithGooglePopup } from '@/services/googleAuth';
 import storage from '@/services/storage';
@@ -523,16 +523,67 @@ export default function TrialGenerationPage() {
     }
   };
 
-  // Build combined slideshow: avatar → styled avatars → title → page images
-  const slideshowItems = useMemo(() => {
-    const items: Array<{ type: 'avatar' | 'title' | 'page'; src: string; label: string }> = [];
-    if (state?.previewAvatar) items.push({ type: 'avatar', src: state.previewAvatar, label: state.characterName || 'Character' });
-    // Styled avatar slides (arrive with title page, before story pages)
+  // Build unified rotation: every slot fills the image area. Order matches
+  // the normal-story generation pattern — show the avatar first so the user
+  // sees the character they uploaded, then weave in benefits + funny tips
+  // while the image pipeline is still warming up. Real images (cover, pages)
+  // get appended as they arrive so they take over once available.
+  //
+  // Each entry is rendered into the same slot:
+  //   { kind: 'image', src }              — avatar / cover / page
+  //   { kind: 'benefits', half: 1 | 2 }   — first or second half of upsell list
+  //   { kind: 'funny',  msgIndex: N }     — funny message (replaces the avatar)
+  type RotationItem =
+    | { kind: 'image'; src: string; emphasis: 'avatar' | 'title' | 'page'; label: string }
+    | { kind: 'benefits'; half: 1 | 2 }
+    | { kind: 'funny'; msgIndex: number };
+
+  const slideshowItems = useMemo<RotationItem[]>(() => {
+    const items: RotationItem[] = [];
+
+    const avatarPool: { src: string; emphasis: 'avatar'; label: string }[] = [];
+    if (state?.previewAvatar) avatarPool.push({ src: state.previewAvatar, emphasis: 'avatar', label: state.characterName || 'Character' });
     for (let i = 0; i < avatarSlides.length; i++) {
-      items.push({ type: 'avatar', src: avatarSlides[i], label: `${state?.characterName || 'Character'} - Style ${i + 1}` });
+      avatarPool.push({ src: avatarSlides[i], emphasis: 'avatar', label: `${state?.characterName || 'Character'} - Style ${i + 1}` });
     }
-    if (titlePageImage) items.push({ type: 'title', src: titlePageImage, label: 'Cover' });
-    for (const img of pageImages) items.push({ type: 'page', src: img.imageData, label: `Page ${img.pageNumber}` });
+
+    // Static intro sequence — same cadence as the normal-story generation
+    // rotation: image, then alternating text, image, text. The first avatar
+    // appears twice so it stays visible for ~2 ticks before the first text
+    // slide (user requested "avatar for 10s" up front).
+    if (avatarPool.length > 0) {
+      const a = avatarPool[0];
+      items.push({ kind: 'image', src: a.src, emphasis: a.emphasis, label: a.label });
+      items.push({ kind: 'image', src: a.src, emphasis: a.emphasis, label: a.label });
+    }
+    items.push({ kind: 'benefits', half: 1 });
+    items.push({ kind: 'funny', msgIndex: 0 });
+    if (avatarPool.length > 0) {
+      const a = avatarPool[1 % avatarPool.length];
+      items.push({ kind: 'image', src: a.src, emphasis: a.emphasis, label: a.label });
+    }
+    items.push({ kind: 'benefits', half: 2 });
+    items.push({ kind: 'funny', msgIndex: 1 });
+
+    // Append remaining styled-avatar variants (rotation includes a funny msg
+    // between each so the user gets variety, not a wall of similar avatars)
+    for (let i = 2; i < avatarPool.length; i++) {
+      const a = avatarPool[i];
+      items.push({ kind: 'image', src: a.src, emphasis: a.emphasis, label: a.label });
+      items.push({ kind: 'funny', msgIndex: 2 + (i - 2) });
+    }
+    // Real story images take over the rotation as they arrive — page render
+    // is the most engaging signal so we want it to be the dominant content
+    // once available. Funny msg between each so the rotation feels alive.
+    if (titlePageImage) {
+      items.push({ kind: 'image', src: titlePageImage, emphasis: 'title', label: 'Cover' });
+      items.push({ kind: 'funny', msgIndex: 99 });
+    }
+    for (let i = 0; i < pageImages.length; i++) {
+      const img = pageImages[i];
+      items.push({ kind: 'image', src: img.imageData, emphasis: 'page', label: `Page ${img.pageNumber}` });
+      items.push({ kind: 'funny', msgIndex: 100 + i });
+    }
     return items;
   }, [state?.previewAvatar, state?.characterName, avatarSlides, titlePageImage, pageImages]);
 
@@ -549,13 +600,6 @@ export default function TrialGenerationPage() {
     { en: 'The story wizard is adding extra sparkle for {name}...', de: 'Der Geschichtenzauberer fügt extra Glitzer für {name} hinzu...', fr: 'Le magicien ajoute des paillettes supplémentaires pour {name}...' },
     { en: '{name} is choosing the perfect adventure outfit...', de: '{name} sucht das perfekte Abenteuer-Outfit aus...', fr: '{name} choisit la tenue d\'aventure parfaite...' },
   ];
-
-  const currentFunnyMsg = useMemo(() => {
-    const lang = (state?.storyInput?.language || 'de').split('-')[0] as 'en' | 'de' | 'fr';
-    const msg = funnyMessages[funnyMsgIndex % funnyMessages.length];
-    const template = msg[lang] || msg.en;
-    return template.replace('{name}', state?.characterName || 'Your hero');
-  }, [funnyMsgIndex, state?.characterName, state?.storyInput?.language]);
 
   // Rotate slideshow every 4 seconds
   useEffect(() => {
@@ -634,22 +678,6 @@ export default function TrialGenerationPage() {
               </div>
             )}
 
-            {/* Benefits panel — shown during the long pre-job wait. Once page
-                images start arriving (3+ slideshow items: avatar + title + page)
-                the slideshow itself becomes the focal point and the panel hides. */}
-            {(pageState === 'starting' || pageState === 'generating') && slideshowItems.length <= 2 && (
-              <div className="w-full bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 my-3 text-left">
-                <p className="text-amber-800 text-sm font-semibold mb-2">{t.upsellTitle}</p>
-                <ul className="text-amber-700 text-sm space-y-1.5">
-                  {t.upsellFeatures.map((f, i) => (
-                    <li key={i} className="flex items-center gap-2">
-                      <span className="text-amber-500 font-bold">&#x2022;</span> {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             {/* Completed */}
             {pageState === 'completed' && (
               <div className="flex items-center gap-2 text-green-600 mb-2">
@@ -676,26 +704,77 @@ export default function TrialGenerationPage() {
             )}
           </div>
 
-          {/* ── Image preview — rotating slideshow: avatar → title → pages ──── */}
+          {/* ── Rotating slot — avatar → benefits → funny → avatar → benefits-2 → ...
+                same area cycles through image and text content. Text slides
+                replace the image instead of crowding above it. */}
           {pageState !== 'failed' && (
             <div className="flex flex-col items-center mb-4">
-              {slideshowItems.length > 0 ? (
-                <>
-                  <img
-                    src={slideshowItems[slideshowIndex % slideshowItems.length].src}
-                    alt={slideshowItems[slideshowIndex % slideshowItems.length].label}
-                    className={`w-full h-auto rounded-xl shadow-lg transition-opacity duration-500 ${
-                      slideshowItems[slideshowIndex % slideshowItems.length].type === 'avatar' ? 'max-w-xs border-4 border-indigo-100' : ''
-                    }`}
-                  />
-                  {/* Funny character message */}
-                  {pageState !== 'completed' && (
-                    <p className="mt-3 text-sm text-indigo-600 font-medium text-center italic transition-opacity duration-300">
-                      {currentFunnyMsg}
+              {slideshowItems.length > 0 ? (() => {
+                const item = slideshowItems[slideshowIndex % slideshowItems.length];
+                const lang = (state?.storyInput?.language || 'de').split('-')[0] as 'en' | 'de' | 'fr';
+
+                if (item.kind === 'image') {
+                  const characterName = state?.characterName || 'Your hero';
+                  // Funny line shown beneath the image, advancing on each rotation tick
+                  // so consecutive image slides don't show the same line.
+                  const msg = funnyMessages[funnyMsgIndex % funnyMessages.length];
+                  const template = msg[lang] || msg.en;
+                  const subline = template.replace('{name}', characterName);
+                  return (
+                    <>
+                      <img
+                        src={item.src}
+                        alt={item.label}
+                        className={`w-full h-auto rounded-xl shadow-lg transition-opacity duration-500 ${
+                          item.emphasis === 'avatar' ? 'max-w-xs border-4 border-indigo-100' : ''
+                        }`}
+                      />
+                      {pageState !== 'completed' && (
+                        <p className="mt-3 text-sm text-indigo-600 font-medium text-center italic transition-opacity duration-300">
+                          {subline}
+                        </p>
+                      )}
+                    </>
+                  );
+                }
+
+                if (item.kind === 'benefits') {
+                  // Split upsellFeatures roughly in half — first slide shows first
+                  // half, second slide shows the rest.
+                  const features = t.upsellFeatures;
+                  const mid = Math.ceil(features.length / 2);
+                  const lines = item.half === 1 ? features.slice(0, mid) : features.slice(mid);
+                  return (
+                    <div className="w-full bg-amber-50 border border-amber-200 rounded-xl px-5 py-6 text-left max-w-md mx-auto transition-opacity duration-500">
+                      {item.half === 1 && (
+                        <p className="text-amber-800 text-sm font-semibold mb-3">{t.upsellTitle}</p>
+                      )}
+                      <ul className="text-amber-800 text-base space-y-2">
+                        {lines.map((f, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <span className="text-amber-500 font-bold mt-0.5">&#x2022;</span>
+                            <span>{f}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                }
+
+                // funny slide — shown alone in the slot, large, no image
+                const characterName = state?.characterName || 'Your hero';
+                const msg = funnyMessages[(item.msgIndex) % funnyMessages.length];
+                const template = msg[lang] || msg.en;
+                const text = template.replace('{name}', characterName);
+                return (
+                  <div className="w-full flex flex-col items-center justify-center py-10 px-6 max-w-md mx-auto transition-opacity duration-500">
+                    <Sparkles className="w-8 h-8 text-indigo-400 mb-3" />
+                    <p className="text-base text-indigo-700 font-medium text-center italic">
+                      {text}
                     </p>
-                  )}
-                </>
-              ) : (
+                  </div>
+                );
+              })() : (
                 <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
                   <BookOpen className="w-8 h-8 text-indigo-500" />
                 </div>
