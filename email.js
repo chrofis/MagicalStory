@@ -143,9 +143,21 @@ function getTemplateSection(templateName, language) {
   };
 }
 
-// Fill placeholders in template string
+// Fill placeholders in template string. Supports two forms:
+//   - Plain substitution: `{name}` → values.name
+//   - Conditional block:  `{?name}...{/name}` keeps inner content only if
+//                         values.name is truthy; otherwise the entire block
+//                         (including the markers) is stripped.
+// Conditional blocks are processed FIRST so that placeholders inside a
+// stripped block don't accidentally leave a leftover `{name}` token.
 function fillTemplate(template, values) {
   let result = template;
+  // Step 1 — conditional blocks
+  result = result.replace(
+    /\{\?(\w+)\}([\s\S]*?)\{\/\1\}/g,
+    (_match, key, inner) => (values[key] ? inner : '')
+  );
+  // Step 2 — plain placeholder substitution
   for (const [key, value] of Object.entries(values)) {
     result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value || '');
   }
@@ -165,6 +177,29 @@ function getGreetingName(fullName) {
 // Check if email is configured
 function isEmailConfigured() {
   return !!resend;
+}
+
+/**
+ * Resolve the publicly-reachable URL for a story's front cover so it can be
+ * embedded as the hero image in story/order emails.
+ *
+ * Only R2 URLs are returned — base64 `image_data` would bloat the email past
+ * Gmail's 102 KB clip threshold and is intentionally skipped. Returns null on
+ * any failure (missing story, no public URL, DB error) so the template's
+ * `{?coverUrl}...{/coverUrl}` block cleanly strips out.
+ */
+async function getCoverPublicUrl(storyId) {
+  if (!storyId) return null;
+  try {
+    const { getActiveVersion } = require('./server/lib/versionManager');
+    const { getStoryImage } = require('./server/services/database');
+    const activeVersion = await getActiveVersion(storyId, 'frontCover');
+    const image = await getStoryImage(storyId, 'frontCover', null, activeVersion);
+    return image?.imageUrl || null;
+  } catch (err) {
+    console.warn(`⚠️ [EMAIL] could not resolve cover URL for story ${storyId}:`, err.message);
+    return null;
+  }
 }
 
 // ===========================================
@@ -220,12 +255,17 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId,
     storyUrl = 'https://www.magicalstory.ch';
   }
 
-  // Fill in placeholders
+  // Resolve cover URL: caller-provided wins, otherwise look up the story's
+  // front cover. Templates wrap the cover image in a `{?coverUrl}...{/coverUrl}`
+  // block, so an empty value cleanly strips the hero from the rendered email.
+  const coverUrl = options.coverUrl || await getCoverPublicUrl(storyId);
+
   const values = {
     greeting: firstName || 'there',
     title: storyTitle,
     storyUrl: storyUrl,
     claimUrl: options.claimUrl || '',
+    coverUrl: coverUrl || '',
     credits: String(CREDIT_CONFIG.LIMITS.INITIAL_USER)
   };
 
@@ -536,7 +576,11 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
     language
   );
 
-  // Fill in placeholders
+  // Resolve cover URL: caller-provided wins, then storyId lookup. Order
+  // emails render this as a small thumbnail above the order details.
+  const coverUrl = orderDetails.coverUrl
+    || await getCoverPublicUrl(orderDetails.storyId);
+
   const values = {
     greeting: getGreetingName(customerName),
     orderId: orderDetails.orderId,
@@ -546,7 +590,8 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
     city: orderDetails.shippingAddress?.city || '',
     postalCode: orderDetails.shippingAddress?.postal_code || '',
     country: orderDetails.shippingAddress?.country || '',
-    deliveryEstimate: deliveryEstimate
+    deliveryEstimate: deliveryEstimate,
+    coverUrl: coverUrl || ''
   };
 
   try {
@@ -592,12 +637,16 @@ async function sendOrderShippedEmail(customerEmail, customerName, trackingDetail
     return null;
   }
 
-  // Fill in placeholders
+  // Resolve cover URL: caller-provided wins, then storyId lookup.
+  const coverUrl = trackingDetails.coverUrl
+    || await getCoverPublicUrl(trackingDetails.storyId);
+
   const values = {
     greeting: getGreetingName(customerName),
     orderId: trackingDetails.orderId || 'N/A',
     trackingNumber: trackingDetails.trackingNumber || 'N/A',
-    trackingUrl: trackingDetails.trackingUrl || '#'
+    trackingUrl: trackingDetails.trackingUrl || '#',
+    coverUrl: coverUrl || ''
   };
 
   try {

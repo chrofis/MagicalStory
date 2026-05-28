@@ -34,7 +34,9 @@
     "test:demo:local": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/demo-story.spec.ts --project=demo-story --workers=1",
     "test:demo:headed": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/demo-story.spec.ts --project=demo-story --workers=1 --headed",
     "showcase": "node scripts/admin/showcase.js",
-    "showcase:local": "cross-env TEST_BASE_URL=http://localhost:5173 node scripts/admin/showcase.js"
+    "showcase:local": "cross-env TEST_BASE_URL=http://localhost:5173 node scripts/admin/showcase.js",
+    "build:emails": "tsx scripts/build-emails.ts",
+    "email:preview": "email dev --dir emails-src --port 3030"
   },
   "keywords": [
     "storytelling",
@@ -68,10 +70,16 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@react-email/components": "^1.0.12",
+    "@react-email/render": "^2.0.8",
     "@types/node": "^25.0.3",
+    "@types/react": "^19.2.15",
     "@vitest/ui": "^4.0.17",
     "cross-env": "^10.1.0",
     "nodemon": "^3.0.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "tsx": "^4.22.3",
     "vitest": "^4.0.17"
   }
 }

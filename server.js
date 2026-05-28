@@ -1350,7 +1350,9 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
                 currency: (orderData.currency || 'CHF').toUpperCase(),
                 shippingAddress: shippingAddress,
                 deliveryEstimateMin: orderData.delivery_estimate_min,
-                deliveryEstimateMax: orderData.delivery_estimate_max
+                deliveryEstimateMax: orderData.delivery_estimate_max,
+                // Lets email.js render the cover thumbnail on the email.
+                storyId: order.story_id
               },
               language
             );
@@ -1391,7 +1393,9 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
             {
               orderId: orderId.substring(0, 8).toUpperCase(),
               trackingNumber,
-              trackingUrl
+              trackingUrl,
+              // Lets email.js render the cover thumbnail on the email.
+              storyId: order.story_id
             },
             language
           );
