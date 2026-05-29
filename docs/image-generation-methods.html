@@ -236,6 +236,13 @@
 </tr>
 
 <tr>
+  <td>Generate empty scene background (trial 2-pass)</td>
+  <td><code>server.js</code> trial-mode <code>onVisualBible</code> block → <code>generateImageOnly(emptyPrompt, [], { landmarkPhotos, skipCache: true })</code></td>
+  <td>Grok edit, landmark photo as Slot 1 when one is linked to the bg</td>
+  <td>Builds a per-page <code>landmarkLookup</code> from <code>vb.locations</code> filtered to <code>isRealLandmark &amp;&amp; photoFetchStatus === 'success'</code>; matches against each <code>bg.pages</code> overlap so the landmark gets baked into the plate. The page render at <code>server.js:3316</code> then passes the plate as <code>sceneBackground</code>, and <code>packReferences</code> at <code>server/lib/grok.js:1036</code> skips the standalone landmark slot since it's already in the background. Single-shot wires both passes — empty-scene + page render — without any extra Gemini eval.</td>
+</tr>
+
+<tr>
   <td>Generate clothing avatars (winter / standard / summer)</td>
   <td><code>POST /api/generate-clothing-avatars</code> → <code>editWithGrok</code></td>
   <td>Grok edit, 1–2 ref images (body + optional face crop)</td>
@@ -244,9 +251,9 @@
 
 <tr>
   <td>Generate styled avatar (watercolor, ghibli, …)</td>
-  <td><code>server/lib/styledAvatars.js</code> → <code>convertAvatarToStyle</code> → <code>editWithGrok</code></td>
-  <td>Grok edit</td>
-  <td>Used when story art style differs from the realistic avatar — re-renders the avatar in the target style.</td>
+  <td><code>server/lib/styledAvatars.js</code> → <code>convertAvatarToStyle</code> → <code>generateCharacter2x4Sheet</code> → Grok edit</td>
+  <td>Grok edit, 3 ref slots: phantom + standard avatar + face photo</td>
+  <td>Canonical path since 2026-05-14: styled avatars ARE the 2×4 reference sheets (face×4 + body×4 angles, one Grok call). The phantom is an age-tiered silhouette template; <code>loadPhantom(character?.age)</code> at <code>server/lib/character2x4Sheet.js:58</code> picks <code>phantom-watercolor-{toddler|child|teen|adult}.png</code> (head-to-body ratios match age — ≤4 toddler, ≤11 child, ≤17 teen, else adult). <code>convertAvatarToStyle</code> must pass <code>age/gender/physical</code> through to the <code>adHocChar</code> it constructs, otherwise the tier defaults to the generic phantom and adult proportions leak into kid characters. Fallback to the legacy 2×2 Gemini path only when <code>generateCharacter2x4Sheet</code> throws (e.g. <code>XAI_API_KEY</code> missing).</td>
 </tr>
 
 <tr>

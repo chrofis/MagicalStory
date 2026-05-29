@@ -134,15 +134,36 @@ Auth: most endpoints require a JWT (<code>Authorization: Bearer &lt;token&gt;</c
 
 <h2 id="trial">6. Trial flow</h2>
 
-<p>File: <code>server/routes/trial.js</code>.</p>
+<p>File: <code>server/routes/trial.js</code>. The trial wizard runs unauthenticated up to the photo step, then issues a session token tied to an anonymous user row. The session token replaces the auth Bearer for trial-only endpoints.</p>
 
+<h3>Pre-auth (unauthenticated)</h3>
 <table>
 <thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td>POST</td><td><code>/api/trial/start</code></td><td>Create anonymous trial account (Turnstile + fingerprint; admin bypass).</td></tr>
-<tr><td>POST</td><td><code>/api/trial/upgrade</code></td><td>Convert trial → full account (set password).</td></tr>
+<tr><td>POST</td><td><code>/api/trial/analyze-photo</code></td><td>Face + body detection via Python service. Returns face thumb, body crop, faceBox.</td></tr>
+<tr><td>POST</td><td><code>/api/trial/generate-preview-avatar</code></td><td>9:16 watercolor preview from face photo (Gemini → Grok fallback). Also extracts physical traits and seeds the trait cache (hash-keyed) so <code>create-anonymous-account</code> doesn't re-call Gemini for the same photo.</td></tr>
+<tr><td>POST</td><td><code>/api/trial/create-anonymous-account</code></td><td>Turnstile + fingerprint + daily cap. INSERTs anonymous user + character row. Stamps <code>photo_consent_at = NOW()</code> at INSERT time (consent already taken in the wizard checkboxes). Reads cached traits if present, else extracts. Returns <code>{ sessionToken, userId, characterId, charId }</code>. Client typically prewarms this in the background the moment the form is valid, so the Next-button click feels instant.</td></tr>
+<tr><td>POST</td><td><code>/api/trial/generate-ideas-stream</code></td><td>Streams story-idea candidates (Claude Sonnet). Uses landmark proximity fallback when no city-named landmarks indexed (lat/lon from <code>/api/user/location</code>).</td></tr>
 </tbody>
 </table>
+
+<h3>Authenticated (session token)</h3>
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>PATCH</td><td><code>/api/trial/update-character-details</code></td><td>Syncs name/age/gender/traits/customTraits edits made AFTER the prewarmed <code>create-anonymous-account</code>. Does not touch server-owned fields (<code>physical</code>, avatars). Client fires this on Next only if the form diffed since prewarm.</td></tr>
+<tr><td>GET</td><td><code>/api/trial/check-status</code></td><td>Returns <code>trialUsed</code> (<code>stories_generated &gt;= story_quota</code>). Forced <code>false</code> on staging via <code>STAGING_AUTH_PASSWORD</code> env signal so the same trial user can re-run.</td></tr>
+<tr><td>POST</td><td><code>/api/trial/prepare-title</code></td><td>Pre-generates 2×4 styled avatars (standard + costumed) under a <code>runInCacheScope</code>; the story job re-uses them. Pre-warming this here lets the story job skip Phase-2 avatar styling.</td></tr>
+<tr><td>POST</td><td><code>/api/trial/create-job</code></td><td>Atomic check-and-increment of <code>stories_generated</code> (cap dropped on staging). Schedules the unified story-generation pipeline.</td></tr>
+<tr><td>GET</td><td><code>/api/trial/job-status/:id</code></td><td>Polled by the trial generation page; carries progress %, title page image, page images as they arrive.</td></tr>
+<tr><td>POST</td><td><code>/api/trial/link-email</code></td><td>Trial → real email. Sets <code>email</code> + verification token, sends verification mail. Stays anonymous until verified.</td></tr>
+<tr><td>POST</td><td><code>/api/trial/link-google</code></td><td>Trial → Google account in one step. Sets <code>is_trial=false, anonymous=false, email_verified=true</code>; grants welcome credits. Fires the deferred <code>sendTrialCompletionEmailIfDeferred</code> (PDF email skipped during pipeline because <code>anon_*@anonymous</code> rejects).</td></tr>
+</tbody>
+</table>
+
+<p>The unified pipeline's story-complete email send is gated by the user's email format: when it matches <code>/^anon_.+@anonymous$/i</code> the PDF generation and send are skipped — the deferred helper at <code>server/lib/trialEmail.js</code> fires it on the first claim path that produces a real verified email (<code>verify-email</code> handler, <code>link-google</code> handler). Idempotent via <code>users.trial_completion_email_sent_at</code>.</p>
+
+<p>Trial → password conversion (<code>POST /api/auth/set-password</code> on a trial user) refuses with <code>{ code: 'EMAIL_REQUIRED_FIRST' }</code> if the email is still the anon placeholder, so the resulting "full account" can't be locked-out unloginable.</p>
 
 <h2 id="print">7. Print, checkout &amp; referral</h2>
 

@@ -405,6 +405,23 @@ Turnstile + fingerprint checks bypassed when valid admin JWT is provided.
 
 **Key files:** `server/routes/trial.js` → `isAdminRequest()`, `client/src/pages/TrialWizard.tsx`
 
+### Trial Flow — Prewarm + PATCH Sync (May 2026)
+
+The trial character step prewarms `POST /api/trial/create-anonymous-account` in the background the moment the form becomes valid (name + gender + photo). The Next-button click awaits the prewarmed promise — usually instant by then. If the user edited any user-facing field (name / age / gender / traits / customTraits) after the prewarm fired, the click also fires `PATCH /api/trial/update-character-details` with the diff, so the latest values land on the character row before advancing. Server-owned fields (`physical` from Gemini, avatars) are never overwritten by the PATCH.
+
+Other trial-flow plumbing live as of this update:
+
+- **Trait cache** in `server/routes/trial.js`: photo-hash keyed cache, TTL 10min. `generate-preview-avatar` writes; `create-anonymous-account` reads. Skips the duplicate ~5–7s `extractTraitsWithGemini` call.
+- **Photo consent**: stamped at trial-account INSERT time (`photo_consent_at = CURRENT_TIMESTAMP`) — the wizard's 2 consent checkboxes count as the legal capture, the INSERT is the binding moment. Verified users (Google link, verify-email) keep the timestamp through trial→full conversion.
+- **`set-password` guard**: refuses with `{ code: 'EMAIL_REQUIRED_FIRST' }` if the trial user's email still matches `anon_*@anonymous`. Prevents creating a "full account" with an unloginable email.
+- **Trial completion email is deferred**: pipeline skips the Resend send when email matches `^anon_.+@anonymous$/i` (avoids `validation_error`). `server/lib/trialEmail.js → sendTrialCompletionEmailIfDeferred(userId)` is called from `verify-email` and `link-google` handlers; idempotent via `users.trial_completion_email_sent_at`.
+- **Trial 2-pass empty scene**: when a real landmark is linked to a bg, the empty-scene render gets it as Slot 1 — bakes it into the plate. Page render then receives the plate as `sceneBackground` and `packReferences` correctly skips the standalone landmark slot. Wired in `server.js` trial-mode `onVisualBible` block.
+- **Landmark proximity fallback**: `getIndexedLandmarks({city, latitude, longitude})` falls back to `getIndexedLandmarksNearLocation` at 20km → 50km → 100km when name match returns 0. Wabern → Bern works without per-city indexing.
+- **Landmark name normalization**: `LANDMARK-LINK` strips parens/brackets/commas/dots before comparing — `Holzbrücke Baden` now matches the Wikidata-indexed `Holzbrücke (Baden)`.
+- **Phantom age tiers**: `convertAvatarToStyle` MUST pass `age/gender/physical` through to the `adHocChar` it builds for `generateCharacter2x4Sheet` — otherwise `loadPhantom(undefined)` falls back to the generic adult phantom and proportions leak into kid characters.
+- **Staging trial-cap bypass**: `/api/trial/create-job` and `/api/trial/check-status` skip the 1-trial-per-user cap when `STAGING_AUTH_PASSWORD` is set (prod leaves it null).
+- **Trial dev panel preservation**: `clearStyledAvatarGenerationLog()` at job start is skipped when `inputData.trialMode === true`, so the prepare-title styled-avatar entries survive into the story result and the `StoryDisplay` "Stilisierte Avatare" panel renders.
+
 ### Test Models (Dev Mode)
 
 Allows admins to compare image generation across multiple AI models side-by-side for the same
