@@ -22,14 +22,16 @@ function initTrialRoutes(serverDeps) {
   deps = serverDeps;
 }
 
-// Trait-extraction cache. The trial flow calls extractTraitsWithGemini twice
-// for the same photo — once in generate-preview-avatar, once in
-// create-anonymous-account — which adds ~5-7s to the user-visible "Next"
-// wait. Caching by photo hash collapses the second call to a synchronous
-// lookup. Entries expire after 10 minutes (long enough for a user to fill
-// the form, short enough not to leak memory).
+// Trait-extraction in-flight + value cache. The trial flow calls
+// extractTraitsWithGemini concurrently from generate-preview-avatar and
+// create-anonymous-account — the prewarm fires the second call ~2s after
+// the first while the first is still running, so a value-only cache never
+// gets populated in time. We cache the in-flight Promise itself so the
+// second caller awaits the same Gemini call. Resolved values stay cached
+// for 10 minutes for late callers (back/forward nav etc).
 const TRAIT_CACHE_TTL_MS = 10 * 60 * 1000;
-const traitCache = new Map(); // hash -> { traits, expiresAt }
+const traitValueCache = new Map();   // hash -> { traits, expiresAt }
+const traitPromiseCache = new Map(); // hash -> Promise<traits|null>
 function _hashPhoto(photoStr) {
   // First 8KB is enough to fingerprint — same photo always hashes to same key.
   const sample = String(photoStr || '').slice(0, 8192);
@@ -38,20 +40,48 @@ function _hashPhoto(photoStr) {
 function cacheTraits(photoStr, traits) {
   if (!photoStr || !traits) return;
   const hash = _hashPhoto(photoStr);
-  traitCache.set(hash, { traits, expiresAt: Date.now() + TRAIT_CACHE_TTL_MS });
+  traitValueCache.set(hash, { traits, expiresAt: Date.now() + TRAIT_CACHE_TTL_MS });
   // Opportunistic GC: prune expired entries when the map gets large.
-  if (traitCache.size > 200) {
+  if (traitValueCache.size > 200) {
     const now = Date.now();
-    for (const [k, v] of traitCache) {
-      if (v.expiresAt < now) traitCache.delete(k);
+    for (const [k, v] of traitValueCache) {
+      if (v.expiresAt < now) traitValueCache.delete(k);
     }
   }
 }
 function getCachedTraits(photoStr) {
   if (!photoStr) return null;
-  const entry = traitCache.get(_hashPhoto(photoStr));
+  const entry = traitValueCache.get(_hashPhoto(photoStr));
   if (!entry || entry.expiresAt < Date.now()) return null;
   return entry.traits;
+}
+/**
+ * Returns extracted traits for `photoStr`, sharing an in-flight Gemini call
+ * with any concurrent caller. `photoDataUri` is passed to the extractor only
+ * on the first caller; later callers piggyback on the same Promise.
+ * Resolves to the traits object or null on failure.
+ */
+function extractTraitsShared(photoStr, photoDataUri, extractFn) {
+  if (!photoStr) return Promise.resolve(null);
+  const cached = getCachedTraits(photoStr);
+  if (cached) return Promise.resolve(cached);
+  const hash = _hashPhoto(photoStr);
+  const inFlight = traitPromiseCache.get(hash);
+  if (inFlight) return inFlight;
+  const p = (async () => {
+    try {
+      const result = await extractFn(photoDataUri);
+      const traits = result?.traits || null;
+      if (traits) cacheTraits(photoStr, traits);
+      return traits;
+    } catch {
+      return null;
+    } finally {
+      traitPromiseCache.delete(hash);
+    }
+  })();
+  traitPromiseCache.set(hash, p);
+  return p;
 }
 
 // Rate limiters for unauthenticated trial endpoints
@@ -530,20 +560,11 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
     let hairDescription = '';
     let extractedTraits = null;
     try {
-      // Cache hits avoid a second ~5-7s Gemini call when create-anonymous-account
-      // runs against the same photo a moment later.
-      const cached = getCachedTraits(facePhoto);
-      if (cached) {
-        extractedTraits = cached;
-        log.debug('[TRIAL AVATAR] Trait cache hit');
-      } else {
-        const photoDataUri = `data:image/jpeg;base64,${resizedBase64}`;
-        const traitsResult = await extractTraitsWithGemini(photoDataUri);
-        if (traitsResult?.traits) {
-          extractedTraits = traitsResult.traits;
-          cacheTraits(facePhoto, extractedTraits);
-        }
-      }
+      // Shared in-flight: if create-anonymous-account fired the same
+      // extraction a moment ago we piggyback on it. Otherwise we start it
+      // and a later caller piggybacks on us.
+      const photoDataUri = `data:image/jpeg;base64,${resizedBase64}`;
+      extractedTraits = await extractTraitsShared(facePhoto, photoDataUri, extractTraitsWithGemini);
       if (extractedTraits) {
         const { buildHairDescription } = require('../lib/storyHelpers');
         hairDescription = buildHairDescription(extractedTraits);
@@ -823,56 +844,54 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
 
     const { characterId, charId } = await saveTrialCharacter(pool, userId, characterData);
 
-    // Save preview avatar + extract physical traits from face photo
-    // Physical traits (hair, eyes, skin tone) are needed for styled avatar prompts
-    {
+    // Save preview avatar if we have one — quick UPDATE, keep it inline so
+    // the row is already populated when prepare-title reads it.
+    if (previewAvatar && typeof previewAvatar === 'string' && previewAvatar.startsWith('data:image/')) {
       try {
         const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
         if (charResult.rows.length > 0) {
           const charData = typeof charResult.rows[0].data === 'string'
             ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
-          if (charData.characters && charData.characters[0]) {
-            // Save preview avatar if already generated (background generation)
-            if (previewAvatar && typeof previewAvatar === 'string' && previewAvatar.startsWith('data:image/')) {
-              charData.characters[0].previewAvatar = previewAvatar;
-            }
-            // Extract physical traits from face photo (non-blocking, best-effort).
-            // generate-preview-avatar usually ran first and seeded the cache,
-            // saving ~5-7s on the user-visible "Next" wait. Fall back to a
-            // fresh extraction if not cached.
-            try {
-              let t = getCachedTraits(facePhoto);
-              if (t) {
-                log.debug('[TRIAL] Trait cache hit — skipping second Gemini extraction');
-              } else {
-                const { extractTraitsWithGemini } = require('./avatars');
-                const photoDataUri = facePhoto.startsWith('data:') ? facePhoto : `data:image/jpeg;base64,${facePhoto}`;
-                const traitsResult = await extractTraitsWithGemini(photoDataUri);
-                if (traitsResult?.traits) {
-                  t = traitsResult.traits;
-                  cacheTraits(facePhoto, t);
-                }
-              }
-              if (t) {
-                const physical = charData.characters[0].physical || {};
-                if (t.hairColor) physical.hairColor = t.hairColor;
-                if (t.eyeColor) physical.eyeColor = t.eyeColor;
-                if (t.skinTone) physical.skinTone = t.skinTone;
-                if (t.apparentAge) physical.apparentAge = t.apparentAge;
-                if (t.detailedHairAnalysis) physical.detailedHairAnalysis = t.detailedHairAnalysis;
-                charData.characters[0].physical = physical;
-                log.debug(`[TRIAL] Physical traits set: hair=${physical.hairColor}, eyes=${physical.eyeColor}, skin=${physical.skinTone}`);
-              }
-            } catch (traitErr) {
-              log.debug(`[TRIAL] Physical trait extraction failed (non-critical): ${traitErr.message}`);
-            }
+          if (charData.characters?.[0]) {
+            charData.characters[0].previewAvatar = previewAvatar;
             await pool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
           }
         }
       } catch (saveErr) {
-        log.warn(`[TRIAL] Failed to save avatar/traits: ${saveErr.message}`);
+        log.warn(`[TRIAL] Failed to save preview avatar: ${saveErr.message}`);
       }
     }
+
+    // Trait extraction runs as a background task — the endpoint returns the
+    // session token without waiting on Gemini. Prepare-title fires ~30s
+    // later (user navigates topic → ideas → click) and reads `physical`
+    // from the character row at that point; the background save lands well
+    // before then. Uses extractTraitsShared so we piggyback on
+    // generate-preview-avatar's already-in-flight call.
+    (async () => {
+      try {
+        const { extractTraitsWithGemini } = require('./avatars');
+        const photoDataUri = facePhoto.startsWith('data:') ? facePhoto : `data:image/jpeg;base64,${facePhoto}`;
+        const t = await extractTraitsShared(facePhoto, photoDataUri, extractTraitsWithGemini);
+        if (!t) return;
+        const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
+        if (charResult.rows.length === 0) return;
+        const charData = typeof charResult.rows[0].data === 'string'
+          ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
+        if (!charData.characters?.[0]) return;
+        const physical = charData.characters[0].physical || {};
+        if (t.hairColor) physical.hairColor = t.hairColor;
+        if (t.eyeColor) physical.eyeColor = t.eyeColor;
+        if (t.skinTone) physical.skinTone = t.skinTone;
+        if (t.apparentAge) physical.apparentAge = t.apparentAge;
+        if (t.detailedHairAnalysis) physical.detailedHairAnalysis = t.detailedHairAnalysis;
+        charData.characters[0].physical = physical;
+        await pool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
+        log.debug(`[TRIAL] Background traits saved for ${characterId}: hair=${physical.hairColor}, eyes=${physical.eyeColor}, skin=${physical.skinTone}`);
+      } catch (err) {
+        log.debug(`[TRIAL] Background trait save failed (non-critical): ${err.message}`);
+      }
+    })();
 
     const sessionToken = generateSessionToken(userId);
 
