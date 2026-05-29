@@ -102,7 +102,6 @@ export default function Pricing() {
       creditsIntro: `Stories are paid for with credits. ${creditsPerPage} credits = 1 page. A typical 10-page story = ${creditsPerPage * 10} credits.`,
       creditsTableCredits: 'Credits',
       creditsTablePrice: 'Price',
-      creditsTablePerPage: 'Per page',
       creditsNote: `New accounts start with free credits — enough to try a full story.`,
       // Book section
       bookTitle: 'Print your book',
@@ -136,7 +135,6 @@ export default function Pricing() {
       creditsIntro: `Geschichten werden mit Credits bezahlt. ${creditsPerPage} Credits = 1 Seite. Eine typische 10-Seiten-Geschichte = ${creditsPerPage * 10} Credits.`,
       creditsTableCredits: 'Credits',
       creditsTablePrice: 'Preis',
-      creditsTablePerPage: 'Pro Seite',
       creditsNote: 'Neue Konten erhalten Gratis-Credits — genug für eine ganze Geschichte zum Ausprobieren.',
       bookTitle: 'Dein Buch drucken lassen',
       bookSubtitle: `Pro Buch — zzgl. CHF ${SHIPPING_COST_CHF} Pauschalversand pro Bestellung (Schweiz)`,
@@ -168,7 +166,6 @@ export default function Pricing() {
       creditsIntro: `Les histoires sont payées en crédits. ${creditsPerPage} crédits = 1 page. Une histoire typique de 10 pages = ${creditsPerPage * 10} crédits.`,
       creditsTableCredits: 'Crédits',
       creditsTablePrice: 'Prix',
-      creditsTablePerPage: 'Par page',
       creditsNote: 'Les nouveaux comptes reçoivent des crédits gratuits — de quoi essayer une histoire complète.',
       bookTitle: 'Imprimez votre livre',
       bookSubtitle: `Par livre — plus CHF ${SHIPPING_COST_CHF} de livraison forfaitaire par commande (Suisse)`,
@@ -197,11 +194,25 @@ export default function Pricing() {
 
   const t = translations[language as keyof typeof translations] || translations.en;
 
+  // ── Shared style tokens ───────────────────────────────────────────────
+  // One card pattern reused across every section so the page has a
+  // consistent rhythm: white surface, subtle shadow, hairline border,
+  // generous padding, equal vertical spacing.
+  const card = 'bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6';
+  const sectionHeader = 'flex items-center gap-2 mb-4';
+  const sectionIcon = 'text-indigo-500';
+  const sectionTitle = 'text-xl md:text-2xl font-bold text-gray-800';
+  // Tables sit inside cards — they don't need their own shadow/rounding.
+  // Just a thin top border on the header row + dividers between rows.
+  const tableHeaderRow = 'bg-indigo-500 text-white text-sm font-semibold';
+  const tableCell = 'p-3';
+  const tableBodyRow = 'border-t border-gray-100';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation currentStep={0} />
 
-      <div className="px-4 md:px-8 py-8 max-w-4xl mx-auto">
+      <div className="px-4 md:px-8 py-8 max-w-3xl mx-auto">
         {/* Back button */}
         <button
           onClick={() => navigate('/stories')}
@@ -211,158 +222,116 @@ export default function Pricing() {
           {t.backToStories}
         </button>
 
-        {/* Header */}
+        {/* Page title (no card — conventional page header) */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-3">
-            {t.title}
-          </h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-3">{t.title}</h1>
           <p className="text-lg text-gray-600">{t.subtitle}</p>
         </div>
 
-        {/* ── Credits section ── */}
-        <div className="mb-10">
-          <div className="flex items-center gap-2 mb-3">
-            <Coins size={22} className="text-indigo-500" />
-            <h2 className="text-xl md:text-2xl font-bold text-gray-800">{t.creditsTitle}</h2>
+        {/* ── Credits card ──────────────────────────────────────────────── */}
+        <section className={card}>
+          <div className={sectionHeader}>
+            <Coins size={22} className={sectionIcon} />
+            <h2 className={sectionTitle}>{t.creditsTitle}</h2>
           </div>
-          <p className="text-gray-600 mb-4">{t.creditsIntro}</p>
-          <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-3">
-            <div className="grid grid-cols-3 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white">
-              <div className="p-3 font-semibold text-sm">{t.creditsTableCredits}</div>
-              <div className="p-3 text-center font-semibold text-sm border-l border-indigo-400">{t.creditsTablePrice}</div>
-              <div className="p-3 text-center font-semibold text-sm border-l border-indigo-400">{t.creditsTablePerPage}</div>
+          <p className="text-gray-600 mb-5">{t.creditsIntro}</p>
+          <div className="rounded-lg overflow-hidden border border-gray-200">
+            <div className={`grid grid-cols-2 ${tableHeaderRow}`}>
+              <div className={tableCell}>{t.creditsTableCredits}</div>
+              <div className={`${tableCell} text-center border-l border-indigo-400`}>{t.creditsTablePrice}</div>
             </div>
-            {creditPackages.map((pkg, index) => {
-              // Cost per page in rappen (1 CHF = 100 Rp), rounded.
-              const perPageRp = Math.round((pkg.amountCHF * 100) / (pkg.credits / creditsPerPage));
-              return (
-                <div
-                  key={pkg.credits}
-                  className={`grid grid-cols-3 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-indigo-50 transition-colors`}
-                >
-                  <div className="p-3 font-medium text-gray-700">{pkg.credits}</div>
-                  <div className="p-3 text-center border-l border-gray-200 font-semibold text-gray-800">CHF {pkg.amountCHF}.-</div>
-                  <div className="p-3 text-center border-l border-gray-200 text-sm text-gray-600">
-                    {perPageRp} Rp.
-                  </div>
+            {creditPackages.map((pkg) => (
+              <div key={pkg.credits} className={`grid grid-cols-2 bg-white ${tableBodyRow}`}>
+                <div className={`${tableCell} font-medium text-gray-700`}>{pkg.credits}</div>
+                <div className={`${tableCell} text-center border-l border-gray-100 font-semibold text-gray-800`}>
+                  CHF {pkg.amountCHF}.-
                 </div>
-              );
-            })}
-          </div>
-          <p className="text-sm text-gray-500 flex items-center gap-1.5">
-            <Sparkles size={14} className="text-amber-500" />
-            {t.creditsNote}
-          </p>
-        </div>
-
-        {/* ── Book section header ── */}
-        <div className="mb-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Book size={22} className="text-indigo-500" />
-            <h2 className="text-xl md:text-2xl font-bold text-gray-800">{t.bookTitle}</h2>
-          </div>
-          <p className="text-gray-600">{t.bookSubtitle}</p>
-          <p className="text-sm text-gray-500 mt-1">{t.internationalNote}</p>
-        </div>
-
-        {/* Pricing Table */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-6 relative">
-          {/* Loading overlay */}
-          {isLoading && (
-            <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-            </div>
-          )}
-          {/* Table Header */}
-          <div className="grid grid-cols-3 bg-gradient-to-r from-indigo-600 to-indigo-600 text-white">
-            <div className="p-4 font-semibold">{t.pages}</div>
-            <div className="p-4 text-center border-l border-indigo-500">
-              <div className="flex flex-col items-center gap-1">
-                <Book size={24} />
-                <span className="font-semibold">{t.softcover}</span>
-                <span className="text-xs text-indigo-200">{t.softcoverSize}</span>
-              </div>
-            </div>
-            <div className="p-4 text-center border-l border-indigo-500">
-              <div className="flex flex-col items-center gap-1">
-                <BookOpen size={24} />
-                <span className="font-semibold">{t.hardcover}</span>
-                <span className="text-xs text-indigo-200">{t.hardcoverSize}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Table Body */}
-          {pricingTiers.map((tier, index) => (
-            <div
-              key={tier.label}
-              className={`grid grid-cols-3 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-indigo-50 transition-colors`}
-            >
-              <div className="p-4 font-medium text-gray-700">
-                {tier.label}
-              </div>
-              <div className="p-4 text-center border-l border-gray-200 font-semibold text-gray-800">
-                CHF {tier.softcover}.-
-              </div>
-              <div className="p-4 text-center border-l border-gray-200 font-semibold text-indigo-700">
-                CHF {tier.hardcover}.-
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Credit-back reward callout — the headline incentive for printing.
-            Uses warm amber when the promo multiplier is active (2× currently),
-            falls back to neutral indigo when multiplier == 1. */}
-        <div
-          className={`rounded-2xl p-5 mb-8 border-2 ${
-            bookCreditMultiplier > 1
-              ? 'bg-gradient-to-r from-amber-50 to-amber-100 border-amber-300'
-              : 'bg-indigo-50 border-indigo-200'
-          }`}
-        >
-          <div className="flex items-start gap-3">
-            <Gift
-              size={28}
-              className={bookCreditMultiplier > 1 ? 'text-amber-600' : 'text-indigo-500'}
-            />
-            <div>
-              <h3
-                className={`font-bold text-lg mb-1 ${
-                  bookCreditMultiplier > 1 ? 'text-amber-900' : 'text-indigo-900'
-                }`}
-              >
-                {t.rewardTitle}
-              </h3>
-              <p className={bookCreditMultiplier > 1 ? 'text-amber-800' : 'text-gray-700'}>
-                {t.rewardBody}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Features */}
-        <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-2xl p-6 mb-8">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">{t.features}</h2>
-          <div className="grid md:grid-cols-2 gap-3">
-            {[t.feature1, t.feature2, t.feature3, t.feature4].map((feature, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <Check size={20} className="text-green-600" />
-                <span className="text-gray-700">{feature}</span>
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Combine Stories Note */}
-        <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 text-center mb-8">
-          <p className="text-amber-800 font-medium">
-            {t.combineNote}
+          <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-4">
+            <Sparkles size={14} className={sectionIcon} />
+            {t.creditsNote}
           </p>
-        </div>
+        </section>
 
-        {/* CTA */}
-        <div className="text-center">
+        {/* ── Book pricing card ─────────────────────────────────────────── */}
+        <section className={`${card} relative`}>
+          {isLoading && (
+            <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-2xl z-10">
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+            </div>
+          )}
+          <div className={sectionHeader}>
+            <Book size={22} className={sectionIcon} />
+            <h2 className={sectionTitle}>{t.bookTitle}</h2>
+          </div>
+          <p className="text-gray-600 mb-1">{t.bookSubtitle}</p>
+          <p className="text-sm text-gray-500 mb-5">{t.internationalNote}</p>
+          <div className="rounded-lg overflow-hidden border border-gray-200">
+            <div className={`grid grid-cols-3 ${tableHeaderRow}`}>
+              <div className={tableCell}>{t.pages}</div>
+              <div className={`${tableCell} text-center border-l border-indigo-400`}>
+                <div className="flex flex-col items-center gap-0.5">
+                  <Book size={18} />
+                  <span>{t.softcover}</span>
+                  <span className="text-xs font-normal text-indigo-100">{t.softcoverSize}</span>
+                </div>
+              </div>
+              <div className={`${tableCell} text-center border-l border-indigo-400`}>
+                <div className="flex flex-col items-center gap-0.5">
+                  <BookOpen size={18} />
+                  <span>{t.hardcover}</span>
+                  <span className="text-xs font-normal text-indigo-100">{t.hardcoverSize}</span>
+                </div>
+              </div>
+            </div>
+            {pricingTiers.map((tier) => (
+              <div key={tier.label} className={`grid grid-cols-3 bg-white ${tableBodyRow}`}>
+                <div className={`${tableCell} font-medium text-gray-700`}>{tier.label}</div>
+                <div className={`${tableCell} text-center border-l border-gray-100 font-semibold text-gray-800`}>
+                  CHF {tier.softcover}.-
+                </div>
+                <div className={`${tableCell} text-center border-l border-gray-100 font-semibold text-indigo-700`}>
+                  CHF {tier.hardcover}.-
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Credit-back reward card ───────────────────────────────────── */}
+        <section className={card}>
+          <div className={sectionHeader}>
+            <Gift size={22} className={sectionIcon} />
+            <h2 className={sectionTitle}>{t.rewardTitle}</h2>
+          </div>
+          <p className="text-gray-600">{t.rewardBody}</p>
+        </section>
+
+        {/* ── Features card ─────────────────────────────────────────────── */}
+        <section className={card}>
+          <div className={sectionHeader}>
+            <Check size={22} className={sectionIcon} />
+            <h2 className={sectionTitle}>{t.features}</h2>
+          </div>
+          <div className="grid md:grid-cols-2 gap-3">
+            {[t.feature1, t.feature2, t.feature3, t.feature4].map((feature) => (
+              <div key={feature} className="flex items-center gap-2 text-gray-700">
+                <Check size={18} className="text-indigo-500 shrink-0" />
+                <span>{feature}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Combine note card ─────────────────────────────────────────── */}
+        <section className={card}>
+          <p className="text-gray-700 text-center">{t.combineNote}</p>
+        </section>
+
+        {/* CTA (no card — single action button) */}
+        <div className="text-center mt-8">
           <button
             onClick={() => navigate('/create')}
             className="px-8 py-3 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600 transition-colors"
