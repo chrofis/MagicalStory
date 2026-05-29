@@ -447,6 +447,24 @@ export default function TrialGenerationPage() {
 
   // ── Email linking ──────────────────────────────────────────────────────────
 
+  // Shared finalizer for the staging "merged into existing account" response.
+  // The server (link-email + link-google) detects when the email belongs to a
+  // real account and returns { merged: true, token, user } instead of the
+  // verification flow. We swap the trial session for the real-account JWT and
+  // navigate straight to /stories so the user sees their merged-in trial run
+  // as part of their existing library.
+  const finalizeMergedClaim = (data: { token?: string; user?: unknown }) => {
+    if (data.token) storage.setItem('auth_token', data.token);
+    if (data.user)  storage.setItem('current_user', JSON.stringify(data.user));
+    storage.removeItem('trial_session_token');
+    storage.removeItem('trial_gen_session_token');
+    storage.removeItem('trial_gen_character_id');
+    storage.removeItem('trial_gen_character_name');
+    storage.removeItem('trial_gen_job_id');
+    // Hard nav so AuthContext re-reads from localStorage on the fresh route.
+    window.location.href = '/stories';
+  };
+
   const handleEmailSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email.trim() || isAuthLoading || !state?.sessionToken) return;
@@ -468,6 +486,14 @@ export default function TrialGenerationPage() {
 
       if (!response.ok) {
         setAuthError(data.error || t.error);
+        return;
+      }
+
+      // Staging merge path — email belonged to a real account, server
+      // already moved everything and issued a fresh JWT. Swap sessions and
+      // land the user on /stories instead of "check your email".
+      if (data.merged) {
+        finalizeMergedClaim(data);
         return;
       }
 
@@ -500,6 +526,13 @@ export default function TrialGenerationPage() {
 
     if (!response.ok) {
       setAuthError(data.error || t.error);
+      return;
+    }
+
+    // Staging merge path — Google email matched an existing real account.
+    // Same finalizer as the email flow; user lands on /stories.
+    if (data.merged) {
+      finalizeMergedClaim(data);
       return;
     }
 
@@ -631,7 +664,7 @@ export default function TrialGenerationPage() {
   useEffect(() => {
     if (slideshowItems.length === 0) return;
     const currentSlide = slideshowItems[slideshowIndex % slideshowItems.length];
-    const dwellMs = currentSlide.caption.kind === 'message' ? 7000 : 4500;
+    const dwellMs = currentSlide.caption.kind === 'message' ? 9000 : 6000;
     const id = setTimeout(() => {
       setSlideshowIndex(prev => (prev + 1) % Math.max(1, slideshowItems.length));
     }, dwellMs);

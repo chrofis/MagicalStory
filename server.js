@@ -3241,8 +3241,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
           // Build per-character clothing for this page
           const perCharClothing = page.characterClothing || {};
-          // Trial mode fallback: if no clothing parsed, use the trial costume type for main characters
-          if (inputData._trialCostumeType && Object.keys(perCharClothing).length === 0) {
+          // Trial mode override: when the user picked a costume theme (wizard,
+          // knight, ...) on a 5-page trial, force the main character into the
+          // costume on EVERY page. Claude's outline routinely writes
+          // `:standard` for every page despite the costume theme (observed
+          // with Lukas/wizard 2026-05-29 and Manu/wizard before), leaving the
+          // theme invisible in the actual story. Trial is too short to allow
+          // narrative-arc costume transitions — applies unconditionally
+          // (previous fallback only fired when no clothing was parsed at all).
+          if (inputData._trialCostumeType) {
             const mainCharIds = inputData.mainCharacters || [];
             for (const char of (inputData.characters || [])) {
               const isMain = char.isMainCharacter === true || mainCharIds.includes(char.id);
@@ -3930,9 +3937,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         log.debug(`⚡ [STREAM] Visual Bible ready - scene expansions can now proceed`);
 
-        // Trial mode: generate empty scene backgrounds from visual bible immediately
-        // Backgrounds arrive early in the stream, so we can start generating before pages are done
-        if (inputData.trialMode && vb.backgrounds?.length > 0) {
+        // Trial: empty scene generation intentionally skipped. Each empty-
+        // scene render is a ~5s Grok call and 5 backgrounds adds ~25s to a
+        // trial that's already too slow. Trial pages render direct from
+        // prompt + character + landmark slot; the scene-anchor benefit
+        // (consistency, baked-in landmark) doesn't justify the latency on a
+        // 5-page taste-test.
+        const _generateTrialEmptyScenes = false;
+        if (_generateTrialEmptyScenes && inputData.trialMode && vb.backgrounds?.length > 0) {
           log.info(`🎬 [TRIAL] Starting early empty scene generation from ${vb.backgrounds.length} visual bible backgrounds`);
           const artStyleDesc = resolveArtStyle(inputData.artStyle || 'watercolor') || '';
           const bgLimit = pLimit(5);
@@ -7113,9 +7125,22 @@ async function _processStoryJobImpl(jobId) {
   const genLog = new GenerationLogger();
   genLog.setStage('outline');
 
-  // Clear avatar generation logs for fresh tracking
-  clearStyledAvatarGenerationLog();
-  clearCostumedAvatarGenerationLog();
+  // Clear avatar generation logs for fresh tracking. Skip for trial: trial
+  // styled avatars are generated in /api/trial/prepare-title BEFORE the job
+  // runs. Clearing here wipes those entries before the result captures
+  // them, hiding the "Stilisierte Avatare" dev panel for every trial story.
+  // We load the job's inputData below; do a lightweight pre-load just to
+  // check trialMode and decide whether to clear.
+  const _preInputDataRes = await dbPool.query('SELECT input_data FROM story_jobs WHERE id = $1', [jobId]);
+  const _preInputData = _preInputDataRes.rows[0]?.input_data
+    ? (typeof _preInputDataRes.rows[0].input_data === 'string'
+       ? JSON.parse(_preInputDataRes.rows[0].input_data)
+       : _preInputDataRes.rows[0].input_data)
+    : null;
+  if (!_preInputData?.trialMode) {
+    clearStyledAvatarGenerationLog();
+    clearCostumedAvatarGenerationLog();
+  }
 
   // Token usage tracker - accumulates usage from all API calls by provider and function
   const tokenUsage = {

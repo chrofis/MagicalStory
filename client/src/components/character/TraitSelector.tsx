@@ -66,16 +66,28 @@ export function TraitSelector({
         <span className="text-lg font-semibold text-gray-800">
           {label}
         </span>
-        {minRequired > 0 && (
-          <span className="text-sm font-normal text-gray-500 ml-1">
-            ({t.selectAtLeast} {minRequired})
-          </span>
-        )}
-        {selectedTraits.length > 0 && (
-          <span className="text-sm font-normal text-gray-500 ml-1">
-            - {selectedTraits.length} {language === 'de' ? 'gewählt' : language === 'fr' ? 'sélectionné' : 'selected'}
-          </span>
-        )}
+        {(() => {
+          // Highlight the count in red until the minimum is met. The
+          // section heading is collapsed by default, so a quiet gray hint is
+          // easy to miss — the red signal makes "you still need more" obvious
+          // without forcing the user to expand the section.
+          const minUnmet = minRequired > 0 && selectedTraits.length < minRequired;
+          const toneClass = minUnmet ? 'text-red-600 font-semibold' : 'text-gray-500';
+          return (
+            <>
+              {minRequired > 0 && (
+                <span className={`text-sm font-normal ml-1 ${toneClass}`}>
+                  ({t.selectAtLeast} {minRequired})
+                </span>
+              )}
+              {selectedTraits.length > 0 && (
+                <span className={`text-sm font-normal ml-1 ${toneClass}`}>
+                  - {selectedTraits.length} {language === 'de' ? 'gewählt' : language === 'fr' ? 'sélectionné' : 'selected'}
+                </span>
+              )}
+            </>
+          );
+        })()}
       </button>
 
       {/* Collapsed view: show selected traits as compact chips */}
