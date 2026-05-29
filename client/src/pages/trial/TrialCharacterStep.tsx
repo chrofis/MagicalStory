@@ -219,6 +219,28 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   // no perceivable wait. Without this, the click triggers a 5-12s blocking
   // call (DB inserts + Gemini trait extraction + DB updates).
   const accountCreationPromiseRef = useRef<Promise<{ sessionToken: string; characterId: string } | null> | null>(null);
+  // Snapshot of the user-facing fields that were sent with the prewarm. On
+  // Next we compare this to the current form state and PATCH any
+  // diffs to /api/trial/update-character-details — so a name edited after
+  // the prewarm still lands on the character row before advancing.
+  const sentSnapshotRef = useRef<{ name: string; age: string; gender: string; traits: string[]; customTraits: string } | null>(null);
+
+  const buildDetailsSnapshot = (data: CharacterData) => ({
+    name: (data.name || '').trim(),
+    age: String(data.age || ''),
+    gender: data.gender || '',
+    traits: [...(data.traits || [])].sort(),
+    customTraits: data.customTraits || '',
+  });
+
+  const detailsDiffer = (a: ReturnType<typeof buildDetailsSnapshot>, b: ReturnType<typeof buildDetailsSnapshot>) => (
+    a.name !== b.name
+    || a.age !== b.age
+    || a.gender !== b.gender
+    || a.customTraits !== b.customTraits
+    || a.traits.length !== b.traits.length
+    || a.traits.some((t, i) => t !== b.traits[i])
+  );
 
   const hasPhoto = !!characterData.photos.face;
   const canProceed = characterData.name.trim() && characterData.gender && hasPhoto;
@@ -297,6 +319,9 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
       }
     }
 
+    // Snapshot the user-facing fields we're sending so the dirty-check on
+    // Next knows whether a PATCH is needed.
+    sentSnapshotRef.current = buildDetailsSnapshot(data);
     const accountResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/create-anonymous-account`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -371,14 +396,49 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
         accountCreationPromiseRef.current = startAccountCreation();
       }
       const result = await accountCreationPromiseRef.current;
+      let activeSession: { sessionToken: string; characterId: string } | null = result;
       if (!result) {
         // Prewarm failed silently — try once more synchronously so the user
         // gets a real error to react to, not a silent abort.
         const retry = await startAccountCreation();
         if (!retry) throw new Error('Account creation failed');
-        if (onAccountCreated) onAccountCreated(retry.sessionToken, retry.characterId);
-      } else if (onAccountCreated) {
-        onAccountCreated(result.sessionToken, result.characterId);
+        activeSession = retry;
+      }
+
+      // Sync any field edits made after the prewarm fired. The prewarm sent
+      // a fixed body; later name/gender/age/traits/customTraits edits
+      // wouldn't reach the DB without this PATCH.
+      const currentSnapshot = buildDetailsSnapshot(characterDataRef.current);
+      if (sentSnapshotRef.current && detailsDiffer(currentSnapshot, sentSnapshotRef.current)) {
+        try {
+          const patchResp = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/update-character-details`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${activeSession!.sessionToken}`,
+            },
+            body: JSON.stringify({
+              name: currentSnapshot.name,
+              age: currentSnapshot.age,
+              gender: currentSnapshot.gender,
+              traits: characterDataRef.current.traits,
+              customTraits: currentSnapshot.customTraits,
+            }),
+          });
+          if (patchResp.ok) {
+            sentSnapshotRef.current = currentSnapshot;
+          } else {
+            // Don't block advance on the sync — log + continue. Topic step
+            // re-reads from local state, so the user still sees their edits.
+            console.warn('[TRIAL] update-character-details failed:', patchResp.status);
+          }
+        } catch (patchErr) {
+          console.warn('[TRIAL] update-character-details network error:', patchErr);
+        }
+      }
+
+      if (onAccountCreated && activeSession) {
+        onAccountCreated(activeSession.sessionToken, activeSession.characterId);
       }
     } catch (err) {
       const status = (err as { status?: number })?.status;

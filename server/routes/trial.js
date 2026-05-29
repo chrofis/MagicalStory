@@ -886,6 +886,75 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
 });
 
 /**
+ * PATCH /api/trial/update-character-details
+ *
+ * Updates the user-facing character fields (name, age, gender, traits,
+ * customTraits) on an existing trial character. Used by the wizard to sync
+ * edits made AFTER the background create-anonymous-account fired — without
+ * this the prewarmed account is locked to whatever the form held at fire
+ * time. Does NOT touch `physical` (extracted from photo, server-owned) or
+ * any avatar fields.
+ */
+router.patch('/update-character-details', verifySessionToken, async (req, res) => {
+  try {
+    const { userId } = req.sessionUser;
+    const { name, age, gender, traits, customTraits } = req.body || {};
+
+    if (typeof name !== 'string' || !name.trim() || name.length > 50) {
+      return res.status(400).json({ error: 'Invalid name' });
+    }
+    if (gender && !['male', 'female'].includes(gender)) {
+      return res.status(400).json({ error: 'Invalid gender' });
+    }
+    if (age != null && age !== '' && (isNaN(parseInt(age)) || parseInt(age) < 1 || parseInt(age) > 18)) {
+      return res.status(400).json({ error: 'Invalid age' });
+    }
+    if (traits && !Array.isArray(traits)) {
+      return res.status(400).json({ error: 'Invalid traits' });
+    }
+
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+
+    // characters.id for trial users is deterministic: `characters_${userId}`
+    const characterId = `characters_${userId}`;
+    const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
+    if (charResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    const charData = typeof charResult.rows[0].data === 'string'
+      ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
+    if (!charData?.characters?.[0]) {
+      return res.status(404).json({ error: 'Character entry missing' });
+    }
+
+    // Mirror the wizard's structuredTraits shape (matches saveTrialCharacter).
+    const rawTraits = traits || [];
+    const structuredTraits = {
+      strengths: rawTraits,
+      flaws: [],
+      challenges: [],
+      ...(customTraits ? { specialDetails: customTraits } : {}),
+    };
+
+    const c = charData.characters[0];
+    c.name = name.replace(/[\r\n]/g, '').trim();
+    c.age = age || '';
+    c.gender = gender || '';
+    c.traits = structuredTraits;
+    if (customTraits != null) c.customTraits = customTraits;
+
+    await pool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
+    log.debug(`[TRIAL] Character details updated for ${userId}: ${c.name}`);
+    res.json({ success: true, characterId, charId: c.id });
+  } catch (err) {
+    log.error(`[TRIAL] update-character-details error: ${err.message}`);
+    res.status(500).json({ error: 'Failed to update character. Please try again.' });
+  }
+});
+
+/**
  * GET /api/trial/check-status
  *
  * Check if this trial user has already used their free story.
