@@ -664,24 +664,37 @@ export default function MyStories() {
     }
   }, [stories.length, hasMore, isLoading, isLoadingMore]);
 
-  // Poll for active jobs when no stories are loaded (e.g., trial user lands here while story generates)
+  // Poll for active jobs when no stories are loaded (e.g., trial user lands
+  // here while story generates). Only refreshes the stories list when we
+  // observed an active job that THEN disappeared (job completed). Without
+  // this guard, polling fires loadStories() on every "no jobs" tick, which
+  // flips isLoading, which retriggers this effect, which polls again — a
+  // ~10×/second hammer loop (logged as "Loaded 0 stories in 50ms" repeating
+  // endlessly when impersonating a user with no stories and no jobs).
   useEffect(() => {
     if (isLoading || stories.length > 0 || !isAuthenticated) return;
 
     let cancelled = false;
+    let hadActiveJob = false;
     const poll = async () => {
       try {
         const jobs = await storyService.getActiveJobs();
         if (cancelled) return;
         if (jobs.length > 0) {
+          hadActiveJob = true;
           const job = jobs[0];
           setActiveJob({ id: job.id, progress: job.progress, message: job.progress_message });
         } else {
           setActiveJob(null);
-          // No active jobs and no stories — try refreshing stories (job may have just completed)
-          storiesCache = { data: null, total: 0, timestamp: 0, userId: null };
-          loadAttemptedRef.current = false;
-          loadStories();
+          // Only refresh the stories list if we PREVIOUSLY saw an active
+          // job — meaning one just completed and there's now likely a new
+          // story to fetch. Otherwise polling does nothing destructive.
+          if (hadActiveJob) {
+            hadActiveJob = false;
+            storiesCache = { data: null, total: 0, timestamp: 0, userId: null };
+            loadAttemptedRef.current = false;
+            loadStories();
+          }
         }
       } catch { /* ignore */ }
     };
