@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Camera, Sparkles, Clock, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { Navigation } from '@/components/common';
@@ -85,6 +85,69 @@ const trialUsedStrings: Record<string, { title: string; desc: string; signUp: st
   },
 };
 
+// One-off intro screen shown to fresh visitors of /try. After they click
+// "Let's start" the wizard takes over (Character → Topic → Ideas).
+// No progress bar here — it's pre-wizard. State lives in TrialWizard
+// (showIntro) and is not persisted; reloading the page shows it again.
+const introStrings: Record<string, {
+  title: string;
+  subtitle: string;
+  step1Title: string; step1Desc: string;
+  step2Title: string; step2Desc: string;
+  step3Title: string; step3Desc: string;
+  freeNote: string;
+  cta: string;
+}> = {
+  en: {
+    title: 'Create your free story',
+    subtitle: 'A personalized children\'s book with your child as the main character — ready in 3 minutes.',
+    step1Title: 'Upload a photo',
+    step1Desc: 'We need one photo of your child.',
+    step2Title: 'Pick a topic',
+    step2Desc: 'Choose a theme your child loves.',
+    step3Title: 'Sit back',
+    step3Desc: 'Ready in ~3 minutes. You\'ll receive it as a PDF by email.',
+    freeNote: 'Free · No signup needed',
+    cta: 'Let\'s start',
+  },
+  de: {
+    title: 'Erstelle deine Gratis-Geschichte',
+    subtitle: 'Eine personalisierte Kinderbuch-Geschichte mit deinem Kind als Hauptfigur — in 3 Minuten.',
+    step1Title: 'Foto hochladen',
+    step1Desc: 'Wir brauchen ein Foto deines Kindes.',
+    step2Title: 'Geschichte wählen',
+    step2Desc: 'Wähle ein Thema, das dein Kind liebt.',
+    step3Title: 'Lehn dich zurück',
+    step3Desc: 'In ~3 Minuten fertig. Du erhältst sie als PDF per E-Mail.',
+    freeNote: 'Gratis · Keine Anmeldung nötig',
+    cta: 'Los geht\'s',
+  },
+  fr: {
+    title: 'Créez votre histoire gratuite',
+    subtitle: 'Un livre pour enfants personnalisé avec votre enfant comme héros — prêt en 3 minutes.',
+    step1Title: 'Téléchargez une photo',
+    step1Desc: 'Une photo de votre enfant suffit.',
+    step2Title: 'Choisir un thème',
+    step2Desc: 'Choisissez un sujet que votre enfant adore.',
+    step3Title: 'Détendez-vous',
+    step3Desc: 'Prête en ~3 minutes. Vous la recevrez en PDF par e-mail.',
+    freeNote: 'Gratuit · Aucune inscription requise',
+    cta: 'C\'est parti',
+  },
+  it: {
+    title: 'Crea la tua storia gratuita',
+    subtitle: 'Un libro per bambini personalizzato con tuo figlio come protagonista — pronto in 3 minuti.',
+    step1Title: 'Carica una foto',
+    step1Desc: 'Basta una foto di tuo figlio.',
+    step2Title: 'Scegli un tema',
+    step2Desc: 'Scegli un argomento che ama.',
+    step3Title: 'Rilassati',
+    step3Desc: 'Pronta in ~3 minuti. La riceverai in PDF via e-mail.',
+    freeNote: 'Gratis · Nessuna registrazione',
+    cta: 'Iniziamo',
+  },
+};
+
 const loggedInStrings: Record<string, { title: string; desc: string; goToCreate: string }> = {
   en: {
     title: 'You already have an account!',
@@ -115,6 +178,13 @@ export default function TrialWizard() {
   const { language } = useLanguage();
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+
+  // One-off intro screen. Fresh visitors land here before the wizard
+  // starts so they know what to expect (photo, topic, ~3 min wait, PDF
+  // by email). Not persisted — reload shows it again. Intentional: it's
+  // a tiny screen, and re-seeing it costs nothing vs the risk of
+  // skipping it for a returning bouncer who never actually started.
+  const [showIntro, setShowIntro] = useState(true);
 
   // Wizard step
   const [currentStep, setCurrentStep] = useState<TrialStep>('character');
@@ -383,6 +453,68 @@ export default function TrialWizard() {
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
+
+  // Intro screen — pre-wizard. Single CTA flips showIntro=false and the
+  // wizard takes over. No progress bar shown (the wizard hasn't started).
+  const intro = introStrings[language] || introStrings.en;
+  if (showIntro) {
+    const cardClass = 'bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4';
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <nav className="bg-black text-white px-3 py-3">
+          <div className="flex justify-between items-center">
+            <Link to="/" className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
+              <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
+              Magical Story
+            </Link>
+          </div>
+        </nav>
+        <div className="px-4 md:px-8 py-8 max-w-2xl mx-auto">
+          {/* Hero */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-3">{intro.title}</h1>
+            <p className="text-lg text-gray-600">{intro.subtitle}</p>
+          </div>
+
+          {/* Three numbered "what happens next" cards */}
+          {([
+            { n: 1, icon: <Camera size={22} className="text-indigo-500" />, title: intro.step1Title, desc: intro.step1Desc },
+            { n: 2, icon: <Sparkles size={22} className="text-indigo-500" />, title: intro.step2Title, desc: intro.step2Desc },
+            { n: 3, icon: <Clock size={22} className="text-indigo-500" />, title: intro.step3Title, desc: intro.step3Desc },
+          ] as const).map((s) => (
+            <section key={s.n} className={cardClass}>
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold shrink-0">
+                  {s.n}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    {s.icon}
+                    <h2 className="text-base md:text-lg font-bold text-gray-800">{s.title}</h2>
+                  </div>
+                  <p className="text-gray-600 text-sm md:text-base">{s.desc}</p>
+                </div>
+              </div>
+            </section>
+          ))}
+
+          {/* Free note */}
+          <p className="text-center text-sm text-gray-500 mt-2 mb-6">{intro.freeNote}</p>
+
+          {/* CTA */}
+          <div className="text-center">
+            <button
+              onClick={() => setShowIntro(false)}
+              className="inline-flex items-center gap-2 px-8 py-3 bg-indigo-500 text-white rounded-lg font-semibold text-lg hover:bg-indigo-600 transition-colors"
+            >
+              {intro.cta}
+              <ArrowRight size={20} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
