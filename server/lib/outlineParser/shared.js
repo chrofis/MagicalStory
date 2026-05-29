@@ -337,12 +337,23 @@ const DRAFT_HEADER_RE = /^\s*(?:#{1,3}\s*)?\*{0,2}\s*Draft\s*(?:Page|Seite|Pági
 /**
  * Extract draft-section pages from a full unified-story response.
  * Pure function — returns a fresh Map each call. Callers should cache.
+ *
+ * Trial stories (`prompts/story-trial.txt`) intentionally don't emit a draft
+ * section — they're single-pass for speed. Callers parsing a trial response
+ * pass `{ isTrial: true }` to suppress the "marker missing" warning, which
+ * is otherwise correct but spurious.
+ *
  * @param {string} response - Full unified-story response text
+ * @param {object} [options]
+ * @param {boolean} [options.isTrial=false] - true when parsing a trial-prompt response
  * @returns {Map<number, {text: string, sceneProse: string, sceneHint: string, content: string}>}
  */
-function extractDraftPagesFromText(response) {
+function extractDraftPagesFromText(response, options = {}) {
   const map = new Map();
   if (!response) return map;
+  // Trial prompts skip draft → analysis → revise by design. Don't even try
+  // to scan; the patch section carries the full story.
+  if (options.isTrial) return map;
 
   // Sonnet sometimes omits the `---STORY DRAFT---` opener and jumps
   // straight into `Draft 1` headers (observed on staging story

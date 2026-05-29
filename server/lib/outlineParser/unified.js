@@ -20,8 +20,13 @@ const {
 class UnifiedStoryParser {
   /**
    * @param {string} response - The full unified story response
+   * @param {object} [options]
+   * @param {boolean} [options.isTrial=false] - true when parsing a trial-prompt response
+   *   (suppresses the spurious "STORY DRAFT marker missing" warning — trial
+   *   prompts intentionally skip draft → analysis → revise; see docs/decisions.md).
    */
-  constructor(response) {
+  constructor(response, options = {}) {
+    this._isTrial = !!options.isTrial;
     this.response = response || '';
     this._cache = {};
   }
@@ -407,7 +412,7 @@ class UnifiedStoryParser {
    */
   _extractDraftPages() {
     if (this._cache.draftPages !== undefined) return this._cache.draftPages;
-    const map = extractDraftPagesFromText(this.response);
+    const map = extractDraftPagesFromText(this.response, { isTrial: this._isTrial });
     this._cache.draftPages = map;
     if (map.size > 0) {
       log.debug(`[UNIFIED-PARSER] Draft pages extracted: ${map.size} (page numbers: ${[...map.keys()].join(',')})`);

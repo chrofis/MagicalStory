@@ -72,7 +72,7 @@ class ProgressiveUnifiedParser {
    */
   _ensureDraftPages() {
     if (this._draftPages !== null) return this._draftPages;
-    this._draftPages = extractDraftPagesFromText(this.fullText);
+    this._draftPages = extractDraftPagesFromText(this.fullText, { isTrial: this._isTrial });
     return this._draftPages;
   }
 

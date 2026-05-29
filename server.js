@@ -4253,8 +4253,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     progressiveParser.finalize();
     log.debug(`📖 [UNIFIED] Response length: ${unifiedResponse.length} chars, ${streamingPagesDetected} pages detected during streaming`);
 
-    // Parse the unified response (full parse for complete data)
-    const parser = new UnifiedStoryParser(unifiedResponse);
+    // Parse the unified response (full parse for complete data). Pass
+    // isTrial so the parser doesn't warn about a missing draft section that
+    // the trial prompt deliberately omits. See docs/decisions.md → "Trial
+    // stories skip draft → analysis → revise".
+    const parser = new UnifiedStoryParser(unifiedResponse, { isTrial: !!inputData.trialMode });
     const title = parser.extractTitle() || streamingTitle || inputData.storyType || 'Untitled Story';
     const titleCandidates = parser.extractTitleCandidates();
     const clothingRequirements = inputData.trialMode
