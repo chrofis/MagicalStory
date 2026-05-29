@@ -845,7 +845,17 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
     const { characterId, charId } = await saveTrialCharacter(pool, userId, characterData);
 
     // Save preview avatar if we have one — quick UPDATE, keep it inline so
-    // the row is already populated when prepare-title reads it.
+    // the row is already populated when prepare-title reads it. ALSO store
+    // the same data URI as `avatars.standard` so the 2×4 sheet generator
+    // (`resolveStandardAvatar` in character2x4Sheet.js) has a clean styled
+    // body reference. Without this fallback the 2×4 generator logs
+    // "standard avatar UNRESOLVABLE — falling back to raw photo for
+    // costumed:* — leaks the raw photo's clothing/background into the
+    // costume render", which is exactly why trial story characters looked
+    // nothing like the preview avatar (real-photo clothes + bg bled into
+    // every sheet). The preview avatar is a 9:16 watercolor portrait of
+    // the same character in standard clothes — perfectly usable as the
+    // body reference.
     if (previewAvatar && typeof previewAvatar === 'string' && previewAvatar.startsWith('data:image/')) {
       try {
         const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
@@ -854,6 +864,10 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
             ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
           if (charData.characters?.[0]) {
             charData.characters[0].previewAvatar = previewAvatar;
+            charData.characters[0].avatars = {
+              ...(charData.characters[0].avatars || {}),
+              standard: previewAvatar,
+            };
             await pool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
           }
         }
