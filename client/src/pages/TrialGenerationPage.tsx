@@ -544,7 +544,8 @@ export default function TrialGenerationPage() {
   // funny line. Once we run out of avatars (small pool early), we recycle.
   type SlideCaption =
     | { kind: 'message'; text: string; tone: 'info' }
-    | { kind: 'funny';   text: string };
+    | { kind: 'funny';   text: string }
+    | { kind: 'none' };
   type Slide = { imageSrc: string; emphasis: 'avatar' | 'title' | 'page'; label: string; caption: SlideCaption };
 
   const slideshowItems = useMemo<Slide[]>(() => {
@@ -583,9 +584,11 @@ export default function TrialGenerationPage() {
       items.push({ imageSrc: a.src, emphasis: 'avatar', label: a.label, caption: introSpecs[i] });
     }
 
-    // Story content: title + pages as they arrive, each with a funny line.
+    // Story content: title + pages as they arrive. No caption — the image
+    // is the message. The caption slot stays reserved (rendered empty) so
+    // the page doesn't reflow between slides.
     if (titlePageImage) {
-      items.push({ imageSrc: titlePageImage, emphasis: 'title', label: 'Cover', caption: { kind: 'funny', text: funnyAt(4) } });
+      items.push({ imageSrc: titlePageImage, emphasis: 'title', label: 'Cover', caption: { kind: 'none' } });
     }
     for (let i = 0; i < pageImages.length; i++) {
       const img = pageImages[i];
@@ -593,9 +596,12 @@ export default function TrialGenerationPage() {
         imageSrc: img.imageData,
         emphasis: 'page',
         label: `Page ${img.pageNumber}`,
-        caption: { kind: 'funny', text: funnyAt(5 + i) },
+        caption: { kind: 'none' },
       });
     }
+    // funnyAt is referenced only by the intro specs above; mark used so the
+    // linter doesn't trip if the intro happens to be empty.
+    void funnyAt;
     return items;
   // funnyMessages is a stable module-scope array; safe to omit
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -749,18 +755,22 @@ export default function TrialGenerationPage() {
 
                     {/* Caption area — fixed min-height so the rest of the
                         page doesn't bounce when a one-line funny is replaced
-                        by a multi-line info message. */}
+                        by a multi-line info message, or by no caption at all
+                        once real story images take over. */}
                     {pageState !== 'completed' && (
                       <div className="mt-3 min-h-[80px] w-full max-w-md flex items-center justify-center px-3 transition-opacity duration-300">
-                        {item.caption.kind === 'message' ? (
+                        {item.caption.kind === 'message' && (
                           <p className="text-sm text-indigo-700 font-medium text-center leading-relaxed">
                             {item.caption.text}
                           </p>
-                        ) : (
+                        )}
+                        {item.caption.kind === 'funny' && (
                           <p className="text-sm text-indigo-600 font-medium text-center italic">
                             {item.caption.text}
                           </p>
                         )}
+                        {/* caption.kind === 'none' renders the empty
+                            min-height block — keeps the layout stable. */}
                       </div>
                     )}
                   </>
