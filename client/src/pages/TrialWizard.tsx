@@ -476,27 +476,26 @@ export default function TrialWizard() {
             <p className="text-lg text-gray-600">{intro.subtitle}</p>
           </div>
 
-          {/* Three numbered "what happens next" cards */}
+          {/* Three "what happens next" cards. Icon-only (no numbered bubble)
+              and everything centered — the cards' vertical order already
+              communicates 1-2-3 without needing digits, and a single visual
+              language reads cleaner than icon+number+text. */}
           {([
-            { n: 1, icon: <Camera size={22} className="text-indigo-500" />, title: intro.step1Title, desc: intro.step1Desc },
-            { n: 2, icon: <Sparkles size={22} className="text-indigo-500" />, title: intro.step2Title, desc: intro.step2Desc },
-            { n: 3, icon: <Clock size={22} className="text-indigo-500" />, title: intro.step3Title, desc: intro.step3Desc },
-          ] as const).map((s) => (
-            <section key={s.n} className={cardClass}>
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold shrink-0">
-                  {s.n}
+            { icon: Camera, title: intro.step1Title, desc: intro.step1Desc },
+            { icon: Sparkles, title: intro.step2Title, desc: intro.step2Desc },
+            { icon: Clock, title: intro.step3Title, desc: intro.step3Desc },
+          ] as const).map((s, i) => {
+            const Icon = s.icon;
+            return (
+              <section key={i} className={`${cardClass} text-center`}>
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-indigo-100 flex items-center justify-center">
+                  <Icon size={24} className="text-indigo-500" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    {s.icon}
-                    <h2 className="text-base md:text-lg font-bold text-gray-800">{s.title}</h2>
-                  </div>
-                  <p className="text-gray-600 text-sm md:text-base">{s.desc}</p>
-                </div>
-              </div>
-            </section>
-          ))}
+                <h2 className="text-base md:text-lg font-bold text-gray-800 mb-1">{s.title}</h2>
+                <p className="text-gray-600 text-sm md:text-base">{s.desc}</p>
+              </section>
+            );
+          })}
 
           {/* Free note */}
           <p className="text-center text-sm text-gray-500 mt-2 mb-6">{intro.freeNote}</p>
