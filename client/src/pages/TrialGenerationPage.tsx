@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, FormEvent, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Loader2, CheckCircle, BookOpen, Mail, AlertTriangle, Sparkles } from 'lucide-react';
+import { Loader2, CheckCircle, BookOpen, Mail, AlertTriangle } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
 import { signInWithGooglePopup } from '@/services/googleAuth';
 import storage from '@/services/storage';
@@ -74,6 +74,8 @@ const translations = {
       'Higher image quality and title page',
       'Order as a printed book',
     ],
+    rotationTrialIntro: 'This is a trial story — it should be ready in about a minute. Trial stories are short. A full story takes a bit longer but gives you many more pages and richer scenes.',
+    rotationEmailHint: 'Add your email after the story finishes so we can send you the PDF. Set a password too and you get free credits for a full-length story.',
   },
   de: {
     brand: 'Magical Story',
@@ -114,6 +116,8 @@ const translations = {
       'Höhere Bildqualität und Titelseite',
       'Als gedrucktes Buch bestellen',
     ],
+    rotationTrialIntro: 'Das ist eine Probegeschichte — sie sollte in etwa einer Minute fertig sein. Probegeschichten sind kurz. Eine vollständige Geschichte dauert etwas länger, hat dafür viel mehr Seiten und reichhaltigere Szenen.',
+    rotationEmailHint: 'Gib am Ende deine E-Mail an, damit wir dir die Geschichte als PDF schicken können. Setze auch ein Passwort, dann bekommst du Gratis-Credits für eine richtige Geschichte in voller Länge.',
   },
   fr: {
     brand: 'Magical Story',
@@ -154,6 +158,8 @@ const translations = {
       'Qualité d\'image supérieure et page de titre',
       'Commander en livre imprimé',
     ],
+    rotationTrialIntro: 'Ceci est une histoire d\'essai — elle devrait être prête en environ une minute. Les histoires d\'essai sont courtes. Une histoire complète prend un peu plus de temps mais offre beaucoup plus de pages et des scènes plus riches.',
+    rotationEmailHint: 'Saisis ton e-mail à la fin pour que nous puissions t\'envoyer le PDF de l\'histoire. Définis aussi un mot de passe et tu reçois des crédits gratuits pour une histoire complète.',
   },
 };
 
@@ -217,7 +223,6 @@ export default function TrialGenerationPage() {
   const [pageImages, setPageImages] = useState<Array<{ pageNumber: number; imageData: string }>>([]);
   const [avatarSlides, setAvatarSlides] = useState<string[]>(state?.titlePageData?.avatarSlides || []);
   const [slideshowIndex, setSlideshowIndex] = useState(0);
-  const [funnyMsgIndex, setFunnyMsgIndex] = useState(0);
 
   // Auth state
   const [email, setEmail] = useState('');
@@ -523,69 +528,78 @@ export default function TrialGenerationPage() {
     }
   };
 
-  // Build unified rotation: every slot fills the image area. Order matches
-  // the normal-story generation pattern — show the avatar first so the user
-  // sees the character they uploaded, then weave in benefits + funny tips
-  // while the image pipeline is still warming up. Real images (cover, pages)
-  // get appended as they arrive so they take over once available.
+  // Every slide is image + caption together. Image fills the top of the slot
+  // (stable, fixed-aspect frame). Caption sits below. Captions rotate
+  // through 3 kinds: info messages, funny one-liners, and no caption when a
+  // real story image arrives (the image speaks for itself).
   //
-  // Each entry is rendered into the same slot:
-  //   { kind: 'image', src }              — avatar / cover / page
-  //   { kind: 'benefits', half: 1 | 2 }   — first or second half of upsell list
-  //   { kind: 'funny',  msgIndex: N }     — funny message (replaces the avatar)
-  type RotationItem =
-    | { kind: 'image'; src: string; emphasis: 'avatar' | 'title' | 'page'; label: string }
-    | { kind: 'benefits'; half: 1 | 2 }
-    | { kind: 'funny'; msgIndex: number };
+  // Initial sequence (before any story images):
+  //   1. avatar A + "trial intro" message
+  //   2. avatar B + funny
+  //   3. avatar C + funny
+  //   4. avatar D + "email/credits" message
+  //   5. avatar E + funny
+  //   6. avatar F + funny
+  // Then title + page images take over as they arrive, each paired with a
+  // funny line. Once we run out of avatars (small pool early), we recycle.
+  type SlideCaption =
+    | { kind: 'message'; text: string; tone: 'info' }
+    | { kind: 'funny';   text: string };
+  type Slide = { imageSrc: string; emphasis: 'avatar' | 'title' | 'page'; label: string; caption: SlideCaption };
 
-  const slideshowItems = useMemo<RotationItem[]>(() => {
-    const items: RotationItem[] = [];
+  const slideshowItems = useMemo<Slide[]>(() => {
+    const items: Slide[] = [];
+    const lang = (state?.storyInput?.language || 'de').split('-')[0] as 'en' | 'de' | 'fr';
+    const characterName = state?.characterName || 'Your hero';
 
-    const avatarPool: { src: string; emphasis: 'avatar'; label: string }[] = [];
-    if (state?.previewAvatar) avatarPool.push({ src: state.previewAvatar, emphasis: 'avatar', label: state.characterName || 'Character' });
+    const avatarPool: { src: string; label: string }[] = [];
+    if (state?.previewAvatar) avatarPool.push({ src: state.previewAvatar, label: characterName });
     for (let i = 0; i < avatarSlides.length; i++) {
-      avatarPool.push({ src: avatarSlides[i], emphasis: 'avatar', label: `${state?.characterName || 'Character'} - Style ${i + 1}` });
+      avatarPool.push({ src: avatarSlides[i], label: `${characterName} - Style ${i + 1}` });
+    }
+    // Pick the avatar for slot N, cycling when the pool is small.
+    const pickAvatar = (i: number) => avatarPool.length > 0 ? avatarPool[i % avatarPool.length] : null;
+    const funnyAt = (i: number) => {
+      const msg = funnyMessages[i % funnyMessages.length];
+      const tmpl = msg[lang] || msg.en;
+      return tmpl.replace('{name}', characterName);
+    };
+
+    const trialIntro = (t as { rotationTrialIntro?: string }).rotationTrialIntro || '';
+    const emailHint  = (t as { rotationEmailHint?: string  }).rotationEmailHint  || '';
+
+    // Pre-content slides (always 6, recycle avatars if pool < 6).
+    const introSpecs: SlideCaption[] = [
+      { kind: 'message', text: trialIntro, tone: 'info' },
+      { kind: 'funny', text: funnyAt(0) },
+      { kind: 'funny', text: funnyAt(1) },
+      { kind: 'message', text: emailHint, tone: 'info' },
+      { kind: 'funny', text: funnyAt(2) },
+      { kind: 'funny', text: funnyAt(3) },
+    ];
+    for (let i = 0; i < introSpecs.length; i++) {
+      const a = pickAvatar(i);
+      if (!a) break; // no avatar at all — skip rather than render blank
+      items.push({ imageSrc: a.src, emphasis: 'avatar', label: a.label, caption: introSpecs[i] });
     }
 
-    // Static intro sequence — same cadence as the normal-story generation
-    // rotation: image, then alternating text, image, text. The first avatar
-    // appears twice so it stays visible for ~2 ticks before the first text
-    // slide (user requested "avatar for 10s" up front).
-    if (avatarPool.length > 0) {
-      const a = avatarPool[0];
-      items.push({ kind: 'image', src: a.src, emphasis: a.emphasis, label: a.label });
-      items.push({ kind: 'image', src: a.src, emphasis: a.emphasis, label: a.label });
-    }
-    items.push({ kind: 'benefits', half: 1 });
-    items.push({ kind: 'funny', msgIndex: 0 });
-    if (avatarPool.length > 0) {
-      const a = avatarPool[1 % avatarPool.length];
-      items.push({ kind: 'image', src: a.src, emphasis: a.emphasis, label: a.label });
-    }
-    items.push({ kind: 'benefits', half: 2 });
-    items.push({ kind: 'funny', msgIndex: 1 });
-
-    // Append remaining styled-avatar variants (rotation includes a funny msg
-    // between each so the user gets variety, not a wall of similar avatars)
-    for (let i = 2; i < avatarPool.length; i++) {
-      const a = avatarPool[i];
-      items.push({ kind: 'image', src: a.src, emphasis: a.emphasis, label: a.label });
-      items.push({ kind: 'funny', msgIndex: 2 + (i - 2) });
-    }
-    // Real story images take over the rotation as they arrive — page render
-    // is the most engaging signal so we want it to be the dominant content
-    // once available. Funny msg between each so the rotation feels alive.
+    // Story content: title + pages as they arrive, each with a funny line.
     if (titlePageImage) {
-      items.push({ kind: 'image', src: titlePageImage, emphasis: 'title', label: 'Cover' });
-      items.push({ kind: 'funny', msgIndex: 99 });
+      items.push({ imageSrc: titlePageImage, emphasis: 'title', label: 'Cover', caption: { kind: 'funny', text: funnyAt(4) } });
     }
     for (let i = 0; i < pageImages.length; i++) {
       const img = pageImages[i];
-      items.push({ kind: 'image', src: img.imageData, emphasis: 'page', label: `Page ${img.pageNumber}` });
-      items.push({ kind: 'funny', msgIndex: 100 + i });
+      items.push({
+        imageSrc: img.imageData,
+        emphasis: 'page',
+        label: `Page ${img.pageNumber}`,
+        caption: { kind: 'funny', text: funnyAt(5 + i) },
+      });
     }
     return items;
-  }, [state?.previewAvatar, state?.characterName, avatarSlides, titlePageImage, pageImages]);
+  // funnyMessages is a stable module-scope array; safe to omit
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.previewAvatar, state?.characterName, state?.storyInput?.language, avatarSlides, titlePageImage, pageImages, t]);
 
   // Funny messages (same as normal story generation)
   const funnyMessages = [
@@ -601,15 +615,18 @@ export default function TrialGenerationPage() {
     { en: '{name} is choosing the perfect adventure outfit...', de: '{name} sucht das perfekte Abenteuer-Outfit aus...', fr: '{name} choisit la tenue d\'aventure parfaite...' },
   ];
 
-  // Rotate slideshow every 4 seconds
+  // Rotate slideshow — info messages stay up longer so they're readable;
+  // funny + image-only slides tick faster. The interval re-fires on every
+  // slide change because the next slide's caption type drives the next dwell.
   useEffect(() => {
     if (slideshowItems.length === 0) return;
-    const interval = setInterval(() => {
+    const currentSlide = slideshowItems[slideshowIndex % slideshowItems.length];
+    const dwellMs = currentSlide.caption.kind === 'message' ? 7000 : 4500;
+    const id = setTimeout(() => {
       setSlideshowIndex(prev => (prev + 1) % Math.max(1, slideshowItems.length));
-      setFunnyMsgIndex(prev => prev + 1);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [slideshowItems.length]);
+    }, dwellMs);
+    return () => clearTimeout(id);
+  }, [slideshowIndex, slideshowItems]);
 
   // Smoothed-progress driver. Floors the visible bar with a time-based optimistic
   // curve so the user sees forward motion immediately, even when the server
@@ -704,75 +721,49 @@ export default function TrialGenerationPage() {
             )}
           </div>
 
-          {/* ── Rotating slot — avatar → benefits → funny → avatar → benefits-2 → ...
-                same area cycles through image and text content. Text slides
-                replace the image instead of crowding above it. */}
+          {/* ── Rotating slot — image + caption together. Fixed-aspect image
+                area on top, fixed-min-height caption area below. Both kinds
+                of caption (info messages + funny lines) use the same
+                indigo brand colours so the page doesn't change palette
+                between slides. */}
           {pageState !== 'failed' && (
             <div className="flex flex-col items-center mb-4">
               {slideshowItems.length > 0 ? (() => {
                 const item = slideshowItems[slideshowIndex % slideshowItems.length];
-                const lang = (state?.storyInput?.language || 'de').split('-')[0] as 'en' | 'de' | 'fr';
-
-                if (item.kind === 'image') {
-                  const characterName = state?.characterName || 'Your hero';
-                  // Funny line shown beneath the image, advancing on each rotation tick
-                  // so consecutive image slides don't show the same line.
-                  const msg = funnyMessages[funnyMsgIndex % funnyMessages.length];
-                  const template = msg[lang] || msg.en;
-                  const subline = template.replace('{name}', characterName);
-                  return (
-                    <>
-                      <img
-                        src={item.src}
-                        alt={item.label}
-                        className={`w-full h-auto rounded-xl shadow-lg transition-opacity duration-500 ${
-                          item.emphasis === 'avatar' ? 'max-w-xs border-4 border-indigo-100' : ''
-                        }`}
-                      />
-                      {pageState !== 'completed' && (
-                        <p className="mt-3 text-sm text-indigo-600 font-medium text-center italic transition-opacity duration-300">
-                          {subline}
-                        </p>
-                      )}
-                    </>
-                  );
-                }
-
-                if (item.kind === 'benefits') {
-                  // Split upsellFeatures roughly in half — first slide shows first
-                  // half, second slide shows the rest.
-                  const features = t.upsellFeatures;
-                  const mid = Math.ceil(features.length / 2);
-                  const lines = item.half === 1 ? features.slice(0, mid) : features.slice(mid);
-                  return (
-                    <div className="w-full bg-amber-50 border border-amber-200 rounded-xl px-5 py-6 text-left max-w-md mx-auto transition-opacity duration-500">
-                      {item.half === 1 && (
-                        <p className="text-amber-800 text-sm font-semibold mb-3">{t.upsellTitle}</p>
-                      )}
-                      <ul className="text-amber-800 text-base space-y-2">
-                        {lines.map((f, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <span className="text-amber-500 font-bold mt-0.5">&#x2022;</span>
-                            <span>{f}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  );
-                }
-
-                // funny slide — shown alone in the slot, large, no image
-                const characterName = state?.characterName || 'Your hero';
-                const msg = funnyMessages[(item.msgIndex) % funnyMessages.length];
-                const template = msg[lang] || msg.en;
-                const text = template.replace('{name}', characterName);
+                const isAvatarLike = item.emphasis === 'avatar';
                 return (
-                  <div className="w-full flex flex-col items-center justify-center py-10 px-6 max-w-md mx-auto transition-opacity duration-500">
-                    <Sparkles className="w-8 h-8 text-indigo-400 mb-3" />
-                    <p className="text-base text-indigo-700 font-medium text-center italic">
-                      {text}
-                    </p>
-                  </div>
+                  <>
+                    {/* Image area — fixed aspect-square frame keeps the slot
+                        stable when avatars/title/pages of different aspect
+                        ratios rotate through. object-contain centres each
+                        image in the frame. */}
+                    <div
+                      className={`relative w-full ${isAvatarLike ? 'max-w-xs' : 'max-w-sm'} aspect-square flex items-center justify-center rounded-xl overflow-hidden bg-indigo-50 ${isAvatarLike ? 'border-4 border-indigo-100' : 'shadow-lg'} transition-opacity duration-300`}
+                    >
+                      <img
+                        src={item.imageSrc}
+                        alt={item.label}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+
+                    {/* Caption area — fixed min-height so the rest of the
+                        page doesn't bounce when a one-line funny is replaced
+                        by a multi-line info message. */}
+                    {pageState !== 'completed' && (
+                      <div className="mt-3 min-h-[80px] w-full max-w-md flex items-center justify-center px-3 transition-opacity duration-300">
+                        {item.caption.kind === 'message' ? (
+                          <p className="text-sm text-indigo-700 font-medium text-center leading-relaxed">
+                            {item.caption.text}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-indigo-600 font-medium text-center italic">
+                            {item.caption.text}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
                 );
               })() : (
                 <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">

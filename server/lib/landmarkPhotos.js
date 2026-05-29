@@ -2352,7 +2352,10 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
 
     // Proximity fallback: when no name match and lat/lon are known, grow the radius until we find something.
     // Handles villages like Wabern (no landmarks of its own) → falls back to Bern landmarks ~3km away.
-    if (result.rows.length === 0 && latitude !== null && longitude !== null) {
+    // Use typeof checks: legacy string callers leave lat/lon as `undefined`, and
+    // `undefined !== null` is true — without the type guard the fallback fired
+    // with undefined coords and wasted 3 DB queries per missed city.
+    if (result.rows.length === 0 && typeof latitude === 'number' && typeof longitude === 'number') {
       for (const radiusKm of [20, 50, 100]) {
         const nearby = await getIndexedLandmarksNearLocation(latitude, longitude, radiusKm, limit);
         if (nearby.length > 0) {

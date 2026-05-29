@@ -791,6 +791,46 @@ async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, char
 }
 
 /**
+ * Extract the first 3 body cells from the bottom row of a 2×4 character sheet
+ * (front-facing, 3/4, profile — skipping the back view at column 4).
+ *
+ * Used for the trial slideshow: showing the raw 2×4 grid is unsightly and the
+ * back view contains no face. Returns an array of 3 individual full-body
+ * images. Aspect of the input sheet is roughly 2:1 (width:height) since
+ * 4 columns × 2 rows of roughly square cells produces a 4:2 grid. If the
+ * input doesn't look like a 2×4 sheet we return an empty array so callers
+ * can fall back to the original image.
+ */
+async function extractBottomBody3Columns(buffer) {
+  try {
+    const meta = await sharp(buffer).metadata();
+    if (!meta.width || !meta.height) return [];
+    // 2×4 sheets are landscape — width should be about 2× the height.
+    const aspect = meta.width / meta.height;
+    if (aspect < 1.6 || aspect > 2.4) return [];
+
+    const w = meta.width;
+    const h = meta.height;
+    const colW = Math.floor(w / 4);
+    const rowH = Math.floor(h / 2);
+    const cells = [];
+    for (let col = 0; col < 3; col++) {
+      const left = col * colW;
+      const top = rowH; // bottom row
+      const cell = await sharp(buffer)
+        .extract({ left, top, width: colW, height: h - rowH })
+        .jpeg({ quality: 88 })
+        .toBuffer();
+      cells.push(cell);
+    }
+    return cells;
+  } catch (err) {
+    log.warn(`⚠️ [GROK] extractBottomBody3Columns failed: ${err.message}`);
+    return [];
+  }
+}
+
+/**
  * Public helper retained for backwards compat: extract front views from a
  * 2×2 avatar grid and rearrange them as a horizontal [body|face] strip.
  * Non-grid images are returned unchanged.
@@ -1428,6 +1468,7 @@ module.exports = {
   isGrokConfigured,
   packReferences,
   cropToFrontColumn,
+  extractBottomBody3Columns,
   buildCharacterGroupSlot,
   GROK_MODELS,
 };

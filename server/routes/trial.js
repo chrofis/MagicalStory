@@ -1345,9 +1345,28 @@ router.post('/link-email', verifySessionToken, async (req, res) => {
 
     // Check email not already used by another user
     const existing = await pool.query(
-      "SELECT id FROM users WHERE email = $1 AND id != $2",
+      "SELECT id, is_trial FROM users WHERE email = $1 AND id != $2",
       [normalizedEmail, userId]
     );
+
+    // Staging: free up the email if a previous trial run holds it. Lets the
+    // same email (any one) re-link to a fresh trial without manual cleanup.
+    // Detection: STAGING_AUTH_PASSWORD is set only on staging (prod null).
+    const isStaging = !!process.env.STAGING_AUTH_PASSWORD;
+    if (existing.rows.length > 0 && isStaging && existing.rows.every(r => r.is_trial)) {
+      // Strip the email from prior trial owners so the UNIQUE-ish lookup
+      // resolves to the new account only. Old trial rows keep their stories
+      // but become anonymous-only again (placeholder email).
+      for (const row of existing.rows) {
+        const placeholder = `anon_${row.id}@anonymous`;
+        await pool.query(
+          'UPDATE users SET email = $1, username = $1, email_verified = false WHERE id = $2',
+          [placeholder, row.id]
+        );
+        log.info(`[TRIAL] Staging email reclaim: stripped "${normalizedEmail}" from prior trial user ${row.id}`);
+      }
+      existing.rows = [];
+    }
 
     if (existing.rows.length > 0) {
       return res.status(409).json({
@@ -1450,9 +1469,24 @@ router.post('/link-google', verifySessionToken, async (req, res) => {
 
     // Check email not used by another user
     const existing = await pool.query(
-      "SELECT id FROM users WHERE email = $1 AND id != $2",
+      "SELECT id, is_trial FROM users WHERE email = $1 AND id != $2",
       [normalizedEmail, userId]
     );
+
+    // Staging: free up the email if a previous trial run holds it (same logic
+    // as /link-email — see comment there).
+    const isStaging = !!process.env.STAGING_AUTH_PASSWORD;
+    if (existing.rows.length > 0 && isStaging && existing.rows.every(r => r.is_trial)) {
+      for (const row of existing.rows) {
+        const placeholder = `anon_${row.id}@anonymous`;
+        await pool.query(
+          'UPDATE users SET email = $1, username = $1, email_verified = false WHERE id = $2',
+          [placeholder, row.id]
+        );
+        log.info(`[TRIAL] Staging email reclaim (google): stripped "${normalizedEmail}" from prior trial user ${row.id}`);
+      }
+      existing.rows = [];
+    }
 
     if (existing.rows.length > 0) {
       return res.status(409).json({
@@ -2032,9 +2066,13 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       // Clear this scoped cache to free memory
       clearStyledAvatarCache();
 
-      // Split styled avatars into individual front-view images for the generation slideshow
-      // Uses cropToFrontColumn which detects the actual separator via Python variance analysis
-      const { cropToFrontColumn } = require('../lib/grok');
+      // Split styled avatars into individual full-body images for the
+      // trial slideshow. The styled avatar IS a 2×4 sheet (head×4 angles on
+      // top, body×4 angles on bottom). We slice the BOTTOM row, columns
+      // 1-3 (front / 3/4 / profile) and skip the back-view (no face) and
+      // the top head-only row. Result: 3 distinct portrait body shots per
+      // sheet → 6 total for standard + costumed.
+      const { extractBottomBody3Columns } = require('../lib/grok');
       const avatarSlides = [];
       // bytesFromAnyImage handles data: URIs, raw base64, and R2 URLs uniformly.
       const r2 = require('../lib/r2');
@@ -2042,10 +2080,8 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
         // styledAvatarsData is keyed by character name; each entry is
         //   { standard, winter, summer, costumed: { default: ... } }
         // Walk both levels (character → clothing) to reach the actual avatar
-        // bytes. The previous one-level loop produced 0 slides every time
-        // because it tried to crop the per-character object as if it were
-        // an image — silently skipped via the `typeof !== 'string'` guard.
-        const pushSlideFromAvatar = async (avatarValue) => {
+        // bytes.
+        const pushBodyCellsFromAvatar = async (avatarValue) => {
           if (!avatarValue) return;
           // Avatar may be a string (data URI or URL) or an object with .imageData/.imageUrl
           let src = null;
@@ -2054,8 +2090,16 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
           if (!src || typeof src !== 'string') return;
           const buf = await r2.bytesFromAnyImage(src);
           if (!buf) return;
-          const cropped = await cropToFrontColumn(buf);
-          avatarSlides.push(`data:image/jpeg;base64,${cropped.toString('base64')}`);
+          const cells = await extractBottomBody3Columns(buf);
+          if (cells.length === 0) {
+            // Fallback: original isn't recognisable as a 2×4 sheet — push it
+            // as-is so the slideshow has something to show.
+            avatarSlides.push(`data:image/jpeg;base64,${buf.toString('base64')}`);
+            return;
+          }
+          for (const cell of cells) {
+            avatarSlides.push(`data:image/jpeg;base64,${cell.toString('base64')}`);
+          }
         };
         for (const perCharAvatars of Object.values(styledAvatarsData)) {
           if (!perCharAvatars || typeof perCharAvatars !== 'object') continue;
@@ -2063,15 +2107,15 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
             // `costumed` is nested one more level (e.g. { default: ..., pirate: ... })
             if (clothingKey === 'costumed' && avatarValue && typeof avatarValue === 'object' && !avatarValue.imageData && !avatarValue.imageUrl) {
               for (const costumeAvatar of Object.values(avatarValue)) {
-                await pushSlideFromAvatar(costumeAvatar);
+                await pushBodyCellsFromAvatar(costumeAvatar);
               }
             } else {
-              await pushSlideFromAvatar(avatarValue);
+              await pushBodyCellsFromAvatar(avatarValue);
             }
           }
         }
         if (avatarSlides.length > 0) {
-          log.info(`[TRIAL AVATARS] Split ${avatarSlides.length} styled avatars for slideshow`);
+          log.info(`[TRIAL AVATARS] Split ${avatarSlides.length} full-body slides from styled avatars`);
         }
       } catch (splitErr) {
         log.debug(`[TRIAL AVATARS] Avatar split failed (non-critical): ${splitErr.message}`);
