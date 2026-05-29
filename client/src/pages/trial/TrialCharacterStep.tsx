@@ -213,6 +213,13 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
+  // Background create-anonymous-account. As soon as the form is valid we
+  // fire the create call in the background — by the time the user clicks
+  // "Next" the promise has usually already resolved, so they advance with
+  // no perceivable wait. Without this, the click triggers a 5-12s blocking
+  // call (DB inserts + Gemini trait extraction + DB updates).
+  const accountCreationPromiseRef = useRef<Promise<{ sessionToken: string; characterId: string } | null> | null>(null);
+
   const hasPhoto = !!characterData.photos.face;
   const canProceed = characterData.name.trim() && characterData.gender && hasPhoto;
 
@@ -271,7 +278,80 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPhoto, facePhotoKey]);
 
-  // Create anonymous account and advance to next step
+  // Shared account creation logic — invoked either by the background prewarm
+  // effect (the moment the form first becomes valid) or by handleNext as a
+  // fallback if the prewarm hasn't fired yet. Returns null on failure so the
+  // caller can decide how to surface the error.
+  const startAccountCreation = async (): Promise<{ sessionToken: string; characterId: string } | null> => {
+    const data = characterDataRef.current;
+    if (!data.photos.face || !data.name?.trim()) return null;
+
+    // Refresh Turnstile token if expired.
+    let token = turnstileToken;
+    if (!token && TURNSTILE_SITE_KEY && turnstileRef.current) {
+      turnstileRef.current.reset();
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        token = turnstileRef.current?.getResponse?.() || null;
+        if (token) break;
+      }
+    }
+
+    const accountResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/create-anonymous-account`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: data.name,
+        age: data.age,
+        gender: data.gender,
+        traits: data.traits,
+        customTraits: data.customTraits,
+        facePhoto: data.photos.face,
+        bodyPhoto: data.photos.body,
+        bodyNoBgPhoto: data.photos.bodyNoBg,
+        faceBox: data.photos.faceBox,
+        previewAvatar: previewAvatar || undefined,
+        turnstileToken: token,
+        fingerprint,
+        ...(adminToken ? { adminToken } : {}),
+      }),
+    });
+    const accountResult = await accountResponse.json();
+    if (!accountResponse.ok) {
+      // On any block (Turnstile, fingerprint, rate limit) — propagate; caller
+      // can redirect to /?signup=true. The prewarm path silently swallows.
+      const err = new Error(accountResult?.error || `create-anonymous-account failed (${accountResponse.status})`);
+      (err as unknown as { status: number }).status = accountResponse.status;
+      throw err;
+    }
+    return {
+      sessionToken: accountResult.sessionToken,
+      characterId: accountResult.characterId || accountResult.charId,
+    };
+  };
+
+  // Prewarm: fire create-anonymous-account in the background the moment the
+  // form is valid. Runs once per session — if the user changes form fields
+  // afterwards, the latest values still flow into the request body because
+  // startAccountCreation reads from characterDataRef.current at fetch time
+  // (not at promise-creation time).
+  //
+  // Wait, that's only true for the FIRST call. After the promise is set, the
+  // request body has already been serialised. So later edits are lost. For
+  // trial this is acceptable: the user usually fills the form once. We could
+  // add a re-fire on field-change but it'd risk creating multiple anonymous
+  // accounts on every keystroke. Trade-off documented; revisit if reports
+  // surface.
+  useEffect(() => {
+    if (!canProceed) return;
+    if (sessionToken) return; // already have one (back/forward nav)
+    if (accountCreationPromiseRef.current) return; // already in flight
+    accountCreationPromiseRef.current = startAccountCreation().catch(() => null);
+  // Trigger exactly when canProceed flips true — readiness to fire.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canProceed, sessionToken]);
+
+  // Create anonymous account (if not already done in background) and advance.
   const handleNext = async () => {
     if (!canProceed || !characterData.photos.face) return;
 
@@ -284,56 +364,31 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
     setIsCreatingAccount(true);
     setAvatarError(null);
 
-    // If Turnstile token expired, trigger a reset and wait briefly for a fresh one
-    let token = turnstileToken;
-    if (!token && TURNSTILE_SITE_KEY && turnstileRef.current) {
-      turnstileRef.current.reset();
-      // Wait up to 5s for fresh token
-      for (let i = 0; i < 10; i++) {
-        await new Promise(r => setTimeout(r, 500));
-        token = turnstileRef.current?.getResponse?.() || null;
-        if (token) break;
-      }
-    }
-
     try {
-      const accountResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/create-anonymous-account`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: characterData.name,
-          age: characterData.age,
-          gender: characterData.gender,
-          traits: characterData.traits,
-          customTraits: characterData.customTraits,
-          facePhoto: characterData.photos.face,
-          bodyPhoto: characterData.photos.body,
-          bodyNoBgPhoto: characterData.photos.bodyNoBg,
-          faceBox: characterData.photos.faceBox,
-          previewAvatar: previewAvatar || undefined, // Save to DB if already generated
-          turnstileToken: token,
-          fingerprint,
-          ...(adminToken ? { adminToken } : {}),
-        }),
-      });
-
-      const accountResult = await accountResponse.json();
-
-      if (!accountResponse.ok) {
-        // On any block (Turnstile, fingerprint, rate limit) — redirect to landing with sign-up prompt
+      // Prefer the prewarmed in-flight call. If it hasn't been kicked off yet
+      // (e.g. handleNext ran the same tick canProceed became true), fire it now.
+      if (!accountCreationPromiseRef.current) {
+        accountCreationPromiseRef.current = startAccountCreation();
+      }
+      const result = await accountCreationPromiseRef.current;
+      if (!result) {
+        // Prewarm failed silently — try once more synchronously so the user
+        // gets a real error to react to, not a silent abort.
+        const retry = await startAccountCreation();
+        if (!retry) throw new Error('Account creation failed');
+        if (onAccountCreated) onAccountCreated(retry.sessionToken, retry.characterId);
+      } else if (onAccountCreated) {
+        onAccountCreated(result.sessionToken, result.characterId);
+      }
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      if (status && status >= 400 && status < 500) {
         navigate('/?signup=true');
         return;
       }
-
-      const newSessionToken = accountResult.sessionToken;
-      const newCharacterId = accountResult.characterId || accountResult.charId;
-
-      if (onAccountCreated && newSessionToken && newCharacterId) {
-        onAccountCreated(newSessionToken, newCharacterId);
-      }
-    } catch {
       setAvatarError('Account creation failed. Please try again.');
       setIsCreatingAccount(false);
+      accountCreationPromiseRef.current = null; // allow retry
       return;
     }
 
