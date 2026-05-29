@@ -174,6 +174,39 @@ listed for discoverability:
 
 ---
 
+## Marketing & Google Ads
+
+### Sitelinks: 5 account-level + 1 per-city = 6 per campaign
+**Context:** Google Ads recommends ≥6 sitelinks per campaign so ads can
+serve in the top-of-page formats (higher CTR). MagicalStory had zero
+sitelinks attached before 2026-05-29.
+**Decision:** 5 generic sitelinks attached at the **customer (account)**
+level via `CustomerAsset` → apply to every campaign. One additional
+per-city sitelink attached at the **campaign** level via `CampaignAsset`
+→ "Geschichten in {City}" pointing at `/stadt/{cityId}`.
+**Rationale:** Account-level handles the bulk efficiently (5× CustomerAsset
+records vs N campaigns × 5 = duplicated work). The per-city addition
+delivers one locally-relevant link on each city campaign — better local
+relevance than purely generic copy.
+**The 5 account-level sitelinks** (all DE):
+- "Zur Startseite" → `/`
+- "Gratis testen" → `/try`
+- "Geschenkideen" → `/geschenk`
+- "Über 44 Themen entdecken" → `/themes`
+- "Preise & Pakete" → `/pricing`
+**Per-city:** "Geschichten in {City}" → `/stadt/{cityId}` for Aarau, Baden,
+Winterthur, Zürich (matched to PMax-{City}-v1 / Search-Zurich-v1
+campaigns; Zürich uses both 'Zurich' and 'Zürich' name patterns since
+the campaign label is ASCII while the display label keeps the umlaut).
+**Idempotency caveat:** Re-running `--push` creates new Asset records
+each time. Run once. Future iterations on copy need a dedup pass that
+lists existing `CustomerAsset` SITELINK rows and skips matching names.
+**Touched:**
+- `scripts/ads/create-sitelinks.js` — creates the assets + attaches them
+**Status:** ✅ active (pushed 2026-05-29).
+
+---
+
 ## Backlog (decisions noticed but not yet expanded)
 
 These deserve an entry once someone has bandwidth — they're real design
