@@ -995,11 +995,7 @@ router.get('/check-status', verifySessionToken, async (req, res) => {
     }
 
     const user = result.rows[0];
-    // Mirror the staging bypass from /trial/create-job — on staging we let the
-    // same trial user generate multiple stories, so check-status must never
-    // report trialUsed=true there or the client refuses to start a new run.
-    const isStaging = !!process.env.STAGING_AUTH_PASSWORD;
-    const trialUsed = isStaging ? false : (user.stories_generated >= user.story_quota);
+    const trialUsed = user.stories_generated >= user.story_quota;
 
     // If trial is used, find their story so we can link to it
     let storyId = null;
@@ -1091,17 +1087,13 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     const { getPool } = require('../services/database');
     const pool = getPool();
 
-    // Staging bypasses the 1-trial-per-user cap so we can re-test the trial
-    // flow without burning fresh accounts each time. Detection: staging is the
-    // only environment where STAGING_AUTH_PASSWORD is set (prod leaves it null).
-    const isStaging = !!process.env.STAGING_AUTH_PASSWORD;
-
     // Atomic check-and-increment to prevent race condition (two simultaneous requests).
-    // On staging we still increment (so counters are accurate) but drop the < 1 cap.
-    const capCondition = isStaging ? '' : 'AND stories_generated < 1';
+    // Hard cap: ONE trial story per user, no environment exceptions. To
+    // retest the trial flow create a fresh account; do not reintroduce a
+    // staging bypass here.
     const userResult = await pool.query(
       `UPDATE users SET stories_generated = stories_generated + 1
-       WHERE id = $1 AND is_trial = true ${capCondition}
+       WHERE id = $1 AND is_trial = true AND stories_generated < 1
        RETURNING id, stories_generated`,
       [userId]
     );
@@ -1113,10 +1105,6 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
         return res.status(404).json({ error: 'Account not found' });
       }
       return res.status(409).json({ error: 'Trial story already used', code: 'TRIAL_USED' });
-    }
-
-    if (isStaging && userResult.rows[0].stories_generated > 1) {
-      log.info(`[TRIAL] Staging bypass — user ${userId} now at stories_generated=${userResult.rows[0].stories_generated}`);
     }
 
     // If a prepare-title call is still in flight for this user, wait for it
@@ -1362,55 +1350,14 @@ router.post('/link-email', verifySessionToken, async (req, res) => {
       return res.status(409).json({ error: 'Email already verified' });
     }
 
-    // Check email not already used by another user
+    // Check email not already used by another user. Strict rule across all
+    // environments: one trial per user, no bypass. No staging-only email
+    // reclaim, no merge into existing accounts — re-test by creating a
+    // fresh trial account with a fresh email each time.
     const existing = await pool.query(
-      "SELECT id, is_trial FROM users WHERE email = $1 AND id != $2",
+      "SELECT id FROM users WHERE email = $1 AND id != $2",
       [normalizedEmail, userId]
     );
-
-    // Staging: free up the email if a previous trial run holds it. Lets the
-    // same email (any one) re-link to a fresh trial without manual cleanup.
-    // Detection: STAGING_AUTH_PASSWORD is set only on staging (prod null).
-    const isStaging = !!process.env.STAGING_AUTH_PASSWORD;
-    if (existing.rows.length > 0 && isStaging && existing.rows.every(r => r.is_trial)) {
-      // Strip the email from prior trial owners so the UNIQUE-ish lookup
-      // resolves to the new account only. Old trial rows keep their stories
-      // but become anonymous-only again (placeholder email).
-      for (const row of existing.rows) {
-        const placeholder = `anon_${row.id}@anonymous`;
-        await pool.query(
-          'UPDATE users SET email = $1, username = $1, email_verified = false WHERE id = $2',
-          [placeholder, row.id]
-        );
-        log.info(`[TRIAL] Staging email reclaim: stripped "${normalizedEmail}" from prior trial user ${row.id}`);
-      }
-      existing.rows = [];
-    }
-
-    // Staging: if the email is held by a REAL (non-trial) account — typically
-    // the admin testing the trial flow — MERGE the trial's stories +
-    // character into that account, then delete the trial user. The verify-
-    // email round-trip is skipped (real account is already verified) and
-    // the caller is told to sign in normally with the existing account.
-    if (existing.rows.length > 0 && isStaging) {
-      const targetUser = existing.rows.find(r => !r.is_trial);
-      if (targetUser) {
-        const mergeResult = await _mergeTrialIntoExistingAccount(pool, userId, targetUser.id);
-        log.info(`[TRIAL] Staging merge: trial user ${userId} → existing account ${targetUser.id} (email: ${normalizedEmail})`);
-        try {
-          const { sendTrialCompletionEmailIfDeferred } = require('../lib/trialEmail');
-          sendTrialCompletionEmailIfDeferred(targetUser.id).catch(() => {});
-        } catch { /* non-fatal */ }
-        return res.json({
-          success: true,
-          merged: true,
-          mergedIntoUserId: targetUser.id,
-          token: mergeResult.token,
-          user: mergeResult.user,
-          message: 'Trial stories moved into your existing account.',
-        });
-      }
-    }
 
     if (existing.rows.length > 0) {
       return res.status(409).json({
@@ -1511,48 +1458,13 @@ router.post('/link-google', verifySessionToken, async (req, res) => {
       return res.status(404).json({ error: 'Account not found' });
     }
 
-    // Check email not used by another user
+    // Check email not used by another user. Strict rule across all
+    // environments: one trial per user, no bypass. No staging-only email
+    // reclaim, no merge into existing accounts.
     const existing = await pool.query(
-      "SELECT id, is_trial FROM users WHERE email = $1 AND id != $2",
+      "SELECT id FROM users WHERE email = $1 AND id != $2",
       [normalizedEmail, userId]
     );
-
-    // Staging: free up the email if a previous trial run holds it (same logic
-    // as /link-email — see comment there).
-    const isStaging = !!process.env.STAGING_AUTH_PASSWORD;
-    if (existing.rows.length > 0 && isStaging && existing.rows.every(r => r.is_trial)) {
-      for (const row of existing.rows) {
-        const placeholder = `anon_${row.id}@anonymous`;
-        await pool.query(
-          'UPDATE users SET email = $1, username = $1, email_verified = false WHERE id = $2',
-          [placeholder, row.id]
-        );
-        log.info(`[TRIAL] Staging email reclaim (google): stripped "${normalizedEmail}" from prior trial user ${row.id}`);
-      }
-      existing.rows = [];
-    }
-
-    // Staging: merge into existing real account when the email belongs to
-    // one (same logic as /link-email — see that block for the rationale).
-    if (existing.rows.length > 0 && isStaging) {
-      const targetUser = existing.rows.find(r => !r.is_trial);
-      if (targetUser) {
-        const mergeResult = await _mergeTrialIntoExistingAccount(pool, userId, targetUser.id);
-        log.info(`[TRIAL] Staging merge (google): trial user ${userId} → existing account ${targetUser.id} (email: ${normalizedEmail})`);
-        try {
-          const { sendTrialCompletionEmailIfDeferred } = require('../lib/trialEmail');
-          sendTrialCompletionEmailIfDeferred(targetUser.id).catch(() => {});
-        } catch { /* non-fatal */ }
-        return res.json({
-          success: true,
-          merged: true,
-          mergedIntoUserId: targetUser.id,
-          token: mergeResult.token,
-          user: mergeResult.user,
-          message: 'Trial stories moved into your existing account.',
-        });
-      }
-    }
 
     if (existing.rows.length > 0) {
       return res.status(409).json({
@@ -2229,64 +2141,6 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
  * @param {object} characterData - { name, age, gender, traits, photos }
  * @returns {string} characterId
  */
-
-/**
- * Staging-only: merge a trial user's content into an existing real account
- * and delete the trial user. Stories and story_jobs are owner re-assigns;
- * the characters table stores one row per user with a `characters[]` JSONB
- * array, so we splice the trial's array onto the target's. Returns a fresh
- * JWT for the target so the client can switch identity without forcing the
- * user to re-enter their password.
- */
-async function _mergeTrialIntoExistingAccount(pool, trialUserId, targetId) {
-  await pool.query("UPDATE stories    SET user_id = $1 WHERE user_id = $2", [targetId, trialUserId]);
-  await pool.query("UPDATE story_jobs SET user_id = $1 WHERE user_id = $2", [targetId, trialUserId]);
-
-  const trialCharRow = await pool.query("SELECT data FROM characters WHERE id = $1", [`characters_${trialUserId}`]);
-  if (trialCharRow.rows.length > 0) {
-    const trialData = typeof trialCharRow.rows[0].data === 'string'
-      ? JSON.parse(trialCharRow.rows[0].data) : trialCharRow.rows[0].data;
-    const trialChars = Array.isArray(trialData?.characters) ? trialData.characters : [];
-    if (trialChars.length > 0) {
-      const targetRow = await pool.query("SELECT data FROM characters WHERE id = $1", [`characters_${targetId}`]);
-      if (targetRow.rows.length === 0) {
-        await pool.query(
-          "INSERT INTO characters (id, user_id, data) VALUES ($1, $2, $3)",
-          [`characters_${targetId}`, targetId, JSON.stringify({ characters: trialChars })]
-        );
-      } else {
-        const targetData = typeof targetRow.rows[0].data === 'string'
-          ? JSON.parse(targetRow.rows[0].data) : targetRow.rows[0].data;
-        targetData.characters = [...(targetData.characters || []), ...trialChars];
-        await pool.query("UPDATE characters SET data = $1 WHERE id = $2", [JSON.stringify(targetData), `characters_${targetId}`]);
-      }
-    }
-    await pool.query("DELETE FROM characters WHERE id = $1", [`characters_${trialUserId}`]);
-  }
-
-  await pool.query("DELETE FROM users WHERE id = $1", [trialUserId]);
-
-  const target = await pool.query(
-    "SELECT id, username, email, role, credits, story_quota, stories_generated, email_verified FROM users WHERE id = $1",
-    [targetId]
-  );
-  const u = target.rows[0];
-  const { generateToken } = require('../middleware/auth');
-  const token = generateToken(u);
-  return {
-    token,
-    user: {
-      id: u.id,
-      username: u.username,
-      email: u.email,
-      role: u.role,
-      credits: u.credits,
-      storyQuota: u.story_quota,
-      storiesGenerated: u.stories_generated,
-      emailVerified: u.email_verified,
-    },
-  };
-}
 
 async function saveTrialCharacter(pool, userId, characterData) {
   const characterId = `characters_${userId}`;

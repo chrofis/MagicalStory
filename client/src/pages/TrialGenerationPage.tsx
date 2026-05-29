@@ -179,6 +179,28 @@ const funnyMessages = [
   { en: '{name} made friends with a talking squirrel!', de: '{name} hat sich mit einem sprechenden Eichhörnchen angefreundet!', fr: '{name} s\'est fait ami avec un écureuil parlant !' },
   { en: 'The story wizard is adding extra sparkle for {name}...', de: 'Der Geschichtenzauberer fügt extra Glitzer für {name} hinzu...', fr: 'Le magicien ajoute des paillettes supplémentaires pour {name}...' },
   { en: '{name} is choosing the perfect adventure outfit...', de: '{name} sucht das perfekte Abenteuer-Outfit aus...', fr: '{name} choisit la tenue d\'aventure parfaite...' },
+  { en: '{name} is teaching the story characters a secret handshake...', de: '{name} bringt den Geschichtsfiguren einen geheimen Handschlag bei...', fr: '{name} apprend une poignée de main secrète aux personnages...' },
+  { en: '{name} is sneaking into the next page already...', de: '{name} schleicht sich schon auf die nächste Seite...', fr: '{name} se glisse déjà dans la page suivante...' },
+  { en: 'The illustrator is mixing fresh paint just for {name}...', de: 'Der Illustrator mischt neue Farben — extra für {name}...', fr: 'L\'illustrateur prépare des couleurs neuves pour {name}...' },
+  { en: '{name} is double-checking every comma...', de: '{name} prüft noch einmal jedes Komma...', fr: '{name} relit chaque virgule...' },
+  { en: '{name} is asking the moon for a tiny smile...', de: '{name} bittet den Mond um ein kleines Lächeln...', fr: '{name} demande à la lune un petit sourire...' },
+  { en: 'A tiny dragon just offered {name} some help. Polite refusal.', de: 'Ein kleiner Drache hat {name} Hilfe angeboten. Höflich abgelehnt.', fr: 'Un petit dragon propose son aide à {name}. Refus poli.' },
+  { en: '{name} is collecting just one more sparkle...', de: '{name} sammelt noch ein letztes Glitzern...', fr: '{name} ramasse encore un éclat de paillette...' },
+  { en: 'The story wizard mislaid a comma. Looking now.', de: 'Der Geschichtenzauberer hat ein Komma verlegt. Sucht es gerade.', fr: 'Le magicien a égaré une virgule. Il la cherche.' },
+  { en: '{name} is humming the title page tune...', de: '{name} summt die Melodie vom Titelbild...', fr: '{name} fredonne l\'air de la couverture...' },
+  { en: 'Adding extra colours to {name}\'s scarf...', de: 'Mehr Farben für {name}s Schal...', fr: 'Encore des couleurs pour l\'écharpe de {name}...' },
+  { en: '{name} is reading the last chapter twice for luck...', de: '{name} liest das letzte Kapitel zweimal, für\'s Glück...', fr: '{name} relit le dernier chapitre, pour porter chance...' },
+  { en: 'A fox in the margins waves at {name}...', de: 'Ein Fuchs am Seitenrand winkt {name} zu...', fr: 'Un renard dans la marge salue {name}...' },
+  { en: '{name} is stretching before the final scene...', de: '{name} streckt sich vor der letzten Szene...', fr: '{name} s\'étire avant la dernière scène...' },
+  { en: 'The font is fluffing its serifs for {name}...', de: 'Die Schrift macht ihre Serifen schön für {name}...', fr: 'La police arrange ses sérifs pour {name}...' },
+  { en: '{name} just found a hidden door in the story!', de: '{name} hat eine geheime Tür in der Geschichte entdeckt!', fr: '{name} a trouvé une porte secrète dans l\'histoire !' },
+  { en: 'Polishing the moonlight before the night scene...', de: 'Das Mondlicht wird poliert für die Nachtszene...', fr: 'On lustre le clair de lune pour la scène nocturne...' },
+  { en: '{name} is convincing a cloud to pose nicely...', de: '{name} überredet eine Wolke, schön zu posieren...', fr: '{name} convainc un nuage de poser joliment...' },
+  { en: '{name} is checking that all the leaves are the right green...', de: '{name} prüft, ob alle Blätter im richtigen Grün leuchten...', fr: '{name} vérifie que toutes les feuilles ont le bon vert...' },
+  { en: 'A page is being rewritten because it wasn\'t magical enough...', de: 'Eine Seite wird neu geschrieben — sie war nicht magisch genug...', fr: 'Une page est réécrite — elle n\'était pas assez magique...' },
+  { en: '{name} is rehearsing the very last sentence...', de: '{name} probt den allerletzten Satz...', fr: '{name} répète la toute dernière phrase...' },
+  { en: 'The story wizard is brewing one last bit of imagination...', de: 'Der Geschichtenzauberer braut die letzte Portion Fantasie...', fr: 'Le magicien brasse une dernière dose d\'imagination...' },
+  { en: '{name} is asking a star for an extra wish...', de: '{name} bittet einen Stern um einen weiteren Wunsch...', fr: '{name} demande à une étoile un voeu de plus...' },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -447,24 +469,6 @@ export default function TrialGenerationPage() {
 
   // ── Email linking ──────────────────────────────────────────────────────────
 
-  // Shared finalizer for the staging "merged into existing account" response.
-  // The server (link-email + link-google) detects when the email belongs to a
-  // real account and returns { merged: true, token, user } instead of the
-  // verification flow. We swap the trial session for the real-account JWT and
-  // navigate straight to /stories so the user sees their merged-in trial run
-  // as part of their existing library.
-  const finalizeMergedClaim = (data: { token?: string; user?: unknown }) => {
-    if (data.token) storage.setItem('auth_token', data.token);
-    if (data.user)  storage.setItem('current_user', JSON.stringify(data.user));
-    storage.removeItem('trial_session_token');
-    storage.removeItem('trial_gen_session_token');
-    storage.removeItem('trial_gen_character_id');
-    storage.removeItem('trial_gen_character_name');
-    storage.removeItem('trial_gen_job_id');
-    // Hard nav so AuthContext re-reads from localStorage on the fresh route.
-    window.location.href = '/stories';
-  };
-
   const handleEmailSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email.trim() || isAuthLoading || !state?.sessionToken) return;
@@ -486,14 +490,6 @@ export default function TrialGenerationPage() {
 
       if (!response.ok) {
         setAuthError(data.error || t.error);
-        return;
-      }
-
-      // Staging merge path — email belonged to a real account, server
-      // already moved everything and issued a fresh JWT. Swap sessions and
-      // land the user on /stories instead of "check your email".
-      if (data.merged) {
-        finalizeMergedClaim(data);
         return;
       }
 
@@ -526,13 +522,6 @@ export default function TrialGenerationPage() {
 
     if (!response.ok) {
       setAuthError(data.error || t.error);
-      return;
-    }
-
-    // Staging merge path — Google email matched an existing real account.
-    // Same finalizer as the email flow; user lands on /stories.
-    if (data.merged) {
-      finalizeMergedClaim(data);
       return;
     }
 
@@ -604,15 +593,50 @@ export default function TrialGenerationPage() {
     const lang = (state?.storyInput?.language || 'de').split('-')[0] as 'en' | 'de' | 'fr';
     const characterName = state?.characterName || 'Your hero';
 
+    // Once any real story image has arrived (cover OR a story page), the
+    // rotation shifts entirely to those — they're what the user actually
+    // wants to see. Intro slides (avatar + tip / funny) are only for the
+    // pre-content wait. This also prevents the rotation from wrapping back
+    // through "Lukas is choosing the perfect outfit..." messages after the
+    // cover is already on screen.
+    const hasStoryContent = !!titlePageImage || pageImages.length > 0;
+    if (hasStoryContent) {
+      if (titlePageImage) {
+        items.push({ imageSrc: titlePageImage, emphasis: 'title', label: 'Cover', caption: { kind: 'none' } });
+      }
+      for (let i = 0; i < pageImages.length; i++) {
+        const img = pageImages[i];
+        items.push({
+          imageSrc: img.imageData,
+          emphasis: 'page',
+          label: `Page ${img.pageNumber}`,
+          caption: { kind: 'none' },
+        });
+      }
+      return items;
+    }
+
+    // Intro phase — no story images yet. Rotate avatar + benefits/funny
+    // captions while the pipeline warms up.
     const avatarPool: { src: string; label: string }[] = [];
     if (state?.previewAvatar) avatarPool.push({ src: state.previewAvatar, label: characterName });
     for (let i = 0; i < avatarSlides.length; i++) {
       avatarPool.push({ src: avatarSlides[i], label: `${characterName} - Style ${i + 1}` });
     }
-    // Pick the avatar for slot N, cycling when the pool is small.
     const pickAvatar = (i: number) => avatarPool.length > 0 ? avatarPool[i % avatarPool.length] : null;
-    const funnyAt = (i: number) => {
-      const msg = funnyMessages[i % funnyMessages.length];
+    // Pick funny captions WITHOUT repeating until the whole pool is exhausted.
+    // shuffleDeck draws once per intro build so the deck is stable across
+    // re-renders within the same intro phase.
+    const shuffledFunny = (() => {
+      const idx = funnyMessages.map((_, i) => i);
+      for (let i = idx.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [idx[i], idx[j]] = [idx[j], idx[i]];
+      }
+      return idx;
+    })();
+    const funnyAt = (slot: number) => {
+      const msg = funnyMessages[shuffledFunny[slot % shuffledFunny.length]];
       const tmpl = msg[lang] || msg.en;
       return tmpl.replace('{name}', characterName);
     };
@@ -620,7 +644,6 @@ export default function TrialGenerationPage() {
     const trialIntro = (t as { rotationTrialIntro?: string }).rotationTrialIntro || '';
     const emailHint  = (t as { rotationEmailHint?: string  }).rotationEmailHint  || '';
 
-    // Pre-content slides (always 6, recycle avatars if pool < 6).
     const introSpecs: SlideCaption[] = [
       { kind: 'message', text: trialIntro, tone: 'info' },
       { kind: 'funny', text: funnyAt(0) },
@@ -631,28 +654,9 @@ export default function TrialGenerationPage() {
     ];
     for (let i = 0; i < introSpecs.length; i++) {
       const a = pickAvatar(i);
-      if (!a) break; // no avatar at all — skip rather than render blank
+      if (!a) break;
       items.push({ imageSrc: a.src, emphasis: 'avatar', label: a.label, caption: introSpecs[i] });
     }
-
-    // Story content: title + pages as they arrive. No caption — the image
-    // is the message. The caption slot stays reserved (rendered empty) so
-    // the page doesn't reflow between slides.
-    if (titlePageImage) {
-      items.push({ imageSrc: titlePageImage, emphasis: 'title', label: 'Cover', caption: { kind: 'none' } });
-    }
-    for (let i = 0; i < pageImages.length; i++) {
-      const img = pageImages[i];
-      items.push({
-        imageSrc: img.imageData,
-        emphasis: 'page',
-        label: `Page ${img.pageNumber}`,
-        caption: { kind: 'none' },
-      });
-    }
-    // funnyAt is referenced only by the intro specs above; mark used so the
-    // linter doesn't trip if the intro happens to be empty.
-    void funnyAt;
     return items;
   // funnyMessages is a module-scope const (declared above the component); safe to omit from deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -664,7 +668,13 @@ export default function TrialGenerationPage() {
   useEffect(() => {
     if (slideshowItems.length === 0) return;
     const currentSlide = slideshowItems[slideshowIndex % slideshowItems.length];
-    const dwellMs = currentSlide.caption.kind === 'message' ? 9000 : 6000;
+    // Dwell rules:
+    //   - info messages (trial intro / email hint):   9s — readable, longer
+    //   - title + page images (caption: 'none'):     10s — the real content
+    //   - avatar + funny line:                        6s — light rotation
+    let dwellMs = 6000;
+    if (currentSlide.caption.kind === 'message') dwellMs = 9000;
+    else if (currentSlide.caption.kind === 'none') dwellMs = 10000;
     const id = setTimeout(() => {
       setSlideshowIndex(prev => (prev + 1) % Math.max(1, slideshowItems.length));
     }, dwellMs);

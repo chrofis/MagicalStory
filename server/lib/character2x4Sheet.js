@@ -44,11 +44,13 @@ const phantomCache = new Map();
 // Map a character's declared age to a phantom tier. The phantom's head-to-body
 // ratio leaks into the rendered character despite the "ignore the body" prompt,
 // so the tier must match the character's age (toddler≈4, child≈5.5, teen≈7,
-// adult≈7.5 head-heights). Unknown/unparseable age → null = use the default
-// phantom (no behaviour change).
+// adult≈7.5 head-heights). Unknown/unparseable age defaults to 'child' — the
+// product is overwhelmingly for kids, so an unknown-age fallback to an
+// adult-proportioned generic phantom (the previous behaviour) produced
+// adult-looking renders for trial users who skipped the optional age field.
 function phantomTierForAge(age) {
   const n = parseInt(age, 10);
-  if (!Number.isFinite(n) || n < 0) return null;
+  if (!Number.isFinite(n) || n < 0) return 'child';
   if (n <= 4) return 'toddler';
   if (n <= 11) return 'child';
   if (n <= 17) return 'teen';
