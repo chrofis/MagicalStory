@@ -20,6 +20,27 @@ const registerLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Decode the Bearer JWT (best-effort) without throwing. Used by skip() in
+// the general apiLimiter so admins (and impersonation tokens, which carry
+// the same admin role) can bypass the 100/min cap. We don't verify here
+// because the underlying route already runs authenticateToken — this is a
+// soft signal to skip rate limiting, not an auth decision.
+function _peekAdminFromToken(req) {
+  try {
+    const jwt = require('jsonwebtoken');
+    const h = req.headers['authorization'] || '';
+    const t = h.startsWith('Bearer ') ? h.slice(7) : null;
+    if (!t) return false;
+    const decoded = jwt.decode(t);
+    // Admin or admin-acting-as-someone-else (impersonation token) both
+    // carry role=admin OR an explicit `impersonating` flag with original
+    // admin id; either should skip the cap.
+    return !!decoded && (decoded.role === 'admin' || decoded.impersonating === true);
+  } catch {
+    return false;
+  }
+}
+
 // General API rate limiter (more permissive)
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
@@ -27,6 +48,11 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests. Please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
+  // Admins bypass — impersonating a user fires many GETs (stories list,
+  // jobs, character data, per-story image lazy-loads) and routinely
+  // trips the 100/min cap. Real users coming through unauthenticated
+  // routes still get the cap.
+  skip: _peekAdminFromToken,
 });
 
 // Story generation rate limiter
