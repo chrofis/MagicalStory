@@ -2308,10 +2308,18 @@ export const storyService = {
   async getPricing(): Promise<{
     tiers: Array<{ maxPages: number; label: string; softcover: number; hardcover: number }>;
     maxBookPages: number;
+    // Credits side of pricing — added so /pricing can render both flows
+    // (buy credits → create stories AND buy book → earn credits back).
+    creditPackages?: Array<{ credits: number; amountCHF: number }>;
+    creditsPerPage?: number;
+    tokenPromoMultiplier?: number;
   }> {
     const response = await api.get<{
       tiers: Array<{ maxPages: number; label: string; softcover: number; hardcover: number }>;
       maxBookPages: number;
+      creditPackages?: Array<{ credits: number; amountCHF: number }>;
+      creditsPerPage?: number;
+      tokenPromoMultiplier?: number;
     }>('/api/pricing');
     return response;
   },

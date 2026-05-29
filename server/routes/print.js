@@ -1395,7 +1395,30 @@ router.get('/pricing', async (req, res) => {
       hardcover: tier.hardcover_price
     }));
 
-    res.json({ tiers: formattedTiers, maxBookPages: 100 });
+    // Also expose credit packages + the book-purchase reward multiplier so
+    // the /pricing page can render the full pricing story (credits → create
+    // stories → buy book → get credits back). Source: server/config/credits.js
+    // (PACKAGES, tokens-per-page = 10) + the runtime DB config row that the
+    // checkout webhook reads at order time.
+    const { CREDIT_CONFIG } = require('../config/credits');
+    const promoResult = await getDbPool().query(
+      "SELECT config_value FROM config WHERE config_key = 'token_promo_multiplier'"
+    );
+    const tokenPromoMultiplier = promoResult.rows[0]?.config_value
+      ? parseInt(promoResult.rows[0].config_value, 10)
+      : 1;
+
+    res.json({
+      tiers: formattedTiers,
+      maxBookPages: 100,
+      // Credits side of pricing
+      creditPackages: CREDIT_CONFIG.PRICING.PACKAGES.map(p => ({
+        credits: p.credits,
+        amountCHF: p.amountCHF,
+      })),
+      creditsPerPage: 10, // mirrors server/config/credits.js comment
+      tokenPromoMultiplier, // 1 normally, 2 during a promo — drives "earn 2× credits back" copy
+    });
   } catch (err) {
     log.error('❌ Error fetching pricing tiers:', err);
     res.status(500).json({ error: 'Failed to fetch pricing' });
