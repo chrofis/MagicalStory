@@ -176,6 +176,29 @@ listed for discoverability:
 
 ## Marketing & Google Ads
 
+### PMax campaigns capped at CHF 0.50 Target CPA
+**Context:** Three PMax campaigns (Baden, Winterthur, Aarau) were running
+on `MAXIMIZE_CONVERSIONS` with no per-conversion ceiling, paying actual
+costs of CHF 1.38 / 2.00 / 2.58 per conversion. Roger wanted a hard cost
+ceiling. PMax doesn't support per-click bid caps (Google product
+limitation — only Search supports `cpc_bid_ceiling`).
+**Decision:** Set `maximize_conversions.target_cpa_micros = 500000` on
+all three PMax campaigns (= CHF 0.50 max per conversion). Search-Zurich
+keeps its per-click cap of CHF 0.50.
+**Rationale:** Explicit budget discipline matters more than maximum
+volume at the current spend level (~CHF 12/day total). User accepts
+that the algorithm will throttle clicks/impressions sharply to hit the
+target — current CPA is 2.8–5× higher than the new target, so volume
+will drop.
+**Re-evaluate trigger:** if total conversions drop more than ~70%
+after 2 weeks with no recovery, either raise the target (e.g. CHF 1.00)
+or revert to uncapped MaxConversions.
+**Touched:**
+- Google Ads campaigns (no code changes) — set via inline node script
+  using the google-ads-api SDK. Same script form could become
+  `scripts/ads/set-target-cpa.js` if we change it again.
+**Status:** ✅ active (set 2026-05-29).
+
 ### Sitelinks: 5 account-level + 1 per-city = 6 per campaign
 **Context:** Google Ads recommends ≥6 sitelinks per campaign so ads can
 serve in the top-of-page formats (higher CTR). MagicalStory had zero
