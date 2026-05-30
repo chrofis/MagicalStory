@@ -8,7 +8,7 @@ Generate a SINGLE illustration of the background environment. Paint only what th
 
 {ERA_GUARD}
 
-**ABOUT THE LANDMARK REFERENCE PHOTO (when provided):** It is a real-world photograph, often taken recently. Use it for the landmark's shape, proportions, architecture, and camera angle only. Exclude any modern elements visible in the photo: cars, parked vehicles, traffic signs, road markings, street lights, utility poles, power lines, billboards, commercial advertising, shopfront windows with price tags, plastic bins, satellite dishes, air conditioners, modern pedestrians. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure.
+**ABOUT THE LANDMARK REFERENCE PHOTO (when provided):** It is a real-world photograph, often taken recently. Match its shape, proportions, architecture, **camera angle, camera elevation, AND camera distance**. The landmark must occupy approximately the same fraction of the rendered frame as in the photo — if the photo crops in, you crop in; if it is a wide shot, you keep the wide shot. Do NOT zoom out to add city context the photo does not show. Exclude any modern elements visible in the photo: cars, parked vehicles, traffic signs, road markings, street lights, utility poles, power lines, billboards, commercial advertising, shopfront windows with price tags, plastic bins, satellite dishes, air conditioners, modern pedestrians. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure.
 
 {LANDMARK_FIDELITY}
 
