@@ -174,6 +174,35 @@ const pageTexts: Record<string, {
     createAccountButton: 'Créer un compte gratuit',
     createAccountNote: 'Les histoires suisses nécessitent un compte gratuit',
   },
+  it: {
+    breadcrumbRoot: 'Città svizzere',
+    intro: {
+      scene: 'Tuo figlio diventa il protagonista di una storia ambientata proprio qui a {city} — nei monumenti reali della città, nelle strade familiari, davanti agli edifici che riconosce dalla vita quotidiana.',
+      customLabel: 'Scegli tu l\'argomento',
+      customBody: 'Un\'avventura fantastica, un regalo di compleanno, coraggio dal dentista, amicizia il primo giorno di scuola — o uno degli oltre 170 temi della nostra biblioteca. Crea un account gratuito, scegli il tuo argomento nella procedura guidata, ambientiamo la storia a {city}.',
+      historicalLabel: 'Oppure entra nella storia di {city}',
+      historicalBody: 'Più sotto trovi le storie storiche di {city} — da antiche leggende a eventi famosi. Crea un account gratuito, scegline una come punto di partenza, tuo figlio interpreta un ruolo all\'interno.',
+    },
+    ideasTitle: 'Storie storiche di {city}',
+    ideasSubtitle: 'Storie vere dal passato di {city} — scegline una e tuo figlio interpreta un ruolo',
+    contextLabel: 'Contesto storico',
+    sagenTitle: 'Leggende locali',
+    howTitle: 'Come funziona',
+    howSteps: [
+      { title: 'Carica una foto', desc: 'Tuo figlio diventa il protagonista illustrato della storia.' },
+      { title: 'Scegli un\'idea per la storia', desc: 'Scegli tra storie locali o oltre 170 altri temi.' },
+      { title: 'Ricevi il tuo libro', desc: 'Una storia personalizzata illustrata pronta in pochi minuti.' },
+    ],
+    nearbyTitle: 'Città vicine',
+    ctaTitle: 'Crea la tua storia svizzera',
+    ctaSubtitle: 'Tuo figlio come protagonista di una storia ambientata proprio qui.',
+    ctaButton: 'Crea account (gratuito)',
+    ctaTrialButton: 'O prova prima una storia gratuita',
+    ctaTrialNote: 'Le storie svizzere richiedono un account gratuito. Le storie di prova usano altri temi.',
+    createButton: 'Crea questa storia',
+    createAccountButton: 'Crea account gratuito',
+    createAccountNote: 'Le storie svizzere richiedono un account gratuito',
+  },
 };
 
 /** Haversine distance in km */
@@ -232,7 +261,7 @@ export default function CityPage() {
 
       {/* Breadcrumb */}
       <div className="bg-white border-b border-stone-100">
-        <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
+        <div className="max-w-5xl mx-auto px-4 pt-4 pb-0">
           <nav className="flex items-center gap-1.5 text-sm text-stone-500">
             <Link to="/stadt" className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
             <ChevronRight size={14} className="text-stone-300" />
@@ -246,7 +275,7 @@ export default function CityPage() {
               (which duplicated the city name and showed an AG canton chip
               that the user found noisy). One unified block. ─────────── */}
       <div className="bg-white border-b border-stone-100">
-        <div className="max-w-3xl mx-auto px-4 pt-6 pb-10">
+        <div className="max-w-5xl mx-auto px-4 pt-6 pb-10">
           {city && (() => {
             const cityName = loc(city.name);
             const fill = (s: string) => s.replace(/\{city\}/g, cityName);
@@ -338,7 +367,7 @@ export default function CityPage() {
         </div>
       </div>
 
-      <div className="flex-1 max-w-4xl mx-auto px-4 py-10 w-full">
+      <div className="flex-1 max-w-5xl mx-auto px-4 py-10 w-full">
 
         {/* Story Ideas */}
         {city && city.ideas.length > 0 && (
