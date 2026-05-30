@@ -3403,6 +3403,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             characterPhotos: pagePhotos,
             grokRefImages: genResult.grokRefImages || null,
             sceneDescription,
+            // Persist the parsed metadata so the UI / dev panel can show
+            // which VB elements (CHR/ART/LOC IDs) each page references
+            // and which landmark variant got picked. Without this, the
+            // page row only has sceneDescription as a blob — every
+            // downstream consumer had to re-run extractSceneMetadata
+            // just to read it. Inspecting a completed story showed
+            // empty sceneMetadata on every page even though the IDs
+            // were emitted correctly in the description.
+            sceneMetadata,
             text: page.text,
             sceneCharacters,
             perCharClothing,

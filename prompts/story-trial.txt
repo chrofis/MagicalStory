@@ -103,9 +103,24 @@ TITLE: [A creative, specific title in {LANGUAGE}]
 Only include characters that YOU invent (friends, shopkeepers, etc.) as `secondaryCharacters`.
 Use empty arrays `[]` for categories with no elements.
 
-**REAL-WORLD LANDMARKS:** For real buildings, monuments, or landmarks:
-- Set `"isRealLandmark": true`
-- Set `"landmarkQuery"` to the EXACT landmark name from the LANDMARKS section above for photo lookup. Copy it verbatim — do not paraphrase.
+**REAL-WORLD LANDMARKS — STRICT RULE:** Any location whose name comes from (or is recognisably) an entry in the LANDMARKS section above is a real-world landmark. For every such location:
+- `"isRealLandmark": true` (NOT false — if you wrote the landmark's name, you picked it from the list, so it IS real)
+- `"landmarkQuery"`: the EXACT landmark name from the LANDMARKS section. Copy it verbatim — do not paraphrase, do not drop parens, do not anglicise.
+
+This is the difference between the system fetching a real Wikipedia photo of the actual building (correct) and the model inventing a generic illustration of what it thinks the building looks like (wrong). When in doubt, mark it as real — false negatives waste the photo pipeline and produce off-brand renders.
+
+Example — picking "Kapellbrücke (Luzern) [Bridge]" from the LANDMARKS section:
+```json
+{
+  "id": "LOC001",
+  "name": "Kapellbrücke",
+  "pages": [1, 2, 3],
+  "setting": "outdoor bridge over the Reuss river",
+  "isRealLandmark": true,
+  "landmarkQuery": "Kapellbrücke (Luzern)"
+}
+```
+Note: `name` can be styled for your story, but `landmarkQuery` must match the LANDMARKS entry character-for-character (parentheses and umlauts included).
 
 **BACKGROUNDS (style anchors for each scene):**
 Each background describes a scene with NO people, NO human figures. Include: location details, architecture, objects, lighting, weather, camera angle. Leave open space where characters would stand. Backgrounds can be reused across multiple pages. Every page must have a background.
