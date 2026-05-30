@@ -70,9 +70,12 @@ function loadPhantom(age) {
   const buf = fs.readFileSync(file);
   const dataUrl = `data:image/png;base64,${buf.toString('base64')}`;
   phantomCache.set(file, dataUrl);
-  if (tier) {
-    log.info(`[2x4-SHEET] age ${age}→${tier} phantom${file === DEFAULT_PHANTOM_PATH ? ' (tier asset not bundled — using default)' : ''}`);
-  }
+  // Include file basename + byte size so the user can verify via the dev
+  // panel which phantom was actually used (different tiers have different
+  // sizes: default ~206KB, toddler ~456KB, child ~477KB, teen ~441KB,
+  // adult ~521KB). Without this we only had the intent log; now we log
+  // what was actually read off disk.
+  log.info(`[2x4-SHEET] age ${age}→${tier || 'default'} phantom — loaded ${path.basename(file)} (${Math.round(buf.length / 1024)} KB)`);
   return dataUrl;
 }
 
