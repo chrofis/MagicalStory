@@ -2907,9 +2907,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.debug(`🎭 [TRIAL] _trialCostumeType set to: ${inputData._trialCostumeType} (costume: ${costume ? costume.costumeType : 'null'}, mainChar gender: ${mainChar?.gender})`);
       log.debug(`🎭 [TRIAL] Characters isMainCharacter: ${(inputData.characters || []).map(c => `${c.name}=${c.isMainCharacter}`).join(', ')}`);
 
+      // Trial policy: when a costume is configured, generate ONLY the
+      // costumed 2×4 sheet. The 'standard' look is seeded from the cheap
+      // preview avatar generated during the wizard (see trial.js:2056
+      // _seedStandardFromPreview) and lives in the styled-avatar cache as
+      // the 'standard' entry — applyStyledAvatars finds it without us
+      // having to spend another ~30s + Grok call on a standard 2×4 sheet
+      // that's only used on rare non-costumed scenes anyway. The previous
+      // code requested BOTH 'standard' AND 'costumed:X' here, contradicting
+      // the prepare-title intent (trial.js builds only costumed in its own
+      // requirements list) and producing a Lukas-watercolor-standard log
+      // entry the user explicitly objected to. Only fall back to 'standard'
+      // when no costume is configured (rare in trial, but supported).
       const trialAvatarRequirements = (inputData.characters || []).flatMap(char => {
-        const cats = ['standard'];
-        if (costume) cats.push(`costumed:${costume.costumeType}`);
+        const cats = costume ? [`costumed:${costume.costumeType}`] : ['standard'];
         return cats.map(cat => ({
           pageNumber: 'pre-cover',
           clothingCategory: cat,

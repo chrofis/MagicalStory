@@ -92,12 +92,47 @@ function loadPhantom(age) {
 //
 // `artStyle` is kept as a parameter for caller compatibility but is no
 // longer consumed here.
-function buildPrompt(_artStyle, costumeDescription) {
+//
+// Build a HAIR block from character.physical when populated. Without this,
+// the prompt only said "same hair" and trusted Grok to extract everything
+// from the Image 3 face crop. That works when the face crop is loose enough
+// to show full hair shape; it fails when the crop is tight to the face or
+// the back-of-head cell (#4) needs to be invented from scratch. The hair
+// fields are populated by trial.js:737-745 (Gemini photo analysis) and
+// stamped onto character.physical — they're free text the sheet prompt
+// can just paste in.
+function buildHairBlock(character) {
+  const p = character?.physical || {};
+  const hairBits = [];
+  if (p.hairColor) hairBits.push(`Hair color: ${p.hairColor}.`);
+  // detailedHairAnalysis is a structured object on trial photos (texture/
+  // type/length/styling/parting/colorHex). Spell out the load-bearing
+  // fields for Grok rather than dumping the JSON — terse imperatives
+  // weight better than free-form prose.
+  if (p.detailedHairAnalysis && typeof p.detailedHairAnalysis === 'object') {
+    const h = p.detailedHairAnalysis;
+    const detail = [];
+    if (h.type)        detail.push(h.type);                 // straight | wavy | curly | coily
+    if (h.lengthTop)   detail.push(`top length ${h.lengthTop}`);
+    if (h.lengthSides) detail.push(`sides ${h.lengthSides}`);
+    if (h.bangsEndAt && h.bangsEndAt !== 'no bangs') detail.push(`bangs ${h.bangsEndAt}`);
+    if (h.styling)     detail.push(`styled ${h.styling}`);
+    if (h.parting && h.parting !== 'none') detail.push(h.parting);
+    if (detail.length) hairBits.push(`Hairstyle: ${detail.join(', ')}.`);
+  } else if (typeof p.detailedHairAnalysis === 'string' && p.detailedHairAnalysis.trim()) {
+    hairBits.push(`Hairstyle: ${p.detailedHairAnalysis.trim()}.`);
+  }
+  if (!hairBits.length) return '';
+  return `\n${hairBits.join(' ')} Reproduce the hair EXACTLY in every cell — same length, same color, same shape, same parting. The back-of-head cell (cell 4) must show the same hair from behind. Do NOT invent a different cut.\n`;
+}
+
+function buildPrompt(_artStyle, costumeDescription, character = null) {
+  const hairBlock = buildHairBlock(character);
   return `Image 1 indicates only the camera angle and facing direction in each cell — ignore its silhouette, body, and face.
 Image 2 is the character's body. Image 3 is the character's face.
 
 Costume: ${costumeDescription}
-
+${hairBlock}
 Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, with natural proportions matching the person's apparent age in Image 3. No cartoon stylisation, no chibi, no anime, no watercolour — those treatments are applied later by downstream steps. This sheet is an identity anchor.
 
 Output a 2×4 grid with thin black dividing lines and pure white background, in the same cell layout as Image 1.
@@ -488,7 +523,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     ? [phantom, standardAvatar, facePhoto]
     : [phantom, facePhoto];
 
-  const prompt = buildPrompt(artStyle, costumeDescription);
+  const prompt = buildPrompt(artStyle, costumeDescription, character);
 
   // Track every attempt — when all retries fail to produce a `valid` sheet
   // (per the eval), we pick the highest-scoring attempt instead of throwing.
