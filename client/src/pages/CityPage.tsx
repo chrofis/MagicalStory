@@ -58,10 +58,19 @@ const SAGE_CITY_MAP: Record<string, string[]> = {
 
 const pageTexts: Record<string, {
   breadcrumbRoot: string;
-  // Intro block above the Story Ideas list — explains what a "city story"
-  // is. {city} placeholder is replaced with the localized city name at
-  // render time.
-  introBody: string;
+  // Intro block — three paragraphs.
+  //   intro.scene: opening line that puts the child in the city
+  //   intro.customLabel + customBody: path A (pick any topic, we set it here)
+  //   intro.historicalLabel + historicalBody: path B (pick a historical
+  //     tale below)
+  // All strings support a {city} placeholder substituted at render time.
+  intro: {
+    scene: string;
+    customLabel: string;
+    customBody: string;
+    historicalLabel: string;
+    historicalBody: string;
+  };
   ideasTitle: string;
   ideasSubtitle: string;
   contextLabel: string;
@@ -80,9 +89,15 @@ const pageTexts: Record<string, {
 }> = {
   en: {
     breadcrumbRoot: 'Swiss Cities',
-    introBody: 'Your child becomes the hero of a story set right here in {city}. Create your own — any topic, any theme — at real local landmarks. Or pick one of {city}\'s historical tales below and let your child step into it.',
+    intro: {
+      scene: 'Your child becomes the hero of a story set right here in {city} — at the city\'s real landmarks, in the familiar streets, in front of the buildings they know from everyday life.',
+      customLabel: 'Pick your own topic',
+      customBody: 'A fantasy adventure, a birthday gift, courage at the dentist, friendship on the first day of school — or any of 170+ themes from our library. You choose the story, we set it in {city}.',
+      historicalLabel: 'Or step into {city}\'s real history',
+      historicalBody: 'Pick one of {city}\'s actual historical tales below — from old legends to famous local events — and your child takes a role inside it. A personalised journey through the real past of your city.',
+    },
     ideasTitle: 'Historical tales from {city}',
-    ideasSubtitle: 'Pre-made stories from real local history — your child plays a role',
+    ideasSubtitle: 'Real stories from {city}\'s past — pick one and your child takes a role',
     contextLabel: 'Historical context',
     sagenTitle: 'Local Legends',
     howTitle: 'How It Works',
@@ -103,9 +118,15 @@ const pageTexts: Record<string, {
   },
   de: {
     breadcrumbRoot: 'Schweizer Städte',
-    introBody: 'Dein Kind wird zum Helden einer Geschichte, die in {city} spielt. Erstelle deine eigene — jedes Thema, jede Idee — an echten Wahrzeichen der Stadt. Oder wähle eine der historischen Geschichten aus {city} weiter unten, in die dein Kind hineinschlüpft.',
+    intro: {
+      scene: 'Dein Kind wird zum Helden einer Geschichte, die in {city} spielt — an echten Wahrzeichen der Stadt, in den vertrauten Gassen, vor den Gebäuden, die es aus dem Alltag kennt.',
+      customLabel: 'Du wählst das Thema selbst',
+      customBody: 'Ein fantastisches Abenteuer, ein Geburtstagsgeschenk, Mut beim Zahnarzt, Freundschaft im ersten Schuljahr — oder eines von über 170 Themen aus unserer Bibliothek für Lebenskompetenzen, Bildung und Spass. Du wählst die Geschichte, wir lassen sie in {city} spielen.',
+      historicalLabel: 'Oder Teil von {city}s echter Geschichte werden',
+      historicalBody: 'Wähle weiter unten eine echte historische Geschichte aus {city} — von alten Sagen bis zu berühmten Ereignissen aus der Stadtgeschichte — und dein Kind übernimmt darin eine Rolle. Eine personalisierte Reise durch die echte Vergangenheit deiner Stadt.',
+    },
     ideasTitle: 'Historische Geschichten aus {city}',
-    ideasSubtitle: 'Vorgefertigte Geschichten aus der echten Stadtgeschichte — dein Kind übernimmt eine Rolle',
+    ideasSubtitle: 'Echte Geschichten aus {city}s Vergangenheit — wähle eine und dein Kind übernimmt eine Rolle',
     contextLabel: 'Historischer Hintergrund',
     sagenTitle: 'Lokale Sagen',
     howTitle: 'So funktioniert\'s',
@@ -126,9 +147,15 @@ const pageTexts: Record<string, {
   },
   fr: {
     breadcrumbRoot: 'Villes suisses',
-    introBody: 'Votre enfant devient le héros d\'une histoire qui se déroule à {city}. Créez la vôtre — n\'importe quel sujet, n\'importe quelle idée — sur les véritables sites locaux. Ou choisissez l\'une des histoires historiques de {city} ci-dessous, dans laquelle votre enfant entrera.',
+    intro: {
+      scene: 'Votre enfant devient le héros d\'une histoire qui se déroule à {city} — sur les véritables sites de la ville, dans les rues familières, devant les bâtiments qu\'il reconnaît au quotidien.',
+      customLabel: 'Vous choisissez vous-même le sujet',
+      customBody: 'Une aventure fantastique, un cadeau d\'anniversaire, du courage chez le dentiste, l\'amitié dès la rentrée — ou l\'un des 170+ thèmes de notre bibliothèque de compétences de vie, d\'éducation et de plaisir. Vous choisissez l\'histoire, nous la situons à {city}.',
+      historicalLabel: 'Ou entrez dans la véritable histoire de {city}',
+      historicalBody: 'Choisissez ci-dessous l\'une des véritables histoires historiques de {city} — des anciennes légendes aux événements célèbres de l\'histoire de la ville — et votre enfant y tient un rôle. Un voyage personnalisé à travers le vrai passé de votre ville.',
+    },
     ideasTitle: 'Histoires historiques de {city}',
-    ideasSubtitle: 'Histoires prêtes tirées de l\'histoire locale réelle — votre enfant y joue un rôle',
+    ideasSubtitle: 'Histoires réelles tirées du passé de {city} — choisissez-en une et votre enfant y joue un rôle',
     contextLabel: 'Contexte historique',
     sagenTitle: 'Légendes locales',
     howTitle: 'Comment ça marche',
@@ -222,7 +249,7 @@ export default function CityPage() {
         <div className="max-w-3xl mx-auto px-4 pt-6 pb-10">
           {city && (() => {
             const cityName = loc(city.name);
-            const introBody = t.introBody.replace(/\{city\}/g, cityName);
+            const fill = (s: string) => s.replace(/\{city\}/g, cityName);
             const gallery = CITY_GALLERIES[city.id] || [];
             const topImages = gallery.slice(0, 2);
             // Disambiguator: only show the canton next to the h1 when another
@@ -249,7 +276,7 @@ export default function CityPage() {
                   </div>
                 )}
                 <div className="text-center">
-                  <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-3">
+                  <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-4">
                     {cityName}
                     {hasNameClash && (
                       <span className="ml-2 text-stone-400 text-2xl md:text-3xl font-normal align-middle">
@@ -257,23 +284,53 @@ export default function CityPage() {
                       </span>
                     )}
                   </h1>
+                  {/* Scene-setting line — sits below the h1, above the two
+                      option blocks. Reads as a continuation of the title. */}
                   <p className="text-stone-600 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-6">
-                    {introBody}
+                    {fill(t.intro.scene)}
                   </p>
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <Link
-                      to="/create"
-                      className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-colors text-lg"
-                    >
-                      {t.ctaButton} <ArrowRight size={20} />
-                    </Link>
-                    <Link
-                      to="/try"
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border-2 border-indigo-200 text-indigo-500 font-medium hover:bg-indigo-50 transition-colors text-sm"
-                    >
-                      {t.ctaTrialButton}
-                    </Link>
-                  </div>
+                </div>
+
+                {/* Two-path option blocks. Path A (custom topic) leads to
+                    /create via the existing CTA below. Path B (historical)
+                    lives in the Story Ideas section further down — a small
+                    in-page anchor would be nice eventually, but for now the
+                    section header and gallery imagery make it discoverable. */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 mb-8">
+                  <section className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 md:p-6 text-left">
+                    <h2 className="font-title text-lg md:text-xl font-bold text-stone-900 mb-2">
+                      {fill(t.intro.customLabel)}
+                    </h2>
+                    <p className="text-stone-600 text-sm md:text-base leading-relaxed">
+                      {fill(t.intro.customBody)}
+                    </p>
+                  </section>
+                  <section className="bg-stone-100 border border-stone-200 rounded-2xl p-5 md:p-6 text-left">
+                    <h2 className="font-title text-lg md:text-xl font-bold text-stone-900 mb-2">
+                      {fill(t.intro.historicalLabel)}
+                    </h2>
+                    <p className="text-stone-600 text-sm md:text-base leading-relaxed">
+                      {fill(t.intro.historicalBody)}
+                    </p>
+                  </section>
+                </div>
+
+                {/* Universal CTAs — apply to both paths (the wizard lets the
+                    user pick their topic, and our Swiss-story prompt drops
+                    the city in automatically when started from /stadt/...). */}
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <Link
+                    to="/create"
+                    className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-colors text-lg"
+                  >
+                    {t.ctaButton} <ArrowRight size={20} />
+                  </Link>
+                  <Link
+                    to="/try"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border-2 border-indigo-200 text-indigo-500 font-medium hover:bg-indigo-50 transition-colors text-sm"
+                  >
+                    {t.ctaTrialButton}
+                  </Link>
                 </div>
               </>
             );
@@ -291,7 +348,7 @@ export default function CityPage() {
                 <BookOpen size={20} className="text-indigo-500" />
                 <h2 className="font-title text-xl font-bold text-stone-900">{t.ideasTitle.replace('{city}', loc(city.name))}</h2>
               </div>
-              <p className="text-sm text-stone-500">{t.ideasSubtitle}</p>
+              <p className="text-sm text-stone-500">{t.ideasSubtitle.replace(/\{city\}/g, loc(city.name))}</p>
             </div>
             <div className="space-y-4">
               {city.ideas.map(idea => {
