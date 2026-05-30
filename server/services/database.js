@@ -798,6 +798,12 @@ async function extractInlineImagesToR2(storyId, data) {
   // 2) Run the queue in a parallel batch pool. Hundreds of small R2 PUTs at
   //    a time of 12 take seconds instead of minutes (was sequential before).
   const tasks = [];
+  // Track which input strings are already queued so the generic sweep
+  // (Phase 1.5) doesn't re-queue them under a different key — that would
+  // upload the same bytes twice AND race two apply()s on the same field,
+  // potentially leaving the base64 stale in the blob when the sweep's
+  // apply() lands AFTER the per-field walker's apply() that cleared it.
+  const queuedInputs = new Set();
   /**
    * Queue one R2 upload. No-op if `input` isn't actual byte data.
    * @param {string} input  — base64 / data: URI, or anything else (skipped).
@@ -806,6 +812,7 @@ async function extractInlineImagesToR2(storyId, data) {
    */
   const upload = (input, key, apply) => {
     if (!looksLikeBytes(input)) return;
+    queuedInputs.add(input);
     tasks.push({ input, key, apply });
   };
 
@@ -1153,6 +1160,68 @@ async function extractInlineImagesToR2(storyId, data) {
       }
     }
   }
+
+  // ─── Phase 1.5: generic recursive sweep ─────────────────────────────────
+  // The per-field walkers above target known shapes with semantic R2 keys
+  // (preferable — group-able under /stories/{id}/page-{N}/...). But every
+  // new image-bearing field added to the data model is one more chance for
+  // base64 to leak past them. Profiling the Jun-2026 trial showed up to
+  // 5.7 MB stuck under styledAvatarGeneration[*].passes.pass{1,2}.imageData
+  // and ...attempts[*].sentToGrok.referenceImages[*].dataUri — fields the
+  // explicit walker didn't know about. For a 14-page repair-heavy story
+  // these multiply per regen pass and blew the JSONB 256MB cap.
+  //
+  // This sweep walks the entire tree and queues every remaining base64-like
+  // string for R2 upload, with the original field rewritten in-place to the
+  // R2 URL. Downstream consumers that already handle "URL or data: URI" in
+  // <img src> contexts work unchanged.
+  //
+  // Three guards keep it safe:
+  // - skips strings already queued by per-field walkers (looksLikeBytes
+  //   uses the same predicate; queued tasks' apply() clears the source)
+  // - skips known-already-URL fields (looksLikeBytes returns false for http*)
+  // - bounds key length (R2 limit 1024 bytes)
+  const sanitizeKeySegment = (s) =>
+    String(s).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
+  const sweptKeys = new Set(tasks.map(t => t.key));
+  const seenObjects = new WeakSet();
+  const queueLeak = (parent, key, child, pathSegments) => {
+    const keyBase = `stories/${storyId}/aux/${[...pathSegments, sanitizeKeySegment(key)].join('-')}`;
+    let k = `${keyBase}.jpg`;
+    let suffix = 1;
+    while (sweptKeys.has(k)) k = `${keyBase}__${suffix++}.jpg`;
+    sweptKeys.add(k);
+    tasks.push({
+      input: child,
+      key: k,
+      apply: (url) => { parent[key] = url; },
+    });
+  };
+  function sweep(node, pathSegments) {
+    if (!node || typeof node !== 'object') return;
+    if (seenObjects.has(node)) return;
+    seenObjects.add(node);
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) {
+        const child = node[i];
+        if (typeof child === 'string' && looksLikeBytes(child)) {
+          queueLeak(node, i, child, pathSegments);
+        } else if (child && typeof child === 'object') {
+          sweep(child, [...pathSegments, sanitizeKeySegment(i)]);
+        }
+      }
+      return;
+    }
+    for (const k of Object.keys(node)) {
+      const child = node[k];
+      if (typeof child === 'string' && looksLikeBytes(child)) {
+        queueLeak(node, k, child, pathSegments);
+      } else if (child && typeof child === 'object') {
+        sweep(child, [...pathSegments, sanitizeKeySegment(k)]);
+      }
+    }
+  }
+  sweep(data, []);
 
   // ─── Phase 2: drain the queue with bounded concurrency ────────────────
   if (tasks.length === 0) return;
