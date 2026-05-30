@@ -29,8 +29,8 @@ const CITY_GALLERIES: Record<string, CityGalleryItem[]> = {
   ],
   baden: [
     { src: '/images/cities/baden/baden-book-knight-holzbruecke-square-v3.jpg', landmark: 'Holzbrücke' },
-    { src: '/images/cities/baden/baden-book-princess-action-ref.jpg', landmark: 'Altstadt' },
     { src: '/images/cities/baden/baden-book-superhero-panorama.jpg', landmark: 'Panorama' },
+    { src: '/images/cities/baden/baden-book-princess-action-ref.jpg', landmark: 'Altstadt' },
     { src: '/images/cities/baden/baden-book-wizard-stadtturm-portrait.jpg', landmark: 'Stadtturm' },
   ],
   winterthur: [
@@ -61,7 +61,6 @@ const pageTexts: Record<string, {
   // Intro block above the Story Ideas list — explains what a "city story"
   // is. {city} placeholder is replaced with the localized city name at
   // render time.
-  introTitle: string;
   introBody: string;
   ideasTitle: string;
   ideasSubtitle: string;
@@ -81,10 +80,9 @@ const pageTexts: Record<string, {
 }> = {
   en: {
     breadcrumbRoot: 'Swiss Cities',
-    introTitle: 'A personalized story set in {city}',
-    introBody: 'We turn your child into the hero of an illustrated story that takes place right here — featuring real local landmarks and historical sites of {city}.',
-    ideasTitle: 'Story Ideas',
-    ideasSubtitle: 'Each story is rooted in real local history and landmarks',
+    introBody: 'Your child becomes the hero of a story set right here in {city}. Create your own — any topic, any theme — at real local landmarks. Or pick one of {city}\'s historical tales below and let your child step into it.',
+    ideasTitle: 'Historical tales from {city}',
+    ideasSubtitle: 'Pre-made stories from real local history — your child plays a role',
     contextLabel: 'Historical context',
     sagenTitle: 'Local Legends',
     howTitle: 'How It Works',
@@ -105,10 +103,9 @@ const pageTexts: Record<string, {
   },
   de: {
     breadcrumbRoot: 'Schweizer Städte',
-    introTitle: 'Eine personalisierte Geschichte aus {city}',
-    introBody: 'Wir verwandeln dein Kind in den Helden einer illustrierten Geschichte, die direkt hier spielt — an echten Wahrzeichen und historischen Orten von {city}.',
-    ideasTitle: 'Geschichten-Ideen',
-    ideasSubtitle: 'Jede Geschichte basiert auf echter lokaler Geschichte und Sehenswürdigkeiten',
+    introBody: 'Dein Kind wird zum Helden einer Geschichte, die in {city} spielt. Erstelle deine eigene — jedes Thema, jede Idee — an echten Wahrzeichen der Stadt. Oder wähle eine der historischen Geschichten aus {city} weiter unten, in die dein Kind hineinschlüpft.',
+    ideasTitle: 'Historische Geschichten aus {city}',
+    ideasSubtitle: 'Vorgefertigte Geschichten aus der echten Stadtgeschichte — dein Kind übernimmt eine Rolle',
     contextLabel: 'Historischer Hintergrund',
     sagenTitle: 'Lokale Sagen',
     howTitle: 'So funktioniert\'s',
@@ -129,10 +126,9 @@ const pageTexts: Record<string, {
   },
   fr: {
     breadcrumbRoot: 'Villes suisses',
-    introTitle: 'Une histoire personnalisée qui se déroule à {city}',
-    introBody: 'Nous transformons votre enfant en héros d\'une histoire illustrée qui prend place ici même — avec les véritables monuments et sites historiques de {city}.',
-    ideasTitle: 'Idées d\'histoires',
-    ideasSubtitle: 'Chaque histoire est ancrée dans l\'histoire et les monuments locaux',
+    introBody: 'Votre enfant devient le héros d\'une histoire qui se déroule à {city}. Créez la vôtre — n\'importe quel sujet, n\'importe quelle idée — sur les véritables sites locaux. Ou choisissez l\'une des histoires historiques de {city} ci-dessous, dans laquelle votre enfant entrera.',
+    ideasTitle: 'Histoires historiques de {city}',
+    ideasSubtitle: 'Histoires prêtes tirées de l\'histoire locale réelle — votre enfant y joue un rôle',
     contextLabel: 'Contexte historique',
     sagenTitle: 'Légendes locales',
     howTitle: 'Comment ça marche',
@@ -293,7 +289,7 @@ export default function CityPage() {
             <div className="text-center mb-6">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <BookOpen size={20} className="text-indigo-500" />
-                <h2 className="font-title text-xl font-bold text-stone-900">{t.ideasTitle}</h2>
+                <h2 className="font-title text-xl font-bold text-stone-900">{t.ideasTitle.replace('{city}', loc(city.name))}</h2>
               </div>
               <p className="text-sm text-stone-500">{t.ideasSubtitle}</p>
             </div>
