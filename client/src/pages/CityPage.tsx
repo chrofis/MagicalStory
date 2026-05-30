@@ -7,6 +7,40 @@ import { ArrowRight, ChevronRight, ChevronDown, MapPin, BookOpen, Sparkles } fro
 
 interface LocalizedString { en: string; de: string; fr: string }
 
+// ─── Per-city illustration gallery ──────────────────────────────────────────
+// Shown on /stadt/{cityId} above the story ideas, so a visitor immediately
+// sees what a story set in this city actually looks like. Images live in
+// client/public/images/cities/{cityId}/ (copied from scripts/ads/approved
+// at build time — those creatives are reused so we don't generate new
+// illustrations just for this page).
+//
+// Cities without approved illustrations yet (e.g. Zürich) are omitted —
+// the intro text alone is shown, no gallery row.
+interface CityGalleryItem {
+  src: string;
+  landmark: string; // caption shown under the image
+}
+const CITY_GALLERIES: Record<string, CityGalleryItem[]> = {
+  aarau: [
+    { src: '/images/cities/aarau/aarau-book-knight-ethan-oberer-turm-aarau.jpg', landmark: 'Oberer Turm' },
+    { src: '/images/cities/aarau/aarau-book-pirate-ethan-biberstein-castle.jpg', landmark: 'Schloss Biberstein' },
+    { src: '/images/cities/aarau/aarau-book-princess-lily-stadtkirche-aarau.jpg', landmark: 'Stadtkirche' },
+    { src: '/images/cities/aarau/aarau-book-wizard-lily-kloster-st-ursula-aarau.jpg', landmark: 'Kloster St. Ursula' },
+  ],
+  baden: [
+    { src: '/images/cities/baden/baden-book-knight-holzbruecke-square-v3.jpg', landmark: 'Holzbrücke' },
+    { src: '/images/cities/baden/baden-book-princess-action-ref.jpg', landmark: 'Altstadt' },
+    { src: '/images/cities/baden/baden-book-superhero-panorama.jpg', landmark: 'Panorama' },
+    { src: '/images/cities/baden/baden-book-wizard-stadtturm-portrait.jpg', landmark: 'Stadtturm' },
+  ],
+  winterthur: [
+    { src: '/images/cities/winterthur/winterthur-book-knight-ethan-alte-kaserne-winterthur.jpg', landmark: 'Alte Kaserne' },
+    { src: '/images/cities/winterthur/winterthur-book-pirate-ethan-fischmaedchenbrunnen.jpg', landmark: 'Fischmädchenbrunnen' },
+    { src: '/images/cities/winterthur/winterthur-book-princess-stadtkirche.jpg', landmark: 'Stadtkirche' },
+    { src: '/images/cities/winterthur/winterthur-book-wizard-lily-casinotheater-winterthur.jpg', landmark: 'Casinotheater' },
+  ],
+};
+
 // Map sage IDs to city IDs where they're most relevant
 const SAGE_CITY_MAP: Record<string, string[]> = {
   andermatt: ['sage-devils-bridge'],
@@ -24,6 +58,12 @@ const SAGE_CITY_MAP: Record<string, string[]> = {
 
 const pageTexts: Record<string, {
   breadcrumbRoot: string;
+  // Intro block above the Story Ideas list — explains what a "city story"
+  // is. {city} placeholder is replaced with the localized city name at
+  // render time.
+  introTitle: string;
+  introBody: string;
+  galleryLabel: string;
   ideasTitle: string;
   ideasSubtitle: string;
   contextLabel: string;
@@ -42,6 +82,9 @@ const pageTexts: Record<string, {
 }> = {
   en: {
     breadcrumbRoot: 'Swiss Cities',
+    introTitle: 'A personalized story set in {city}',
+    introBody: 'We turn your child into the hero of an illustrated story that takes place right here — featuring real local landmarks and historical sites of {city}.',
+    galleryLabel: 'A glimpse of what your story could look like',
     ideasTitle: 'Story Ideas',
     ideasSubtitle: 'Each story is rooted in real local history and landmarks',
     contextLabel: 'Historical context',
@@ -64,6 +107,9 @@ const pageTexts: Record<string, {
   },
   de: {
     breadcrumbRoot: 'Schweizer Städte',
+    introTitle: 'Eine personalisierte Geschichte aus {city}',
+    introBody: 'Wir verwandeln dein Kind in den Helden einer illustrierten Geschichte, die direkt hier spielt — an echten Wahrzeichen und historischen Orten von {city}.',
+    galleryLabel: 'So könnte deine Geschichte aussehen',
     ideasTitle: 'Geschichten-Ideen',
     ideasSubtitle: 'Jede Geschichte basiert auf echter lokaler Geschichte und Sehenswürdigkeiten',
     contextLabel: 'Historischer Hintergrund',
@@ -86,6 +132,9 @@ const pageTexts: Record<string, {
   },
   fr: {
     breadcrumbRoot: 'Villes suisses',
+    introTitle: 'Une histoire personnalisée qui se déroule à {city}',
+    introBody: 'Nous transformons votre enfant en héros d\'une histoire illustrée qui prend place ici même — avec les véritables monuments et sites historiques de {city}.',
+    galleryLabel: 'Voici à quoi pourrait ressembler votre histoire',
     ideasTitle: 'Idées d\'histoires',
     ideasSubtitle: 'Chaque histoire est ancrée dans l\'histoire et les monuments locaux',
     contextLabel: 'Contexte historique',
@@ -209,6 +258,55 @@ export default function CityPage() {
       </div>
 
       <div className="flex-1 max-w-4xl mx-auto px-4 py-10 w-full">
+        {/* ── Intro: what a personalized story in this city looks like ─────
+            Solves the "user lands here and doesn't know what this is" gap.
+            For cities with approved illustrations (Aarau / Baden /
+            Winterthur), a 4-image gallery sits below the body text.
+            Cities without illustrations yet (Zürich) get the intro text
+            only. */}
+        {city && (() => {
+          const cityName = loc(city.name);
+          const introTitle = t.introTitle.replace('{city}', cityName);
+          const introBody = t.introBody.replace(/\{city\}/g, cityName);
+          const gallery = CITY_GALLERIES[city.id] || [];
+          return (
+            <section className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6 md:p-8 mb-10">
+              <div className="text-center mb-6">
+                <h2 className="font-title text-2xl md:text-3xl font-bold text-stone-900 mb-3">
+                  {introTitle}
+                </h2>
+                <p className="text-stone-600 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+                  {introBody}
+                </p>
+              </div>
+              {gallery.length > 0 && (
+                <>
+                  <p className="text-center text-xs uppercase tracking-wider font-semibold text-stone-400 mb-4 mt-6">
+                    {t.galleryLabel}
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                    {gallery.map((g) => (
+                      <figure key={g.src} className="text-center">
+                        <div className="aspect-square overflow-hidden rounded-xl bg-stone-100 mb-2">
+                          <img
+                            src={g.src}
+                            alt={`${cityName} — ${g.landmark}`}
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <figcaption className="text-xs md:text-sm font-medium text-stone-600">
+                          {g.landmark}
+                        </figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                </>
+              )}
+            </section>
+          );
+        })()}
+
         {/* Story Ideas */}
         {city && city.ideas.length > 0 && (
           <div className="mb-12">
