@@ -91,7 +91,7 @@ const pageTexts: Record<string, {
     breadcrumbRoot: 'Swiss Cities',
     intro: {
       scene: 'Your child becomes the hero of a story set right here in {city} — at the city\'s real landmarks, in the familiar streets, in front of the buildings they know from everyday life.',
-      customLabel: 'Pick your topic — we set it in {city}',
+      customLabel: 'You pick the topic',
       customBody: 'A fantasy adventure, a birthday gift, courage at the dentist, friendship on the first day of school — or any of 170+ themes from our library. Create a free account, pick your topic in the wizard, we set the story in {city}.',
       historicalLabel: 'Or become part of {city}\'s history',
       historicalBody: 'Below you find {city}\'s historical tales — from old legends to famous local events. Create a free account, pick one as your starting point, your child takes a role inside it.',
@@ -120,7 +120,7 @@ const pageTexts: Record<string, {
     breadcrumbRoot: 'Schweizer Städte',
     intro: {
       scene: 'Dein Kind wird zum Helden einer Geschichte, die in {city} spielt — an echten Wahrzeichen der Stadt, in den vertrauten Gassen, vor den Gebäuden, die es aus dem Alltag kennt.',
-      customLabel: 'Wähle dein Thema — wir setzen es in {city}',
+      customLabel: 'Du wählst das Thema selbst',
       customBody: 'Ein fantastisches Abenteuer, ein Geburtstagsgeschenk, Mut beim Zahnarzt, Freundschaft im ersten Schuljahr — oder eines von über 170 Themen aus unserer Bibliothek. Erstelle ein kostenloses Konto, wähle dein Thema im Assistenten, wir lassen die Geschichte in {city} spielen.',
       historicalLabel: 'Oder werde Teil von {city}s Geschichte',
       historicalBody: 'Unten findest du {city}s historische Geschichten — von alten Sagen bis zu berühmten Ereignissen. Erstelle ein kostenloses Konto, wähle eine als Vorlage, dein Kind übernimmt darin eine Rolle.',
@@ -149,7 +149,7 @@ const pageTexts: Record<string, {
     breadcrumbRoot: 'Villes suisses',
     intro: {
       scene: 'Votre enfant devient le héros d\'une histoire qui se déroule à {city} — sur les véritables sites de la ville, dans les rues familières, devant les bâtiments qu\'il reconnaît au quotidien.',
-      customLabel: 'Choisissez votre sujet — nous le plaçons à {city}',
+      customLabel: 'Vous choisissez le sujet',
       customBody: 'Une aventure fantastique, un cadeau d\'anniversaire, du courage chez le dentiste, l\'amitié dès la rentrée — ou l\'un des 170+ thèmes de notre bibliothèque. Créez un compte gratuit, choisissez votre sujet dans l\'assistant, nous plaçons l\'histoire à {city}.',
       historicalLabel: 'Ou entrez dans l\'histoire de {city}',
       historicalBody: 'Plus bas vous trouvez les histoires historiques de {city} — des anciennes légendes aux événements célèbres. Créez un compte gratuit, choisissez-en une comme point de départ, votre enfant y tient un rôle.',
