@@ -6,7 +6,7 @@ import { signInWithGooglePopup } from '@/services/googleAuth';
 import storage from '@/services/storage';
 import { useLanguage } from '@/context/LanguageContext';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
-import { trackEmailLead } from '@/utils/gtagConversion';
+import { trackEmailLead, trackTrialStoryCompleted } from '@/utils/gtagConversion';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -451,6 +451,22 @@ export default function TrialGenerationPage() {
     };
   }, [jobId, state?.sessionToken, pollJobStatus]);
 
+  // ── Fire 'Trial story completed' Google Ads conversion ─────────────────────
+  // Two state transitions land us in 'completed' (line ~348 + the polling
+  // handler ~401), and the dedicated useEffect below redirects shortly
+  // after. To keep the fire-event in one place and dedupe across the two
+  // entry points (plus React StrictMode double-render in dev), gate it on a
+  // ref so the same mount can only fire once. Counting type on the Ads side
+  // is ONE_PER_CLICK, which would dedupe a re-fire too, but firing once is
+  // cleaner.
+  const storyCompletionFiredRef = useRef(false);
+  useEffect(() => {
+    if (pageState === 'completed' && !storyCompletionFiredRef.current) {
+      storyCompletionFiredRef.current = true;
+      trackTrialStoryCompleted();
+    }
+  }, [pageState]);
+
   // ── Auto-redirect when story is complete AND user is verified ──────────────
   useEffect(() => {
     if (pageState === 'completed' && (isVerified || googleLinked)) {
@@ -708,6 +724,19 @@ export default function TrialGenerationPage() {
     window.scrollTo(0, 0);
   }, []);
 
+  // Scroll to top whenever the rotation crosses from intro slides into
+  // story content. The user may have scrolled down to read the upsell
+  // panel below; when the title page first arrives we want them looking
+  // at THE TITLE, not at the email-claim form.
+  const hasStoryContent = !!titlePageImage || pageImages.length > 0;
+  const prevHadStoryContent = useRef(false);
+  useEffect(() => {
+    if (hasStoryContent && !prevHadStoryContent.current) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    prevHadStoryContent.current = hasStoryContent;
+  }, [hasStoryContent]);
+
   // Don't render if no state (will redirect)
   if (!state?.sessionToken) return null;
 
@@ -715,8 +744,10 @@ export default function TrialGenerationPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
-      {/* Navigation bar matching the trial wizard */}
-      <nav className="bg-black text-white px-3 py-3">
+      {/* Navigation bar — sticky during trial generation so the user can
+          always see where they are even after scrolling down to read the
+          benefits / funny messages further down the page. */}
+      <nav className="bg-black text-white px-3 py-3 sticky top-0 z-50 shadow-md">
         <div className="flex justify-between items-center">
           <span className="text-sm md:text-base font-bold whitespace-nowrap flex items-center gap-1.5">
             <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
@@ -788,10 +819,13 @@ export default function TrialGenerationPage() {
                   <>
                     {/* Image area — fixed aspect-square frame keeps the slot
                         stable when avatars/title/pages of different aspect
-                        ratios rotate through. object-contain centres each
-                        image in the frame. */}
+                        ratios rotate through. object-contain prevents
+                        cropping; items-start TOP-ALIGNS so portrait
+                        images (avatar 9:16 with face at top, title 3:4
+                        with title text at top) don't get their top half
+                        pushed off-screen by vertical centering. */}
                     <div
-                      className={`relative w-full ${isAvatarLike ? 'max-w-xs' : 'max-w-sm'} aspect-square flex items-center justify-center rounded-xl overflow-hidden bg-indigo-50 ${isAvatarLike ? 'border-4 border-indigo-100' : 'shadow-lg'} transition-opacity duration-300`}
+                      className={`relative w-full ${isAvatarLike ? 'max-w-xs' : 'max-w-sm'} aspect-square flex items-start justify-center rounded-xl overflow-hidden bg-indigo-50 ${isAvatarLike ? 'border-4 border-indigo-100' : 'shadow-lg'} transition-opacity duration-300`}
                     >
                       <img
                         src={item.imageSrc}
