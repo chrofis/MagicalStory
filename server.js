@@ -2851,6 +2851,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const sceneBackgrounds = {}; // Populated by trial mode early background generation OR Phase 5a-pre
     let streamingAvatarStylingPromise = null; // Promise for early avatar styling (started when clothing requirements ready)
     let earlyAvatarStylingSucceeded = false; // Track whether early styling actually cached avatars
+    // Trial-only: kicked off inside onVisualBible callback so the same compute
+    // we run anyway (post-finalize generateReferenceSheet at ~line 4443) lands
+    // in time for trial page render. Awaited by startTrialPageImageGeneration
+    // before reading element refs. Skipped for full mode (which has its own
+    // scene-expansion + finalize-time gen path).
+    let trialReferenceSheetPromise = null;
 
     // Track parallel tasks started during streaming
     const streamingSceneExpansionPromises = new Map(); // pageNum -> promise
@@ -3315,6 +3321,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // Resolve landmarks and VB grid for Grok reference slots
           const sceneMetadata = extractSceneMetadata(sceneDescription);
           const pageLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, sceneMetadata);
+          // Wait for the parallel ref-sheet generation (started in onVisualBible
+          // alongside empty scenes + costumed avatars) before reading element
+          // refs — otherwise getElementReferenceImagesForPage returns an empty
+          // array because referenceImageUrl hasn't been populated on each VB
+          // entry yet. The promise typically resolves well before page render
+          // since costumed avatar gen takes ~30s and ref sheets ~15-20s; this
+          // await is usually a no-op by the time we hit it. Falls through on
+          // failure (ref sheets are an enhancement, not a hard requirement).
+          if (trialReferenceSheetPromise) {
+            try { await trialReferenceSheetPromise; } catch { /* logged in the catch in onVisualBible */ }
+          }
           let elementRefs = getElementReferenceImagesForPage(streamingVisualBible, page.pageNumber, 6);
           // Also match by IDs from scene hint (same as Phase 5a)
           if (sceneMetadata?.fullData) {
@@ -3957,6 +3974,31 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         log.debug(`⚡ [STREAM] Visual Bible ready - scene expansions can now proceed`);
 
+        // Trial only: kick off VB reference-sheet generation IN PARALLEL with
+        // empty scenes + costumed avatar styling. The full-mode path also runs
+        // generateReferenceSheet (server.js ~line 4443) but that fires AFTER
+        // the unified Sonnet stream finalizes, by which point trial pages have
+        // already rendered. Result: VB element refs (CHR / ART illustrations)
+        // landed on the row but were never sent to Grok at page-render time —
+        // wasted compute. Run it here, await it in startTrialPageImageGeneration
+        // before reading element refs, and skip the post-finalize call below to
+        // avoid duplicate work.
+        if (inputData.trialMode && !skipImages && artStyle !== 'realistic') {
+          const refSheetModel = MODEL_DEFAULTS.image;
+          const refSheetBackend = IMAGE_MODELS[refSheetModel]?.backend || null;
+          const styleDescriptionForRefs = resolveArtStyle(artStyle, refSheetBackend) || resolveArtStyle('pixar');
+          trialReferenceSheetPromise = generateReferenceSheet(streamingVisualBible, styleDescriptionForRefs, {
+            minAppearances: 2,
+            maxPerBatch: 4,
+            maxElements: 6,  // trial cap — story-trial.txt limits to max 2 secondaries + 2 artifacts + 2 locations
+            storyId: jobId,
+          }).catch(err => {
+            log.warn(`⚠️ [TRIAL] Early VB reference sheet generation failed: ${err.message}`);
+            return { generated: 0, failed: 0, elements: [] };
+          });
+          log.info(`📚 [TRIAL] Early VB reference-sheet generation started (parallel with empty scenes + costumed avatars)`);
+        }
+
         // Trial: empty scene generation re-enabled per user. The scene
         // consistency it provides outweighs the ~25s latency on the 5-page
         // taste-test. KNOWN ISSUE (to address): the rendered empty scene
@@ -4453,10 +4495,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       resolveLandmarksReady();
     }
 
-    // Start background reference sheet generation for secondary elements
-    // This generates reference images for recurring characters, animals, artifacts etc.
-    let referenceSheetPromise = null;
-    if (!skipImages) {
+    // Start background reference sheet generation for secondary elements.
+    // For TRIAL: this already ran early inside onVisualBible (trialReferenceSheetPromise)
+    // so trial page render could actually consume the refs — we just reuse that
+    // promise here rather than firing a duplicate finalize-time gen.
+    // For FULL mode: this is the canonical kickoff point — scene expansion is
+    // a separate second pass after streaming, so timing isn't an issue and the
+    // wider element scope (maxElements: null) is the right default.
+    let referenceSheetPromise = inputData.trialMode ? trialReferenceSheetPromise : null;
+    if (!inputData.trialMode && !skipImages) {
       const refSheetModel = MODEL_DEFAULTS.image;
       const refSheetBackend = IMAGE_MODELS[refSheetModel]?.backend || null;
       const styleDescription = resolveArtStyle(artStyle, refSheetBackend) || resolveArtStyle('pixar');

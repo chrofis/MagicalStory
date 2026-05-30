@@ -128,7 +128,13 @@ Each background describes a scene with NO people, NO human figures. Include: loc
 - For indoor scenes: describe furniture, walls, lighting, floor
 - For outdoor scenes: describe landscape, sky, vegetation, architecture
 
-Keep it minimal: max 2-3 locations, 1-2 key objects, only secondary characters, 3-5 backgrounds.
+**Keep it MINIMAL for a 5-scene story:**
+- max **2 locations**
+- max **2 artifacts** (only props that actually drive the action across multiple scenes — not background dressing)
+- max **2 secondary characters** (only if they appear on 2+ pages — single-scene helpers can stay nameless in prose)
+- 3-5 backgrounds (one per scene if scenes change settings, fewer if scenes share a setting)
+
+Every entry costs a reference image generation pass. A 5-page story rarely benefits from more than 2 of each — pick the elements that need consistency across scenes and leave the rest as scene-prose details.
 
 ---COVER SCENE---
 Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no secondary characters. Use a Visual Bible location (prefer real landmarks) as background. Characters in costumed clothing. Wide shot, balanced composition.
