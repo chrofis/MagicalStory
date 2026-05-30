@@ -10,6 +10,8 @@ Generate a SINGLE illustration of the background environment. Paint only what th
 
 **ABOUT THE LANDMARK REFERENCE PHOTO (when provided):** It is a real-world photograph, often taken recently. Use it for the landmark's shape, proportions, architecture, and camera angle only. Exclude any modern elements visible in the photo: cars, parked vehicles, traffic signs, road markings, street lights, utility poles, power lines, billboards, commercial advertising, shopfront windows with price tags, plastic bins, satellite dishes, air conditioners, modern pedestrians. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure.
 
+{LANDMARK_FIDELITY}
+
 Fill the entire frame edge-to-edge — no borders, no cropping, no black bars. Do not add any text, labels, signs, banners, posters, logos, or watermarks — no readable writing of any kind.
 Lighting must come from a consistent direction — all shadows point the same way.
 The ground, floor, or surface where characters would stand or sit must be clearly visible.

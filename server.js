@@ -3977,6 +3977,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // shape; the scene description alone doesn't carry visual identity.
             const bgLandmark = bg.pages.map(pn => pageLandmarkLookup[pn]).find(Boolean);
             const emptySceneLandmarkPhotos = bgLandmark ? [bgLandmark] : [];
+            // Strong landmark-fidelity block — only included when a landmark
+            // is actually attached. Anchors the photo by NAME so Grok knows
+            // which building it's looking at, and asks for silhouette
+            // preservation (the previous prompt told Grok "use the photo
+            // for shape" but never named the landmark — without the name
+            // Grok would treat the photo as one style hint among many and
+            // stylize away the distinctive shape).
+            const landmarkFidelityBlock = bgLandmark
+              ? `**LANDMARK IN THIS SCENE: ${bgLandmark.name}.** The attached reference photo shows this exact real-world landmark. Recreate it FAITHFULLY — preserve the silhouette, architectural details, distinctive features, and overall proportions exactly as in the photo. Do NOT stylize away its identity. The landmark must be immediately recognisable to someone who has seen the real building.\n\nExclude modern intrusions visible in the photo: cars, parked vehicles, traffic signs, road markings, street lights, utility poles, power lines, billboards, commercial advertising, shopfront price tags, plastic bins, satellite dishes, air conditioners, modern pedestrians. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure. Keep the landmark itself unchanged; only remove the modern surroundings.`
+              : '';
             for (const pageNum of bg.pages) {
               bgPromises.push(bgLimit(async () => {
                 try {
@@ -3986,6 +3996,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     REQUIRED_OBJECTS: '',
                     TEXT_AREA_INSTRUCTION: '',
                     ERA_GUARD: '',
+                    LANDMARK_FIDELITY: landmarkFidelityBlock,
                   });
                   const result = await generateImageOnly(emptyPrompt, [], {
                     landmarkPhotos: emptySceneLandmarkPhotos,
