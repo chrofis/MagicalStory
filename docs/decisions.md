@@ -345,6 +345,55 @@ phantom (acceptable friction for the rare case).
 **Touched:** `server/lib/character2x4Sheet.js` (`phantomTierForAge`).
 **Status:** ✅ active.
 
+### Phantom face replaced with RGB axis-gizmo overlay
+**Context:** The 2×4 character sheet generation uses a phantom (mannequin
+in 4 angles × 2 rows of head/body) as a pose template. The phantom is
+generated with "two small dots for eyes, a small line for a mouth"
+(see `scripts/generate-phantom-age-tiers.js:89`) so Grok knows where the
+face goes per cell. Problem: Grok **copies whatever it sees** on the
+phantom's head into the rendered character. The eye-dots and
+mouth-line leak into every render — the character's face structure ends
+up reading as "phantom-face-with-skin-tone" instead of "the kid in the
+source photo". Tried smooth/featureless heads, but Grok then renders
+smooth/featureless faces ("the avatar gets a smooth oval face"). Tried
+composite-source-face onto phantom, but that defeats the purpose since
+the 2×4 IS the source for downstream composites. Tension: phantom MUST
+have a face for orientation cue, but ANY face leaks.
+
+**Decision:** Overlay a 3-axis RGB gizmo (red X, green Y, blue Z) on the
+face region of each cell. The gizmo communicates orientation through
+its OWN rotation per cell (front=0°, quarter=45°, profile=90°,
+back-3/4=135°) but is unmistakably non-anatomical — Grok reads it as
+"directional marker, not a face" so no face features leak into the
+render. The phantom body (proportions, pose) is preserved untouched.
+
+  Cell layout per angle:
+  | Angle | Red (X) | Green (Y) | Blue (Z) |
+  |---|---|---|---|
+  | 0° front | → right | ↑ up | • dot (toward viewer) |
+  | 45° quarter | ↗ up-right | ↑ up | ↘ down-right |
+  | 90° profile | • faded dot (perpendicular) | ↑ up | → right |
+  | 135° back-3/4 | ↖ up-left | ↑ up | ↗ up-right |
+
+**Rationale:** Keeps the body+pose value the phantom provides without
+the feature-leak cost. The gizmo "leak" is benign because the gizmo
+doesn't resemble human anatomy — Grok renders the character from the
+source face photo, gives the head the orientation indicated by the
+gizmo, and discards the gizmo geometry. Build-time transformation
+(scripts/generate-phantom-axes.js) keeps the original assets untouched
+on disk for easy rollback.
+
+**Touched:**
+- `scripts/generate-phantom-axes.js` — generator that overlays gizmos
+  onto each existing phantom PNG, outputs `*-axes.png` variants
+- `server/assets/phantom-watercolor-{toddler,child,teen,adult,*}-axes.png`
+- `server/lib/character2x4Sheet.js` — `loadPhantom()` reads the
+  `-axes` variants
+
+**Status:** ✅ active. Cross-character validation (Noah + Emma, all 4
+  age tiers) showed clean faces with correct per-cell orientation and
+  no gizmo geometry leaking into the renders.
+
 ### One trial story per user — no environment exceptions, no merges, no email reclaim
 **Context:** During testing, multiple convenience features were added on
 staging: cap bypass (let same trial user generate multiple stories),

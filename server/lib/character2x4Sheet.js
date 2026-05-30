@@ -35,7 +35,13 @@ const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
 const MAX_SHEET_RETRIES = 2;
 
 const ASSETS_DIR = path.resolve(__dirname, '..', 'assets');
-const DEFAULT_PHANTOM_PATH = path.join(ASSETS_DIR, 'phantom-watercolor.png');
+// The -axes variants overlay a 3-axis RGB gizmo (red X / green Y / blue Z)
+// on the face region of every cell instead of the original eye-dots + mouth
+// line. Grok was copying the smooth featureless face from the original
+// phantom into renders ("phantom face leak"); the gizmo is unmistakably
+// non-anatomical so it gets ignored while still communicating head angle.
+// See docs/decisions.md → "Phantom face replaced with RGB axis-gizmo overlay".
+const DEFAULT_PHANTOM_PATH = path.join(ASSETS_DIR, 'phantom-watercolor-axes.png');
 // Resolved-file-path → data URL. Each age tier is a distinct reusable asset
 // generated once (scripts/generate-phantom-age-tiers.js) so its proportions
 // can be cached independently.
@@ -59,7 +65,7 @@ function phantomTierForAge(age) {
 
 function loadPhantom(age) {
   const tier = phantomTierForAge(age);
-  const tierPath = tier ? path.join(ASSETS_DIR, `phantom-watercolor-${tier}.png`) : null;
+  const tierPath = tier ? path.join(ASSETS_DIR, `phantom-watercolor-${tier}-axes.png`) : null;
   // Prefer the age-tier phantom; fall back to the default when its asset
   // isn't bundled yet, so behaviour is unchanged until the tiers land.
   const file = (tierPath && fs.existsSync(tierPath)) ? tierPath : DEFAULT_PHANTOM_PATH;
@@ -71,10 +77,8 @@ function loadPhantom(age) {
   const dataUrl = `data:image/png;base64,${buf.toString('base64')}`;
   phantomCache.set(file, dataUrl);
   // Include file basename + byte size so the user can verify via the dev
-  // panel which phantom was actually used (different tiers have different
-  // sizes: default ~206KB, toddler ~456KB, child ~477KB, teen ~441KB,
-  // adult ~521KB). Without this we only had the intent log; now we log
-  // what was actually read off disk.
+  // panel which phantom was actually used. Each tier has a distinct
+  // size — -axes variants run ~360–728 KB depending on tier.
   log.info(`[2x4-SHEET] age ${age}→${tier || 'default'} phantom — loaded ${path.basename(file)} (${Math.round(buf.length / 1024)} KB)`);
   return dataUrl;
 }
