@@ -3,7 +3,7 @@ import { Link, useParams, Navigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSwissStories } from '@/context/SEODataContext';
 import { Navigation, Footer } from '@/components/common';
-import { ArrowRight, ChevronRight, ChevronDown, MapPin, BookOpen, Sparkles } from 'lucide-react';
+import { ArrowRight, ChevronRight, ChevronDown, BookOpen, Sparkles } from 'lucide-react';
 
 interface LocalizedString { en: string; de: string; fr: string }
 
@@ -175,11 +175,10 @@ export default function CityPage() {
     return data.cities.find(c => c.id === cityId) || null;
   }, [data, cityId]);
 
-  const cantonName = useMemo(() => {
-    if (!data || !city) return '';
-    const cn = data.cantons[city.canton];
-    return cn?.[language as keyof typeof cn] || cn?.de || city.canton;
-  }, [data, city, language]);
+  // (cantonName useMemo removed — no longer displayed in the hero. The
+  // h1 now shows only the city name, with the canton appended via
+  // city.canton only when another Swiss city shares the same name —
+  // see hasNameClash in the hero render block.)
 
   // Related Sagen for this city
   const relatedSagen = useMemo(() => {
@@ -219,82 +218,74 @@ export default function CityPage() {
         </div>
       </div>
 
-      {/* Hero */}
+      {/* ── Hero: two illustrations on top, city name as h1, intro body,
+              primary CTAs. Replaces the older separate hero + intro card
+              (which duplicated the city name and showed an AG canton chip
+              that the user found noisy). One unified block. ─────────── */}
       <div className="bg-white border-b border-stone-100">
-        <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-5">
-            <MapPin className="w-8 h-8 text-indigo-500" />
-          </div>
-          <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-2">
-            {city ? loc(city.name) : '...'}
-          </h1>
-          {cantonName && (
-            <p className="text-stone-400 text-sm mb-5">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="bg-stone-100 text-stone-600 text-xs font-bold px-2 py-0.5 rounded-full">{city?.canton}</span>
-                {cantonName}
-              </span>
-            </p>
-          )}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link
-              to="/create"
-              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-colors text-lg"
-            >
-              {t.ctaButton} <ArrowRight size={20} />
-            </Link>
-            <Link
-              to="/try"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border-2 border-indigo-200 text-indigo-500 font-medium hover:bg-indigo-50 transition-colors text-sm"
-            >
-              {t.ctaTrialButton}
-            </Link>
-          </div>
+        <div className="max-w-3xl mx-auto px-4 pt-6 pb-10">
+          {city && (() => {
+            const cityName = loc(city.name);
+            const introBody = t.introBody.replace(/\{city\}/g, cityName);
+            const gallery = CITY_GALLERIES[city.id] || [];
+            const topImages = gallery.slice(0, 2);
+            // Disambiguator: only show the canton next to the h1 when another
+            // Swiss city shares this exact name in any language (e.g.
+            // 'Bremgarten' exists in both AG and BE). For unique names like
+            // Baden/Aarau, the canton is redundant and the user finds it
+            // noisy.
+            const hasNameClash = data
+              ? data.cities.filter(c => loc(c.name).toLowerCase() === cityName.toLowerCase()).length > 1
+              : false;
+            return (
+              <>
+                {topImages.length > 0 && (
+                  <div className="grid grid-cols-2 gap-4 md:gap-6 mb-6">
+                    {topImages.map((g) => (
+                      <img
+                        key={g.src}
+                        src={g.src}
+                        alt={`${cityName} — ${g.landmark}`}
+                        loading="eager"
+                        className="w-full aspect-square object-cover rounded-2xl"
+                      />
+                    ))}
+                  </div>
+                )}
+                <div className="text-center">
+                  <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-3">
+                    {cityName}
+                    {hasNameClash && (
+                      <span className="ml-2 text-stone-400 text-2xl md:text-3xl font-normal align-middle">
+                        {city.canton}
+                      </span>
+                    )}
+                  </h1>
+                  <p className="text-stone-600 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-6">
+                    {introBody}
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <Link
+                      to="/create"
+                      className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-colors text-lg"
+                    >
+                      {t.ctaButton} <ArrowRight size={20} />
+                    </Link>
+                    <Link
+                      to="/try"
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border-2 border-indigo-200 text-indigo-500 font-medium hover:bg-indigo-50 transition-colors text-sm"
+                    >
+                      {t.ctaTrialButton}
+                    </Link>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
 
       <div className="flex-1 max-w-4xl mx-auto px-4 py-10 w-full">
-        {/* ── Intro: what a personalized story in this city looks like ─────
-            Solves the "user lands here and doesn't know what this is" gap.
-            For cities with approved illustrations (Aarau / Baden /
-            Winterthur), a 4-image gallery sits below the body text.
-            Cities without illustrations yet (Zürich) get the intro text
-            only. */}
-        {city && (() => {
-          const cityName = loc(city.name);
-          const introTitle = t.introTitle.replace('{city}', cityName);
-          const introBody = t.introBody.replace(/\{city\}/g, cityName);
-          const gallery = CITY_GALLERIES[city.id] || [];
-          const topImages = gallery.slice(0, 2);
-          // The other two run further down (just above the final CTA).
-          // No visible captions — the landmark name only lives in alt text
-          // for accessibility / SEO.
-          return (
-            <section className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden mb-10">
-              {topImages.length > 0 && (
-                <div className="grid grid-cols-2 gap-0">
-                  {topImages.map((g) => (
-                    <img
-                      key={g.src}
-                      src={g.src}
-                      alt={`${cityName} — ${g.landmark}`}
-                      loading="lazy"
-                      className="w-full aspect-square object-cover"
-                    />
-                  ))}
-                </div>
-              )}
-              <div className="text-center p-6 md:p-8">
-                <h2 className="font-title text-2xl md:text-3xl font-bold text-stone-900 mb-3">
-                  {introTitle}
-                </h2>
-                <p className="text-stone-600 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-                  {introBody}
-                </p>
-              </div>
-            </section>
-          );
-        })()}
 
         {/* Story Ideas */}
         {city && city.ideas.length > 0 && (
@@ -410,7 +401,7 @@ export default function CityPage() {
           const bottomImages = gallery.slice(2, 4);
           if (bottomImages.length === 0) return null;
           return (
-            <div className="grid grid-cols-2 gap-3 md:gap-4 mb-10">
+            <div className="grid grid-cols-2 gap-4 md:gap-6 mb-10">
               {bottomImages.map((g) => (
                 <img
                   key={g.src}
