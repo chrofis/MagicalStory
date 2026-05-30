@@ -4646,6 +4646,37 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     }
   }
 
+  // VB-secondary descriptors for invented characters appearing in THIS scene.
+  // Without this, characters like Mia / Noah / shopkeepers Claude invents
+  // reach Grok as bare names (e.g. "Mia and Noah lean in") — no hair, no
+  // clothing, no face — and Grok invents their appearance from scratch every
+  // page, breaking cross-page consistency. Uploaded characters carry their
+  // identity via the styled-avatar reference images; secondaries have only
+  // the VB entry, and the VB text is stripped from the prompt for Grok
+  // (skipVisualBible: true). One compact line per scene-relevant secondary
+  // restores them as identifiable characters. Filter by VB.pages[] so we
+  // only inject characters who actually appear on this page (not the full
+  // cast on every page — that'd blow the Grok 7500-char limit).
+  if (pageNumber !== null && Array.isArray(visualBible?.secondaryCharacters)) {
+    const sceneSecondaries = visualBible.secondaryCharacters.filter(c =>
+      c && Array.isArray(c.pages) && c.pages.includes(pageNumber)
+    );
+    if (sceneSecondaries.length > 0) {
+      const lines = sceneSecondaries.map(c => {
+        const bits = [];
+        if (c.age) bits.push(c.age);
+        if (c.build) bits.push(c.build);
+        if (c.hair) bits.push(`hair: ${c.hair}`);
+        if (c.face) bits.push(`face: ${c.face}`);
+        if (c.signatureLook) bits.push(c.signatureLook);
+        if (c.clothing) bits.push(`wearing ${c.clothing}`);
+        return `- ${c.name}: ${bits.join('; ')}`;
+      });
+      characterReferenceList += `\n**SECONDARY CHARACTERS IN THIS SCENE:**\n${lines.join('\n')}\n`;
+      log.debug(`[IMAGE PROMPT] Added ${sceneSecondaries.length} VB-secondary descriptor(s) for page ${pageNumber}`);
+    }
+  }
+
   // Build required objects section from metadata.objects by looking up in Visual Bible
   // This ensures objects listed in scene metadata are included with their full descriptions
   // Supports lookup by name OR identifier (e.g., "CLO001", "ART002", etc.)
@@ -5348,6 +5379,19 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
     const parts = [char.name];
     if (char.age) parts.push(`age ${char.age}`);
     if (char.gender) parts.push(char.gender);
+    // Physical traits: Gemini extracts hair/eyes/skin from the uploaded photo
+    // (trial.js:737-745 stamps them on character.physical). Without surfacing
+    // them here Claude wrote scene prose like "Lukas stands at the gate" with
+    // zero visual anchors — Grok then either had to guess or fall back on the
+    // photo ref. Inlining the descriptors lets Claude write "Lukas's blond
+    // hair catches the sunlight" so even the text path carries identity.
+    const p = char.physical || {};
+    const physicalParts = [];
+    if (p.hairColor)   physicalParts.push(`${p.hairColor} hair`);
+    if (p.eyeColor)    physicalParts.push(`${p.eyeColor} eyes`);
+    if (p.skinTone)    physicalParts.push(`${p.skinTone} skin`);
+    if (physicalParts.length) parts.push(physicalParts.join(', '));
+    if (p.detailedHairAnalysis) parts.push(`hair detail: ${p.detailedHairAnalysis}`);
     // Traits can be a flat array or structured { strengths, flaws, challenges, specialDetails }
     const t = char.traits;
     if (Array.isArray(t) && t.length) {
