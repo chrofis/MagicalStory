@@ -6079,9 +6079,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
 
       if (skipQualityEval) {
-        // Trial/lightweight mode: skip evaluation and repair entirely
+        // Trial/lightweight mode: skip evaluation and repair entirely.
+        // Drop the cover entries (pageNumber < 0 — added above so they
+        // would have flowed through the eval pipeline) BEFORE mapping
+        // into allImages — covers live on storyData.coverImages, not on
+        // sceneImages. Without this filter the sharing-viewer treats
+        // sceneImages.length as the page count, sees one entry with
+        // pageNumber=-1, and emits a phantom hasImage=false page at
+        // index N+1 — manifests as a "no image" placeholder past the
+        // last real story page.
         log.info(`⏭️ [UNIFIED] Skipping quality evaluation and repair pipeline (skipQualityEval=true)`);
-        allImages = rawImages.map(img => ({
+        allImages = rawImages
+          .filter(img => img.pageNumber == null || img.pageNumber >= 0)
+          .map(img => ({
           pageNumber: img.pageNumber,
           text: img.text,
           description: img.sceneDescription,
