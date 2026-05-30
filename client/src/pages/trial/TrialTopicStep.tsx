@@ -122,6 +122,16 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
       storyTopic: '',
       storyTheme: '',
     });
+    // Auto-scroll to the newly-revealed sub-step section. The new section
+    // mounts on the next render, so defer the scroll. requestAnimationFrame
+    // → setTimeout(0) gives React a tick to paint the new DOM before we
+    // scroll into view.
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const el = document.getElementById('trial-topic-substep');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 0);
+    });
   };
 
   const handleThemeSelect = (themeId: string) => {
@@ -219,7 +229,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
     const catData = trialCategories.find((c) => c.id === 'adventure');
 
     return (
-      <div className="max-w-4xl mx-auto pt-4">
+      <div id="trial-topic-substep" className="max-w-4xl mx-auto pt-4">
         {avatarBanner}
         {/* Selected category chip */}
         <div className="flex items-center gap-2 mb-5">
@@ -276,7 +286,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
     const popularThemes = getStoryTypesByGroup('popular');
 
     return (
-      <div className="max-w-4xl mx-auto pt-4">
+      <div id="trial-topic-substep" className="max-w-4xl mx-auto pt-4">
         {avatarBanner}
         <div className="flex items-center gap-2 mb-5">
           <div className="inline-flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-indigo-200 shadow-sm text-sm">

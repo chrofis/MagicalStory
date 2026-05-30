@@ -3239,17 +3239,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             await streamingAvatarStylingPromise;
           }
 
-          // Build per-character clothing for this page
+          // Build per-character clothing for this page.
+          // Honour Claude's per-page clothing choices — including narrative
+          // arcs that put the main character in standard clothes for some
+          // pages and costume for others. The previous force-costumed
+          // override here was reverted (user direction): the story should
+          // dictate the wardrobe, not the trial theme. Same fallback as
+          // pre-override: only if Claude emits no clothing at all do we
+          // default the main character to 'costumed' so the page has
+          // something to render.
           const perCharClothing = page.characterClothing || {};
-          // Trial mode override: when the user picked a costume theme (wizard,
-          // knight, ...) on a 5-page trial, force the main character into the
-          // costume on EVERY page. Claude's outline routinely writes
-          // `:standard` for every page despite the costume theme (observed
-          // with Lukas/wizard 2026-05-29 and Manu/wizard before), leaving the
-          // theme invisible in the actual story. Trial is too short to allow
-          // narrative-arc costume transitions — applies unconditionally
-          // (previous fallback only fired when no clothing was parsed at all).
-          if (inputData._trialCostumeType) {
+          if (inputData._trialCostumeType && Object.keys(perCharClothing).length === 0) {
             const mainCharIds = inputData.mainCharacters || [];
             for (const char of (inputData.characters || [])) {
               const isMain = char.isMainCharacter === true || mainCharIds.includes(char.id);

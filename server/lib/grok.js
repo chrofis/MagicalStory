@@ -791,15 +791,17 @@ async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, char
 }
 
 /**
- * Extract the first 3 body cells from the bottom row of a 2×4 character sheet
+ * Extract the first 3 full-column strips from a 2×4 character sheet
  * (front-facing, 3/4, profile — skipping the back view at column 4).
  *
- * Used for the trial slideshow: showing the raw 2×4 grid is unsightly and the
- * back view contains no face. Returns an array of 3 individual full-body
- * images. Aspect of the input sheet is roughly 2:1 (width:height) since
- * 4 columns × 2 rows of roughly square cells produces a 4:2 grid. If the
- * input doesn't look like a 2×4 sheet we return an empty array so callers
- * can fall back to the original image.
+ * Each strip spans both rows: the head cell (top row) stacked above the
+ * body cell (bottom row), same angle. Used for the trial slideshow so the
+ * viewer sees face + body together rather than a faceless body.
+ *
+ * Aspect of the input sheet is roughly 2:1 (width:height) since 4 columns
+ * × 2 rows of roughly square cells produces a 4:2 grid. If the input
+ * doesn't look like a 2×4 sheet we return an empty array so callers can
+ * fall back to the original image.
  */
 async function extractBottomBody3Columns(buffer) {
   try {
@@ -812,13 +814,14 @@ async function extractBottomBody3Columns(buffer) {
     const w = meta.width;
     const h = meta.height;
     const colW = Math.floor(w / 4);
-    const rowH = Math.floor(h / 2);
     const cells = [];
     for (let col = 0; col < 3; col++) {
       const left = col * colW;
-      const top = rowH; // bottom row
+      // Full column height — head + body, same angle. Previously took only
+      // the bottom row which produced faceless body shots ("cropping off
+      // the face" complaint).
       const cell = await sharp(buffer)
-        .extract({ left, top, width: colW, height: h - rowH })
+        .extract({ left, top: 0, width: colW, height: h })
         .jpeg({ quality: 88 })
         .toBuffer();
       cells.push(cell);
