@@ -212,7 +212,7 @@ export default function Pricing() {
     <div className="min-h-screen bg-gray-50">
       <Navigation currentStep={0} />
 
-      <div className="px-4 md:px-8 py-8 max-w-3xl mx-auto">
+      <div className="px-4 md:px-8 py-8 max-w-5xl mx-auto">
         {/* Back button */}
         <button
           onClick={() => navigate('/stories')}

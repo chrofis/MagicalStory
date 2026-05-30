@@ -106,7 +106,7 @@ export default function Comparisons() {
 
       {/* Hero */}
       <div className="bg-white border-b border-stone-100">
-        <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
+        <div className="max-w-5xl mx-auto px-4 pt-10 pb-10 text-center">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-50 mb-5">
             <Shield size={28} className="text-indigo-500" />
           </div>
@@ -117,7 +117,7 @@ export default function Comparisons() {
         </div>
       </div>
 
-      <div className="flex-1 max-w-4xl mx-auto px-4 py-10 w-full">
+      <div className="flex-1 max-w-5xl mx-auto px-4 py-10 w-full">
         {/* 1-on-1 Comparisons */}
         <div className="mb-12">
           <h2 className="font-title text-xl font-bold text-stone-900 mb-5 text-center">

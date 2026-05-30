@@ -132,7 +132,7 @@ export default function GiftPage() {
 
       {/* Breadcrumb */}
       <div className="bg-white border-b border-stone-100">
-        <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
+        <div className="max-w-5xl mx-auto px-4 pt-4 pb-0">
           <nav className="flex items-center gap-1.5 text-sm text-stone-500">
             <Link to="/geschenk" className="hover:text-indigo-500 transition-colors">{t.breadcrumbRoot}</Link>
             <ChevronRight size={14} className="text-stone-300" />
@@ -143,7 +143,7 @@ export default function GiftPage() {
 
       {/* Hero Section */}
       <div className="bg-white border-b border-stone-100">
-        <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
+        <div className="max-w-5xl mx-auto px-4 pt-10 pb-10 text-center">
           <span className="text-6xl block mb-5">{gift.emoji}</span>
           <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-4">{title}</h1>
           <p className="text-stone-500 text-lg max-w-xl mx-auto mb-6">{description}</p>
@@ -156,7 +156,7 @@ export default function GiftPage() {
         </div>
       </div>
 
-      <div className="flex-1 max-w-4xl mx-auto px-4 py-10 w-full">
+      <div className="flex-1 max-w-5xl mx-auto px-4 py-10 w-full">
         {/* Why Section */}
         <div className="mb-12">
           <h2 className="font-title text-xl font-bold text-stone-900 mb-5 text-center">{t.whyTitle}</h2>

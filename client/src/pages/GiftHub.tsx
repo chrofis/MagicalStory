@@ -73,7 +73,7 @@ export default function GiftHub() {
 
       {/* Header */}
       <div className="bg-white border-b border-stone-100">
-        <div className="max-w-4xl mx-auto px-4 pt-10 pb-8 text-center">
+        <div className="max-w-5xl mx-auto px-4 pt-10 pb-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-5">
             <Gift className="w-8 h-8 text-indigo-500" />
           </div>

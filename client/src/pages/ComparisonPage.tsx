@@ -303,7 +303,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
 
         {/* Breadcrumb */}
         <div className="bg-white border-b border-stone-100">
-          <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
+          <div className="max-w-5xl mx-auto px-4 pt-4 pb-0">
             <nav className="flex items-center gap-1.5 text-sm text-stone-500">
               <Link to="/vergleich" className="hover:text-indigo-500 transition-colors">
                 {t.breadcrumbRoot}
@@ -316,7 +316,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
 
         {/* Hero */}
         <div className="bg-white border-b border-stone-100">
-          <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
+          <div className="max-w-5xl mx-auto px-4 pt-10 pb-10 text-center">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-amber-50 mb-5">
               <Trophy size={28} className="text-amber-600" />
             </div>
@@ -328,7 +328,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
           </div>
         </div>
 
-        <div className="flex-1 max-w-4xl mx-auto px-4 py-10 w-full">
+        <div className="flex-1 max-w-5xl mx-auto px-4 py-10 w-full">
           {/* Listicle entries */}
           <div className="mb-12">
             <h2 className="font-title text-xl font-bold text-stone-900 mb-6 text-center">
@@ -403,7 +403,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
 
       {/* Breadcrumb */}
       <div className="bg-white border-b border-stone-100">
-        <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
+        <div className="max-w-5xl mx-auto px-4 pt-4 pb-0">
           <nav className="flex items-center gap-1.5 text-sm text-stone-500">
             <Link to="/vergleich" className="hover:text-indigo-500 transition-colors">
               {t.breadcrumbRoot}
@@ -416,7 +416,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
 
       {/* Hero */}
       <div className="bg-white border-b border-stone-100">
-        <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
+        <div className="max-w-5xl mx-auto px-4 pt-10 pb-10 text-center">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-50 mb-5">
             <Shield size={28} className="text-indigo-500" />
           </div>
@@ -427,7 +427,7 @@ function ComparisonPageContent({ data }: { data: ComparisonData }) {
         </div>
       </div>
 
-      <div className="flex-1 max-w-4xl mx-auto px-4 py-10 w-full">
+      <div className="flex-1 max-w-5xl mx-auto px-4 py-10 w-full">
         {/* Quick Comparison Table */}
         <div className="mb-12">
           <h2 className="font-title text-xl font-bold text-stone-900 mb-5 text-center">
