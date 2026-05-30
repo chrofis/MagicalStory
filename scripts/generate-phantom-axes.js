@@ -37,10 +37,15 @@ const ANGLES = ['front', 'quarter', 'profile', 'back'];
 
 // Approximate face-region within a cell as a fraction of cell width/height.
 // Top row = head-only cells: face occupies most of the cell. Bottom row =
-// body cell with the head at the top.
+// body cell with the head at the top. The bottom rect needs to land on
+// the FACE (eyes/nose/mouth area), not the cranium — earlier values
+// (cy=0.10–0.13) painted the gizmo on the top of the head, leaving the
+// actual face features uncovered below. cy=0.20 + hFrac=0.20 puts the
+// gizmo center on the face proper; wFrac=0.30 covers the full face width
+// without spilling into torso/shoulders.
 const FACE_RECT = {
   top:    { wFrac: 0.45, hFrac: 0.55, cx: 0.50, cy: 0.42 },
-  bottom: { wFrac: 0.18, hFrac: 0.10, cx: 0.50, cy: 0.10 },
+  bottom: { wFrac: 0.30, hFrac: 0.20, cx: 0.50, cy: 0.20 },
 };
 
 // Build one axis line with arrowhead. Direction is a 2D vector in screen
