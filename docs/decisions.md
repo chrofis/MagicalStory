@@ -176,7 +176,48 @@ listed for discoverability:
 
 ## Marketing & Google Ads
 
-### PMax campaigns capped at CHF 0.50 Target CPA
+### Conversion goal: demote PAGE_VIEW, add "Trial story completed", uncap PMax
+**Context:** PMax campaigns were optimizing toward whatever fired most — and
+that turned out to be the "Page view" conversion (counting_type MANY,
+value CHF 1, primary). Conversion count ≈ click count → algorithm chased
+clicks, not value. CHF 0.50 Target CPA on top of that throttled
+campaigns toward zero because real conversions cost ~CHF 1.38–2.58.
+**Decision:**
+1. **Demote PAGE_VIEW** at the customer_conversion_goal level
+   (`biddable: false`). It still counts for analytics; just no longer
+   feeds the bidder. Done via `customerConversionGoals.update()` —
+   the per-conversion-action `primary_for_goal` field is read-only for
+   GA4-sourced conversions (origin=2).
+2. **Create "Trial story completed"** — a real high-value signal.
+   Category SIGNUP, value CHF 10, counting ONE_PER_CLICK, type WEBPAGE.
+   Conversion action id 7629103661. Fire is **not yet wired** —
+   needs gtag event from the trial-completion screen in the React app.
+3. **Remove CHF 0.50 Target CPA** from PMax-Baden/Winterthur/Aarau.
+   Daily budget cap (CHF 3/day) is the real spending control at this
+   volume. Target CPA needs ~30+ conversions/campaign/month to be
+   useful; we have 7/3/2.
+**Rationale:** At ~12 conversions/month total, Google's ML bidding
+flies blind. Better to keep the algorithm unconstrained but optimizing
+for a higher-quality signal (real story completion, not landing page
+view).
+**Re-evaluate trigger:** once we hit 30+ "Trial story completed"
+conversions/campaign/month, switch to Maximize Conversion Value with
+per-action values: Trial=CHF 10, Account claim=CHF 30, Book purchase
+=CHF 60. Until then, no Target CPA.
+**Touched:**
+- Google Ads conversions + bidding (no code changes for the Ads side)
+- ⚠️ Still TODO in code: fire `gtag('event', 'conversion', {send_to: 'AW-17995593741/<LABEL>'})`
+  from the trial-completion screen (TrialGenerationPage / story-ready
+  state). LABEL is visible in the Ads UI under Tools → Conversions →
+  Trial story completed → Tag setup. Without this the conversion
+  action exists but never fires.
+**Supersedes:** the earlier "PMax campaigns capped at CHF 0.50 Target CPA"
+entry below — that cap is now removed.
+**Status:** ✅ active (set 2026-05-30).
+
+### 🗄 PMax campaigns capped at CHF 0.50 Target CPA (SUPERSEDED 2026-05-30)
+> Superseded by "Conversion goal: demote PAGE_VIEW, add Trial story completed, uncap PMax" above. The CHF 0.50 Target CPA was throttling campaigns to near-zero impressions because actual CPA on real conversions was 2.8–5× higher. Kept here for history.
+>
 **Context:** Three PMax campaigns (Baden, Winterthur, Aarau) were running
 on `MAXIMIZE_CONVERSIONS` with no per-conversion ceiling, paying actual
 costs of CHF 1.38 / 2.00 / 2.58 per conversion. Roger wanted a hard cost
