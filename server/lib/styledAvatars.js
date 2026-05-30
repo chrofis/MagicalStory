@@ -546,7 +546,10 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
         if (originalAvatar && (await resolveAvatarBytes(avatars, 'standard'))) {
           log.debug(`[STYLED AVATARS] ${charName}: standard avatar resolved from R2 fallback`);
         } else if (originalAvatar) {
-          log.warn(`⚠️ [STYLED AVATARS] ${charName}:${clothingCategory} — fell back to raw photo (no usable standard avatar inline OR in R2)`);
+          // bodyNoBg cutout from the upload pipeline — expected for trial
+          // and any character without a styled standard avatar yet. Not
+          // an error path; downgrade to debug so it stops looking alarming.
+          log.debug(`[STYLED AVATARS] ${charName}:${clothingCategory} — using bodyNoBg/face cutout as body ref (no styled standard avatar)`);
         }
       }
 
@@ -667,7 +670,13 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
     if (!originalAvatar) {
       const fallback = getPrimaryPhoto(char);
       if (fallback) {
-        log.error(`❌ [STYLED AVATARS] ${charName}: standard avatar UNRESOLVABLE (avatars.standard=${avatars?.standard ? 'set' : 'null'}, standardUrl=${avatars?.standardUrl ? 'set' : 'null'}, resolved=${getStandardAvatar(avatars, 'standard') ? 'set' : 'null'}) — falling back to raw photo for costumed:${costumeType}. This will leak the raw photo's clothing/background into the costume render.`);
+        // Expected for trial and any character without a styled standard
+        // avatar. getPrimaryPhoto returns photos.bodyNoBg first (background
+        // already removed by the Python service), so this is not a
+        // "raw photo's bg leaks" situation — the costume prompt drives
+        // the wardrobe and the bodyNoBg cutout provides body + face
+        // identity. Logged at debug level so it stops looking like a bug.
+        log.debug(`[STYLED AVATARS] ${charName}: no styled standard avatar → using bodyNoBg/face cutout as body ref for costumed:${costumeType}`);
         originalAvatar = fallback;
       }
     }
@@ -773,7 +782,10 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       if (!originalAvatar) {
         const fallback = getPrimaryPhoto(char);
         if (fallback) {
-          log.error(`❌ [STYLED AVATARS] ${charName}: standard avatar UNRESOLVABLE (avatars.standard=${avatars?.standard ? 'set' : 'null'}, standardUrl=${avatars?.standardUrl ? 'set' : 'null'}, resolved=${getStandardAvatar(avatars, 'standard') ? 'set' : 'null'}) — falling back to raw photo for standard fallback. Costume failed AND base avatar missing.`);
+          // Same fallback as the costumed path above — bodyNoBg cutout
+          // becomes the body ref when no styled standard avatar exists.
+          // Not an error condition.
+          log.debug(`[STYLED AVATARS] ${charName}: no styled standard avatar (and costume failed) → using bodyNoBg/face cutout as body ref for standard sheet`);
           originalAvatar = fallback;
         }
       }
