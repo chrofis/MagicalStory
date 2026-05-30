@@ -63,7 +63,6 @@ const pageTexts: Record<string, {
   // render time.
   introTitle: string;
   introBody: string;
-  galleryLabel: string;
   ideasTitle: string;
   ideasSubtitle: string;
   contextLabel: string;
@@ -84,7 +83,6 @@ const pageTexts: Record<string, {
     breadcrumbRoot: 'Swiss Cities',
     introTitle: 'A personalized story set in {city}',
     introBody: 'We turn your child into the hero of an illustrated story that takes place right here — featuring real local landmarks and historical sites of {city}.',
-    galleryLabel: 'A glimpse of what your story could look like',
     ideasTitle: 'Story Ideas',
     ideasSubtitle: 'Each story is rooted in real local history and landmarks',
     contextLabel: 'Historical context',
@@ -109,7 +107,6 @@ const pageTexts: Record<string, {
     breadcrumbRoot: 'Schweizer Städte',
     introTitle: 'Eine personalisierte Geschichte aus {city}',
     introBody: 'Wir verwandeln dein Kind in den Helden einer illustrierten Geschichte, die direkt hier spielt — an echten Wahrzeichen und historischen Orten von {city}.',
-    galleryLabel: 'So könnte deine Geschichte aussehen',
     ideasTitle: 'Geschichten-Ideen',
     ideasSubtitle: 'Jede Geschichte basiert auf echter lokaler Geschichte und Sehenswürdigkeiten',
     contextLabel: 'Historischer Hintergrund',
@@ -134,7 +131,6 @@ const pageTexts: Record<string, {
     breadcrumbRoot: 'Villes suisses',
     introTitle: 'Une histoire personnalisée qui se déroule à {city}',
     introBody: 'Nous transformons votre enfant en héros d\'une histoire illustrée qui prend place ici même — avec les véritables monuments et sites historiques de {city}.',
-    galleryLabel: 'Voici à quoi pourrait ressembler votre histoire',
     ideasTitle: 'Idées d\'histoires',
     ideasSubtitle: 'Chaque histoire est ancrée dans l\'histoire et les monuments locaux',
     contextLabel: 'Contexte historique',
@@ -269,9 +265,26 @@ export default function CityPage() {
           const introTitle = t.introTitle.replace('{city}', cityName);
           const introBody = t.introBody.replace(/\{city\}/g, cityName);
           const gallery = CITY_GALLERIES[city.id] || [];
+          const topImages = gallery.slice(0, 2);
+          // The other two run further down (just above the final CTA).
+          // No visible captions — the landmark name only lives in alt text
+          // for accessibility / SEO.
           return (
-            <section className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6 md:p-8 mb-10">
-              <div className="text-center mb-6">
+            <section className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden mb-10">
+              {topImages.length > 0 && (
+                <div className="grid grid-cols-2 gap-0">
+                  {topImages.map((g) => (
+                    <img
+                      key={g.src}
+                      src={g.src}
+                      alt={`${cityName} — ${g.landmark}`}
+                      loading="lazy"
+                      className="w-full aspect-square object-cover"
+                    />
+                  ))}
+                </div>
+              )}
+              <div className="text-center p-6 md:p-8">
                 <h2 className="font-title text-2xl md:text-3xl font-bold text-stone-900 mb-3">
                   {introTitle}
                 </h2>
@@ -279,30 +292,6 @@ export default function CityPage() {
                   {introBody}
                 </p>
               </div>
-              {gallery.length > 0 && (
-                <>
-                  <p className="text-center text-xs uppercase tracking-wider font-semibold text-stone-400 mb-4 mt-6">
-                    {t.galleryLabel}
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                    {gallery.map((g) => (
-                      <figure key={g.src} className="text-center">
-                        <div className="aspect-square overflow-hidden rounded-xl bg-stone-100 mb-2">
-                          <img
-                            src={g.src}
-                            alt={`${cityName} — ${g.landmark}`}
-                            loading="lazy"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <figcaption className="text-xs md:text-sm font-medium text-stone-600">
-                          {g.landmark}
-                        </figcaption>
-                      </figure>
-                    ))}
-                  </div>
-                </>
-              )}
             </section>
           );
         })()}
@@ -411,6 +400,29 @@ export default function CityPage() {
             </div>
           </div>
         )}
+
+        {/* Lower image pair — the remaining two illustrations from the
+            gallery. Sits just above the conversion CTA to give a final
+            visual reminder of what a city story looks like. */}
+        {city && (() => {
+          const cityName = loc(city.name);
+          const gallery = CITY_GALLERIES[city.id] || [];
+          const bottomImages = gallery.slice(2, 4);
+          if (bottomImages.length === 0) return null;
+          return (
+            <div className="grid grid-cols-2 gap-3 md:gap-4 mb-10">
+              {bottomImages.map((g) => (
+                <img
+                  key={g.src}
+                  src={g.src}
+                  alt={`${cityName} — ${g.landmark}`}
+                  loading="lazy"
+                  className="w-full aspect-square object-cover rounded-2xl shadow-sm border border-stone-100"
+                />
+              ))}
+            </div>
+          );
+        })()}
 
         {/* CTA */}
         <div className="bg-indigo-500 rounded-2xl p-8 md:p-12 text-center text-white">
