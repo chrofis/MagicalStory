@@ -20,24 +20,34 @@ interface CityGalleryItem {
   src: string;
   landmark: string; // caption shown under the image
 }
+// Image order matters: slice(0,2) renders at the top of the hero, slice(2,4)
+// renders above the bottom CTA. Pairs are arranged boy + girl on each row
+// (knight/pirate/superhero are boy-coded, princess/wizard girl-coded in our
+// approved creatives) so both rows feel inclusive.
 const CITY_GALLERIES: Record<string, CityGalleryItem[]> = {
   aarau: [
-    { src: '/images/cities/aarau/aarau-book-knight-ethan-oberer-turm-aarau.jpg', landmark: 'Oberer Turm' },
-    { src: '/images/cities/aarau/aarau-book-pirate-ethan-biberstein-castle.jpg', landmark: 'Schloss Biberstein' },
-    { src: '/images/cities/aarau/aarau-book-princess-lily-stadtkirche-aarau.jpg', landmark: 'Stadtkirche' },
-    { src: '/images/cities/aarau/aarau-book-wizard-lily-kloster-st-ursula-aarau.jpg', landmark: 'Kloster St. Ursula' },
+    // top pair
+    { src: '/images/cities/aarau/aarau-book-knight-ethan-oberer-turm-aarau.jpg', landmark: 'Oberer Turm' },        // boy
+    { src: '/images/cities/aarau/aarau-book-princess-lily-stadtkirche-aarau.jpg', landmark: 'Stadtkirche' },      // girl
+    // bottom pair
+    { src: '/images/cities/aarau/aarau-book-pirate-ethan-biberstein-castle.jpg', landmark: 'Schloss Biberstein' }, // boy
+    { src: '/images/cities/aarau/aarau-book-wizard-lily-kloster-st-ursula-aarau.jpg', landmark: 'Kloster St. Ursula' }, // girl
   ],
   baden: [
-    { src: '/images/cities/baden/baden-book-knight-holzbruecke-square-v3.jpg', landmark: 'Holzbrücke' },
-    { src: '/images/cities/baden/baden-book-superhero-panorama.jpg', landmark: 'Panorama' },
-    { src: '/images/cities/baden/baden-book-princess-action-ref.jpg', landmark: 'Altstadt' },
-    { src: '/images/cities/baden/baden-book-wizard-stadtturm-portrait.jpg', landmark: 'Stadtturm' },
+    // top pair
+    { src: '/images/cities/baden/baden-book-knight-holzbruecke-square-v3.jpg', landmark: 'Holzbrücke' },     // boy
+    { src: '/images/cities/baden/baden-book-princess-action-ref.jpg', landmark: 'Altstadt' },                // girl
+    // bottom pair
+    { src: '/images/cities/baden/baden-book-superhero-panorama.jpg', landmark: 'Panorama' },                 // boy
+    { src: '/images/cities/baden/baden-book-wizard-stadtturm-portrait.jpg', landmark: 'Stadtturm' },         // girl
   ],
   winterthur: [
-    { src: '/images/cities/winterthur/winterthur-book-knight-ethan-alte-kaserne-winterthur.jpg', landmark: 'Alte Kaserne' },
-    { src: '/images/cities/winterthur/winterthur-book-pirate-ethan-fischmaedchenbrunnen.jpg', landmark: 'Fischmädchenbrunnen' },
-    { src: '/images/cities/winterthur/winterthur-book-princess-stadtkirche.jpg', landmark: 'Stadtkirche' },
-    { src: '/images/cities/winterthur/winterthur-book-wizard-lily-casinotheater-winterthur.jpg', landmark: 'Casinotheater' },
+    // top pair
+    { src: '/images/cities/winterthur/winterthur-book-knight-ethan-alte-kaserne-winterthur.jpg', landmark: 'Alte Kaserne' },  // boy
+    { src: '/images/cities/winterthur/winterthur-book-princess-stadtkirche.jpg', landmark: 'Stadtkirche' },                   // girl
+    // bottom pair
+    { src: '/images/cities/winterthur/winterthur-book-pirate-ethan-fischmaedchenbrunnen.jpg', landmark: 'Fischmädchenbrunnen' }, // boy
+    { src: '/images/cities/winterthur/winterthur-book-wizard-lily-casinotheater-winterthur.jpg', landmark: 'Casinotheater' },    // girl
   ],
 };
 
