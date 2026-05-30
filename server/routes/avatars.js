@@ -125,9 +125,14 @@ const ENABLE_AVATAR_EVALUATION = true;
 // Disable for faster avatar generation on production
 const ENABLE_FACE_COMPARISON = false;
 
-// Minimum face score for base clothing avatars before triggering a retry
-// Categories scoring below this threshold get one regeneration attempt
-const MIN_BASE_AVATAR_SCORE = 5;
+// Minimum face score for base clothing avatars before triggering a retry.
+// Categories scoring below this threshold get one regeneration attempt.
+// Raised from 5 to 7 alongside the F3 prompt tightening — the prior 5 paired
+// with the lenient prompt let through "vaguely the same person" avatars where
+// face geometry visibly drifted. With the stricter forehead/cheek/jawline
+// check, a score of 5-6 now genuinely means "different face geometry" and
+// should retry; 7+ is the new "actually the same person" bar.
+const MIN_BASE_AVATAR_SCORE = 7;
 
 // ============================================================================
 // AVATAR JOB QUEUE (for non-blocking avatar generation)
@@ -625,13 +630,31 @@ function consensusTraits(photoTraits, avatarTraitsArray) {
  */
 async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApiKey, requestedClothing = null) {
   try {
-    const originalBase64 = originalPhoto.replace(/^data:image\/\w+;base64,/, '');
-    const originalMime = originalPhoto.match(/^data:(image\/\w+);base64,/) ?
-      originalPhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
-
-    const avatarBase64 = generatedAvatar.replace(/^data:image\/\w+;base64,/, '');
-    const avatarMime = generatedAvatar.match(/^data:(image\/\w+);base64,/) ?
-      generatedAvatar.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+    // Both inputs may arrive as data: URIs, raw base64, or HTTPS R2 URLs (the
+    // common case post-R2 migration). bytesFromAnyImage normalizes all three
+    // shapes into Buffer bytes. The old .replace(/^data:image\/\w+;base64,/)
+    // path was a no-op on URLs, sent the URL string to Gemini as base64,
+    // produced a 400 from the API, and silently returned null — which meant
+    // the avatar's eval score never landed on the result, so retries didn't
+    // fire and stale scores persisted. Fail loudly when decoding fails so
+    // the eval skip is visible in logs instead of silent.
+    const r2 = require('../lib/r2');
+    const [originalBytes, avatarBytes] = await Promise.all([
+      r2.bytesFromAnyImage(originalPhoto),
+      r2.bytesFromAnyImage(generatedAvatar),
+    ]);
+    if (!originalBytes) {
+      log.warn(`[AVATAR EVAL] Could not decode originalPhoto (type=${typeof originalPhoto}, len=${originalPhoto?.length}) — skipping eval`);
+      return null;
+    }
+    if (!avatarBytes) {
+      log.warn(`[AVATAR EVAL] Could not decode generatedAvatar (type=${typeof generatedAvatar}, len=${generatedAvatar?.length}) — skipping eval`);
+      return null;
+    }
+    const originalBase64 = originalBytes.toString('base64');
+    const originalMime = 'image/jpeg';
+    const avatarBase64 = avatarBytes.toString('base64');
+    const avatarMime = 'image/jpeg';
 
     let evalPrompt = PROMPT_TEMPLATES.avatarEvaluation || 'Compare these two faces. Rate similarity 1-10. Output: FINAL SCORE: [number]';
 
@@ -733,6 +756,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
         const fm = faceMatch;
         const details = [
           `Face Shape: ${fm.faceShape?.score}/10 - ${fm.faceShape?.reason}`,
+          `Forehead/Cheek/Jaw: ${fm.foreheadCheekJawline?.score ?? '?'}/10 - ${fm.foreheadCheekJawline?.reason ?? '(not scored)'}`,
           `Eyes: ${fm.eyes?.score}/10 - ${fm.eyes?.reason}`,
           `Nose: ${fm.nose?.score}/10 - ${fm.nose?.reason}`,
           `Mouth: ${fm.mouth?.score}/10 - ${fm.mouth?.reason}`,
@@ -2098,9 +2122,14 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         // Extract traits from ORIGINAL PHOTO (ground truth for face) in parallel with avatar evals
         const photoTraitsPromise = extractTraitsWithGemini(referencePhoto);
 
-        // Evaluate all avatars in parallel
+        // Evaluate all avatars in parallel. Use facePhoto for the face match
+        // when available (zoomed crop = more face pixels for Gemini to read);
+        // referencePhoto is the bg-removed body where the face occupies ~5%
+        // of pixels and identity signal is dilute. Falls back to referencePhoto
+        // when no dedicated face crop was uploaded.
+        const faceRef = facePhoto || referencePhoto;
         const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
-          const faceMatchResult = await evaluateAvatarFaceMatch(referencePhoto, imageData, geminiApiKey);
+          const faceMatchResult = await evaluateAvatarFaceMatch(faceRef, imageData, geminiApiKey);
           return { category, faceMatchResult };
         });
 
@@ -2255,8 +2284,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               log.warn(`🔄 [AVATAR JOB ${jobId}] Thumbnail extraction failed for ${category} retry: ${splitErr.message}`);
             }
 
-            // Re-evaluate
-            const retryEval = await evaluateAvatarFaceMatch(referencePhoto, retryGen.imageData, geminiApiKey);
+            // Re-evaluate (use facePhoto for face match — see comment above)
+            const retryEval = await evaluateAvatarFaceMatch(faceRef, retryGen.imageData, geminiApiKey);
             const retryScore = retryEval?.score ?? 0;
             log.debug(`🔄 [AVATAR JOB ${jobId}] Retry ${category}: new score ${retryScore}/10 (was ${originalScore}/10)`);
 
@@ -3263,8 +3292,12 @@ These corrections OVERRIDE what is visible in the reference photo.
       // Extract traits from ORIGINAL PHOTO (ground truth for face) in parallel with avatar evals
       const photoTraitsPromise = extractTraitsWithGemini(referencePhoto);
 
+      // Use the dedicated face photo for face matching when available; the
+      // body referencePhoto has too little face signal (see F2 comment in
+      // the async/job path above).
+      const faceRefSync = faceRefPhoto || referencePhoto;
       const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
-        const faceMatchResult = await evaluateAvatarFaceMatch(referencePhoto, imageData, geminiApiKey);
+        const faceMatchResult = await evaluateAvatarFaceMatch(faceRefSync, imageData, geminiApiKey);
         return { category, faceMatchResult };
       });
 
@@ -3399,8 +3432,8 @@ These corrections OVERRIDE what is visible in the reference photo.
             return null;
           }
 
-          // Re-evaluate
-          const retryEval = await evaluateAvatarFaceMatch(referencePhoto, retryResult.imageData, geminiApiKey);
+          // Re-evaluate (use face crop for face match — see F2 comment above)
+          const retryEval = await evaluateAvatarFaceMatch(faceRefSync, retryResult.imageData, geminiApiKey);
           const retryScore = retryEval?.score ?? 0;
           log.debug(`🔄 [CLOTHING AVATARS] Retry ${category}: new score ${retryScore}/10 (was ${originalScore}/10)`);
 

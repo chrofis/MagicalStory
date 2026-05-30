@@ -13,10 +13,18 @@ The `finalScore` field at the end MUST equal the LOWEST of these three checks:
 Anything below 5/10 in any of those three forces the entire avatar to fail. Children rendered as adults, adults rendered as children, or completely wrong clothing must score ≤3 on the failing dimension.
 
 TASK 1: FACE MATCH
-Compare facial features only (face shape, eyes, nose, mouth, overall structure, glasses). Score each 1-10 (10 = perfect match).
-IGNORE when scoring face: lighting, skin tone, clothing, hairstyle, background, expression, minor AI artifacts.
-GLASSES CHECK: If reference person wears glasses, avatar MUST have glasses (face score capped at 3 if missing). If no glasses in reference, avatar must NOT have glasses (capped at 3 if added).
-`faceMatch.score` = lowest of the feature scores (NOT an average — one bad feature drags it down).
+Compare facial features. Score each 1-10 (10 = perfect match).
+IGNORE when scoring face: lighting, skin tone, clothing, hairstyle, background, expression, minor AI artifacts, art-style differences (photo vs illustration).
+DO NOT ignore: face geometry. A different forehead height, cheekbone prominence, jawline shape, or chin shape means a different face — even if the eyes/nose/mouth happen to look similar. Score these explicitly:
+  - faceShape: overall outline (round / oval / heart / square / long). Wrong category → ≤4.
+  - foreheadCheekJawline: forehead height + cheekbone width/prominence + jawline angle. Visibly different geometry → ≤4 even when individual features look similar.
+  - eyes: shape, spacing, lid type.
+  - nose: bridge profile + tip + nostril shape.
+  - mouth: lip thickness + width + cupid's bow.
+  - overallStructure: holistic "is this the same person" gestalt.
+  - glasses: if reference person wears glasses, avatar MUST have matching style (capped at 3 if missing or wrong frame). If no glasses in reference, avatar MUST NOT have glasses (capped at 3 if added).
+Cross-style benefit-of-doubt is limited: when IMAGE 2 is illustration and IMAGE 1 is photo, a score of 8-10 requires faceShape AND foreheadCheekJawline AND eyes AND nose AND mouth to ALL agree. If any one is visibly different, cap at 6. If two are off, cap at 4.
+`faceMatch.score` = LOWEST of the seven feature scores. NOT average. One drift drags everything down.
 
 TASK 2: AGE & BODY PROPORTION MATCH
 Compare apparent age AND body proportions between IMAGE 1 and IMAGE 2.
@@ -48,14 +56,15 @@ Return a JSON object with this EXACT structure:
 
 {
   "faceMatch": {
-    "faceShape": {"score": 8, "reason": "Similar oval shape"},
-    "eyes": {"score": 9, "reason": "Same shape and spacing"},
-    "nose": {"score": 7, "reason": "Slightly different bridge"},
-    "mouth": {"score": 8, "reason": "Lip shape matches"},
-    "overallStructure": {"score": 8, "reason": "Proportions match"},
-    "glasses": {"score": 10, "reason": "Both have matching glasses"},
+    "faceShape":             {"score": 8, "reason": "Similar oval shape"},
+    "foreheadCheekJawline":  {"score": 7, "reason": "Cheekbones less prominent in avatar; jawline slightly softer"},
+    "eyes":                  {"score": 9, "reason": "Same shape and spacing"},
+    "nose":                  {"score": 7, "reason": "Slightly different bridge"},
+    "mouth":                 {"score": 8, "reason": "Lip shape matches"},
+    "overallStructure":      {"score": 8, "reason": "Proportions match"},
+    "glasses":               {"score": 10, "reason": "Both have matching glasses"},
     "score": 7,
-    "reason": "Lowest feature score is nose at 7"
+    "reason": "Lowest feature score is foreheadCheekJawline / nose at 7"
   },
   "ageCheck": {
     "referenceAge": "<estimated age group from IMAGE 1>",
