@@ -5384,17 +5384,36 @@ The main character has two avatar styles available:
 **IMPORTANT**: The MAJORITY of scenes (at least 3 out of 5) MUST use \`costumed:${costume.costumeType}\` for the main character's clothing in scene hints. Use \`standard\` only for 1-2 scenes where it makes narrative sense (e.g., before a transformation, or a brief real-world moment).`;
     }
 
-    // Build landmarks instruction for the visual bible
+    // Build landmarks instruction for the visual bible.
+    // For each landmark we surface ALL indexed photo variants (interior /
+    // exterior / detail / etc) with their descriptions so Claude can pick
+    // the variant whose framing matches each scene. Without this, Claude
+    // writes plain [LOC###] and the renderer always falls back to variant 1
+    // — e.g. Holzbrücke (Baden) has 2 interior shots (variants 4 & 5)
+    // perfect for "on the bridge" scenes, but they never get chosen.
     let landmarksInstruction = '';
     if (inputData.availableLandmarks?.length > 0) {
       const top3 = inputData.availableLandmarks.slice(0, 3);
-      const landmarkNames = top3.map(l => l.name).join(', ');
       const cityName = inputData.userLocation?.city || '';
+      const landmarkBlock = top3.map(l => {
+        let entry = `- ${l.name}`;
+        const variants = l.photoVariants || [];
+        if (variants.length >= 2) {
+          const angles = variants.map(v => `    ${v.n}: ${v.description}`).join('\n');
+          entry += `\n  PHOTO ANGLES (pick the variant whose description matches your scene framing):\n${angles}`;
+        }
+        return entry;
+      }).join('\n');
+      const hasVariants = top3.some(l => (l.photoVariants?.length || 0) >= 2);
+      const variantHint = hasVariants
+        ? `\nWhen a landmark has PHOTO ANGLES, reference it as \`[LOC###.N]\` in the scene hint's \`setting.location\` (e.g. \`"setting": {"location": "Wooden Bridge [LOC001.4]"}\` to pick the interior shot). Use interior angles for inside/on-the-landmark scenes, exterior angles for distant/establishing shots. Plain \`[LOC###]\` defaults to variant 1.`
+        : '';
       landmarksInstruction = `# Location${cityName ? `: ${cityName}` : ''}
 The story takes place in ${cityName || 'the child\'s hometown'}. Use real place names — do NOT invent fictional city names.
-At least one scene MUST take place at one of these real local landmarks: ${landmarkNames}.
+At least one scene MUST take place at one of these real local landmarks:
+${landmarkBlock}
 Include the chosen landmark(s) in the visual bible locations section with their real name and accurate visual description.
-Reference the landmark by its LOC ID in the relevant scene hints.`;
+Reference the landmark by its LOC ID in the relevant scene hints.${variantHint}`;
     } else if (inputData.userLocation?.city) {
       landmarksInstruction = `# Location: ${inputData.userLocation.city}
 The story takes place in ${inputData.userLocation.city}. Use real place names — do NOT invent fictional city names.`;

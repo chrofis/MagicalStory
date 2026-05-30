@@ -311,17 +311,35 @@ router.post('/generate-story-ideas', authenticateToken, async (req, res) => {
       try {
         const indexedLandmarks = await getIndexedLandmarks(effectiveLocation.city, 20);
         if (indexedLandmarks.length > 0) {
-          // For story ideas, we just need landmark names (no photos needed)
-          availableLandmarks = indexedLandmarks.map(l => ({
-            name: l.name,
-            query: l.name,
-            type: l.type,
-            score: l.score,
-            wikipediaExtract: l.wikipedia_extract,  // For outline prompt (what landmark IS)
-            photoDescription: l.photo_description,   // For image generation (what photo looks like)
-            isIndexed: true,
-            landmarkIndexId: l.id
-          }));
+          // Collect every populated photo variant so downstream prompts can
+          // surface per-angle descriptions and let Claude pick the right one
+          // (e.g. interior vs exterior of a covered bridge). Without this,
+          // trial mode — which has no scene-expansion second pass — only ever
+          // sees variant 1's description and writes plain [LOC###], which
+          // falls back to variant 1 every time. Holzbrücke (Baden) is the
+          // canonical example: 2 interior shots (variants 4 and 5) never get
+          // picked because Claude never knew they existed.
+          availableLandmarks = indexedLandmarks.map(l => {
+            const photoVariants = [];
+            for (let n = 1; n <= 6; n++) {
+              const urlKey = n === 1 ? 'photo_url' : `photo_url_${n}`;
+              const descKey = n === 1 ? 'photo_description' : `photo_description_${n}`;
+              if (l[urlKey] && l[descKey]) {
+                photoVariants.push({ n, description: l[descKey] });
+              }
+            }
+            return {
+              name: l.name,
+              query: l.name,
+              type: l.type,
+              score: l.score,
+              wikipediaExtract: l.wikipedia_extract,
+              photoDescription: l.photo_description,
+              photoVariants,
+              isIndexed: true,
+              landmarkIndexId: l.id
+            };
+          });
           log.info(`[LANDMARK] 📍 Using ${availableLandmarks.length} indexed landmarks for ${effectiveLocation.city}`);
         }
       } catch (indexErr) {
@@ -533,17 +551,35 @@ router.post('/generate-story-ideas-stream', authenticateToken, async (req, res) 
       try {
         const indexedLandmarks = await getIndexedLandmarks(effectiveLocation.city, 20);
         if (indexedLandmarks.length > 0) {
-          // For story ideas, we just need landmark names (no photos needed)
-          availableLandmarks = indexedLandmarks.map(l => ({
-            name: l.name,
-            query: l.name,
-            type: l.type,
-            score: l.score,
-            wikipediaExtract: l.wikipedia_extract,  // For outline prompt (what landmark IS)
-            photoDescription: l.photo_description,   // For image generation (what photo looks like)
-            isIndexed: true,
-            landmarkIndexId: l.id
-          }));
+          // Collect every populated photo variant so downstream prompts can
+          // surface per-angle descriptions and let Claude pick the right one
+          // (e.g. interior vs exterior of a covered bridge). Without this,
+          // trial mode — which has no scene-expansion second pass — only ever
+          // sees variant 1's description and writes plain [LOC###], which
+          // falls back to variant 1 every time. Holzbrücke (Baden) is the
+          // canonical example: 2 interior shots (variants 4 and 5) never get
+          // picked because Claude never knew they existed.
+          availableLandmarks = indexedLandmarks.map(l => {
+            const photoVariants = [];
+            for (let n = 1; n <= 6; n++) {
+              const urlKey = n === 1 ? 'photo_url' : `photo_url_${n}`;
+              const descKey = n === 1 ? 'photo_description' : `photo_description_${n}`;
+              if (l[urlKey] && l[descKey]) {
+                photoVariants.push({ n, description: l[descKey] });
+              }
+            }
+            return {
+              name: l.name,
+              query: l.name,
+              type: l.type,
+              score: l.score,
+              wikipediaExtract: l.wikipedia_extract,
+              photoDescription: l.photo_description,
+              photoVariants,
+              isIndexed: true,
+              landmarkIndexId: l.id
+            };
+          });
           log.info(`[LANDMARK] 📍 [STREAM] Using ${availableLandmarks.length} indexed landmarks for ${effectiveLocation.city}`);
         }
       } catch (indexErr) {
