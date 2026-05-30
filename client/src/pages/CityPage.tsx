@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSwissStories } from '@/context/SEODataContext';
@@ -221,6 +221,18 @@ export default function CityPage() {
   const t = pageTexts[language] || pageTexts.de;
   const { data } = useSwissStories();
   const [openContext, setOpenContext] = useState<string | null>(null);
+
+  // Reset scroll + collapse any expanded context box whenever the user
+  // navigates from one city page to another (e.g. via a 'nearby city' link
+  // at the bottom). React Router reuses the CityPage instance because both
+  // routes match /stadt/:cityId, so the global ScrollToTop and useState
+  // both miss this transition — the user lands already-scrolled past the
+  // historical stories section, thinking it's missing. This effect makes
+  // the cityId change feel like a fresh page load.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    setOpenContext(null);
+  }, [cityId]);
 
   const city = useMemo(() => {
     if (!data || !cityId) return null;
