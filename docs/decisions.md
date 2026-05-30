@@ -245,3 +245,81 @@ choices buried in code or settings, not yet written up here:
 - Why Grok is the avatar-face provider (switched from Gemini after
   `IMAGE_OTHER` refusals on adult-face photos — already noted in
   CLAUDE.md, expand here with the model-comparison data).
+
+---
+
+## Trial flow
+
+### Trial skips the 2×4 standard sheet — uses preview avatar as standard
+**Context:** Generating both standard and costumed 2×4 sheets adds ~30-40s
+to the trial wait. The trial character is in `costumed` for nearly every
+page of a 5-page story; the standard look only matters for the rare
+non-costumed scene. The preview avatar (9:16 full-body watercolor portrait,
+generated cheaply during the wizard) is good enough for that.
+**Decision:** Trial `prepare-title` only adds the costumed entry to
+`avatarRequirements`. Before calling `prepareStyledAvatars`, the standard
+cache key is seeded with the preview avatar via `_seedStandardFromPreview()`.
+Page rendering's `applyStyledAvatars` finds it there for standard-clothing
+pages and never triggers a separate 2×4 standard generation. If no costume
+is configured (unusual), we still fall back to generating the standard sheet.
+**Rationale:** ~30-40s saved per trial — major UX win on a flow already
+too slow. Quality loss is bounded: standard scenes are rare in trial, and
+the preview avatar shows the same character in the same watercolor style.
+**Touched:** `server/routes/trial.js` (`prepare-title` handler — `avatarRequirements`
+and `_seedStandardFromPreview` call); `server/lib/styledAvatars.js`
+(`_seedStandardFromPreview` helper, exported).
+**Status:** ✅ active
+
+### Trial DOES generate empty scenes (re-enabled after brief disable)
+**Context:** Empty-scene generation for trial was disabled in commit
+`05d4c221` to save ~25s on the 5-page wait. User feedback: the scene
+quality wins outweigh the latency — page renders look noticeably better
+when each one inherits a pre-rendered scene plate as background slot.
+**Decision:** Trial re-enables empty-scene generation for all 5 pages
+(server.js trial-mode `onVisualBible` block). Each empty scene is a ~5s
+Grok call; total ~25s extra in the wait — accepted.
+**Rationale:** Scene-anchored renders (`packReferences` uses the empty
+scene as Slot 1) are visibly more consistent across pages than text-only
+renders. The latency cost is recoverable elsewhere (skipping the 2×4
+standard sheet saves ~30s, net positive).
+**Touched:** `server.js` trial-mode `onVisualBible` block (~3942).
+**Status:** ✅ active. KNOWN ISSUE: empty-scene rendering deviates too
+much from the passed landmark photo — needs prompt review (tracked as
+task #34).
+
+### Trial uses age-tier phantom (child as fallback for unknown age)
+**Context:** Phantom silhouette controls head-to-body ratio of the
+generated 2×4 character. A generic adult-proportioned phantom leaks adult
+proportions into kid characters. Age tiers (toddler / child / teen / adult)
+shipped earlier. The trial form does NOT require age — `canProceed` only
+checks name + gender + photo. When users skipped age, the chain was
+`age='' → tier null → loadPhantom() falls back to phantom-watercolor.png
+(adult-ish)`. Result: kid renders looked adult-ish.
+**Decision:** `phantomTierForAge('')` returns `'child'` (not `null`). Any
+unknown / unparseable age renders against `phantom-watercolor-child.png`.
+**Rationale:** Product is overwhelmingly for kids. Adult-proportioned
+default phantom is the wrong fallback; child is the right one. Users who
+make an adult character must explicitly enter age 18+ to get the adult
+phantom (acceptable friction for the rare case).
+**Touched:** `server/lib/character2x4Sheet.js` (`phantomTierForAge`).
+**Status:** ✅ active.
+
+### One trial story per user — no environment exceptions, no merges, no email reclaim
+**Context:** During testing, multiple convenience features were added on
+staging: cap bypass (let same trial user generate multiple stories),
+email reclaim (free up the same email between trial runs), and merge into
+existing real account (let an admin claim multiple trial runs into their
+own account). The user rejected all of these.
+**Decision:** Hard rule across all environments: `stories_generated < 1`
+in `/api/trial/create-job`; no staging email reclaim in `/link-email` or
+`/link-google`; no merge-into-existing-account path; no `_merge*` helper.
+To re-test the trial flow, create a fresh trial account with a fresh
+email each time.
+**Rationale:** Product policy: trial is the user's one free shot at the
+experience and the entire claim/conversion funnel is calibrated around
+scarcity. Any "convenience" workaround distorts conversion numbers,
+abuse-resistance tests, and the deferred-email helper's idempotency
+guard — all assume one trial = one user.
+**Touched:** `server/routes/trial.js` (`/create-job`, `/check-status`,
+`/link-email`, `/link-google`); CLAUDE.md (rule).
+**Status:** ✅ active.

@@ -3937,14 +3937,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         log.debug(`⚡ [STREAM] Visual Bible ready - scene expansions can now proceed`);
 
-        // Trial: empty scene generation intentionally skipped. Each empty-
-        // scene render is a ~5s Grok call and 5 backgrounds adds ~25s to a
-        // trial that's already too slow. Trial pages render direct from
-        // prompt + character + landmark slot; the scene-anchor benefit
-        // (consistency, baked-in landmark) doesn't justify the latency on a
-        // 5-page taste-test.
-        const _generateTrialEmptyScenes = false;
-        if (_generateTrialEmptyScenes && inputData.trialMode && vb.backgrounds?.length > 0) {
+        // Trial: empty scene generation re-enabled per user. The scene
+        // consistency it provides outweighs the ~25s latency on the 5-page
+        // taste-test. KNOWN ISSUE (to address): the rendered empty scene
+        // deviates too much from the passed landmark photo — needs prompt
+        // review so the landmark identity is preserved into the plate.
+        if (inputData.trialMode && vb.backgrounds?.length > 0) {
           log.info(`🎬 [TRIAL] Starting early empty scene generation from ${vb.backgrounds.length} visual bible backgrounds`);
           const artStyleDesc = resolveArtStyle(inputData.artStyle || 'watercolor') || '';
           const bgLimit = pLimit(5);

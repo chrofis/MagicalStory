@@ -1356,6 +1356,19 @@ function clearStyledAvatarGenerationLog() {
   log.debug(`🗑️ [STYLED AVATARS] Generation log cleared (${count} entries)`);
 }
 
+/**
+ * Trial-only escape hatch: seed the styled-avatar cache at the 'standard'
+ * key with a pre-built image (the preview avatar). Lets trial skip the
+ * full 2×4 standard sheet generation when the preview is "good enough"
+ * for the rare standard-clothing scenes. See docs/decisions.md for the
+ * "trial uses costumed-only" decision.
+ */
+function _seedStandardFromPreview(characterName, artStyle, previewAvatarDataUrl) {
+  if (!characterName || !previewAvatarDataUrl) return;
+  const cacheKey = getAvatarCacheKey(characterName, 'standard', artStyle);
+  styledAvatarCache.set(cacheKey, previewAvatarDataUrl);
+}
+
 module.exports = {
   // Core functions
   getOrCreateStyledAvatar,
@@ -1382,6 +1395,9 @@ module.exports = {
   // Developer mode auditing
   getStyledAvatarGenerationLog,
   clearStyledAvatarGenerationLog,
+
+  // Trial-only escape hatch (see docs/decisions.md)
+  _seedStandardFromPreview,
 
   // Utility
   getAvatarCacheKey,

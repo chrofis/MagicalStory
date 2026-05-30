@@ -2019,24 +2019,53 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       },
     };
 
-    // Build avatar requirements for prepareStyledAvatars
-    const avatarRequirements = [
-      { pageNumber: 'cover', clothingCategory: 'standard', characterNames: [character.name] },
-    ];
+    // Build avatar requirements for prepareStyledAvatars.
+    // Trial decision (logged in docs/decisions.md): skip the 2×4 standard
+    // sheet. The character is in `costumed` for nearly every page; the
+    // standard look only shows on the rare non-costumed scene. The
+    // preview avatar (9:16 full-body watercolor portrait, generated cheaply
+    // during the wizard) is good enough as the standard reference. Saves
+    // ~30-40s on every trial. If no costume is configured we still need a
+    // standard sheet so the character can render at all.
+    const avatarRequirements = [];
     if (costume) {
       avatarRequirements.push({
         pageNumber: 'cover',
         clothingCategory: `costumed:${costume.costumeType}`,
         characterNames: [character.name],
       });
+    } else {
+      // No costume — fall back to generating the standard sheet so pages
+      // have something. (Unusual for trial, but supported.)
+      avatarRequirements.push({
+        pageNumber: 'cover',
+        clothingCategory: 'standard',
+        characterNames: [character.name],
+      });
     }
 
     // Lazy require the styled avatar module
-    const { runInCacheScope, prepareStyledAvatars, clearStyledAvatarCache, exportStyledAvatarsForPersistence } = require('../lib/styledAvatars');
+    const { runInCacheScope, prepareStyledAvatars, clearStyledAvatarCache, exportStyledAvatarsForPersistence, _styledAvatarCacheForTrial } = require('../lib/styledAvatars');
 
     // Run avatar styling inside a cache scope to prevent cross-user collisions
     await runInCacheScope(`title-${userId}`, async () => {
-      // Prepare styled avatars (standard + costumed)
+      // Pre-populate the cache with the preview avatar at the 'standard'
+      // key so applyStyledAvatars finds it on standard-clothing pages
+      // without us having to generate a separate 2×4 sheet for standard.
+      // Only the costumed sheet will actually be generated below.
+      if (costume && mainChar.previewAvatar && typeof mainChar.previewAvatar === 'string') {
+        try {
+          const { _seedStandardFromPreview } = require('../lib/styledAvatars');
+          if (typeof _seedStandardFromPreview === 'function') {
+            _seedStandardFromPreview(character.name, 'watercolor', mainChar.previewAvatar);
+            log.info(`[TRIAL AVATARS] Seeded standard cache from preview avatar for "${character.name}" (skipping standard 2×4 sheet)`);
+          }
+        } catch (seedErr) {
+          log.warn(`[TRIAL AVATARS] Failed to seed standard cache: ${seedErr.message}`);
+        }
+      }
+
+      // Prepare styled avatars (costumed only for trial — see decision above)
       await prepareStyledAvatars(characters, 'watercolor', avatarRequirements, avatarClothingRequirements, null);
       log.info(`[TRIAL AVATARS] Avatar styling complete for "${character.name}"`);
 
