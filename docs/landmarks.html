@@ -73,6 +73,20 @@
 
 <p>Discovery returns landmark name, lat/lon, Wikipedia summary, and category (mountain / castle / square / monument). The story pipeline picks 0-3 landmarks per story based on the outline.</p>
 
+<h2 id="photo-variants">4a. Photo variants per landmark</h2>
+
+<p>Each indexed landmark row carries up to <strong>6 photo variants</strong> in <code>landmark_index</code>: <code>photo_url</code>, <code>photo_url_2</code>, … <code>photo_url_6</code>, each with a paired <code>photo_description_N</code> describing what the photo shows (exterior, interior, detail, etc.). The exterior variants (1–3) come from the Wikidata image + Commons category scan; the interior variants (4–6) come from a separate Commons "interior" tag scan when present. Holzbrücke (Baden) is the canonical example: 3 exterior shots + 2 interior shots of the covered wooden bridge.</p>
+
+<p><strong>Per-variant selection in scene metadata:</strong> the parser at <code>server/lib/storyHelpers.js → getLandmarkPhotosForScene</code> recognises a <code>[LOC###.N]</code> suffix (e.g. <code>[LOC001.4]</code> picks variant 4). When the suffix is omitted, variant 1 is used. The variant integer is also accepted from <code>metadata.landmarkVariants</code> when scene hints don't inline the suffix.</p>
+
+<p><strong>How Claude learns about variants:</strong></p>
+<ul>
+  <li><strong>Full mode</strong> (story-unified.txt): scene expansion runs as a second pass after <code>loadLandmarkPhotoDescriptions</code> has populated per-variant descriptions onto the visual bible. The scene-expansion prompt has direct access to descriptions and can write <code>[LOC###.N]</code>.</li>
+  <li><strong>Trial mode</strong> (story-trial.txt): no second pass. Per-variant info is surfaced in the <code>{LANDMARKS}</code> section of the trial prompt as a <code>PHOTO ANGLES</code> block per landmark, plus an explicit instruction to use <code>[LOC###.N]</code> when picking interior vs exterior framing. Built by <code>buildTrialStoryPrompt</code> in <code>server/lib/storyHelpers.js</code>. The variant carry-through happens in <code>server/routes/storyIdeas.js</code>, which maps <code>photo_url_N + photo_description_N</code> into a structured <code>photoVariants: [{n, description}]</code> array on each landmark.</li>
+</ul>
+
+<p><strong>Avoiding example bias:</strong> the trial prompt deliberately does NOT show a specific landmark as the <code>landmarkQuery</code> example — previous versions used "Holzbrücke Baden" and Claude pattern-matched it on every Baden story even when other landmarks scored higher. See <code>docs/decisions.md</code> → "Trial landmark photo variants — surface per-angle descriptions to Claude".</p>
+
 <h2 id="curated">5. Curated historical_locations</h2>
 
 <p>For period stories, generic Wikipedia data is too thin. <code>historical_locations</code> rows hold:</p>

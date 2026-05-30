@@ -413,3 +413,127 @@ guard — all assume one trial = one user.
 **Touched:** `server/routes/trial.js` (`/create-job`, `/check-status`,
 `/link-email`, `/link-google`); CLAUDE.md (rule).
 **Status:** ✅ active.
+
+### JSONB R2 sweep — every inline base64 leaves stories.data
+**Context:** A 14-page repair-heavy Berger smoke (`job_1780141948847_xzk2o00ua`)
+hit Postgres' 256 MB JSONB cap (`total size of jsonb object elements exceeds
+the maximum of 268435455 bytes`). `extractInlineImagesToR2` had explicit
+walkers for known image-bearing fields, but every new field added to the
+data model was one more chance for base64 to leak. Profiling a 5-page 1-char
+trial showed 11 MB of leaks across 74 fields the explicit walkers missed
+(notably `styledAvatarGeneration[*].passes.pass{1,2}.imageData`,
+`sceneImages[*].sceneCharacters[*].bodyNoBgUrl`,
+`visualBible.locations[*].photoVariants[*].cachedPhotoData`,
+`...sentToGrok.referenceImages[*].dataUri`). Multiply by 14 pages × 5 chars
+× 4 repair passes → past the 256 MB cap.
+**Decision:** Add a Phase 1.5 generic recursive sweep to `extractInlineImagesToR2`
+that walks the entire data tree and queues every remaining base64 / data:image
+string for R2 upload, replacing each field in-place with the R2 URL under
+`stories/{id}/aux/{path}.jpg`. Per-field walkers stay (semantic R2 keys
+under `/stories/{id}/page-{N}/...` are nicer for browsing) and a `queuedInputs`
+Set prevents the sweep from re-queueing strings already targeted by the
+explicit walkers (would race two `apply()` callbacks on the same field).
+**Rationale:** The original per-field strip philosophy required adding a
+new walker for every new image field — an unmaintainable allowlist that
+silently regressed every time anyone added an image-bearing key. A generic
+sweep + a `queuedInputs` dedup gives us **deny-by-default** for inline
+base64 in JSONB without breaking the semantic R2 keys we still want for
+audited fields. Nothing destructive: failed R2 uploads leave bytes in
+place for the existing strip to drop (same behaviour as before).
+**Touched:** `server/services/database.js` (`extractInlineImagesToR2`).
+**Status:** ✅ active.
+
+### Trial landmark photo variants — surface per-angle descriptions to Claude
+**Context:** Every Baden trial picked "Holzbrücke (Baden)" and the renderer
+always used variant 1 (an exterior far-away river shot), even when scenes
+took place inside or on the bridge — Holzbrücke has 5 indexed variants
+including 2 interior shots (variants 4-5). Two compounding bugs: (1) the
+trial landmarks instruction at `storyHelpers.js:5388` listed only landmark
+names with no photo-angle descriptions, so Claude had no signal to pick a
+variant; (2) the trial prompt's `landmarkQuery` example was literally
+`"Holzbrücke Baden"`, biasing Claude to pick it over higher-scored
+candidates (Sankt-Nikolaus-Kapelle 135, Stadtpfarrkirche 135 both beat
+Holzbrücke 134). Few-shot examples in prompts are sticky.
+**Decision:** Carry the full `photoVariants` array (with per-variant
+descriptions) through `storyIdeas.js` → trial landmarks instruction.
+Emit a `PHOTO ANGLES` block per landmark when ≥2 variants exist, plus a
+variant-syntax instruction (`[LOC###.N]`) so Claude can pick interior
+vs exterior per scene. Remove the Holzbrücke example from the trial
+prompt and replace with a generic "copy verbatim" instruction.
+**Rationale:** The variant indexing + `getLandmarkPhotosForScene`
+`[LOC###.N]` parser were already in place; the planner just never knew
+about them. Full mode uses a second scene-expansion pass that loads
+variant descriptions, but trial has no second pass — variant info must
+land in the unified prompt or it never lands.
+**Touched:** `server/routes/storyIdeas.js` (variant carry-through);
+`server/lib/storyHelpers.js` (`buildTrialStoryPrompt` landmark
+instruction); `prompts/story-trial.txt` (drop bias example).
+**Status:** ✅ active.
+
+### Trial scenes: character physical traits + VB-secondary descriptors
+**Context:** Trial scene prose came out as bare action ("Lukas stands at
+the wooden garden gate") with zero visual descriptors — Grok had to rely
+entirely on the styled-avatar reference image for the uploaded main
+character, and **invented secondary characters** (Mia, Noah, shopkeepers)
+landed in the prompt as just a name. Grok reinvented their appearance
+every page, breaking cross-page consistency. Two distinct leaks: (1)
+`buildTrialStoryPrompt` emitted `name/age/gender/traits` but not
+`character.physical` even though `trial.js:737-745` stamps Gemini-
+extracted `hairColor/eyeColor/skinTone/detailedHairAnalysis` onto the
+character row; (2) `buildImagePrompt`'s storybook path strips the full
+VB text when `skipVisualBible: true` (the default for Grok — 8000-char
+limit, VB grid sent as image instead), so secondary-character VB entries
+with hair/face/clothing fields never reach the prompt.
+**Decision:** Surface `character.physical` to Claude via the trial
+CHARACTERS section (`hair: brown; eyes: blue; skin: fair; hair detail:
+...`) so prose can weave it in. Separately, in `buildImagePrompt`,
+inject a compact `**SECONDARY CHARACTERS IN THIS SCENE:**` block built
+from `visualBible.secondaryCharacters` filtered by `.pages[]` —
+preserves the Grok-skips-VB optimization for the bulk text while keeping
+the per-scene-relevant secondaries (typically 1-3 per page) so invented
+characters render consistently.
+**Rationale:** Photos work for uploaded characters; descriptors work
+for invented ones. We need both. Filtering by `pages[]` means each page
+only carries ~50 chars per relevant secondary instead of the full cast
+(would blow Grok's 7500-char effective limit on busy stories).
+**Touched:** `server/lib/storyHelpers.js` (`buildTrialStoryPrompt`,
+`buildImagePrompt`).
+**Status:** ✅ active.
+
+### Avatar eval: normalize inputs + use face crop + tighten scoring (F1/F2/F3)
+**Context:** User flagged avatar evaluation scores as suspiciously high.
+Three issues compounded: (F1) `evaluateAvatarFaceMatch` used a string
+`.replace(/^data:image\/\w+;base64,/, '')` to peel data-URI prefixes
+before sending to Gemini — a no-op for HTTPS R2 URLs (the common case
+post-R2 migration), causing the URL string to be sent as "base64 image
+bytes", Gemini returning 400, and the function silently returning null
+(stale score persists, no retry fires). (F2) All 4 callsites passed
+`referencePhoto` (the bg-removed body with clothing — face is ~5% of
+pixels) as the face-match anchor instead of the dedicated `facePhoto`
+(zoomed face crop the Python service produces). Dilute signal. (F3) The
+prompt was lenient — Gemini was told to score eyes/nose/mouth/overall
+structure but not face geometry (forehead height, cheekbone prominence,
+jawline shape), so avatars with visibly different geometry could pass
+with 7-8 if individual features happened to look similar.
+**Decision:**
+- **F1:** Normalize both `evaluateAvatarFaceMatch` args via
+  `r2.bytesFromAnyImage()` (handles URL / data URI / raw base64
+  uniformly), fail loudly on decode failure.
+- **F2:** Prefer `facePhoto` / `faceRefPhoto` over `referencePhoto` at
+  all 4 callsites (job + sync, initial + retry). Falls back to
+  `referencePhoto` only when no dedicated face crop was uploaded.
+- **F3:** Add `foreheadCheekJawline` as an explicit scored feature in
+  `avatar-evaluation.txt`. Cross-style cap explicit: 8-10 requires ALL
+  of faceShape + foreheadCheekJawline + eyes + nose + mouth to agree;
+  one off → cap at 6; two off → cap at 4. Raise `MIN_BASE_AVATAR_SCORE`
+  5→7 so genuinely-different-geometry sheets actually retry.
+**Rationale:** The face photo IS sent to the evaluator (rules out the
+"no face photo" hypothesis), but the wrong-shape input (F1) silently
+broke it for URL inputs, the wrong-photo input (F2) starved Gemini of
+signal even when decoding worked, and the lenient prompt (F3) let
+genuine identity drift slip past. All three are independent root
+causes with independent fixes.
+**Touched:** `server/routes/avatars.js` (`evaluateAvatarFaceMatch` +
+4 callsites + `MIN_BASE_AVATAR_SCORE`); `prompts/avatar-evaluation.txt`
+(scoring rules + JSON schema).
+**Status:** ✅ active.

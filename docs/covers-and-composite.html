@@ -112,7 +112,7 @@
 
 <p>Per character per costume, generated once and cached on the character record. <code>server/lib/character2x4Sheet.js</code> sends three reference images to Grok edit:</p>
 <ol>
-  <li><strong>Phantom asset</strong> (<code>server/assets/phantom-watercolor.png</code>) — a 2×4 grid of wooden mannequins showing the 8 target angles. Phantom indicates camera angle and head/body facing direction only; the model is told to ignore its silhouette, face, and surface texture.</li>
+  <li><strong>Phantom asset</strong> (<code>server/assets/phantom-watercolor-{tier}-axes.png</code>; tier picked by age via <code>loadPhantom</code>) — a 2×4 grid of wooden mannequins showing the 8 target angles, with a 3-axis RGB gizmo (red X / green Y / blue Z) overlaid on the face region of each cell. The gizmo communicates head orientation per cell without giving Grok any facial geometry to copy — earlier versions baked in eye-dots and a mouth-line, both of which leaked into the rendered character ("phantom face leak"). The model is told to ignore the silhouette and surface texture; the gizmo is unmistakably non-anatomical so it gets dropped too. See <code>docs/decisions.md</code> → "Phantom face replaced with RGB axis-gizmo overlay".</li>
   <li><strong>Standard avatar</strong> — the character's body / proportions reference.</li>
   <li><strong>Face photo</strong> — the character's face / hair / skin tone reference.</li>
 </ol>
