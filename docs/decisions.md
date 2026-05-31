@@ -215,8 +215,30 @@ per-action values: Trial=CHF 10, Account claim=CHF 30, Book purchase
 entry below — that cap is now removed.
 **Status:** ✅ active (set 2026-05-30).
 
+### PMax tight cost control: Target CPA CHF 0.50 + budget CHF 1.50/day
+**Context:** After uncapping PMax earlier today (removed Target CPA),
+Baden paid CHF 4.09 for a single click. User confirmed they want
+predictable low spend over volume — willing to accept near-zero
+serving in exchange for a hard cost ceiling.
+**Decision:** Apply both constraints to PMax-Baden/Winterthur/Aarau:
+  - `target_cpa_micros = 500000` (CHF 0.50)
+  - `budget.amount_micros = 1500000` (CHF 1.50/day)
+**Expected outcome:** Campaigns serve very little or not at all
+(current actual CPA is CHF 1.38–2.58, so asking for 0.50 means most
+auctions won't be entered). Total daily spend ceiling ≈ CHF 4.50/day
+across the three; actual likely far lower. Essentially 'paused with
+optionality' — keeps the campaigns alive for when we relax constraints
+again.
+**Re-evaluate trigger:** If we want any volume, either raise target_cpa
+(e.g. CHF 1.50–2.00) or remove it. User accepts the trade-off; in-house
+priority is the trial-funnel landing pages, not paid acquisition volume.
+**Supersedes:** today's earlier 'uncap PMax' decision (the conversion-
+goal restructuring from that entry — PAGE_VIEW demoted, 'Trial story
+completed' created — stays active).
+**Status:** ✅ active (set 2026-05-31).
+
 ### 🗄 PMax campaigns capped at CHF 0.50 Target CPA (SUPERSEDED 2026-05-30)
-> Superseded by "Conversion goal: demote PAGE_VIEW, add Trial story completed, uncap PMax" above. The CHF 0.50 Target CPA was throttling campaigns to near-zero impressions because actual CPA on real conversions was 2.8–5× higher. Kept here for history.
+> Superseded by "Conversion goal: demote PAGE_VIEW, add Trial story completed, uncap PMax" above. The CHF 0.50 Target CPA was throttling campaigns to near-zero impressions because actual CPA on real conversions was 2.8–5× higher. Kept here for history. (Note: re-applied 2026-05-31 with a tightened budget — see top of section.)
 >
 **Context:** Three PMax campaigns (Baden, Winterthur, Aarau) were running
 on `MAXIMIZE_CONVERSIONS` with no per-conversion ceiling, paying actual
