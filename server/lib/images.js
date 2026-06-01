@@ -13505,10 +13505,16 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
     }
   }
 
-  // Multi-element: single column vertical stack — each element gets full width
+  // Multi-element: single column vertical stack — each element gets full width.
+  // Cells touch directly (gap=0) on a pure-white background — Grok was picking
+  // up the prior dark-gray (rgb 50,50,50) inter-cell gap as a "frame" and
+  // baking it into the rendered page as a gray border around the illustration.
+  // The image-generation + empty-scene prompts already specify "edge-to-edge,
+  // no borders, pure white background" — match those in the reference grid too
+  // so Grok has nothing border-like to copy.
   const cellWidth = 512;
   const labelHeight = 28;
-  const gap = 4;
+  const gap = 0;
 
   log.debug(`🔲 [VB-GRID] Building vertical stack with ${gridElements.length} elements`);
 
@@ -13560,13 +13566,14 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
       log.info(`🔲 [VB-GRID] Dropped labels for ${droppedCount}/${cellLayout.length} cells (mode=${labelMode})`);
     }
 
-    // Create base image and composite all elements
+    // Create base image and composite all elements on PURE WHITE bg —
+    // see the gap=0 comment above for why this is white, not gray.
     const gridBuffer = await sharp({
       create: {
         width: gridWidth,
         height: gridHeight,
         channels: 3,
-        background: { r: 50, g: 50, b: 50 }
+        background: { r: 255, g: 255, b: 255 }
       }
     })
       .composite(composites)
