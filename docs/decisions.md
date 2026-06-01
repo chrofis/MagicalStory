@@ -215,6 +215,64 @@ per-action values: Trial=CHF 10, Account claim=CHF 30, Book purchase
 entry below — that cap is now removed.
 **Status:** ✅ active (set 2026-05-30).
 
+### landmark_index broad coverage: all 1,439 Swiss cities (2026-06-01)
+**Context:** The Wikipedia-geosearch indexer covered ~22 Swiss cities;
+swiss-cities.json catalogues 100; Google Ads' geo-target catalog has
+**1,439** Swiss CITY + MUNICIPALITY entries. Goal: every Swiss city
+that exists in any of these catalogs should have at least one usable
+overview photo in `landmark_index`, so future creative-gen and city-
+landing-page features can refer to any city without "no photo
+available" gaps.
+**Decision:** Built `scripts/admin/broad-city-overviews.js`:
+1. Pulls all CH-CITY + CH-MUNICIPALITY entries from Google Ads
+   `geo_target_constant`.
+2. For each, looks up the city's own Wikipedia page in its primary
+   language (DE / FR / IT by canton).
+3. Saves the lead `pageimages.original` photo as an entry named
+   `<City> (Stadt|ville|città)` with `photo_type='distant'`, country
+   = 'Switzerland'.
+4. Zero Gemini Vision calls — overviews are definitionally `distant`,
+   so the classification is hardcoded. **$0 cost.**
+**Result:** Every Swiss city has a baseline aerial/overview photo
+useable as a reference image for ad creative generation, city landing
+pages, and story prompts.
+**Trade-off:** Quality varies — some lead images are coats of arms or
+maps rather than aerial shots (limitation of Wikipedia's pageimages).
+Acceptable as a baseline; can be improved per-city later.
+**Touched:**
+- `scripts/admin/broad-city-overviews.js` — idempotent re-runnable
+**Status:** ✅ active (run 2026-06-01).
+
+### Photo-type classification: metadata-first, Read-tool second (2026-06-01)
+**Context:** `photo_type` (distant/close/interior/view_from/bad) was
+unset on 93% of landmark rows. The existing `classify-landmark-photos.js`
+uses Gemini Vision (~$0.001/photo × 1,700 photos = ~$1.70). User
+preference: avoid the dollar cost; use Claude's Read tool tokens
+instead (which are budgeted differently).
+**Decision:** Two-tier classifier `scripts/admin/classify-via-read.js`:
+1. **Tier 1 — metadata heuristic (free, instant).** For each photo
+   slot, fetch Wikimedia Commons extmetadata (ImageDescription,
+   DateTimeOriginal, Categories). Regex-match against multi-language
+   keyword sets:
+     - `bad` (engraving, lithograph, painting, map, coat-of-arms,
+       portrait, statue-detail) — auto-discarded
+     - `distant` (aerial, panorama, Schrägluftbild, drone, skyline)
+     - `interior` (Innenraum, Nave, Chor, Kreuzgang, crypt, altar)
+     - `view_from` (Blick von, Aussicht von, vue depuis)
+   Confidently classified rows are written immediately. Empirical
+   filter rate: ~70-80% per sample.
+2. **Tier 2 — Read tool for survivors.** Photos that don't match any
+   pattern emit to `ambiguous-photos.json`. A separate pass downloads
+   each image, opens it via Read, and writes a decision back to the
+   JSON. `--tier2-apply` then writes decisions to DB.
+**Result:** ~70-80% of photo_type classifications free at Tier 1; only
+~150-300 photos (estimate) need eyes via Read at Tier 2. Zero Gemini
+Vision spend.
+**Touched:**
+- `scripts/admin/classify-via-read.js` — both tiers in one file
+**Status:** 🟡 in-progress (tier-1 tested on Baden, full run pending
+broad-coverage completion).
+
 ### landmark_index iconic-fill + canonical-name rename (2026-06-01)
 **Context:** The existing Wikipedia-geosearch indexer
 (`server/lib/landmarkPhotos.js` → `indexLandmarksForCities`) systematically
