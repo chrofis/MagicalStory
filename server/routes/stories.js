@@ -1601,6 +1601,15 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
       try {
         const imgRow = await getStoryImage(id, 'scene', pageNum, versionIdx);
         imageData = imgRow?.imageData || null;
+        // Post-R2 migration: most rows have imageUrl set, imageData null.
+        // Rehydrate from R2 the same way the empty_scene path does (~line 1761).
+        // Without this the dev modal's "Erkannte Regionen laden" button silently
+        // returns null for every char-fix / inpaint version (their images live
+        // in R2 only, never in the DB blob).
+        if (!imageData && imgRow?.imageUrl) {
+          try { imageData = await imgBytesAsync({ image_data: null, image_url: imgRow.imageUrl }); }
+          catch (r2Err) { log.warn(`⚠️ [DEV-IMAGE] R2 rehydration failed for p${pageNum} v${versionIdx}: ${r2Err.message}`); }
+        }
       } catch (dbErr) {
         log.warn(`⚠️ [DEV-IMAGE] Failed to load v${versionIdx} image for page ${pageNum}: ${dbErr.message}`);
       }
