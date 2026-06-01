@@ -3878,6 +3878,26 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     const expectedPositions = sceneMetadata?.characterPositions || {};
     const expectedClothing = sceneMetadata?.characterClothing || {};
     const expectedObjects = sceneMetadata?.objects || [];
+
+    // Cover-specific fallback: covers don't get a populated sceneMetadata at
+    // generation time (only scenes do via extractSceneMetadata(scene.description)).
+    // Without expected character names/positions, Gemini returns figures as
+    // "UNKNOWN" — char-repair then can't locate any character on the cover
+    // because tier-1 exact-name match misses every figure. Mine the data from
+    // coverHints[coverKey].characterDetails which already has {name, position,
+    // clothing} per character on the cover.
+    if (isCover && Object.keys(expectedPositions).length === 0) {
+      const coverKey2 = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' }[String(pageNumber)];
+      const charDetails = storyData?.coverHints?.[coverKey2]?.characterDetails || {};
+      for (const [name, info] of Object.entries(charDetails)) {
+        if (info?.position) expectedPositions[name] = info.position;
+        if (info?.clothing) expectedClothing[name] = info.clothing;
+      }
+      if (Object.keys(expectedPositions).length > 0) {
+        log.info(`📦 [REFRESH-BBOX] Cover ${coverKey2}: built expectedPositions from coverHints.characterDetails — ${Object.keys(expectedPositions).join(', ')}`);
+      }
+    }
+
     // Build character descriptions — primary characters + Visual Bible
     // secondaries/animals named in expectedPositions (CHR003, ANI001, etc.).
     const characterDescriptions = buildCharacterDescriptionsForBbox(storyData, expectedPositions);
