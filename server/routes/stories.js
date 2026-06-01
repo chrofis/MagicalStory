@@ -922,6 +922,17 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             hasGrokRefImages: Array.isArray(v.grokRefImages) && v.grokRefImages.length > 0,
             hasInpaintReferenceImages: Array.isArray(v.inpaintReferenceImages) && v.inpaintReferenceImages.length > 0,
             bboxDetection: v.bboxDetection || null,
+            // Char-repair pipeline intermediate stages — the dev modal renders
+            // these as thumbnails ("Whiteout (Eingabe) / Grok-Rohausgabe /
+            // Blend-Maske") so the user can see WHERE in the pipeline a bad
+            // result entered. Persisted on the version row by char-fix and
+            // already stored as R2 URLs (or data URIs). Without surfacing
+            // them here the modal renders the thumbnails block as null
+            // because `detailVersion.charRepair* === undefined`.
+            charRepairGrokRaw: v.charRepairGrokRaw || null,
+            charRepairBlendMask: v.charRepairBlendMask || null,
+            charRepairWhiteout: v.charRepairWhiteout || null,
+            inpaintInstruction: v.inpaintInstruction || null,
           }));
         })(),
       })) || [],
