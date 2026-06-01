@@ -6699,6 +6699,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       charRepairGrokRaw: repairResult.grokRawResult || repairResult.comparison?.grokRawResult || null,
       charRepairBlendMask: repairResult.blendMask || repairResult.comparison?.blendMask || null,
       charRepairWhiteout: repairResult.blackoutImage || repairResult.comparison?.blackoutImage || null,
+      // Telemetry: which character char-fix actually targeted, which bbox it
+      // crosshatched, where the bbox came from, and which body part. Without
+      // these the post-hoc data (stories.data + retryHistory) shows source=
+      // 'char-fix-round-N' but you can't tell who was targeted or where the
+      // hatch landed — observed on prod page 5 v2 where inpaintInstruction
+      // named Emma but the whiteout placed crosshatch on Sarah's bbox. Now
+      // visible on the row + bubbled into retryHistory.
+      charName,
+      targetBbox: repairBbox,
+      targetBboxSource: targetResolved.source,
+      whiteoutTarget: useFaceOnly ? 'face' : 'body',
     };
   };
 
@@ -7351,7 +7362,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       imageVersions.push(buildVersionEntry(v));
     }
 
-    // Build retryHistory
+    // Build retryHistory — forward char-fix telemetry so post-hoc debugging
+    // can see who was targeted, what bbox was crosshatched, and where the
+    // bbox came from. Without these the dev panel showed source=char-fix-N
+    // for both v2 and v3 of a page with no way to tell them apart.
     const retryHistory = versions.map((v, idx) => ({
       attempt: idx + 1,
       type: 'unified_pipeline',
@@ -7359,6 +7373,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       score: v.score,
       bboxDetection: v.evaluation?.bboxDetection,
       bboxOverlayImage: v.evaluation?.bboxOverlayImage,
+      charName: v.charName || null,
+      targetBbox: v.targetBbox || null,
+      targetBboxSource: v.targetBboxSource || null,
+      whiteoutTarget: v.whiteoutTarget || null,
+      inpaintInstruction: v.inpaintInstruction || null,
       timestamp: new Date().toISOString()
     }));
 
