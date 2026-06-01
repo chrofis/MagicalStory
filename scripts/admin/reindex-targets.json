@@ -1,0 +1,1019 @@
+{
+  "generatedAt": "2026-06-01T21:18:57.858Z",
+  "cities": [
+    {
+      "canonicalName": "Aarberg",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Aarberg",
+        "Aarberg",
+        "Aarberg"
+      ],
+      "lat": 47.044,
+      "lon": 7.273,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Adelboden",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Adelboden",
+        "Adelboden",
+        "Adelboden"
+      ],
+      "lat": 46.492,
+      "lon": 7.56,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Aigle",
+      "lang": "fr",
+      "canton": "VD",
+      "nameVariants": [
+        "Aigle",
+        "Aigle",
+        "Aigle"
+      ],
+      "lat": 46.318,
+      "lon": 6.97,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Andermatt",
+      "lang": "de",
+      "canton": "UR",
+      "nameVariants": [
+        "Andermatt",
+        "Andermatt",
+        "Andermatt"
+      ],
+      "lat": 46.636,
+      "lon": 8.594,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Appenzell",
+      "lang": "de",
+      "canton": "AI",
+      "nameVariants": [
+        "Appenzell",
+        "Appenzell",
+        "Appenzell"
+      ],
+      "lat": 47.331,
+      "lon": 9.409,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Arbon",
+      "lang": "de",
+      "canton": "TG",
+      "nameVariants": [
+        "Arbon",
+        "Arbon",
+        "Arbon"
+      ],
+      "lat": 47.516,
+      "lon": 9.434,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Arosa",
+      "lang": "de",
+      "canton": "GR",
+      "nameVariants": [
+        "Arosa",
+        "Arosa",
+        "Arosa"
+      ],
+      "lat": 46.783,
+      "lon": 9.681,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Ascona",
+      "lang": "it",
+      "canton": "TI",
+      "nameVariants": [
+        "Ascona",
+        "Ascona",
+        "Ascona"
+      ],
+      "lat": 46.157,
+      "lon": 8.773,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Avenches",
+      "lang": "fr",
+      "canton": "VD",
+      "nameVariants": [
+        "Avenches",
+        "Avenches",
+        "Avenches"
+      ],
+      "lat": 46.882,
+      "lon": 7.042,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Brienz",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Brienz",
+        "Brienz",
+        "Brienz"
+      ],
+      "lat": 46.754,
+      "lon": 8.043,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Brig-Glis",
+      "lang": "de",
+      "canton": "VS",
+      "nameVariants": [
+        "Brig-Glis",
+        "Brig-Glis",
+        "Brigue-Glis"
+      ],
+      "lat": 46.315,
+      "lon": 7.987,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Brugg",
+      "lang": "de",
+      "canton": "AG",
+      "nameVariants": [
+        "Brugg",
+        "Brugg",
+        "Brugg"
+      ],
+      "lat": 47.486,
+      "lon": 8.208,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Bülach",
+      "lang": "de",
+      "canton": "ZH",
+      "nameVariants": [
+        "Bülach",
+        "Bülach",
+        "Bülach"
+      ],
+      "lat": 47.519,
+      "lon": 8.541,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Bulle",
+      "lang": "fr",
+      "canton": "FR",
+      "nameVariants": [
+        "Bulle",
+        "Bulle",
+        "Bulle"
+      ],
+      "lat": 46.618,
+      "lon": 7.055,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Burgdorf",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Burgdorf",
+        "Burgdorf",
+        "Berthoud"
+      ],
+      "lat": 47.059,
+      "lon": 7.629,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Château-d'Œx",
+      "lang": "fr",
+      "canton": "VD",
+      "nameVariants": [
+        "Château-d'Œx",
+        "Château-d'Œx",
+        "Château-d'Œx"
+      ],
+      "lat": 46.476,
+      "lon": 7.136,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Davos",
+      "lang": "de",
+      "canton": "GR",
+      "nameVariants": [
+        "Davos",
+        "Davos",
+        "Davos"
+      ],
+      "lat": 46.802,
+      "lon": 9.836,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Delémont",
+      "lang": "fr",
+      "canton": "JU",
+      "nameVariants": [
+        "Delsberg",
+        "Delémont",
+        "Delémont"
+      ],
+      "lat": 47.364,
+      "lon": 7.343,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Disentis",
+      "lang": "de",
+      "canton": "GR",
+      "nameVariants": [
+        "Disentis",
+        "Disentis",
+        "Disentis"
+      ],
+      "lat": 46.707,
+      "lon": 8.853,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Einsiedeln",
+      "lang": "de",
+      "canton": "SZ",
+      "nameVariants": [
+        "Einsiedeln",
+        "Einsiedeln",
+        "Einsiedeln"
+      ],
+      "lat": 47.128,
+      "lon": 8.747,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Engelberg",
+      "lang": "de",
+      "canton": "OW",
+      "nameVariants": [
+        "Engelberg",
+        "Engelberg",
+        "Engelberg"
+      ],
+      "lat": 46.821,
+      "lon": 8.407,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Flims",
+      "lang": "de",
+      "canton": "GR",
+      "nameVariants": [
+        "Flims",
+        "Flims",
+        "Flims"
+      ],
+      "lat": 46.837,
+      "lon": 9.283,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Frauenfeld",
+      "lang": "de",
+      "canton": "TG",
+      "nameVariants": [
+        "Frauenfeld",
+        "Frauenfeld",
+        "Frauenfeld"
+      ],
+      "lat": 47.558,
+      "lon": 8.899,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Glarus",
+      "lang": "de",
+      "canton": "GL",
+      "nameVariants": [
+        "Glarus",
+        "Glarus",
+        "Glaris"
+      ],
+      "lat": 47.041,
+      "lon": 9.068,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Grandson",
+      "lang": "fr",
+      "canton": "VD",
+      "nameVariants": [
+        "Grandson",
+        "Grandson",
+        "Grandson"
+      ],
+      "lat": 46.81,
+      "lon": 6.646,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Grindelwald",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Grindelwald",
+        "Grindelwald",
+        "Grindelwald"
+      ],
+      "lat": 46.624,
+      "lon": 8.041,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Gruyères",
+      "lang": "fr",
+      "canton": "FR",
+      "nameVariants": [
+        "Gruyères",
+        "Gruyères",
+        "Gruyères"
+      ],
+      "lat": 46.583,
+      "lon": 7.081,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Gstaad",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Gstaad",
+        "Gstaad",
+        "Gstaad"
+      ],
+      "lat": 46.475,
+      "lon": 7.286,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Guarda",
+      "lang": "de",
+      "canton": "GR",
+      "nameVariants": [
+        "Guarda",
+        "Guarda",
+        "Guarda"
+      ],
+      "lat": 46.775,
+      "lon": 10.149,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Herisau",
+      "lang": "de",
+      "canton": "AR",
+      "nameVariants": [
+        "Herisau",
+        "Herisau",
+        "Herisau"
+      ],
+      "lat": 47.386,
+      "lon": 9.279,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Interlaken",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Interlaken",
+        "Interlaken",
+        "Interlaken"
+      ],
+      "lat": 46.686,
+      "lon": 7.863,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Kandersteg",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Kandersteg",
+        "Kandersteg",
+        "Kandersteg"
+      ],
+      "lat": 46.497,
+      "lon": 7.674,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Klosters",
+      "lang": "de",
+      "canton": "GR",
+      "nameVariants": [
+        "Klosters",
+        "Klosters",
+        "Klosters"
+      ],
+      "lat": 46.871,
+      "lon": 9.878,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Kreuzlingen",
+      "lang": "de",
+      "canton": "TG",
+      "nameVariants": [
+        "Kreuzlingen",
+        "Kreuzlingen",
+        "Kreuzlingen"
+      ],
+      "lat": 47.65,
+      "lon": 9.175,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "La Chaux-de-Fonds",
+      "lang": "fr",
+      "canton": "NE",
+      "nameVariants": [
+        "La Chaux-de-Fonds",
+        "La Chaux-de-Fonds",
+        "La Chaux-de-Fonds"
+      ],
+      "lat": 47.104,
+      "lon": 6.826,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Langenthal",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Langenthal",
+        "Langenthal",
+        "Langenthal"
+      ],
+      "lat": 47.215,
+      "lon": 7.795,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Langnau im Emmental",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Langnau im Emmental",
+        "Langnau im Emmental",
+        "Langnau im Emmental"
+      ],
+      "lat": 46.94,
+      "lon": 7.788,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Lauterbrunnen",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Lauterbrunnen",
+        "Lauterbrunnen",
+        "Lauterbrunnen"
+      ],
+      "lat": 46.594,
+      "lon": 7.909,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Leukerbad",
+      "lang": "de",
+      "canton": "VS",
+      "nameVariants": [
+        "Leukerbad",
+        "Leukerbad",
+        "Loèche-les-Bains"
+      ],
+      "lat": 46.379,
+      "lon": 7.633,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Liestal",
+      "lang": "de",
+      "canton": "BL",
+      "nameVariants": [
+        "Liestal",
+        "Liestal",
+        "Liestal"
+      ],
+      "lat": 47.485,
+      "lon": 7.735,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Locarno",
+      "lang": "it",
+      "canton": "TI",
+      "nameVariants": [
+        "Locarno",
+        "Locarno",
+        "Locarno"
+      ],
+      "lat": 46.172,
+      "lon": 8.796,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Martigny",
+      "lang": "fr",
+      "canton": "VS",
+      "nameVariants": [
+        "Martigny",
+        "Martigny",
+        "Martigny"
+      ],
+      "lat": 46.102,
+      "lon": 7.072,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Meiringen",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Meiringen",
+        "Meiringen",
+        "Meiringen"
+      ],
+      "lat": 46.727,
+      "lon": 8.186,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Montreux",
+      "lang": "fr",
+      "canton": "VD",
+      "nameVariants": [
+        "Montreux",
+        "Montreux",
+        "Montreux"
+      ],
+      "lat": 46.431,
+      "lon": 6.911,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Morges",
+      "lang": "fr",
+      "canton": "VD",
+      "nameVariants": [
+        "Morges",
+        "Morges",
+        "Morges"
+      ],
+      "lat": 46.511,
+      "lon": 6.498,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Moudon",
+      "lang": "fr",
+      "canton": "VD",
+      "nameVariants": [
+        "Moudon",
+        "Moudon",
+        "Moudon"
+      ],
+      "lat": 46.669,
+      "lon": 6.796,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Murten",
+      "lang": "de",
+      "canton": "FR",
+      "nameVariants": [
+        "Murten",
+        "Murten",
+        "Morat"
+      ],
+      "lat": 46.929,
+      "lon": 7.118,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Neuchâtel",
+      "lang": "fr",
+      "canton": "NE",
+      "nameVariants": [
+        "Neuenburg",
+        "Neuchâtel",
+        "Neuchâtel"
+      ],
+      "lat": 46.99,
+      "lon": 6.929,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Nyon",
+      "lang": "fr",
+      "canton": "VD",
+      "nameVariants": [
+        "Nyon",
+        "Nyon",
+        "Nyon"
+      ],
+      "lat": 46.383,
+      "lon": 6.24,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Olten",
+      "lang": "de",
+      "canton": "SO",
+      "nameVariants": [
+        "Olten",
+        "Olten",
+        "Olten"
+      ],
+      "lat": 47.35,
+      "lon": 7.907,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Payerne",
+      "lang": "fr",
+      "canton": "VD",
+      "nameVariants": [
+        "Payerne",
+        "Payerne",
+        "Payerne"
+      ],
+      "lat": 46.822,
+      "lon": 6.938,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Pontresina",
+      "lang": "de",
+      "canton": "GR",
+      "nameVariants": [
+        "Pontresina",
+        "Pontresina",
+        "Pontresina"
+      ],
+      "lat": 46.496,
+      "lon": 9.901,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Porrentruy",
+      "lang": "fr",
+      "canton": "JU",
+      "nameVariants": [
+        "Pruntrut",
+        "Porrentruy",
+        "Porrentruy"
+      ],
+      "lat": 47.415,
+      "lon": 7.075,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Poschiavo",
+      "lang": "it",
+      "canton": "GR",
+      "nameVariants": [
+        "Poschiavo",
+        "Poschiavo",
+        "Poschiavo"
+      ],
+      "lat": 46.325,
+      "lon": 10.06,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Rapperswil-Jona",
+      "lang": "de",
+      "canton": "SG",
+      "nameVariants": [
+        "Rapperswil-Jona",
+        "Rapperswil-Jona",
+        "Rapperswil-Jona"
+      ],
+      "lat": 47.227,
+      "lon": 8.832,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Rheinfelden",
+      "lang": "de",
+      "canton": "AG",
+      "nameVariants": [
+        "Rheinfelden",
+        "Rheinfelden",
+        "Rheinfelden"
+      ],
+      "lat": 47.554,
+      "lon": 7.795,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Romanshorn",
+      "lang": "de",
+      "canton": "TG",
+      "nameVariants": [
+        "Romanshorn",
+        "Romanshorn",
+        "Romanshorn"
+      ],
+      "lat": 47.565,
+      "lon": 9.379,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Romont",
+      "lang": "fr",
+      "canton": "FR",
+      "nameVariants": [
+        "Romont",
+        "Romont",
+        "Romont"
+      ],
+      "lat": 46.693,
+      "lon": 6.918,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Sarnen",
+      "lang": "de",
+      "canton": "OW",
+      "nameVariants": [
+        "Sarnen",
+        "Sarnen",
+        "Sarnen"
+      ],
+      "lat": 46.896,
+      "lon": 8.245,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Schwyz",
+      "lang": "de",
+      "canton": "SZ",
+      "nameVariants": [
+        "Schwyz",
+        "Schwyz",
+        "Schwytz"
+      ],
+      "lat": 47.021,
+      "lon": 8.654,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Sierre",
+      "lang": "fr",
+      "canton": "VS",
+      "nameVariants": [
+        "Siders",
+        "Sierre",
+        "Sierre"
+      ],
+      "lat": 46.292,
+      "lon": 7.536,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Sion",
+      "lang": "fr",
+      "canton": "VS",
+      "nameVariants": [
+        "Sitten",
+        "Sion",
+        "Sion"
+      ],
+      "lat": 46.233,
+      "lon": 7.36,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Soglio",
+      "lang": "it",
+      "canton": "GR",
+      "nameVariants": [
+        "Soglio",
+        "Soglio",
+        "Soglio"
+      ],
+      "lat": 46.338,
+      "lon": 9.525,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Solothurn",
+      "lang": "de",
+      "canton": "SO",
+      "nameVariants": [
+        "Solothurn",
+        "Solothurn",
+        "Soleure"
+      ],
+      "lat": 47.208,
+      "lon": 7.537,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Spiez",
+      "lang": "de",
+      "canton": "BE",
+      "nameVariants": [
+        "Spiez",
+        "Spiez",
+        "Spiez"
+      ],
+      "lat": 46.685,
+      "lon": 7.692,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "St. Moritz",
+      "lang": "de",
+      "canton": "GR",
+      "nameVariants": [
+        "St. Moritz",
+        "St. Moritz",
+        "Saint-Moritz"
+      ],
+      "lat": 46.497,
+      "lon": 9.838,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Stans",
+      "lang": "de",
+      "canton": "NW",
+      "nameVariants": [
+        "Stans",
+        "Stans",
+        "Stans"
+      ],
+      "lat": 46.958,
+      "lon": 8.366,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Steckborn",
+      "lang": "de",
+      "canton": "TG",
+      "nameVariants": [
+        "Steckborn",
+        "Steckborn",
+        "Steckborn"
+      ],
+      "lat": 47.67,
+      "lon": 8.981,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Stein am Rhein",
+      "lang": "de",
+      "canton": "SH",
+      "nameVariants": [
+        "Stein am Rhein",
+        "Stein am Rhein",
+        "Stein am Rhein"
+      ],
+      "lat": 47.659,
+      "lon": 8.86,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Vals",
+      "lang": "de",
+      "canton": "GR",
+      "nameVariants": [
+        "Vals",
+        "Vals",
+        "Vals"
+      ],
+      "lat": 46.618,
+      "lon": 9.18,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Vevey",
+      "lang": "fr",
+      "canton": "VD",
+      "nameVariants": [
+        "Vevey",
+        "Vevey",
+        "Vevey"
+      ],
+      "lat": 46.461,
+      "lon": 6.843,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Visp",
+      "lang": "de",
+      "canton": "VS",
+      "nameVariants": [
+        "Visp",
+        "Visp",
+        "Viège"
+      ],
+      "lat": 46.294,
+      "lon": 7.883,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Wädenswil",
+      "lang": "de",
+      "canton": "ZH",
+      "nameVariants": [
+        "Wädenswil",
+        "Wädenswil",
+        "Wädenswil"
+      ],
+      "lat": 47.231,
+      "lon": 8.672,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Weggis",
+      "lang": "de",
+      "canton": "LU",
+      "nameVariants": [
+        "Weggis",
+        "Weggis",
+        "Weggis"
+      ],
+      "lat": 47.035,
+      "lon": 8.434,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Willisau",
+      "lang": "de",
+      "canton": "LU",
+      "nameVariants": [
+        "Willisau",
+        "Willisau",
+        "Willisau"
+      ],
+      "lat": 47.121,
+      "lon": 7.992,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Yverdon-les-Bains",
+      "lang": "fr",
+      "canton": "VD",
+      "nameVariants": [
+        "Yverdon-les-Bains",
+        "Yverdon-les-Bains",
+        "Yverdon-les-Bains"
+      ],
+      "lat": 46.778,
+      "lon": 6.641,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Zermatt",
+      "lang": "de",
+      "canton": "VS",
+      "nameVariants": [
+        "Zermatt",
+        "Zermatt",
+        "Zermatt"
+      ],
+      "lat": 46.021,
+      "lon": 7.749,
+      "currentLandmarkCount": 0
+    },
+    {
+      "canonicalName": "Zug",
+      "lang": "de",
+      "canton": "ZG",
+      "nameVariants": [
+        "Zug",
+        "Zug",
+        "Zoug"
+      ],
+      "lat": 47.167,
+      "lon": 8.516,
+      "currentLandmarkCount": 0
+    }
+  ]
+}
