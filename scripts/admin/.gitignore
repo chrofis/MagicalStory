@@ -14,5 +14,8 @@ sample-overviews/
 coverage-misses.json
 
 # Generated artifact from classify-via-read.js tier-2 emit.
-# Tracked so decisions can be reviewed in PRs.
-# ambiguous-photos.json
+# 1.1MB file with 3,411 ambiguous photo entries. Regenerable any time
+# by re-running classify-via-read.js --tier2-emit --push, so ignored.
+# For on-demand per-city classification, regenerate scoped to that city:
+#   node scripts/admin/classify-via-read.js --city="X" --tier2-emit --push
+ambiguous-photos.json
