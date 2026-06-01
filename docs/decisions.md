@@ -215,6 +215,42 @@ per-action values: Trial=CHF 10, Account claim=CHF 30, Book purchase
 entry below — that cap is now removed.
 **Status:** ✅ active (set 2026-05-30).
 
+### landmark_index iconic-fill + canonical-name rename (2026-06-01)
+**Context:** The existing Wikipedia-geosearch indexer
+(`server/lib/landmarkPhotos.js` → `indexLandmarksForCities`) systematically
+missed or mis-named famous Swiss landmarks. Concretely:
+- **Geosearch radius + score filters** dropped some icons that should
+  have been the first hit (Grossmünster, Zytglogge, Spalentor, Jet d'eau,
+  Käfigturm — none were in the index at all).
+- **Cross-language storage** stored iconic landmarks under their non-local
+  Wikipedia title (e.g. Berner Münster as "Collégiale Saint-Vincent de
+  Berne", Bundeshaus as "Palais fédéral", Cathédrale de Lausanne as
+  "Kathedrale Notre-Dame (Lausanne)"). The creative-generation script
+  does ILIKE '%<name>%' lookups, so the canonical local name failed to
+  match.
+**Decision:** Built `scripts/admin/add-iconic-landmarks.js` — a targeted
+fetcher that:
+1. Looks up each iconic landmark by exact Wikipedia title in the
+   appropriate language (DE for Zürich/Bern/Basel, FR for Genève/
+   Lausanne) — bypasses geosearch entirely.
+2. UPSERTs by either name OR wikidata_qid — catches existing rows under
+   different local names.
+3. **Renames non-canonical existing rows to the local-language form**
+   (e.g. "Palais fédéral" → "Bundeshaus (Bern)"). Keeps the photo and
+   wikidata_qid intact.
+4. Patches missing nearest_city values.
+**Result:** 6 new landmarks inserted, 11 renamed, 13 already-canonical
+left alone. Every iconic landmark now findable by its canonical local
+name across Zürich, Bern, Basel, Genève, Lausanne. Total Swiss landmark
+coverage above tier-1 iconic threshold for these 5 cities.
+**Touched:**
+- `scripts/admin/add-iconic-landmarks.js` — re-runnable fetcher/renamer
+- `landmark_index` table (production DB) — direct writes
+**Re-evaluate trigger:** If we extend to more cities (Luzern, Lugano,
+St. Gallen, Biel, etc.), add their iconic-list to the same script and
+re-push. The script is idempotent.
+**Status:** ✅ active.
+
 ### PMax tight cost control: Target CPA CHF 0.50 + budget CHF 1.50/day
 **Context:** After uncapping PMax earlier today (removed Target CPA),
 Baden paid CHF 4.09 for a single click. User confirmed they want
