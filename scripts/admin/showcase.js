@@ -117,7 +117,7 @@ async function provisionAccount(apiBase, email, family) {
       username: email,
       email,
       password: DEMO_PASSWORD,
-      _formStartTime: Date.now() - 5000,
+      _formStartTime: Date.now() - 30000,
     }),
   });
   if (!registerRes.ok) {
@@ -194,11 +194,10 @@ async function main() {
     DEMO_PASSWORD,
     DEMO_ENTRY_INDEX: String(entry.index),
   };
-  const result = spawnSync(
-    'npx',
-    ['playwright', 'test', 'tests/demo-story.spec.ts', '--project=demo-story', '--workers=1'],
-    { stdio: 'inherit', env, shell: true }
-  );
+  const headed = process.env.HEADED === '1' || args.headed === 'true';
+  const playwrightArgs = ['playwright', 'test', 'tests/demo-story.spec.ts', '--project=demo-story', '--workers=1'];
+  if (headed) playwrightArgs.push('--headed');
+  const result = spawnSync('npx', playwrightArgs, { stdio: 'inherit', env, shell: true });
 
   if (result.status !== 0) {
     console.error(`\nPlaywright exited with code ${result.status}.`);
