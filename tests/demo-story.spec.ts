@@ -584,9 +584,14 @@ async function isOnCharacterListNow(page: Page): Promise<boolean> {
  * an unambiguous "we're on a later wizard step" signal.
  */
 async function isPastCharacterStep(page: Page): Promise<boolean> {
-  // Step 2+ headings — short, specific, unique to each step.
+  // Step 2+ headings — full phrases unique to each step's CONTENT.
+  // Do NOT use single-word tokens like 'Übersicht|Summary|Récapitulatif' —
+  // those also appear in the wizard navbar's step-5 label, so they match
+  // on every page (including Step 1 sub-steps like the avatar preview)
+  // and cause this helper to falsely return true, short-circuiting the
+  // post-character driver before it clicks the avatar-preview Weiter.
   const stepHeading = await page.locator(
-    'text=/Wähle ein Buch|Choose a book|Choisis un livre|Wähle einen Geschichtstyp|Choose a story type|Choisis un type|Wähle einen Stil|Choose a style|Choisis un style|Übersicht|Summary|Récapitulatif/i'
+    'text=/Wähle ein Buch|Choose a book|Choisis un livre|Wähle einen Geschichtstyp|Choose a story type|Choisis un type|Wähle einen Stil|Choose a style|Choisis un style/i'
   ).first().isVisible({ timeout: 400 }).catch(() => false);
   if (!stepHeading) return false;
   // Make sure we're not still inside a character sub-step that happens to
@@ -988,7 +993,27 @@ test.describe('Demo Story Generation', () => {
           return true;
         } catch { /* not in this group — try next */ }
       }
+      // Last-resort broad sweep: any clickable element whose text matches the
+      // label. Catches cases where the wizard wrapped the style in a div /
+      // labeled-card / radio / link instead of a <button>. Previously the spec
+      // gave up silently here and the showcase rendered in the DEFAULT style
+      // (watercolor), silently invalidating the showcase. See task #62.
+      const broad = page.locator(`*:has-text("${artStyleLabel}")`).filter({ hasNot: page.locator('*:has-text("${artStyleLabel}") *') }).first();
+      try {
+        await broad.waitFor({ state: 'visible', timeout: 2000 });
+        await broad.click({ timeout: 2000 });
+        console.log(`  Found "${artStyleLabel}" via broad sweep (was not in any named group).`);
+        return true;
+      } catch { /* genuinely missing */ }
       return false;
+    }
+    // Check if Step 5 content is already showing — if so, the wizard
+    // auto-advanced past Step 4 with a default style, which means our chosen
+    // style was NOT applied. That's the bug we are now failing loudly on:
+    // showcase entry says "comic" but the story silently renders watercolor.
+    async function isAlreadyOnStep5(): Promise<boolean> {
+      const ideaOpt = page.locator('button').filter({ hasText: USE_THIS_RE }).first();
+      return await ideaOpt.isVisible({ timeout: 1000 }).catch(() => false);
     }
     const styleClicked = await findAndClickArtStyle();
     if (styleClicked) {
@@ -1001,8 +1026,24 @@ test.describe('Demo Story Generation', () => {
         await page.waitForTimeout(1000);
       }
     } else {
-      // Style label genuinely absent (e.g. preselected on Step 5 already).
-      console.log(`  Art style "${artStyleLabel}" not findable in any group — assuming Step 5 already.`);
+      // Style label genuinely absent. Two scenarios:
+      // (a) Step 5 is already showing because the wizard auto-advanced with a
+      //     DEFAULT style — this is a real failure for the showcase (our chosen
+      //     style was not applied).
+      // (b) The label is missing because the wizard UI changed and the locator
+      //     no longer finds the style button.
+      // BOTH cases mean the requested art style is not being applied — throw
+      // hard so the showcase fails visibly instead of silently rendering in
+      // the default style. Take a debug screenshot first so the failure is
+      // diagnosable.
+      const shotPath = `test-results/debug-art-style-not-found-${artStyleLabel}-${Date.now()}.png`;
+      await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
+      const onStep5 = await isAlreadyOnStep5();
+      throw new Error(
+        `Art style "${artStyleLabel}" not selectable (entry requested ${entry.artStyle}). ` +
+        `${onStep5 ? 'Wizard auto-advanced to Step 5 with the default style — chosen style NOT applied.' : 'Step 4 still showing but style button not found anywhere on the page — locator may need updating.'} ` +
+        `Screenshot: ${shotPath}`
+      );
     }
 
     // ── Step 5: Summary & Generate ──

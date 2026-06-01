@@ -137,7 +137,9 @@ Each background describes a scene with NO people, NO human figures. Include: loc
 Every entry costs a reference image generation pass. A 5-page story rarely benefits from more than 2 of each — pick the elements that need consistency across scenes and leave the rest as scene-prose details.
 
 ---COVER SCENE---
-Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no secondary characters. Use a Visual Bible location (prefer real landmarks) as background. Characters in costumed clothing. Wide shot, balanced composition.
+Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no secondary characters. Wide shot, balanced composition. Characters in costumed clothing.
+
+**LOCATION REQUIREMENT (STRICT):** The front cover's `setting.location` MUST reference a Visual Bible location with `isRealLandmark: true`. If you wrote multiple locations in the VB and any are real landmarks, pick one of those for the cover — never a fictional indoor/underground/imagined location, even if it's the dramatic climax setting. The cover is the marketing image; it must show a recognisable real place. If your VB has NO real landmarks, fall back to the first location and accept the limitation.
 
 ```json
 {
