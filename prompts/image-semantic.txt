@@ -40,7 +40,7 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 - Key objects present? (an object named in DECLARED INTERACTIONS, or named ≥ 2 times in SCENE_HINT/IMAGE_PROMPT prose, is "key") — **[MAJOR]** per missing key object
 - Character-object plausibility? (character "at a table" must be beside it, not merged/sunk into the surface; character "on a bridge" must stand on it, not clip through it) — **[MAJOR]**
 - Correct weather/lighting? (night = dark, snow = snow) — **[MODERATE]**
-- Emotion matches the scene? (smiling during danger = wrong, scared during calm = wrong) — **[MODERATE]**
+- Emotion matches the scene? (smiling during danger = wrong, scared during calm = wrong) — **[MODERATE]**. If you notice ANY emotion/tone defect — wrong facial expression for the narrative beat (broad smile when the scene's prose describes urgency, fear, sadness, or shouting; vacant calm during a chase or shock; placid happiness during a crisis), wrong body language (relaxed posture in declared danger, tense posture in declared calm), or any mismatch between a character's rendered affect and the action the STORY_TEXT describes — you **MUST** emit it as a structured `semantic_issues[]` entry: `{problem: "<character> shows <observed emotion>, scene expects <expected emotion> (STORY_TEXT says ...)", severity: "MODERATE"}`. Do NOT mention emotion/tone defects only in `issues_summary` prose — the downstream repair pipeline ONLY reads `semantic_issues[]`. Subtle expression deltas already excluded above (calm vs thoughtful, slightly worried vs neutral) remain non-deductions.
 - Gaze direction matches a DECLARED INTERACTION? Only flag when two characters listed in DECLARED INTERACTIONS as interacting face away from each other, or a character listed as watching a specific named object is looking elsewhere. Prose phrases like "looking toward the distance", "gaze upward", "facing the sky", "scanning sideways" are NOT declared interactions — do NOT flag. — **[MODERATE]** when flagged
 - **Declared interactions placement** (overrides the "ignore spatial arrangement" rule below — declared interactions ARE spatial requirements that matter):
   - Verify each entry: the object is at that exact location relative to the character. "In pocket" must be a tiny silhouette in the pocket, not a held plush. "Climbing rope" must show hands gripping the rope. "Standing on stairs" must show feet on the step.
@@ -94,6 +94,7 @@ Return JSON only. Put every issue you find in the `semantic_issues` array. Do no
 - The `score` field must be an integer 0–10 — no decimals, no fractions.
 - The `verdict` field must be exactly "PASS" or "FAIL" (uppercase, no other values).
 - Do not add explanatory text before or after the JSON. Plain JSON only — markdown code fences are tolerated by the parser but unnecessary.
+- `issues_summary` (when present) is a one-line recap of `semantic_issues[]` only. Every concern named in `issues_summary` MUST have a corresponding structured `semantic_issues[]` entry with a severity. The downstream repair pipeline ignores `issues_summary` — only structured entries trigger redos / inpaints. Do not put issues in prose that aren't also in the array.
 
 ```json
 {

@@ -1187,34 +1187,53 @@ async function packReferences(refs = {}, options = {}) {
       targetW = Math.round(h * targetRatio);
     }
 
-    // Sample the edge colour (4-pixel border) so the padding bars blend with
-    // whatever's at the image edge. For character cell crops this is the
-    // cell's white-ish background → invisible. For landmark photos this is
-    // typically sky/wall/foliage → less visually jarring than pure white.
-    let padR = 255, padG = 255, padB = 255;
+    // Sample edge colours PER SIDE so each pad bar blends with the part of
+    // the image it's adjacent to. Previously we sampled only the TOP edge and
+    // used that colour for ALL bars → user-portrait photos with sky at top
+    // produced sky-blue bars on the BOTTOM of letterboxed refs (observed on
+    // prod job_1780263997444 initial page). Per-side: top bar = sampled top
+    // edge, bottom bar = sampled bottom edge, left/right same.
+    const sampleSide = async (side) => {
+      try {
+        const band = Math.max(2, Math.round(Math.min(w, h) * 0.01));
+        let region;
+        if (side === 'top')    region = { left: 0,        top: 0,        width: w,    height: band };
+        if (side === 'bottom') region = { left: 0,        top: h - band, width: w,    height: band };
+        if (side === 'left')   region = { left: 0,        top: 0,        width: band, height: h    };
+        if (side === 'right')  region = { left: w - band, top: 0,        width: band, height: h    };
+        const { data: px } = await sharp(buf).extract(region).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+        let sR = 0, sG = 0, sB = 0, n = 0;
+        for (let p = 0; p < px.length; p += 3) { sR += px[p]; sG += px[p + 1]; sB += px[p + 2]; n++; }
+        return n > 0
+          ? { r: Math.round(sR / n), g: Math.round(sG / n), b: Math.round(sB / n) }
+          : { r: 255, g: 255, b: 255 };
+      } catch { return { r: 255, g: 255, b: 255 }; }
+    };
     try {
-      const edgeBand = Math.max(2, Math.round(Math.min(w, h) * 0.01));
-      const { data: edgePixels } = await sharp(buf)
-        .extract({ left: 0, top: 0, width: w, height: edgeBand })
-        .removeAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-      let sumR = 0, sumG = 0, sumB = 0, n = 0;
-      for (let p = 0; p < edgePixels.length; p += 3) {
-        sumR += edgePixels[p]; sumG += edgePixels[p + 1]; sumB += edgePixels[p + 2]; n++;
+      const isLetterbox = currentRatio > targetRatio;  // wider source → top+bottom bars
+      let padded;
+      if (isLetterbox) {
+        const totalPad = targetH - h;
+        const topBarH = Math.floor(totalPad / 2);
+        const bottomBarH = totalPad - topBarH;
+        const [topC, bottomC] = await Promise.all([sampleSide('top'), sampleSide('bottom')]);
+        const composites = [{ input: buf, left: 0, top: topBarH }];
+        if (topBarH > 0) composites.unshift({ input: { create: { width: targetW, height: topBarH, channels: 3, background: topC }}, left: 0, top: 0 });
+        if (bottomBarH > 0) composites.push({ input: { create: { width: targetW, height: bottomBarH, channels: 3, background: bottomC }}, left: 0, top: targetH - bottomBarH });
+        padded = await sharp({ create: { width: targetW, height: targetH, channels: 3, background: { r: 255, g: 255, b: 255 }}}).composite(composites).jpeg({ quality: 90 }).toBuffer();
+        log.debug(`🎨 ${tag} Slot ${i + 1}: letterbox ${w}x${h} → ${targetW}x${targetH} (top rgb(${topC.r},${topC.g},${topC.b}), bottom rgb(${bottomC.r},${bottomC.g},${bottomC.b}))`);
+      } else {
+        const totalPad = targetW - w;
+        const leftBarW = Math.floor(totalPad / 2);
+        const rightBarW = totalPad - leftBarW;
+        const [leftC, rightC] = await Promise.all([sampleSide('left'), sampleSide('right')]);
+        const composites = [{ input: buf, left: leftBarW, top: 0 }];
+        if (leftBarW > 0) composites.unshift({ input: { create: { width: leftBarW, height: targetH, channels: 3, background: leftC }}, left: 0, top: 0 });
+        if (rightBarW > 0) composites.push({ input: { create: { width: rightBarW, height: targetH, channels: 3, background: rightC }}, left: targetW - rightBarW, top: 0 });
+        padded = await sharp({ create: { width: targetW, height: targetH, channels: 3, background: { r: 255, g: 255, b: 255 }}}).composite(composites).jpeg({ quality: 90 }).toBuffer();
+        log.debug(`🎨 ${tag} Slot ${i + 1}: pillarbox ${w}x${h} → ${targetW}x${targetH} (left rgb(${leftC.r},${leftC.g},${leftC.b}), right rgb(${rightC.r},${rightC.g},${rightC.b}))`);
       }
-      if (n > 0) { padR = Math.round(sumR / n); padG = Math.round(sumG / n); padB = Math.round(sumB / n); }
-    } catch (sampleErr) {
-      log.debug(`🎨 ${tag} Slot ${i + 1}: edge sample failed (${sampleErr.message}) — padding with white`);
-    }
-
-    try {
-      const padded = await sharp(buf)
-        .resize(targetW, targetH, { fit: 'contain', position: 'centre', background: { r: padR, g: padG, b: padB } })
-        .jpeg({ quality: 90 })
-        .toBuffer();
       paddedSlots.push(`data:image/jpeg;base64,${padded.toString('base64')}`);
-      log.debug(`🎨 ${tag} Slot ${i + 1}: padded ${w}x${h} → ${targetW}x${targetH} (target ${aspectRatio}, pad rgb(${padR},${padG},${padB}))`);
     } catch (padErr) {
       log.warn(`⚠️ [GROK] Slot ${i + 1}: pad failed (${padErr.message}) — dropping slot`);
     }

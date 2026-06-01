@@ -37,6 +37,7 @@ Only deduct when the image fails on one of these axes:
 - **Figure completeness** — a character drawn as a partial figure when the prompt expects the whole body in frame: floating head with no torso, body with no head, missing torso, transparent or ghostly limbs, half the figure fading into the background. Crops at the frame edge are fine; missing parts inside the frame are not.
 - **Face direction** — front-facing when prompt says back view, or vice versa.
 - **Rendered text** — any readable writing painted into the artwork that wasn't requested: captions, banners, signs on walls, book titles, decorative inscriptions, embroidered words, sky-writing, garbled letterforms. The story-text overlay is composited later by the renderer and is NOT in the input image.
+- **Object count** — when the prompt names an exact count of a multi-instance prop ("three apples", "four candles", "five stars"), and the rendered count is off by 1–2 but the cluster is CLEARLY present, this is **MINOR** (`type: object`, `severity: minor`). Only flag as **MAJOR** when the exact count is narratively load-bearing — the SCENE INTENT or story beat depends on the number (e.g. a folk tale's "seven dwarfs" where the count IS the identity, or a counting book where the number is the point). When in doubt, MINOR. Never lower the overall verdict from PASS to SOFT_FAIL on a count-mismatch alone.
 
 Everything else is stylistic flavor — descriptive intent for the image generator, not a contract for the evaluator. Never deduct for it.
 
@@ -57,6 +58,7 @@ The image is allowed to differ from the prompt in these ways. Do NOT lower the s
 - Stylistic loose brushwork that's clearly intentional and consistent with the rest of the artwork.
 - Pose details from prose not in DECLARED INTERACTIONS — "hands drawn in tight", "fingers curled", "chin tucked", "jaw set". Descriptive context only.
 - Back-view characters (no face is expected).
+- Off-by-one or off-by-two count of a decorative cluster (apples in a basket, flowers in a vase, books on a shelf, leaves on a branch, pebbles on a path, stars in the sky, buttons on a coat) when the cluster is present and the exact count isn't tied to the scene's action.
 
 ---
 
