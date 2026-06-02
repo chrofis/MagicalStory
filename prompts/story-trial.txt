@@ -180,7 +180,7 @@ TEXT:
 
 SCENE HINT:
 ```json
-{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","weather":"..."},"characters":[{"name":"...","position":"...","action":"...","expression":"...","clothing":"..."}],"objects":[]}}
+{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","weather":"...","camera":"medium","depthLayers":"..."},"characters":[{"id":"CHR001","name":"...","position":"...","action":"...","expression":"...","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[]}}
 ```
 
 --- Page 2 ---
@@ -189,7 +189,7 @@ TEXT:
 
 SCENE HINT:
 ```json
-{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","weather":"..."},"characters":[{"name":"...","position":"...","action":"...","expression":"...","clothing":"..."}],"objects":[]}}
+{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","weather":"...","camera":"medium","depthLayers":"..."},"characters":[{"id":"CHR001","name":"...","position":"...","action":"...","expression":"...","clothing":"standard","depth":"foreground","perspective":"front"}],"objects":[]}}
 ```
 
 ... continue for ALL {PAGES} pages ...

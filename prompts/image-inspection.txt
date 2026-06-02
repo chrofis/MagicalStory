@@ -20,7 +20,7 @@ If error found, return:
 ```json
 {
   "error_found": true,
-  "error_type": "slack_rope" | "hand_fusion" | "wrong_facing" | "gravity" | "anatomy" | "material_boundary",
+  "error_type": "<one of: slack_rope, hand_fusion, wrong_facing, gravity, anatomy, material_boundary>",
   "description": "Brief description of what's wrong",
   "bounding_box": [ymin, xmin, ymax, xmax],
   "fix_prompt": "Specific instruction to fix this error"

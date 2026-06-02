@@ -11,6 +11,7 @@ Create a back cover illustration for a children's book.
 
 **COMPOSITION GUIDELINES:**
 - Draw EXACTLY the characters listed in the scene — no more, no fewer. Do not invent extra figures.
+- If only one character is listed, center it with comfortable negative space around the figure.
 - If more than one character is listed, arrange them as a balanced group with equal prominence.
 - Characters should look happy and relaxed — smiling, laughing, or at ease after the adventure.
 - Warm lighting, relaxed poses.

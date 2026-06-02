@@ -6,8 +6,9 @@ GRID LAYOUT (with clear black dividing lines between quadrants):
 ┌─────────────────┬─────────────────┐
 │  TOP LEFT       │  TOP RIGHT      │
 │  Face - Front   │  Face - 3/4     │
-│  (looking at    │  Profile (75°   │
-│   camera)       │   looking RIGHT)│
+│  (looking at    │  view (turned   │
+│   camera)       │   right, both   │
+│                 │   eyes visible) │
 ├─────────────────┼─────────────────┤
 │  BOTTOM LEFT    │  BOTTOM RIGHT   │
 │  Full Body      │  Full Body      │
@@ -17,9 +18,9 @@ GRID LAYOUT (with clear black dividing lines between quadrants):
 
 GRID REQUIREMENTS:
 - Clean 2x2 collage layout with a thin neutral divider.
-- Both profile views (top right and bottom right) the face looks towards the RIGHT (nose pointing towards right edge of image)
+- Both right-side views (top right and bottom right) face toward the RIGHT — top right is a 3/4 turn (both eyes visible, nose angled right); bottom right is a true profile (single eye visible, nose pointing toward right edge).
 - Each quadrant has solid light grey (off-white) studio background
-- All 4 quadrants show the SAME outfit. If the outfit has pattern/ logos the must be identical in size, color, and placement in all four views.
+- All 4 quadrants show the SAME outfit. If the outfit has patterns or logos, the pattern and colors stay identical across all four views; logo placement adapts to the view angle (front view may show a logo the profile view doesn't).
 
 VISUAL REQUIREMENTS:
 - Face: 100% identical to reference photo. Direct replication, not averaged.

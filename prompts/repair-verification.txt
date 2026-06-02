@@ -24,7 +24,11 @@ EVALUATE CAREFULLY:
    - No other "improvements" or changes should be visible
    - Everything except the fix should be pixel-perfect identical
 
-5. NEW PROBLEMS? Check for:
+5. CHANGED AT ALL? Do BEFORE and AFTER differ?
+   - `changed`: true if any pixels visibly differ between BEFORE and AFTER, regardless of whether the change is correct.
+   - This is independent of `fixed` — a repair can leave pixels untouched (changed=false, fixed=false) or change pixels without fixing the issue (changed=true, fixed=false).
+
+6. NEW PROBLEMS? Check for:
    - {TYPE_SPECIFIC_CHECKS}
    - Blurry or smeared areas
    - Unnatural color transitions

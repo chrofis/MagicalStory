@@ -349,7 +349,7 @@ Return JSON only (no other text):
 - `rendering.cross_eyes`: true if any figure has eyes looking different directions.
 - `rendering.physics_ok`: false if floating figures, impossible poses, detached limbs, character-object fusion, or held object detached from declared owner.
 - `rendering.issues`: list specific problems (e.g., "figure on left has three arms", "figure in center holds 3 items so has extra hand").
-- `fixable_issues`: only if score < 9 and issues are fixable by inpainting. ONE entry per issue.
+- `fixable_issues`: list every defect you find (one entry per issue). The pipeline derives the final score from this list using §2 severities. Don't gate on the audit `score` field — emit every real defect regardless of what `score` you wrote.
   - `character`: required for any character-related issue. Use the exact character name from the reference list above (e.g. "CharacterA", "CharacterB"). Only null for non-character issues (environment, background). Never leave null when a specific character is affected.
   - `description`: what is wrong — always use the character's name, never describe them by appearance or position alone. GOOD: "CharacterA has wrong coat color". BAD: "The elderly man on the left has wrong coat color".
   - `severity`: CATASTROPHIC, CRITICAL, MAJOR, MODERATE, MINOR (per §2).

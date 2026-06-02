@@ -76,7 +76,7 @@ Return a JSON object with this exact structure:
     "distinguishingMarks": {
       "freckles": "<none | light | moderate | heavy>",
       "moles": "<description of visible moles and locations, or 'none'>",
-      "skinTexture": "<smooth | textured | weathered>",
+      "skinTexture": "<smooth | textured>",
       "nasolabialFolds": "<none | subtle | moderate | pronounced>"
     }
   },

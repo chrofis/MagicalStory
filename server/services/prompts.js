@@ -84,7 +84,6 @@ async function loadPromptTemplates() {
     ['referenceSheet', 'reference-sheet.txt'],
     ['sceneRepair', 'scene-repair.txt'],
     ['entityConsistencyCheck', 'entity-consistency-check.txt'],
-    ['entityConsistencyRepair', 'entity-consistency-repair.txt'],
     ['entitySinglePageRepair', 'entity-single-page-repair.txt'],
     ['subRegionDetection', 'sub-region-detection.txt'],
     ['generatedImageAnalysis', 'generated-image-analysis.txt'],

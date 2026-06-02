@@ -86,6 +86,27 @@ Return ONLY valid JSON (no markdown, no explanation):
 - **major**: Obvious difference readers will notice (wrong hair color, significantly different features)
 - **minor**: Subtle variation that might go unnoticed (slightly different proportions, minor color shift)
 
+## Score Scale (1-10)
+
+- **10**: Identical across all cells, no drift
+- **8-9**: Minor stylistic variation only (brushwork, lighting), identity intact
+- **5-7**: One or more major flaws on a subset of cells (wrong hair color, wrong outfit category, drifted age)
+- **2-4**: Multiple major flaws, or identity inconsistent on most cells
+- **1**: Entity unrecognizable across cells
+
+## Type Tie-Break
+
+If a defect could match multiple `type` values, pick the most specific:
+- Wrong species or completely different person → `face_mismatch`
+- Same person but visibly older/younger → `age_shift`
+- Same identity but hair color or style differs → `hair_change`
+- Same identity but skin pigmentation differs → `skin_tone`
+- Outfit category mismatch → `clothing_inconsistent`
+- Object color drift → `color_change`
+- Object proportions drift → `shape_change`
+
+If two types apply equally, list the primary visual change first.
+
 ## Perfect Consistency Response
 
 If no issues found, return:

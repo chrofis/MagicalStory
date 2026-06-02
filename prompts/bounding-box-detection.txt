@@ -93,7 +93,7 @@ Given expected objects: "golden crown", "brown teddy bear"
       "position": "center",
       "face_box": null,
       "body_box": [500, 400, 700, 600],
-      "confidence": "n/a"
+      "confidence": "low"
     }
   ],
   "objects": [
