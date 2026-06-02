@@ -178,7 +178,15 @@ const MODEL_DEFAULTS = {
   // Single-pass scene mode — when true, skip empty-scene plate generation
   // and render the page in one pass (populated prose only). Recommended
   // pairing with referenceMode != 'strict'.
-  singlePassScene: true,
+  // Re-enabled empty-scene plate generation (singlePassScene: false) after
+  // observing that comic-style stories rendered pages in generic semi-painted
+  // realism instead of comic, because Grok had no style-anchored backdrop to
+  // commit to. Empty-scene pass renders the location IN the art style first
+  // and feeds it back as sceneBackground for the page-render call — Grok then
+  // composites characters onto a style-consistent canvas. Adds 1 image gen
+  // per location vantage (cached across pages sharing the vantage). Cost:
+  // ~$0.02/vantage × usually 2-3 vantages = ~$0.04-0.06/story.
+  singlePassScene: false,
   // Unified scene prose: Sonnet writes the ~300-word scene paragraph directly
   // in the unified story pass (instead of emitting a tight JSON hint that Haiku
   // then expands). Eliminates the Haiku scene-expansion call for initial gen.
