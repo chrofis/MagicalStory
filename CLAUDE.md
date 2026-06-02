@@ -558,7 +558,7 @@ All prompts are in `/prompts/*.txt` and loaded via `server/services/prompts.js`:
 - `bbox-refine.txt` - Bounding box refinement (2-pass detection)
 - `front-cover.txt`, `back-cover.txt`, `initial-page-*.txt` - Cover generation
 
-**Note**: `image-generation-storybook.txt` was merged into `image-generation.txt`. The `imageGenerationStorybook` template key is aliased to `imageGeneration` in prompts.js.
+**Note**: `image-generation.txt` is the single image-prompt template. Legacy `image-generation-storybook.txt` was merged into it, and the per-language (`-de`, `-fr`) plus `-sequential` variants were deleted along with the `isStorybook` / `isSequential` flags on `buildImagePrompt()` — unified mode is the only generation pipeline.
 
 ## Database
 

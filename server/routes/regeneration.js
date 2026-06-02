@@ -552,10 +552,9 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       }
     }
 
-    // Build image prompt with scene-specific characters and visual bible
-    // Use isStorybook=true to include Visual Bible section in prompt
+    // Build image prompt with scene-specific characters and visual bible.
     // Note: We don't build originalPrompt separately to avoid duplicate logging - originalDescription is stored for comparison
-    let imagePrompt = customPrompt || buildImagePrompt(expandedDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
+    let imagePrompt = customPrompt || buildImagePrompt(expandedDescription, storyData, sceneCharacters, visualBible, pageNumber, referencePhotos);
 
     // If user selected specific characters, add explicit restriction to prompt
     if (characterIds && Array.isArray(characterIds) && characterIds.length > 0) {
@@ -912,7 +911,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       // for legacy covers that didn't persist the prompt.
       const chars = getCharactersInScene(cover.description || '', storyData.characters || []);
       characterPhotos = getCharacterPhotoDetails(chars, parseClothingCategory(cover.description || '') || 'standard', artStyle, clothingReqs);
-      prompt = cover.prompt || buildImagePrompt(cover.description || '', storyData, chars, true, visualBible, pageNumber, true, characterPhotos);
+      prompt = cover.prompt || buildImagePrompt(cover.description || '', storyData, chars, visualBible, pageNumber, characterPhotos);
     } else {
       const savedSceneImage = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
       if (!savedSceneImage) return res.status(400).json({ error: `No scene image found for page ${pageNumber}` });
@@ -931,7 +930,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       }
       // Reuse the saved prompt verbatim — Test Models tests image models against
       // a fixed prompt, not against a re-expanded scene.
-      prompt = savedSceneImage.prompt || buildImagePrompt(desc, storyData, chars, false, visualBible, pageNumber, true, characterPhotos);
+      prompt = savedSceneImage.prompt || buildImagePrompt(desc, storyData, chars, visualBible, pageNumber, characterPhotos);
       // Reuse the original empty-scene plate so two-pass renders use the same
       // background. If absent (older stories), the per-model render still works
       // — generateImageOnly just won't have a sceneBackground to anchor on.
@@ -1668,7 +1667,7 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
         ? (getCoverData(storyData, getCoverType(pageNumber))?.description || '')
         : ((storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber)?.description || '');
       const chars = getCharactersInScene(sceneDesc, storyData.characters || []);
-      const prompt = buildImagePrompt(sceneDesc, storyData, chars, false, visualBible, pageNumber, true, characterPhotos, {
+      const prompt = buildImagePrompt(sceneDesc, storyData, chars, visualBible, pageNumber, characterPhotos, {
         customStyleDescription: effectiveStyle
       });
 

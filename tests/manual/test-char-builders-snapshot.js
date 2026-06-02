@@ -65,7 +65,7 @@ async function main() {
     // Most pipelines call it via buildImagePromptForPage or similar.
     // If not exported, skip with a note.
     if (typeof helpers.buildImagePrompt === 'function') {
-      const imgPrompt = helpers.buildImagePrompt('test scene', data, chars, false, null, 2, false, photos);
+      const imgPrompt = helpers.buildImagePrompt('test scene', data, chars, null, 2, photos);
       // Grab the numbered character list section
       const m2 = imgPrompt.match(/(\d+\.\s[^\n]+(?:\n|$))+/);
       console.log(m2 ? m2[0].trim() : '(no numbered list found)');

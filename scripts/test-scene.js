@@ -265,17 +265,15 @@ async function doFetch() {
   const { buildImagePrompt } = require(path.join(ROOT, 'server/lib/storyHelpers'));
   try {
     // buildImagePrompt signature:
-    // (sceneDescription, inputData, sceneCharacters, isSequential, visualBible,
-    //  pageNumber, isStorybook, referencePhotos, options)
+    // (sceneDescription, inputData, sceneCharacters, visualBible,
+    //  pageNumber, referencePhotos, options)
     const inputData = { artStyle, language, ageFrom: 3, ageTo: 8, languageLevel };
     const rebuilt = buildImagePrompt(
       scene.sceneDescription,
       inputData,
       scene.sceneCharacters || null,
-      false,                  // isSequential
       null,                   // visualBible
       pageNum,
-      true,                   // isStorybook
       scene.referencePhotos || null,
       { textPosition: scene.textPosition }
     );

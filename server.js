@@ -3314,8 +3314,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const isGrokImage = pageImageBackend === 'grok';
 
           const imagePrompt = buildImagePrompt(
-            sceneDescription, inputData, sceneCharacters, false, streamingVisualBible,
-            page.pageNumber, true, pagePhotos, { skipVisualBible: isGrokImage }
+            sceneDescription, inputData, sceneCharacters, streamingVisualBible,
+            page.pageNumber, pagePhotos, { skipVisualBible: isGrokImage }
           );
 
           // Resolve landmarks and VB grid for Grok reference slots
@@ -5137,7 +5137,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const imageModelConfig = IMAGE_MODELS[pageImageModel];
         const isGrokImage = imageModelConfig?.backend === 'grok';
         const imagePrompt = buildImagePrompt(
-          scene.sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum, true, pagePhotos, { skipVisualBible: isGrokImage }
+          scene.sceneDescription, inputData, sceneCharacters, visualBible, pageNum, pagePhotos, { skipVisualBible: isGrokImage }
         );
         // Extract emptyScenePrompt from outline hint (Sonnet-generated, high quality)
         // Falls back to scene expansion's emptyScenePrompt via sceneMetadata

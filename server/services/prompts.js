@@ -38,11 +38,6 @@ async function loadPromptTemplates() {
     ['sceneIteration', 'scene-iteration.txt'],
     ['sceneIterationFree', 'scene-iteration-free.txt'],
     ['imageGeneration', 'image-generation.txt'],
-    ['imageGenerationDe', 'image-generation-de.txt'],
-    ['imageGenerationFr', 'image-generation-fr.txt'],
-    ['imageGenerationSequential', 'image-generation-sequential.txt'],
-    ['imageGenerationSequentialDe', 'image-generation-sequential-de.txt'],
-    ['imageGenerationSequentialFr', 'image-generation-sequential-fr.txt'],
     ['imageEvaluation', 'image-evaluation.txt'],
     ['imageVisualInventory', 'image-visual-inventory.txt'],
     ['imageVisionInventory', 'image-vision-inventory.txt'],
@@ -102,7 +97,6 @@ async function loadPromptTemplates() {
 
   // Backwards-compat aliases (computed AFTER loads so the source key is set)
   PROMPT_TEMPLATES.sceneDescriptions = PROMPT_TEMPLATES.sceneIteration;
-  PROMPT_TEMPLATES.imageGenerationStorybook = PROMPT_TEMPLATES.imageGeneration;
 
   if (failures.length > 0) {
     log.error(`❌ Prompt template load: ${failures.length} file(s) failed:`);

@@ -4523,10 +4523,10 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 /**
  * Build image generation prompt
  */
-function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false, visualBible = null, pageNumber = null, isStorybook = false, referencePhotos = null, options = {}) {
-  // Build image generation prompt (matches step-by-step format)
-  // For storybook mode: visualBible entries are added here since there's no separate scene description step
-  // For parallel/sequential modes: Visual Bible is also in scene description, but adding here ensures consistency
+function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, visualBible = null, pageNumber = null, referencePhotos = null, options = {}) {
+  // Build image generation prompt. The unified pipeline is the only generation
+  // mode; legacy pictureBook / outlineAndText / sequential / language-variant
+  // template paths were removed along with the isStorybook/isSequential flags.
 
   // Extract metadata BEFORE stripping (needed for objects lookup)
   const metadata = extractSceneMetadata(sceneDescription);
@@ -4829,34 +4829,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     log.debug(`[IMAGE PROMPT] Skipping Visual Bible text for page ${pageNumber} (visual reference sent as image)`);
   }
 
-  // Select the correct template based on mode and language
-  let template = null;
-  let templateName = '';
-  if (isStorybook && PROMPT_TEMPLATES.imageGeneration) {
-    // Unified template for all modes
-    template = PROMPT_TEMPLATES.imageGeneration;
-    templateName = 'storybook';
-  } else if (isSequential) {
-    // Sequential mode templates (with visual continuity instructions)
-    if (language === 'de' && PROMPT_TEMPLATES.imageGenerationSequentialDe) {
-      template = PROMPT_TEMPLATES.imageGenerationSequentialDe;
-    } else if (language === 'fr' && PROMPT_TEMPLATES.imageGenerationSequentialFr) {
-      template = PROMPT_TEMPLATES.imageGenerationSequentialFr;
-    } else if (PROMPT_TEMPLATES.imageGenerationSequential) {
-      template = PROMPT_TEMPLATES.imageGenerationSequential;
-    }
-    templateName = 'sequential';
-  } else {
-    // Parallel mode templates
-    if (language === 'de' && PROMPT_TEMPLATES.imageGenerationDe) {
-      template = PROMPT_TEMPLATES.imageGenerationDe;
-    } else if (language === 'fr' && PROMPT_TEMPLATES.imageGenerationFr) {
-      template = PROMPT_TEMPLATES.imageGenerationFr;
-    } else if (PROMPT_TEMPLATES.imageGeneration) {
-      template = PROMPT_TEMPLATES.imageGeneration;
-    }
-    templateName = 'parallel';
-  }
+  const template = PROMPT_TEMPLATES.imageGeneration || null;
 
   // Build an EXACT POSES block from the scene's declared interactions. Image
   // models (Grok Aurora especially) weight the end of the prompt heavily, and
@@ -4881,54 +4854,19 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
   // Use template if available, otherwise fall back to hardcoded prompt
   if (template) {
-    log.debug(`[IMAGE PROMPT] Using ${templateName} template for language: ${language} (proseFormat=${isProseFormat})`);
+    log.debug(`[IMAGE PROMPT] Using image-generation template for language: ${language} (proseFormat=${isProseFormat})`);
 
-    // Storybook mode + prose format: scene prose carries character descriptions
-    // and setting woven in by Sonnet, but Sonnet drops clothing for some
-    // characters intermittently (observed: Emma's pirate costume missing on
-    // p2 of `Was unter der Holzbrücke lag` → Grok defaulted to yellow dress).
-    // Pass the explicit reference list / clothing / heights / required objects
-    // blocks too — redundant when the prose is complete, load-bearing when not.
-    if (isStorybook && isProseFormat) {
-      return appendExactPoses(fillTemplate(template, {
-        STYLE_DESCRIPTION: styleDescription,
-        SCENE_DESCRIPTION: cleanSceneDescription,
-        CHARACTER_REFERENCE_LIST: characterReferenceList,
-        REQUIRED_OBJECTS: requiredObjectsSection,
-        TEXT_AREA_INSTRUCTION: textAreaInstruction,
-        ERA_GUARD: eraGuard,
-        SCENE_INTENT: sceneIntentLine,
-        AGE_FROM: inputData.ageFrom || 3,
-        AGE_TO: inputData.ageTo || 8
-      }));
-    }
-
-    // Storybook mode + legacy JSON format (iteratePage path): the scene description
-    // is JSON, so character descriptions and VB elements are NOT in the prose.
-    // Let the template's own placeholders position char refs + required objects —
-    // previously we ALSO prepended them into SCENE_DESCRIPTION, producing duplicate
-    // copies that inflated iterate prompts past Grok's 7500-char limit.
-    if (isStorybook && !isProseFormat) {
-      return appendExactPoses(fillTemplate(template, {
-        STYLE_DESCRIPTION: styleDescription,
-        SCENE_DESCRIPTION: cleanSceneDescription,
-        CHARACTER_REFERENCE_LIST: characterReferenceList,
-        REQUIRED_OBJECTS: requiredObjectsSection,
-        TEXT_AREA_INSTRUCTION: textAreaInstruction,
-        ERA_GUARD: eraGuard,
-        SCENE_INTENT: sceneIntentLine,
-        AGE_FROM: inputData.ageFrom || 3,
-        AGE_TO: inputData.ageTo || 8
-      }));
-    }
-
-    // Non-storybook modes (parallel, sequential): use the existing template
-    // structure with all placeholders.
+    // Both prose and legacy-JSON scene formats use the same placeholder set:
+    // the prose carries character descriptions + setting woven in by Sonnet
+    // (sometimes with clothing dropped — observed: Emma's pirate costume
+    // missing → Grok defaulted to yellow dress), and the JSON iterate path
+    // has neither. In both cases we pass the explicit reference list /
+    // clothing / heights / required objects blocks — redundant when the
+    // prose is complete, load-bearing when not.
     return appendExactPoses(fillTemplate(template, {
       STYLE_DESCRIPTION: styleDescription,
       SCENE_DESCRIPTION: cleanSceneDescription,
       CHARACTER_REFERENCE_LIST: characterReferenceList,
-      VISUAL_BIBLE: visualBibleSection,
       REQUIRED_OBJECTS: requiredObjectsSection,
       TEXT_AREA_INSTRUCTION: textAreaInstruction,
       ERA_GUARD: eraGuard,
