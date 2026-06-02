@@ -653,3 +653,36 @@ causes with independent fixes.
 4 callsites + `MIN_BASE_AVATAR_SCORE`); `prompts/avatar-evaluation.txt`
 (scoring rules + JSON schema).
 **Status:** ✅ active.
+
+## Performance
+
+### Landing+nav static images shipped as WebP at display-resolution
+**Context:** PageSpeed Insights flagged 871 KiB of unnecessary bytes on
+the landing page, dominated by `logo-book.png` (664 KiB, an 868×864 PNG
+rendered at 40px) plus oversized JPGs for the section illustrations,
+hero thumbs, and video poster. Also: a 512×512 arrow icon rendered at
+42px (`arrow-icon-1162.png`, 12 KiB), and the landing-characters image
+had no `width`/`height` causing a 0.121 layout shift.
+**Decision:**
+- One-shot resize + WebP encode via `scripts/optimize-landing-images.js`
+  (sharp). Each entry has an explicit target width — roughly 2× the
+  measured display dimension. Originals get a `-orig.<ext>` backup the
+  first run, so the script is idempotent (always re-encodes from the
+  backup). Backups are gitignored.
+- Consumers switched to `.webp`. Arrow icon stays PNG but in-place
+  shrunk to 128×128 (12 KiB → 2 KiB).
+- Every `<img>` got explicit `width` + `height` (CLS fix) plus
+  `loading="lazy" decoding="async"` for below-fold images and
+  `fetchPriority="high"` on the logo + first hero thumbs.
+**Rationale:** WebP is supported by 97 %+ of browsers — no `<picture>`
+fallback needed for a public landing page. The originals stay on disk
+under `images/*-orig.*` so a one-line `git checkout` can roll back if a
+browser issue surfaces. Display-2× resolution is the standard retina
+buffer; going higher just wastes bytes the rendering layer doesn't use.
+Total measured savings: 1,230 KiB → 339 KiB (−891 KiB, 72.4 %).
+**Touched:** `scripts/optimize-landing-images.js` (new); 11 files in
+`images/` (new `.webp` siblings + arrow-icon shrunk in place);
+`client/src/pages/LandingPage.tsx` (7 imgs); `Navigation.tsx`,
+`ClaimAccount.tsx`, `SharedStoryViewer.tsx`, `TrialGenerationPage.tsx`,
+`TrialWizard.tsx` (logo references); `.gitignore` (backups).
+**Status:** ✅ active.

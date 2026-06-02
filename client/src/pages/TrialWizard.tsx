@@ -377,7 +377,7 @@ export default function TrialWizard() {
         <nav className="bg-black text-white px-3 py-3">
           <div className="flex justify-between items-center">
             <Link to="/" className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
-              <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
+              <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />
               Magical Story
             </Link>
           </div>
@@ -417,7 +417,7 @@ export default function TrialWizard() {
         <nav className="bg-black text-white px-3 py-3">
           <div className="flex justify-between items-center">
             <Link to="/" className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
-              <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
+              <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />
               Magical Story
             </Link>
           </div>
@@ -464,7 +464,7 @@ export default function TrialWizard() {
         <nav className="bg-black text-white px-3 py-3">
           <div className="flex justify-between items-center">
             <Link to="/" className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
-              <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
+              <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />
               Magical Story
             </Link>
           </div>

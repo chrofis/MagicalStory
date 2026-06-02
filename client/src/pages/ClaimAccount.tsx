@@ -258,7 +258,7 @@ export default function ClaimAccount() {
       <nav className="bg-black text-white px-3 py-3">
         <div className="flex justify-between items-center">
           <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
-            <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
+            <img src="/images/logo-book.webp" alt="" width="88" height="88" className="h-10 md:h-11 -my-2 w-auto" />
             {t.brand}
           </button>
         </div>

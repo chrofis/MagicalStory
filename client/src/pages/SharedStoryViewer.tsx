@@ -499,7 +499,7 @@ export default function SharedStoryViewer() {
           <div className="flex items-center justify-between gap-2">
             {/* Left: Logo + optional title */}
             <button onClick={() => navigate('/')} className="text-sm md:text-base font-semibold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5 flex-shrink-0">
-              <img src="/images/logo-book.png" alt="" className="h-7 md:h-10 -my-1 md:-my-2 w-auto" />
+              <img src="/images/logo-book.webp" alt="" width="88" height="88" className="h-7 md:h-10 -my-1 md:-my-2 w-auto" />
               <span className="hidden md:inline">{t.title}</span>
             </button>
 

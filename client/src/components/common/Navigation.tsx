@@ -90,7 +90,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
         {/* Left: Title */}
         <div className="flex-shrink-0">
           <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
-            <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
+            <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />
             <span className={isGenerationInProgress ? 'hidden sm:inline' : ''}>{t.title}</span>
           </button>
         </div>

@@ -379,7 +379,7 @@ export default function LandingPage() {
                 {/* Real Photo */}
                 <div className="text-center">
                   <div className="mb-1 lg:mb-2">
-                    <img src="/images/Real person.jpg" alt="Your Picture" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
+                    <img src="/images/Real person.webp" alt="Your Picture" width="360" height="433" fetchPriority="high" decoding="async" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
                   </div>
                   <p className="text-xs lg:text-base text-black font-semibold">
                     {language === 'de' ? 'Dein Foto' : language === 'fr' ? 'Votre Photo' : 'Your Picture'}
@@ -388,13 +388,13 @@ export default function LandingPage() {
 
                 {/* Arrow Down */}
                 <div className="flex justify-center my-1 lg:my-2">
-                  <img src="/images/arrow-icon-1162.png" alt="Arrow Down" className="w-6 h-6 lg:w-12 lg:h-12" style={{transform: 'rotate(90deg)'}} />
+                  <img src="/images/arrow-icon-1162.png" alt="Arrow Down" width="128" height="128" decoding="async" className="w-6 h-6 lg:w-12 lg:h-12" style={{transform: 'rotate(90deg)'}} />
                 </div>
 
                 {/* Avatar */}
                 <div className="text-center">
                   <div className="mb-1 lg:mb-2">
-                    <img src="/images/Avatar.jpg" alt="Your Character" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
+                    <img src="/images/Avatar.webp" alt="Your Character" width="360" height="360" fetchPriority="high" decoding="async" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
                   </div>
                   <p className="text-xs lg:text-base text-black font-semibold">
                     {language === 'de' ? 'Dein Charakter' : language === 'fr' ? 'Votre Personnage' : 'Your Character'}
@@ -404,7 +404,7 @@ export default function LandingPage() {
 
               {/* Arrow Right - Hidden on mobile */}
               <div className="hidden lg:flex justify-center items-center lg:w-[8%] self-center">
-                <img src="/images/arrow-icon-1162.png" alt="Arrow Right" className="w-14 h-14 lg:w-16 lg:h-16" />
+                <img src="/images/arrow-icon-1162.png" alt="Arrow Right" width="128" height="128" decoding="async" className="w-14 h-14 lg:w-16 lg:h-16" />
               </div>
 
               {/* Video Column */}
@@ -415,7 +415,7 @@ export default function LandingPage() {
                     loop
                     muted
                     playsInline
-                    poster="/images/video-poster.jpg"
+                    poster="/images/video-poster.webp"
                     className="w-full h-full object-cover"
                   >
                     <source src="/images/Boy to pirat to book.mp4" type="video/mp4" />
@@ -511,8 +511,12 @@ export default function LandingPage() {
             {/* Image - Second on mobile, peeks from below */}
             <div className="w-full lg:w-1/2 order-2 lg:order-2 flex items-center">
               <img
-                src={`/images/landing-characters-${language}.jpg`}
+                src={`/images/landing-characters-${language}.webp`}
                 alt={st.createCharacters}
+                width="1000"
+                height="545"
+                loading="lazy"
+                decoding="async"
                 className="w-full h-auto rounded-2xl shadow-lg"
               />
             </div>
@@ -566,8 +570,12 @@ export default function LandingPage() {
             {/* Image - Second on mobile, peeks from below */}
             <div className="w-full lg:w-1/2 order-2 lg:order-1 flex items-center">
               <img
-                src="/images/landing-tell-your-story.jpg"
+                src="/images/landing-tell-your-story.webp"
                 alt={st.tellStory}
+                width="1000"
+                height="1490"
+                loading="lazy"
+                decoding="async"
                 className="w-full h-auto rounded-2xl shadow-lg"
               />
             </div>
@@ -611,8 +619,12 @@ export default function LandingPage() {
             {/* Image - Second on mobile, peeks from below */}
             <div className="w-full lg:w-1/2 order-2 lg:order-2 flex items-center">
               <img
-                src="/images/landing-styles.jpg"
+                src="/images/landing-styles.webp"
                 alt={st.chooseStyle}
+                width="1000"
+                height="1204"
+                loading="lazy"
+                decoding="async"
                 className="w-full h-auto rounded-2xl shadow-lg"
               />
             </div>
@@ -662,8 +674,12 @@ export default function LandingPage() {
             {/* Image - Second on mobile, peeks from below */}
             <div className="w-full lg:w-1/2 order-2 lg:order-1 flex items-center">
               <img
-                src="/images/landing-print.jpg"
+                src="/images/landing-print.webp"
                 alt={st.printShare}
+                width="1000"
+                height="1204"
+                loading="lazy"
+                decoding="async"
                 className="w-full h-auto rounded-2xl shadow-lg"
               />
             </div>

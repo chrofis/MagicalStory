@@ -59,6 +59,11 @@ images/not used/
 images/*.mp4
 !images/Boy to pirat to book.mp4
 !images/landing-why-it-works.mp4
+
+# Pre-optimization backups produced by scripts/optimize-landing-images.js
+# (kept locally as a safety net; regenerable from git history if needed).
+images/*-orig.*
+
 Magical-Story-images/
 Geschichten, Prompts, Inputs/
 MagicalStory/
