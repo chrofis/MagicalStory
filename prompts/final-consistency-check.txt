@@ -20,17 +20,17 @@ Each entry contains:
 - "clothing": Object mapping character names to clothing category (or "_default" if same for all)
 - "scene": Brief description of what happens in the scene
 
-**CRITICAL: Use the CHARACTER DESCRIPTIONS above to identify which figure is which character in each image. Use this JSON data to understand which characters appear in each image and what clothing they should wear.**
+**Use the CHARACTER DESCRIPTIONS above to identify which figure is which character in each image. Use this JSON data to understand which characters appear in each image and what clothing they should wear.**
 
-- Different characters appearing in different images is EXPECTED - do NOT flag this as inconsistent
-- Clothing changes between scenes are INTENTIONAL if the clothing category differs (e.g., "standard" vs "winter" vs "costumed")
+- Different characters appearing in different images is expected - don't flag this as inconsistent
+- Clothing changes between scenes are intentional if the clothing category differs (e.g., "standard" vs "winter" vs "costumed")
 - Only flag as inconsistent if:
   1. The SAME character looks different in scenes with the SAME clothing requirement
   2. A character's core features (face, hair color, skin tone) change unexpectedly
   3. Art style or quality varies significantly between images
 
 ### For CHARACTER checks:
-Focus on whether {CHARACTER_NAME} looks like the same person across images WHERE THEY APPEAR:
+Focus on whether {CHARACTER_NAME} looks like the same person across images where they appear:
 - Face shape and features (eyes, nose, mouth proportions)
 - Hair color, style, and length
 - Skin tone
@@ -76,15 +76,15 @@ Return ONLY valid JSON (no markdown, no explanation):
   "summary": "Brief overall assessment"
 }
 
-## Recommendation Rules (CRITICAL)
+## Recommendation Rules
 
 When writing `recommendation` and `pagesToFix`:
 
-1. **NEVER give "either/or" options** - pick ONE specific direction
-2. **Minimize regeneration** - fix the FEWEST pages possible
+1. **Don't give "either/or" options** - pick one specific direction
+2. **Minimize regeneration** - fix the fewest pages possible
 3. **Majority wins** - if 2 images show red hair and 1 shows brown, fix the brown one
 4. **First appearance wins** - if tied, match the earlier image (readers saw that first)
-5. **`pagesToFix`** - list ONLY the page numbers that need regeneration (not all involved pages)
+5. **`pagesToFix`** - list only the page numbers that need regeneration (not all involved pages)
 6. **`canonicalVersion`** - describe what the correct version looks like (used as reference)
 
 Example:

@@ -1,5 +1,5 @@
-**CRITICAL: NO QUESTIONS - JUST DO IT**
-You MUST NOT ask clarifying questions. You MUST NOT ask for more information. You MUST NOT say "I need more details" or "Could you tell me more about...". NEVER respond with questions. Produce the complete output immediately using ONLY the information provided below. Make reasonable creative decisions if anything is unclear.
+**No questions — just do it.**
+Don't ask clarifying questions. Don't ask for more information. Don't say "I need more details" or "Could you tell me more about...". Don't respond with questions. Produce the complete output immediately using only the information provided below. Make reasonable creative decisions if anything is unclear.
 
 ---
 
@@ -38,22 +38,22 @@ Your task is to create a compelling, well-structured story outline that will gui
 
 {CATEGORY_GUIDELINES}
 
-# IMPORTANT: Character Portrayal Guidelines
+# Character Portrayal Guidelines
 
-- **CRITICAL: ONLY use the character names listed in "Characters" above.** Do NOT invent new character names or use names from other stories. If a name is not in the character list, do NOT use it in the story.
+- **Only use the character names listed in "Characters" above.** Don't invent new character names or use names from other stories. If a name is not in the character list, don't use it in the story.
 - Write in third person (he/she/they)
 
-**CRITICAL: Write in PRESENT TENSE**
-- The story should be written in PRESENT TENSE (e.g., "the protagonist walks into the forest", "the main character finds a treasure")
+**Write in present tense**
+- The story should be written in present tense (e.g., "the protagonist walks into the forest", "the main character finds a treasure")
 - This creates immediacy and engagement for young readers
 - Exception: Use past tense only when a character recalls or talks about something that happened before the story (flashbacks, memories)
 - Example CORRECT: "the protagonist opens the door and sees a magical garden."
 - Example WRONG: "the protagonist opened the door and saw a magical garden."
 
 When writing about characters' strengths and weaknesses:
-- NEVER mention the trait words directly (e.g., don't write "She is brave" or "He is shy")
-- SHOW the traits through actions, dialogue, and behavior instead
-- Let the reader discover the character's personality through what they DO, not what they ARE told
+- Don't mention the trait words directly (e.g., don't write "She is brave" or "He is shy")
+- Show the traits through actions, dialogue, and behavior instead
+- Let the reader discover the character's personality through what they do, not what they are told
 - Example: Instead of "the protagonist is curious", show them asking lots of questions and exploring new places
 - Example: Instead of "the protagonist is afraid of the dark", show them hesitating at a dark doorway or asking for a nightlight
 
@@ -69,18 +69,18 @@ For each main character ({CHARACTER_NAMES}), specify which clothing variations a
 - **costumed** - Full costume transformation (pirate, superhero, cowboy, princess, etc.)
 
 **Guidelines:**
-- **COSTUME PRIORITY RULE:**
-  1. If story defines PERIOD COSTUMES or specific costumes (spacesuits, uniforms, historical attire) → ALWAYS use `costumed`
+- **Costume priority rule:**
+  1. If story defines period costumes or specific costumes (spacesuits, uniforms, historical attire) → use `costumed`
   2. If no costumes defined → use `standard` (or create appropriate costumes if story theme warrants it)
-  3. Winter clothing is ONLY for outdoor cold weather scenes
+  3. Winter clothing is only for outdoor cold weather scenes
 - For `costumed`: Provide **complete outfit description** (full transformation)
 - Only mark variations as `used: true` if they actually appear in the story
 
-**CRITICAL - Signature Accessories (for standard/winter/summer):**
-Each character needs ONE distinctive accessory that makes them instantly recognizable. Look at the "Character Base Clothing" above to pick something that COMPLEMENTS their outfit.
+**Signature Accessories (for standard/winter/summer):**
+Each character needs one distinctive accessory that makes them instantly recognizable. Look at the "Character Base Clothing" above to pick something that complements their outfit.
 
 **Rules:**
-1. Each character gets a DIFFERENT accessory type:
+1. Each character gets a different accessory type:
    - Scarf (wool, patterned, long)
    - Jacket/Coat (denim jacket, bomber jacket, cardigan, hoodie)
    - Bag (backpack, messenger bag, small purse)

@@ -1,6 +1,6 @@
 Compare these two image regions: BEFORE (left) and AFTER (right).
 
-This is a CROP from a larger illustration. The repair should ONLY fix the specific issue while keeping everything else identical.
+This is a CROP from a larger illustration. The repair should only fix the specific issue while keeping everything else identical.
 
 ISSUE TO FIX:
 - Problem: "{ISSUE_DESCRIPTION}"
@@ -11,7 +11,7 @@ EVALUATE CAREFULLY:
 
 1. ISSUE FIXED? Is the specific problem mentioned above fixed in the AFTER image?
 
-2. POSITION PRESERVED? Are ALL elements in the EXACT same position?
+2. POSITION PRESERVED? Are all elements in the exact same position?
    - Nothing should have moved, shifted, or been resized
    - This crop goes back into a larger image - alignment is critical
 
@@ -20,7 +20,7 @@ EVALUATE CAREFULLY:
    - Colors and lighting
    - Background and textures
 
-4. MINIMAL CHANGE? Was ONLY the fix instruction applied?
+4. MINIMAL CHANGE? Was only the fix instruction applied?
    - No other "improvements" or changes should be visible
    - Everything except the fix should be pixel-perfect identical
 

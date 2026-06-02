@@ -8,7 +8,7 @@ Your task: Look at the image carefully and REFINE these bounding boxes so they a
 FACE BOX RULES (most important):
 - Must include the COMPLETE face: forehead to chin, ear to ear. Nothing cut off.
 - Include hair/hat if it's part of the head silhouette.
-- Must NOT include shoulders or neck below the jawline.
+- Must not include shoulders or neck below the jawline.
 - If the face is turned or at an angle, the box should still capture the full visible face area.
 
 BODY BOX RULES:
@@ -19,12 +19,12 @@ BODY BOX RULES:
 
 Common issues to fix:
 - Box shifted away from the actual element (move it to center on the character)
-- Box too small — part of the face/body is cut off (EXPAND it)
-- Box too large — includes background or other characters (SHRINK it)
+- Box too small — part of the face/body is cut off (expand it)
+- Box too large — includes background or other characters (shrink it)
 
-Return CORRECTED coordinates. Keep the same character names. Only adjust the box positions.
+Return corrected coordinates. Keep the same character names. Only adjust the box positions.
 
-Output JSON (ONLY figures, no objects):
+Output JSON (only figures, no objects):
 {
   "figures": [
     {"name": "CharName", "label": "description", "position": "center", "confidence": "high", "face_box": [ymin, xmin, ymax, xmax], "body_box": [ymin, xmin, ymax, xmax]}
@@ -32,4 +32,4 @@ Output JSON (ONLY figures, no objects):
 }
 
 Coordinates use 0-1000 scale where [0,0] is top-left and [1000,1000] is bottom-right.
-Respond with ONLY the JSON, no explanation.
+Respond with only the JSON, no explanation.

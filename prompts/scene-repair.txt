@@ -14,19 +14,19 @@ Your job: Fix ONLY the geometric issues while preserving the narrative intent.
 
 **1. POINTING AT BACKGROUND OBJECTS:**
 
-If a character must point at something in the BACKGROUND (like a mountain):
-- They CANNOT face the camera and point at it (pointing behind yourself is impossible)
+If a character must point at something in the background (like a mountain):
+- They can't face the camera and point at it (pointing behind yourself is impossible)
 - FIX OPTIONS:
-  a) Turn character to FACE AWAY from camera (back visible, pointing forward at target)
-  b) Turn character SIDEWAYS (profile view, pointing to the side at target)
-  c) Position character so target is to their LEFT or RIGHT (not behind)
+  a) Turn character to face away from camera (back visible, pointing forward at target)
+  b) Turn character sideways (profile view, pointing to the side at target)
+  c) Position character so target is to their left or right (not behind)
   d) REPOSITION THE BACKGROUND: Move the landmark to left/right side of frame, place character on opposite side, pointing across the frame
 
 PREFER: Sideways/profile view - shows partial face + can point at target
 
 **2. POINTING AT FOREGROUND OBJECTS:**
 
-Character CAN face camera and point at things in front of them. Point DOWN and FORWARD toward the target.
+Character can face camera and point at things in front of them. Point down and forward toward the target.
 
 **3. GAZE MUST MATCH BODY ORIENTATION:**
 
@@ -34,9 +34,9 @@ Character CAN face camera and point at things in front of them. Point DOWN and F
 |-------------|-------------------|
 | Toward camera | Full expression visible (eyes, mouth, etc.) |
 | Sideways/Profile | Profile expression only (jaw, one eye) |
-| Away from camera | NO facial expression - use body language only |
+| Away from camera | No facial expression - use body language only |
 
-If character faces away from camera, REMOVE detailed facial expressions. Replace with body language:
+If character faces away from camera, remove detailed facial expressions. Replace with body language:
 - "shoulders squared, determined stance"
 - "head tilted toward target"
 - "posture leaning forward eagerly"

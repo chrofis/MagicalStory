@@ -1,5 +1,5 @@
-# CRITICAL: NO QUESTIONS - JUST DO IT
-You MUST NOT ask clarifying questions. You MUST NOT ask for more information. You MUST NOT say "I need more details" or "Could you tell me more about...". NEVER respond with questions. Produce the complete output immediately using ONLY the information provided below. Make reasonable creative decisions if anything is unclear.
+# NO QUESTIONS - JUST DO IT
+Don't ask clarifying questions. Don't ask for more information. Don't say "I need more details" or "Could you tell me more about...". Don't respond with questions. Produce the complete output immediately using only the information provided below. Make reasonable creative decisions if anything is unclear.
 
 ---
 
@@ -18,7 +18,7 @@ Your strengths:
 Write pages {START_PAGE} through {END_PAGE} of a children's story based on the outline below.
 {INCLUDE_TITLE}
 
-**Your priority is a COHERENT, FLOWING STORY** - not checking off every detail from the outline. The outline is a guide, not a checklist. If including something from the outline would create an awkward sentence or break the story's flow, leave it out. A consistent, well-crafted story is far more important than mentioning every element.
+**Your priority is a coherent, flowing story** - not checking off every detail from the outline. The outline is a guide, not a checklist. If including something from the outline would create an awkward sentence or break the story's flow, leave it out. A consistent, well-crafted story is far more important than mentioning every element.
 
 **Story Context:**
 {BASE_PROMPT}
@@ -35,7 +35,7 @@ Write pages {START_PAGE} through {END_PAGE} of a children's story based on the o
 
 Your characters must feel like real people, not cardboard cutouts.
 
-**SHOW, don't TELL:**
+**Show, don't tell:**
 - Instead of "the main character was curious" → Show them asking unexpected questions, peeking behind doors, wondering aloud
 - Instead of "the main character was shy" → Show them hiding behind a parent, speaking quietly, avoiding eye contact
 - Instead of "the main character was brave" → Show them stepping forward when others hesitate, volunteering for the scary task
@@ -43,19 +43,19 @@ Your characters must feel like real people, not cardboard cutouts.
 **Each character should:**
 - Have a unique voice in dialogue (different speech patterns, word choices)
 - React differently to situations based on their personality
-- Show their traits through ACTIONS, not descriptions
+- Show their traits through actions, not descriptions
 - Grow and change through the story
 
-**AVOID:**
+**Avoid:**
 - Repeating character traits - if a character is "curious", don't keep writing "she was curious" or "her curiosity led her to..."
 - Mentioning the same trait more than once in the entire story
 - Generic dialogue that any character could say
 - Characters who all react the same way
-- **Repetitive physical gestures** - Do NOT overuse "put hand on shoulder", "ruffled hair", "patted on the back". Use each gesture ONCE in the entire story, maximum. Vary how characters show affection: a wink, a thumbs up, a gentle nudge, standing closer, a shared smile, a fist bump, holding hands, a quick hug, an arm around the waist, leaning in to whisper.
+- **Repetitive physical gestures** - Don't overuse "put hand on shoulder", "ruffled hair", "patted on the back". Use each gesture once in the entire story, maximum. Vary how characters show affection: a wink, a thumbs up, a gentle nudge, standing closer, a shared smile, a fist bump, holding hands, a quick hug, an arm around the waist, leaning in to whisper.
 
 ## Jokes and Humor
 
-**DO NOT include jokes, puns, or wordplay.** AI-generated humor is not funny and puns don't translate between languages.
+**Don't include jokes, puns, or wordplay.** AI-generated humor is not funny and puns don't translate between languages.
 
 Instead, create humor through funny situations, silly reactions, or absurd moments. Let the story be warm and entertaining without trying to be a comedian.
 

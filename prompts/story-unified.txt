@@ -1,7 +1,7 @@
 # Unified Story Generation
 
-**CRITICAL: NO QUESTIONS - JUST DO IT**
-You MUST NOT ask clarifying questions. You MUST NOT ask for more information. You MUST NOT say "I need more details". NEVER respond with questions. Produce the complete output immediately using ONLY the information provided below. Make reasonable creative decisions if anything is unclear.
+**No questions — just do it.**
+Don't ask clarifying questions. Don't ask for more information. Don't say "I need more details". Don't respond with questions. Produce the complete output immediately using only the information provided below. Make reasonable creative decisions if anything is unclear.
 
 ---
 
@@ -39,18 +39,18 @@ Your task is to create a COMPLETE story including:
 
 # CHARACTER DETAILS (source of truth for physical description)
 
-The following block lists each character's ACTUAL physical traits. When you describe a character in SCENE prose you MUST use these values verbatim. Do not invent traits, do not drop traits, and do not contradict them.
+The following block lists each character's actual physical traits. When you describe a character in SCENE prose, use these values verbatim. Do not invent traits, do not drop traits, and do not contradict them.
 
-**LOCK these strings to the page-image renderer.** The same description that produced the character's avatar reference photo must appear in every SCENE that includes the character — otherwise the page image will drift away from the avatar. Specifically:
+**Lock these strings to the page-image renderer.** The same description that produced the character's avatar reference photo must appear in every SCENE that includes the character — otherwise the page image will drift away from the avatar. Specifically:
 
-- **Hair**: copy the `Hair:` value WORD FOR WORD (colour, type, length, styling, parting). Do not paraphrase. ✗ "Hair: brown, wavy, shoulder-length, ponytail, side part left" → "dark hair greying at the temples". ✗ "shoulder-length wavy brown hair" → "salt-and-pepper hair". ✗ Drop the styling ("ponytail" must stay).
-- **Facial hair**: when `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face` is listed, the character has no facial hair in ANY scene. Never write "weathered face", "stubbled jaw", "grizzled beard", or imply age via facial hair. The negation is part of the lock.
+- **Hair**: copy the `Hair:` value word for word (colour, type, length, styling, parting). Do not paraphrase. ✗ "Hair: brown, wavy, shoulder-length, ponytail, side part left" → "dark hair greying at the temples". ✗ "shoulder-length wavy brown hair" → "salt-and-pepper hair". ✗ Drop the styling ("ponytail" must stay).
+- **Facial hair**: when `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face` is listed, the character has no facial hair in any scene. Never write "weathered face", "stubbled jaw", "grizzled beard", or imply age via facial hair. The negation is part of the lock.
 - **Glasses**: when `Glasses:` is listed, the character wears them in every scene. Use the listed name verbatim (e.g. "schwarze Brille"), do not translate or substitute ("dark spectacles" is wrong if the source says "schwarze Brille").
-- **Age cues**: copy the `Looks:` / `Age cues:` block verbatim. Do NOT paraphrase "adult" as "middle-aged", "weathered", "elderly", or "ageing". The avatar was generated for the listed age bucket; using a different age word produces a face mismatch the eval will flag.
-- **Distinctive marks**: any entry on the `Distinctive marks:` line MUST be visible in every scene where that character's face/body is rendered.
+- **Age cues**: copy the `Looks:` / `Age cues:` block verbatim. Do not paraphrase "adult" as "middle-aged", "weathered", "elderly", or "ageing". The avatar was generated for the listed age bucket; using a different age word produces a face mismatch the eval will flag.
+- **Distinctive marks**: any entry on the `Distinctive marks:` line must be visible in every scene where that character's face/body is rendered.
 - **Build / eye colour / face shape**: same verbatim rule.
 
-The mood of the scene (medieval, Wilhelm Tell, fantasy battle, peaceful village) does NOT change a character's appearance. If the scene mood pulls you toward "grizzled" / "weathered" / "ageing" / "salt-and-pepper", suppress that pull — write the action and setting in mood-language, but the character's traits stay verbatim from CHARACTER DETAILS.
+The mood of the scene (medieval, Wilhelm Tell, fantasy battle, peaceful village) does not change a character's appearance. If the scene mood pulls you toward "grizzled" / "weathered" / "ageing" / "salt-and-pepper", suppress that pull — write the action and setting in mood-language, but the character's traits stay verbatim from CHARACTER DETAILS.
 
 {CHARACTER_PHYSICAL_BLOCK}
 

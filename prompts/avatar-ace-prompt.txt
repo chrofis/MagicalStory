@@ -12,20 +12,20 @@ GRID REQUIREMENTS:
 - Clean 2x2 collage layout with a thin neutral divider.
 - Both profile views (top right and bottom right) face towards the RIGHT
 - Each quadrant has solid light grey (off-white) studio background
-- All 4 quadrants show the SAME outfit. Patterns/logos must be identical in size, color, and placement.
+- All 4 quadrants show the same outfit. Patterns/logos must be identical in size, color, and placement.
 
 VISUAL REQUIREMENTS:
 - Face: 100% identical to reference photo. Direct replication, not averaged.
 - Body: Generate age-appropriate body proportions based on apparent age in reference.
 - Setting: Pure clean white background (#FFFFFF) in each quadrant.
 - Lighting: Natural, even, studio-style diffused light.
-- Top quadrants: FACE ONLY - forehead to chin. NO shoulders, NO neck, NO clothing visible. Tight crop on face.
+- Top quadrants: Face only - forehead to chin. No shoulders, no neck, no clothing visible. Tight crop on face.
 - Bottom quadrants: Full body, head to toe. Shoes visible.
 
 BODY TRANSFORMATION:
 - Generate the person with an ATHLETIC, FIT body type by default
-- Do NOT preserve overweight or heavy body proportions from the reference photo
-- Keep the EXACT same face and identity, but transform the body to be slim and athletic
+- Don't preserve overweight or heavy body proportions from the reference photo
+- Keep the exact same face and identity, but transform the body to be slim and athletic
 - For children: fit and healthy, age-appropriate athletic proportions
 
 IDENTITY PERSISTENCE:

@@ -75,7 +75,7 @@ It must be detailed enough to illustrate without additional context.
 
 # OUTPUT FORMAT
 
-Output ALL sections in this EXACT order. Do not skip any.
+Output all sections in this exact order. Do not skip any.
 
 ---TITLE---
 TITLE: [A creative, specific title in {LANGUAGE}]
@@ -99,13 +99,13 @@ TITLE: [A creative, specific title in {LANGUAGE}]
   ]
 }
 ```
-**Do NOT include the main character ({MAIN_CHARACTER_NAME}) — they have reference photos.**
-Only include characters that YOU invent (friends, shopkeepers, etc.) as `secondaryCharacters`.
+Don't include the main character ({MAIN_CHARACTER_NAME}) — they have reference photos.
+Only include characters that you invent (friends, shopkeepers, etc.) as `secondaryCharacters`.
 Use empty arrays `[]` for categories with no elements.
 
-**REAL-WORLD LANDMARKS — STRICT RULE:** Any location whose name comes from (or is recognisably) an entry in the LANDMARKS section above is a real-world landmark. For every such location:
-- `"isRealLandmark": true` (NOT false — if you wrote the landmark's name, you picked it from the list, so it IS real)
-- `"landmarkQuery"`: the EXACT landmark name from the LANDMARKS section. Copy it verbatim — do not paraphrase, do not drop parens, do not anglicise.
+**Real-world landmarks:** Any location whose name comes from (or is recognisably) an entry in the LANDMARKS section above is a real-world landmark. For every such location:
+- `"isRealLandmark": true` (not false — if you wrote the landmark's name, you picked it from the list, so it is real)
+- `"landmarkQuery"`: the exact landmark name from the LANDMARKS section. Copy it verbatim — do not paraphrase, do not drop parens, do not anglicise.
 
 This is the difference between the system fetching a real Wikipedia photo of the actual building (correct) and the model inventing a generic illustration of what it thinks the building looks like (wrong). When in doubt, mark it as real — false negatives waste the photo pipeline and produce off-brand renders.
 
@@ -123,7 +123,7 @@ Example — picking "Kapellbrücke (Luzern) [Bridge]" from the LANDMARKS section
 Note: `name` can be styled for your story, but `landmarkQuery` must match the LANDMARKS entry character-for-character (parentheses and umlauts included).
 
 **BACKGROUNDS (style anchors for each scene):**
-Each background describes a scene with NO people, NO human figures. Include: location details, architecture, objects, lighting, weather, camera angle. Leave open space where characters would stand. Backgrounds can be reused across multiple pages. Every page must have a background.
+Each background describes a scene with no people, no human figures. Include: location details, architecture, objects, lighting, weather, camera angle. Leave open space where characters would stand. Backgrounds can be reused across multiple pages. Every page must have a background.
 - Use the landmark photo descriptions if available to describe real locations accurately
 - For indoor scenes: describe furniture, walls, lighting, floor
 - For outdoor scenes: describe landscape, sky, vegetation, architecture

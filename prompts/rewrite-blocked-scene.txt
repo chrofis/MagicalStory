@@ -37,4 +37,4 @@ Rewrite this image scene description to avoid content safety filters while prese
    - All characters fully clothed in everyday attire
 
 **OUTPUT FORMAT:**
-Return ONLY the rewritten scene description, nothing else. Keep the same format as the original (Setting, Characters, Action, Mood).
+Return only the rewritten scene description, nothing else. Keep the same format as the original (Setting, Characters, Action, Mood).

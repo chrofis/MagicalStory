@@ -34,13 +34,13 @@ If NO error found, return:
 }
 ```
 
-**IMPORTANT NOTES:**
+**Notes:**
 
 - Bounding box coordinates are normalized 0-1000 (relative to image dimensions)
   - Example: [250, 100, 750, 400] means top-left at 25% down/10% right, bottom-right at 75% down/40% right
-- Only report the SINGLE MOST SIGNIFICANT error if multiple exist
-- Be CONSERVATIVE - only flag CLEAR physics/visual violations
-- Artistic style choices are NOT errors (e.g., stylized proportions, cartoon physics that's intentional)
+- Only report the single most significant error if multiple exist
+- Be conservative - only flag clear physics/visual violations
+- Artistic style choices are not errors (e.g., stylized proportions, cartoon physics that's intentional)
 - This is a children's book - minor imperfections are acceptable if the overall image works
 
 **FIX PROMPT EXAMPLES:**

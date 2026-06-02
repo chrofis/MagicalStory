@@ -129,9 +129,15 @@ function fillTemplate(template, replacements) {
     const safeValue = String(value ?? '').replace(/\$/g, '$$$$');
     result = result.replace(new RegExp(`\\{${escapedKey}\\}`, 'g'), safeValue);
   }
-  // Strip any placeholders the caller didn't provide at all (e.g. a new template
-  // variable added before its caller was updated). Collapse any resulting
-  // blank-line runs so the output stays tight.
+  // Warn (then strip) any placeholders the caller didn't provide. The strip
+  // alone hides typos and missing fills — a misspelled key vanishes silently
+  // and the prompt ships with a hole. Logging the unfilled tokens makes those
+  // bugs visible without changing behaviour.
+  const unfilled = result.match(/\{[A-Z][A-Z0-9_]*\}/g);
+  if (unfilled && unfilled.length > 0) {
+    const unique = [...new Set(unfilled)];
+    log.warn(`[PROMPT] Unfilled placeholder(s) stripped: ${unique.join(', ')}`);
+  }
   result = result.replace(/\{[A-Z][A-Z0-9_]*\}/g, '');
   result = result.replace(/\n{3,}/g, '\n\n');
   return result;

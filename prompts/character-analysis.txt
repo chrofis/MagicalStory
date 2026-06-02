@@ -3,17 +3,17 @@ You are an expert Image Prompt Engineer specializing in character consistency.
 Analyze this image of a person.
 Extract PERMANENT visual attributes that will maintain consistency across different scenes.
 
-IMPORTANT: Only describe PERMANENT physical features, NOT temporary states:
-- Face: Describe bone structure, shape, skin tone - NOT expressions (no "smiling", "frowning", "laughing")
-- Hair: Describe color, length, and style separately - NOT temporary styling (no "windblown", "messy from wind", "wet")
-- Eyes: Describe color and shape - NOT expression (no "squinting", "wide-eyed")
+Only describe permanent physical features, not temporary states:
+- Face: Describe bone structure, shape, skin tone - not expressions (no "smiling", "frowning", "laughing")
+- Hair: Describe color, length, and style separately - not temporary styling (no "windblown", "messy from wind", "wet")
+- Eyes: Describe color and shape - not expression (no "squinting", "wide-eyed")
 
 {LANGUAGE_INSTRUCTION}
 
-IMPORTANT: For fields marked "MUST be one of:", use the EXACT English values listed (these are system identifiers).
+For fields marked "MUST be one of:", use the exact English values listed (these are system identifiers).
 Only use local language for free-text fields: "face" and "distinctive markings".
 
-Return a JSON object with this EXACT structure:
+Return a JSON object with this exact structure:
 
 {
   "traits": {
@@ -25,7 +25,7 @@ Return a JSON object with this EXACT structure:
     "skinTone": "<MUST be one of: porcelain | fair | light | medium | olive | tan | caramel | brown | dark brown | deep>",
     "skinUndertone": "<MUST be one of: warm | cool | neutral>",
     "skinToneHex": "<skin tone as HEX code, e.g. '#E8BEAC'>",
-    "face": "<PERMANENT anatomical facial features as a short comma-separated list. Use ONLY anatomical descriptors: jawline (sharp/angular/soft/rounded/square), chin (prominent/recessed/neutral/dimpled/pointed), nose (straight/aquiline/concave/curved bridge; pointed/bulbous/upturned/rounded tip), cheekbones (high/medium/low), lip fullness (thin/medium/full). Example: 'square jawline, prominent chin, aquiline nose with rounded tip, high cheekbones, full lips'. STRICTLY FORBIDDEN words and phrases: 'typical of', 'young', 'old', 'child', 'baby', 'baby-faced', 'youthful', 'mature', 'weathered', 'soft features typical', 'developing', 'adolescent', 'juvenile', 'aged', 'wrinkled', 'fresh-faced'. NO age cues whatsoever — only geometry. NO expressions.>",
+    "face": "<PERMANENT anatomical facial features as a short comma-separated list. Use only anatomical descriptors: jawline (sharp/angular/soft/rounded/square), chin (prominent/recessed/neutral/dimpled/pointed), nose (straight/aquiline/concave/curved bridge; pointed/bulbous/upturned/rounded tip), cheekbones (high/medium/low), lip fullness (thin/medium/full). Example: 'square jawline, prominent chin, aquiline nose with rounded tip, high cheekbones, full lips'. Forbidden words and phrases: 'typical of', 'young', 'old', 'child', 'baby', 'baby-faced', 'youthful', 'mature', 'weathered', 'soft features typical', 'developing', 'adolescent', 'juvenile', 'aged', 'wrinkled', 'fresh-faced'. No age cues whatsoever — only geometry. No expressions.>",
     "eyeColor": "<eye color (e.g. blue, brown, green, hazel, gray)>",
     "hairColor": "<MUST be one of: black | dark brown | brown | light brown | chestnut | auburn | red | strawberry blonde | dark blonde | blonde | light blonde | platinum blonde | gray | silver | white | salt and pepper>",
     "glasses": "<describe glasses if worn: frame shape, color, style (e.g. 'round black-framed glasses', 'rectangular silver wireframe glasses'). Use 'none' if no glasses visible>",

@@ -59,7 +59,6 @@ Image shows: Character with arms behind back
   "description": "hands not visible - arms behind back"
 }
 
-IMPORTANT:
 - Be precise with bounding boxes - they will be used for targeted inpainting
 - Include a small margin around the element (5-10% padding)
 - If element is partially occluded but mostly visible, still return found: true
