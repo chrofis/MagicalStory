@@ -167,20 +167,31 @@ async function main() {
   console.log(`  Backend:  ${apiBase}`);
   console.log('═══════════════════════════════════════════════════════════');
 
-  // Sanity-check that the family's photos exist on disk — Playwright (run below)
-  // will upload them via the real wizard UI, which is what triggers automatic
-  // avatar generation on the client side.
-  verifyPhotosOnDisk(family);
-
-  const email = showcaseEmail(family);
-  if (email.length > 30) {
-    throw new Error(`Generated email exceeds 30-char auth cap: ${email} (${email.length} chars)`);
+  // --reuse-email <existing-email>: skip provisioning + character upload. Use
+  // when re-running a showcase to validate a downstream wizard fix without
+  // burning another fresh account (each new account costs credits + 30 sec of
+  // photo provisioning). The spec gets DEMO_REUSE_ACCOUNT=1 and skips the
+  // createFamilyViaWizard step (chars already exist on the account).
+  const reuseEmail = args['reuse-email'] || process.env.DEMO_REUSE_EMAIL || null;
+  let email;
+  if (reuseEmail) {
+    email = String(reuseEmail).trim();
+    console.log(`\n── Reusing existing account ──────────────────────────────`);
+    console.log(`  Email:    ${email}`);
+    console.log(`  Password: ${DEMO_PASSWORD}  (default; assumes account was provisioned via showcase)`);
+    console.log(`  Skipping: photo upload + character creation (account already has the family).`);
+  } else {
+    // Fresh-account path: check photos exist, generate email, provision.
+    verifyPhotosOnDisk(family);
+    email = showcaseEmail(family);
+    if (email.length > 30) {
+      throw new Error(`Generated email exceeds 30-char auth cap: ${email} (${email.length} chars)`);
+    }
+    await provisionAccount(apiBase, email, family);
+    console.log('\n── Account ready ──────────────────────────────────────────');
+    console.log(`  Email:    ${email}`);
+    console.log(`  Password: ${DEMO_PASSWORD}`);
   }
-  await provisionAccount(apiBase, email, family);
-
-  console.log('\n── Account ready ──────────────────────────────────────────');
-  console.log(`  Email:    ${email}`);
-  console.log(`  Password: ${DEMO_PASSWORD}`);
 
   if (args['upload-only']) {
     console.log('\n--upload-only flag set — skipping Playwright. Done.');
@@ -193,6 +204,7 @@ async function main() {
     DEMO_EMAIL: email,
     DEMO_PASSWORD,
     DEMO_ENTRY_INDEX: String(entry.index),
+    ...(reuseEmail ? { DEMO_REUSE_ACCOUNT: '1' } : {}),
   };
   const headed = process.env.HEADED === '1' || args.headed === 'true';
   const playwrightArgs = ['playwright', 'test', 'tests/demo-story.spec.ts', '--project=demo-story', '--workers=1'];

@@ -882,7 +882,16 @@ test.describe('Demo Story Generation', () => {
     //            traits, characteristics, relationships, save — exactly like a real user.
     //            showcase.js only registered + logged in the account; everything
     //            beyond that is pure UI clicking.
-    await createFamilyViaWizard(page, family);
+    //
+    // DEMO_REUSE_ACCOUNT=1 (set by `--reuse-email` orchestrator flag) means the
+    // account already has the family — skip char creation to avoid duplicates.
+    // Used when re-running the showcase to validate a downstream wizard fix
+    // without burning another fresh account.
+    if (process.env.DEMO_REUSE_ACCOUNT === '1') {
+      console.log('  DEMO_REUSE_ACCOUNT=1 — skipping character creation; assuming family already exists on account');
+    } else {
+      await createFamilyViaWizard(page, family);
+    }
 
     // ── Step 0c: Navigate to a fresh story (lang param keeps language sticky) ──
     console.log('Step 0c: Starting new story...');
@@ -1007,15 +1016,52 @@ test.describe('Demo Story Generation', () => {
       } catch { /* genuinely missing */ }
       return false;
     }
-    // Check if Step 5 content is already showing — if so, the wizard
-    // auto-advanced past Step 4 with a default style, which means our chosen
-    // style was NOT applied. That's the bug we are now failing loudly on:
-    // showcase entry says "comic" but the story silently renders watercolor.
+    // Check if the wizard is currently on Step 5 (Übersicht) — meaning Step 4
+    // (Stil) was auto-advanced past with whatever default style was preselected
+    // (server-side or localStorage). Use the progress bar — the bottom-of-page
+    // "USE_THIS" button is timing-dependent (ideas can take seconds to load and
+    // we'd false-negative). The progress bar always reflects the current step
+    // by which step-number button has the "active" indicator.
     async function isAlreadyOnStep5(): Promise<boolean> {
-      const ideaOpt = page.locator('button').filter({ hasText: USE_THIS_RE }).first();
-      return await ideaOpt.isVisible({ timeout: 1000 }).catch(() => false);
+      // Step 5's heading is "Geschichte erstellen" (DE) / "Create story" (EN/FR)
+      // — distinctive to Step 5 (Step 4 is "Kunststil wählen" / "Choose art style").
+      const step5Heading = page.locator('h1, h2').filter({ hasText: /Geschichte erstellen|Create story|Cr[ée]er.*histoire/i }).first();
+      return await step5Heading.isVisible({ timeout: 1000 }).catch(() => false);
     }
-    const styleClicked = await findAndClickArtStyle();
+    // Click the Step 4 button in the top progress bar — used when the wizard
+    // auto-advanced past Step 4 and we need to go back to pick a style.
+    async function navigateBackToStep4(): Promise<boolean> {
+      // The progress bar renders each step as a numbered button. Find the one
+      // with exact text "4". role=button + name=/^4$/ avoids matching "4 Stil"
+      // labels rendered as separate spans.
+      const step4Btn = page.getByRole('button', { name: /^4$/ }).first();
+      try {
+        await step4Btn.waitFor({ state: 'visible', timeout: 2000 });
+        await step4Btn.click({ timeout: 2000 });
+        await page.waitForTimeout(800);
+        // Confirm we're on Step 4 — heading should change.
+        const step4Heading = page.locator('h1, h2').filter({ hasText: /Kunststil|Art Style|Style.*artistique/i }).first();
+        const ok = await step4Heading.isVisible({ timeout: 3000 }).catch(() => false);
+        return ok;
+      } catch {
+        return false;
+      }
+    }
+    let styleClicked = await findAndClickArtStyle();
+    if (!styleClicked && await isAlreadyOnStep5()) {
+      // Wizard auto-advanced past Step 4. Click the Step 4 button in the nav
+      // bar to go back and try again. Real wizard UX bug (task #75) — users
+      // can't easily change art style either — but for showcase we route around
+      // it by navigating back explicitly.
+      console.log(`  Wizard auto-advanced to Step 5 with default style. Navigating back to Step 4...`);
+      const backOk = await navigateBackToStep4();
+      if (backOk) {
+        console.log('  Back on Step 4. Re-trying art-style click...');
+        styleClicked = await findAndClickArtStyle();
+      } else {
+        console.log('  Failed to navigate back to Step 4 (button not clickable).');
+      }
+    }
     if (styleClicked) {
       await page.waitForTimeout(1000);
       const nextBtnAfterArt = page.getByRole('button', { name: NEXT_BTN_RE }).first();
@@ -1028,20 +1074,18 @@ test.describe('Demo Story Generation', () => {
     } else {
       // Style label genuinely absent. Two scenarios:
       // (a) Step 5 is already showing because the wizard auto-advanced with a
-      //     DEFAULT style — this is a real failure for the showcase (our chosen
-      //     style was not applied).
+      //     DEFAULT style AND nav-back to Step 4 also failed — total spec fail.
       // (b) The label is missing because the wizard UI changed and the locator
-      //     no longer finds the style button.
+      //     no longer finds the style button — also fail.
       // BOTH cases mean the requested art style is not being applied — throw
       // hard so the showcase fails visibly instead of silently rendering in
-      // the default style. Take a debug screenshot first so the failure is
-      // diagnosable.
+      // the default style.
       const shotPath = `test-results/debug-art-style-not-found-${artStyleLabel}-${Date.now()}.png`;
       await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
       const onStep5 = await isAlreadyOnStep5();
       throw new Error(
         `Art style "${artStyleLabel}" not selectable (entry requested ${entry.artStyle}). ` +
-        `${onStep5 ? 'Wizard auto-advanced to Step 5 with the default style — chosen style NOT applied.' : 'Step 4 still showing but style button not found anywhere on the page — locator may need updating.'} ` +
+        `${onStep5 ? 'Wizard auto-advanced to Step 5 AND nav-back-to-Step-4 failed.' : 'Step 4 showing but style button not found anywhere on the page — locator may need updating.'} ` +
         `Screenshot: ${shotPath}`
       );
     }
