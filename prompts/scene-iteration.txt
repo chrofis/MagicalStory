@@ -94,6 +94,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 
 ```
 {
+  "sceneIntent": "One short sentence (under 25 words) naming WHAT THE IMAGE SHOWS — the central action + main characters + setting. Example: 'CharacterA reaches up toward the glowing clock tower while CharacterB watches from a few paces back in the snowy plaza.' This goes at the very top of the rendered image prompt as the **THIS IMAGE DEPICTS:** anchor — the image model weights it heavily.",
   "diagnosis": ["Evaluator: extra soldier in upper-right. Cause: prose said 'soldiers approach' without count — model invented one."],
   "previewMismatches": ["Intent: hero faces target. Preview: hero faced away."],
   "issues": ["short bullets describing problems found"],
