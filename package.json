@@ -33,6 +33,8 @@
     "test:demo": "npx playwright test tests/demo-story.spec.ts --project=demo-story --workers=1",
     "test:demo:local": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/demo-story.spec.ts --project=demo-story --workers=1",
     "test:demo:headed": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/demo-story.spec.ts --project=demo-story --workers=1 --headed",
+    "test:trial": "npx playwright test tests/trial-to-full.spec.ts --project=trial-flow --workers=1 --reporter=line",
+    "test:trial:headed": "npx playwright test tests/trial-to-full.spec.ts --project=trial-flow --workers=1 --reporter=line --headed",
     "showcase": "node scripts/admin/showcase.js",
     "showcase:local": "cross-env TEST_BASE_URL=http://localhost:5173 node scripts/admin/showcase.js",
     "build:emails": "tsx scripts/build-emails.ts",

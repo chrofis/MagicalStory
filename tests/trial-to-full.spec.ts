@@ -18,11 +18,28 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
  * to prove the account is authenticated and fully-provisioned.
  */
 
-const TEST_PHOTO = 'C:/Users/roger/OneDrive/Pictures/For automatic testing/Roger.jpg';
+// Rotate inputs so each run exercises a slightly different path. The single
+// run-seed below makes outputs reproducible if a failure needs to be replayed
+// (`E2E_SEED=<n>` env var pins it). Without a pinned seed, every run picks
+// fresh photo + name + age + category.
+const RUN_SEED = process.env.E2E_SEED ? Number(process.env.E2E_SEED) : Date.now();
+function seededPick<T>(arr: readonly T[], offset: number): T {
+  return arr[(RUN_SEED + offset) % arr.length];
+}
+
+const PHOTO_DIR = 'C:/Users/roger/OneDrive/Pictures/For automatic testing';
+const PHOTOS = ['Roger.jpg', 'Franziska.jpg', 'Lukas.jpg', 'Manuel.jpg', 'Sophie.JPG'] as const;
+const NAMES = ['Testkid', 'Mia', 'Felix', 'Lina', 'Jonas', 'Sara'] as const;
+const AGES = ['4', '5', '6', '7', '8'] as const;
+// 0 = first category card, 1 = second. Adventure (0) is usually safest; rotate
+// occasionally to also exercise alternate flows when this test runs in CI.
+const CATEGORY_INDEXES = [0, 0, 0, 1] as const;
+
+const TEST_PHOTO = `${PHOTO_DIR}/${seededPick(PHOTOS, 0)}`;
 const TEST_EMAIL_BASE = process.env.E2E_EMAIL_BASE || 'rogerfischer+e2e';
-const STORY_TOPIC = 'abenteuer am bach mit meinem hund';
-const CHAR_NAME = 'Testkid';
-const CHAR_AGE = '5';
+const CHAR_NAME = seededPick(NAMES, 1);
+const CHAR_AGE = seededPick(AGES, 2);
+const CATEGORY_INDEX = seededPick(CATEGORY_INDEXES, 3);
 
 const TRIAL_GEN_TIMEOUT_MS = 25 * 60 * 1000; // 25 min safety ceiling
 const WIZARD_STEP_TIMEOUT = 60 * 1000;
@@ -118,8 +135,12 @@ test.describe('Trial → full-account end-to-end', () => {
 
   test('creates trial, claims via email DB-flip, lands in full wizard', async ({ page, context }) => {
     const testEmail = makeTestEmail();
+    console.log(`▶️  Run seed: ${RUN_SEED} (pin with E2E_SEED=${RUN_SEED} to replay)`);
     console.log(`▶️  Test email: ${testEmail}`);
-    console.log(`▶️  Base URL: ${process.env.TEST_BASE_URL || 'https://magicalstory.ch'}`);
+    console.log(`▶️  Photo:      ${TEST_PHOTO}`);
+    console.log(`▶️  Character:  ${CHAR_NAME}, age ${CHAR_AGE}`);
+    console.log(`▶️  Category:   index ${CATEGORY_INDEX}`);
+    console.log(`▶️  Base URL:   ${process.env.TEST_BASE_URL || 'https://magicalstory.ch'}`);
 
     // Surface console errors from the page so we see what breaks
     page.on('pageerror', (err) => console.error('❌ [PAGE ERROR]', err.message));
@@ -235,8 +256,9 @@ test.describe('Trial → full-account end-to-end', () => {
     await expect(categoryCards.first()).toBeVisible({ timeout: 30000 });
     const categoryCount = await categoryCards.count();
     console.log(`   Found ${categoryCount} category cards`);
-    await categoryCards.first().click();
-    console.log('✅ [P2a] Category picked (first)');
+    const pickedIdx = Math.min(CATEGORY_INDEX, categoryCount - 1);
+    await categoryCards.nth(pickedIdx).click();
+    console.log(`✅ [P2a] Category picked (index ${pickedIdx})`);
 
     // Step 2b: pick a theme (second screen after adventure category).
     // Adventure theme buttons are `button.p-2.5.rounded-lg.border.border-gray-200`.
