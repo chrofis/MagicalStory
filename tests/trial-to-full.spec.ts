@@ -167,14 +167,22 @@ test.describe('Trial → full-account end-to-end', () => {
 
     // ─── Intro screen ───────────────────────────────────────────────────
     // The trial flow now opens with a pre-wizard intro (TrialWizard.tsx:460,
-    // showIntro state). Single CTA button "Los geht's" / "Let's start" /
-    // "Allons-y" flips state to false and reveals the character step.
-    const introCta = page.getByRole('button', {
-      name: /los geht|let'?s start|allons|cominciamo|iniziamo/i,
-    }).first();
-    if (await introCta.isVisible({ timeout: 5000 }).catch(() => false)) {
+    // showIntro state). We anchor on the title text in any supported locale,
+    // then click the single indigo CTA inside the intro container. If the
+    // intro is ever skipped (returning user, A/B test), the waitFor times
+    // out fast and the rest of the test runs unchanged.
+    try {
+      const introTitle = page.getByText(
+        /create your free story|erstelle deine gratis|cr[ée]ez votre histoire|crea la tua/i
+      ).first();
+      await introTitle.waitFor({ state: 'visible', timeout: 10000 });
+      const introCta = page.locator('button.bg-indigo-500').first();
+      await introCta.waitFor({ state: 'visible', timeout: 5000 });
+      await introCta.scrollIntoViewIfNeeded();
       await introCta.click();
       console.log('✅ [P1] Intro screen dismissed');
+    } catch {
+      console.log('   No intro screen (skipped or A/B variant)');
     }
 
     // Accept the two consent checkboxes. Each row is a
