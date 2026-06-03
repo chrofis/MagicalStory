@@ -430,14 +430,20 @@ router.post('/', authenticateToken, async (req, res) => {
     console.log(`[Characters] POST - Saving ${characters?.length || 0} characters for user.id: ${req.user.id}`);
 
     // IMPORTANT: Strip avatar data from frontend input - avatars are backend-only
-    // This prevents the frontend from accidentally overwriting avatar data
-    const charactersWithoutAvatars = (characters || []).map(char => {
+    // This prevents the frontend from accidentally overwriting avatar data.
+    // Also strip EXIF (GPS, camera model) from any photos the client just
+    // uploaded — see server/lib/imageMetadata.js for the rationale.
+    const { stripExifFromPhotos } = require('../lib/imageMetadata');
+    const charactersWithoutAvatars = await Promise.all((characters || []).map(async char => {
       const { avatars, ...charWithoutAvatars } = char;
       if (avatars) {
         console.log(`[Characters] POST - Stripping frontend avatars for ${char.name}`);
       }
+      if (charWithoutAvatars.photos) {
+        charWithoutAvatars.photos = await stripExifFromPhotos(charWithoutAvatars.photos);
+      }
       return charWithoutAvatars;
-    });
+    }));
 
     if (isDatabaseMode()) {
       // Use UPSERT to atomically update or insert character data

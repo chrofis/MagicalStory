@@ -828,6 +828,16 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
       [userId, `anon_${userId}`, `anon_${userId}@anonymous`, hashedPassword]
     );
 
+    // Strip EXIF (GPS, camera model, timestamps) from user-uploaded photos
+    // before they're persisted to the DB. The raw client upload carries
+    // metadata that would deanonymize the child if the DB were ever leaked.
+    const { stripExif } = require('../lib/imageMetadata');
+    const [strippedFace, strippedBody, strippedBodyNoBg] = await Promise.all([
+      stripExif(facePhoto),
+      bodyPhoto ? stripExif(bodyPhoto) : Promise.resolve(null),
+      bodyNoBgPhoto ? stripExif(bodyNoBgPhoto) : Promise.resolve(null),
+    ]);
+
     const characterData = {
       name: safeName,
       age: age || '',
@@ -835,9 +845,9 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
       traits: traits || [],
       customTraits: customTraits || '',
       photos: {
-        face: facePhoto,
-        body: bodyPhoto || null,
-        bodyNoBg: bodyNoBgPhoto || null,
+        face: strippedFace,
+        body: strippedBody,
+        bodyNoBg: strippedBodyNoBg,
         faceBox: faceBox || null,
       },
     };
@@ -2047,8 +2057,15 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     // Lazy require the styled avatar module
     const { runInCacheScope, prepareStyledAvatars, clearStyledAvatarCache, exportStyledAvatarsForPersistence, _styledAvatarCacheForTrial } = require('../lib/styledAvatars');
 
-    // Run avatar styling inside a cache scope to prevent cross-user collisions
-    await runInCacheScope(`title-${userId}`, async () => {
+    // Run avatar styling inside the trial user's cache scope. Same scope key
+    // the trial story job uses (see processStoryJob → `trial-${userId}`) so:
+    //   1. The job's avatar cache hits the pre-warmed entries here (perf win:
+    //      avoids regenerating the same 2×4 sheet during the job).
+    //   2. The avatar-log entries we push here flow through to the job's
+    //      finalize-time `getStyledAvatarGenerationLog()` capture.
+    // Trial is 1-per-user enforced, so the userId-keyed scope is unique to
+    // this trial run end-to-end.
+    await runInCacheScope(`trial-${userId}`, async () => {
       // Pre-populate the cache with the preview avatar at the 'standard'
       // key so applyStyledAvatars finds it on standard-clothing pages
       // without us having to generate a separate 2×4 sheet for standard.
