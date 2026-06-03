@@ -165,6 +165,18 @@ test.describe('Trial → full-account end-to-end', () => {
     await expect(page).toHaveURL(/\/try/);
     console.log('✅ [P1] /try loaded');
 
+    // ─── Intro screen ───────────────────────────────────────────────────
+    // The trial flow now opens with a pre-wizard intro (TrialWizard.tsx:460,
+    // showIntro state). Single CTA button "Los geht's" / "Let's start" /
+    // "Allons-y" flips state to false and reveals the character step.
+    const introCta = page.getByRole('button', {
+      name: /los geht|let'?s start|allons|cominciamo|iniziamo/i,
+    }).first();
+    if (await introCta.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await introCta.click();
+      console.log('✅ [P1] Intro screen dismissed');
+    }
+
     // Accept the two consent checkboxes. Each row is a
     // `div.flex.items-start.gap-3.cursor-pointer.group` containing an SVG
     // checkbox as its first child. The 2nd row has nested <a> links (Terms,
