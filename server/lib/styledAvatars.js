@@ -149,10 +149,14 @@ function getCacheScope() {
 // Value: Promise that resolves to the styled avatar
 const conversionInProgress = new Map();
 
-// Generation log for developer mode auditing
-// Tracks all avatar conversions with inputs, prompts, outputs, timing
-let styledAvatarGenerationLog = [];
+// Generation log for developer mode auditing, scoped per cache scope (= per
+// story job, via AsyncLocalStorage). Was previously a single module-level
+// array, which caused cross-story bleed on trial pipelines (the global never
+// cleared between users, so a trial story baked in 5 stale avatar entries
+// from a previous story's user). Key: scope from cacheContext.getStore().
+const styledAvatarGenerationLogs = new Map();
 const MAX_GENERATION_LOG_ENTRIES = 50;
+const _STYLED_LOG_UNSCOPED = '__unscoped__';
 
 /**
  * Create a short identifier for an image (first 8 chars of base64 data after header)
@@ -371,9 +375,17 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       output: { sizeKB: getImageSizeKB(downsizedSheet), imageData: downsizedSheet },
       ...(passed ? {} : { warning: `face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10` }),
     };
-    styledAvatarGenerationLog.push(logEntry);
-    if (styledAvatarGenerationLog.length > MAX_GENERATION_LOG_ENTRIES) {
-      styledAvatarGenerationLog = styledAvatarGenerationLog.slice(-MAX_GENERATION_LOG_ENTRIES);
+    {
+      const scope = cacheContext.getStore() || _STYLED_LOG_UNSCOPED;
+      let bucket = styledAvatarGenerationLogs.get(scope);
+      if (!bucket) { bucket = []; styledAvatarGenerationLogs.set(scope, bucket); }
+      bucket.push(logEntry);
+      if (bucket.length > MAX_GENERATION_LOG_ENTRIES) {
+        bucket.splice(0, bucket.length - MAX_GENERATION_LOG_ENTRIES);
+      }
+      if (scope === _STYLED_LOG_UNSCOPED) {
+        log.warn(`⚠️ [STYLED-AVATAR LOG] Entry pushed outside cache scope — entry will be invisible to dev panels (code path escaped runInCacheScope)`);
+      }
     }
 
     if (passed) {
@@ -890,6 +902,15 @@ function hasStyledAvatar(characterName, clothingCategory, artStyle) {
  * @param {string} imageData - Base64 image data
  */
 function setStyledAvatar(characterName, clothingCategory, artStyle, imageData) {
+  // Refuse to write when called outside a runInCacheScope wrapper. The cache
+  // key prefix would be empty, so the entry would live in a shared bucket
+  // visible to every other unscoped caller — same cross-story bleed class as
+  // the avatar-log bug. Loud failure is better than silent collision; downstream
+  // hits the existing bucket-substitution fallback in getStyledAvatar.
+  if (getCacheScope() === '') {
+    log.error(`❌ [STYLED-AVATAR] setStyledAvatar called outside cache scope for "${characterName}/${clothingCategory}/${artStyle}" — REFUSED to write (would collide with other unscoped callers). Wrap the caller in runInCacheScope.`);
+    return;
+  }
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
   styledAvatarCache.set(cacheKey, imageData);
   log.debug(`📥 [STYLED AVATARS] Added to cache: ${cacheKey}`);
@@ -1355,17 +1376,23 @@ function exportStyledAvatarsForPersistence(characters, artStyle) {
  * @returns {Array} Array of generation log entries
  */
 function getStyledAvatarGenerationLog() {
-  return [...styledAvatarGenerationLog];
+  const scope = cacheContext.getStore();
+  if (!scope) return [];
+  const bucket = styledAvatarGenerationLogs.get(scope);
+  return bucket ? [...bucket] : [];
 }
 
 /**
- * Clear the styled avatar generation log
- * Call this at the start of a new story generation
+ * Clear the styled avatar generation log for the current scope only.
+ * Call after capturing the log into the saved story result to free memory.
+ * Scope-aware: deletes only this job's bucket, never another user's.
  */
 function clearStyledAvatarGenerationLog() {
-  const count = styledAvatarGenerationLog.length;
-  styledAvatarGenerationLog = [];
-  log.debug(`🗑️ [STYLED AVATARS] Generation log cleared (${count} entries)`);
+  const scope = cacheContext.getStore();
+  if (!scope) return;
+  const count = styledAvatarGenerationLogs.get(scope)?.length || 0;
+  styledAvatarGenerationLogs.delete(scope);
+  log.debug(`🗑️ [STYLED AVATARS] Generation log cleared (${count} entries) for scope ${scope}`);
 }
 
 /**
@@ -1410,6 +1437,11 @@ module.exports = {
 
   // Trial-only escape hatch (see docs/decisions.md)
   _seedStandardFromPreview,
+
+  // Internal: AsyncLocalStorage used by avatars.js to scope its own per-story
+  // generation log to the same scope as styled avatars (DRY — one source of
+  // scope identity for the whole avatar pipeline).
+  _cacheContext: cacheContext,
 
   // Utility
   getAvatarCacheKey,

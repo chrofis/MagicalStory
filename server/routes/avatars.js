@@ -98,16 +98,31 @@ function loadStyleSampleImage(artStyle) {
 // COSTUMED AVATAR GENERATION LOG (for developer mode auditing)
 // ============================================================================
 
-// Generation log for developer mode auditing
-// Tracks all costumed avatar generations with inputs, prompts, outputs, timing
-// Capped at 50 entries to prevent unbounded memory growth
-let costumedAvatarGenerationLog = [];
+// Generation log for developer mode auditing, scoped per cache scope (= per
+// story job, via the AsyncLocalStorage in styledAvatars.js). Was previously
+// a single module-level array — same cross-story bleed bug as the styled
+// avatar log. Key: scope from styledAvatars._cacheContext.getStore().
+const costumedAvatarGenerationLogs = new Map();
 const MAX_GENERATION_LOG_ENTRIES = 50;
+const _COSTUMED_LOG_UNSCOPED = '__unscoped__';
+
+function _getCurrentCostumedScope() {
+  // Lazy require — styledAvatars.js is loaded later in the require graph in
+  // some boot orders; deferring avoids a circular-require edge case.
+  const { _cacheContext } = require('../lib/styledAvatars');
+  return _cacheContext.getStore() || _COSTUMED_LOG_UNSCOPED;
+}
 
 function pushGenerationLog(entry) {
-  costumedAvatarGenerationLog.push(entry);
-  if (costumedAvatarGenerationLog.length > MAX_GENERATION_LOG_ENTRIES) {
-    costumedAvatarGenerationLog = costumedAvatarGenerationLog.slice(-MAX_GENERATION_LOG_ENTRIES);
+  const scope = _getCurrentCostumedScope();
+  let bucket = costumedAvatarGenerationLogs.get(scope);
+  if (!bucket) { bucket = []; costumedAvatarGenerationLogs.set(scope, bucket); }
+  bucket.push(entry);
+  if (bucket.length > MAX_GENERATION_LOG_ENTRIES) {
+    bucket.splice(0, bucket.length - MAX_GENERATION_LOG_ENTRIES);
+  }
+  if (scope === _COSTUMED_LOG_UNSCOPED) {
+    log.warn(`⚠️ [COSTUMED-AVATAR LOG] Entry pushed outside cache scope — invisible to dev panels`);
   }
 }
 
@@ -213,19 +228,28 @@ async function splitGridAndExtractFace(imageData) {
 }
 
 /**
- * Get the costumed avatar generation log for developer mode auditing
+ * Get the costumed avatar generation log for the current cache scope only.
+ * Returns [] when called outside a runInCacheScope wrapper.
  */
 function getCostumedAvatarGenerationLog() {
-  return [...costumedAvatarGenerationLog];
+  const { _cacheContext } = require('../lib/styledAvatars');
+  const scope = _cacheContext.getStore();
+  if (!scope) return [];
+  const bucket = costumedAvatarGenerationLogs.get(scope);
+  return bucket ? [...bucket] : [];
 }
 
 /**
- * Clear the costumed avatar generation log
+ * Clear the costumed avatar log for the current scope only.
+ * Call after capturing into saved story result to free memory.
  */
 function clearCostumedAvatarGenerationLog() {
-  const count = costumedAvatarGenerationLog.length;
-  costumedAvatarGenerationLog = [];
-  log.debug(`🗑️ [COSTUMED AVATARS] Generation log cleared (${count} entries)`);
+  const { _cacheContext } = require('../lib/styledAvatars');
+  const scope = _cacheContext.getStore();
+  if (!scope) return;
+  const count = costumedAvatarGenerationLogs.get(scope)?.length || 0;
+  costumedAvatarGenerationLogs.delete(scope);
+  log.debug(`🗑️ [COSTUMED AVATARS] Generation log cleared (${count} entries) for scope ${scope}`);
 }
 
 // ============================================================================

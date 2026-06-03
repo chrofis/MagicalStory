@@ -276,14 +276,42 @@ class GenerationLogger {
   }
 }
 
-// Module-level current logger so deep helpers (images.js, entityConsistency.js)
-// can call apiUsage without threading genLog through every signature. Single
-// global is fine for now — concurrent stories on one node mix metrics, but
-// model+function tagging keeps the breakdown usable. Move to AsyncLocalStorage
-// if that ever becomes a real problem.
-let _currentLogger = null;
-function setCurrentLogger(logger) { _currentLogger = logger; }
-function clearCurrentLogger() { _currentLogger = null; }
-function getCurrentLogger() { return _currentLogger; }
+// Per-scope logger registry so deep helpers (images.js, entityConsistency.js)
+// can call apiUsage without threading genLog through every signature, AND
+// concurrent stories on one node don't attribute each other's API usage.
+// Keyed by the same cache scope styled-avatar buckets use (AsyncLocalStorage
+// from styledAvatars._cacheContext, normally `${jobId}` or `trial-${userId}`).
+// `_legacyLogger` is the out-of-scope fallback for one-off admin tools or
+// any other call path that doesn't run inside a runInCacheScope wrapper.
+const _loggers = new Map(); // scope → GenerationLogger
+let _legacyLogger = null;
+
+function _getScope() {
+  // Lazy-require to dodge the styledAvatars ⇄ images.js boot order edge case
+  // (images.js requires generationLogger; styledAvatars requires images).
+  try {
+    const { _cacheContext } = require('./styledAvatars');
+    return _cacheContext.getStore() || null;
+  } catch { return null; }
+}
+
+function setCurrentLogger(logger) {
+  const scope = _getScope();
+  if (scope) _loggers.set(scope, logger);
+  else _legacyLogger = logger;
+}
+function clearCurrentLogger() {
+  const scope = _getScope();
+  if (scope) _loggers.delete(scope);
+  else _legacyLogger = null;
+}
+function getCurrentLogger() {
+  const scope = _getScope();
+  if (scope) {
+    const scoped = _loggers.get(scope);
+    if (scoped) return scoped;
+  }
+  return _legacyLogger;
+}
 
 module.exports = { GenerationLogger, setCurrentLogger, clearCurrentLogger, getCurrentLogger };

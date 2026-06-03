@@ -94,7 +94,7 @@ Return JSON only. Put every issue you find in the `semantic_issues` array. Do no
 - The `score` field must be an integer 0–10 — no decimals, no fractions.
 - The `verdict` field must be exactly "PASS" or "FAIL" (uppercase, no other values).
 - Do not add explanatory text before or after the JSON. Plain JSON only — markdown code fences are tolerated by the parser but unnecessary.
-- `issues_summary` (when present) is a one-line recap of `semantic_issues[]` only. Every concern named in `issues_summary` MUST have a corresponding structured `semantic_issues[]` entry with a severity. The downstream repair pipeline ignores `issues_summary` — only structured entries trigger redos / inpaints. Do not put issues in prose that aren't also in the array.
+- **Do NOT emit `issues_summary`, `notes`, `comments`, or any other prose field.** Every observation — including emotion/tone mismatches, posture mismatches, gaze defects — goes in `semantic_issues[]` as a structured entry with `problem` and `severity`. Prose fields are silently dropped by the downstream repair pipeline; an issue you describe in prose but not in `semantic_issues[]` will never trigger a fix.
 
 ```json
 {
@@ -126,10 +126,8 @@ Return JSON only. Put every issue you find in the `semantic_issues` array. Do no
 }
 ```
 
-**Examples of emotion/tone problems that MUST go into `semantic_issues[]` (not just `issues_summary`):**
-- `"Hans shows a neutral/serious expression; scene expects a smiling expression (STORY_TEXT describes a warm greeting)"` — severity MODERATE
-- `"Sarah is smiling broadly; scene expects alarmed/concerned (STORY_TEXT: she shouts 'NO!' as kids run into danger)"` — severity MODERATE
-- `"Daniel looks bored; scene expects excited (STORY_TEXT: 'he jumped up clapping his hands')"` — severity MODERATE
-- `"Emma's body posture is relaxed; scene expects tense/scared (STORY_TEXT: she presses herself against the wall)"` — severity MODERATE
-
-If you wrote any of those observations in `issues_summary`, the corresponding `semantic_issues[]` entry MUST also be in the JSON array above. The repair pipeline does not parse `issues_summary` prose — only structured entries trigger fixes.
+**Examples of emotion/tone problems — all go into `semantic_issues[]`:**
+- `"CharacterA shows a neutral/serious expression; scene expects a smiling expression (STORY_TEXT describes a warm greeting)"` — severity MODERATE
+- `"CharacterB is smiling broadly; scene expects alarmed/concerned (STORY_TEXT: shouts 'NO!' as kids run into danger)"` — severity MODERATE
+- `"CharacterC looks bored; scene expects excited (STORY_TEXT: 'jumped up clapping hands')"` — severity MODERATE
+- `"CharacterD's body posture is relaxed; scene expects tense/scared (STORY_TEXT: presses herself against the wall)"` — severity MODERATE
