@@ -315,15 +315,26 @@ export default function CityPage() {
               <>
                 {topImages.length > 0 && (
                   <div className="grid grid-cols-2 gap-4 md:gap-6 mb-6">
-                    {topImages.map((g) => (
-                      <img
-                        key={g.src}
-                        src={g.src}
-                        alt={`${cityName} — ${g.landmark}`}
-                        loading="eager"
-                        className="w-full aspect-square object-cover rounded-2xl"
-                      />
-                    ))}
+                    {topImages.map((g) => {
+                      const base = g.src.replace(/\.jpe?g$/i, '');
+                      return (
+                        <picture key={g.src}>
+                          <source
+                            type="image/webp"
+                            srcSet={`${base}-640w.webp 640w, ${base}-1280w.webp 1280w`}
+                            sizes="(min-width: 1024px) 600px, 50vw"
+                          />
+                          <img
+                            src={g.src}
+                            alt={`${cityName} — ${g.landmark}`}
+                            loading="eager"
+                            fetchPriority="high"
+                            decoding="async"
+                            className="w-full aspect-square object-cover rounded-2xl"
+                          />
+                        </picture>
+                      );
+                    })}
                   </div>
                 )}
                 <div className="text-center">
@@ -506,15 +517,25 @@ export default function CityPage() {
           if (bottomImages.length === 0) return null;
           return (
             <div className="grid grid-cols-2 gap-4 md:gap-6 mb-10">
-              {bottomImages.map((g) => (
-                <img
-                  key={g.src}
-                  src={g.src}
-                  alt={`${cityName} — ${g.landmark}`}
-                  loading="lazy"
-                  className="w-full aspect-square object-cover rounded-2xl shadow-sm border border-stone-100"
-                />
-              ))}
+              {bottomImages.map((g) => {
+                const base = g.src.replace(/\.jpe?g$/i, '');
+                return (
+                  <picture key={g.src}>
+                    <source
+                      type="image/webp"
+                      srcSet={`${base}-640w.webp 640w, ${base}-1280w.webp 1280w`}
+                      sizes="(min-width: 1024px) 600px, 50vw"
+                    />
+                    <img
+                      src={g.src}
+                      alt={`${cityName} — ${g.landmark}`}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full aspect-square object-cover rounded-2xl shadow-sm border border-stone-100"
+                    />
+                  </picture>
+                );
+              })}
             </div>
           );
         })()}
