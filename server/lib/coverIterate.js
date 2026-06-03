@@ -608,7 +608,9 @@ async function buildCoverReferences({
         EMPTY_SCENE_DESCRIPTION: emptyDesc,
         CHARACTER_SPACE: '',
         REQUIRED_OBJECTS: '',
-        TEXT_AREA_INSTRUCTION: ''
+        TEXT_AREA_INSTRUCTION: '',
+        ERA_GUARD: '',
+        LANDMARK_FIDELITY: '',
       });
       const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, coverPageNumber, landmarkPhotos);
       const emptyOptions = {

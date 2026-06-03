@@ -8034,6 +8034,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           CHARACTER_SPACE: '',
           TEXT_AREA_INSTRUCTION: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
           ERA_GUARD: buildEraGuard(iterateEra),
+          // Iterate path doesn't have landmark-fidelity context at hand —
+          // empty string strips the placeholder cleanly. (Initial generation
+          // at server.js:4093 builds the proper block when a landmark exists.)
+          LANDMARK_FIDELITY: '',
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;

@@ -1899,25 +1899,8 @@ async function REMOVED_initializeDatabase_DEAD() {
     await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_url VARCHAR(500)`);
     await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMP`);
     await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP`);
-
-    // Stripe webhook retry buffer — captures events whose processing threw
-    // after signature verification, so we can replay them out of band rather
-    // than failing the webhook back to Stripe (which then gives up after 3
-    // retries and the customer is charged with no order created).
-    await dbPool.query(`
-      CREATE TABLE IF NOT EXISTS stripe_webhook_retry (
-        id SERIAL PRIMARY KEY,
-        event_id VARCHAR(255) UNIQUE,
-        event_type VARCHAR(100),
-        payload JSONB NOT NULL,
-        error_message TEXT,
-        error_stack TEXT,
-        retry_count INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        processed_at TIMESTAMP
-      )
-    `);
-    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stripe_webhook_retry_unprocessed ON stripe_webhook_retry(created_at) WHERE processed_at IS NULL`);
+    // (stripe_webhook_retry now lives in migrations/005_stripe_webhook_retry.sql —
+    // the prior inline addition here never ran because this whole function is dead.)
 
     // Credit transactions table for tracking credit history
     await dbPool.query(`
