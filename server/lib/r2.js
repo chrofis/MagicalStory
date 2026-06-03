@@ -246,11 +246,17 @@ async function uploadImage(input, key, contentType = 'image/jpeg') {
   }
   try {
     const client = getClient();
+    // Versioned keys (…/vN.jpg or …-vN.jpg) are immutable by construction — a
+    // new render writes a new URL — so they can be cached forever. Non-versioned
+    // keys overwrite in place, so we leave their Cache-Control unset (the CDN
+    // default short TTL stays, preserving the avatar staleness fix above).
+    const isVersioned = /(?:\/|-)v\d+\.(?:jpg|jpeg|png|webp)$/i.test(key);
     await client.send(new PutObjectCommand({
       Bucket: process.env.R2_BUCKET,
       Key: key,
       Body: buf,
       ContentType: contentType,
+      ...(isVersioned ? { CacheControl: 'public, max-age=31536000, immutable' } : {}),
     }));
     return publicUrlForKey(key);
   } catch (err) {

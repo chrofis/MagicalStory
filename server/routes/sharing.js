@@ -864,7 +864,10 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
     // first cover fetch). Add the specific cover URL preload only for
     // public stories.
     const r2Origin = coverUrl ? new URL(coverUrl).origin : 'https://images.magicalstory.ch';
-    let perfHints = `<link rel="preconnect" href="${r2Origin}" crossorigin>`;
+    // No crossorigin: the cover <img> and its preload below load the R2 image
+    // without CORS, so a crossorigin preconnect opens a separate (unused)
+    // connection pool. Matching them lets the browser reuse the warmed socket.
+    let perfHints = `<link rel="preconnect" href="${r2Origin}">`;
     if (coverUrl) {
       perfHints += `<link rel="preload" as="image" href="${coverUrl}" fetchpriority="high">`;
     }

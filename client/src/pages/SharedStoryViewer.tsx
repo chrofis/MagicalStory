@@ -399,6 +399,8 @@ export default function SharedStoryViewer() {
             alt={header.title || 'Cover'}
             className="max-h-[85vh] max-w-full object-contain rounded shadow-lg"
             draggable={false}
+            fetchPriority="high"
+            decoding="async"
           />
         ) : (
           <div className="text-center text-gray-500">
