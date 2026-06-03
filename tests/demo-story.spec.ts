@@ -286,9 +286,29 @@ async function uploadPhotoInCreateFlow(page: Page, photoPath: string) {
   // what makes the eventual 'Continue to traits' click trigger
   // onSaveAndGenerateAvatar (StoryWizard.tsx:3220 path). If we proceed
   // BEFORE analysis completes, status stays undefined → no avatar trigger
-  // → 'Kein Bild' dead state at the avatar sub-step. Wait up to 90s.
+  // → 'Kein Bild' dead state at the avatar sub-step.
+  //
+  // Edge case: if face detection finds >1 face (real face + a false-positive
+  // in the bokeh, a face on a poster, etc.), the wizard pops the
+  // FaceSelectionModal ("Mehrere Gesichter erkannt") and blocks until the
+  // user clicks one. We always pick face #1 — it's the highest-confidence
+  // detection and matches what a real user would default to. Demo photos
+  // are shot with the subject central, so face #1 is always the character.
+  // Without this, the spec hangs forever waiting on the name input that
+  // never appears (the modal blocks it).
   const nameInput = page.locator('input[placeholder*="Name" i], input[placeholder*="Nom" i]').first();
-  await nameInput.waitFor({ state: 'visible', timeout: 90000 });
+  const selectFaceBtn = page.getByRole('button', { name: /(Gesicht auswählen|Select Face|Sélectionner le visage)\s*1\b/i }).first();
+  const deadline = Date.now() + 90_000;
+  while (Date.now() < deadline) {
+    if (await selectFaceBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+      console.log(`    multiple faces detected — picking face #1`);
+      await selectFaceBtn.click().catch(() => {});
+      // Modal close triggers form advance; loop continues to wait for name input.
+      continue;
+    }
+    if (await nameInput.isVisible({ timeout: 500 }).catch(() => false)) break;
+  }
+  await nameInput.waitFor({ state: 'visible', timeout: 5000 });
   // Small settle so the avatars.status='pending' state-update commits.
   await page.waitForTimeout(500);
 }
