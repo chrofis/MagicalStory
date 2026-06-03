@@ -322,6 +322,9 @@ export default function LandingPage() {
 
   return (
     <div className="bg-stone-50">
+      {/* Preload the hero video poster — it's the LCP element. React 19 hoists this
+          <link> into <head>; the prerender keeps it landing-only (see scripts/prerender.mjs). */}
+      <link rel="preload" as="image" href="/images/video-poster.webp" fetchPriority="high" />
 
       {/* Navigation - Fixed at top */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-stone-50">
