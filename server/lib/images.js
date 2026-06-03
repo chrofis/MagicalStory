@@ -2101,6 +2101,60 @@ function resolveExpectedObjectLabels(entries, visualBible) {
   return out;
 }
 
+// Content-hashed bbox cache. Without this, the eval + entity-consistency
+// passes each detect bboxes for the same regenerated image — burning a
+// Gemini call per redundant pair (~$0.30-0.60/story across a 3-pass repair).
+// Cache key is sha256 of image bytes + expected-character names (since the
+// model uses that list to identify figures; different expectations would
+// yield different `name` fields on figures even on identical pixels).
+// Entries expire after BBOX_CACHE_TTL_MS and an LRU-ish eviction caps memory.
+// (crypto is required at the top of this module — reused here.)
+const _bboxCache = new Map(); // key -> { result, ts }
+const BBOX_CACHE_TTL_MS = 30 * 60 * 1000;
+const BBOX_CACHE_MAX_ENTRIES = 500;
+const _bboxCacheStats = { hits: 0, misses: 0 };
+
+function _hashBboxKey(imageData, expectedCharacters, expectedObjects) {
+  if (!imageData) return null;
+  const b64 = typeof imageData === 'string' && imageData.includes(',')
+    ? imageData.split(',', 2)[1]
+    : imageData;
+  if (typeof b64 !== 'string') return null;
+  const h = crypto.createHash('sha256');
+  h.update(b64);
+  // Names only — descriptions/positions don't affect detection identity.
+  h.update('|chars:' + (expectedCharacters || []).map(c => (c.name || c)).sort().join(','));
+  h.update('|objs:' + (expectedObjects || []).slice().sort().join(','));
+  return h.digest('hex').slice(0, 32);
+}
+
+function _bboxCacheGet(key) {
+  if (!key) return null;
+  const entry = _bboxCache.get(key);
+  if (!entry) { _bboxCacheStats.misses++; return null; }
+  if (Date.now() - entry.ts > BBOX_CACHE_TTL_MS) {
+    _bboxCache.delete(key);
+    _bboxCacheStats.misses++;
+    return null;
+  }
+  _bboxCacheStats.hits++;
+  return entry.result;
+}
+
+function _bboxCacheSet(key, result) {
+  if (!key || !result) return;
+  if (_bboxCache.size >= BBOX_CACHE_MAX_ENTRIES) {
+    // Drop oldest insertion (Map preserves insertion order).
+    const oldest = _bboxCache.keys().next().value;
+    if (oldest) _bboxCache.delete(oldest);
+  }
+  _bboxCache.set(key, { result, ts: Date.now() });
+}
+
+function getBboxCacheStats() {
+  return { ..._bboxCacheStats, size: _bboxCache.size };
+}
+
 /**
  * Detect bounding boxes for a specific issue using Gemini's native detection
  * This is stage 2 of the two-stage detection approach:
@@ -2111,11 +2165,23 @@ function resolveExpectedObjectLabels(entries, visualBible) {
  * @param {Object} options - Detection options
  * @param {Array<{name: string, description: string, position: string}>} options.expectedCharacters - Characters to identify
  * @param {string[]} options.expectedObjects - Objects to check for
+ * @param {boolean} [options.skipCache] - Bypass the bbox cache (force fresh detection)
  * @returns {Promise<{figures: Array, objects: Array, usage: Object}|null>}
  */
 async function detectAllBoundingBoxes(imageData, options = {}) {
-  const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '' } = options;
+  const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '', skipCache = false } = options;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
+
+  // Cache check — content-hashed by image bytes + expected names. Hits skip
+  // the full Gemini round-trip; misses fall through to the API and populate.
+  const cacheKey = _hashBboxKey(imageData, expectedCharacters, expectedObjects);
+  if (!skipCache && cacheKey) {
+    const cached = _bboxCacheGet(cacheKey);
+    if (cached) {
+      log.debug(`♻️ [BBOX-CACHE] ${pageLabel}hit (${cached.figures?.length || 0} figures)`);
+      return cached;
+    }
+  }
 
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -2639,7 +2705,7 @@ Respond with ONLY the JSON.`;
     const foundObjects = finalObjects.filter(o => o.found).map(o => o.name);
     const missingObjects = finalObjects.filter(o => !o.found).map(o => o.name);
 
-    return {
+    const finalResult = {
       figures: finalFigures,
       objects: finalObjects,
       // Include expected inputs for dev mode display
@@ -2654,6 +2720,12 @@ Respond with ONLY the JSON.`;
       rawResponse: responseText,
       refinementResponse
     };
+
+    // Populate the cache so the entity-consistency pass can reuse this on
+    // the same image without re-paying the Gemini call.
+    if (!skipCache) _bboxCacheSet(cacheKey, finalResult);
+
+    return finalResult;
 
   } catch (error) {
     log.error(`❌ [BBOX-DETECT] Error detecting bounding boxes: ${error.message}`);
@@ -3516,6 +3588,11 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         imageData: result.imageData,
         modelId: result.modelId,
         score: qualityResult?.score ?? null,
+        // Distinguish "no opinion" from "eval failed". Null score + evaluated:false
+        // tells findBadPages to redo the page instead of silently shipping it
+        // because the eval call timed out / blew up.
+        evaluated: !!qualityResult,
+        evalError: qualityResult ? null : 'evaluator returned no result',
         reasoning: qualityResult?.reasoning ?? null,
         detectedProblems: qualityResult?.detectedProblems || [],
         figures: qualityResult?.figures || [],
@@ -3626,6 +3703,11 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         imageData: result.imageData,
         modelId: result.modelId,
         score: qualityResult?.score ?? null,
+        // Distinguish "no opinion" from "eval failed". Null score + evaluated:false
+        // tells findBadPages to redo the page instead of silently shipping it
+        // because the eval call timed out / blew up.
+        evaluated: !!qualityResult,
+        evalError: qualityResult ? null : 'evaluator returned no result',
         reasoning: qualityResult?.reasoning ?? null,
         detectedProblems: qualityResult?.detectedProblems || [],
         figures: qualityResult?.figures || [],
@@ -7032,6 +7114,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         roundEvals = [];
       }
 
+      // pageVersions append is intentionally sequential here. Earlier audits
+      // raised a concern about parallel .set() races — that concern was based
+      // on a different code shape. Today each page picks ONE repair method
+      // (executeIterateAction OR executeInpaintAction OR executeCharFixAction)
+      // and returns ONE result. The for-loop reads pageVersions.get(n) — the
+      // returned array reference is mutated by .push() — so no .set() race
+      // is possible and no per-page lock is needed.
       for (const ev of roundEvals) {
         if (ev.usage && usageTracker) {
           usageTracker('gemini_quality', ev.usage, `unified_pipeline_quality_r${round}`, ev.modelId);
@@ -13956,6 +14045,7 @@ module.exports = {
   detectAllBoundingBoxes,
   detectSubRegion,  // Sub-region detection for targeted repairs (shoes, shirt, hands, etc.)
   createBboxOverlayImage,  // Create overlay image with boxes drawn
+  getBboxCacheStats, // Telemetry for the content-hashed bbox cache
   FIGURE_COLORS,  // Color palette for bbox overlay (shared with prompt building)
   callGrokVisionAPI,  // Grok vision API for bbox/quality eval
   GEMINI_SAFETY_SETTINGS,  // Safety settings for Gemini API calls

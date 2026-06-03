@@ -12,6 +12,7 @@
 
 const { REPAIR_DEFAULTS } = require('../config/models');
 const { computeFinalScore, SCORE_THRESHOLDS } = require('./scoring');
+const { log } = require('../utils/logger');
 
 /**
  * Identify pages that need redo. Reads the canonical finalScore via
@@ -32,6 +33,15 @@ function findBadPages(evalPages, options = {}) {
   for (const [pageNumStr, result] of Object.entries(evalPages || {})) {
     const pageNum = parseInt(pageNumStr, 10);
     if (isNaN(pageNum)) continue;
+
+    // Eval failure (timeout, API error, etc.) — treat as bad and redo on the
+    // next pass. Without this, a transient Gemini outage means a broken image
+    // ships as "completed" because score==null skipped the threshold check.
+    if (result?.evaluated === false) {
+      log.warn(`[FIND-BAD] page ${pageNum}: eval failed (${result.evalError || 'unknown'}) — marking bad for redo`);
+      bad.push(pageNum);
+      continue;
+    }
 
     const score = computeFinalScore(result);
     const issueCount = result.fixableIssues?.length ?? 0;

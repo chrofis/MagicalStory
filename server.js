@@ -7122,6 +7122,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.debug(`[SCORE-SUMMARY] skipped: ${err.message}`);
     }
 
+    // Bbox cache hit-rate telemetry — high hit rate means the eval and
+    // entity-consistency passes are reusing the same detection rather than
+    // re-paying Gemini for each.
+    try {
+      const { getBboxCacheStats } = require('./server/lib/images');
+      const s = getBboxCacheStats();
+      const total = s.hits + s.misses;
+      const hitPct = total > 0 ? Math.round((s.hits / total) * 100) : 0;
+      log.info(`[BBOX-CACHE] story ${jobId}: ${s.hits} hits / ${s.misses} misses (${hitPct}%), size=${s.size}`);
+    } catch (err) {
+      log.debug(`[BBOX-CACHE-STATS] skipped: ${err.message}`);
+    }
+
     log.info(`✅ [UNIFIED] Job ${jobId} completed successfully`);
 
     // Send story completion email to customer
@@ -8016,6 +8029,31 @@ initialize().then(() => {
         log.error('[trial-reminders] sweep crashed:', err.message);
       });
     }, 60 * 60 * 1000); // every hour
+
+    // Stripe webhook retry monitor — polls every 5 min for buffered events
+    // that landed during a DB blip / processing throw. Emits an ERROR-level
+    // alert when unprocessed rows exist. Operators inspect + manually
+    // resolve via /api/admin/stripe-webhook-retry (full auto-replay is
+    // tracked as the BullMQ refactor in the long-term plan).
+    const checkStripeRetryBuffer = async () => {
+      try {
+        const result = await dbPool.query(`
+          SELECT COUNT(*)::int AS unprocessed,
+                 MIN(created_at) AS oldest
+          FROM stripe_webhook_retry
+          WHERE processed_at IS NULL
+        `);
+        const { unprocessed, oldest } = result.rows[0] || {};
+        if (unprocessed > 0) {
+          const ageMin = oldest ? Math.round((Date.now() - new Date(oldest).getTime()) / 60000) : 0;
+          log.error(`🚨 [STRIPE-RETRY-MONITOR] ${unprocessed} buffered event(s) need triage — oldest is ${ageMin} min old. Inspect at /api/admin/stripe-webhook-retry`);
+        }
+      } catch (err) {
+        log.warn(`[STRIPE-RETRY-MONITOR] check failed: ${err.message}`);
+      }
+    };
+    setTimeout(checkStripeRetryBuffer, 30 * 1000);          // first check 30s after boot
+    setInterval(checkStripeRetryBuffer, 5 * 60 * 1000);     // then every 5 min
   }
 
   // Configure server timeouts to prevent premature connection closures
