@@ -322,8 +322,11 @@ export default function LandingPage() {
 
   return (
     <div className="bg-stone-50">
-      {/* Preload the hero video poster — it's the LCP element. React 19 hoists this
-          <link> into <head>; the prerender keeps it landing-only (see scripts/prerender.mjs). */}
+      {/* Preload LCP-critical assets. React 19 hoists these <link>s into <head>;
+          the prerender keeps them landing-only (see scripts/prerender.mjs).
+          - Cinzel 400 woff2: the hero <h1> (font-title) is the measured LCP element.
+          - video-poster.webp: the hero video's first paint. */}
+      <link rel="preload" as="font" type="font/woff2" href="/fonts/cinzel-400-latin.woff2" crossOrigin="anonymous" />
       <link rel="preload" as="image" href="/images/video-poster.webp" fetchPriority="high" />
 
       {/* Navigation - Fixed at top */}
