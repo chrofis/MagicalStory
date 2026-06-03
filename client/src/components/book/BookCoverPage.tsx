@@ -5,6 +5,12 @@ interface BookCoverPageProps {
   imageUrl: string;
   alt: string;
   onImageClick?: (url: string) => void;
+  /**
+   * Whether this cover is the LCP element (above-the-fold first paint).
+   * When true, hints the browser to fetch immediately and decode async so
+   * the first paint isn't blocked. Use only for the front cover.
+   */
+  priority?: boolean;
 }
 
 /**
@@ -12,13 +18,14 @@ interface BookCoverPageProps {
  * react-pageflip requires forwardRef — the ref attaches to the outer div.
  */
 const BookCoverPage = React.forwardRef<HTMLDivElement, BookCoverPageProps>(
-  ({ imageUrl, alt, onImageClick }, ref) => (
+  ({ imageUrl, alt, onImageClick, priority }, ref) => (
     <div ref={ref} className="w-full h-full relative bg-white group">
       <img
         src={imageUrl}
         alt={alt}
         className="w-full h-full object-contain"
         draggable={false}
+        {...(priority ? { fetchPriority: 'high' as const, decoding: 'async' as const } : {})}
       />
       {onImageClick && (
         <button

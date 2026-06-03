@@ -259,6 +259,7 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
               imageUrl={coverImageUrl('frontCover')}
               alt={story.title}
               onImageClick={onImageClick}
+              priority
             />
           );
           physicalToLogical.push(i);
