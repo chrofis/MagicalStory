@@ -16,6 +16,17 @@ interface LocalizedString { en: string; de: string; fr: string }
 //
 // Cities without approved illustrations yet (e.g. Zürich) are omitted —
 // the intro text alone is shown, no gallery row.
+//
+// **ADDING A CITY — required perf step.** The render path below wraps each
+// entry in a <picture> with WebP <source> at -640w / -1280w variants. After
+// dropping new .jpg files into client/public/images/cities/{cityId}/, you
+// MUST run:
+//     node scripts/admin/optimize-city-images.js
+// to generate the .webp variants. Without them, modern browsers fall through
+// to the JPG and the page LCP balloons (~3-5× over-sized + non-modern format
+// = ~500 KiB waste; PageSpeed will flag it). The script is idempotent — only
+// processes files that don't already have variants. The .webp files MUST be
+// committed to git alongside the .jpg sources.
 interface CityGalleryItem {
   src: string;
   landmark: string; // caption shown under the image
