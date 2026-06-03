@@ -55,6 +55,7 @@
 
 const { setActiveVersion } = require('../services/database');
 const { arrayToDbIndex } = require('./versionManager');
+const { log } = require('../utils/logger');
 
 // =====================================================================
 // NEW DEDUCTIONS-FIRST MODEL (May 2026 redesign)
@@ -165,7 +166,37 @@ function applyScore(version, { evalResult = null, entityResult = null, promptFin
   version.promptFinalScore = (typeof promptFinalScore === 'number') ? promptFinalScore : null;
   version.finalScore = finalScore;
   version.scoreModel = scoreModel; // remember which model produced finalScore
+
+  // Info-level visibility for threshold calibration. Without this, prod logs
+  // show "page X scored Y" with no indication whether Y came from the
+  // consolidator (lenient) or the math fallback (conservative) — meaning the
+  // 60-threshold can't be tuned from logs alone.
+  const pn = version.pageNumber != null ? `page ${version.pageNumber}` : 'version';
+  log.info(`[SCORE] ${pn}: ${scoreModel} model → finalScore=${finalScore} (math=${mathFinalScore}, prompt=${promptFinalScore})`);
+
   return version;
+}
+
+/**
+ * Emit a per-story summary of which scoreModel produced each version's
+ * finalScore. Call once at story completion so we can see the mix in logs
+ * without grepping per-page lines.
+ *
+ * @param {string} storyId
+ * @param {Array<{scoreModel?: string}>} versions  Flat list of all scored versions
+ */
+function logScoreModelSummary(storyId, versions) {
+  if (!Array.isArray(versions) || versions.length === 0) return;
+  const counts = { prompt: 0, math: 0, unknown: 0 };
+  for (const v of versions) {
+    const m = v?.scoreModel;
+    if (m === 'prompt') counts.prompt++;
+    else if (m === 'math') counts.math++;
+    else counts.unknown++;
+  }
+  const total = versions.length;
+  const pct = (n) => Math.round((n / total) * 100);
+  log.info(`[SCORE-SUMMARY] story ${storyId}: ${total} versions scored — ${pct(counts.prompt)}% prompt, ${pct(counts.math)}% math${counts.unknown ? `, ${pct(counts.unknown)}% unknown` : ''}`);
 }
 
 
@@ -432,6 +463,7 @@ module.exports = {
   composeDeductions,
   computeMathFinalScore,
   applyScore,
+  logScoreModelSummary,
   // Legacy helpers (still used by some readers/writers — to be migrated)
   computeFinalScore,
   buildScoreBreakdown,

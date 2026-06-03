@@ -1872,7 +1872,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         issuesSummary: combinedIssuesSummary,
         textIssue,
         fixTargets: jsonFixTargets,       // Legacy format with bboxes (backwards compat)
-        fixableIssues: fixableIssues,     // New format without bboxes (for two-stage detection)
+        fixableIssues: Array.isArray(fixableIssues) ? fixableIssues : [],  // always an array — eliminates downstream null-checks
         figures,                          // Detected figures with descriptions
         matches,                          // Character name → figure mapping with face_bbox
         semanticResult,                   // Full semantic evaluation result (if available)

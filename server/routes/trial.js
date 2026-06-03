@@ -140,8 +140,8 @@ function isAdminRequest(req) {
     // Token format: "timestamp:hmac"
     const [ts, sig] = token.split(':');
     if (!ts || !sig) return false;
-    const timestamp = parseInt(ts, 10);
-    if (isNaN(timestamp) || Date.now() - timestamp > BYPASS_TTL_MS) return false;
+    const timestamp = Number(ts);
+    if (!Number.isFinite(timestamp) || Date.now() - timestamp > BYPASS_TTL_MS) return false;
     const expected = crypto.createHmac('sha256', secret).update(`trial-bypass:${ts}`).digest('hex');
     // Constant-time comparison. The old `sig === expected` short-circuits
     // on the first mismatched byte, leaking timing information that lets a
@@ -1959,6 +1959,16 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
   // Resolves when this handler returns — successfully or with error — guaranteeing
   // any DB writes have happened before /start reads the character row.
   const { userId } = req.sessionUser;
+  // Reject concurrent prepare-title calls for the same user. Two parallel
+  // calls (e.g. user double-click) would race: the second overwrites the
+  // first's promise in the map → /start could await the wrong one, and the
+  // first call's avatars get generated twice (cost). Trial is 1-per-user
+  // enforced anyway, so two title-page calls in flight = client bug;
+  // surface it as 409 so the client backs off cleanly.
+  if (inFlightTitlePagePromises.has(userId)) {
+    log.warn(`[TRIAL AVATARS] prepare-title called concurrently for user ${userId} — rejecting duplicate (first call still running)`);
+    return res.status(409).json({ error: 'Title-page generation already in progress', retryable: true });
+  }
   let resolveInFlight;
   const inFlightPromise = new Promise(resolve => { resolveInFlight = resolve; });
   inFlightTitlePagePromises.set(userId, inFlightPromise);

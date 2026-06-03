@@ -337,7 +337,7 @@ const REPAIR_DEFAULTS = {
   scoreThreshold: 60,       // Pages scoring below this need redo (0-100)
   issueThreshold: 5,        // Pages with this many fixable issues need redo
   maxPasses: 3,             // Global passes over all pages
-  maxCharRepairPages: 50,   // Max pages to character-repair per run (effectively uncapped; pipeline passes actual page count)
+  maxCharRepairPages: 20,   // Max pages to character-repair per run (hard ceiling: bounds the worst-case spend even on "Repair All" against a 32-page story)
   semanticThresholdForIterate: 30, // Below this semantic score → iterate (scene fundamentally wrong)
   qualityThresholdForIterate: 20,  // Below this quality score → iterate immediately
   inpaintMaxPasses: 1,             // Inpaint attempts per page per round

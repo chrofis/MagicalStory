@@ -50,8 +50,13 @@ interface GenerationContextType extends GenerationState {
 
 const GenerationContext = createContext<GenerationContextType | null>(null);
 
-// Poll interval in milliseconds
-const POLL_INTERVAL = 3000;
+// Poll interval in milliseconds. While generation is actively progressing
+// (under 95% complete) poll at 1500ms so the user sees movement; once the
+// pipeline is in the slow tail (cover gen, eval write-back), drop back to
+// 3000ms to halve idle polling load.
+const POLL_INTERVAL_ACTIVE = 1500;
+const POLL_INTERVAL_TAIL = 3000;
+const POLL_TAIL_THRESHOLD = 95;
 
 export function GenerationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -244,10 +249,14 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
     }
   }, [cleanupAfterTerminalState]);
 
-  // Start/stop polling based on activeJob
+  // Start/stop polling based on activeJob. The interval flips from
+  // POLL_INTERVAL_ACTIVE to POLL_INTERVAL_TAIL once progress crosses the
+  // tail threshold — re-runs the effect whenever that boundary is crossed.
+  const inTail = progress.current >= POLL_TAIL_THRESHOLD;
   useEffect(() => {
     if (activeJob && !isComplete) {
-      logger.info('[GenerationContext] Starting polling for job:', activeJob.jobId);
+      const interval = inTail ? POLL_INTERVAL_TAIL : POLL_INTERVAL_ACTIVE;
+      logger.info(`[GenerationContext] Starting polling for job: ${activeJob.jobId} (interval=${interval}ms)`);
       const { jobId, startedAt } = activeJob;
 
       // Poll immediately
@@ -256,7 +265,7 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
       // Then poll at interval
       pollingRef.current = setInterval(() => {
         pollJobStatus(jobId, startedAt);
-      }, POLL_INTERVAL);
+      }, interval);
     }
 
     return () => {
@@ -265,7 +274,7 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
         pollingRef.current = null;
       }
     };
-  }, [activeJob, isComplete, pollJobStatus]);
+  }, [activeJob, isComplete, inTail, pollJobStatus]);
 
   // Poll immediately when user returns to app (phone wakes up, tab refocused)
   // Prevents stale "generating 18%" state from showing after a deploy killed the job

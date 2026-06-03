@@ -6270,7 +6270,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Phase 5b-pre: Shared bbox detection — runs ONCE per image before quality eval
         // and entity consistency. Both consume the same result, avoiding redundant API calls.
         const { detectAllBoundingBoxes } = require('./server/lib/images');
-        const bboxLimit = pLimit(3); // throttle to 3 parallel Gemini calls to avoid 503s
+        const bboxLimit = pLimit(500); // match quality-eval concurrency; existing retry logic handles 503s
         const bboxStartTime = Date.now();
         log.info(`🔍 [UNIFIED] Phase 5b-pre: Shared bbox detection for ${rawImages.length} images...`);
         await Promise.all(rawImages.filter(img => img.imageData).map(img => bboxLimit(async () => {
@@ -7107,6 +7107,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Clear styled avatar cache to free memory
     clearStyledAvatarCache();
 
+    // Score-model mix telemetry: which fraction of versions ended up scored
+    // by the consolidator prompt vs the math fallback? Makes the 60-threshold
+    // tunable from logs alone instead of needing to query the DB.
+    try {
+      const { logScoreModelSummary } = require('./server/lib/scoring');
+      const sceneVersions = (storyData?.sceneImages || []).flatMap(p => Array.isArray(p?.imageVersions) ? p.imageVersions : []);
+      const coverVersions = ['frontCover', 'initialPage', 'backCover'].flatMap(k => {
+        const c = storyData?.coverImages?.[k];
+        return Array.isArray(c?.versions) ? c.versions : [];
+      });
+      logScoreModelSummary(jobId, [...sceneVersions, ...coverVersions]);
+    } catch (err) {
+      log.debug(`[SCORE-SUMMARY] skipped: ${err.message}`);
+    }
+
     log.info(`✅ [UNIFIED] Job ${jobId} completed successfully`);
 
     // Send story completion email to customer
@@ -7270,6 +7285,7 @@ async function processStoryJob(jobId) {
       // job's bucket, never another user's).
       try { clearStyledAvatarGenerationLog(); } catch (e) { log.warn(`[processStoryJob] styled-log cleanup failed: ${e.message}`); }
       try { clearCostumedAvatarGenerationLog(); } catch (e) { log.warn(`[processStoryJob] costumed-log cleanup failed: ${e.message}`); }
+      try { clearCurrentLogger(); } catch (e) { log.warn(`[processStoryJob] generation-logger cleanup failed: ${e.message}`); }
     }
   });
 }

@@ -62,7 +62,7 @@ User clicks "Run Full Workflow"
 - `scoreThreshold: 60` — pages scoring below 60/100 get redone
 - `issueThreshold: 5` — pages with 5+ fixable issues get redone
 - `maxPasses: 3` — max global passes through all pages
-- `maxCharRepairPages: 3` — max pages for character repair per run
+- `maxCharRepairPages: 20` — max pages for character repair per run
 
 **Character repair methods** (in `server/lib/images.js` → `repairCharacterMismatchWithGrok()`):
 - **Grok Cutout** (default): extract the figure's bbox + 20% padding → send cutout + avatar
