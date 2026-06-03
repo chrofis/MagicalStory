@@ -1176,8 +1176,32 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
     res.json({ received: true });
   } catch (err) {
+    // Signature was verified upstream, so this is a processing error inside
+    // our handler — DB blip, unexpected throw, etc. Returning non-200 makes
+    // Stripe retry 3× and then give up permanently; the customer ends up
+    // charged with no order. Buffer the event to stripe_webhook_retry for
+    // out-of-band replay, then ack 200 so Stripe doesn't abandon it.
     log.error('❌ [STRIPE WEBHOOK] Error processing webhook:', err);
-    res.status(400).json({ error: 'Webhook error' });
+    log.error('   Event type:', event?.type);
+    log.error('   Event ID:', event?.id);
+    log.error('   Stack:', err.stack);
+
+    if (event) {
+      try {
+        await dbPool.query(
+          `INSERT INTO stripe_webhook_retry (event_id, event_type, payload, error_message, error_stack)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (event_id) DO NOTHING`,
+          [event.id, event.type, JSON.stringify(event), err.message, err.stack]
+        );
+        log.warn(`💾 [STRIPE WEBHOOK] Buffered event ${event.id} (${event.type}) to stripe_webhook_retry for replay`);
+      } catch (bufferErr) {
+        log.error('❌ [STRIPE WEBHOOK] CRITICAL: failed to buffer event for retry:', bufferErr.message);
+        log.error('   Event payload was:', JSON.stringify(event));
+      }
+    }
+
+    res.json({ received: true, deferred: true });
   }
 });
 
@@ -1875,6 +1899,25 @@ async function REMOVED_initializeDatabase_DEAD() {
     await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_url VARCHAR(500)`);
     await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMP`);
     await dbPool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP`);
+
+    // Stripe webhook retry buffer — captures events whose processing threw
+    // after signature verification, so we can replay them out of band rather
+    // than failing the webhook back to Stripe (which then gives up after 3
+    // retries and the customer is charged with no order created).
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS stripe_webhook_retry (
+        id SERIAL PRIMARY KEY,
+        event_id VARCHAR(255) UNIQUE,
+        event_type VARCHAR(100),
+        payload JSONB NOT NULL,
+        error_message TEXT,
+        error_stack TEXT,
+        retry_count INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        processed_at TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stripe_webhook_retry_unprocessed ON stripe_webhook_retry(created_at) WHERE processed_at IS NULL`);
 
     // Credit transactions table for tracking credit history
     await dbPool.query(`
@@ -2706,16 +2749,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     end: null
   };
 
-  // Clear avatar generation logs for fresh tracking. Skip for trial: the trial
-  // flow generates styled avatars in /api/trial/prepare-title BEFORE the story
-  // job runs. Clearing here wipes those entries before the job result captures
-  // them, so the StoryDisplay "Stilisierte Avatare" dev panel hides for every
-  // trial story. The unified pipeline appends new entries to whatever's already
-  // in the log, so preserving the prepare-title entries is safe.
-  if (!inputData?.trialMode) {
-    clearStyledAvatarGenerationLog();
-    clearCostumedAvatarGenerationLog();
-  }
+  // Avatar generation logs are now per-cache-scope (keyed by runInCacheScope
+  // wrapper). No clear-at-start needed — a fresh job's scope has an empty
+  // bucket, and a trial job's scope intentionally inherits the entries that
+  // /api/trial/prepare-title pushed. Cleanup happens in processStoryJob's
+  // finally block.
 
   // Generation logger for debugging
   const genLog = new GenerationLogger();
@@ -7203,8 +7241,37 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 // Background worker function to process a story generation job
 // NEW STREAMING ARCHITECTURE: Generate images as story batches complete
 async function processStoryJob(jobId) {
-  // Run entire job inside a cache scope so styled avatars don't collide between concurrent jobs
-  return runInCacheScope(jobId, () => _processStoryJobImpl(jobId));
+  // Run entire job inside a cache scope so styled avatars + per-story dev
+  // logs don't collide across concurrent jobs.
+  // Trial mode uses `trial-${userId}` to match the scope `/api/trial/prepare-title`
+  // pre-warms under — that way the trial job reuses the pre-warmed avatar
+  // cache AND inherits the prepare-title styled-avatar log entries for the
+  // dev panel. Full mode uses jobId (always unique).
+  let scopeId = jobId;
+  try {
+    const preRow = await dbPool.query('SELECT user_id, input_data FROM story_jobs WHERE id = $1', [jobId]);
+    const row = preRow.rows[0];
+    const inputData = row?.input_data
+      ? (typeof row.input_data === 'string' ? JSON.parse(row.input_data) : row.input_data)
+      : null;
+    if (inputData?.trialMode && row?.user_id) {
+      scopeId = `trial-${row.user_id}`;
+    }
+  } catch (e) {
+    log.warn(`[processStoryJob] Could not pre-load input_data for scope decision: ${e.message} — falling back to jobId scope`);
+  }
+  return runInCacheScope(scopeId, async () => {
+    try {
+      return await _processStoryJobImpl(jobId);
+    } finally {
+      // Free the per-scope avatar log buckets. The buckets were captured into
+      // saved story data already; the dev panel reads from the DB, not from
+      // these in-memory buckets. Both clears are scope-aware (only touch this
+      // job's bucket, never another user's).
+      try { clearStyledAvatarGenerationLog(); } catch (e) { log.warn(`[processStoryJob] styled-log cleanup failed: ${e.message}`); }
+      try { clearCostumedAvatarGenerationLog(); } catch (e) { log.warn(`[processStoryJob] costumed-log cleanup failed: ${e.message}`); }
+    }
+  });
 }
 
 async function _processStoryJobImpl(jobId) {
@@ -7233,22 +7300,9 @@ async function _processStoryJobImpl(jobId) {
   const genLog = new GenerationLogger();
   genLog.setStage('outline');
 
-  // Clear avatar generation logs for fresh tracking. Skip for trial: trial
-  // styled avatars are generated in /api/trial/prepare-title BEFORE the job
-  // runs. Clearing here wipes those entries before the result captures
-  // them, hiding the "Stilisierte Avatare" dev panel for every trial story.
-  // We load the job's inputData below; do a lightweight pre-load just to
-  // check trialMode and decide whether to clear.
-  const _preInputDataRes = await dbPool.query('SELECT input_data FROM story_jobs WHERE id = $1', [jobId]);
-  const _preInputData = _preInputDataRes.rows[0]?.input_data
-    ? (typeof _preInputDataRes.rows[0].input_data === 'string'
-       ? JSON.parse(_preInputDataRes.rows[0].input_data)
-       : _preInputDataRes.rows[0].input_data)
-    : null;
-  if (!_preInputData?.trialMode) {
-    clearStyledAvatarGenerationLog();
-    clearCostumedAvatarGenerationLog();
-  }
+  // Avatar generation logs are per-cache-scope (see processStoryJob wrapper).
+  // No clear-at-start needed — the wrapper's finally block clears once after
+  // capture so a single bucket lives for the full job lifecycle.
 
   // Token usage tracker - accumulates usage from all API calls by provider and function
   const tokenUsage = {
