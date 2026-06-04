@@ -26,6 +26,43 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 // Shared repair logic
 const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
 
+// Canonical scoring writer. Every newVersion / newImageData construction
+// in this file routes its score data through `applyScore` so the persisted
+// version row carries the canonical fields (finalScore, deductions,
+// scoreBreakdown, mathFinalScore, promptFinalScore, scoreModel, evalScore,
+// entityPenalty). Legacy fields (qualityScore, semanticScore,
+// rawQualityScore) are kept on the literal during the transition for
+// in-flight consumers; saveStoryData/saveStoryImage and the frontend now
+// read canonical only.
+//
+// imageResult shape from generateImageWithQualityRetry / iterate:
+//   { score, qualityReasoning, fixableIssues, fixTargets, semanticResult,
+//     threeStageResult, modelId, ... }
+// The .score field IS the final combined number (already includes
+// semantic + threeStage merges via mergeSemanticResult in images.js).
+// We pass it as promptFinalScore so applyScore preserves the existing
+// behavior of "finalScore = imageResult.score" exactly.
+function stampCanonicalScore(version, imageResult, opts = {}) {
+  if (!version || typeof version !== 'object') return;
+  const { applyScore } = require('../lib/scoring');
+  const evalResult = imageResult ? {
+    qualityScore: imageResult.qualityScore ?? imageResult.score,
+    fixableIssues: imageResult.fixableIssues || [],
+    reasoning: imageResult.reasoning || imageResult.qualityReasoning || null,
+    semanticResult: imageResult.semanticResult || null,
+    threeStageResult: imageResult.threeStageResult || null,
+  } : null;
+  const entityResult = (opts.entityIssues || opts.entityPenalty != null)
+    ? { issues: opts.entityIssues || [], penalty: opts.entityPenalty || 0 }
+    : null;
+  applyScore(version, {
+    evalResult,
+    entityResult,
+    promptFinalScore: imageResult?.score ?? null,
+    scoreModel: 'prompt',
+  });
+}
+
 // Lib modules
 const {
   getPageText,
@@ -691,6 +728,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
       })),
     };
+    stampCanonicalScore(newVersion, imageResult);
 
     if (existingIndex >= 0) {
       if (sceneImages[existingIndex].imageVersions) {
@@ -2022,6 +2060,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         bboxDetection: imageResult.bboxDetection || null,
         compositeAttempts,
       };
+      stampCanonicalScore(newVersion, imageResult);
       existingCover.imageVersions.push(newVersion);
 
       // Also update cover-level bboxDetection to match new active image
@@ -2338,6 +2377,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       bboxDetection: iterResult.bboxDetection || null,
       grokRefImages: iterResult.grokRefImages || null,
     };
+    stampCanonicalScore(newVersion, iterResult);
 
     let iterateNewVersionIndex;
     if (existingImageIndex >= 0) {
@@ -2677,6 +2717,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       source: compositeAttempts ? 'composite-regenerate' : 'regenerate',
       compositeAttempts,
     };
+    stampCanonicalScore(newVersion, coverResult);
 
     // Add new version
     const updatedVersions = [...(existingCover.imageVersions || []), newVersion];
@@ -3237,7 +3278,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
 
         // Create new version entry
         const timestamp = new Date().toISOString();
-        currentScene.imageVersions.push({
+        const repairVersion = {
           imageData: currentImageData,
           description: currentScene.description,
           prompt: currentScene.prompt,
@@ -3247,7 +3288,9 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           type: 'inpaint-repair',
           qualityScore: repairScore,
           repairHistory: allRepairHistory,
-        });
+        };
+        stampCanonicalScore(repairVersion, { score: repairScore });
+        currentScene.imageVersions.push(repairVersion);
 
         // Delete rehydrated imageData to prevent saveStoryData from re-saving it at version_index 0
         delete currentScene.imageData;
@@ -3515,6 +3558,17 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           activeVersion.evaluatedAt = new Date().toISOString();
           activeVersion.issuesSummary = evaluation.issuesSummary || '';
           activeVersion.bboxDetection = scene.bboxDetection || null;
+          // Canonical scoring fields alongside legacy (legacy kept for in-flight
+          // consumers — step-6 cleanup will drop them once frontend + DB
+          // writer migrations land).
+          stampCanonicalScore(activeVersion, {
+            score: adjustedScore,
+            qualityScore: evaluation.qualityScore ?? evaluation.score,
+            fixableIssues: allIssues,
+            reasoning: evaluation.reasoning,
+            semanticResult: evaluation.semanticResult || null,
+            threeStageResult: evaluation.threeStageResult || null,
+          }, { entityIssues, entityPenalty: entityPenalty || 0 });
         }
 
         // Update scene with adjusted score

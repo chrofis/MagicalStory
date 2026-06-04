@@ -161,20 +161,67 @@ function applyScore(version, { evalResult = null, entityResult = null, promptFin
   const mathFinalScore = computeMathFinalScore(deductions);
   const usePrompt = scoreModel === 'prompt' && typeof promptFinalScore === 'number';
   const finalScore = usePrompt ? promptFinalScore : mathFinalScore;
+
+  // Canonical fields written by the single writer.
   version.deductions = deductions;
   version.mathFinalScore = mathFinalScore;
   version.promptFinalScore = (typeof promptFinalScore === 'number') ? promptFinalScore : null;
   version.finalScore = finalScore;
-  version.scoreModel = scoreModel; // remember which model produced finalScore
+  version.scoreModel = scoreModel;
+
+  // scoreBreakdown — per-evaluator card for the dev panel's breakdown view.
+  // Built from the same evalResult so it stays consistent with deductions.
+  // Shape: { visual: {score, reasoning, issues}, semantic: {...}|null, threeStage: {...}|null, entity: {penalty, issues} }
+  version.scoreBreakdown = _buildBreakdownFromEvalResult(evalResult, entityResult);
+
+  // evalScore (pre-entity) + entityPenalty kept as separate fields so an
+  // entity-only re-run can recompute finalScore without re-running visual.
+  // The previous evalScore math (MIN of visual/semantic/threeStage subscores
+  // from composeEvalScore) was the legacy behavior; new model derives
+  // evalScore from deductions ÷ entity-penalty split.
+  const entityPoints = (deductions.entity || []).reduce((s, d) => s + (SEVERITY_POINTS[d.severity] || 0), 0);
+  version.entityPenalty = entityPoints;
+  version.evalScore = Math.max(0, Math.min(100, finalScore + entityPoints));
 
   // Info-level visibility for threshold calibration. Without this, prod logs
   // show "page X scored Y" with no indication whether Y came from the
   // consolidator (lenient) or the math fallback (conservative) — meaning the
   // 60-threshold can't be tuned from logs alone.
   const pn = version.pageNumber != null ? `page ${version.pageNumber}` : 'version';
-  log.info(`[SCORE] ${pn}: ${scoreModel} model → finalScore=${finalScore} (math=${mathFinalScore}, prompt=${promptFinalScore})`);
+  log.info(`[SCORE] ${pn}: ${scoreModel} model → finalScore=${finalScore} (math=${mathFinalScore}, prompt=${promptFinalScore}, entity=−${entityPoints})`);
 
   return version;
+}
+
+/**
+ * Internal helper: derive a scoreBreakdown from an evaluator output + entity
+ * result. Lives next to applyScore so the single writer owns both layouts
+ * (deductions + breakdown) from the same input.
+ *
+ * @param {object|null} evalResult     evaluateImageQuality output
+ * @param {object|null} entityResult   { penalty, issues } from getEntityPenaltyAndIssues
+ */
+function _buildBreakdownFromEvalResult(evalResult, entityResult) {
+  const visual = evalResult ? {
+    score: typeof evalResult.qualityScore === 'number'
+      ? evalResult.qualityScore
+      : (typeof evalResult.score === 'number' ? evalResult.score : 0),
+    reasoning: evalResult.reasoning || null,
+    issues: Array.isArray(evalResult.fixableIssues) ? evalResult.fixableIssues : [],
+  } : { score: 0, reasoning: null, issues: [] };
+  const semantic = evalResult?.semanticResult ? {
+    score: typeof evalResult.semanticResult.score === 'number' ? evalResult.semanticResult.score : 0,
+    issues: Array.isArray(evalResult.semanticResult.semanticIssues) ? evalResult.semanticResult.semanticIssues : [],
+  } : null;
+  const threeStage = evalResult?.threeStageResult ? {
+    score: typeof evalResult.threeStageResult.score === 'number' ? evalResult.threeStageResult.score : 0,
+    issues: Array.isArray(evalResult.threeStageResult.fixableIssues) ? evalResult.threeStageResult.fixableIssues : [],
+  } : null;
+  const entity = entityResult ? {
+    penalty: Number(entityResult.penalty) || 0,
+    issues: Array.isArray(entityResult.issues) ? entityResult.issues : [],
+  } : { penalty: 0, issues: [] };
+  return { visual, semantic, threeStage, entity };
 }
 
 /**

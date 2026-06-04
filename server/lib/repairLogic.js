@@ -178,8 +178,21 @@ function selectCharRepairTasks(entityReport, options = {}) {
  */
 function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) {
   const evaluator = evaluation || {};
-  const visualScore = evaluator.qualityScore ?? evaluator.rawQualityScore ?? 100;
-  const semanticScore = evaluator.semanticScore ?? 100;
+  // Canonical reads via scoreBreakdown (post chunk-2 scoring migration). Each
+  // evaluator's NATIVE score lives in scoreBreakdown.<evaluator>.score; the
+  // combined number lives in evaluator.finalScore. Legacy fallbacks
+  // (qualityScore / rawQualityScore / semanticScore on the evaluator object
+  // itself) kept for stories that predate the migration. Default of 100 keeps
+  // the legacy "no eval data → don't trigger catastrophic gate" behavior.
+  const visualScore =
+    evaluator.scoreBreakdown?.visual?.score
+    ?? evaluator.qualityScore
+    ?? evaluator.rawQualityScore
+    ?? 100;
+  const semanticScore =
+    evaluator.scoreBreakdown?.semantic?.score
+    ?? evaluator.semanticScore
+    ?? 100;
 
   // 1. Catastrophic — iterate immediately (figure unrecognisable).
   if (visualScore < 50) {

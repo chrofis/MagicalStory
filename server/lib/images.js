@@ -7396,23 +7396,56 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       if (typeof source === 'string' && source.startsWith('text-space-repair')) return 'text-space-repair';
       return 'repair';
     };
-    const buildVersionEntry = (v) => ({
+    // Single canonical writer. Stamps finalScore + deductions + scoreBreakdown
+    // + mathFinalScore + promptFinalScore + scoreModel + evalScore +
+    // entityPenalty on the version. Legacy fields (qualityScore, semanticScore,
+    // threeStageScore, rawQualityScore) are no longer written — readers go
+    // through computeFinalScore or version.finalScore, and per-evaluator
+    // sub-scores live under version.scoreBreakdown.<evaluator>.score.
+    const { applyScore } = require('./scoring');
+    const stampScores = (v) => {
+      if (!v.evaluation && !v.entityIssues && (v.entityPenalty == null || v.entityPenalty === 0)) {
+        // Un-evaluated version (e.g. a just-pushed original before any eval
+        // result is attached). Leave canonical fields null rather than
+        // defaulting to 100 (which composeDeductions on empty would yield —
+        // "no evidence of issues" is not the same as "image is perfect").
+        v.finalScore = null;
+        v.scoreBreakdown = null;
+        v.deductions = null;
+        return;
+      }
+      const entityResult = (v.entityIssues || v.entityPenalty != null)
+        ? { issues: v.entityIssues || [], penalty: v.entityPenalty || 0 }
+        : null;
+      applyScore(v, {
+        evalResult: v.evaluation || null,
+        entityResult,
+        promptFinalScore: v.evaluation?.promptFinalScore ?? null,
+        scoreModel: 'prompt',
+      });
+    };
+    const buildVersionEntry = (v) => {
+      stampScores(v);
+      return {
       imageData: v.imageData,
-      qualityScore: v.score,                                    // combined final (visual − semantic penalty)
-      // finalScore = qualityScore − entityPenalty. Single number the frontend
-      // shows; no client-side recompute. Falls back to score when the round
-      // loop didn't stamp it (e.g. v0 before entity report is ready).
-      finalScore: v.finalScore != null
-        ? v.finalScore
-        : (v.score != null ? Math.max(0, v.score - (v.entityPenalty || 0)) : null),
-      rawQualityScore: v.evaluation?.qualityScore ?? null,      // raw visual eval
-      semanticScore: v.evaluation?.semanticScore ?? null,
-      semanticResult: v.evaluation?.semanticResult || null,
-      // Three-stage eval — Stage 1 vision inventory + Stage 2 Sonnet
-      // compliance JSON. Surfaced verbatim per version so the dev panel
-      // can show "what Gemini saw" alongside the eval scores.
-      threeStageResult: v.evaluation?.threeStageResult || null,
+      // Canonical scoring fields written by applyScore. finalScore is the
+      // single number the frontend + picker read. scoreBreakdown is the
+      // per-evaluator detail for the dev panel. deductions / mathFinalScore
+      // / promptFinalScore / scoreModel are audit-only.
+      finalScore: v.finalScore,
+      scoreBreakdown: v.scoreBreakdown || null,
+      deductions: v.deductions || null,
+      mathFinalScore: v.mathFinalScore ?? null,
+      promptFinalScore: v.promptFinalScore ?? null,
+      scoreModel: v.scoreModel || null,
+      evalScore: v.evalScore ?? null,
       entityPenalty: v.entityPenalty ?? 0,
+      // Detailed evaluator outputs — kept verbatim because the dev panel uses
+      // the structured detail (visible/expected character lists from semantic,
+      // visionInventory from three-stage) that doesn't fit in scoreBreakdown.
+      // These are NOT score fields; no duplication with finalScore.
+      semanticResult: v.evaluation?.semanticResult || null,
+      threeStageResult: v.evaluation?.threeStageResult || null,
       evaluatedAt: v.evaluatedAt || null,
       issuesSummary: v.evaluation?.issuesSummary || null,
       fixableIssues: v.evaluation?.fixableIssues || [],
@@ -7446,7 +7479,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       charRepairGrokRaw: v.charRepairGrokRaw || null,
       charRepairBlendMask: v.charRepairBlendMask || null,
       charRepairWhiteout: v.charRepairWhiteout || null,
-    });
+      };
+    };
     for (const v of versions) {
       imageVersions.push(buildVersionEntry(v));
     }

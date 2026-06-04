@@ -50,8 +50,12 @@ export function ImageHistoryModal({
     let bestIdx = -1;
     let bestScore = -Infinity;
     for (let i = 0; i < versions.length; i++) {
-      const s = (versions[i] as any)?.qualityScore;
-      if (typeof s !== 'number') continue;
+      // Canonical read: finalScore is the single number written by applyScore.
+      // Fall through to legacy qualityScore for pre-migration stories (<= 2026-06-04).
+      const v = versions[i] as { finalScore?: number | null; qualityScore?: number | null };
+      const s = typeof v?.finalScore === 'number' ? v.finalScore
+        : (typeof v?.qualityScore === 'number' ? v.qualityScore : null);
+      if (s == null) continue;
       if (s >= bestScore) { bestScore = s; bestIdx = i; }
     }
     return bestIdx >= 0 ? bestIdx : versions.length - 1;
@@ -179,11 +183,17 @@ export function ImageHistoryModal({
           <div className="flex items-center justify-between px-4 py-2 bg-black/80 shrink-0">
             <span className="text-white text-sm font-medium">
               {versionLabel(fullscreenIndex)} ({fullscreenIndex + 1}/{versions.length})
-              {developerMode && versions[fullscreenIndex].qualityScore != null && (
-                <span className={`ml-2 text-xs font-bold px-1.5 py-0.5 rounded ${scoreBgColor(versions[fullscreenIndex].qualityScore!)}`}>
-                  {versions[fullscreenIndex].qualityScore}%
-                </span>
-              )}
+              {(() => {
+                const v = versions[fullscreenIndex] as { finalScore?: number | null; qualityScore?: number | null };
+                const score = typeof v.finalScore === 'number' ? v.finalScore
+                  : (typeof v.qualityScore === 'number' ? v.qualityScore : null);
+                if (!developerMode || score == null) return null;
+                return (
+                  <span className={`ml-2 text-xs font-bold px-1.5 py-0.5 rounded ${scoreBgColor(score)}`}>
+                    {score}%
+                  </span>
+                );
+              })()}
             </span>
             <button onClick={() => setFullscreenIndex(null)} className="text-white p-1.5 hover:bg-white/20 rounded-lg">
               <X size={20} />
@@ -292,15 +302,14 @@ export function ImageHistoryModal({
                       <div className="flex items-center gap-1 sm:gap-2">
                         <span className="text-white text-xs sm:text-sm font-semibold">{versionLabel(idx)}</span>
                         {developerMode && (() => {
-                          // Fall back through every score field so a version with
-                          // any persisted evaluation result shows a badge — older
-                          // entries may carry score under different keys
-                          // (finalScore from the unified pipeline,
-                          // rawQualityScore from a pre-penalty pass).
-                          const score = (version as { qualityScore?: number | null }).qualityScore
-                            ?? (version as { finalScore?: number | null }).finalScore
-                            ?? (version as { rawQualityScore?: number | null }).rawQualityScore
-                            ?? null;
+                          // Canonical read: finalScore is the single number
+                          // written by applyScore (chunk-2 scoring migration).
+                          // Legacy qualityScore kept as fallback for stories
+                          // saved before the migration. Use ?? not || so
+                          // legitimate zero scores still render.
+                          const v = version as { finalScore?: number | null; qualityScore?: number | null };
+                          const score = typeof v.finalScore === 'number' ? v.finalScore
+                            : (typeof v.qualityScore === 'number' ? v.qualityScore : null);
                           if (score == null) {
                             return (
                               <span className="text-gray-300 text-[10px] sm:text-[11px] font-medium px-1 sm:px-1.5 py-0.5 rounded border border-gray-400/40">
@@ -547,22 +556,33 @@ export function ImageHistoryModal({
                        (semantic + entity penalties applied on top), so the user can see
                        why "the image shows 40%" became "Endwert 20%". */}
                   {(() => {
-                    const score = detailVersion.finalScore != null
-                      ? detailVersion.finalScore
-                      : (detailVersion.qualityScore != null
-                        ? Math.max(0, detailVersion.qualityScore - (detailVersion.entityPenalty || 0))
+                    // Canonical: finalScore + scoreBreakdown written by applyScore.
+                    // Legacy: qualityScore / rawQualityScore for pre-2026-06-04 stories.
+                    type Breakdown = {
+                      visual?: { score?: number | null };
+                      semantic?: { score?: number | null } | null;
+                      threeStage?: { score?: number | null } | null;
+                      entity?: { penalty?: number | null };
+                    };
+                    const v = detailVersion as typeof detailVersion & {
+                      scoreBreakdown?: Breakdown | null;
+                      rawQualityScore?: number | null;
+                      evalScore?: number | null;
+                    };
+                    const score = typeof v.finalScore === 'number' ? v.finalScore
+                      : (typeof v.qualityScore === 'number'
+                        ? Math.max(0, v.qualityScore - (v.entityPenalty || 0))
                         : null);
                     if (score == null) return null;
-                    const entityPenalty = detailVersion.entityPenalty || 0;
-                    // `qualityScore` is the value emitted by the main image-evaluation
-                    // eval AFTER semantic and three-stage merges (pipeline buildVersionEntry
-                    // at server/lib/images.js:7199 sets `qualityScore: v.score`, and v.score
-                    // is post-semantic). `rawQualityScore` is the pre-semantic visual.
-                    // We show the chain: rawQuality → quality (after semantic) → final
-                    // (after entity). Only show segments that actually differ from final.
-                    const visual = (detailVersion as { rawQualityScore?: number | null }).rawQualityScore
-                      ?? detailVersion.qualityScore ?? null;
-                    const afterSemantic = detailVersion.qualityScore ?? visual;
+                    const entityPenalty = typeof v.scoreBreakdown?.entity?.penalty === 'number'
+                      ? v.scoreBreakdown.entity.penalty
+                      : (v.entityPenalty || 0);
+                    // visual = the raw visual eval score (BEFORE any penalties)
+                    // afterSemantic = score after semantic + threeStage merges (= evalScore in canonical model)
+                    const visual = typeof v.scoreBreakdown?.visual?.score === 'number' ? v.scoreBreakdown.visual.score
+                      : (v.rawQualityScore ?? v.qualityScore ?? null);
+                    const afterSemantic = typeof v.evalScore === 'number' ? v.evalScore
+                      : (v.qualityScore ?? visual);
                     const semanticPenalty = (typeof visual === 'number' && typeof afterSemantic === 'number')
                       ? Math.max(0, visual - afterSemantic)
                       : 0;

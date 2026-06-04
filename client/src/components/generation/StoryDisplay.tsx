@@ -258,8 +258,16 @@ function activeVersionIndex(image: any): number | undefined {
 // carries eval fields; everything reads per-version, same as scenes.
 function activeQuality(image: any): { score: number | undefined; reasoning: string | null; modelId: string | null } {
   const v: any = pickActiveVersion(image);
+  // Canonical read: finalScore (chunk-2 scoring migration). Legacy qualityScore
+  // kept as fallback for stories saved before 2026-06-04. Use typeof === 'number'
+  // so legitimate zero scores still surface (?? would also keep 0, but explicit
+  // type check is clearer about intent).
+  const score = typeof v?.finalScore === 'number' ? v.finalScore
+    : (typeof v?.qualityScore === 'number' ? v.qualityScore
+      : (typeof image?.finalScore === 'number' ? image.finalScore
+        : (typeof image?.qualityScore === 'number' ? image.qualityScore : undefined)));
   return {
-    score: (v?.qualityScore ?? image?.qualityScore) as number | undefined,
+    score,
     reasoning: (v?.qualityReasoning ?? image?.qualityReasoning) ?? null,
     modelId: (v?.qualityModelId ?? image?.qualityModelId) ?? null,
   };
@@ -5335,7 +5343,13 @@ export function StoryDisplay({
                             )}
 
                             {/* Quality Score with Reasoning */}
-                            {image?.qualityScore !== undefined && (
+                            {(() => {
+                              // Canonical: finalScore. Legacy: qualityScore. Use typeof check
+                              // so a legitimate zero score still renders the badge.
+                              const score = typeof (image as any)?.finalScore === 'number' ? (image as any).finalScore
+                                : (typeof image?.qualityScore === 'number' ? image.qualityScore : undefined);
+                              if (score === undefined) return null;
+                              return (
                               <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
                                   <span className="flex items-center gap-2">
@@ -5343,11 +5357,11 @@ export function StoryDisplay({
                                     {image?.qualityModelId && <span className="text-xs font-normal text-indigo-500">({image.qualityModelId})</span>}
                                   </span>
                                   <span className={`text-lg font-bold ${
-                                    (image?.qualityScore ?? 0) >= 70 ? 'text-green-600' :
-                                    (image?.qualityScore ?? 0) >= 50 ? 'text-yellow-600' :
+                                    score >= 70 ? 'text-green-600' :
+                                    score >= 50 ? 'text-yellow-600' :
                                     'text-red-600'
                                   }`}>
-                                    {Math.round(image?.qualityScore ?? 0)}%
+                                    {Math.round(score)}%
                                   </span>
                                 </summary>
                                 {(image?.issuesSummary || image?.qualityReasoning) && (
@@ -5368,7 +5382,8 @@ export function StoryDisplay({
                                   </div>
                                 )}
                               </details>
-                            )}
+                              );
+                            })()}
 
                             {/* Semantic Fidelity Score (scene vs story text match) */}
                             {image?.semanticResult && (
@@ -6017,7 +6032,12 @@ export function StoryDisplay({
                             )}
 
                             {/* Quality Score with Reasoning */}
-                            {image.qualityScore !== undefined && (
+                            {(() => {
+                              // Canonical finalScore with legacy qualityScore fallback (chunk-2 migration).
+                              const score = typeof (image as any).finalScore === 'number' ? (image as any).finalScore
+                                : (typeof image.qualityScore === 'number' ? image.qualityScore : undefined);
+                              if (score === undefined) return null;
+                              return (
                               <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
                                   <span className="flex items-center gap-2">
@@ -6025,11 +6045,11 @@ export function StoryDisplay({
                                     {image.qualityModelId && <span className="text-xs font-normal text-indigo-500">({image.qualityModelId})</span>}
                                   </span>
                                   <span className={`text-lg font-bold ${
-                                    image.qualityScore >= 70 ? 'text-green-600' :
-                                    image.qualityScore >= 50 ? 'text-yellow-600' :
+                                    score >= 70 ? 'text-green-600' :
+                                    score >= 50 ? 'text-yellow-600' :
                                     'text-red-600'
                                   }`}>
-                                    {Math.round(image.qualityScore)}%
+                                    {Math.round(score)}%
                                   </span>
                                 </summary>
                                 {(image.issuesSummary || image.qualityReasoning) && (
@@ -6050,7 +6070,8 @@ export function StoryDisplay({
                                   </div>
                                 )}
                               </details>
-                            )}
+                              );
+                            })()}
 
                             {/* Semantic Fidelity Score */}
                             {image?.semanticResult && (

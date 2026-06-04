@@ -129,11 +129,44 @@ function PageFeedbackCard({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  // When reEvalResult is provided, prefer its scores (more recent)
-  const qualityScore = reEvalResult?.qualityScore ?? feedback.qualityScore;
-  const semanticScore = reEvalResult?.semanticScore ?? feedback.semanticScore;
-  const entityPenalty = reEvalResult?.entityPenalty ?? feedback.entityPenalty ?? 0;
-  const finalScore = reEvalResult?.score ?? feedback.score ?? qualityScore;
+  // When reEvalResult is provided, prefer its scores (more recent).
+  // Canonical sources (chunk-2 scoring migration):
+  //   visual headline (raw eval) ← scoreBreakdown.visual.score
+  //   semantic                   ← scoreBreakdown.semantic.score
+  //   entity penalty             ← scoreBreakdown.entity.penalty
+  //   combined final             ← finalScore
+  // Legacy fields (qualityScore, semanticScore, entityPenalty, score) kept
+  // as fallbacks for pre-migration stories and for the re-evaluate API
+  // response that hasn't been updated yet.
+  type Breakdown = {
+    visual?: { score?: number | null };
+    semantic?: { score?: number | null } | null;
+    entity?: { penalty?: number | null };
+  };
+  const reEvalBreakdown = (reEvalResult as { scoreBreakdown?: Breakdown } | undefined)?.scoreBreakdown;
+  const feedbackBreakdown = (feedback as { scoreBreakdown?: Breakdown }).scoreBreakdown;
+  const qualityScore =
+    reEvalBreakdown?.visual?.score
+    ?? reEvalResult?.qualityScore
+    ?? feedbackBreakdown?.visual?.score
+    ?? feedback.qualityScore;
+  const semanticScore =
+    reEvalBreakdown?.semantic?.score
+    ?? reEvalResult?.semanticScore
+    ?? feedbackBreakdown?.semantic?.score
+    ?? feedback.semanticScore;
+  const entityPenalty =
+    reEvalBreakdown?.entity?.penalty
+    ?? reEvalResult?.entityPenalty
+    ?? feedbackBreakdown?.entity?.penalty
+    ?? feedback.entityPenalty
+    ?? 0;
+  const finalScore =
+    (reEvalResult as { finalScore?: number | null } | undefined)?.finalScore
+    ?? reEvalResult?.score
+    ?? (feedback as { finalScore?: number | null }).finalScore
+    ?? feedback.score
+    ?? qualityScore;
   const verdict = reEvalResult?.verdict ?? feedback.verdict;
   const semanticResult = reEvalResult?.semanticResult ?? feedback.semanticResult;
   const issuesSummary = feedback.issuesSummary;
