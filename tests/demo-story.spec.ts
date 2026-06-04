@@ -993,6 +993,16 @@ test.describe('Demo Story Generation', () => {
     // server default), Step 4 can auto-advance to Step 5 before we get a
     // chance to click. Treat the art-style button as optional.
     console.log(`Step 4: Selecting art style: ${artStyleLabel}...`);
+    // WizardStep5ArtStyle is React.lazy — Step 4 shows a Suspense fallback
+    // (spinner) for ~1-3s while the chunk downloads, then renders the cards.
+    // Wait until ANY of the popular-row art-style labels is visible before
+    // searching for the target. Without this, the spec's locator races the
+    // chunk load and fails loud with "style button not found" on a still-
+    // loading Step 4.
+    const anyPopularStyle = page.locator('button').filter({ hasText: /Aquarell|Watercolor|Aquarelle|Anime|Comic|Bande dessinée|Pixar/ }).first();
+    await anyPopularStyle.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
+      console.log('  WARN: no popular art-style button visible after 15s — chunk may have failed to load');
+    });
     async function findAndClickArtStyle(): Promise<boolean> {
       const direct = page.locator('button').filter({ hasText: artStyleLabel }).first();
       // First try direct — popular styles (Aquarell/Anime/Comic/Pixar) are
