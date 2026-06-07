@@ -929,6 +929,34 @@ const BLEND_STYLE_LINES = {
 // brief ~5300 chars of room.
 const BLEND_PROMPT_HARD_CAP = 7700;
 
+/**
+ * Build a text-rendering directive for cover blend prompts. When the caller
+ * (test-models cover dispatcher) supplies scene.textOverlay, we append an
+ * EXCEPTION block that overrides the boilerplate's "no text" rule for a
+ * single specific text element. Wording cribbed from coverComposite.js:724-735
+ * so the two cover paths produce comparable typography.
+ *
+ * Returns '' when textOverlay is null / undefined / falsy.
+ */
+function buildTextOverlayDirective(textOverlay, fallbackArtStyle) {
+  if (!textOverlay || typeof textOverlay !== 'object') return '';
+  const text = String(textOverlay.text || '').trim();
+  if (!text) return '';
+  const style = textOverlay.artStyle || fallbackArtStyle || 'watercolor';
+  const type = String(textOverlay.type || '').toLowerCase();
+  let directive;
+  if (type === 'title') {
+    directive = `TITLE TEXT (override the no-text rule): render this exact title across the upper third of the canvas: "${text}". Hand-painted ${style} letterforms — NOT a system font, not flat digital text. Looks brushed by an illustrator. Letters have depth, integrated with the sky / upper background area, never on faces. This is the ONLY text in the image.`;
+  } else if (type === 'dedication') {
+    directive = `DEDICATION TEXT (override the no-text rule): render this exact dedication in the lower third of the canvas: "${text}". Hand-painted ${style} letterforms — quieter and smaller than a title, no 3D depth, kept flat and graceful. This is the ONLY text in the image.`;
+  } else if (type === 'branding') {
+    directive = `FOOTER TEXT (override the no-text rule): render exactly the text "${text}" inset from the bottom-left corner (roughly 5% in from both the left edge and the bottom edge, sitting clearly inside the frame, not flush against the border). Hand-painted ${style} letterforms — NOT a system font. This is the ONLY text in the image.`;
+  } else {
+    return '';
+  }
+  return `\n\n═══ TEXT RENDERING ═══\n${directive}`;
+}
+
 function buildBlendEditPrompt(scene) {
   const styleLine = BLEND_STYLE_LINES[scene.artStyle] || BLEND_STYLE_LINES.watercolor;
   const brief = (scene.pageBrief || '').trim();
@@ -952,16 +980,22 @@ DO NOT:
 - Restructure the underlying background scenery (architecture, geography, sky). Adding a named required object at the correct position is COMPLETING the scene, not restructuring it.
 - Add text, captions, numbers, or signatures of any kind.`;
 
+  // Cover text-overlay directive — only present when caller (test-models cover
+  // dispatcher) supplied scene.textOverlay. Empty string otherwise so scenes
+  // are unaffected. Built before the brief-trim so the directive's bytes are
+  // accounted for in briefRoom.
+  const textDirective = buildTextOverlayDirective(scene.textOverlay, scene.artStyle);
+
   // Tight cap: trim the brief if total prompt would exceed Grok's 8000-char
   // edit limit. The earlier 5500-char compositeBrief slice in regeneration.js
   // left no room for boilerplate when fully populated (8058 chars in
   // production smoke). Re-slice at the prompt builder so both the test-
   // models route AND the main pipeline are protected.
-  const fixedLen = boilerplate.length + (brief ? briefHeader.length : 0);
+  const fixedLen = boilerplate.length + (brief ? briefHeader.length : 0) + textDirective.length;
   const briefRoom = Math.max(0, BLEND_PROMPT_HARD_CAP - fixedLen);
   const trimmedBrief = brief.length > briefRoom ? brief.slice(0, briefRoom).trim() + '\n[...]' : brief;
   const briefBlock = trimmedBrief ? `${briefHeader}${trimmedBrief}` : '';
-  const full = `${boilerplate}${briefBlock}`;
+  const full = `${boilerplate}${briefBlock}${textDirective}`;
   if (full.length > 8000) {
     log.warn(`[SCENE COMPOSITE] blend prompt at ${full.length} chars after trim — still over Grok's 8000 limit (brief input was ${brief.length})`);
   }

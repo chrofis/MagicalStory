@@ -228,6 +228,58 @@ single-edit refactor (commit `b8e72eb9`) stabilised it.
 **Status:** 🗄 superseded by direct path. Re-enable only after the four
 fixes above land + the validation gate passes.
 
+### Cover & scene composite unified at the test-models dispatcher
+**Context:** Two parallel composite pipelines exist — `coverComposite.js`
+for covers (sharp-composite figures + 1–2 Grok edits) and `sceneComposite.js`
+for scene pages (uniform: populated plate → depopulate → cutout → blend;
+stratified: back native + front silhouettes → depopulate front →
+front-figure plate → composite → blend). The dev-panel TestModelsPanel
+showed Method 1/2/3 toggles for both surfaces but for cover pages
+(`pageNumber < 0`) the backend at `regeneration.js:1249` silently ignored
+the strategy and ran cover composite regardless. The UI lied to the user.
+The split was historical (different code authors, different times), not
+principled — covers ARE just scenes with a fixed group-portrait layout and
+title/dedication/branding text.
+**Decision:** Make `generateSceneComposite` cover-capable by adding
+`scene.textOverlay = { type, text, artStyle }` plumbing through
+`buildBlendEditPrompt`. Add `buildCoverCompositeCast()` adapter in
+`compositeCastBuilder.js` — synthesises a scene-shaped pageData from
+`coverHint.characterDetails` + `coverHint.characters`, then delegates to
+the existing `buildCompositeCast` for avatar resolution and lazy 2×4 sheet
+generation (no duplication). Test-models cover branch dispatches by
+`compositeStrategy`: when `'uniform'` or `'stratified'`, route through
+the new path; anything else preserves the legacy `iterateCover` call.
+**Rationale:** Truthful UI > parallel parallel pipelines. The user picked
+Method 2/3 — they should get scene composite for covers, not be silently
+re-routed to the legacy cover path. Auto-pipeline routing is unchanged
+(covers still default to `generateCoverViaComposite` single-pass);
+Method 2/3 for covers is manual-only via test-models, same gate scene
+pages already use. Scene composite's documented failure modes (style
+drift, label leakage, depopulate drift) will likely show up on covers
+via Method 2/3 — that's a known limitation, not a blocker, since manual
+testing is exactly where you want to discover that.
+**Touched:**
+- `server/lib/compositeCastBuilder.js` — new `buildCoverCompositeCast`
+  adapter (~120 lines, delegates to existing `buildCompositeCast`)
+- `server/lib/sceneComposite.js` — `scene.textOverlay` plumbing through
+  `buildBlendEditPrompt`; new `buildTextOverlayDirective` helper
+- `server/routes/regeneration.js:1249` — dispatcher branch on
+  `compositeStrategy` for `pageNumber < 0`
+- `docs/image-generation-methods.html` — methods table updated to note
+  the new cover-via-scene-composite path
+- `memory/project_scene_composite_killed.md` — note that covers can
+  reach scene composite via test-models
+**Production-path behaviour after this change:**
+- V1 covers (streaming initial gen): unchanged — direct path
+- V2+ covers (auto-repair iterate): unchanged — cover composite
+  single-pass
+- Manual cover regen via repair-panel "Iterate Cover": unchanged
+- Test-models on covers with NO composite toggle: unchanged
+- Test-models on covers with Method 2 / Method 3 toggle: NEW — runs
+  scene composite adapted for the cover, with text rendered in the
+  blend step
+**Status:** ✅ active.
+
 ---
 
 ## Cross-cuts already documented elsewhere

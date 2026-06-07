@@ -203,4 +203,135 @@ function splitCastByStratum(cast) {
   };
 }
 
-module.exports = { buildCompositeCast, splitCastByStratum };
+/**
+ * Build the composite-cast array for a COVER (page numbers -1, -2, -3).
+ *
+ * Adapter — transforms cover-hint shape into a scene-shaped pageData, then
+ * delegates to buildCompositeCast so the avatar resolution + lazy 2×4 sheet
+ * generation logic stays in one place. Covers' equivalent of scene
+ * `interactions[]` is `coverHint.characterDetails[name] = { name, holds,
+ * gazesAt, priority }` — same shape, different source.
+ *
+ * Ordering: when coverHint.characters has explicit positions ("Name (left
+ * foreground)"), parseExplicitSequence resolves them; otherwise we fall
+ * back to gender-alternated centre-out via arrangeCenterOut. Both helpers
+ * live in coverComposite.js and are already exported.
+ *
+ * Default pose is 'front' (head-on group portrait) — covers always face the
+ * viewer. flip stays false (no mirroring on covers). Depth defaults to
+ * 'foreground' unless the explicit position phrase says otherwise.
+ *
+ * @param {Array<Object>} characters - story characters (storyData.characters).
+ * @param {Object} coverHint - storyData.coverHints[coverKey].
+ * @param {Object} storyData - full story payload (artStyle, clothingRequirements, characterAvatars).
+ * @param {Object} deps - same shape buildCompositeCast takes (userId, addUsage, log, storyCharacterAvatars).
+ * @returns {Promise<Array<Object>|null>} cast in the same shape buildCompositeCast returns.
+ */
+async function buildCoverCompositeCast(characters, coverHint, storyData, deps = {}) {
+  if (!deps.log) throw new Error('buildCoverCompositeCast: deps.log is required');
+  if (!Array.isArray(characters) || characters.length === 0) return null;
+  if (!coverHint || typeof coverHint !== 'object') return null;
+
+  const { parseExplicitSequence, arrangeCenterOut, sortByImportance } = require('./coverComposite');
+
+  // Step 1: resolve order. parseExplicitSequence returns null when no explicit
+  // positions are present; we fall back to centre-out gender alternation.
+  let ordered = parseExplicitSequence(coverHint, characters);
+  let positionByName = new Map();
+  if (ordered) {
+    // Re-extract the position phrase per character so depth can be inferred.
+    if (Array.isArray(coverHint.characters)) {
+      for (const entry of coverHint.characters) {
+        if (typeof entry !== 'string') continue;
+        const m = entry.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
+        if (m) positionByName.set(m[1].trim().toLowerCase(), m[2].trim().toLowerCase());
+      }
+    }
+  } else {
+    const importance = sortByImportance(characters);
+    ordered = arrangeCenterOut(importance).filter(Boolean);
+  }
+
+  // Step 2: build the fake sceneMetadata.fullData shape buildCompositeCast reads.
+  const details = (coverHint.characterDetails && typeof coverHint.characterDetails === 'object')
+    ? coverHint.characterDetails
+    : {};
+  const artNames = (coverHint._artifactNames && typeof coverHint._artifactNames === 'object')
+    ? coverHint._artifactNames
+    : {};
+
+  // Map holds + gazesAt → action phrase. Same wording as
+  // coverComposite.js:650-681 so the two paths produce comparable cast actions.
+  const buildAction = (d) => {
+    if (!d) return null;
+    const parts = [];
+    const holds = String(d.holds || '').trim();
+    if (holds && holds.toLowerCase() !== 'nothing') {
+      const m = holds.match(/^(ART\d+)/i);
+      if (m && artNames[m[1].toUpperCase()]) {
+        parts.push(`holds the ${artNames[m[1].toUpperCase()]}, both hands visibly gripping it`);
+      } else {
+        parts.push(`holds ${holds}`);
+      }
+    }
+    const gaze = String(d.gazesAt || '').trim();
+    if (gaze) {
+      const m = gaze.match(/^(ART\d+)/i);
+      if (m && artNames[m[1].toUpperCase()]) {
+        parts.push(`eyes fixed on the ${artNames[m[1].toUpperCase()]}`);
+      } else if (/^the viewer$/i.test(gaze)) {
+        parts.push('eyes on the viewer');
+      } else if (/^the distance$/i.test(gaze)) {
+        parts.push('eyes looking off into the distance');
+      } else {
+        parts.push(`eyes on ${gaze}`);
+      }
+    }
+    return parts.length > 0 ? parts.join(', ') : null;
+  };
+
+  const interactions = [];
+  const sceneChars = [];
+  for (const c of ordered) {
+    if (!c?.name) continue;
+    const nameLower = c.name.toLowerCase();
+    const posPhrase = positionByName.get(nameLower) || '';
+    let depth = 'foreground';
+    if (posPhrase.includes('background')) depth = 'background';
+    else if (posPhrase.includes('midground')) depth = 'midground';
+    sceneChars.push({
+      name: c.name,
+      pose: 'front',          // covers face the viewer; head-on portrait
+      flip: false,
+      position: posPhrase || 'in the cover composition',
+      depth,
+      clothing: (coverHint.characterClothing && coverHint.characterClothing[c.name])
+        || 'standard',
+    });
+    const detail = details[c.name] || Object.values(details).find(d => d?.name?.toLowerCase() === nameLower);
+    const action = buildAction(detail);
+    if (detail && action) {
+      interactions.push({
+        character: c.name,
+        where: action,
+        priority: String(detail.priority || 'normal').toLowerCase(),
+      });
+    }
+  }
+  if (sceneChars.length === 0) return null;
+
+  // Step 3: delegate to buildCompositeCast with the synthesised shape.
+  const fakePageData = {
+    sceneMetadata: { fullData: { characters: sceneChars, interactions } },
+    perCharClothing: coverHint.characterClothing || {},
+    sceneCharacters: sceneChars.map(c => ({ name: c.name })),
+  };
+  const fakeInputData = {
+    artStyle: storyData?.artStyle || 'watercolor',
+    characters,
+    clothingRequirements: storyData?.clothingRequirements || {},
+  };
+  return buildCompositeCast(fakePageData, fakeInputData, deps);
+}
+
+module.exports = { buildCompositeCast, buildCoverCompositeCast, splitCastByStratum };

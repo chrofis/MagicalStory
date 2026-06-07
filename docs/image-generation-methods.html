@@ -189,11 +189,19 @@
 </tr>
 
 <tr>
-  <td><strong>Cover composite</strong> (two-pass Grok edit)</td>
+  <td><strong>Cover composite</strong> (single-pass on styled empty scene, legacy 2-pass fallback)</td>
   <td><code>server/lib/coverComposite.js</code></td>
-  <td>Grok edit ×2</td>
-  <td>Manually composited canvas (costumed avatars + landmark photo) + cover hint.</td>
-  <td>Pass 1: pose-redraw on white background. Pass 2: composite onto landmark, watercolor finish. Active when <code>MODEL_DEFAULTS.compositeCovers</code> is true.</td>
+  <td>Grok edit ×1 (single-pass) or ×2 (legacy)</td>
+  <td>Manually composited canvas (costumed avatars + styled empty scene OR landmark photo) + cover hint.</td>
+  <td>Single-pass (default when styled empty scene exists, since commit <code>b8e72eb9</code> 2026-06-07): sharp-composite figures onto styled scene → 1 Grok edit (blend + ground + title). Legacy two-pass (fallback when no styled scene): pass 1 pose-redraw on white BG → pass 2 composite onto landmark + watercolor finish. Active when <code>MODEL_DEFAULTS.compositeCovers</code> is true. <strong>Auto-pipeline default for V2+ covers.</strong></td>
+</tr>
+
+<tr>
+  <td><strong>Scene composite for covers</strong> (Method 2/3 in test panel)</td>
+  <td><code>server/lib/sceneComposite.js</code> via <code>buildCoverCompositeCast</code> adapter</td>
+  <td>Grok generate ×1 + edit ×2 (uniform) or flat 4 (stratified)</td>
+  <td>2×4 character sheets (resolved via cover-cast adapter from <code>coverHint.characterDetails</code>) + styled empty scene + VB grid + textOverlay (title/dedication/branding).</td>
+  <td>Same scene-composite pipeline used for pages, adapted for covers via <code>buildCoverCompositeCast</code> in <code>server/lib/compositeCastBuilder.js</code>. Cover text (title / dedication / "magicalstory.ch" branding) renders in the blend step via the <code>scene.textOverlay</code> param. <strong>Manual-only via test-models</strong> — auto-pipeline still uses the cover composite path above. Reachable through TestModelsPanel Method 2 (Uniform) or Method 3 (Stratified) toggles on negative pageNumbers (-1/-2/-3). Inherits the same documented failure modes as scene composite on pages — see Why-not table.</td>
 </tr>
 
 </tbody>

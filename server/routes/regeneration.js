@@ -1239,35 +1239,156 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       }
     }
 
-    // Cover composite (pageNumber < 0). Covers use a DIFFERENT pipeline than
-    // page scene-composite: generateCoverViaComposite (2×4 cutouts onto the
-    // landmark photo + 2-pass Grok edit), reached via iterateCover with the
-    // compositeCovers flag. On real runs the cover composite path only fires
-    // when a landmark photo resolves; this lets the panel preview what it
-    // would have produced regardless. Result lands under "composite" so the
-    // panel renders it next to the current cover.
+    // Cover composite (pageNumber < 0). Two dispatch targets:
+    //   1. compositeStrategy='uniform'|'stratified' → scene-composite path
+    //      adapted for covers (Method 2/3 from the UI). Builds a composite
+    //      cast from coverHint.characterDetails, pulls the styled empty
+    //      scene + VB grid via buildCoverReferences (same bundle iterateCover
+    //      uses), runs generateSceneComposite with a textOverlay so the
+    //      blend step renders the cover's title/dedication/branding.
+    //   2. anything else → iterateCover legacy single-pass (cover composite
+    //      via generateCoverViaComposite). Preserved as the implicit default
+    //      so existing call sites that don't pick a strategy still work.
+    //
+    // Before this dispatcher, Method 2/3 toggles on covers silently no-op'd —
+    // backend ran cover composite regardless. Now they actually fire scene
+    // composite + cover-cast adapter, and the cover composite legacy path
+    // is reachable through the repair-panel "Iterate Cover" button (different
+    // endpoint) plus the auto-pipeline default.
     if (composite && pageNumber < 0) {
       const compositeStart = Date.now();
+      const coverType = getCoverType(pageNumber);
+      const useSceneComposite = (compositeStrategy === 'uniform' || compositeStrategy === 'stratified');
       try {
-        const coverType = getCoverType(pageNumber);
-        const { iterateCover } = require('../lib/coverIterate');
-        const covResult = await iterateCover(coverType, storyData, {
-          compositeCovers: true,
-          usageTracker: () => {}, // test-models doesn't bill credits
-        });
-        results['composite'] = {
-          imageData: covResult.imageData,
-          modelId: covResult.modelId || 'cover-composite',
-          elapsed: Date.now() - compositeStart,
-          usage: covResult.usage || null,
-          compositeDebug: covResult.compositeDebug || null,
-        };
-        log.info(`🧪 [TEST-MODELS] Cover composite complete for ${coverType} in ${Date.now() - compositeStart}ms (modelId=${covResult.modelId})`);
+        if (useSceneComposite) {
+          // ── Scene-composite-for-covers path (Method 2/3) ──────────────
+          const { buildCoverReferences } = require('../lib/coverIterate');
+          const { buildCoverCompositeCast } = require('../lib/compositeCastBuilder');
+          const { generateSceneComposite } = require('../lib/sceneComposite');
+          const { coverKeyToHintKey, coverLabel } = require('../lib/coverKeys');
+          const hintKey = coverKeyToHintKey(coverType);
+          const coverHint = storyData.coverHints?.[hintKey] || {};
+          // Pull artifact images so the cast's prop references resolve to
+          // actual bytes (same enrichment iterateCover does at line 351).
+          const enrichedHint = { ...coverHint };
+          enrichedHint._artifactImages = enrichedHint._artifactImages || {};
+          enrichedHint._artifactNames = enrichedHint._artifactNames || {};
+          for (const oid of (coverHint.objects || [])) {
+            if (!/^ART\d+/.test(String(oid))) continue;
+            const art = (visualBible?.artifacts || []).find(a => a?.id === oid);
+            if (!art) continue;
+            enrichedHint._artifactNames[oid] = art.name || oid;
+            const src = art.referenceImageUrl || art.referenceImageData;
+            if (src) enrichedHint._artifactImages[oid] = src;
+          }
+          // Filter back-cover characters to main-only (same rule iterateCover
+          // applies at line 196-207). Front/initial pass through all.
+          let coverCharacters = storyData.characters || [];
+          if (coverType === 'backCover') {
+            const mainIds = Array.isArray(storyData.mainCharacters) ? storyData.mainCharacters : [];
+            const isMain = (c) => c.isMainCharacter === true || (mainIds.length > 0 && mainIds.includes(c.id));
+            const mainOnly = coverCharacters.filter(isMain);
+            if (mainOnly.length > 0) coverCharacters = mainOnly;
+          }
+          // Build cover cast — delegates to buildCompositeCast for avatar
+          // resolution + lazy 2×4 sheet generation.
+          const cast = await buildCoverCompositeCast(coverCharacters, enrichedHint, storyData, {
+            userId: req.user.id, addUsage: () => {}, log,
+            storyCharacterAvatars: storyData.characterAvatars || null,
+          });
+          if (!cast || cast.length === 0) {
+            throw new Error('Cover composite cast is empty (no resolvable characters in coverHint)');
+          }
+          // Reference bundle — same one iterateCover uses (landmark photos
+          // + styled empty scene + VB grid). buildCoverReferences handles
+          // empty-scene generation when MODEL_DEFAULTS.singlePassScene is off.
+          const refs = await buildCoverReferences({
+            coverKey: coverType,
+            visualBible,
+            artStyle: storyData.artStyle,
+            sceneDescription: (storyData.coverImages?.[coverType]?.description) || '',
+            coverHint: enrichedHint,
+            logLabel: `${coverLabel(coverType)} TEST-MODELS`,
+            // test-models doesn't bill — pass no usageTracker so empty-scene
+            // generation either uses cached or skips depending on defaults.
+          });
+          // Cover-text helper — single source of truth for title / dedication
+          // / branding so both this path and cover composite stay aligned.
+          const coverTextFor = (ckey, sdata) => {
+            const style = sdata.artStyle || 'watercolor';
+            if (ckey === 'frontCover' && sdata.title) {
+              return { type: 'title', text: sdata.title, artStyle: style };
+            }
+            if (ckey === 'initialPage' && sdata.dedication) {
+              return { type: 'dedication', text: sdata.dedication, artStyle: style };
+            }
+            if (ckey === 'backCover') {
+              return { type: 'branding', text: 'magicalstory.ch', artStyle: style };
+            }
+            return null;
+          };
+          const textOverlay = coverTextFor(coverType, storyData);
+          const vbGridUri = Buffer.isBuffer(refs.visualBibleGrid)
+            ? `data:image/jpeg;base64,${refs.visualBibleGrid.toString('base64')}`
+            : (typeof refs.visualBibleGrid === 'string' && refs.visualBibleGrid ? refs.visualBibleGrid : null);
+          // Composite brief: use cover prompt if available; trimmed to
+          // BLEND_PROMPT_HARD_CAP room (the prompt builder trims again).
+          const coverPrompt = storyData.coverImages?.[coverType]?.prompt || '';
+          const compositeBrief = coverPrompt.length > 5500 ? coverPrompt.slice(0, 5500).trim() : coverPrompt;
+          const compResult = await generateSceneComposite({
+            cleanBackgroundPrompt: refs.sceneMetadata?.emptyScenePrompt
+              || storyData.coverImages?.[coverType]?.description
+              || coverPrompt,
+            existingCleanBackground: refs.sceneBackground || null,
+            scene: {
+              description: storyData.coverImages?.[coverType]?.description || '',
+              action: '',
+              sceneIntent: refs.sceneMetadata?.sceneIntent || '',
+              pageBrief: compositeBrief,
+              artStyle: storyData.artStyle || 'watercolor',
+              textOverlay,
+            },
+            cast,
+            aspectRatio: '3:4',  // cover aspect — MODEL_DEFAULTS.coverAspect
+            visualBibleGridImage: vbGridUri,
+            phantomPoseRender,
+            compositeStrategy,
+            usageTracker: () => {}, // test-models doesn't bill
+          });
+          const compositeKey = `composite${compositeStrategy === 'uniform' ? '+uniform' : ''}`;
+          results[compositeKey] = {
+            imageData: compResult.imageData,
+            modelId: 'scene-composite-cover',
+            elapsed: Date.now() - compositeStart,
+            usage: compResult.usage || null,
+            compositeDebug: compResult.debug || null,
+          };
+          log.info(`🧪 [TEST-MODELS] Cover scene-composite complete for ${coverType} in ${Date.now() - compositeStart}ms (strategy=${compositeStrategy}, phantomPose=${phantomPoseRender})`);
+        } else {
+          // ── Legacy cover composite path (iterateCover default) ───────
+          const { iterateCover } = require('../lib/coverIterate');
+          const covResult = await iterateCover(coverType, storyData, {
+            compositeCovers: true,
+            usageTracker: () => {}, // test-models doesn't bill credits
+          });
+          results['composite'] = {
+            imageData: covResult.imageData,
+            modelId: covResult.modelId || 'cover-composite',
+            elapsed: Date.now() - compositeStart,
+            usage: covResult.usage || null,
+            compositeDebug: covResult.compositeDebug || null,
+          };
+          log.info(`🧪 [TEST-MODELS] Cover composite (legacy) complete for ${coverType} in ${Date.now() - compositeStart}ms (modelId=${covResult.modelId})`);
+        }
       } catch (compErr) {
         log.error(`🧪 [TEST-MODELS] Cover composite failed for page ${pageNumber}: ${compErr.message}`);
-        results['composite'] = {
+        const errorKey = useSceneComposite
+          ? `composite${compositeStrategy === 'uniform' ? '+uniform' : ''}`
+          : 'composite';
+        results[errorKey] = {
           error: compErr.message || 'Cover composite generation failed',
-          modelId: 'cover-composite', elapsed: Date.now() - compositeStart,
+          modelId: useSceneComposite ? 'scene-composite-cover' : 'cover-composite',
+          elapsed: Date.now() - compositeStart,
           compositeDebug: compErr.partialDebug || null,
         };
       }
