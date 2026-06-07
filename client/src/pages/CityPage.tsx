@@ -60,6 +60,14 @@ const CITY_GALLERIES: Record<string, CityGalleryItem[]> = {
     { src: '/images/cities/winterthur/winterthur-book-pirate-ethan-fischmaedchenbrunnen.jpg', landmark: 'Fischmädchenbrunnen' }, // boy
     { src: '/images/cities/winterthur/winterthur-book-wizard-lily-casinotheater-winterthur.jpg', landmark: 'Casinotheater' },    // girl
   ],
+  luzern: [
+    // top pair
+    { src: '/images/cities/luzern/luzern-book-knight-noah-zytturm-luzern.jpg', landmark: 'Zytturm' },                 // boy
+    { src: '/images/cities/luzern/luzern-book-princess-lily-st-leodegar-im-hof.jpg', landmark: 'Hofkirche' },         // girl
+    // bottom pair
+    { src: '/images/cities/luzern/luzern-book-pirate-jules-kapellbruecke.jpg', landmark: 'Kapellbrücke' },            // boy
+    { src: '/images/cities/luzern/luzern-book-wizard-emma-jesuitenkirche-luzern.jpg', landmark: 'Jesuitenkirche' },   // girl
+  ],
 };
 
 // Map sage IDs to city IDs where they're most relevant
