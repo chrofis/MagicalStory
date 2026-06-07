@@ -181,11 +181,11 @@
 </tr>
 
 <tr>
-  <td><strong>Scene composite</strong> (multiple Grok calls)</td>
-  <td><code>server/lib/sceneComposite.js</code></td>
-  <td>Grok generate ×1 + edit ×2</td>
+  <td><strong>Scene composite</strong> (multiple Grok calls) — <strong>🗄 KILLED 2026-05-16</strong></td>
+  <td><code>server/lib/sceneComposite.js</code> (in tree, unreachable)</td>
+  <td>Grok generate ×1 + edit ×2 (+N for phantom-pose); stratified variant flat 4 calls</td>
   <td>2×4 character sheet + scene metadata + optional VB grid.</td>
-  <td>Five-step: <em>populated plate</em> (Grok generate the scene with all silhouettes + VB props in place) → bbox detect → <em>depopulate</em> (Grok edit removes silhouettes, derives clean BG from the same source plate) → sharp-composite character cutouts → Grok-edit blend. Active when <code>MODEL_DEFAULTS.enableSceneComposite</code> is true (current default) + cast-aware router picks composite; <code>inputData.composite</code> can hard-override. See <code>docs/SCENE-COMPOSITE-PIPELINE.html</code>.</td>
+  <td>Five-step uniform: <em>populated plate</em> → bbox detect → <em>depopulate</em> → sharp-composite cutouts → blend. Stratified variant (2026-05-16, killed same day): cast depth-split, back native in anchor plate, front silhouettes → front-figure plate → diff-crop → composite → blend. <strong>Both killed by the hardcoded <code>compositeEnabled = false</code> kill-switch at <code>server.js:5668</code></strong> after producing score-0 outputs that always fell back to the direct path anyway. Re-enable only after fixing style-drift, identity-pack label leakage, Grok input-aspect coercion, and passing an end-to-end staging gate. See <code>docs/decisions.md</code> → "Scene composite pipeline killed".</td>
 </tr>
 
 <tr>
@@ -428,6 +428,8 @@
 <tr><td>Grok Pro everywhere</td><td>🟡 conditional</td><td>$0.07/image (3.5× Standard). Reserved for situations where Standard's quality is genuinely insufficient and a single regen will save more than the price difference.</td></tr>
 <tr><td>Single-portrait avatars (no 2×2 grid)</td><td>🟡 candidate</td><td>3 calls/character instead of 1, but each gets full attention → better identity. Open lever, not yet shipped.</td></tr>
 <tr><td>Kontext LoRA for character locking</td><td>🟡 conditional</td><td>1 training image, $2–5 per character, 99% identity. Too expensive for the current pricing model; revisit if a tier supports it.</td></tr>
+<tr><td>Scene composite — uniform (populated plate → depopulate → cutout → blend)</td><td>❌ killed 2026-05-16</td><td>Score-0 outputs on staging; iterate-fallback to direct salvaged every page, making composite pure cost. Style drift across 3–4 sequential edits, silhouette detection failures on desaturated palette hits, depopulate edit drifted the BG. <code>server.js:5668</code> hardcoded kill-switch.</td></tr>
+<tr><td>Scene composite — stratified (back native + front silhouettes, flat 4 calls)</td><td>❌ killed 2026-05-16</td><td>Built and killed the same day (~7.5h, ~28 fix commits). Same root failures as uniform (style drift, identity-pack label leakage, Grok input-aspect coercion clipping silhouettes) plus extra failure modes on the back/front split.</td></tr>
 </tbody>
 </table>
 

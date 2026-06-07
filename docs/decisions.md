@@ -151,6 +151,83 @@ glitch.
   instruction the model uses to keep the chosen corner light
 **Status:** ✅ active.
 
+### Scene composite pipeline killed — every page goes direct
+**Context:** Two scene-composite variants were built between 2026-05-08
+and 2026-05-16: (1) the **uniform composite** (populated plate with ALL
+cast as colored silhouettes → bbox detect → depopulate → paste 2×4 cell
+cutouts → blend; ~3 Grok calls flat, +N per phantom-pose render), and
+(2) the **stratified composite** (cast depth-split: back stratum rendered
+natively in the anchor plate, front stratum as silhouettes → front-figure
+plate → diff-crop → composite onto depopulated back plate → blend; flat 4
+Grok calls; N=1 short-circuits to anchor plate only). Initial stratified
+commit `23fcf070` 2026-05-16 16:04; killed `8557b0ac` 2026-05-16 23:28
+(~7.5 hours and ~28 fix-commits later). Same-day saga.
+**Decision:** Hard-disable the composite branch at `server.js:5668` —
+`const compositeEnabled = false;` regardless of what `decidePageRoute()`
+returns. `routeDecision` metadata still populates so the dev panel reports
+which method WOULD have been picked; only the gate flips. Every page
+takes the direct Grok-edit path (`generateImageWithQualityRetry`).
+`server/lib/sceneComposite.js`, `server/lib/compositeCastBuilder.js`,
+`server/lib/phantomPoseRender.js` remain in the tree but are unreachable.
+**Rationale:** Composite pages produced score-0 outputs on staging
+`job_1778925296736_c9ia8qrio` pages 3 + 4. The auto-repair iterate path
+salvaged every failed composite by re-running it as direct, so every
+composite call was pure cost. Failure modes that never stabilised:
+- **Style drift across 3–4 sequential Grok edits.** Each edit shifted
+  brushwork, palette, or detail level; the final blend pass couldn't
+  reconcile back to the anchor's style.
+- **Silhouette detection failures.** Desaturated reds drifted past the
+  RGB-distance threshold (commits `d359fabe`, `1a66a0b6`); translucent
+  silhouettes required tolerance tuning (`f3096b00`); label bars from
+  identity packs leaked into the mask (`5061bdd3`); split silhouette
+  fragments needed merge logic (`fb1e6ca8`).
+- **Depopulate drift.** Grok edit on the populated plate to "remove the
+  silhouettes" frequently moved a building, swapped a VB prop, or
+  repainted the floor (`ead1ed8b` ended up dropping the step entirely
+  in favor of a direct RGB mask, defeating the architectural purpose).
+- **Identity pack leakage.** Grok kept copying labels and reference cells
+  from the identity packs into the output (`6f84dbca`, `a08aff78`,
+  `11094490`) — same VB-grid-label problem we hit again on covers in
+  2026-06-04 (commit `27e375ba`).
+- **Aspect / cropping bugs.** Grok edit's input-aspect coercion clipped
+  silhouettes off the edges (`3f38b295`, `144041df`, `9e9ce7bc`) — same
+  root cause as the cover blur problem solved in 2026-06-04 with
+  magenta-pad-extend.
+The cover variant (`server/lib/coverComposite.js`) is unaffected and is
+still on by default (`MODEL_DEFAULTS.compositeCovers: true`) — covers
+have a different shape (3–5 figures in a single group portrait, landmark
+backdrop, pre-styled costumed avatars), and 2026-06-04's single-pass
+single-edit refactor (commit `b8e72eb9`) stabilised it.
+**Before re-enabling scene composite, fix:**
+1. Style-drift across sequential edits (probably means collapsing to a
+   single edit, like the cover did in `b8e72eb9`).
+2. Identity-pack label leakage (apply the `composeCharWithVbRow` no-label
+   fix from `27e375ba` to whatever reference packing the composite path
+   uses).
+3. Grok input-aspect coercion (apply the magenta-pad-extend trick from
+   the cover work).
+4. End-to-end validation: pick 3 staging stories with cast ≥ 4 and prove
+   the composite pages score ≥ direct on quality eval (semantic + visual).
+   Without that gate, re-enabling is the same trap.
+**Touched:**
+- `server.js:5658-5668` — the kill-switch + the comment block explaining
+  why it's hardcoded
+- `server/lib/sceneComposite.js` — uniform composite (still in tree,
+  unreachable)
+- `server/lib/compositeCastBuilder.js` — cast builder (still in tree,
+  unreachable)
+- `server/lib/phantomPoseRender.js` — per-figure pose render (still in
+  tree, unreachable)
+- `server/config/models.js:enableSceneComposite` /
+  `compositeStrategy` / `phantomPoseRender` — flags still defined but
+  the kill-switch bypasses them
+- `docs/image-generation-methods.html` — Why-not table entry; the
+  scene-composite row in the methods table marked killed
+- `memory/project_scene_composite_killed.md` — short verdict + don't
+  re-suggest without addressing the 4 fixes above
+**Status:** 🗄 superseded by direct path. Re-enable only after the four
+fixes above land + the validation gate passes.
+
 ---
 
 ## Cross-cuts already documented elsewhere
