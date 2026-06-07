@@ -17,7 +17,7 @@ steampunk: Steampunk graphic novel illustration, Victorian aesthetic, intricate 
 
 comic: Classic American comic book art, heavy black ink lines, dynamic composition, visible halftone/Ben-Day dots, vibrant CMYK colors, style of Jack Kirby/Jim Lee
 
-manga: Traditional manga style, Japanese comic art, intricate detailed linework, black and white/monochrome, atmospheric screentones, dramatic lighting and composition
+manga: Traditional manga style, Japanese comic art, intricate detailed ink linework, atmospheric screentones, dramatic lighting and composition. Backgrounds and scenery in monochrome ink + screentones. Character clothing, hair, and key story objects in their natural specified colors (color-spread / promotional cover style, not pure black-and-white interior panels).
 
 watercolor: Traditional watercolor painting, textured paper, delicate color washes (wet-on-wet technique), soft edges, visible artistic brushstrokes, luminous flowing colors. Characters are fully opaque — never see-through, never fading into the background.
 

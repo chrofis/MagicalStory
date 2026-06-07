@@ -114,11 +114,11 @@ export const artStyles: ArtStyle[] = [
     emoji: '📚',
     image: '/images/manga style.jpg',
     description: {
-      en: 'Japanese manga style, black and white with screentones',
-      de: 'Japanischer Manga-Stil, schwarz-weiss mit Rastern',
-      fr: 'Style manga japonais, noir et blanc avec trames',
+      en: 'Japanese manga style, ink linework with selective color accents on characters',
+      de: 'Japanischer Manga-Stil, Tuschelinien mit gezielten Farbakzenten auf Figuren',
+      fr: 'Style manga japonais, encrage avec accents colorés sélectifs sur les personnages',
     },
-    prompt: 'Traditional manga style, Japanese comic art, intricate detailed linework, black and white/monochrome, atmospheric screentones, dramatic lighting and composition',
+    prompt: 'Traditional manga style, Japanese comic art, intricate detailed ink linework, atmospheric screentones, dramatic lighting and composition. Backgrounds and scenery rendered in monochrome ink + screentones. Character clothing, hair, and key story objects rendered in their natural specified colors (this is "color spread" manga — promotional cover style, not pure black-and-white interior panels).',
     category: 'illustrated',
   },
 
