@@ -8,6 +8,7 @@ import TrialCharacterStep from './trial/TrialCharacterStep';
 import TrialTopicStep from './trial/TrialTopicStep';
 import TrialIdeasStep from './trial/TrialIdeasStep';
 import { trackTrialPageVisit } from '@/utils/gtagConversion';
+import { trackEvent } from '@/utils/analytics';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -238,7 +239,7 @@ export default function TrialWizard() {
   // User location (IP-based, for landmark personalization)
   const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null; latitude?: number | null; longitude?: number | null } | null>(null);
 
-  useEffect(() => { trackTrialPageVisit(); }, []);
+  useEffect(() => { trackTrialPageVisit(); trackEvent('trial_landing'); }, []);
 
   useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL || '';

@@ -7,7 +7,11 @@ import { LanguageProvider } from './context/LanguageContext';
 import { StoryProvider } from './context/StoryContext';
 import { ToastProvider } from './context/ToastContext';
 import { SEODataProvider } from './context/SEODataContext';
+import { initGA4 } from './utils/analytics';
 import './index.css';
+
+// Configure GA4 (behavioural analytics) once on load. No-op until VITE_GA4_ID is set.
+initGA4();
 
 // Stale-chunk recovery: when a deploy ships new chunks, old browsers may fail
 // to load the now-missing files. Reload to fetch the new build.

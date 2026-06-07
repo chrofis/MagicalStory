@@ -7,6 +7,7 @@ import storage from '@/services/storage';
 import { useLanguage } from '@/context/LanguageContext';
 import { INITIAL_USER_CREDITS } from '@/constants/credits';
 import { trackEmailLead, trackTrialStoryCompleted } from '@/utils/gtagConversion';
+import { trackEvent } from '@/utils/analytics';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -464,6 +465,7 @@ export default function TrialGenerationPage() {
     if (pageState === 'completed' && !storyCompletionFiredRef.current) {
       storyCompletionFiredRef.current = true;
       trackTrialStoryCompleted();
+      trackEvent('trial_completed');
     }
   }, [pageState]);
 
@@ -511,6 +513,7 @@ export default function TrialGenerationPage() {
 
       setEmailLinked(true);
       trackEmailLead();
+      trackEvent('trial_email_lead');
     } catch {
       setAuthError(t.error);
     } finally {

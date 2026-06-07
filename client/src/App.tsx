@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { ImpersonationBanner } from './components/common/ImpersonationBanner';
 import { ScrollToTop } from './components/common/ScrollToTop';
+import { RouteTracker } from './components/common/RouteTracker';
 import { GenerationProvider } from './context/GenerationContext';
 import { useAuth } from './context/AuthContext';
 
@@ -69,6 +70,7 @@ function App() {
   return (
     <GenerationProvider>
       <ScrollToTop />
+      <RouteTracker />
       <ImpersonationBanner />
       <Suspense fallback={<LoadingSpinner fullScreen />}>
         <Routes>
