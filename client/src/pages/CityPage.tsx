@@ -84,6 +84,14 @@ const CITY_GALLERIES: Record<string, CityGalleryItem[]> = {
     { src: '/images/cities/stgallen/st-gallen-book-pirate-noah-broderbrunnen.jpg', landmark: 'Broderbrunnen' },                    // boy
     { src: '/images/cities/stgallen/st-gallen-book-wizard-emma-christuskirche-st-gallen.jpg', landmark: 'Christuskirche' },        // girl
   ],
+  'biel-bienne': [
+    // top pair
+    { src: '/images/cities/biel-bienne/biel-book-knight-ethan-schloss-nidau.jpg', landmark: 'Schloss Nidau' },        // boy
+    { src: '/images/cities/biel-bienne/biel-book-princess-lily-stadtkirche-biel.jpg', landmark: 'Stadtkirche' },      // girl
+    // bottom pair
+    { src: '/images/cities/biel-bienne/biel-book-pirate-noah-bielersee.jpg', landmark: 'Bielersee' },                 // boy
+    { src: '/images/cities/biel-bienne/biel-book-wizard-lea-pasquart-kirche-biel.jpg', landmark: 'Pasquart-Kirche' }, // girl
+  ],
 };
 
 // Map sage IDs to city IDs where they're most relevant
