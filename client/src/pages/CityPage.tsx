@@ -76,6 +76,14 @@ const CITY_GALLERIES: Record<string, CityGalleryItem[]> = {
     { src: '/images/cities/schaffhausen/schaffhausen-book-pirate-noah-rheinfall.jpg', landmark: 'Rheinfall' },                                    // boy
     { src: '/images/cities/schaffhausen/schaffhausen-book-wizard-lea-schwabentor-schaffhausen.jpg', landmark: 'Schwabentor' },                    // girl
   ],
+  stgallen: [
+    // top pair
+    { src: '/images/cities/stgallen/st-gallen-book-knight-jules-st-laurenzen-st-gallen.jpg', landmark: 'St. Laurenzen' },           // boy
+    { src: '/images/cities/stgallen/st-gallen-book-princess-lily-stiftskirche-st-gallen.jpg', landmark: 'Stiftskirche' },          // girl
+    // bottom pair
+    { src: '/images/cities/stgallen/st-gallen-book-pirate-noah-broderbrunnen.jpg', landmark: 'Broderbrunnen' },                    // boy
+    { src: '/images/cities/stgallen/st-gallen-book-wizard-emma-christuskirche-st-gallen.jpg', landmark: 'Christuskirche' },        // girl
+  ],
 };
 
 // Map sage IDs to city IDs where they're most relevant
