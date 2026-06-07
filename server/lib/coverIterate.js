@@ -398,6 +398,14 @@ async function iterateCover(coverKey, storyData, options = {}) {
         // each element it should depict in the figures' hands.
         vbGrid: coverVbGrid,
         landmarkBuf,
+        // sceneBackground = already-styled manga/watercolor empty scene of
+        // the landmark, generated earlier by packReferences-equivalent code
+        // around line 600 of this file. When present, the composite path
+        // uses it as the figure backdrop and runs ONE Grok refinement edit
+        // (no style transfer, no landmark protection needed — both are
+        // already baked into the empty scene). Without this V2/V3/V4 of
+        // job_1780564110486_g4gn4vzvu all dropped the landmark on pass 2.
+        sceneBackground: coverSceneBackground,
         artStyle: storyData.artStyle || 'watercolor',
         title: storyData.title || '',
         dedication: storyData.dedication || '',
