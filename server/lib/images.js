@@ -4661,7 +4661,19 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio });
+        // Magenta-extension on slot 0 when the primary input is a scene-type plate
+        // (landmark photo, previous full scene, or sceneBackground). These have full
+        // backgrounds whose aspect rarely matches target (Wikipedia landscape → A4
+        // portrait, etc); without extension Grok composes for the input's native
+        // aspect and pads the output with blurred edge bars. Skip when slot 0 is
+        // a character-only ref (avatars are tall portraits that should keep their
+        // existing white-letterbox behavior).
+        const slot0IsScenePlate = !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
+        result = await editWithGrok(effectivePrompt, refImages, {
+          model: grokModel,
+          aspectRatio,
+          padInputWithExtension: slot0IsScenePlate,
+        });
       } else {
         result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio });
       }

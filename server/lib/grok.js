@@ -179,6 +179,18 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
                               // — padding adds invisible margins. Don't use for inputs with
                               // full backgrounds (scenes/covers) — pad bars survive through
                               // the edit and bake into the output as visible letterboxing.
+    padInputWithExtension = false, // For scene-like slot-0 inputs whose aspect differs from
+                              // target: pad slot 0 with MAGENTA (#FF00FF) and auto-prepend
+                              // an extension instruction to the prompt telling Grok to
+                              // paint the magenta regions with scene continuation (more
+                              // sky above, more ground below, etc). Grok edit returns the
+                              // input aspect, so a magenta-padded 3:4 input → 3:4 output
+                              // with the magenta filled. Use this instead of padInput when
+                              // the input has a full background. Confirmed working on the
+                              // Holzbrücke Wikipedia photo: 3:2 landscape color → 3:4
+                              // portrait manga B&W with sky + river extended cleanly.
+                              // Slots 1+ (avatars, VB grids) keep their existing padInput
+                              // behavior — only slot 0 gets the magenta treatment.
   } = options;
 
   if (!XAI_API_KEY) {
@@ -218,6 +230,10 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   // Parses aspectRatio strings like '3:4', '1:1', '9:16'.
   const [aspW, aspH] = String(aspectRatio).split(':').map(Number);
   const targetRatio = (aspW > 0 && aspH > 0) ? aspW / aspH : 1;
+  // Track magenta padding applied to slot 0 so we can prepend the extension
+  // instruction to the prompt. Only slot 0 (primary scene plate) gets magenta;
+  // slots 1+ are labeled reference cards that shouldn't be "extended".
+  let slot0Pad = null;
   for (let i = 0; i < images.length; i++) {
     try {
       const base64 = r2.stripDataUriPrefix(images[i]);
@@ -227,9 +243,12 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
       const currentRatio = meta.width / meta.height;
       // Skip if already within 1% of target (avoid gratuitous re-encode)
       if (Math.abs(currentRatio - targetRatio) / targetRatio < 0.01) continue;
+      const useMagentaExtension = padInputWithExtension && i === 0;
       let targetW, targetH, fit, background;
-      if (padInput) {
-        // EXPAND the shorter axis. Add white margins; keep all source pixels.
+      if (padInput || useMagentaExtension) {
+        // EXPAND the shorter axis. Magenta for slot 0 when extension mode is on
+        // (Grok fills the magenta with scene continuation per the prompt prefix);
+        // white otherwise (existing avatar behavior).
         if (currentRatio > targetRatio) {
           // Source wider than target — keep width, expand height.
           targetW = meta.width;
@@ -240,7 +259,21 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
           targetW = Math.round(meta.height * targetRatio);
         }
         fit = 'contain';
-        background = { r: 255, g: 255, b: 255 };
+        background = useMagentaExtension
+          ? { r: 255, g: 0, b: 255 }      // magenta — placeholder Grok will fill
+          : { r: 255, g: 255, b: 255 };   // white — original padInput behavior
+        if (useMagentaExtension) {
+          // Per-axis pad pixel counts so the prompt prefix names exact dimensions
+          // ("top 343px, bottom 344px") — gives Grok an unambiguous anchor.
+          const padW = targetW - meta.width;
+          const padH = targetH - meta.height;
+          slot0Pad = {
+            top: Math.floor(padH / 2),
+            bottom: padH - Math.floor(padH / 2),
+            left: Math.floor(padW / 2),
+            right: padW - Math.floor(padW / 2),
+          };
+        }
       } else {
         // CROP the longer axis. Trim edge content; preserve edge-to-edge visuals.
         if (currentRatio > targetRatio) {
@@ -261,10 +294,25 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
         .jpeg({ quality: 90 })
         .toBuffer();
       images[i] = `data:image/jpeg;base64,${out.toString('base64')}`;
-      log.debug(`🎨 [GROK] ${padInput ? 'Padded' : 'Cropped'} edit input ${i}: ${meta.width}x${meta.height} → ${targetW}x${targetH} (aspect ${aspectRatio})`);
+      const padMode = (padInputWithExtension && i === 0) ? 'Magenta-padded' : (padInput ? 'Padded' : 'Cropped');
+      log.debug(`🎨 [GROK] ${padMode} edit input ${i}: ${meta.width}x${meta.height} → ${targetW}x${targetH} (aspect ${aspectRatio})`);
     } catch (padErr) {
       log.warn(`⚠️ [GROK] Failed to normalise edit image ${i} aspect: ${padErr.message}`);
     }
+  }
+
+  // Auto-prepend extension instruction when slot 0 got magenta-padded. Names
+  // the exact pixel counts so Grok has unambiguous anchors. Without this
+  // prefix the magenta would survive into the output as visible bars.
+  if (slot0Pad && (slot0Pad.top + slot0Pad.bottom + slot0Pad.left + slot0Pad.right) > 0) {
+    const parts = [];
+    if (slot0Pad.top > 0) parts.push(`${slot0Pad.top}px at the TOP`);
+    if (slot0Pad.bottom > 0) parts.push(`${slot0Pad.bottom}px at the BOTTOM`);
+    if (slot0Pad.left > 0) parts.push(`${slot0Pad.left}px on the LEFT`);
+    if (slot0Pad.right > 0) parts.push(`${slot0Pad.right}px on the RIGHT`);
+    const prefix = `The first input image has SOLID BRIGHT MAGENTA (pure #FF00FF) placeholder padding: ${parts.join(', ')}. Extend the existing scene content INTO these magenta regions so the output is a continuous illustration filling the entire canvas — paint matching sky above, matching ground/foreground below, matching scene continuation on the sides. The non-magenta center region must remain pixel-faithful in composition and geometry. DO NOT preserve any magenta. DO NOT add a magenta/pink/purple border, frame, or vignette. The final output must have NO visible magenta and NO visible padding boundary.\n\n`;
+    prompt = prefix + prompt;
+    log.info(`🎨 [GROK] Magenta-extension active on slot 0: pad top=${slot0Pad.top} bottom=${slot0Pad.bottom} left=${slot0Pad.left} right=${slot0Pad.right}`);
   }
 
   log.info(`🎨 [GROK] Starting edit (model: ${model}, refs: ${images.length}, aspect: ${aspectRatio})`);
