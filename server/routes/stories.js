@@ -2106,9 +2106,12 @@ router.get('/:id/reference-sheet-sources', authenticateToken, async (req, res) =
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    // Verify user has access (or admin impersonating)
+    // Verify user has access: story owner, admin (any story), or admin impersonating.
+    // Previously failed silently for admin-without-active-impersonation → endpoint
+    // returned 404 → frontend treated as "0 batches" → dev panel button broken.
+    const isAdmin = req.user?.role === 'admin';
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (isAdmin || (req.user.impersonating && req.user.originalAdminId)) {
       rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
     } else {
       rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
@@ -2771,13 +2774,13 @@ router.get('/:id/visual-bible-image/:elementId', authenticateToken, async (req, 
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    // Verify user has access to this story
+    // Verify user has access: story owner, admin (any story), or admin impersonating.
+    // Admin role bypasses user-filter so dev-panel "Load All Reference Images"
+    // works against any story without needing active impersonation.
+    const isAdmin = req.user?.role === 'admin';
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
-      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
-      if (rows.length === 0) {
-        rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
-      }
+    if (isAdmin || (req.user.impersonating && req.user.originalAdminId)) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
     } else {
       rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     }
