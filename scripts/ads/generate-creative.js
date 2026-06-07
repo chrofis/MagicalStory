@@ -233,7 +233,7 @@ INTENTIONAL CONTRAST between the two figures: the LEFT (real-photo) child gazes 
 
 Book has clearly readable paper texture, slight curve at the spine, faint shadow in the gutter. A few small magical sparkles drift from the right page like fairy dust.
 
-Composition: book centred. Calm space top-right above the watercolour page (leaves room for an ad headline). NO text anywhere in the image. NO logos. NO watermarks. NO brand names. NO captions. NO signatures. NO fake AI watermarks in any corner. Completely clean image with zero text overlays.
+Composition: book centred. Keep the top-right area calm and completely EMPTY — render it blank with NO text, NO letters, NO headline, NO writing of any kind. NO text anywhere in the image. NO logos. NO watermarks. NO brand names. NO captions. NO signatures. NO fake AI watermarks in any corner. Completely clean image with zero text overlays.
 
 Reference image 1 = the child's face/identity (use across both pages — same child).
 Reference image 2 = ${lm.name} (use as backdrop on BOTH pages).
