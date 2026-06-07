@@ -1349,14 +1349,13 @@ async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '
       const cellLeft = i * cellW;
       composites.push({ input: cell, left: cellLeft, top: charHOrig });
 
-      // Caption: white text with heavy black stroke directly on the cell —
-      // no rect, no bar (Grok occasionally bakes captioned bars into output).
-      const label = String(el.name || '').slice(0, 18).replace(/[<>&]/g, '');
-      const fontPx = Math.max(14, Math.min(40, Math.round(cellH * 0.14)));
-      const strokeW = Math.max(2, Math.round(fontPx * 0.18));
-      const baselineY = cellH - Math.round(fontPx * 0.35);
-      const svg = `<svg width="${cellW}" height="${cellH}" xmlns="http://www.w3.org/2000/svg"><text x="${cellW/2}" y="${baselineY}" font-family="Arial,Helvetica,sans-serif" font-size="${fontPx}" font-weight="bold" text-anchor="middle" fill="white" stroke="black" stroke-width="${strokeW}" paint-order="stroke fill">${label}</text></svg>`;
-      composites.push({ input: Buffer.from(svg), left: cellLeft, top: charHOrig });
+      // VB cell labels intentionally dropped — Grok knows what a bench /
+      // coin / sundial / bridge looks like; the caption only ever serves to
+      // leak into the rendered scene (e.g. "Holzbank am Stadtturm" baked
+      // into page 7 V2 of job_1780564110486_g4gn4vzvu). Same policy as
+      // buildVisualBibleGrid's labelMode='all' default (commit ac4ee3bc).
+      // Character labels stay on the character cells above via
+      // labelCharacterImage — those are needed for name↔face binding.
     } catch (err) {
       log.warn(`⚠️ [GROK] composeCharWithVbRow: failed cell ${i} (${el.name}): ${err.message}`);
     }
