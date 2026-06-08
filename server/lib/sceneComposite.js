@@ -1839,14 +1839,16 @@ async function _simpleCompositePath({ emptySceneData, frontCast, aspectRatio, sc
 
   // 6. Build blend prompt — existing buildBlendEditPrompt has scene.textOverlay
   // support so covers get title/dedication/branding rendered, scenes get the
-  // default no-text behaviour.
+  // default no-text behaviour. editWithGrok wants data URI strings (it does
+  // r2.stripDataUriPrefix on each ref), so convert the composited buffer
+  // before passing.
   const blendPrompt = buildBlendEditPrompt(scene);
-  const blendRefs = [composited];
+  const blendRefs = [`data:image/jpeg;base64,${composited.toString('base64')}`];
   if (visualBibleGridImage) {
-    const vbBase64 = typeof visualBibleGridImage === 'string'
-      ? visualBibleGridImage.replace(/^data:image\/\w+;base64,/, '')
-      : null;
-    if (vbBase64) blendRefs.push(Buffer.from(vbBase64, 'base64'));
+    const vbUri = typeof visualBibleGridImage === 'string'
+      ? (visualBibleGridImage.startsWith('data:') ? visualBibleGridImage : `data:image/jpeg;base64,${visualBibleGridImage}`)
+      : (Buffer.isBuffer(visualBibleGridImage) ? `data:image/jpeg;base64,${visualBibleGridImage.toString('base64')}` : null);
+    if (vbUri) blendRefs.push(vbUri);
   }
   log.info(`[SCENE COMPOSITE/SIMPLE] blend edit — ${blendRefs.length} ref(s), aspect ${aspectRatio}`);
   const blend = await editWithGrok(blendPrompt, blendRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
