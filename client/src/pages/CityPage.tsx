@@ -373,7 +373,7 @@ export default function CityPage() {
                             loading="eager"
                             fetchPriority="high"
                             decoding="async"
-                            className="w-full aspect-square object-cover rounded-2xl"
+                            className="w-full aspect-video object-contain rounded-2xl"
                           />
                         </picture>
                       );
@@ -574,7 +574,7 @@ export default function CityPage() {
                       alt={`${cityName} — ${g.landmark}`}
                       loading="lazy"
                       decoding="async"
-                      className="w-full aspect-square object-cover rounded-2xl shadow-sm border border-stone-100"
+                      className="w-full aspect-video object-contain rounded-2xl shadow-sm border border-stone-100"
                     />
                   </picture>
                 );
