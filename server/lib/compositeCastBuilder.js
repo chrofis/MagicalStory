@@ -132,7 +132,23 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
         return null;
       }
     }
-    const sheetBuf = Buffer.from(sheetUri.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    // sheetUri can be a data: URI OR an https:// R2 URL (post-R2 migration).
+    // Buffer.from(URL, 'base64') silently decodes the URL string itself —
+    // produces garbage bytes, sharp downstream throws "Input buffer contains
+    // unsupported image format". Branch by URI type and fetch URLs first.
+    let sheetBuf;
+    if (typeof sheetUri === 'string' && /^https?:\/\//i.test(sheetUri)) {
+      try {
+        const resp = await fetch(sheetUri);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        sheetBuf = Buffer.from(await resp.arrayBuffer());
+      } catch (err) {
+        log.warn(`[COMPOSITE CAST] failed to fetch styled avatar for ${name}: ${err.message}`);
+        return null;
+      }
+    } else {
+      sheetBuf = Buffer.from(String(sheetUri).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    }
     const pose = (sc.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
       ? sc.pose : 'threeQuarter';
     const flip = sc.flip === true;
