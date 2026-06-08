@@ -164,6 +164,12 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       // signal the stratified composite reads.
       depth: sc.depth || 'foreground',
       sizeHint: sc.depth === 'background' ? 'small in the distance' : (sc.depth === 'midground' ? 'medium' : undefined),
+      // Age + gender carried through for the simple-composite path's age-
+      // appropriate scaling (child figures shorter than adult figures by
+      // real-world cm). Null/undefined when the source character row lacks
+      // these fields; the consumer falls back to uniform height.
+      age: parseInt(character.age, 10) || null,
+      gender: character.gender || null,
     });
   }
   return out;

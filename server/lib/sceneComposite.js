@@ -1698,6 +1698,172 @@ async function generateStratifiedComposite(opts) {
   }
 }
 
+// ─── Simple composite (no silhouette dance) ───────────────────────────────
+//
+// When backCast is empty (cast≤2 OR no real depth signal — see
+// splitCastByStratum), the silhouette → cutout → align → composite cycle is
+// pointless: there's nothing to round-trip. Instead we do the same thing
+// coverComposite.js does for V2+ covers — server-side sharp.composite of
+// each character's body-front cell onto the styled empty scene, then ONE
+// Grok blend pass to refine edges + render text + add required objects.
+//
+// Identity is guaranteed because the actual styled-avatar pixels are in the
+// canvas before Grok touches it. Grok can refine but can't reinvent a face
+// it didn't draw. Same pattern, same cost ($0.02 empty scene + $0.02 blend
+// edit = $0.04 total), and the dev panel gets the pre-Grok composited
+// intermediate the user was looking for.
+
+// Real-world heights by age (cm), copied from coverComposite.js so both
+// paths produce visually consistent sizing.
+function _heightCm(age) {
+  const n = parseInt(age, 10);
+  if (!Number.isFinite(n)) return 175;
+  if (n <= 1) return 75;
+  if (n <= 3) return 95;
+  if (n <= 5) return 110;
+  if (n <= 7) return 122;
+  if (n <= 10) return 140;
+  if (n <= 12) return 150;
+  if (n <= 14) return 162;
+  if (n <= 17) return 172;
+  if (n <= 60) return 175;
+  return 168;
+}
+
+// Parse a position phrase ("left foreground", "right midground", "in the
+// scene") into a horizontal fraction (0–1) and a depth multiplier for size.
+// Vague phrases default to centre + foreground.
+function _parsePosition(phrase) {
+  const s = String(phrase || '').toLowerCase();
+  let xFrac = 0.5;
+  if (s.includes('far left')) xFrac = 0.10;
+  else if (s.includes('left')) xFrac = 0.30;
+  else if (s.includes('far right')) xFrac = 0.90;
+  else if (s.includes('right')) xFrac = 0.70;
+  else if (s.includes('centre') || s.includes('center')) xFrac = 0.50;
+  let depthMul = 1.0;
+  if (s.includes('background')) depthMul = 0.55;
+  else if (s.includes('midground')) depthMul = 0.75;
+  return { xFrac, depthMul };
+}
+
+// Parse an aspect-ratio string ("3:4", "16:9") into [w, h] pixel dims given
+// a base width. Used to size the composite canvas.
+function _aspectDims(aspectRatio, baseWidth = 1024) {
+  const m = String(aspectRatio || '3:4').match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
+  if (!m) return { W: baseWidth, H: Math.round(baseWidth * 4 / 3) };
+  const aw = parseFloat(m[1]), ah = parseFloat(m[2]);
+  if (!aw || !ah) return { W: baseWidth, H: Math.round(baseWidth * 4 / 3) };
+  return { W: baseWidth, H: Math.round(baseWidth * ah / aw) };
+}
+
+/**
+ * Simple-composite path: paste body-front cells onto the empty scene at
+ * deterministic positions, then run a single Grok blend pass to refine.
+ * Used when backCast is empty.
+ *
+ * Returns the same shape generateStratifiedComposite returns so callers stay
+ * agnostic about which branch ran.
+ */
+async function _simpleCompositePath({ emptySceneData, frontCast, aspectRatio, scene, usageTracker, debug, totalCost, visualBibleGridImage }) {
+  const { W, H } = _aspectDims(aspectRatio, 1024);
+  log.info(`[SCENE COMPOSITE/SIMPLE] start — ${frontCast.length} chars, canvas ${W}×${H}`);
+
+  // 1. Decode empty scene into a buffer at canvas dimensions.
+  const baseBase64 = (typeof emptySceneData === 'string')
+    ? emptySceneData.replace(/^data:image\/\w+;base64,/, '')
+    : emptySceneData.toString('base64');
+  const baseInputBuf = Buffer.from(baseBase64, 'base64');
+  const baseBuf = await sharp(baseInputBuf)
+    .resize(W, H, { fit: 'cover', position: 'centre' })
+    .jpeg({ quality: 92 })
+    .toBuffer();
+
+  // 2. Extract body-front cell + remove BG + trim, per character.
+  const figures = [];
+  for (const c of frontCast) {
+    if (!c.sheetBuf || !Buffer.isBuffer(c.sheetBuf)) {
+      log.warn(`[SCENE COMPOSITE/SIMPLE] ${c.name}: no sheetBuf — skipping`);
+      continue;
+    }
+    const cellIdx = POSE_CELL[c.pose] ?? POSE_CELL.front;
+    let cellBuf;
+    try {
+      cellBuf = await cropSheetCell(c.sheetBuf, cellIdx);
+    } catch (err) {
+      log.warn(`[SCENE COMPOSITE/SIMPLE] ${c.name}: cropSheetCell failed (${err.message}); using full sheet`);
+      cellBuf = c.sheetBuf;
+    }
+    const cleanBuf = await removeBackground(cellBuf);
+    const trimmedBuf = await sharp(cleanBuf).trim({ threshold: 1 }).toBuffer().catch(() => cleanBuf);
+    figures.push({ name: c.name, age: c.age, position: c.position, depth: c.depth, buffer: trimmedBuf });
+  }
+  if (figures.length === 0) throw new Error('[SCENE COMPOSITE/SIMPLE] no usable figures');
+
+  // 3. Resize each figure by age (proportional to real-world cm). The tallest
+  // figure occupies ~62% of canvas height; everyone else scales to match.
+  const tallestCm = Math.max(...figures.map(f => _heightCm(f.age)));
+  const targetTallestPx = Math.round(H * 0.62);
+  const pxPerCm = targetTallestPx / tallestCm;
+  for (const f of figures) {
+    const { depthMul } = _parsePosition(f.position);
+    const targetH = Math.max(40, Math.round(_heightCm(f.age) * pxPerCm * depthMul));
+    let resized = await sharp(f.buffer).resize({ height: targetH }).png().toBuffer();
+    let meta = await sharp(resized).metadata();
+    if (meta.width > W || meta.height > H) {
+      resized = await sharp(resized).resize({ width: W, height: H, fit: 'inside' }).png().toBuffer();
+      meta = await sharp(resized).metadata();
+    }
+    f.buffer = resized;
+    f.width = meta.width;
+    f.height = meta.height;
+    f.xFrac = _parsePosition(f.position).xFrac;
+  }
+
+  // 4. Compute (left, top) for each figure. Bottom-aligned to groundY; x
+  // from parsed position phrase. Clamp to canvas bounds.
+  const groundY = Math.round(H * 0.96);
+  const layers = [];
+  for (const f of figures) {
+    const cx = Math.round(f.xFrac * W);
+    const left = Math.max(0, Math.min(W - f.width, cx - Math.round(f.width / 2)));
+    const top = Math.max(0, groundY - f.height);
+    layers.push({ input: f.buffer, left, top });
+  }
+
+  // 5. Composite figures onto base.
+  const composited = await sharp(baseBuf).composite(layers).jpeg({ quality: 92 }).toBuffer();
+  debug.simpleComposite = `data:image/jpeg;base64,${composited.toString('base64')}`;
+  debug.simpleCompositeFigures = figures.map(f => ({ name: f.name, age: f.age, width: f.width, height: f.height, position: f.position }));
+  log.info(`[SCENE COMPOSITE/SIMPLE] composited ${figures.length} figures onto ${W}×${H} base`);
+
+  // 6. Build blend prompt — existing buildBlendEditPrompt has scene.textOverlay
+  // support so covers get title/dedication/branding rendered, scenes get the
+  // default no-text behaviour.
+  const blendPrompt = buildBlendEditPrompt(scene);
+  const blendRefs = [composited];
+  if (visualBibleGridImage) {
+    const vbBase64 = typeof visualBibleGridImage === 'string'
+      ? visualBibleGridImage.replace(/^data:image\/\w+;base64,/, '')
+      : null;
+    if (vbBase64) blendRefs.push(Buffer.from(vbBase64, 'base64'));
+  }
+  log.info(`[SCENE COMPOSITE/SIMPLE] blend edit — ${blendRefs.length} ref(s), aspect ${aspectRatio}`);
+  const blend = await editWithGrok(blendPrompt, blendRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
+  if (usageTracker) usageTracker('grok', blend.usage, 'scene_composite_simple_blend', blend.modelId);
+  totalCost += blend.usage?.cost || 0;
+  debug.blendInput = `data:image/jpeg;base64,${composited.toString('base64')}`;
+  debug.blendOutput = blend.imageData;
+  debug.blendPrompt = blendPrompt;
+  debug.blendSentToGrok = blend.sentToGrok || null;
+
+  return {
+    imageData: blend.imageData,
+    usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite-simple' },
+    debug,
+  };
+}
+
 async function _stratifiedBody(ctx) {
   let { debug, totalCost, backCast, frontCast, existingCleanBackground, cleanBackgroundPrompt, scene, aspectRatio, usageTracker, visualBibleGridImage } = ctx;
 
@@ -1725,6 +1891,21 @@ async function _stratifiedBody(ctx) {
   }
   debug.emptyScene = emptySceneData;
   debug.emptySceneSource = emptySceneSource;
+
+  // ── Simple-composite branch ─────────────────────────────────────────────
+  // When the back stratum is empty (cast≤2 or no real depth signal — see
+  // splitCastByStratum), skip the anchor plate + silhouette dance entirely.
+  // Server-side sharp.composite figures onto the empty scene, then one Grok
+  // blend pass. Same cost as the old short-circuit ($0.04 total: empty scene
+  // + 1 edit) but produces deterministic placement, pixel-faithful identity
+  // (the styled avatar pixels ARE in the canvas before Grok touches it), and
+  // a visible composited intermediate in the dev panel.
+  if (backCast.length === 0) {
+    return _simpleCompositePath({
+      emptySceneData, frontCast, aspectRatio, scene, usageTracker, debug, totalCost,
+      visualBibleGridImage,
+    });
+  }
 
   // ── Identity packs. Built once at page aspect; the editWithGrok call
   // for step 2 uses padInput:true so the cropper pads (instead of
@@ -1763,17 +1944,10 @@ async function _stratifiedBody(ctx) {
   debug.blocking = anchor.imageData;
   debug.blockingPrompt = anchorPrompt;
 
-  // N=1 short-circuit: only one character total, and they're rendered
-  // natively in the anchor plate. No silhouettes to lift, no inset. Return
-  // the anchor plate directly.
-  if (backCast.length === 0) {
-    log.info(`[SCENE COMPOSITE/STRATIFIED] short-circuit — back stratum empty; anchor plate is final ($${totalCost.toFixed(4)})`);
-    return {
-      imageData: anchor.imageData,
-      usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite-stratified' },
-      debug,
-    };
-  }
+  // (The backCast.length === 0 short-circuit is handled earlier in this
+  // function via _simpleCompositePath — the anchor-plate Grok edit is
+  // skipped entirely in that case so the dev panel sees a real composited
+  // intermediate instead of a prompt-driven render.)
 
   // ── Step 1.5: detect BACK-stratum silhouette bboxes on the anchor plate
   // — these are the placeholders we'll replace with real characters in
