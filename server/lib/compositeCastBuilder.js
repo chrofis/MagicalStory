@@ -172,15 +172,25 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
 /**
  * Split a composite cast into back/front strata for Stratified Composite.
  *
- * Sort order (back → front):
+ * Skip rules — return everything in `frontCast` (anchor plate renders all
+ * natively, no silhouette dance) when:
+ *   1. cast.length ≤ 2 — the silhouette round-trip costs ~$0.04 + 14s vs ~2s
+ *      of straight-line anchor-plate work; not worth it for tiny casts.
+ *   2. nobody has explicit background or midground depth — the split would
+ *      be arbitrary by declaration order, pushing one cast member through a
+ *      lossy silhouette→cutout→align→composite cycle for nothing. Covers
+ *      (all foreground portraits) and any scene without depth markers fall
+ *      here.
+ *
+ * Otherwise sort by (back → front):
  *   1. depth-rank: background (0) < midground (1) < foreground/default (2)
  *   2. size hint:  smaller-sounding first ("small in the distance" < "medium" < default)
  *   3. position:   "background" in the position string < "midground" < "foreground"
  *   4. declaration order (preserve stable ordering for ties)
+ * and split ceil(N/2) into back, floor(N/2) into front.
  *
- * Split: ceil(N/2) into back, floor(N/2) into front. When N=1 the lone entry
- * goes into back and the front stratum is empty — caller short-circuits to
- * a single-pass render (no foreground inset step).
+ * Caller short-circuits to a single-pass render (anchor plate is the final
+ * image, no inset step) when `backCast` comes back empty.
  *
  * @param {Array<Object>} cast — entries with at least `name` and `depth`.
  * @returns {{ backCast: Array<Object>, frontCast: Array<Object> }}
@@ -188,6 +198,18 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
 function splitCastByStratum(cast) {
   if (!Array.isArray(cast) || cast.length === 0) {
     return { backCast: [], frontCast: [] };
+  }
+  // Skip rule 1: small casts always render native.
+  if (cast.length <= 2) {
+    return { backCast: [], frontCast: cast.slice() };
+  }
+  // Skip rule 2: no real depth signal → no meaningful split possible.
+  const hasBack = cast.some(c =>
+    c.depth === 'background' || c.depth === 'midground' ||
+    (typeof c.position === 'string' && (c.position.toLowerCase().includes('background') || c.position.toLowerCase().includes('midground')))
+  );
+  if (!hasBack) {
+    return { backCast: [], frontCast: cast.slice() };
   }
   const DEPTH_RANK = { background: 0, midground: 1, foreground: 2 };
   const SIZE_RANK = { 'small in the distance': 0, medium: 1 };
@@ -312,15 +334,20 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
     if (!c?.name) continue;
     const nameLower = c.name.toLowerCase();
     const posPhrase = positionByName.get(nameLower) || '';
-    let depth = 'foreground';
-    if (posPhrase.includes('background')) depth = 'background';
-    else if (posPhrase.includes('midground')) depth = 'midground';
     sceneChars.push({
       name: c.name,
       pose: 'front',          // covers face the viewer; head-on portrait
       flip: false,
       position: posPhrase || 'in the cover composition',
-      depth,
+      // Covers are group portraits — every character is at the same depth
+      // by intent (the camera framing puts them all on the cover line).
+      // Forcing depth='foreground' for all cover chars combines with the
+      // splitCastByStratum "no real depth signal → no split" rule to skip
+      // the silhouette dance entirely. Without this, a position phrase
+      // like "left foreground"/"right foreground" still parsed as the
+      // same depth bucket, but anyone with a vaguer position would slip
+      // through and trigger an arbitrary split.
+      depth: 'foreground',
       clothing: (coverHint.characterClothing && coverHint.characterClothing[c.name])
         || 'standard',
     });

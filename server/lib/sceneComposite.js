@@ -305,7 +305,9 @@ async function findSilhouettesByDiff(populatedBuf, cleanBgBuf, cast, opts = {}) 
 
   const pop = await sharp(populatedBuf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   // Align clean BG to populated dimensions (depopulate can rescale).
-  const cleanAligned = await sharp(cleanBgBuf).resize(W, H, { fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  // Uniform scaling — if depopulate rescaled the BG, contain pads instead of
+  // stretching so the diff-mask alignment isn't distorted.
+  const cleanAligned = await sharp(cleanBgBuf).resize(W, H, { fit: 'contain', background: { r: 255, g: 255, b: 255 } }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const popD = pop.data, clD = cleanAligned.data;
 
   // ── 1. Diff mask: where the two images disagree.
@@ -1942,8 +1944,14 @@ async function _stratifiedBody(ctx) {
   // padded-aspect output. resize the output to the padded dimensions, then
   // extract the (padLeft, padTop, cropW, cropH) sub-rectangle.
   const frontPlateRawBuf = Buffer.from(frontPlate.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  // Uniform scaling — pad with white instead of stretching when Grok's
+  // output aspect drifts from the requested padded aspect (common when
+  // Grok coerces a 9:20 ask into 1:1 or similar). fit: 'contain' preserves
+  // proportions, pads to exact paddedW×paddedH so the extract step still
+  // works. Without this, characters near the edges came back stretched
+  // before they were cropped back out.
   const grokAtCrop = await sharp(frontPlateRawBuf)
-    .resize(paddedW, paddedH, { fit: 'fill' })
+    .resize(paddedW, paddedH, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
     .extract({ left: padLeft, top: padTop, width: cropW, height: cropH })
     .raw()
     .toBuffer();
@@ -2018,15 +2026,24 @@ async function _stratifiedBody(ctx) {
         contentRgb[dstI + 2] = grokAtCrop[srcI + 2];
       }
     }
+    // Uniform single scale factor — never separate x/y. Non-uniform stretch
+    // (the old fit: 'fill' here) was the visible distortion in step 2c: a
+    // narrow silhouette + wide Grok output → stretched character. Pick min
+    // ratio so the content fits inside the silhouette box, then center.
+    const scale = Math.min(inBoxW / outBoxW, inBoxH / outBoxH);
+    const scaledW = Math.max(1, Math.round(outBoxW * scale));
+    const scaledH = Math.max(1, Math.round(outBoxH * scale));
     const contentScaled = await sharp(contentRgb, { raw: { width: outBoxW, height: outBoxH, channels: 3 } })
-      .resize(inBoxW, inBoxH, { fit: 'fill' })
+      .resize(scaledW, scaledH, { fit: 'inside' })
       .raw()
       .toBuffer();
     alignedRgb = Buffer.alloc(cropW * cropH * 3, 255);
-    for (let y = 0; y < inBoxH; y++) {
-      for (let x = 0; x < inBoxW; x++) {
-        const srcI = (y * inBoxW + x) * 3;
-        const dstI = ((inMinY + y) * cropW + (inMinX + x)) * 3;
+    const offX = inMinX + Math.floor((inBoxW - scaledW) / 2);
+    const offY = inMinY + Math.floor((inBoxH - scaledH) / 2);
+    for (let y = 0; y < scaledH; y++) {
+      for (let x = 0; x < scaledW; x++) {
+        const srcI = (y * scaledW + x) * 3;
+        const dstI = ((offY + y) * cropW + (offX + x)) * 3;
         alignedRgb[dstI]     = contentScaled[srcI];
         alignedRgb[dstI + 1] = contentScaled[srcI + 1];
         alignedRgb[dstI + 2] = contentScaled[srcI + 2];
@@ -2135,8 +2152,13 @@ async function _stratifiedBody(ctx) {
   // their canvas positions overlap, because Grok drew foreground ON
   // TOP of silhouettes in the anchor plate.
   const emptySceneRawBuf = Buffer.from(emptySceneData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  // Uniform scaling — when Grok's anchor-plate output aspect drifts from
+  // the empty-scene aspect (rare but happens with the input-coerce edge),
+  // fit: 'contain' preserves proportions and pads to canvasW×canvasH so the
+  // downstream raw-buffer diff still indexes correctly. White pad bg keeps
+  // the foreground-mask diff threshold consistent.
   const emptyScaledPng = await sharp(emptySceneRawBuf)
-    .resize(canvasW, canvasH, { fit: 'fill' })
+    .resize(canvasW, canvasH, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
     .png()
     .toBuffer();
   const { data: emptyRgb, info: emptyInfo } = await sharp(emptyScaledPng).raw().toBuffer({ resolveWithObject: true });
