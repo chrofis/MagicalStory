@@ -914,13 +914,24 @@ DO NOT:
 The output is the same scene as the input, empty of people, identical in every other respect.`;
 }
 
-// Art-style descriptors — must stay aligned with character2x4Sheet.js ART_STYLE_LINES.
+// Art-style descriptors — must stay aligned with prompts/art-styles.txt and
+// client/src/constants/artStyles.ts. The blend boilerplate reads from this
+// map; falling back to watercolor for an unmapped style produces colourful
+// output for manga / pixel / cyber etc. which contradicts the brief.
 const BLEND_STYLE_LINES = {
   watercolor:   "soft watercolor children's storybook illustration style — gentle washes, simple outlines",
   pixar:        "Pixar 3D illustration style — smooth shading, clean rim light",
   anime:        "anime line-art style — clean lines, flat shading",
-  cartoon:      "modern flat cartoon, bold outlines, clean shapes",
+  cartoon:      "modern flat cartoon, bold outlines, clean shapes, vibrant flat colours",
   oil:          "oil painting style with visible brushwork",
+  manga:        "traditional Japanese manga style — intricate detailed ink linework, atmospheric screentones, dramatic monochrome composition; character clothing/hair/key objects may carry their specified colours (color-spread / promotional cover style), backgrounds stay monochrome",
+  chibi:        "chibi super-deformed style — massive head, tiny body, kawaii aesthetic, smooth illustration with minimal detail",
+  steampunk:    "Steampunk graphic novel illustration — Victorian aesthetic, brass and copper accents, leather textures, sepia/muted palette, detailed linework",
+  comic:        "classic American comic book art — heavy black ink lines, dynamic composition, halftone/Ben-Day dots, vibrant CMYK colours",
+  lowpoly:      "low-poly 3D style — isometric geometric shapes, vibrant solid colours, clean edges, retro video-game aesthetic",
+  concept:      "digital concept art — painterly brushwork, dramatic lighting, rich palette, visible artistic strokes, cinematic atmosphere (NOT photorealistic)",
+  pixel:        "16-bit pixel art style — limited palette, detailed sprite work, retro video-game aesthetic",
+  cyber:        "cyberpunk graphic novel illustration — neon reflections, chrome, dense complexity, high contrast, dark atmosphere, volumetric fog",
 };
 
 // Grok's edit endpoint caps prompts at 8000 chars. Reserve ~300 char
