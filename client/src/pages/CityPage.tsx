@@ -46,11 +46,11 @@ const CITY_GALLERIES: Record<string, CityGalleryItem[]> = {
   ],
   baden: [
     // top pair
-    { src: '/images/cities/baden/baden-book-knight-holzbruecke-square-v3.jpg', landmark: 'Holzbrücke' },     // boy
-    { src: '/images/cities/baden/baden-book-princess-action-ref.jpg', landmark: 'Altstadt' },                // girl
-    // bottom pair
     { src: '/images/cities/baden/baden-book-superhero-panorama.jpg', landmark: 'Panorama' },                 // boy
     { src: '/images/cities/baden/baden-book-wizard-stadtturm-portrait.jpg', landmark: 'Stadtturm' },         // girl
+    // bottom pair
+    { src: '/images/cities/baden/baden-book-knight-noah-holzbruecke-baden.jpg', landmark: 'Holzbrücke' },    // boy
+    { src: '/images/cities/baden/baden-book-princess-emma-ruine-stein.jpg', landmark: 'Ruine Stein' },       // girl
   ],
   winterthur: [
     // top pair

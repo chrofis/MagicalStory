@@ -4,6 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 const footerTexts = {
   en: {
     faq: 'FAQ',
+    cities: 'Swiss cities',
     about: 'About',
     contact: 'Contact',
     terms: 'Terms of Service',
@@ -12,6 +13,7 @@ const footerTexts = {
   },
   de: {
     faq: 'FAQ',
+    cities: 'Schweizer Städte',
     about: 'Über uns',
     contact: 'Kontakt',
     terms: 'Nutzungsbedingungen',
@@ -20,6 +22,7 @@ const footerTexts = {
   },
   fr: {
     faq: 'FAQ',
+    cities: 'Villes suisses',
     about: 'À propos',
     contact: 'Contact',
     terms: 'Conditions d\'Utilisation',
@@ -37,6 +40,10 @@ export function Footer() {
     <footer className="bg-stone-100 border-t border-stone-200 py-4 px-4">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-stone-600">
         <div className="flex items-center gap-4 flex-wrap">
+          <Link to="/stadt" className="hover:text-indigo-500 hover:underline">
+            {texts.cities}
+          </Link>
+          <span className="text-stone-300">|</span>
           <Link to="/faq" className="hover:text-indigo-500 hover:underline">
             {texts.faq}
           </Link>
