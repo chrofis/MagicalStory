@@ -1236,7 +1236,14 @@ PRIORITY 2 — Cast placement. Characters stand on a SOLID surface visible in th
 
 ${frontBlock}
 ${backBlock}`;
-  const tail = `\nNO TEXT in the output.`;
+  // Tail: by default "NO TEXT in the output." For covers (scene.textOverlay
+  // supplied), swap in the override directive so the anchor plate renders
+  // title / dedication / branding instead of dropping it. Without this swap,
+  // even when the brief asks for a title, the trailing NO TEXT line wins
+  // and Grok produces a textless front cover. Same pattern as
+  // buildBlendEditPrompt's textOverlay override.
+  const textDirective = buildTextOverlayDirective(scene?.textOverlay, scene?.artStyle);
+  const tail = textDirective || `\nNO TEXT in the output.`;
   const rawBrief = scene?.pageBrief ? String(scene.pageBrief).trim() : '';
   const filteredBrief = filterBriefByStratum(rawBrief, frontNames, backNames, backSubs);
   const fixedLen = head.length + tail.length + (filteredBrief ? briefHeader.length + 1 : 0);
