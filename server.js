@@ -178,7 +178,8 @@ const {
   linkPreDiscoveredLandmarks,
   injectHistoricalLocations,
   getElementReferenceImagesForPage,
-  getElementReferenceImagesByIds
+  getElementReferenceImagesByIds,
+  dedupeSecondaryCharacterIds
 } = require('./server/lib/visualBible');
 const {
   prefetchLandmarkPhotos,
@@ -4379,6 +4380,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       ? inputData._trialClothingRequirements
       : (parser.extractClothingRequirements() || streamingClothingRequirements);
     const visualBible = parser.extractVisualBible() || streamingVisualBible || {};
+    // Sonnet sometimes emits two secondaryCharacters entries that share the
+    // same CHR id (the same person referenced by relation AND by attribute).
+    // Resolve via Haiku before any downstream consumer sees the collision —
+    // image prompts, VB grid, BBOX-enrich all assume unique ids.
+    await dedupeSecondaryCharacterIds(visualBible, addUsage);
     const coverHints = parser.extractCoverHints();
 
     // Reconcile cover hint clothing against the story's clothingRequirements.

@@ -1982,11 +1982,105 @@ function getElementReferenceImagesByIds(visualBible, elementIds) {
 // EXPORTS
 // ============================================================================
 
+/**
+ * Detect and resolve duplicate CHR ids in secondaryCharacters.
+ *
+ * Sonnet sometimes emits two secondaryCharacters entries that share the
+ * same id (observed 2026-06-09 on the Miller showcase: CHR001 used for both
+ * "Sofias Mutter" and "Apfelsaft-Frau" — same person referenced by relation
+ * AND by attribute). The parser previously trusted Sonnet's ids blindly,
+ * which produced a colliding VB that downstream image prompts then rendered
+ * as two phantom adult-female figures.
+ *
+ * For each collision we ask Haiku (cheap, ~$0.001 / collision) whether the
+ * two entries describe the same person or two distinct ones:
+ *   - SAME → merge: keep first id, union pages, prefer longer description
+ *   - DIFFERENT → split: reassign duplicates to the next free CHR id
+ * If the LLM call errors out, default to merge (safer — losing one phantom
+ * is cheaper than rendering two of them as separate characters).
+ *
+ * Returns the mutated visualBible. Safe to call when no collisions exist
+ * (returns immediately).
+ */
+async function dedupeSecondaryCharacterIds(visualBible, addUsage = null) {
+  if (!visualBible || !Array.isArray(visualBible.secondaryCharacters)) return visualBible;
+  const chars = visualBible.secondaryCharacters;
+  if (chars.length < 2) return visualBible;
+
+  const idMap = new Map();
+  for (const c of chars) {
+    if (!c?.id) continue;
+    if (!idMap.has(c.id)) idMap.set(c.id, []);
+    idMap.get(c.id).push(c);
+  }
+  const collisions = [...idMap.entries()].filter(([, entries]) => entries.length > 1);
+  if (collisions.length === 0) return visualBible;
+
+  log.warn(
+    `[VISUAL BIBLE] CHR id collision(s) detected: ${
+      collisions
+        .map(([id, e]) => `${id}×${e.length} (${e.map(c => c.name).join(', ')})`)
+        .join('; ')
+    }`
+  );
+
+  const padId = (n) => `CHR${String(n).padStart(3, '0')}`;
+  const usedIds = new Set([...idMap.keys()]);
+  let nextNum = chars.length + 1;
+  const nextFreeId = () => {
+    while (usedIds.has(padId(nextNum))) nextNum++;
+    const id = padId(nextNum);
+    usedIds.add(id);
+    return id;
+  };
+
+  const { callClaudeAPI } = require('./textModels');
+
+  for (const [collisionId, entries] of collisions) {
+    const first = entries[0];
+    for (let i = 1; i < entries.length; i++) {
+      const other = entries[i];
+      let decision = 'merge';
+      let llmReason = '(llm not consulted)';
+      try {
+        const prompt =
+          `Two secondary character entries in a children's storybook Visual Bible share the same id "${collisionId}".\n\n` +
+          `Entry A:\n  name: ${first.name || '(none)'}\n  description: ${first.description || '(none)'}\n  pages: ${(first.appearsInPages || []).join(',')}\n\n` +
+          `Entry B:\n  name: ${other.name || '(none)'}\n  description: ${other.description || '(none)'}\n  pages: ${(other.appearsInPages || []).join(',')}\n\n` +
+          `Question: are these two entries the same person (one character referenced in two different ways — e.g. by relation and by attribute) or two genuinely distinct characters?\n\n` +
+          `Answer with exactly one word on the first line: SAME or DIFFERENT. Optionally add a short one-sentence reason on the next line.`;
+        const resp = await callClaudeAPI(prompt, 80, 'claude-haiku-4-5');
+        const text = (resp?.text || '').trim();
+        if (/^\s*SAME\b/i.test(text)) decision = 'merge';
+        else if (/^\s*DIFFERENT\b/i.test(text)) decision = 'split';
+        llmReason = text.replace(/\s+/g, ' ').slice(0, 240);
+        if (addUsage && resp?.usage) addUsage('anthropic', resp.usage, 'vb_chr_dedup', resp.modelId || 'claude-haiku-4-5');
+      } catch (err) {
+        log.warn(`[VISUAL BIBLE] CHR dedup LLM call failed for ${collisionId}: ${err.message} — defaulting to merge`);
+      }
+      log.info(`[VISUAL BIBLE] CHR dedup ${collisionId} (${first.name} vs ${other.name}): ${decision.toUpperCase()} — ${llmReason}`);
+      if (decision === 'merge') {
+        first.appearsInPages = [...new Set([...(first.appearsInPages || []), ...(other.appearsInPages || [])])].sort((a, b) => a - b);
+        if ((other.description || '').length > (first.description || '').length) first.description = other.description;
+        if (!first.name) first.name = other.name;
+        other._mergedInto = first.id;
+      } else {
+        const newId = nextFreeId();
+        log.info(`[VISUAL BIBLE] CHR dedup ${collisionId}: split — "${other.name}" reassigned to ${newId}`);
+        other.id = newId;
+      }
+    }
+  }
+  visualBible.secondaryCharacters = chars.filter(c => !c._mergedInto);
+  return visualBible;
+}
+
 module.exports = {
   // Parsing
   parseVisualBible,
   filterMainCharactersFromVisualBible,
   parseVisualBibleEntries,
+  dedupeSecondaryCharacterIds,
 
   // Initialization
   initializeVisualBibleMainCharacters,

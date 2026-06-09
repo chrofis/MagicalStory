@@ -726,6 +726,8 @@ Scan the draft and extract all elements that need to be consistent for visualiza
 - Vehicles: VEH001, VEH002...
 - Clothing & Costumes: CLO001, CLO002...
 
+**Each secondary character is ONE entry, no matter how the prose refers to them.** Before finalising `secondaryCharacters`, scan your prose for any character referenced both by relation (the friend's mother, the shopkeeper's daughter) AND by attribute (the woman with the basket, the man at the door) — those are the same person, write a single entry. Never reuse a CHR id across entries.
+
 
 
 ```json
