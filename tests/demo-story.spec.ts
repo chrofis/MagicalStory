@@ -296,27 +296,78 @@ async function uploadPhotoInCreateFlow(page: Page, photoPath: string) {
   // are shot with the subject central, so face #1 is always the character.
   // Without this, the spec hangs forever waiting on the name input that
   // never appears (the modal blocks it).
+  //
+  // The wait below intentionally does NOT break the moment the name input is
+  // visible — analysis can return AFTER the form is rendered, so the modal
+  // pops AFTER nameInput becomes visible. Memory recorded a 1.5h Playwright
+  // timeout on Margaret.jpg (Miller showcase, 2026-06-09) caused by this race.
+  // Instead we (a) dismiss the modal whenever it appears, (b) break only when
+  // the name input is visible AND no face button has been seen for >2s.
   const nameInput = page.locator('input[placeholder*="Name" i], input[placeholder*="Nom" i]').first();
-  const selectFaceBtn = page.getByRole('button', { name: /(Gesicht auswählen|Select Face|Sélectionner le visage)\s*1\b/i }).first();
   const deadline = Date.now() + 90_000;
+  let lastModalSeenAt = 0;
+  let nameSeenAt = 0;
   while (Date.now() < deadline) {
-    if (await selectFaceBtn.isVisible({ timeout: 500 }).catch(() => false)) {
-      console.log(`    multiple faces detected — picking face #1`);
-      await selectFaceBtn.click().catch(() => {});
-      // Modal close triggers form advance; loop continues to wait for name input.
+    if (await dismissFaceSelectionModalIfOpen(page)) {
+      lastModalSeenAt = Date.now();
+      nameSeenAt = 0;
       continue;
     }
-    if (await nameInput.isVisible({ timeout: 500 }).catch(() => false)) break;
+    if (await nameInput.isVisible({ timeout: 200 }).catch(() => false)) {
+      if (nameSeenAt === 0) nameSeenAt = Date.now();
+      // Break only after the name input has been continuously visible for
+      // 2 seconds without the modal reappearing — gives analysis time to
+      // fire its modal AFTER the form is already rendered.
+      if (nameSeenAt > 0 && Date.now() - nameSeenAt >= 2000) break;
+    } else {
+      nameSeenAt = 0;
+    }
+    await page.waitForTimeout(250);
   }
   await nameInput.waitFor({ state: 'visible', timeout: 5000 });
   // Small settle so the avatars.status='pending' state-update commits.
   await page.waitForTimeout(500);
+  // Defensive: dismiss the modal one more time if it raced in just now.
+  await dismissFaceSelectionModalIfOpen(page);
+}
+
+/**
+ * If the FaceSelectionModal is currently open, click "Gesicht auswählen 1"
+ * (or the i18n equivalent) and wait briefly for it to close. Returns true if
+ * a dismissal was performed.
+ *
+ * Called from waitForPhotoAnalysis (during the post-upload wait loop) AND
+ * defensively before every form interaction in fillCharacterBasics — a race
+ * between photo analysis and the next user action otherwise hangs the click
+ * for the full 1.5h Playwright timeout (memory: Margaret.jpg detector
+ * pareidolia, see reference_face_selection_modal_in_wizard.md).
+ */
+async function dismissFaceSelectionModalIfOpen(page: Page): Promise<boolean> {
+  const selectFaceBtn = page.getByRole('button', {
+    name: /(Gesicht auswählen|Select Face|Sélectionner le visage)\s*1\b/i,
+  }).first();
+  if (!(await selectFaceBtn.isVisible({ timeout: 200 }).catch(() => false))) {
+    return false;
+  }
+  console.log(`    face selection modal open — picking face #1`);
+  await selectFaceBtn.click({ timeout: 5000 }).catch((err) => {
+    console.log(`    face #1 click failed: ${String(err).slice(0, 120)}`);
+  });
+  // Wait for the modal to actually close — checked by the button disappearing.
+  const closed = await selectFaceBtn.waitFor({ state: 'hidden', timeout: 5000 })
+    .then(() => true).catch(() => false);
+  if (!closed) console.log(`    modal still visible 5s after click — continuing anyway`);
+  return true;
 }
 
 async function fillCharacterBasics(page: Page, char: DemoCharacter) {
   // Required fields on the name sub-step (Geschlecht + Alter); Next is disabled
   // until both are filled. Photo analyzer SOMETIMES auto-fills these from the
   // photo, but we can't rely on it (network issues, ambiguous photos).
+  // Defensive: dismiss any FaceSelectionModal that raced in after the photo
+  // wait — the modal intercepts pointer events and the name-input click
+  // hangs for the full 1.5h Playwright timeout otherwise.
+  await dismissFaceSelectionModalIfOpen(page);
   console.log(`    entering name: ${char.name}`);
   const nameSelectors = [
     'input[placeholder*="Name" i]',
