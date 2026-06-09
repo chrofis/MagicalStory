@@ -1343,12 +1343,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }
     } catch { /* silent — evaluator tolerates empty block */ }
 
+    const { buildEvaluationPrompt } = require('../services/prompts');
     const evaluationPrompt = evaluationTemplate
-      ? fillTemplate(evaluationTemplate, {
-          ORIGINAL_PROMPT: promptForEval,
-          INTERACTIONS_BLOCK: interactionsBlock,
-          FIGURE_PROPORTIONS: figureProportionsBlock,
-          SCENE_INTENT: sceneIntentBlock,
+      ? buildEvaluationPrompt({
+          originalPrompt: promptForEval,
+          interactionsBlock,
+          figureProportions: figureProportionsBlock,
+          sceneIntent: sceneIntentBlock,
         })
       : 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
 
@@ -8073,17 +8074,16 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         const { buildTextZoneInstruction, buildEraGuard } = getStoryHelpers();
         const iterateTextZoneDesc = iterateSceneMetadata?.textZoneDescription || null;
         const iterateEra = iterateSceneMetadata?.era || null;
-        const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
-          STYLE_DESCRIPTION: artStyleDesc,
-          EMPTY_SCENE_DESCRIPTION: iterateSceneMetadata.emptyScenePrompt,
-          REQUIRED_OBJECTS: '',
-          CHARACTER_SPACE: '',
-          TEXT_AREA_INSTRUCTION: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
-          ERA_GUARD: buildEraGuard(iterateEra),
-          // Iterate path doesn't have landmark-fidelity context at hand —
-          // empty string strips the placeholder cleanly. (Initial generation
-          // at server.js:4093 builds the proper block when a landmark exists.)
-          LANDMARK_FIDELITY: '',
+        // Iterate path doesn't have landmark-fidelity context at hand —
+        // buildEmptyScenePrompt defaults landmarkFidelity to '' so the
+        // placeholder strips cleanly. Initial generation at server.js:4087
+        // builds the proper block when a landmark exists.
+        const { buildEmptyScenePrompt } = require('../services/prompts');
+        const emptyPrompt = buildEmptyScenePrompt({
+          style: artStyleDesc,
+          description: iterateSceneMetadata.emptyScenePrompt,
+          textAreaInstruction: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
+          eraGuard: buildEraGuard(iterateEra),
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;

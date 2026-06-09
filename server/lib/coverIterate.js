@@ -611,14 +611,10 @@ async function buildCoverReferences({
         || '';
       const emptyDesc = emptyScenePromptOverride
         || `**SETTING:** ${sceneDescription}\n**CAMERA:** wide shot`;
-      const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
-        STYLE_DESCRIPTION: artStyleDesc,
-        EMPTY_SCENE_DESCRIPTION: emptyDesc,
-        CHARACTER_SPACE: '',
-        REQUIRED_OBJECTS: '',
-        TEXT_AREA_INSTRUCTION: '',
-        ERA_GUARD: '',
-        LANDMARK_FIDELITY: '',
+      const { buildEmptyScenePrompt } = require('../services/prompts');
+      const emptyPrompt = buildEmptyScenePrompt({
+        style: artStyleDesc,
+        description: emptyDesc,
       });
       const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, coverPageNumber, landmarkPhotos);
       const emptyOptions = {

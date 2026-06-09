@@ -89,7 +89,7 @@ const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryD
 const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('./server/middleware/validation');
 const { authenticateToken } = require('./server/middleware/auth');
 const { authLimiter, registerLimiter, apiLimiter, aiProxyLimiter, storyGenerationLimiter, imageRegenerationLimiter } = require('./server/middleware/rateLimit');
-const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
+const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate, buildEmptyScenePrompt } = require('./server/services/prompts');
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('./server/lib/pdf');
 const { processBookOrder, getCoverDimensions } = require('./server/lib/gelato');
 const {
@@ -4085,13 +4085,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             for (const pageNum of bg.pages) {
               bgPromises.push(bgLimit(async () => {
                 try {
-                  const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
-                    STYLE_DESCRIPTION: artStyleDesc,
-                    EMPTY_SCENE_DESCRIPTION: bg.description,
-                    REQUIRED_OBJECTS: '',
-                    TEXT_AREA_INSTRUCTION: '',
-                    ERA_GUARD: '',
-                    LANDMARK_FIDELITY: landmarkFidelityBlock,
+                  const emptyPrompt = buildEmptyScenePrompt({
+                    style: artStyleDesc,
+                    description: bg.description,
+                    landmarkFidelity: landmarkFidelityBlock,
                   });
                   const result = await generateImageOnly(emptyPrompt, [], {
                     landmarkPhotos: emptySceneLandmarkPhotos,
@@ -5249,12 +5246,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const landmarkPhotos = (v.location?.isRealLandmark && v.location?.referencePhotoData)
               ? [{ name: v.location.name, photoData: v.location.referencePhotoData, attribution: v.location.photoAttribution, source: v.location.photoSource }]
               : (repPageData.landmarkPhotos || []);
-            const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
-              STYLE_DESCRIPTION: artStyleDesc,
-              EMPTY_SCENE_DESCRIPTION: emptySceneDesc,
-              CHARACTER_SPACE: characterSpace,
-              TEXT_AREA_INSTRUCTION: '',
-              ERA_GUARD: eraGuard,
+            const emptyPrompt = buildEmptyScenePrompt({
+              style: artStyleDesc,
+              description: emptySceneDesc,
+              characterSpace,
+              eraGuard,
             });
             try {
               const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, repPageNum, landmarkPhotos);
@@ -5433,12 +5429,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
             const eraGuard = buildEraGuard(sceneMetadata?.era || null);
 
-            const emptyPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
-              STYLE_DESCRIPTION: artStyleDesc,
-              EMPTY_SCENE_DESCRIPTION: emptySceneDesc,
-              CHARACTER_SPACE: characterSpace,
-              TEXT_AREA_INSTRUCTION: emptyTextAreaInstr,
-              ERA_GUARD: eraGuard,
+            const emptyPrompt = buildEmptyScenePrompt({
+              style: artStyleDesc,
+              description: emptySceneDesc,
+              characterSpace,
+              textAreaInstruction: emptyTextAreaInstr,
+              eraGuard,
             });
 
             try {
@@ -5519,12 +5515,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     ? buildTextZoneInstruction(textPos, textZoneDesc, emptyAreaPct, { isEmptyScene: true })
                     : '';
                   log.info(`🔄 [EMPTY SCENE] P${pageData.pageNumber} failed QC (${qc.issues.join(', ')}), retrying with feedback...`);
-                  const retryPrompt = fillTemplate(PROMPT_TEMPLATES.emptyScene, {
-                    STYLE_DESCRIPTION: artStyleDesc,
-                    EMPTY_SCENE_DESCRIPTION: emptySceneDesc + fixHint,
-                    CHARACTER_SPACE: characterSpace,
-                    TEXT_AREA_INSTRUCTION: softerTextInstr,
-                    ERA_GUARD: eraGuard,
+                  const retryPrompt = buildEmptyScenePrompt({
+                    style: artStyleDesc,
+                    description: emptySceneDesc + fixHint,
+                    characterSpace,
+                    textAreaInstruction: softerTextInstr,
+                    eraGuard,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,

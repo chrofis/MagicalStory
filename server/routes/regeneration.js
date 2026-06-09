@@ -3840,8 +3840,16 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
       } else {
         evaluationTemplate = null;
       }
+      // Admin re-evaluate endpoint: we have only the bare prompt (no
+      // interactions / sceneIntent / figureProportions context). The eval
+      // helper defaults missing keys to '' so the placeholders strip
+      // cleanly without firing the unfilled-placeholder warning. The
+      // actual eval below uses the bound evaluateImageQuality which builds
+      // its own filled prompt; the filledPrompt variable here is only
+      // returned for response visibility.
+      const { buildEvaluationPrompt } = require('../services/prompts');
       const filledPrompt = evaluationTemplate
-        ? fillTemplate(evaluationTemplate, { ORIGINAL_PROMPT: cleanDescription })
+        ? buildEvaluationPrompt({ originalPrompt: cleanDescription })
         : '(no evaluation template loaded)';
 
       // Run the actual evaluation

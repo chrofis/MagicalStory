@@ -136,8 +136,85 @@ function fillTemplate(template, replacements) {
   return result;
 }
 
+/**
+ * Build the empty-scene generation prompt from a known opts contract.
+ *
+ * The empty-scene template (prompts/empty-scene.txt) has six placeholders:
+ *   STYLE_DESCRIPTION, EMPTY_SCENE_DESCRIPTION, CHARACTER_SPACE,
+ *   REQUIRED_OBJECTS, TEXT_AREA_INSTRUCTION, ERA_GUARD, LANDMARK_FIDELITY.
+ *
+ * Before this helper, every empty-scene call site (server.js × 3,
+ * coverIterate.js, images.js × 1) hand-built the replacements bag and
+ * inconsistently forgot LANDMARK_FIDELITY — fillTemplate then stripped the
+ * placeholder + emitted a per-call WARN. This single chokepoint enforces
+ * the placeholder contract: every key is filled (with '' as the safe
+ * default), so the template emerges hole-free regardless of which caller
+ * built it.
+ *
+ * New empty-scene call sites just call this helper and pass what they
+ * have — never raw fillTemplate on PROMPT_TEMPLATES.emptyScene.
+ *
+ * @param {Object} opts
+ * @param {string} opts.style              - Resolved style description (paragraph form)
+ * @param {string} opts.description        - Empty-scene description body
+ * @param {string} [opts.characterSpace]   - Optional character-space instruction
+ * @param {string} [opts.requiredObjects]  - Optional required-objects block
+ * @param {string} [opts.textAreaInstruction] - Optional text-zone instruction
+ * @param {string} [opts.eraGuard]         - Optional era-guard guidance
+ * @param {string} [opts.landmarkFidelity] - Optional landmark-fidelity block
+ * @returns {string} Filled prompt ready for the image model.
+ */
+function buildEmptyScenePrompt(opts = {}) {
+  if (!PROMPT_TEMPLATES.emptyScene) {
+    throw new Error('buildEmptyScenePrompt: empty-scene template not loaded');
+  }
+  return fillTemplate(PROMPT_TEMPLATES.emptyScene, {
+    STYLE_DESCRIPTION: opts.style || '',
+    EMPTY_SCENE_DESCRIPTION: opts.description || '',
+    CHARACTER_SPACE: opts.characterSpace || '',
+    REQUIRED_OBJECTS: opts.requiredObjects || '',
+    TEXT_AREA_INSTRUCTION: opts.textAreaInstruction || '',
+    ERA_GUARD: opts.eraGuard || '',
+    LANDMARK_FIDELITY: opts.landmarkFidelity || '',
+  });
+}
+
+/**
+ * Build the image-evaluation prompt from a known opts contract.
+ *
+ * The image-evaluation template (prompts/image-evaluation.txt) has four
+ * placeholders: ORIGINAL_PROMPT, INTERACTIONS_BLOCK, SCENE_INTENT,
+ * FIGURE_PROPORTIONS.
+ *
+ * Before this helper, images.js:1346 filled all four correctly while
+ * regeneration.js:3844 (the admin re-evaluate endpoint) passed only
+ * ORIGINAL_PROMPT — Gemini then got a prompt with 3 stripped placeholders
+ * and ran with degraded context. This helper enforces the contract so
+ * every call site can't accidentally omit a key.
+ *
+ * @param {Object} opts
+ * @param {string} opts.originalPrompt       - The original image prompt
+ * @param {string} [opts.interactionsBlock]  - Declared-interactions block
+ * @param {string} [opts.sceneIntent]        - Scene intent line
+ * @param {string} [opts.figureProportions]  - Figure-proportions block
+ * @returns {string} Filled prompt ready for Gemini eval.
+ */
+function buildEvaluationPrompt(opts = {}) {
+  if (!PROMPT_TEMPLATES.imageEvaluation) {
+    throw new Error('buildEvaluationPrompt: imageEvaluation template not loaded');
+  }
+  return fillTemplate(PROMPT_TEMPLATES.imageEvaluation, {
+    ORIGINAL_PROMPT: opts.originalPrompt || '',
+    INTERACTIONS_BLOCK: opts.interactionsBlock || '',
+    SCENE_INTENT: opts.sceneIntent || '',
+    FIGURE_PROPORTIONS: opts.figureProportions || '',
+  });
+}
+
 module.exports = {
   PROMPT_TEMPLATES,
   loadPromptTemplates,
-  fillTemplate
+  fillTemplate,
+  buildEmptyScenePrompt,
+  buildEvaluationPrompt,
 };
