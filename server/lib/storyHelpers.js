@@ -4646,36 +4646,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     }
   }
 
-  // VB-secondary descriptors for invented characters appearing in THIS scene.
-  // Without this, characters like Mia / Noah / shopkeepers Claude invents
-  // reach Grok as bare names (e.g. "Mia and Noah lean in") — no hair, no
-  // clothing, no face — and Grok invents their appearance from scratch every
-  // page, breaking cross-page consistency. Uploaded characters carry their
-  // identity via the styled-avatar reference images; secondaries have only
-  // the VB entry, and the VB text is stripped from the prompt for Grok
-  // (skipVisualBible: true). One compact line per scene-relevant secondary
-  // restores them as identifiable characters. Filter by VB.pages[] so we
-  // only inject characters who actually appear on this page (not the full
-  // cast on every page — that'd blow the Grok 7500-char limit).
-  if (pageNumber !== null && Array.isArray(visualBible?.secondaryCharacters)) {
-    const sceneSecondaries = visualBible.secondaryCharacters.filter(c =>
-      c && Array.isArray(c.pages) && c.pages.includes(pageNumber)
-    );
-    if (sceneSecondaries.length > 0) {
-      const lines = sceneSecondaries.map(c => {
-        const bits = [];
-        if (c.age) bits.push(c.age);
-        if (c.build) bits.push(c.build);
-        if (c.hair) bits.push(`hair: ${c.hair}`);
-        if (c.face) bits.push(`face: ${c.face}`);
-        if (c.signatureLook) bits.push(c.signatureLook);
-        if (c.clothing) bits.push(`wearing ${c.clothing}`);
-        return `- ${c.name}: ${bits.join('; ')}`;
-      });
-      characterReferenceList += `\n**SECONDARY CHARACTERS IN THIS SCENE:**\n${lines.join('\n')}\n`;
-      log.debug(`[IMAGE PROMPT] Added ${sceneSecondaries.length} VB-secondary descriptor(s) for page ${pageNumber}`);
-    }
-  }
+  // (Removed 2026-06-09) SECONDARY CHARACTERS IN THIS SCENE block — was
+  // injecting a third copy of each secondary character's appearance onto
+  // pages where the SCENE prose already embeds it inline. story-unified.txt
+  // explicitly instructs Sonnet to "Name each character explicitly on first
+  // mention, THEN weave the physical description in" (prompts/story-
+  // unified.txt:125). Trust the prose. If a future bug shows Sonnet
+  // skipping the inline embed for secondaries, fix it at the Sonnet output
+  // level — don't re-add a duplicate emitter here. Page 12 of the Miller
+  // showcase wasted ~1050 chars triple-counting Sofia before this removal.
 
   // Build required objects section from metadata.objects by looking up in Visual Bible
   // This ensures objects listed in scene metadata are included with their full descriptions
@@ -4715,31 +4694,21 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       return false;
     };
 
-    // First, look up secondary characters from metadata.characters
-    // Use STRICT matching to avoid "Luis" matching "Luis' Mama"
-    if (metadata.characters && metadata.characters.length > 0) {
-      for (const charName of metadata.characters) {
-        // Look up in secondaryCharacters with strict mode to prevent partial name matches
-        const secondaryChar = (visualBible.secondaryCharacters || []).find(sc => matchesEntry(sc, charName, true));
-        if (secondaryChar) {
-          const description = secondaryChar.extractedDescription || secondaryChar.description;
-          requiredObjects.push({ name: secondaryChar.name, id: secondaryChar.id, type: 'secondary character', description });
-        }
-      }
-    }
-
+    // (Removed 2026-06-09) Secondary-character lookups in this section.
+    // Both the metadata.characters loop and the CHR-id detour inside the
+    // metadata.objects loop emitted a SECOND copy (or with the now-removed
+    // SECONDARY CHARACTERS block, a THIRD copy) of each secondary
+    // character's full description. The prose already carries them inline.
+    // CHR ids that slip into metadata.objects are now filtered below and
+    // silently skipped — the prose is the canonical source.
     for (const objName of metadata.objects) {
-      // First check if this is a character ID (CHR*) - AI sometimes puts characters in objects
-      const chrIdMatch = typeof objName === 'string' ? objName.match(/\[?(CHR\d{3})\]?/i) :
-                         (objName?.id?.match(/^CHR\d{3}$/i) ? [null, objName.id] : null);
-      if (chrIdMatch) {
-        const secondaryChar = (visualBible.secondaryCharacters || []).find(sc => matchesEntry(sc, objName, true));
-        if (secondaryChar) {
-          const description = secondaryChar.extractedDescription || secondaryChar.description;
-          requiredObjects.push({ name: secondaryChar.name, id: secondaryChar.id, type: 'secondary character', description });
-          continue;
-        }
-      }
+      // Skip any character id in the objects list — the prose carries the
+      // character. AI sometimes mis-categorises secondaries into objects;
+      // this filter ignores them rather than re-injecting a duplicate.
+      const isChrId = typeof objName === 'string'
+        ? /^\s*\[?CHR\d{3}\]?\s*$/i.test(objName) || /\[CHR\d{3}\]/i.test(objName)
+        : (typeof objName?.id === 'string' && /^CHR\d{3}$/i.test(objName.id));
+      if (isChrId) continue;
 
       // Look up in artifacts
       const artifact = (visualBible.artifacts || []).find(a => matchesEntry(a, objName));
