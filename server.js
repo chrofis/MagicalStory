@@ -3059,29 +3059,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         } catch { /* not valid JSON — skip background parsing */ }
         if (backgroundMentionAdded.length > 0) {
-          // Sonnet's hint named these characters in the background prose but
-          // forgot to list them in the page's characterClothing. Don't just
-          // warn — actually populate page.characterClothing so every
-          // downstream consumer (scene metadata at line 3246, perCharClothing
-          // at line 3290, scene output at line 4573, pageClothing build at
-          // line 4649) sees a resolved entry instead of an implicit fallback.
-          // Without this, the local pageClothingReqs gap-fill at line 3119
-          // only patched the avatar-resolution path — the persisted
-          // characterClothing data stayed incomplete and downstream paths
-          // diverged on what to render.
           const missing = backgroundMentionAdded.filter(n => !(page.characterClothing && page.characterClothing[n]));
           if (missing.length > 0) {
-            page.characterClothing = page.characterClothing || {};
-            const populated = [];
-            for (const name of missing) {
-              const globalReqs = streamingClothingRequirements?.[name];
-              const fallback = (globalReqs?.costumed?.used && globalReqs.costumed.costume)
-                ? `costumed:${globalReqs.costumed.costume}`
-                : 'standard';
-              page.characterClothing[name] = fallback;
-              populated.push(`${name}:${fallback}`);
-            }
-            log.info(`[SCENE HINT] Page ${page.pageNumber}: auto-populated characterClothing for background-mention char(s) Sonnet forgot to list: ${populated.join(', ')}`);
+            log.warn(`[SCENE HINT] Page ${page.pageNumber}: characters named in background but missing from characters[]: ${missing.join(', ')} — falling back to global clothing requirements`);
           }
         }
 
