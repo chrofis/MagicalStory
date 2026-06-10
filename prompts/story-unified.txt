@@ -418,6 +418,27 @@ For EACH **primary character** ({PRIMARY_CHARACTER_NAMES}):
 **Tone**: [Overall feeling: adventurous, heartwarming, playful, magical]
 
 
+---SCENE PLAN---
+Plan the visual composition for each page BEFORE writing. One line per page:
+`Page N: [shot] — [character count] character(s) — [brief composition note]`
+
+Example for a 10-page story:
+```
+Page 1: wide — 1 char — Luna alone discovering the forest entrance
+Page 2: medium — 2 chars — Luna meets the fox, over-the-shoulder from Luna
+Page 3: close-up — 1 char — Luna's face reacting to the fox's riddle
+Page 4: ultra-wide — 1 char — tiny Luna crossing the vast frozen lake
+Page 5: medium — 2 chars — Luna and fox at the bridge, both facing it
+Page 6: wide — 1 char — Luna climbing the tower, seen from below
+Page 7: medium — 1 char + crowd — Luna in the market, crowd in background
+Page 8: close-up — 1 char — Luna reading the ancient scroll, concentration
+Page 9: wide — 2 chars — Luna and fox running, chase perspective, both small
+Page 10: medium — 2 chars — Luna and fox at the meadow, back view walking away
+```
+
+Rules: no two consecutive pages with same shot + same character count. At least 30% solo scenes. Emit this section exactly once, here — do not repeat it later in the output.
+
+
 ---STORY DRAFT---
 Draft the story with scene output. Focus on creativity first.
 For EACH of the {PAGES} pages:
@@ -629,6 +650,10 @@ Based on the story draft, determine which clothing variants each character needs
 
 **Brief example:**
 ```
+---SCENE PLAN---
+Page 1: close-up — 1 char — the main character at the window, snow falling outside
+... (one line per page) ...
+
 ---STORY DRAFT---
 **Draft 1**
 The main character ran to the window. Snow was falling!
@@ -881,26 +906,6 @@ Objects: [LOC### + 1-2 ART### refs]
 Characters:
 - [MainChar1] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
 - [MainChar2] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
-
----SCENE PLAN---
-Plan the visual composition for each page BEFORE writing. One line per page:
-`Page N: [shot] — [character count] character(s) — [brief composition note]`
-
-Example for a 10-page story:
-```
-Page 1: wide — 1 char — Luna alone discovering the forest entrance
-Page 2: medium — 2 chars — Luna meets the fox, over-the-shoulder from Luna
-Page 3: close-up — 1 char — Luna's face reacting to the fox's riddle
-Page 4: ultra-wide — 1 char — tiny Luna crossing the vast frozen lake
-Page 5: medium — 2 chars — Luna and fox at the bridge, both facing it
-Page 6: wide — 1 char — Luna climbing the tower, seen from below
-Page 7: medium — 1 char + crowd — Luna in the market, crowd in background
-Page 8: close-up — 1 char — Luna reading the ancient scroll, concentration
-Page 9: wide — 2 chars — Luna and fox running, chase perspective, both small
-Page 10: medium — 2 chars — Luna and fox at the meadow, back view walking away
-```
-
-Rules: no two consecutive pages with same shot + same character count. At least 30% solo scenes.
 
 ---STORY PAGES---
 **CRITICAL: NO Visual Bible IDs in story text.** [LOC001], [ART001], [CHR001], [ANI001], [VEH001], [CLO001] etc. are for the Visual Bible JSON and scene hints ONLY. Story text must use natural names ("the old tower", "her amulet") — never bracket IDs.
