@@ -2724,6 +2724,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   log.debug(`📝 [UNIFIED INPUT] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"`);
   log.debug(`📝 [UNIFIED INPUT] mainCharacters: ${JSON.stringify(inputData.mainCharacters)}, characters count: ${inputData.characters?.length || 0}`);
 
+  // Normalize character names at intake. A trailing/leading space in a name
+  // ("Lian ") survives into avatar keys, photo labels, and prompts, while
+  // Sonnet's hints echo the trimmed form — exact-match selection then silently
+  // drops the character (observed: cover rendered the other child twice
+  // because only one reference photo survived the match).
+  for (const c of (inputData.characters || [])) {
+    if (typeof c?.name === 'string') c.name = c.name.trim();
+  }
+  if (Array.isArray(inputData.mainCharacters)) {
+    inputData.mainCharacters = inputData.mainCharacters.map(m => (typeof m === 'string' ? m.trim() : m));
+  }
+
   // Timing tracker for all stages
   const timing = {
     start: timingStart,
@@ -3604,7 +3616,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (hint.characterClothing && Object.keys(hint.characterClothing).length > 0) {
           const clothingCharNames = Object.keys(hint.characterClothing);
           coverCharacters = inputData.characters.filter(c =>
-            clothingCharNames.some(name => name.toLowerCase() === c.name.toLowerCase())
+            clothingCharNames.some(name => name.trim().toLowerCase() === String(c.name || '').trim().toLowerCase())
           );
           if (coverCharacters.length > 0) {
             log.debug(`📕 [COVER] ${coverType}: Using ${coverCharacters.length} characters from hint.characterClothing: ${coverCharacters.map(c => c.name).join(', ')}`);

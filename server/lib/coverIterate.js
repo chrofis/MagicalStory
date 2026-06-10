@@ -184,7 +184,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // Primary: use outline's character list (matches initial generation logic)
     const hintCharNames = Object.keys(hintCharClothing);
     selectedCoverCharacters = mergedCharacters.filter(c =>
-      hintCharNames.some(name => name.toLowerCase() === c.name.toLowerCase())
+      hintCharNames.some(name => name.trim().toLowerCase() === String(c.name || '').trim().toLowerCase())
     ).slice(0, MAX_COVER_CHARACTERS);
     // Merge hint clothing into clothingRequirements for avatar lookup
     const mergedClothing = { ...clothingRequirements };
@@ -845,7 +845,7 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
   const charSentences = sortedDetails.map(d => {
     const pos = d.position ? `in the ${d.position}` : '';
     const physChar = Array.isArray(characters)
-      ? characters.find(c => c?.name === d.name)
+      ? characters.find(c => String(c?.name || '').trim().toLowerCase() === String(d.name || '').trim().toLowerCase())
       : null;
     // Brief physical descriptor — the cover prompt template's CHARACTER_REFERENCE_LIST
     // also provides per-character details, but mentioning the name in prose ties
