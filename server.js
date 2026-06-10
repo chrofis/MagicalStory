@@ -7282,21 +7282,34 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // status update raced or the SET credits_reserved=0 failed after the
     // user-credits write succeeded.
     try {
+      // RETURNING the OLD reserved amount: `RETURNING credits_reserved` after
+      // `SET credits_reserved = 0` returns the post-update value (0), so the
+      // refund guard `refunded > 0` never fired and refunds silently no-op'd
+      // since the atomic-claim refactor. Read the pre-update value via a
+      // self-join subquery (snapshot-stable, single statement, still atomic).
       const claim = await dbPool.query(
-        `UPDATE story_jobs
+        `UPDATE story_jobs s
          SET credits_reserved = 0
-         WHERE id = $1 AND credits_reserved > 0
-         RETURNING credits_reserved AS refunded, user_id`,
+         FROM (SELECT credits_reserved AS prev, user_id AS uid FROM story_jobs WHERE id = $1) old
+         WHERE s.id = $1 AND s.credits_reserved > 0
+         RETURNING old.prev AS refunded, s.user_id`,
         [jobId]
       );
       if (claim.rows.length > 0) {
         const { refunded, user_id: refundUserId } = claim.rows[0];
         if (refundUserId && refunded > 0) {
-          await dbPool.query(
-            'UPDATE users SET credits = credits + $1 WHERE id = $2',
+          const upd = await dbPool.query(
+            'UPDATE users SET credits = credits + $1 WHERE id = $2 AND credits <> -1 RETURNING credits',
             [refunded, refundUserId]
           );
-          log.info(`💳 [UNIFIED] Refunded ${refunded} credits for failed job ${jobId}`);
+          if (upd.rows.length > 0) {
+            await dbPool.query(
+              `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+              [refundUserId, refunded, upd.rows[0].credits, 'story_refund', jobId, `Full refund: ${refunded} credits - story generation failed`]
+            );
+            log.info(`💳 [UNIFIED] Refunded ${refunded} credits for failed job ${jobId}`);
+          }
         }
       }
     } catch (refundErr) {
@@ -7809,10 +7822,11 @@ async function _processStoryJobImpl(jobId) {
     // can't double-refund — whoever zeros credits_reserved first wins.
     try {
       const claim = await dbPool.query(
-        `UPDATE story_jobs
+        `UPDATE story_jobs s
          SET credits_reserved = 0
-         WHERE id = $1 AND credits_reserved > 0 AND COALESCE(progress, 0) < 100
-         RETURNING credits_reserved AS refunded, user_id, COALESCE(progress, 0) AS progress_percent`,
+         FROM (SELECT credits_reserved AS prev, user_id AS uid FROM story_jobs WHERE id = $1) old
+         WHERE s.id = $1 AND s.credits_reserved > 0 AND COALESCE(s.progress, 0) < 100
+         RETURNING old.prev AS refunded, s.user_id, COALESCE(s.progress, 0) AS progress_percent`,
         [jobId]
       );
       if (claim.rows.length > 0) {

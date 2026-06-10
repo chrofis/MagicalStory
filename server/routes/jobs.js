@@ -210,10 +210,14 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
             try {
               await client.query('BEGIN');
               // Atomically claim the credits_reserved (prevents double-refund if cancel runs concurrently)
+              // RETURNING the OLD reserved amount — `RETURNING credits_reserved`
+              // after SET=0 returns 0, which silently broke this refund. Read
+              // the pre-update value via a self-join subquery.
               const claimResult = await client.query(
-                `UPDATE story_jobs SET credits_reserved = 0
-                 WHERE id = $1 AND credits_reserved > 0
-                 RETURNING credits_reserved AS refund_amount, progress`,
+                `UPDATE story_jobs s SET credits_reserved = 0
+                 FROM (SELECT credits_reserved AS prev, progress AS prog FROM story_jobs WHERE id = $1) old
+                 WHERE s.id = $1 AND s.credits_reserved > 0
+                 RETURNING old.prev AS refund_amount, old.prog AS progress`,
                 [activeJob.id]
               );
               if (claimResult.rows.length > 0) {
@@ -573,10 +577,15 @@ router.post('/:jobId/cancel', authenticateToken, async (req, res) => {
       try {
         await client.query('BEGIN');
         // Atomically claim the credits_reserved (prevents double-refund if stale cleanup runs concurrently)
+        // RETURNING the OLD reserved amount — `RETURNING credits_reserved`
+        // after SET=0 returns 0, which silently broke this refund since the
+        // atomic-claim refactor. Read the pre-update value via a self-join
+        // subquery (snapshot-stable, atomic).
         const claimResult = await client.query(
-          `UPDATE story_jobs SET credits_reserved = 0
-           WHERE id = $1 AND credits_reserved > 0
-           RETURNING credits_reserved AS refund_amount, progress`,
+          `UPDATE story_jobs s SET credits_reserved = 0
+           FROM (SELECT credits_reserved AS prev, progress AS prog FROM story_jobs WHERE id = $1) old
+           WHERE s.id = $1 AND s.credits_reserved > 0
+           RETURNING old.prev AS refund_amount, old.prog AS progress`,
           [jobId]
         );
         if (claimResult.rows.length > 0) {
