@@ -2453,6 +2453,9 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
         }
         if (data.visualBible) visualBible = data.visualBible;
         if (data.clothingRequirements) pageClothingData = data.clothingRequirements;
+        // Raw unified response → outline, so a failed job is diagnosable from
+        // data.outline (matches what successful jobs store there).
+        if (data.unifiedResponse && !outline) outline = data.unifiedResponse;
         if (data.unifiedPrompt) {
           outlinePrompt = data.unifiedPrompt;
           outlineModelId = data.unifiedModelId || null;
@@ -2866,6 +2869,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let streamingTitle = null;
     let streamingClothingRequirements = null;
     let streamingVisualBible = null;
+    let streamEnded = false;  // set true after progressiveParser.finalize() so scene-expansion VB waits stop spinning once the authoritative parse has run
     let streamingCoverHints = null;
     let streamingPagesDetected = 0;
     let lastProgressUpdate = Date.now();
@@ -3000,15 +3004,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       // Need visual bible for scene expansion - queue if not available yet
       const expansionPromise = streamSceneLimit(async () => {
-        // Wait for visual bible if not yet available (cap at 5 minutes)
+        // Wait for visual bible if not yet available (cap at 5 minutes), but
+        // stop early once the stream has finished — at that point the
+        // authoritative full parse has run and backfilled streamingVisualBible
+        // (see finalize block below), so there's nothing more to wait for.
+        // Spinning the full 5 minutes after stream-end is what produced the
+        // heartbeat timeout on job_1781036274234 (2026-06-09).
         let vbWait = 0;
-        while (!streamingVisualBible && vbWait < 3000) {
+        while (!streamingVisualBible && !streamEnded && vbWait < 3000) {
           await new Promise(r => setTimeout(r, 100));
           vbWait++;
         }
+        // Never return null here — a null scene crashes the page-sort
+        // downstream. If the VB never materialised (streaming AND full parse
+        // both missed it), proceed with an empty VB: the unified-prose path
+        // uses page.sceneProse directly and only loses landmark / element-ref
+        // enrichment. A degraded page beats a crashed story.
         if (!streamingVisualBible) {
-          log.warn('[STREAM] Timed out waiting for Visual Bible in scene expansion — skipping');
-          return null;
+          log.warn(`[STREAM] Visual Bible unavailable for page ${page.pageNumber} scene expansion — proceeding with empty VB (degraded, no landmark/element refs)`);
+          streamingVisualBible = streamingVisualBible || {};
         }
 
         // Wait for landmark photo descriptions to be loaded (so variants are in the prompt)
@@ -4382,6 +4396,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Resolve via Haiku before any downstream consumer sees the collision —
     // image prompts, VB grid, BBOX-enrich all assume unique ids.
     await dedupeSecondaryCharacterIds(visualBible, addUsage);
+    // Backfill the streaming VB from the authoritative full parse. When the
+    // streaming parser's stricter section detection missed the Visual Bible
+    // (it diverged from the full parser's regex — the root cause of the
+    // job_1781036274234 crash), any scene expansions still waiting on
+    // streamingVisualBible now pick up the correct VB instead of timing out.
+    // streamEnded then releases any expansion still in its wait loop.
+    if (!streamingVisualBible && visualBible && Object.keys(visualBible).length > 0) {
+      streamingVisualBible = visualBible;
+      log.info('[STREAM] Backfilled streamingVisualBible from authoritative full parse (streaming detection had missed it)');
+    }
+    streamEnded = true;
     const coverHints = parser.extractCoverHints();
 
     // Reconcile cover hint clothing against the story's clothingRequirements.
@@ -4542,7 +4567,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       });
     }
 
-    // Save checkpoint
+    // Save checkpoint. Include the RAW unified response (unifiedResponse) so a
+    // later failure's partial-save can persist it to data.outline — successful
+    // jobs save the raw response there, but the partial-save path previously
+    // had no source for it (only the prompt), which left failed jobs
+    // un-diagnosable from the DB (the job_1781036274234 parse failure couldn't
+    // be inspected because the raw response was nowhere).
     await saveCheckpoint(jobId, 'unified_story', {
       title,
       clothingRequirements,
@@ -4550,6 +4580,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       coverHints,
       storyPages,
       unifiedPrompt,
+      unifiedResponse,
       unifiedModelId,
       unifiedUsage
     });
@@ -4753,8 +4784,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         Array.from(streamingSceneExpansionPromises.values())
       );
 
-      // Sort by page number
-      expandedScenes = sceneResults.sort((a, b) => a.pageNumber - b.pageNumber);
+      // Sort by page number. filter(Boolean) first — a scene expansion can
+      // resolve to null (its thunk threw, or the user skipped it); a null in
+      // the sort comparator dereferences null.pageNumber and crashes the whole
+      // job (the job_1781036274234 crash, 2026-06-09). Drop nulls and log how
+      // many so a silent page loss is visible.
+      const nullScenes = sceneResults.length - sceneResults.filter(Boolean).length;
+      if (nullScenes > 0) {
+        log.warn(`⚠️ [UNIFIED] ${nullScenes}/${sceneResults.length} scene expansion(s) returned null — dropped before sort (page(s) will be missing)`);
+      }
+      expandedScenes = sceneResults.filter(Boolean).sort((a, b) => a.pageNumber - b.pageNumber);
       log.debug(`✅ [UNIFIED] All ${expandedScenes.length} scene expansions complete`);
       genLog.info('scenes_complete', `All ${expandedScenes.length} scene expansions complete`);
 
