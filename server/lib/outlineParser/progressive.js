@@ -179,53 +179,15 @@ class ProgressiveUnifiedParser {
     // Full flow: TITLE → CLOTHING REQUIREMENTS
     // Trial flow: TITLE → VISUAL BIBLE
     if (!this._hasMarker('TITLE')) return;
-    if (!this._hasMarker('CLOTHING REQUIREMENTS') && !this._hasMarker('VISUAL BIBLE')) return;
+    if (!this._finalized
+        && !this._hasMarker('CLOTHING REQUIREMENTS')
+        && !this._hasMarker('VISUAL BIBLE')) return;
 
-    const sectionMatch = this.fullText.match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*(?:CLOTHING|VISUAL))/i);
-    const section = sectionMatch ? sectionMatch[1] : null;
-    if (!section) return;
-
-    let title = null;
-
-    // Prefer TITLE_CANDIDATES list and pick one at random — same logic as the
-    // unified parser. The model would otherwise converge on the most-iconic
-    // candidate every run, and even when it does emit a TITLE: line we want
-    // server-side variety, not its preference.
-    const candidatesMatch = section.match(/TITLE_CANDIDATES\s*:\s*([\s\S]+?)(?=\n\s*(?:TITLE\s*:|---|$))/i);
-    if (candidatesMatch) {
-      const candidates = candidatesMatch[1]
-        .split('\n')
-        .map(l => l.match(/^\s*\d+[.)]\s*(.+?)\s*$/))
-        .filter(Boolean)
-        .map(m => m[1].trim()
-          .replace(/^\*{1,2}|\*{1,2}$/g, '')
-          .replace(/^"|"$/g, '')
-          .replace(/^\[|\]$/g, '')
-          .trim())
-        .filter(s => s.length > 0 && !/^\[.*\]$/.test(s));
-      if (candidates.length > 0) {
-        // Deterministic pick — see comment in unified.js. Both parsers must
-        // pick the same title or the cover image (built from this pick) and
-        // the saved story title (built from the unified parser's pick) will
-        // diverge.
-        const { stableCandidateIndex } = require('./shared');
-        title = candidates[stableCandidateIndex(candidates)];
-        log.info(`🌊 [STREAM-UNIFIED] Title picked (stable) from ${candidates.length} candidates: "${title}"`);
-      }
-    }
-
-    // Fallback: legacy `TITLE: <value>` line (older runs / partial outputs).
-    if (!title) {
-      const titleLineMatch = section.match(/^\s*(?:\*{1,2})?\s*TITLE(?!_)\s*:\s*(.+?)\s*(?:\*{1,2})?\s*$/im);
-      if (titleLineMatch) {
-        title = titleLineMatch[1].trim()
-          .replace(/^\*{1,2}|\*{1,2}$/g, '')
-          .replace(/^"|"$/g, '')
-          .trim();
-        log.debug(`🌊 [STREAM-UNIFIED] Title (legacy single-line): "${title}"`);
-      }
-    }
-
+    // Delegate to the canonical extractor — same TITLE_CANDIDATES stable-pick
+    // and legacy-line fallback as the final parse, so streaming and final
+    // pick the identical title (a divergence here desyncs the cover image,
+    // built from the streaming pick, from the saved story title).
+    const title = this._extractWithUnified(p => p.extractTitle());
     if (title) {
       this.emitted.title = true;
       if (this.callbacks.onTitle) this.callbacks.onTitle(title);
@@ -241,32 +203,15 @@ class ProgressiveUnifiedParser {
 
     // Complete when we see VISUAL BIBLE marker (next section in output)
     if (!this._hasMarker('CLOTHING REQUIREMENTS')) return;
-    if (!this._hasMarker('VISUAL BIBLE')) return;
+    if (!this._finalized && !this._hasMarker('VISUAL BIBLE')) return;
 
-    const sectionMatch = this.fullText.match(/---\s*CLOTHING\s+REQUIREMENTS\s*---\s*([\s\S]*?)(?=---\s*VISUAL\s+BIBLE\s*---)/i);
-    if (!sectionMatch) return;
-
-    const section = sectionMatch[1];
-    const jsonMatch = section.match(/```json\s*([\s\S]*?)```/i) ||
-                      section.match(/(\{[\s\S]*?"clothingRequirements"[\s\S]*?\})/);
-
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[1]);
-        const requirements = parsed.clothingRequirements || parsed;
-        this.emitted.clothingRequirements = true;
-        log.debug(`🌊 [STREAM-UNIFIED] Clothing requirements detected for ${Object.keys(requirements).length} characters`);
-
-        if (this.callbacks.onClothingRequirements) {
-          this.callbacks.onClothingRequirements(requirements);
-        }
-        if (this.callbacks.onProgress) {
-          this.callbacks.onProgress('clothing', `Clothing for ${Object.keys(requirements).length} characters`);
-        }
-      } catch (e) {
-        // JSON parse error - log it for debugging
-        log.debug(`[STREAM-UNIFIED] Clothing requirements JSON parse error (may be incomplete): ${e.message}`);
-      }
+    // Delegate to the canonical extractor — one clothing-JSON implementation.
+    const requirements = this._extractWithUnified(p => p.extractClothingRequirements());
+    if (requirements) {
+      this.emitted.clothingRequirements = true;
+      log.debug(`🌊 [STREAM-UNIFIED] Clothing requirements detected for ${Object.keys(requirements).length} characters`);
+      if (this.callbacks.onClothingRequirements) this.callbacks.onClothingRequirements(requirements);
+      if (this.callbacks.onProgress) this.callbacks.onProgress('clothing', `Clothing for ${Object.keys(requirements).length} characters`);
     }
   }
 
@@ -572,10 +517,13 @@ class ProgressiveUnifiedParser {
     // Rescue truncated cover scene before final page check
     if (this._isTrial) this._checkCoverScene();
 
-    // Final VB extraction pass. _finalized=true relaxes the trailing-marker
-    // gate so the canonical extractor's permissive end-of-text lookahead
-    // catches a VB the streaming gate missed (model omitted the STORY PAGES
-    // marker). Belt-and-suspenders with server.js's authoritative-VB backfill.
+    // Final extraction pass for the delegated sections. _finalized=true relaxes
+    // their trailing-marker gates so the canonical extractor's permissive
+    // end-of-text lookahead catches anything the streaming gates missed (model
+    // omitted a section marker). Belt-and-suspenders with server.js's
+    // authoritative backfill.
+    this._checkTitle();
+    this._checkClothingRequirements();
     this._checkVisualBible();
 
     // Re-check pages one more time to catch the last page
