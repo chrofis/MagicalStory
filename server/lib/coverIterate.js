@@ -17,6 +17,53 @@ function getStoryHelpers() {
   return require('./storyHelpers');
 }
 
+// Cover page numbers follow the convention used across entityConsistency,
+// repair workflow, and the streaming generator: -1 frontCover, -2 initialPage,
+// -3 backCover.
+const COVER_PAGE_NUMBERS = { frontCover: -1, initialPage: -2, backCover: -3 };
+
+/**
+ * Drop sentences that mention a character by name. Used on the cover
+ * empty-scene plate description: covers fall back to the full group-portrait
+ * prose, and any character sentence left in makes the "empty" plate render
+ * placeholder figures (with held VB props painted as literal ID signs). The
+ * final render then keeps those placeholders alongside the real cast —
+ * phantom duplicate figures.
+ */
+function stripCharacterSentences(description, characterNames = []) {
+  if (!description) return description;
+  const names = (characterNames || [])
+    .filter(n => typeof n === 'string' && n.trim().length > 1)
+    .map(n => n.trim().toLowerCase());
+  if (names.length === 0) return description;
+  return description
+    .split('\n')
+    .map(line => line
+      .split(/(?<=[.!?])\s+/)
+      .filter(sentence => {
+        const s = sentence.toLowerCase();
+        return !names.some(n => s.includes(n));
+      })
+      .join(' '))
+    .join('\n');
+}
+
+/**
+ * Build the PEOPLE-FREE description for the cover empty-scene plate.
+ * Strips character sentences, rewrites the hint builder's composition
+ * starters ("group portrait", "Only these two people appear") to a
+ * setting-only view, and resolves/drops VB ids so no raw ART###/CHR###
+ * token reaches the image model as paintable text.
+ */
+function buildPlateDescription(emptyDescRaw, characterNames, visualBible, pageNumber) {
+  const { sanitizeVbIdsInPrompt } = getStoryHelpers();
+  const stripped = stripCharacterSentences(emptyDescRaw, characterNames)
+    .replace(/\ba wide group portrait set before\b/gi, 'A wide view of')
+    .replace(/\ba portrait of (?:two characters|a single character) set before\b/gi, 'A wide view of')
+    .replace(/\bOnly (?:these two people|this one person) appears?[^.]*\.\s*/gi, '');
+  return sanitizeVbIdsInPrompt(stripped, visualBible, pageNumber);
+}
+
 /**
  * Iterate a cover page: rebuild prompt from templates, select characters,
  * build landmark/VB references, generate new image. The single entry point
@@ -276,6 +323,16 @@ async function iterateCover(coverKey, storyData, options = {}) {
       coverPrompt = `${coverPrompt}\n\n${feedbackParts.join('\n\n')}`;
       log.info(`🔄 [COVER-ITERATE] ${coverKey}: Appended evaluation feedback (score: ${evaluationFeedback.score ?? 'N/A'})`);
     }
+  }
+
+  // Final chokepoint — same VB-id protection buildImagePrompt gives pages.
+  // The deterministic hint builder falls back to the bare id when `holds`
+  // references an id missing from hint.objects, and evaluation feedback
+  // quotes ids back verbatim ("missing ART002") — resolve them all here so
+  // no raw id reaches the image model as paintable text.
+  {
+    const { sanitizeVbIdsInPrompt } = getStoryHelpers();
+    coverPrompt = sanitizeVbIdsInPrompt(coverPrompt, visualBible, COVER_PAGE_NUMBERS[coverKey] ?? -1);
   }
 
   // Clear cache
@@ -593,9 +650,6 @@ async function buildCoverReferences({
     landmarkPhotos = [...landmarkPhotos, ...photoOnlyLocs];
   }
 
-  // Cover page numbers follow the convention used across entityConsistency, repair
-  // workflow, and the streaming generator: -1 frontCover, -2 initialPage, -3 backCover.
-  const COVER_PAGE_NUMBERS = { frontCover: -1, initialPage: -2, backCover: -3 };
   const coverPageNumber = COVER_PAGE_NUMBERS[coverKey] ?? -1;
 
   // --- Generate empty scene for style anchoring ---
@@ -609,8 +663,20 @@ async function buildCoverReferences({
       const artStyleDesc = resolveArtStyleForEmptyScene(artStyle || 'pixar')
         || resolveArtStyle(artStyle || 'pixar')
         || '';
-      const emptyDesc = emptyScenePromptOverride
+      const emptyDescRaw = emptyScenePromptOverride
         || `**SETTING:** ${sceneDescription}\n**CAMERA:** wide shot`;
+      // The plate must be PEOPLE-FREE. Covers fall back to the full
+      // group-portrait prose, so drop every sentence that names a character
+      // (those sentences also carry the held VB props) — a placeholder
+      // figure left on the plate survives into the final render as a
+      // phantom duplicate, and a raw "ART002" gets painted as a literal sign.
+      const coverCastNames = [
+        ...Object.values(coverHint?.characterDetails || {}).map(d => d?.name),
+        ...(Array.isArray(coverHint?.characters) ? coverHint.characters : []),
+        ...((visualBible?.mainCharacters || []).map(c => c?.name)),
+        ...((visualBible?.secondaryCharacters || []).map(c => c?.name)),
+      ];
+      const emptyDesc = buildPlateDescription(emptyDescRaw, coverCastNames, visualBible, coverPageNumber);
       const { buildEmptyScenePrompt } = require('../services/prompts');
       const emptyPrompt = buildEmptyScenePrompt({
         style: artStyleDesc,
@@ -822,4 +888,4 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
   return lines.join(' ');
 }
 
-module.exports = { iterateCover, buildCoverReferences, buildCoverSceneFromHint };
+module.exports = { iterateCover, buildCoverReferences, buildCoverSceneFromHint, stripCharacterSentences, buildPlateDescription };

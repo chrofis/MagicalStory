@@ -3824,6 +3824,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           });
         }
 
+        // Final chokepoint — same VB-id protection buildImagePrompt gives
+        // pages. buildCoverSceneFromHint falls back to the bare id when a
+        // character's `holds` references an id missing from hint.objects
+        // ("holds the ART002"), and the image model paints unknown ids as
+        // literal signs. Resolve or drop them before the prompt ships.
+        {
+          const { sanitizeVbIdsInPrompt } = require('./server/lib/storyHelpers');
+          const coverPageNum = coverType === 'titlePage' ? -1 : coverType === 'initialPage' ? -2 : -3;
+          coverPrompt = sanitizeVbIdsInPrompt(coverPrompt, streamingVisualBible, coverPageNum);
+        }
+
         // Usage tracker for cover images
         const coverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
           if (imgUsage) {

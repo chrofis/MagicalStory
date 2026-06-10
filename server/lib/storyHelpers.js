@@ -6037,6 +6037,7 @@ module.exports = {
 
   // Entity ID stripping (for image prompts)
   stripEntityIds,
+  sanitizeVbIdsInPrompt,
 
   // Character parsing for bbox matching
   parseCharacterDescriptions,
