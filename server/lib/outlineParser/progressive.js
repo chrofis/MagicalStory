@@ -320,123 +320,50 @@ class ProgressiveUnifiedParser {
     // Full flow: VISUAL BIBLE → COVER SCENE HINTS
     // Trial flow: VISUAL BIBLE → COVER SCENE → STORY PAGES
     if (!this._hasMarker('VISUAL BIBLE')) return;
-    if (!this._hasMarker('COVER SCENE HINTS') && !this._hasMarker('COVER SCENE') && !this._hasMarker('STORY PAGES')) return;
+    // During streaming, wait for a following section marker so the VB JSON is
+    // known-complete before we parse it. At finalize the full text is in hand,
+    // so a trailing marker is no longer required — this is what lets streaming
+    // catch a VB even when the model omitted/renamed the STORY PAGES header
+    // (the job_1781036274234 shape: pages emitted as `## Seite N`, no
+    // `---STORY PAGES---` marker, so the streaming gate never fired).
+    if (!this._finalized
+        && !this._hasMarker('COVER SCENE HINTS')
+        && !this._hasMarker('COVER SCENE')
+        && !this._hasMarker('STORY PAGES')) return;
 
-    const sectionMatch = this.fullText.match(/---\s*VISUAL\s+BIBLE\s*---\s*([\s\S]*?)(?=---\s*(?:COVER\s+SCENE(?:\s+HINTS)?|STORY\s+PAGES)\s*---)/i);
-    if (!sectionMatch) return;
+    // Delegate extraction to the canonical UnifiedStoryParser. The gate above
+    // guarantees the VB section is bounded by a following marker (so the
+    // permissive extractor won't parse incomplete JSON mid-stream). Using the
+    // SAME extractor as the final parse removes the regex/normalization
+    // divergence that previously let streaming miss a VB the full parse caught
+    // (the job_1781036274234 crash root cause).
+    const parsed = this._extractWithUnified(p => p.extractVisualBible());
+    if (parsed) {
+      this.emitted.visualBible = true;
+      const entryCount = (parsed.secondaryCharacters?.length || 0) +
+                        (parsed.animals?.length || 0) +
+                        (parsed.artifacts?.length || 0) +
+                        (parsed.locations?.length || 0);
+      log.debug(`🌊 [STREAM-UNIFIED] Visual Bible detected with ${entryCount} entries`);
+      if (this.callbacks.onVisualBible) this.callbacks.onVisualBible(parsed);
+      if (this.callbacks.onProgress) this.callbacks.onProgress('visualBible', `Visual Bible: ${entryCount} elements`);
+    }
+  }
 
-    const section = sectionMatch[1];
-    const jsonMatch = section.match(/```json\s*([\s\S]*?)```/i);
-
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[1]);
-        this.emitted.visualBible = true;
-
-        // Normalize pages -> appearsInPages field mapping (Claude generates "pages", code expects "appearsInPages")
-        const normalizeVisualBibleEntries = (entries) => {
-          if (!entries || !Array.isArray(entries)) return entries;
-          return entries.map(entry => ({
-            ...entry,
-            appearsInPages: entry.appearsInPages || entry.pages || [],
-          }));
-        };
-
-        // Apply normalization to all entry arrays
-        if (parsed.secondaryCharacters) parsed.secondaryCharacters = normalizeVisualBibleEntries(parsed.secondaryCharacters);
-        if (parsed.artifacts) parsed.artifacts = normalizeVisualBibleEntries(parsed.artifacts);
-        if (parsed.animals) parsed.animals = normalizeVisualBibleEntries(parsed.animals);
-        if (parsed.vehicles) parsed.vehicles = normalizeVisualBibleEntries(parsed.vehicles);
-        if (parsed.locations) parsed.locations = normalizeVisualBibleEntries(parsed.locations);
-        if (parsed.clothing) parsed.clothing = normalizeVisualBibleEntries(parsed.clothing);
-
-        // Add computed 'description' field for all entry types (same logic as extractVisualBible)
-        if (parsed.secondaryCharacters) {
-          parsed.secondaryCharacters = parsed.secondaryCharacters.map(char => {
-            if (!char.description) {
-              const parts = [];
-              if (char.age) parts.push(char.age);
-              if (char.build) parts.push(char.build);
-              if (char.hair) parts.push(`hair: ${char.hair}`);
-              if (char.face) parts.push(char.face);
-              if (char.signatureLook) parts.push(`Signature: ${char.signatureLook}`);
-              if (char.clothing) parts.push(`Clothing: ${char.clothing}`);
-              char.description = parts.join('. ') || char.name;
-            }
-            return char;
-          });
-        }
-
-        if (parsed.animals) {
-          parsed.animals = parsed.animals.map(animal => {
-            if (!animal.description) {
-              const parts = [];
-              if (animal.species) parts.push(animal.species);
-              if (animal.size) parts.push(animal.size);
-              if (animal.coloring) parts.push(animal.coloring);
-              if (animal.features) parts.push(animal.features);
-              animal.description = parts.join('. ') || animal.name;
-            }
-            return animal;
-          });
-        }
-
-        if (parsed.artifacts) {
-          parsed.artifacts = parsed.artifacts.map(item => {
-            if (!item.description) {
-              const parts = [];
-              if (item.type) parts.push(item.type);
-              if (item.appearance) parts.push(item.appearance);
-              if (item.size) parts.push(item.size);
-              item.description = parts.join('. ') || item.name;
-            }
-            return item;
-          });
-        }
-
-        if (parsed.locations) {
-          parsed.locations = parsed.locations.map(loc => {
-            if (!loc.description) {
-              const parts = [];
-              if (loc.type) parts.push(loc.type);
-              if (loc.atmosphere) parts.push(loc.atmosphere);
-              if (loc.keyFeatures) parts.push(loc.keyFeatures);
-              loc.description = parts.join('. ') || loc.name;
-            }
-            return loc;
-          });
-        }
-
-        if (parsed.vehicles) {
-          parsed.vehicles = parsed.vehicles.map(v => {
-            if (!v.description) {
-              const parts = [];
-              if (v.type) parts.push(v.type);
-              if (v.appearance) parts.push(v.appearance);
-              if (v.size) parts.push(v.size);
-              v.description = parts.join('. ') || v.name;
-            }
-            return v;
-          });
-        }
-
-        const entryCount = (parsed.secondaryCharacters?.length || 0) +
-                          (parsed.animals?.length || 0) +
-                          (parsed.artifacts?.length || 0) +
-                          (parsed.locations?.length || 0);
-
-        log.debug(`🌊 [STREAM-UNIFIED] Visual Bible detected with ${entryCount} entries`);
-
-        if (this.callbacks.onVisualBible) {
-          this.callbacks.onVisualBible(parsed);
-        }
-        if (this.callbacks.onProgress) {
-          this.callbacks.onProgress('visualBible', `Visual Bible: ${entryCount} elements`);
-        }
-      } catch (e) {
-        // JSON parse error - log it for debugging
-        log.debug(`[STREAM-UNIFIED] Visual Bible JSON parse error (may be incomplete): ${e.message}`);
-      }
+  /**
+   * Run a UnifiedStoryParser extractor over the text buffered so far. The
+   * single canonical extraction implementation — both the streaming path
+   * (here, gated by section-boundary detection) and the final full parse use
+   * it, so they can never diverge. Lazy-require avoids a load-order cycle.
+   * @private
+   */
+  _extractWithUnified(fn) {
+    const { UnifiedStoryParser } = require('./unified');
+    try {
+      return fn(new UnifiedStoryParser(this.fullText, { isTrial: this._isTrial }));
+    } catch (e) {
+      log.debug(`[STREAM-UNIFIED] delegated extraction failed (text may be incomplete): ${e.message}`);
+      return null;
     }
   }
 
@@ -644,6 +571,12 @@ class ProgressiveUnifiedParser {
 
     // Rescue truncated cover scene before final page check
     if (this._isTrial) this._checkCoverScene();
+
+    // Final VB extraction pass. _finalized=true relaxes the trailing-marker
+    // gate so the canonical extractor's permissive end-of-text lookahead
+    // catches a VB the streaming gate missed (model omitted the STORY PAGES
+    // marker). Belt-and-suspenders with server.js's authoritative-VB backfill.
+    this._checkVisualBible();
 
     // Re-check pages one more time to catch the last page
     this._checkPages();
