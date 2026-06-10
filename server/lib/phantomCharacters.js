@@ -132,6 +132,49 @@ Output ONLY a JSON array — no markdown fence, no commentary:
 }
 
 /**
+ * Resolve character keys that are VB ids of ALREADY-DEFINED entries.
+ *
+ * Sonnet sometimes writes `"name": "CHR001"` in page metadata for a character
+ * it declared in the Visual Bible (e.g. CHR001 = Luca). The phantom detector
+ * only knows NAMES, so without this step the id-key reads as an unknown
+ * person and Haiku invents a DUPLICATE character with a different look.
+ * Renaming the key to the entry's real name also repairs the downstream
+ * avatar / clothing lookups, which are name-keyed.
+ *
+ * Mutates pages in place. Returns the number of keys remapped.
+ */
+function resolveVbIdCharacterKeys(storyPages, visualBible) {
+  const idToName = new Map();
+  for (const list of [visualBible?.secondaryCharacters, visualBible?.mainCharacters, visualBible?.animals]) {
+    for (const entry of (list || [])) {
+      if (entry?.id && entry?.name) idToName.set(String(entry.id).toUpperCase(), entry.name);
+    }
+  }
+  if (idToName.size === 0) return 0;
+
+  let remapped = 0;
+  for (const page of (storyPages || [])) {
+    for (const key of Object.keys(page.characterClothing || {})) {
+      if (!/^(CHR|ANI)\d+$/i.test(key.trim())) continue;
+      const realName = idToName.get(key.trim().toUpperCase());
+      if (!realName || page.characterClothing[realName] !== undefined) continue;
+      page.characterClothing[realName] = page.characterClothing[key];
+      delete page.characterClothing[key];
+      if (page.characterPerspectives?.[key] !== undefined) {
+        page.characterPerspectives[realName] = page.characterPerspectives[key];
+        delete page.characterPerspectives[key];
+      }
+      if (Array.isArray(page.characters)) {
+        page.characters = page.characters.map(n => (n?.trim?.().toUpperCase() === key.trim().toUpperCase() ? realName : n));
+      }
+      log.info(`👻 [PHANTOM] Page ${page.pageNumber}: remapped id-key "${key}" → "${realName}" (already defined in VB)`);
+      remapped++;
+    }
+  }
+  return remapped;
+}
+
+/**
  * Detect phantom characters and patch the Visual Bible in place.
  *
  * @param {Object} args
@@ -142,6 +185,10 @@ Output ONLY a JSON array — no markdown fence, no commentary:
  * @returns {Promise<Object|null>} usage object if a call was made, else null
  */
 async function detectAndPatchPhantomCharacters({ storyPages, visualBible, inputCharacters, modelId }) {
+  // First resolve id-keys of already-defined characters — they are NOT
+  // phantoms and must not get duplicate invented entries.
+  resolveVbIdCharacterKeys(storyPages, visualBible);
+
   const phantoms = findPhantomNames(storyPages, visualBible, inputCharacters);
   if (phantoms.length === 0) return null;
 
@@ -250,7 +297,139 @@ async function detectAndPatchPhantomCharacters({ storyPages, visualBible, inputC
   };
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// Orphan object ids: ART/ANI/VEH/LOC/CLO ids referenced in page metadata but
+// never defined in the Visual Bible. The image-prompt sanitizer drops lines
+// with unresolved ids, so an orphan id silently erases scene content. Same
+// repair pattern as phantom characters: a small Haiku call writes the
+// missing entries from the page context.
+// ───────────────────────────────────────────────────────────────────────────
+
+const ORPHAN_POOLS = {
+  ART: 'artifacts',
+  ANI: 'animals',
+  VEH: 'vehicles',
+  LOC: 'locations',
+  CLO: 'clothing',
+};
+
+function collectUsedObjectIds(storyPages) {
+  const used = new Map(); // baseId -> Set(pageNumbers)
+  const re = /\b(ART|ANI|VEH|LOC|CLO)\d+(?:\.\d+)?\b/gi;
+  for (const page of (storyPages || [])) {
+    const haystack = `${page.sceneHint || ''}\n${page.sceneProse || ''}`;
+    let m;
+    while ((m = re.exec(haystack)) !== null) {
+      const base = m[0].toUpperCase().split('.')[0];
+      if (!used.has(base)) used.set(base, new Set());
+      used.get(base).add(page.pageNumber);
+    }
+  }
+  return used;
+}
+
+/**
+ * Detect object ids used in page metadata that have no VB entry, and patch
+ * the Visual Bible in place via a Haiku call. Mirrors
+ * detectAndPatchPhantomCharacters.
+ *
+ * @returns {Promise<Object|null>} usage object if a call was made, else null
+ */
+async function detectAndPatchOrphanObjectIds({ storyPages, visualBible, modelId }) {
+  if (!visualBible) return null;
+  const defined = new Set();
+  for (const pool of Object.values(ORPHAN_POOLS).concat(['mainCharacters', 'secondaryCharacters'])) {
+    for (const entry of (visualBible[pool] || [])) {
+      if (entry?.id) defined.add(String(entry.id).toUpperCase().split('.')[0]);
+    }
+  }
+
+  const used = collectUsedObjectIds(storyPages);
+  const orphans = [...used.keys()].filter(id => !defined.has(id));
+  if (orphans.length === 0) return null;
+
+  log.warn(`👻 [ORPHAN-ID] ${orphans.length} object id(s) used in pages but missing from Visual Bible: ${orphans.join(', ')}`);
+
+  // Context: scene text of up to 3 pages per orphan id
+  const contextBlocks = orphans.map(id => {
+    const pages = [...(used.get(id) || [])].slice(0, 3);
+    const samples = (storyPages || [])
+      .filter(p => pages.includes(p.pageNumber))
+      .map(p => `[p${p.pageNumber}] ${(`${p.sceneProse || p.sceneHint || ''}`).substring(0, 300).replace(/\s+/g, ' ').trim()}`)
+      .join('\n');
+    return `### ${id}\n${samples || '(no context found)'}`;
+  }).join('\n\n');
+
+  const prompt = `These Visual Bible ids are referenced in a children's story's scene metadata but were never defined:
+
+${orphans.join(', ')}
+
+Scene passages where each id appears (the prose describes the object in words):
+
+${contextBlocks}
+
+For EACH id, write its Visual Bible entry. Infer what the object is from the passages — the id prefix tells you the type (ART artifact/prop, ANI animal, VEH vehicle, LOC location, CLO clothing item). The description must be purely visual (shape, size, colors, material).
+
+Output ONLY a JSON array — no markdown fence, no commentary:
+
+[
+  { "id": "<exact id>", "name": "<short name>", "description": "<2-3 sentence visual description>" }
+]`;
+
+  let result;
+  try {
+    result = await callClaudeAPI(prompt, 3000, modelId || 'claude-haiku-4-5');
+  } catch (err) {
+    log.warn(`👻 [ORPHAN-ID] Patch call failed: ${err.message}`);
+    return null;
+  }
+  if (!result?.text) return null;
+
+  let entries;
+  try {
+    const cleaned = result.text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+    entries = JSON.parse(cleaned);
+  } catch {
+    const match = result.text.match(/\[[\s\S]*\]/);
+    if (match) { try { entries = JSON.parse(match[0]); } catch { entries = null; } }
+  }
+  if (!Array.isArray(entries) || entries.length === 0) {
+    log.warn(`👻 [ORPHAN-ID] Could not parse patch response — orphan ids NOT patched`);
+    return null;
+  }
+
+  let added = 0;
+  for (const entry of entries) {
+    const id = String(entry?.id || '').toUpperCase();
+    const prefix = id.slice(0, 3);
+    const pool = ORPHAN_POOLS[prefix];
+    if (!pool || !orphans.includes(id) || !entry.name) continue;
+    if (!Array.isArray(visualBible[pool])) visualBible[pool] = [];
+    const newEntry = {
+      id,
+      name: entry.name,
+      description: entry.description || '',
+      appearsInPages: [...(used.get(id) || [])],
+      referenceImageData: null,
+      referenceImageGenerated: false,
+    };
+    if (pool === 'locations') newEntry.isRealLandmark = false;
+    visualBible[pool].push(newEntry);
+    log.info(`👻 [ORPHAN-ID] Added ${id} "${entry.name}" to visualBible.${pool} (pages: ${newEntry.appearsInPages.join(',')})`);
+    added++;
+  }
+  if (added === 0) return null;
+
+  return {
+    input_tokens: result.usage?.input_tokens || 0,
+    output_tokens: result.usage?.output_tokens || 0,
+    modelId: result.modelId || modelId,
+  };
+}
+
 module.exports = {
   findPhantomNames,
+  resolveVbIdCharacterKeys,
   detectAndPatchPhantomCharacters,
+  detectAndPatchOrphanObjectIds,
 };

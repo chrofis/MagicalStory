@@ -386,6 +386,19 @@ class UnifiedStoryParser {
         };
       }
 
+      // Per-character holds/gazesAt may reference VB ids the Objects: line
+      // forgot to list. Downstream id→name resolution (buildCoverSceneFromHint's
+      // artMap) is built from objects[] only, so an unlisted id leaks raw
+      // ("holds the ART002") into the cover prompt. Append them here.
+      for (const det of Object.values(characterDetails)) {
+        for (const field of [det.holds, det.gazesAt]) {
+          const ids = String(field || '').match(/(?:LOC|ANI|ART|OBJ|VEH|CHR)\d+/gi) || [];
+          for (const id of ids) {
+            if (!objects.includes(id.toUpperCase())) objects.push(id.toUpperCase());
+          }
+        }
+      }
+
       return { hint, mood, objects, characterClothing, characterPerspectives, characters, characterDetails };
     };
 

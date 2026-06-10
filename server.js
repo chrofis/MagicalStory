@@ -4472,7 +4472,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // main characters or the Visual Bible. Without this, the image generator
     // invents a different person for the same name on every page.
     try {
-      const { detectAndPatchPhantomCharacters } = require('./server/lib/phantomCharacters');
+      const { detectAndPatchPhantomCharacters, detectAndPatchOrphanObjectIds } = require('./server/lib/phantomCharacters');
       const phantomUsage = await detectAndPatchPhantomCharacters({
         storyPages,
         visualBible,
@@ -4481,6 +4481,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       });
       if (phantomUsage) {
         addUsage('anthropic', phantomUsage, 'phantom_patch', phantomUsage.modelId || MODEL_DEFAULTS.sceneIteration);
+      }
+      // Same repair for object ids (ART/ANI/VEH/LOC/CLO) referenced in page
+      // metadata but never defined — the image-prompt sanitizer drops lines
+      // with unresolved ids, so an orphan id silently erases scene content.
+      const orphanUsage = await detectAndPatchOrphanObjectIds({
+        storyPages,
+        visualBible,
+        modelId: MODEL_DEFAULTS.sceneIteration || 'claude-haiku-4-5',
+      });
+      if (orphanUsage) {
+        addUsage('anthropic', orphanUsage, 'phantom_patch', orphanUsage.modelId || MODEL_DEFAULTS.sceneIteration);
       }
     } catch (err) {
       log.warn(`👻 [PHANTOM] Detection/patch failed (continuing): ${err.message}`);
