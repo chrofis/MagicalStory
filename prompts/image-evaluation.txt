@@ -37,6 +37,7 @@ Only deduct when the image fails on one of these axes:
 - **Figure completeness** — a character drawn as a partial figure when the prompt expects the whole body in frame: floating head with no torso, body with no head, missing torso, transparent or ghostly limbs, half the figure fading into the background. Crops at the frame edge are fine; missing parts inside the frame are not.
 - **Face direction** — front-facing when prompt says back view, or vice versa.
 - **Rendered text** — any readable writing painted into the artwork that wasn't requested: captions, banners, signs on walls, book titles, decorative inscriptions, embroidered words, sky-writing, garbled letterforms. The story-text overlay is composited later by the renderer and is not in the input image.
+- **Character marking** — an arrow, symbol, logo, badge, motif, decal, or coloured graphic painted onto a character's skin, hair, face, or clothing that the scene did not call for. Most often a coloured shape on the back of the head or on a back-facing figure (a reference-art artifact). Not a tattoo or print the costume actually specifies.
 - **Object count** — when the prompt names an exact count of a multi-instance prop ("three apples", "four candles", "five stars"), and the rendered count is off by 1–2 but the cluster is CLEARLY present, this is **MINOR** (`type: object`, `severity: minor`). Only flag as **MAJOR** when the exact count is narratively load-bearing — the SCENE INTENT or story beat depends on the number (e.g. a folk tale's "seven dwarfs" where the count IS the identity, or a counting book where the number is the point). When in doubt, MINOR. Never lower the overall verdict from PASS to SOFT_FAIL on a count-mismatch alone.
 
 Everything else is stylistic flavor — descriptive intent for the image generator, not a contract for the evaluator. Never deduct for it.
@@ -230,6 +231,11 @@ Skip this sub-check if DECLARED INTERACTIONS is empty. Entries without a `storyR
 - Illegible / garbled pseudo-text on a small prop (a label, a coin face, a book spine, a sign in the deep background) that doesn't form readable words → **MINOR**, `type: "rendered_text"`. It's a localised cosmetic flaw, not a content failure — `fix` says "Inpaint the small text region as continuous prop material."
 - Add the `fixable_issues` entry with `description` quoting (or describing) the unwanted text, and `fix` saying "Inpaint the text region as continuous scene material — wall, sky, ground, foliage — no readable writing of any kind."
 
+**CHARACTER MARKING** (reference-art artifact, common on back-facing figures):
+- An arrow, symbol, logo, badge, motif, decal, or coloured graphic painted onto a character's skin, hair, face, or clothing that the scene did not request → **CRITICAL**, `type: "character_marking"`. A coloured shape on the back of a head is the typical case. Score CRITICAL so the redo gate fires even when everything else is correct.
+- A tattoo, print, or emblem the costume actually specifies is allowed — don't flag it.
+- Add the `fixable_issues` entry with `description` naming the mark and where it sits, and `fix` saying "Inpaint the marked region as the character's plain skin, hair, or clothing — no symbol of any kind."
+
 **FACES:**
 - Cross-eyes (eyes pointing different directions) → **MAJOR**.
 - Merged or duplicated faces, features grossly misplaced → **MAJOR**.
@@ -354,7 +360,7 @@ Return JSON only (no other text):
   - `character`: required for any character-related issue. Use the exact character name from the reference list above (e.g. "CharacterA", "CharacterB"). Only null for non-character issues (environment, background). Never leave null when a specific character is affected.
   - `description`: what is wrong — always use the character's name, never describe them by appearance or position alone. GOOD: "CharacterA has wrong coat color". BAD: "The elderly man on the left has wrong coat color".
   - `severity`: CATASTROPHIC, CRITICAL, MAJOR, MODERATE, MINOR (per §2).
-  - `type`: image_coherence, face, limb, clothing, object, environment, physics, proportion, incomplete_figure, scale, rendered_text.
+  - `type`: image_coherence, face, limb, clothing, object, environment, physics, proportion, incomplete_figure, scale, rendered_text, character_marking.
   - `fix`: how to fix this exact issue described above (visual description only, no character names — use position and appearance).
   - `description` and `fix` refer to the same issue and the same figure. The visual identifier in `description` and the figure the `fix` acts on are the same physical figure; lateral position (left/center/right) in `fix` matches `description`.
   - When a figure is rendered as the wrong character, `fix` repaints that figure using the correct character's reference traits (hair, age, clothing, accessories from the character reference list). Never replace with a generic type.

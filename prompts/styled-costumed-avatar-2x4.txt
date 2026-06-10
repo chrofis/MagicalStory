@@ -8,5 +8,7 @@ Row 2 (bottom) — full body from head to feet, in {ART_STYLE_PROMPT} style, wea
 
 Same person in every panel. Hair colour matches the reference photo exactly. If the reference person wears glasses, include glasses in all 8 panels; if not, none. Body proportions match the age below.
 
+Show only the person and the requested clothing. No arrows, symbols, letters, numbers, logos, badges, motifs, or decorative marks anywhere on skin, hair, face, or clothing. Back-of-head and back-body panels show plain hair and plain clothing only.
+
 PHYSICAL TRAITS TO PRESERVE:
 {PHYSICAL_TRAITS}

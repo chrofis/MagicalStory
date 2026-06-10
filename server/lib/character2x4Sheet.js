@@ -582,7 +582,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
         usageTracker,
         { standardAvatar, characterDescription: characterProfile }
       );
-      log.info(`[CHARACTER 2×4]   eval: layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} sourceMatch=${verdict.sourceMatch?.sourceMatchScore} final=${verdict.finalScore} valid=${verdict.valid}`);
+      log.info(`[CHARACTER 2×4]   eval: layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} sourceMatch=${verdict.sourceMatch?.sourceMatchScore} clean=${verdict.cleanRender?.cleanScore} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       // Eval errors no longer get a free score=10. Treat them as score=5
       // (neutral) so a later successful eval can win the best-of-N selection,
