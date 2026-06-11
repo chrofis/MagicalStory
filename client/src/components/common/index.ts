@@ -14,3 +14,4 @@ export { Footer } from './Footer';
 export { DiagnosticImage } from './DiagnosticImage';
 export { ScrollToTop } from './ScrollToTop';
 export { WizardHelperText } from './WizardHelperText';
+export { ProductPitch } from './ProductPitch';

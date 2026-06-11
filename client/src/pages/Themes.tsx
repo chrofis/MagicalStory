@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
-import { Navigation, Footer } from '@/components/common';
+import { Navigation, Footer, ProductPitch } from '@/components/common';
 import { Compass, ArrowRight } from 'lucide-react';
 import {
   storyTypes,
@@ -182,6 +182,8 @@ export default function Themes() {
           <p className="text-stone-500 text-lg max-w-2xl mx-auto">{t.subtitle}</p>
         </div>
       </div>
+
+      <ProductPitch />
 
       <div className="flex-1 max-w-5xl mx-auto px-4 py-10 w-full">
         {/* Category Cards Grid */}

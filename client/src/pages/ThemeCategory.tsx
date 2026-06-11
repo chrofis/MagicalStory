@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
-import { Navigation, Footer } from '@/components/common';
+import { Navigation, Footer, ProductPitch } from '@/components/common';
 import { ArrowRight, ChevronRight } from 'lucide-react';
 import {
   storyTypes,
@@ -173,6 +173,8 @@ export default function ThemeCategory() {
           </p>
         </div>
       </div>
+
+      <ProductPitch />
 
       {/* Breadcrumb */}
       <div className="max-w-5xl mx-auto px-4 pt-6 w-full">

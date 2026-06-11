@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
-import { Navigation, Footer } from '@/components/common';
+import { Navigation, Footer, ProductPitch } from '@/components/common';
 import { ArrowRight, ChevronRight, Upload, Palette, BookOpen, Check } from 'lucide-react';
 import {
   storyTypes,
@@ -305,6 +305,8 @@ export default function ThemePage() {
           })()}
         </div>
       </div>
+
+      <ProductPitch />
 
       <div className="flex-1 max-w-4xl mx-auto px-4 py-10 w-full">
         {/* Long Description + Skills + Age */}
