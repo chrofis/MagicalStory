@@ -353,9 +353,39 @@ export interface UserDetailsResponse {
   creditHistory: CreditTransaction[];
 }
 
+export interface ActivityEvent {
+  ts: string;
+  type: 'new_user' | 'trial_started' | 'login' | 'story' | 'trial_story' | 'job_failed' | 'order' | 'credits';
+  user: string;
+  label: string;
+  storyId?: string;
+  jobId?: string;
+  orderId?: string;
+}
+
+export interface ActivityFeed {
+  since: string;
+  hours: number;
+  summary: {
+    newUsers: number;
+    trialsStarted: number;
+    logins: number;
+    stories: number;
+    trialStories: number;
+    failedJobs: number;
+    orders: number;
+    creditTopUps: number;
+  };
+  events: ActivityEvent[];
+}
+
 export const adminService = {
   async getStats(): Promise<DashboardStats> {
     return api.get<DashboardStats>('/api/admin/stats');
+  },
+
+  async getActivity(hours = 24): Promise<ActivityFeed> {
+    return api.get<ActivityFeed>(`/api/admin/activity?hours=${hours}`);
   },
 
   async getUsers(params: GetUsersParams = {}): Promise<UsersResponse> {

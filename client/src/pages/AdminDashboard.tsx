@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { adminService, type DashboardStats, type TrialStats, type TrialStatsHistoryEntry, type TrialFunnel, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo, type FailedJob } from '@/services';
+import { adminService, type DashboardStats, type TrialStats, type TrialStatsHistoryEntry, type TrialFunnel, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo, type FailedJob, type ActivityFeed } from '@/services';
 import {
   Users,
   BookOpen,
@@ -52,8 +52,8 @@ export default function AdminDashboard() {
   const { language } = useLanguage();
 
   // Read initial tab from URL query parameter
-  const tabFromUrl = searchParams.get('tab') as 'stats' | 'users' | 'products' | 'tokens' | 'jobs' | null;
-  const initialTab = tabFromUrl && ['stats', 'users', 'products', 'tokens', 'jobs'].includes(tabFromUrl) ? tabFromUrl : 'stats';
+  const tabFromUrl = searchParams.get('tab') as 'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs' | null;
+  const initialTab = tabFromUrl && ['stats', 'activity', 'users', 'products', 'tokens', 'jobs'].includes(tabFromUrl) ? tabFromUrl : 'stats';
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [trialStats, setTrialStats] = useState<TrialStats | null>(null);
@@ -66,7 +66,12 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'products' | 'tokens' | 'jobs'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs'>(initialTab);
+
+  // Activity feed state
+  const [activityFeed, setActivityFeed] = useState<ActivityFeed | null>(null);
+  const [activityHours, setActivityHours] = useState(24);
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
 
   // Modal states
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
@@ -212,10 +217,21 @@ export default function AdminDashboard() {
   }, [isAuthenticated, user, isImpersonating, activeTab]);
 
   // Update URL when tab changes
-  const handleTabChange = (tab: 'stats' | 'users' | 'products' | 'tokens' | 'jobs') => {
+  const handleTabChange = (tab: 'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs') => {
     setActiveTab(tab);
     setSearchParams(tab === 'stats' ? {} : { tab });
   };
+
+  // Load activity feed when the tab opens or the window changes
+  useEffect(() => {
+    if (!isAuthenticated || !(user?.role === 'admin' || isImpersonating) || activeTab !== 'activity') return;
+    setIsLoadingActivity(true);
+    adminService.getActivity(activityHours)
+      .then(setActivityFeed)
+      .catch(() => setActivityFeed(null))
+      .finally(() => setIsLoadingActivity(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user, isImpersonating, activeTab, activityHours]);
 
   const handleCleanOrphaned = async () => {
     setIsActionLoading(true);
@@ -643,6 +659,16 @@ export default function AdminDashboard() {
             {texts.stats}
           </button>
           <button
+            onClick={() => handleTabChange('activity')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'activity'
+                ? 'bg-indigo-500 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            {language === 'de' ? 'Aktivität' : language === 'fr' ? 'Activité' : 'Activity'}
+          </button>
+          <button
             onClick={() => handleTabChange('users')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               activeTab === 'users'
@@ -691,6 +717,91 @@ export default function AdminDashboard() {
             )}
           </button>
         </div>
+
+        {activeTab === 'activity' && (
+          <div className="bg-white rounded-xl shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">
+                {language === 'de' ? 'Aktivität' : 'Activity'}
+              </h2>
+              <div className="flex gap-2">
+                {[24, 48, 168].map(hrs => (
+                  <button
+                    key={hrs}
+                    onClick={() => setActivityHours(hrs)}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                      activityHours === hrs ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {hrs === 168 ? (language === 'de' ? '7 Tage' : '7 days') : `${hrs}h`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {isLoadingActivity ? (
+              <div className="py-12 text-center text-gray-500">{language === 'de' ? 'Laden…' : 'Loading…'}</div>
+            ) : !activityFeed ? (
+              <div className="py-12 text-center text-gray-500">{language === 'de' ? 'Keine Daten' : 'No data'}</div>
+            ) : (
+              <>
+                <div className="grid grid-cols-4 md:grid-cols-8 gap-3 mb-6">
+                  {([
+                    ['Signups', activityFeed.summary.newUsers, false],
+                    ['Trials', activityFeed.summary.trialsStarted, false],
+                    ['Logins', activityFeed.summary.logins, false],
+                    ['Stories', activityFeed.summary.stories, false],
+                    ['Trial Stories', activityFeed.summary.trialStories, false],
+                    ['Failed', activityFeed.summary.failedJobs, true],
+                    ['Orders', activityFeed.summary.orders, false],
+                    ['Credits+', activityFeed.summary.creditTopUps, false],
+                  ] as [string, number, boolean][]).map(([label, n, warn]) => (
+                    <div key={label} className={`rounded-lg p-3 text-center ${warn && n > 0 ? 'bg-red-50' : 'bg-gray-50'}`}>
+                      <div className={`text-xl font-bold ${warn && n > 0 ? 'text-red-600' : 'text-gray-800'}`}>{n}</div>
+                      <div className="text-xs text-gray-500">{label}</div>
+                    </div>
+                  ))}
+                </div>
+                {activityFeed.events.length === 0 ? (
+                  <div className="py-8 text-center text-gray-500">
+                    {language === 'de' ? 'Keine Aktivität im Zeitraum.' : 'No activity in this window.'}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left bg-gray-50 text-gray-600">
+                          <th className="px-3 py-2">{language === 'de' ? 'Zeit' : 'Time'}</th>
+                          <th className="px-3 py-2">{language === 'de' ? 'Typ' : 'Type'}</th>
+                          <th className="px-3 py-2">User</th>
+                          <th className="px-3 py-2">Event</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activityFeed.events.map((e, i) => {
+                          const typeBadge: Record<string, string> = {
+                            new_user: '👤 Signup', trial_started: '🕵️ Trial', login: '🔑 Login',
+                            story: '📖 Story', trial_story: '📖 Trial', job_failed: '❌ Failed',
+                            order: '🛒 Order', credits: '💰 Credits',
+                          };
+                          return (
+                            <tr key={i} className={`border-b border-gray-100 ${e.type === 'job_failed' ? 'bg-red-50' : ''}`}>
+                              <td className="px-3 py-2 whitespace-nowrap text-gray-500">
+                                {new Date(e.ts).toLocaleString('de-CH', { timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap">{typeBadge[e.type] || e.type}</td>
+                              <td className="px-3 py-2 max-w-[220px] truncate" title={e.user}>{e.user}</td>
+                              <td className="px-3 py-2">{e.label}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {activeTab === 'stats' && (
           <>

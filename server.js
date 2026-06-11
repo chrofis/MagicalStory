@@ -8102,6 +8102,21 @@ initialize().then(() => {
       });
     }, 60 * 60 * 1000); // every hour
 
+    // Daily admin summary email — same hourly cadence; sends once per
+    // Swiss-local day after 07:00 (config row daily_summary_last_sent
+    // dedupes across restarts).
+    const { runDailySummarySweep } = require('./server/lib/dailySummary');
+    setTimeout(() => {
+      runDailySummarySweep(dbPool, log).catch(err => {
+        log.error('[daily-summary] sweep crashed:', err.message);
+      });
+    }, 90 * 1000);
+    setInterval(() => {
+      runDailySummarySweep(dbPool, log).catch(err => {
+        log.error('[daily-summary] sweep crashed:', err.message);
+      });
+    }, 60 * 60 * 1000); // every hour
+
     // Stripe webhook retry monitor — polls every 5 min for buffered events
     // that landed during a DB blip / processing throw. Emits an ERROR-level
     // alert when unprocessed rows exist. Operators inspect + manually

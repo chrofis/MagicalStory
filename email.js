@@ -1002,6 +1002,88 @@ async function sendAdminOrderFailureAlert(sessionId, customerEmail, customerName
 }
 
 // Export all functions
+
+/**
+ * Daily admin activity summary. `feed` is the buildActivityFeed() result
+ * (server/lib/adminActivity.js); `dateLabel` is the Swiss-local date the
+ * summary covers (e.g. "Mittwoch, 11.06.2026").
+ */
+async function sendAdminDailySummary(feed, dateLabel) {
+  if (!resend) {
+    console.log('📧 Email not configured - skipping daily summary');
+    return null;
+  }
+
+  const s = feed.summary || {};
+  const fmtTime = (ts) => new Date(ts).toLocaleString('de-CH', {
+    timeZone: 'Europe/Zurich', hour: '2-digit', minute: '2-digit',
+  });
+  const TYPE_LABELS = {
+    new_user: '👤 Signup', trial_started: '🕵️ Trial', login: '🔑 Login',
+    story: '📖 Story', trial_story: '📖 Trial story', job_failed: '❌ Failed',
+    order: '🛒 Order', credits: '💰 Credits',
+  };
+  const esc = (t) => String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const rows = (feed.events || []).map(e => `
+    <tr>
+      <td style="padding:6px 10px; border-bottom:1px solid #e5e7eb; white-space:nowrap;">${fmtTime(e.ts)}</td>
+      <td style="padding:6px 10px; border-bottom:1px solid #e5e7eb; white-space:nowrap;">${TYPE_LABELS[e.type] || e.type}</td>
+      <td style="padding:6px 10px; border-bottom:1px solid #e5e7eb;">${esc(e.user)}</td>
+      <td style="padding:6px 10px; border-bottom:1px solid #e5e7eb;">${esc(e.label)}</td>
+    </tr>`).join('');
+
+  const stat = (label, n, warn) => `
+    <td style="padding:10px 14px; text-align:center; background:${warn && n > 0 ? '#fef2f2' : '#f8fafc'}; border-radius:8px;">
+      <div style="font-size:22px; font-weight:bold; color:${warn && n > 0 ? '#ef4444' : '#1f2937'};">${n}</div>
+      <div style="font-size:11px; color:#6b7280;">${label}</div>
+    </td>`;
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: ADMIN_EMAIL,
+      subject: `[MagicalStory] Tagesbericht ${dateLabel} — ${s.stories + (s.trialStories || 0) || 0} Stories, ${s.newUsers || 0} Signups${s.failedJobs ? `, ${s.failedJobs} FAILED` : ''}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 720px; margin: 0 auto;">
+          <h2 style="color:#4f46e5;">MagicalStory Tagesbericht — ${dateLabel}</h2>
+          <table style="border-collapse:separate; border-spacing:6px; width:100%;"><tr>
+            ${stat('Signups', s.newUsers || 0)}
+            ${stat('Trials', s.trialsStarted || 0)}
+            ${stat('Logins', s.logins || 0)}
+            ${stat('Stories', (s.stories || 0) + (s.trialStories || 0))}
+            ${stat('Failed', s.failedJobs || 0, true)}
+            ${stat('Orders', s.orders || 0)}
+          </tr></table>
+          ${rows ? `
+          <table style="border-collapse:collapse; width:100%; margin-top:16px; font-size:13px;">
+            <tr style="background:#f1f5f9; text-align:left;">
+              <th style="padding:6px 10px;">Zeit</th><th style="padding:6px 10px;">Typ</th>
+              <th style="padding:6px 10px;">User</th><th style="padding:6px 10px;">Event</th>
+            </tr>
+            ${rows}
+          </table>` : '<p style="color:#6b7280;">Keine Aktivität in den letzten 24 Stunden.</p>'}
+          <p style="margin-top:18px;">
+            <a href="https://www.magicalstory.ch/admin?tab=activity"
+               style="display:inline-block; background:#6366f1; color:white; padding:10px 20px; text-decoration:none; border-radius:6px;">
+              Zum Admin Dashboard
+            </a>
+          </p>
+        </div>
+      `,
+    });
+    if (error) {
+      console.error('📧 Daily summary email failed:', error);
+      return null;
+    }
+    console.log(`📧 Daily summary sent to ${ADMIN_EMAIL} (${(feed.events || []).length} events)`);
+    return data;
+  } catch (err) {
+    console.error('📧 Daily summary email error:', err.message);
+    return null;
+  }
+}
+
 module.exports = {
   // Error handling utilities
   EmailErrorCode,
@@ -1023,4 +1105,5 @@ module.exports = {
   // Admin emails
   sendAdminStoryFailureAlert,
   sendAdminOrderFailureAlert,
+  sendAdminDailySummary,
 };
