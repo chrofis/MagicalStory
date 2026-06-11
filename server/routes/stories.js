@@ -107,7 +107,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 6, 1), 50);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
-    log.debug(`📚 GET /api/stories - User: ${req.user.username}, limit: ${limit}, offset: ${offset}`);
+    log.debug(`📚 GET /api/stories - User: ${req.user.username}${req.user.impersonating ? ' (IMPERSONATED by admin)' : ''}, limit: ${limit}, offset: ${offset}`);
     console.log(`📚 [STORIES] Fetching stories for user: ${req.user.username} (id: ${req.user.id})`);
     log.debug(`📚 [DEBUG] Stories query user ID: "${req.user.id}" (type: ${typeof req.user.id})`);
     let userStories = [];
@@ -323,7 +323,7 @@ router.get('/:id/quick-metadata', authenticateToken, async (req, res) => {
 router.get('/:id/metadata', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`📖 GET /api/stories/${id}/metadata - User: ${req.user.username}`);
+    console.log(`📖 GET /api/stories/${id}/metadata - User: ${req.user.username}${req.user.impersonating ? ' (IMPERSONATED by admin)' : ''}`);
 
     if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
@@ -728,7 +728,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
 router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`🔧 GET /api/stories/${id}/dev-metadata - User: ${req.user.username}`);
+    console.log(`🔧 GET /api/stories/${id}/dev-metadata - User: ${req.user.username}${req.user.impersonating ? ' (IMPERSONATED by admin)' : ''}`);
 
     if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
@@ -3023,7 +3023,7 @@ router.post('/', authenticateToken, async (req, res) => {
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`🗑️  DELETE /api/stories/${id} - User: ${req.user.username}`);
+    console.log(`🗑️  DELETE /api/stories/${id} - User: ${req.user.username}${req.user.impersonating ? ' (IMPERSONATED by admin)' : ''}`);
 
     if (isDatabaseMode()) {
       const result = await dbQuery('DELETE FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
@@ -3151,7 +3151,7 @@ router.put('/:id/visual-bible', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'visualBible is required' });
     }
 
-    console.log(`📖 PUT /api/stories/${id}/visual-bible - User: ${req.user.username}`);
+    console.log(`📖 PUT /api/stories/${id}/visual-bible - User: ${req.user.username}${req.user.impersonating ? ' (IMPERSONATED by admin)' : ''}`);
 
     if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });

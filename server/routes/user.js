@@ -250,7 +250,7 @@ router.put('/shipping-address', authenticateToken, async (req, res) => {
 // GET /api/user/orders - Get user's orders
 router.get('/orders', authenticateToken, async (req, res) => {
   try {
-    log.debug(`📦 [USER] GET /api/user/orders - User: ${req.user.username}`);
+    log.debug(`📦 [USER] GET /api/user/orders - User: ${req.user.username}${req.user.impersonating ? ' (IMPERSONATED by admin)' : ''}`);
 
     if (isDatabaseMode()) {
       const query = `
