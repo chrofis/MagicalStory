@@ -54,6 +54,9 @@ COPY . .
 ARG VITE_TURNSTILE_SITE_KEY
 ARG VITE_API_URL
 ARG VITE_GOOGLE_OAUTH_CLIENT_ID
+# GA4 measurement id (G-XXXXXXXXXX) — public key; client analytics ships
+# inert until this is set (client/src/utils/analytics.ts).
+ARG VITE_GA4_ID
 
 # BASE_URL is needed by scripts/prerender.mjs (via server/lib/seoMeta.js)
 # at BUILD time — the prerender step bakes canonical / og:url / hreflang
