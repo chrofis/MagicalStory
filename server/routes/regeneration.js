@@ -2791,6 +2791,10 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       imageModel: coverImageModelId,
       freshCharacters,
       selectedCharacterIds: Array.isArray(characterIds) && characterIds.length > 0 ? characterIds : null,
+      // Überarbeiten = regenerate from scratch with the user's edited scene.
+      // Always a normal single-pass render — never the composite method
+      // (composite stays for iterate + the auto pipeline).
+      compositeCovers: false,
     });
 
     // Result mapping: keep the variable names the downstream save / response

@@ -398,8 +398,13 @@ async function iterateCover(coverKey, storyData, options = {}) {
   // When MODEL_DEFAULTS.compositeCovers is true (or modelOverrides override),
   // skip the normal generation path and use the manual-composite + 2-pass
   // Grok edit method. Same return shape so all callers stay agnostic.
-  const compositeOn = options.compositeCovers === true
-    || MODEL_DEFAULTS.compositeCovers === true;
+  // options.compositeCovers === false is an explicit opt-out: the
+  // user-facing "Überarbeiten" (regenerate-from-scratch) endpoint passes it
+  // so a from-scratch render never routes through composite — composite
+  // stays for iterate (repair panel, auto-pipeline) and initial generation.
+  const compositeOn = options.compositeCovers === false
+    ? false
+    : (options.compositeCovers === true || MODEL_DEFAULTS.compositeCovers === true);
   if (compositeOn) {
     try {
       const { generateCoverViaComposite } = require('./coverComposite');
