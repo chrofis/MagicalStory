@@ -53,6 +53,8 @@ export interface AdminUser {
   lastLogin?: string;
   emailVerified?: boolean;
   photoConsentAt?: string | null;
+  anonymous?: boolean;
+  storyCount?: number;
   totalOrders?: number;
   failedOrders?: number;
 }

@@ -1084,6 +1084,7 @@ export default function AdminDashboard() {
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.username}</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.email}</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.role}</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stories</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.credits}</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.actions}</th>
                   </tr>
@@ -1095,7 +1096,14 @@ export default function AdminDashboard() {
                         className="px-4 py-3 text-sm cursor-pointer hover:text-indigo-500 hover:underline"
                         onClick={() => handleViewUserDetails(u)}
                       >
-                        {u.username}
+                        <span className="flex items-center gap-1.5">
+                          {u.username}
+                          {u.anonymous && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 whitespace-nowrap">
+                              🕵️ anonym
+                            </span>
+                          )}
+                        </span>
                       </td>
                       <td
                         className="px-4 py-3 text-sm text-gray-600 cursor-pointer hover:text-indigo-500"
@@ -1111,6 +1119,17 @@ export default function AdminDashboard() {
                         }`}>
                           {u.role}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm cursor-pointer" onClick={() => handleViewUserDetails(u)}>
+                        {(u.storyCount ?? 0) > 0 ? (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 whitespace-nowrap">
+                            📖 {u.storyCount}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-400">
+                            0
+                          </span>
+                        )}
                       </td>
                       <td
                         className="px-4 py-3 text-sm cursor-pointer hover:text-indigo-500"

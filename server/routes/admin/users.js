@@ -53,9 +53,16 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
     const selectQuery = `
       SELECT
         u.id, u.username, u.email, u.role, u.story_quota, u.stories_generated, u.credits, u.created_at, u.last_login, u.email_verified, u.photo_consent_at,
+        COALESCE(u.anonymous, false) as anonymous,
+        COALESCE(story_stats.story_count, 0) as story_count,
         COALESCE(order_stats.total_orders, 0) as total_orders,
         COALESCE(order_stats.failed_orders, 0) as failed_orders
       FROM users u
+      LEFT JOIN (
+        SELECT user_id, COUNT(*) as story_count
+        FROM stories
+        GROUP BY user_id
+      ) story_stats ON u.id = story_stats.user_id
       LEFT JOIN (
         SELECT
           user_id,
@@ -82,6 +89,8 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
       lastLogin: user.last_login,
       emailVerified: user.email_verified !== false,
       photoConsentAt: user.photo_consent_at || null,
+      anonymous: user.anonymous === true,
+      storyCount: parseInt(user.story_count) || 0,
       totalOrders: parseInt(user.total_orders) || 0,
       failedOrders: parseInt(user.failed_orders) || 0
     }));

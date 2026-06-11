@@ -329,8 +329,10 @@ export default function LandingPage() {
       <link rel="preload" as="font" type="font/woff2" href="/fonts/cinzel-400-latin.woff2" crossOrigin="anonymous" />
       <link rel="preload" as="image" href="/images/video-poster.webp" fetchPriority="high" />
 
-      {/* Navigation - Fixed at top */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-stone-50">
+      {/* Navigation - Fixed at top. z-40 (site convention, same as Navigation's
+          own sticky variant) so the impersonation banner (z-50) stays above it
+          and its Beenden button remains clickable. */}
+      <div className="fixed top-0 left-0 right-0 z-40 bg-stone-50">
         <Navigation currentStep={0} />
       </div>
 
