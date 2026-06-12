@@ -1318,6 +1318,7 @@ function extractSceneMetadata(sceneDescription) {
         setting: metadata.setting || null,
         time: metadata.time || null,
         weather: metadata.weather || null,
+        background: metadata.background || null,
       },
       thinking: null,
       translatedSummary: metadata.translatedSummary || null,
@@ -1332,6 +1333,7 @@ function extractSceneMetadata(sceneDescription) {
       era: metadata.era || null,
       framingPattern: metadata.framingPattern || null,
       sceneIntent: metadata.sceneIntent || null,
+      background: metadata.background || null,
       isJsonFormat: true,
       isProseFormat: true
     };
@@ -4597,6 +4599,16 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       cleanSceneDescription += `\n\n**Perspective:**\n${lines.join('\n')}`;
       log.info(`[IMAGE PROMPT] Page ${pageNumber}: Perspective directives for ${lines.length} character(s)`);
     }
+  }
+
+  // Forward the scene hint's `background` field explicitly. It carries the
+  // atmosphere AND any story-essential unnamed figures (antagonists, guards —
+  // see story-unified.txt BACKGROUND rule). The prose is supposed to weave it
+  // in but can drop the figures, and the evaluator scores against the hint —
+  // generator and evaluator must receive the same contract.
+  const sceneBackground = metadata?.background || metadata?.fullData?.background || null;
+  if (sceneBackground && typeof sceneBackground === 'string') {
+    cleanSceneDescription += `\n\n**BACKGROUND:** ${sceneBackground.trim()}`;
   }
 
   const artStyleId = inputData.artStyle || 'pixar';

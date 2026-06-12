@@ -25,6 +25,7 @@ If ORIGINAL_PROMPT names a character who has no entry in QUALITY_FIGURES.matches
 
 - Extra inventory figures with no pairing: flag only if ORIGINAL_PROMPT describes a solo or small-group scene; ignore for crowd/marketplace/villagers.
 - Are all requested objects/animals/landmarks present per VISION_INVENTORY?
+- Supporting figures the prompt explicitly places with a role and location (guards inside a vehicle, a sentry at a gate, a crowd surrounding the hero) entirely missing from the inventory → MAJOR. Ambient decoration ("a few passersby", "busy street") absent → no deduction.
 - Is the setting/environment correct?
 
 ---

@@ -32,6 +32,7 @@ VERDICT: PASS (5+), SOFT_FAIL (3-4), HARD_FAIL (0-2).
 Only deduct when the image fails on one of these axes:
 - **Character presence** — a declared character is absent, duplicated, or unrecognisable (face/hair/build clearly different from reference, or identities swapped between figures).
 - **Object presence** — a declared Visual Bible object or landmark is missing.
+- **Supporting figures** — unnamed figures the prompt explicitly places with a role and location (guards inside a vehicle, a sentry at a gate, a crowd surrounding the hero) are entirely absent. Ambient decoration ("a few passersby", "busy street") absent is fine.
 - **Anachronism** — an element appears that contradicts the setting era (clock tower in a medieval scene, smartphone in an 1800s scene, modern signage on a period building).
 - **Anatomy** — extra limbs, fused or melted fingers, missing hand, figure floating, body fused into furniture, eyes pointing different directions.
 - **Figure completeness** — a character drawn as a partial figure when the prompt expects the whole body in frame: floating head with no torso, body with no head, missing torso, transparent or ghostly limbs, half the figure fading into the background. Crops at the frame edge are fine; missing parts inside the frame are not.
@@ -126,6 +127,7 @@ For each animal, landmark, vehicle, or notable object the prompt mentions:
 
 - Identify it in the image, note position (left/center/right) and visual appearance, match to the reference name from the prompt.
 - **Key landmark or object entirely missing from the image** → **MAJOR**.
+- **Prompt-placed supporting figures entirely missing** — the prompt places unnamed figures with a role and location (guards inside a vehicle, a sentry at a gate, a crowd surrounding the hero) and none are rendered → **MAJOR**, `type: missing_element`. The fix names the figures and the region to paint them into. Ambient decoration ("a few passersby") absent → no deduction.
 - **Object rendering quality** — when a reference image is provided for the object (visual bible reference, landmark photo) and the rendered shape is fundamentally wrong against that reference (a crossbow with impossible limbs or no string and no tiller, a sword rendered as a bent curve, a lantern as an amorphous blob, a building with the wrong silhouette) → **MAJOR**, type: `object_quality`. Description names the object and what is wrong; fix names what the correct shape should look like. Stylistic differences in brushwork, colour mood, or finish do NOT count — only fundamental shape / structure errors. If no reference image is provided for the object, skip this check.
 
 ---
@@ -361,7 +363,7 @@ Return JSON only (no other text):
   - `character`: required for any character-related issue. Use the exact character name from the reference list above (e.g. "CharacterA", "CharacterB"). Only null for non-character issues (environment, background). Never leave null when a specific character is affected.
   - `description`: what is wrong — always use the character's name, never describe them by appearance or position alone. GOOD: "CharacterA has wrong coat color". BAD: "The elderly man on the left has wrong coat color".
   - `severity`: CATASTROPHIC, CRITICAL, MAJOR, MODERATE, MINOR (per §2).
-  - `type`: image_coherence, face, limb, clothing, object, environment, physics, proportion, incomplete_figure, scale, rendered_text, character_marking.
+  - `type`: image_coherence, face, limb, clothing, object, environment, physics, proportion, incomplete_figure, missing_character, missing_element, scale, rendered_text, character_marking.
   - `fix`: how to fix this exact issue described above (visual description only, no character names — use position and appearance).
   - `description` and `fix` refer to the same issue and the same figure. The visual identifier in `description` and the figure the `fix` acts on are the same physical figure; lateral position (left/center/right) in `fix` matches `description`.
   - When a figure is rendered as the wrong character, `fix` repaints that figure using the correct character's reference traits (hair, age, clothing, accessories from the character reference list). Never replace with a generic type.

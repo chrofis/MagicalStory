@@ -308,6 +308,33 @@ visible contacts makes both versions score consistently.
 `prompts/image-prompt-compliance.txt`, `prompts/image-evaluation.txt`.
 **Status:** ✅ active.
 
+### Scene-hint `background` is forwarded verbatim into the image prompt
+**Context:** The unified outline correctly placed story-essential
+antagonists in the scene hint's `background` field ("faint soldier
+faces inside the retreating boat" — per the ANTAGONISTS rule in
+`story-unified.txt`), but the field never reached the image generator:
+`extractSceneMetadata()` dropped it, and the prose — the only channel
+into `buildImagePrompt` — omitted the soldiers. The evaluator, which
+scores against the hint, flagged the empty boat but only as MODERATE,
+so nothing forced a fix. Result: an escape scene with no one to escape
+from (job_1781289599516 p7).
+**Decision:** (1) `extractSceneMetadata()` exposes `background`
+(top-level + `fullData`); (2) `buildImagePrompt()` appends a
+`**BACKGROUND:**` line with the hint's background text to the scene
+description — even when the prose already covers it (short, harmless
+redundancy beats a silent drop); (3) both evaluators score
+prompt-placed supporting figures (role + location given) as MAJOR
+`missing_element` when entirely absent — ambient decoration ("a few
+passersby") stays no-deduction.
+**Rationale:** Generator and evaluator must see the same contract. The
+prose weaving background in is the happy path, not a guarantee — a
+deterministic append closes the gap for every story instead of relying
+on the prose writer never dropping a clause.
+**Touched:** `server/lib/storyHelpers.js` (`extractSceneMetadata`,
+`buildImagePrompt`); `prompts/image-evaluation.txt`;
+`prompts/image-prompt-compliance.txt`.
+**Status:** ✅ active.
+
 ---
 
 ## Cross-cuts already documented elsewhere
