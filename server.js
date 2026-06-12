@@ -5956,6 +5956,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       description: helpers.buildCharacterPhysicalDescription(c, override) || '',
                     };
                   }).filter(x => x.description);
+                  // Background characters that aren't user characters (VB
+                  // secondaries like a story's antagonist) have no inputData
+                  // entry — without a description the repair prompt says
+                  // "move <name>" to a model that has no idea who that is,
+                  // and the verification gate can't check them by signature.
+                  // Fall back to the Visual Bible secondary-character entry.
+                  const coveredBgNames = new Set(bgDescriptions.map(d => (d.name || '').toLowerCase()));
+                  for (const bgName of bgNames) {
+                    if (coveredBgNames.has(bgName)) continue;
+                    const vbEntry = (visualBible?.secondaryCharacters || []).find(sc =>
+                      (sc.name || '').toLowerCase() === bgName);
+                    const vbDesc = vbEntry?.extractedDescription || vbEntry?.description;
+                    if (vbDesc) bgDescriptions.push({ name: vbEntry.name, description: vbDesc });
+                  }
                   // Foreground/midground avatar refs. Resolve per-character
                   // clothing the same way the main scene render does, then
                   // pull the corresponding styled avatar (2×4 sheet body cell

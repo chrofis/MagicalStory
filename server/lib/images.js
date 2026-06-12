@@ -7218,6 +7218,52 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
   log.info(`✅ [UNIFIED PIPELINE] Step 3: ${finalUpgradedCount} pages upgraded total`);
 
+  // Step 3b: rescue-eval unscored originals on pages where every scored
+  // version is poor. The pre-scale-repair original is stored with
+  // score:null (eval only runs on the promoted image), and selectBestVersion
+  // skips null scores — so a damaged repair could never lose to the image it
+  // replaced (job_1781289599516 p9: original with Gessler locked out, the
+  // Gessler-less scale-repair shipped at score 30). Evaluate the unscored
+  // original with the same eval the repairs got, then re-pick.
+  try {
+    const RESCUE_THRESHOLD = 60;
+    const { computeFinalScore: rescueScoreOf, setVersionScores: rescueSetScores } = require('./scoring');
+    const rescueEntries = [];
+    for (const [pageNumber, versions] of pageVersions) {
+      const bestScore = rescueScoreOf(finalBestPerPage.get(pageNumber));
+      if (bestScore != null && bestScore >= RESCUE_THRESHOLD) continue;
+      const unscored = versions.find(v => v.imageData && rescueScoreOf(v) == null);
+      if (!unscored) continue;
+      rescueEntries.push({ pageNumber, imageData: unscored.imageData, version: unscored });
+    }
+    if (rescueEntries.length > 0) {
+      log.info(`🛟 [UNIFIED PIPELINE] Step 3b: best score < ${RESCUE_THRESHOLD} on ${rescueEntries.length} page(s) with an unscored original — evaluating originals: ${rescueEntries.map(r => r.pageNumber).join(', ')}`);
+      const rescueEvals = await evaluateImageBatch(buildEvalInputs(rescueEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible });
+      for (const ev of rescueEvals) {
+        const entry = rescueEntries.find(r => r.pageNumber === ev.pageNumber);
+        if (!entry) continue;
+        if (ev.usage && usageTracker) {
+          usageTracker('gemini_quality', ev.usage, 'unified_pipeline_quality_rescue', ev.modelId);
+        }
+        const evScore = ev.score ?? ev.qualityScore ?? null;
+        if (evScore == null) continue;
+        const entityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
+        entry.version.evaluation = ev;
+        entry.version.entityIssues = entityResult.issues;
+        entry.version.evaluatedAt = new Date().toISOString();
+        rescueSetScores(entry.version, evScore, entityResult.penalty);
+        const repicked = selectBestVersion(pageVersions.get(ev.pageNumber));
+        const prevBest = finalBestPerPage.get(ev.pageNumber);
+        finalBestPerPage.set(ev.pageNumber, repicked);
+        if (repicked !== prevBest) {
+          log.info(`🛟 [UNIFIED PIPELINE] Page ${ev.pageNumber}: original scored ${rescueScoreOf(entry.version)} — replaces ${prevBest?.source || '?'} (score ${rescueScoreOf(prevBest)}) as best version`);
+        }
+      }
+    }
+  } catch (rescueErr) {
+    log.warn(`⚠️ [UNIFIED PIPELINE] Step 3b rescue-eval failed: ${rescueErr.message}`);
+  }
+
   // The most recent entity report from the round loop is the FINAL entity
   // verdict — no separate end-of-flow entity check fires anymore. Aliased
   // here for the per-page entityReport field built into results below.
@@ -8713,6 +8759,27 @@ function buildCharActionContextFromInteractions(sceneDescription, charName) {
   }
 }
 
+/**
+ * Strip cross-image-comparison vocabulary from an issue description before
+ * embedding it in an inpaint prompt. Entity-consistency findings are written
+ * against a labelled comparison grid ("cells A, D, E, and F", "the reference
+ * (R)") that the inpaint model never sees — to Grok those phrases are noise.
+ * Also collapses label-concatenation slips ("costume costume").
+ */
+function sanitizeIssueForInpaint(text) {
+  if (!text) return text;
+  let out = String(text);
+  const CELL_LIST = String.raw`[A-H](?:\s*,\s*[A-H])*(?:\s*,?\s*(?:and|&)\s*[A-H])?`;
+  out = out.replace(new RegExp(String.raw`\b(?:in|across|on)\s+cells?\s+${CELL_LIST}\b`, 'gi'), '');
+  out = out.replace(new RegExp(String.raw`\bcells?\s+${CELL_LIST}\b`, 'gi'), '');
+  out = out.replace(/\bthe reference(?:\s+photo)?\s*\(\s*R\s*\)/gi, 'the reference');
+  out = out.replace(/\(\s*R\s*\)/g, '');
+  out = out.replace(/\b(\w+)['’]?\s+\1\b/gi, '$1');
+  out = out.replace(/\s+(?:and|&)\s*([,.;])/gi, '$1');
+  out = out.replace(/\s{2,}/g, ' ').replace(/\s+([,.;])/g, '$1').replace(/,\s*,/g, ',').trim();
+  return out;
+}
+
 async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options = {}) {
   if (!isGrokConfigured()) {
     throw new Error('XAI_API_KEY not configured for Grok repair');
@@ -8809,7 +8876,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   const issueDescription = options.issueDescription || '';
   const clothingDescription = options.clothingDescription || '';
   const sceneDescription = options.sceneDescription || '';
-  const issueContext = issueDescription ? `\nIssues to fix: ${issueDescription}` : '';
+  const issueContext = issueDescription ? `\nIssues to fix: ${sanitizeIssueForInpaint(issueDescription)}` : '';
   const clothingContext = clothingDescription ? `\nClothing: ${clothingDescription}` : '';
   // textPositionContext: when text overlay will land on a fixed zone of the
   // image, tell the model not to move the character into that zone. Inpaint

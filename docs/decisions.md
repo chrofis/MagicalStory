@@ -355,6 +355,42 @@ ANTAGONISTS + OBJECTS); `server/lib/storyHelpers.js` (comment on the
 CHR filter).
 **Status:** ✅ active.
 
+### Scale-repair is verified before promotion; unscored originals get a rescue eval
+**Context:** Page 9 of job_1781289599516: the unconditional scale-repair
+("shrink the background character") edit DELETED Gessler instead of
+shrinking him; the edit was promoted blindly; the pre-repair original is
+stored with score:null (eval only runs on the promoted image) and
+selectBestVersion skips null scores — so the original (the best image of
+the run) was mathematically locked out and the Gessler-less version
+shipped at score 30 after three repair rounds made everything worse.
+Compounding factor: Gessler is a VB secondary (CHR001), not a user
+character, so bgDescriptions came up empty — the repair prompt said
+"move Gessler" to a model that has no idea who Gessler is.
+**Decision:**
+1. `verifyScaleRepair()` (scaleRepair.js) — one gemini-2.5-flash call on
+   the edited image checks each background character by VISUAL SIGNATURE
+   (clothing/colours/mount, never by name — a silhouette passes for a
+   name, not for "crimson cloak + white-feathered hat"). Any "not
+   present" → repair discarded, original stays active. Fails OPEN on API
+   errors (a verification hiccup must not discard a probably-fine edit).
+2. Step 3b rescue eval (images.js) — when a page's best version scores
+   < 60 and an unscored original exists, evaluate it with the standard
+   eval and re-pick. Healthy pages never pay the extra eval.
+3. bgDescriptions in server.js fall back to Visual Bible
+   secondaryCharacters for background characters that aren't user
+   characters — both the repair prompt and the verification gate need
+   the signature description.
+4. `sanitizeIssueForInpaint()` (images.js) — entity-consistency grid
+   vocabulary ("cells A, D, E, F", "reference (R)", "costume costume")
+   is stripped from issue text before it lands in inpaint prompts; the
+   inpaint model never sees the comparison grid.
+**Verified:** gate replayed on the stored p9 images (flags v1 missing
+Gessler, passes v0); rescue re-pick flips best from scale-repair(30) to
+original; sanitizer tested on the exact leaked strings.
+**Touched:** `server/lib/scaleRepair.js`, `server/lib/images.js`,
+`server.js`.
+**Status:** ✅ active.
+
 ---
 
 ## Cross-cuts already documented elsewhere

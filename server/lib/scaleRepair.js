@@ -170,6 +170,69 @@ function buildScaleRepairPrompt({ bgChars, fgChars, shot, artStyleDescription, i
 }
 
 /**
+ * Verify a scale-repair edit did not delete the figures it was asked to
+ * relocate. Grok's relocate-edit sometimes erases the background figure
+ * instead of shrinking it (job_1781289599516 p9: Gessler removed, only the
+ * anonymous background silhouettes left — the damaged image then shipped).
+ *
+ * One Gemini-flash call on the EDITED image. Each background character is
+ * checked by their visual signature (clothing, colours, mount), never by
+ * name — a generic silhouette can pass for a name, not for "crimson
+ * fur-trimmed cloak with a white-feathered hat".
+ *
+ * Fails OPEN: an API/parsing hiccup accepts the repair (current behaviour);
+ * only a confident "not present" discards it.
+ *
+ * @param {string} imageData - edited image (data URL or raw base64)
+ * @param {Array}  bgChars   - background characters with .physicalDescription
+ * @returns {Promise<{allPresent: boolean, missing: string[]}>}
+ */
+async function verifyScaleRepair(imageData, bgChars, { pageNumber = null, usageTracker = null } = {}) {
+  const toCheck = (bgChars || []).filter(c => (c.physicalDescription || '').trim());
+  if (toCheck.length === 0) return { allPresent: true, missing: [], skipped: true };
+  const pageLabel = pageNumber != null ? `Page ${pageNumber}: ` : '';
+  try {
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const mimeType = String(imageData).match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+    const base64 = String(imageData).replace(/^data:image\/\w+;base64,/, '');
+    const lines = toCheck.map((c, i) => `${i + 1}. ${c.physicalDescription.trim()}`);
+    const prompt = [
+      'This illustration was just edited to relocate some figures. Verify the edit did not delete anyone.',
+      'For each numbered description below, answer whether a figure matching it is visible ANYWHERE in the image, at ANY size — including tiny distant figures and partial views.',
+      'Judge ONLY by the visual signature (clothing, colours, mount, accessories).',
+      '',
+      ...lines,
+      '',
+      'Return JSON only: {"checks":[{"index":1,"present":true,"confidence":0.9}]}',
+    ].join('\n');
+    const result = await model.generateContent([
+      { inlineData: { mimeType, data: base64 } },
+      { text: prompt },
+    ]);
+    const text = result.response.text();
+    if (usageTracker && result.response.usageMetadata) {
+      usageTracker('gemini_quality', {
+        input_tokens: result.response.usageMetadata.promptTokenCount || 0,
+        output_tokens: result.response.usageMetadata.candidatesTokenCount || 0,
+      }, 'scale_repair_verify', 'gemini-2.5-flash');
+    }
+    const parsed = JSON.parse((text.match(/\{[\s\S]*\}/) || ['{}'])[0]);
+    if (!Array.isArray(parsed.checks)) throw new Error('unparseable verification response');
+    const missing = [];
+    for (let i = 0; i < toCheck.length; i++) {
+      const check = parsed.checks.find(x => Number(x.index) === i + 1);
+      if (check && check.present === false) missing.push(toCheck[i].name || `figure ${i + 1}`);
+    }
+    return { allPresent: missing.length === 0, missing };
+  } catch (err) {
+    log.warn(`⚠️ [SCALE-REPAIR] ${pageLabel}verification failed (${err.message}) — accepting repair unverified`);
+    return { allPresent: true, missing: [], error: err.message };
+  }
+}
+
+/**
  * Run the scale-repair pass on a page that's already been rendered.
  *
  * @param {string} currentImage         - data: URL or base64 of the rendered page image
@@ -261,6 +324,15 @@ async function runScaleRepair(currentImage, sceneMetadata, options = {}) {
     return null;
   }
 
+  // Gate: every described background character must still be visible in the
+  // edited image. A relocate-edit that deleted a figure returns null so the
+  // caller keeps the pre-repair image as the active version.
+  const verification = await verifyScaleRepair(result.imageData, bgCharsWithDesc, { pageNumber, usageTracker });
+  if (!verification.allPresent) {
+    log.warn(`⚠️ [SCALE-REPAIR] Page ${pageNumber}: edit removed ${verification.missing.join(', ')} — discarding repair, keeping original image`);
+    return null;
+  }
+
   log.info(`✅ [SCALE-REPAIR] Page ${pageNumber}: completed (model=${result.modelId})`);
   return {
     imageData: result.imageData,
@@ -276,4 +348,5 @@ module.exports = {
   needsScaleRepair,
   runScaleRepair,
   buildScaleRepairPrompt,
+  verifyScaleRepair,
 };
