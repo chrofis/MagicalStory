@@ -158,13 +158,16 @@ Essential Cookies:
 • Authentication and session management
 • Security features
 
-Google Ads (Cookieless Mode):
-• We use Google Ads conversion tracking in cookieless mode (Google Consent Mode v2 with all storage denied)
-• No advertising cookies or tracking pixels are stored on your device
-• Google may use anonymized, aggregated signals for statistical conversion modeling
-• No personal data is shared with Google for ad personalization
+Google Analytics 4:
+• We use Google Analytics 4 to understand how visitors use our website (pages visited, features used, where visitors leave)
+• Google Analytics sets cookies to recognize returning visitors; full IP addresses are not logged or stored by Google Analytics 4
+• The data is used in aggregated form to improve our website and service
 
-You can block all Google tags entirely via your browser settings or a browser extension such as uBlock Origin.`
+Google Ads:
+• We use Google Ads conversion tracking to measure whether our advertising works (e.g. whether an ad click leads to a trial story)
+• Google Ads sets cookies to attribute website visits to ad clicks
+
+You can opt out at any time: block cookies in your browser settings, use a browser extension such as uBlock Origin, or install the Google Analytics opt-out add-on (tools.google.com/dlpage/gaoptout).`
       },
       {
         title: '13. Changes to This Policy',
@@ -341,13 +344,16 @@ Essentielle Cookies:
 • Authentifizierung und Sitzungsverwaltung
 • Sicherheitsfunktionen
 
-Google Ads (Cookie-freier Modus):
-• Wir verwenden Google Ads Conversion-Tracking im Cookie-freien Modus (Google Consent Mode v2, alle Speicheroptionen deaktiviert)
-• Es werden keine Werbe-Cookies oder Tracking-Pixel auf Ihrem Gerät gespeichert
-• Google kann anonymisierte, aggregierte Signale für statistisches Conversion-Modeling verwenden
-• Es werden keine personenbezogenen Daten an Google zur Personalisierung von Werbung weitergegeben
+Google Analytics 4:
+• Wir verwenden Google Analytics 4, um zu verstehen, wie Besucher unsere Website nutzen (besuchte Seiten, genutzte Funktionen, Absprungstellen)
+• Google Analytics setzt Cookies, um wiederkehrende Besucher zu erkennen; vollständige IP-Adressen werden von Google Analytics 4 nicht gespeichert
+• Die Daten werden in aggregierter Form genutzt, um Website und Service zu verbessern
 
-Sie können alle Google-Tags vollständig über Ihre Browsereinstellungen oder eine Browsererweiterung wie uBlock Origin blockieren.`
+Google Ads:
+• Wir verwenden Google Ads Conversion-Tracking, um die Wirksamkeit unserer Werbung zu messen (z.B. ob ein Anzeigenklick zu einer Probegeschichte führt)
+• Google Ads setzt Cookies, um Website-Besuche Anzeigenklicks zuzuordnen
+
+Sie können dem Tracking jederzeit widersprechen: Cookies in den Browsereinstellungen blockieren, eine Browsererweiterung wie uBlock Origin verwenden oder das Google Analytics Opt-out-Add-on installieren (tools.google.com/dlpage/gaoptout).`
       },
       {
         title: '13. Änderungen dieser Richtlinie',
@@ -524,13 +530,16 @@ Cookies Essentiels :
 • Authentification et gestion de session
 • Fonctionnalités de sécurité
 
-Google Ads (Mode sans cookies) :
-• Nous utilisons le suivi des conversions Google Ads en mode sans cookies (Google Consent Mode v2, tout stockage refusé)
-• Aucun cookie publicitaire ni pixel de suivi n'est stocké sur votre appareil
-• Google peut utiliser des signaux anonymisés et agrégés pour la modélisation statistique des conversions
-• Aucune donnée personnelle n'est partagée avec Google pour la personnalisation publicitaire
+Google Analytics 4 :
+• Nous utilisons Google Analytics 4 pour comprendre comment les visiteurs utilisent notre site (pages visitées, fonctionnalités utilisées, points d'abandon)
+• Google Analytics dépose des cookies pour reconnaître les visiteurs récurrents; les adresses IP complètes ne sont pas conservées par Google Analytics 4
+• Les données sont utilisées sous forme agrégée pour améliorer notre site et notre service
 
-Vous pouvez bloquer entièrement tous les tags Google via les paramètres de votre navigateur ou une extension comme uBlock Origin.`
+Google Ads :
+• Nous utilisons le suivi des conversions Google Ads pour mesurer l'efficacité de notre publicité (p.ex. si un clic sur une annonce mène à une histoire d'essai)
+• Google Ads dépose des cookies pour attribuer les visites du site aux clics publicitaires
+
+Vous pouvez vous opposer au suivi à tout moment : bloquer les cookies dans les paramètres de votre navigateur, utiliser une extension comme uBlock Origin, ou installer le module de désactivation Google Analytics (tools.google.com/dlpage/gaoptout).`
       },
       {
         title: '13. Modifications de cette Politique',
