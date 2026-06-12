@@ -1,16 +1,22 @@
 <!DOCTYPE html>
 <html lang="de">
   <head>
-    <!-- Google tag (gtag.js) with Consent Mode v2 — no cookies set -->
+    <!-- Google tag (gtag.js) with Consent Mode v2.
+         Defaults GRANTED (decision 2026-06-12): ads target Switzerland only
+         (not EEA/UK, where Google's EU User Consent Policy would require a
+         banner); Swiss revFADP practice = transparency via privacy policy.
+         Denied-by-default with no banner silently discarded ALL GA4 data and
+         ad-conversion attribution. Consent Mode structure kept so a CMP
+         banner can downgrade these later if targeting expands to the EU. -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17995593741"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('consent', 'default', {
-        'ad_storage': 'denied',
-        'ad_user_data': 'denied',
-        'ad_personalization': 'denied',
-        'analytics_storage': 'denied'
+        'ad_storage': 'granted',
+        'ad_user_data': 'granted',
+        'ad_personalization': 'granted',
+        'analytics_storage': 'granted'
       });
       gtag('js', new Date());
       gtag('config', 'AW-17995593741');
