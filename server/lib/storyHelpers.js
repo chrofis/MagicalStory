@@ -1854,6 +1854,7 @@ async function preloadHistoricalLocations() {
       if (row.photo_data || row.photo_url) {
         loc.photos.push({
           photoUrl: row.photo_url || '',
+          photoUrlSquare: row.photo_url_square || '',
           photoData: row.photo_data || '',
           attribution: row.photo_attribution || '',
           description: row.photo_description || '',
@@ -1908,13 +1909,21 @@ function loadHistoricalLocationsDatabank() {
  * @param {string} eventId - The historical event ID (e.g., 'moon-landing', 'pyramids')
  * @returns {Array} Array of location objects with randomly selected photo
  */
-function getHistoricalLocations(eventId) {
+function getHistoricalLocations(eventId, opts = {}) {
   if (!eventId) {
     log.debug(`[LOCATIONS] getHistoricalLocations called with no eventId`);
     return [];
   }
 
-  log.info(`[LOCATIONS] Getting locations for event: ${eventId}`);
+  // Square-format stories (imageAspect '1:1') use the square landmark variant
+  // (photo_url_square) so the stylized empty scene fills the page edge-to-edge.
+  // A4/portrait stories keep the original A4 photo. Parse W:H — square when
+  // width === height. Falls back to the A4 photo when no square exists.
+  const aspect = String(opts.aspect || '').trim();
+  const [aw, ah] = aspect.split(':').map(Number);
+  const wantSquare = aw > 0 && ah > 0 && aw === ah;
+
+  log.info(`[LOCATIONS] Getting locations for event: ${eventId} (aspect: ${aspect || 'default'}, variant: ${wantSquare ? 'square' : 'A4'})`);
   const databank = loadHistoricalLocationsDatabank();
   const eventData = databank[eventId];
 
@@ -1949,7 +1958,7 @@ function getHistoricalLocations(eventId) {
       // "Marktplatz Altdorf" both containing "Altdorf").
       dbKey: locationNameToDbKey(loc.name),
       description: randomPhoto.description,
-      photoUrl: randomPhoto.photoUrl,
+      photoUrl: (wantSquare && randomPhoto.photoUrlSquare) ? randomPhoto.photoUrlSquare : randomPhoto.photoUrl,
       photoData: randomPhoto.photoData,
       attribution: randomPhoto.attribution,
       hasPhoto: true
@@ -4715,8 +4724,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // silently skipped — the prose is the canonical source.
     for (const objName of metadata.objects) {
       // Skip any character id in the objects list — the prose carries the
-      // character. AI sometimes mis-categorises secondaries into objects;
-      // this filter ignores them rather than re-injecting a duplicate.
+      // character's description (story-unified.txt instructs the model to
+      // both name antagonists in the prose AND list their CHR id here; the
+      // id is presence metadata for the pipeline, not a prompt input).
+      // Re-injecting the VB description would duplicate the prose.
       const isChrId = typeof objName === 'string'
         ? /^\s*\[?CHR\d{3}\]?\s*$/i.test(objName) || /\[CHR\d{3}\]/i.test(objName)
         : (typeof objName?.id === 'string' && /^CHR\d{3}$/i.test(objName.id));

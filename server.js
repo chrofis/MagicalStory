@@ -4016,7 +4016,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // (added by Sonnet) but the photo bytes only landed on the finalize-time
         // visualBible at line 4023, which is a separate object.
         if (inputData.storyCategory === 'historical' && inputData.storyTopic) {
-          const historicalLocations = getHistoricalLocations(inputData.storyTopic);
+          const historicalLocations = getHistoricalLocations(inputData.storyTopic, { aspect: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect });
           if (historicalLocations?.length > 0) {
             injectHistoricalLocations(streamingVisualBible, historicalLocations);
             log.info(`📍 [STREAM] Injected ${historicalLocations.length} pre-fetched historical location(s) into streaming VB`);
@@ -4515,7 +4515,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // Inject historical locations with pre-fetched photos (for historical stories)
     if (inputData.storyCategory === 'historical' && inputData.storyTopic) {
-      const historicalLocations = getHistoricalLocations(inputData.storyTopic);
+      const historicalLocations = getHistoricalLocations(inputData.storyTopic, { aspect: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect });
       if (historicalLocations?.length > 0) {
         injectHistoricalLocations(visualBible, historicalLocations);
         log.info(`📍 [UNIFIED] Injected ${historicalLocations.length} pre-fetched historical location(s)`);
