@@ -280,6 +280,34 @@ testing is exactly where you want to discover that.
   blend step
 **Status:** ✅ active.
 
+### Evaluators never judge direction of travel from a mid-motion pose
+**Context:** A page whose beat was "character leaps from a vehicle onto
+a surface" rendered correctly (push-off foot still touching the
+vehicle), but the blind vision inventory *guessed* the leap direction
+from the frozen pose ("jumping from the ledge toward the boat") and the
+text-only compliance scorer treated that guess as fact → `wrong_action`
+CRITICAL on a correct image → unnecessary repair. The repair came back
+genuinely inverted, and the scorer then stretched the left/right-mirror
+leniency to a *surface swap* (foot on vehicle vs foot on rock),
+downgrading it to MAJOR → the wrong image passed and won pick-best over
+the correct original (job_1781289599516 p7).
+**Decision:** Two rules added to all three eval prompts
+(`image-vision-inventory.txt`, `image-prompt-compliance.txt`,
+`image-evaluation.txt`): (1) a still frame cannot show direction of
+travel — describers report only which surfaces/objects each limb
+touches, scorers never flag `wrong_action` from inferred motion
+direction; (2) mirror equivalence covers body sides and frame halves
+only — a limb contacting a *different object* than declared is a real
+contradiction, not a mirror.
+**Rationale:** Direction-of-motion in a static image is a guess stacked
+on a guess (vision infers, compliance scores the inference). The same
+ambiguous pose got CRITICAL when correct and MAJOR when wrong — the
+asymmetry, not the ambiguity, is what broke the page. Judging only
+visible contacts makes both versions score consistently.
+**Touched:** `prompts/image-vision-inventory.txt`,
+`prompts/image-prompt-compliance.txt`, `prompts/image-evaluation.txt`.
+**Status:** ✅ active.
+
 ---
 
 ## Cross-cuts already documented elsewhere

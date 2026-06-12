@@ -5,7 +5,7 @@ For EACH human figure:
 - Facing direction (toward viewer, away from viewer, left, right, toward another figure)
 - Hair color, length, style
 - Clothing: describe every visible garment with colors and type
-- What they are doing (action, pose)
+- What they are doing (action, pose). For a mid-motion figure (jumping, falling, reaching), describe only the pose and which surface or object each foot and hand touches (or that it is in the air). Never state where the figure is coming from or going to — a still frame cannot show direction of travel, so phrases like "jumping from X toward Y" are guesses, not observations.
 - What they hold in each hand (or nothing)
 - Expression (if face visible)
 - Approximate age group (child/teenager/adult/elderly)

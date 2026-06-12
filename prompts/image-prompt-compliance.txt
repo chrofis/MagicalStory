@@ -48,7 +48,7 @@ Only flag a contradiction:
 - Declared "sits / kneels", inventory says standing → MAJOR
 - Declared action toward Y, inventory shows the figure turned the opposite way with no matching gesture → MAJOR
 - Declared object entirely missing from inventory → CRITICAL
-- Object placement in a genuinely different category (declared "in pocket", drawn as large held object; declared "on head", drawn "in hand") → CRITICAL. Left/right mirror differences are equivalent and do NOT flag.
+- Object placement in a genuinely different category (declared "in pocket", drawn as large held object; declared "on head", drawn "in hand") → CRITICAL. Left/right mirror differences are equivalent and do NOT flag. Mirror equivalence covers body sides and frame halves only — a limb declared to contact one surface but rendered contacting a different object is a real contradiction, not a mirror.
 
 If the inventory is roughly compatible with the declared action, do not deduct. Pose details in the scene prose that are NOT in DECLARED INTERACTIONS (hands drawn in tight, fingers curled, jaw set) are descriptive only — do NOT deduct. Extra background figures in populated scenes (crowd, vendors, villagers, passersby) do NOT deduct.
 
@@ -60,6 +60,7 @@ If the inventory is roughly compatible with the declared action, do not deduct. 
 - Small position drift (left-of-center vs center).
 - Exact pose, gesture, or framing.
 - Motion verbs in the prose (walking, running, approaching, scanning). A still image cannot show motion; any frozen pose satisfies them.
+- Direction of travel of a mid-motion figure (leaping, falling, diving). A frozen pose cannot show which way the figure moves; an inventory phrase like "jumping from X toward Y" is inference, not observation. Judge only which surfaces and objects are visibly touched.
 - Internal-state claims ("appears thoughtful", "looks distracted").
 
 ---
@@ -67,7 +68,7 @@ If the inventory is roughly compatible with the declared action, do not deduct. 
 **STEP 4: SCORING (0-10)**
 
 Start at 10:
-- CRITICAL (-3): Missing character (per STEP 1 matching — no inventory figure matches on age + clothing colour), clothing completely wrong TYPE (modern vs medieval/costume), declared interaction object missing or in a genuinely different category (held-vs-pocket-vs-on-head — NOT left arm vs right arm), extra limbs, floating figure, `wrong_action` (main beat intent contradicted by inventory — e.g. prompt says offering, inventory shows aiming)
+- CRITICAL (-3): Missing character (per STEP 1 matching — no inventory figure matches on age + clothing colour), clothing completely wrong TYPE (modern vs medieval/costume), declared interaction object missing or in a genuinely different category (held-vs-pocket-vs-on-head — NOT left arm vs right arm), extra limbs, floating figure, `wrong_action` (main beat intent contradicted by inventory — e.g. prompt says offering, inventory shows aiming; never based on direction of travel inferred from a mid-motion pose)
 - MAJOR (-2): Character facing the wrong way for a DECLARED INTERACTION (e.g. two characters declared as interacting but facing away from each other; character declared as watching a named object but looking elsewhere), wrong clothing color, wrong age appearance, cross-eyes
 - MODERATE (-1): Minor clothing detail, key object missing
 - MINOR (-0.5): Small differences

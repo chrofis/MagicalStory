@@ -52,7 +52,8 @@ The image is allowed to differ from the prompt in these ways. Don't lower the sc
 - Precise hand positions or gestures.
 - Character left/right placement in the frame (left-foreground vs right-foreground, etc.). Treat horizontal placement as a mirror — never deduct.
 - Left↔right body facing direction. A character described as "facing left" but rendered facing right (or vice versa) is a mirror equivalent. The face still reads, the emotional beat survives. Do not deduct, even when this contradicts the declared interaction's direction.
-- Left/right mirror differences in interactions (left arm vs right arm, left hand vs right hand, left pocket vs right pocket) — equivalent.
+- Left/right mirror differences in interactions (left arm vs right arm, left hand vs right hand, left pocket vs right pocket) — equivalent. A swap of which object or surface a limb contacts (declared on one surface, rendered on a different one) is not a mirror — flag that normally.
+- Direction of travel of a mid-motion figure (leaping, falling, thrown). A still frame cannot prove which way the figure moves — judge only visible contacts and pose, never an inferred direction.
 - Hidden/occluded parts. Only flag VISIBLE errors.
 - Clothing or props that fall outside the visible crop (e.g. boots when the figure is shown chest-up; belt when the torso is hidden by another object; held items when the hands are off-frame; pockets when only the head is visible). If the body part the item attaches to is not in the rendered area, don't flag the item as missing.
 - Extra background figures in scenes whose scene hint describes a populated setting (crowd, vendors, villagers, marketgoers, passersby, busy street).
