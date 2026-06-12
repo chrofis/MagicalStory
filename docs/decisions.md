@@ -335,6 +335,26 @@ on the prose writer never dropping a clause.
 `prompts/image-prompt-compliance.txt`.
 **Status:** ✅ active.
 
+### Antagonists: outline declares them in prose + objects[]; builder keeps the CHR filter
+**Context:** Follow-up to the background-forwarding fix. The Visual
+Bible had a secondary-character entry for the antagonists (CHR002,
+`pages` including the failing page), but the scene hint never
+referenced it — soldiers lived only in background prose, and the
+2026-06-09 builder change silently skips CHR ids in `objects[]` on the
+assumption the prose always carries secondaries.
+**Decision (user-chosen scope: outline rule only, no builder safety
+net):** `story-unified.txt` now requires story-present antagonists to
+be (1) named in the SCENE prose with count + placement + VB signature
+look, (2) listed by CHR id in `objects[]` (presence metadata — the
+builder still filters CHR ids out of REQUIRED OBJECTS to avoid
+duplicating the prose), (3) summarised in `background`. A builder-side
+re-inject fallback (when prose drops a declared CHR) was offered and
+declined — revisit if antagonist drops recur despite the new rules.
+**Touched:** `prompts/story-unified.txt` (SCENE prose rules +
+ANTAGONISTS + OBJECTS); `server/lib/storyHelpers.js` (comment on the
+CHR filter).
+**Status:** ✅ active.
+
 ---
 
 ## Cross-cuts already documented elsewhere
