@@ -12,6 +12,7 @@ Preserve the original emotion and direction:
 - Match the gaze direction — if the character is looking left, right, up, down, at another character, or away from the camera, the new face must look the same way.
 - Don't make the character face the camera unless they were already facing the camera in the original.
 - Don't change the head tilt or angle — the head was facing a specific direction for a reason.
+- A head seen from behind stays seen from behind. Never rotate the head to make a reference feature (glasses, face) visible — a feature the pose hides stays hidden.
 
 Each character's body, pose, clothing, and position in IMAGE 2 are fully visible — preserve these exactly. Keep the same age and body proportions — don't make characters look older or younger. Only redraw the blurred face and head areas to match the reference photo while keeping the original expression and gaze.
 

@@ -10,6 +10,8 @@ Match {charName}'s face, hair, skin tone, build, and clothing from the reference
 
 Keep the original pose, body language, hand positions, held items, facial expression, and gaze direction — infer these from the surrounding scene and from the figure still faintly visible through the crosshatch. Do not default to a smile or make the character face the camera.
 
+Keep the original head and body orientation exactly. A figure seen from behind stays seen from behind; a profile stays a profile. Never rotate the head or body to make a listed attribute (glasses, garment front, face) visible — an attribute the pose hides stays hidden.
+
 Only one figure should appear in the result. If a partial figure is visible just outside the crosshatch, it is a leftover fragment of the same figure — absorb it into {charName}, do not paint a second character.
 
 The repainted figure must match the art style of the surrounding illustration exactly — same rendering technique, same brush texture, same level of detail, same color palette. Do not render the character more realistically or with a different style than the background.{artStyleContext}

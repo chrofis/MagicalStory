@@ -499,6 +499,12 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
                 ? v.inpaintReferenceImages.filter(s => typeof s === 'string' && !s.startsWith('data:'))
                 : [],
               hasInpaintReferenceImages: Array.isArray(v.inpaintReferenceImages) && v.inpaintReferenceImages.length > 0,
+              // Char-repair intermediates for the version picker (whiteout
+              // input / Grok raw output / feather blend mask). R2 URLs only —
+              // same data:-URI guard as the ref-image fields above.
+              charRepairGrokRaw: (typeof v.charRepairGrokRaw === 'string' && !v.charRepairGrokRaw.startsWith('data:')) ? v.charRepairGrokRaw : null,
+              charRepairBlendMask: (typeof v.charRepairBlendMask === 'string' && !v.charRepairBlendMask.startsWith('data:')) ? v.charRepairBlendMask : null,
+              charRepairWhiteout: (typeof v.charRepairWhiteout === 'string' && !v.charRepairWhiteout.startsWith('data:')) ? v.charRepairWhiteout : null,
             })));
           }
         }
@@ -604,6 +610,15 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             inpaintInstruction: versionMeta.inpaintInstruction || null,
             inpaintReferenceImages: versionMeta.inpaintReferenceImages || [],
             hasInpaintReferenceImages: !!versionMeta.hasInpaintReferenceImages,
+            // Char-repair pipeline intermediates (whiteout input / Grok raw
+            // output / feather blend mask) — the Bild-wählen modal renders
+            // these per version. The dev-metadata route already surfaces
+            // them; without these three lines the picker's version entries
+            // (built HERE) had charRepair* === undefined and the modal
+            // silently hid the thumbnails.
+            charRepairGrokRaw: versionMeta.charRepairGrokRaw || null,
+            charRepairBlendMask: versionMeta.charRepairBlendMask || null,
+            charRepairWhiteout: versionMeta.charRepairWhiteout || null,
           });
           // Update main qualityScore and bboxDetection to reflect the ACTIVE version
           if (isActiveVersion) {

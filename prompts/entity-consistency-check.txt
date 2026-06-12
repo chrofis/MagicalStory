@@ -48,6 +48,12 @@ Analyze whether this entity (specifically {ENTITY_NAME}) looks consistent across
 - Example: If cell A has "winter" and cell B has "standard", different outfits are fine
 - Example: If both cells have "standard" but one shows a jacket and one shows a t-shirt, that's inconsistent
 
+## Visibility Rules
+
+- Cells show the entity from different angles (front, profile, back view) and crops. Never flag an attribute the pose or crop hides: glasses and facial features are invisible on a back-view cell; front-of-garment details (lacing, buttons, prints, necklines) are invisible from behind; footwear is invisible on a chest-up crop.
+- Pose and viewing-angle differences between cells are never inconsistencies.
+- Only flag an attribute as missing or wrong when the cell's angle would actually show it.
+
 ## Output Format
 
 Return ONLY valid JSON (no markdown, no explanation):
