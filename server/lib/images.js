@@ -5398,11 +5398,26 @@ function selectBestVersion(versions) {
   if (!versions || versions.length === 0) return null;
   if (versions.length === 1) return versions[0];
 
-  // Delegate to the canonical picker. One scoring rule, no per-site
-  // divergence (the old impl used `score` only and ignored entity penalty).
-  const { pickBestVersionIndex } = require('./scoring');
-  const idx = pickBestVersionIndex(versions);
-  return idx >= 0 ? versions[idx] : versions[0];
+  // Canonical SCORE rule (computeFinalScore: evalScore − entityPenalty), but
+  // pipeline-specific TIE-BREAK: earliest version wins. pickBestVersionIndex
+  // uses later-wins ties for interactive flows (a user who just regenerated
+  // expects their new version on a tie). In the repair pipeline the opposite
+  // holds: when scores tie — typically all 0 on safety-fought stories — the
+  // LAST repair round is the most content-mangled image, while the original
+  // is the least-mangled. Observed on job_1781289599516: page 2 shipped
+  // inpaint-round-3 (score 0) instead of the original (score 0).
+  const { computeFinalScore } = require('./scoring');
+  let bestIdx = -1;
+  let bestScore = -Infinity;
+  for (let i = 0; i < versions.length; i++) {
+    const s = computeFinalScore(versions[i]);
+    if (s == null) continue;
+    if (s > bestScore) {  // strict > — earlier index wins ties
+      bestScore = s;
+      bestIdx = i;
+    }
+  }
+  return bestIdx >= 0 ? versions[bestIdx] : versions[0];
 }
 
 /**
