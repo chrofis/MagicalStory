@@ -608,6 +608,14 @@ export default function StoryWizard() {
                 type: (meta.type ?? v.type) as ImageVersion['type'],
                 grokRefImages: (meta as any).grokRefImages ?? (v as any).grokRefImages,
                 bboxDetection: (meta as any).bboxDetection ?? (v as any).bboxDetection,
+                inpaintInstruction: (meta as any).inpaintInstruction ?? (v as any).inpaintInstruction,
+                // Char-repair intermediates (whiteout input / Grok raw output /
+                // feather blend mask) — sent by dev-metadata since the char-fix
+                // telemetry work, but silently dropped by this merge until now,
+                // which is why the modal showed no repair thumbnails in dev mode.
+                charRepairGrokRaw: (meta as any).charRepairGrokRaw ?? (v as any).charRepairGrokRaw,
+                charRepairBlendMask: (meta as any).charRepairBlendMask ?? (v as any).charRepairBlendMask,
+                charRepairWhiteout: (meta as any).charRepairWhiteout ?? (v as any).charRepairWhiteout,
               };
             }) ?? img.imageVersions,
           };
