@@ -233,39 +233,10 @@ function sanitizePromptLevel1(prompt) {
   return sanitized;
 }
 
-/**
- * Simplify prompt to core scene elements only (Level 2 sanitization)
- * Keeps: art style, character names/positions, setting, time, weather
- * Removes: detailed descriptions, mood, atmosphere
- */
-function sanitizePromptLevel2(prompt) {
-  // Try to extract key elements from the prompt
-  const settingMatch = prompt.match(/Setting:\s*([^\n|]+)/i);
-  const timeMatch = prompt.match(/Time:\s*([^\n|]+)/i);
-  const styleMatch = prompt.match(/(?:art\s*style|style):\s*([^\n,]+)/i);
-  const charMatches = prompt.match(/(?:Characters?|Character Reference).*?(?:\n|:)([\s\S]*?)(?=Setting:|Key objects:|$)/i);
-
-  const setting = settingMatch ? settingMatch[1].trim() : 'a scenic location';
-  const time = timeMatch ? timeMatch[1].trim() : 'daytime';
-  const style = styleMatch ? styleMatch[1].trim() : 'watercolor';
-
-  // Extract just character names
-  let characters = 'a child';
-  if (charMatches) {
-    const names = charMatches[1].match(/[\w]+(?:\s+[\w]+)?(?=\s*\()/g);
-    if (names) characters = names.join(' and ');
-  }
-
-  return `A ${style} illustration of ${characters} in ${setting} during ${time}. Warm, friendly, child-appropriate scene. Bright colors, soft lighting.`;
-}
-
-/**
- * Build minimal fallback prompt (Level 3 sanitization)
- */
-function sanitizePromptLevel3(artStyle) {
-  const style = artStyle || 'watercolor';
-  return `A beautiful ${style} illustration of a happy child on an adventure in a colorful, magical setting. Bright, warm colors. Friendly atmosphere. Child-appropriate.`;
-}
+// Former sanitization levels 2-3 (generic "simplified scene" / "happy child
+// in a magical setting" prompts) are GONE — they produced images unrelated
+// to the page. Blocked generations now get a Claude scene rewrite instead
+// (see the sanitization ladder in generateImageOnly).
 
 // =============================================================================
 // LRU CACHE IMPLEMENTATION
@@ -4730,20 +4701,45 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), model: ${modelId}, temperature: ${modelTemp}, aspect: ${aspectRatio}, systemInstruction: ${!!systemInstruction}`);
 
   // Progressive retry with sanitization on safety blocks
+  // Progressive retries on safety blocks. Level 1 is a cheap local word
+  // strip; level 2 asks Claude to REWRITE the scene — defuse the safety
+  // trigger while keeping the story moment (same rewriteBlockedScene used
+  // by the main generation path). The former levels 2-3 replaced the prompt
+  // with a generic "happy child in a magical setting" one-liner, so the
+  // "successful" image had nothing to do with the page (observed: a
+  // fairy/bubbles image shipped as a Tell-saga crossbow scene on
+  // job_1781289599516 p4). If the rewritten scene is STILL blocked, this
+  // function throws — a wrong image is worse than no image.
+  const rewriteSceneInPrompt = async () => {
+    const { callTextModel } = require('./textModels');
+    const sceneMatch = prompt.match(/\*\*THIS IMAGE DEPICTS:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
+      || prompt.match(/\*\*SCENE:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
+      || prompt.match(/Scene Description:\s*([\s\S]*?)(?=\n\n\*\*|$)/i);
+    const originalScene = sceneMatch?.[1]?.trim();
+    const rewriteResult = await rewriteBlockedScene(originalScene || prompt, callTextModel);
+    // Replace the scene block in place so style / reference / no-text rules
+    // survive; when no scene block was found (custom prompts like
+    // scale-repair or empty-scene), use the rewrite as the whole prompt.
+    return originalScene ? prompt.replace(originalScene, rewriteResult.text) : rewriteResult.text;
+  };
   const sanitizationLevels = [
-    null,                                                    // Level 0: original prompt
-    () => sanitizePromptLevel1(prompt),                      // Level 1: remove problematic words
-    () => sanitizePromptLevel2(prompt),                      // Level 2: simplify to core scene
-    () => sanitizePromptLevel3(artStyle)                     // Level 3: minimal fallback
+    null,                                       // Level 0: original prompt
+    () => sanitizePromptLevel1(prompt),         // Level 1: strip safety-trigger words
+    rewriteSceneInPrompt,                       // Level 2: Claude scene rewrite (keeps the story moment)
   ];
 
   for (let sanitizationLevel = 0; sanitizationLevel < sanitizationLevels.length; sanitizationLevel++) {
     // Apply sanitization if needed
     let currentPrompt = prompt;
     if (sanitizationLevel > 0) {
-      currentPrompt = sanitizationLevels[sanitizationLevel]();
+      try {
+        currentPrompt = await sanitizationLevels[sanitizationLevel]();
+      } catch (rewriteErr) {
+        log.warn(`⚠️ [IMAGE GEN-ONLY] Level ${sanitizationLevel} prompt rewrite failed: ${rewriteErr.message}`);
+        throw new Error(`Image blocked and scene rewrite failed: ${rewriteErr.message}`);
+      }
       parts[0] = { text: currentPrompt };
-      log.info(`🔄 [IMAGE GEN-ONLY] Retry with sanitization level ${sanitizationLevel}, prompt: ${currentPrompt.substring(0, 100)}...`);
+      log.info(`🔄 [IMAGE GEN-ONLY] Retry with sanitization level ${sanitizationLevel}${sanitizationLevel === 2 ? ' (Claude scene rewrite)' : ''}, prompt: ${currentPrompt.substring(0, 100)}...`);
     }
 
     try {
