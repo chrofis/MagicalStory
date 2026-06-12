@@ -261,17 +261,6 @@ async function runScaleRepair(currentImage, sceneMetadata, options = {}) {
     return null;
   }
 
-  // A result generated at sanitization level ≥2 came from a prompt that no
-  // longer describes the scene (level 2 strips it to a generic one-liner,
-  // level 3 is "a happy child in a magical setting"). Replacing the page
-  // with that is strictly worse than keeping the pre-repair image — observed
-  // on job_1781289599516 p4, where scale-repair swapped a real crossbow
-  // scene for a generic fairy image. Keep the original instead.
-  if ((result.sanitizationLevel ?? 0) >= 2) {
-    log.warn(`⚠️ [SCALE-REPAIR] Page ${pageNumber}: result was generated at sanitization level ${result.sanitizationLevel} (prompt no longer describes the scene) — discarding, keeping pre-repair image`);
-    return null;
-  }
-
   log.info(`✅ [SCALE-REPAIR] Page ${pageNumber}: completed (model=${result.modelId})`);
   return {
     imageData: result.imageData,

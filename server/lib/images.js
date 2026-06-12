@@ -7075,11 +7075,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 prompt: result.imagePrompt || null,
                 description: result.newScene || null,
                 compositeAttempts,
-                // Emergency-sanitized generation marker (regen fallback path
-                // returns the raw generateImageOnly result). Level ≥2 means
-                // the prompt no longer described the scene — the round loop
-                // force-fails such versions.
-                sanitizationLevel: result.sanitizationLevel ?? 0,
               };
             }
             return { pageNumber, imageData: null, error: 'iterate produced no result' };
@@ -7221,22 +7216,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             charRepairWhiteout: repairResult.charRepairWhiteout || null,
           };
           // Single source of truth for evalScore/entityPenalty/finalScore.
-          // A repair generated at sanitization level ≥2 came from a prompt
-          // that no longer describes the scene (level 3 is "a happy child in
-          // a magical setting") — it is garbage BY CONSTRUCTION, regardless
-          // of what any evaluator says about it. Force score 0 so it can
-          // never win pick-best over a real version; keep it in the list as
-          // an inspectable placeholder only.
-          if ((repairResult.sanitizationLevel ?? 0) >= 2) {
-            log.warn(`📊 [UNIFIED PIPELINE] Page ${ev.pageNumber}: repair was generated at sanitization level ${repairResult.sanitizationLevel} — forcing score 0 (image does not depict the scene)`);
-            newVersion.evaluation = {
-              ...(ev || {}),
-              issuesSummary: `Generated from emergency-sanitized prompt (level ${repairResult.sanitizationLevel}) — image does not depict the scene.${ev?.issuesSummary ? ' ' + ev.issuesSummary : ''}`,
-            };
-            setVersionScores(newVersion, 0, evEntityPenalty);
-          } else {
-            setVersionScores(newVersion, evScore, evEntityPenalty);
-          }
+          setVersionScores(newVersion, evScore, evEntityPenalty);
           versions.push(newVersion);
         }
       }
