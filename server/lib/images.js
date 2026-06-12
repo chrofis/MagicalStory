@@ -1464,10 +1464,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     // Blocked content: retry with full sanitization, then fall back to Grok vision.
-    // Track when the verdict we end up parsing came from a sanitized-prompt
-    // retry — such verdicts are LOW-CONFIDENCE when they claim perfection
-    // (see hollow-pass guard at the scoring step).
-    let sanitizedEvalUsed = false;
     if (isBlockedResponse(data)) {
       const pageLabel = pageContext ? `[${pageContext}] ` : '';
       const promptBlockReason = data.promptFeedback?.blockReason || null;
@@ -1491,7 +1487,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           if (!isBlockedResponse(retryData)) {
             log.info(`✅ [QUALITY] ${pageLabel}Full sanitization retry succeeded`);
             data = retryData;
-            sanitizedEvalUsed = true;
           } else {
             data = retryData; // still blocked — fall through to Grok
           }
@@ -1515,7 +1510,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
                 if (grokData?.candidates?.[0]?.content?.parts?.[0]?.text) {
                   log.info(`✅ [QUALITY] ${pageLabel}Grok fallback succeeded`);
                   data = grokData;
-                  sanitizedEvalUsed = true; // Grok also evaluated the sanitized prompt
                 } else {
                   log.error(`❌ [QUALITY] ${pageLabel}Grok fallback returned no text`);
                   return null;
@@ -1625,7 +1619,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     if (parsedJson && typeof parsedJson.score === 'number') {
       // Full JSON format with 0-10 scale and detailed analysis
       const modelRawScore = parsedJson.score; // What the model claimed (kept for logging only)
-      let verdict = parsedJson.verdict || parsedJson.final_verdict || 'UNKNOWN';
+      const verdict = parsedJson.verdict || parsedJson.final_verdict || 'UNKNOWN';
       // Support both old 'issues' and new 'issues_summary' field
       // Handle case where issues might be an array (convert to string)
       let issuesSummary = parsedJson.issues_summary || parsedJson.issues || '';
@@ -1670,23 +1664,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1),
         0
       );
-      let rawScore = Math.max(0, Math.min(10, 10 - totalPenalty));
-
-      // Hollow-pass guard: a sanitized-retry eval that reports a PERFECT image
-      // is low-confidence — the original eval prompt was safety-blocked, the
-      // retry ran against a weakened prompt, and Gemini sometimes returns a
-      // 10/10-zero-issues verdict for a completely wrong image (observed on
-      // job_1781289599516 p4: a generic happy-child fallback image rated 100
-      // against a crossbow scene; the bogus 100 persisted on v0 where any
-      // active-version recompute would resurrect it over the real 92 repair).
-      // Degrade to a neutral 50 SOFT_FAIL: can't pass gates, can't outrank a
-      // genuinely-scored version, and the next round re-evaluates anyway.
-      if (sanitizedEvalUsed && fixableIssues.length === 0 && rawScore >= 9) {
-        const pageLabel = pageContext ? `[${pageContext}] ` : '';
-        log.warn(`📊 [EVAL] ${pageLabel}Sanitized-retry eval claims a perfect image (no issues) — low confidence, degrading to neutral 50 (SOFT_FAIL)`);
-        rawScore = 5;
-        verdict = 'SOFT_FAIL';
-      }
+      const rawScore = Math.max(0, Math.min(10, 10 - totalPenalty));
       const score = rawScore * 10; // 0-100 for compatibility
 
       const scoreDelta = Math.abs(modelRawScore - rawScore);
@@ -1900,7 +1878,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         matches,                          // Character name → figure mapping with face_bbox
         semanticResult,                   // Full semantic evaluation result (if available)
         threeStageResult,                 // Full three-stage evaluation result (if available)
-        sanitizedEval: sanitizedEvalUsed, // Verdict came from a sanitized-prompt retry (low-confidence)
         usage: totalUsage,
         modelId: modelId
       };
@@ -4348,8 +4325,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     textAreaMask = null,
     // Output aspect ratio — defaults to MODEL_DEFAULTS.pageAspect (A4 portrait)
     // so callers that forget to pass one still get the configured page aspect.
-    // Callers can override: avatars pass '9:16', covers pass MODEL_DEFAULTS.coverAspect,
-    // and square-layout books (layout.imageAspect '1:1') pass their per-page aspect.
+    // Callers can override: avatars pass '9:16', covers pass MODEL_DEFAULTS.coverAspect.
     // Flows through to Grok and Gemini image configs.
     aspectRatio = CONFIG_DEFAULTS.pageAspect
   } = options;
