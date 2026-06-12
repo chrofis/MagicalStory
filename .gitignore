@@ -144,3 +144,6 @@ tasks/
 
 # React Email browser previews (regenerable via npx tsx scripts/preview-email.ts)
 emails-preview/
+
+# Local creative drafts (not committed)
+drafts/
