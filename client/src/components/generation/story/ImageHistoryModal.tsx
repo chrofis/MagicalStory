@@ -338,15 +338,15 @@ export function ImageHistoryModal({
                         </button>
                       )}
                     </div>
-                    <div className="text-[9px] sm:text-[11px] text-gray-300 mt-0.5">
-                      {version.createdAt && new Date(version.createdAt).toLocaleDateString()}
-                      {/* Always show the method (direct / composite / inpaint / etc) so v0
-                          isn't ambiguous — formatMethod now appends `· direkt` to
-                          `original` / `regenerate` and `· composite` to composite-prefixed
-                          sources, so the user can tell which path produced this version
-                          without opening the detail panel. */}
-                      <span className="ml-1 text-gray-400">({formatMethod(version.source, version.type)})</span>
-                    </div>
+                    {/* Date + generation method (direct / composite / inpaint / round)
+                        is developer-only metadata. Normal users see just the version
+                        label (Original / V2 …) and the Active/Select button. */}
+                    {developerMode && (
+                      <div className="text-[9px] sm:text-[11px] text-gray-300 mt-0.5">
+                        {version.createdAt && new Date(version.createdAt).toLocaleDateString()}
+                        <span className="ml-1 text-gray-400">({formatMethod(version.source, version.type)})</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Dev mode: info button */}
