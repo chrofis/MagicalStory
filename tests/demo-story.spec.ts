@@ -1016,9 +1016,16 @@ test.describe('Demo Story Generation', () => {
       const groupHeaders = page.locator('button').filter({
         hasText: /beliebt|popular|populaire|historisch|historical|fantasie|fantasy|fantastique|entdeckung|exploration|helden|heroes|héros|jahreszeiten|seasonal|saisons|schweiz|swiss|suisse|welt|world|monde|toddler|kleinkind|tout-petit|preschool|vorschul|maternelle|school|schul|école|family|famili|famille|numbers|math|science|animal|body|time|music|musique|letter|lettres/i,
       });
-      const groupCount = await groupHeaders.count();
-      for (let i = 0; i < groupCount; i++) {
-        await groupHeaders.nth(i).click();
+      // Snapshot the header elements ONCE. The locator is live: expanding a
+      // group inserts tile buttons that can match the group regex (e.g.
+      // "Dinosaur World" matches 'world'), shifting nth() indices so a later
+      // iteration clicks a THEME TILE instead of a header — which on the
+      // adventure category auto-advances the wizard to the Style step and
+      // strands the loop (90-min hang on a locator that no longer resolves).
+      const headerHandles = await groupHeaders.elementHandles();
+      for (const header of headerHandles) {
+        const clicked = await header.click({ timeout: 5000 }).then(() => true).catch(() => false);
+        if (!clicked) continue;  // stale handle (page advanced) — try the rest, then bail
         await page.waitForTimeout(500);
         const found = await page.locator('button').filter({ hasText: topicPattern }).first().isVisible().catch(() => false);
         if (found) {
@@ -1033,7 +1040,16 @@ test.describe('Demo Story Generation', () => {
       throw new Error(`Could not find topic button for: ${entry.storyTopic}`);
     }
     await page.waitForTimeout(1000);
-    await clickNext(page);
+    // Selecting an adventure theme auto-advances the wizard to the Style
+    // step (handleThemeChange → safeSetStep(4)). Only click Next if we are
+    // still on the Story step — otherwise we'd skip straight past Style.
+    const onStyleStep = await page.getByRole('heading', { name: /art style|kunststil|style artistique/i })
+      .isVisible().catch(() => false);
+    if (!onStyleStep) {
+      await clickNext(page);
+    } else {
+      console.log('  (theme selection auto-advanced to Style step — skipping Next)');
+    }
 
     // ── Step 4: Art Style ──
     // Wizard groups styles into collapsible sections (Beliebt / Realistisch /
