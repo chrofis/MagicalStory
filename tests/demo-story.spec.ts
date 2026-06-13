@@ -156,6 +156,12 @@ async function preSeedLanguage(page: Page, language: DemoLanguage, baseUrl: stri
   await page.goto(`${baseUrl}/?lang=${language}`);
   await page.evaluate((lang) => {
     try { localStorage.setItem('magicalstory_language', lang); } catch { /* ignore */ }
+    // The wizard's STORY language is separate state read from 'story_language'
+    // and hard-defaults to 'de-ch' — without this seed every demo story
+    // generates in Swiss German regardless of the entry's language (all
+    // Miller/EN showcases before 2026-06-13 silently came out de-ch).
+    // The wizard normalizes 'en'→'en-gb', 'de'→'de-ch', 'fr'→'fr-ch'.
+    try { localStorage.setItem('story_language', lang); } catch { /* ignore */ }
   }, language);
 }
 
