@@ -274,6 +274,49 @@ function computeFinalScore(version) {
   return fallback - (Number(version.entityPenalty) || 0);
 }
 
+// Canonical severity → weight for the un-clamped ranking tiebreak below.
+const RANK_SEVERITY_WEIGHT = { CATASTROPHIC: 50, CRITICAL: 30, MAJOR: 20, MODERATE: 10, MINOR: 5 };
+
+/**
+ * Un-clamped total weighted deduction for a version, summed across every
+ * evaluator's issue list + the entity penalty. This is the RANKING signal
+ * that the clamped 0–100 finalScore throws away: once a page accrues >10
+ * deduction points its finalScore pins to 0, and several failing candidates
+ * all read 0 — so pick-best can no longer tell them apart and selection
+ * collapses to "earliest version" (pure luck). This number keeps growing
+ * past the 0 floor, so the candidate with the FEWEST / LIGHTEST issues still
+ * ranks above a more-broken one even when all of them score 0.
+ *
+ * Lower is better. Returns Infinity when the version has no scoreable data
+ * so it never wins a tiebreak by accident.
+ */
+function versionDeductionTotal(version) {
+  if (!version || typeof version !== 'object') return Infinity;
+  let total = 0;
+  let sawAny = false;
+  const addIssues = (issues) => {
+    if (!Array.isArray(issues)) return;
+    for (const i of issues) {
+      sawAny = true;
+      total += RANK_SEVERITY_WEIGHT[String(i?.severity || '').toUpperCase()] ?? 10;
+    }
+  };
+  const bd = version.scoreBreakdown;
+  if (bd) {
+    addIssues(bd.visual?.issues);
+    addIssues(bd.semantic?.issues);
+    addIssues(bd.threeStage?.issues);
+    if (typeof bd.entity?.penalty === 'number') { total += bd.entity.penalty; sawAny = true; }
+  } else {
+    // Fallback to the flat fields a version carries before applyScore folds
+    // them into a breakdown.
+    addIssues(version.fixableIssues);
+    addIssues(version.semanticResult?.semanticIssues || version.semanticResult?.issues);
+    if (typeof version.entityPenalty === 'number') { total += version.entityPenalty; sawAny = true; }
+  }
+  return sawAny ? total : Infinity;
+}
+
 /**
  * Build the canonical scoreBreakdown structure from an evaluator output.
  * Used by evaluateImageQuality + re-evaluate endpoint so the version object
@@ -395,11 +438,18 @@ function pickBestVersionIndex(versions) {
   if (!Array.isArray(versions) || versions.length === 0) return -1;
   let bestIdx = -1;
   let bestScore = -Infinity;
+  let bestDeduction = Infinity;
   for (let i = 0; i < versions.length; i++) {
     const s = computeFinalScore(versions[i]);
     if (s == null) continue;
-    if (s >= bestScore) {  // >= so later index wins ties
+    const ded = versionDeductionTotal(versions[i]);
+    // Primary: clamped finalScore (higher better). Tiebreak when the clamped
+    // scores are equal — typically several candidates pinned at 0: prefer the
+    // one with the smallest un-clamped deduction total (fewest/lightest
+    // issues), which the 0-floor erased. Final tiebreak: later index wins.
+    if (s > bestScore || (s === bestScore && ded <= bestDeduction)) {
       bestScore = s;
+      bestDeduction = ded;
       bestIdx = i;
     }
   }
@@ -513,6 +563,7 @@ module.exports = {
   logScoreModelSummary,
   // Legacy helpers (still used by some readers/writers — to be migrated)
   computeFinalScore,
+  versionDeductionTotal,
   buildScoreBreakdown,
   composeEvalScore,
   composeFinalScore,
