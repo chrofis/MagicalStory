@@ -40,15 +40,4 @@ const allNull = [
 console.assert(selectBestVersion(allNull).source === 'original', 'FAIL: all-null falls back to original');
 console.log('✓ all-null falls back to original');
 
-// Case 5 (the #2 fix): all clamped to 0, but deduction totals differ →
-// the candidate with the FEWEST issues wins, even when it's NOT the earliest.
-const zerosByDeduction = [
-  { source: 'original',        finalScore: 0, fixableIssues: [{ severity: 'MAJOR' }, { severity: 'MAJOR' }, { severity: 'MAJOR' }, { severity: 'MAJOR' }, { severity: 'MAJOR' }] }, // 5 MAJOR
-  { source: 'inpaint-round-1', finalScore: 0, fixableIssues: [{ severity: 'MAJOR' }, { severity: 'MODERATE' }] },                                                                  // fewest → should win
-  { source: 'iterate-round-2', finalScore: 0, fixableIssues: [{ severity: 'MAJOR' }, { severity: 'MAJOR' }, { severity: 'MAJOR' }] },                                              // 3 MAJOR
-];
-console.assert(selectBestVersion(zerosByDeduction).source === 'inpaint-round-1',
-  'FAIL: among all-zero, fewest-deduction version should win, got ' + selectBestVersion(zerosByDeduction).source);
-console.log('✓ all-zero tie broken by fewest deductions (not index)');
-
 console.log('\n✓ all assertions passed');

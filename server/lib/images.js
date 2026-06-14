@@ -5420,22 +5420,14 @@ function selectBestVersion(versions) {
   // LAST repair round is the most content-mangled image, while the original
   // is the least-mangled. Observed on job_1781289599516: page 2 shipped
   // inpaint-round-3 (score 0) instead of the original (score 0).
-  // When the clamped scores tie (typically several candidates pinned at 0),
-  // break the tie by the un-clamped deduction total the 0-floor erased —
-  // the candidate with the fewest/lightest issues wins. Only on a true tie of
-  // BOTH does the earliest index win (least-mangled original beats the last
-  // repair round).
-  const { computeFinalScore, versionDeductionTotal } = require('./scoring');
+  const { computeFinalScore } = require('./scoring');
   let bestIdx = -1;
   let bestScore = -Infinity;
-  let bestDeduction = Infinity;
   for (let i = 0; i < versions.length; i++) {
     const s = computeFinalScore(versions[i]);
     if (s == null) continue;
-    const ded = versionDeductionTotal(versions[i]);
-    if (s > bestScore || (s === bestScore && ded < bestDeduction)) {  // strict — earlier index keeps a full tie
+    if (s > bestScore) {  // strict > — earlier index wins ties
       bestScore = s;
-      bestDeduction = ded;
       bestIdx = i;
     }
   }
