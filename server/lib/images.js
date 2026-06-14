@@ -43,6 +43,19 @@ function recordImageApiUsage(modelId, evaluationType, imageUsage) {
   }, perImage);
 }
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS, TEXT_MODELS } = require('../config/models');
+
+// Quality-eval sampling knobs (env-overridable for A/B). Defaults chosen from
+// a local variance test on job_1781310332569 p4 (4 runs × 3 configs):
+//   temp 0.3 + thinking 8192 (old): mean 6.3 issues, count spread 4 (noisy)
+//   temp 0   + thinking 8192      : mean 9.3 issues — thinking OVER-flags
+//   temp 0   + thinking 0  (this) : mean 4.5 issues, count spread 1 — stable
+//                                   AND finds the real issues, not invented ones
+// Temperature 0 stabilises the issue count; thinking off stops the structured
+// detection check from rationalising extra "problems" (it permanently
+// condemns good images). Semantic / three-stage evals are unaffected — they
+// keep their own calls and can keep thinking where reasoning genuinely helps.
+const EVAL_TEMPERATURE = process.env.EVAL_TEMPERATURE != null ? Number(process.env.EVAL_TEMPERATURE) : 0;
+const EVAL_THINKING_BUDGET = process.env.EVAL_THINKING_BUDGET != null ? Number(process.env.EVAL_THINKING_BUDGET) : 0;
 const { createDiffImage } = require('./repairVerification');
 
 // Distinct color per figure — high contrast palette, shared between overlay drawing and prompt building
@@ -1391,7 +1404,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // thinkingBudget caps how many of the 32k output tokens Gemini may spend on
     // hidden reasoning. Without a cap, 2.5 Flash has been observed burning the
     // entire budget on thinking (30k+) and emitting truncated JSON → MAX_TOKENS.
-    const callQualityAPI = async (model, thinkingBudget = 8192) => {
+    const callQualityAPI = async (model, thinkingBudget = EVAL_THINKING_BUDGET) => {
       // Route to Grok vision API for xAI models
       const modelConfig = TEXT_MODELS[model];
       if (modelConfig?.provider === 'xai') {
@@ -1406,7 +1419,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             contents: [{ parts }],
             generationConfig: {
               maxOutputTokens: 32000,
-              temperature: 0.3,
+              // Evaluation is a judgment task — temperature 0 minimises the
+              // run-to-run severity/detection swing (same image scored 0 vs 60
+              // on consecutive runs at 0.3). thinkingBudget: 0 disables the
+              // hidden reasoning pass, another variance source for this
+              // structured check. Both env-overridable for A/B.
+              temperature: EVAL_TEMPERATURE,
               thinkingConfig: { thinkingBudget }
             },
             safetySettings: GEMINI_SAFETY_SETTINGS
