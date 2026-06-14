@@ -51,4 +51,31 @@ console.assert(selectBestVersion(zerosByDeduction).source === 'inpaint-round-1',
   'FAIL: among all-zero, fewest-deduction version should win, got ' + selectBestVersion(zerosByDeduction).source);
 console.log('✓ all-zero tie broken by fewest deductions (not index)');
 
+// Case 6 (#1 dedup): the SAME conceptual issue flagged by all three evaluators
+// must count ONCE, not 3×. Without dedup a clean image whose single real error
+// is triple-flagged ranks below a broken image whose errors are unique.
+const { versionDeductionTotal } = require('../../server/lib/scoring.js');
+const tripleFlagged = {
+  scoreBreakdown: {
+    visual:     { issues: [{ severity: 'critical', description: 'The setting is an outdoor exterior, not an indoor corridor' }] },
+    semantic:   { issues: [{ severity: 'critical', description: 'Setting rendered outdoors, not the indoor corridor specified' }] },
+    threeStage: { issues: [{ severity: 'critical', description: 'Scene shows outdoor exterior; should be indoor corridor' }] },
+    entity:     { penalty: 0 },
+  },
+};
+console.assert(versionDeductionTotal(tripleFlagged) === 30,
+  'FAIL: triple-flagged single issue should count once (CRITICAL=30), got ' + versionDeductionTotal(tripleFlagged));
+console.log('✓ same issue across 3 evaluators counts once (30, not 90)');
+
+const twoDistinct = {
+  scoreBreakdown: {
+    visual:     { issues: [{ severity: 'major', description: 'The ceiling is rendered as a cloudy sky' }] },
+    semantic:   { issues: [{ severity: 'major', description: 'Character hands are inside pockets not pressed flat' }] },
+    threeStage: { issues: [] }, entity: { penalty: 0 },
+  },
+};
+console.assert(versionDeductionTotal(twoDistinct) === 40,
+  'FAIL: two distinct MAJOR issues should sum (40), got ' + versionDeductionTotal(twoDistinct));
+console.log('✓ distinct issues still sum (no false-merge)');
+
 console.log('\n✓ all assertions passed');

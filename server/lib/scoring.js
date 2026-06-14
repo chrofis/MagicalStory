@@ -277,44 +277,86 @@ function computeFinalScore(version) {
 // Canonical severity → weight for the un-clamped ranking tiebreak below.
 const RANK_SEVERITY_WEIGHT = { CATASTROPHIC: 50, CRITICAL: 30, MAJOR: 20, MODERATE: 10, MINOR: 5 };
 
+// Words too common to signal that two issue descriptions are about the same
+// thing — stripped before the overlap check below.
+const RANK_STOPWORDS = new Set([
+  'the','and','not','instead','should','with','that','this','have','has','are','being','rendered',
+  'scene','image','prompt','character','characters','specified','expected','expects','declared',
+  'interaction','interactions','shows','show','show n','wrong','incorrect','missing','appears',
+  'must','only','their','they','from','into','onto','toward','towards','than','but','for','his',
+  'her','its','both','one','two','left','right','side','front','back','color','colour','colors',
+]);
+
+function significantWords(desc) {
+  return new Set(
+    String(desc || '').toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/)
+      .filter(w => w.length >= 4 && !RANK_STOPWORDS.has(w))
+  );
+}
+
 /**
- * Un-clamped total weighted deduction for a version, summed across every
- * evaluator's issue list + the entity penalty. This is the RANKING signal
- * that the clamped 0–100 finalScore throws away: once a page accrues >10
+ * Un-clamped total weighted deduction for a version. This is the RANKING
+ * signal the clamped 0–100 finalScore throws away: once a page accrues >100
  * deduction points its finalScore pins to 0, and several failing candidates
- * all read 0 — so pick-best can no longer tell them apart and selection
- * collapses to "earliest version" (pure luck). This number keeps growing
- * past the 0 floor, so the candidate with the FEWEST / LIGHTEST issues still
- * ranks above a more-broken one even when all of them score 0.
+ * all read 0 — pick-best can no longer tell them apart and selection
+ * collapses to "earliest version" (pure luck). This number keeps growing past
+ * the 0 floor, so the candidate with the FEWEST / LIGHTEST DISTINCT issues
+ * still ranks above a more-broken one even when all of them score 0.
  *
- * Lower is better. Returns Infinity when the version has no scoreable data
- * so it never wins a tiebreak by accident.
+ * DEDUPLICATED across evaluators: the visual, semantic, and three-stage evals
+ * overlap heavily — the same conceptual flaw ("wrong setting") gets flagged by
+ * all three, which without dedup counts 3× and lets a clean-but-off-scene
+ * image (one error, triple-counted) rank below a broken-but-on-scene one
+ * (job_1781086474294 p9). Issues whose descriptions share enough significant
+ * words are merged into one cluster scored at its MAX severity. Entity
+ * penalties are per-character consistency, disjoint from scene issues, so they
+ * add as-is.
+ *
+ * Lower is better. Returns Infinity when the version has no scoreable data so
+ * it never wins a tiebreak by accident.
  */
 function versionDeductionTotal(version) {
   if (!version || typeof version !== 'object') return Infinity;
-  let total = 0;
-  let sawAny = false;
-  const addIssues = (issues) => {
-    if (!Array.isArray(issues)) return;
-    for (const i of issues) {
-      sawAny = true;
-      total += RANK_SEVERITY_WEIGHT[String(i?.severity || '').toUpperCase()] ?? 10;
-    }
-  };
   const bd = version.scoreBreakdown;
+  const sceneIssues = [];
+  let entityPenalty = 0;
+  let sawAny = false;
+
   if (bd) {
-    addIssues(bd.visual?.issues);
-    addIssues(bd.semantic?.issues);
-    addIssues(bd.threeStage?.issues);
-    if (typeof bd.entity?.penalty === 'number') { total += bd.entity.penalty; sawAny = true; }
+    for (const cat of ['visual', 'semantic', 'threeStage']) {
+      for (const i of (bd[cat]?.issues || [])) { sceneIssues.push(i); sawAny = true; }
+    }
+    if (typeof bd.entity?.penalty === 'number') { entityPenalty = bd.entity.penalty; sawAny = true; }
   } else {
-    // Fallback to the flat fields a version carries before applyScore folds
-    // them into a breakdown.
-    addIssues(version.fixableIssues);
-    addIssues(version.semanticResult?.semanticIssues || version.semanticResult?.issues);
-    if (typeof version.entityPenalty === 'number') { total += version.entityPenalty; sawAny = true; }
+    for (const i of (version.fixableIssues || [])) { sceneIssues.push(i); sawAny = true; }
+    for (const i of (version.semanticResult?.semanticIssues || version.semanticResult?.issues || [])) { sceneIssues.push(i); sawAny = true; }
+    if (typeof version.entityPenalty === 'number') { entityPenalty = version.entityPenalty; sawAny = true; }
   }
-  return sawAny ? total : Infinity;
+  if (!sawAny) return Infinity;
+
+  // Cluster scene issues by significant-word overlap; each cluster counts once
+  // at its heaviest severity.
+  const weightOf = (i) => RANK_SEVERITY_WEIGHT[String(i?.severity || '').toUpperCase()] ?? 10;
+  const clusters = []; // { words:Set, weight:number }
+  for (const issue of sceneIssues) {
+    const w = significantWords(issue?.description || issue?.problem);
+    const wt = weightOf(issue);
+    let merged = false;
+    for (const c of clusters) {
+      // shared ≥ 2 significant words OR Jaccard ≥ 0.4 → same conceptual issue
+      let shared = 0;
+      for (const word of w) if (c.words.has(word)) shared++;
+      const union = c.words.size + w.size - shared;
+      if (shared >= 2 || (union > 0 && shared / union >= 0.4)) {
+        for (const word of w) c.words.add(word);
+        c.weight = Math.max(c.weight, wt);
+        merged = true;
+        break;
+      }
+    }
+    if (!merged) clusters.push({ words: w, weight: wt });
+  }
+  return clusters.reduce((sum, c) => sum + c.weight, 0) + entityPenalty;
 }
 
 /**
