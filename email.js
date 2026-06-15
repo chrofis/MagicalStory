@@ -191,8 +191,7 @@ function isEmailConfigured() {
 async function getCoverPublicUrl(storyId) {
   if (!storyId) return null;
   try {
-    const { getActiveVersion } = require('./server/lib/versionManager');
-    const { getStoryImage } = require('./server/services/database');
+    const { getActiveVersion, getStoryImage } = require('./server/services/database');
     const activeVersion = await getActiveVersion(storyId, 'frontCover');
     const image = await getStoryImage(storyId, 'frontCover', null, activeVersion);
     return image?.imageUrl || null;
