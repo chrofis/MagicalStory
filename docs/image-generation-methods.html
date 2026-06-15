@@ -88,8 +88,8 @@
   <td><code>editWithGrok(prompt, refImages, options)</code></td>
   <td><code>server/lib/grok.js:153</code></td>
   <td>Grok edit endpoint</td>
-  <td>Prompt (text) + 1–3 reference images (data-URI base64). Options: <code>aspectRatio</code>, <code>model</code> (Standard/Pro), <code>padInput</code> (pad vs crop refs to match output aspect).</td>
-  <td><code>{ imageData, usage, modelId }</code>. Output aspect = input image's aspect (the <code>aspectRatio</code> param controls input-coercion, not output).</td>
+  <td>Prompt (text) + 1–3 reference images (data-URI base64). Options: <code>aspectRatio</code>, <code>model</code> (Standard/Pro), <code>padInput</code> (pad vs crop refs to match output aspect), <code>padInputWithExtension</code> (slot-0 scene plate: magenta-pad + auto-prompt Grok to paint scene continuation into the gap — full-bleed without grey bars).</td>
+  <td><code>{ imageData, usage, modelId }</code>. Output aspect = input image's aspect (the <code>aspectRatio</code> param controls input-coercion, not output). <strong>Aspect quirk:</strong> for page/empty-scene gen the input passes through <code>packReferences</code> FIRST, which would pillarbox a portrait scene plate to square with sampled grey edge bars. <code>padInputWithExtension</code> must be passed to BOTH <code>packReferences</code> (so it leaves slot 0 native) AND <code>editWithGrok</code> (so it magenta-extends) — passing it only to <code>editWithGrok</code> is a no-op here (the cover path, which calls <code>editWithGrok</code> directly, is the exception). See <code>docs/decisions.md</code> → "Scene-plate slot 0 is magenta-extended".</td>
 </tr>
 
 <tr>

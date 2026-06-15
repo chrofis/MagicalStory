@@ -133,6 +133,32 @@ unmonitored alias as the contact point burns user trust on the rare reply.
 
 ## Image generation
 
+### Scene-plate slot 0 is magenta-extended, never gray-pillarboxed (2026-06-16)
+**Context:** A portrait landmark photo (e.g. Baden Altstadt 533×800) used as
+the slot-0 scene anchor for a square (1:1) story got pillarboxed to square by
+`packReferences` using SAMPLED edge colours — grey on a stone-lane photo. Those
+flat-grey bars baked into the empty-scene plate and survived the Grok edit into
+the final page (showcase `job_1781557946649` p8+p9, ~17% bars each side). The
+earlier magenta-extension fix (`02abce7d`) lived inside `editWithGrok`, but the
+page/empty-scene path runs `packReferences` FIRST, which pre-squares slot 0
+before `editWithGrok` sees it — so the magenta step was a no-op there. It only
+ever worked for covers (which call `editWithGrok` directly).
+**Decision:** `padInputWithExtension` is threaded through `packReferences`. When
+slot 0 is a scene plate whose aspect differs from target, `packReferences`
+leaves it at native aspect and `editWithGrok` magenta-pads + extends it (paints
+real scene continuation into the gap). Later slots keep their pad/letterbox
+behaviour. Both `generateImageOnly` Grok branches (imageBackend-routed AND
+modelConfig-routed) pass the flag to `packReferences` as well as `editWithGrok`.
+**Rationale:** Extension preserves the full landmark (no crop, no loss of
+the tower/sky) AND produces full-bleed output. Cropping was rejected because it
+loses landmark detail; gray pillarbox is the bug itself. Verified end-to-end on
+the p8 landmark: before = 17%/17% bars, after = 1%/1% full-bleed.
+**Touched:**
+- `server/lib/grok.js` — `packReferences` accepts `padInputWithExtension`, skips
+  slot-0 pad when set; `editWithGrok` magenta logic unchanged
+- `server/lib/images.js` — both Grok branches in `generateImageOnly` pass the flag
+**Status:** ✅ active.
+
 ### Text-overlay font size never shrinks
 **Context:** Page text gets overlaid on the rendered illustration. Longer
 paragraphs are tempting to shrink so they always fit a fixed box.
