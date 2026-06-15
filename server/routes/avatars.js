@@ -1731,7 +1731,15 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     // produced. We send both as Grok edit references: the body anchors
     // outfit/pose, the face anchors identity (eyes/hair/skin) at full
     // resolution since the face is tiny in the body crop.
-    const { characterId, referencePhoto, facePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = bodyParams;
+    const { characterId, facePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = bodyParams;
+
+    // Mirror the sync endpoint's normalization (see /api/avatars/generate):
+    // referencePhoto is the bg-removed body photo, but the trial account-claim
+    // path only carries a face crop — fall back to facePhoto so it isn't undefined.
+    const referencePhoto = bodyParams.referencePhoto || facePhoto;
+    if (!referencePhoto) {
+      throw new Error(`[AVATAR JOB ${jobId}] No referencePhoto or facePhoto provided`);
+    }
 
     // Import the actual generation logic (reuse from sync path)
     // For now, we'll make a simplified version that calls the same helpers
