@@ -931,7 +931,7 @@ async function packReferences(refs = {}, options = {}) {
     sceneBackground = null,
     textAreaMask = null, // Pre-built black/white mask for empty scene text area
   } = refs;
-  const { aspectRatio = '1:1', pageLabel = '' } = options;
+  const { aspectRatio = '1:1', pageLabel = '', padInputWithExtension = false } = options;
   const tag = pageLabel ? `[GROK P${pageLabel}]` : '[GROK]';
 
   // Extract character photo buffers as raw data — the layout function decides
@@ -1206,6 +1206,17 @@ async function packReferences(refs = {}, options = {}) {
     if (Math.abs(currentRatio - targetRatio) / targetRatio < TOLERANCE) {
       paddedSlots.push(slot);
       log.debug(`🎨 ${tag} Slot ${i + 1}: ${w}x${h} already matches target ${aspectRatio}`);
+      continue;
+    }
+
+    // Scene-plate slot 0 with extension requested: leave it at native aspect so
+    // editWithGrok magenta-pads + extends it (paints scene continuation into the
+    // gap). Pillarboxing it here with sampled edge colours bakes flat grey bars
+    // into the plate that survive the edit into the empty scene and every page
+    // built on it. Only slot 0 is the scene plate; later slots keep padding.
+    if (padInputWithExtension && i === 0) {
+      paddedSlots.push(slot);
+      log.debug(`🎨 ${tag} Slot 1: native ${w}x${h} kept for editWithGrok magenta-extension`);
       continue;
     }
 

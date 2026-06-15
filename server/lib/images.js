@@ -4402,14 +4402,20 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     }
 
     try {
+      // When slot 0 is a scene plate (empty-scene landmark photo, previous full
+      // scene, or sceneBackground) whose aspect differs from target, packReferences
+      // leaves it native-aspect and editWithGrok magenta-extends it — instead of
+      // pillarboxing it with sampled gray edge bars that bake into the empty scene
+      // and every page built on it. Both calls must share the flag.
+      const slot0IsScenePlate = !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
       const refImages = await packReferences(
         { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask },
-        { aspectRatio, pageLabel: pageNumber != null ? String(pageNumber) : '' }
+        { aspectRatio, pageLabel: pageNumber != null ? String(pageNumber) : '', padInputWithExtension: slot0IsScenePlate }
       );
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(grokPrompt, refImages, { model: GROK_MODELS.STANDARD, aspectRatio });
+        result = await editWithGrok(grokPrompt, refImages, { model: GROK_MODELS.STANDARD, aspectRatio, padInputWithExtension: slot0IsScenePlate });
       } else {
         result = await generateWithGrok(grokPrompt, { model: GROK_MODELS.STANDARD, aspectRatio });
       }
@@ -4644,21 +4650,21 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
     try {
       const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
+      // Magenta-extension on slot 0 when the primary input is a scene-type plate
+      // (landmark photo, previous full scene, or sceneBackground). These have full
+      // backgrounds whose aspect rarely matches target (Wikipedia landscape → A4
+      // portrait, etc); without extension packReferences pillarboxes it with sampled
+      // gray bars and Grok composes for the wrong aspect. packReferences leaves slot 0
+      // native so editWithGrok extends it. Skip when slot 0 is a character-only ref
+      // (avatars are tall portraits that keep their existing white-letterbox behavior).
+      const slot0IsScenePlate = !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
       const refImages = await packReferences(
         { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
-        { aspectRatio, pageLabel: pageNumber != null ? String(pageNumber) : '' }
+        { aspectRatio, pageLabel: pageNumber != null ? String(pageNumber) : '', padInputWithExtension: slot0IsScenePlate }
       );
 
       let result;
       if (refImages.length > 0) {
-        // Magenta-extension on slot 0 when the primary input is a scene-type plate
-        // (landmark photo, previous full scene, or sceneBackground). These have full
-        // backgrounds whose aspect rarely matches target (Wikipedia landscape → A4
-        // portrait, etc); without extension Grok composes for the input's native
-        // aspect and pads the output with blurred edge bars. Skip when slot 0 is
-        // a character-only ref (avatars are tall portraits that should keep their
-        // existing white-letterbox behavior).
-        const slot0IsScenePlate = !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
         result = await editWithGrok(effectivePrompt, refImages, {
           model: grokModel,
           aspectRatio,
