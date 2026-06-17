@@ -32,18 +32,23 @@ const strings: Record<string, {
   next: string;
   nextNoPhoto: string;
   nextNoDetails: string;
-  consent1: string;
-  consent2: string;
+  continueLabel: string;
+  back: string;
+  consentBefore: string;
   termsLink: string;
-  and: string;
+  consentMiddle: string;
   privacyLink: string;
-  consentPeriod: string;
+  consentAfter: string;
   pleaseAccept: string;
   selectFace: string;
   noFaceDetected: string;
   multipleFaces: string;
   photoError: string;
   photoUploaded: string;
+  traitsOptional: string;
+  avatarReward: string;
+  avatarRewardChild: string;
+  avatarCreating: string;
 }> = {
   en: {
     title: 'Create Your Hero',
@@ -66,18 +71,23 @@ const strings: Record<string, {
     next: 'Next',
     nextNoPhoto: 'Add photo and details to continue',
     nextNoDetails: 'Add details to continue',
-    consent1: 'I confirm I have the right to use the uploaded photos and, for photos of minors, I am the parent/guardian or have obtained their consent.',
-    consent2: 'I agree to the',
+    continueLabel: 'Continue',
+    back: 'Back',
+    consentBefore: "I'm the child's parent or guardian (or have their consent), and I accept the ",
     termsLink: 'Terms of Service',
-    and: 'and',
+    consentMiddle: ' and ',
     privacyLink: 'Privacy Policy',
-    consentPeriod: ', including the processing of these photos by AI to create illustrated avatars.',
+    consentAfter: ', including AI processing of the photo to create avatars.',
     pleaseAccept: 'Please accept the terms above to upload a photo',
     selectFace: 'Select the correct face',
     noFaceDetected: 'No face detected. Please try a different photo.',
     multipleFaces: 'Multiple faces detected. Please select the correct one.',
     photoError: 'Failed to analyze photo. Please try again.',
     photoUploaded: 'Photo uploaded',
+    traitsOptional: 'optional — skip if you like',
+    avatarReward: "Here's {name} as a character!",
+    avatarRewardChild: 'Here\'s your child as a character!',
+    avatarCreating: 'Creating your character…',
   },
   de: {
     title: 'Erstelle deinen Helden',
@@ -100,18 +110,23 @@ const strings: Record<string, {
     next: 'Weiter',
     nextNoPhoto: 'Foto und Details hinzufügen, um fortzufahren',
     nextNoDetails: 'Details hinzufügen, um fortzufahren',
-    consent1: 'Ich bestätige, dass ich das Recht habe, die hochgeladenen Fotos zu verwenden, und bei Fotos von Minderjährigen bin ich der Elternteil/Vormund oder habe deren Zustimmung eingeholt.',
-    consent2: 'Ich stimme den',
-    termsLink: 'Nutzungsbedingungen',
-    and: 'und der',
-    privacyLink: 'Datenschutzrichtlinie',
-    consentPeriod: ' zu, einschliesslich der Verarbeitung dieser Fotos durch KI zur Erstellung illustrierter Avatare.',
+    continueLabel: 'Weiter',
+    back: 'Zurück',
+    consentBefore: 'Ich bin Elternteil/erziehungsberechtigt (oder habe die Zustimmung) und akzeptiere die ',
+    termsLink: 'AGB',
+    consentMiddle: ' und ',
+    privacyLink: 'Datenschutzerklärung',
+    consentAfter: ', einschliesslich der KI-Verarbeitung des Fotos zur Erstellung von Avataren.',
     pleaseAccept: 'Bitte akzeptieren Sie die obigen Bedingungen, um ein Foto hochzuladen',
     selectFace: 'Wähle das richtige Gesicht',
     noFaceDetected: 'Kein Gesicht erkannt. Bitte versuche ein anderes Foto.',
     multipleFaces: 'Mehrere Gesichter erkannt. Bitte wähle das richtige aus.',
     photoError: 'Foto konnte nicht analysiert werden. Bitte versuche es erneut.',
     photoUploaded: 'Foto hochgeladen',
+    traitsOptional: 'optional — kannst du überspringen',
+    avatarReward: 'Hier ist {name} als Figur!',
+    avatarRewardChild: 'Hier ist dein Kind als Figur!',
+    avatarCreating: 'Deine Figur wird erstellt…',
   },
   fr: {
     title: 'Créez votre héros',
@@ -134,18 +149,62 @@ const strings: Record<string, {
     next: 'Suivant',
     nextNoPhoto: 'Ajoute photo et détails pour continuer',
     nextNoDetails: 'Ajoute les détails pour continuer',
-    consent1: 'Je confirme que j\'ai le droit d\'utiliser les photos téléchargées et, pour les photos de mineurs, je suis le parent/tuteur ou j\'ai obtenu leur consentement.',
-    consent2: 'J\'accepte les',
-    termsLink: 'Conditions d\'Utilisation',
-    and: 'et la',
-    privacyLink: 'Politique de Confidentialité',
-    consentPeriod: ', y compris le traitement de ces photos par l\'IA pour créer des avatars illustrés.',
+    continueLabel: 'Continuer',
+    back: 'Retour',
+    consentBefore: "Je suis le parent ou le tuteur de l'enfant (ou j'ai son consentement) et j'accepte les ",
+    termsLink: "Conditions d'utilisation",
+    consentMiddle: ' et la ',
+    privacyLink: 'Politique de confidentialité',
+    consentAfter: ', y compris le traitement de la photo par IA pour créer des avatars.',
     pleaseAccept: 'Veuillez accepter les conditions ci-dessus pour télécharger une photo',
     selectFace: 'Sélectionnez le bon visage',
     noFaceDetected: 'Aucun visage détecté. Veuillez essayer une autre photo.',
     multipleFaces: 'Plusieurs visages détectés. Veuillez sélectionner le bon.',
     photoError: "Échec de l'analyse de la photo. Veuillez réessayer.",
     photoUploaded: 'Photo téléchargée',
+    traitsOptional: 'optionnel — tu peux passer',
+    avatarReward: 'Voici {name} en personnage !',
+    avatarRewardChild: 'Voici votre enfant en personnage !',
+    avatarCreating: 'Création de votre personnage…',
+  },
+  it: {
+    title: 'Crea il tuo eroe',
+    photoTitle: 'Carica una foto',
+    photoHint: 'Carica una foto del tuo bambino',
+    photoGuidelines: 'Il viso e la parte superiore del corpo devono essere visibili',
+    dropOrClick: 'Trascina una foto o clicca per caricare',
+    analyzing: 'Analisi della foto...',
+    changePhoto: 'Cambia foto',
+    nameLabel: 'Nome',
+    namePlaceholder: 'Nome del bambino',
+    ageLabel: 'Età',
+    agePlaceholder: 'es. 5',
+    genderLabel: 'Sesso',
+    boy: 'Maschio',
+    girl: 'Femmina',
+    traitsLabel: 'Caratteristiche',
+    customTraitsLabel: 'Ulteriori caratteristiche',
+    customTraitsPlaceholder: 'Ama i dinosauri, ha paura del buio, ha una sorellina...',
+    next: 'Avanti',
+    nextNoPhoto: 'Aggiungi foto e dettagli per continuare',
+    nextNoDetails: 'Aggiungi i dettagli per continuare',
+    continueLabel: 'Continua',
+    back: 'Indietro',
+    consentBefore: 'Sono il genitore o il tutore del bambino (o ho il suo consenso) e accetto i ',
+    termsLink: 'Termini di servizio',
+    consentMiddle: " e l'",
+    privacyLink: 'Informativa sulla privacy',
+    consentAfter: ', inclusa l\'elaborazione della foto tramite IA per creare avatar.',
+    pleaseAccept: 'Accetta le condizioni qui sopra per caricare una foto',
+    selectFace: 'Seleziona il viso corretto',
+    noFaceDetected: 'Nessun viso rilevato. Prova con un\'altra foto.',
+    multipleFaces: 'Rilevati più visi. Seleziona quello corretto.',
+    photoError: 'Impossibile analizzare la foto. Riprova.',
+    photoUploaded: 'Foto caricata',
+    traitsOptional: 'opzionale — puoi saltare',
+    avatarReward: 'Ecco {name} come personaggio!',
+    avatarRewardChild: 'Ecco il tuo bambino come personaggio!',
+    avatarCreating: 'Creazione del tuo personaggio…',
   },
 };
 
@@ -189,12 +248,16 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
     });
   }, []);
 
-  // Consent state — once both are checked and a photo is uploaded, don't ask again
+  // Two-phase flow internal to this step: 'photo' (consent + upload + avatar
+  // reward) then 'details' (name/gender/age/traits). The wizard's STEPS array
+  // and progress bar are unchanged — this split is purely local.
+  const [phase, setPhase] = useState<'photo' | 'details'>('photo');
+
+  // Consent state — once checked and a photo is uploaded, don't ask again.
   // consentGiven is stored in characterData (parent state) so it survives component remounts
-  const [consent1Checked, setConsent1Checked] = useState(false);
-  const [consent2Checked, setConsent2Checked] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
   const hasConsented = !!characterData.consentGiven;
-  const canUpload = hasConsented || (consent1Checked && consent2Checked);
+  const canUpload = hasConsented || consentChecked;
 
   // Keep a ref to the latest characterData so async callbacks don't use stale closures
   const characterDataRef = useRef(characterData);
@@ -612,18 +675,46 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
-  return (
-    <div className="max-w-4xl mx-auto pt-4">
-      <h2 className="text-2xl font-bold text-gray-900 text-center mb-6">{t.title}</h2>
+  // Avatar reward / progress element. Shown prominently on the 'photo' phase
+  // (size="large") and smaller on the 'details' phase (size="small").
+  const renderAvatarReward = (size: 'large' | 'small') => {
+    if (!hasPhoto) return null;
+    if (!previewAvatar && !isGeneratingAvatar) return null;
+    const imgSize = size === 'large' ? 'w-40 h-40' : 'w-20 h-20';
+    const rewardLabel = characterData.name.trim()
+      ? t.avatarReward.replace('{name}', characterData.name.trim())
+      : t.avatarRewardChild;
+    return (
+      <div className="flex flex-col items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+        {isGeneratingAvatar && !previewAvatar ? (
+          <>
+            <div className={`${imgSize} rounded-2xl bg-indigo-50 flex items-center justify-center`}>
+              <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+            </div>
+            <p className="text-sm text-indigo-500 font-medium">{t.avatarCreating}</p>
+          </>
+        ) : previewAvatar ? (
+          <>
+            <img
+              src={previewAvatar}
+              alt={rewardLabel}
+              className={`${imgSize} rounded-2xl object-cover border-2 border-indigo-200`}
+            />
+            <p className="text-sm font-semibold text-indigo-600 text-center">{rewardLabel}</p>
+          </>
+        ) : null}
+      </div>
+    );
+  };
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
-        {/* ── Left column: Photo upload ─────────────────────────────────── */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">{t.photoTitle}</label>
-          <p className="text-sm text-gray-500 mb-3">{t.photoHint}</p>
+  // ── Photo upload block (consent + dropzone + face picker) ──────────────────
+  const photoUploadBlock = (
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">{t.photoTitle}</label>
+      <p className="text-sm text-gray-500 mb-3">{t.photoHint}</p>
 
-          {/* Face selection UI (multiple faces detected) */}
-          {detectedFaces.length > 0 && (
+      {/* Face selection UI (multiple faces detected) */}
+      {detectedFaces.length > 0 && (
             <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <p className="text-sm font-medium text-amber-800 mb-3">{t.multipleFaces}</p>
               <div className="flex flex-wrap gap-3 justify-center">
@@ -650,40 +741,21 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
             </div>
           )}
 
-          {/* Consent checkboxes - shown before first upload only.
-              Uses role=checkbox + aria-checked + Space/Enter keyboard
-              handler so screen-reader and keyboard-only users can
-              interact — without these, VoiceOver/NVDA see a plain div
-              and keyboard users can't tab to it. */}
+          {/* Single consent checkbox - shown before first upload only.
+              Combines the parent/guardian attestation and the Terms/Privacy +
+              AI-processing acceptance into one statement. Uses role=checkbox +
+              aria-checked + Space/Enter keyboard handler so screen-reader and
+              keyboard-only users can interact — without these, VoiceOver/NVDA
+              see a plain div and keyboard users can't tab to it. */}
           {!hasPhoto && !hasConsented && (
-            <div className="bg-white rounded-lg p-4 mb-4 space-y-3 border border-gray-200">
+            <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
               <div
                 role="checkbox"
-                aria-checked={consent1Checked}
-                tabIndex={0}
-                onClick={() => setConsent1Checked(!consent1Checked)}
-                onKeyDown={(e) => {
-                  if (e.key === ' ' || e.key === 'Enter') {
-                    e.preventDefault();
-                    setConsent1Checked(!consent1Checked);
-                  }
-                }}
-                className="flex items-start gap-3 cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded"
-              >
-                <span className="flex-shrink-0 mt-0.5 text-indigo-500 hover:text-indigo-800">
-                  {consent1Checked ? <CheckSquare size={20} /> : <Square size={20} />}
-                </span>
-                <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                  {t.consent1}
-                </span>
-              </div>
-              <div
-                role="checkbox"
-                aria-checked={consent2Checked}
+                aria-checked={consentChecked}
                 tabIndex={0}
                 onClick={(e) => {
                   if ((e.target as HTMLElement).tagName !== 'A') {
-                    setConsent2Checked(!consent2Checked);
+                    setConsentChecked(!consentChecked);
                   }
                 }}
                 onKeyDown={(e) => {
@@ -692,24 +764,24 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                   if ((e.target as HTMLElement).tagName === 'A') return;
                   if (e.key === ' ' || e.key === 'Enter') {
                     e.preventDefault();
-                    setConsent2Checked(!consent2Checked);
+                    setConsentChecked(!consentChecked);
                   }
                 }}
                 className="flex items-start gap-3 cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded"
               >
                 <span className="flex-shrink-0 mt-0.5 text-indigo-500 hover:text-indigo-800">
-                  {consent2Checked ? <CheckSquare size={20} /> : <Square size={20} />}
+                  {consentChecked ? <CheckSquare size={20} /> : <Square size={20} />}
                 </span>
                 <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                  {t.consent2}{' '}
+                  {t.consentBefore}
                   <Link to="/terms" className="text-indigo-500 hover:underline">
                     {t.termsLink}
-                  </Link>{' '}
-                  {t.and}{' '}
+                  </Link>
+                  {t.consentMiddle}
                   <Link to="/privacy" className="text-indigo-500 hover:underline">
                     {t.privacyLink}
                   </Link>
-                  {t.consentPeriod}
+                  {t.consentAfter}
                 </span>
               </div>
             </div>
@@ -779,10 +851,12 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
           {!hasPhoto && !hasConsented && !canUpload && (
             <p className="mt-2 text-sm text-amber-600 text-center">{t.pleaseAccept}</p>
           )}
-        </div>
+    </div>
+  );
 
-        {/* ── Right column: Character details ───────────────────────────── */}
-        <div>
+  // ── Character details block (name / gender / age / traits) ─────────────────
+  const detailsBlock = (
+    <div>
           {/* Name */}
           <div className="mb-5">
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.nameLabel} <span className="text-red-400">*</span></label>
@@ -837,9 +911,11 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
             </div>
           </div>
 
-          {/* Traits */}
+          {/* Traits — optional, never gates Next */}
           <div className="mb-5">
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.traitsLabel}</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              {t.traitsLabel} <span className="font-normal text-gray-400">({t.traitsOptional})</span>
+            </label>
             <div className="flex flex-wrap gap-2">
               {(defaultStrengths[language as Language] || defaultStrengths.en).map((trait) => (
                 <button
@@ -869,51 +945,93 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
               className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-gray-900 placeholder-gray-400 resize-none"
             />
           </div>
-        </div>
-      </div>
+    </div>
+  );
 
-      {/* Avatar generation error */}
-      {avatarError && (
-        <p className="mt-4 text-sm text-red-600 text-center">{avatarError}</p>
+  // Shared button styling for the primary CTA on both phases.
+  const ctaClass = (enabled: boolean) =>
+    `w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all ${
+      enabled
+        ? 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-200'
+        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+    }`;
+
+  return (
+    <div className="max-w-4xl mx-auto pt-4">
+      <h2 className="text-2xl font-bold text-gray-900 text-center mb-6">{t.title}</h2>
+
+      {phase === 'photo' ? (
+        // ── Phase 1: consent + photo upload + avatar reward ─────────────────
+        <div className="max-w-md mx-auto space-y-6">
+          {photoUploadBlock}
+
+          {renderAvatarReward('large')}
+
+          {/* Continue → details phase (enabled once a photo exists) */}
+          <button
+            onClick={() => setPhase('details')}
+            disabled={!hasPhoto}
+            className={ctaClass(!!hasPhoto)}
+          >
+            {t.continueLabel}
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        // ── Phase 2: small avatar + name/gender/age/traits + Next ───────────
+        <div className="max-w-md mx-auto space-y-6">
+          {/* Back to photo phase (does NOT call the wizard onBack) */}
+          <button
+            onClick={() => setPhase('photo')}
+            className="text-sm text-gray-500 hover:text-indigo-600 flex items-center gap-1 transition-colors"
+          >
+            <ArrowRight className="w-4 h-4 rotate-180" />
+            {t.back}
+          </button>
+
+          {renderAvatarReward('small')}
+
+          {detailsBlock}
+
+          {/* Avatar generation error */}
+          {avatarError && (
+            <p className="text-sm text-red-600 text-center">{avatarError}</p>
+          )}
+
+          {/* Next button — wired to handleNext (unchanged) */}
+          <button
+            onClick={handleNext}
+            disabled={!canProceed || isCreatingAccount}
+            className={ctaClass(!!canProceed && !isCreatingAccount)}
+          >
+            {isCreatingAccount ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+              </>
+            ) : isGeneratingAvatar && canProceed ? (
+              // Avatar prewarm running but all required fields filled — button
+              // is enabled, label reflects the background work that's finishing.
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>{characterData.name || '...'} {language === 'de' ? 'wird erstellt' : language === 'fr' ? 'en cours de création' : language === 'it' ? 'in fase di creazione' : 'is being created'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            ) : !canProceed ? (
+              // Button is disabled because required fields are missing — tell
+              // the user what's outstanding instead of a plain greyed-out "Weiter".
+              <span>{!hasPhoto ? t.nextNoPhoto : t.nextNoDetails}</span>
+            ) : (
+              <>
+                {t.next}
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </div>
       )}
 
-      {/* Next button — full width below both columns */}
-      <div className="mt-6">
-        <button
-          onClick={handleNext}
-          disabled={!canProceed || isCreatingAccount}
-          className={`w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all ${
-            canProceed && !isCreatingAccount
-              ? 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-200'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          {isCreatingAccount ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-            </>
-          ) : isGeneratingAvatar && canProceed ? (
-            // Avatar prewarm running but all required fields filled — button
-            // is enabled, label reflects the background work that's finishing.
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>{characterData.name || '...'} {language === 'de' ? 'wird erstellt' : language === 'fr' ? 'en cours de création' : 'is being created'}</span>
-              <ArrowRight className="w-4 h-4" />
-            </>
-          ) : !canProceed ? (
-            // Button is disabled because required fields are missing — tell
-            // the user what's outstanding instead of a plain greyed-out "Weiter".
-            <span>{!hasPhoto ? t.nextNoPhoto : t.nextNoDetails}</span>
-          ) : (
-            <>
-              {t.next}
-              <ArrowRight className="w-4 h-4" />
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Invisible Turnstile widget for bot protection */}
+      {/* Invisible Turnstile widget for bot protection — mounted on BOTH
+          phases (needed for account creation which fires on canProceed). */}
       {TURNSTILE_SITE_KEY && (
         <Turnstile
           ref={turnstileRef}
