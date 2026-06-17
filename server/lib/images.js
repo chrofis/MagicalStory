@@ -1463,10 +1463,21 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.info(`[QUALITY] ${pageLabel}Gemini safety block (${reason}), retrying with sanitization...`);
       log.debug(`[QUALITY] ${pageLabel}Safety details: prompt=[${promptSafety}], candidate=[${candSafety}]`);
 
-      // Step 1: Retry with full sanitization (strips all gender/age nouns)
+      // Step 1: Retry with full sanitization (strips all gender/age nouns).
+      // Go through buildEvaluationPrompt so the retry keeps the same four-block
+      // contract as the primary path — a raw fillTemplate here dropped
+      // SCENE_INTENT + FIGURE_PROPORTIONS, leaving the safety-retry eval blind
+      // to scene intent and proportion expectations on exactly the pages a
+      // safety block forced us to re-run.
       const fullSanitized = sanitizeForGemini(originalPrompt, 'full');
+      const { buildEvaluationPrompt } = require('../services/prompts');
       const fullEvalPrompt = evaluationTemplate
-        ? fillTemplate(evaluationTemplate, { ORIGINAL_PROMPT: fullSanitized, INTERACTIONS_BLOCK: interactionsBlock })
+        ? buildEvaluationPrompt({
+            originalPrompt: fullSanitized,
+            interactionsBlock,
+            figureProportions: figureProportionsBlock,
+            sceneIntent: sceneIntentBlock,
+          })
         : evaluationPrompt;
       parts[parts.length - 1] = { text: fullEvalPrompt };
       try {

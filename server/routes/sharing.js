@@ -660,11 +660,26 @@ async function ogImageHandler(req, res) {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
 
+    // getStoryImage returns { imageData, imageUrl } — post-R2-migration the
+    // bytes live at imageUrl and image_data is NULL, so reading imageData alone
+    // returns nothing and the OG preview 404s for every story. Resolve base64
+    // from either source: inline data first, else fetch the R2 URL.
+    const { bytesFromAnyImage } = require('../lib/r2');
+    const resolveCoverB64 = async (result) => {
+      if (!result) return null;
+      if (result.imageData) return result.imageData.replace(/^data:image\/\w+;base64,/, '');
+      if (result.imageUrl) {
+        const buf = await bytesFromAnyImage(result.imageUrl);
+        if (buf) return buf.toString('base64');
+      }
+      return null;
+    };
+
     log.debug(`[OG-IMAGE] Fetching frontCover for story ${storyId}`);
     // Use the active version (user-selected), not always version 0
     const activeFrontCoverVersion = await getActiveVersion(storyId, 'frontCover');
     const coverImageResult = await getStoryImage(storyId, 'frontCover', null, activeFrontCoverVersion);
-    let coverImage = coverImageResult?.imageData?.replace(/^data:image\/\w+;base64,/, '') || null;
+    let coverImage = await resolveCoverB64(coverImageResult);
 
     if (coverImage) {
       log.debug(`[OG-IMAGE] Found frontCover in story_images table (${coverImage.length} chars)`);
@@ -695,8 +710,8 @@ async function ogImageHandler(req, res) {
       log.debug(`[OG-IMAGE] No cover found, trying first page image...`);
       const activePage1Version = await getActiveVersion(storyId, 1);
       const pageImageResult = await getStoryImage(storyId, 'scene', 1, activePage1Version);
-      if (pageImageResult?.imageData) {
-        coverImage = pageImageResult.imageData.replace(/^data:image\/\w+;base64,/, '');
+      coverImage = await resolveCoverB64(pageImageResult);
+      if (coverImage) {
         log.debug(`[OG-IMAGE] Using page 1 image as fallback (${coverImage.length} chars)`);
       }
     }
