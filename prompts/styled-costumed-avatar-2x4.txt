@@ -1,4 +1,4 @@
-Create a reference sheet showing the SAME person in 8 panels arranged as 2 rows and 4 columns. Equal panel sizes. Light grey studio background.
+Create a reference sheet showing the SAME person in 8 panels arranged as 2 rows and 4 columns. Equal panel sizes. Light grey studio background. Each panel is self-contained: the figure, hair, limbs, shadow, and any clothing graphic stay fully inside their own panel, with plain light-grey gutters between panels that nothing touches or crosses.
 
 Row 1 (top) — face only (forehead to chin), in the ORIGINAL reference photo's style. No shoulders, no clothing visible.
   Panel 1: face front. Panel 2: face turned 45° to camera's right. Panel 3: face profile (90° right). Panel 4: back of head.
