@@ -380,19 +380,36 @@ async function deleteStoryArtefacts(storyId) {
  *
  * Returns Buffer on success, null on failure.
  */
-async function fetchImageBytes(url) {
+// Wikimedia (and good practice generally) rate-limits requests that carry no
+// descriptive User-Agent — a bare fetch() to upload.wikimedia.org gets an
+// immediate 429. Send a real UA on every fetch (harmless for our own R2 URLs).
+const IMG_FETCH_UA = 'MagicalStory/1.0 (https://magicalstory.ch; contact@magicalstory.ch) Node.js';
+
+async function fetchImageBytes(url, { retries = 3 } = {}) {
   if (!url) return null;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(url, { headers: { 'User-Agent': IMG_FETCH_UA } });
+      if (res.ok) return Buffer.from(await res.arrayBuffer());
+      // 429 (rate limit) / 503: back off and retry. Honour Retry-After when
+      // present, else exponential backoff with jitter so a burst of retries
+      // doesn't fire in lockstep (thundering herd).
+      if ((res.status === 429 || res.status === 503) && attempt < retries) {
+        const ra = Number(res.headers.get('retry-after'));
+        const wait = (Number.isFinite(ra) && ra > 0 ? ra * 1000 : 600 * 2 ** attempt) + Math.floor(Math.random() * 400);
+        await new Promise((r) => setTimeout(r, Math.min(wait, 10000)));
+        continue;
+      }
       log.warn(`[R2] fetchImageBytes ${url}: HTTP ${res.status}`);
       return null;
+    } catch (err) {
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 600 * 2 ** attempt + Math.floor(Math.random() * 400)));
+        continue;
+      }
+      log.warn(`[R2] fetchImageBytes ${url}: ${err.message}`);
+      return null;
     }
-    const arr = await res.arrayBuffer();
-    return Buffer.from(arr);
-  } catch (err) {
-    log.warn(`[R2] fetchImageBytes ${url}: ${err.message}`);
-    return null;
   }
 }
 
