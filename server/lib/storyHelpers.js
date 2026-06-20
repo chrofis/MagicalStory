@@ -4665,6 +4665,23 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       characterReferenceList += `\n${heightDescription}\n`;
       log.debug(`[IMAGE PROMPT] Added relative heights: ${heightDescription}`);
     }
+
+    // Age proportions per character — load-bearing and cheap (~60 chars each).
+    // The full physical block was dropped above (prose carries it), but the
+    // prose routinely omits age, and there is no relative-height signal for a
+    // solo character — so a 1-year-old infant came through with NO size cue and
+    // rendered as a toddler/preschooler. Worse, a freely-edited story idea
+    // ("a 1-year-old who dives off a bridge") gives the model action cues that
+    // imply an older child. This explicit proportion anchor counters that.
+    const ageCueLines = [];
+    for (const c of sceneCharacters) {
+      const ageMarkers = extractCharacterVisualProfile(c).ageMarkers;
+      if (ageMarkers) ageCueLines.push(`- ${c.name}: ${ageMarkers}`);
+    }
+    if (ageCueLines.length > 0) {
+      characterReferenceList += `\nAGE & PROPORTIONS (render each character at their real age, regardless of the action described):\n${ageCueLines.join('\n')}\n`;
+      log.debug(`[IMAGE PROMPT] Added age proportions for ${ageCueLines.length} character(s)`);
+    }
   }
 
   // (Removed 2026-06-09) SECONDARY CHARACTERS IN THIS SCENE block — was
