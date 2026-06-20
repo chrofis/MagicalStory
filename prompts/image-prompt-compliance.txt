@@ -27,6 +27,7 @@ If ORIGINAL_PROMPT names a character who has no entry in QUALITY_FIGURES.matches
 - Are all requested objects/animals/landmarks present per VISION_INVENTORY?
 - Supporting figures the prompt explicitly places with a role and location (guards inside a vehicle, a sentry at a gate, a crowd surrounding the hero) entirely missing from the inventory → MAJOR. Ambient decoration ("a few passersby", "busy street") absent → no deduction.
 - Is the setting/environment correct?
+- Implausible placement: if VISION_INVENTORY's standing-surface or physics check reports a figure standing where a person would not stand — in water, inside a fountain/pond/basin, inside a solid object, on furniture, or floating — and the prompt did not call for it, flag it `implausible_placement` CRITICAL for a named character.
 
 ---
 
@@ -69,7 +70,7 @@ If the inventory is roughly compatible with the declared action, do not deduct. 
 **STEP 4: SCORING (0-10)**
 
 Start at 10:
-- CRITICAL (-3): Missing character (per STEP 1 matching — no inventory figure matches on age + clothing colour), clothing completely wrong TYPE (modern vs medieval/costume), declared interaction object missing or in a genuinely different category (held-vs-pocket-vs-on-head — NOT left arm vs right arm), extra limbs, floating figure, `wrong_action` (main beat intent contradicted by inventory — e.g. prompt says offering, inventory shows aiming; never based on direction of travel inferred from a mid-motion pose)
+- CRITICAL (-3): Missing character (per STEP 1 matching — no inventory figure matches on age + clothing colour), clothing completely wrong TYPE (modern vs medieval/costume), declared interaction object missing or in a genuinely different category (held-vs-pocket-vs-on-head — NOT left arm vs right arm), extra limbs, floating figure, `implausible_placement` (a named figure standing in water, inside a fountain/pond/basin, or inside a solid object the scene did not call for), `wrong_action` (main beat intent contradicted by inventory — e.g. prompt says offering, inventory shows aiming; never based on direction of travel inferred from a mid-motion pose)
 - MAJOR (-2): Character facing the wrong way for a DECLARED INTERACTION (e.g. two characters declared as interacting but facing away from each other; character declared as watching a named object but looking elsewhere), wrong clothing color, wrong age appearance, cross-eyes
 - MODERATE (-1): Minor clothing detail, key object missing
 - MINOR (-0.5): Small differences

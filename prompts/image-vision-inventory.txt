@@ -9,6 +9,7 @@ For EACH human figure:
 - What they hold in each hand (or nothing)
 - Expression (if face visible)
 - Approximate age group (child/teenager/adult/elderly)
+- Standing surface: name the surface the feet / lower body rest on or in (cobblestones, floor, grass, sand, water, snow, a boat deck, inside a fountain/pond/basin, a rooftop, etc.), or "mid-air" if not touching a surface
 
 For EACH notable object, animal, or vehicle:
 - What it is
@@ -26,5 +27,6 @@ Physics check:
 - Does any figure have more than 2 arms or 2 legs?
 - Are all figures and objects grounded on surfaces (not floating)?
 - Any body parts merged, detached, or phasing through objects?
+- Is any figure standing somewhere a person would not normally stand — in water, inside a fountain/pond/basin, inside a solid object, on top of furniture or a fragile surface, or floating? Name the figure and where.
 
 Output as structured free text, not JSON. Be precise and factual.
