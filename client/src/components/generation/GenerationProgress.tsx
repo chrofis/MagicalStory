@@ -382,11 +382,17 @@ export function GenerationProgress({
 
   const [displayProgress, setDisplayProgress] = useState(1);
   const targetRef = useRef(1);
+  // The NEXT checkpoint's mapped percent — the bar creeps toward it (minus a
+  // small margin) while it waits, so it is never frozen during a long phase.
+  // Read from a ref so the interval (deps [isDone]) always sees the fresh value
+  // without being recreated. Both are monotonic (checkpoints only advance).
+  const nextTargetRef = useRef(3);
 
-  // Update target when checkpoint changes
+  // Update targets when checkpoint changes
   if (targetPercent > targetRef.current) {
     targetRef.current = targetPercent;
   }
+  nextTargetRef.current = Math.max(nextTargetRef.current, Math.min(checkpointToPercent(serverCheckpoint + 1), 99));
 
   useEffect(() => {
     if (isDone) { setDisplayProgress(100); return; }
@@ -404,26 +410,30 @@ export function GenerationProgress({
       setDisplayProgress(prev => {
         const target = targetRef.current;
         const gap = target - prev;
-        if (gap <= 0) return prev; // already at target — wait for next checkpoint
 
-        // Large checkpoint leaps (text done → quality-eval start = +25, scenes
-        // → covers done = +18) used to crawl at 0.5%/tick which made the main
-        // bar visibly trail the nav bar by tens of seconds. Snap when the gap
-        // is wide enough that the lag is the message itself — bar stays
-        // smooth for small refinements (~1-3 points between sub-steps).
-        const SNAP_GAP = 12;
-        if (gap >= SNAP_GAP) return target;
-
-        // Adaptive step for small gaps — bar feels alive without dragging.
-        let step: number;
-        if (gap < 3) {
-          step = 0.3;
-        } else if (gap < 6) {
-          step = 0.6;
-        } else {
-          step = 1.0;
+        // Below the confirmed checkpoint: catch up to it.
+        if (gap > 0) {
+          // Large checkpoint leaps (text done → quality-eval start = +25,
+          // scenes → covers done = +18) used to crawl at 0.5%/tick which made
+          // the bar visibly trail. Snap when the gap is wide enough that the
+          // lag is the message itself; stay smooth for small refinements.
+          const SNAP_GAP = 12;
+          if (gap >= SNAP_GAP) return target;
+          const step = gap < 3 ? 0.3 : gap < 6 ? 0.6 : 1.0;
+          return Math.min(prev + step, target);
         }
-        return Math.min(prev + step, target);
+
+        // At/above the confirmed checkpoint: the next checkpoint can be tens of
+        // seconds away (plot streaming sits on checkpoint 5 = 20% for 60s+
+        // before jumping to 48%). Instead of freezing, creep toward the NEXT
+        // checkpoint's percent — decelerating as it approaches, never reaching
+        // it (leaves headroom so the real checkpoint lands smoothly above). The
+        // bar is therefore never stuck, and because display only ever increases
+        // toward a monotonic ceiling there is no see-saw.
+        const ceiling = nextTargetRef.current - 0.5;
+        if (prev >= ceiling) return prev; // asymptote reached near a milestone — rare
+        const creep = Math.max((ceiling - prev) * 0.04, 0.08);
+        return Math.min(prev + creep, ceiling);
       });
     }, 500);
     return () => clearInterval(interval);
@@ -433,8 +443,6 @@ export function GenerationProgress({
   if (!isGenerating || total === 0) {
     return null;
   }
-
-  const progressPercent = isDone ? 100 : Math.round(displayProgress);
 
   // Helper to extract imageData from cover
   const getImageData = (cover: { imageData?: string } | null | undefined): string | undefined => {
@@ -635,7 +643,7 @@ export function GenerationProgress({
         {/* Progress bar */}
         <div className="mb-4">
           <ProgressBar
-            value={progressPercent}
+            value={isDone ? 100 : displayProgress}
             max={100}
             showPercentage
             size="lg"
