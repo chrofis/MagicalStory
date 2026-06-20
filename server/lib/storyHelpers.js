@@ -14,6 +14,7 @@ const { buildVisualBiblePrompt } = require('./visualBible');
 const { getPrimaryPhoto, getFacePhoto, getStandardAvatar, getFaceThumb, getBodyThumb } = require('./characterPhotos');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
+const { frameColorForName } = require('./characterFrames');
 
 // Lazy-load images module to avoid circular dependency
 // (images.js imports storyHelpers.js, so we can't import at top level)
@@ -4681,6 +4682,22 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     if (ageCueLines.length > 0) {
       characterReferenceList += `\nAGE & PROPORTIONS (render each character at their real age, regardless of the action described):\n${ageCueLines.join('\n')}\n`;
       log.debug(`[IMAGE PROMPT] Added age proportions for ${ageCueLines.length} character(s)`);
+    }
+
+    // Colour-frame mapping. Each reference card is framed in a colour (not
+    // stamped with a name — Grok copies a printed name straight into the scene,
+    // which is how child names leaked onto pages). Tell Grok which card is whom
+    // by colour, and that the frame colour is an identifier only. Must use the
+    // SAME frameColorForName() assignment as the baked frames (grok.js).
+    const allSceneNames = sceneCharacters.map(c => c.name);
+    const frameLines = [];
+    for (const c of sceneCharacters) {
+      const col = frameColorForName(c.name, allSceneNames);
+      if (col) frameLines.push(`- ${col.label} frame = ${c.name}`);
+    }
+    if (frameLines.length > 0) {
+      characterReferenceList += `\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n${frameLines.join('\n')}\nThe frame colours are identifiers ONLY. Never paint a coloured frame, border, or these colours onto any character, clothing, prop, or surface in the scene.\n`;
+      log.debug(`[IMAGE PROMPT] Added colour-frame mapping for ${frameLines.length} character(s)`);
     }
   }
 

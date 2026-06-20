@@ -12,10 +12,10 @@
  */
 
 const sharp = require('sharp');
-const { createCanvas } = require('canvas');
 const { log } = require('../utils/logger');
 const r2 = require('./r2');
 const { withGrok } = require('./aiConcurrency');
+const { frameColorForName } = require('./characterFrames');
 
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const XAI_API_URL = 'https://api.x.ai/v1';
@@ -488,58 +488,35 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
 // Shared constants for character composition
 const CHAR_BG = { r: 220, g: 220, b: 220 };
 const CHAR_GAP = 4;
-const LABEL_BG = { r: 26, g: 26, b: 26 };
-
-function escapeLabelXml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
 
 /**
- * Stamp a bold name caption onto a character image so Grok can map each name
- * to the right face. Label is appended BELOW the image on a dark bar with
- * white bold text — matches the VB grid labeling pattern (see images.js).
- * Sized proportionally to image width so it stays legible after the slot is
- * resized down to ~1024px tall.
+ * Bind a character reference card to a character with a COLOURED FRAME instead
+ * of a stamped name. A name caption gets copied into the output by Grok (it
+ * paints visible glyphs) — that's how child names leaked onto finished pages.
+ * A frame is not paintable scene content, so it binds card↔character without
+ * leaking. A white gap separates the character from the frame so Grok reads it
+ * as a frame, not the character's own colour. The prompt carries the
+ * "<colour> = <name>" mapping (see buildImagePrompt) — both derive the colour
+ * from the same per-page name set via frameColorForName().
  *
  * @param {Buffer} buffer - Pre-composed character image (vertical stack or horizontal strip)
- * @param {string|null} name - Character name; if falsy the buffer is returned unchanged
+ * @param {{label:string, rgb:{r:number,g:number,b:number}}|null} color - frame colour; falsy → unchanged
  */
-async function labelCharacterImage(buffer, name) {
-  if (!name || typeof name !== 'string') return buffer;
+async function frameCharacterImage(buffer, color) {
+  if (!color || !color.rgb) return buffer;
   const meta = await sharp(buffer).metadata();
   const width = meta.width;
   const height = meta.height;
   if (!width || !height) return buffer;
 
-  // No background bar — overlay the name directly on the image as white text
-  // with a heavy black stroke so it stays legible against any background and
-  // doesn't add a chunky bar that Grok sometimes bakes into the output.
-  const rawDisplay = name.length > 28 ? name.substring(0, 26) + '…' : name;
-  const display = escapeLabelXml(rawDisplay);
-  const padding = Math.max(8, Math.round(width * 0.04));
-  const maxTextWidth = Math.max(40, width - padding * 2);
-  const measureCtx = createCanvas(10, 10).getContext('2d');
-  let fontSize = Math.max(36, Math.min(96, Math.round(width * 0.075)));
-  const minFontSize = 22;
-  while (fontSize > minFontSize) {
-    measureCtx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
-    if (measureCtx.measureText(rawDisplay).width <= maxTextWidth) break;
-    fontSize -= 2;
-  }
-  const strokeW = Math.max(3, Math.round(fontSize * 0.12));
-  const baselineY = height - Math.round(fontSize * 0.35);
-
-  const labelSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-    <text x="${width / 2}" y="${baselineY}" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="bold" text-anchor="middle" fill="white" stroke="black" stroke-width="${strokeW}" paint-order="stroke fill">${display}</text>
-  </svg>`;
-
-  return sharp(buffer)
-    .composite([{ input: Buffer.from(labelSvg), left: 0, top: 0 }])
+  const border = Math.max(10, Math.round(Math.min(width, height) * 0.05));
+  const gap = Math.max(6, Math.round(border * 0.5)); // white gap → reads as a frame, not an aura
+  // White gap first, then the solid colour border around it.
+  const withGap = await sharp(buffer)
+    .extend({ top: gap, bottom: gap, left: gap, right: gap, background: { r: 255, g: 255, b: 255 } })
+    .toBuffer();
+  return sharp(withGap)
+    .extend({ top: border, bottom: border, left: border, right: border, background: color.rgb })
     .jpeg({ quality: 90 })
     .toBuffer();
 }
@@ -780,6 +757,12 @@ async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, char
   const n = rawBuffers.length;
   if (n === 0 || n > 3) return null;
 
+  // Per-page character name set → each card gets a colour frame (not a name
+  // caption) so Grok can bind card↔character without leaking the name. Same
+  // assignment as the prompt's "<colour> = <name>" mapping.
+  const allCharNames = options.allCharNames || charNames;
+  const colorFor = (i) => frameColorForName(charNames[i], allCharNames);
+
   // Extract face/body for each avatar-grid buffer; null for non-grid photos
   const parts = [];
   for (let i = 0; i < n; i++) {
@@ -788,28 +771,28 @@ async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, char
     parts.push(isGrid ? await extractFaceAndBody(rawBuffers[i]) : null);
   }
 
-  // Helper: vertical stack if grid, else use raw buffer as-is — then stamp the
-  // character's name on a dark bar below so Grok can bind name↔face.
+  // Helper: vertical stack if grid, else raw buffer — then frame it in the
+  // character's colour so Grok can bind card↔face.
   const buildVertical = async (i) => {
     const composed = parts[i] ? await composeFaceBodyVertical(parts[i].face, parts[i].body) : rawBuffers[i];
-    return labelCharacterImage(composed, charNames[i]);
+    return frameCharacterImage(composed, colorFor(i));
   };
 
-  // Helper: horizontal strip if grid, else raw — labeled the same way.
+  // Helper: horizontal strip if grid, else raw — framed the same way.
   const buildHorizontal = async (i) => {
     const composed = parts[i] ? await composeBodyFaceHorizontal(parts[i].face, parts[i].body) : rawBuffers[i];
-    return labelCharacterImage(composed, charNames[i]);
+    return frameCharacterImage(composed, colorFor(i));
   };
 
   let composed;
   if (n === 1) {
-    // Always label — when the slot holds one character but another slot also
-    // has one character, Grok needs the name↔face binding to keep the two
-    // figures distinct. Simpler to always label than branch on sibling slots.
+    // Always frame — when the slot holds one character but another slot also
+    // has one character, Grok needs the card↔face binding to keep the two
+    // figures distinct. Simpler to always frame than branch on sibling slots.
     const single = parts[0]
       ? await composeBodyFaceHorizontal(parts[0].face, parts[0].body)
       : rawBuffers[0];
-    composed = await labelCharacterImage(single, charNames[0]);
+    composed = await frameCharacterImage(single, colorFor(0));
   } else if (n === 2) {
     const stacks = [await buildVertical(0), await buildVertical(1)];
     composed = await composeRow(stacks);
@@ -1083,7 +1066,7 @@ async function packReferences(refs = {}, options = {}) {
       group.map(c => c.photoType),
       aspectRatio,
       group.map(c => c.charName),
-      { skipAspectPad: willAddVb },
+      { skipAspectPad: willAddVb, allCharNames: rawCharData.map(c => c.charName) },
     );
     if (!composed) return;
     let slotBuf = composed;
@@ -1365,8 +1348,8 @@ async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '
       // leak into the rendered scene (e.g. "Holzbank am Stadtturm" baked
       // into page 7 V2 of job_1780564110486_g4gn4vzvu). Same policy as
       // buildVisualBibleGrid's labelMode='all' default (commit ac4ee3bc).
-      // Character labels stay on the character cells above via
-      // labelCharacterImage — those are needed for name↔face binding.
+      // Character cells above carry a coloured FRAME (frameCharacterImage)
+      // for card↔face binding — a frame doesn't leak the way a name caption did.
     } catch (err) {
       log.warn(`⚠️ [GROK] composeCharWithVbRow: failed cell ${i} (${el.name}): ${err.message}`);
     }
@@ -1550,5 +1533,6 @@ module.exports = {
   cropToFrontColumn,
   extractBottomBody3Columns,
   buildCharacterGroupSlot,
+  frameCharacterImage,
   GROK_MODELS,
 };
