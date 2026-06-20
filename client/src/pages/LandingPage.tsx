@@ -332,7 +332,7 @@ export default function LandingPage() {
       {/* Navigation - Fixed at top. z-40 (site convention, same as Navigation's
           own sticky variant) so the impersonation banner (z-50) stays above it
           and its Beenden button remains clickable. */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-stone-50">
+      <div className="fixed top-[var(--impersonation-banner-h,0px)] left-0 right-0 z-40 bg-stone-50">
         <Navigation currentStep={0} />
       </div>
 

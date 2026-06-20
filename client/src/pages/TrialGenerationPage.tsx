@@ -750,7 +750,7 @@ export default function TrialGenerationPage() {
       {/* Navigation bar — sticky during trial generation so the user can
           always see where they are even after scrolling down to read the
           benefits / funny messages further down the page. */}
-      <nav className="bg-black text-white px-3 py-3 sticky top-0 z-40 shadow-md">
+      <nav className="bg-black text-white px-3 py-3 sticky top-[var(--impersonation-banner-h,0px)] z-40 shadow-md">
         <div className="flex justify-between items-center">
           <span className="text-sm md:text-base font-bold whitespace-nowrap flex items-center gap-1.5">
             <img src="/images/logo-book.webp" alt="" width="88" height="88" fetchPriority="high" className="h-10 md:h-11 -my-2 w-auto" />

@@ -497,7 +497,7 @@ export default function SharedStoryViewer() {
           book-cover accent used throughout the product. Ghost action buttons,
           one white primary (Share). */}
       {isAuthenticated ? (
-        <header className="bg-zinc-900 text-white px-3 py-1.5 md:py-2.5 sticky top-0 z-10 border-b border-amber-400/60">
+        <header className="bg-zinc-900 text-white px-3 py-1.5 md:py-2.5 sticky top-[var(--impersonation-banner-h,0px)] z-10 border-b border-amber-400/60">
           <div className="flex items-center justify-between gap-2">
             {/* Left: Logo + optional title */}
             <button onClick={() => navigate('/')} className="text-sm md:text-base font-semibold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5 flex-shrink-0">
@@ -572,7 +572,7 @@ export default function SharedStoryViewer() {
           </div>
         </header>
       ) : (
-        <header className="bg-gradient-to-b from-amber-50 to-amber-100/60 backdrop-blur-sm border-b-2 border-amber-400 sticky top-0 z-10">
+        <header className="bg-gradient-to-b from-amber-50 to-amber-100/60 backdrop-blur-sm border-b-2 border-amber-400 sticky top-[var(--impersonation-banner-h,0px)] z-10">
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 flex-shrink-0">
               <BookOpen className="w-6 h-6 text-amber-700" />
