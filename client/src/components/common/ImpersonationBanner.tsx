@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useLayoutEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -10,6 +10,28 @@ export function ImpersonationBanner() {
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const bannerRef = useRef<HTMLDivElement>(null);
+
+  // Publish the banner's height so sticky elements below it (the nav) can offset
+  // their own `top` and stack underneath instead of being covered. ResizeObserver
+  // keeps it correct when the banner wraps to two rows on narrow screens. Cleared
+  // to 0px when the banner unmounts (impersonation ends).
+  useLayoutEffect(() => {
+    const el = bannerRef.current;
+    const root = document.documentElement;
+    if (!el) {
+      root.style.setProperty('--impersonation-banner-h', '0px');
+      return;
+    }
+    const setVar = () => root.style.setProperty('--impersonation-banner-h', `${el.offsetHeight}px`);
+    setVar();
+    const ro = new ResizeObserver(setVar);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.setProperty('--impersonation-banner-h', '0px');
+    };
+  }, [isImpersonating]);
 
   if (!isImpersonating || !user || !originalAdmin) {
     return null;
@@ -30,7 +52,7 @@ export function ImpersonationBanner() {
   };
 
   return (
-    <div className="bg-amber-500 text-black py-2 px-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm font-medium sticky top-0 z-50">
+    <div ref={bannerRef} className="bg-amber-500 text-black py-2 px-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm font-medium sticky top-0 z-50">
       <div className="flex items-center gap-2">
         <Eye size={16} />
         <span>

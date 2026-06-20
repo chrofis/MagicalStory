@@ -85,7 +85,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   }, [showMenu]);
 
   return (
-    <nav className="bg-gray-900 text-white px-3 py-3 sticky top-0 z-40">
+    <nav className="bg-gray-900 text-white px-3 py-3 sticky top-[var(--impersonation-banner-h,0px)] z-40">
       <div className="flex justify-between items-center min-w-0">
         {/* Left: Title */}
         <div className="flex-shrink-0">
