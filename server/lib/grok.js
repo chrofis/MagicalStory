@@ -509,8 +509,12 @@ async function frameCharacterImage(buffer, color) {
   const height = meta.height;
   if (!width || !height) return buffer;
 
-  const border = Math.max(10, Math.round(Math.min(width, height) * 0.05));
-  const gap = Math.max(6, Math.round(border * 0.5)); // white gap → reads as a frame, not an aura
+  // Border proportional to HEIGHT, not min(w,h): packReferences resizes every
+  // slot to a common height, so a height-relative border lands at the SAME
+  // visible thickness on every card regardless of its original size. Thin enough
+  // to read as a clean frame, not a thick band that swamps the white card.
+  const border = Math.max(8, Math.round(height * 0.02));
+  const gap = Math.max(4, Math.round(border * 0.4)); // white gap → reads as a frame, not an aura
   // White gap first, then the solid colour border around it.
   const withGap = await sharp(buffer)
     .extend({ top: gap, bottom: gap, left: gap, right: gap, background: { r: 255, g: 255, b: 255 } })
