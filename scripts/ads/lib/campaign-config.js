@@ -124,7 +124,7 @@ const CITIES = {
 const ZURICH_SEARCH = {
   label: 'Zürich',
   geoTargetId: 20151, // Canton of Zürich (region) — widened from Zürich city 1003297
-  campaignName: 'Search-Zurich-v1',
+  campaignName: 'Search-Deutschschweiz-v1',
   budgetName: 'Search-Zurich-Budget-v1',
   dailyBudgetMicros: CHF(3),
   biddingStrategyType: 'TARGET_SPEND',   // Maximize Clicks

@@ -35,9 +35,9 @@ async function main() {
   // Resolve campaign + budget + existing location criteria
   const camp = await customer.query(`
     SELECT campaign.id, campaign.resource_name, campaign_budget.resource_name, campaign_budget.amount_micros
-    FROM campaign WHERE campaign.name = 'Search-Zurich-v1'
+    FROM campaign WHERE campaign.name = 'Search-Deutschschweiz-v1'
   `);
-  if (!camp.length) throw new Error('Search-Zurich-v1 not found');
+  if (!camp.length) throw new Error('Search-Deutschschweiz-v1 not found');
   const campaignRn = camp[0].campaign.resource_name;
   const budgetRn = camp[0].campaign_budget.resource_name;
   const curBudget = Number(camp[0].campaign_budget.amount_micros) / 1e6;
@@ -45,7 +45,7 @@ async function main() {
   const existing = await customer.query(`
     SELECT campaign_criterion.location.geo_target_constant
     FROM campaign_criterion
-    WHERE campaign.name = 'Search-Zurich-v1' AND campaign_criterion.type = 'LOCATION'
+    WHERE campaign.name = 'Search-Deutschschweiz-v1' AND campaign_criterion.type = 'LOCATION'
       AND campaign_criterion.negative = false
   `);
   const haveIds = new Set(existing.map(r =>
