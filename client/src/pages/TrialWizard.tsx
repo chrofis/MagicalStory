@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { BookOpen, Camera, Sparkles, Clock, ArrowRight } from 'lucide-react';
+import { BookOpen, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { Navigation } from '@/components/common';
@@ -103,48 +103,48 @@ const introStrings: Record<string, {
     title: 'Create your free story',
     subtitle: 'A personalized children\'s book with your child as the main character — ready in 3 minutes.',
     step1Title: 'Upload a photo',
-    step1Desc: 'We need one photo of your child.',
+    step1Desc: 'One photo of your child — and their name.',
     step2Title: 'Pick a topic',
-    step2Desc: 'Choose a theme your child loves.',
+    step2Desc: 'A fun adventure, or a story that gently teaches something.',
     step3Title: 'Sit back',
     step3Desc: 'Ready in ~3 minutes. You\'ll receive it as a PDF by email.',
-    freeNote: 'Free · No signup needed',
+    freeNote: 'This first story is a quick free trial — ready in ~3 minutes. Sign up for full, high-quality stories (a bit slower to create) — your first one is free.',
     cta: 'Let\'s start',
   },
   de: {
     title: 'Erstelle deine Gratis-Geschichte',
     subtitle: 'Eine personalisierte Kinderbuch-Geschichte mit deinem Kind als Hauptfigur — in 3 Minuten.',
     step1Title: 'Foto hochladen',
-    step1Desc: 'Wir brauchen ein Foto deines Kindes.',
+    step1Desc: 'Ein Foto deines Kindes — und seinen Namen.',
     step2Title: 'Geschichte wählen',
-    step2Desc: 'Wähle ein Thema, das dein Kind liebt.',
+    step2Desc: 'Ein Abenteuer oder eine Geschichte, die spielerisch etwas vermittelt.',
     step3Title: 'Lehn dich zurück',
     step3Desc: 'In ~3 Minuten fertig. Du erhältst sie als PDF per E-Mail.',
-    freeNote: 'Gratis · Keine Anmeldung nötig',
+    freeNote: 'Diese erste Geschichte ist eine schnelle Gratis-Probe — in ~3 Minuten fertig. Melde dich an für vollständige Geschichten in hoher Qualität (etwas langsamer) — die erste ist gratis.',
     cta: 'Los geht\'s',
   },
   fr: {
     title: 'Créez votre histoire gratuite',
     subtitle: 'Un livre pour enfants personnalisé avec votre enfant comme héros — prêt en 3 minutes.',
     step1Title: 'Téléchargez une photo',
-    step1Desc: 'Une photo de votre enfant suffit.',
+    step1Desc: 'Une photo de votre enfant — et son prénom.',
     step2Title: 'Choisir un thème',
-    step2Desc: 'Choisissez un sujet que votre enfant adore.',
+    step2Desc: 'Une aventure, ou une histoire qui transmet un message en douceur.',
     step3Title: 'Détendez-vous',
     step3Desc: 'Prête en ~3 minutes. Vous la recevrez en PDF par e-mail.',
-    freeNote: 'Gratuit · Aucune inscription requise',
+    freeNote: 'Cette première histoire est un essai gratuit rapide — prête en ~3 minutes. Inscrivez-vous pour des histoires complètes de haute qualité (un peu plus longues à créer) — la première est offerte.',
     cta: 'C\'est parti',
   },
   it: {
     title: 'Crea la tua storia gratuita',
     subtitle: 'Un libro per bambini personalizzato con tuo figlio come protagonista — pronto in 3 minuti.',
     step1Title: 'Carica una foto',
-    step1Desc: 'Basta una foto di tuo figlio.',
+    step1Desc: 'Una foto di tuo figlio — e il suo nome.',
     step2Title: 'Scegli un tema',
-    step2Desc: 'Scegli un argomento che ama.',
+    step2Desc: 'Un\'avventura, o una storia che insegna qualcosa con dolcezza.',
     step3Title: 'Rilassati',
     step3Desc: 'Pronta in ~3 minuti. La riceverai in PDF via e-mail.',
-    freeNote: 'Gratis · Nessuna registrazione',
+    freeNote: 'Questa prima storia è una prova gratuita veloce — pronta in ~3 minuti. Registrati per storie complete di alta qualità (un po\' più lente) — la prima è gratis.',
     cta: 'Iniziamo',
   },
 };
@@ -459,7 +459,6 @@ export default function TrialWizard() {
   // wizard takes over. No progress bar shown (the wizard hasn't started).
   const intro = introStrings[language] || introStrings.en;
   if (showIntro) {
-    const cardClass = 'bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4';
     return (
       <div className="min-h-screen bg-gray-50">
         <nav className="bg-black text-white px-3 py-3">
@@ -470,46 +469,82 @@ export default function TrialWizard() {
             </Link>
           </div>
         </nav>
-        <div className="px-4 md:px-8 py-8 max-w-2xl mx-auto">
+        <div className="px-4 md:px-8 py-6 max-w-7xl mx-auto">
           {/* Hero */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-3">{intro.title}</h1>
+          <div className="text-center mb-6">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">{intro.title}</h1>
             <p className="text-lg text-gray-600">{intro.subtitle}</p>
           </div>
 
-          {/* Three "what happens next" cards. Icon-only (no numbered bubble)
-              and everything centered — the cards' vertical order already
-              communicates 1-2-3 without needing digits, and a single visual
-              language reads cleaner than icon+number+text. */}
-          {([
-            { icon: Camera, title: intro.step1Title, desc: intro.step1Desc },
-            { icon: Sparkles, title: intro.step2Title, desc: intro.step2Desc },
-            { icon: Clock, title: intro.step3Title, desc: intro.step3Desc },
-          ] as const).map((s, i) => {
-            const Icon = s.icon;
-            return (
-              <section key={i} className={`${cardClass} text-center`}>
-                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <Icon size={24} className="text-indigo-500" />
-                </div>
-                <h2 className="text-base md:text-lg font-bold text-gray-800 mb-1">{s.title}</h2>
-                <p className="text-gray-600 text-sm md:text-base">{s.desc}</p>
-              </section>
-            );
-          })}
+          {/* MOBILE — each step stacked: image then its caption (1, 2). The
+              desktop bookend below doesn't stack cleanly, so phones get this
+              simple vertical version instead. */}
+          <div className="md:hidden space-y-8 mb-8">
+            {([
+              { n: 1, img: '/images/try/step1-photo.webp', title: intro.step1Title, desc: intro.step1Desc },
+              { n: 2, img: '/images/try/step2-topics.webp', title: intro.step2Title, desc: intro.step2Desc },
+            ] as const).map((s) => (
+              <div key={s.n} className="text-center">
+                <img src={s.img} alt="" loading="lazy" decoding="async"
+                  className="max-h-72 w-auto mx-auto object-contain rounded-2xl shadow-sm mb-3" />
+                <h2 className="text-2xl font-bold text-gray-800 mb-1"><span className="text-indigo-500">{s.n}.</span> {s.title}</h2>
+                <p className="text-gray-600 text-base max-w-xs mx-auto">{s.desc}</p>
+              </div>
+            ))}
+          </div>
 
-          {/* Free note */}
-          <p className="text-center text-sm text-gray-500 mt-2 mb-6">{intro.freeNote}</p>
+          {/* DESKTOP — the two tall images at the SAME height, bookending the
+              row; numbered captions stacked in the centre between them. */}
+          <div className="hidden md:flex md:items-stretch justify-between gap-10 mb-12">
+            <img
+              src="/images/try/step1-photo.webp"
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="w-full md:w-auto max-h-72 md:max-h-none md:h-96 object-contain rounded-2xl shadow-sm flex-shrink-0"
+            />
+            <div className="flex-1 flex flex-col justify-between gap-8 py-2">
+              <div className="self-start max-w-[14rem] text-left">
+                <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-1"><span className="text-indigo-500">1.</span> {intro.step1Title}</h2>
+                <p className="text-gray-600 text-base md:text-lg">{intro.step1Desc}</p>
+              </div>
+              <div className="self-end max-w-[14rem] text-right">
+                <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-1"><span className="text-indigo-500">2.</span> {intro.step2Title}</h2>
+                <p className="text-gray-600 text-base md:text-lg">{intro.step2Desc}</p>
+              </div>
+            </div>
+            <img
+              src="/images/try/step2-topics.webp"
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="w-full md:w-auto max-h-72 md:max-h-none md:h-96 object-contain rounded-2xl shadow-sm flex-shrink-0"
+            />
+          </div>
 
-          {/* CTA */}
-          <div className="text-center">
-            <button
-              onClick={() => setShowIntro(false)}
-              className="inline-flex items-center gap-2 px-8 py-3 bg-indigo-500 text-white rounded-lg font-semibold text-lg hover:bg-indigo-600 transition-colors"
-            >
-              {intro.cta}
-              <ArrowRight size={20} />
-            </button>
+          {/* Closing — the finished spread on the left; on the right the
+              "sit back" message plus the free-trial note and the Start button.
+              No step number here: this is the payoff + call to action. */}
+          <div className="flex flex-col md:flex-row items-center gap-6 md:gap-12">
+            <img
+              src="/images/try/step3-spread.webp"
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="w-full md:w-auto md:max-w-[55%] max-h-96 object-contain rounded-2xl shadow-sm flex-shrink-0"
+            />
+            <div className="md:flex-1 text-center md:text-left">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">{intro.step3Title}</h2>
+              <p className="text-gray-600 text-base md:text-lg mb-4">{intro.step3Desc}</p>
+              <button
+                onClick={() => setShowIntro(false)}
+                className="inline-flex items-center gap-2 px-8 py-3 bg-indigo-500 text-white rounded-lg font-semibold text-lg hover:bg-indigo-600 transition-colors mb-4"
+              >
+                {intro.cta}
+                <ArrowRight size={20} />
+              </button>
+              <p className="text-sm text-gray-500 max-w-md">{intro.freeNote}</p>
+            </div>
           </div>
         </div>
       </div>
