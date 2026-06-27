@@ -42,6 +42,9 @@ const sectionTranslations = {
     // Why It Works
     whyTitle: 'A story does more than a thousand words.',
     whyDesc: "You can't hand your child confidence. But a story where they're the one who tries, stumbles, and succeeds? That stays with them long after the last page.",
+    localTitle: 'From William Tell to your own village',
+    localDesc: 'Be the hero of Swiss history — or of an adventure set right in your home town. Printed in Switzerland.',
+    localCta: 'Explore city stories',
     whyLink: 'Learn why it works',
     // CTA
     readyToCreate: 'Ready to create your book?',
@@ -97,6 +100,9 @@ const sectionTranslations = {
     // Why It Works
     whyTitle: 'Eine Geschichte bewirkt mehr als tausend Worte.',
     whyDesc: 'Selbstvertrauen kann man seinem Kind nicht einfach geben. Aber eine Geschichte, in der es selbst probiert, stolpert und es schafft? Die bleibt — lange nach der letzten Seite.',
+    localTitle: 'Von Wilhelm Tell bis zu deinem Dorf',
+    localDesc: 'Erlebe Schweizer Geschichte als Held — oder ein Abenteuer, das genau in deiner Stadt spielt. Gedruckt in der Schweiz.',
+    localCta: 'Stadtgeschichten entdecken',
     whyLink: 'Erfahre warum es wirkt',
     // CTA
     readyToCreate: 'Bereit für dein eigenes Buch?',
@@ -152,6 +158,9 @@ const sectionTranslations = {
     // Why It Works
     whyTitle: 'Une histoire vaut plus que mille mots.',
     whyDesc: "On ne peut pas offrir la confiance à son enfant. Mais une histoire où c'est lui qui essaie, trébuche et réussit ? Elle reste, bien après la dernière page.",
+    localTitle: 'De Guillaume Tell à ton village',
+    localDesc: "Sois le héros de l'histoire suisse — ou d'une aventure qui se déroule dans ta propre ville. Imprimé en Suisse.",
+    localCta: 'Découvrir les histoires de villes',
     whyLink: 'Découvrez pourquoi ça marche',
     // CTA
     readyToCreate: 'Prêt à créer votre livre ?',
@@ -207,6 +216,9 @@ const sectionTranslations = {
     // Why It Works
     whyTitle: 'Una storia vale più di mille parole.',
     whyDesc: 'La sicurezza in sé non si può regalare a un figlio. Ma una storia in cui è lui a provare, inciampare e farcela? Resta, molto dopo l\'ultima pagina.',
+    localTitle: 'Da Guglielmo Tell al tuo paese',
+    localDesc: 'Sii l\'eroe della storia svizzera — o di un\'avventura ambientata nella tua città. Stampato in Svizzera.',
+    localCta: 'Scopri le storie delle città',
     whyLink: 'Scopri perché funziona',
     // CTA
     readyToCreate: 'Pronto a creare il tuo libro?',
@@ -763,6 +775,36 @@ export default function LandingPage() {
                 </div>
               </Link>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Local stories — Swiss history + your own town (bottom feature) */}
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-white border-t border-stone-200">
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+          <img
+            src="/images/landing-local.webp"
+            alt={st.localTitle}
+            width={900}
+            height={612}
+            loading="lazy"
+            decoding="async"
+            className="w-full rounded-2xl shadow-md"
+          />
+          <div className="text-center lg:text-left">
+            <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-4">
+              {st.localTitle}
+            </h2>
+            <p className="text-lg text-stone-600 mb-6">
+              {st.localDesc}
+            </p>
+            <Link
+              to="/stadt"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600 transition-colors"
+            >
+              {st.localCta}
+              <ArrowRight size={18} />
+            </Link>
           </div>
         </div>
       </section>
