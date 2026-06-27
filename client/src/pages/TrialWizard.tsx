@@ -487,7 +487,7 @@ export default function TrialWizard() {
               <div key={s.n} className="text-center">
                 <img src={s.img} alt="" loading="lazy" decoding="async"
                   className="max-h-72 w-auto mx-auto object-contain rounded-2xl shadow-sm mb-3" />
-                <h2 className="text-2xl font-bold text-gray-800 mb-1"><span className="text-indigo-500">{s.n}.</span> {s.title}</h2>
+                <h2 className="text-2xl font-bold text-gray-800 mb-1">{s.n}. {s.title}</h2>
                 <p className="text-gray-600 text-base max-w-xs mx-auto">{s.desc}</p>
               </div>
             ))}
@@ -505,11 +505,11 @@ export default function TrialWizard() {
             />
             <div className="flex-1 flex flex-col justify-between gap-8 py-2">
               <div className="self-start max-w-[14rem] text-left">
-                <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-1"><span className="text-indigo-500">1.</span> {intro.step1Title}</h2>
+                <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-1">1. {intro.step1Title}</h2>
                 <p className="text-gray-600 text-base md:text-lg">{intro.step1Desc}</p>
               </div>
               <div className="self-end max-w-[14rem] text-right">
-                <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-1"><span className="text-indigo-500">2.</span> {intro.step2Title}</h2>
+                <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-1">2. {intro.step2Title}</h2>
                 <p className="text-gray-600 text-base md:text-lg">{intro.step2Desc}</p>
               </div>
             </div>
