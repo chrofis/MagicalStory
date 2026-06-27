@@ -36,7 +36,7 @@ const COPY = {
     'Geburtstagsgeschenk gesucht? Ein Kinderbuch, in dem dein Kind der Star ist',          // 74
     'Personalisierte Kinderbücher in unter 3 Minuten erstellen. Erste Geschichte gratis.',  // 84
     'Dein Kind als Held der eigenen Geschichte. Aus Familienfotos wird ein echtes Buch.',  // 82
-    'Kinder lernen nicht durch Ermahnen. Sie lernen durch Geschichten, die sie lieben.',   // 82
+    'Eine Geschichte bewirkt mehr als tausend Worte — dein Kind als mutiger Held.',         // 76
   ],
 
   // Up to 5 descriptions (≤90 chars) — from existing DE campaign

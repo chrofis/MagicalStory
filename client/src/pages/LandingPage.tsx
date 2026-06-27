@@ -40,8 +40,8 @@ const sectionTranslations = {
     shipping: 'Ships within Switzerland - the perfect gift for any occasion',
     giftGuideLink: 'Browse gift ideas by age & occasion',
     // Why It Works
-    whyTitle: 'Why lecture when you can tell a story?',
-    whyDesc: "Children don't learn from nagging — they learn from stories they love. A story about brushing teeth inspires more than any argument. And when they're the hero? They can't wait to do it themselves.",
+    whyTitle: 'A story does more than a thousand words.',
+    whyDesc: "You can't hand your child confidence. But a story where they're the one who tries, stumbles, and succeeds? That stays with them long after the last page.",
     whyLink: 'Learn why it works',
     // CTA
     readyToCreate: 'Ready to create your book?',
@@ -95,8 +95,8 @@ const sectionTranslations = {
     shipping: 'Versand innerhalb der Schweiz - das perfekte Geschenk für jeden Anlass',
     giftGuideLink: 'Geschenkideen nach Alter & Anlass entdecken',
     // Why It Works
-    whyTitle: 'Eine Geschichte bewirkt mehr als tausend Ermahnungen.',
-    whyDesc: 'Kinder lernen nicht durch Schimpfen — sie lernen durch Geschichten, die sie lieben. Eine Geschichte übers Zähneputzen bewirkt mehr als jede Diskussion. Und wenn sie selbst der Held sind? Können sie es kaum erwarten, es nachzumachen.',
+    whyTitle: 'Eine Geschichte bewirkt mehr als tausend Worte.',
+    whyDesc: 'Selbstvertrauen kann man seinem Kind nicht einfach geben. Aber eine Geschichte, in der es selbst probiert, stolpert und es schafft? Die bleibt — lange nach der letzten Seite.',
     whyLink: 'Erfahre warum es wirkt',
     // CTA
     readyToCreate: 'Bereit für dein eigenes Buch?',
@@ -150,8 +150,8 @@ const sectionTranslations = {
     shipping: 'Livraison en Suisse - le cadeau parfait pour toute occasion',
     giftGuideLink: 'Idées cadeaux par âge et occasion',
     // Why It Works
-    whyTitle: 'Pourquoi sermonner quand on peut raconter une histoire ?',
-    whyDesc: "Les enfants n'apprennent pas par les sermons — ils apprennent par les histoires qu'ils aiment. Une histoire sur le brossage des dents inspire plus que n'importe quelle discussion. Et quand ils sont le héros ? Ils ont hâte de le faire eux-mêmes.",
+    whyTitle: 'Une histoire vaut plus que mille mots.',
+    whyDesc: "On ne peut pas offrir la confiance à son enfant. Mais une histoire où c'est lui qui essaie, trébuche et réussit ? Elle reste, bien après la dernière page.",
     whyLink: 'Découvrez pourquoi ça marche',
     // CTA
     readyToCreate: 'Prêt à créer votre livre ?',
@@ -205,8 +205,8 @@ const sectionTranslations = {
     shipping: 'Spedizione in Svizzera - il regalo perfetto per ogni occasione',
     giftGuideLink: 'Scopri idee regalo per età e occasione',
     // Why It Works
-    whyTitle: 'Perché fare la predica quando si può raccontare una storia?',
-    whyDesc: 'I bambini non imparano dalle prediche — imparano dalle storie che amano. Una storia sul lavarsi i denti ispira più di qualsiasi discussione. E quando sono loro l\'eroe? Non vedono l\'ora di farlo da soli.',
+    whyTitle: 'Una storia vale più di mille parole.',
+    whyDesc: 'La sicurezza in sé non si può regalare a un figlio. Ma una storia in cui è lui a provare, inciampare e farcela? Resta, molto dopo l\'ultima pagina.',
     whyLink: 'Scopri perché funziona',
     // CTA
     readyToCreate: 'Pronto a creare il tuo libro?',
