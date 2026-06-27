@@ -45,6 +45,9 @@ const sectionTranslations = {
     localTitle: 'From William Tell to your own village',
     localDesc: 'Be the hero of Swiss history — or of an adventure set right in your home town. Printed in Switzerland.',
     localCta: 'Explore city stories',
+    localBullet1: 'Set in your own town — real streets and landmarks',
+    localBullet2: 'Or relive history as the hero',
+    step5: 'Step 5',
     whyLink: 'Learn why it works',
     // CTA
     readyToCreate: 'Ready to create your book?',
@@ -103,6 +106,9 @@ const sectionTranslations = {
     localTitle: 'Von Wilhelm Tell bis zu deinem Dorf',
     localDesc: 'Erlebe Schweizer Geschichte als Held — oder ein Abenteuer, das genau in deiner Stadt spielt. Gedruckt in der Schweiz.',
     localCta: 'Stadtgeschichten entdecken',
+    localBullet1: 'Spielt in deiner Stadt — echte Orte und Wahrzeichen',
+    localBullet2: 'Oder erlebe historische Helden hautnah',
+    step5: 'Schritt 5',
     whyLink: 'Erfahre warum es wirkt',
     // CTA
     readyToCreate: 'Bereit für dein eigenes Buch?',
@@ -161,6 +167,9 @@ const sectionTranslations = {
     localTitle: 'De Guillaume Tell à ton village',
     localDesc: "Sois le héros de l'histoire suisse — ou d'une aventure qui se déroule dans ta propre ville. Imprimé en Suisse.",
     localCta: 'Découvrir les histoires de villes',
+    localBullet1: 'Se déroule dans ta ville — lieux et monuments réels',
+    localBullet2: "Ou revis l'histoire en héros",
+    step5: 'Étape 5',
     whyLink: 'Découvrez pourquoi ça marche',
     // CTA
     readyToCreate: 'Prêt à créer votre livre ?',
@@ -219,6 +228,9 @@ const sectionTranslations = {
     localTitle: 'Da Guglielmo Tell al tuo paese',
     localDesc: 'Sii l\'eroe della storia svizzera — o di un\'avventura ambientata nella tua città. Stampato in Svizzera.',
     localCta: 'Scopri le storie delle città',
+    localBullet1: 'Ambientata nella tua città — luoghi e monumenti reali',
+    localBullet2: 'O rivivi la storia da eroe',
+    step5: 'Passo 5',
     whyLink: 'Scopri perché funziona',
     // CTA
     readyToCreate: 'Pronto a creare il tuo libro?',
@@ -603,7 +615,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Section 3: Choose Your Style */}
+      {/* Section 3: Your local / Swiss story */}
       <section className="py-16 lg:py-24 px-4 lg:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
@@ -611,9 +623,59 @@ export default function LandingPage() {
             <div className="w-full lg:w-1/2 order-1 lg:order-1">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-indigo-100 p-3 rounded-full">
-                  <Palette className="w-6 h-6 text-indigo-500" />
+                  <MapPin className="w-6 h-6 text-indigo-500" />
                 </div>
                 <span className="text-indigo-500 font-semibold text-lg">{st.step3}</span>
+              </div>
+              <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
+                {st.localTitle}
+              </h2>
+              <p className="text-lg text-stone-600 mb-4">
+                {st.localDesc}
+              </p>
+              <ul className="space-y-3">
+                <li className="flex items-start gap-3">
+                  <MapPin className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
+                  <span className="text-stone-600">{st.localBullet1}</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <MapPin className="w-5 h-5 text-indigo-500 mt-1 flex-shrink-0" />
+                  <span className="text-stone-600">{st.localBullet2}</span>
+                </li>
+              </ul>
+              <Link
+                to="/stadt"
+                className="inline-flex items-center gap-1 mt-4 text-indigo-500 hover:text-indigo-800 font-medium text-sm"
+              >
+                {st.localCta} <ArrowRight size={16} />
+              </Link>
+            </div>
+            <div className="w-full lg:w-1/2 order-2 lg:order-2 flex items-center">
+              <img
+                src="/images/landing-local.webp"
+                alt={st.localTitle}
+                width="900"
+                height="612"
+                loading="lazy"
+                decoding="async"
+                className="w-full h-auto rounded-2xl shadow-lg"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 4: Choose Your Style */}
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-stone-50">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
+            {/* Text Content - First on mobile */}
+            <div className="w-full lg:w-1/2 order-1 lg:order-2">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-indigo-100 p-3 rounded-full">
+                  <Palette className="w-6 h-6 text-indigo-500" />
+                </div>
+                <span className="text-indigo-500 font-semibold text-lg">{st.step4}</span>
               </div>
               <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
                 {st.chooseStyle}
@@ -637,7 +699,7 @@ export default function LandingPage() {
               </ul>
             </div>
             {/* Image - Second on mobile, peeks from below */}
-            <div className="w-full lg:w-1/2 order-2 lg:order-2 flex items-center">
+            <div className="w-full lg:w-1/2 order-2 lg:order-1 flex items-center">
               <img
                 src="/images/landing-styles.webp"
                 alt={st.chooseStyle}
@@ -652,17 +714,17 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Section 4: Print & Share */}
-      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-stone-50">
+      {/* Section 5: Print & Share */}
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
-            <div className="w-full lg:w-1/2 order-1 lg:order-2">
+            <div className="w-full lg:w-1/2 order-1 lg:order-1">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-indigo-100 p-3 rounded-full">
                   <Printer className="w-6 h-6 text-indigo-500" />
                 </div>
-                <span className="text-indigo-500 font-semibold text-lg">{st.step4}</span>
+                <span className="text-indigo-500 font-semibold text-lg">{st.step5}</span>
               </div>
               <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
                 {st.printShare}
@@ -692,7 +754,7 @@ export default function LandingPage() {
               </Link>
             </div>
             {/* Image - Second on mobile, peeks from below */}
-            <div className="w-full lg:w-1/2 order-2 lg:order-1 flex items-center">
+            <div className="w-full lg:w-1/2 order-2 lg:order-2 flex items-center">
               <img
                 src="/images/landing-print.webp"
                 alt={st.printShare}
@@ -775,36 +837,6 @@ export default function LandingPage() {
                 </div>
               </Link>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Local stories — Swiss history + your own town (bottom feature) */}
-      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-white border-t border-stone-200">
-        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-          <img
-            src="/images/landing-local.webp"
-            alt={st.localTitle}
-            width={900}
-            height={612}
-            loading="lazy"
-            decoding="async"
-            className="w-full rounded-2xl shadow-md"
-          />
-          <div className="text-center lg:text-left">
-            <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-4">
-              {st.localTitle}
-            </h2>
-            <p className="text-lg text-stone-600 mb-6">
-              {st.localDesc}
-            </p>
-            <Link
-              to="/stadt"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-500 text-white rounded-lg font-semibold hover:bg-indigo-600 transition-colors"
-            >
-              {st.localCta}
-              <ArrowRight size={18} />
-            </Link>
           </div>
         </div>
       </section>
