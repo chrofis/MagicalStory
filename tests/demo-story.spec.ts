@@ -81,7 +81,11 @@ const NEXT_BTN_RE = /^(weiter|next|suivant)$/i;
 const SIGN_IN_RE = /log in|sign in|anmelden|connexion|se connecter/i;
 const MAIN_BTN_RE = /^main$|hauptrolle|principal/i;
 const USE_THIS_RE = /diese verwenden|use this|utiliser|select this|choisir/i;
-const GENERATE_RE = /geschichte erstellen|generate story|create story|générer|créer.*histoire/i;
+// Match ONLY the real "Generate Story" button per language, by its full phrase.
+// A bare /générer/ also matched the FR "Générer une suggestion" (regenerate-idea)
+// button, which sits earlier in the DOM — so .first() clicked the wrong button and
+// the story was never generated. Use the complete per-language label instead.
+const GENERATE_RE = /geschichte erstellen|generate story|générer l['’]histoire|genera la storia/i;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -947,6 +951,15 @@ test.describe('Demo Story Generation', () => {
     const jsErrors: string[] = [];
     page.on('pageerror', err => jsErrors.push(err.message));
 
+    // Capture the wizard's generateStory() console trail so a "POST never fired"
+    // failure tells us WHICH guard/await the function stalled on (email guard,
+    // pendingSave await, avatar-regen loop, etc.) instead of just timing out blind.
+    const genStoryLogs: string[] = [];
+    page.on('console', (msg) => {
+      const t = msg.text();
+      if (t.includes('[generateStory]')) genStoryLogs.push(t);
+    });
+
     // ── Step 0: Pre-seed language, then login ──
     // DEMO_EMAIL env var overrides the family's default account — used by the
     // showcase orchestrator to log in as the freshly-provisioned per-run account.
@@ -1221,9 +1234,13 @@ test.describe('Demo Story Generation', () => {
     // gets aborted in flight. (That's exactly what was happening: across
     // 2026-04-24 → today, 13/14 demo runs left a registered user with zero
     // story_jobs and zero stories.)
+    // generateStory() can do real pre-POST work (avatar status reconciliation,
+    // pending-save flush) before the request leaves the browser; 60s was too
+    // tight and turned a slow-but-fine run into a hard failure. Give it room.
+    const CREATE_STORY_WAIT_MS = 180000;
     const createStoryResponse = page.waitForResponse(
       (r) => r.url().includes('/api/jobs/create-story') && r.request().method() === 'POST',
-      { timeout: 60000 }
+      { timeout: CREATE_STORY_WAIT_MS }
     );
     await generateBtn.click();
 
@@ -1233,8 +1250,11 @@ test.describe('Demo Story Generation', () => {
     } catch (err) {
       const errToast = await page.locator('[role="alert"], .toast, [class*="error"]').first()
         .textContent({ timeout: 1500 }).catch(() => null);
+      const trail = genStoryLogs.length
+        ? `\n  generateStory() trail:\n    ${genStoryLogs.join('\n    ')}`
+        : '\n  generateStory() never logged — the click did not invoke it (button handler / overlay issue).';
       throw new Error(
-        `POST /api/jobs/create-story did not complete within 60s. ${errToast ? `Toast: "${errToast.trim()}"` : ''}`
+        `POST /api/jobs/create-story did not complete within ${CREATE_STORY_WAIT_MS / 1000}s. ${errToast ? `Toast: "${errToast.trim()}"` : ''}${trail}`
       );
     }
 
