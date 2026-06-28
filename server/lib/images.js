@@ -1230,10 +1230,26 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       return null;
     }
 
-    // Start semantic evaluation in parallel if story text provided (for scene evaluations)
-    if (storyText && evaluationType === 'scene') {
+    // Covers get the SAME fidelity checks as pages (semantic, three-stage,
+    // visual inventory) — they are not exempt. A page's reference is its story
+    // prose; a cover has none, so its reference is the cover brief, which
+    // arrives as sceneHint (scene.outlineExtract). Comparing the cover against
+    // its own brief catches wrong placement ("characters standing in the
+    // river"), wrong/extra objects, and missing figures. The title/dedication
+    // text is the only cover-specific concern, handled by the TEXT RULES below.
+    const isCover = evaluationType === 'cover';
+    // Covers are head-on portraits: viewer-gaze and a flat 2D title are correct,
+    // not defects. Tell the fidelity evaluators so they don't penalize those,
+    // while still catching placement / text / identity problems.
+    const coverEvalNote = '\n\nCOVER: a book-cover portrait. Characters facing or looking at the viewer is intended — do not deduct for gaze direction or for facing the camera. A flat 2D title is acceptable — do not deduct for the title not being three-dimensional. Still flag implausible placement (a figure on a surface that cannot support it), wrong or garbled text on objects, and missing, extra, or mismatched characters.';
+    const fidelityRef = storyText || (isCover && sceneHint ? sceneHint + coverEvalNote : null);
+    const runFidelity = !!fidelityRef && (evaluationType === 'scene' || isCover);
+
+    // Start semantic evaluation in parallel when we have a reference (page prose
+    // or cover brief).
+    if (runFidelity) {
       const { evaluateSemanticFidelity } = require('./sceneValidator');
-      semanticPromise = evaluateSemanticFidelity(imageData, storyText, originalPrompt, sceneHint);
+      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint);
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
 
@@ -1241,12 +1257,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Stage 2 (compliance) needs the quality eval's named figures[] + matches[] so it
     // can pair each named character with the blind vision inventory by zone. We expose
     // those via qualityFiguresResolve, fulfilled once the quality JSON is parsed below.
-    if (evaluationType === 'scene') {
+    if (evaluationType === 'scene' || isCover) {
       qualityFiguresPromise = new Promise((resolve) => { qualityFiguresResolve = resolve; });
       threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, {
         qualityModelOverride,
         pageContext,
-        storyText,
+        storyText: fidelityRef,
         qualityFiguresPromise,
       });
       log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
@@ -1283,6 +1299,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
       // Strip art style description (noise for evaluator)
       promptForEval = promptForEval.replace(/\*\*ART STYLE[^*]*\*\*[^*]*(?=\*\*|$)/s, '');
+
+      // Cover portraits: viewer-gaze and a flat title are intended, not defects.
+      promptForEval = `COVER NOTE: a book-cover portrait. Do not deduct for characters facing or looking at the viewer, or for the title being flat 2D rather than three-dimensional.\n\n${promptForEval}`;
 
       if (expectedText) {
         promptForEval = `⚠️ TEXT RULES FOR THIS IMAGE (HARD FAIL):\nAllowed text: "${expectedText}" — and NOTHING else.\nScore MUST be 0 if ANY of the following are true:\n- The allowed text is missing or misspelled (even one wrong letter).\n- The image shows ANY other text anywhere (character names, labels, watermarks, captions, extra words, stray letters on clothing or signs).\nIf the only text on the image is exactly the allowed text, evaluate normally.\n\nWhen you flag a text issue, use these severities:\n- Title or expected text missing/misspelled (any character difference) → severity: CRITICAL.\n- Other unrequested text on the cover (random labels, signs, captions) → severity: MAJOR.\n\nBefore reporting a title misspelling, RE-READ the rendered text letter-by-letter against the allowed text above. Report a mismatch ONLY if you can quote the exact rendered string and it differs from the allowed text. If you are uncertain whether the rendering matches, do NOT flag it.\n\n${promptForEval}`;
@@ -1387,7 +1406,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     // === LAUNCH P1 VISUAL INVENTORY IN PARALLEL (age/figure detection) ===
-    if (evaluationType === 'scene' && PROMPT_TEMPLATES.imageVisualInventory) {
+    // Covers included — the standing-surface / implausible-placement signal that
+    // catches "characters in the river" lives in this inventory pass.
+    if ((evaluationType === 'scene' || isCover) && PROMPT_TEMPLATES.imageVisualInventory) {
       log.debug(`📊 [EVAL P1] Launching parallel figure/age detection for ${pageContext || 'scene'}`);
       p1Promise = runVisualInventory(parts, modelId, apiKey, pageContext);
     }
