@@ -952,3 +952,34 @@ Total measured savings: 1,230 KiB → 339 KiB (−891 KiB, 72.4 %).
 `ClaimAccount.tsx`, `SharedStoryViewer.tsx`, `TrialGenerationPage.tsx`,
 `TrialWizard.tsx` (logo references); `.gitignore` (backups).
 **Status:** ✅ active.
+
+---
+
+## Covers get full page-style evaluation (semantic + 3-stage + placement)
+**Context:** Cover images (title page, initial page, back cover) skipped semantic
+eval, three-stage compliance, and the P1 visual-inventory pass — all gated to
+`evaluationType === 'scene'` in `evaluateImageQuality`. Those passes carry the
+standing-surface / implausible-placement check, so a title page with characters
+"standing in the river" scored 86 and shipped; the single quality pass missed it.
+The original rationale was that semantic eval compares an image against the page's
+story prose, and a cover has no prose — but the physics/placement/figure checks
+were bundled into the same scene-only gate even though they need no prose.
+**Decision:**
+- Covers now run all three fidelity passes. The semantic reference is the cover
+  brief (`sceneHint` = `scene.outlineExtract`) in place of page prose.
+- Covers are head-on portraits, so viewer-gaze and a flat (non-3D) title are
+  intended, NOT defects. Two-part fix: (1) the outline's cover `GAZES AT` rule
+  now sets every cover figure to gaze at `the viewer`, so a correctly rendered
+  cover matches its brief; (2) a COVER note tells the fidelity + quality
+  evaluators not to deduct for viewer-gaze or a flat title — while still flagging
+  placement, garbled object text, and missing/extra/mismatched characters.
+- Only the unified repair pipeline's eval was changed (the authoritative scorer
+  that persists versions, picks best, and triggers cover regen). The in-loop
+  generation-time eval for covers was deliberately left without fidelity passes
+  to avoid extra cover regens on every story.
+**Rationale:** Covers are the marketing image; an in-river or garbled-text cover
+must be caught and regenerated like any bad page. Viewer-gaze leniency prevents
+the new strictness from regenerating good covers for facing the camera.
+**Touched:** `server/lib/images.js` (`evaluateImageQuality` gates + cover note),
+`prompts/story-unified.txt` (cover GAZES AT rule).
+**Status:** ✅ active.
