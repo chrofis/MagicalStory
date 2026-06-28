@@ -28,6 +28,12 @@ function frameColorForName(name, allNames) {
   if (!name) return null;
   const canon = [...new Set((allNames || []).filter(Boolean).map((n) => String(n)))]
     .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+  // A frame only disambiguates BETWEEN characters. On a single-character page
+  // there is nothing to tell apart, so a frame is pure overhead — and Grok
+  // copies the coloured border into the scene (observed: a red border around a
+  // solo page). Return null so both the baked card frame (grok.js) AND the
+  // prompt's "<colour> = <name>" mapping (buildImagePrompt) drop out together.
+  if (canon.length <= 1) return null;
   const idx = canon.findIndex((n) => n.toLowerCase() === String(name).toLowerCase());
   if (idx < 0 || idx >= FRAME_COLORS.length) return null;
   return FRAME_COLORS[idx];

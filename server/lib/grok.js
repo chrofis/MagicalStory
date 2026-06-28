@@ -763,7 +763,9 @@ async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, char
 
   // Per-page character name set → each card gets a colour frame (not a name
   // caption) so Grok can bind card↔character without leaking the name. Same
-  // assignment as the prompt's "<colour> = <name>" mapping.
+  // assignment as the prompt's "<colour> = <name>" mapping. frameColorForName
+  // returns null on a single-character page (nothing to disambiguate), so the
+  // card is left unframed and no coloured border leaks into the scene.
   const allCharNames = options.allCharNames || charNames;
   const colorFor = (i) => frameColorForName(charNames[i], allCharNames);
 
@@ -790,9 +792,10 @@ async function buildCharacterGroupSlot(rawBuffers, photoTypes, aspectRatio, char
 
   let composed;
   if (n === 1) {
-    // Always frame — when the slot holds one character but another slot also
-    // has one character, Grok needs the card↔face binding to keep the two
-    // figures distinct. Simpler to always frame than branch on sibling slots.
+    // Frame (via colorFor) when the page has >1 character total — even if this
+    // slot holds just one, a sibling slot's character needs the card↔face
+    // binding to stay distinct. colorFor returns null on a single-character
+    // page, so frameCharacterImage leaves the card unframed (no border leak).
     const single = parts[0]
       ? await composeBodyFaceHorizontal(parts[0].face, parts[0].body)
       : rawBuffers[0];
