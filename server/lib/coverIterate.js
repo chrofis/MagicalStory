@@ -60,7 +60,17 @@ function buildPlateDescription(emptyDescRaw, characterNames, visualBible, pageNu
   const stripped = stripCharacterSentences(emptyDescRaw, characterNames)
     .replace(/\ba wide group portrait set before\b/gi, 'A wide view of')
     .replace(/\ba portrait of (?:two characters|a single character) set before\b/gi, 'A wide view of')
-    .replace(/\bOnly (?:these two people|this one person) appears?[^.]*\.\s*/gi, '');
+    .replace(/\bOnly (?:these two people|this one person) appears?[^.]*\.\s*/gi, '')
+    // Drop mood/atmosphere sentences that imply a group of people. The empty-
+    // scene generator reads "warm family gathering" / "reunion" as a cue to
+    // paint figures into a plate that must stay people-free — the painted-in
+    // figure then survives as a phantom duplicate once the real character
+    // cutouts are composited on top. Name-stripping alone misses these because
+    // the mood phrase carries no character name.
+    .split(/(?<=[.!?])\s+/)
+    .filter(s => !/\b(gathering|gather|gathers|reunion|crowd|together|everyone|group portrait|family portrait)\b/i.test(s))
+    .join(' ')
+    .trim();
   return sanitizeVbIdsInPrompt(stripped, visualBible, pageNumber);
 }
 
