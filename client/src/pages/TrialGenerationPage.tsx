@@ -580,8 +580,11 @@ export default function TrialGenerationPage() {
       const { idToken } = await signInWithGooglePopup();
       await completeGoogleLink(idToken);
     } catch (err) {
-      console.error('Google sign-in failed:', err);
-      setAuthError(t.error);
+      // User closed the Google popup on purpose — not an error. Just unblock.
+      if (!(err instanceof Error && err.message === 'GOOGLE_POPUP_CLOSED')) {
+        console.error('Google sign-in failed:', err);
+        setAuthError(t.error);
+      }
     } finally {
       setIsAuthLoading(false);
     }

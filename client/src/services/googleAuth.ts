@@ -130,6 +130,8 @@ declare global {
             ux_mode?: 'popup' | 'redirect';
             redirect_uri?: string;
             callback: (response: { code?: string; error?: string }) => void;
+            // Fires when the popup is closed/blocked — `callback` does NOT.
+            error_callback?: (error: { type?: string; message?: string }) => void;
           }) => { requestCode: () => void };
         };
       };
@@ -189,6 +191,14 @@ export async function signInWithGooglePopup(): Promise<{ idToken: string }> {
             return;
           }
           resolve(response.code);
+        },
+        // GIS does NOT call `callback` when the user closes the popup or it's
+        // blocked — without this the promise hangs until the 5-min timeout,
+        // leaving the caller's loading state stuck and every button disabled.
+        error_callback: (err) => {
+          clearTimeout(timeout);
+          const cancelled = err?.type === 'popup_closed' || err?.type === 'popup_closed_by_user';
+          reject(new Error(cancelled ? 'GOOGLE_POPUP_CLOSED' : (err?.message || 'Google sign-in failed')));
         },
       });
       client.requestCode();

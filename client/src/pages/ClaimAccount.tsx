@@ -241,7 +241,10 @@ export default function ClaimAccount() {
       setPageState('success');
       setTimeout(() => { window.location.href = '/stories'; }, 1500);
     } catch (err) {
-      if (err instanceof Error && err.message === 'Redirecting to Google...') {
+      // 'Redirecting…' = redirect fallback; 'GOOGLE_POPUP_CLOSED' = user closed
+      // the popup on purpose. Neither is an error — just let the finally clear
+      // the loading state so the buttons unblock.
+      if (err instanceof Error && (err.message === 'Redirecting to Google...' || err.message === 'GOOGLE_POPUP_CLOSED')) {
         return;
       }
       setError(t.error);
