@@ -675,37 +675,10 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
-  // Avatar reward / progress element. Shown prominently on the 'photo' phase
-  // (size="large") and smaller on the 'details' phase (size="small").
-  const renderAvatarReward = (size: 'large' | 'small') => {
-    if (!hasPhoto) return null;
-    if (!previewAvatar && !isGeneratingAvatar) return null;
-    const imgSize = size === 'large' ? 'w-40 h-40' : 'w-20 h-20';
-    const rewardLabel = characterData.name.trim()
-      ? t.avatarReward.replace('{name}', characterData.name.trim())
-      : t.avatarRewardChild;
-    return (
-      <div className="flex flex-col items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
-        {isGeneratingAvatar && !previewAvatar ? (
-          <>
-            <div className={`${imgSize} rounded-2xl bg-indigo-50 flex items-center justify-center`}>
-              <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
-            </div>
-            <p className="text-sm text-indigo-500 font-medium">{t.avatarCreating}</p>
-          </>
-        ) : previewAvatar ? (
-          <>
-            <img
-              src={previewAvatar}
-              alt={rewardLabel}
-              className={`${imgSize} rounded-2xl object-cover border-2 border-indigo-200`}
-            />
-            <p className="text-sm font-semibold text-indigo-600 text-center">{rewardLabel}</p>
-          </>
-        ) : null}
-      </div>
-    );
-  };
+  // The avatar reveal is deliberately NOT shown on this step — it cropped the
+  // head (square object-cover) and pre-empted the reward. The avatar appears
+  // (uncropped, object-contain) on the next step, TrialTopicStep's avatarBanner.
+  // Generation still runs in the background via the effect above.
 
   // ── Photo upload block (consent + dropzone + face picker) ──────────────────
   const photoUploadBlock = (
@@ -965,8 +938,6 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
         <div className="max-w-md mx-auto space-y-6">
           {photoUploadBlock}
 
-          {renderAvatarReward('large')}
-
           {/* Continue → details phase (enabled once a photo exists) */}
           <button
             onClick={() => setPhase('details')}
@@ -988,8 +959,6 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
             <ArrowRight className="w-4 h-4 rotate-180" />
             {t.back}
           </button>
-
-          {renderAvatarReward('small')}
 
           {detailsBlock}
 
