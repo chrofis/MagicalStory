@@ -24,11 +24,27 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* Metric-matched Georgia fallback for Cinzel. The overrides are computed from
+   the two fonts' own metrics (fontTools): Cinzel and Georgia normalised to em,
+   so text set in this fallback occupies the SAME box as Cinzel. With it in the
+   --font-title stack, swapping Cinzel in causes NO size change — the hero <h1>
+   text-LCP is no longer re-fired late on slow connections (measured: the hero
+   LCP was ~9.2s on mobile Slow-4G purely from that font swap). Georgia is a
+   web-safe font on Windows/Mac/iOS; where absent, the plain serif is used. */
+@font-face {
+  font-family: 'Cinzel-fallback';
+  src: local('Georgia');
+  ascent-override: 97.6%;
+  descent-override: 37.2%;
+  line-gap-override: 0%;
+  size-adjust: 150.02%;
+}
+
 /* Base styles */
 :root {
   --color-primary: #4f46e5;
   --color-primary-dark: #4338ca;
-  --font-title: 'Cinzel', serif;
+  --font-title: 'Cinzel', 'Cinzel-fallback', serif;
   --font-body: 'Libre Baskerville', serif;
 }
 

@@ -350,7 +350,7 @@ export default function LandingPage() {
           the prerender keeps them landing-only (see scripts/prerender.mjs).
           - Cinzel 400 woff2: the hero <h1> (font-title) is the measured LCP element.
           - video-poster.webp: the hero video's first paint. */}
-      <link rel="preload" as="font" type="font/woff2" href="/fonts/cinzel-400-latin.woff2" crossOrigin="anonymous" />
+      <link rel="preload" as="font" type="font/woff2" href="/fonts/cinzel-400-latin.woff2" crossOrigin="anonymous" fetchPriority="high" />
       <link rel="preload" as="image" href="/images/video-poster.webp" fetchPriority="high" />
 
       {/* Navigation - Fixed at top. z-40 (site convention, same as Navigation's
