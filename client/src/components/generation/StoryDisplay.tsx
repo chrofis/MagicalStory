@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users, Pencil, Wand2, Eye } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
@@ -1360,7 +1360,10 @@ export function StoryDisplay({
 
   // Use edited story in edit mode, otherwise use original
   const displayStory = isEditMode ? editedStory : story;
-  const storyPages = parseStoryPages(displayStory);
+  // parseStoryPages is a pure function of displayStory (reads no other scope),
+  // so memoizing on [displayStory] is complete. Avoids re-running the regex
+  // split on every poll-tick re-render.
+  const storyPages = useMemo(() => parseStoryPages(displayStory), [displayStory]);
   const hasImages = sceneImages.length > 0;
   // Canonical page count for rendering. sceneImages comes from /metadata
   // (length = backend's sceneCount = data.sceneImages.length). storyPages

@@ -17,6 +17,7 @@ const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropTo
 const { MODEL_PRICING } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
+const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
 
 // Maps callGeminiAPIForImage's evaluationType to a stable function-name tag
 // for the analyze-story-log cost rollup.
@@ -8538,37 +8539,12 @@ Output a single corrected image.`;
 // Grok image edits only support specific aspect ratios — pick the closest
 // preset for a given source (width, height). Used by character repair so we
 // don't send "1024:768" (which Grok may reject) and instead send "4:3".
-// Full set of aspect presets the Grok Imagine edit endpoint supports.
+// Full set of aspect presets the Grok Imagine edit endpoint supports lives
+// in ./grokAspect (GROK_ASPECT_PRESETS + closestGrokAspect), imported above.
+// The 13-preset set (incl 2:1, 1:2, 19.5:9, 9:19.5, 20:9, 9:20) gives tighter
+// snaps for odd cutout shapes so the scene extract can naturally match a
+// preset without any letterbox padding.
 // Source: https://docs.x.ai/developers/model-capabilities/images/generation
-// Previously we only listed 7 — the other 6 (2:1, 1:2, 19.5:9, 9:19.5, 20:9,
-// 9:20) give us tighter snaps for odd cutout shapes, so the scene extract
-// can naturally match a preset without any letterbox padding.
-const GROK_ASPECT_PRESETS = [
-  { name: '1:1',    value: 1.0 },
-  { name: '4:3',    value: 4 / 3 },
-  { name: '3:4',    value: 3 / 4 },
-  { name: '16:9',   value: 16 / 9 },
-  { name: '9:16',   value: 9 / 16 },
-  { name: '3:2',    value: 3 / 2 },
-  { name: '2:3',    value: 2 / 3 },
-  { name: '2:1',    value: 2 / 1 },
-  { name: '1:2',    value: 1 / 2 },
-  { name: '19.5:9', value: 19.5 / 9 },
-  { name: '9:19.5', value: 9 / 19.5 },
-  { name: '20:9',   value: 20 / 9 },
-  { name: '9:20',   value: 9 / 20 },
-];
-function closestGrokAspect(width, height) {
-  if (!width || !height) return '1:1';
-  const ratio = width / height;
-  let best = GROK_ASPECT_PRESETS[0];
-  let bestDist = Infinity;
-  for (const p of GROK_ASPECT_PRESETS) {
-    const d = Math.abs(p.value - ratio);
-    if (d < bestDist) { bestDist = d; best = p; }
-  }
-  return best.name;
-}
 
 /**
  * Pick an extract rectangle that naturally matches a Grok preset aspect.
@@ -8601,12 +8577,8 @@ function computePresetAlignedExtract({ pixelLeft, pixelTop, pixelWidth, pixelHei
 
   // Pick closest preset to the padded box aspect
   const baseRatio = baseW / baseH;
-  let best = GROK_ASPECT_PRESETS[0];
-  let bestDist = Infinity;
-  for (const p of GROK_ASPECT_PRESETS) {
-    const d = Math.abs(p.value - baseRatio);
-    if (d < bestDist) { bestDist = d; best = p; }
-  }
+  const presetName = closestGrokAspect(baseW, baseH);
+  const best = GROK_ASPECT_PRESETS.find(p => p.name === presetName);
 
   // Expand one axis to match preset exactly. Whichever axis grows, the other
   // stays at baseW / baseH so we only ADD scene pixels, never subtract.

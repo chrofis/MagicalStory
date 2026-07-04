@@ -143,6 +143,67 @@ function findSceneOrCover(sData, pageNum) {
 
 function getDbPool() { return getPool(); }
 
+// SPD-2: byte-exact replica of database.js `imgBytesAsync` — returns the inline
+// bytes when present, otherwise fetches from R2 and wraps as a data URI with the
+// same mime sniffing. Kept local because imgBytesAsync isn't exported; must stay
+// in lock-step with the source so partial-rehydrate consumers get an identical
+// string to the one the full rehydrate produced.
+async function imgRowToBytes(row) {
+  if (!row) return null;
+  if (row.image_data) return row.image_data;
+  if (!row.image_url) return null;
+  try {
+    const buf = await r2.fetchImageBytes(row.image_url);
+    if (!buf) return row.image_url;
+    const mime = buf[0] === 0x89 && buf[1] === 0x50 ? 'image/png'
+               : buf[0] === 0xFF && buf[1] === 0xD8 ? 'image/jpeg'
+               : buf[0] === 0x52 && buf[1] === 0x49 ? 'image/webp'
+               : 'image/jpeg';
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  } catch (err) {
+    log.warn(`[R2] imgRowToBytes fetch failed: ${err.message}`);
+    return row.image_url;
+  }
+}
+
+// SPD-2: rehydrate image bytes for a SINGLE scene page instead of the whole
+// story. `rehydrateStoryImages` (activeOnly) loads the active image for EVERY
+// page + cover (~50-100MB for a 30-page story), which OOM-503s under concurrent
+// repairs. The single-`:pageNum` handlers that call this only ever read the
+// target page's bytes, so we load just that one page. Behaviour matches the full
+// rehydrate's activeOnly path exactly: (1) copy the active version's
+// bboxDetection up to the scene root, (2) populate scene.imageData with the
+// active version's bytes (R2-safe via imgRowToBytes). Active-version selection
+// mirrors getActiveStoryImages — image_version_meta.activeVersion, falling back
+// to version_index 0 when unset or when that version row is missing. Only used
+// for scene pages (pageNumber >= 0); cover branches keep the full rehydrate.
+async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
+  const sceneEntry = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
+  if (!sceneEntry) return storyData; // page absent — route will 404 downstream
+
+  // bboxDetection mirror (pure in-memory, no bytes) — same as rehydrate.
+  const activeV = sceneEntry.imageVersions?.find(v => v.isActive);
+  if (activeV?.bboxDetection) sceneEntry.bboxDetection = activeV.bboxDetection;
+
+  if (sceneEntry.imageData) return storyData; // already inline (legacy blob)
+
+  const rows = await dbQuery(
+    `SELECT version_index, image_data, image_url FROM story_images
+     WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2
+     ORDER BY version_index`,
+    [storyId, pageNumber]
+  );
+  if (rows.length === 0) return storyData; // no separate rows → images still inline
+
+  const metaRows = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [storyId]);
+  const versionMeta = metaRows[0]?.image_version_meta || {};
+  const activeVersion = versionMeta[String(pageNumber)]?.activeVersion || 0;
+  const activeRow = rows.find(r => r.version_index === activeVersion)
+    || rows.find(r => r.version_index === 0);
+  sceneEntry.imageData = await imgRowToBytes(activeRow);
+  return storyData;
+}
+
 // Calculate token-based API cost for Gemini models
 function calculateTokenCost(modelId, inputTokens, outputTokens) {
   const pricing = MODEL_PRICING[modelId] || { input: 0.10, output: 0.40 };
@@ -1466,7 +1527,8 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
     const story = storyResult.rows[0];
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
-    storyData = await rehydrateStoryImages(id, storyData);
+    // SPD-2: single-page handler — load only this page's active image.
+    storyData = await rehydrateActivePageImage(id, storyData, pageNumber);
 
     const scene = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
     if (!scene || !scene.imageData) {
@@ -1591,7 +1653,13 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
     const story = storyResult.rows[0];
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
-    storyData = await rehydrateStoryImages(id, storyData);
+    // SPD-2: scene pages load only their own image; covers keep the full
+    // rehydrate (the cover branch below reads cover bytes).
+    if (pageNumber < 0) {
+      storyData = await rehydrateStoryImages(id, storyData);
+    } else {
+      storyData = await rehydrateActivePageImage(id, storyData, pageNumber);
+    }
     const artStyle = storyData.artStyle || 'pixar';
 
     // Get the current image for the page
@@ -1731,7 +1799,13 @@ router.post('/:id/analyze-style/:pageNum', authenticateToken, async (req, res) =
     const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
     let storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
-    storyData = await rehydrateStoryImages(id, storyData);
+    // SPD-2: scene pages load only their own image; covers keep the full
+    // rehydrate (the cover branch below reads cover bytes).
+    if (pageNumber < 0) {
+      storyData = await rehydrateStoryImages(id, storyData);
+    } else {
+      storyData = await rehydrateActivePageImage(id, storyData, pageNumber);
+    }
 
     let imageData;
     if (pageNumber < 0) {
@@ -2071,8 +2145,13 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       ? JSON.parse(story.data)
       : story.data;
 
-    // Rehydrate images from story_images table (images may be stripped from data blob)
-    storyData = await rehydrateStoryImages(id, storyData);
+    // SPD-2: scene pages load only their own image; cover iterations keep the
+    // full rehydrate (the cover branch reads cover bytes + versions).
+    if (pageNumber < 0) {
+      storyData = await rehydrateStoryImages(id, storyData);
+    } else {
+      storyData = await rehydrateActivePageImage(id, storyData, pageNumber);
+    }
 
     // Determine if this is a cover iteration (negative page numbers)
     const isCover = pageNumber < 0;
@@ -3040,8 +3119,8 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
       ? JSON.parse(story.data)
       : story.data;
 
-    // Rehydrate images from story_images table (images may be stripped from data blob)
-    storyData = await rehydrateStoryImages(id, storyData);
+    // SPD-2: single-page handler — load only this page's active image.
+    storyData = await rehydrateActivePageImage(id, storyData, pageNumber);
 
     // Get the current image
     const sceneImages = storyData.sceneImages || [];
@@ -3207,8 +3286,8 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
       ? JSON.parse(story.data)
       : story.data;
 
-    // Rehydrate images from story_images table (images may be stripped from data blob)
-    storyData = await rehydrateStoryImages(id, storyData);
+    // SPD-2: single-page handler — load only this page's active image.
+    storyData = await rehydrateActivePageImage(id, storyData, pageNumber);
 
     // Get the current image
     const sceneImages = storyData.sceneImages || [];
@@ -3817,7 +3896,13 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
     let storyData = typeof storyResult.rows[0].data === 'string'
       ? JSON.parse(storyResult.rows[0].data)
       : storyResult.rows[0].data;
-    storyData = await rehydrateStoryImages(id, storyData);
+    // SPD-2: scene pages load only their own image; covers keep the full
+    // rehydrate (the cover branch below reads cover bytes).
+    if (pageNumber < 0) {
+      storyData = await rehydrateStoryImages(id, storyData);
+    } else {
+      storyData = await rehydrateActivePageImage(id, storyData, pageNumber);
+    }
 
     // Find the page or cover
     let scene;
@@ -4073,7 +4158,13 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     let storyData = typeof storyResult.rows[0].data === 'string'
       ? JSON.parse(storyResult.rows[0].data)
       : storyResult.rows[0].data;
-    storyData = await rehydrateStoryImages(id, storyData);
+    // SPD-2: scene pages load only their own image; covers keep the full
+    // rehydrate (the cover branch below reads cover bytes).
+    if (pageNumber < 0) {
+      storyData = await rehydrateStoryImages(id, storyData);
+    } else {
+      storyData = await rehydrateActivePageImage(id, storyData, pageNumber);
+    }
 
     // Find scene
     const isCover = pageNumber < 0;
@@ -4408,7 +4499,13 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
     const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
     let storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
-    storyData = await rehydrateStoryImages(id, storyData);
+    // SPD-2: scene pages load only their own image; covers keep the full
+    // rehydrate (the cover branch below reads cover bytes).
+    if (pageNumber < 0) {
+      storyData = await rehydrateStoryImages(id, storyData);
+    } else {
+      storyData = await rehydrateActivePageImage(id, storyData, pageNumber);
+    }
 
     const isCover = pageNumber < 0;
     let scene, imageData;

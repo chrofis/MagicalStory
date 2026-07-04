@@ -41,6 +41,8 @@ const { log } = require('../utils/logger');
 const { generateWithGrok, editWithGrok, GROK_MODELS } = require('./grok');
 const { renderCharacterInPhantomPose } = require('./phantomPoseRender');
 const { stripDataUriPrefix } = require('./r2');
+const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
+const { rembgRemoveBackground } = require('./rembg');
 
 const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 
@@ -91,30 +93,8 @@ const DEFAULT_PALETTE_NAMES = {
 // background (which is already white inside the masked crop), so we lose
 // no silhouette pixels. After Grok returns, we extract the original crop
 // region back out of the padded output.
-const GROK_ASPECT_PRESETS = [
-  { name: '1:1',    ratio: 1 },
-  { name: '3:4',    ratio: 3 / 4 },
-  { name: '4:3',    ratio: 4 / 3 },
-  { name: '9:16',   ratio: 9 / 16 },
-  { name: '16:9',   ratio: 16 / 9 },
-  { name: '2:3',    ratio: 2 / 3 },
-  { name: '3:2',    ratio: 3 / 2 },
-  { name: '1:2',    ratio: 0.5 },
-  { name: '2:1',    ratio: 2 },
-  { name: '9:19.5', ratio: 9 / 19.5 },
-  { name: '19.5:9', ratio: 19.5 / 9 },
-  { name: '9:20',   ratio: 9 / 20 },
-  { name: '20:9',   ratio: 20 / 9 },
-];
-function nearestGrokAspect(w, h) {
-  const r = w / h;
-  let best = GROK_ASPECT_PRESETS[0], bestDiff = Math.abs(r - best.ratio);
-  for (const p of GROK_ASPECT_PRESETS) {
-    const d = Math.abs(r - p.ratio);
-    if (d < bestDiff) { bestDiff = d; best = p; }
-  }
-  return best;
-}
+// The preset set + nearest-preset lookup live in ./grokAspect (imported
+// above as GROK_ASPECT_PRESETS + closestGrokAspect).
 
 // ─── Silhouette colour match — RGB Euclidean distance ────────────────────
 //
@@ -463,24 +443,9 @@ async function cropSheetCell(sheetBuf, cellIdx) {
 
 /** Background-remove via the Python rembg service; white-threshold fallback. */
 async function removeBackground(buf) {
-  try {
-    const b64 = buf.toString('base64');
-    const r = await fetch(`${PHOTO_ANALYZER_URL}/remove-bg`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: `data:image/png;base64,${b64}` }),
-      signal: AbortSignal.timeout(60000),
-    });
-    if (!r.ok) throw new Error(`rembg ${r.status}`);
-    const data = await r.json();
-    const out = data.image || data.result || data.data;
-    if (!out) throw new Error('rembg returned no image');
-    const cleanB64 = stripDataUriPrefix(String(out));
-    return Buffer.from(cleanB64, 'base64');
-  } catch (err) {
-    log.warn(`[SCENE COMPOSITE] rembg fallback to threshold: ${err.message}`);
-    return whiteToTransparent(buf);
-  }
+  const out = await rembgRemoveBackground(buf);
+  if (out) return out;
+  return whiteToTransparent(buf);
 }
 
 async function whiteToTransparent(buf, threshold = 240) {
@@ -2077,8 +2042,8 @@ async function _stratifiedBody(ctx) {
   // silhouettes is already white, so the pad is invisible at composite time.
   // Track the pad offsets so we can extract the original cropW×cropH region
   // back out of the Grok output before alignment.
-  const preset = nearestGrokAspect(cropW, cropH);
-  const targetRatio = preset.ratio;
+  const presetName = closestGrokAspect(cropW, cropH);
+  const targetRatio = GROK_ASPECT_PRESETS.find(p => p.name === presetName).value;
   const currentRatio = cropW / cropH;
   let paddedW = cropW, paddedH = cropH, padLeft = 0, padTop = 0;
   if (currentRatio < targetRatio) {
@@ -2090,7 +2055,7 @@ async function _stratifiedBody(ctx) {
   }
   const padRight = paddedW - cropW - padLeft;
   const padBottom = paddedH - cropH - padTop;
-  log.info(`[SCENE COMPOSITE/STRATIFIED]   pad to preset ${preset.name}: ${cropW}×${cropH} → ${paddedW}×${paddedH} (pad L${padLeft} T${padTop} R${padRight} B${padBottom})`);
+  log.info(`[SCENE COMPOSITE/STRATIFIED]   pad to preset ${presetName}: ${cropW}×${cropH} → ${paddedW}×${paddedH} (pad L${padLeft} T${padTop} R${padRight} B${padBottom})`);
   const maskedInputBuf = await sharp(maskedInputRgb, { raw: { width: cropW, height: cropH, channels: 3 } })
     .extend({ top: padTop, bottom: padBottom, left: padLeft, right: padRight, background: '#ffffff' })
     .png()

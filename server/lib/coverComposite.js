@@ -47,9 +47,9 @@ const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
 const { coverLabel } = require('./coverKeys');
 const { stripDataUriPrefix } = require('./r2');
+const { rembgRemoveBackground } = require('./rembg');
 const { getStandardAvatar } = require('./characterPhotos');
 
-const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 const XAI_API_URL = 'https://api.x.ai/v1';
 
 // ─── Real-world heights by age (cm) — for figure scale ─────────────────
@@ -276,24 +276,8 @@ async function extractQuadrant(buffer, which = 'body-front') {
 
 // ─── Background removal (rembg via Python service, chroma-key fallback) ──
 async function removeBackground(buf) {
-  // Try Python rembg first
-  try {
-    const dataUrl = `data:image/png;base64,${buf.toString('base64')}`;
-    const r = await fetch(`${PHOTO_ANALYZER_URL}/remove-bg`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: dataUrl, max_size: 1024 }),
-      signal: AbortSignal.timeout(60000),
-    });
-    if (r.ok) {
-      const j = await r.json();
-      if (j.success && j.image) {
-        return Buffer.from(stripDataUriPrefix(j.image), 'base64');
-      }
-    }
-  } catch (e) {
-    log.warn(`[COVER-COMPOSITE] rembg failed: ${e.message}`);
-  }
+  const out = await rembgRemoveBackground(buf, { maxSize: 1024 });
+  if (out) return out;
   // Fallback: edge-flood chroma-key
   return chromaKeyBg(buf, 45);
 }
