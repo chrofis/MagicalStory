@@ -983,3 +983,31 @@ the new strictness from regenerating good covers for facing the camera.
 **Touched:** `server/lib/images.js` (`evaluateImageQuality` gates + cover note),
 `prompts/story-unified.txt` (cover GAZES AT rule).
 **Status:** ✅ active.
+
+---
+
+## 2026-07-04 — Code-review cleanup: 18 fixes shipped, 6 structural refactors deferred
+
+**Context:** The 2026-07-04 high-effort review (docs/review-2026-07-04.html) found
+43 issues. 19 P0/P1 (security/billing/pipeline) shipped earlier. A follow-up pass
+implemented the remaining contained findings.
+
+**Decision:** Shipped 18 more to staging — DUP-1..7 (dedup: data-URI strip x56,
+withRetry, image-metadata/costume-key helpers, grokAspect + rembg modules), SW-1..5
+(collapse dead composite gate to single source `enableSceneComposite:false`; delete
+dead storyAvatarGeneration.js + face-comparison code + phantomPoseRender flag),
+SPD-1..6 (poll knownPages dedup, per-page rehydrate on repair endpoints,
+structuredClone + parallel image inserts, parallel cover bbox, useMemo parse),
+STR-6 (7 inline prompts → prompts/*.txt). Deferred 6 structural refactors
+(STR-1 pipeline split, STR-2 images.js god-file split, STR-3 positional-args→object,
+STR-4 25-endpoint ownership middleware, STR-5 StoryDisplay split, VAR-1 image-version
+data-model unification) to individual staging-tested PRs.
+
+**Rationale:** The 18 are behavior-preserving and provable by the generation
+showcase. The 6 deferred touch god-files / 25 repair endpoints / persisted data that
+one autonomous showcase cannot validate; bundling them would risk the safety gate.
+Each has a concrete plan.
+
+**Touched:** ~30 files across server/lib, server/routes, server.js, config/models.js,
+client; new lib/grokAspect.js, lib/rembg.js, utils/imageMetadata.js, utils/costumeKey.js.
+**Status:** ✅ active. Plans: docs/review-2026-07-04-structural-plan.md.
