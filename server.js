@@ -1546,8 +1546,21 @@ if (authRoutes.initAuthRoutes) {
 }
 
 if (hasDistFolder) {
-  // Serve the built React app from dist/
-  app.use(express.static(distPath, { index: false }));
+  // Serve the built React app from dist/. express.static defaults to
+  // Cache-Control: max-age=0, so every hashed bundle (index-<hash>.js/.css) was
+  // re-downloaded on every visit. Vite content-hashes everything under /assets/,
+  // so those are safe to cache immutably forever; /fonts/ are stable too. HTML
+  // and other unhashed files keep the default (revalidate) so deploys show up.
+  app.use(express.static(distPath, {
+    index: false,
+    setHeaders: (res, filePath) => {
+      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else if (filePath.includes(`${path.sep}fonts${path.sep}`)) {
+        res.setHeader('Cache-Control', 'public, max-age=2592000');
+      }
+    },
+  }));
   log.debug('📦 Serving built React app from dist/');
 } else {
   // Fallback to legacy: serve files from project root (index.html with Babel)
