@@ -253,6 +253,60 @@ const sectionTranslations = {
   },
 };
 
+// Real friends-&-family testimonials — approved wording, deliberately
+// Swiss-understated (restraint reads as sincerity here). First name + town shown
+// with permission; no invented star ratings or review counts.
+const TESTIMONIALS_HEADING: Record<string, string> = {
+  de: 'Was Familien sagen',
+  en: 'What families say',
+  fr: 'Ce que disent les familles',
+  it: 'Cosa dicono le famiglie',
+};
+const TESTIMONIALS: { name: string; town: string; quote: Record<string, string> }[] = [
+  { name: 'Franziska', town: 'Ennetbaden', quote: {
+    de: `«Mein Sohn nimmt das Buch erstaunlich oft hervor. Dass er selbst darin vorkommt, hat ihn mehr gepackt als erwartet.»`,
+    en: `"My son picks the book up surprisingly often. That he's in it himself grabbed him more than I expected."`,
+    fr: `«Mon fils ressort le livre étonnamment souvent. Le fait qu'il y figure lui-même l'a captivé plus que prévu.»`,
+    it: `«Mio figlio riprende in mano il libro sorprendentemente spesso. Il fatto di esserci lui stesso lo ha coinvolto più del previsto.»`,
+  } },
+  { name: 'Corina & Roland', town: 'Bremgarten', quote: {
+    de: `«Schön fanden wir, dass die Geschichte an Orten spielt, die wir kennen. Das macht sie für die Kinder gleich näher.»`,
+    en: `"We liked that the story is set in places we know. It makes it feel closer for the kids."`,
+    fr: `«Nous avons apprécié que l'histoire se déroule dans des lieux que nous connaissons. Cela la rend plus proche pour les enfants.»`,
+    it: `«Ci è piaciuto che la storia si svolga in luoghi che conosciamo. La rende più vicina per i bambini.»`,
+  } },
+  { name: 'Nicole & Petar', town: 'Zürich', quote: {
+    de: `«Wir haben es zum Geburtstag verschenkt. Mal etwas anderes als das übliche Spielzeug.»`,
+    en: `"We gave it as a birthday present. For once, something other than the usual toy."`,
+    fr: `«Nous l'avons offert pour un anniversaire. Pour une fois, autre chose que le jouet habituel.»`,
+    it: `«L'abbiamo regalato per un compleanno. Per una volta qualcosa di diverso dal solito giocattolo.»`,
+  } },
+  { name: 'Verena & Werner', town: 'Baden', quote: {
+    de: `«Wir lesen es mit den Enkeln – für einmal ein Geschenk mit etwas Bestand.»`,
+    en: `"We read it with our grandchildren – for once, a gift with some lasting value."`,
+    fr: `«Nous le lisons avec nos petits-enfants – pour une fois, un cadeau qui dure.»`,
+    it: `«Lo leggiamo con i nipoti – per una volta un regalo che dura.»`,
+  } },
+  { name: 'Renate & Ehsan', town: 'Bern', quote: {
+    de: `«Unsere Tochter hat sich die Geschichte übers Zähneputzen gemerkt und macht seither weniger Theater. Mehr wollten wir gar nicht.»`,
+    en: `"Our daughter remembered the story about brushing teeth and has made less fuss since. That's all we wanted."`,
+    fr: `«Notre fille a retenu l'histoire sur le brossage des dents et fait moins d'histoires depuis. Nous n'en demandions pas plus.»`,
+    it: `«Nostra figlia si è ricordata della storia sul lavarsi i denti e da allora fa meno storie. Non chiedevamo altro.»`,
+  } },
+  { name: 'Christoph', town: 'Würenlos', quote: {
+    de: `«Ging schneller als gedacht, und das gedruckte Buch ist ordentlich geworden. Hatte ehrlich weniger erwartet.»`,
+    en: `"Went faster than I thought, and the printed book turned out decent. Honestly expected less."`,
+    fr: `«C'est allé plus vite que prévu, et le livre imprimé est bien fait. J'en attendais honnêtement moins.»`,
+    it: `«È stato più veloce del previsto e il libro stampato è venuto bene. Onestamente mi aspettavo meno.»`,
+  } },
+  { name: 'Martin & Ursula', town: 'Solothurn', quote: {
+    de: `«Waren zuerst skeptisch, ob so etwas funktioniert. Das Ergebnis hat uns dann positiv überrascht.»`,
+    en: `"We were skeptical at first whether this would work. The result then pleasantly surprised us."`,
+    fr: `«Nous étions d'abord sceptiques quant au fonctionnement. Le résultat nous a ensuite agréablement surpris.»`,
+    it: `«All'inizio eravamo scettici se una cosa così funzionasse. Il risultato ci ha poi piacevolmente sorpreso.»`,
+  } },
+];
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -765,6 +819,27 @@ export default function LandingPage() {
                 className="w-full h-auto rounded-2xl shadow-lg"
               />
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-stone-50">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl lg:text-4xl font-title text-stone-900 text-center mb-10 lg:mb-14">
+            {TESTIMONIALS_HEADING[language] || TESTIMONIALS_HEADING.en}
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {TESTIMONIALS.map((tm, i) => (
+              <figure key={i} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 flex flex-col">
+                <blockquote className="text-stone-700 leading-relaxed flex-1">
+                  {tm.quote[language] || tm.quote.en}
+                </blockquote>
+                <figcaption className="mt-4 text-sm font-semibold text-stone-500">
+                  {tm.name}, {tm.town}
+                </figcaption>
+              </figure>
+            ))}
           </div>
         </div>
       </section>
