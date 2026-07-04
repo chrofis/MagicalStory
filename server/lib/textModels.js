@@ -7,6 +7,7 @@
 const { log } = require('../utils/logger');
 const { TEXT_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { withAnthropic, withGemini, withGrok } = require('./aiConcurrency');
+const apiHealth = require('./apiHealth');
 
 // Get active model from environment (legacy - prefer MODEL_DEFAULTS)
 const TEXT_MODEL = process.env.TEXT_MODEL || 'claude-sonnet';
@@ -27,6 +28,10 @@ async function withRetry(fn, options = {}) {
       return await fn();
     } catch (error) {
       lastError = error;
+
+      // Record rate-limit / overload hits (Anthropic 429/529 etc.) so they
+      // surface in the daily summary. Best-effort, never blocks the retry.
+      if (apiHealth.isLimitError(error)) apiHealth.recordApiError(error);
 
       // Check if error is retryable (network errors, timeouts, 5xx, 429).
       // Anthropic/xAI attach error.status on HTTP failures; retrying 4xx
@@ -506,29 +511,39 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
  * Call Google Gemini API for text generation
  * Includes retry logic with fallback to gemini-2.0-flash on empty responses
  */
-async function callGeminiTextAPI(prompt, maxTokens, modelId) {
+async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
     throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
   }
 
+  // PIPE-9: options used to be silently dropped on the google branch. Support the
+  // common ones (system, prefill) additively; warn loudly for image inputs which
+  // this text path cannot carry (callers must use the vision path instead).
+  const prefill = options && options.prefill;
+  if (options && Array.isArray(options.images) && options.images.length) {
+    log.warn('⚠️ [GEMINI TEXT] image options are not supported by callGeminiTextAPI — use the vision path; images were ignored');
+  }
+
   const callAPI = async (model) => {
     return withGemini(() => withRetry(async () => {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const reqBody = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          temperature: 0.7
+        }
+      };
+      if (options && options.system) reqBody.systemInstruction = { parts: [{ text: options.system }] };
+      // Prefill: seed a model turn so the model continues from it (e.g. '{' for JSON).
+      if (prefill) reqBody.contents.push({ role: 'model', parts: [{ text: prefill }] });
       return fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: AbortSignal.timeout(120000),
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }]
-          }],
-          generationConfig: {
-            maxOutputTokens: maxTokens,
-            temperature: 0.7
-          }
-        })
+        body: JSON.stringify(reqBody)
       });
     }, { maxRetries: 2, baseDelay: 2000 }));
   };
@@ -562,7 +577,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
       if (grokFallbackModel && process.env.XAI_API_KEY) {
         log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with grok-4-fast...`);
         try {
-          const grokResult = await callXaiAPI(prompt, maxTokens, grokFallbackModel.modelId, {});
+          const grokResult = await callXaiAPI(prompt, maxTokens, grokFallbackModel.modelId, prefill ? { prefill } : {});
           return { ...grokResult, modelId: grokFallbackModel.modelId };
         } catch (grokErr) {
           log.warn(`⚠️  [GEMINI] Grok fallback also failed: ${grokErr.message}, trying gemini-2.0-flash...`);
@@ -587,8 +602,11 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
     }
   }
 
+  // With a seeded model turn, Gemini returns only the continuation — prepend the
+  // prefill so callers get the complete text (mirrors the Anthropic path).
+  const geminiText = data.candidates[0].content.parts[0].text;
   return {
-    text: data.candidates[0].content.parts[0].text,
+    text: prefill ? prefill + geminiText : geminiText,
     usage: {
       input_tokens: inputTokens,
       output_tokens: outputTokens,
@@ -822,7 +840,7 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, opt
       result = await callAnthropicAPI(prompt, effectiveMaxTokens, model.modelId, options);
       break;
     case 'google':
-      result = await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId);
+      result = await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId, options);
       break;
     case 'xai':
       result = await callXaiAPI(prompt, effectiveMaxTokens, model.modelId, options);

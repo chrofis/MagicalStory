@@ -15,7 +15,7 @@ const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
 const { dbToArrayIndex } = require('../lib/versionManager');
 const { generateTextOverlay } = require('../lib/textOverlayRenderer');
-const { enforceSpreadTextPosition } = require('../lib/storyHelpers');
+const { enforceSpreadTextPosition, updatePageText } = require('../lib/storyHelpers');
 const { getTextAreaMask } = require('../lib/textMasks');
 const { loadVbReferenceBytes } = require('../lib/characterPhotos');
 
@@ -3010,9 +3010,16 @@ router.post('/', authenticateToken, async (req, res) => {
     let isNewStory;
 
     if (isDatabaseMode()) {
-      // Check if story exists
-      const existing = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [story.id, req.user.id]);
-      isNewStory = existing.length === 0;
+      // Ownership guard (SEC-1): a story id is client-supplied, so check whether
+      // it already belongs to a DIFFERENT user before upserting. upsertStory does
+      // ON CONFLICT(id) DO UPDATE SET user_id=EXCLUDED.user_id with no user filter,
+      // so without this guard any user could hijack/overwrite another user's story.
+      const owner = await dbQuery('SELECT user_id FROM stories WHERE id = $1', [story.id]);
+      if (owner.length > 0 && String(owner[0].user_id) !== String(req.user.id)) {
+        console.warn(`⛔ [SEC] User ${req.user.id} attempted to overwrite story ${story.id} owned by ${owner[0].user_id}`);
+        return res.status(403).json({ error: 'You do not have permission to modify this story' });
+      }
+      isNewStory = owner.length === 0;
 
       // Save story (automatically extracts images to story_images table)
       // Use upsertStory which handles both insert and update
@@ -3079,18 +3086,9 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Helper function to update page text
-function updatePageText(storyText, pageNumber, newText) {
-  const pageRegex = new RegExp(`(Page ${pageNumber}[:\\s]*\\n?)([\\s\\S]*?)(?=Page \\d+|$)`, 'i');
-  const match = storyText.match(pageRegex);
-
-  if (match) {
-    return storyText.replace(pageRegex, `$1${newText}\n\n`);
-  }
-  return storyText;
-}
-
 // PATCH /api/stories/:id/page/:pageNum - Update page text or scene description
+// (updatePageText is imported from ../lib/storyHelpers — the single multilingual,
+//  $-escaping implementation; the old English-only local copy was removed.)
 router.patch('/:id/page/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
@@ -3120,9 +3118,15 @@ router.patch('/:id/page/:pageNum', authenticateToken, async (req, res) => {
     const story = storyResult.rows[0];
     const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
 
-    // Update page text if provided
+    // Update page text if provided. Readers prefer data->'story' (COALESCE), and
+    // unified stories carry both 'story' (canonical) and 'storyText' (compat), so
+    // edit whichever source exists and write BOTH fields (PIPE-1) — otherwise the
+    // edit lands in the shadowed field and never surfaces in viewer/PDF/share.
     if (text !== undefined) {
-      storyData.storyText = updatePageText(storyData.storyText, pageNumber, text);
+      const source = storyData.story || storyData.storyText || '';
+      const updated = updatePageText(source, pageNumber, text);
+      if (storyData.story !== undefined) storyData.story = updated;
+      storyData.storyText = updated;
     }
 
     // Update scene description if provided

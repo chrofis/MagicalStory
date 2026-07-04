@@ -1374,8 +1374,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
       if (!matchingFigure) {
         matchingFigure = figures.find(f => {
           const label = (f.label || '').toLowerCase();
-          // Match if character name appears as a complete word in the label
-          const namePattern = new RegExp(`\\b${charNameLower}\\b`, 'i');
+          // Match if character name appears as a complete word in the label.
+          // Escape regex metacharacters (PIPE-8) — names like "Lea (Mami)" or "A+"
+          // would otherwise mis-match or throw SyntaxError (swallowed upstream →
+          // entity check silently disabled for the whole story).
+          const escapedName = charNameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const namePattern = new RegExp(`\\b${escapedName}\\b`, 'i');
           return namePattern.test(label);
         });
       }

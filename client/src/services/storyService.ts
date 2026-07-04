@@ -1138,10 +1138,10 @@ export const storyService = {
     sceneDescription?: string;
     imageData?: string;
   }): Promise<void> {
+    // Server reads camelCase (req.body.{text,sceneDescription}); send matching keys (PIPE-4).
     await api.patch(`/api/stories/${storyId}/page/${pageNum}`, {
       text: data.text,
-      scene_description: data.sceneDescription,
-      image_data: data.imageData,
+      sceneDescription: data.sceneDescription,
     });
   },
 

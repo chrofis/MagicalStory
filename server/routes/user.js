@@ -374,32 +374,50 @@ router.get('/orders', authenticateToken, async (req, res) => {
   }
 });
 
-// PUT /api/user/update-email - Update user's email address
+// PUT /api/user/update-email - Update user's login email address
+// SEC-2: require the current password (re-auth), and reset email_verified so the
+// new address must be re-verified before story generation (jobs.js gate). Without
+// these, a verified user could rotate to any unowned address while staying "verified",
+// bypassing the email-verification gate, and a session hijacker could silently
+// re-point the login email without the password.
 router.put('/update-email', authenticateToken, async (req, res) => {
   try {
-    const { newEmail } = req.body;
+    const bcrypt = require('bcryptjs');
+    const newEmail = req.body.newEmail || req.body.email; // accept both key names
+    const { password } = req.body;
 
     if (!newEmail || !newEmail.includes('@')) {
       return res.status(400).json({ error: 'Invalid email address' });
     }
+    if (!password) {
+      return res.status(400).json({ error: 'Current password is required to change email' });
+    }
 
-    if (isDatabaseMode()) {
-      // Check if email already exists
-      const checkQuery = 'SELECT id FROM users WHERE username = $1 AND id != $2';
-      const existing = await dbQuery(checkQuery, [newEmail, req.user.id]);
-
-      if (existing.length > 0) {
-        return res.status(400).json({ error: 'Email already in use' });
-      }
-
-      const updateQuery = 'UPDATE users SET username = $1 WHERE id = $2';
-      await dbQuery(updateQuery, [newEmail, req.user.id]);
-
-      await logActivity(req.user.id, newEmail, 'EMAIL_UPDATED', { oldEmail: req.user.username });
-      res.json({ success: true, username: newEmail });
-    } else {
+    if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
+
+    // Verify current password
+    const userRows = await dbQuery('SELECT password FROM users WHERE id = $1', [req.user.id]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const valid = userRows[0].password && await bcrypt.compare(password, userRows[0].password);
+    if (!valid) {
+      return res.status(401).json({ error: 'Incorrect password' });
+    }
+
+    // Check if email already in use by another account
+    const existing = await dbQuery('SELECT id FROM users WHERE username = $1 AND id != $2', [newEmail, req.user.id]);
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'Email already in use' });
+    }
+
+    // Update login email + mirror email column, and require re-verification of the new address
+    await dbQuery('UPDATE users SET username = $1, email = $1, email_verified = FALSE WHERE id = $2', [newEmail, req.user.id]);
+
+    await logActivity(req.user.id, newEmail, 'EMAIL_UPDATED', { oldEmail: req.user.username });
+    res.json({ success: true, username: newEmail, requiresVerification: true });
   } catch (err) {
     console.error('Error updating email:', err);
     res.status(500).json({ error: 'Failed to update email' });

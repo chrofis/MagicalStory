@@ -122,6 +122,18 @@ const trialAvatarLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Story-ideas limiter (BILL-3): these endpoints call Claude but cost no credits,
+// so without a dedicated cap the only guard is the 100/min global apiLimiter —
+// enough for a single abuser to burn hundreds of dollars. 30 per 15 min per IP
+// is generous for real browsing while bounding runaway spend.
+const storyIdeasLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,
+  message: { error: 'Too many story-idea requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 /** Reset trial-related stores from this module */
 function resetTrialMiddlewareStores() {
   trialAvatarStore.resetAll();
@@ -138,5 +150,6 @@ module.exports = {
   imageRegenerationLimiter,
   jobStatusLimiter,
   trialAvatarLimiter,
+  storyIdeasLimiter,
   resetTrialMiddlewareStores,
 };

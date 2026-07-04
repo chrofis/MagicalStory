@@ -94,8 +94,9 @@ export const authService = {
     };
   },
 
-  async updateEmail(email: string): Promise<void> {
-    await api.put('/api/user/update-email', { email });
+  async updateEmail(email: string, password: string): Promise<void> {
+    // Server requires current-password re-auth and re-verifies the new address (SEC-2).
+    await api.put('/api/user/update-email', { email, password });
   },
 
   async getShippingAddress(): Promise<{

@@ -358,15 +358,17 @@ async function detectBboxOnCovers(coverImages, characters) {
 
   const coverTypes = ['frontCover', 'initialPage', 'backCover'];
 
-  for (const coverType of coverTypes) {
+  // SPD-5: the three covers are independent (each writes only its own object),
+  // so detect them concurrently instead of sequentially (~25-45s → ~8-15s).
+  await Promise.all(coverTypes.map(async (coverType) => {
     const cover = coverImages[coverType];
-    if (!cover) continue;
+    if (!cover) return;
 
     const imageData = cover.imageData;
-    if (!imageData) continue;
+    if (!imageData) return;
 
     // Skip if already has bbox detection
-    if (cover.bboxDetection) continue;
+    if (cover.bboxDetection) return;
 
     // Use cover's referencePhotos (only the characters that appear on THIS cover)
     // Fall back to all characters if referencePhotos not available
@@ -426,7 +428,7 @@ async function detectBboxOnCovers(coverImages, characters) {
     } catch (err) {
       log.warn(`⚠️ [COVER BBOX] Failed to detect bbox on ${coverType}: ${err.message}`);
     }
-  }
+  }));
 
   return coverImages;
 }
@@ -1220,7 +1222,15 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
       return res.status(500).json({ error: 'Webhook secret not configured' });
     }
 
-    if (receivedSecret !== webhookSecret) {
+    // Constant-time comparison (SEC-3) — matches the timingSafeEqual standard the
+    // repo adopted for the trial admin-secret check; a plain !== leaks timing.
+    const secretOk = (() => {
+      if (typeof receivedSecret !== 'string') return false;
+      const a = Buffer.from(receivedSecret);
+      const b = Buffer.from(webhookSecret);
+      return a.length === b.length && crypto.timingSafeEqual(a, b);
+    })();
+    if (!secretOk) {
       log.warn('⚠️ [GELATO WEBHOOK] Invalid or missing authorization header');
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -4056,7 +4066,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // before reading element refs, and skip the post-finalize call below to
         // avoid duplicate work.
         if (inputData.trialMode && !skipImages && artStyle !== 'realistic') {
-          const refSheetModel = MODEL_DEFAULTS.image;
+          const refSheetModel = MODEL_DEFAULTS.pageImage; // PIPE-7: was MODEL_DEFAULTS.image (nonexistent → undefined → wrong style variant)
           const refSheetBackend = IMAGE_MODELS[refSheetModel]?.backend || null;
           const styleDescriptionForRefs = resolveArtStyle(artStyle, refSheetBackend) || resolveArtStyle('pixar');
           trialReferenceSheetPromise = generateReferenceSheet(streamingVisualBible, styleDescriptionForRefs, {
@@ -4600,7 +4610,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // wider element scope (maxElements: null) is the right default.
     let referenceSheetPromise = inputData.trialMode ? trialReferenceSheetPromise : null;
     if (!inputData.trialMode && !skipImages) {
-      const refSheetModel = MODEL_DEFAULTS.image;
+      const refSheetModel = MODEL_DEFAULTS.pageImage; // PIPE-7: was MODEL_DEFAULTS.image (nonexistent)
       const refSheetBackend = IMAGE_MODELS[refSheetModel]?.backend || null;
       const styleDescription = resolveArtStyle(artStyle, refSheetBackend) || resolveArtStyle('pixar');
       referenceSheetPromise = generateReferenceSheet(visualBible, styleDescription, {

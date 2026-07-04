@@ -12,6 +12,7 @@ const path = require('path');
 
 // Middleware
 const { authenticateToken } = require('../middleware/auth');
+const { storyIdeasLimiter } = require('../middleware/rateLimit');
 
 // Services
 const { log } = require('../utils/logger');
@@ -269,7 +270,7 @@ ${adventureGuideContent}`
 }
 
 // Generate story ideas endpoint - FREE, no credits
-router.post('/generate-story-ideas', authenticateToken, async (req, res) => {
+router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async (req, res) => {
   try {
     const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season } = req.body;
 
@@ -500,7 +501,7 @@ ${landmarkEntries}`;
 });
 
 // SSE Streaming endpoint for story ideas - streams each story as it completes
-router.post('/generate-story-ideas-stream', authenticateToken, async (req, res) => {
+router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter, async (req, res) => {
   // Set up SSE headers. Don't set Connection: keep-alive — it's forbidden in
   // HTTP/2 (RFC 7540 §8.1.2.2) and Cloudflare/Railway hand the response to
   // the browser over HTTP/2, which then drops the frame with

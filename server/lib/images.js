@@ -12132,8 +12132,11 @@ IMPORTANT:
 - Match the art style, lighting, and color palette of the surrounding image
 - Make the repaired areas blend seamlessly with the rest`;
 
-  // 3. Send to Grok — detect aspect ratio from original image dimensions
-  const aspectRatio = width > height ? '16:9' : height > width ? '9:16' : '1:1';
+  // 3. Send to Grok — snap to the nearest SUPPORTED Grok preset (PIPE-6).
+  // The old 3-way 16:9/9:16/1:1 guess turned 3:4 pages into 9:16, then the
+  // fit:'fill' resize below stretched every repaired region ~33%. closestGrokAspect
+  // includes 3:4/4:3/2:3/etc. so the returned image already matches the page shape.
+  const aspectRatio = closestGrokAspect(width, height);
   log.info(`🔧 [INPAINT-GROK] Sending ${boundingBoxes.length} region(s) to Grok for repair (aspect: ${aspectRatio})`);
 
   const grokResult = await editWithGrok(grokPrompt, [whiteoutDataUri], {

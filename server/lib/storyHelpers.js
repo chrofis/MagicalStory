@@ -4688,11 +4688,21 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // stamped with a name — Grok copies a printed name straight into the scene,
     // which is how child names leaked onto pages). Tell Grok which card is whom
     // by colour, and that the frame colour is an identifier only. Must use the
-    // SAME frameColorForName() assignment as the baked frames (grok.js).
-    const allSceneNames = sceneCharacters.map(c => c.name);
+    // SAME frameColorForName() canon as the baked frames (grok.js).
+    //
+    // PIPE-5: grok.js frames cards ONLY for characters that actually have a
+    // reference photo on this page (referencePhotos, after any OTS/background
+    // filtering), so the colour canon MUST be that same filtered set. Building it
+    // from ALL sceneCharacters diverges in membership → colours bind to the wrong
+    // character (identity swap) whenever a character's photo is dropped.
+    const cardNames = (referencePhotos || []).map(p => p && p.name).filter(Boolean);
+    const cardSet = new Set(cardNames.map(n => n.toLowerCase()));
+    const canonNames = cardNames.length ? cardNames : sceneCharacters.map(c => c.name);
     const frameLines = [];
     for (const c of sceneCharacters) {
-      const col = frameColorForName(c.name, allSceneNames);
+      // Only characters with a reference card get a colour line (matches grok.js).
+      if (cardNames.length && !cardSet.has(String(c.name).toLowerCase())) continue;
+      const col = frameColorForName(c.name, canonNames);
       if (col) frameLines.push(`- ${col.label} frame = ${c.name}`);
     }
     if (frameLines.length > 0) {
@@ -5972,8 +5982,12 @@ function updatePageText(storyText, pageNumber, newText) {
   const pageRegex = new RegExp(`((?:---|##)\\s*(?:Page|Seite|Página|Pagina)\\s+${safeNum}\\s*(?:---|\\n))([\\s\\S]*?)(?=(?:---|##)\\s*(?:Page|Seite|Página|Pagina)\\s+\\d+|$)`, 'i');
   const match = storyText.match(pageRegex);
 
+  // Escape '$' in the user-supplied replacement so sequences like $1/$&/$` in the
+  // edited text aren't interpreted as regex capture-group references (PIPE-3).
+  const safeText = String(newText == null ? '' : newText).replace(/\$/g, '$$$$');
+
   if (match) {
-    return storyText.replace(pageRegex, `$1\n${newText}\n`);
+    return storyText.replace(pageRegex, `$1\n${safeText}\n`);
   } else {
     // Page doesn't exist, append it
     return storyText + `\n--- Page ${safeNum} ---\n${newText}\n`;

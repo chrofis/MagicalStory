@@ -365,9 +365,17 @@ async function iterateCover(coverKey, storyData, options = {}) {
       if (storyId) {
         const activeIdx = await getActiveVersion(storyId, coverKey);
         const row = await getStoryImage(storyId, coverKey, null, activeIdx);
-        rehydratedCoverBytes = row?.imageData || null;
+        // R2-1: post-migration rows have image_data NULL and bytes at imageUrl —
+        // resolve from either source (inline first, else fetch the R2 URL).
+        if (row?.imageData) {
+          rehydratedCoverBytes = row.imageData;
+        } else if (row?.imageUrl) {
+          const { bytesFromAnyImage } = require('./r2');
+          const buf = await bytesFromAnyImage(row.imageUrl);
+          if (buf) rehydratedCoverBytes = buf.toString('base64');
+        }
         if (rehydratedCoverBytes) {
-          log.info(`🔄 [COVER-ITERATE] ${coverKey}: Rehydrated active version imageData from story_images (v${activeIdx})`);
+          log.info(`🔄 [COVER-ITERATE] ${coverKey}: Rehydrated active version bytes from story_images (v${activeIdx})`);
         }
       }
     } catch (rehydrateErr) {
