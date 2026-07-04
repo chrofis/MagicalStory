@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import Beasties from 'beasties';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,6 +37,19 @@ const DIST_DIR = path.join(ROOT, 'dist');
 const MANIFEST = path.join(DIST_DIR, '.vite', 'manifest.json');
 const INDEX_HTML = path.join(DIST_DIR, 'index.html');
 const OUT_DIR = path.join(DIST_DIR, 'prerendered');
+
+// Critical-CSS inliner (Google's beasties). Used on the homepage only: inline
+// the above-the-fold CSS and load the full stylesheet async, so first paint
+// (FCP) doesn't block on the render-blocking CSS request. pruneSource:false
+// keeps the original /assets/*.css intact — the async load + every other page
+// still use it. Scoped to '/' to keep the build fast.
+const beasties = new Beasties({
+  path: DIST_DIR,
+  publicPath: '/',
+  preload: 'swap',
+  pruneSource: false,
+  logLevel: 'silent',
+});
 const SWISS_CITIES_JSON = path.join(ROOT, 'server', 'data', 'swiss-cities.json');
 const SWISS_SAGEN_JSON = path.join(ROOT, 'server', 'data', 'swiss-sagen.json');
 const SWISS_STORY_IDEAS_JSON = path.join(ROOT, 'server', 'data', 'swiss-story-ideas.json');
@@ -187,6 +201,12 @@ for (const route of routes) {
         /<div id="root"><\/div>/,
         `<div id="root">${bodyHtml}</div>${initialDataScript}`
       );
+
+      // Homepage is the ad landing page: inline its critical CSS + defer the
+      // full stylesheet so first paint isn't blocked on the CSS request.
+      if (route === '/') {
+        html = await beasties.process(html);
+      }
 
       // File path: route + .{lang}.html  (root → /index.{lang}.html)
       const routePath = route === '/' ? '/index' : route;

@@ -52,6 +52,7 @@
     "@aws-sdk/client-s3": "^3.1037.0",
     "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^2.4.3",
+    "beasties": "^0.4.2",
     "canvas": "^3.2.3",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
