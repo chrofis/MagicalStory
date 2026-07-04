@@ -13,6 +13,7 @@
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
 const { withRunware } = require('./aiConcurrency');
+const { withRetry } = require('./textModels');
 
 const RUNWARE_API_KEY = process.env.RUNWARE_API_KEY;
 const RUNWARE_API_URL = 'https://api.runware.ai/v1';
@@ -45,44 +46,30 @@ async function runwareFetchWithRetry(payload, opts = {}) {
 }
 
 async function _runwareFetchWithRetryInner(payload, { maxRetries = 2, baseDelay = 1000, maxDelay = 6000, timeoutMs = 60000 } = {}) {
-  let lastError = null;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await fetch(RUNWARE_API_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${RUNWARE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        const err = new Error(`Runware API error (${response.status}): ${errorText}`);
-        err.status = response.status;
-        throw err;
-      }
-      return response;
-    } catch (error) {
-      lastError = error;
-      const isRetryable =
-        error.code === 'UND_ERR_SOCKET' ||
-        error.code === 'UND_ERR_HEADERS_TIMEOUT' ||
-        error.code === 'ECONNRESET' ||
-        error.code === 'ETIMEDOUT' ||
-        error.name === 'AbortError' ||
-        error.name === 'TimeoutError' ||
-        error.message?.includes('fetch failed') ||
-        error.status === 429 ||
-        (error.status >= 500 && error.status < 600);
-      if (!isRetryable || attempt === maxRetries) throw lastError;
-      const delay = Math.min(baseDelay * Math.pow(2, attempt) + Math.random() * 500, maxDelay);
-      log.warn(`⚠️ [RUNWARE] Transient failure (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message} — retrying in ${Math.round(delay)}ms`);
-      await new Promise(r => setTimeout(r, delay));
+  // Delegate to the shared textModels.withRetry so Runware transient failures
+  // get recorded to apiHealth and pick up the fuller retryable-error set
+  // (HeadersTimeoutError / 'Headers Timeout' / 'aborted' / 'terminated' / 'reset').
+  // Runware's faster backoff (baseDelay 1000, maxDelay 6000) and 60s per-attempt
+  // timeout are preserved. The fetch + non-ok → throw-with-status logic stays in
+  // the callback so status-based retryability keeps working.
+  return withRetry(async () => {
+    const response = await fetch(RUNWARE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RUNWARE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      const err = new Error(`Runware API error (${response.status}): ${errorText}`);
+      err.status = response.status;
+      throw err;
     }
-  }
-  throw lastError;
+    return response;
+  }, { maxRetries, baseDelay: 1000, maxDelay: 6000 });
 }
 
 // Available models

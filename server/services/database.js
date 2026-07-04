@@ -1543,9 +1543,32 @@ async function saveStoryData(storyId, storyData) {
     throw new Error('Database mode required');
   }
 
-  // Deep clone to avoid modifying original
-  const dataForStorage = JSON.parse(JSON.stringify(storyData));
+  // Deep clone to avoid modifying original. structuredClone avoids the extra
+  // full JSON string serialization that JSON.parse(JSON.stringify(...)) does
+  // over the 50-100MB blob (inline base64 images); story data is plain JSON so
+  // it's always structured-cloneable.
+  const dataForStorage = structuredClone(storyData);
   let imagesSaved = 0;
+
+  // SPD-4: collect image-insert thunks and run them with bounded concurrency
+  // after the loops instead of one sequential await at a time. Each insert is
+  // an independent row keyed by (story_id, image_type, page_number,
+  // version_index) — no ordering dependency between them.
+  const imageSaveTasks = [];
+  async function runWithConcurrency(tasks, limit) {
+    let idx = 0;
+    async function worker() {
+      while (idx < tasks.length) {
+        const i = idx++;
+        await tasks[i]();
+      }
+    }
+    const workers = [];
+    for (let w = 0; w < Math.min(limit, tasks.length); w++) {
+      workers.push(worker());
+    }
+    await Promise.all(workers);
+  }
 
   // Check if this story already has images in the separate story_images table.
   // If so, DON'T re-save v0 imageData (it would overwrite originals with rehydrated active versions).
@@ -1557,12 +1580,17 @@ async function saveStoryData(storyId, storyData) {
     for (const img of dataForStorage.sceneImages) {
       if (img.imageData) {
         if (!hasSeparateImages) {
-          // First-time extraction: save v0 to story_images
-          await saveStoryImage(storyId, 'scene', img.pageNumber, img.imageData, {
-            qualityScore: img.finalScore ?? img.qualityScore ?? img.score,
-            generatedAt: img.generatedAt,
+          // First-time extraction: save v0 to story_images. Capture imageData
+          // before the delete below strips it from the blob.
+          const sceneImageData = img.imageData;
+          const pageNumber = img.pageNumber;
+          const qualityScore = img.finalScore ?? img.qualityScore ?? img.score;
+          const generatedAt = img.generatedAt;
+          imageSaveTasks.push(() => saveStoryImage(storyId, 'scene', pageNumber, sceneImageData, {
+            qualityScore,
+            generatedAt,
             versionIndex: 0
-          });
+          }));
           imagesSaved++;
         }
         // Always strip from blob
@@ -1574,11 +1602,16 @@ async function saveStoryData(storyId, storyData) {
           if (version.imageData) {
             // Skip versions that were rehydrated from DB (marked by rehydrateStoryImages)
             if (!version._rehydrated) {
-              await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
-                qualityScore: version.finalScore ?? version.qualityScore ?? version.score,
-                generatedAt: version.generatedAt,
-                versionIndex: arrayToDbIndex(i, 'scene')
-              });
+              const versionImageData = version.imageData;
+              const pageNumber = img.pageNumber;
+              const qualityScore = version.finalScore ?? version.qualityScore ?? version.score;
+              const generatedAt = version.generatedAt;
+              const versionIndex = arrayToDbIndex(i, 'scene');
+              imageSaveTasks.push(() => saveStoryImage(storyId, 'scene', pageNumber, versionImageData, {
+                qualityScore,
+                generatedAt,
+                versionIndex
+              }));
               imagesSaved++;
             }
             delete version.imageData;
@@ -1630,12 +1663,16 @@ async function saveStoryData(storyId, storyData) {
     if (coverData) {
       if (coverData.imageData) {
         if (!hasSeparateImages) {
-          // First-time extraction: save v0 to story_images
-          await saveStoryImage(storyId, coverType, null, coverData.imageData, {
-            qualityScore: coverData.finalScore ?? coverData.qualityScore ?? null,
-            generatedAt: coverData.generatedAt || null,
+          // First-time extraction: save v0 to story_images. Capture imageData
+          // before the delete below strips it from the blob.
+          const coverImageData = coverData.imageData;
+          const qualityScore = coverData.finalScore ?? coverData.qualityScore ?? null;
+          const generatedAt = coverData.generatedAt || null;
+          imageSaveTasks.push(() => saveStoryImage(storyId, coverType, null, coverImageData, {
+            qualityScore,
+            generatedAt,
             versionIndex: 0
-          });
+          }));
           imagesSaved++;
         }
         // Always strip from blob
@@ -1649,11 +1686,15 @@ async function saveStoryData(storyId, storyData) {
           if (version.imageData) {
             // Skip versions already saved to DB (rehydrated from DB, or pre-saved by cover regen)
             if (!version._rehydrated && !version._alreadySaved) {
-              await saveStoryImage(storyId, coverType, null, version.imageData, {
-                qualityScore: version.finalScore ?? version.qualityScore,
-                generatedAt: version.createdAt || version.generatedAt,
-                versionIndex: arrayToDbIndex(i, coverType)
-              });
+              const versionImageData = version.imageData;
+              const qualityScore = version.finalScore ?? version.qualityScore;
+              const generatedAt = version.createdAt || version.generatedAt;
+              const versionIndex = arrayToDbIndex(i, coverType);
+              imageSaveTasks.push(() => saveStoryImage(storyId, coverType, null, versionImageData, {
+                qualityScore,
+                generatedAt,
+                versionIndex
+              }));
               imagesSaved++;
             }
             delete version.imageData;
@@ -1664,6 +1705,11 @@ async function saveStoryData(storyId, storyData) {
       }
     }
   }
+
+  // SPD-4: run all collected scene/cover image inserts with bounded
+  // concurrency. If any rejects, this throws and saveStoryData rejects before
+  // the UPDATE below — same failure semantics as the previous sequential await.
+  await runWithConcurrency(imageSaveTasks, 8);
 
   // Push every remaining inline image (debug overlays, Grok/inpaint refs,
   // entity grids, repair comparison images, landmark photos, VB-location

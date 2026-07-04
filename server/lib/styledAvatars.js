@@ -20,6 +20,8 @@ const { buildHairDescription, getHeadBodyRatio } = require('./storyHelpers');
 const { getFacePhoto, getPrimaryPhoto, getStandardAvatar } = require('./characterPhotos');
 const { normalizeClothingCategory } = require('./clothingCategories');
 const { fetchImageBytes } = require('./r2');
+const { getImageIdentifier, getImageSizeKB } = require('../utils/imageMetadata');
+const { slugifyCostume } = require('../utils/costumeKey');
 
 /**
  * Resolve an avatar's bytes for one of the standard categories. After the R2
@@ -157,25 +159,6 @@ const conversionInProgress = new Map();
 const styledAvatarGenerationLogs = new Map();
 const MAX_GENERATION_LOG_ENTRIES = 50;
 const _STYLED_LOG_UNSCOPED = '__unscoped__';
-
-/**
- * Create a short identifier for an image (first 8 chars of base64 data after header)
- * Used for logging without storing full image data
- */
-function getImageIdentifier(imageData) {
-  if (!imageData || typeof imageData !== 'string') return null;
-  const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
-  return base64.substring(0, 12) + '...';
-}
-
-/**
- * Get the size of an image in KB from base64
- */
-function getImageSizeKB(imageData) {
-  if (!imageData || typeof imageData !== 'string') return 0;
-  const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
-  return Math.round((base64.length * 3 / 4) / 1024);
-}
 
 // Load art style prompts from prompts/art-styles.txt
 function loadArtStylePrompts() {
@@ -526,9 +509,8 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           if (matchingKey) charReqs = clothingRequirements[matchingKey];
         }
         const costumeConfig = charReqs?.costumed;
-        const slugify = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
         const colonKey = clothingCategory.startsWith('costumed:') ? clothingCategory.split(':')[1] : null;
-        const costumeType = colonKey || slugify(costumeConfig?.costume) || 'default';
+        const costumeType = colonKey || slugifyCostume(costumeConfig?.costume) || 'default';
         originalAvatar = avatars?.costumed?.[costumeType];
         if (!originalAvatar) {
           if (costumeConfig?.used && costumeConfig?.description) {

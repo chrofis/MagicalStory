@@ -27,6 +27,7 @@
 
 const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
 const { persistStyledAvatar } = require('../services/database');
+const { slugifyCostume } = require('../utils/costumeKey');
 
 async function buildCompositeCast(pageData, inputData, deps = {}) {
   const { userId, addUsage, log, storyCharacterAvatars = null } = deps;
@@ -65,7 +66,7 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
     if (!character) return null;
     const clothing = (pageData.perCharClothing?.[name] || sc.clothing || 'standard').toLowerCase();
     const costumeKey = clothing.startsWith('costumed:')
-      ? clothing.slice('costumed:'.length).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+      ? slugifyCostume(clothing.slice('costumed:'.length))
       : null;
 
     // Step 1: try the story-scoped sheet first (Phase 4 — the canonical
