@@ -1,0 +1,22 @@
+FIX the character in this illustration. The character at the {REGION_DESC} of the scene does NOT correctly match {CHAR_NAME}'s reference appearance. You MUST change their face to match the reference.
+
+IMAGE 1 (Reference): Shows the CORRECT appearance of {CHAR_NAME}. This is the ground truth.
+IMAGE 2 (Scene to fix): The illustration where the character at the {REGION_DESC} needs to be corrected.
+{ISSUE_CONTEXT}
+THE CHARACTER TO FIX is located at the {REGION_DESC} of the scene (approximately {REGION_WIDTH}% wide, {REGION_HEIGHT}% tall, centered at {CENTER_X}% from left, {CENTER_Y}% from top).
+
+YOU MUST CHANGE the following to match the reference photo:
+1. FACE - Match the exact facial features: eyes, nose, mouth shape, face shape from the reference
+2. HAIR - Match the exact hair color, style, length, and texture from the reference
+3. SKIN TONE - Match the exact skin complexion from the reference
+4. BODY PROPORTIONS - Match the age appearance and build from the reference
+
+KEEP UNCHANGED:
+- The character's current pose, position, and gesture
+- The background and all other elements in the scene
+- The art style and lighting
+- All other characters in the scene
+
+CRITICAL: The current face is WRONG. You MUST produce a visibly different result where {CHAR_NAME}'s face matches the reference. If you return the image unchanged, the repair has FAILED.
+
+Output a single corrected image.

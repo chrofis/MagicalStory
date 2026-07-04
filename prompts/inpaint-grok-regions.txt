@@ -1,0 +1,12 @@
+Fix the whited-out region(s) in this illustration. Regenerate ONLY the blanked areas to match the surrounding art style perfectly.
+
+TARGET REGIONS:
+{REGION_DESCRIPTIONS}
+
+WHAT TO FIX:
+{FIX_PROMPT}
+
+IMPORTANT:
+- Preserve everything outside the white regions exactly as shown
+- Match the art style, lighting, and color palette of the surrounding image
+- Make the repaired areas blend seamlessly with the rest

@@ -1,0 +1,27 @@
+Detect the 2d bounding boxes: verify and correct the drawn boxes in this illustration.
+
+The image shows colored bounding boxes overlaid on a storybook illustration:
+- THICK GREEN boxes = character BODY region
+- THICK BLUE boxes labeled "FACE" = character FACE region
+
+CURRENT BOXES (0-1000 scale, [ymin, xmin, ymax, xmax]):
+{FIGURES_SUMMARY}
+
+CRITICAL CHECK — for each character:
+1. Is the FACE BOX centered on the actual face? If the box only covers half the face or is placed on the shoulder/chest/hair instead of the face, MOVE it to the correct position.
+2. Is the FACE BOX the right size? It must cover forehead-to-chin and ear-to-ear. Include hair/hat. Exclude neck/shoulders.
+3. Is the BODY BOX covering the complete character from head to feet? Nothing cut off.
+
+MOST COMMON ERROR: Face box placed at wrong location — shifted to one side, covering only half the face, or placed on the body instead of the face. Fix this by re-centering the face_box on the actual face in the image.
+
+Return corrected coordinates. Keep the same character names.
+
+Output JSON:
+{
+  "figures": [
+    {"name": "CharName", "label": "description", "position": "center", "confidence": "high", "face_box": [ymin, xmin, ymax, xmax], "body_box": [ymin, xmin, ymax, xmax]}
+  ]
+}
+
+Coordinates: 0-1000 scale, [0,0] = top-left, [1000,1000] = bottom-right.
+Respond with ONLY the JSON.

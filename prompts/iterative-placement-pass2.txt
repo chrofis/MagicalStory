@@ -1,0 +1,10 @@
+{STYLE_LINE}This illustration shows {FG_NAMES} in the foreground. Do NOT change them.
+
+ADD to the FAR BACKGROUND as a TINY FIGURE (approximately 1/5 the size of the foreground character):
+- {BG_CHAR_DESC}
+
+The added character must be:
+- Very small compared to the foreground figure
+- In the distant background area
+- Recognizable but tiny — match the scene's art style and lighting
+- PRESERVE the entire foreground exactly as shown

@@ -1,0 +1,9 @@
+{STYLE_LINE}Generate a SINGLE illustration. No split screen, no panels, no grid. No text or watermarks.
+
+**SCENE:** {SCENE_BODY}
+Camera: {CAMERA}
+
+**Characters (foreground ONLY):**
+{FG_CHAR_DESC}
+
+IMPORTANT: Show ONLY {FG_NAMES}. Leave the far background OPEN and EMPTY — no other figures. Space must remain for a tiny character to be added later.

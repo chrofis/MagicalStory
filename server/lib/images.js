@@ -4,6 +4,7 @@
  * Extracted from server.js for maintainability
  */
 
+const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const sharp = require('sharp');
@@ -18,6 +19,24 @@ const { MODEL_PRICING } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
+
+// STR-6: image-prompt strings that used to be inline template literals in this
+// file (Gemini/Grok repair, edit, bbox-refine, iterative placement, style
+// transfer) now live in prompts/*.txt so they pass through the same reviewable
+// template mechanism the Grok path already uses. Loaded once at module load and
+// filled with fillTemplate() exactly like PROMPT_TEMPLATES. Kept local (not in
+// services/prompts.js) so this refactor touches only images.js + new prompt
+// files; the fill contract is identical.
+const LOCAL_PROMPTS_DIR = path.join(__dirname, '../../prompts');
+const LOCAL_PROMPTS = {
+  bboxRefineOverlay: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'bbox-refine-overlay.txt'), 'utf-8'),
+  iterativePlacementPass1: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'iterative-placement-pass1.txt'), 'utf-8'),
+  iterativePlacementPass2: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'iterative-placement-pass2.txt'), 'utf-8'),
+  characterRepairGemini: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'character-repair-gemini.txt'), 'utf-8'),
+  characterRepairGrokFullscene: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'character-repair-grok-fullscene.txt'), 'utf-8'),
+  inpaintGrokRegions: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'inpaint-grok-regions.txt'), 'utf-8'),
+  styleTransfer: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'style-transfer.txt'), 'utf-8'),
+};
 
 // Maps callGeminiAPIForImage's evaluationType to a stable function-name tag
 // for the analyze-story-log cost rollup.
@@ -2596,33 +2615,9 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
             return `  ${i + 1}. "${f.name}" (${f.confidence}) — ${fb}, ${bb}`;
           }).join('\n');
 
-          const refinePrompt = `Detect the 2d bounding boxes: verify and correct the drawn boxes in this illustration.
-
-The image shows colored bounding boxes overlaid on a storybook illustration:
-- THICK GREEN boxes = character BODY region
-- THICK BLUE boxes labeled "FACE" = character FACE region
-
-CURRENT BOXES (0-1000 scale, [ymin, xmin, ymax, xmax]):
-${figuresSummary}
-
-CRITICAL CHECK — for each character:
-1. Is the FACE BOX centered on the actual face? If the box only covers half the face or is placed on the shoulder/chest/hair instead of the face, MOVE it to the correct position.
-2. Is the FACE BOX the right size? It must cover forehead-to-chin and ear-to-ear. Include hair/hat. Exclude neck/shoulders.
-3. Is the BODY BOX covering the complete character from head to feet? Nothing cut off.
-
-MOST COMMON ERROR: Face box placed at wrong location — shifted to one side, covering only half the face, or placed on the body instead of the face. Fix this by re-centering the face_box on the actual face in the image.
-
-Return corrected coordinates. Keep the same character names.
-
-Output JSON:
-{
-  "figures": [
-    {"name": "CharName", "label": "description", "position": "center", "confidence": "high", "face_box": [ymin, xmin, ymax, xmax], "body_box": [ymin, xmin, ymax, xmax]}
-  ]
-}
-
-Coordinates: 0-1000 scale, [0,0] = top-left, [1000,1000] = bottom-right.
-Respond with ONLY the JSON.`;
+          const refinePrompt = fillTemplate(LOCAL_PROMPTS.bboxRefineOverlay, {
+            FIGURES_SUMMARY: figuresSummary,
+          });
 
           const refineModelId = bboxModelOverride || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
           const refineModelConfig = TEXT_MODELS[refineModelId];
@@ -4972,15 +4967,13 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
     `- ${c.name}: ${c.position || 'foreground'}, ${c.action || 'standing'}${c.expression ? ', ' + c.expression : ''}`
   ).join('\n');
 
-  const pass1Prompt = `${styleLine}Generate a SINGLE illustration. No split screen, no panels, no grid. No text or watermarks.
-
-**SCENE:** ${settingDesc || imageSummary}
-Camera: ${camera}
-
-**Characters (foreground ONLY):**
-${fgCharDesc}
-
-IMPORTANT: Show ONLY ${fgNames}. Leave the far background OPEN and EMPTY — no other figures. Space must remain for a tiny character to be added later.`;
+  const pass1Prompt = fillTemplate(LOCAL_PROMPTS.iterativePlacementPass1, {
+    STYLE_LINE: styleLine,
+    SCENE_BODY: settingDesc || imageSummary,
+    CAMERA: camera,
+    FG_CHAR_DESC: fgCharDesc,
+    FG_NAMES: fgNames,
+  });
 
   log.info(`🎯 [ITERATIVE] Pass 1: ${foregroundPhotos.length} foreground chars (${fgNames}), excluding ${bgNamesList}`);
   log.info(`🎯 [ITERATIVE] Pass 1 prompt (${pass1Prompt.length} chars)`);
@@ -5011,16 +5004,11 @@ IMPORTANT: Show ONLY ${fgNames}. Leave the far background OPEN and EMPTY — no 
     return parts.join(', ');
   }).join('\n- ');
 
-  const pass2Prompt = `${styleLine}This illustration shows ${fgNames} in the foreground. Do NOT change them.
-
-ADD to the FAR BACKGROUND as a TINY FIGURE (approximately 1/5 the size of the foreground character):
-- ${bgCharDesc}
-
-The added character must be:
-- Very small compared to the foreground figure
-- In the distant background area
-- Recognizable but tiny — match the scene's art style and lighting
-- PRESERVE the entire foreground exactly as shown`;
+  const pass2Prompt = fillTemplate(LOCAL_PROMPTS.iterativePlacementPass2, {
+    STYLE_LINE: styleLine,
+    FG_NAMES: fgNames,
+    BG_CHAR_DESC: bgCharDesc,
+  });
 
   log.info(`🎯 [ITERATIVE] Pass 2 prompt (${pass2Prompt.length} chars)`);
 
@@ -8427,28 +8415,15 @@ async function repairCharacterMismatch(imageData, characterPhoto, bbox, charName
   const verticalPos = centerY < 33 ? 'upper' : centerY > 66 ? 'lower' : 'middle';
   const regionDesc = `${verticalPos} ${horizontalPos}`;
 
-  const prompt = `FIX the character in this illustration. The character at the ${regionDesc} of the scene does NOT correctly match ${charName}'s reference appearance. You MUST change their face to match the reference.
-
-IMAGE 1 (Reference): Shows the CORRECT appearance of ${charName}. This is the ground truth.
-IMAGE 2 (Scene to fix): The illustration where the character at the ${regionDesc} needs to be corrected.
-${issueContext}
-THE CHARACTER TO FIX is located at the ${regionDesc} of the scene (approximately ${regionWidth}% wide, ${regionHeight}% tall, centered at ${centerX}% from left, ${centerY}% from top).
-
-YOU MUST CHANGE the following to match the reference photo:
-1. FACE - Match the exact facial features: eyes, nose, mouth shape, face shape from the reference
-2. HAIR - Match the exact hair color, style, length, and texture from the reference
-3. SKIN TONE - Match the exact skin complexion from the reference
-4. BODY PROPORTIONS - Match the age appearance and build from the reference
-
-KEEP UNCHANGED:
-- The character's current pose, position, and gesture
-- The background and all other elements in the scene
-- The art style and lighting
-- All other characters in the scene
-
-CRITICAL: The current face is WRONG. You MUST produce a visibly different result where ${charName}'s face matches the reference. If you return the image unchanged, the repair has FAILED.
-
-Output a single corrected image.`;
+  const prompt = fillTemplate(LOCAL_PROMPTS.characterRepairGemini, {
+    REGION_DESC: regionDesc,
+    CHAR_NAME: charName,
+    ISSUE_CONTEXT: issueContext,
+    REGION_WIDTH: regionWidth,
+    REGION_HEIGHT: regionHeight,
+    CENTER_X: centerX,
+    CENTER_Y: centerY,
+  });
 
   // Build parts: prompt, reference image (IMAGE 1), scene to fix (IMAGE 2)
   const parts = [
@@ -10156,7 +10131,15 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const verticalPos = centerY < 33 ? 'upper' : centerY > 66 ? 'lower' : 'middle';
     const regionDesc = `${verticalPos} ${horizontalPos}`;
 
-    const prompt = `Fix the character at the ${regionDesc} of this illustration. Their face does not match the reference photo of ${charName}. Change their face, hair, and skin tone to match the reference exactly. The character is at approximately ${centerX}% from left, ${centerY}% from top, ${regionWidth}% wide, ${regionHeight}% tall. Keep the pose, background, art style, and all other characters unchanged.${issueContext}`;
+    const prompt = fillTemplate(LOCAL_PROMPTS.characterRepairGrokFullscene, {
+      REGION_DESC: regionDesc,
+      CHAR_NAME: charName,
+      CENTER_X: centerX,
+      CENTER_Y: centerY,
+      REGION_WIDTH: regionWidth,
+      REGION_HEIGHT: regionHeight,
+      ISSUE_CONTEXT: issueContext,
+    });
 
     // Honour the input scene's aspect — without this, square (advanced /
     // Jugendbuch) pages get re-output as 3:4 and the scene's framing changes.
@@ -12091,18 +12074,10 @@ async function inpaintWithGrokBackend(originalImage, boundingBoxes, fixPrompt, o
     return `Region ${idx + 1}: top ${Math.round(ymin * 100)}%-${Math.round(ymax * 100)}%, left ${Math.round(xmin * 100)}%-${Math.round(xmax * 100)}%`;
   }).join('\n');
 
-  const grokPrompt = `Fix the whited-out region(s) in this illustration. Regenerate ONLY the blanked areas to match the surrounding art style perfectly.
-
-TARGET REGIONS:
-${regionDescriptions}
-
-WHAT TO FIX:
-${fixPrompt}
-
-IMPORTANT:
-- Preserve everything outside the white regions exactly as shown
-- Match the art style, lighting, and color palette of the surrounding image
-- Make the repaired areas blend seamlessly with the rest`;
+  const grokPrompt = fillTemplate(LOCAL_PROMPTS.inpaintGrokRegions, {
+    REGION_DESCRIPTIONS: regionDescriptions,
+    FIX_PROMPT: fixPrompt,
+  });
 
   // 3. Send to Grok — snap to the nearest SUPPORTED Grok preset (PIPE-6).
   // The old 3-way 16:9/9:16/1:1 guess turned 3:4 pages into 9:16, then the
@@ -13960,33 +13935,9 @@ async function applyStyleTransfer(imageData, artStyle, options = {}) {
   //     leaves figures in source rendering.
   //   - Anti-photo banner addresses the recurring "figures look like photos"
   //     case directly.
-  const prompt = `**ART STYLE — APPLIES TO EVERY PIXEL OF THE OUTPUT:**
-${styleDescription}
-
-**TASK:** Redraw the input image in the art style above. Treat the input as a
-LAYOUT REFERENCE only: copy character positions, body sizes, gestures, gaze
-direction, object placement, and background composition. Re-render every pixel
-from scratch in the target art style — including faces, skin, hair, eyes,
-clothing textures, walls, ground, sky, and all other surfaces.
-
-**STYLE ENFORCEMENT (mandatory):**
-- The output is a styled illustration. NOT a photograph. NOT a photo-realistic
-  render. NOT a 3D render. NOT a digital airbrush.
-- Faces, skin, and hair are rendered in the same medium and brush technique as
-  the rest of the image. No photographic skin texture, no photoreal pores, no
-  realistic hair strands. Use the style's brushwork for every facial feature.
-- All background surfaces (walls, ground, sky, water, fabric, foliage) carry
-  the style's texture, edge softness, and brushwork.
-- If the input image's existing rendering conflicts with the target style, the
-  target style WINS. Override every pixel of the input that does not match the
-  target medium.
-
-**KEEP:** composition, character positions, body sizes, gestures, gaze, object
-placement, background layout.
-
-**CHANGE:** every aspect of rendering — medium, brush, texture, edges, palette,
-shading, line work, paper grain. The output should look like a different artist
-made the same scene in the target style.`;
+  const prompt = fillTemplate(LOCAL_PROMPTS.styleTransfer, {
+    STYLE_DESCRIPTION: styleDescription,
+  });
 
   log.info(`🎨 [STYLE TRANSFER] target: ${artStyle}, model: ${imageModelOverride || 'default'} (no avatars — input image is sole reference)`);
 

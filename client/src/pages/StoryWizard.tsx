@@ -513,6 +513,10 @@ export default function StoryWizard() {
     totalPages: number;
   } | null>(null);
   const [completedPageImages, setCompletedPageImages] = useState<Record<number, string>>({}); // pageNumber -> imageData
+  // Page numbers whose images the client already holds. Sent to the status poll as `knownPages`
+  // so the server omits their base64 payloads (bandwidth optimization). Kept in a ref to avoid
+  // stale-closure reads inside the poll loop. Must stay in sync with completedPageImages.
+  const knownPagesRef = useRef<Set<number>>(new Set());
 
   // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -777,8 +781,9 @@ export default function StoryWizard() {
       setStoryTitle(activeJob.storyTitle);
       setJobId(activeJob.jobId);
 
-      // Fetch current job status to restore partial results
-      storyService.getJobStatus(activeJob.jobId).then((status) => {
+      // Fetch current job status to restore partial results. On a fresh restore the client
+      // holds no images yet, so knownPages is empty and the server returns the full payload.
+      storyService.getJobStatus(activeJob.jobId, Array.from(knownPagesRef.current)).then((status) => {
         log.info('Restored job status:', {
           progress: status.progress,
           hasStoryText: !!status.storyText,
@@ -812,16 +817,20 @@ export default function StoryWizard() {
           log.warn('No storyText in job status response');
         }
 
-        // Restore completed page images
+        // Restore completed page images. Merge (not replace): the server may omit pages we
+        // already hold (knownPages), so previously-received images must be retained.
         if (status.partialPages && status.partialPages.length > 0) {
-          const pageImages: Record<number, string> = {};
-          status.partialPages.forEach((page: { pageNumber: number; imageData: string }) => {
-            if (page.pageNumber && page.imageData) {
-              pageImages[page.pageNumber] = page.imageData;
-            }
+          setCompletedPageImages(prev => {
+            const updated = { ...prev };
+            status.partialPages!.forEach((page: { pageNumber: number; imageData: string }) => {
+              if (page.pageNumber && page.imageData) {
+                updated[page.pageNumber] = page.imageData;
+                knownPagesRef.current.add(page.pageNumber);
+              }
+            });
+            log.info('Restored', Object.keys(updated).length, 'page images');
+            return updated;
           });
-          log.info('Restored', Object.keys(pageImages).length, 'page images');
-          setCompletedPageImages(pageImages);
         }
 
         // Restore cover images
@@ -901,6 +910,7 @@ export default function StoryWizard() {
       // Clear generation state from previous story
       setProgressiveStoryData(null);
       setCompletedPageImages({});
+      knownPagesRef.current.clear();
       setCoverImages({ frontCover: null, initialPage: null, backCover: null });
       setGeneratedStory('');
       setIsGenerating(false);
@@ -3850,6 +3860,7 @@ export default function StoryWizard() {
     setProgressiveStoryData(null);
     storyTextReceivedRef.current = false;
     setCompletedPageImages({});
+    knownPagesRef.current.clear();
     setCoverImages({ frontCover: null, initialPage: null, backCover: null });
 
     // Check for characters with stale or missing avatars. Exclude permanently-
@@ -4025,7 +4036,9 @@ export default function StoryWizard() {
 
         let status;
         try {
-          status = await storyService.getJobStatus(newJobId);
+          // Tell the server which page images we already have so it omits their base64
+          // payloads (bandwidth optimization). knownPagesRef is updated as pages accumulate.
+          status = await storyService.getJobStatus(newJobId, Array.from(knownPagesRef.current));
           networkErrors = 0; // Reset on success
         } catch (networkErr) {
           networkErrors++;
@@ -4105,6 +4118,7 @@ export default function StoryWizard() {
             status.partialPages?.forEach(page => {
               if (page.imageData && !prev[page.pageNumber]) {
                 updated[page.pageNumber] = page.imageData;
+                knownPagesRef.current.add(page.pageNumber);
                 newCount++;
               }
             });
@@ -4201,6 +4215,7 @@ export default function StoryWizard() {
           // Clear progressive state now that we have final data
           setProgressiveStoryData(null);
           setCompletedPageImages({});
+          knownPagesRef.current.clear();
           completed = true;
 
           // Update user's credits in the UI with the new balance

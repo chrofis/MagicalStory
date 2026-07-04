@@ -404,6 +404,16 @@ router.get('/:jobId/status', jobStatusLimiter, authenticateToken, async (req, re
     const { jobId } = req.params;
     const userId = req.user.id;
 
+    // Bandwidth optimization: client may send ?knownPages=1,3,4 listing page numbers whose
+    // images it already holds. We omit those pages' (large) base64 payloads from the response.
+    // Absent/empty param => full payload (backward-compatible with older clients).
+    const knownPages = new Set(
+      String(req.query.knownPages || '')
+        .split(',')
+        .map(s => parseInt(s.trim(), 10))
+        .filter(n => Number.isInteger(n))
+    );
+
     if (STORAGE_MODE === 'database') {
       const result = await getDbPool().query(
         `SELECT id, status, progress, progress_message, result_data, error_message, created_at, completed_at, updated_at
@@ -485,6 +495,12 @@ router.get('/:jobId/status', jobStatusLimiter, authenticateToken, async (req, re
           [jobId]
         );
         partialPages = partialPagesResult.rows.map(row => row.step_data);
+
+        // Drop base64 for pages the client already rendered (bandwidth optimization).
+        // Pages NOT in knownPages are returned unchanged (full pageNumber/text/imageData).
+        if (knownPages.size > 0) {
+          partialPages = partialPages.filter(p => !knownPages.has(p.pageNumber));
+        }
 
         // Fetch partial covers (generated during streaming)
         const partialCoversResult = await getDbPool().query(

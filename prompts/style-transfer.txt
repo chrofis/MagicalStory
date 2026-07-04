@@ -1,0 +1,27 @@
+**ART STYLE — APPLIES TO EVERY PIXEL OF THE OUTPUT:**
+{STYLE_DESCRIPTION}
+
+**TASK:** Redraw the input image in the art style above. Treat the input as a
+LAYOUT REFERENCE only: copy character positions, body sizes, gestures, gaze
+direction, object placement, and background composition. Re-render every pixel
+from scratch in the target art style — including faces, skin, hair, eyes,
+clothing textures, walls, ground, sky, and all other surfaces.
+
+**STYLE ENFORCEMENT (mandatory):**
+- The output is a styled illustration. NOT a photograph. NOT a photo-realistic
+  render. NOT a 3D render. NOT a digital airbrush.
+- Faces, skin, and hair are rendered in the same medium and brush technique as
+  the rest of the image. No photographic skin texture, no photoreal pores, no
+  realistic hair strands. Use the style's brushwork for every facial feature.
+- All background surfaces (walls, ground, sky, water, fabric, foliage) carry
+  the style's texture, edge softness, and brushwork.
+- If the input image's existing rendering conflicts with the target style, the
+  target style WINS. Override every pixel of the input that does not match the
+  target medium.
+
+**KEEP:** composition, character positions, body sizes, gestures, gaze, object
+placement, background layout.
+
+**CHANGE:** every aspect of rendering — medium, brush, texture, edges, palette,
+shading, line work, paper grain. The output should look like a different artist
+made the same scene in the target style.

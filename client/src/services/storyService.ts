@@ -1878,7 +1878,7 @@ export const storyService = {
     return { jobId: response.jobId, creditsRemaining: response.creditsRemaining };
   },
 
-  async getJobStatus(jobId: string): Promise<{
+  async getJobStatus(jobId: string, knownPages?: number[]): Promise<{
     status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
     progress?: { current: number; total: number; message: string };
     result?: {
@@ -2103,7 +2103,9 @@ export const storyService = {
         sceneImages?: SceneImage[];
         coverImages?: CoverImages;
       };
-    }>(`/api/jobs/${jobId}/status`);
+      // Bandwidth optimization: tell the server which page images the client already
+      // has so it can omit their (large) base64 payloads. Absent/empty = full payload.
+    }>(`/api/jobs/${jobId}/status${knownPages && knownPages.length > 0 ? `?knownPages=${knownPages.join(',')}` : ''}`);
 
     // Map server response to client format
     // Backend sends 'result' (not 'resultData') - support both for backwards compatibility
