@@ -144,22 +144,16 @@ const MODEL_DEFAULTS = {
                                        // with anything else that wants to use it). When false,
                                        // composite generates its own clean BG from emptyScenePrompt
                                        // and direct-path pages skip the empty-scene step entirely.
-  // Phantom-pose render — per-character extra Grok edit call inside scene
-  // composite step 3 that renders the character (from their 2×4 sheet) in
-  // the pose of the blocking-pass silhouette, instead of pasting a static
-  // standing cell. Decouples pose correctness from the final blend pass at
-  // the cost of +1 Grok call per character per page (~$0.02 each).
-  // TEMPORARILY true on staging to validate the technique. Flip back to
-  // false after the comparison run is reviewed.
-  phantomPoseRender: true,
-  enableSceneComposite: true,          // Scene composite mode: route page generation through
-                                       // server/lib/sceneComposite.js (3 Grok calls per page —
-                                       // clean BG, blocking with colour silhouettes, blend pass —
-                                       // with characters cut in from their pre-rendered 2×4 sheets
-                                       // at positions decided by the blocking step). When false,
-                                       // the legacy direct-prompt path runs unchanged. Per-story
-                                       // opt-out: inputData.composite === false. See
-                                       // docs/SCENE-COMPOSITE-PIPELINE.html.
+  // Scene composite was killed 2026-05-16 (score-0 outputs; depopulate/diff/
+  // blend stages unreliable). This flag is now the single source of truth for
+  // the gate — false → decidePageRoute always returns path:'direct', so every
+  // page goes through the direct-prompt path. refMode is computed independently
+  // and is unaffected. The composite pipeline (sceneComposite.js) survives only
+  // in the admin test-models route. Do not re-enable without passing an
+  // end-to-end gate (see docs/decisions.md + project memory).
+  // (phantomPoseRender MODEL_DEFAULTS flag removed 2026-07-04 — it was read by
+  // no code; imageRouter reads the per-request inputData.phantomPoseRender.)
+  enableSceneComposite: false,
   enableTextOverlay: true,             // Global kill switch for the text-overlay pipeline. ON by
                                        // default — `1st-grade` stories use the a4-overlay layout
                                        // (text composited onto image, calm-zone reserved). Set to

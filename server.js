@@ -4749,7 +4749,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // NOTE: Avatar generation removed from story processing.
     // Base avatars should already exist from character creation.
-    // For costumed/signature avatars, use server/lib/storyAvatarGeneration.js if needed.
+    // Costumed/signature avatars are produced by prepareStyledAvatars (below).
 
     // Prepare styled avatars (convert existing avatars to target art style)
     // Skip if early avatar styling already succeeded (avoids duplicate costumed avatar generation)
@@ -5673,32 +5673,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
 
       // Phase 5a continued: Generate ALL images (no evaluation)
-      // ── Scene composite — cast builder ──────────────────────────────────
-      // For each character on the page:
-      //   1. Locate the 2×4 reference sheet for the costume worn on this page.
-      //      The canonical write location is
-      //        character.avatars.styledAvatars[artStyle].costumed[costumeKey]
-      //        character.avatars.styledAvatars[artStyle][category]
-      //      i.e. the same field the rest of the codebase calls "styled
-      //      avatar" — there is no separate styled-2×2, the 2×4 IS the
-      //      styled avatar. Lazy-generated via generateCharacter2x4Sheet
-      //      when missing (one Grok call, ~$0.02 per character per costume).
-      //   2. Pull pose + flip from the scene metadata (Sonnet outline emits
-      //      these alongside position/perspective when scene composite is on).
+      // Scene composite was killed 2026-05-16 — every page goes through the
+      // direct path (see enableSceneComposite in config/models.js). The
+      // composite cast-builder setup that used to be hoisted here was dead work
+      // on every story and is gone; the composite pipeline itself survives only
+      // in the admin test-models route (server/routes/regeneration.js).
       //
-      // Returns null if any cast character can't be set up — the caller
-      // then falls through to the legacy direct-prompt path.
-      const { buildCompositeCast: buildCompositeCastShared } = require('./server/lib/compositeCastBuilder');
-      // Phase 4: project per-character sheets once so compositeCastBuilder
-      // reads from the story-scoped object (story.data.characterAvatars)
-      // first. Hoisted out of the per-page loop — same data for all pages.
-      const storyCharacterAvatarsForComposite = require('./server/lib/storyAvatars')
+      // Per-character projected avatars, keyed for the iterate/repair cell-crop
+      // path (pipelineStoryData.characterAvatars, Phase 7) — lets iterate crop a
+      // single body cell per character at the scene pose instead of attaching
+      // the full 2×4 sheet. Hoisted once; same data for all pages.
+      const storyCharacterAvatars = require('./server/lib/storyAvatars')
         .projectStoryCharacterAvatars(inputData.characters || [], inputData.artStyle || 'pixar');
-      const buildCompositeCast = (pageData, inputData) =>
-        buildCompositeCastShared(pageData, inputData, {
-          userId, addUsage, log,
-          storyCharacterAvatars: storyCharacterAvatarsForComposite,
-        });
 
       log.info(`📸 [UNIFIED] Phase 5a: Generating all ${expandedScenes.length} images...`);
       const genStartTime = Date.now();
@@ -5750,135 +5736,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // server/lib/imageRouter.js for the decision table.
             const { decidePageRoute } = require('./server/lib/imageRouter');
             const route = decidePageRoute(pageData, inputData, MODEL_DEFAULTS);
-            // Surface the route on pageData so downstream code (eval, dev
-            // panel, story-data snapshot) can see which method ran.
-            pageData.routeDecision = route;
-            log.info(`🧭 [ROUTE] P${pageData.pageNumber}: ${route.path}${route.phantomPoseRender ? '+phantomPose' : ''} (cast=${route.cast}, refMode=${route.refMode}) — ${route.reason}`);
-            // KILL-SWITCH (2026-05-16, per user direction): force every page
-            // through the direct path. Composite pipeline was producing
-            // score-0 outputs on staging job_1778925296736_c9ia8qrio pages
-            // 3 + 4, and the depopulate / diff / blend stages are still
-            // unreliable enough that the iterate fallback was salvaging
-            // every composite attempt anyway. The decidePageRoute output
-            // and routeDecision metadata stay populated so the dev panel
-            // still reports which method WOULD have been chosen — only
-            // the gate flips. Remove this override to re-enable composite.
-            const compositeEnabled = false;
-            if (compositeEnabled) {
-              try {
-                const { generateSceneComposite } = require('./server/lib/sceneComposite');
-                const compositeCast = await buildCompositeCast(pageData, inputData);
-                if (compositeCast && compositeCast.length > 0) {
-                  log.info(`[SCENE COMPOSITE] P${pageData.pageNumber}: routing through composite path (${compositeCast.length} cast)`);
-                  // Reuse the empty-scene image generated by the dedicated
-                  // pre-phase (sceneBackgrounds[pageNumber]) when available —
-                  // composite was previously regenerating it from scratch,
-                  // burning a Grok call per page and producing a BG that drifted
-                  // from the rest of the pipeline.
-                  const existingEmptyScene = sceneBackgrounds[pageData.pageNumber]?.imageData || null;
-                  const cleanBgPrompt = pageData.scene?.emptyScenePrompt
-                    || pageData.emptyScenePrompt
-                    || pageData.scene?.sceneDescription
-                    || pageData.prompt;
-                  // Build a tight page brief for the blend step. The composited
-                  // image already shows the staged scene — the brief only needs
-                  // to anchor IDENTITY (who looks like what, who's tallest, what
-                  // objects must look like). Scene prose, composition rules,
-                  // "reference photo is a location" instructions, and the
-                  // character-action paragraph are HARMFUL here: they tell Grok
-                  // to redraw / restage / interact, contradicting our DON'T list.
-                  //
-                  // We extract a few labelled sections from pageData.prompt:
-                  //   - THIS IMAGE DEPICTS (sceneIntent)
-                  //   - Clothing for each named character
-                  //   - HEIGHT ORDER
-                  //   - REQUIRED OBJECTS / ERFORDERLICHE OBJEKTE / OBJETS REQUIS
-                  //   - EXACT POSES (Sonnet appends at the tail)
-                  // and drop everything else.
-                  const compositeBrief = (() => {
-                    const src = pageData.prompt || '';
-                    if (!src) return '';
-                    const wanted = [
-                      /\*\*THIS IMAGE DEPICTS:\*\*[\s\S]*?(?=\n\n|$)/i,
-                      /\*\*Clothing for each named character[\s\S]*?(?=\n\n|$)/i,
-                      /\*\*HEIGHT ORDER[\s\S]*?(?=\n\n|$)/i,
-                      /\*\*(?:REQUIRED OBJECTS|ERFORDERLICHE OBJEKTE|OBJETS REQUIS)[\s\S]*?(?=\n\n|$)/i,
-                      /EXACT POSES:[\s\S]*$/i,
-                    ];
-                    const blocks = [];
-                    for (const re of wanted) {
-                      const m = src.match(re);
-                      if (m) blocks.push(m[0].trim());
-                    }
-                    let out = blocks.join('\n\n');
-                    if (out.length > 5500) out = out.slice(0, 5500).trim();
-                    return out;
-                  })();
-                  // Visual Bible grid: buildVisualBibleGrid returns a Buffer
-                  // at this point in the pipeline (R2 upload runs later). Grok
-                  // edit needs each ref as a data URI string — a raw Buffer
-                  // serialises into {"type":"Buffer","data":[...]} which the
-                  // xAI API rejects with 422 "invalid type: map".
-                  const vbGrid = pageData.visualBibleGrid;
-                  const vbGridUri = Buffer.isBuffer(vbGrid)
-                    ? `data:image/jpeg;base64,${vbGrid.toString('base64')}`
-                    : (typeof vbGrid === 'string' && vbGrid ? vbGrid : null);
-                  const compResult = await generateSceneComposite({
-                    cleanBackgroundPrompt: cleanBgPrompt,
-                    existingCleanBackground: existingEmptyScene,
-                    scene: {
-                      description: pageData.scene?.sceneDescription || '',
-                      action: pageData.scene?.text || '',
-                      // sceneIntent (1-3 sentences from the outline) — used by
-                      // the blocking prompt to tell Grok what the figures are
-                      // doing and how they interact, so silhouettes are placed
-                      // in physically-correct relationships.
-                      intent: pageData.scene?.sceneIntent
-                        || pageData.sceneMetadata?.sceneIntent
-                        || pageData.sceneMetadata?.fullData?.sceneIntent
-                        || '',
-                      pageBrief: compositeBrief,
-                      artStyle: inputData?.artStyle || 'watercolor',
-                    },
-                    cast: compositeCast,
-                    aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-                    visualBibleGridImage: vbGridUri,
-                    // Phantom-pose render: the router's decision wins.
-                    // The router already honoured per-story overrides
-                    // (inputData.phantomPoseRender) and the cast-size rule.
-                    phantomPoseRender: route.phantomPoseRender,
-                    // Composite strategy: per-story opt-out via inputData,
-                    // otherwise the new Stratified Composite is the default.
-                    compositeStrategy: inputData?.compositeStrategy || 'stratified',
-                    usageTracker: (provider, usage, fn, modelId) => addUsage(provider, usage, fn, modelId),
-                  });
-                  return {
-                    pageNumber: pageData.pageNumber,
-                    imageData: compResult.imageData,
-                    modelId: 'scene-composite',
-                    thinkingText: null,
-                    usage: compResult.usage,
-                    prompt: pageData.prompt,
-                    characterPhotos: pageData.characterPhotos,
-                    landmarkPhotos: pageData.landmarkPhotos,
-                    visualBibleGrid: pageData.visualBibleGrid,
-                    grokRefImages: null,
-                    emptySceneImage: null,
-                    emptyScenePrompt: pageData.scene?.emptyScenePrompt || null,
-                    sceneDescription: pageData.scene?.sceneDescription,
-                    text: pageData.scene?.text,
-                    sceneCharacters: pageData.sceneCharacters,
-                    sceneMetadata: pageData.sceneMetadata,
-                    perCharClothing: pageData.perCharClothing,
-                    scene: pageData.scene,
-                    compositeDebug: compResult.debug,
-                  };
-                }
-                log.info(`[SCENE COMPOSITE] P${pageData.pageNumber}: falling back to direct path (no usable cast)`);
-              } catch (compErr) {
-                log.warn(`[SCENE COMPOSITE] P${pageData.pageNumber}: composite path failed (${compErr.message}); falling back to direct path`);
-              }
-            }
+            log.info(`🧭 [ROUTE] P${pageData.pageNumber}: ${route.path} (cast=${route.cast}, refMode=${route.refMode}) — ${route.reason}`);
             // Apply reference-mode flag — strips refs/grid per the chosen mode.
             // Per-page route decision (from decidePageRoute) wins over the
             // run-level default. The router picks 'off' for 0-cast pages and
@@ -6405,7 +6263,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // sheet. Without this field present, the cell-crop branch silently
           // skips and Grok receives the full sheet as a reference — the model
           // then tries to recompose all 8 cells into the page.
-          characterAvatars: storyCharacterAvatarsForComposite,
+          characterAvatars: storyCharacterAvatars,
           sceneDescriptions: expandedScenes,
           story: fullStoryText,
           storyText: fullStoryText,
