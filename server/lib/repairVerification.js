@@ -8,6 +8,7 @@
 const sharp = require('sharp');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { stripDataUriPrefix } = require('./r2');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -525,7 +526,7 @@ async function applyVerifiedRepairs(originalImage, verifiedRepairs) {
   // Convert to buffer if needed
   const imageBuffer = Buffer.isBuffer(originalImage)
     ? originalImage
-    : Buffer.from(originalImage.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    : Buffer.from(stripDataUriPrefix(originalImage), 'base64');
 
   if (verifiedRepairs.length === 0) {
     return imageBuffer;
@@ -629,11 +630,11 @@ async function applyVerifiedRepairs(originalImage, verifiedRepairs) {
 async function createComparisonImage(originalImage, repairedImage, repairs) {
   const origBuffer = Buffer.isBuffer(originalImage)
     ? originalImage
-    : Buffer.from(originalImage.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    : Buffer.from(stripDataUriPrefix(originalImage), 'base64');
 
   const repairBuffer = Buffer.isBuffer(repairedImage)
     ? repairedImage
-    : Buffer.from(repairedImage.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    : Buffer.from(stripDataUriPrefix(repairedImage), 'base64');
 
   const [origMeta, repairMeta] = await Promise.all([
     sharp(origBuffer).metadata(),

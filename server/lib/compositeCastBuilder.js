@@ -28,6 +28,7 @@
 const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
 const { persistStyledAvatar } = require('../services/database');
 const { slugifyCostume } = require('../utils/costumeKey');
+const { stripDataUriPrefix } = require('./r2');
 
 async function buildCompositeCast(pageData, inputData, deps = {}) {
   const { userId, addUsage, log, storyCharacterAvatars = null } = deps;
@@ -148,7 +149,7 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
         return null;
       }
     } else {
-      sheetBuf = Buffer.from(String(sheetUri).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      sheetBuf = Buffer.from(stripDataUriPrefix(String(sheetUri)), 'base64');
     }
     const pose = (sc.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
       ? sc.pose : 'threeQuarter';

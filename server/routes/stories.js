@@ -18,6 +18,7 @@ const { generateTextOverlay } = require('../lib/textOverlayRenderer');
 const { enforceSpreadTextPosition, updatePageText } = require('../lib/storyHelpers');
 const { getTextAreaMask } = require('../lib/textMasks');
 const { loadVbReferenceBytes } = require('../lib/characterPhotos');
+const { stripDataUriPrefix } = require('../lib/r2');
 
 /**
  * Normalize image data to ensure it has the correct data URI prefix.
@@ -3767,7 +3768,7 @@ router.post('/:id/text-overlay/:pageNum', authenticateToken, async (req, res) =>
     // fetch the bytes from R2.
     let imgBuffer;
     if (imageRow.imageData) {
-      const imgBase64 = imageRow.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const imgBase64 = stripDataUriPrefix(imageRow.imageData);
       imgBuffer = Buffer.from(imgBase64, 'base64');
     } else if (imageRow.imageUrl) {
       const { fetchImageBytes } = require('../lib/r2');

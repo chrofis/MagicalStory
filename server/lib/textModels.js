@@ -8,6 +8,7 @@ const { log } = require('../utils/logger');
 const { TEXT_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { withAnthropic, withGemini, withGrok } = require('./aiConcurrency');
 const apiHealth = require('./apiHealth');
+const { stripDataUriPrefix } = require('./r2');
 
 // Get active model from environment (legacy - prefer MODEL_DEFAULTS)
 const TEXT_MODEL = process.env.TEXT_MODEL || 'claude-sonnet';
@@ -134,7 +135,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
     // Vision mode: content is an array of image + text blocks
     userContent = [];
     for (const img of options.images) {
-      const base64 = img.replace(/^data:image\/\w+;base64,/, '');
+      const base64 = stripDataUriPrefix(img);
       const mimeType = img.match(/^data:(image\/\w+);base64,/) ? img.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
       userContent.push({
         type: 'image',

@@ -29,6 +29,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { stripDataUriPrefix } = require('./r2');
 
 /**
  * Returns true if the scene metadata declares at least one background
@@ -196,7 +197,7 @@ async function verifyScaleRepair(imageData, bgChars, { pageNumber = null, usageT
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const mimeType = String(imageData).match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
-    const base64 = String(imageData).replace(/^data:image\/\w+;base64,/, '');
+    const base64 = stripDataUriPrefix(String(imageData));
     const lines = toCheck.map((c, i) => `${i + 1}. ${c.physicalDescription.trim()}`);
     const prompt = [
       'This illustration was just edited to relocate some figures. Verify the edit did not delete anyone.',

@@ -23,6 +23,7 @@ const { getPool, rehydrateStoryImages, logActivity } = require('../services/data
 // Lib modules
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, parseStoryPages } = require('../lib/pdf');
 const { processBookOrder, getCoverDimensions } = require('../lib/gelato');
+const { stripDataUriPrefix } = require('../lib/r2');
 const email = require('../../email');
 
 function getDbPool() { return getPool(); }
@@ -821,12 +822,12 @@ router.post('/generate-pdf', authenticateToken, async (req, res) => {
 
     if (backCoverImageData && frontCoverImageData) {
       // Add back cover on left half
-      const backCoverData = backCoverImageData.replace(/^data:image\/\w+;base64,/, '');
+      const backCoverData = stripDataUriPrefix(backCoverImageData);
       const backCoverBuffer = Buffer.from(backCoverData, 'base64');
       doc.image(backCoverBuffer, 0, 0, { width: coverWidth / 2, height: coverHeight });
 
       // Add front cover on right half
-      const frontCoverData = frontCoverImageData.replace(/^data:image\/\w+;base64,/, '');
+      const frontCoverData = stripDataUriPrefix(frontCoverImageData);
       const frontCoverBuffer = Buffer.from(frontCoverData, 'base64');
       doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
 
@@ -838,7 +839,7 @@ router.post('/generate-pdf', authenticateToken, async (req, res) => {
 
     const initialPageImageData = getCoverImageData(coverImages?.initialPage);
     if (initialPageImageData) {
-      const initialPageData = initialPageImageData.replace(/^data:image\/\w+;base64,/, '');
+      const initialPageData = stripDataUriPrefix(initialPageImageData);
       const initialPageBuffer = Buffer.from(initialPageData, 'base64');
       doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
     }
@@ -860,7 +861,7 @@ router.post('/generate-pdf', authenticateToken, async (req, res) => {
         const sceneImage = sceneImages.find(img => img.pageNumber === pageNumber);
         if (sceneImage && sceneImage.imageData) {
           try {
-            const base64Data = sceneImage.imageData.replace(/^data:image\/\w+;base64,/, '');
+            const base64Data = stripDataUriPrefix(sceneImage.imageData);
             const imageBuffer = Buffer.from(base64Data, 'base64');
 
             doc.image(imageBuffer, 0, 0, {
@@ -997,7 +998,7 @@ router.post('/generate-pdf', authenticateToken, async (req, res) => {
           doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
           try {
-            const base64Data = sceneImage.imageData.replace(/^data:image\/\w+;base64,/, '');
+            const base64Data = stripDataUriPrefix(sceneImage.imageData);
             const imageBuffer = Buffer.from(base64Data, 'base64');
 
             doc.image(imageBuffer, 0, 0, {

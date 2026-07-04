@@ -12,6 +12,7 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
+const { stripDataUriPrefix } = require('./r2');
 
 // Standard region extraction size - larger to reduce scaling artifacts
 // Previously 256, but this caused tiny grids that Gemini would upscale 3x
@@ -624,7 +625,7 @@ async function extractPageIssues(pageNum, imageData, issues, outputDir) {
   // Convert base64 to buffer if needed
   const imageBuffer = Buffer.isBuffer(imageData)
     ? imageData
-    : Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    : Buffer.from(stripDataUriPrefix(imageData), 'base64');
 
   const metadata = await sharp(imageBuffer).metadata();
   const imgDimensions = { width: metadata.width, height: metadata.height };

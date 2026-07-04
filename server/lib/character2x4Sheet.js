@@ -214,7 +214,7 @@ async function resolveStandardAvatar(character) {
  * uniform.
  */
 async function quickLayoutCheck(imageData) {
-  const b64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+  const b64 = r2.stripDataUriPrefix(imageData);
   const buf = Buffer.from(b64, 'base64');
   const { data, info } = await sharp(buf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height;
@@ -327,7 +327,7 @@ function buildCharacterDescription(character) {
 
 async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiKey, sourcePhoto = null, usageTracker = null, opts = {}) {
   const { standardAvatar = null, characterDescription = '' } = opts;
-  const sheetB64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+  const sheetB64 = r2.stripDataUriPrefix(imageData);
   const sheetMime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
   let prompt = PROMPT_TEMPLATES.sheet2x4Evaluation;
@@ -351,12 +351,12 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
   // falls back to cell-1-as-anchor mode documented in the prompt).
   const parts = [];
   if (sourcePhoto) {
-    const srcB64 = sourcePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const srcB64 = r2.stripDataUriPrefix(sourcePhoto);
     const srcMime = sourcePhoto.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
     parts.push({ inline_data: { mime_type: srcMime, data: srcB64 } });
   }
   if (standardAvatar) {
-    const avB64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
+    const avB64 = r2.stripDataUriPrefix(standardAvatar);
     const avMime = standardAvatar.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
     parts.push({ inline_data: { mime_type: avMime, data: avB64 } });
   }
@@ -440,7 +440,7 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
   prompt = prompt.replace(/REQUESTED_STYLE/g, `REQUESTED_STYLE: ${styleLabel}`);
 
   const toInlinePart = (dataUri) => {
-    const b64 = dataUri.replace(/^data:image\/\w+;base64,/, '');
+    const b64 = r2.stripDataUriPrefix(dataUri);
     const mime = dataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
     return { inline_data: { mime_type: mime, data: b64 } };
   };

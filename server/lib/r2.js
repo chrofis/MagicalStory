@@ -34,7 +34,9 @@ const { log } = require('../utils/logger');
  * @returns {string|*}
  */
 function stripDataUriPrefix(s) {
-  return typeof s === 'string' ? s.replace(/^data:image\/\w+;base64,/, '') : s;
+  // [^;]+ (not \w+) so MIME subtypes with '+'/'.' (image/svg+xml, image/vnd.*)
+  // are stripped too — this is the canonical superset of the inline forks.
+  return typeof s === 'string' ? s.replace(/^data:image\/[^;]+;base64,/, '') : s;
 }
 
 let _client = null;

@@ -565,7 +565,7 @@ async function generateCoverViaComposite({
     // Decode the styled empty scene (data URI or base64 → buffer) and resize
     // to canvas (cover-fit to preserve aspect — same as pass-2 landmark resize).
     const bgBase64 = (typeof sceneBackground === 'string')
-      ? sceneBackground.replace(/^data:image\/\w+;base64,/, '')
+      ? stripDataUriPrefix(sceneBackground)
       : sceneBackground.toString('base64');
     const bgBuf = Buffer.from(bgBase64, 'base64');
     baseLayer = await sharp(bgBuf).resize(W, H, { fit: 'cover', position: 'centre' }).jpeg({ quality: 92 }).toBuffer();

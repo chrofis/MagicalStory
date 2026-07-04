@@ -11,6 +11,7 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { stripDataUriPrefix } = require('./r2');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -713,7 +714,7 @@ async function analyzeCellDimensions(cells) {
       if (Buffer.isBuffer(cell.buffer)) {
         imgBuffer = cell.buffer;
       } else if (typeof cell.buffer === 'string') {
-        const base64Data = cell.buffer.replace(/^data:image\/\w+;base64,/, '');
+        const base64Data = stripDataUriPrefix(cell.buffer);
         imgBuffer = Buffer.from(base64Data, 'base64');
       } else {
         continue;
@@ -878,7 +879,7 @@ async function createLabeledGrid(cells, options = {}) {
           .toBuffer();
       } else if (typeof cell.buffer === 'string') {
         // Handle base64 data URI
-        const base64Data = cell.buffer.replace(/^data:image\/\w+;base64,/, '');
+        const base64Data = stripDataUriPrefix(cell.buffer);
         cellBuffer = await sharp(Buffer.from(base64Data, 'base64'))
           .resize(cellWidth, cellHeight, {
             fit: 'contain',

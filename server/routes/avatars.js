@@ -20,6 +20,7 @@ const { editWithGrok } = require('../lib/grok');
 const { buildHairDescription, getAgeCategory, clampApparentAge } = require('../lib/storyHelpers');
 const { getFacePhoto } = require('../lib/characterPhotos');
 const { getImageIdentifier, getImageSizeKB } = require('../utils/imageMetadata');
+const { stripDataUriPrefix } = require('../lib/r2');
 
 // ============================================================================
 // ART STYLE SAMPLE IMAGES (copied from styledAvatars.js — can't import due to circular dep)
@@ -245,7 +246,7 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
       return null;
     }
 
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = stripDataUriPrefix(imageData);
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
@@ -652,7 +653,7 @@ async function callGeminiAvatarApi(opts) {
 async function evaluateCostumeApplication(gridImage, costumeDescription, geminiApiKey) {
   const startTime = Date.now();
   try {
-    const imageBase64 = gridImage.replace(/^data:image\/\w+;base64,/, '');
+    const imageBase64 = stripDataUriPrefix(gridImage);
     const imageMime = gridImage.match(/^data:(image\/\w+);base64,/) ?
       gridImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
@@ -936,7 +937,7 @@ async function generateDynamicAvatar(character, category, config) {
     log.debug(`🎭 [DYNAMIC AVATAR] Input photo: ${photoSizeKB}KB`);
 
     const sharp = require('sharp');
-    const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const base64Input = stripDataUriPrefix(facePhoto);
     const inputBuffer = Buffer.from(base64Input, 'base64');
     const resizedBuffer = await sharp(inputBuffer)
       .resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true })
@@ -947,7 +948,7 @@ async function generateDynamicAvatar(character, category, config) {
 
     const result = await callGeminiAvatarApi({
       geminiApiKey,
-      referenceImageBase64: resizedPhoto.replace(/^data:image\/\w+;base64,/, ''),
+      referenceImageBase64: stripDataUriPrefix(resizedPhoto),
       referenceMimeType: 'image/jpeg',
       prompt: avatarPrompt,
       logTag: `[DYNAMIC AVATAR] ${logCategory}`,
@@ -1536,7 +1537,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       .toBuffer();
     const finalPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
     log.info(`[AVATAR JOB ${jobId}] Prepared reference photo: ${Math.round(finalPhoto.length / 1024)}KB (was ${photoSizeKB}KB)`);
-    const base64Data = finalPhoto.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = stripDataUriPrefix(finalPhoto);
     const mimeType = finalPhoto.match(/^data:(image\/\w+);base64,/) ?
       finalPhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
@@ -2632,7 +2633,7 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     log.info(`👔 [CLOTHING AVATARS] Prepared: ${Math.round(resizedPhoto.length / 1024)}KB (was ${photoSizeKB}KB)`);
 
     // Prepare base64 data once for all requests
-    const base64Data = resizedPhoto.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = stripDataUriPrefix(resizedPhoto);
     const mimeType = 'image/jpeg'; // Always JPEG after resize
 
     // Build user clothing section if provided

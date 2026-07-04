@@ -16,6 +16,7 @@
 const sharp = require('sharp');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { log } = require('../utils/logger');
+const { stripDataUriPrefix } = require('./r2');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -45,7 +46,7 @@ async function buildStyleGrid(cells) {
 
   // Resize all thumbnails in parallel
   const resized = await Promise.all(cells.map(async (cell) => {
-    const base64 = (cell.imageData || '').replace(/^data:image\/\w+;base64,/, '');
+    const base64 = stripDataUriPrefix(cell.imageData || '');
     if (!base64) return null;
     const buf = Buffer.from(base64, 'base64');
     try {

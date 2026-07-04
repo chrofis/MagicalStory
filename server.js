@@ -264,6 +264,7 @@ const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
 const { hasPhotos: hasCharacterPhotos, getFacePhoto } = require('./server/lib/characterPhotos');
 const { generateSitemap } = require('./server/lib/seoMeta');
+const { stripDataUriPrefix } = require('./server/lib/r2');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
 const authRoutes = require('./server/routes/auth');
@@ -3476,7 +3477,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               const { enforceSpreadTextPosition } = require('./server/lib/storyHelpers');
               const textPos = enforceSpreadTextPosition(sceneMetadata?.textPosition || null, page.pageNumber);
               if (textPos) {
-                const imgBuf = Buffer.from(genResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+                const imgBuf = Buffer.from(stripDataUriPrefix(genResult.imageData), 'base64');
                 calmRegion = await detectCalmRegion(imgBuf, textPos).catch(() => null);
               }
             } catch (e) { /* calm region detection is optional */ }
@@ -5915,7 +5916,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 const { detectCalmRegion } = require('./server/lib/calmRegion');
                 const textPos = enforceSpreadTextPosition(pageData.sceneMetadata?.textPosition || null, pageData.pageNumber);
                 if (textPos) {
-                  const imgBuf = Buffer.from(activeImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+                  const imgBuf = Buffer.from(stripDataUriPrefix(activeImageData), 'base64');
                   calmRegion = await detectCalmRegion(imgBuf, textPos).catch(() => null);
                 }
               } catch (e) { /* calm region detection is optional */ }

@@ -3988,7 +3988,7 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
       }
 
       // Build parts array (image + reference images) — same structure as evaluateImageQuality
-      const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+      const base64Data = r2.stripDataUriPrefix(imageData);
       const mimeType = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
       const parts = [
         { inline_data: { mime_type: mimeType, data: base64Data } }
@@ -4002,7 +4002,7 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
         if (!refBuf) continue;
         const dataUri = `data:image/jpeg;base64,${refBuf.toString('base64')}`;
         const compressed = await compressImageToJPEG(dataUri, 85, 768);
-        const compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+        const compressedBase64 = r2.stripDataUriPrefix(compressed);
         parts.push({ text: `Reference: ${ref.name}` });
         parts.push({ inline_data: { mime_type: 'image/jpeg', data: compressedBase64 } });
       }
@@ -4164,7 +4164,7 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
           ? fillTemplate(PROMPT_TEMPLATES.bboxRefine, { figuresSummary })
           : `Refine bounding boxes for:\n${figuresSummary}\nReturn corrected JSON with figures array.`;
 
-        const overlayBase64 = bboxOverlayImage.replace(/^data:image\/\w+;base64,/, '');
+        const overlayBase64 = r2.stripDataUriPrefix(bboxOverlayImage);
         const overlayMime = 'image/jpeg';
         const refineParts = [
           { inline_data: { mime_type: overlayMime, data: overlayBase64 } },
@@ -4314,7 +4314,7 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
       : `Refine bounding boxes for:\n${figuresSummary}\nReturn corrected JSON with figures array.`;
 
     // Send overlay image + prompt to vision model
-    const overlayBase64 = overlayImage.replace(/^data:image\/\w+;base64,/, '');
+    const overlayBase64 = r2.stripDataUriPrefix(overlayImage);
     const overlayMime = overlayImage.match(/^data:(image\/\w+);base64,/) ?
       overlayImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 

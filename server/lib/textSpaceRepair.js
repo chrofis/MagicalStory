@@ -26,6 +26,7 @@ const { log } = require('../utils/logger');
 const { detectAndLightenTextRegion } = require('./textRegion');
 const { getTextZonePolygon, polygonArea, sizeNameFor } = require('./textMasks');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { stripDataUriPrefix } = require('./r2');
 const {
   REPAIR,
   requiredTextPixels,
@@ -38,7 +39,7 @@ const {
  * check for non-empty imageData before calling.
  */
 async function probeDimensions(imageData) {
-  const buf = Buffer.from((imageData || '').replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const buf = Buffer.from(stripDataUriPrefix(imageData || ''), 'base64');
   const meta = await sharp(buf).metadata();
   if (!meta.width || !meta.height) {
     throw new Error('image has no width/height — corrupt input?');

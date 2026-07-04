@@ -11907,7 +11907,7 @@ async function blackoutIssueRegions(imageBase64, fixTargets, padding = 0.05) {
 
   try {
     // Decode image
-    const rawBase64 = imageBase64.replace(/^data:image\/[^;]+;base64,/, '');
+    const rawBase64 = r2Lib.stripDataUriPrefix(imageBase64);
     const imageBuffer = Buffer.from(rawBase64, 'base64');
     const metadata = await sharp(imageBuffer).metadata();
     const { width, height } = metadata;

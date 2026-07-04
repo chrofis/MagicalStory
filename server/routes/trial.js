@@ -14,6 +14,7 @@ const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { stripDataUriPrefix } = require('../lib/r2');
 
 // Server.js-local dependencies received via initTrialRoutes()
 let deps = {};
@@ -538,7 +539,7 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
     log.info(`[TRIAL AVATAR] Generating preview avatar for "${safeName}" (age: ${age}, gender: ${gender})`);
 
     // Resize face photo for Gemini
-    const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const base64Input = stripDataUriPrefix(facePhoto);
     const inputBuffer = Buffer.from(base64Input, 'base64');
     const resizedBuffer = await sharp(inputBuffer)
       .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })

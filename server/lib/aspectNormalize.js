@@ -12,6 +12,8 @@
  * of A4 or if sharp fails (safe fallback).
  */
 
+const { stripDataUriPrefix } = require('./r2');
+
 const A4_RATIO = 210 / 297;
 const TOLERANCE = 0.005; // 0.5% — tight enough to catch Grok's 1% drift
 
@@ -22,7 +24,7 @@ async function normalizeImageToA4(imageData) {
     const sharp = require('sharp');
 
     const isDataUri = imageData.startsWith('data:image/');
-    const base64 = isDataUri ? imageData.replace(/^data:image\/\w+;base64,/, '') : imageData;
+    const base64 = isDataUri ? stripDataUriPrefix(imageData) : imageData;
     const mime = isDataUri ? (imageData.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg') : 'image/jpeg';
 
     const buf = Buffer.from(base64, 'base64');

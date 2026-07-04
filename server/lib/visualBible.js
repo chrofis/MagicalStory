@@ -11,6 +11,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('./textModels');
 const { getPhysical } = require('./characterPhysical');
+const { stripDataUriPrefix } = require('./r2');
 
 // Lazy-load storyHelpers to break circular dependency
 // (storyHelpers.js imports buildVisualBiblePrompt from this file at top level —
@@ -792,7 +793,7 @@ async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
     });
 
     // Extract base64 and mime type
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = stripDataUriPrefix(imageData);
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 

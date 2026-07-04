@@ -19,6 +19,7 @@
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { stripDataUriPrefix } = require('./r2');
 
 const BLOCK_SIZE = 16;
 
@@ -45,7 +46,7 @@ async function detectAndLightenTextRegion(imageData, preferredPosition, pageNumb
   const { washOpacity = 0.9, calmThreshold = 0.35, overlayPolygon = null } = options;
 
   try {
-    const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const base64 = stripDataUriPrefix(imageData);
     const buf = Buffer.from(base64, 'base64');
     const meta = await sharp(buf).metadata();
     const width = meta.width;

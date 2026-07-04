@@ -18,6 +18,7 @@ const sharp = require('sharp');
 
 const { dbQuery, getStoryImage, getActiveVersion, imagesExistByType } = require('../services/database');
 const { log } = require('../utils/logger');
+const { stripDataUriPrefix } = require('../lib/r2');
 const { verifyToken } = require('../middleware/auth');
 
 // Base URL for OG tags and share links (consistent with stories.js)
@@ -424,7 +425,7 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
       return res.redirect(302, separateImage.imageUrl);
     }
     if (separateImage?.imageData) {
-      const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const base64 = stripDataUriPrefix(separateImage.imageData);
       // Serve the image at its stored dims. Old code ran normalizeToPortrait
       // here (cover-cropping every scene to A4 on the fly), which silently
       // sliced ~6% off the sides of new 3:4 / 1:1 stories whose layout
@@ -448,7 +449,7 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
       return res.status(404).json({ error: 'Image not found' });
     }
 
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = stripDataUriPrefix(imageData);
     const imageBuffer = Buffer.from(base64Data, 'base64');
     res.set('Content-Type', sniffImageMime(imageBuffer));
     res.set('Cache-Control', 'public, max-age=86400');
@@ -551,7 +552,7 @@ apiRouter.post('/shared/:shareToken/text-overlay/:pageNumber', async (req, res) 
     const { generateTextOverlay } = require('../lib/textOverlayRenderer');
     let rawBuf;
     if (separateImage.imageData) {
-      const imgBase64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const imgBase64 = stripDataUriPrefix(separateImage.imageData);
       rawBuf = Buffer.from(imgBase64, 'base64');
     } else if (separateImage.imageUrl) {
       const { fetchImageBytes } = require('../lib/r2');
@@ -614,7 +615,7 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
       return res.redirect(302, separateImage.imageUrl);
     }
     if (separateImage?.imageData) {
-      const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const base64 = stripDataUriPrefix(separateImage.imageData);
       const imageBuffer = await normalizeToPortrait(Buffer.from(base64, 'base64'));
       res.set('Content-Type', sniffImageMime(imageBuffer));
       res.set('Cache-Control', 'public, max-age=86400');
@@ -632,7 +633,7 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
       return res.status(404).json({ error: 'Cover not found' });
     }
 
-    const base64Data = coverImageData.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = stripDataUriPrefix(coverImageData);
     const imageBuffer = Buffer.from(base64Data, 'base64');
     res.set('Content-Type', sniffImageMime(imageBuffer));
     res.set('Cache-Control', 'public, max-age=86400');
@@ -667,7 +668,7 @@ async function ogImageHandler(req, res) {
     const { bytesFromAnyImage } = require('../lib/r2');
     const resolveCoverB64 = async (result) => {
       if (!result) return null;
-      if (result.imageData) return result.imageData.replace(/^data:image\/\w+;base64,/, '');
+      if (result.imageData) return stripDataUriPrefix(result.imageData);
       if (result.imageUrl) {
         const buf = await bytesFromAnyImage(result.imageUrl);
         if (buf) return buf.toString('base64');
@@ -695,7 +696,7 @@ async function ogImageHandler(req, res) {
         log.debug(`[OG-IMAGE] Legacy frontCover type: ${typeof fc}, keys: ${typeof fc === 'object' ? Object.keys(fc).join(',') : 'N/A'}`);
         const fcData = typeof fc === 'string' ? fc : fc?.imageData;
         if (fcData) {
-          coverImage = fcData.replace(/^data:image\/\w+;base64,/, '');
+          coverImage = stripDataUriPrefix(fcData);
           log.debug(`[OG-IMAGE] Found legacy frontCover (${coverImage.length} chars)`);
         } else {
           log.warn(`[OG-IMAGE] Legacy frontCover exists but no imageData - was it stripped? Keys: ${typeof fc === 'object' ? Object.keys(fc).join(',') : 'N/A'}`);

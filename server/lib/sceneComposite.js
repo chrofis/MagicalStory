@@ -40,6 +40,7 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { generateWithGrok, editWithGrok, GROK_MODELS } = require('./grok');
 const { renderCharacterInPhantomPose } = require('./phantomPoseRender');
+const { stripDataUriPrefix } = require('./r2');
 
 const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 
@@ -474,7 +475,7 @@ async function removeBackground(buf) {
     const data = await r.json();
     const out = data.image || data.result || data.data;
     if (!out) throw new Error('rembg returned no image');
-    const cleanB64 = String(out).replace(/^data:image\/\w+;base64,/, '');
+    const cleanB64 = stripDataUriPrefix(String(out));
     return Buffer.from(cleanB64, 'base64');
   } catch (err) {
     log.warn(`[SCENE COMPOSITE] rembg fallback to threshold: ${err.message}`);
@@ -535,7 +536,7 @@ async function cropAvatarCell(sheet, opts = {}) {
   const { pose = 'threeQuarter', flip = false, includeFace = false, stack = false } = opts;
   const sheetBuf = Buffer.isBuffer(sheet)
     ? sheet
-    : Buffer.from(String(sheet).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    : Buffer.from(stripDataUriPrefix(String(sheet)), 'base64');
 
   const bodyIdx = POSE_CELL[pose] || POSE_CELL.threeQuarter;
   let body = await cropSheetCell(sheetBuf, bodyIdx);
@@ -1441,7 +1442,7 @@ async function generateSceneComposite(opts) {
   const populated = await generateWithGrok(populatedPrompt, { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', populated.usage, 'scene_composite_populated_plate', populated.modelId);
   totalCost += populated.usage?.cost || 0;
-  const populatedBuf = Buffer.from(populated.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const populatedBuf = Buffer.from(stripDataUriPrefix(populated.imageData), 'base64');
   debug.populatedPlate = populated.imageData;
   debug.populatedPlatePrompt = populatedPrompt;
   // sentToGrok comes verbatim from the Grok API wrapper — every byte +
@@ -1460,7 +1461,7 @@ async function generateSceneComposite(opts) {
   if (usageTracker) usageTracker('grok', depopulated.usage, 'scene_composite_depopulate', depopulated.modelId);
   totalCost += depopulated.usage?.cost || 0;
   const bgImageData = depopulated.imageData;
-  const bgBuf = Buffer.from(bgImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const bgBuf = Buffer.from(stripDataUriPrefix(bgImageData), 'base64');
   debug.cleanBackground = bgImageData;
   debug.cleanBackgroundPrompt = cleanBackgroundPrompt || null;
   debug.cleanBackgroundSource = 'derived-from-populated-plate';
@@ -1531,7 +1532,7 @@ async function generateSceneComposite(opts) {
         totalCost += ppr.usage?.cost || 0;
         phantomPoseRenders[c.name] = { ...ppr.debug, output: ppr.imageData };
         const renderedBuf = Buffer.from(
-          ppr.imageData.replace(/^data:image\/\w+;base64,/, ''),
+          stripDataUriPrefix(ppr.imageData),
           'base64',
         );
         cutBuf = await removeBackground(renderedBuf);
@@ -1771,7 +1772,7 @@ async function _simpleCompositePath({ emptySceneData, frontCast, aspectRatio, sc
 
   // 1. Decode empty scene into a buffer at canvas dimensions.
   const baseBase64 = (typeof emptySceneData === 'string')
-    ? emptySceneData.replace(/^data:image\/\w+;base64,/, '')
+    ? stripDataUriPrefix(emptySceneData)
     : emptySceneData.toString('base64');
   const baseInputBuf = Buffer.from(baseBase64, 'base64');
   const baseBuf = await sharp(baseInputBuf)
@@ -1935,7 +1936,7 @@ async function _stratifiedBody(ctx) {
   const anchor = await editWithGrok(anchorPrompt, anchorRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', anchor.usage, 'scene_composite_strat_anchor_plate', anchor.modelId);
   totalCost += anchor.usage?.cost || 0;
-  const anchorBuf = Buffer.from(anchor.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const anchorBuf = Buffer.from(stripDataUriPrefix(anchor.imageData), 'base64');
   debug.anchorPlate = anchor.imageData;
   debug.anchorPlatePrompt = anchorPrompt;
   debug.anchorPlateSentToGrok = anchor.sentToGrok || null;
@@ -2126,7 +2127,7 @@ async function _stratifiedBody(ctx) {
   // Extract the ORIGINAL crop region (cropW × cropH) back out of Grok's
   // padded-aspect output. resize the output to the padded dimensions, then
   // extract the (padLeft, padTop, cropW, cropH) sub-rectangle.
-  const frontPlateRawBuf = Buffer.from(frontPlate.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const frontPlateRawBuf = Buffer.from(stripDataUriPrefix(frontPlate.imageData), 'base64');
   // Uniform scaling — pad with white instead of stretching when Grok's
   // output aspect drifts from the requested padded aspect (common when
   // Grok coerces a 9:20 ask into 1:1 or similar). fit: 'contain' preserves
@@ -2334,7 +2335,7 @@ async function _stratifiedBody(ctx) {
   // This preserves z-order: foreground occludes background wherever
   // their canvas positions overlap, because Grok drew foreground ON
   // TOP of silhouettes in the anchor plate.
-  const emptySceneRawBuf = Buffer.from(emptySceneData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const emptySceneRawBuf = Buffer.from(stripDataUriPrefix(emptySceneData), 'base64');
   // Uniform scaling — when Grok's anchor-plate output aspect drifts from
   // the empty-scene aspect (rare but happens with the input-coerce edge),
   // fit: 'contain' preserves proportions and pads to canvasW×canvasH so the
