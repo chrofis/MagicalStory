@@ -7045,6 +7045,29 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       } : coverImages,
     };
     log.debug(`📊 [UNIFIED] resultData generationLog has ${resultData.generationLog?.length || 0} entries`);
+    // Belt-and-suspenders: stripImageData above is an allow-list that only drops
+    // imageData — it leaves per-version debug base64 (charRepair*, grokRefImages,
+    // inpaintReferenceImages, bboxOverlayImage…) inline. On a repair-heavy story
+    // (dozens of repaired versions) that overflows PG's 256MB jsonb array cap on
+    // the result_data UPDATE below. result_data is navigation metadata only — no
+    // image bytes are needed (they live in story_images) — so drop ANY remaining
+    // inline base64 outright.
+    const dropInlineBase64 = (node, seen = new WeakSet()) => {
+      if (!node || typeof node !== 'object' || seen.has(node)) return;
+      seen.add(node);
+      const isBytes = (s) => typeof s === 'string' && s.length > 1024
+        && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0') || s.startsWith('R0lGOD'));
+      if (Array.isArray(node)) {
+        for (let i = 0; i < node.length; i++) {
+          if (isBytes(node[i])) node[i] = undefined; else dropInlineBase64(node[i], seen);
+        }
+        return;
+      }
+      for (const k of Object.keys(node)) {
+        if (isBytes(node[k])) node[k] = undefined; else dropInlineBase64(node[k], seen);
+      }
+    };
+    dropInlineBase64(resultDataForStorage);
     const resultJson = JSON.stringify(resultDataForStorage);
     log.debug(`📊 [UNIFIED] result_data size: ${(resultJson.length / 1024).toFixed(1)}KB (images stripped)`);
     await dbPool.query(
