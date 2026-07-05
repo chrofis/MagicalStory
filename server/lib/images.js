@@ -1215,6 +1215,26 @@ const isBlockedResponse = (responseData) => {
   return false;
 };
 
+/**
+ * Blend the model's own 0-10 quality score with the score computed from its
+ * fixable_issues[] list. The issue list double-counts nitpicks (the same
+ * physical flaw flagged as several moderates collapses the computed score to
+ * 0 on an image the model itself rated 8/10), while the model score sees the
+ * whole image — so the computed score may pull at most 3 points below the
+ * model's own judgment: final = max(computed, model − 3).
+ * When the model gave no numeric score, the computed score stands alone.
+ *
+ * @param {number|null} modelRawScore   model's own score, 0-10 scale
+ * @param {number} computedRawScore     rubric score from issue severities, 0-10
+ * @returns {number} blended 0-10 score
+ */
+function blendVisualScore(modelRawScore, computedRawScore) {
+  if (typeof modelRawScore !== 'number' || !Number.isFinite(modelRawScore)) {
+    return computedRawScore;
+  }
+  return Math.max(computedRawScore, modelRawScore - 3);
+}
+
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null) {
   // Hoisted outside try so the catch/finally below can reference them.
   // `let` is block-scoped to the try body — without these declarations here,
@@ -1698,23 +1718,29 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // `score` field is unreliable — the same image rerendered through eval
       // gets different scores because the model recomputes its own arithmetic.
       // fixable_issues[] is the structured contract; this function turns it
-      // into a number by the published rubric and ignores the model's claim.
-      // Model score is logged for visibility (audits when the two diverge).
+      // into a number by the published rubric.
+      //
+      // BLEND (Jul 2026): the Apr-2026 "ignore the model's score" rule
+      // over-corrected — the issue list double-counts nitpicks (5 moderates
+      // = 0/10 on an image the model itself rated 8/10), so the computed
+      // score can only pull at most 3 points below the model's own judgment:
+      // final = max(computed, model − 3). See blendVisualScore.
       const SEVERITY_PENALTY = { CATASTROPHIC: 5, CRITICAL: 3, MAJOR: 2, MODERATE: 1, MINOR: 0.5 };
       const totalPenalty = fixableIssues.reduce(
         (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1),
         0
       );
-      const rawScore = Math.max(0, Math.min(10, 10 - totalPenalty));
+      const computedRawScore = Math.max(0, Math.min(10, 10 - totalPenalty));
+      const rawScore = blendVisualScore(modelRawScore, computedRawScore);
       const score = rawScore * 10; // 0-100 for compatibility
 
-      const scoreDelta = Math.abs(modelRawScore - rawScore);
+      const scoreDelta = Math.abs(modelRawScore - computedRawScore);
       if (scoreDelta > 3) {
-        log.warn(`📊 [EVAL] Score divergence: model=${modelRawScore}/10, computed-from-issues=${rawScore}/10 (Δ=${scoreDelta}). Using computed.`);
+        log.warn(`📊 [EVAL] Score divergence: model=${modelRawScore}/10, computed-from-issues=${computedRawScore}/10 (Δ=${scoreDelta}). Using blended=${rawScore}/10.`);
       } else if (scoreDelta >= 1) {
-        log.debug(`[EVAL] Score divergence: model=${modelRawScore}/10, computed=${rawScore}/10 (Δ=${scoreDelta}). Using computed.`);
+        log.debug(`[EVAL] Score divergence: model=${modelRawScore}/10, computed=${computedRawScore}/10 (Δ=${scoreDelta}). Using blended=${rawScore}/10.`);
       }
-      log.info(`📊 [EVAL] Score: ${rawScore}/10 (${score}/100) [computed from ${fixableIssues.length} issues; model said ${modelRawScore}/10], Verdict: ${verdict}`);
+      log.info(`📊 [EVAL] Score: ${rawScore}/10 (${score}/100) [computed ${computedRawScore}/10 from ${fixableIssues.length} issues; model said ${modelRawScore}/10], Verdict: ${verdict}`);
       const hasRealIssues = issuesSummary && issuesSummary !== 'none' && issuesSummary.toLowerCase() !== 'none';
       if (hasRealIssues) {
         log.info(`📊 [EVAL] Issues: ${issuesSummary}`);
@@ -14096,6 +14122,7 @@ module.exports = {
   // Core image functions
   validateEmptyScene,
   evaluateImageQuality,
+  blendVisualScore,
   evaluateThreeStage,
   callGeminiAPIForImage,
   editImageWithPrompt,
