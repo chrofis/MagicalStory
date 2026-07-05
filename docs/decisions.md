@@ -1011,3 +1011,32 @@ Each has a concrete plan.
 **Touched:** ~30 files across server/lib, server/routes, server.js, config/models.js,
 client; new lib/grokAspect.js, lib/rembg.js, utils/imageMetadata.js, utils/costumeKey.js.
 **Status:** ✅ active. Plans: docs/review-2026-07-04-structural-plan.md.
+
+---
+
+## 2026-07-05 — jsonb 256MB overflow on repair-heavy stories (finalize save)
+
+**Context:** A staging showcase (comic, 14pp, 11/11/11 repairs) failed at finalize
+with Postgres `total size of jsonb array elements exceeds the maximum of
+268435455 bytes`. Root cause: `extractInlineImagesToR2` moves debug base64
+(bboxOverlayImage, charRepair*, grids, grokRefImages…) to R2 and swaps in URLs,
+but on an R2 upload failure it retains the base64. The safety-net
+`stripInlineImagesFromStoryData` is an explicit allow-list that did NOT cover the
+per-version `charRepairGrokRaw/BlendMask/Whiteout` fields, so those leaked and,
+across many repaired versions, overflowed PG's 256MB jsonb cap. Pre-existing
+(unrelated to the 2026-07-04 cleanup; discovered by its validation showcase).
+
+**Decision:** (1) Added `charRepair*` to the version strip explicitly. (2) Added a
+generic recursive base64 safety-net sweep at the end of
+`stripInlineImagesFromStoryData` that drops ANY remaining inline base64 image
+string, EXCEPT within `styledAvatars`/`costumed` subtrees (per-story data with no
+other home). Guarantees the blob can never overflow from a debug field again,
+regardless of R2 outages or newly-added image fields.
+
+**Rationale:** Every inline payload here is redundant (source of truth is the
+characters table / story_images / R2). Losing a diagnostic image on an R2 outage
+is always better than failing the entire story save. Unit-tested: base64 dropped,
+R2 URLs kept, styledAvatars preserved.
+
+**Touched:** `server/services/database.js` (`stripInlineImagesFromStoryData`).
+**Status:** ✅ active.

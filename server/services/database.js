@@ -1352,6 +1352,11 @@ function stripInlineImagesFromStoryData(data) {
           v.grokRefImages = filterUrlArray(v.grokRefImages);
           v.inpaintReferenceImages = filterUrlArray(v.inpaintReferenceImages);
           v.bboxOverlayImage = keepUrl(v.bboxOverlayImage);
+          // Char-repair debug artifacts (raw Grok output, blend mask, whiteout).
+          // extract uploads these to R2; keep the URL, drop leftover base64.
+          v.charRepairGrokRaw = keepUrl(v.charRepairGrokRaw);
+          v.charRepairBlendMask = keepUrl(v.charRepairBlendMask);
+          v.charRepairWhiteout = keepUrl(v.charRepairWhiteout);
         }
       }
       if (Array.isArray(s.sceneCharacters)) {
@@ -1407,6 +1412,9 @@ function stripInlineImagesFromStoryData(data) {
           v.grokRefImages = filterUrlArray(v.grokRefImages);
           v.inpaintReferenceImages = filterUrlArray(v.inpaintReferenceImages);
           v.bboxOverlayImage = keepUrl(v.bboxOverlayImage);
+          v.charRepairGrokRaw = keepUrl(v.charRepairGrokRaw);
+          v.charRepairBlendMask = keepUrl(v.charRepairBlendMask);
+          v.charRepairWhiteout = keepUrl(v.charRepairWhiteout);
         }
       }
       if (Array.isArray(cv.retryHistory)) {
@@ -1531,6 +1539,41 @@ function stripInlineImagesFromStoryData(data) {
   if (Array.isArray(data.characters)) {
     for (const c of data.characters) stripCharSnapshot(c);
   }
+
+  // ─── Final safety net: generic base64 sweep ──────────────────────────────
+  // The explicit walkers above are an allow-list — every new image-bearing
+  // field is a chance for base64 to leak past them (this is how per-version
+  // charRepair* artifacts slipped through and overflowed PG's 256MB jsonb cap
+  // on a repair-heavy story). extractInlineImagesToR2 moves bytes to R2, but a
+  // failed/unreachable upload leaves base64 inline. Every inline payload here
+  // is redundant (source of truth: characters table / story_images / R2), so
+  // drop ANY remaining base64 string outright — losing a diagnostic image is
+  // always better than failing the entire save. Exception: styledAvatars /
+  // costumed subtrees are per-story with no other home, so they are preserved.
+  const looksLikeBytes = (s) =>
+    typeof s === 'string'
+    && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0') || s.startsWith('R0lGOD'))
+    && s.length > 1024;
+  const PRESERVE_KEYS = new Set(['styledAvatars', 'costumed']);
+  const swept = new WeakSet();
+  const sweepBytes = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (swept.has(node)) return;
+    swept.add(node);
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) {
+        if (typeof node[i] === 'string') { if (looksLikeBytes(node[i])) node[i] = undefined; }
+        else sweepBytes(node[i]);
+      }
+      return;
+    }
+    for (const k of Object.keys(node)) {
+      if (PRESERVE_KEYS.has(k)) continue; // per-story avatars, no other source
+      if (typeof node[k] === 'string') { if (looksLikeBytes(node[k])) node[k] = undefined; }
+      else sweepBytes(node[k]);
+    }
+  };
+  sweepBytes(data);
 }
 
 /**
