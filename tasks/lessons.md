@@ -330,3 +330,35 @@ Each lesson should include:
 - New tables MUST be added to `server.js`'s `initializeDatabase()` (the one that actually runs on startup)
 - The `database.js` version is a secondary copy — update it too for completeness, but `server.js` is authoritative
 - After adding any new table, verify it was created by checking Railway logs for the `CREATE TABLE` output
+
+## Showcase "POST create-story never fires" was a test-locator bug, not a prod outage (2026-06-27)
+
+**Symptom**: French (Dubois) showcase failed repeatedly — Playwright threw "POST /api/jobs/create-story did not complete within 60s". No job row, credits untouched (200), wizard stuck on Summary. German showcases worked fine.
+
+**Wrong turns I took**: chased a server-side create-story hang (queried prod DB health, locks, idle txns), then the wizard's pre-POST avatar-regen loop, then the email-verification guard. All dead ends.
+
+**What actually found it**: instrumented the spec to (a) capture the browser console `[generateStory]` trail and (b) report when generateStory was NEVER invoked. The trail showed the click never reached generateStory().
+
+**Root cause**: `GENERATE_RE` had a bare `/générer/` alternative. The FR summary screen has TWO "Générer" buttons — "Générer une suggestion" (regenerate idea, earlier in DOM) and "Générer l'histoire !" (real). `.first()` clicked the wrong one. German "geschichte erstellen" only matched the real button, so DE never broke.
+
+**Rules**:
+- A button-text regex for a test MUST match the FULL per-language label, never a shared verb stem. "Generate X" and "Generate suggestion" collide on the stem.
+- When a flow "silently does nothing", first prove WHICH handler ran (capture console / add a log), before theorizing about servers, DB, or downstream awaits. The fastest path to the truth was 2 console listeners, not hours of DB forensics.
+- Per-language UI tests: enumerate every button containing the matched verb in EACH language before trusting `.first()`.
+
+## 2026-07-05 — Deploy race: three "failed fixes" that never ran
+**What happened:** Three consecutive staging showcases failed with the same 256MB
+jsonb error. Fixes #1 and #2 were correct, but each showcase was launched ~6-10
+minutes after `git push` using a blind `sleep 360` — Railway's build hadn't cut
+over, so every run executed PRE-fix code. Two days of "the fix didn't work"
+was actually "the fix was never deployed yet".
+**Rule:** NEVER launch a validation run after a timed wait. Verify the deployed
+build first — `/api/health` now returns the commit SHA (RAILWAY_GIT_COMMIT_SHA);
+poll until it equals the pushed SHA, then launch.
+**Second lesson:** when a "fixed" bug reproduces identically, first ask "did my
+fix actually run?" (check deployed version / add a log marker) before writing
+the next fix. I wrote fix #2 while fix #1 was unverified, and fix #3's review
+revealed both were probably fine.
+**Third lesson:** the failure-path partial-save overwrote a SUCCESSFUL full
+story save (stories.data) with a checkpoint skeleton, destroying evidence and
+the user's story. Failure-path writes must check what they're overwriting.

@@ -112,5 +112,17 @@
 </table>
 
 <p style="color:#6b7280;margin:26px;font-size:12px">Generated 2026-07-04 · high-effort review, 7 finder angles + 1-vote recall-biased verification. Update statuses in place; never delete rows.</p>
+<h2>Post-refactor Fable review — 2026-07-05</h2>
+<table>
+<tr><th>ID</th><th>Sev</th><th>Status</th><th>File:line</th><th>Finding</th><th>commit / test</th></tr>
+<tr><td class="id">REV-1</td><td><span class="sev P0">P0</span></td><td><span class="st fixed">fixed</span></td><td class="loc">database.js:1629</td><td>SPD-4 parallelization let top-level v0 + imageVersions[0] write version_index 0 concurrently (old order load-bearing) — skip redundant top-level v0 task</td><td class="meta">1d081a99</td></tr>
+<tr><td class="id">REV-2</td><td><span class="sev P0">P0</span></td><td><span class="st fixed">fixed</span></td><td class="loc">database.js:1593</td><td>SPD-3 structuredClone turns Buffers into Uint8Array → JSON.stringify one-key-per-byte explosion (256MB jsonb class) — reverted to JSON round-trip</td><td class="meta">1d081a99</td></tr>
+<tr><td class="id">REV-3</td><td><span class="sev P1">P1</span></td><td><span class="st fixed">fixed</span></td><td class="loc">server.js:7060</td><td>result_data sweep stripped landmarkPhotos.photoData contradicting keep-contract — landmarkPhotos now preserved</td><td class="meta">1d081a99</td></tr>
+<tr><td class="id">REV-4</td><td><span class="sev P2">P2</span></td><td><span class="st fixed">fixed</span></td><td class="loc">database.js x4, server.js</td><td>base64 detectors missed WebP (UklGR); keepUrl treated such blobs as URLs — prefix added to all 5 predicates</td><td class="meta">1d081a99</td></tr>
+<tr><td class="id">REV-5</td><td><span class="sev P1">P1</span></td><td><span class="st fixed">fixed</span></td><td class="loc">server.js:2438</td><td>savePartialStoryFromCheckpoints overwrote successful full saves with [PARTIAL] skeleton (destroyed 2 finished stories) — guard added</td><td class="meta">1d081a99</td></tr>
+<tr><td class="id">REV-6</td><td><span class="sev P3">P3</span></td><td><span class="st fixed">fixed</span></td><td class="loc">runware.js, apiHealth.js</td><td>ignored baseDelay/maxDelay params, unbounded error body triggering bogus retries, Runware logged as provider unknown</td><td class="meta">1d081a99</td></tr>
+<tr><td class="id">REV-7</td><td><span class="sev P3">P3</span></td><td><span class="st open">open</span></td><td class="loc">GenerationContext.tsx:177, regeneration.js:151, server.js:7055</td><td>Deferred minors: second poller lacks knownPages; imgRowToBytes is a hand-copied fork of imgBytesAsync (export instead); dropInlineBase64 mutates shared refs (safe today by ordering)</td><td class="meta">—</td></tr>
+<tr><td class="id">REV-8</td><td><span class="sev P1">P1</span></td><td><span class="st fixed">fixed</span></td><td class="loc">server.js:1530</td><td>Process: 3 showcase failures all ran pre-fix code (blind sleep-360 deploy wait). /api/health now returns commit SHA; validation runs verify the deployed build first</td><td class="meta">1d081a99</td></tr>
+</table>
 </body>
 </html>
