@@ -91,6 +91,32 @@ const SEVERITY_POINTS = {
   minor:         2,
 };
 
+// Entity-penalty cap (Jul 2026). Uncapped entity penalties (−70/−90 on one
+// page) zeroed out 90-scoring versions and could never converge — the repair
+// loop kept redoing pages whose flags the consolidator itself marked
+// "not actionable as inpaint edits". Policy: at most 40 points of entity
+// penalty apply to a version's finalScore; when ALL of the page's entity
+// issues that round were classified not-actionable by the consolidator, the
+// capped penalty is halved (advisory signal, not a fixable defect). The raw
+// uncapped value stays on the version as `entityPenaltyRaw` for diagnosis.
+const ENTITY_PENALTY_CAP = 40;
+
+/**
+ * Applied entity penalty for a version. Single chokepoint — every writer
+ * (setVersionScores, applyScore) and every legacy read-time fallback
+ * (computeFinalScore, composeFinalScore) must go through this so the
+ * round-loop scores and the finalize-time recompute can't diverge.
+ *
+ * @param {number} rawPenalty  uncapped sum of entity issue penalties
+ * @param {{allNonActionable?: boolean}} [opts]
+ * @returns {number} penalty to subtract from the score
+ */
+function capEntityPenalty(rawPenalty, { allNonActionable = false } = {}) {
+  const raw = Math.max(0, Number(rawPenalty) || 0);
+  const capped = Math.min(raw, ENTITY_PENALTY_CAP);
+  return allNonActionable ? capped / 2 : capped;
+}
+
 /**
  * Normalize a list of raw evaluator issues into the deductions shape.
  * Filters out anything without a severity.
@@ -137,10 +163,16 @@ function composeDeductions({ evalResult = null, entityResult = null } = {}) {
 function computeMathFinalScore(deductions) {
   if (!deductions || typeof deductions !== 'object') return 100;
   let total = 0;
-  for (const cat of ['quality', 'semantic', 'compliance', 'entity']) {
+  for (const cat of ['quality', 'semantic', 'compliance']) {
     const list = deductions[cat] || [];
     for (const d of list) total += SEVERITY_POINTS[d.severity] || 0;
   }
+  // Entity penalty capped (see capEntityPenalty): an uncapped −70/−90 entity
+  // sum zeroed otherwise-good versions on flags the consolidator itself
+  // marked not-actionable. capEntityPenalty is idempotent, so it's safe to
+  // apply at every entity-penalty site.
+  const entityRaw = (deductions.entity || []).reduce((s, d) => s + (SEVERITY_POINTS[d.severity] || 0), 0);
+  total += capEntityPenalty(entityRaw);
   return Math.max(0, Math.min(100, 100 - total));
 }
 
@@ -179,7 +211,9 @@ function applyScore(version, { evalResult = null, entityResult = null, promptFin
   // The previous evalScore math (MIN of visual/semantic/threeStage subscores
   // from composeEvalScore) was the legacy behavior; new model derives
   // evalScore from deductions ÷ entity-penalty split.
-  const entityPoints = (deductions.entity || []).reduce((s, d) => s + (SEVERITY_POINTS[d.severity] || 0), 0);
+  const entityRaw = (deductions.entity || []).reduce((s, d) => s + (SEVERITY_POINTS[d.severity] || 0), 0);
+  const entityPoints = capEntityPenalty(entityRaw);
+  version.entityPenaltyRaw = entityRaw;
   version.entityPenalty = entityPoints;
   version.evalScore = Math.max(0, Math.min(100, finalScore + entityPoints));
 
@@ -326,11 +360,11 @@ function versionDeductionTotal(version) {
     for (const cat of ['visual', 'semantic', 'threeStage']) {
       for (const i of (bd[cat]?.issues || [])) { sceneIssues.push(i); sawAny = true; }
     }
-    if (typeof bd.entity?.penalty === 'number') { entityPenalty = bd.entity.penalty; sawAny = true; }
+    if (typeof bd.entity?.penalty === 'number') { entityPenalty = capEntityPenalty(bd.entity.penalty); sawAny = true; }
   } else {
     for (const i of (version.fixableIssues || [])) { sceneIssues.push(i); sawAny = true; }
     for (const i of (version.semanticResult?.semanticIssues || version.semanticResult?.issues || [])) { sceneIssues.push(i); sawAny = true; }
-    if (typeof version.entityPenalty === 'number') { entityPenalty = version.entityPenalty; sawAny = true; }
+    if (typeof version.entityPenalty === 'number') { entityPenalty = capEntityPenalty(version.entityPenalty); sawAny = true; }
   }
   if (!sawAny) return Infinity;
 
@@ -427,7 +461,7 @@ function composeEvalScore(breakdown) {
 function composeFinalScore(breakdown) {
   if (!breakdown) return 0;
   const evalScore = composeEvalScore(breakdown);
-  const entityPenalty = (breakdown.entity && Number(breakdown.entity.penalty)) || 0;
+  const entityPenalty = capEntityPenalty((breakdown.entity && Number(breakdown.entity.penalty)) || 0);
   return Math.max(0, evalScore - entityPenalty);
 }
 
@@ -451,7 +485,9 @@ function composeFinalScore(breakdown) {
 function setVersionScores(version, evalScore, entityPenalty) {
   if (!version || typeof version !== 'object') return;
   version.evalScore = evalScore;
-  version.entityPenalty = (Number(entityPenalty) || 0);
+  const rawPenalty = (Number(entityPenalty) || 0);
+  version.entityPenaltyRaw = rawPenalty;
+  version.entityPenalty = capEntityPenalty(rawPenalty);
   version.finalScore = (typeof evalScore === 'number')
     ? evalScore - version.entityPenalty
     : null;
