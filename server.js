@@ -1526,6 +1526,9 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     r2: r2.isConfigured() ? 'configured' : 'not configured',
+    // Deployed commit — lets deploy scripts verify the running build instead
+    // of racing Railway's cutover (Railway injects RAILWAY_GIT_COMMIT_SHA).
+    commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 8) || null,
   });
 });
 
@@ -2435,6 +2438,24 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
   if (STORAGE_MODE !== 'database' || !dbPool) return;
 
   try {
+    // GUARD: if the full story save (upsertStory at finalize) already
+    // succeeded and only a LATER step failed (e.g. the result_data update),
+    // overwriting stories.data with a checkpoint-reconstructed skeleton would
+    // DESTROY the complete story. Skip the partial save when the stored story
+    // already has scene images and isn't itself a previous partial.
+    try {
+      const existing = await dbPool.query(
+        `SELECT jsonb_array_length(COALESCE(data->'sceneImages','[]'::jsonb)) AS pages,
+                COALESCE(data->>'title','') AS title
+         FROM stories WHERE id = $1`, [jobId]);
+      if (existing.rows.length > 0
+          && existing.rows[0].pages > 0
+          && !existing.rows[0].title.includes('[PARTIAL]')) {
+        log.info(`🛟 [PARTIAL] Story ${jobId} already has a full save (${existing.rows[0].pages} pages) — skipping partial overwrite`);
+        return;
+      }
+    } catch { /* stories row absent or unreadable → proceed with partial save */ }
+
     const jobDataResult = await dbPool.query('SELECT user_id, input_data FROM story_jobs WHERE id = $1', [jobId]);
     if (jobDataResult.rows.length === 0) return;
 
@@ -7056,7 +7077,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (!node || typeof node !== 'object' || seen.has(node)) return;
       seen.add(node);
       const isBytes = (s) => typeof s === 'string' && s.length > 1024
-        && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0') || s.startsWith('R0lGOD'));
+        && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0')
+            || s.startsWith('R0lGOD') || s.startsWith('UklGR'));
       if (Array.isArray(node)) {
         for (let i = 0; i < node.length; i++) {
           if (isBytes(node[i])) node[i] = undefined; else dropInlineBase64(node[i], seen);
@@ -7064,6 +7086,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         return;
       }
       for (const k of Object.keys(node)) {
+        // landmarkPhotos stay inline by contract (see stripImageData above):
+        // small, unique per page, needed for immediate display.
+        if (k === 'landmarkPhotos') continue;
         if (isBytes(node[k])) node[k] = undefined; else dropInlineBase64(node[k], seen);
       }
     };

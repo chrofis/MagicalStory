@@ -789,7 +789,7 @@ async function extractInlineImagesToR2(storyId, data) {
 
   const looksLikeBytes = (s) =>
     typeof s === 'string'
-    && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0') || s.startsWith('R0lGOD'))
+    && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0') || s.startsWith('R0lGOD') || s.startsWith('UklGR'))
     && s.length > 1024;
 
   // Two-phase design:
@@ -1282,13 +1282,13 @@ function stripInlineImagesFromStoryData(data) {
   // unreachable or the field never went through extract.
   const keepUrl = (s) =>
     (typeof s === 'string' && s.length > 0 && !s.startsWith('data:') && !s.startsWith('/9j/')
-      && !s.startsWith('iVBORw0') && !s.startsWith('R0lGOD'))
+      && !s.startsWith('iVBORw0') && !s.startsWith('R0lGOD') && !s.startsWith('UklGR'))
       ? s
       : undefined;
   const filterUrlArray = (arr) => Array.isArray(arr)
     ? arr.filter(s => typeof s === 'string' && s.length > 0
         && !s.startsWith('data:') && !s.startsWith('/9j/')
-        && !s.startsWith('iVBORw0') && !s.startsWith('R0lGOD'))
+        && !s.startsWith('iVBORw0') && !s.startsWith('R0lGOD') && !s.startsWith('UklGR'))
     : undefined;
 
   // Strip per-character bytes that DUPLICATE the characters table (photos
@@ -1552,7 +1552,7 @@ function stripInlineImagesFromStoryData(data) {
   // costumed subtrees are per-story with no other home, so they are preserved.
   const looksLikeBytes = (s) =>
     typeof s === 'string'
-    && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0') || s.startsWith('R0lGOD'))
+    && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0') || s.startsWith('R0lGOD') || s.startsWith('UklGR'))
     && s.length > 1024;
   const PRESERVE_KEYS = new Set(['styledAvatars', 'costumed']);
   const swept = new WeakSet();
@@ -1586,17 +1586,22 @@ async function saveStoryData(storyId, storyData) {
     throw new Error('Database mode required');
   }
 
-  // Deep clone to avoid modifying original. structuredClone avoids the extra
-  // full JSON string serialization that JSON.parse(JSON.stringify(...)) does
-  // over the 50-100MB blob (inline base64 images); story data is plain JSON so
-  // it's always structured-cloneable.
-  const dataForStorage = structuredClone(storyData);
+  // Deep clone to avoid modifying original. Deliberately JSON round-trip, NOT
+  // structuredClone: structuredClone turns a Buffer into a Uint8Array whose
+  // JSON.stringify explodes into one key per byte ({"0":137,"1":80,...}, ~20x
+  // inflation — overflows PG's 256MB jsonb cap), and it throws on function
+  // values the JSON round-trip silently drops. Pipeline data can carry Buffers
+  // (e.g. visualBibleGrid before R2 upload), so the normalization matters.
+  const dataForStorage = JSON.parse(JSON.stringify(storyData));
   let imagesSaved = 0;
 
   // SPD-4: collect image-insert thunks and run them with bounded concurrency
-  // after the loops instead of one sequential await at a time. Each insert is
-  // an independent row keyed by (story_id, image_type, page_number,
-  // version_index) — no ordering dependency between them.
+  // after the loops instead of one sequential await at a time. Inserts are
+  // independent rows keyed by (story_id, image_type, page_number,
+  // version_index) — EXCEPT version_index 0, which two writers can target
+  // (top-level best image and imageVersions[0] original). The loops below skip
+  // the redundant top-level v0 write when a versions[0] write exists, so no
+  // two tasks ever hit the same key.
   const imageSaveTasks = [];
   async function runWithConcurrency(tasks, limit) {
     let idx = 0;
@@ -1622,7 +1627,14 @@ async function saveStoryData(storyId, storyData) {
   if (dataForStorage.sceneImages && Array.isArray(dataForStorage.sceneImages)) {
     for (const img of dataForStorage.sceneImages) {
       if (img.imageData) {
-        if (!hasSeparateImages) {
+        // imageVersions[0] (the original) also writes version_index 0 and, in
+        // the old sequential code, deliberately landed LAST so the original is
+        // canonical at v0. With concurrent tasks that ordering is gone — skip
+        // the redundant top-level v0 write whenever the versions[0] write will
+        // happen, so v0 has exactly one writer.
+        const v0 = Array.isArray(img.imageVersions) ? img.imageVersions[0] : null;
+        const versionZeroWillWrite = !!(v0 && v0.imageData && !v0._rehydrated);
+        if (!hasSeparateImages && !versionZeroWillWrite) {
           // First-time extraction: save v0 to story_images. Capture imageData
           // before the delete below strips it from the blob.
           const sceneImageData = img.imageData;
@@ -1705,7 +1717,11 @@ async function saveStoryData(storyId, storyData) {
     const coverData = dataForStorage.coverImages?.[coverType];
     if (coverData) {
       if (coverData.imageData) {
-        if (!hasSeparateImages) {
+        // Same v0 single-writer rule as scenes: skip the top-level v0 task
+        // when imageVersions[0] (the original) will write version_index 0.
+        const cv0 = Array.isArray(coverData.imageVersions) ? coverData.imageVersions[0] : null;
+        const coverV0WillWrite = !!(cv0 && cv0.imageData && !cv0._rehydrated && !cv0._alreadySaved);
+        if (!hasSeparateImages && !coverV0WillWrite) {
           // First-time extraction: save v0 to story_images. Capture imageData
           // before the delete below strips it from the blob.
           const coverImageData = coverData.imageData;

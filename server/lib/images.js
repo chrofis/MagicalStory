@@ -8235,12 +8235,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       elementReferences = elementReferences.filter(e => e.type !== 'location');
     }
     if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-      // Pass per-scene character context so the grid builder crops 2×4
-      // character refs to a single scene-appropriate cell (face+body for
-      // close-ups, body for medium/background — never the whole 8-cell sheet).
-      visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks, {
-        sceneCharacters: newSceneMetadata?.fullData?.characters || newSceneMetadata?.characters || [],
-      });
+      visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
     }
   }
 

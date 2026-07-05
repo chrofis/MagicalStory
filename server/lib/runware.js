@@ -63,13 +63,16 @@ async function _runwareFetchWithRetryInner(payload, { maxRetries = 2, baseDelay 
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) {
-      const errorText = await response.text();
+      // Truncate the body: withRetry matches message substrings ('reset',
+      // 'aborted', 'terminated') for retryability — a long error body echoing
+      // one of those words would turn a non-retryable 4xx into wasted retries.
+      const errorText = (await response.text()).slice(0, 200);
       const err = new Error(`Runware API error (${response.status}): ${errorText}`);
       err.status = response.status;
       throw err;
     }
     return response;
-  }, { maxRetries, baseDelay: 1000, maxDelay: 6000 });
+  }, { maxRetries, baseDelay, maxDelay });
 }
 
 // Available models
