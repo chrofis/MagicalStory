@@ -704,7 +704,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     let verdict = null;
     try {
       verdict = await evaluateStyledSheetWithGemini(facePhoto, pass1ImageData, result.imageData, artStyle, process.env.GEMINI_API_KEY, usageTracker);
-      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} final=${verdict.finalScore} valid=${verdict.valid}`);
+      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} clean=${verdict.cleanScore} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       // Mirror Pass-1 behaviour (line 414): a Gemini eval failure should NOT
       // lock in this attempt at the maximum score and break the retry loop.
@@ -725,6 +725,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       identityScore: verdict.identityScore,
       styleScore: verdict.styleScore,
       outfitScore: verdict.outfitScore,
+      cleanScore: verdict.cleanScore,
       reasons: verdict.failureReasons || [],
       imageData: result.imageData,
       sentToGrok: result.sentToGrok || null,
