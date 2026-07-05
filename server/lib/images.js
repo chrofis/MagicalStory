@@ -3435,7 +3435,17 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     // largest figure as a last resort). Object issues are filtered out above
     // and never reach this block — see the isCharacterIssue gate.
     if (!bestMatch) {
-      if (issue.type === 'face' || issue.type === 'hand' || issue.type === 'clothing') {
+      // If the issue explicitly NAMES a character we know but PRIORITY 1/2
+      // couldn't find that character's detected figure, do NOT fall back to a
+      // different person's figure — repairing the wrong character (e.g.
+      // Patrick's clothing issue pinned to Nicole's figure) is worse than
+      // leaving it text-only. Only the last-resort largest/identified-figure
+      // fallback is for GENERIC "a child / the boy" issues that name nobody.
+      const namesAKnownChar = !!issue.character
+        || extractCharacterNames(issueDesc + ' ' + issueFix).length > 0;
+      if (namesAKnownChar) {
+        log.debug(`📦 [BBOX-ENRICH] Issue names a character whose figure wasn't detected — leaving text-only (not mis-assigning to another person): "${(issue.description || '').substring(0, 60)}"`);
+      } else if (issue.type === 'face' || issue.type === 'hand' || issue.type === 'clothing') {
         // For character-related issues, prefer identified characters or largest figure
         const identifiedFigures = allDetections.figures.filter(f => f.name && f.name !== 'UNKNOWN');
         if (identifiedFigures.length > 0) {
@@ -7028,7 +7038,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const latestEval = bestSoFar?.evaluation || evalMap.get(img.pageNumber);
 
       if (bothStrategiesTriedAndRegressed(versions)) {
-        log.info(`  ⏭️  [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: skipped — both inpaint and iterate already tried, neither improved the original`);
+        // Never silently drop unaddressed high-severity issues. When a page is
+        // given up on, surface any CRITICAL/CATASTROPHIC issues still present
+        // in its latest eval (these include fixes deferred by the per-round
+        // cap-at-3 that never got attempted) so they're visible in logs and can
+        // be manually repaired — instead of shipping a defect without a trace.
+        const outstanding = [
+          ...(latestEval?.fixableIssues || []),
+          ...(latestEval?.semanticResult?.semanticIssues || latestEval?.semanticResult?.issues || []),
+        ].filter(i => /catastrophic|critical/i.test(String(i?.severity || '')));
+        if (outstanding.length > 0) {
+          log.warn(`  ⚠️  [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: giving up with ${outstanding.length} unaddressed ${outstanding.length === 1 ? 'issue' : 'issues'} — ${outstanding.map(i => `[${i.severity}] ${String(i.description || i.problem || '').substring(0, 60)}`).join(' | ')}`);
+        } else {
+          log.info(`  ⏭️  [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: skipped — both inpaint and iterate already tried, neither improved the original`);
+        }
         return { img, method: null, latestEval, skipped: true };
       }
 
@@ -7571,6 +7594,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // sub-scores live under version.scoreBreakdown.<evaluator>.score.
     const { applyScore } = require('./scoring');
     const stampScores = (v) => {
+      // Stamp the page number so applyScore's [SCORE] log identifies the page
+      // (was logging a bare "version" with no page).
+      if (v.pageNumber == null) v.pageNumber = pageNumber;
       if (!v.evaluation && !v.entityIssues && (v.entityPenalty == null || v.entityPenalty === 0)) {
         // Un-evaluated version (e.g. a just-pushed original before any eval
         // result is attached). Leave canonical fields null rather than
