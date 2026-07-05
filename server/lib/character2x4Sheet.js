@@ -454,7 +454,10 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
         { text: prompt },
       ],
     }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 2500, responseMimeType: 'application/json' },
+    // 8000 not 2500: gemini-2.5 internal thinking counts toward
+    // maxOutputTokens — the TASK-5 colour enumeration makes it think longer,
+    // and a 2500 cap truncated the JSON mid-string (parse failures).
+    generationConfig: { temperature: 0.2, maxOutputTokens: 8000, responseMimeType: 'application/json' },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
       { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
