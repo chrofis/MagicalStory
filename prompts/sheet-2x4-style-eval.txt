@@ -33,10 +33,10 @@ TASK 4: COSTUME PRESERVED
 - `outfitScore` is the score.
 
 TASK 5: CLEAN RENDER
-- First, for each of the 4 head cells in Image 3, list every colour region visible on the SKIN of the face and on the HAIR. Put the list in the `clean.reason` field (e.g. "cell1 skin: tan + blue patch + yellow patch; cell1 hair: black + magenta").
-- Skin must be a single natural skin tone with natural shading. Hair must be one natural hair colour. Any region of blue, yellow, green, magenta, cyan, red, or another non-natural colour ON the skin or IN the hair is a defect — regardless of art style.
+- For each of the 4 head cells in Image 3, list in `clean.reason` the colour regions visible on the skin and in the hair (compact, one line per cell).
+- Judge each listed colour against the character's natural colouring in Image 1: skin shows one natural skin tone plus its shading; hair shows one natural hair colour plus its shading. Any colour region that does not belong to that natural colouring — a paint-like patch, streak, or overlay — is a defect, regardless of art style.
 - Also flag arrows, symbols, letters, or logos anywhere on the character.
-- Score 1-10: 9-10 = skin and hair in natural colours only, no marks. 1-3 = any non-natural colour region on any face, in any hair, or any graphic mark. There is no middle score for colour patches — if you listed one, score 1-3.
+- Score 1-10: 9-10 = natural colouring only, no marks. 1-3 = any foreign colour region on skin or hair, or any graphic mark. No middle score: if you listed a foreign region, score 1-3.
 - `cleanScore` is the score.
 
 `finalScore` MUST equal the LOWEST of layoutScore, identityScore, styleScore, outfitScore, cleanScore.
