@@ -281,12 +281,6 @@ const TESTIMONIALS: { name: string; town: string; quote: Record<string, string> 
     fr: `«Nous l'avons offert pour un anniversaire. Pour une fois, autre chose que le jouet habituel.»`,
     it: `«L'abbiamo regalato per un compleanno. Per una volta qualcosa di diverso dal solito giocattolo.»`,
   } },
-  { name: 'Verena & Werner', town: 'Baden', quote: {
-    de: `«Wir lesen es mit den Enkeln – für einmal ein Geschenk mit etwas Bestand.»`,
-    en: `"We read it with our grandchildren – for once, a gift with some lasting value."`,
-    fr: `«Nous le lisons avec nos petits-enfants – pour une fois, un cadeau qui dure.»`,
-    it: `«Lo leggiamo con i nipoti – per una volta un regalo che dura.»`,
-  } },
   { name: 'Renate & Ehsan', town: 'Bern', quote: {
     de: `«Unsere Tochter hat sich die Geschichte übers Zähneputzen gemerkt und macht seither weniger Theater. Mehr wollten wir gar nicht.»`,
     en: `"Our daughter remembered the story about brushing teeth and has made less fuss since. That's all we wanted."`,
