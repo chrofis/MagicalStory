@@ -1040,3 +1040,17 @@ R2 URLs kept, styledAvatars preserved.
 
 **Touched:** `server/services/database.js` (`stripInlineImagesFromStoryData`).
 **Status:** ✅ active.
+
+---
+
+## 2026-07-05 — Search ads land on the HOMEPAGE — final, do not re-litigate
+
+**Context:** June: 79 paid clicks → homepage, 0 reached /try (the /try page-view
+conversion pixel fired zero times), 0 trials, 0 attributable books. Prior
+history: ads pointed at /try, repointed to homepage 2026-06-14, question
+re-raised 2026-07-05.
+**Decision (user, explicit):** ads keep landing on the homepage. Permanently.
+The optimization surface is the HOMEPAGE→/try path (CTA prominence, homepage
+conversion), never the ad final URL.
+**Touched:** none (status quo confirmed).
+**Status:** ✅ final.
