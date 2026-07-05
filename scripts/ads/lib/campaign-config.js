@@ -199,7 +199,8 @@ const CAMPAIGN_DEFAULTS = {
 // Reusable assets from existing Campaign Deutsch (id 23651105239) — saves re-uploading
 // the same logos / squares / business name on every PMax campaign create.
 const REUSABLE_ASSETS = {
-  logo:            'customers/6507339241/assets/337532317437',  // 1:1 LOGO
+  logo:            'customers/6507339241/assets/386020463531',  // 1:1 LOGO — simplified book (approved 2026-07-05)
+  logoWithText:    'customers/6507339241/assets/386121276691',  // 1:1 LOGO — book + "Magical Story" text (bigger slots)
   landscapeLogo:   'customers/6507339241/assets/337393717742',  // 4:1 LANDSCAPE_LOGO
   squareImage:     'customers/6507339241/assets/337875585322',  // 1:1 SQUARE_MARKETING_IMAGE
   businessName:    'customers/6507339241/assets/337389367601',  // "Magical Story"
