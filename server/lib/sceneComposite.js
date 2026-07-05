@@ -40,7 +40,7 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { generateWithGrok, editWithGrok, GROK_MODELS } = require('./grok');
 const { renderCharacterInPhantomPose } = require('./phantomPoseRender');
-const { stripDataUriPrefix } = require('./r2');
+const { stripDataUriPrefix, bytesFromAnyImage } = require('./r2');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
 const { rembgRemoveBackground } = require('./rembg');
 
@@ -490,7 +490,9 @@ const FACE_CELL = {
  * reference — sending just the matching pose cell keeps the model focused
  * on identity + costume without the other 7 pose distractions.
  *
- * @param {Buffer|string} sheet - the 2×4 sheet as a raw Buffer OR data URI.
+ * @param {Buffer|string} sheet - the 2×4 sheet as a raw Buffer, data URI,
+ *   raw base64, or http(s) URL (post-R2-migration stories store sheets as
+ *   `https://images.magicalstory.ch/...` URLs — resolved via r2.bytesFromAnyImage).
  * @param {Object} opts
  * @param {'front'|'threeQuarter'|'profile'|'back'} opts.pose - body angle. Defaults to 'threeQuarter'.
  * @param {boolean} [opts.flip=false] - mirror horizontally (camera-right facing).
@@ -499,9 +501,15 @@ const FACE_CELL = {
  */
 async function cropAvatarCell(sheet, opts = {}) {
   const { pose = 'threeQuarter', flip = false, includeFace = false, stack = false } = opts;
-  const sheetBuf = Buffer.isBuffer(sheet)
-    ? sheet
-    : Buffer.from(stripDataUriPrefix(String(sheet)), 'base64');
+  // bytesFromAnyImage handles Buffer / data-URI / raw base64 / http(s) URL.
+  // Pre-R2-migration this was a bare base64 decode, which turned stored R2
+  // URLs into ~80 bytes of garbage and silently broke cell refs for every
+  // DB-reloaded story.
+  const sheetBuf = await bytesFromAnyImage(sheet);
+  if (!sheetBuf) {
+    const preview = Buffer.isBuffer(sheet) ? '<Buffer>' : String(sheet).slice(0, 80);
+    throw new Error(`cropAvatarCell: could not resolve sheet input to image bytes (input: "${preview}")`);
+  }
 
   const bodyIdx = POSE_CELL[pose] || POSE_CELL.threeQuarter;
   let body = await cropSheetCell(sheetBuf, bodyIdx);

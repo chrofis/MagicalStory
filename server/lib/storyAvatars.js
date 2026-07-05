@@ -16,6 +16,8 @@
  */
 'use strict';
 
+const { log } = require('../utils/logger');
+
 /**
  * Pull a URL out of whatever shape the legacy code stored.
  *   - string: a data: URI or http(s) URL
@@ -183,8 +185,10 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
       ref.cellDepth = pf.depth;
       ref.cellIncludesFace = includeFace;
     } catch (err) {
-      // Fall through to the existing full-image ref. Logged at debug level
-      // by the caller if it tracks errors.
+      // Fall through to the existing full-image ref — but never silently:
+      // this catch swallowed the R2-URL base64-garbage bug for every
+      // DB-reloaded story until it was made loud.
+      log.warn(`[CELL REFS] crop failed for ${charName} (${slotKey}): ${err.message} — falling back to full-image ref`);
     }
   }
   return referencePhotos;
