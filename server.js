@@ -7029,7 +7029,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
         clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData)
       }));
-      // Keep landmarkPhotos WITH photoData (small, unique per page, needed for display)
+      // landmarkPhotos: bytes are dropped by dropInlineBase64 below (hasPhoto
+      // flag set → client lazy-loads from stories.data, which holds R2 URLs).
+      // No image bytes are stored in the database — R2 is the only byte store.
       const stripped = { ...metadata, hasImage: !!imageData, hasVisualBibleGrid: !!visualBibleGrid, referencePhotos: strippedRefPhotos };
       // Strip imageData from imageVersions
       if (stripped.imageVersions) {
@@ -7086,9 +7088,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         return;
       }
       for (const k of Object.keys(node)) {
-        // landmarkPhotos stay inline by contract (see stripImageData above):
-        // small, unique per page, needed for immediate display.
-        if (k === 'landmarkPhotos') continue;
+        // landmarkPhotos: drop the bytes like everything else (no images in
+        // the DB — R2 is the only byte store), but set hasPhoto so the client
+        // lazy-loads them via getDevImage(...,'landmark'), which serves the
+        // R2-backed copies from stories.data (ReferencePhotosDisplay:111).
+        if (k === 'landmarkPhotos' && Array.isArray(node[k])) {
+          for (const lp of node[k]) {
+            if (lp && typeof lp === 'object' && isBytes(lp.photoData)) {
+              lp.hasPhoto = true;
+              lp.photoData = undefined;
+            }
+          }
+          continue;
+        }
         if (isBytes(node[k])) node[k] = undefined; else dropInlineBase64(node[k], seen);
       }
     };
