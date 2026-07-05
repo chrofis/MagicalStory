@@ -774,6 +774,13 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           }
 
           const refAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
+          // Expected clothing as TEXT from this story's clothingRequirements.
+          // The grid prompt judges clothing against this description, not against
+          // the reference avatar's pixels — style transfer can mutate the avatar's
+          // outfit, and avatars.clothing can be stale across stories.
+          const expectedClothing = buildClothingDescription(
+            character, clothingCategory, artStyle, storyData.clothingRequirements || null
+          );
           const gridLabel = `${charName} (${clothingCategory})`;
 
           // Split crops into batches for multiple 3x3 grids (8 crops + 1 ref per grid)
@@ -811,6 +818,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             const evalResult = await evaluateEntityConsistency(
               gridResult.buffer, gridResult.manifest,
               { entityType: 'character', entityName: charName, clothingCategory,
+                expectedClothing,
                 referencePhoto: refAvatar, cellCount: batchCrops.length }
             );
 
@@ -1266,11 +1274,13 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
             && !styledForArt.summer;
           const fallbackCategory = onlyHasCostumed ? 'costumed' : 'standard';
           const clothingCategory = charClothing[name] || fallbackCategory;
-          // Resolve category to actual clothing description
-          let clothing = fullChar?.avatars?.clothing?.[clothingCategory] || '';
-          if (!clothing && clothingCategory.startsWith('costumed:')) {
-            clothing = fullChar?.avatars?.clothing?.[clothingCategory] || '';
-          }
+          // Resolve category to actual clothing description.
+          // buildClothingDescription prefers this story's clothingRequirements
+          // (signature → description) and only falls back to avatars.clothing,
+          // which is character-level metadata that can be stale across stories.
+          const clothing = fullChar
+            ? buildClothingDescription(fullChar, clothingCategory, artStyle, clothingRequirements)
+            : '';
           const physDesc = fullChar ? buildCharacterPhysicalDescription(fullChar) : 'character';
           const position = sceneMetadata?.characterPositions?.[name] || '';
           // Sanitize age/gender terms to avoid Gemini safety blocks on children in costumes
@@ -1837,7 +1847,7 @@ async function createEntityGrid(crops, entityName, referencePhoto = null) {
  * @returns {Promise<Object>} Evaluation result
  */
 async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
-  const { entityType, entityName, referencePhoto, cellCount, clothingCategory } = entityInfo;
+  const { entityType, entityName, referencePhoto, cellCount, clothingCategory, expectedClothing } = entityInfo;
 
   // Build prompt from template
   const promptTemplate = PROMPT_TEMPLATES.entityConsistencyCheck;
@@ -1865,34 +1875,34 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
     ? 'A reference photo of this character is provided as cell R.'
     : 'No reference photo available.';
 
-  // Build clothing context info (new for per-clothing evaluation)
+  // Build clothing context info. Cell R is authoritative for IDENTITY only;
+  // expected clothing comes as text from the story's clothingRequirements
+  // (styled-avatar pixels can drift from the story's clothing spec).
   let clothingContextInfo = '';
   if (clothingCategory) {
-    if (clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:')) {
-      const costumeType = clothingCategory.startsWith('costumed:') ? clothingCategory.replace('costumed:', '') : 'costume';
-      clothingContextInfo = `
-## Clothing Context
-
-This evaluation is for **${clothingCategory}** (costume: ${costumeType}).
-All cells show the character in their ${costumeType} costume.
-Cell R shows the reference avatar with the correct costumed appearance.
-
-Compare each cell to the reference avatar (Cell R) for:
-- Face, hair, skin tone consistency
-- Costume matches the ${costumeType} style shown in Cell R
-- Even if only one appearance exists, compare it to the reference avatar`;
-    } else {
-      clothingContextInfo = `
-## Clothing Context
-
-This evaluation is for **${clothingCategory}** clothing category.
-All cells should show the character in ${clothingCategory} attire.
-Cell R shows the reference avatar with the correct ${clothingCategory} appearance.
-
-Compare each cell to the reference avatar (Cell R) for:
-- Face, hair, skin tone consistency
-- Clothing matches the ${clothingCategory} style shown in Cell R`;
+    const isCostumed = clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:');
+    const costumeType = isCostumed
+      ? (clothingCategory.startsWith('costumed:') ? clothingCategory.replace('costumed:', '') : 'costume')
+      : null;
+    const lines = [
+      '',
+      '## Clothing Context',
+      '',
+      `This evaluation is for the **${clothingCategory}** clothing category${costumeType ? ` (costume: ${costumeType})` : ''}.`,
+    ];
+    if (referencePhoto) {
+      lines.push('Cell R is authoritative for identity only (face, hair, skin tone, age). Do not treat the outfit shown in Cell R as the expected clothing.');
     }
+    if (expectedClothing) {
+      lines.push(`Expected clothing for these cells: ${expectedClothing}`);
+      lines.push('Judge clothing against this description; flag cells whose outfit contradicts it or differs from the other cells.');
+    } else {
+      lines.push(`All cells should show the character in ${clothingCategory} attire; flag outfits that differ between cells.`);
+    }
+    if (isCostumed && referencePhoto) {
+      lines.push('Even if only one appearance exists, verify its identity against Cell R.');
+    }
+    clothingContextInfo = lines.join('\n');
   }
 
   // Fill template

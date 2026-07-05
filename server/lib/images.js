@@ -5650,6 +5650,11 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     sceneDescription = '',
     artStyle = null,
     characterClothing = null,
+    // Story-level clothing spec ({name: {standard: {description, signature}, ...}}).
+    // Merged into the per-character requirements passed to getCharacterPhotoDetails
+    // so resolveClothingDescription reads THIS story's clothing instead of falling
+    // through to stale cross-story avatars.clothing.
+    clothingRequirements = null,
     // Audit trail: when provided, consolidator calls get persisted to DB
     storyId = null,
     round = null,
@@ -5729,7 +5734,14 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     const helpers = getStoryHelpers();
     const charReqs = {};
     for (const [name, variant] of Object.entries(characterClothing || {})) {
-      charReqs[name] = { _currentClothing: variant };
+      // Merge the story-level spec so resolveClothingDescription finds
+      // clothingRequirements[name][category].signature/description (this
+      // story's clothing) before falling back to stale avatars.clothing.
+      const storyReqs = clothingRequirements?.[name];
+      charReqs[name] = {
+        ...(storyReqs && typeof storyReqs === 'object' ? storyReqs : {}),
+        _currentClothing: variant,
+      };
     }
     const photos = helpers.getCharacterPhotoDetails(characters || [], null, artStyle || 'watercolor', charReqs);
     for (const p of photos) {
@@ -6665,6 +6677,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       sceneDescription: img.sceneDescription || img.description || '',
       artStyle: storyData?.artStyle || artStyle || null,
       characterClothing: pageCharacterClothing,
+      clothingRequirements: storyData?.clothingRequirements || null,
       coverText,
       // Thread storyId + round so consolidator calls get persisted
       storyId: storyData?.id || jobId || null,
@@ -6731,7 +6744,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return { pageNumber, imageData: null, error: `character ${charName} not found` };
     }
 
-    const clothingCategory = img.perCharClothing?.[charName] || 'standard';
+    // Case-insensitive lookup — scene metadata can key perCharClothing with
+    // different casing than the canonical character name, and an exact-key
+    // miss silently degraded the repair to 'standard' clothing.
+    const perCharClothingKey = Object.keys(img.perCharClothing || {})
+      .find(k => k.toLowerCase() === charName.toLowerCase());
+    const clothingCategory = (perCharClothingKey && img.perCharClothing[perCharClothingKey]) || 'standard';
     const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
     const avatarPhoto = styledAvatar || getFacePhoto(character);
     const avatarPhotoType = styledAvatar
