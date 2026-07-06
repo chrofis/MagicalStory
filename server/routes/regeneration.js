@@ -2312,9 +2312,17 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       };
       storyData.coverImages[coverKey] = coverData;
 
-      // Active version is picked by recomputeAllActiveVersions inside
-      // saveStoryData (best score wins) — no explicit setActiveVersion needed.
       await saveStoryData(id, storyData);
+
+      // Composite-iterate (and any cover) versions carry a NULL quality score,
+      // so recomputeAllActiveVersions inside saveStoryData (best-score-wins)
+      // will NOT promote the new version over an older scored one — the user's
+      // regenerated cover then silently stays inactive and the old image keeps
+      // showing. The user explicitly asked to regenerate THIS cover, so the new
+      // version must become active. Set it explicitly (same as the style-
+      // transfer path at ~line 1736). Points at the DB row we just saved, which
+      // survives even if a concurrent multi-cover save races the JSONB blob.
+      await setActiveVersion(id, coverKey, newVersionIndex);
 
       // Deduct credits if not unlimited
       let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;

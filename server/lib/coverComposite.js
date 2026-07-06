@@ -759,7 +759,7 @@ ${actionSection}${vbGridSection}
 ═══ POSE REDRAW (mandatory — do every line) ═══
 ${POSES.join('\n')}
 
-After fixing poses: BLEND the figures into the scene. CRITICAL — REMOVE ANY HALO: each figure is a cutout and may have a pale, white, or glowing rim/outline where it meets the background. Paint that rim out completely — no light outline, no glow, no ring around hair, shoulders, or body. The figure's edges must dissolve naturally into the scene so nothing looks pasted or stickered. Match the lighting direction of the background. REPAINT the ground patch directly beneath each figure's feet (a small area, only beneath/around feet) so it reads as a natural continuation of the surface the landmark stands on — do NOT extend the ground OVER the buildings, the river, the foliage, or other background elements.${textLine}
+After fixing poses: render every figure as if painted directly into the scene — the same brush texture, palette, and lighting direction as the background, their hair and body edges flowing into their surroundings as one continuous illustration. Repaint each figure's outline so it belongs to the scene. Match the lighting direction of the background. REPAINT the ground patch directly beneath each figure's feet (a small area, only beneath/around feet) so it reads as a natural continuation of the surface the landmark stands on — do NOT extend the ground OVER the buildings, the river, the foliage, or other background elements.${textLine}
 
 PRESERVE EXACTLY:
 - The background scene: every building, window, roofline, doorway, foliage, river, sky — pixel-faithful to the input.
@@ -865,7 +865,7 @@ The background of this image is a real photograph of a specific landmark. DO NOT
 
 YOUR EDIT (in this order):
 1. Apply ${styleHint} stylistically across the whole image — soft watercolor brushstrokes, paper texture, gentle wash. The buildings keep their EXACT geometry, only their rendering changes from photographic to painted.
-2. The figures (already painted with interactive poses) are foreground — blend them into the scene by matching lighting and edges. CRITICAL — REMOVE ANY HALO: each figure is a cutout and may have a pale, white, or glowing rim/outline where it meets the background. Paint that rim out completely — no light outline, glow, or ring around hair, shoulders, or body — so the figure's edges dissolve naturally into the scene and nothing looks pasted or stickered. DO NOT change their poses.
+2. The figures (already painted with interactive poses) are the foreground — render them as if painted directly into the scene: the same watercolor texture, palette, and lighting as the background, their hair and body edges flowing naturally into their surroundings as one continuous illustration. Repaint each figure's outline so it belongs to the scene. DO NOT change their poses.
 3. REPAINT THE GROUND ONLY beneath/around the figures' feet so it reads as a continuation of the actual ground material the landmark stands on (cobblestone, paving stones, plaza, dirt, grass, sand, snow — whichever matches the landmark). Make the transition invisible. Do not extend ground OVER the buildings.${textLine}
 
 PRESERVE EXACTLY:
