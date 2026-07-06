@@ -282,6 +282,35 @@ async function removeBackground(buf) {
   return chromaKeyBg(buf, 45);
 }
 
+// Un-multiply the WHITE background from the cutout's semi-transparent edge
+// pixels — the real cause of the cover "halo". rembg (and the chroma-key
+// fallback) leave an anti-aliased edge whose colour is observed = fg·a +
+// white·(1−a), i.e. white/pink-tinted; composited onto the scene that reads as
+// a light rim around each figure. Recover the true foreground colour
+// fg = (observed − 255·(1−a)) / a so the edge stops carrying white, while the
+// soft alpha (a) is KEPT — clean anti-aliased edges, no jaggies, no halo.
+// Fully-opaque pixels (a=255, incl. white clothing/highlights) are untouched.
+// Validated: a pink (237,147,147)@a128 edge → true red (219,40,40)@a128.
+async function defringeCutout(buf) {
+  try {
+    const meta = await sharp(buf).metadata();
+    if (!meta.hasAlpha) return buf;
+    const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a === 0 || a >= 255) continue;
+      const af = a / 255;
+      for (let c = 0; c < 3; c++) {
+        data[i + c] = Math.max(0, Math.min(255, Math.round((data[i + c] - 255 * (1 - af)) / af)));
+      }
+    }
+    return await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
+  } catch (e) {
+    log.warn(`[COVER-COMPOSITE] defringe failed, using raw cutout: ${e.message}`);
+    return buf;
+  }
+}
+
 async function chromaKeyBg(buf, threshold = 45) {
   const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width, height } = info;
@@ -505,7 +534,7 @@ async function generateCoverViaComposite({
     const buf = await loadImageAny(src);
     if (!buf) { log.warn(`[COVER-COMPOSITE] ${c.name}: avatar load failed`); continue; }
     const body = await extractQuadrant(buf, 'body-front');
-    const cleanRaw = await removeBackground(body);
+    const cleanRaw = await defringeCutout(await removeBackground(body));
     const trimmed = await sharp(cleanRaw).trim({ threshold: 1 }).toBuffer().catch(() => cleanRaw);
     const targetH = Math.max(40, Math.round(heightCm(c.age) * pxPerCm * 1.2));
     let resized = await sharp(trimmed).resize({ height: targetH }).png().toBuffer();
@@ -533,7 +562,7 @@ async function generateCoverViaComposite({
     if (artImg) {
       const raw = await loadImageAny(artImg);
       if (raw) {
-        const cleaned = await removeBackground(raw);
+        const cleaned = await defringeCutout(await removeBackground(raw));
         const trimmed = await sharp(cleaned).trim({ threshold: 1 }).toBuffer().catch(() => cleaned);
         propBuf = trimmed;
       }
@@ -579,18 +608,13 @@ async function generateCoverViaComposite({
     const top = Math.max(0, groundY - f.height);
     layers.push({ input: f.buffer, left, top });
   }
-  if (propBuf) {
-    const propTargetH = Math.round(H * 0.25);
-    let propResized = await sharp(propBuf).resize({ height: propTargetH }).png().toBuffer();
-    let pm = await sharp(propResized).metadata();
-    if (pm.width > W || pm.height > H) {
-      propResized = await sharp(propResized).resize({ width: W, height: H, fit: 'inside' }).png().toBuffer();
-      pm = await sharp(propResized).metadata();
-    }
-    const left = Math.max(0, Math.round((W - pm.width) / 2));
-    const top = Math.max(0, H - 8 - pm.height);
-    layers.push({ input: propResized, left, top });
-  }
+  // NOTE: the prop is deliberately NOT composited as a cutout layer. Pasting it
+  // at a fixed 25%-of-height, centre-bottom, ON TOP of the figures produced the
+  // "giant table floating in front of a child" artefact — a table/furniture prop
+  // has no sensible cutout placement. Instead the pose prompt tells the centre
+  // figure to hold/rest-on the prop by name, and the VB-grid reference image
+  // (passed to pass 1) shows Grok exactly what it looks like, so Grok DRAWS it
+  // in-hand at the correct scale and position. `propName` still feeds the pose.
   const pass1Input = await sharp(whiteBg).composite(layers).jpeg({ quality: 92 }).toBuffer();
 
   // 5. Build pass 1 prompt (pose redraw only, no landmark, no style)
@@ -603,14 +627,16 @@ async function generateCoverViaComposite({
     let pose;
     if (i === centerIdx) {
       pose = propName
-        ? `BOTH HANDS rest on the ${propName} on the ground in front. Body leans slightly forward. Head looks down at the prop and up at the viewer. NOT arms-at-sides.`
+        ? `BOTH HANDS hold the ${propName} up at chest height, both hands visibly gripping it and the object clearly presented to the viewer. Body squared to the camera. NOT arms-at-sides.`
         : `Holding hands with the figure to the immediate right. Body squared to camera. NOT arms-at-sides.`;
     } else if (i < centerIdx) {
       pose = `RIGHT ARM raised and around ${visualIdentifier(i + 1, n, figures[i + 1].age)}'s shoulders, pulling that figure close. Body angled slightly to the right. NOT arms-at-sides.`;
     } else {
       pose = `LEFT HAND placed on ${visualIdentifier(i - 1, n, figures[i - 1].age)}'s shoulder, fingers visible. Body angled slightly to the left. NOT arms-at-sides.`;
     }
-    POSES.push(`- ${me}: REDRAW the pose. New pose: ${pose}`);
+    // Eyes-open-at-viewer default: the old "looks down at the prop" wording made
+    // Grok draw closed / downcast eyes. Every cover figure faces the reader.
+    POSES.push(`- ${me}: REDRAW the pose. New pose: ${pose} Eyes wide OPEN looking straight at the viewer with a warm natural smile — never closed, squinting, or downcast.`);
   }
   // Pass-1 must stay WHITE-BACKGROUND only. We can't dump the full scene
   // prose here — the prose names the landmark explicitly and Grok would paint
@@ -784,7 +810,7 @@ If any figure still has arms at their sides, the task has failed. If the backgro
   }
 
   // 7. Cut figures from pass 1 result
-  let cutout = await removeBackground(pass1.imageData);
+  let cutout = await defringeCutout(await removeBackground(pass1.imageData));
   // 8. Composite cutout onto landmark
   const landmarkResized = await sharp(landmarkBuf).resize(W, H, { fit: 'cover', position: 'centre' }).jpeg({ quality: 92 }).toBuffer();
   const cutoutResized = await sharp(cutout).resize(W, H, { fit: 'inside' }).png().toBuffer();
