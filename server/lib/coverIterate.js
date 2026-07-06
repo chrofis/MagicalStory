@@ -703,6 +703,12 @@ async function buildCoverReferences({
       const { buildEmptyScenePrompt } = require('../services/prompts');
       const emptyPrompt = buildEmptyScenePrompt({
         style: artStyleDesc,
+        // Covers paste the figures at a fixed bottom-centre position (see
+        // coverComposite.js groundY), so the plate MUST paint solid dry ground
+        // across the bottom or the figures land in whatever is there — on a
+        // beach/lakeside/river scene that is open water, and the single Grok
+        // pass cannot reliably carve a bank out of a "preserve the water" plate.
+        characterSpace: 'The bottom fifth of the frame must be solid dry standing ground spanning the full width — sand above the waterline, beach berm, boardwalk, grass, path, stone, or deck — where the characters will stand. Any ocean, river, lake, surf, pool, or open water stays in the mid-ground or higher and never touches the bottom edge of the frame.',
         description: emptyDesc,
       });
       const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, coverPageNumber, landmarkPhotos);

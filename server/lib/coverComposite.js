@@ -781,7 +781,7 @@ ${POSES.join('\n')}
 After fixing poses: render every figure as if painted directly into the scene — the same brush texture, palette, and lighting direction as the background, their hair and body edges flowing into their surroundings as one continuous illustration. Repaint each figure's outline so it belongs to the scene. Match the lighting direction of the background. Every figure must stand on SOLID GROUND — feet flat on a stable surface (bank, cobblestones, path, grass, stone). NO figure stands in or on water. REPAINT the ground patch directly beneath each figure's feet (a small area, only beneath/around the feet): if their feet fall over water or any unstable surface, paint a small natural bank, shoreline, or stepping stones under them so they stand firmly on land. Keep this to the small area right under the feet — do NOT pave over the wider river, the buildings, or the foliage elsewhere.${textLine}
 
 PRESERVE EXACTLY:
-- The background scene: every building, window, roofline, doorway, foliage, river, sky — pixel-faithful to the input.
+- The background scene: every building, window, roofline, doorway, foliage, river, sky — pixel-faithful to the input, EXCEPT the narrow strip directly beneath each figure's feet, which you may repaint into dry standing ground (sand, bank, path, stone, deck) as instructed above so no figure stands in water.
 - Every figure's face, hair, skin tone, clothing — keep their identity exact, only fix the pose and soften the edges.
 - The ${artStyle} aesthetic — do not change the style, do not photo-realize, do not add color if the background is monochrome.
 

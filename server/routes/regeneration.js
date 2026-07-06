@@ -2346,7 +2346,11 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         if (!imgData) {
           try {
             const dbImg = await getStoryImage(id, coverKey, null, arrayToDbIndex(idx, coverKey));
-            imgData = dbImg?.imageData || undefined;
+            // After the R2 migration older versions store bytes ONLY in image_url
+            // (image_data is NULL). Falling back to imageUrl mirrors the canonical
+            // load path's pickImageSrc — without it, every older cover version comes
+            // back with no image and renders as a blank/"vanished" cell until reload.
+            imgData = dbImg?.imageData || dbImg?.imageUrl || undefined;
           } catch { /* ignore */ }
         }
         return {
@@ -2358,6 +2362,12 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
           type: v.type,
           qualityScore: v.qualityScore,
           imageData: imgData,
+          // Match the canonical load-path shape (stories.js): without these the
+          // freshly-iterated version loses its composite intermediates in the
+          // picker until a reload re-hydrates them from the DB.
+          method: v.method || null,
+          source: v.source || null,
+          compositeAttempts: v.compositeAttempts || null,
         };
       }));
 

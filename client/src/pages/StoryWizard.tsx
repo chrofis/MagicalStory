@@ -4770,7 +4770,12 @@ export default function StoryWizard() {
                         setCoverImages(prev => {
                           if (!prev) return prev;
                           const existing = prev[coverKey];
-                          return { ...prev, [coverKey]: { ...existing, imageData: result.imageData, qualityScore: result.qualityScore, imageVersions: result.imageVersions || existing?.imageVersions } };
+                          // MERGE (keep R2-only versions' bytes) + adopt server activeVersion — same as the onIteratePage cover branch.
+                          return { ...prev, [coverKey]: { ...existing, imageData: result.imageData, qualityScore: result.qualityScore,
+                            imageVersions: result.imageVersions
+                              ? result.imageVersions.map((v, idx) => ({ ...(existing?.imageVersions?.[idx] || {}), ...v, imageData: v.imageData || existing?.imageVersions?.[idx]?.imageData }))
+                              : existing?.imageVersions,
+                            activeVersion: result.activeVersion ?? existing?.activeVersion } };
                         });
                       }
                     } else {
@@ -5287,7 +5292,23 @@ export default function StoryWizard() {
                               qualityScore: result.qualityScore,
                               qualityReasoning: result.qualityReasoning,
                               wasRegenerated: true,
-                              imageVersions: result.imageVersions || existing?.imageVersions,
+                              // MERGE, don't replace: the server may return older versions
+                              // without image bytes (R2-only rows) — keep the imageData/URL
+                              // already in local state so those versions don't blank out
+                              // ("vanish") until reload. Mirrors the scene branch below.
+                              imageVersions: result.imageVersions
+                                ? result.imageVersions.map((v, idx) => ({
+                                    ...(existing?.imageVersions?.[idx] || {}),
+                                    ...v,
+                                    imageData: v.imageData || existing?.imageVersions?.[idx]?.imageData,
+                                  }))
+                                : existing?.imageVersions,
+                              // The server just pushed a new version and set it active
+                              // (returns canonical activeVersion). Without adopting it here
+                              // the display + picker keep pointing at the OLD active index,
+                              // so the new image and its composite intermediates only appear
+                              // after a full reload.
+                              activeVersion: result.activeVersion ?? existing?.activeVersion,
                               bboxDetection: result.bboxDetection ?? existing?.bboxDetection,
                               bboxOverlayImage: null,
                             }
