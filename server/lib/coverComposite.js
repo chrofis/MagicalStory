@@ -713,9 +713,8 @@ async function generateCoverViaComposite({
     ? `\n═══ STORY ACTION (essential first — these poses are mandatory; environmental detail forbidden) ═══\n${interactionLines.join('\n')}\n**Essential lines override the POSE REDRAW templates below when the same character appears in both.**\n`
     : '';
 
-  // VB grid handling: when present, send as a second image slot. Normalise
-  // input format — buildVisualBibleGrid returns a Buffer; coverIterate may
-  // also pass a data: URI or base64 string depending on path. Accept all.
+  // VB grid handling: normalise input format — buildVisualBibleGrid returns a
+  // Buffer; coverIterate may also pass a data: URI or base64 string. Accept all.
   let vbGridBuf = null;
   if (vbGrid) {
     if (Buffer.isBuffer(vbGrid)) {
@@ -725,9 +724,29 @@ async function generateCoverViaComposite({
       try { vbGridBuf = Buffer.from(stripped, 'base64'); } catch { vbGridBuf = null; }
     }
   }
-  const vbGridSection = vbGridBuf
-    ? `\n═══ VISUAL BIBLE GRID (second image attached) ═══\nThe SECOND image shows a labeled grid of every artifact, animal, and secondary character referenced in this scene. When the STORY ACTION above names an object (map, chest, key, sword, lantern, etc.), use the matching grid cell as the visual reference for that object — that's exactly what the rendered prop must look like. Do NOT copy the grid cell layout or background into the output; the grid is reference only. The first image (figures on white) remains the primary edit target.\n`
-    : '';
+
+  // Reference image slots that follow the primary figures image (always slot 1).
+  // Order is fixed — prop cutout first (if any), then the VB grid — and the
+  // ordinal words in the prompt sections are derived from this order so they
+  // never drift when one of the slots is absent. The prop is a SEPARATE
+  // reference image (not composited into the figures plate): Grok draws it
+  // in-hand from this reference, which avoids the floating-cutout artefact.
+  const ORD = ['first', 'second', 'third', 'fourth'];
+  const refSlots = [];
+
+  let propRefSection = '';
+  if (propBuf) {
+    const ord = ORD[refSlots.length + 1];
+    refSlots.push(propBuf);
+    propRefSection = `\n═══ PROP REFERENCE (${ord} image attached) ═══\nThe ${ord} image is a cutout of the exact ${propName || 'central prop'} on a plain background — its true shape, colour, and proportions. Render this object held in the centre character's hands per the poses below, matching that reference. Paint it into the scene as a real object under the scene's lighting and brush texture; do NOT paste it as a flat sticker, and do NOT copy the reference's background into the output.\n`;
+  }
+
+  let vbGridSection = '';
+  if (vbGridBuf) {
+    const ord = ORD[refSlots.length + 1];
+    refSlots.push(vbGridBuf);
+    vbGridSection = `\n═══ VISUAL BIBLE GRID (${ord} image attached) ═══\nThe ${ord} image shows a labeled grid of every artifact, animal, and secondary character referenced in this scene. When the STORY ACTION above names an object (map, chest, key, sword, lantern, etc.), use the matching grid cell as the visual reference for that object — that's exactly what the rendered prop must look like. Do NOT copy the grid cell layout or background into the output; the grid is reference only. The first image (figures) remains the primary edit target.\n`;
+  }
 
   // Text line — used by single-pass (in pass-1 prompt) AND by legacy two-pass
   // (in pass-2 prompt). Computed once here so both branches stay in sync.
@@ -755,7 +774,7 @@ async function generateCoverViaComposite({
 The input image is a children's book cover composite: a fully-styled ${artStyle} scene with ${n} character cutouts placed in the foreground. The background scene (landscape, buildings, sky, landmark) is ALREADY CORRECTLY STYLED AND PLACED — do NOT change buildings, do NOT move the landmark, do NOT repaint the sky.
 
 YOUR JOB (in order):
-${actionSection}${vbGridSection}
+${actionSection}${propRefSection}${vbGridSection}
 ═══ POSE REDRAW (mandatory — do every line) ═══
 ${POSES.join('\n')}
 
@@ -769,8 +788,8 @@ PRESERVE EXACTLY:
 DO NOT regenerate the scene. DO NOT shift the landmark. DO NOT add or remove characters. DO NOT add frames, borders, or vignettes.`
     : `PASS 1: REPOSE FIGURES ONLY.
 
-The first input image shows ${n} character cutouts on a plain background${propBuf ? ', plus a prop in the foreground' : ''}. The figures are pasted with ARMS AT THEIR SIDES — this is wrong, and your only job is to redraw their poses per the lines below. Keep the plain background. Keep every face/hair/skin/clothing exactly. Just change the poses.
-${actionSection}${vbGridSection}
+The first input image shows ${n} character cutouts on a plain background. The figures are pasted with ARMS AT THEIR SIDES — this is wrong, and your only job is to redraw their poses per the lines below. Keep the plain background. Keep every face/hair/skin/clothing exactly. Just change the poses.
+${actionSection}${propRefSection}${vbGridSection}
 ═══ POSE REDRAW (mandatory — do every line) ═══
 ${POSES.join('\n')}
 
@@ -783,8 +802,8 @@ If any figure still has arms at their sides, the task has failed. If the backgro
   // 6. Call Grok pass 1 — figures-on-white as primary edit target, VB grid as
   // a second reference image when available so the model knows exactly what
   // each named artifact / animal / secondary character looks like.
-  log.info(`🎨 [COVER-COMPOSITE] ${label}: pass 1 (repose) — Grok edit${vbGridBuf ? ' + VB grid ref' : ''}`);
-  const pass1Inputs = vbGridBuf ? [pass1Input, vbGridBuf] : pass1Input;
+  log.info(`🎨 [COVER-COMPOSITE] ${label}: pass 1 (repose) — Grok edit${propBuf ? ' + prop ref' : ''}${vbGridBuf ? ' + VB grid ref' : ''}`);
+  const pass1Inputs = refSlots.length > 0 ? [pass1Input, ...refSlots] : pass1Input;
   const pass1 = await callGrokEdit(pass1Prompt, pass1Inputs);
   if (usageTracker) usageTracker('grok', { cost: 0.02, direct_cost: 0.02, inferenceTime: pass1.elapsedMs }, 'cover_composite_pass1', pass1.modelId);
 
@@ -800,6 +819,7 @@ If any figure still has arms at their sides, the task has failed. If the backgro
       totalAttempts: 1,
       debug: {
         pass1Input,
+        pass1PropRef: propBuf || null,
         pass1VbGrid: vbGridBuf || null,
         pass1Output: pass1.imageData,
         pass1Prompt,
@@ -889,6 +909,7 @@ DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generi
     debug: {
       sequence: sequence.map(c => c.name),
       pass1Input,
+      pass1PropRef: propBuf || null,
       pass1VbGrid: vbGridBuf || null,
       pass1Output: pass1.imageData,
       pass1Prompt,
@@ -928,6 +949,7 @@ function buildCompositeAttemptsFromDebug(compositeDebug) {
   const pass1 = {
     pass: 1,
     input: bufToDataUrl(compositeDebug.pass1Input, 'image/jpeg'),
+    propRef: bufToDataUrl(compositeDebug.pass1PropRef, 'image/png'),
     vbGrid: bufToDataUrl(compositeDebug.pass1VbGrid, 'image/jpeg'),
     output: bufToDataUrl(compositeDebug.pass1Output, 'image/jpeg'),
     prompt: compositeDebug.pass1Prompt || null,

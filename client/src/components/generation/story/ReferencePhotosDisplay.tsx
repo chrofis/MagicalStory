@@ -15,6 +15,7 @@ interface LandmarkPhoto {
 interface CompositeAttempt {
   pass: number;
   input?: string | null;
+  propRef?: string | null;  // Prop cutout sent as a dedicated Grok reference slot (pass 1)
   vbGrid?: string | null;  // VB grid second-image reference for pass 1
   output?: string | null;
   prompt?: string | null;
@@ -886,10 +887,11 @@ export function ReferencePhotosDisplay({
                 {att.modelId && <span className="ml-2 text-[10px] font-normal text-purple-500">{att.modelId}</span>}
                 {att.elapsedMs != null && <span className="ml-2 text-[10px] font-normal text-purple-500">{(att.elapsedMs / 1000).toFixed(1)}s</span>}
               </div>
-              {/* Pass 1 includes a VB grid reference slot when available;
-                  pass 2 only has input/output. Layout adapts: 2 cols for
-                  input+output, 3 cols when VB grid is also present. */}
-              <div className={`grid gap-2 mb-2 ${att.vbGrid ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              {/* Pass 1 sends up to two reference slots — a prop cutout and/or
+                  the VB grid — alongside the figures input; pass 2 only has
+                  input/output. Layout adapts: 2 cols for input+output, +1 per
+                  reference slot present (up to 4). */}
+              <div className={`grid gap-2 mb-2 ${att.propRef && att.vbGrid ? 'grid-cols-4' : (att.propRef || att.vbGrid ? 'grid-cols-3' : 'grid-cols-2')}`}>
                 {att.input && (
                   <div>
                     <div className="text-[10px] text-purple-600 font-medium mb-1 text-center">{language === 'de' ? 'Eingabe' : 'Input'}</div>
@@ -898,6 +900,18 @@ export function ReferencePhotosDisplay({
                       alt={`Composite pass ${att.pass} input`}
                       className="w-full object-contain rounded border border-purple-200 bg-white cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={(e) => { e.stopPropagation(); setLightboxImage(att.input!); }}
+                      title="Click to enlarge"
+                    />
+                  </div>
+                )}
+                {att.propRef && (
+                  <div>
+                    <div className="text-[10px] text-purple-600 font-medium mb-1 text-center">{language === 'de' ? 'Requisit (Ref.)' : 'Prop (ref)'}</div>
+                    <img
+                      src={att.propRef}
+                      alt={`Composite pass ${att.pass} prop reference`}
+                      className="w-full object-contain rounded border border-purple-200 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={(e) => { e.stopPropagation(); setLightboxImage(att.propRef!); }}
                       title="Click to enlarge"
                     />
                   </div>

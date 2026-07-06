@@ -3012,9 +3012,15 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       storyData.coverImages.backCover = coverData;
     }
 
-    // Active version is picked by recomputeAllActiveVersions inside
-    // saveStoryData (best score wins) — same as scenes.
     await saveStoryData(id, storyData);
+
+    // A user-triggered cover regenerate must ALWAYS become the active version —
+    // the user clicked "regenerate" to replace what they saw. recomputeAllActiveVersions
+    // inside saveStoryData is best-score-wins, so a regen that happens to score
+    // lower than a previous version would silently leave the OLD version active
+    // (and its composite intermediates would be the ones shown). Set explicitly,
+    // mirroring the dev-mode iterate path.
+    await setActiveVersion(id, coverKey, newVersionIndex);
 
     // Deduct credits and log transaction (skip for infinite credits or impersonating admin)
     // Relative atomic deduct with a floor (BILL-2): userCredits was read before the

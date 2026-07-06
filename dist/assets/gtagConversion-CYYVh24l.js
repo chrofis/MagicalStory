@@ -1,0 +1,1 @@
+const c="AW-17995593741/cDfDCJTFs4McEI3w-4RD",e="AW-17995593741/oCLQCMLTt7McEI3w-4RD",a="AW-17995593741/VHg2CK3E67UcEI3w-4RD";function n(t,o,i="CHF"){typeof window>"u"||typeof window.gtag!="function"||window.gtag("event","conversion",{send_to:t,value:o,currency:i})}function E(){n(c,1)}function r(){n(e,5)}function f(){n(a,10)}export{f as a,r as b,E as t};

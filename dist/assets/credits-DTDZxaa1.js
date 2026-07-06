@@ -1,0 +1,1 @@
+const E=200,e=10,s=2,c=20,_=200,a=[{credits:150,priceCHF:5,label:"Starter"},{credits:350,priceCHF:10,label:"Popular"},{credits:750,priceCHF:20,label:"Best Value"},{credits:2e3,priceCHF:50,label:"Pro"}];export{e as C,c as E,E as I,_ as a,a as b,s as c};

@@ -500,7 +500,7 @@ export function ImageHistoryModal({
                        in the modal shows that version's actual intermediate plates. */}
                   {(() => {
                     const attempts = (detailVersion as any).compositeAttempts as Array<{
-                      pass: number; input?: string; vbGrid?: string; output?: string;
+                      pass: number; input?: string; propRef?: string; vbGrid?: string; output?: string;
                       prompt?: string; modelId?: string; elapsedMs?: number;
                     }> | null | undefined;
                     if (!Array.isArray(attempts) || attempts.length === 0) return null;
@@ -519,11 +519,17 @@ export function ImageHistoryModal({
                               {att.modelId && <span className="ml-2 text-[10px] font-normal text-purple-500">{att.modelId}</span>}
                               {att.elapsedMs != null && <span className="ml-2 text-[10px] font-normal text-purple-500">{(att.elapsedMs / 1000).toFixed(1)}s</span>}
                             </div>
-                            <div className={`grid gap-2 mb-2 ${att.vbGrid ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                            <div className={`grid gap-2 mb-2 ${att.propRef && att.vbGrid ? 'grid-cols-4' : (att.propRef || att.vbGrid ? 'grid-cols-3' : 'grid-cols-2')}`}>
                               {att.input && (
                                 <div>
                                   <div className="text-[10px] text-purple-600 font-medium mb-1 text-center">{language === 'de' ? 'Eingabe' : 'Input'}</div>
                                   <img src={att.input} alt={`Composite pass ${att.pass} input`} className="w-full object-contain rounded border border-purple-200 bg-white cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setLightboxRef(att.input!)} title="Click to enlarge" />
+                                </div>
+                              )}
+                              {att.propRef && (
+                                <div>
+                                  <div className="text-[10px] text-purple-600 font-medium mb-1 text-center">{language === 'de' ? 'Requisit (Ref.)' : 'Prop (ref)'}</div>
+                                  <img src={att.propRef} alt={`Composite pass ${att.pass} prop reference`} className="w-full object-contain rounded border border-purple-200 bg-white cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setLightboxRef(att.propRef!)} title="Click to enlarge" />
                                 </div>
                               )}
                               {att.vbGrid && (
