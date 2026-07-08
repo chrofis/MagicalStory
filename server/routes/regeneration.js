@@ -182,7 +182,10 @@ async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
   if (!sceneEntry) return storyData; // page absent — route will 404 downstream
 
   // bboxDetection mirror (pure in-memory, no bytes) — same as rehydrate.
-  const activeV = sceneEntry.imageVersions?.find(v => v.isActive);
+  // Numeric activeVersion first; boolean isActive only on legacy blobs.
+  const activeV = (typeof sceneEntry.activeVersion === 'number'
+    ? sceneEntry.imageVersions?.[sceneEntry.activeVersion]
+    : null) || sceneEntry.imageVersions?.find(v => v.isActive);
   if (activeV?.bboxDetection) sceneEntry.bboxDetection = activeV.bboxDetection;
 
   if (sceneEntry.imageData) return storyData; // already inline (legacy blob)
@@ -4616,7 +4619,10 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
           if (!cover) continue;
           cover.bboxDetection = bbox;
           if (cover.imageVersions?.length > 0) {
-            const activeVer = cover.imageVersions.find(v => v.isActive);
+            // Numeric activeVersion first; boolean isActive only on legacy blobs.
+            const activeVer = (typeof cover.activeVersion === 'number'
+              ? cover.imageVersions[cover.activeVersion]
+              : null) || cover.imageVersions.find(v => v.isActive);
             if (activeVer) activeVer.bboxDetection = bbox;
           }
           log.info(`🔍 [REPAIR-WORKFLOW] Cached cover bbox for ${coverType} (${bbox.figures?.length || 0} figures)`);
@@ -5463,9 +5469,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             // persisting them the dev panel only sees the inputs (avatar +
             // crosshatch); the raw Grok output and feather mask were stored
             // in the API response and lost on page reload.
-            charRepairGrokRaw: repairResult.grokRawResult || null,
-            charRepairBlendMask: repairResult.blendMask || null,
-            charRepairWhiteout: repairResult.blackoutImage || null,
+            charRepairGrokRaw: repairResult.grokRawResult || repairResult.comparison?.grokRawResult || null,
+            charRepairBlendMask: repairResult.blendMask || repairResult.comparison?.blendMask || null,
+            charRepairWhiteout: repairResult.blackoutImage || repairResult.comparison?.blackoutImage || null,
             ...(isMagicApiMethod && repairResult.cropHistory && { cropHistory: repairResult.cropHistory })
           });
 
@@ -5638,22 +5644,36 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
           }
 
           const newVersionIndex = scene.imageVersions.length;
+          // gridBasedRepair returns { imageData, repaired, history, fixedCount,
+          // failedCount, totalIssues, annotatedOriginal, grids } — there is NO
+          // score/reasoning/fixTargets on it (they were read here before and
+          // came back undefined, clobbering the scene's valid score and leaving
+          // the version unrankable so pick-best could never promote it).
+          // No eval runs in this repair — inherit the prior score so the
+          // repaired version ties and wins pick-best (later wins ties).
+          const priorScore = (typeof scene.qualityScore === 'number') ? scene.qualityScore : null;
           scene.imageVersions.push({
             imageData: repairResult.imageData,
             description: scene.description,
             createdAt: new Date().toISOString(),
             generatedAt: new Date().toISOString(),
             type: 'repair',
-            qualityScore: repairResult.score,
-            qualityReasoning: repairResult.reasoning || null,
-            fixTargets: repairResult.fixTargets || [],
-            fixableIssues: repairResult.fixableIssues || [],
-            totalAttempts: null,
+            qualityScore: priorScore,
+            qualityReasoning: `Artifact repair: fixed ${repairResult.fixedCount || 0}/${repairResult.totalIssues || 0} issues (score inherited from previous version — no eval in this pass)`,
+            fixTargets: [],
+            fixableIssues: [],
+            totalAttempts: repairResult.history?.totalAttempts ?? null,
+            // Diagnostics for the dev panel: bbox-annotated original + per-batch
+            // grid before/after/prompt. Inline base64 here is fine — the save
+            // path's generic extract sweep uploads it to R2.
+            gridRepair: {
+              annotatedOriginal: repairResult.annotatedOriginal || null,
+              grids: repairResult.grids || [],
+              fixedCount: repairResult.fixedCount || 0,
+              failedCount: repairResult.failedCount || 0,
+              totalIssues: repairResult.totalIssues || 0,
+            },
           });
-
-          // Update scene metadata (but NOT imageData - that would cause duplicate image storage)
-          // The new image is stored in imageVersions and activeVersion meta points to it
-          scene.qualityScore = repairResult.score;
 
           pagesProcessed.push(pageNumber);
           issuesFixed += repairResult.fixedCount || 1;

@@ -1798,6 +1798,15 @@ async function saveStoryData(storyId, storyData) {
           delete version._alreadySaved;
         }
       }
+
+      // Cover retryHistory: persist bytes to story_retry_images (same table
+      // and pattern as pages, using the negative cover page numbers) before
+      // the strip below hard-deletes them. Without this, cover retry images
+      // were destroyed on every save — pages kept theirs, covers didn't.
+      if (coverData.retryHistory?.length) {
+        const coverPageNum = { frontCover: -1, initialPage: -2, backCover: -3 }[coverType];
+        await saveRetryHistoryImages(storyId, coverPageNum, coverData.retryHistory);
+      }
     }
   }
 
@@ -2200,6 +2209,14 @@ async function upsertStory(storyId, userId, storyData) {
           delete version.imageData;
           delete version._rehydrated;
         }
+      }
+
+      // Cover retryHistory bytes → story_retry_images (negative cover page
+      // numbers), mirroring saveStoryData. The strip below hard-deletes these
+      // from the blob; without this call they were destroyed on first save.
+      if (coverData.retryHistory?.length) {
+        const coverPageNum = { frontCover: -1, initialPage: -2, backCover: -3 }[coverType];
+        await saveRetryHistoryImages(storyId, coverPageNum, coverData.retryHistory);
       }
     }
   }
@@ -2977,7 +2994,12 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
           const img = activeImages.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber);
           if (img) scene.imageData = await imgBytesAsync(img);
         }
-        const activeV = scene.imageVersions?.find(v => v.isActive);
+        // Numeric activeVersion is the live mechanism; the boolean isActive
+        // flag only exists on pre-migration blob data. Reading only the flag
+        // meant this bbox mirror never fired for modern rows.
+        const activeV = (typeof scene.activeVersion === 'number'
+          ? scene.imageVersions?.[scene.activeVersion]
+          : null) || scene.imageVersions?.find(v => v.isActive);
         if (activeV?.bboxDetection) {
           scene.bboxDetection = activeV.bboxDetection;
         }
@@ -3057,7 +3079,11 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
         }));
       }
 
-      const activeV = scene.imageVersions?.find(v => v.isActive);
+      // Numeric activeVersion first; boolean isActive only on legacy blobs
+      // (see mirror above).
+      const activeV = (typeof scene.activeVersion === 'number'
+        ? scene.imageVersions?.[scene.activeVersion]
+        : null) || scene.imageVersions?.find(v => v.isActive);
       if (activeV?.bboxDetection) {
         scene.bboxDetection = activeV.bboxDetection;
       }

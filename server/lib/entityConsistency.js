@@ -629,21 +629,23 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     if (storyData.coverImages) {
       for (const [coverType, cover] of Object.entries(storyData.coverImages)) {
         if (cover && (cover.imageData || cover.hasImage)) {
-          // NOTE: covers identify their active version by a boolean `isActive` flag
-          // on each version entry, NOT by the numeric `activeVersion` index that
-          // scene images use. Do not route this through resolveActiveVersionData().
+          // Covers use the same numeric `activeVersion` index as scenes
+          // (recomputeAllActiveVersions and the regen routes maintain it).
+          // The boolean `isActive` flag is deprecated and written by nothing —
+          // reading only it meant post-repair consistency checks silently
+          // evaluated the stale v0 image. Kept as fallback for old blob data
+          // saved before the numeric index existed.
           let imageData = cover.imageData;
+          let coverBbox = cover.bboxDetection || null;
           if (cover.imageVersions?.length > 0) {
-            const activeVersion = cover.imageVersions.find(v => v.isActive);
+            const legacyActive = (typeof cover.activeVersion !== 'number')
+              ? cover.imageVersions.find(v => v.isActive)
+              : null;
+            const activeVersion = legacyActive || resolveActiveVersionData(cover).activeVersion;
             if (activeVersion?.imageData) imageData = activeVersion.imageData;
+            if (activeVersion?.bboxDetection) coverBbox = activeVersion.bboxDetection;
           }
           if (imageData) {
-            // Get bbox from active version or cover root
-            let coverBbox = cover.bboxDetection || null;
-            if (cover.imageVersions?.length > 0) {
-              const activeVersion = cover.imageVersions.find(v => v.isActive);
-              if (activeVersion?.bboxDetection) coverBbox = activeVersion.bboxDetection;
-            }
             // Pull per-cover characterClothing from outline coverHints so the entity
             // collector can drive bbox detection with the actual cover cast instead
             // of falling back to the full story roster (too noisy for Gemini to ID).

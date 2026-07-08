@@ -362,3 +362,22 @@ revealed both were probably fine.
 **Third lesson:** the failure-path partial-save overwrote a SUCCESSFUL full
 story save (stories.data) with a checkpoint skeleton, destroying evidence and
 the user's story. Failure-path writes must check what they're overwriting.
+
+## 2026-07-08 — Week-review pattern: fixes shipped on one of two sibling paths
+**What happened:** A four-agent review of the week's 42 commits found the same
+defect shape four times: a correct fix applied to one code path while its
+sibling kept the bug. Entity-penalty cap → scoring.js helpers but not the
+inline finalScore math in images.js; clothing source-of-truth →
+entityConsistency but not the eval/bbox path or the Grok repair; cover
+solid-ground rule → single-pass prompt but not the two-pass fallback; cover
+version imageUrl fallback → dev iterate route but not the production
+/regenerate/cover route.
+**Rule:** before declaring a fix done, grep for the pattern being fixed
+(the raw field read, the inline formula, the prompt clause) across the whole
+repo and enumerate every occurrence. Parallel paths to check explicitly:
+dev-mode route vs production route, single-pass vs fallback branch, Gemini
+path vs Grok path, scoring helper vs inline arithmetic.
+**Second lesson:** an aggressive sanitizer (the jsonb byte sweep) shared
+between write paths and read paths breaks the read path the moment it gets
+stricter. When hardening a shared function, list every caller and re-verify
+the read-path callers still get what they need.
