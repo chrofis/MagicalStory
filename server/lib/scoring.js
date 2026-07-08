@@ -639,6 +639,7 @@ module.exports = {
   computeMathFinalScore,
   applyScore,
   logScoreModelSummary,
+  capEntityPenalty,
   // Legacy helpers (still used by some readers/writers — to be migrated)
   computeFinalScore,
   versionDeductionTotal,

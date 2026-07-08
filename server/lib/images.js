@@ -6489,7 +6489,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // disagreeing scores in the UI.
     const baseScore = ev?.score ?? ev?.qualityScore ?? null;
     const baseEntityResult = getEntityPenaltyAndIssues(img.pageNumber, entityReport);
-    const baseEntityPenalty = baseEntityResult.penalty;
+    // Same cap setVersionScores applies to repair versions. Uncapped here,
+    // originals scored −70/−90 against repairs' −40, so a visually worse
+    // repair could beat a better original (and false entity flags kept
+    // dragging good originals below the redo threshold). Raw kept for audit.
+    const { capEntityPenalty } = require('./scoring');
+    const baseEntityPenaltyRaw = baseEntityResult.penalty;
+    const baseEntityPenalty = capEntityPenalty(baseEntityPenaltyRaw);
     const baseEntityIssues = baseEntityResult.issues;
     const baseFinalScore = baseScore != null ? Math.max(0, baseScore - baseEntityPenalty) : null;
 
@@ -6522,6 +6528,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           grokRefImages: img.grokRefImages || null,
           referencePhotos: img.referencePhotos || null,
           entityPenalty: baseEntityPenalty,
+          entityPenaltyRaw: baseEntityPenaltyRaw,
           entityIssues: baseEntityIssues,
           evaluatedAt: new Date().toISOString(),
         };
@@ -6540,6 +6547,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           grokRefImages: img.scaleRepairGrokRefImages || null,
           inpaintInstruction: img.scaleRepairPrompt || null,
           entityPenalty: baseEntityPenalty,
+          entityPenaltyRaw: baseEntityPenaltyRaw,
           entityIssues: baseEntityIssues,
           evaluatedAt: new Date().toISOString(),
         }
@@ -7003,7 +7011,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const visualScore = bestSoFar.evaluation?.qualityScore ?? bestSoFar.score;
         const imageScore = bestSoFar.score;
         const semanticPenalty = Math.max(0, visualScore - imageScore);
-        const entityPenalty = getEntityPenalty(img.pageNumber, currentEntityReport);
+        // Capped like every version score — uncapped, pages with large
+        // non-actionable entity penalties stayed under the redo threshold
+        // and were re-attempted every round without ever converging.
+        const { capEntityPenalty: capEnt } = require('./scoring');
+        const entityPenalty = capEnt(getEntityPenalty(img.pageNumber, currentEntityReport));
         const finalScore = Math.max(0, imageScore - entityPenalty);
 
         log.debug(`📊 [PIPELINE] Round ${round} Page ${img.pageNumber}: vis=${visualScore} sem=-${semanticPenalty} img=${imageScore} ent=-${entityPenalty} final=${finalScore}`);
