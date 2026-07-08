@@ -23,6 +23,10 @@ const { getPhysical } = require('./characterPhysical');
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Eval calls had no timeout — a hung provider connection froze the whole job
+// forever (stuck-at-51% incident, 2026-07-07). The SDK aborts after this, the
+// error propagates, and callers skip the eval instead of hanging.
+const EVAL_REQUEST_OPTIONS = { timeout: 120000 };
 const { MODEL_DEFAULTS } = require('../config/models');
 const VISION_MODEL = MODEL_DEFAULTS.qualityEval || 'gemini-2.0-flash';
 const COMPARISON_MODEL = MODEL_DEFAULTS.qualityEval || 'gemini-2.0-flash';
@@ -254,7 +258,7 @@ function buildPreviewPrompt(sceneJson) {
 async function describeImage(imageData) {
   log.debug('[SCENE-VALIDATOR] Vision model describing image...');
 
-  const model = genAI.getGenerativeModel({ model: VISION_MODEL });
+  const model = genAI.getGenerativeModel({ model: VISION_MODEL }, EVAL_REQUEST_OPTIONS);
   const startTime = Date.now();
 
   // Convert image to base64 if needed
@@ -358,7 +362,7 @@ function formatLandmarkContext(visualBible) {
 async function analyzeGeneratedImage(imageData, characters = null, visualBible = null, clothingRequirements = null) {
   log.debug('[SCENE-VALIDATOR] Analyzing generated image with character context...');
 
-  const model = genAI.getGenerativeModel({ model: VISION_MODEL });
+  const model = genAI.getGenerativeModel({ model: VISION_MODEL }, EVAL_REQUEST_OPTIONS);
   const startTime = Date.now();
 
   // Build character info section
@@ -481,7 +485,7 @@ async function generatePreviewFeedback(sceneHint, characterNames = []) {
 async function validateComposition(sceneJson, imageDescription) {
   log.debug('[SCENE-VALIDATOR] Comparing scene vs image...');
 
-  const model = genAI.getGenerativeModel({ model: COMPARISON_MODEL });
+  const model = genAI.getGenerativeModel({ model: COMPARISON_MODEL }, EVAL_REQUEST_OPTIONS);
   const startTime = Date.now();
 
   // Format scene JSON for the prompt
@@ -752,7 +756,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     model: VISION_MODEL,
     safetySettings: GEMINI_SAFETY_SETTINGS,
     generationConfig: { maxOutputTokens: 24000, temperature: 0.3 }
-  });
+  }, EVAL_REQUEST_OPTIONS);
   const startTime = Date.now();
 
   // Load semantic evaluation template

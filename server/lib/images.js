@@ -157,7 +157,11 @@ async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${xaiApiKey}`
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      // Eval calls had no timeout — a hung provider connection froze the whole
+      // job forever (stuck-at-51% incident, 2026-07-07). Abort → withRetry
+      // re-runs → on final failure eval is skipped and the job continues.
+      signal: AbortSignal.timeout(120000)
     });
   }, { maxRetries: 2, baseDelay: 2000 });
 
@@ -1014,7 +1018,10 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
             contents: [{ parts }],
             generationConfig: { maxOutputTokens: 4096, temperature: 0.3 },
             safetySettings: GEMINI_SAFETY_SETTINGS
-          })
+          }),
+          // No timeout here froze jobs mid-eval (stuck-at-51% incident,
+          // 2026-07-07); abort feeds withRetry, then the eval is skipped.
+          signal: AbortSignal.timeout(120000)
         });
         // Throw on 5xx so withRetry can retry with backoff
         if (resp.status >= 500) {
@@ -1489,7 +1496,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
               thinkingConfig: { thinkingBudget }
             },
             safetySettings: GEMINI_SAFETY_SETTINGS
-          })
+          }),
+          // No timeout here froze jobs mid-eval (stuck-at-51% incident,
+          // 2026-07-07); abort feeds withRetry, then the eval is skipped.
+          signal: AbortSignal.timeout(120000)
         });
       }, { maxRetries: 2, baseDelay: 2000 });
     };
