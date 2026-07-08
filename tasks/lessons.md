@@ -381,3 +381,18 @@ path vs Grok path, scoring helper vs inline arithmetic.
 between write paths and read paths breaks the read path the moment it gets
 stricter. When hardening a shared function, list every caller and re-verify
 the read-path callers still get what they need.
+
+## 2026-07-09 — Schema change added to the DEAD database.js init, caught on staging
+**What happened:** Added `credit_transactions.price_cents` to
+`server/services/database.js initializeDatabase()` — which is NOT on the
+startup path. Prod/staging schema comes exclusively from `migrations/00N_*.sql`
+via `server/services/migrate.js` (runs at boot, fails loud). Staging deployed
+the code but the column never appeared; caught it by checking
+information_schema on staging BEFORE promoting to prod. Migration 006's header
+comment documents a previous session making the exact same mistake with
+`trial_completion_email_sent_at`.
+**Rule:** every schema change = a new `migrations/00N_*.sql` file, nothing
+else. Never touch database.js initializeDatabase() or the dead
+REMOVED_initializeDatabase_DEAD() in server.js. After deploy, verify the
+column/table actually exists in the target environment's information_schema
+before shipping dependent code to the next environment.
