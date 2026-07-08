@@ -48,11 +48,14 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     && s.length > 1024;
 
   const limitClause = LIMIT ? ` LIMIT ${LIMIT}` : '';
+  // NOTE: no r2BackfilledAt exclusion — the marker used to permanently skip a
+  // row after its first pass, so photos uploaded AFTER a backfill stayed
+  // inline forever. Rows with nothing inline are cheap: the scan queues zero
+  // tasks and we skip the UPDATE below.
   const candidates = await pool.query(
     `SELECT id, user_id, pg_column_size(data) AS bytes
      FROM characters
      WHERE pg_column_size(data) > 1048576
-       AND NOT (data ? 'r2BackfilledAt')
      ORDER BY pg_column_size(data) DESC${limitClause}`
   );
 
@@ -172,6 +175,13 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
         }
       });
       await Promise.all(workers);
+
+      // Nothing inline found → don't rewrite the row (marker only records the
+      // last pass that actually moved bytes).
+      if (tasks.length === 0) {
+        process.stdout.write('skip (nothing inline)\n');
+        continue;
+      }
 
       data.r2BackfilledAt = new Date().toISOString();
 

@@ -11,7 +11,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
-const { logActivity, dbQuery, saveAvatarToR2, saveAvatarThumbToR2 } = require('../services/database');
+const { logActivity, dbQuery, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2 } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
@@ -1228,6 +1228,19 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
       try {
         const rowId = `characters_${req.user.id}`;
 
+        // Build photos object (new structure used by frontend)
+        const photosObj = {
+          face: faceThumbnail,
+          original: imageData,
+          bodyNoBg: bodyNoBg,
+          body: bodyCrop
+        };
+        // Upload source photos to R2 and store URLs instead of inline base64
+        // (same pattern as generated avatars). Runs BEFORE the transaction so
+        // R2 latency doesn't extend the row lock. On upload failure the slot
+        // keeps its bytes — the documented inline fallback.
+        await uploadCharacterPhotosToR2(req.user.id, characterId, photosObj);
+
         // Use transaction with FOR UPDATE to prevent race with avatar job writes
         await dbQuery('BEGIN');
 
@@ -1239,14 +1252,6 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
 
         let charData = existingResult.length > 0 ? (existingResult[0].data || {}) : {};
         let characters = charData.characters || [];
-
-        // Build photos object (new structure used by frontend)
-        const photosObj = {
-          face: faceThumbnail,
-          original: imageData,
-          bodyNoBg: bodyNoBg,
-          body: bodyCrop
-        };
 
         if (isReupload) {
           // Update existing character's photo data (don't create new)

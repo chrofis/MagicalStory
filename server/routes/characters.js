@@ -7,7 +7,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, uploadCharacterPhotosToR2 } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { normalizePhotos, stripLegacyPhotoFields, normalizeAvatarsForResponse, normalizeCharacterAvatars } = require('../lib/characterPhotos');
 const { normalizePhysical, stripLegacyPhysicalFields, expandUserHairOverrideForDisplay } = require('../lib/characterPhysical');
@@ -592,9 +592,16 @@ router.post('/', authenticateToken, async (req, res) => {
           hasChanges = true;
         } else if (existingChar.photos && mergedChar.photos) {
           // Merge photos - keep existing values, only overwrite with non-null new values
+          const isInlineImg = (s) => typeof s === 'string' && s.length > 1024
+            && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0') || s.startsWith('R0lGOD') || s.startsWith('UklGR'));
+          const isUrl = (s) => typeof s === 'string' && /^https?:\/\//.test(s);
           const mergedPhotos = { ...existingChar.photos };
           for (const [key, value] of Object.entries(mergedChar.photos)) {
             if (value !== null && value !== undefined) {
+              // The wizard echoes the upload-time base64 from client state.
+              // Never let it clobber the R2 URL the upload endpoint stored —
+              // same image, the URL is canonical.
+              if (isUrl(mergedPhotos[key]) && isInlineImg(value)) continue;
               mergedPhotos[key] = value;
             }
           }
@@ -654,6 +661,14 @@ router.post('/', authenticateToken, async (req, res) => {
       if (dbOnlyCharacters.length > 0) {
         console.log(`[Characters] POST - Preserving ${dbOnlyCharacters.length} DB-only characters not in frontend array: ${dbOnlyCharacters.map(c => `${c.name || '(unnamed)'}(${c.id})`).join(', ')}`);
         mergedCharacters.push(...dbOnlyCharacters);
+      }
+
+      // Upload any still-inline source photos to R2 (fallback persistence:
+      // the photo-upload endpoint's DB write is best-effort, so photos can
+      // arrive here as base64 when that write failed, or from pre-R2 wizard
+      // state). No-op when slots already hold URLs.
+      for (const char of mergedCharacters) {
+        if (char?.photos) await uploadCharacterPhotosToR2(req.user.id, char.id, char.photos);
       }
 
       // Store character data as an object with all related information

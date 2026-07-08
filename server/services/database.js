@@ -2278,6 +2278,30 @@ async function upsertStory(storyId, userId, storyData) {
  * @param {string} imageData      - base64 (with or without data: prefix)
  * @returns {Promise<string|null>} public R2 URL, or null on failure
  */
+/**
+ * Upload character source photos (original/face/body/bodyNoBg) to R2 and
+ * replace inline base64 slots with URLs, mutating `photos` in place.
+ * Best-effort per slot — a failed upload keeps the bytes inline (documented
+ * fallback; the backfill script migrates leftovers later). Source photos
+ * were the last image bytes still landing in Postgres on every upload.
+ */
+async function uploadCharacterPhotosToR2(userId, characterId, photos) {
+  if (!photos || typeof photos !== 'object' || !userId || !characterId) return;
+  const r2 = require('../lib/r2');
+  if (!r2.isConfigured()) return;
+  const isInline = (s) => typeof s === 'string' && s.length > 1024
+    && (s.startsWith('data:image/') || s.startsWith('/9j/') || s.startsWith('iVBORw0') || s.startsWith('R0lGOD') || s.startsWith('UklGR'));
+  await Promise.all(['original', 'face', 'body', 'bodyNoBg'].map(async (slot) => {
+    if (!isInline(photos[slot])) return;
+    try {
+      const url = await r2.uploadImage(photos[slot], r2.keyForUserCharacterPhoto(userId, characterId, slot));
+      if (url) photos[slot] = url;
+    } catch (err) {
+      console.warn(`[R2] character photo upload skipped (${characterId}/${slot}): ${err.message}`);
+    }
+  }));
+}
+
 async function saveAvatarToR2(userId, characterId, slot, imageData, version) {
   if (!imageData || !userId || !characterId || !slot) return null;
   try {
@@ -3341,6 +3365,7 @@ module.exports = {
   imagesExistByType,
   imgBytesAsync,
   saveAvatarToR2,
+  uploadCharacterPhotosToR2,
   saveStyledAvatarToR2,
   persistStyledAvatar,
   saveAvatarThumbToR2,
