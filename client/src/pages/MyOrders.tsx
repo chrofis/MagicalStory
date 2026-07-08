@@ -9,6 +9,40 @@ import { createLogger } from '@/services/logger';
 
 const log = createLogger('MyOrders');
 
+interface CreditTransaction {
+  id: number;
+  amount: number;
+  balanceAfter: number;
+  type: string;
+  description: string | null;
+  createdAt: string;
+}
+
+const TX_LABELS: Record<string, { de: string; fr: string; en: string }> = {
+  initial: { de: 'Willkommens-Credits', fr: 'Crédits de bienvenue', en: 'Welcome credits' },
+  purchase: { de: 'Credits gekauft', fr: 'Crédits achetés', en: 'Credits purchased' },
+  story_reserve: { de: 'Geschichte erstellt', fr: 'Histoire créée', en: 'Story created' },
+  story_complete: { de: 'Geschichte abgeschlossen', fr: 'Histoire terminée', en: 'Story completed' },
+  story_refund: { de: 'Rückerstattung', fr: 'Remboursement', en: 'Refund' },
+  image_regeneration: { de: 'Bild neu generiert', fr: 'Image régénérée', en: 'Image regenerated' },
+  image_iteration: { de: 'Bild überarbeitet', fr: 'Image retravaillée', en: 'Image revised' },
+  referral_conversion: { de: 'Empfehlungs-Guthaben umgewandelt', fr: 'Solde de parrainage converti', en: 'Referral balance converted' },
+  admin_add: { de: 'Anpassung durch Support', fr: 'Ajustement par le support', en: 'Support adjustment' },
+  admin_deduct: { de: 'Anpassung durch Support', fr: 'Ajustement par le support', en: 'Support adjustment' },
+};
+
+function txLabel(tx: CreditTransaction, language: string): string {
+  const lang = language === 'de' ? 'de' : language === 'fr' ? 'fr' : 'en';
+  const entry = TX_LABELS[tx.type];
+  let label = entry ? entry[lang] : tx.description || tx.type;
+  // Story descriptions carry the page count, e.g. "Reserved 250 credits for 25-page story"
+  if (tx.type === 'story_reserve') {
+    const m = /(\d+)-page/.exec(tx.description || '');
+    if (m) label += language === 'de' ? ` (${m[1]} Seiten)` : ` (${m[1]} pages)`;
+  }
+  return label;
+}
+
 interface Order {
   id: number | string;
   displayOrderId?: string;  // Gelato order ID (first 8 chars) for display
@@ -296,6 +330,7 @@ export default function MyOrders() {
   const { language } = useLanguage();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [creditHistory, setCreditHistory] = useState<CreditTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -311,9 +346,14 @@ export default function MyOrders() {
     log.debug('Loading orders...');
     try {
       setIsLoading(true);
-      const data = await api.get<{ orders: Order[] }>('/api/user/orders');
-      log.info('Loaded orders:', data.orders?.length || 0);
+      const [data, history] = await Promise.all([
+        api.get<{ orders: Order[] }>('/api/user/orders'),
+        api.get<{ transactions: CreditTransaction[] }>('/api/user/credit-history')
+          .catch(err => { log.error('Failed to load credit history:', err); return { transactions: [] }; }),
+      ]);
+      log.info('Loaded orders:', data.orders?.length || 0, 'credit transactions:', history.transactions?.length || 0);
       setOrders(data.orders || []);
+      setCreditHistory(history.transactions || []);
     } catch (error) {
       log.error('Failed to load orders:', error);
     } finally {
@@ -357,7 +397,7 @@ export default function MyOrders() {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
             <Package size={28} />
-            {language === 'de' ? 'Meine Bestellungen' : language === 'fr' ? 'Mes commandes' : 'My Orders'}
+            {language === 'de' ? 'Bestellungen & Guthaben' : language === 'fr' ? 'Commandes & crédits' : 'Orders & Credits'}
           </h1>
         </div>
 
@@ -403,6 +443,36 @@ export default function MyOrders() {
                 />
               )
             ))}
+          </div>
+        )}
+
+        {/* Credit history ledger */}
+        {!isLoading && creditHistory.length > 0 && (
+          <div className="mt-10">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-4">
+              <Coins size={22} />
+              {language === 'de' ? 'Guthaben-Verlauf' : language === 'fr' ? 'Historique des crédits' : 'Credit History'}
+            </h2>
+            <div className="bg-white rounded-2xl shadow-md divide-y divide-gray-100">
+              {creditHistory.map(tx => (
+                <div key={tx.id} className="flex items-center justify-between px-4 md:px-6 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{txLabel(tx, language)}</p>
+                    <p className="text-xs text-gray-500">{formatDate(tx.createdAt)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm font-semibold ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {tx.amount > 0 ? '+' : ''}{tx.amount}
+                    </p>
+                    {tx.balanceAfter >= 0 && (
+                      <p className="text-xs text-gray-400">
+                        {language === 'de' ? 'Saldo' : language === 'fr' ? 'Solde' : 'Balance'}: {tx.balanceAfter}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -36,7 +36,7 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
     credits: language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : language === 'it' ? 'crediti' : 'credits',
     createNewStory: language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : language === 'it' ? 'Nuova storia' : 'Create New Story',
     myStories: language === 'de' ? 'Meine Geschichten' : language === 'fr' ? 'Mes histoires' : language === 'it' ? 'Le mie storie' : 'My Stories',
-    myOrders: language === 'de' ? 'Meine Bestellungen' : language === 'fr' ? 'Mes commandes' : language === 'it' ? 'I miei ordini' : 'My Orders',
+    myOrders: language === 'de' ? 'Bestellungen & Guthaben' : language === 'fr' ? 'Commandes & crédits' : language === 'it' ? 'Ordini e crediti' : 'Orders & Credits',
     buyCredits: language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des crédits' : language === 'it' ? 'Acquista crediti' : 'Buy Credits',
     adminPanel: language === 'de' ? 'Admin Panel' : language === 'fr' ? 'Panneau Admin' : language === 'it' ? 'Pannello Admin' : 'Admin Panel',
     manageUsers: language === 'de' ? 'Benutzer verwalten' : language === 'fr' ? 'Gérer les utilisateurs' : language === 'it' ? 'Gestisci utenti' : 'Manage Users',

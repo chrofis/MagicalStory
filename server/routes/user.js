@@ -383,6 +383,37 @@ router.get('/orders', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/user/credit-history - Full credit ledger (purchases, story costs, refunds)
+router.get('/credit-history', authenticateToken, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) {
+      return res.json({ transactions: [] });
+    }
+    // amount != 0 skips pure bookkeeping rows (e.g. story_complete markers)
+    const rows = await dbQuery(
+      `SELECT id, amount, balance_after, transaction_type, description, created_at
+       FROM credit_transactions
+       WHERE user_id = $1 AND amount != 0
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [req.user.id]
+    );
+    res.json({
+      transactions: rows.map(tx => ({
+        id: tx.id,
+        amount: tx.amount,
+        balanceAfter: tx.balance_after,
+        type: tx.transaction_type,
+        description: tx.description,
+        createdAt: tx.created_at
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching credit history:', err);
+    res.status(500).json({ error: 'Failed to fetch credit history' });
+  }
+});
+
 // PUT /api/user/update-email - Update user's login email address
 // SEC-2: require the current password (re-auth), and reset email_verified so the
 // new address must be re-verified before story generation (jobs.js gate). Without
