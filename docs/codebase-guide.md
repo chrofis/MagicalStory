@@ -12,102 +12,212 @@ navigation, and the operational rules (push approval, timezone, log analysis) st
 
 ## Repair Workflow (Post-Generation)
 
-After story generation, the user can run an automated repair workflow to improve image
-quality and character consistency. Triggered from `RepairWorkflowPanel` → `runFullWorkflow()`.
+Two separate orchestrators share the same repair primitives:
 
-**Scoring model** — one unified score drives all redo decisions:
+1. **Pipeline auto-repair** — `runUnifiedRepairPipeline()` in `server/lib/images.js` (~6239).
+   Runs automatically inside every story generation (server.js Phases 5b-5g), pages AND
+   covers (covers join as negative page numbers -1/-2/-3).
+2. **Manual repair workflow** — `useRepairWorkflow.ts → runFullWorkflow()` (~1154), triggered
+   from `RepairWorkflowPanel`. Orchestrates the HTTP endpoints in `server/routes/regeneration.js`.
+
+**Scoring model** — canonical scores live in `server/lib/scoring.js` (`computeFinalScore`,
+`applyScore`, `setVersionScores`, `capEntityPenalty`):
 ```
-finalScore = qualityScore - semanticPenalties - entityPenalties
+imageScore  = visualScore − semanticPenalty     (quality eval already folds semantic in)
+finalScore  = imageScore − entityPenalty        (entity penalty CAPPED via capEntityPenalty)
 ```
-- Quality eval (Gemini 2.5 Flash): produces qualityScore (0-100) and fixableIssues
-- Semantic eval: compares image to scene description, penalties baked into score
-- Entity penalties: from finalChecksReport.entity (critical -30, major -20, minor -10)
-- Image check penalties: same scale as entity
-- Quality eval issues are NOT double-penalized (already in qualityScore)
+- Entity penalties: critical −30, major −20, minor −10 (character AND object issues), then capped
+  so a stack of non-actionable entity flags can't sink a good original below the redo threshold.
+- Per-evaluator sub-scores live under `version.scoreBreakdown.<evaluator>.score`; legacy
+  `qualityScore`/`semanticScore` fields are read-only fallbacks for pre-migration stories.
 
-**Important**: Entity data exists from generation (the pipeline runs entity consistency
-before the workflow starts). So entity penalties apply from Pass 1 onward.
+**Thresholds** (`server/config/models.js` → `REPAIR_DEFAULTS`; client mirror in
+`client/src/config/repairDefaults.ts` — keep in sync, they drifted once):
+- `scoreThreshold: 60` — pages with finalScore below this get repaired
+- `issueThreshold: 5` — pages with 5+ fixable issues get repaired
+- `maxPasses: 3` — repair rounds
+- `maxCharRepairPages: 20` — character-repair budget per run (hard spend ceiling)
+- `inpaintMaxPasses: 1` — inpaint attempts per page per round
+- Client-only: `semanticThresholdForIterate: 30`, `qualityThresholdForIterate: 20`
+
+### Pipeline auto-repair (`runUnifiedRepairPipeline`)
 
 ```
-Story completes → entity consistency already ran → finalChecksReport.entity saved
-User clicks "Run Full Workflow"
+(before the pipeline) SCALE-REPAIR per page — outline-triggered, see subsection below
 
-1. COLLECT FEEDBACK
-   Reads existing evaluation data from DB (populates UI; pass logic uses fresh API data)
+Step 1  Evaluate ALL images + entity consistency in ONE parallel batch
+        (evaluateImageBatch + runEntityConsistencyChecks; checkObjects:false —
+        objects are per-page concerns handled by quality/semantic eval)
 
-═══ GLOBAL PASS LOOP (maxPasses = 3) ═══════════════════════════════════════════
+Step 2  ROUND LOOP (round 1..maxPasses):
+        ├─ findBadPages (server/lib/repairLogic.js) on best-version scores:
+        │    finalScore < 60 OR fixableIssues >= 5 OR eval failed (evaluated:false)
+        ├─ decideRepairMethod (repairLogic.js:179) per bad page, EVERY round:
+        │    1. visualScore < 50 OR semanticScore < 30 (hardcoded inline) → iterate
+        │    2. major/critical entity issue on this page (scene pages only) → char-fix
+        │    3. anything inpaintable (fixableIssues/fixTargets/semantic)   → inpaint
+        │    4. otherwise → skip
+        ├─ flip logic: inpaint↔iterate flips when the last repair regressed or the
+        │    same method failed twice; a page where BOTH regressed is given up on
+        │    (outstanding critical issues logged). char-fix is never flipped.
+        ├─ execute in parallel (pLimit 50):
+        │    iterate  → iteratePage (scene re-expansion, styled-only refs, saved
+        │               plate reused) / iterateCover for covers / generateImageOnly
+        │    inpaint  → inpaintPage (consolidated instruction → editImageWithPrompt)
+        │    char-fix → repairCharacterMismatch (Grok; see modes below)
+        └─ re-evaluate repaired pages + fresh entity check in parallel; append
+           versions; failed attempts persist to retryHistory (round_repair_failed)
 
-  PASS 1:
-  ├─ EVALUATE ALL pages (quality + semantic + entity penalties from generation)
-  ├─ IDENTIFY BAD PAGES (score < 60 OR issues >= 5)
-  ├─ If no bad pages → skip to final steps
-  └─ REDO all bad pages (once each, generates new image version)
-
-  PASS 2+:
-  ├─ RUN ENTITY CONSISTENCY (fresh grid analysis against new images)
-  ├─ EVALUATE ALL pages (quality + semantic + fresh entity penalties)
-  ├─ IDENTIFY BAD PAGES (score < 60 OR issues >= 5)
-  ├─ If no bad pages → skip to final steps
-  └─ REDO all bad pages (once each)
-
-═══ FINAL STEPS ═════════════════════════════════════════════════════════════════
-
-  FINAL ENTITY CONSISTENCY (against latest images)
-  FINAL EVALUATE ALL pages (with fresh entity data)
-  CHARACTER REPAIR (up to 3 pages, critical severity first, Grok blended mode)
-  PICK BEST VERSIONS (for each redone page, activate highest-scoring version)
+Step 3  Pick best version per page across original + all rounds (selectBestVersion)
+Step 3b Rescue eval: if best < RESCUE_THRESHOLD (60, hardcoded) and an unscored
+        original exists (e.g. pre-scale-repair v0), evaluate it and re-pick —
+        prevents a damaged repair from shipping just because the original had no score
+Step 4  Post-repair calm-zone recovery — ensureCalmZone (textSpaceRepair.js) on
+        repaired text-overlay pages; a better candidate becomes a new version
+Step 5  Style-consistency audit (styleConsistency.js → checkStoryStyleConsistency)
+        across the picked images; verdict + outliers surfaced on the results
 ```
 
-**Thresholds** (in `server/config/models.js` → `REPAIR_DEFAULTS`):
-- `scoreThreshold: 60` — pages scoring below 60/100 get redone
-- `issueThreshold: 5` — pages with 5+ fixable issues get redone
-- `maxPasses: 3` — max global passes through all pages
-- `maxCharRepairPages: 20` — max pages for character repair per run
+There is **no separate post-loop character-repair stage** — char-fix is a per-round
+per-page method inside the loop, and entity consistency re-runs once per round (the last
+round's report is the final verdict). Char-fix resolves the target bbox via
+`resolveCharBbox` (entity report → bbox detection → eval matches), builds protection
+bboxes for every OTHER character on the page, picks face-vs-body from the issue text, and
+attaches the styled avatar matching the page's clothing category.
 
-**Character repair methods** (in `server/lib/images.js` → `repairCharacterMismatchWithGrok()`):
-- **Grok Cutout** (default): extract the figure's bbox + 20% padding → send cutout + avatar
-  to Grok as an inpaint-style replacement → composite back with a feathered edge (~8% of the
-  smaller dimension). Keeps background, other characters, and objects fully untouched.
-- **Grok Blended**: blur the character region → Grok regenerates → feathered blend onto the
-  original scene (30px feather, bbox + 50% padding). Good for face-only repairs but the blur
-  radius can include too much surrounding context on larger bboxes.
-- **Grok Blackout**: send full scene with blackout overlay → Grok regenerates entire scene
+### Manual workflow (`runFullWorkflow` in useRepairWorkflow.ts)
 
-**When images are REDONE (full regeneration):**
-- User clicks "Regenerate Image" button (manual)
-- Repair workflow identifies bad pages (score < 60 or issues >= 5)
-- Uses `POST /:id/iterate/:pageNum` — re-expands scene description, generates new image
+```
+collect-feedback
+ROUNDS 1..maxPasses(3):
+  re-evaluate ALL pages + covers (POST /:id/repair-workflow/re-evaluate;
+    server-side findBadPages returns badPages)
+  per bad page: local chooseRepairStrategy —
+    round >= 3            → inpaint (last chance, cheap)
+    semantic < 30 or quality < 20 → iterate
+    round 2               → alternate from round-1 action
+    has fixableIssues/fixTargets  → inpaint, else iterate
+  inpaint → POST /:id/repair/image/:pageNum ; iterate → POST /:id/iterate/:pageNum
+pick-best (changed pages)             → POST /:id/repair-workflow/pick-best-versions
+entity check                          → POST /:id/repair-workflow/consistency-check
+character repair                      → POST /:id/repair-workflow/character-repair
+                                        { autoSelect: true, maxCharRepairPages }
+                                        (selectCharRepairTasks: major/critical, dedup,
+                                        critical-first, budget 20)
+re-evaluate changed pages
+style audit                           → POST /:id/style-check (non-fatal on error)
+final pick-best (incl. char-repair versions), refresh story
+```
 
-**When images are FIXED (character repair only):**
-- Character repair step in the workflow (final steps)
-- Entity consistency found character appearance mismatches
-- Uses Grok blended mode: only the character region changes, background preserved
-- Cost: ~$0.02/image (vs full regeneration cost)
+Note the two orchestrators intentionally differ: the client keeps character repair as a
+post-round step; the server pipeline runs it inside the rounds. Abortable at every step
+via AbortController.
 
-**Key design decisions:**
-- Entity data exists from generation — penalties apply from Pass 1.
-- On Pass 2+, entity consistency re-runs first (images changed), then one evaluation.
-- No per-page retries — each pass redoes each bad page once. Versions accumulate.
-- Character repair runs before pick-best so repair versions are also considered.
-- Pick-best runs last, comparing ALL versions (original + redos + repairs) per page.
-- Character repair budget: max 3 pages, critical > major priority.
-- Grok blended is default when Grok is configured; falls back to Gemini otherwise.
-- Abortable at every step via AbortController.
+### Character repair — FOUR modes (`repairCharacterMismatchWithGrok`, images.js)
 
-**Endpoints** (in `server/routes/regeneration.js`):
-- `POST /:id/repair-workflow/re-evaluate` — quality + semantic eval, entity penalties
+Defaults (both the pipeline char-fix and the manual endpoint): **face repairs → blended,
+body repairs → fullScene**. In `regeneration.js`:
+`effectiveMode = grokRepairMode || (useFaceOnly ? 'blended' : 'fullScene')`.
+Cutout and blackout only run when explicitly requested via `grokRepairMode`.
+
+| Mode | method label | What it does | Prompt file |
+|------|--------------|--------------|-------------|
+| **blended** | `grok_blended` | Blur the face/figure region → Grok redraws → feathered blend back onto the original scene | `character-repair-blended.txt` (face) / `character-repair-body-blended.txt` (body whiteout) |
+| **fullScene** | `grok_inpaint` | Mirror-pad scene to a Grok preset → magenta crosshatch over body + solid block over face → Grok edits the FULL scene → unpad → conditional feather composite | `character-repair-inpaint.txt` |
+| **cutout** | `grok_cutout` | Preset-aligned extract of bbox + **40% min padding** (`PAD_FACTOR = 0.4`, `computePresetAlignedExtract`) → magenta hatch → Grok → feathered composite back | `character-repair-cutout.txt` |
+| **blackout** | `grok_blackout` | Legacy fallback: full scene + avatar ref to Grok, no mask, no composite | `character-repair-grok-fullscene.txt` |
+
+**Prompt-file naming trap:** `character-repair-grok-fullscene.txt` belongs to the
+BLACKOUT mode; the fullScene mode uses `character-repair-inpaint.txt`.
+
+Non-Grok paths on the character-repair endpoint: `useGeminiRepair` →
+`entityConsistency.repairSinglePage()` (also the fallback when bbox/avatar/bytes are
+missing); `useMagicApiRepair` → MagicAPI face swap. `repairSinglePage()` is a repair
+dispatcher exported by `server/lib/entityConsistency.js` — that module does repair, not
+just detection.
+
+### Scale repair (`server/lib/scaleRepair.js`)
+
+Fixes "tiny background figure" scenes where Grok pulls a `depth: background` character
+into the foreground. **Outline-triggered, not eval-triggered**: runs unconditionally when
+the scene metadata declares ≥1 background AND ≥1 foreground character (skips indoor
+scenes and shared-vessel scenes — boat/cart/wagon). Runs during generation right after
+the first render (server.js ~5815), **before** the repair pipeline's eval rounds. One
+Grok edit with a relocate+shrink prompt (foreground avatars attached as identity
+anchors). `verifyScaleRepair` then checks each background character is still present by
+visual signature — **fails open** (API hiccup accepts the repair; only a confident "not
+present" discards it). The pre-repair image is kept as an unscored v0 version; Step 3b's
+rescue eval protects it. Manual rerun: `POST /:id/scale-repair/:pageNum`.
+
+### Text-space repair (`server/lib/textSpaceRepair.js` → `ensureCalmZone`)
+
+**Regenerates pixels** — distinct from `textRegion.js`, which only measures calmness and
+composites a white wash. Gate: calm pixels inside the overlay polygon must be ≥
+`calmNeededPx = words × pxPerWord(fontPt)`. On failure it re-rolls the image via the
+caller-supplied `generateImage` (Grok/Gemini edit with the `textAreaMask` hint), up to
+`REPAIR.maxRetries` (2, `server/config/textRegion.js`), picks the candidate with the
+highest `calmFoundPx`, and **returns the best candidate even when none pass** the
+threshold. Used at initial generation (server.js text-region phase) and in pipeline
+Step 4 (post-repair recovery). All candidates persist as versions
+(`textSpaceCandidates`), the non-winner original gets a baseline eval in pipeline Step 1.
+
+### Endpoints (`server/routes/regeneration.js`)
+
+Repair workflow:
+- `POST /:id/repair-workflow/re-evaluate` — quality + semantic eval, returns badPages
 - `POST /:id/repair-workflow/consistency-check` — entity grid analysis
 - `POST /:id/repair-workflow/pick-best-versions` — activate best version per page
-- `POST /:id/repair-workflow/character-repair` — fix character appearance (Grok blended/cutout/blackout)
-- Page redo uses existing `POST /:id/iterate/:pageNum` endpoint
+- `POST /:id/repair-workflow/character-repair` — autoSelect or explicit repairs; options
+  `grokRepairMode` (blended/cutout/blackout/fullScene), `whiteoutTarget`, `useGeminiRepair`,
+  `useMagicApiRepair`, `maxCharRepairPages`, `featherComposite`
+- `POST /:id/repair-workflow/artifact-repair` — grid-based artifact repair
+
+Regenerate / edit:
+- `POST /:id/regenerate/scene-description/:pageNum`
+- `POST /:id/regenerate/image/:pageNum` (credits)
+- `POST /:id/regenerate/cover/:coverType` — funnels through `iterateCover`
+- `POST /:id/iterate/:pageNum` — re-expansion iterate (covers via negative pageNum)
+- `POST /:id/edit/image/:pageNum`, `POST /:id/edit/cover/:coverType` — user-prompt edit → `editImageWithPrompt`
+- `POST /:id/repair/image/:pageNum` — manual inpaint (multi-pass, Grok text edit)
+
+Eval / detection:
+- `POST /:id/evaluate-single/:pageNum`
+- `POST /:id/refresh-bbox/:pageNum`, `POST /:id/iterate-bbox/:pageNum`
+
+Style / scale / dev (admin):
+- `POST /:id/style-check` — cross-page style audit (detection only)
+- `POST /:id/scale-repair/:pageNum`
+- `POST /:id/style-transfer/:pageNum`, `POST /:id/analyze-style/:pageNum`
+- `POST /:id/style-lab/:pageNum` (+ `/evaluate`, `GET .../history`, `GET .../history/:runId`)
+- `POST /:id/test-models/:pageNum`
+
+### Observability — what's stored per version (2026-07-09 O-series)
+
+- Every repair version carries the prompt actually sent (`prompt` / `inpaintInstruction`),
+  `inpaintReferenceImages`/`inpaintReferenceSources`, `consolidatedPlan`, and for char-fix
+  the pipeline images (`charRepairWhiteout` / `charRepairGrokRaw` / `charRepairBlendMask`)
+  plus telemetry (`charName`, `targetBbox`, `targetBboxSource`, `whiteoutTarget`).
+- All char-repair modes return `promptSent` ungated; the user endpoint persists it as
+  `charRepairPrompt` on the version; the manual repair loop stores the per-pass
+  `editInstruction`.
+- Evals persist `qualityRawOutput` (verbatim model output) + `evalTemplateHash` (md5-8 of
+  the eval template) so stored scores stay re-derivable after prompt edits.
+- Composite-cover versions carry `compositeAttempts` (pass-1/pass-2 inputs, prompts,
+  outputs, plus the clean `plate` and per-character `cutouts`).
+- Failures persist to `retryHistory`: `round_repair_failed` (pipeline rounds),
+  `char_repair_failed` (endpoint). Cover retryHistory bytes save to `story_retry_images`
+  under the negative cover page numbers (-1/-2/-3).
 
 **Key files:**
-- `client/src/hooks/useRepairWorkflow.ts` — orchestrates the full workflow
+- `server/lib/images.js` → `runUnifiedRepairPipeline()`, `inpaintPage()`, `repairCharacterMismatchWithGrok()`
+- `server/lib/repairLogic.js` — `findBadPages()`, `decideRepairMethod()`, `selectCharRepairTasks()`
+- `server/lib/scoring.js` — canonical score computation
+- `server/lib/scaleRepair.js`, `server/lib/textSpaceRepair.js`, `server/lib/styleConsistency.js`
+- `server/lib/entityConsistency.js` → `repairSinglePage()` + detection
+- `server/routes/regeneration.js` — all endpoints above
+- `client/src/hooks/useRepairWorkflow.ts` — manual workflow orchestration
 - `client/src/components/generation/RepairWorkflowPanel.tsx` — UI panel
-- `client/src/services/storyService.ts` — API client methods
-- `server/routes/regeneration.js` — backend endpoints
-- `server/lib/images.js` → `repairCharacterMismatchWithGrok()` — Grok character repair
-- `server/lib/images.js` → `collectAllIssuesForPage()` — aggregates all issue sources
+- `client/src/config/repairDefaults.ts` — client threshold mirror
 
 ---
 

@@ -36,8 +36,10 @@
 <tr><td>Page (scene) image</td><td><code>grok-imagine</code></td><td>Grok (xAI)</td><td>$0.02</td><td>Half the price of Gemini, accepts reference images, "good enough" for storybook style.</td></tr>
 <tr><td>Cover image</td><td><code>grok-imagine</code></td><td>Grok</td><td>$0.02</td><td>Same as scenes. Cover-composite mode (default ON) layers Grok edits on a hand-built composite for stronger character placement.</td></tr>
 <tr><td>Avatar (clothing variants)</td><td><code>grok-imagine</code></td><td>Grok</td><td>$0.02</td><td>Gemini 2.5 Flash Image silently <code>IMAGE_OTHER</code>-refuses adult-face photos, leaving avatars stuck at <code>status='pending'</code> forever. Grok edit handles the same photos cleanly.</td></tr>
-<tr><td>Inpaint (auto-repair)</td><td><code>grok</code> (edit)</td><td>Grok</td><td>$0.02</td><td>Switched from Runware SDXL ($0.002) for face-quality reasons. Edit endpoint preserves identity better in the unmasked area.</td></tr>
-<tr><td>Character repair (cutout/blended)</td><td><code>grok-imagine</code></td><td>Grok</td><td>$0.02</td><td>Single function (<code>repairCharacterMismatchWithGrok</code>) with three modes — the unmasked area of the original survives the edit.</td></tr>
+<tr><td>Inpaint (repair rounds + manual repair)</td><td><code>grok</code> (edit)</td><td>Grok</td><td>$0.02</td><td>Live inpaint converges on <code>editImageWithPrompt()</code>, whose backend comes from <code>IMAGE_MODELS[MODEL_DEFAULTS.pageImage].backend</code> — <strong>not</strong> <code>MODEL_DEFAULTS.inpaintBackend</code>, which is DEAD config (see §3). Switched from Runware SDXL ($0.002) for face-quality reasons.</td></tr>
+<tr><td>Character repair (4 modes)</td><td><code>grok-imagine</code></td><td>Grok</td><td>$0.02</td><td>Single function (<code>repairCharacterMismatchWithGrok</code>) with four modes (blended / fullScene / cutout / blackout). Defaults: face repair → blended, body repair → <strong>fullScene</strong>.</td></tr>
+<tr><td>Scale repair (tiny background figures)</td><td><code>grok-imagine</code></td><td>Grok</td><td>$0.02</td><td>Outline-triggered relocate+shrink edit (<code>server/lib/scaleRepair.js</code>), runs before the repair pipeline's eval rounds. Gemini-verified, fail-open.</td></tr>
+<tr><td>Text-space repair (calm zone)</td><td><code>grok-imagine</code> (per page config)</td><td>Grok/Gemini</td><td>$0.02</td><td><code>ensureCalmZone</code> (<code>server/lib/textSpaceRepair.js</code>) re-rolls the page when the text-overlay polygon lacks calm pixels — regenerates pixels, unlike <code>textRegion.js</code> which only composites a wash.</td></tr>
 <tr><td>Quality eval / bbox</td><td><code>gemini-2.5-flash</code></td><td>Gemini</td><td>text-tier</td><td>2.5 Flash returns bboxes reliably; Lite and 2.0 Flash miss small objects. (Not an image generator — vision-only.)</td></tr>
 </tbody>
 </table>
@@ -86,7 +88,7 @@
 
 <tr>
   <td><code>editWithGrok(prompt, refImages, options)</code></td>
-  <td><code>server/lib/grok.js:153</code></td>
+  <td><code>server/lib/grok.js:171</code></td>
   <td>Grok edit endpoint</td>
   <td>Prompt (text) + 1–3 reference images (data-URI base64). Options: <code>aspectRatio</code>, <code>model</code> (Standard/Pro), <code>padInput</code> (pad vs crop refs to match output aspect), <code>padInputWithExtension</code> (slot-0 scene plate: magenta-pad + auto-prompt Grok to paint scene continuation into the gap — full-bleed without grey bars).</td>
   <td><code>{ imageData, usage, modelId }</code>. Output aspect = input image's aspect (the <code>aspectRatio</code> param controls input-coercion, not output). <strong>Aspect quirk:</strong> for page/empty-scene gen the input passes through <code>packReferences</code> FIRST, which would pillarbox a portrait scene plate to square with sampled grey edge bars. <code>padInputWithExtension</code> must be passed to BOTH <code>packReferences</code> (so it leaves slot 0 native) AND <code>editWithGrok</code> (so it magenta-extends) — passing it only to <code>editWithGrok</code> is a no-op here (the cover path, which calls <code>editWithGrok</code> directly, is the exception). See <code>docs/decisions.md</code> → "Scene-plate slot 0 is magenta-extended".</td>
@@ -94,7 +96,7 @@
 
 <tr>
   <td><code>generateWithGrok(prompt, options)</code></td>
-  <td><code>server/lib/grok.js:49</code></td>
+  <td><code>server/lib/grok.js:50</code></td>
   <td>Grok generate endpoint</td>
   <td>Prompt only (no reference). Options: <code>aspectRatio</code>, <code>resolution</code>.</td>
   <td><code>{ imageData, usage, modelId }</code>. Used for text-only "concept" pages where no character refs are sent.</td>
@@ -102,7 +104,7 @@
 
 <tr>
   <td><code>callGeminiAPIForImage(prompt, charPhotos, prev, evalType, …)</code></td>
-  <td><code>server/lib/images.js:3406</code></td>
+  <td><code>server/lib/images.js:3582</code></td>
   <td>Gemini 2.5 Flash Image / Gemini 3 Pro Image Preview</td>
   <td>Long parameter list — prompt, character photos, previous image (iteration), landmarks, VB grid, scene background, characters, story text, aspect override.</td>
   <td><code>{ imageData, usage, modelId, prompt }</code>. Direct provider call — not a dispatcher.</td>
@@ -110,7 +112,7 @@
 
 <tr>
   <td><code>generateWithRunware(prompt, options)</code></td>
-  <td><code>server/lib/runware.js:185</code></td>
+  <td><code>server/lib/runware.js:216</code></td>
   <td>Runware FLUX (Schnell, Dev, …)</td>
   <td>Prompt + model id + optional <code>referenceImages</code> (IP-Adapter style hint).</td>
   <td><code>{ imageData, usage, modelId }</code>. Direct provider call.</td>
@@ -118,23 +120,23 @@
 
 <tr>
   <td><code>generateAvatarWithACE(refImage, prompt, options)</code></td>
-  <td><code>server/lib/runware.js:308</code></td>
+  <td><code>server/lib/runware.js:324</code></td>
   <td>Runware ACE++</td>
   <td>Single reference image (face) + prompt + <code>identityStrength</code>.</td>
   <td><code>{ imageData }</code>. Face-locked variant generation.</td>
 </tr>
 
 <tr>
-  <td><code>inpaintWithRunware(seed, mask, prompt, options)</code></td>
-  <td><code>server/lib/runware.js:61</code></td>
+  <td><code>inpaintWithRunware(seed, mask, prompt, options)</code> <strong>🗄 DEAD CHAIN</strong></td>
+  <td><code>server/lib/runware.js:107</code></td>
   <td>Runware SDXL / FLUX-Fill</td>
   <td>Seed image, white-on-black mask, prompt, model id.</td>
-  <td><code>{ imageData }</code>. Pixel-level inpaint only — preserves unmasked region byte-for-byte.</td>
+  <td><code>{ imageData }</code>. Pixel-level inpaint — preserves unmasked region byte-for-byte. Only reachable through the dead mask-inpaint dispatcher below; no live production caller.</td>
 </tr>
 
 <tr>
   <td><code>generateImageOnly(prompt, charPhotos, options)</code></td>
-  <td><code>server/lib/images.js:4195</code></td>
+  <td><code>server/lib/images.js:4401</code></td>
   <td><strong>Dispatcher</strong> → Grok / Gemini / Runware</td>
   <td>Prompt + character photos + options (<code>imageBackendOverride</code>, <code>imageModelOverride</code>, scene metadata).</td>
   <td><code>{ imageData, prompt, modelId, usage }</code>. Single-shot generation, no quality retry.</td>
@@ -142,7 +144,7 @@
 
 <tr>
   <td><code>generateImageWithQualityRetry(prompt, charPhotos, …)</code></td>
-  <td><code>server/lib/images.js:9689</code></td>
+  <td><code>server/lib/images.js:10585</code></td>
   <td><strong>Dispatcher + retry loop</strong> → Grok / Gemini</td>
   <td>Same as <code>generateImageOnly</code> + quality eval callback.</td>
   <td>Loops up to <code>maxPasses</code>: generate → eval → redo on low score / many issues. Returns best version. Primary entry point for scenes, covers, empty backgrounds.</td>
@@ -150,7 +152,7 @@
 
 <tr>
   <td><code>generateWithIterativePlacement(prompt, charPhotos, sceneMeta, options)</code></td>
-  <td><code>server/lib/images.js:4739</code></td>
+  <td><code>server/lib/images.js:4996</code></td>
   <td>Grok edit (two passes)</td>
   <td>Prompt + character photos + scene metadata with depth info.</td>
   <td>Two-pass: render background, then composite characters at scene-prescribed positions. Used when scene metadata has foreground/background depth markers.</td>
@@ -158,23 +160,47 @@
 
 <tr>
   <td><code>inpaintPage(imageData, evaluation, options)</code></td>
-  <td><code>server/lib/images.js:5437</code></td>
-  <td>Configurable backend (default Grok edit)</td>
-  <td>Source image + evaluation report (fixable issues with bboxes) + options.</td>
-  <td>Auto-repair entry. Selects backend per <code>MODEL_DEFAULTS.inpaintBackend</code>: <code>'grok'</code> uses edit endpoint; <code>'runware'</code> uses SDXL/FLUX-Fill; <code>'gemini'</code> uses Gemini imagen.</td>
+  <td><code>server/lib/images.js:5750</code></td>
+  <td>Grok edit (via <code>editImageWithPrompt</code>)</td>
+  <td>Source image + evaluation report (fixable issues) + options (visualBible, entityReport, aspectRatio, textPosition, coverText, …).</td>
+  <td>LIVE inpaint entry for the unified pipeline's round loop. Consolidates all issue sources into ONE edit instruction, then calls <code>editImageWithPrompt()</code>. Backend comes from <code>IMAGE_MODELS[MODEL_DEFAULTS.pageImage].backend</code> — not <code>inpaintBackend</code>. The other live inpaint path is the manual <code>POST /:id/repair/image/:pageNum</code> route, which also converges on <code>editImageWithPrompt()</code>.</td>
+</tr>
+
+<tr>
+  <td><strong>Mask-inpaint dispatcher</strong> — <code>inpaintWithMask</code>, <code>inpaintWithRunwareBackend</code>, <code>inpaintWithGrokBackend</code>, <code>createMaskFromBoundingBox</code> <strong>🗄 DEAD CODE</strong></td>
+  <td><code>server/lib/images.js:11530–12450</code></td>
+  <td>—</td>
+  <td>Seed image + bounding boxes + mask + fix prompt.</td>
+  <td><strong>ZERO live callers</strong> (audit 2026-07-09; DEAD CODE banners in source). Left over from an unshipped mask-based inpaint plan. This dispatcher is the only reader of <code>MODEL_DEFAULTS.inpaintBackend</code> — changing that config value changes nothing. <code>MODEL_DEFAULTS.enableAutoRepair</code> is likewise dead: nothing reads it, and the <code>generateImageWithQualityRetry</code> option it mirrors defaults to false with no caller flipping it. Kept marked-not-deleted per user decision.</td>
 </tr>
 
 <tr>
   <td><code>repairCharacterMismatchWithGrok(imageData, charPhoto, bbox, charName, options)</code></td>
-  <td><code>server/lib/images.js:8286</code></td>
+  <td><code>server/lib/images.js:8973</code></td>
   <td>Grok edit</td>
-  <td>Source scene image + character avatar reference + bbox + name + repair mode (<code>cutout</code> | <code>blended</code> | <code>blackout</code>).</td>
-  <td>Character-specific repair pipeline. Default mode <code>blended</code>; <code>cutout</code> for preset-aligned bbox extract; <code>blackout</code> for full-scene regen with overlay.</td>
+  <td>Source scene image + character avatar reference + bbox + name + repair mode (<code>blended</code> | <code>fullScene</code> | <code>cutout</code> | <code>blackout</code> via <code>useBlended</code>/<code>useFullScene</code>/<code>useCutout</code> flags).</td>
+  <td>Character-specific repair with FOUR modes. Defaults by <code>whiteoutTarget</code>: face → <code>blended</code> (blur + feathered blend), body → <strong><code>fullScene</code></strong> (mirror-pad + magenta crosshatch + full-scene edit + conditional feather). <code>cutout</code> (preset-aligned extract, bbox + 40% min padding, <code>PAD_FACTOR 0.4</code>) and <code>blackout</code> (full scene, no mask) only on explicit request. <strong>Prompt-file trap:</strong> <code>character-repair-grok-fullscene.txt</code> is the BLACKOUT prompt; the fullScene mode uses <code>character-repair-inpaint.txt</code>. Returns <code>promptSent</code> ungated for persistence (dev panel / <code>charRepairPrompt</code> on versions).</td>
+</tr>
+
+<tr>
+  <td><code>runScaleRepair(currentImage, sceneMetadata, options)</code></td>
+  <td><code>server/lib/scaleRepair.js:256</code></td>
+  <td>Grok edit (via <code>generateImageOnly</code> with <code>previousImage</code>)</td>
+  <td>Rendered page + scene metadata + foreground avatar refs + background-character physical descriptions + empty-scene plate.</td>
+  <td>Relocate+shrink edit for "tiny background figure" scenes. <strong>Outline-triggered</strong> (<code>needsScaleRepair</code>: ≥1 <code>depth: background</code> AND ≥1 foreground char; skips indoor and shared-vessel scenes) — no eval, no threshold. Runs during generation right after the first render, before the repair pipeline. <code>verifyScaleRepair</code> checks every background char is still visible by visual signature — <strong>fails open</strong> (verification error accepts; confident "not present" discards, keeping the original). Pre-repair image kept as unscored v0 version. Manual: <code>POST /:id/scale-repair/:pageNum</code>.</td>
+</tr>
+
+<tr>
+  <td><code>ensureCalmZone(opts)</code></td>
+  <td><code>server/lib/textSpaceRepair.js:97</code></td>
+  <td>Grok/Gemini edit (caller-supplied <code>generateImage</code> callback → <code>generateImageOnly</code> with <code>textAreaMask</code>)</td>
+  <td>Page image + page text + textPosition + languageLevel + textAreaMask.</td>
+  <td>Calm-zone legibility loop — <strong>REGENERATES pixels</strong>, unlike <code>textRegion.js</code> which only measures calmness and composites the white wash. Gate: calm pixels inside the overlay polygon ≥ <code>words × pxPerWord(fontPt)</code>. On failure re-rolls up to <code>REPAIR.maxRetries</code> (2), picks highest <code>calmFoundPx</code>, and returns the best candidate <strong>even when none pass</strong>. Used at initial generation AND in the pipeline's post-repair recovery step; all candidates persist as versions.</td>
 </tr>
 
 <tr>
   <td><code>applyStyleTransfer(imageData, artStyle, options)</code></td>
-  <td><code>server/lib/images.js:13209</code></td>
+  <td><code>server/lib/images.js:14163</code></td>
   <td>Configurable (Grok / Gemini)</td>
   <td>Source image + target art style name + optional model override.</td>
   <td>Re-renders the same scene composition in a different art style — used by the dev-mode "Style Transfer" button to compare models on the same scene.</td>
@@ -266,16 +292,30 @@
 
 <tr>
   <td>Repair a single character in a scene (face/identity off)</td>
-  <td><code>repairCharacterMismatchWithGrok</code></td>
+  <td><code>repairCharacterMismatch</code> → <code>repairCharacterMismatchWithGrok</code></td>
   <td>Grok edit</td>
-  <td>Default mode <code>blended</code>. Triggered by the repair workflow's character-repair step.</td>
+  <td>Four modes; effective defaults: face → <code>blended</code>, body → <strong><code>fullScene</code></strong> (<code>effectiveMode = grokRepairMode || (useFaceOnly ? 'blended' : 'fullScene')</code> in <code>regeneration.js</code>). Triggered by the pipeline's per-round char-fix method AND the manual workflow's character-repair step. Gemini fallback: <code>entityConsistency.repairSinglePage()</code>.</td>
 </tr>
 
 <tr>
-  <td>Repair a non-character flaw (missing prop, wrong scale)</td>
-  <td><code>inpaintPage</code></td>
-  <td>Grok edit (default) / Runware / Gemini per <code>inpaintBackend</code></td>
-  <td>Auto-repair step in the global pass loop. Currently disabled by default (<code>enableAutoRepair: false</code>).</td>
+  <td>Repair a non-character flaw (missing prop, wrong pose, artifacts)</td>
+  <td><code>inpaintPage</code> (pipeline round loop) / <code>POST /:id/repair/image/:pageNum</code> (manual)</td>
+  <td>Grok edit via <code>editImageWithPrompt</code> — backend from <code>IMAGE_MODELS[MODEL_DEFAULTS.pageImage].backend</code></td>
+  <td>These are the ONLY live inpaint paths. <code>MODEL_DEFAULTS.inpaintBackend</code> and <code>enableAutoRepair</code> are DEAD config (nothing live reads them — see the dead mask-inpaint dispatcher in §3).</td>
+</tr>
+
+<tr>
+  <td>Shrink an oversized background figure</td>
+  <td><code>runScaleRepair</code> (<code>server/lib/scaleRepair.js</code>) / <code>POST /:id/scale-repair/:pageNum</code></td>
+  <td>Grok edit (via <code>generateImageOnly</code> with <code>previousImage</code>)</td>
+  <td>Outline-triggered (<code>depth: background</code> + a foreground char), runs before the repair pipeline's eval rounds. Fail-open Gemini verification discards edits that deleted the figure.</td>
+</tr>
+
+<tr>
+  <td>Recover the text-overlay calm zone</td>
+  <td><code>ensureCalmZone</code> (<code>server/lib/textSpaceRepair.js</code>)</td>
+  <td>Grok/Gemini edit with <code>textAreaMask</code> hint</td>
+  <td>Regenerates pixels when the overlay polygon lacks calm pixels for the page text (≤2 retries, best candidate wins even if none pass). Runs at initial generation and again after pipeline repairs. Not to be confused with <code>textRegion.js</code>'s wash compositing.</td>
 </tr>
 
 <tr>
@@ -444,7 +484,7 @@
 <p class="note">When adding a new provider or model, update this page in the same PR that introduces it — otherwise the doc starts lying within a week.</p>
 
 <footer>
-  <p>Last reviewed: 2026-05-14. Source of truth: <code>server/config/models.js</code> + the call sites linked above.</p>
+  <p>Last reviewed: 2026-07-09. Source of truth: <code>server/config/models.js</code> + the call sites linked above.</p>
 </footer>
 
 </body>
