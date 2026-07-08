@@ -18,27 +18,30 @@ interface CreditTransaction {
   createdAt: string;
 }
 
-const TX_LABELS: Record<string, { de: string; fr: string; en: string }> = {
-  initial: { de: 'Willkommens-Credits', fr: 'Crédits de bienvenue', en: 'Welcome credits' },
-  purchase: { de: 'Credits gekauft', fr: 'Crédits achetés', en: 'Credits purchased' },
-  story_reserve: { de: 'Geschichte erstellt', fr: 'Histoire créée', en: 'Story created' },
-  story_complete: { de: 'Geschichte abgeschlossen', fr: 'Histoire terminée', en: 'Story completed' },
-  story_refund: { de: 'Rückerstattung', fr: 'Remboursement', en: 'Refund' },
-  image_regeneration: { de: 'Bild neu generiert', fr: 'Image régénérée', en: 'Image regenerated' },
-  image_iteration: { de: 'Bild überarbeitet', fr: 'Image retravaillée', en: 'Image revised' },
-  referral_conversion: { de: 'Empfehlungs-Guthaben umgewandelt', fr: 'Solde de parrainage converti', en: 'Referral balance converted' },
-  admin_add: { de: 'Anpassung durch Support', fr: 'Ajustement par le support', en: 'Support adjustment' },
-  admin_deduct: { de: 'Anpassung durch Support', fr: 'Ajustement par le support', en: 'Support adjustment' },
+const TX_LABELS: Record<string, { de: string; fr: string; it: string; en: string }> = {
+  initial: { de: 'Willkommens-Credits', fr: 'Crédits de bienvenue', it: 'Crediti di benvenuto', en: 'Welcome credits' },
+  purchase: { de: 'Credits gekauft', fr: 'Crédits achetés', it: 'Crediti acquistati', en: 'Credits purchased' },
+  story_reserve: { de: 'Geschichte erstellt', fr: 'Histoire créée', it: 'Storia creata', en: 'Story created' },
+  story_complete: { de: 'Geschichte abgeschlossen', fr: 'Histoire terminée', it: 'Storia completata', en: 'Story completed' },
+  story_refund: { de: 'Rückerstattung', fr: 'Remboursement', it: 'Rimborso', en: 'Refund' },
+  image_regeneration: { de: 'Bild neu generiert', fr: 'Image régénérée', it: 'Immagine rigenerata', en: 'Image regenerated' },
+  image_iteration: { de: 'Bild überarbeitet', fr: 'Image retravaillée', it: 'Immagine rielaborata', en: 'Image revised' },
+  cover_regeneration: { de: 'Cover neu generiert', fr: 'Couverture régénérée', it: 'Copertina rigenerata', en: 'Cover regenerated' },
+  character_repair: { de: 'Charakter korrigiert', fr: 'Personnage corrigé', it: 'Personaggio corretto', en: 'Character repaired' },
+  book_purchase_reward: { de: 'Bonus für Buchbestellung', fr: 'Bonus commande de livre', it: 'Bonus per ordine libro', en: 'Book order bonus' },
+  referral_conversion: { de: 'Empfehlungs-Guthaben umgewandelt', fr: 'Solde de parrainage converti', it: 'Saldo referral convertito', en: 'Referral balance converted' },
+  admin_add: { de: 'Anpassung durch Support', fr: 'Ajustement par le support', it: 'Rettifica del supporto', en: 'Support adjustment' },
+  admin_deduct: { de: 'Anpassung durch Support', fr: 'Ajustement par le support', it: 'Rettifica del supporto', en: 'Support adjustment' },
 };
 
 function txLabel(tx: CreditTransaction, language: string): string {
-  const lang = language === 'de' ? 'de' : language === 'fr' ? 'fr' : 'en';
+  const lang = language === 'de' ? 'de' : language === 'fr' ? 'fr' : language === 'it' ? 'it' : 'en';
   const entry = TX_LABELS[tx.type];
   let label = entry ? entry[lang] : tx.description || tx.type;
   // Story descriptions carry the page count, e.g. "Reserved 250 credits for 25-page story"
   if (tx.type === 'story_reserve') {
     const m = /(\d+)-page/.exec(tx.description || '');
-    if (m) label += language === 'de' ? ` (${m[1]} Seiten)` : ` (${m[1]} pages)`;
+    if (m) label += language === 'de' ? ` (${m[1]} Seiten)` : language === 'it' ? ` (${m[1]} pagine)` : ` (${m[1]} pages)`;
   }
   return label;
 }
@@ -365,7 +368,7 @@ export default function MyOrders() {
     if (!dateStr) return '-';
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString(language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-FR' : 'en-US', {
+      return date.toLocaleDateString(language === 'de' ? 'de-CH' : language === 'fr' ? 'fr-CH' : language === 'it' ? 'it-CH' : 'en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -397,7 +400,7 @@ export default function MyOrders() {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
             <Package size={28} />
-            {language === 'de' ? 'Bestellungen & Guthaben' : language === 'fr' ? 'Commandes & crédits' : 'Orders & Credits'}
+            {language === 'de' ? 'Bestellungen & Guthaben' : language === 'fr' ? 'Commandes & crédits' : language === 'it' ? 'Ordini e crediti' : 'Orders & Credits'}
           </h1>
         </div>
 
@@ -451,7 +454,7 @@ export default function MyOrders() {
           <div className="mt-10">
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-4">
               <Coins size={22} />
-              {language === 'de' ? 'Guthaben-Verlauf' : language === 'fr' ? 'Historique des crédits' : 'Credit History'}
+              {language === 'de' ? 'Guthaben-Verlauf' : language === 'fr' ? 'Historique des crédits' : language === 'it' ? 'Cronologia crediti' : 'Credit History'}
             </h2>
             <div className="bg-white rounded-2xl shadow-md divide-y divide-gray-100">
               {creditHistory.map(tx => (
@@ -466,7 +469,7 @@ export default function MyOrders() {
                     </p>
                     {tx.balanceAfter >= 0 && (
                       <p className="text-xs text-gray-400">
-                        {language === 'de' ? 'Saldo' : language === 'fr' ? 'Solde' : 'Balance'}: {tx.balanceAfter}
+                        {language === 'de' ? 'Saldo' : language === 'fr' ? 'Solde' : language === 'it' ? 'Saldo' : 'Balance'}: {tx.balanceAfter}
                       </p>
                     )}
                   </div>
