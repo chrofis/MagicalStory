@@ -6411,6 +6411,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // Sonnet compliance JSON. Persisted so the dev-mode version picker
           // can show what Gemini actually saw vs what Sonnet judged.
           threeStageResult: img.threeStageResult || null,
+          // O7: verbatim quality-eval model output + eval-template hash, so a
+          // stored score stays re-derivable after prompt-file edits.
+          qualityRawOutput: img.qualityRawOutput || null,
+          evalTemplateHash: img.evalTemplateHash || null,
           issuesSummary: img.issuesSummary || null,
           verdict: img.verdict || null,
           imageVersions: img.imageVersions || [],
@@ -6831,6 +6835,61 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`📝 [UNIFIED SAVE] storyCategory: "${storyData.storyCategory}", storyTopic: "${storyData.storyTopic}", storyTheme: "${storyData.storyTheme}"`);
     log.debug(`📝 [UNIFIED SAVE] mainCharacters: ${JSON.stringify(storyData.mainCharacters)}, characters count: ${storyData.characters?.length || 0}`);
 
+    // Persist styled avatars to BOTH story data AND characters table.
+    // MUST run BEFORE upsertStory: storyData.characters is the same array as
+    // inputData.characters, so mutating it here is what puts styledAvatars into
+    // the saved blob. This block used to run ~80 lines below the save, so the
+    // stored story kept empty avatar shells ({styledAvatars:{}}) and every later
+    // cover-Überarbeiten / page-iterate found no usable character avatars.
+    if ((artStyle !== 'realistic' || hasCostumedClothing) && inputData.characters) {
+      try {
+        const styledAvatarsMap = exportStyledAvatarsForPersistence(inputData.characters, artStyle);
+        if (styledAvatarsMap.size > 0) {
+          log.debug(`💾 [UNIFIED] Persisting ${styledAvatarsMap.size} styled avatar sets...`);
+
+          // 1. Save to story data (inputData.characters) - IMPORTANT for repair workflow
+          for (const char of inputData.characters) {
+            const styledAvatars = styledAvatarsMap.get(char.name) || styledAvatarsMap.get(char.name?.trim());
+            if (styledAvatars) {
+              if (!char.avatars) char.avatars = {};
+              if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+              char.avatars.styledAvatars[artStyle] = styledAvatars;
+              log.debug(`   ✓ Story data: ${Object.keys(styledAvatars).length} ${artStyle} avatars for "${char.name}"`);
+            }
+          }
+
+          // 2. Also save to characters table (for character editor)
+          const characterId = `characters_${userId}`;
+          const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
+          if (charResult.rows.length > 0) {
+            // Handle both TEXT and JSONB column types
+            const rawData = charResult.rows[0].data;
+            const charData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+            const chars = charData.characters || [];
+            let updatedCount = 0;
+            for (const dbChar of chars) {
+              // Match by name (trim to handle trailing spaces)
+              const styledAvatars = styledAvatarsMap.get(dbChar.name) || styledAvatarsMap.get(dbChar.name?.trim());
+              if (styledAvatars) {
+                if (!dbChar.avatars) dbChar.avatars = {};
+                if (!dbChar.avatars.styledAvatars) dbChar.avatars.styledAvatars = {};
+                dbChar.avatars.styledAvatars[artStyle] = styledAvatars;
+                updatedCount++;
+              }
+            }
+            if (updatedCount > 0) {
+              charData.characters = chars;
+              await dbPool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
+              log.debug(`💾 [UNIFIED] Updated ${updatedCount} characters in database with ${artStyle} styled avatars`);
+            }
+          }
+        }
+      } catch (persistErr) {
+        log.error('❌ [UNIFIED] Failed to persist styled avatars:', persistErr.message);
+        // Non-fatal - story generation continues
+      }
+    }
+
     log.debug(`💾 [UNIFIED] Saving story to database... (generationLog has ${storyData.generationLog?.length || 0} entries)`);
     await upsertStory(storyId, userId, storyData);
     log.debug(`📚 [UNIFIED] Story ${storyId} saved to stories table`);
@@ -6912,56 +6971,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
       }
       log.debug(`📚 [UNIFIED] Initialized image_version_meta for covers`);
-    }
-
-    // Persist styled avatars to BOTH story data AND characters table
-    if ((artStyle !== 'realistic' || hasCostumedClothing) && inputData.characters) {
-      try {
-        const styledAvatarsMap = exportStyledAvatarsForPersistence(inputData.characters, artStyle);
-        if (styledAvatarsMap.size > 0) {
-          log.debug(`💾 [UNIFIED] Persisting ${styledAvatarsMap.size} styled avatar sets...`);
-
-          // 1. Save to story data (inputData.characters) - IMPORTANT for repair workflow
-          for (const char of inputData.characters) {
-            const styledAvatars = styledAvatarsMap.get(char.name) || styledAvatarsMap.get(char.name?.trim());
-            if (styledAvatars) {
-              if (!char.avatars) char.avatars = {};
-              if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
-              char.avatars.styledAvatars[artStyle] = styledAvatars;
-              log.debug(`   ✓ Story data: ${Object.keys(styledAvatars).length} ${artStyle} avatars for "${char.name}"`);
-            }
-          }
-
-          // 2. Also save to characters table (for character editor)
-          const characterId = `characters_${userId}`;
-          const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
-          if (charResult.rows.length > 0) {
-            // Handle both TEXT and JSONB column types
-            const rawData = charResult.rows[0].data;
-            const charData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-            const chars = charData.characters || [];
-            let updatedCount = 0;
-            for (const dbChar of chars) {
-              // Match by name (trim to handle trailing spaces)
-              const styledAvatars = styledAvatarsMap.get(dbChar.name) || styledAvatarsMap.get(dbChar.name?.trim());
-              if (styledAvatars) {
-                if (!dbChar.avatars) dbChar.avatars = {};
-                if (!dbChar.avatars.styledAvatars) dbChar.avatars.styledAvatars = {};
-                dbChar.avatars.styledAvatars[artStyle] = styledAvatars;
-                updatedCount++;
-              }
-            }
-            if (updatedCount > 0) {
-              charData.characters = chars;
-              await dbPool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
-              log.debug(`💾 [UNIFIED] Updated ${updatedCount} characters in database with ${artStyle} styled avatars`);
-            }
-          }
-        }
-      } catch (persistErr) {
-        log.error('❌ [UNIFIED] Failed to persist styled avatars:', persistErr.message);
-        // Non-fatal - story generation continues
-      }
     }
 
     // Log credit completion (credits were already reserved at job creation)

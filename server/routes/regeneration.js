@@ -2441,6 +2441,24 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       log.info(`🔄 [ITERATE] Page ${pageNumber}: Using model override: ${imageModel}`);
     }
 
+    // Re-hydrate character avatars from the characters table — same as the
+    // cover branch above. The story blob can carry present-but-empty avatar
+    // shells ({styledAvatars:{}}) when generation's styled-avatar persist ran
+    // after the story save; iteratePageCore reads only storyData.characters, so
+    // without this merge those pages iterate with no character reference at all.
+    {
+      const { mergeFreshAvatars } = require('../lib/characterPhotos');
+      const freshPageCharResult = await getDbPool().query(
+        'SELECT data FROM characters WHERE user_id = $1',
+        [req.user.id]
+      );
+      const freshPageCharacters = freshPageCharResult.rows[0]?.data?.characters || [];
+      storyData.characters = mergeFreshAvatars(
+        storyData.characters || [], freshPageCharacters, storyData.artStyle || 'pixar',
+        (msg) => log.debug(`🔄 [ITERATE] Page ${pageNumber}: ${msg}`)
+      );
+    }
+
     // Per-scene layout: 'advanced' stories generate at 1:1 (square + text-below).
     // Iterating a page must keep the scene's saved aspect — otherwise a square
     // page comes back as 3:4 and looks wrong sitting above the text strip sized

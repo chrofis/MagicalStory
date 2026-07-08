@@ -420,6 +420,42 @@ function normalizeCharacterAvatars(characters) {
   return characters;
 }
 
+/**
+ * True when a character carries avatars an iterate/regenerate can actually use:
+ * either a populated styledAvatars entry for the story's art style, or a base
+ * clothing-variant avatar. A present-but-EMPTY shell ({} or {styledAvatars:{}})
+ * counts as unusable — generation can leave that shape on the story blob when
+ * the styled-avatar persist runs after the story save.
+ */
+function hasUsableAvatar(c, artStyleId) {
+  const av = c?.avatars;
+  if (!av || typeof av !== 'object') return false;
+  const styled = artStyleId ? av.styledAvatars?.[artStyleId] : null;
+  const styledOk = !!(styled && typeof styled === 'object' && Object.keys(styled).length > 0);
+  const baseOk = !!(av.standard || av.standardUrl || av.summer || av.summerUrl || av.winter || av.winterUrl);
+  return styledOk || baseOk;
+}
+
+/**
+ * Re-hydrate story-blob characters whose avatars are missing OR unusable from
+ * the fresh characters-table rows (which reliably keep styled + base avatars).
+ * Returns a NEW array; story characters with usable avatars pass through as-is.
+ * Single source of truth for the iterate/regenerate paths (cover + scene page).
+ */
+function mergeFreshAvatars(storyCharacters, freshCharacters, artStyleId, logFn) {
+  if (!Array.isArray(storyCharacters)) return storyCharacters;
+  if (!Array.isArray(freshCharacters) || freshCharacters.length === 0) return storyCharacters;
+  return storyCharacters.map(storyChar => {
+    if (hasUsableAvatar(storyChar, artStyleId)) return storyChar;
+    const freshChar = freshCharacters.find(fc => fc.id === storyChar.id || fc.name === storyChar.name);
+    if (freshChar?.avatars) {
+      if (logFn) logFn(`Using fresh avatars for ${storyChar.name}`);
+      return { ...storyChar, avatars: freshChar.avatars };
+    }
+    return storyChar;
+  });
+}
+
 module.exports = {
   getPhoto,
   getPrimaryPhoto,
@@ -432,6 +468,8 @@ module.exports = {
   loadVbReferenceBytes,
   normalizeAvatarsForResponse,
   normalizeCharacterAvatars,
+  hasUsableAvatar,
+  mergeFreshAvatars,
   // Phase 1 dual-shape readers
   getStandardAvatar,
   getFaceThumb,

@@ -165,18 +165,18 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const coverClothing = parseClothingCategory(sceneDescription) || 'standard';
   const clothingRequirements = convertClothingToCurrentFormat(storyData.clothingRequirements);
 
-  // Merge avatars with fresh characters if provided
-  const mergedCharacters = freshCharacters
-    ? characters.map(storyChar => {
-        if (storyChar.avatars) return storyChar;
-        const freshChar = freshCharacters.find(fc => fc.id === storyChar.id || fc.name === storyChar.name);
-        if (freshChar?.avatars) {
-          log.debug(`🔄 [COVER-ITERATE] ${coverKey}: Using fresh avatars for ${storyChar.name}`);
-          return { ...storyChar, avatars: freshChar.avatars };
-        }
-        return storyChar;
-      })
-    : characters;
+  // Re-hydrate avatars from the fresh characters-table rows. The usable-avatar
+  // check matters: generation can leave a present-but-empty shell on the story
+  // blob ({} or {styledAvatars:{}}) when the styled-avatar persist runs after
+  // upsertStory. The old truthy-existence guard treated that shell as "has
+  // avatars", skipped the fresh merge, and the composite cover then found
+  // neither styled nor base avatars → every figure dropped → "No figures could
+  // be assembled" → character-less Überarbeiten covers.
+  const { mergeFreshAvatars } = require('./characterPhotos');
+  const mergedCharacters = mergeFreshAvatars(
+    characters, freshCharacters, artStyleId,
+    (msg) => log.debug(`🔄 [COVER-ITERATE] ${coverKey}: ${msg}`)
+  );
 
   // Character selection: use cover hints (authoritative) > scene description > fallback
   const MAX_COVER_CHARACTERS = 5;
