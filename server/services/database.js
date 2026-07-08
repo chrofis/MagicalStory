@@ -1579,6 +1579,38 @@ function stripInlineImagesFromStoryData(data) {
 }
 
 /**
+ * Deep-clone story data for the save path (so we can strip inline image bytes
+ * without mutating the caller's object). Clones plain objects and arrays but
+ * SHARES leaf values — strings, Buffers, numbers, Dates — by reference.
+ *
+ * Why not `JSON.parse(JSON.stringify(storyData))`: the round-trip materialises
+ * the ENTIRE story (every inline base64 image) as one string, and a large story
+ * (e.g. 25 pages with full-repair versions + composite intermediates) blows past
+ * V8's ~512MB max string length → "RangeError: Invalid string length", losing a
+ * fully-generated story at the final save.
+ *
+ * Why not `structuredClone`: it turns a Buffer into a Uint8Array whose later
+ * JSON.stringify explodes into one key per byte ({"0":137,"1":80,...}, ~20x
+ * inflation → overflows PG's 256MB jsonb cap). Pipeline data can still carry
+ * Buffers (e.g. visualBibleGrid before R2 upload).
+ *
+ * Sharing leaves is safe here: the save path only ever REASSIGNS or DELETES keys
+ * on the cloned containers (never mutates a shared string/Buffer in place), and
+ * Buffers stay real Buffers so the R2 offload's Buffer.isBuffer() checks work.
+ */
+function cloneForStorage(v) {
+  if (Array.isArray(v)) return v.map(cloneForStorage);
+  if (v !== null && typeof v === 'object' && !Buffer.isBuffer(v) && !(v instanceof Date)) {
+    const out = {};
+    for (const k in v) {
+      if (Object.prototype.hasOwnProperty.call(v, k)) out[k] = cloneForStorage(v[k]);
+    }
+    return out;
+  }
+  return v; // primitives, Buffers, Dates — shared by reference (immutable in this path)
+}
+
+/**
  * Save story data with metadata column for fast list queries.
  * Use this instead of raw UPDATE to ensure metadata stays in sync.
  * OPTIMIZED: Extracts images to story_images table for faster queries.
@@ -1588,13 +1620,10 @@ async function saveStoryData(storyId, storyData) {
     throw new Error('Database mode required');
   }
 
-  // Deep clone to avoid modifying original. Deliberately JSON round-trip, NOT
-  // structuredClone: structuredClone turns a Buffer into a Uint8Array whose
-  // JSON.stringify explodes into one key per byte ({"0":137,"1":80,...}, ~20x
-  // inflation — overflows PG's 256MB jsonb cap), and it throws on function
-  // values the JSON round-trip silently drops. Pipeline data can carry Buffers
-  // (e.g. visualBibleGrid before R2 upload), so the normalization matters.
-  const dataForStorage = JSON.parse(JSON.stringify(storyData));
+  // Clone so we can strip inline image bytes without mutating the caller's
+  // object. See cloneForStorage: avoids both the 512MB-string RangeError of a
+  // JSON round-trip and the Buffer→Uint8Array blowup of structuredClone.
+  const dataForStorage = cloneForStorage(storyData);
   let imagesSaved = 0;
 
   // SPD-4: collect image-insert thunks and run them with bounded concurrency
@@ -1943,8 +1972,10 @@ async function updateStoryDataOnly(storyId, storyData) {
     throw new Error('Database mode required');
   }
 
-  // Deep clone to avoid modifying original
-  const dataForStorage = JSON.parse(JSON.stringify(storyData));
+  // Clone so we can strip inline image bytes without mutating the caller's
+  // object. cloneForStorage avoids the 512MB-string RangeError a JSON round-trip
+  // throws on large stories (25 pages + full-repair versions + composites).
+  const dataForStorage = cloneForStorage(storyData);
   let imagesSaved = 0;
 
   // Strip imageData from scenes (but don't save them - they're already in story_images)
@@ -2037,8 +2068,10 @@ async function upsertStory(storyId, userId, storyData) {
     throw new Error('Database mode required');
   }
 
-  // Deep clone to avoid modifying original
-  const dataForStorage = JSON.parse(JSON.stringify(storyData));
+  // Clone so we can strip inline image bytes without mutating the caller's
+  // object. cloneForStorage avoids the 512MB-string RangeError a JSON round-trip
+  // throws on large stories (25 pages + full-repair versions + composites).
+  const dataForStorage = cloneForStorage(storyData);
   let imagesSaved = 0;
 
   // IMPORTANT: Insert story record FIRST to satisfy foreign key constraint
