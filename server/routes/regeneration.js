@@ -92,6 +92,7 @@ const {
   generateImageWithQualityRetry,
   evaluateImageQuality,
   editImageWithPrompt,
+  sanitizeIssueForInpaint,
   deleteFromImageCache,
   generateImageCacheKey,
   buildVisualBibleGrid,
@@ -3431,7 +3432,9 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
             .filter(Boolean)
             .join('. ');
           log.info(`🔧 [REPAIR] Pass ${pass}: Using Grok text edit with ${combinedIssues.length} issues (quality: ${qualityIssues.length}, semantic: ${semanticIssues.length}): ${editInstruction.substring(0, 200)}`);
-          const sentInstruction = `Fix these issues in this children's book illustration: ${editInstruction}`;
+          // Same entity-grid vocabulary guard as inpaintPage — image models
+          // draw what the prompt names ("cells A, D, F" ends up painted).
+          const sentInstruction = `Fix these issues in this children's book illustration: ${sanitizeIssueForInpaint(editInstruction)}`;
           const editResult = await editImageWithPrompt(currentImageData, sentInstruction);
           if (editResult?.imageData) {
             repairResult = {
@@ -5155,10 +5158,12 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             }
           }
         } else if (!useGeminiRepair && (grokRepairMode || isGrokConfigured())) {
-          // Grok repair modes: blended | cutout | blackout.
+          // Grok repair modes: blended | cutout | blackout | fullScene.
           // Default is decided below once `useFaceOnly` is known:
-          //   - face repair → blended (tight blur on small region)
-          //   - body repair → cutout  (extract figure + inpaint + composite)
+          //   - face repair → blended   (tight blur on small region)
+          //   - body repair → fullScene (magenta crosshatch on the full scene)
+          // (cutout/blackout are only used when explicitly requested via
+          // grokRepairMode — see effectiveMode below.)
 
           const sceneImage = findSceneOrCover(storyData, pageNumber);
           if (!sceneImage || !sceneImage.imageData) {

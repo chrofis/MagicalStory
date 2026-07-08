@@ -112,7 +112,10 @@ const MODEL_DEFAULTS = {
   // Utility models (inspection, visual bible, etc.)
   utility: 'gemini-2.0-flash',         // Fast utility tasks
 
-  // Inpainting backend for auto-repair
+  // DEAD CONFIG (audit 2026-07-09): only read by the never-wired mask-inpaint
+  // dispatcher (inpaintWithMask etc. in images.js — see DEAD CODE banners).
+  // Live inpaint dispatches via IMAGE_MODELS[pageImage].backend instead.
+  // Changing this value changes NOTHING. Kept per user decision (mark, not delete).
   inpaintBackend: 'grok',              // 'gemini', 'runware', or 'grok' ($0.02/repair via Grok edit)
 
   // Image generation backend (can be overridden in dev mode)
@@ -133,6 +136,10 @@ const MODEL_DEFAULTS = {
   // can be re-evaluated against either model later.
   scoreModel: 'prompt',
   // Feature flags for generation pipeline
+  // DEAD CONFIG (audit 2026-07-09): enableAutoRepair is read by nothing — the
+  // in-generation auto-repair branch it gated is unreachable (its function
+  // param defaults false and no caller flips it). Repair happens in
+  // runUnifiedRepairPipeline instead. Kept per user decision (mark, not delete).
   enableAutoRepair: false,             // Auto-repair: inpaint fixable issues (Runware SDXL/FLUX)
   useGridRepair: false,                // Grid-based artifact repair: OFF - we only want character fixes
   enableQualityRetry: false,           // Quality retry: regenerate images scoring below threshold
@@ -332,6 +339,10 @@ const REPAIR_DEFAULTS = {
   issueThreshold: 5,        // Pages with this many fixable issues need redo
   maxPasses: 3,             // Global passes over all pages
   maxCharRepairPages: 20,   // Max pages to character-repair per run (hard ceiling: bounds the worst-case spend even on "Repair All" against a 32-page story)
+  // DEAD CONFIG (audit 2026-07-09): neither threshold below is read anywhere —
+  // the real gate is hardcoded in repairLogic.js decideRepairMethod()
+  // (visualScore<50, semanticScore<30). Note the values DISAGREE (20 vs 50);
+  // wiring these in would change behavior, so they are only marked, not wired.
   semanticThresholdForIterate: 30, // Below this semantic score → iterate (scene fundamentally wrong)
   qualityThresholdForIterate: 20,  // Below this quality score → iterate immediately
   inpaintMaxPasses: 1,             // Inpaint attempts per page per round

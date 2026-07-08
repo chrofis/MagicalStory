@@ -5579,8 +5579,10 @@ function buildRegenFeedback(evaluation) {
   const parts = [];
   // Only include fixable issues (concise) — skip verbose reasoning (can be 5000+ chars)
   if (evaluation.fixableIssues?.length > 0) {
+    // sanitizeIssueForInpaint: entity-grid vocabulary ("cells A, D, F") in an
+    // issue description would otherwise reach the regeneration prompt.
     parts.push('IMPORTANT — Fix these issues from the previous attempt:\n' +
-      evaluation.fixableIssues.map(i => `- ${i.description || i.issue || i}`).join('\n'));
+      evaluation.fixableIssues.map(i => `- ${sanitizeIssueForInpaint(i.description || i.issue || i)}`).join('\n'));
   }
   // Cap total feedback to 2000 chars to stay within prompt limits
   const feedback = parts.join('\n\n');
@@ -5604,6 +5606,9 @@ function buildRegenFeedback(evaluation) {
  * @param {Object} evaluation - { qualityScore, semanticScore, fixableIssues, fixTargets, enrichedFixTargets, semanticResult }
  * @returns {{ strategy: 'inpaint'|'iterate', reason: string }}
  */
+// DEAD CODE (audit 2026-07-09): never called — the real per-page router is
+// decideRepairMethod() in repairLogic.js. Kept per user decision (mark, not
+// delete). The frontend has a third, different chooseRepairStrategy of its own.
 function chooseRepairStrategy(evaluation) {
   // Severity-driven repair routing:
   //   ≥1 CRITICAL  → iterate  (structural defect — missing character/object,
@@ -6075,6 +6080,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     coverTextSuffix = `\n\nPRESERVE EXISTING TEXT — CRITICAL: this image is a book cover. Do NOT modify, remove, distort, or re-letter the following pre-existing text:\n${lines.join('\n')}\nWhile fixing the issues listed above, leave every letter of these texts pixel-perfect. If a fix would overlap the text area, work around it.`;
   }
 
+  // Strip entity-grid vocabulary ("cells A, D, F", "the reference (R)")
+  // before the instruction reaches the image model — image models DRAW what
+  // a prompt names. Previously only character-repair prompts were guarded.
+  editInstruction = sanitizeIssueForInpaint(editInstruction);
   const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${quietZoneSuffix}${coverTextSuffix}`;
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
@@ -9513,11 +9522,12 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       } : null
     };
   } else if (useCutout) {
-    // ── Cut-out mode: extract the figure's bbox + 20% padding, send to Grok
-    // as an inpaint-style replacement, composite back with a feathered edge.
-    // The surrounding 20% padding gives Grok visual context but the prompt
-    // tells it not to change anything outside the figure. The feathered
-    // composite hides any small edge mismatches so the seam is invisible.
+    // ── Cut-out mode: extract the figure's bbox + 40% padding (PAD_FACTOR
+    // below), send to Grok as an inpaint-style replacement, composite back
+    // with a feathered edge. The surrounding padding gives Grok visual
+    // context but the prompt tells it not to change anything outside the
+    // figure. The feathered composite hides any small edge mismatches so
+    // the seam is invisible.
     const sceneMeta = await sharp(sceneBuffer).metadata();
     const pixelLeft = Math.max(0, Math.floor(xmin * sceneMeta.width));
     const pixelTop = Math.max(0, Math.floor(ymin * sceneMeta.height));
@@ -11512,6 +11522,11 @@ async function getImageDimensions(imageData) {
  * @param {number[]} boundingBox - [ymin, xmin, ymax, xmax] normalized 0-1000
  * @returns {Promise<string>} Base64 mask image (black background, white rectangle)
  */
+// DEAD CODE (audit 2026-07-09): zero live callers. Part of the mask-based
+// inpaint dispatcher from docs/plans/2026-03-25-grok-inpaint-repair.md that
+// was built but never wired in — live inpaint is inpaintPage() → 
+// editImageWithPrompt() (backend from MODEL_DEFAULTS.pageImage). Kept per
+// user decision (mark, do not delete). Do NOT document as live behavior.
 async function createMaskFromBoundingBox(width, height, boundingBox) {
   const [ymin, xmin, ymax, xmax] = boundingBox;
 
@@ -11672,6 +11687,11 @@ function padBoundingBox(bbox, issueType) {
  * @param {Array} bbox - Bounding box [ymin, xmin, ymax, xmax] normalized
  * @returns {Object} { lpipsScore, interpretation, changed } or null if unavailable
  */
+// DEAD CODE (audit 2026-07-09): zero live callers. Part of the mask-based
+// inpaint dispatcher from docs/plans/2026-03-25-grok-inpaint-repair.md that
+// was built but never wired in — live inpaint is inpaintPage() → 
+// editImageWithPrompt() (backend from MODEL_DEFAULTS.pageImage). Kept per
+// user decision (mark, do not delete). Do NOT document as live behavior.
 async function verifyInpaintWithLPIPS(beforeImage, afterImage, bbox = null) {
   try {
     const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
@@ -11733,6 +11753,11 @@ async function verifyInpaintWithLPIPS(beforeImage, afterImage, bbox = null) {
  * @param {Array} bbox - Bounding box [ymin, xmin, ymax, xmax] normalized
  * @returns {Object} { fixed, confidence, explanation } or null
  */
+// DEAD CODE (audit 2026-07-09): zero live callers. Part of the mask-based
+// inpaint dispatcher from docs/plans/2026-03-25-grok-inpaint-repair.md that
+// was built but never wired in — live inpaint is inpaintPage() → 
+// editImageWithPrompt() (backend from MODEL_DEFAULTS.pageImage). Kept per
+// user decision (mark, do not delete). Do NOT document as live behavior.
 async function verifyInpaintWithLLM(beforeImage, afterImage, issueDescription, fixDescription, bbox = null) {
   try {
     const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -11843,6 +11868,11 @@ Output JSON only:
  * @param {Array} targets - Array of {boundingBox, issue, fixPrompt}
  * @returns {Object} { lpips, llm, success }
  */
+// DEAD CODE (audit 2026-07-09): zero live callers. Part of the mask-based
+// inpaint dispatcher from docs/plans/2026-03-25-grok-inpaint-repair.md that
+// was built but never wired in — live inpaint is inpaintPage() → 
+// editImageWithPrompt() (backend from MODEL_DEFAULTS.pageImage). Kept per
+// user decision (mark, do not delete). Do NOT document as live behavior.
 async function verifyInpaintResult(beforeImage, afterImage, targets) {
   if (!targets || targets.length === 0) {
     return { lpips: null, llm: null, success: true };
@@ -11904,6 +11934,11 @@ async function verifyInpaintResult(beforeImage, afterImage, targets) {
  * @param {Array} fixTargets - Array of {boundingBox, faceBox?, bodyBox?, issue, fixPrompt}
  * @returns {Object} Grouped targets: { faceTargets, anatomyTargets, objectTargets }
  */
+// DEAD CODE (audit 2026-07-09): zero live callers. Part of the mask-based
+// inpaint dispatcher from docs/plans/2026-03-25-grok-inpaint-repair.md that
+// was built but never wired in — live inpaint is inpaintPage() → 
+// editImageWithPrompt() (backend from MODEL_DEFAULTS.pageImage). Kept per
+// user decision (mark, do not delete). Do NOT document as live behavior.
 function groupFixTargetsForInpainting(fixTargets) {
   const faceTargets = [];
   const anatomyTargets = [];
@@ -11972,6 +12007,11 @@ function groupFixTargetsForInpainting(fixTargets) {
  * @param {Array<number[]>} boundingBoxes - Array of [ymin, xmin, ymax, xmax] normalized 0.0-1.0
  * @returns {Promise<string>} Base64 mask image (black background, white rectangles for all boxes)
  */
+// DEAD CODE (audit 2026-07-09): zero live callers. Part of the mask-based
+// inpaint dispatcher from docs/plans/2026-03-25-grok-inpaint-repair.md that
+// was built but never wired in — live inpaint is inpaintPage() → 
+// editImageWithPrompt() (backend from MODEL_DEFAULTS.pageImage). Kept per
+// user decision (mark, do not delete). Do NOT document as live behavior.
 async function createCombinedMask(width, height, boundingBoxes) {
   if (!boundingBoxes || boundingBoxes.length === 0) {
     throw new Error('No bounding boxes provided');
@@ -12155,6 +12195,11 @@ async function blackoutIssueRegions(imageBase64, fixTargets, padding = 0.05) {
  * @param {Object} options - Runware options
  * @returns {Promise<{imageData: string, usage: Object, modelId: string}|null>}
  */
+// DEAD CODE (audit 2026-07-09): zero live callers. Part of the mask-based
+// inpaint dispatcher from docs/plans/2026-03-25-grok-inpaint-repair.md that
+// was built but never wired in — live inpaint is inpaintPage() → 
+// editImageWithPrompt() (backend from MODEL_DEFAULTS.pageImage). Kept per
+// user decision (mark, do not delete). Do NOT document as live behavior.
 async function inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt, existingMask = null, options = {}) {
   try {
     const { inpaintWithRunware, downloadRunwareImage, isRunwareConfigured } = require('./runware');
@@ -12233,6 +12278,11 @@ async function inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt
  * @param {Object} options - Additional options
  * @returns {Promise<{imageData: string, modelId: string, usage?: Object, fullPrompt: string}>}
  */
+// DEAD CODE (audit 2026-07-09): zero live callers. Part of the mask-based
+// inpaint dispatcher from docs/plans/2026-03-25-grok-inpaint-repair.md that
+// was built but never wired in — live inpaint is inpaintPage() → 
+// editImageWithPrompt() (backend from MODEL_DEFAULTS.pageImage). Kept per
+// user decision (mark, do not delete). Do NOT document as live behavior.
 async function inpaintWithGrokBackend(originalImage, boundingBoxes, fixPrompt, options = {}) {
   // 1. Create whiteout overlay on all bounding box regions
   const origBase64 = r2Lib.stripDataUriPrefix(originalImage);
@@ -12377,6 +12427,11 @@ async function inpaintWithGrokBackend(originalImage, boundingBoxes, fixPrompt, o
  * @param {string} options.runwareModel - Runware model to use (default: 'runware:101@1' SDXL)
  * @returns {Promise<{imageData: string, usage?: Object, modelId?: string}|null>}
  */
+// DEAD CODE (audit 2026-07-09): zero live callers. Part of the mask-based
+// inpaint dispatcher from docs/plans/2026-03-25-grok-inpaint-repair.md that
+// was built but never wired in — live inpaint is inpaintPage() → 
+// editImageWithPrompt() (backend from MODEL_DEFAULTS.pageImage). Kept per
+// user decision (mark, do not delete). Do NOT document as live behavior.
 async function inpaintWithMask(originalImage, boundingBoxes, fixPrompt, maskImage = null, options = {}) {
   const {
     backend = MODEL_DEFAULTS.inpaintBackend || 'runware',
@@ -14298,6 +14353,7 @@ module.exports = {
   runUnifiedRepairPipeline,
   chooseRepairStrategy,
   inpaintPage,
+  sanitizeIssueForInpaint,
 
   // Active repair primitives
   classifyIssues,
