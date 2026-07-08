@@ -2509,7 +2509,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
 
       // Defensive strip — `images`/`covers` mirror sceneImages/coverImages structure,
       // so the walker drops any base64 still piggybacked through mergeFields.
-      stripInlineImagesFromStoryData({ sceneImages: images, coverImages: covers });
+      stripInlineImagesFromStoryData({ sceneImages: images, coverImages: covers }, { keepDisplayBytes: true });
       return res.json({ images, covers });
     }
 
@@ -2567,7 +2567,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
 
     console.log(`📷 [BATCH-FALLBACK] ${id} - ${images.length} pages, ${Object.keys(covers).length} covers, ${Date.now() - startTime}ms`);
 
-    stripInlineImagesFromStoryData({ sceneImages: images, coverImages: covers });
+    stripInlineImagesFromStoryData({ sceneImages: images, coverImages: covers }, { keepDisplayBytes: true });
     return res.json({ images, covers });
 
   } catch (err) {

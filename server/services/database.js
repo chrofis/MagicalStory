@@ -1274,7 +1274,7 @@ async function extractInlineImagesToR2(storyId, data) {
  *
  * Mutates `data` in place. Idempotent.
  */
-function stripInlineImagesFromStoryData(data) {
+function stripInlineImagesFromStoryData(data, { keepDisplayBytes = false } = {}) {
   if (!data || typeof data !== 'object') return;
 
   // Helpers — these preserve real http(s) URLs (left in place for readers)
@@ -1571,6 +1571,11 @@ function stripInlineImagesFromStoryData(data) {
     }
     for (const k of Object.keys(node)) {
       if (PRESERVE_KEYS.has(k)) continue; // per-story avatars, no other source
+      // Read-path responses (GET /:id/images) legitimately carry inline bytes
+      // in imageData when a row has no R2 URL (upload failed / R2 unconfigured)
+      // — the documented bytes-only fallback. Sweeping those blanked real
+      // pages/covers for the client. Write paths never set this flag.
+      if (keepDisplayBytes && k === 'imageData') continue;
       if (typeof node[k] === 'string') { if (looksLikeBytes(node[k])) node[k] = undefined; }
       else sweepBytes(node[k]);
     }
