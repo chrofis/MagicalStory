@@ -430,24 +430,28 @@ async function callGrokEdit(promptOrImgs, imgBuf, { aspectRatio = '3:4', model =
 // ─── Resolve the styled costumed avatar for a character ────────────────
 function getCostumedAvatarSrc(c, artStyle) {
   const styled = c.avatars?.styledAvatars?.[artStyle];
-  if (!styled) return null;
-  const costumedObj = styled.costumed;
-  if (costumedObj && typeof costumedObj === 'object') {
-    // costumed is keyed by costume description: { "medieval swiss huntsman": "data:..." }
-    const first = Object.values(costumedObj)[0];
-    if (typeof first === 'string') return first;
-    if (first && typeof first === 'object') return first.imageUrl || first.imageData;
-  } else if (typeof costumedObj === 'string') {
-    return costumedObj;
-  }
-  // Fall back to standard in the same art style
-  {
+  // Prefer the style-specific costumed → styled-standard avatar when present.
+  if (styled) {
+    const costumedObj = styled.costumed;
+    if (costumedObj && typeof costumedObj === 'object') {
+      // costumed is keyed by costume description: { "medieval swiss huntsman": "data:..." }
+      const first = Object.values(costumedObj)[0];
+      if (typeof first === 'string') return first;
+      if (first && typeof first === 'object') return first.imageUrl || first.imageData;
+    } else if (typeof costumedObj === 'string') {
+      return costumedObj;
+    }
+    // Fall back to standard in the same art style
     const v = styled.standard;
     if (typeof v === 'string') return v;
     if (v && typeof v === 'object') return v.imageUrl || v.imageData;
   }
-  // Last resort: base standard avatar (dual-shape — NEW `avatars.standard`
-  // (URL string) wins, OLD `avatars.standardUrl` / inline form falls back).
+  // Last resort: the base standard avatar, tried EVEN WHEN no style-specific
+  // styled avatar exists for this art style. Previously an absent
+  // styledAvatars[artStyle] returned null here, so a character with a perfectly
+  // good base avatar was silently dropped from the composite (all figures gone →
+  // "No figures could be assembled" → character-less fallback cover). Pass 1's
+  // Grok edit restyles the figure anyway, so a base avatar is a fine input.
   return getStandardAvatar(c, 'standard');
 }
 

@@ -51,11 +51,22 @@ class UnifiedStoryParser {
         .split('\n')
         .map(l => l.match(/^\s*\d+[.)]\s*(.+?)\s*$/))
         .filter(Boolean)
-        .map(m => m[1].trim()
-          .replace(/^\*{1,2}|\*{1,2}$/g, '')
-          .replace(/^"|"$/g, '')
-          .replace(/^\[|\]$/g, '')
-          .trim())
+        .map(m => {
+          let t = m[1].trim();
+          // The model emits each candidate as `**Title** — <angle>: <description>`
+          // (it labels the VARY-ANGLE facet the prompt asked for). Keep ONLY the
+          // bolded title — the old code only stripped `**` at the very start/end
+          // of the line, so the CLOSING `**` (mid-line) and the trailing
+          // "— character-focused: ..." annotation leaked into the saved title.
+          const bold = t.match(/^\*{1,2}([^*]+?)\*{1,2}/);
+          if (bold) t = bold[1];
+          else t = t.split(/\s+[—–-]\s+/)[0]; // no bold: cut at the annotation dash
+          return t
+            .replace(/^\*{1,2}|\*{1,2}$/g, '')
+            .replace(/^"|"$/g, '')
+            .replace(/^\[|\]$/g, '')
+            .trim();
+        })
         .filter(s => s.length > 0 && !/^\[.*\]$/.test(s));
       if (candidates.length > 0) {
         // Deterministic pick: stableCandidateIndex hashes the candidates and
