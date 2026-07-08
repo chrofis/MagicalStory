@@ -3407,11 +3407,16 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
             .filter(Boolean)
             .join('. ');
           log.info(`🔧 [REPAIR] Pass ${pass}: Using Grok text edit with ${combinedIssues.length} issues (quality: ${qualityIssues.length}, semantic: ${semanticIssues.length}): ${editInstruction.substring(0, 200)}`);
-          const editResult = await editImageWithPrompt(currentImageData, `Fix these issues in this children's book illustration: ${editInstruction}`);
+          const sentInstruction = `Fix these issues in this children's book illustration: ${editInstruction}`;
+          const editResult = await editImageWithPrompt(currentImageData, sentInstruction);
           if (editResult?.imageData) {
             repairResult = {
               repaired: true,
               imageData: editResult.imageData,
+              // The literal instruction sent to the model — the version used
+              // to store only the original scene prompt, so "what edit did
+              // this pass actually request" was unreconstructable.
+              editInstruction: sentInstruction,
               repairs: combinedIssues.map(i => ({
                 issue: i.description || i.issue || 'fixed',
                 method: 'grok-text-edit',
@@ -3481,6 +3486,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           fixTargets: postEvalResult.fixTargets || []
         } : null,
         repairDetails: repairResult.repairHistory || [],
+        editInstruction: repairResult.editInstruction || null,
         timestamp: new Date().toISOString()
       });
 
@@ -5323,6 +5329,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               updatedImages: [{ pageNumber, imageData: grokResult.imageData }],
               method: grokResult.method,
               usage: grokResult.usage,
+              promptSent: grokResult.promptSent || null,
               debug: grokResult.debug || null,
               comparison: {
                 before: sceneImage.imageData,
@@ -5374,6 +5381,25 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       }
     }
 
+    // Failed/rejected repairs used to live only in this HTTP response — gone
+    // on reload, so "why did this repair fail" was undiagnosable. Persist
+    // each failure into the page's retryHistory (the inpaint endpoint's
+    // pattern); the save path R2-extracts the diagnostic images.
+    let charRepairFailuresRecorded = false;
+    const recordRepairFailure = (pageNumber, characterName, entry) => {
+      const target = findSceneOrCover(storyData, pageNumber);
+      if (!target) return;
+      target.retryHistory = target.retryHistory || [];
+      target.retryHistory.push({
+        attempt: target.retryHistory.length + 1,
+        type: 'char_repair_failed',
+        character: characterName,
+        timestamp: new Date().toISOString(),
+        ...entry,
+      });
+      charRepairFailuresRecorded = true;
+    };
+
     for (const apiResult of apiResults) {
       if (!apiResult) continue;
       const { task, repairResult, error, failReason } = apiResult;
@@ -5383,6 +5409,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
       if (error) {
         charResult.pagesFailed.push({ pageNumber, reason: failReason });
+        recordRepairFailure(pageNumber, characterName, { reason: failReason });
         continue;
       }
 
@@ -5408,6 +5435,14 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           reason,
           rejected: repairResult.rejected || false,
           comparison: repairResult.comparison || null
+        });
+        recordRepairFailure(pageNumber, characterName, {
+          reason,
+          rejected: repairResult.rejected || false,
+          method: repairResult.method || null,
+          promptSent: repairResult.promptSent || null,
+          blackoutImage: repairResult.comparison?.blackoutImage || null,
+          grokRawResult: repairResult.comparison?.grokRawResult || null,
         });
         continue;
       }
@@ -5472,6 +5507,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             charRepairGrokRaw: repairResult.grokRawResult || repairResult.comparison?.grokRawResult || null,
             charRepairBlendMask: repairResult.blendMask || repairResult.comparison?.blendMask || null,
             charRepairWhiteout: repairResult.blackoutImage || repairResult.comparison?.blackoutImage || null,
+            // The filled repair template actually sent (O3) — `prompt` on this
+            // version is the original scene prompt, not the repair instruction.
+            charRepairPrompt: repairResult.promptSent || null,
             ...(isMagicApiMethod && repairResult.cropHistory && { cropHistory: repairResult.cropHistory })
           });
 
@@ -5532,6 +5570,16 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             afterScore,
             afterReasoning,
           });
+      }
+    }
+
+    // Persist recorded failures when no successful update already saved the
+    // story (successes call saveStoryData per update inside the loop).
+    if (charRepairFailuresRecorded) {
+      try {
+        await saveStoryData(id, storyData);
+      } catch (saveErr) {
+        log.warn(`[REPAIR-WORKFLOW] Could not persist repair-failure history: ${saveErr.message}`);
       }
     }
 

@@ -3790,6 +3790,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         qualityModelId: qualityResult?.qualityModelId ?? null,
         usage: result.usage,
         grokRefImages: refImages.length > 0 ? refImages : undefined,
+        // Prompt actually sent (may be truncated to Grok's max) — completes
+        // the reconstruction record next to the refs.
+        prompt: grokPrompt,
       };
 
       imageCache.set(cacheKey, finalResult);
@@ -4071,7 +4074,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         issuesSummary: qualityResult?.issuesSummary || null,
         qualityModelId: qualityResult?.qualityModelId ?? null,
         imageUsage: result.usage,
-        qualityUsage: qualityResult?.usage ?? null
+        qualityUsage: qualityResult?.usage ?? null,
+        // Reconstruction record (see Gemini/Grok branches).
+        prompt: effectivePrompt,
+        grokRefImages: referenceImages?.length > 0 ? referenceImages : undefined
       };
     } catch (runwareError) {
       log.error('❌ [IMAGE GEN] Runware generation failed:', runwareError.message);
@@ -4152,6 +4158,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         // CONFIG_DEFAULTS.imageBackend='gemini' but grok-imagine's modelConfig
         // says backend='grok') always had grokRefImages=null in the DB.
         grokRefImages: refImages.length > 0 ? refImages : undefined,
+        // Prompt actually sent (may be truncated to the model's max) —
+        // completes the reconstruction record next to the refs.
+        prompt: effectivePrompt,
       };
     } catch (grokError) {
       log.error(`❌ [IMAGE GEN] Grok generation failed (model-routed), falling back to Gemini: ${grokError.message}`);
@@ -4323,7 +4332,18 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           qualityModelId,  // Include which model was used for quality evaluation
           thinkingText, // Gemini thinking/reasoning text (if available)
           imageUsage: imageUsage,  // Token usage for image generation
-          qualityUsage: qualityUsage  // Token usage for quality evaluation
+          qualityUsage: qualityUsage,  // Token usage for quality evaluation
+          // Reconstruction record: prompt + reference images actually sent in
+          // this call. This branch (Gemini — the fallback when Grok fails)
+          // recorded neither, so exactly the generations that already had a
+          // failure were unreconstructable. grokRefImages is the historical
+          // field name for "refs sent to the image model" — the save path
+          // R2-extracts it and the dev viewer displays it. parts[0] holds the
+          // exact sent text (post-truncation when a model cap applied).
+          prompt: parts[0]?.text || prompt,
+          grokRefImages: parts
+            .filter(p => p.inline_data)
+            .map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`)
         };
         imageCache.set(cacheKey, result);
         log.verbose('💾 [IMAGE CACHE] Stored in cache. Total cached:', imageCache.size, 'images');
@@ -4707,7 +4727,9 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
         imageData: result.imageData,
         prompt: effectivePrompt,
         modelId: result.modelId,
-        usage: result.usage
+        usage: result.usage,
+        // Reconstruction record — refs were built above but never stamped.
+        grokRefImages: referenceImages.length > 0 ? referenceImages : undefined
       };
 
       if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
@@ -4904,11 +4926,17 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
             const result = {
               imageData: compressedImageData,
-              prompt: effectivePrompt,
+              // parts[0] holds the exact sent text — after a safety block the
+              // sanitized/rewritten prompt, not the original.
+              prompt: parts[0]?.text || effectivePrompt,
               modelId,
               thinkingText,
               usage,
-              sanitizationLevel // Track which level succeeded
+              sanitizationLevel, // Track which level succeeded
+              // Reconstruction record — refs were in parts but never stamped.
+              grokRefImages: parts
+                .filter(p => p.inline_data)
+                .map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`)
             };
 
             if (!skipCache) imageCache.set(genOnlyCacheKey, result);
@@ -6894,7 +6922,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         includeDebug: true,
       });
     } catch (err) {
-      return { pageNumber, imageData: null, error: err.message };
+      return { pageNumber, imageData: null, method, error: err.message };
     }
 
     if (!repairResult?.imageData || repairResult.imageData.length < 1000) {
@@ -6925,7 +6953,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       blendMask: repairResult.blendMask || repairResult.comparison?.blendMask || null,
       croppedAvatar: repairResult.croppedAvatar || repairResult.comparison?.croppedAvatar || null,
       method: repairResult.method || 'grok_blended',
-      prompt: repairResult.debug?.prompt || null,
+      // promptSent is always returned; debug.prompt only when includeDebug.
+      prompt: repairResult.promptSent || repairResult.debug?.prompt || null,
       avatarSent: repairResult.debug?.avatarSent || repairResult.croppedAvatar || null,
       bbox: repairResult.debug?.bbox || null,
     });
@@ -7172,7 +7201,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 grokRefImages: null,
               };
             }
-            return { pageNumber, imageData: null, error: 'inpaint produced no result' };
+            return { pageNumber, imageData: null, method, error: 'inpaint produced no result' };
           }
           if (method === 'iterate') {
             const result = await executeIterateAction(img, latestEval);
@@ -7210,19 +7239,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 compositeAttempts,
               };
             }
-            return { pageNumber, imageData: null, error: 'iterate produced no result' };
+            return { pageNumber, imageData: null, method, error: 'iterate produced no result' };
           }
           if (method === 'char-fix') {
             const result = await executeCharFixAction(img, decision, round);
             if (result?.imageData) {
               return result;
             }
-            return { pageNumber, imageData: null, error: result?.error || 'char-fix produced no result' };
+            return { pageNumber, imageData: null, method, error: result?.error || 'char-fix produced no result' };
           }
-          return { pageNumber, imageData: null, error: `unknown method ${method}` };
+          return { pageNumber, imageData: null, method, error: `unknown method ${method}` };
         } catch (err) {
           log.error(`❌ [UNIFIED PIPELINE] Round ${round} ${method} failed for page ${pageNumber}: ${err.message}`);
-          return { pageNumber, imageData: null, error: err.message };
+          return { pageNumber, imageData: null, method, error: err.message };
         }
       }))
       );
@@ -7233,6 +7262,23 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const roundSuccess = roundResults.filter(r => r.imageData);
     const roundDuration = ((Date.now() - roundStart) / 1000).toFixed(1);
     log.info(`✅ [UNIFIED PIPELINE] Round ${round}: ${roundSuccess.length}/${badPages.length} repaired in ${roundDuration}s`);
+
+    // Failed round attempts used to vanish (filtered out above, log-only) —
+    // "why didn't round 2 fix this page" was undiagnosable afterwards.
+    // Record each failure on the page's retryHistory so it persists.
+    for (const f of roundResults.filter(r => r && !r.imageData)) {
+      const img = rawImages.find(i => i.pageNumber === f.pageNumber);
+      if (!img) continue;
+      img.retryHistory = img.retryHistory || [];
+      img.retryHistory.push({
+        attempt: img.retryHistory.length + 1,
+        type: 'round_repair_failed',
+        round,
+        method: f.method || null,
+        error: f.error || 'no result',
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     // Run fresh entity consistency AND quality eval in parallel. They're
     // independent — `evaluateImageBatch` doesn't consume the entity report
@@ -9429,6 +9475,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       character: charName,
       usage: grokResult.usage,
       method,
+      // The filled repair template actually sent — always returned (small
+      // text) so the endpoint can persist it; heavy debug images stay gated.
+      promptSent: prompt,
       // Debug: what was sent to Grok (for dev panel inspection) — gated by options.includeDebug
       debug: options.includeDebug ? {
         prompt,
@@ -9695,6 +9744,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       character: charName,
       usage: grokResult.usage,
       method,
+      // The filled repair template actually sent — always returned (small
+      // text) so the endpoint can persist it; heavy debug images stay gated.
+      promptSent: prompt,
       debug: options.includeDebug ? {
         prompt,
         sceneSent: regionDataUri,
@@ -10215,6 +10267,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       character: charName,
       usage: grokResult.usage,
       method,
+      // The filled repair template actually sent — always returned (small
+      // text) so the endpoint can persist it; heavy debug images stay gated.
+      promptSent: prompt,
       debug: options.includeDebug ? {
         prompt,
         sceneSent: sentToGrokDataUri,
@@ -10634,12 +10689,14 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             currentPrompt = currentPrompt.replace(originalScene, rewrittenScene);
             wasSceneRewritten = true;
 
-            // Record the rewrite attempt
+            // Record the rewrite attempt — full scene text, not a 200-char
+            // truncation: the whole point of this entry is reconstructing
+            // what the rewrite changed.
             retryHistory.push({
               attempt: attempts,
               type: 'safety_block_rewrite',
-              originalScene: originalScene.substring(0, 200),
-              rewrittenScene: rewrittenScene.substring(0, 200),
+              originalScene,
+              rewrittenScene,
               rewriteUsage: rewriteResult.usage,
               error: error.message,
               timestamp: new Date().toISOString()
@@ -10661,6 +10718,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         attempt: attempts,
         type: 'generation_failed',
         error: error.message,
+        // The prompt this failed attempt was sent with (post-rewrite when a
+        // safety rewrite preceded it) — failed attempts left no trace of it.
+        prompt: currentPrompt,
         timestamp: new Date().toISOString()
       });
 
@@ -10714,6 +10774,10 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       actualText: result.actualText,
       imageData: result.imageData,  // Include for dev mode Generierungshistorie
       modelId: result.modelId,
+      // What was actually sent on THIS attempt — the rejected image was kept
+      // but "what did we send on attempt 2" was unanswerable without these.
+      prompt: result.prompt || null,
+      grokRefImages: result.grokRefImages || null,
       timestamp: new Date().toISOString()
     });
 
