@@ -335,7 +335,7 @@ router.get('/orders', authenticateToken, async (req, res) => {
 
       // Fetch credit purchases
       const creditPurchasesQuery = `
-        SELECT id, amount, balance_after, reference_id, description, created_at
+        SELECT id, amount, balance_after, reference_id, description, price_cents, created_at
         FROM credit_transactions
         WHERE user_id = $1 AND transaction_type = 'purchase'
         ORDER BY created_at DESC
@@ -343,18 +343,27 @@ router.get('/orders', authenticateToken, async (req, res) => {
       const creditRows = await dbQuery(creditPurchasesQuery, [req.user.id]);
 
       // Map credit purchases to order-like format
-      const creditOrders = creditRows.map(tx => ({
-        id: `credit-${tx.id}`,
-        type: 'credits',
-        creditsAmount: tx.amount,
-        balanceAfter: tx.balance_after,
-        description: tx.description,
-        amount: Math.round((tx.amount / 100) * 500), // CHF 5 per 100 credits
-        currency: 'chf',
-        paymentStatus: 'paid',
-        orderStatus: 'completed',
-        createdAt: tx.created_at
-      }));
+      const creditOrders = creditRows.map(tx => {
+        // Actual paid amount: price_cents (written by the Stripe webhook); rows from
+        // before that column existed only carry it in the description text.
+        let priceCents = tx.price_cents;
+        if (priceCents == null) {
+          const match = /\(CHF (\d+(?:\.\d+)?)\)/.exec(tx.description || '');
+          priceCents = match ? Math.round(parseFloat(match[1]) * 100) : null;
+        }
+        return {
+          id: `credit-${tx.id}`,
+          type: 'credits',
+          creditsAmount: tx.amount,
+          balanceAfter: tx.balance_after,
+          description: tx.description,
+          amount: priceCents,
+          currency: 'chf',
+          paymentStatus: 'paid',
+          orderStatus: 'completed',
+          createdAt: tx.created_at
+        };
+      });
 
       // Add type to book orders and combine
       const typedOrders = orders.map(o => ({ ...o, type: 'book' }));

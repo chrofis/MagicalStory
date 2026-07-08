@@ -387,11 +387,15 @@ async function initializeDatabase() {
         transaction_type VARCHAR(50) NOT NULL,
         reference_id VARCHAR(255),
         description TEXT,
+        price_cents INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_id ON credit_transactions(user_id)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_credit_transactions_type ON credit_transactions(transaction_type)`);
+    // Actual amount paid (Stripe amount_total) for 'purchase' rows — packages have
+    // volume discounts, so the price cannot be derived from the credit count.
+    await dbPool.query(`ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS price_cents INT`);
     // The Stripe webhook idempotency check filters by reference_id (=session_id)
     // and runs inside the 10s webhook response window. Without this index, the
     // lookup degrades to a sequential scan as credit_transactions grows. Partial

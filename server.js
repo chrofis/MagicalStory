@@ -805,9 +805,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               // this INSERT throws on a true duplicate, so the transaction
               // rolls back without granting credits.
               await dbClient.query(`
-                INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-                VALUES ($1, $2, $3, 'purchase', $4, $5)
-              `, [userId, creditsToAdd, newCredits, fullSession.id, `Purchased ${creditsToAdd} credits via Stripe (CHF ${(amountPaid / 100).toFixed(2)})`]);
+                INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description, price_cents)
+                VALUES ($1, $2, $3, 'purchase', $4, $5, $6)
+              `, [userId, creditsToAdd, newCredits, fullSession.id, `Purchased ${creditsToAdd} credits via Stripe (CHF ${(amountPaid / 100).toFixed(2)})`, amountPaid]);
 
               await dbClient.query('COMMIT');
 

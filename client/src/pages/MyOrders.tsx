@@ -34,7 +34,7 @@ interface Order {
   balanceAfter?: number;
   description?: string;
   // Shared fields
-  amount: number;
+  amount: number | null;  // credit purchases from before price_cents existed may lack it
   currency: string;
   paymentStatus: string;
   orderStatus: string;
@@ -152,12 +152,14 @@ function CreditOrderCard({
             </span>{' '}
             {formatDate(order.createdAt)}
           </p>
-          <p>
-            <span className="font-medium">
-              {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant:' : 'Amount:'}
-            </span>{' '}
-            {formatAmount(order.amount, order.currency)}
-          </p>
+          {order.amount != null && (
+            <p>
+              <span className="font-medium">
+                {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant:' : 'Amount:'}
+              </span>{' '}
+              {formatAmount(order.amount, order.currency)}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -232,12 +234,14 @@ function BookOrderCard({
             </span>{' '}
             {formatDate(order.createdAt)}
           </p>
-          <p>
-            <span className="font-medium">
-              {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant:' : 'Amount:'}
-            </span>{' '}
-            {formatAmount(order.amount, order.currency)}
-          </p>
+          {order.amount != null && (
+            <p>
+              <span className="font-medium">
+                {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant:' : 'Amount:'}
+              </span>{' '}
+              {formatAmount(order.amount, order.currency)}
+            </p>
+          )}
           {order.shippingAddress && (
             <p>
               <span className="font-medium">
