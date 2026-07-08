@@ -5136,7 +5136,9 @@ async function evaluateImageBatch(images, options = {}) {
   const {
     concurrency = 100,
     qualityModelOverride = null,
-    visualBible = null
+    visualBible = null,
+    clothingRequirements = null,
+    artStyle = null
   } = options;
 
   if (!images || images.length === 0) {
@@ -5204,9 +5206,26 @@ async function evaluateImageBatch(images, options = {}) {
       if (img.sceneCharacters && img.sceneCharacters.length > 0) {
         characterDescriptions = {};
         for (const char of img.sceneCharacters) {
+          // Resolve each category through the story's clothingRequirements
+          // (signature → description → avatars.clothing fallback) — raw
+          // avatars.clothing is character-level metadata that can be stale
+          // across stories, so the evaluator judged against the wrong outfit.
+          let clothingDescriptions = char.avatars?.clothing || {};
+          if (clothingRequirements) {
+            const { buildClothingDescription } = require('./entityConsistency');
+            const categories = new Set([
+              ...Object.keys(char.avatars?.clothing || {}),
+              ...Object.keys(clothingRequirements?.[char.name] || {}),
+            ]);
+            const resolved = {};
+            for (const cat of categories) {
+              resolved[cat] = buildClothingDescription(char, cat, artStyle, clothingRequirements);
+            }
+            clothingDescriptions = resolved;
+          }
           characterDescriptions[char.name] = {
             richDescription: getStoryHelpers().buildCharacterPhysicalDescription(char),
-            clothingDescriptions: char.avatars?.clothing || {}
+            clothingDescriptions
           };
         }
       } else {
@@ -6347,7 +6366,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   // Run both in parallel
   const [evaluations, entityReport] = await Promise.all([
-    evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible }),
+    evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle }),
     runEntityConsistencyChecks(imageCheckData, characters, {
       checkCharacters: true,
       // Objects (LOC/ART/VEH/ANI) are NOT cross-page identity entities — a boat
@@ -6414,7 +6433,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
   const baselineEvalsByPage = new Map();
   if (baselineEvalInputs.length > 0) {
-    const baselineEvals = await evaluateImageBatch(baselineEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible });
+    const baselineEvals = await evaluateImageBatch(baselineEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle });
     for (const ev of baselineEvals) {
       baselineEvalsByPage.set(ev.pageNumber, ev);
       if (ev.usage && usageTracker) {
@@ -7250,7 +7269,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           saveGrids: false,
           onHeartbeat: pingHeartbeat
         }),
-        evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible }),
+        evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle }),
       ]);
 
       if (freshEntityResult.status === 'fulfilled') {
@@ -7380,7 +7399,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
     if (rescueEntries.length > 0) {
       log.info(`🛟 [UNIFIED PIPELINE] Step 3b: best score < ${RESCUE_THRESHOLD} on ${rescueEntries.length} page(s) with an unscored original — evaluating originals: ${rescueEntries.map(r => r.pageNumber).join(', ')}`);
-      const rescueEvals = await evaluateImageBatch(buildEvalInputs(rescueEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible });
+      const rescueEvals = await evaluateImageBatch(buildEvalInputs(rescueEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle });
       for (const ev of rescueEvals) {
         const entry = rescueEntries.find(r => r.pageNumber === ev.pageNumber);
         if (!entry) continue;

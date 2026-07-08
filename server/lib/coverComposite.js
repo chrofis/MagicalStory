@@ -886,7 +886,7 @@ The background of this image is a real photograph of a specific landmark. DO NOT
 YOUR EDIT (in this order):
 1. Apply ${styleHint} stylistically across the whole image — soft watercolor brushstrokes, paper texture, gentle wash. The buildings keep their EXACT geometry, only their rendering changes from photographic to painted.
 2. The figures (already painted with interactive poses) are the foreground — render them as if painted directly into the scene: the same watercolor texture, palette, and lighting as the background, their hair and body edges flowing naturally into their surroundings as one continuous illustration. Repaint each figure's outline so it belongs to the scene. DO NOT change their poses.
-3. REPAINT THE GROUND ONLY beneath/around the figures' feet so it reads as a continuation of the actual ground material the landmark stands on (cobblestone, paving stones, plaza, dirt, grass, sand, snow — whichever matches the landmark). Make the transition invisible. Do not extend ground OVER the buildings.${textLine}
+3. REPAINT THE GROUND ONLY beneath/around the figures' feet so it reads as a continuation of the actual ground material the landmark stands on (cobblestone, paving stones, plaza, dirt, grass, sand, snow — whichever matches the landmark). Every figure must stand on SOLID GROUND — feet flat on a stable surface. NO figure stands in or on water: if a figure's feet fall over water, paint a small natural bank, shoreline, or stepping stones under them so they stand firmly on land. Make the transition invisible. Keep this to the small area right under the feet — do not extend ground OVER the buildings or pave over the wider water.${textLine}
 
 PRESERVE EXACTLY:
 - Every building, window, roofline, doorway — they are correct in the input.

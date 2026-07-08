@@ -118,7 +118,7 @@ const {
   buildFullVisualBiblePrompt
 } = require('../lib/visualBible');
 const { applyStyledAvatars } = require('../lib/styledAvatars');
-const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
+const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing, collectEntityAppearances, buildClothingDescription } = require('../lib/entityConsistency');
 const { getActiveIndexAfterPush, arrayToDbIndex } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
@@ -3093,7 +3093,10 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       // Server's canonical pointer to the now-displayed version.
       activeVersion: newVersionIndex,
       imageVersions: updatedVersions.map(v => ({
-        imageData: v.imageData,
+        // Saved versions have bytes moved to R2 (imageData deleted, imageUrl
+        // left behind) — without the fallback every older version serialized
+        // empty and the picker thumbnails went blank after a regenerate.
+        imageData: v.imageData || v.imageUrl,
         qualityScore: v.qualityScore,
         description: v.description,
         createdAt: v.createdAt,
@@ -5233,8 +5236,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             bbox = [repairBox.y, repairBox.x, repairBox.y + repairBox.height, repairBox.x + repairBox.width];
           }
 
-          // Get clothing description for the prompt
-          const clothingDesc = character.avatars?.clothing?.[clothingCategory] || '';
+          // Get clothing description for the prompt. Resolved through the
+          // story's clothingRequirements first — raw avatars.clothing is
+          // character-level metadata that can be stale across stories and
+          // redressed repairs in an old outfit.
+          const clothingDesc = buildClothingDescription(character, clothingCategory, artStyle, storyData.clothingRequirements) || '';
 
           // Get scene description for context (what is the character doing?)
           const sceneDesc = sceneImage.description || sceneImage.translatedDescription || '';

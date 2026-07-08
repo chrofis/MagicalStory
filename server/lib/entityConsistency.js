@@ -1273,7 +1273,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
             && !styledForArt.winter
             && !styledForArt.summer;
           const fallbackCategory = onlyHasCostumed ? 'costumed' : 'standard';
-          const clothingCategory = charClothing[name] || fallbackCategory;
+          // Case-insensitive lookup — scene metadata can key characterClothing
+          // with different casing than the canonical character name, and an
+          // exact-key miss silently degraded the eval to the fallback category.
+          const charClothingKey = Object.keys(charClothing)
+            .find(k => k.toLowerCase() === name.toLowerCase());
+          const clothingCategory = (charClothingKey && charClothing[charClothingKey]) || fallbackCategory;
           // Resolve category to actual clothing description.
           // buildClothingDescription prefers this story's clothingRequirements
           // (signature → description) and only falls back to avatars.clothing,
