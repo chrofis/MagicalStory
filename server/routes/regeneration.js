@@ -2269,6 +2269,12 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
           name: p.name, photoType: p.photoType,
           clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
         })),
+        // O6: iterateCover returns these but they were dropped here — the
+        // landmark photo, VB grid, and packed Grok refs for a direct-path
+        // cover were unviewable after reload. Save path R2-extracts them.
+        grokRefImages: imageResult.grokRefImages || null,
+        landmarkPhotos: imageResult.landmarkPhotos || null,
+        visualBibleGrid: imageResult.visualBibleGrid || null,
         bboxDetection: imageResult.bboxDetection || null,
         compositeAttempts,
       };

@@ -829,6 +829,10 @@ If any figure still has arms at their sides, the task has failed. If the backgro
         pass1Prompt,
         pass1ModelId: pass1.modelId,
         pass1ElapsedMs: pass1.elapsedMs,
+        // O6: the clean plate BEFORE figures were pasted, and each character's
+        // extracted cutout — these were local variables, unviewable afterwards.
+        plate: baseLayer,
+        figureCutouts: figures.map(f => ({ name: f.name, image: f.buffer })),
       },
     };
   }
@@ -924,6 +928,11 @@ DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generi
       pass2Prompt,
       pass2ModelId: pass2.modelId,
       pass2ElapsedMs: pass2.elapsedMs,
+      // O6: clean plate + per-character cutouts (see single-pass branch).
+      // For two-pass the plate is the resized landmark photo before the
+      // figure cutout was composited onto it.
+      plate: landmarkResized,
+      figureCutouts: figures.map(f => ({ name: f.name, image: f.buffer })),
     },
   };
 }
@@ -959,6 +968,12 @@ function buildCompositeAttemptsFromDebug(compositeDebug) {
     prompt: compositeDebug.pass1Prompt || null,
     modelId: compositeDebug.pass1ModelId || null,
     elapsedMs: compositeDebug.pass1ElapsedMs || null,
+    // O6: the clean plate before figures + each character's cutout. The save
+    // path's generic extract sweep uploads these to R2 like the pass images.
+    plate: bufToDataUrl(compositeDebug.plate, 'image/jpeg'),
+    cutouts: Array.isArray(compositeDebug.figureCutouts)
+      ? compositeDebug.figureCutouts.map(fc => ({ name: fc.name, image: bufToDataUrl(fc.image, 'image/png') }))
+      : null,
   };
   if (!compositeDebug.pass2Input) {
     return [pass1];

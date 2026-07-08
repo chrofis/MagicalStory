@@ -1329,6 +1329,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     } else {
       evaluationTemplate = null;
     }
+    // O7: hash of the template that produced this score. Prompt-file edits
+    // silently change what a historical score means — the hash makes each
+    // stored eval traceable to its template version.
+    const evalTemplateHash = evaluationTemplate
+      ? require('crypto').createHash('md5').update(evaluationTemplate).digest('hex').slice(0, 8)
+      : null;
 
     // Determine model to use (parameter override > config default > fallback)
     // let: may be reassigned to fallback model on content block
@@ -1947,6 +1953,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         verdict,
         reasoning,
         rawOutput: responseText,              // Full unparsed API response (for dev testing)
+        evalTemplateHash,                     // Template version that produced this score
         issuesSummary: combinedIssuesSummary,
         textIssue,
         fixTargets: jsonFixTargets,       // Legacy format with bboxes (backwards compat)
@@ -2038,6 +2045,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         threeStageScore: threeStageResult?.score ?? null, // Three-stage compliance score (0-100)
         reasoning,
         rawOutput: responseText,              // Full unparsed API response
+        evalTemplateHash,                     // Template version that produced this score
         issuesSummary,
         fixTargets,
         semanticResult,
@@ -7226,6 +7234,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 modelId: result.modelId,
                 grokRefImages: result.grokRefImages || null,
                 referencePhotos: result.referencePhotos || null,
+                // O6: direct-path covers — iterateCover returns these; they
+                // were dropped here, leaving the landmark/VB-grid refs
+                // unviewable after reload.
+                landmarkPhotos: result.landmarkPhotos || null,
+                visualBibleGrid: result.visualBibleGrid || null,
                 // Capture the iterate's actual image prompt — this is the
                 // feedback-augmented prompt that was sent to Grok (built in
                 // iteratePageCore line ~7250 + appended evaluation feedback at
@@ -7743,6 +7756,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       prompt: v.prompt || img.prompt || null,
       grokRefImages: v.grokRefImages || null,
       referencePhotos: v.referencePhotos || null,
+      // O6: direct-path cover refs (landmark photo, VB grid) — captured by
+      // the iterate action, previously dropped at this conversion.
+      landmarkPhotos: v.landmarkPhotos || null,
+      visualBibleGrid: v.visualBibleGrid || null,
       inpaintInstruction: v.inpaintInstruction || null,
       inpaintReferenceImages: v.inpaintReferenceImages || null,
       textSpaceCoveragePct: v.textSpaceCoveragePct ?? null,
@@ -7816,6 +7833,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       qualityReasoning: finalEval?.reasoning ?? null,
       semanticScore: finalEval?.semanticScore ?? null,
       semanticResult: finalEval?.semanticResult ?? null,
+      // O7: verbatim eval model output (quality JSON + three-stage) and the
+      // template hash — evaluateImageQuality returns rawOutput, but this
+      // mapping dropped it, so historical scores couldn't be re-derived.
+      qualityRawOutput: finalEval?.rawOutput ?? null,
+      threeStageResult: finalEval?.threeStageResult ?? null,
+      evalTemplateHash: finalEval?.evalTemplateHash ?? null,
       issuesSummary: finalEval?.issuesSummary ?? null,
       verdict: finalEval?.verdict ?? null,
       fixTargets: finalEval?.enrichedFixTargets || finalEval?.fixTargets || [],

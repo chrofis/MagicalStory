@@ -910,7 +910,9 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             pageNumber: a.pageNumber, faceBox: a.faceBox || null,
             bodyBox: a.bodyBox || null, clothing: a.clothing || clothingCategory,
           })),
-          ...(evalResult.parseError && { parseError: true, rawResponse: evalResult.rawResponse })
+          // O7: raw output persisted for successful evals too (was error-only)
+          ...(evalResult.rawResponse && { rawResponse: evalResult.rawResponse }),
+          ...(evalResult.parseError && { parseError: true })
         };
 
         // Aggregate stats
@@ -1064,7 +1066,9 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             issues: evalResult.issues || [],
             summary: evalResult.summary,
             // Include debug info for parse failures
-            ...(evalResult.parseError && { parseError: true, rawResponse: evalResult.rawResponse })
+            // O7: raw output persisted for successful evals too (was error-only)
+          ...(evalResult.rawResponse && { rawResponse: evalResult.rawResponse }),
+          ...(evalResult.parseError && { parseError: true })
           };
 
           // Aggregate
@@ -1983,6 +1987,9 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
       score: parsed.score ?? 10,
       issues,
       summary: parsed.summary || 'Evaluation complete',
+      // O7: verbatim model output — was kept only on parse failure, so a
+      // successful eval's raw judgment was unreconstructable afterwards.
+      rawResponse: text,
       usage: response.usageMetadata
     };
 

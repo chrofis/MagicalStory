@@ -1620,6 +1620,11 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         // Grok branch — edit endpoint with face photo as reference.
         if (useGrok) {
           log.info(`[AVATAR JOB ${jobId}] 🎨 Generating ${category} via Grok (${selectedModel})`);
+          // O2 observability: refsSent/attempts/lastError travel back on the
+          // result so the job can persist which photo derivatives were sent
+          // and how the retries went — avatar retries used to leave no trail.
+          const grokRefs = facePhoto ? [finalPhoto, facePhoto] : [finalPhoto];
+          let lastErrorMsg = null;
           for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
             if (attempt > 0) {
               log.info(`[AVATAR JOB ${jobId}] 🔄 Retry ${attempt}/${MAX_RETRIES} for ${category} (Grok)...`);
@@ -1630,7 +1635,6 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               // face provides identity at full resolution (the face area in the
               // body crop is tiny — ~100px in a 432-wide canvas — too small for
               // Grok to faithfully replicate in the face-dominant top quadrants).
-              const grokRefs = facePhoto ? [finalPhoto, facePhoto] : [finalPhoto];
               const result = await editWithGrok(avatarPrompt, grokRefs, {
                 aspectRatio: '9:16',
                 resolution: '1k',
@@ -1643,16 +1647,17 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
                 if (attempt > 0) {
                   log.info(`[AVATAR JOB ${jobId}] ✅ ${category} succeeded on Grok retry ${attempt}`);
                 }
-                return { category, imageData: compressedImage, prompt: avatarPrompt, inputTokens: 0, outputTokens: 0 };
+                return { category, imageData: compressedImage, prompt: avatarPrompt, refsSent: grokRefs, attempts: attempt + 1, inputTokens: 0, outputTokens: 0 };
               }
             } catch (grokErr) {
+              lastErrorMsg = grokErr.message;
               log.warn(`[AVATAR JOB ${jobId}] Grok ${category} attempt ${attempt + 1} failed: ${grokErr.message}`);
               if (attempt >= MAX_RETRIES) {
-                return { category, imageData: null, prompt: avatarPrompt, inputTokens: 0, outputTokens: 0 };
+                return { category, imageData: null, prompt: avatarPrompt, refsSent: grokRefs, attempts: attempt + 1, lastError: lastErrorMsg, inputTokens: 0, outputTokens: 0 };
               }
             }
           }
-          return { category, imageData: null, prompt: avatarPrompt, inputTokens: 0, outputTokens: 0 };
+          return { category, imageData: null, prompt: avatarPrompt, refsSent: grokRefs, attempts: MAX_RETRIES + 1, lastError: lastErrorMsg, inputTokens: 0, outputTokens: 0 };
         }
 
         // Build request body matching the sync CLOTHING AVATARS path
@@ -1829,9 +1834,14 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     job.progress = 70;
     job.message = 'Processing avatars...';
 
-    // Aggregate token usage
-    for (const { category, prompt, inputTokens, outputTokens } of generatedAvatars) {
+    // Aggregate token usage + O2 generation metadata (retry trail, refs sent)
+    results.generationMeta = {};
+    for (const { category, prompt, refsSent, attempts, lastError, inputTokens, outputTokens } of generatedAvatars) {
       if (prompt) results.prompts[category] = prompt;
+      if (attempts) results.generationMeta[category] = { attempts, ...(lastError && { lastError }) };
+      // Refs are the same body-cutout + face-crop pair for every category —
+      // keep one copy for the persistence step to upload to R2.
+      if (refsSent && !results.avatarRefsSent) results.avatarRefsSent = refsSent;
       if (inputTokens > 0 || outputTokens > 0) {
         if (!results.tokenUsage.byModel[geminiModelId]) {
           results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0 };
@@ -2277,9 +2287,33 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             // onlyIfNoUrl / onlyMissingThumbs are hoisted to module scope.
             const fbThumbs = onlyMissingThumbs(results.faceThumbnails, results.faceThumbnailsUrl);
             const bbThumbs = onlyMissingThumbs(results.bodyThumbnails, results.bodyThumbnailsUrl);
+
+            // O2: persist WHICH photo derivatives were sent to Grok, as R2
+            // URLs (never inline — characters.data stays byte-free). The
+            // prompt was already persisted; the refs were the missing half.
+            let generationRefs = null;
+            if (results.avatarRefsSent?.length) {
+              try {
+                const r2 = require('../lib/r2');
+                if (r2.isConfigured()) {
+                  const slots = ['body', 'face'];
+                  const refUrls = {};
+                  await Promise.all(results.avatarRefsSent.slice(0, 2).map(async (img, i) => {
+                    const u = await r2.uploadImage(img, `characters/${job.userId}/${characterId}/avatar-refs/${slots[i]}-${r2Version}.jpg`);
+                    if (u) refUrls[slots[i]] = u;
+                  }));
+                  if (Object.keys(refUrls).length) generationRefs = refUrls;
+                }
+              } catch (refErr) {
+                log.warn(`[AVATAR JOB ${jobId}] avatar-ref R2 upload skipped: ${refErr.message}`);
+              }
+            }
+
             const newAvatarData = {
               status: 'complete',
               generatedAt: new Date().toISOString(),
+              ...(generationRefs && { generationRefs }),
+              ...(results.generationMeta && Object.keys(results.generationMeta).length > 0 && { generationLog: results.generationMeta }),
               ...(fbThumbs && { faceThumbnails: fbThumbs }),
               ...(bbThumbs && { bodyThumbnails: bbThumbs }),
               ...(onlyIfNoUrl(results.standard, results.standardUrl) && { standard: results.standard }),
