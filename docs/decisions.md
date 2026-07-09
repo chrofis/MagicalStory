@@ -1054,3 +1054,45 @@ The optimization surface is the HOMEPAGE→/try path (CTA prominence, homepage
 conversion), never the ad final URL.
 **Touched:** none (status quo confirmed).
 **Status:** ✅ final.
+
+## 2026-07-09 — Storage & observability overhaul: what shipped, what's deferred, what's dead-by-decision
+
+**Context:** Four-agent audit of image storage (R2 completeness), the version
+viewer, prompt/output logging, and repair-method docs. Full findings in the
+session; fixes shipped across `ba2d2f92..50d79c26`.
+
+**Decisions:**
+- **Dead code is MARKED, not deleted** (user decision): the mask-inpaint
+  dispatcher (`inpaintWithMask` + 8 siblings in images.js), server
+  `chooseRepairStrategy`, `MODEL_DEFAULTS.inpaintBackend`,
+  `enableAutoRepair`, and the two unread `REPAIR_DEFAULTS` iterate
+  thresholds all carry DEAD CODE/CONFIG banners. Do not document them as
+  live; do not wire the thresholds in without recalibrating (their values
+  disagree with the hardcoded gates in repairLogic.js).
+- **Eval calls have a 120s timeout** (stuck-at-51% incident 2026-07-07):
+  abort → withRetry → skip-eval-and-continue. A hung provider call can no
+  longer freeze a job.
+- **grokRefImages is the model-agnostic "refs sent" field**: all
+  callGeminiAPIForImage/generateImageOnly branches stamp prompt + refs on
+  their results (name kept for save-path + viewer compat).
+- **Character source photos upload to R2 at write time**; the wizard's
+  echoed base64 never overwrites a stored URL; the backfill script no
+  longer self-blinds (marker doesn't exclude rows). Full prod backfill run
+  2026-07-09: 31 rows, 77 MB reclaimed.
+- **Cover retryHistory persists to story_retry_images under negative page
+  numbers** (frontCover -1, initialPage -2, backCover -3).
+
+**Deferred (deliberately, not forgotten):**
+- `saveStoryData`/`upsertStory` ~150-line duplication merge — highest-risk
+  write path; needs its own session with an end-to-end story-save
+  validation run.
+- Deleting the `/images` SLOW blob path — blocked: 11 prod stories (mostly
+  Jan 2026) still have no story_images rows. Migrate them first (re-save
+  through saveStoryData), then delete.
+- R2 orphan cleanup on character delete + checkpoint cleanup on job
+  failure — improvement, not selected in this round.
+**Touched:** server/lib/images.js, sceneValidator.js, entityConsistency.js,
+coverComposite.js, scoring.js, services/database.js, routes/regeneration.js,
+routes/avatars.js, routes/characters.js, routes/stories.js, config/models.js,
+server.js, client repairDefaults.ts, scripts/admin/backfill-character-photos.js,
+docs/codebase-guide.md, docs/image-generation-methods.html.
