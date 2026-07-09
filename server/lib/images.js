@@ -9033,6 +9033,26 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     useCutout = false;
     useFullScene = !defaultToBlended;
   }
+
+  // Guard: cutout extracts the character bbox + 40% padding and grows it to a
+  // Grok aspect preset (computePresetAlignedExtract). When detection returns a
+  // near-full-frame bbox — common for a foreground adult or a mis-sized UNKNOWN
+  // box — the extract covers most of the scene, so Grok repaints nearly the whole
+  // page and the feathered composite stamps that full-frame redraw back, reading
+  // as a "huge artifact"/style drift over the page. In that case a bbox-cutout is
+  // degenerate: fall back to full-scene inpaint (mask-hatch over the figure),
+  // which repaints only the masked region.
+  if (useCutout && Array.isArray(bbox) && bbox.length === 4) {
+    const bboxW = Math.max(0, bbox[2] - bbox[0]);
+    const bboxH = Math.max(0, bbox[3] - bbox[1]);
+    const bboxArea = bboxW * bboxH;
+    if (bboxArea > 0.5 || bboxW > 0.85 || bboxH > 0.85) {
+      log.warn(`👤 [CHAR REPAIR GROK] ${charName}: bbox is ${Math.round(bboxW * 100)}%×${Math.round(bboxH * 100)}% (area ${Math.round(bboxArea * 100)}%) — cutout would repaint most of the page; falling back to full-scene inpaint`);
+      useCutout = false;
+      useFullScene = true;
+    }
+  }
+
   const method = useBlended ? 'grok_blended' : useCutout ? 'grok_cutout' : useFullScene ? 'grok_inpaint' : 'grok_blackout';
 
   // Hoisted so every branch (blended / cutout / fullScene / blackout) can read

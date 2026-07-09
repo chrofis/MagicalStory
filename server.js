@@ -3673,18 +3673,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
         }
 
-        // Back cover is a main-characters-only group portrait (same rule as title page).
-        // Drop any supporting characters Claude may have listed in the hint.
-        if (coverType === 'backCover' && coverCharacters.length > 0) {
+        // The FRONT cover (coverType 'titlePage' → stored as frontCover) and the
+        // BACK cover are both main-characters-only group portraits. Drop any
+        // supporting characters Claude listed in the hint. Previously only
+        // backCover dropped them, so the front cover fed the WHOLE cast to the
+        // generator even when the outline scoped its description to the single
+        // main character — producing a family portrait the evaluator then flagged
+        // "N characters vs a single character" every pass, and round-3 inpaint
+        // bluntly deleting all-but-one figure (often the WRONG one).
+        if ((coverType === 'backCover' || coverType === 'titlePage') && coverCharacters.length > 0) {
           const isMainChar = (c) =>
             c.isMainCharacter === true ||
             (inputData.mainCharacters?.length > 0 && inputData.mainCharacters.includes(c.id));
           const mainOnly = coverCharacters.filter(isMainChar);
-          if (mainOnly.length !== coverCharacters.length) {
-            const dropped = coverCharacters.filter(c => !isMainChar(c)).map(c => c.name).join(', ');
-            log.info(`📕 [COVER] backCover: Dropping non-main characters: ${dropped}`);
+          // If NO character qualifies as main, keep the original list rather than
+          // emptying the cover — better a full-cast cover than an empty one.
+          if (mainOnly.length > 0) {
+            if (mainOnly.length !== coverCharacters.length) {
+              const dropped = coverCharacters.filter(c => !isMainChar(c)).map(c => c.name).join(', ');
+              log.info(`📕 [COVER] ${coverType}: Dropping non-main characters: ${dropped}`);
+            }
+            coverCharacters = mainOnly;
           }
-          coverCharacters = mainOnly;
         }
 
         // Final fallback for title page: use main characters or all characters
@@ -6940,44 +6950,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
     }
 
-    // Initialize image_version_meta with active versions for all pages.
-    // The pipeline's Step 7 (pick-best) already picked the winner and stamped it
-    // onto scene.bestSource. We honor that decision directly by finding the
-    // version whose `source` matches `bestSource`. This correctly handles cases
-    // where a character-fix version made things worse than the pre-fix best.
-    if (storyData.sceneImages?.length > 0) {
-      for (const scene of storyData.sceneImages) {
-        if (scene.imageVersions?.length > 0) {
-          let activeIdx = -1;
-          // Primary: match bestSource from Step 7 pick-best
-          if (scene.bestSource) {
-            activeIdx = scene.imageVersions.findIndex(v => v.source === scene.bestSource);
-          }
-          // Fallback: highest qualityScore
-          if (activeIdx < 0) {
-            let bestScore = -1;
-            for (let i = 0; i < scene.imageVersions.length; i++) {
-              const s = scene.imageVersions[i].qualityScore;
-              if (s != null && s > bestScore) { bestScore = s; activeIdx = i; }
-            }
-          }
-          if (activeIdx < 0) activeIdx = scene.imageVersions.length - 1;
-          await setActiveVersion(storyId, scene.pageNumber, activeIdx);
-        }
-      }
-      log.debug(`📚 [UNIFIED] Initialized image_version_meta for ${storyData.sceneImages.length} pages`);
-    }
-
-    // Initialize image_version_meta for covers too (covers always have one version — use last)
-    if (storyData.coverImages) {
-      for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
-        const cover = storyData.coverImages[coverType];
-        if (cover?.imageVersions?.length > 0) {
-          await setActiveVersion(storyId, coverType, cover.imageVersions.length - 1);
-        }
-      }
-      log.debug(`📚 [UNIFIED] Initialized image_version_meta for covers`);
-    }
+    // Active versions are already set by recomputeAllActiveVersions() inside
+    // upsertStory() (above) — the canonical pickBestVersionIndex/finalScore path,
+    // the same one saveStoryData and the regen routes use.
+    //
+    // A manual override used to run HERE, AFTER upsertStory, and clobbered that
+    // correct result: for scenes it fell back to the legacy `qualityScore` field
+    // (which applyScore no longer writes → always null → picked the LAST version),
+    // and for covers it unconditionally picked `imageVersions.length - 1` (the last
+    // version, ignoring score). That left a lower-scoring version active on many
+    // stories — e.g. a cover whose v3 scored 100 stuck showing v2 at 63. Removed;
+    // upsertStory's recompute is the single source of truth.
 
     // Log credit completion (credits were already reserved at job creation)
     try {
