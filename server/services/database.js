@@ -1637,6 +1637,27 @@ async function saveStoryData(storyId, storyData) {
   if (!isDatabaseMode()) {
     throw new Error('Database mode required');
   }
+  return persistStoryToDatabase(storyId, storyData, { firstSave: false });
+}
+
+/**
+ * Single implementation of "write a story + its images to the database".
+ * Called by saveStoryData (updates) and upsertStory (first save). The two
+ * used to be ~150-line near-copies that had already diverged once (the v0
+ * single-writer rule existed only in saveStoryData) — every save-path fix
+ * had to be made twice, and this week's cover-retryHistory fix was exactly
+ * the kind that historically landed in only one copy.
+ *
+ * firstSave semantics: the story has no (relevant) story_images rows yet, so
+ * the top-level v0 write always runs (hasSeparateImages treated as false —
+ * matches upsertStory's historical unconditional v0 write). The old
+ * upsertStory wrote top-level v0 first and let imageVersions[0] overwrite it
+ * sequentially ("original is canonical at v0"); the v0 single-writer skip
+ * below produces the identical final state without depending on write order,
+ * so both modes share it.
+ */
+async function persistStoryToDatabase(storyId, storyData, { firstSave = false } = {}) {
+  const TAG = firstSave ? 'UPSERT' : 'SAVE';
 
   // Clone so we can strip inline image bytes without mutating the caller's
   // object. See cloneForStorage: avoids both the 512MB-string RangeError of a
@@ -1670,7 +1691,8 @@ async function saveStoryData(storyId, storyData) {
   // Check if this story already has images in the separate story_images table.
   // If so, DON'T re-save v0 imageData (it would overwrite originals with rehydrated active versions).
   // Only save NEW imageVersions entries and strip all imageData from the blob.
-  const hasSeparateImages = await hasStorySeparateImages(storyId);
+  // First save: no rows exist yet — always write v0.
+  const hasSeparateImages = firstSave ? false : await hasStorySeparateImages(storyId);
 
   // Extract and save scene images to story_images table
   if (dataForStorage.sceneImages && Array.isArray(dataForStorage.sceneImages)) {
@@ -1841,7 +1863,7 @@ async function saveStoryData(storyId, storyData) {
 
   const metadata = buildStoryMetadata(storyData);
   if (imagesSaved > 0) {
-    console.log(`💾 [SAVE] Extracted ${imagesSaved} images to story_images for ${storyId}`);
+    console.log(`💾 [${TAG}] Extracted ${imagesSaved} images to story_images for ${storyId}`);
   }
   await dbQuery(
     'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3',
@@ -1857,10 +1879,10 @@ async function saveStoryData(storyId, storyData) {
     const { recomputeAllActiveVersions } = require('../lib/scoring');
     const summary = await recomputeAllActiveVersions(storyId, dataForStorage);
     if (summary.switches > 0) {
-      console.log(`🏆 [SAVE] Active version recomputed: ${summary.scenes} scenes, ${summary.covers} covers`);
+      console.log(`🏆 [${TAG}] Active version recomputed: ${summary.scenes} scenes, ${summary.covers} covers`);
     }
   } catch (err) {
-    console.warn(`⚠️  [SAVE] Active version recompute failed for ${storyId}: ${err.message}`);
+    console.warn(`⚠️  [${TAG}] Active version recompute failed for ${storyId}: ${err.message}`);
   }
 }
 
@@ -2095,12 +2117,6 @@ async function upsertStory(storyId, userId, storyData) {
     throw new Error('Database mode required');
   }
 
-  // Clone so we can strip inline image bytes without mutating the caller's
-  // object. cloneForStorage avoids the 512MB-string RangeError a JSON round-trip
-  // throws on large stories (25 pages + full-repair versions + composites).
-  const dataForStorage = cloneForStorage(storyData);
-  let imagesSaved = 0;
-
   // IMPORTANT: Insert story record FIRST to satisfy foreign key constraint
   // story_images references stories.id, so story must exist before saving images
   const metadata = buildStoryMetadata(storyData);
@@ -2118,156 +2134,15 @@ async function upsertStory(storyId, userId, storyData) {
     [storyId, userId, JSON.stringify({}), JSON.stringify(metadata), shareToken]
   );
 
-  // Extract and save scene images to story_images table
-  if (dataForStorage.sceneImages && Array.isArray(dataForStorage.sceneImages)) {
-    const emptySceneCount = dataForStorage.sceneImages.filter(i => !!i.emptySceneImage).length;
-    if (emptySceneCount > 0) console.log(`🎬 [UPSERT] ${emptySceneCount} pages have emptySceneImage data`);
-    for (const img of dataForStorage.sceneImages) {
-      if (img.imageData) {
-        // Save to story_images table
-        await saveStoryImage(storyId, 'scene', img.pageNumber, img.imageData, {
-          qualityScore: img.finalScore ?? img.qualityScore ?? img.score,
-          generatedAt: img.generatedAt,
-          versionIndex: 0
-        });
-        imagesSaved++;
-        // Remove imageData from storage (keep metadata)
-        delete img.imageData;
-      }
-      // Also save image versions
-      if (img.imageVersions && Array.isArray(img.imageVersions)) {
-        for (let i = 0; i < img.imageVersions.length; i++) {
-          const version = img.imageVersions[i];
-          if (version.imageData) {
-            await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
-              qualityScore: version.finalScore ?? version.qualityScore ?? version.score,
-              generatedAt: version.generatedAt,
-              versionIndex: arrayToDbIndex(i, 'scene')
-            });
-            imagesSaved++;
-            delete version.imageData;
-          }
-        }
-      }
-
-      // Save retry history images to separate table and strip from data blob
-      if (img.retryHistory?.length) {
-        await saveRetryHistoryImages(storyId, img.pageNumber, img.retryHistory);
-        for (const entry of img.retryHistory) {
-          delete entry.imageData;
-          delete entry.bboxOverlayImage;
-          delete entry.originalImage;
-          delete entry.annotatedOriginal;
-          if (entry.grids) {
-            for (const grid of entry.grids) {
-              // Handle both property naming conventions
-              delete grid.imageData;
-              delete grid.repairedImageData;
-              delete grid.original;
-              delete grid.repaired;
-            }
-          }
-        }
-      }
-      // Save empty scene image separately and set flag for lazy loading (same as saveStoryData)
-      if (img.emptySceneImage) {
-        await saveStoryImage(storyId, 'empty_scene', img.pageNumber, img.emptySceneImage);
-        imagesSaved++;
-        img.hasEmptySceneImage = true;
-      }
-      imagesSaved += await persistCompositeDebug(storyId, img);
-      delete img.originalImage;
-      delete img.preEntityRepairImage;
-      delete img.emptySceneImage;
-    }
-  }
-
-  // Extract and save cover images to story_images table
-  const coverTypes = ['frontCover', 'initialPage', 'backCover'];
-  console.log(`💾 [UPSERT] Processing covers for ${storyId}: ${Object.keys(dataForStorage.coverImages || {}).join(', ') || 'none'}`);
-  for (const coverType of coverTypes) {
-    // Normalize legacy string covers to object format
-    if (dataForStorage.coverImages?.[coverType]) {
-      dataForStorage.coverImages[coverType] = normalizeCoverValue(dataForStorage.coverImages[coverType]);
-    }
-    const coverData = dataForStorage.coverImages?.[coverType];
-    if (coverData) {
-      const imageData = coverData.imageData;
-      console.log(`💾 [UPSERT] Cover ${coverType}: hasData=${!!imageData}, dataLength=${imageData?.length || 0}, versions=${coverData.imageVersions?.length || 0}`);
-      if (imageData) {
-        await saveStoryImage(storyId, coverType, null, imageData, {
-          qualityScore: coverData.finalScore ?? coverData.qualityScore ?? null,
-          generatedAt: coverData.generatedAt || null,
-          versionIndex: 0
-        });
-        imagesSaved++;
-        console.log(`✅ [UPSERT] Saved ${coverType} to story_images (${imageData.length} chars)`);
-        delete coverData.imageData;
-      }
-      // Also save imageVersions (so the version picker can load every variant —
-      // original + character-fix + iterate). Order matters: imageVersions[0] is
-      // the original, so saving it after the top-level (best) image overwrites
-      // v=0 with the original, putting the canonical history into the DB.
-      if (coverData.imageVersions && Array.isArray(coverData.imageVersions)) {
-        for (let i = 0; i < coverData.imageVersions.length; i++) {
-          const version = coverData.imageVersions[i];
-          if (version.imageData && !version._rehydrated) {
-            await saveStoryImage(storyId, coverType, null, version.imageData, {
-              qualityScore: version.finalScore ?? version.qualityScore ?? version.score ?? null,
-              generatedAt: version.generatedAt || null,
-              versionIndex: arrayToDbIndex(i, coverType)
-            });
-            imagesSaved++;
-          }
-          delete version.imageData;
-          delete version._rehydrated;
-        }
-      }
-
-      // Cover retryHistory bytes → story_retry_images (negative cover page
-      // numbers), mirroring saveStoryData. The strip below hard-deletes these
-      // from the blob; without this call they were destroyed on first save.
-      if (coverData.retryHistory?.length) {
-        const coverPageNum = { frontCover: -1, initialPage: -2, backCover: -3 }[coverType];
-        await saveRetryHistoryImages(storyId, coverPageNum, coverData.retryHistory);
-      }
-    }
-  }
-
-  // Push every remaining inline image (debug overlays, Grok/inpaint refs,
-  // entity grids, repair comparison images, landmark photos, VB-location
-  // refs, styled-avatar inputs) up to R2, replacing inline base64 with the
-  // public R2 URL. Then strip preserves URLs and clears anything that didn't
-  // make the round-trip. Same flow as saveStoryData — without this the
-  // unified-pipeline save kept the entire 100MB+ debug payload inline.
-  await extractInlineImagesToR2(storyId, dataForStorage);
-  stripInlineImagesFromStoryData(dataForStorage);
-
-  // Now update the story with full data and final metadata
-  const finalMetadata = buildStoryMetadata(storyData); // Use original for metadata (includes image counts)
-  console.log(`💾 [UPSERT] Updating story ${storyId} with full data (${imagesSaved} images saved to story_images)`);
-
-  await dbQuery(
-    'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3',
-    [JSON.stringify(dataForStorage), JSON.stringify(finalMetadata), storyId]
-  );
-
-  // Same active-version recompute as saveStoryData. The unified pipeline
-  // pushes versions through here; without this hook the picker sees scores
-  // but the activeVersion marker would still point at the last-pushed
-  // (typically lowest-scoring) version.
-  try {
-    const { recomputeAllActiveVersions } = require('../lib/scoring');
-    const summary = await recomputeAllActiveVersions(storyId, dataForStorage);
-    if (summary.switches > 0) {
-      console.log(`🏆 [UPSERT] Active version recomputed: ${summary.scenes} scenes, ${summary.covers} covers`);
-    }
-  } catch (err) {
-    console.warn(`⚠️  [UPSERT] Active version recompute failed: ${err.message}`);
-  }
-
+  // Image extraction + blob write + active-version recompute: single shared
+  // implementation (see persistStoryToDatabase). firstSave keeps the
+  // historical upsert semantics: top-level v0 always written (no
+  // hasSeparateImages skip), imageVersions[0] canonical at v0 via the
+  // single-writer rule.
+  await persistStoryToDatabase(storyId, storyData, { firstSave: true });
   console.log(`✅ [UPSERT] Story ${storyId} saved successfully`);
 }
+
 
 /**
  * Save a story image to the story_images table.
