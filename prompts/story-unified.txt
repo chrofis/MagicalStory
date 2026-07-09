@@ -900,13 +900,15 @@ Characters (MAX 5):
 - [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
 
 **Back Cover**
-ONLY main characters: {MAIN_CHARACTER_NAMES}
+(Group portrait of the whole cast at the story's happy conclusion.)
+Pick **UP TO 5** of the most important characters from {MAIN_CHARACTER_NAMES} and {PRIMARY_CHARACTER_NAMES}. Always include main characters. If total exceeds 5, DROP the least important primary characters entirely — never reference them as a group.
 
 Mood: [one phrase]
 Objects: [LOC### + 1-2 ART### refs]
-Characters:
-- [MainChar1] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
-- [MainChar2] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
+Characters (MAX 5):
+- [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
+- [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
+- [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
 
 ---STORY PAGES---
 **CRITICAL: NO Visual Bible IDs in story text.** [LOC001], [ART001], [CHR001], [ANI001], [VEH001], [CLO001] etc. are for the Visual Bible JSON and scene hints ONLY. Story text must use natural names ("the old tower", "her amulet") — never bracket IDs.

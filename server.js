@@ -3673,15 +3673,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
         }
 
-        // The FRONT cover (coverType 'titlePage' → stored as frontCover) and the
-        // BACK cover are both main-characters-only group portraits. Drop any
-        // supporting characters Claude listed in the hint. Previously only
-        // backCover dropped them, so the front cover fed the WHOLE cast to the
-        // generator even when the outline scoped its description to the single
-        // main character — producing a family portrait the evaluator then flagged
-        // "N characters vs a single character" every pass, and round-3 inpaint
-        // bluntly deleting all-but-one figure (often the WRONG one).
-        if ((coverType === 'backCover' || coverType === 'titlePage') && coverCharacters.length > 0) {
+        // The FRONT cover (coverType 'titlePage' → stored as frontCover) is a
+        // main-characters-only portrait; drop any supporting characters Claude
+        // listed in the hint, so the front cover matches the single-main-character
+        // description instead of feeding the whole cast to the generator (which the
+        // evaluator flagged "N vs a single character" and round-3 inpaint then
+        // bluntly deleted all-but-one figure, often the WRONG one).
+        // The BACK cover is deliberately a full-cast group portrait (see
+        // story-unified.txt Back Cover spec) — do NOT drop non-mains there.
+        if (coverType === 'titlePage' && coverCharacters.length > 0) {
           const isMainChar = (c) =>
             c.isMainCharacter === true ||
             (inputData.mainCharacters?.length > 0 && inputData.mainCharacters.includes(c.id));
