@@ -681,7 +681,11 @@ router.delete('/:userId', authenticateToken, requireAdmin, async (req, res) => {
       for (const row of deletedStories.rows) {
         totalR2 += await r2.deleteStoryArtefacts(row.id);
       }
-      if (totalR2 > 0) log.info(`[ADMIN] Pruned ${totalR2} R2 objects across ${deletedStories.rows.length} stories`);
+      // Sibling path of the single-character delete: the user's whole
+      // character namespace (photos, avatars, styled, avatar-refs) —
+      // previously orphaned on every user deletion.
+      totalR2 += await r2.deleteByPrefix(`characters/${userIdToDelete}/`);
+      if (totalR2 > 0) log.info(`[ADMIN] Pruned ${totalR2} R2 objects across ${deletedStories.rows.length} stories + character namespace`);
     } catch (r2Err) {
       log.warn(`[ADMIN] R2 cleanup partial: ${r2Err.message}`);
     }

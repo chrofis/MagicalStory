@@ -975,6 +975,19 @@ router.delete('/:characterId', authenticateToken, async (req, res) => {
 
     const remainingCount = updateResult[0]?.remaining_count || 0;
 
+    // Prune the character's R2 prefix (photos, avatars, styled avatars,
+    // avatar-refs). Story deletion has done this for story artefacts since
+    // the R2 migration; character deletion never did, so every deleted
+    // character orphaned its objects on R2 permanently. Best-effort — the
+    // DB delete already won.
+    try {
+      const r2 = require('../lib/r2');
+      const removed = await r2.deleteByPrefix(`characters/${req.user.id}/${characterIdToDelete}/`);
+      if (removed > 0) console.log(`☁️  Deleted ${removed} R2 objects for character ${characterIdToDelete}`);
+    } catch (r2Err) {
+      console.warn(`R2 cleanup failed for character ${characterIdToDelete}: ${r2Err.message}`);
+    }
+
     await logActivity(req.user.id, req.user.username, 'CHARACTER_DELETED', {
       characterId: characterIdToDelete,
       characterName: deletedCharName,
