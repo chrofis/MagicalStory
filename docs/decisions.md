@@ -1096,3 +1096,34 @@ coverComposite.js, scoring.js, services/database.js, routes/regeneration.js,
 routes/avatars.js, routes/characters.js, routes/stories.js, config/models.js,
 server.js, client repairDefaults.ts, scripts/admin/backfill-character-photos.js,
 docs/codebase-guide.md, docs/image-generation-methods.html.
+
+## 2026-07-09 — Realistic style: redress pass instead of full styling skip
+
+**Context:** For realistic, styled-avatar generation was skipped entirely
+("photos are already realistic"). But the outline contract
+(story-unified.txt: clothingRequirements.description "IS the outfit" and the
+model MAY change garments/add accessories) is fulfilled by the styled-avatar
+redress for every other style. Skipping it meant realistic scene refs (and
+composite-cover cutouts, whose pass-1 prompt commands "keep clothing
+exactly") wore the creation-time outfit while the prompt text said the story
+outfit — the visual ref wins, so story outfits never rendered, and the
+entity eval (which judges against clothingRequirements) flagged the
+mismatch it couldn't fix.
+
+**Decision (user, option A):** realistic keeps skipping STYLE transfer (the
+2x4 sheet's Pass 2 already skips it) but redresses per category when the
+resolved story outfit differs from the stored avatars.clothing — Pass 1
+generates a realistic sheet in the requested outfit. Unchanged outfits (the
+common case) generate nothing. server.js gates no longer exclude realistic;
+prepareStyledAvatars decides per category. applyStyledAvatars applies
+redressed avatars for realistic (cache misses are the normal case there —
+logged quiet, not as ERROR).
+
+**Also fixed:** getStyledAvatarForClothing's no-styled-avatars fallback
+tried base 'standard' BEFORE the requested category (winter-page repairs and
+entity grids got standard-clothing references); and when realistic has some
+redressed categories, a non-redressed category now prefers its own base
+avatar over a redressed standard.
+
+**Touched:** server/lib/styledAvatars.js, server/lib/entityConsistency.js,
+server.js (4 gates).

@@ -4006,7 +4006,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // START AVATAR STYLING EARLY - we have everything we need now
         // This saves ~3min by running in parallel with story text generation
-        if (!inputData.trialMode && !skipImages && artStyle !== 'realistic' && !streamingAvatarStylingPromise) {
+        // Realistic is no longer excluded: prepareStyledAvatars decides
+        // per-category (skips unchanged outfits, redresses changed ones so
+        // the reference avatar matches the story's clothing text).
+        if (!inputData.trialMode && !skipImages && !streamingAvatarStylingPromise) {
           log.debug(`🎨 [STREAM] Starting early avatar styling (${reqCharCount} characters, ${artStyle} style)...`);
           streamingAvatarStylingPromise = (async () => {
             try {
@@ -4695,8 +4698,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     );
 
     // Wait for early avatar styling (started during streaming when clothing requirements detected)
-    // This runs in parallel with story text generation, saving ~3min
-    if (!skipImages && artStyle !== 'realistic') {
+    // This runs in parallel with story text generation, saving ~3min.
+    // Realistic included — prepareStyledAvatars decides per-category.
+    if (!skipImages) {
       if (streamingAvatarStylingPromise) {
         log.debug(`🎨 [UNIFIED] Waiting for early avatar styling to complete...`);
         await streamingAvatarStylingPromise;
@@ -4776,9 +4780,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Prepare styled avatars (convert existing avatars to target art style)
     // Skip if early avatar styling already succeeded (avoids duplicate costumed avatar generation)
     // If early styling was attempted but failed (promise exists but succeeded=false), run PHASE 2 as fallback
-    // Run avatar styling when: non-realistic style OR costumed clothing exists (costumes need generation even for realistic)
-    const hasCostumedClothing = Object.values(clothingRequirements || {}).some(r => r?.costumed?.used);
-    if (avatarRequirements.length > 0 && (artStyle !== 'realistic' || hasCostumedClothing) && !earlyAvatarStylingSucceeded) {
+    // Realistic runs too — prepareStyledAvatars decides per-category
+    // (skips unchanged outfits, redresses changed ones + costumes).
+    if (avatarRequirements.length > 0 && !earlyAvatarStylingSucceeded) {
       // Validate that characters have base avatars
       const charactersWithoutAvatars = (inputData.characters || []).filter(c =>
         !c.avatars?.standard && !c.photoUrl && !c.bodyNoBgUrl
@@ -6841,7 +6845,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // the saved blob. This block used to run ~80 lines below the save, so the
     // stored story kept empty avatar shells ({styledAvatars:{}}) and every later
     // cover-Überarbeiten / page-iterate found no usable character avatars.
-    if ((artStyle !== 'realistic' || hasCostumedClothing) && inputData.characters) {
+    // Realistic included — exports whatever was generated (redressed
+    // categories + costumes); a zero-size map is a no-op.
+    if (inputData.characters) {
       try {
         const styledAvatarsMap = exportStyledAvatarsForPersistence(inputData.characters, artStyle);
         if (styledAvatarsMap.size > 0) {

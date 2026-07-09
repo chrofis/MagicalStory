@@ -613,10 +613,21 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       }
 
       if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
-        // For realistic style, skip style conversion of standard/winter/summer avatars
-        // (they're already realistic photos). Only costumed avatars need generation.
-        if (isRealistic && !clothingCategory.startsWith('costumed:') && clothingCategory !== 'costumed') {
-          log.debug(`⏭️ [STYLED AVATARS] ${charName}:${clothingCategory} - skipping for realistic style (already a photo)`);
+        // Realistic style needs no STYLE conversion (base avatars are already
+        // photos) — but the story may have CHANGED the outfit: the outline
+        // contract says clothingRequirements.description "IS the outfit" and
+        // every other style redresses the avatar to match. Skipping outright
+        // meant realistic scene refs wore the creation-time clothes while the
+        // prompt text said the story outfit — the visual ref wins, so the
+        // story outfit never rendered. Redress (2x4 Pass 1 in the requested
+        // outfit; Pass 2 style transfer is already skipped for realistic)
+        // whenever the resolved outfit differs from the stored base clothing;
+        // skip only when they match (base avatar already correct).
+        const storedClothing = String(char.avatars?.clothing?.[clothingCategory] || '').trim();
+        const outfitChanged = !!clothingDescription && clothingDescription.trim() !== storedClothing;
+        const isCostumedCat = clothingCategory.startsWith('costumed:') || clothingCategory === 'costumed';
+        if (isRealistic && !isCostumedCat && !outfitChanged) {
+          log.debug(`⏭️ [STYLED AVATARS] ${charName}:${clothingCategory} - skipping for realistic style (outfit unchanged, base avatar matches)`);
         } else {
           neededAvatars.set(cacheKey, {
             characterName: charName,
@@ -1031,8 +1042,11 @@ function invalidateStyledAvatarForCategory(characterName, clothingCategory, char
 function applyStyledAvatars(characterPhotos, artStyle) {
   if (!characterPhotos || characterPhotos.length === 0) return characterPhotos;
 
-  // Skip for realistic style
-  if (artStyle === 'realistic') return characterPhotos;
+  // Realistic: styled avatars exist ONLY for categories the story redressed
+  // (outfit changed vs stored clothing) plus costumes — a cache miss is the
+  // NORMAL case (base avatar already matches the story outfit), not a
+  // degradation. Apply the hits, stay quiet on misses.
+  const isRealisticStyle = artStyle === 'realistic';
 
   let appliedCount = 0;
   const missed = [];
@@ -1059,8 +1073,8 @@ function applyStyledAvatars(characterPhotos, artStyle) {
         originalPhotoUrl: photo.photoUrl // Keep original for debugging
       };
     }
-    // Track cache misses for debugging
-    missed.push(`${photo.name}:${photo.clothingCategory}`);
+    // Track cache misses for debugging (expected for realistic — see above)
+    if (!isRealisticStyle) missed.push(`${photo.name}:${photo.clothingCategory}`);
     return photo;
   });
 

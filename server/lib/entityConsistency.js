@@ -483,10 +483,15 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory)
   };
 
   if (!avatars?.styledAvatars?.[artStyle]) {
-    // No styled avatars for this art style — try base avatar (2x2 sheet) before face photo
-    const baseAvatar = (await baseFromSlot('standard')) || (await baseFromSlot(clothingCategory));
+    // No styled avatars for this art style — try base avatar before face
+    // photo, REQUESTED CATEGORY FIRST: this branch is the normal path for
+    // realistic style, and standard-first meant a winter-page repair/eval
+    // got the standard-clothing avatar as its reference (Grok redressed the
+    // character into standard clothes; entity eval flagged correct winter
+    // outfits against a standard reference).
+    const baseAvatar = (await baseFromSlot(clothingCategory)) || (await baseFromSlot('standard'));
     if (baseAvatar) {
-      log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No styledAvatars for ${artStyle}, using base standard avatar`);
+      log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No styledAvatars for ${artStyle}, using base ${clothingCategory} avatar (or standard fallback)`);
       return baseAvatar;
     }
     const fallback = getFallbackPhoto();
@@ -522,6 +527,18 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory)
   if (resolved) {
     log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: Found ${clothingCategory} avatar`);
     return resolved;
+  }
+
+  // Realistic: styledAvatars.realistic only holds story-REDRESSED categories
+  // (+costumes). When the requested category wasn't redressed, its BASE
+  // avatar already matches the story outfit — a far better reference than a
+  // redressed standard in the wrong clothing.
+  if (artStyle === 'realistic') {
+    const base = await baseFromSlot(clothingCategory);
+    if (base) {
+      log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: realistic ${clothingCategory} not redressed — using base ${clothingCategory} avatar`);
+      return base;
+    }
   }
 
   // Fallback chain: requested → standard → any other styled avatar → original photo.
