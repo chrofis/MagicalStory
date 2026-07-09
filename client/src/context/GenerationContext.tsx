@@ -111,6 +111,7 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
       setIsComplete(false);
       setCompletedStoryId(null);
       setCompletedShareToken(null);
+      setHasUnviewedCompletion(false);
       setError(null);
       storage.removeItem(ACTIVE_JOB_KEY);
     }
