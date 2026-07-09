@@ -68,7 +68,7 @@ router.post('/impersonate/:userId', authenticateToken, requireAdmin, async (req,
     await logActivity(req.user.id, req.user.username, 'ADMIN_IMPERSONATE_START', {
       targetUserId: targetUser.id,
       targetUsername: targetUser.username,
-    });
+    }, req.user);
 
     const impersonationToken = signToken(
       {
@@ -219,7 +219,7 @@ router.post('/config', authenticateToken, async (req, res) => {
     };
 
     await writeJSON(CONFIG_FILE, config);
-    await logActivity(req.user.id, req.user.username, 'API_KEYS_UPDATED', {});
+    await logActivity(req.user.id, req.user.username, 'API_KEYS_UPDATED', {}, req.user);
 
     res.json({ message: 'API keys updated successfully' });
   } catch (err) {
@@ -260,7 +260,7 @@ router.post('/config/token-promo', authenticateToken, async (req, res) => {
       ON CONFLICT (config_key) DO UPDATE SET config_value = $1
     `, [multiplier.toString()]);
 
-    await logActivity(req.user.id, req.user.username, 'TOKEN_PROMO_UPDATED', { multiplier });
+    await logActivity(req.user.id, req.user.username, 'TOKEN_PROMO_UPDATED', { multiplier }, req.user);
     log.info(`🎁 [ADMIN] Token promo multiplier set to ${multiplier}x by ${req.user.username}`);
 
     res.json({ success: true, multiplier });

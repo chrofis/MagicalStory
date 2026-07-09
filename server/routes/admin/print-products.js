@@ -96,7 +96,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_CREATED', {
       productId: newProduct.id,
       productName: product_name
-    });
+    }, req.user);
 
     res.json({ product: newProduct, message: 'Product created successfully' });
   } catch (err) {
@@ -161,7 +161,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
     await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_UPDATED', {
       productId: id,
       productName: updatedProduct.product_name
-    });
+    }, req.user);
 
     res.json({ product: updatedProduct, message: 'Product updated successfully' });
   } catch (err) {
@@ -192,7 +192,7 @@ router.put('/:id/toggle', authenticateToken, requireAdmin, async (req, res) => {
     await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_TOGGLED', {
       productId: id,
       isActive: !is_active
-    });
+    }, req.user);
 
     res.json({ product: updatedProduct, message: 'Product status updated successfully' });
   } catch (err) {
@@ -225,7 +225,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
     await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_DELETED', {
       productId: id,
       productName: productName
-    });
+    }, req.user);
 
     res.json({ message: 'Product deleted successfully' });
   } catch (err) {

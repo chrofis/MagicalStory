@@ -63,7 +63,7 @@ router.post('/', authenticateToken, validateBody(schemas.uploadFile), async (req
       fileId,
       fileType,
       fileSize
-    });
+    }, req.user);
 
     res.json({
       success: true,
@@ -183,7 +183,7 @@ router.delete('/:fileId', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    await logActivity(req.user.id, req.user.username, 'FILE_DELETED', { fileId });
+    await logActivity(req.user.id, req.user.username, 'FILE_DELETED', { fileId }, req.user);
     res.json({ success: true, message: 'File deleted successfully' });
 
   } catch (err) {

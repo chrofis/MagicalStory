@@ -64,7 +64,7 @@ router.post('/claude', aiProxyLimiter, authenticateToken, async (req, res) => {
     await logActivity(req.user.id, req.user.username, 'CLAUDE_API_CALL', {
       promptLength: prompt?.length || 0,
       maxTokens: max_tokens
-    });
+    }, req.user);
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -155,7 +155,7 @@ router.post('/gemini', aiProxyLimiter, authenticateToken, async (req, res) => {
 
     await logActivity(req.user.id, req.user.username, 'GEMINI_API_CALL', {
       model: effectiveModel
-    });
+    }, req.user);
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent?key=${geminiApiKey}`;
 

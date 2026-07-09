@@ -172,7 +172,7 @@ router.get('/', authenticateToken, async (req, res) => {
     normalizeCharacterAvatars(characterData.characters);
 
     // Fire and forget - don't block response for logging
-    logActivity(req.user.id, req.user.username, 'CHARACTERS_LOADED', { count: characterData.characters.length }).catch(() => {});
+    logActivity(req.user.id, req.user.username, 'CHARACTERS_LOADED', { count: characterData.characters.length }, req.user).catch(() => {});
     res.json(characterData);
   } catch (err) {
     console.error('Error fetching characters:', err);
@@ -787,7 +787,7 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    await logActivity(req.user.id, req.user.username, 'CHARACTERS_SAVED', { count: charactersWithoutAvatars.length });
+    await logActivity(req.user.id, req.user.username, 'CHARACTERS_SAVED', { count: charactersWithoutAvatars.length }, req.user);
     res.json({ message: 'Characters saved successfully', count: charactersWithoutAvatars.length });
   } catch (err) {
     // Attempt ROLLBACK in case transaction was started but not committed
@@ -979,7 +979,7 @@ router.delete('/:characterId', authenticateToken, async (req, res) => {
       characterId: characterIdToDelete,
       characterName: deletedCharName,
       remainingCount
-    });
+    }, req.user);
 
     console.log(`[Characters] DELETE - Successfully deleted character ${characterIdToDelete} (${deletedCharName}) - ${remainingCount} remaining`);
     res.json({

@@ -258,7 +258,7 @@ router.post('/print-provider/order', authenticateToken, async (req, res) => {
       orderId: printData.id || printData.orderId,
       orderReference: orderPayload.orderReferenceId,
       orderType: orderType
-    });
+    }, req.user);
 
     // Extract preview URLs if available
     const previewUrls = [];
@@ -531,7 +531,7 @@ router.post('/admin/print-provider/products', authenticateToken, async (req, res
       await fs.writeFile(productsFile, JSON.stringify(products, null, 2));
     }
 
-    await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_SAVED', { product_uid });
+    await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_SAVED', { product_uid }, req.user);
 
     res.json({ success: true, message: 'Product saved successfully' });
 
@@ -1076,7 +1076,7 @@ router.post('/generate-pdf', authenticateToken, async (req, res) => {
       fileId,
       storyId,
       fileSize
-    });
+    }, req.user);
 
     const fileUrl = `${req.protocol}://${req.get('host')}/api/files/${fileId}`;
 
@@ -1696,7 +1696,7 @@ router.post('/referral/cash-out', authenticateToken, async (req, res) => {
           refundId: refund.id,
           amountCents: refundAmount,
           stripeMode: order.stripeMode,
-        });
+        }, req.user);
       } catch (stripeErr) {
         failed.push({ orderId: order.orderId, error: stripeErr.message, code: stripeErr.code });
         log.warn(`⚠️ [REFERRAL CASHOUT] Refund failed for order ${order.orderId} (PI ${order.paymentIntentId}): ${stripeErr.message}`);

@@ -236,7 +236,7 @@ router.put('/shipping-address', authenticateToken, async (req, res) => {
       const updateQuery = 'UPDATE users SET shipping_first_name = $1, shipping_last_name = $2, shipping_address_line1 = $3, shipping_city = $4, shipping_post_code = $5, shipping_country = $6, shipping_email = $7 WHERE id = $8';
       await dbQuery(updateQuery, [firstName, lastName, addressLine1, city, postCode, country, email, req.user.id]);
 
-      await logActivity(req.user.id, req.user.username, 'SHIPPING_ADDRESS_SAVED', { country });
+      await logActivity(req.user.id, req.user.username, 'SHIPPING_ADDRESS_SAVED', { country }, req.user);
       res.json({ success: true });
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
@@ -456,7 +456,7 @@ router.put('/update-email', authenticateToken, async (req, res) => {
     // Update login email + mirror email column, and require re-verification of the new address
     await dbQuery('UPDATE users SET username = $1, email = $1, email_verified = FALSE WHERE id = $2', [newEmail, req.user.id]);
 
-    await logActivity(req.user.id, newEmail, 'EMAIL_UPDATED', { oldEmail: req.user.username });
+    await logActivity(req.user.id, newEmail, 'EMAIL_UPDATED', { oldEmail: req.user.username }, req.user);
     res.json({ success: true, username: newEmail, requiresVerification: true });
   } catch (err) {
     console.error('Error updating email:', err);

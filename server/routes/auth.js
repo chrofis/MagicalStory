@@ -1240,7 +1240,7 @@ router.post('/photo-consent', authenticateToken, async (req, res) => {
       [userId]
     );
 
-    await logActivity(userId, req.user.username, 'PHOTO_CONSENT_GIVEN', {});
+    await logActivity(userId, req.user.username, 'PHOTO_CONSENT_GIVEN', {}, req.user);
     log.info(`Photo consent recorded for user: ${req.user.username}`);
 
     res.json({

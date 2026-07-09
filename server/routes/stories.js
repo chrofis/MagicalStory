@@ -186,7 +186,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 
     console.log(`📚 Returning ${userStories.length} stories`);
-    await logActivity(req.user.id, req.user.username, 'STORIES_LOADED', { count: userStories.length });
+    await logActivity(req.user.id, req.user.username, 'STORIES_LOADED', { count: userStories.length }, req.user);
 
     res.json({
       stories: userStories,
@@ -3034,7 +3034,7 @@ router.post('/', authenticateToken, async (req, res) => {
     await logActivity(req.user.id, req.user.username, 'STORY_SAVED', {
       storyId: story.id,
       isNew: isNewStory
-    });
+    }, req.user);
 
     res.json({ message: 'Story saved successfully', id: story.id });
   } catch (err) {
@@ -3080,7 +3080,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    await logActivity(req.user.id, req.user.username, 'STORY_DELETED', { storyId: id });
+    await logActivity(req.user.id, req.user.username, 'STORY_DELETED', { storyId: id }, req.user);
     res.json({ message: 'Story deleted successfully' });
   } catch (err) {
     console.error('Error deleting story:', err);
@@ -3267,7 +3267,7 @@ router.put('/:id/text', authenticateToken, async (req, res) => {
     await saveStoryData(id, storyData);
 
     console.log(`✅ Story text updated for ${id}`);
-    await logActivity(req.user.id, req.user.username, 'STORY_TEXT_EDITED', { storyId: id });
+    await logActivity(req.user.id, req.user.username, 'STORY_TEXT_EDITED', { storyId: id }, req.user);
 
     res.json({
       success: true,
@@ -3328,7 +3328,7 @@ router.put('/:id/title', authenticateToken, async (req, res) => {
     await saveStoryData(id, storyData);
 
     console.log(`✅ Story title updated for ${id}: "${title.trim()}"`);
-    await logActivity(req.user.id, req.user.username, 'STORY_TITLE_EDITED', { storyId: id, newTitle: title.trim() });
+    await logActivity(req.user.id, req.user.username, 'STORY_TITLE_EDITED', { storyId: id, newTitle: title.trim() }, req.user);
 
     res.json({
       success: true,
@@ -3617,7 +3617,7 @@ router.post('/:id/share', authenticateToken, async (req, res) => {
     await logActivity(req.user.id, req.user.username, 'STORY_SHARE_ENABLED', {
       storyId: id,
       shareTokenPrefix: shareToken.substring(0, 8),
-    });
+    }, req.user);
 
     res.json({
       isShared: true,
@@ -3660,7 +3660,7 @@ router.delete('/:id/share', authenticateToken, async (req, res) => {
     console.log(`🚫 Sharing disabled for story ${id}`);
     await logActivity(req.user.id, req.user.username, 'STORY_SHARE_DISABLED', {
       storyId: id,
-    });
+    }, req.user);
 
     res.json({ isShared: false, shareToken: null, shareUrl: null });
   } catch (err) {

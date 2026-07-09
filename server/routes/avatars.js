@@ -1214,7 +1214,7 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         hasBody: !!analyzerData.body_crop || !!analyzerData.bodyCrop,
         faceCount: analyzerData.face_count,
         selectedFaceId: selectedFaceId
-      });
+      }, req.user);
 
       // Create or update character in database immediately so avatar job can find it later
       // If existingCharacterId provided, update that character (photo re-upload)
@@ -3337,7 +3337,7 @@ These corrections OVERRIDE what is visible in the reference photo.
         tokenUsage: results.tokenUsage,
         // Runware cost: $0.0006 per image
         estimatedCost: useRunware ? avatarsGenerated * 0.0006 : null
-      });
+      }, req.user);
     } catch (activityErr) {
       log.warn('Failed to log avatar generation activity:', activityErr.message);
     }

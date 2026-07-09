@@ -716,12 +716,25 @@ async function imgBytesAsync(row) {
 }
 
 // Helper to log activity
-async function logActivity(userId, username, action, details) {
+async function logActivity(userId, username, action, details, actor = null) {
   try {
     if (isDatabaseMode()) {
+      // Impersonation audit: an impersonated action logs the TARGET's
+      // username, which made it indistinguishable from the real user (a
+      // STORY_DELETED during an admin impersonation session could not be
+      // attributed). When the caller passes req.user as `actor`, stamp the
+      // admin's identity into details.
+      let finalDetails = details;
+      if (actor?.impersonating) {
+        finalDetails = {
+          ...(details && typeof details === 'object' ? details : { value: details }),
+          impersonating: true,
+          impersonatedBy: actor.originalAdminUsername || actor.originalAdminId || 'unknown-admin',
+        };
+      }
       await dbQuery(
         'INSERT INTO logs (user_id, username, action, details) VALUES ($1, $2, $3, $4)',
-        [userId, username, action, JSON.stringify(details)]
+        [userId, username, action, JSON.stringify(finalDetails)]
       );
     }
   } catch (err) {

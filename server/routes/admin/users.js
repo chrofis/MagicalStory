@@ -158,7 +158,7 @@ router.post('/:userId/quota', authenticateToken, requireAdmin, async (req, res) 
       targetUserId: userId,
       targetUsername: rows[0].username,
       newCredits: credits
-    });
+    }, req.user);
 
     res.json({
       message: 'User credits updated successfully',
@@ -247,7 +247,7 @@ router.post('/:userId/role', authenticateToken, requireAdmin, async (req, res) =
       targetUsername: user.username,
       previousRole,
       newRole: role,
-    });
+    }, req.user);
 
     res.json({
       message: 'User role updated',
@@ -712,7 +712,7 @@ router.delete('/:userId', authenticateToken, requireAdmin, async (req, res) => {
         files: deletedFiles.rows.length,
         logs: deletedLogsCount,
       },
-    });
+    }, req.user);
 
     res.json({
       success: true,
