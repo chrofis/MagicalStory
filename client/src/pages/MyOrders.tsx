@@ -5,6 +5,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { LoadingSpinner, Navigation } from '@/components/common';
 import { api } from '@/services/api';
+import { toImgSrc } from '@/utils/imgSrc';
 import { createLogger } from '@/services/logger';
 
 const log = createLogger('MyOrders');
@@ -245,7 +246,7 @@ function BookOrderCard({
       {thumbnailData && (
         <div className="h-32 bg-gray-100 overflow-hidden">
           <img
-            src={thumbnailData.startsWith('data:') ? thumbnailData : `data:image/jpeg;base64,${thumbnailData}`}
+            src={toImgSrc(thumbnailData) || undefined}
             alt={order.storyTitle || 'Book cover'}
             className="w-full h-full object-cover"
           />

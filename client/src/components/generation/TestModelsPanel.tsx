@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { toImgSrc } from '@/utils/imgSrc';
 import { X, Loader2, Check, Clock, AlertTriangle, Paintbrush, ChevronDown, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import storyService from '@/services/storyService';
@@ -824,10 +825,10 @@ export function TestModelsPanel({
                     <div className="mt-2 space-y-1">
                       <div className="text-[10px] font-medium text-orange-600">Pass 1 (foreground only):</div>
                       <img
-                        src={result.pass1Image.startsWith('data:') ? result.pass1Image : `data:image/png;base64,${result.pass1Image}`}
+                        src={toImgSrc(result.pass1Image, 'image/png')!}
                         alt="Pass 1"
                         className="max-h-32 w-full object-contain rounded border bg-white cursor-pointer"
-                        onClick={() => setLightboxImage(result.pass1Image!.startsWith('data:') ? result.pass1Image! : `data:image/png;base64,${result.pass1Image!}`)}
+                        onClick={() => setLightboxImage(toImgSrc(result.pass1Image, 'image/png')!)}
                       />
                     </div>
                   )}
@@ -1211,10 +1212,10 @@ export function TestModelsPanel({
                               {result.inputSnapshot.landmarkPhotos.map((l, i) => l.photoData ? (
                                 <div key={`lm-${i}`} className="flex flex-col items-center">
                                   <img
-                                    src={l.photoData.startsWith('data:') ? l.photoData : `data:image/jpeg;base64,${l.photoData}`}
+                                    src={toImgSrc(l.photoData, 'image/jpeg')!}
                                     alt={l.name}
                                     className="h-16 w-16 object-cover rounded border bg-white cursor-pointer"
-                                    onClick={() => setLightboxImage(l.photoData!.startsWith('data:') ? l.photoData! : `data:image/jpeg;base64,${l.photoData!}`)}
+                                    onClick={() => setLightboxImage(toImgSrc(l.photoData, 'image/jpeg')!)}
                                   />
                                   <span className="text-[8px] text-gray-500 mt-0.5 truncate max-w-[64px]">{l.name}</span>
                                 </div>
@@ -1230,10 +1231,10 @@ export function TestModelsPanel({
                               {result.grokRefImages.map((img, i) => (
                                 <img
                                   key={`grok-${i}`}
-                                  src={img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`}
+                                  src={toImgSrc(img, 'image/jpeg')!}
                                   alt={`Grok ref ${i + 1}`}
                                   className="h-16 w-16 object-cover rounded border bg-white cursor-pointer"
-                                  onClick={() => setLightboxImage(img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`)}
+                                  onClick={() => setLightboxImage(toImgSrc(img, 'image/jpeg')!)}
                                 />
                               ))}
                             </div>

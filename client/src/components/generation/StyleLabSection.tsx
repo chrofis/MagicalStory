@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toImgSrc } from '@/utils/imgSrc';
 import { Loader2, Check, Clock, AlertTriangle, FlaskConical, ChevronDown, ChevronRight, RotateCw, History } from 'lucide-react';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import { artStyles } from '@/constants/artStyles';
 import storyService from '@/services/storyService';
 
 const formatElapsed = (ms: number) => ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
-const toSrc = (img: string) => img.startsWith('data:') ? img : `data:image/png;base64,${img}`;
+const toSrc = (img: string) => toImgSrc(img, 'image/png')!;
 
 interface StyleLabSectionProps {
   storyId: string;

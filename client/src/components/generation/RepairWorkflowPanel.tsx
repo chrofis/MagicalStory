@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { toImgSrc } from '@/utils/imgSrc';
 import {
   Wrench,
   RotateCcw,
@@ -994,9 +995,9 @@ export function RepairWorkflowPanel({
                               {getPageName(page)} (v{workflowState.redoResults.newVersions[page] ?? '?'})
                             </div>
                             {detail && (detail.previousImage || detail.newImage) ? (() => {
-                              const beforeSrc = detail.previousImage ? (detail.previousImage.startsWith('data:') ? detail.previousImage : `data:image/jpeg;base64,${detail.previousImage}`) : null;
-                              const afterSrc = detail.newImage ? (detail.newImage.startsWith('data:') ? detail.newImage : `data:image/jpeg;base64,${detail.newImage}`) : null;
-                              const blackoutSrc = detail.blackoutImage ? (detail.blackoutImage.startsWith('data:') ? detail.blackoutImage : `data:image/jpeg;base64,${detail.blackoutImage}`) : null;
+                              const beforeSrc = toImgSrc(detail.previousImage);
+                              const afterSrc = toImgSrc(detail.newImage);
+                              const blackoutSrc = toImgSrc(detail.blackoutImage);
                               const canCompare = beforeSrc && afterSrc;
                               return (
                                 <div className="space-y-1">
