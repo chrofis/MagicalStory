@@ -3,6 +3,11 @@
 # Format: STYLE_ID: prompt text
 #
 # NOTE: After editing this file, update client/src/constants/artStyles.ts and server/lib/storyHelpers.js to match.
+#
+# DEAD FILE (audit 2026-07-09): loaded by loadArtStylePrompts() but the
+# resulting ART_STYLE_PROMPTS export has ZERO readers — live style prompts
+# come from ART_STYLES in server/lib/storyHelpers.js. Synced 2026-07-10 so a
+# future wiring doesn't resurrect the old comic-CMYK / gears-on-people bugs.
 
 # SCENE ART STYLES (for story images with backgrounds)
 pixar: 3D render, Pixar cinematic style, natural eye proportion, subtle expression, highly detailed textures, octane render, volumetric lighting, vibrant colors, smooth shading, family-friendly
@@ -13,9 +18,9 @@ anime: Modern digital anime art, high detail, expressive large eyes, dynamic com
 
 chibi: Chibi style, super deformed (SD) proportions, massive head, tiny body, kawaii aesthetic, adorable, smooth illustration, minimalist detail
 
-steampunk: Steampunk graphic novel illustration, Victorian aesthetic, intricate gears, brass and copper mechanisms, leather textures, sepia/muted color palette, detailed linework
+steampunk: Steampunk graphic novel illustration, warm brown and muted amber palette, clean linework, leather and brass textures on machines and architecture only — mechanical elements never on people, characters wear exactly their described clothing
 
-comic: Classic American comic book art, heavy black ink lines, dynamic composition, visible halftone/Ben-Day dots, vibrant CMYK colors, style of Jack Kirby/Jim Lee
+comic: Franco-Belgian comic book illustration in the ligne claire style of Hergé and Peyo, bold clean black outlines of uniform weight, flat solid colors, no halftone dots, no CMYK separation, bright friendly palette
 
 manga: Traditional manga style, Japanese comic art, intricate detailed ink linework, atmospheric screentones, dramatic lighting and composition. Backgrounds and scenery in monochrome ink + screentones. Character clothing, hair, and key story objects in their natural specified colors (color-spread / promotional cover style, not pure black-and-white interior panels).
 

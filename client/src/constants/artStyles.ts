@@ -92,7 +92,7 @@ export const artStyles: ArtStyle[] = [
       de: 'Comic-Stil mit kräftigen Linien und Raster',
       fr: 'Style bande dessinée avec lignes épaisses et trames',
     },
-    prompt: 'Classic American comic book art, heavy black ink lines, dynamic composition, visible halftone/Ben-Day dots, vibrant CMYK colors, style of Jack Kirby/Jim Lee',
+    prompt: 'A Franco-Belgian comic book illustration in the ligne claire style of Hergé and Peyo. Bold clean black outlines of uniform weight, flat solid colors, no halftone dots, no CMYK color separation, no crosshatching, no painterly shading. Bright friendly palette, dynamic composition. Not photorealistic.',
     category: 'illustrated',
   },
   {
@@ -133,7 +133,7 @@ export const artStyles: ArtStyle[] = [
       de: 'Von der viktorianischen Ära inspiriert mit Zahnrädern und Messing',
       fr: "Inspiré de l'ère victorienne avec engrenages et laiton",
     },
-    prompt: 'Steampunk graphic novel illustration in the style of Sean Murphy. Victorian aesthetic with abundant brass and copper gears, cogs, and clockwork mechanisms. Visible leather grain, stitching on clothing, and metal patina on gears. Warm brown and muted amber color palette with restrained saturation. Clean linework with even shading and smooth gradients. Realistic human faces with natural proportions, detailed eyes, and subtle expressions.',
+    prompt: 'Steampunk graphic novel illustration in the style of Sean Murphy. Warm brown and muted amber color palette with restrained saturation — earthy tones only. Clean linework with even shading and smooth gradients; visible leather grain and metal patina where the scene contains machines or Victorian architecture. Mechanical elements (gears, cogs, pipes, clockwork) appear only on machines, vehicles, and architecture the scene describes — never on people (no gears or mechanisms on skin, hair, faces, or garments). Characters wear exactly their described clothing — the style changes rendering, not garments. Realistic human faces with natural proportions, detailed eyes, and subtle expressions.',
     category: 'creative',
   },
   {
