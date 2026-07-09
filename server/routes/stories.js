@@ -2513,62 +2513,19 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
       return res.json({ images, covers });
     }
 
-    // SLOW path: Load from data blob (for non-migrated stories)
-    const dataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
-    if (dataRows.length === 0) {
+    // No story_images rows: the legacy "SLOW path" that read images out of
+    // the data blob was deleted 2026-07-10 — a prod survey found every
+    // remaining non-migrated story (11, all pre-Feb-2026) has ZERO images in
+    // its blob (they predate image persistence; two survive as order PDFs in
+    // the files table), so the blob read served nothing for any story.
+    // Verify the story exists, then return the same empty set the blob read
+    // produced.
+    const exists = await dbQuery('SELECT 1 FROM stories WHERE id = $1', [id]);
+    if (exists.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
-
-    const story = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;
-
-    const images = (story.sceneImages || []).map(img => {
-      const activeIdx = activeVersions[img.pageNumber?.toString()] ?? 0;
-      return {
-        pageNumber: img.pageNumber,
-        imageData: normalizeImageData(img.imageData),
-        qualityScore: img.qualityScore,
-        activeVersion: activeIdx,
-        imageVersions: img.imageVersions?.map((v, i) => ({
-          imageData: normalizeImageData(v.imageData),
-          qualityScore: v.qualityScore,
-          versionIndex: i
-        }))
-      };
-    });
-
-    const covers = {};
-    if (story.coverImages) {
-      for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
-        const coverData = story.coverImages[coverType];
-        if (coverData) {
-          const imageData = coverData.imageData;
-          if (imageData) {
-            const activeCoverIdx = activeVersions[coverType] ?? 0;
-            covers[coverType] = {
-              imageData: normalizeImageData(imageData),
-              qualityScore: coverData.qualityScore || null,
-              activeVersion: activeCoverIdx
-            };
-            // Include imageVersions if available in blob (more than 1 version)
-            if (coverData.imageVersions && coverData.imageVersions.length > 1) {
-              covers[coverType].imageVersions = coverData.imageVersions.map((v, i) => ({
-                imageData: normalizeImageData(v.imageData),
-                qualityScore: v.qualityScore,
-                description: v.description,
-                type: v.type,
-                createdAt: v.createdAt,
-                versionIndex: i
-              }));
-            }
-          }
-        }
-      }
-    }
-
-    console.log(`📷 [BATCH-FALLBACK] ${id} - ${images.length} pages, ${Object.keys(covers).length} covers, ${Date.now() - startTime}ms`);
-
-    stripInlineImagesFromStoryData({ sceneImages: images, coverImages: covers }, { keepDisplayBytes: true });
-    return res.json({ images, covers });
+    console.log(`📷 [BATCH] ${id} - no story_images rows (pre-migration text-only story), returning empty set`);
+    return res.json({ images: [], covers: {} });
 
   } catch (err) {
     console.error(`❌ Error fetching batch images for ${req.params.id}:`, err);
