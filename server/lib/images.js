@@ -8975,6 +8975,139 @@ function sanitizeIssueForInpaint(text) {
   return out;
 }
 
+/**
+ * Estimate the global (dx, dy) translation between two same-sized grayscale
+ * rasters by comparing small background patches. Grok redraws pages freehand,
+ * so its output often sits a few pixels off the original — and the resize/crop
+ * back to scene dims adds its own shift. A composite mask built in original
+ * coordinates then blends misregistered content, which reads as a smeared /
+ * "blended" figure. Patches that fall inside excludeRects (repaint zones,
+ * blur boxes, hatch) or are near-flat are skipped; the shift is only trusted
+ * when several independent patches agree.
+ *
+ * @param {object} orig {data, width, height} grayscale raw (1 channel)
+ * @param {object} cand same shape/size as orig
+ * @param {Array}  excludeRects [{left, top, width, height}] pixel rects to avoid
+ * @returns {{dx: number, dy: number, consensus: number, patches: number} | null}
+ */
+function estimateGlobalShift(orig, cand, excludeRects = []) {
+  const MAX_SHIFT = 8;
+  const PATCH = 48;
+  const GRID = 6;
+  const MIN_VARIANCE = 60;      // skip flat sky / walls — ambiguous under SAD
+  const { width, height } = orig;
+  if (cand.width !== width || cand.height !== height) return null;
+  if (width < PATCH + 4 * MAX_SHIFT || height < PATCH + 4 * MAX_SHIFT) return null;
+
+  const margin = MAX_SHIFT + 2;
+  const expanded = excludeRects.map(r => ({
+    left: r.left - margin, top: r.top - margin,
+    right: r.left + r.width + margin, bottom: r.top + r.height + margin,
+  }));
+  const intersectsExcluded = (px, py) => expanded.some(r =>
+    px + PATCH > r.left && px < r.right && py + PATCH > r.top && py < r.bottom);
+
+  const offsets = [];
+  for (let gy = 0; gy < GRID && offsets.length < 10; gy++) {
+    for (let gx = 0; gx < GRID && offsets.length < 10; gx++) {
+      const px = Math.round(margin + (gx / (GRID - 1)) * (width - PATCH - 2 * margin));
+      const py = Math.round(margin + (gy / (GRID - 1)) * (height - PATCH - 2 * margin));
+      if (intersectsExcluded(px, py)) continue;
+
+      // Patch variance — reject textureless patches
+      let sum = 0, sumSq = 0;
+      for (let y = 0; y < PATCH; y++) {
+        const row = (py + y) * width + px;
+        for (let x = 0; x < PATCH; x++) {
+          const v = orig.data[row + x];
+          sum += v; sumSq += v * v;
+        }
+      }
+      const n = PATCH * PATCH;
+      const variance = sumSq / n - (sum / n) ** 2;
+      if (variance < MIN_VARIANCE) continue;
+
+      // Integer SAD search over ±MAX_SHIFT
+      let best = Infinity, bestDx = 0, bestDy = 0;
+      for (let dy = -MAX_SHIFT; dy <= MAX_SHIFT; dy++) {
+        for (let dx = -MAX_SHIFT; dx <= MAX_SHIFT; dx++) {
+          let sad = 0;
+          for (let y = 0; y < PATCH; y += 2) {          // 2px stride: 4× faster, same argmin
+            const oRow = (py + y) * width + px;
+            const cRow = (py + y + dy) * width + px + dx;
+            for (let x = 0; x < PATCH; x += 2) {
+              sad += Math.abs(orig.data[oRow + x] - cand.data[cRow + x]);
+            }
+          }
+          if (sad < best) { best = sad; bestDx = dx; bestDy = dy; }
+        }
+      }
+      offsets.push({ dx: bestDx, dy: bestDy });
+    }
+  }
+  if (offsets.length < 3) return null;
+
+  const median = arr => {
+    const s = [...arr].sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)];
+  };
+  const dx = median(offsets.map(o => o.dx));
+  const dy = median(offsets.map(o => o.dy));
+  const consensus = offsets.filter(o => Math.abs(o.dx - dx) <= 1 && Math.abs(o.dy - dy) <= 1).length;
+  return { dx, dy, consensus, patches: offsets.length };
+}
+
+/**
+ * Shift a raw RGB buffer by (-dx, -dy) so content estimated at offset (dx, dy)
+ * lands back in register with the original. Uncovered edge strips are filled
+ * from `fallback` (the original region) so the downstream feather blends into
+ * true scene pixels instead of black.
+ */
+function shiftRawRegion(cand, fallback, width, height, dx, dy) {
+  const out = Buffer.from(fallback);   // start as original, overwrite the overlap
+  for (let y = 0; y < height; y++) {
+    const sy = y + dy;
+    if (sy < 0 || sy >= height) continue;
+    for (let x = 0; x < width; x++) {
+      const sx = x + dx;
+      if (sx < 0 || sx >= width) continue;
+      const oIdx = (y * width + x) * 3;
+      const sIdx = (sy * width + sx) * 3;
+      out[oIdx] = cand[sIdx];
+      out[oIdx + 1] = cand[sIdx + 1];
+      out[oIdx + 2] = cand[sIdx + 2];
+    }
+  }
+  return out;
+}
+
+/**
+ * Edge energy (Laplacian variance) of a region — the standard blur metric.
+ * Used to reject repairs whose figure came back soft: the blended repair
+ * signals "redraw this" with a blur, and diffusion editors sometimes enhance
+ * the blur instead of replacing it (the known failure that gave the cutout
+ * path its crosshatch). Comparing repaired vs original edge energy in the
+ * figure bbox catches that deterministically.
+ */
+async function measureRegionSharpness(imageBuffer, rect) {
+  const { data, info } = await sharp(imageBuffer)
+    .extract(rect)
+    .greyscale()
+    .convolve({ width: 3, height: 3, kernel: [0, 1, 0, 1, -4, 1, 0, 1, 0] })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const n = info.width * info.height;
+  let sum = 0, sumSq = 0;
+  for (let i = 0; i < n; i++) { const v = data[i]; sum += v; sumSq += v * v; }
+  return sumSq / n - (sum / n) ** 2;
+}
+
+// Repaired-figure blur gate: reject when the repaired figure region has lost
+// most of its edge detail vs the original. Ratio-based so soft art styles
+// (watercolor) pass — both sides are equally soft there.
+const REPAIR_SHARPNESS_REJECT_RATIO = 0.5;
+const REPAIR_SHARPNESS_MIN_ORIG = 25; // orig region too flat → ratio meaningless, skip gate
+
 async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options = {}) {
   if (!isGrokConfigured()) {
     throw new Error('XAI_API_KEY not configured for Grok repair');
@@ -9139,6 +9272,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     let sceneForGrok = sceneBuffer;
 
     const composites = [];
+    const blurredRects = []; // pixel rects of every blurred region — excluded from registration patches
     const FACE_BLUR_RADIUS_FACTOR = 0.03; // 3% of face width — very slight blur, enough to signal "redraw this"
     const FACE_PADDING = 0.2; // 20% padding around face bbox
 
@@ -9163,6 +9297,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       const fWidth = Math.max(1, Math.min(Math.ceil((padXmax - padXmin) * sceneMeta.width), sceneMeta.width - fLeft));
       const fHeight = Math.max(1, Math.min(Math.ceil((padYmax - padYmin) * sceneMeta.height), sceneMeta.height - fTop));
       const blurRadius = Math.max(10, Math.round(fWidth * FACE_BLUR_RADIUS_FACTOR));
+      blurredRects.push({ left: fLeft, top: fTop, width: fWidth, height: fHeight });
       try {
         const cropJpeg = await sharp(sceneBuffer)
           .extract({ left: fLeft, top: fTop, width: fWidth, height: fHeight })
@@ -9312,6 +9447,51 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     let grokBuffer = Buffer.from(r2Lib.stripDataUriPrefix(grokResult.imageData), 'base64');
     grokBuffer = await resizeGrokToSceneDims(grokBuffer, sceneMeta.width, sceneMeta.height);
 
+    // C2. Registration guard: Grok redraws the page freehand and the resize
+    // back to scene dims can center-crop — both shift the content a few px.
+    // The blend mask below is built in ORIGINAL coordinates, so unaligned
+    // content crossfades into a smeared/"blended" figure. Measure the drift
+    // on background patches (outside the repaint bbox and every blurred box)
+    // and slide the output back into register before any mask math.
+    let registrationShift = null;
+    try {
+      const [origGray, grokGray] = await Promise.all([
+        sharp(sceneBuffer).greyscale().raw().toBuffer({ resolveWithObject: true }),
+        sharp(grokBuffer).greyscale().raw().toBuffer({ resolveWithObject: true }),
+      ]);
+      const excludeRects = [
+        {
+          left: bboxLeft - Math.round(bboxWidth * 0.15),
+          top: bboxTop - Math.round(bboxHeight * 0.15),
+          width: Math.round(bboxWidth * 1.3),
+          height: Math.round(bboxHeight * 1.3),
+        },
+        ...blurredRects,
+      ];
+      const shift = estimateGlobalShift(
+        { data: origGray.data, width: origGray.info.width, height: origGray.info.height },
+        { data: grokGray.data, width: grokGray.info.width, height: grokGray.info.height },
+        excludeRects
+      );
+      if (shift && (Math.abs(shift.dx) >= 1 || Math.abs(shift.dy) >= 1)) {
+        if (shift.consensus >= Math.max(3, Math.ceil(shift.patches / 2))) {
+          const [grokRaw, sceneRaw] = await Promise.all([
+            sharp(grokBuffer).raw().toBuffer(),
+            sharp(sceneBuffer).raw().toBuffer(),
+          ]);
+          const shifted = shiftRawRegion(grokRaw, sceneRaw, sceneMeta.width, sceneMeta.height, shift.dx, shift.dy);
+          grokBuffer = await sharp(shifted, { raw: { width: sceneMeta.width, height: sceneMeta.height, channels: 3 } })
+            .jpeg({ quality: 95 }).toBuffer();
+          registrationShift = shift;
+          log.info(`📐 [CHAR REPAIR GROK] Blended: Grok output drifted (${shift.dx},${shift.dy})px (${shift.consensus}/${shift.patches} patches agree) — re-aligned`);
+        } else {
+          log.warn(`📐 [CHAR REPAIR GROK] Blended: drift estimate (${shift.dx},${shift.dy})px but only ${shift.consensus}/${shift.patches} patches agree (non-uniform drift?) — not applying`);
+        }
+      }
+    } catch (regErr) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] Registration check failed: ${regErr.message} — blending unaligned`);
+    }
+
     // D. Calculate blend region: bbox + 10% padding (just enough for the edge feather).
     // Was 50% previously — that caused the blend rectangle to cover a huge chunk of
     // the scene, letting Grok's repaint overwrite background and other elements.
@@ -9382,6 +9562,50 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           .raw()
           .toBuffer();
         log.info(`👤 [CHAR REPAIR GROK] Blended ${whiteoutTarget}: silhouette-gated composite ON (only figure pixels repainted)`);
+
+        // Union with the silhouette of the figure Grok ACTUALLY drew. The
+        // original-only mask assumes the repaint landed on the same pixels;
+        // when it lands a few px off, the new figure gets clipped by the old
+        // outline and old-figure pixels outside the new outline survive as a
+        // smeared edge. Union (old ∪ new) paints the new figure fully and
+        // overwrites every old-figure pixel.
+        try {
+          const grokCropForSilhouette = await sharp(grokBuffer)
+            .extract({ left: tCropLeft, top: tCropTop, width: tCropWidth, height: tCropHeight })
+            .jpeg({ quality: 90 })
+            .toBuffer();
+          const grokSilhouettePng = await fetchSilhouettePng(grokCropForSilhouette);
+          if (grokSilhouettePng) {
+            const grokSilRGBA = await sharp({
+              create: { width: sceneMeta.width, height: sceneMeta.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+            })
+              .composite([{ input: grokSilhouettePng, top: tCropTop, left: tCropLeft }])
+              .png()
+              .toBuffer();
+            const grokAlphaInBlend = await sharp(grokSilRGBA)
+              .extractChannel(3)
+              .extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight })
+              .raw()
+              .toBuffer();
+            // Plausibility: a wildly different area means rembg traced
+            // something else (held object, background prop) — keep old-only.
+            let oldArea = 0, newArea = 0;
+            for (let i = 0; i < silhouetteAlphaInBlend.length; i++) {
+              if (silhouetteAlphaInBlend[i] > 128) oldArea++;
+              if (grokAlphaInBlend[i] > 128) newArea++;
+            }
+            if (newArea > 0 && newArea < oldArea * 3 && newArea > oldArea / 3) {
+              for (let i = 0; i < silhouetteAlphaInBlend.length; i++) {
+                if (grokAlphaInBlend[i] > silhouetteAlphaInBlend[i]) silhouetteAlphaInBlend[i] = grokAlphaInBlend[i];
+              }
+              log.info(`👤 [CHAR REPAIR GROK] Blended ${whiteoutTarget}: union silhouette (original ${oldArea}px ∪ repaint ${newArea}px)`);
+            } else {
+              log.warn(`👤 [CHAR REPAIR GROK] Blended ${whiteoutTarget}: repaint silhouette ${newArea}px vs original ${oldArea}px — implausible, keeping original-only mask`);
+            }
+          }
+        } catch (unionErr) {
+          log.warn(`⚠️ [CHAR REPAIR GROK] Union silhouette failed (${unionErr.message}) — original-only mask`);
+        }
       } else {
         log.info(`👤 [CHAR REPAIR GROK] Blended ${whiteoutTarget}: silhouette unavailable — falling back to rectangular blend (legacy behaviour)`);
       }
@@ -9513,6 +9737,37 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       .composite([{ input: blendedRegion, left: blendLeft, top: blendTop }])
       .jpeg({ quality: 95 }).toBuffer();
 
+    // Blur gate: the blended mode signals "redraw this" with a blur, and
+    // diffusion editors sometimes enhance the blur instead of replacing it —
+    // shipping a figure that is visibly softer than the rest of the page.
+    // Ratio-based, so uniformly soft art styles pass.
+    try {
+      const figureRect = {
+        left: Math.max(0, Math.min(bboxLeft, sceneMeta.width - 2)),
+        top: Math.max(0, Math.min(bboxTop, sceneMeta.height - 2)),
+      };
+      figureRect.width = Math.max(1, Math.min(bboxWidth, sceneMeta.width - figureRect.left));
+      figureRect.height = Math.max(1, Math.min(bboxHeight, sceneMeta.height - figureRect.top));
+      const [origSharpness, repairedSharpness] = await Promise.all([
+        measureRegionSharpness(sceneBuffer, figureRect),
+        measureRegionSharpness(composited, figureRect),
+      ]);
+      log.info(`🔬 [CHAR REPAIR GROK] Blended figure edge energy: original ${origSharpness.toFixed(0)}, repaired ${repairedSharpness.toFixed(0)}`);
+      if (origSharpness >= REPAIR_SHARPNESS_MIN_ORIG && repairedSharpness < origSharpness * REPAIR_SHARPNESS_REJECT_RATIO) {
+        log.warn(`🚫 [CHAR REPAIR GROK] Blended repair for ${charName} REJECTED: repaired figure is blurred (edge energy ${repairedSharpness.toFixed(0)} vs original ${origSharpness.toFixed(0)}) — keeping original`);
+        return {
+          imageData: null,
+          character: charName,
+          method,
+          rejectedReason: 'repaired_figure_blurred',
+          sharpness: { original: origSharpness, repaired: repairedSharpness },
+          usage: grokResult.usage,
+        };
+      }
+    } catch (gateErr) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] Sharpness gate failed: ${gateErr.message} — accepting repair unchecked`);
+    }
+
     const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
     log.info(`✅ [CHAR REPAIR GROK] Blended repair for ${charName} completed. Blend region: ${blendWidth}x${blendHeight}. Cost: $${grokResult.usage?.cost || 0.02}`);
 
@@ -9525,6 +9780,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       blendMask: blendMaskFinal ? `data:image/jpeg;base64,${blendMaskFinal.toString('base64')}` : null,
       croppedAvatar: croppedAvatarDataUri,
       character: charName,
+      registrationShift,
       usage: grokResult.usage,
       method,
       // The filled repair template actually sent — always returned (small
@@ -9738,7 +9994,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     }
     // Always use 'cover' — 'fill' stretches when aspects differ by even 1-2 pixels
     // after border trimming. Cover crops at most a few pixels and never distorts.
-    const resizedRegion = await sharp(repairedRegionBuffer)
+    let resizedRegion = await sharp(repairedRegionBuffer)
       .resize(extractWidth, extractHeight, { fit: 'cover', position: 'center' })
       .raw()
       .toBuffer();
@@ -9748,6 +10004,39 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       .extract({ left: extractLeft, top: extractTop, width: extractWidth, height: extractHeight })
       .raw()
       .toBuffer();
+
+    // Registration guard: Grok redraws the whole cutout and the cover-crop
+    // above can shift content when the aspect drifted. The padding ring
+    // outside the hatch should be pixel-identical to the original — measure
+    // the drift there and slide the repaint back into register so background
+    // lines don't double up in the feather ring.
+    let registrationShift = null;
+    try {
+      const grayOf = (rgb) => {
+        const g = Buffer.alloc(extractWidth * extractHeight);
+        for (let i = 0; i < g.length; i++) {
+          const idx = i * 3;
+          g[i] = (rgb[idx] + rgb[idx + 1] + rgb[idx + 2]) / 3 | 0;
+        }
+        return g;
+      };
+      const shift = estimateGlobalShift(
+        { data: grayOf(origRegion), width: extractWidth, height: extractHeight },
+        { data: grayOf(resizedRegion), width: extractWidth, height: extractHeight },
+        [{ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight }]
+      );
+      if (shift && (Math.abs(shift.dx) >= 1 || Math.abs(shift.dy) >= 1)) {
+        if (shift.consensus >= Math.max(3, Math.ceil(shift.patches / 2))) {
+          resizedRegion = shiftRawRegion(resizedRegion, origRegion, extractWidth, extractHeight, shift.dx, shift.dy);
+          registrationShift = shift;
+          log.info(`📐 [CHAR REPAIR GROK] Cutout: repaint drifted (${shift.dx},${shift.dy})px (${shift.consensus}/${shift.patches} patches agree) — re-aligned`);
+        } else {
+          log.warn(`📐 [CHAR REPAIR GROK] Cutout: drift estimate (${shift.dx},${shift.dy})px but only ${shift.consensus}/${shift.patches} patches agree — not applying`);
+        }
+      }
+    } catch (regErr) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] Cutout registration check failed: ${regErr.message} — blending unaligned`);
+    }
 
     // Feathered blend: full Grok content in the center, original pixels at
     // the outer edges. With the now-larger 40% extract padding, the outer
@@ -9774,6 +10063,36 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       .jpeg({ quality: 95 })
       .toBuffer();
 
+    // Blur gate: reject the repair when the repaired figure came back
+    // visibly softer than the original (model kept/enhanced blur or produced
+    // a mushy repaint). Same ratio gate as the blended branch.
+    try {
+      const figureRect = {
+        left: Math.max(0, Math.min(pixelLeft, sceneMeta.width - 2)),
+        top: Math.max(0, Math.min(pixelTop, sceneMeta.height - 2)),
+      };
+      figureRect.width = Math.max(1, Math.min(pixelWidth, sceneMeta.width - figureRect.left));
+      figureRect.height = Math.max(1, Math.min(pixelHeight, sceneMeta.height - figureRect.top));
+      const [origSharpness, repairedSharpness] = await Promise.all([
+        measureRegionSharpness(sceneBuffer, figureRect),
+        measureRegionSharpness(composited, figureRect),
+      ]);
+      log.info(`🔬 [CHAR REPAIR GROK] Cutout figure edge energy: original ${origSharpness.toFixed(0)}, repaired ${repairedSharpness.toFixed(0)}`);
+      if (origSharpness >= REPAIR_SHARPNESS_MIN_ORIG && repairedSharpness < origSharpness * REPAIR_SHARPNESS_REJECT_RATIO) {
+        log.warn(`🚫 [CHAR REPAIR GROK] Cutout repair for ${charName} REJECTED: repaired figure is blurred (edge energy ${repairedSharpness.toFixed(0)} vs original ${origSharpness.toFixed(0)}) — keeping original`);
+        return {
+          imageData: null,
+          character: charName,
+          method,
+          rejectedReason: 'repaired_figure_blurred',
+          sharpness: { original: origSharpness, repaired: repairedSharpness },
+          usage: grokResult.usage,
+        };
+      }
+    } catch (gateErr) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] Cutout sharpness gate failed: ${gateErr.message} — accepting repair unchecked`);
+    }
+
     const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
     const originalSceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
     log.info(`✅ [CHAR REPAIR GROK] Cut-out repair for ${charName} completed (feather ${FEATHER_PX}px). Cost: $${grokResult.usage?.cost || 0.02}`);
@@ -9795,6 +10114,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       grokRawResult: grokResult.imageData,
       croppedAvatar: croppedAvatarDataUri,
       character: charName,
+      registrationShift,
       usage: grokResult.usage,
       method,
       // The filled repair template actually sent — always returned (small
@@ -14371,6 +14691,9 @@ module.exports = {
   // Unified repair pipeline (the only active repair pipeline)
   selectBestVersion,
   runUnifiedRepairPipeline,
+  estimateGlobalShift,
+  shiftRawRegion,
+  measureRegionSharpness,
   chooseRepairStrategy,
   inpaintPage,
   sanitizeIssueForInpaint,

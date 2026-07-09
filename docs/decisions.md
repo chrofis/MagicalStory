@@ -1127,3 +1127,45 @@ avatar over a redressed standard.
 
 **Touched:** server/lib/styledAvatars.js, server/lib/entityConsistency.js,
 server.js (4 gates).
+
+---
+
+### Char-repair misregistration + blur guards (blended/cutout)
+
+**Date:** 2026-07-09
+
+**Context:** A prod page shipped with a blurred/"blended"-looking figure after
+character repair. Two verified mechanisms in `repairCharacterMismatchWithGrok`:
+(1) Grok redraws the page freehand and `resizeGrokToSceneDims` can center-crop
+— the output sits a few px off the original, and the blend mask (feather ring
++ ORIGINAL-scene silhouette) is built in original coordinates, so old and new
+content crossfade into a smeared figure; (2) blended mode signals "redraw
+this" with a blur, and diffusion editors sometimes ENHANCE the blur instead
+of replacing it — the exact failure that gave the cutout path its magenta
+crosshatch, never ported to the blended path (sibling gap, still open —
+switching blended to a shape-aware hatch needs scene-harness validation
+before shipping).
+
+**Decision:** three guards at the `repairCharacterMismatchWithGrok`
+chokepoint (all callers inherit): (a) `estimateGlobalShift` — background-patch
+SAD (±8 px, ≥3-patch consensus, low-variance patches skipped) measures Grok's
+global drift; output is re-aligned via `shiftRawRegion` before any mask math
+(blended + cutout); (b) blended's silhouette gate now uses old ∪ new — rembg
+runs on Grok's repaint too, union-gated by area plausibility (⅓×–3×), so an
+offset repaint is neither clipped by the old outline nor leaves old-figure
+pixels standing; (c) sharpness gate — Laplacian edge-energy of the figure
+bbox, repaired < 50% of original → repair rejected
+(`rejectedReason: 'repaired_figure_blurred'`), original page kept. Plus one
+eval bullet (image-evaluation.txt figure-completeness list): a whole figure
+noticeably blurrier than the rest of the page → MAJOR `smeared_artifact`.
+Gates fail open (guard error → repair accepted unchecked, warned) so rembg
+or sharp failures never kill a repair that used to succeed.
+
+**Rationale:** feathering smooths seams but cannot re-register shifted
+content; the mask must match where the figure actually landed. Ratio-based
+sharpness (not absolute) so soft art styles (watercolor) pass. Thresholds:
+`REPAIR_SHARPNESS_REJECT_RATIO 0.5`, `REPAIR_SHARPNESS_MIN_ORIG 25`,
+`MAX_SHIFT 8`, `MIN_VARIANCE 60`.
+
+**Touched:** server/lib/images.js (helpers + blended + cutout branches),
+prompts/image-evaluation.txt, docs/image-generation-methods.html.

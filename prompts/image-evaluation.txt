@@ -169,6 +169,7 @@ Flag as a defect when you see (severity in brackets):
 - Missing one arm or one leg inside the frame (not just cropped at the edge) → **MAJOR**.
 - Two overlapping copies of the same figure stacked (double-exposure artifact) → **MAJOR**.
 - A whole limb or large body region rendered as a blurred / smeared / unrecognisable shape (cannot read as an arm, hand, leg) → **MAJOR**.
+- A whole figure noticeably blurrier, softer, or more washed-out than the rest of the image (an out-of-focus figure on an otherwise sharp page) → **MAJOR** (`smeared_artifact`).
 - Slight smudging on a small body region (one finger fused to another, soft fingertips, gentle blur on a hand) where the limb is still clearly identifiable → **MINOR**. This is normal stylised brushwork, not a structural defect.
 
 Don't flag when:
