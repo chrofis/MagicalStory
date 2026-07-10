@@ -313,9 +313,9 @@ export default function ThemePage() {
         {(longDescription || skills || ageRec) && (
           <div className="mb-12">
             <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6 space-y-4">
-              {longDescription && (
-                <p className="text-stone-600 leading-relaxed">{longDescription}</p>
-              )}
+              {longDescription && longDescription.split('\n\n').map((para, i) => (
+                <p key={i} className="text-stone-600 leading-relaxed">{para}</p>
+              ))}
               {(skills || ageRec) && (
                 <div className="flex flex-wrap gap-4 pt-2 border-t border-stone-100">
                   {skills && (
@@ -343,6 +343,22 @@ export default function ThemePage() {
         {/* FAQ */}
         {faq.length > 0 && (
           <div className="mb-12">
+            {/* FAQPage JSON-LD — rendered inline so the build-time prerender
+                bakes it into the static HTML for rich results. */}
+            <script
+              type="application/ld+json"
+              dangerouslySetInnerHTML={{
+                __html: JSON.stringify({
+                  '@context': 'https://schema.org',
+                  '@type': 'FAQPage',
+                  mainEntity: faq.map(item => ({
+                    '@type': 'Question',
+                    name: item.q,
+                    acceptedAnswer: { '@type': 'Answer', text: item.a },
+                  })),
+                }),
+              }}
+            />
             <h2 className="font-title text-xl font-bold text-stone-900 mb-5 text-center">
               {language === 'de' ? 'Häufige Fragen' : language === 'fr' ? 'Questions fréquentes' : 'Frequently Asked Questions'}
             </h2>
