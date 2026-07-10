@@ -34,10 +34,20 @@ RUN npm install --omit=dev
 # Torch CPU build FIRST — requirements.txt's ultralytics depends on torch,
 # and without a preinstalled CPU build pip resolves the default Linux wheels,
 # which drag in ~2.5GB of CUDA libraries this CPU-only container can't use.
+#
+# numpy MUST be co-pinned here to the same version requirements.txt pins.
+# Without it, torch pulls numpy 2.x, and the later `-r requirements.txt`
+# DOWNGRADE to numpy==1.24.3 leaves a mixed 2.x/1.x tree in dist-packages
+# (--break-system-packages overlay) → `AttributeError: numpy._globals has no
+# attribute '_signature_descriptor'` at import → the whole Python service
+# (face detection, rembg, MobileSAM) failed to boot on every staging deploy
+# from 2026-07-10 21:28 onward. Co-pinning makes the second install a no-op
+# for numpy so no downgrade ever happens.
 RUN pip3 install --no-cache-dir --break-system-packages \
     --timeout 120 --retries 5 \
     --index-url https://download.pytorch.org/whl/cpu \
-    torch torchvision
+    --extra-index-url https://pypi.org/simple \
+    torch torchvision "numpy==1.24.3"
 
 # Install Python dependencies. mediapipe / opencv are large (>30 MB each) and
 # files.pythonhosted.org occasionally stalls mid-download — give pip more
