@@ -3,6 +3,7 @@ import { Images, X, Check, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } f
 import { useLanguage } from '@/context/LanguageContext';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import type { ImageVersion } from '@/types/story';
+import { versionScore } from '@/utils/versionScore';
 
 // Cover type names for display
 const COVER_LABELS = {
@@ -50,11 +51,9 @@ export function ImageHistoryModal({
     let bestIdx = -1;
     let bestScore = -Infinity;
     for (let i = 0; i < versions.length; i++) {
-      // Canonical read: finalScore is the single number written by applyScore.
-      // Fall through to legacy qualityScore for pre-migration stories (<= 2026-06-04).
-      const v = versions[i] as { finalScore?: number | null; qualityScore?: number | null };
-      const s = typeof v?.finalScore === 'number' ? v.finalScore
-        : (typeof v?.qualityScore === 'number' ? v.qualityScore : null);
+      // Canonical read via the shared util (same fallback chain as the
+      // server's computeFinalScore — entity penalty included for legacy).
+      const s = versionScore(versions[i]);
       if (s == null) continue;
       if (s >= bestScore) { bestScore = s; bestIdx = i; }
     }
@@ -184,9 +183,7 @@ export function ImageHistoryModal({
             <span className="text-white text-sm font-medium">
               {versionLabel(fullscreenIndex)} ({fullscreenIndex + 1}/{versions.length})
               {(() => {
-                const v = versions[fullscreenIndex] as { finalScore?: number | null; qualityScore?: number | null };
-                const score = typeof v.finalScore === 'number' ? v.finalScore
-                  : (typeof v.qualityScore === 'number' ? v.qualityScore : null);
+                const score = versionScore(versions[fullscreenIndex]);
                 if (!developerMode || score == null) return null;
                 return (
                   <span className={`ml-2 text-xs font-bold px-1.5 py-0.5 rounded ${scoreBgColor(score)}`}>
@@ -302,14 +299,10 @@ export function ImageHistoryModal({
                       <div className="flex items-center gap-1 sm:gap-2">
                         <span className="text-white text-xs sm:text-sm font-semibold">{versionLabel(idx)}</span>
                         {developerMode && (() => {
-                          // Canonical read: finalScore is the single number
-                          // written by applyScore (chunk-2 scoring migration).
-                          // Legacy qualityScore kept as fallback for stories
-                          // saved before the migration. Use ?? not || so
-                          // legitimate zero scores still render.
-                          const v = version as { finalScore?: number | null; qualityScore?: number | null };
-                          const score = typeof v.finalScore === 'number' ? v.finalScore
-                            : (typeof v.qualityScore === 'number' ? v.qualityScore : null);
+                          // Canonical read via the shared util — same chain
+                          // (incl. entity penalty) as the detail panel, so the
+                          // card badge and "Endwert" always agree.
+                          const score = versionScore(version);
                           if (score == null) {
                             return (
                               <span className="text-gray-300 text-[10px] sm:text-[11px] font-medium px-1 sm:px-1.5 py-0.5 rounded border border-gray-400/40">
@@ -575,10 +568,7 @@ export function ImageHistoryModal({
                       rawQualityScore?: number | null;
                       evalScore?: number | null;
                     };
-                    const score = typeof v.finalScore === 'number' ? v.finalScore
-                      : (typeof v.qualityScore === 'number'
-                        ? Math.max(0, v.qualityScore - (v.entityPenalty || 0))
-                        : null);
+                    const score = versionScore(v);
                     if (score == null) return null;
                     const entityPenalty = typeof v.scoreBreakdown?.entity?.penalty === 'number'
                       ? v.scoreBreakdown.entity.penalty

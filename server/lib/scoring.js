@@ -73,10 +73,10 @@ const { log } = require('../utils/logger');
 //   }
 //
 //   mathFinalScore   = max(0, 100 − Σ SEVERITY_POINTS[d.severity])
-//   promptFinalScore = consolidator's tolerant deduplicated score (0–100), or null
-//   finalScore       = (scoreModel === 'prompt' && promptFinalScore != null) ? promptFinalScore : mathFinalScore
+//   promptFinalScore = the evaluator/consolidator merged score — AUDIT ONLY
+//   finalScore       = mathFinalScore, always (single scale, 2026-07-10)
 //
-// Writers call `applyScore(version, {evalResult, entityResult, complianceResult, promptFinalScore, scoreModel})`
+// Writers call `applyScore(version, {evalResult, entityResult, promptFinalScore})`
 // — single entry point. Readers (`findBadPages`, `pickBestVersionIndex`)
 // read `version.finalScore` only.
 //
@@ -180,26 +180,33 @@ function computeMathFinalScore(deductions) {
  * Single entry point that mutates a version with the canonical scoring
  * fields. Writers call this; readers read `version.finalScore`.
  *
+ * SINGLE SCALE (2026-07-10): finalScore is ALWAYS the math model
+ * (100 − Σ SEVERITY_POINTS over structured issues, entity capped). The former
+ * 'prompt' score model was dead in the pipeline (nothing ever plumbed the
+ * consolidator's final_score into evaluation.promptFinalScore) while the regen
+ * routes laundered the merged-eval score through the promptFinalScore
+ * parameter — leaving two incomparable finalScore scales in the same
+ * imageVersions[] arrays that pickBestVersionIndex compared directly.
+ * promptFinalScore is kept as an AUDIT field only; it never drives finalScore.
+ *
  * @param {object} version  mutated in place
  * @param {object} params
  * @param {object} [params.evalResult]     evaluateImageQuality output
  * @param {object} [params.entityResult]   { penalty, issues } from getEntityPenaltyAndIssues
- * @param {number|null} [params.promptFinalScore]   consolidator's final_score (null if no consolidator ran)
- * @param {'prompt'|'math'} [params.scoreModel='prompt']
+ * @param {number|null} [params.promptFinalScore]   audit-only: the evaluator/consolidator combined score, if any
  */
-function applyScore(version, { evalResult = null, entityResult = null, promptFinalScore = null, scoreModel = 'prompt' } = {}) {
+function applyScore(version, { evalResult = null, entityResult = null, promptFinalScore = null } = {}) {
   if (!version || typeof version !== 'object') return;
   const deductions = composeDeductions({ evalResult, entityResult });
   const mathFinalScore = computeMathFinalScore(deductions);
-  const usePrompt = scoreModel === 'prompt' && typeof promptFinalScore === 'number';
-  const finalScore = usePrompt ? promptFinalScore : mathFinalScore;
+  const finalScore = mathFinalScore;
 
   // Canonical fields written by the single writer.
   version.deductions = deductions;
   version.mathFinalScore = mathFinalScore;
   version.promptFinalScore = (typeof promptFinalScore === 'number') ? promptFinalScore : null;
   version.finalScore = finalScore;
-  version.scoreModel = scoreModel;
+  version.scoreModel = 'math';
 
   // scoreBreakdown — per-evaluator card for the dev panel's breakdown view.
   // Built from the same evalResult so it stays consistent with deductions.
@@ -222,7 +229,7 @@ function applyScore(version, { evalResult = null, entityResult = null, promptFin
   // consolidator (lenient) or the math fallback (conservative) — meaning the
   // 60-threshold can't be tuned from logs alone.
   const pn = version.pageNumber != null ? `page ${version.pageNumber}` : 'version';
-  log.info(`[SCORE] ${pn}: ${scoreModel} model → finalScore=${finalScore} (math=${mathFinalScore}, prompt=${promptFinalScore}, entity=−${entityPoints})`);
+  log.info(`[SCORE] ${pn}: math model → finalScore=${finalScore} (evalAudit=${promptFinalScore}, entity=−${entityPoints})`);
 
   return version;
 }
@@ -475,12 +482,11 @@ function composeFinalScore(breakdown) {
  * @param {object} breakdown
  */
 /**
- * Single source of truth for writing scoring fields onto a version
- * object. Used by every code path that produces a new version (the
- * round-loop push in images.js, applyScoreBreakdown below, the
- * regeneration routes). Keeps finalScore SIGNED — clamping to 0
- * collapses "marginal" and "broken" into the same value and the
- * picker's later-wins-ties rule then promotes the broken one.
+ * LEGACY writer (scoring audit 2026-07-10): no production code path calls
+ * this anymore — every version writer now goes through applyScore (single
+ * scale). Only applyScoreBreakdown (itself dead in prod, tests-only) still
+ * calls it. Kept per mark-not-delete. Note its finalScore is the SIGNED
+ * merged-eval scale, NOT comparable with applyScore's math finalScore.
  */
 function setVersionScores(version, evalScore, entityPenalty) {
   if (!version || typeof version !== 'object') return;
@@ -512,7 +518,7 @@ function applyScoreBreakdown(version, breakdown) {
  * @param {Array<object>} versions
  * @returns {number} index in versions[], or -1 when none scoreable
  */
-function pickBestVersionIndex(versions) {
+function pickBestVersionIndex(versions, { tieBreak = 'latest' } = {}) {
   if (!Array.isArray(versions) || versions.length === 0) return -1;
   let bestIdx = -1;
   let bestScore = -Infinity;
@@ -524,8 +530,15 @@ function pickBestVersionIndex(versions) {
     // Primary: clamped finalScore (higher better). Tiebreak when the clamped
     // scores are equal — typically several candidates pinned at 0: prefer the
     // one with the smallest un-clamped deduction total (fewest/lightest
-    // issues), which the 0-floor erased. Final tiebreak: later index wins.
-    if (s > bestScore || (s === bestScore && ded <= bestDeduction)) {
+    // issues), which the 0-floor erased. Final full-tie break is direction-
+    // parameterized — BOTH directions are deliberate, do not "fix" one:
+    //   'latest'   (<=): newer version wins a full tie — interactive flows,
+    //               where the user's just-made regen should show.
+    //   'earliest' (<): the earlier version keeps a full tie — the repair
+    //               pipeline, where the least-mangled original beats a repair
+    //               that changed nothing measurable (job_1781289599516).
+    const tie = (s === bestScore) && (tieBreak === 'latest' ? ded <= bestDeduction : ded < bestDeduction);
+    if (s > bestScore || tie) {
       bestScore = s;
       bestDeduction = ded;
       bestIdx = i;
@@ -608,12 +621,16 @@ async function recomputeAllActiveVersions(storyId, storyData) {
   return { scenes, covers, switches };
 }
 
+// Single-sourced from REPAIR_DEFAULTS (config/models.js) — these used to be
+// independent literals that could drift from the values the repair pipeline
+// actually runs with. Lazy require avoids a config↔scoring load cycle.
+const { REPAIR_DEFAULTS: _REPAIR_DEFAULTS } = require('../config/models');
 const SCORE_THRESHOLDS = {
   // Pages scoring below this trigger a redo in the repair workflow.
-  REDO: 60,
+  REDO: _REPAIR_DEFAULTS?.scoreThreshold ?? 60,
   // Pages with this many or more fixable issues trigger a redo even if
   // the score is acceptable (something visually subtle is off).
-  ISSUES: 5,
+  ISSUES: _REPAIR_DEFAULTS?.issueThreshold ?? 5,
 };
 
 /**

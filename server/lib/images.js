@@ -5540,33 +5540,16 @@ function selectBestVersion(versions) {
   if (!versions || versions.length === 0) return null;
   if (versions.length === 1) return versions[0];
 
-  // Canonical SCORE rule (computeFinalScore: evalScore − entityPenalty), but
-  // pipeline-specific TIE-BREAK: earliest version wins. pickBestVersionIndex
-  // uses later-wins ties for interactive flows (a user who just regenerated
-  // expects their new version on a tie). In the repair pipeline the opposite
-  // holds: when scores tie — typically all 0 on safety-fought stories — the
+  // Same canonical loop as scoring.js pickBestVersionIndex, with the
+  // pipeline-specific 'earliest' tie-break: when scores AND deduction totals
+  // fully tie — typically all pinned at 0 on safety-fought stories — the
   // LAST repair round is the most content-mangled image, while the original
-  // is the least-mangled. Observed on job_1781289599516: page 2 shipped
-  // inpaint-round-3 (score 0) instead of the original (score 0).
-  // When the clamped scores tie (typically several candidates pinned at 0),
-  // break the tie by the un-clamped deduction total the 0-floor erased —
-  // the candidate with the fewest/lightest issues wins. Only on a true tie of
-  // BOTH does the earliest index win (least-mangled original beats the last
-  // repair round).
-  const { computeFinalScore, versionDeductionTotal } = require('./scoring');
-  let bestIdx = -1;
-  let bestScore = -Infinity;
-  let bestDeduction = Infinity;
-  for (let i = 0; i < versions.length; i++) {
-    const s = computeFinalScore(versions[i]);
-    if (s == null) continue;
-    const ded = versionDeductionTotal(versions[i]);
-    if (s > bestScore || (s === bestScore && ded < bestDeduction)) {  // strict — earlier index keeps a full tie
-      bestScore = s;
-      bestDeduction = ded;
-      bestIdx = i;
-    }
-  }
+  // is the least-mangled (observed job_1781289599516: page 2 shipped
+  // inpaint-round-3 score 0 instead of the original score 0). Interactive
+  // flows use the default 'latest' (a user who just regenerated expects
+  // their new version to show on a tie).
+  const { pickBestVersionIndex } = require('./scoring');
+  const bestIdx = pickBestVersionIndex(versions, { tieBreak: 'earliest' });
   return bestIdx >= 0 ? versions[bestIdx] : versions[0];
 }
 
@@ -6645,6 +6628,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // the candidate didn't capture any.
           grokRefImages: c.grokRefImages || baseVersion.grokRefImages || null,
           entityPenalty: isWinner ? baseVersion.entityPenalty : 0,
+          entityPenaltyRaw: isWinner ? baseVersion.entityPenaltyRaw : 0,
+          entityIssues: isWinner ? (baseVersion.entityIssues || []) : [],
           evaluatedAt: new Date().toISOString(),
           // Surface the text-space repair inputs in the viewer's repair section.
           inpaintInstruction: c.prompt || null,
@@ -6665,6 +6650,24 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         ? [baseVersion, scaleRepairVersion]
         : [baseVersion];
       pageVersions.set(img.pageNumber, final);
+    }
+
+    // Canonical single-scale stamp AT CREATION for every evaluated version —
+    // the same applyScore math the persist path re-stamps, so every in-flight
+    // decision (findBadPages, selectBestVersion, rescue) runs on the numbers
+    // that actually get persisted. Un-evaluated versions (pre-scale-repair v0,
+    // non-winner text-space candidates) stay unscored by design.
+    {
+      const { applyScore: stampAtCreation } = require('./scoring');
+      for (const v of pageVersions.get(img.pageNumber) || []) {
+        if (!v?.evaluation) continue;
+        v.pageNumber = img.pageNumber;
+        stampAtCreation(v, {
+          evalResult: v.evaluation,
+          entityResult: { issues: v.entityIssues || [], penalty: v.entityPenaltyRaw ?? v.entityPenalty ?? 0 },
+          promptFinalScore: v.score ?? null,
+        });
+      }
     }
   }
 
@@ -7076,12 +7079,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const visualScore = bestSoFar.evaluation?.qualityScore ?? bestSoFar.score;
         const imageScore = bestSoFar.score;
         const semanticPenalty = Math.max(0, visualScore - imageScore);
-        // Capped like every version score — uncapped, pages with large
-        // non-actionable entity penalties stayed under the redo threshold
-        // and were re-attempted every round without ever converging.
-        const { capEntityPenalty: capEnt } = require('./scoring');
-        const entityPenalty = capEnt(getEntityPenalty(img.pageNumber, currentEntityReport));
-        const finalScore = Math.max(0, imageScore - entityPenalty);
+        // Canonical: the version's own single-scale finalScore (stamped by
+        // applyScore at creation) — the same number the pickers and persist
+        // path use. Was an inline eval-scale max(0, imageScore − entity)
+        // recompute that disagreed with the persisted score.
+        const { computeFinalScore: roundScoreOf } = require('./scoring');
+        const finalScore = roundScoreOf(bestSoFar);
+        const entityPenalty = bestSoFar.entityPenalty || 0;
 
         log.debug(`📊 [PIPELINE] Round ${round} Page ${img.pageNumber}: vis=${visualScore} sem=-${semanticPenalty} img=${imageScore} ent=-${entityPenalty} final=${finalScore}`);
 
@@ -7383,8 +7387,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         if (versions && repairResult) {
           const evScore = ev.score ?? ev.qualityScore ?? null;
           const evEntityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
-          const evEntityPenalty = evEntityResult.penalty;
-          const { setVersionScores } = require('./scoring');
+          const { applyScore } = require('./scoring');
           const newVersion = {
             imageData: repairResult.imageData,
             score: evScore,
@@ -7416,8 +7419,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             charRepairBlendMask: repairResult.charRepairBlendMask || null,
             charRepairWhiteout: repairResult.charRepairWhiteout || null,
           };
-          // Single source of truth for evalScore/entityPenalty/finalScore.
-          setVersionScores(newVersion, evScore, evEntityPenalty);
+          // Canonical stamp AT CREATION (single scale): the same applyScore
+          // math the persist path uses, so Step-3 selectBestVersion and
+          // findBadPages decide on the SAME numbers that get persisted and
+          // re-picked by recomputeAllActiveVersions. Previously this used
+          // setVersionScores (signed merged-eval scale) and stampScores
+          // rewrote finalScore with math at persist — the Step-3 winner and
+          // the saved activeVersion could disagree.
+          newVersion.pageNumber = ev.pageNumber;
+          applyScore(newVersion, {
+            evalResult: ev,
+            entityResult: evEntityResult,
+            promptFinalScore: evScore,
+          });
           versions.push(newVersion);
         }
       }
@@ -7455,8 +7469,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // Gessler-less scale-repair shipped at score 30). Evaluate the unscored
   // original with the same eval the repairs got, then re-pick.
   try {
-    const RESCUE_THRESHOLD = 60;
-    const { computeFinalScore: rescueScoreOf, setVersionScores: rescueSetScores } = require('./scoring');
+    // Single-sourced: same threshold the repair rounds use (REPAIR_DEFAULTS
+    // .scoreThreshold, default 60) — was a hardcoded 60 here.
+    const RESCUE_THRESHOLD = REPAIR_DEFAULTS?.scoreThreshold ?? 60;
+    const { computeFinalScore: rescueScoreOf, applyScore: rescueApplyScore } = require('./scoring');
     const rescueEntries = [];
     for (const [pageNumber, versions] of pageVersions) {
       const bestScore = rescueScoreOf(finalBestPerPage.get(pageNumber));
@@ -7480,7 +7496,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         entry.version.evaluation = ev;
         entry.version.entityIssues = entityResult.issues;
         entry.version.evaluatedAt = new Date().toISOString();
-        rescueSetScores(entry.version, evScore, entityResult.penalty);
+        entry.version.pageNumber = ev.pageNumber;
+        // Canonical stamp — same single-scale math as every other writer.
+        rescueApplyScore(entry.version, { evalResult: ev, entityResult, promptFinalScore: evScore });
         const repicked = selectBestVersion(pageVersions.get(ev.pageNumber));
         const prevBest = finalBestPerPage.get(ev.pageNumber);
         finalBestPerPage.set(ev.pageNumber, repicked);
@@ -7584,17 +7602,27 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const newVersion = {
           imageData: w.imageData,
           score: best.score,
-          finalScore: best.finalScore != null
-            ? best.finalScore
-            : (best.score != null ? Math.max(0, best.score - (best.entityPenalty || 0)) : null),
           source: 'post-repair-text-space',
           evaluation: best.evaluation || null,
           modelId: w.modelId || best.modelId,
           grokRefImages: w.grokRefImages,
-          entityPenalty: best.entityPenalty || 0,
+          entityIssues: best.entityIssues || [],
           evaluatedAt: new Date().toISOString(),
           prompt: w.prompt,
+          pageNumber,
         };
+        // Canonical stamp (inherits the pre-recovery best's evaluation).
+        // Previously this copied finalScore inline WITHOUT an .evaluation-aware
+        // stamp, so the persist-time stampScores nulled its finalScore and the
+        // chosen text-space winner could never win pickBestVersionIndex —
+        // activeVersion then pointed at a different version than the flattened
+        // root imageData.
+        const { applyScore: stampTextSpace } = require('./scoring');
+        stampTextSpace(newVersion, {
+          evalResult: newVersion.evaluation,
+          entityResult: { issues: newVersion.entityIssues, penalty: best.entityPenaltyRaw ?? best.entityPenalty ?? 0 },
+          promptFinalScore: best.score ?? null,
+        });
         versions.push(newVersion);
         finalBestPerPage.set(pageNumber, newVersion);
       }
@@ -7722,8 +7750,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       applyScore(v, {
         evalResult: v.evaluation || null,
         entityResult,
-        promptFinalScore: v.evaluation?.promptFinalScore ?? null,
-        scoreModel: 'prompt',
+        // Audit-only: the evaluator's merged score. finalScore is always math.
+        promptFinalScore: v.evaluation?.score ?? v.evaluation?.qualityScore ?? null,
       });
     };
     const buildVersionEntry = (v) => {
@@ -7833,12 +7861,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       modelId: best?.modelId || img.modelId,
       thinkingText: img.thinkingText || null,
       qualityScore: best?.score ?? finalEval?.qualityScore ?? null,
-      // Single score the UI shows. Falls back to derive from quality - entity
-      // when the round loop didn't stamp it (cover paths, post-repair-text-space
-      // before round 1).
-      finalScore: best?.finalScore != null
-        ? best.finalScore
-        : (best?.score != null ? Math.max(0, best.score - (best.entityPenalty || 0)) : null),
+      // Single score the UI shows — the canonical reader (handles the stamped
+      // finalScore plus every legacy fallback shape in one place).
+      finalScore: best ? require('./scoring').computeFinalScore(best) : null,
       qualityReasoning: finalEval?.reasoning ?? null,
       semanticScore: finalEval?.semanticScore ?? null,
       semanticResult: finalEval?.semanticResult ?? null,

@@ -107,15 +107,26 @@ test('picks highest finalScore', () => {
   ];
   assert.strictEqual(pickBestVersionIndex(versions), 1);
 });
-test('exactly the v3 cover scenario from production: q80/p60 < q50/p30 (later wins on tie)', () => {
+test('score tie broken by smaller deduction total first (v1 ded30 beats v2 ded60)', () => {
   const versions = [
     { qualityScore: 10, finalScore: 10 },                 // v0
     { qualityScore: 50, entityPenalty: 30, finalScore: 20 },  // v1
     { qualityScore: 80, entityPenalty: 60, finalScore: 20 },  // v2 (same final as v1)
     { qualityScore: 0, entityPenalty: 60, finalScore: 0 },   // v3 (worst, was active in prod)
   ];
-  // Tie-break: later wins, so v2 beats v1 on the 20-vs-20 tie. v2 = best.
-  assert.strictEqual(pickBestVersionIndex(versions), 2);
+  // On the 20-vs-20 finalScore tie, the un-clamped deduction total decides
+  // FIRST (fewest/lightest issues wins): v1 carries −30 vs v2's −60 → v1.
+  // Index direction only breaks a FULL tie of score AND deductions.
+  // (This test previously asserted pure later-wins and had been failing.)
+  assert.strictEqual(pickBestVersionIndex(versions), 1);
+});
+test('full tie (score + deductions): latest wins by default, earliest with tieBreak option', () => {
+  const versions = [
+    { finalScore: 20, entityPenalty: 30 },  // v0
+    { finalScore: 20, entityPenalty: 30 },  // v1 — identical
+  ];
+  assert.strictEqual(pickBestVersionIndex(versions), 1);                            // interactive default
+  assert.strictEqual(pickBestVersionIndex(versions, { tieBreak: 'earliest' }), 0);  // repair pipeline
 });
 test('un-evaluated newer version does NOT beat scored older one', () => {
   const versions = [

@@ -583,9 +583,8 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             versionIndex: row.version_index,
             hasImage: true,
             qualityScore: row.quality_score,
-            finalScore: versionMeta.finalScore != null
-              ? versionMeta.finalScore
-              : (row.quality_score != null ? Math.max(0, row.quality_score - (versionMeta.entityPenalty || 0)) : null),
+            // Canonical reader — one fallback chain for every legacy shape.
+            finalScore: require('../lib/scoring').computeFinalScore({ ...versionMeta, qualityScore: row.quality_score }),
             generatedAt: versionDate,
             createdAt: versionDate,  // ImageHistoryModal reads createdAt
             // Dev mode metadata from data blob
@@ -923,7 +922,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             createdAt: v.createdAt || null,
             type: v.type || v.source || null,
             qualityScore: v.qualityScore ?? null,
-            finalScore: v.finalScore ?? (v.qualityScore != null ? Math.max(0, v.qualityScore - (v.entityPenalty || 0)) : null),
+            // Canonical reader — one fallback chain for every legacy shape.
+            finalScore: require('../lib/scoring').computeFinalScore(v),
             rawQualityScore: v.rawQualityScore ?? null,
             semanticScore: v.semanticScore ?? null,
             semanticResult: v.semanticResult || null,

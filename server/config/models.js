@@ -126,14 +126,12 @@ const MODEL_DEFAULTS = {
   // and character-repair passes catch most of it.
   imageBackend: 'grok',
 
-  // Scoring model — picks which finalScore the pipeline uses.
-  //   'prompt' = consolidator's tolerant deduplicated final_score (default).
-  //             Falls back to math when consolidator hasn't run on a version.
-  //   'math'   = sum of severity points from raw deductions, 100 − total.
-  // Both numbers are stored on every version (mathFinalScore, promptFinalScore)
-  // so retrospectives can see what each model said. The flag is snapshotted
-  // onto each story at creation in story.flagSnapshot.scoreModel — old stories
-  // can be re-evaluated against either model later.
+  // DEAD CONFIG (scoring audit 2026-07-10): scoreModel is read by nothing.
+  // The 'prompt' model was never plumbed (no code ever wrote the consolidator's
+  // final_score into evaluation.promptFinalScore), so every finalScore was
+  // silently the math model while telemetry claimed 'prompt'. applyScore is now
+  // math-only by design — ONE score scale across pipeline + regen versions —
+  // and promptFinalScore survives as an audit-only field. Kept per mark-not-delete.
   scoreModel: 'prompt',
   // Feature flags for generation pipeline
   // DEAD CONFIG (audit 2026-07-09): enableAutoRepair is read by nothing — the

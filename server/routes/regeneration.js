@@ -38,10 +38,13 @@ const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
 // imageResult shape from generateImageWithQualityRetry / iterate:
 //   { score, qualityReasoning, fixableIssues, fixTargets, semanticResult,
 //     threeStageResult, modelId, ... }
-// The .score field IS the final combined number (already includes
-// semantic + threeStage merges via mergeSemanticResult in images.js).
-// We pass it as promptFinalScore so applyScore preserves the existing
-// behavior of "finalScore = imageResult.score" exactly.
+// SINGLE SCALE (2026-07-10): finalScore is the math model computed from the
+// structured issues below — the same formula the unified pipeline persists —
+// so regen versions and pipeline versions are comparable in the same
+// imageVersions[] array. imageResult.score (the merged evaluator number) is
+// passed only as the promptFinalScore AUDIT field; it no longer drives
+// finalScore (it used to be laundered through the prompt-model branch,
+// leaving two incomparable scales in one array).
 function stampCanonicalScore(version, imageResult, opts = {}) {
   if (!version || typeof version !== 'object') return;
   const { applyScore } = require('../lib/scoring');
@@ -59,7 +62,6 @@ function stampCanonicalScore(version, imageResult, opts = {}) {
     evalResult,
     entityResult,
     promptFinalScore: imageResult?.score ?? null,
-    scoreModel: 'prompt',
   });
 }
 
@@ -5555,12 +5557,17 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             if (evalResult) {
               afterScore = evalResult.score ?? evalResult.qualityScore ?? null;
               afterReasoning = evalResult.reasoning || null;
-              // Store score on the new version
+              // Store score on the new version — CANONICAL stamp. Previously
+              // this wrote only the legacy qualityScore field (no finalScore /
+              // deductions), so the char-repair version competed against
+              // canonically-scored versions via computeFinalScore's legacy
+              // fallback — a different scale with no entity penalty.
               const newVersion = existingImage.imageVersions[existingImage.imageVersions.length - 1];
               newVersion.qualityScore = afterScore;
               newVersion.qualityReasoning = afterReasoning;
               newVersion.issuesSummary = evalResult.issuesSummary || '';
               newVersion.evaluatedAt = new Date().toISOString();
+              stampCanonicalScore(newVersion, evalResult);
               const delta = beforeScore != null && afterScore != null ? afterScore - beforeScore : null;
               log.info(`🔍 [CHAR REPAIR] ${pageLabel} After: ${afterScore}% (before: ${beforeScore}%, delta: ${delta != null ? (delta >= 0 ? '+' : '') + delta : 'n/a'})`);
             }
