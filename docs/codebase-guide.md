@@ -68,7 +68,15 @@ Step 2  ROUND LOOP (round 1..maxPasses):
         └─ re-evaluate repaired pages + fresh entity check in parallel; append
            versions; failed attempts persist to retryHistory (round_repair_failed)
 
-Step 3  Pick best version per page across original + all rounds (selectBestVersion)
+Step 3  Pick best version per page across original + all rounds (selectBestVersion).
+        Score-based selection respects PINNED active versions: explicit user
+        choices (manual version pick, iterate, style-transfer, scale-repair,
+        cover regen/edit) write image_version_meta[key] = { activeVersion,
+        pinned: true } and every recompute skips them; a plain setActiveVersion
+        (pipeline / repair-workflow pick-best) clears the pin. Regen routes also
+        stamp version entries with dbVersionIndex (real DB version_index) —
+        pickers and rehydrate prefer the stamp over the identity array mapping.
+        See docs/decisions.md 2026-07-10 and server/lib/versionManager.js.
 Step 3b Rescue eval: if best < RESCUE_THRESHOLD (60, hardcoded) and an unscored
         original exists (e.g. pre-scale-repair v0), evaluate it and re-pick —
         prevents a damaged repair from shipping just because the original had no score

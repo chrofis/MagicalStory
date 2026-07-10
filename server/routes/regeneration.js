@@ -122,7 +122,7 @@ const {
 } = require('../lib/visualBible');
 const { applyStyledAvatars } = require('../lib/styledAvatars');
 const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing, collectEntityAppearances, buildClothingDescription } = require('../lib/entityConsistency');
-const { getActiveIndexAfterPush, arrayToDbIndex } = require('../lib/versionManager');
+const { getActiveIndexAfterPush, arrayToDbIndex, dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
 const { coverKeyToType, coverTypeToKey, coverLabel } = require('../lib/coverKeys');
@@ -439,7 +439,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         for (let vIdx = 0; vIdx < sceneEntry.imageVersions.length; vIdx++) {
           const version = sceneEntry.imageVersions[vIdx];
           if (!version.imageData) {
-            const dbVersionIndex = arrayToDbIndex(vIdx, 'scene');
+            const dbVersionIndex = dbIndexFor(version, vIdx, 'scene');
             const vImg = pageImages.find(i => i.version_index === dbVersionIndex);
             if (vImg) {
               version.imageData = vImg.image_data;
@@ -1620,8 +1620,12 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
       generatedAt: newVersion.createdAt,
       versionIndex: newVersionIndex,
     });
+    newVersion.dbVersionIndex = newVersionIndex;
     newVersion._alreadySaved = true;
-    await setActiveVersion(id, `${pageNumber}`, newVersionIndex);
+    // pinned: scale-repair is an explicit user choice — without the pin the
+    // recompute inside saveStoryData would re-point active at the best-scored
+    // older version (the new version is unscored) and this set would be lost.
+    await setActiveVersion(id, `${pageNumber}`, newVersionIndex, { pinned: true });
     await saveStoryData(id, storyData);
 
     res.json({
@@ -1737,9 +1741,12 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
           // the default 0 OVERWRITES the original.
           newVersionIndex = await getNextVersionIndex(id, coverType, null);
           await saveStoryImage(id, coverType, null, result.imageData, { versionIndex: newVersionIndex });
-          // Style-transfer has no quality score on the new version, so
-          // recomputeAllActiveVersions wouldn't pick it — set explicitly.
-          await setActiveVersion(id, coverType, newVersionIndex);
+          newVersion.dbVersionIndex = newVersionIndex;
+          newVersion._alreadySaved = true;
+          // pinned: if any older version is scored, the recompute inside
+          // saveStoryData would otherwise re-point active at it (the new
+          // style-transfer version is unscored) and silently undo this set.
+          await setActiveVersion(id, coverType, newVersionIndex, { pinned: true });
         }
       } else {
         // Scene page
@@ -1766,8 +1773,10 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
           // Query DB for next version_index — see cover branch comment above.
           newVersionIndex = await getNextVersionIndex(id, 'scene', pageNumber);
           await saveStoryImage(id, 'scene', pageNumber, result.imageData, { versionIndex: newVersionIndex });
-          // No quality score on style-transfer output — set active explicitly.
-          await setActiveVersion(id, `${pageNumber}`, newVersionIndex);
+          newVersion.dbVersionIndex = newVersionIndex;
+          newVersion._alreadySaved = true;
+          // pinned — same reasoning as the cover branch above.
+          await setActiveVersion(id, `${pageNumber}`, newVersionIndex, { pinned: true });
         }
       }
       // Persist updated blob + version index
@@ -2296,6 +2305,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         versionIndex: newVersionIndex
       });
       // Mark as already saved so saveStoryData doesn't re-save it
+      newVersion.dbVersionIndex = newVersionIndex;
       newVersion._alreadySaved = true;
 
       // Update the cover data in storyData.
@@ -2334,7 +2344,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       // version must become active. Set it explicitly (same as the style-
       // transfer path at ~line 1736). Points at the DB row we just saved, which
       // survives even if a concurrent multi-cover save races the JSONB blob.
-      await setActiveVersion(id, coverKey, newVersionIndex);
+      // pinned: any later save's recompute would otherwise revert to pickBest.
+      await setActiveVersion(id, coverKey, newVersionIndex, { pinned: true });
 
       // Deduct credits if not unlimited
       let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
@@ -2357,7 +2368,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         let imgData = v.imageData || undefined;
         if (!imgData) {
           try {
-            const dbImg = await getStoryImage(id, coverKey, null, arrayToDbIndex(idx, coverKey));
+            const dbImg = await getStoryImage(id, coverKey, null, dbIndexFor(v, idx, coverKey));
             // After the R2 migration older versions store bytes ONLY in image_url
             // (image_data is NULL). Falling back to imageUrl mirrors the canonical
             // load path's pickImageSrc — without it, every older cover version comes
@@ -2643,14 +2654,20 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     };
     stampCanonicalScore(newVersion, iterResult);
 
-    let iterateNewVersionIndex;
+    // DB-authoritative allocation (MAX(version_index)+1). The old
+    // `imageVersions.length - 1` diverges from the DB row set on
+    // lazy-migrated stories and could overwrite an existing row — the exact
+    // failure mode getNextVersionIndex's docstring warns about. The stamp on
+    // the version entry makes the save loops + pickers write/point at this
+    // row even when array position and DB index differ.
+    const iterateNewVersionIndex = await getNextVersionIndex(id, 'scene', pageNumber);
+    newVersion.dbVersionIndex = iterateNewVersionIndex;
     if (existingImageIndex >= 0) {
       if (sceneImages[existingImageIndex].imageVersions) {
         sceneImages[existingImageIndex].imageVersions.push(newVersion);
       } else {
         sceneImages[existingImageIndex].imageVersions = [newVersion];
       }
-      iterateNewVersionIndex = sceneImages[existingImageIndex].imageVersions.length - 1;
       // Update main fields (but NOT imageData - that would cause duplicate image storage)
       const { imageData: _unusedImg, ...metadataOnly } = newImageData;
       Object.assign(sceneImages[existingImageIndex], metadataOnly);
@@ -2660,7 +2677,6 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       newImageData.imageVersions = [newVersion];
       sceneImages.push(newImageData);
       sceneImages.sort((a, b) => a.pageNumber - b.pageNumber);
-      iterateNewVersionIndex = 0;
     }
 
     // Update image prompts
@@ -2680,7 +2696,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     // canonical regardless of what recomputeAllActiveVersions just picked.
     // This is the only signal the client needs back; we return it as
     // `activeVersion` so the API has one consistent field name.
-    await setActiveVersion(id, `${pageNumber}`, iterateNewVersionIndex);
+    // pinned: without it the NEXT save's recompute reverts to pickBest.
+    await setActiveVersion(id, `${pageNumber}`, iterateNewVersionIndex, { pinned: true });
 
     // Deduct credits if not unlimited
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
@@ -3042,6 +3059,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       versionIndex: newVersionIndex
     });
     // Mark the new version's imageData as already saved so saveStoryData doesn't re-save it
+    newVersion.dbVersionIndex = newVersionIndex;
     newVersion._alreadySaved = true;
 
     if (normalizedCoverType === 'front') {
@@ -3060,7 +3078,8 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     // lower than a previous version would silently leave the OLD version active
     // (and its composite intermediates would be the ones shown). Set explicitly,
     // mirroring the dev-mode iterate path.
-    await setActiveVersion(id, coverKey, newVersionIndex);
+    // pinned: any later save's recompute would otherwise revert to pickBest.
+    await setActiveVersion(id, coverKey, newVersionIndex, { pinned: true });
 
     // Deduct credits and log transaction (skip for infinite credits or impersonating admin)
     // Relative atomic deduct with a floor (BILL-2): userCredits was read before the
@@ -3594,6 +3613,9 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           repairHistory: allRepairHistory,
         };
         stampCanonicalScore(repairVersion, { score: repairScore });
+        // DB-authoritative allocation — see iterate: `length - 1` diverges
+        // from the DB row set on lazy-migrated stories.
+        repairVersion.dbVersionIndex = await getNextVersionIndex(id, 'scene', pageNumber);
         currentScene.imageVersions.push(repairVersion);
 
         // Delete rehydrated imageData to prevent saveStoryData from re-saving it at version_index 0
@@ -3615,12 +3637,16 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
 
     // Single source of truth: when a repair happened, make the just-pushed
     // version active. Otherwise fall back to whatever was already active.
-    const repairActiveVersion = anyRepaired && Array.isArray(currentScene.imageVersions)
-      ? currentScene.imageVersions.length - 1
+    const lastVersion = Array.isArray(currentScene.imageVersions)
+      ? currentScene.imageVersions[currentScene.imageVersions.length - 1]
+      : null;
+    const repairActiveVersion = anyRepaired && lastVersion
+      ? dbIndexFor(lastVersion, currentScene.imageVersions.length - 1, 'scene')
       : (typeof currentScene.activeVersion === 'number' ? currentScene.activeVersion : 0);
     if (anyRepaired) {
       // Persist the override so a refresh + the wire response agree.
-      await setActiveVersion(id, `${pageNumber}`, repairActiveVersion);
+      // pinned: without it the NEXT save's recompute reverts to pickBest.
+      await setActiveVersion(id, `${pageNumber}`, repairActiveVersion, { pinned: true });
     }
 
     res.json({
@@ -4810,9 +4836,17 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
 
       // Canonical pick — same helper as auto-activation and findBadPages
       // (server/lib/scoring.js). One scoring rule, no per-site divergence.
+      // The plain (unpinned) setActiveVersion calls below deliberately CLEAR
+      // any user pin: "pick best" is the user handing the page back to
+      // score-based selection.
       const { pickBestVersionIndex, computeFinalScore } = require('../lib/scoring');
       const pickVersionKey = isCoverPage(pageNumber) ? getCoverType(pageNumber) : pageNumber;
-      const activeIndex = await getActiveVersion(id, pickVersionKey);
+      // getActiveVersion returns a DB version_index; blob positions and DB
+      // indices diverge on stamped versions (dbVersionIndex) — resolve both
+      // directions explicitly instead of assuming identity.
+      const activeDbIndex = await getActiveVersion(id, pickVersionKey);
+      const activeIndex = arrayIndexForDb(scene.imageVersions, activeDbIndex, imageType);
+      const toDbIndex = (arrIdx) => dbIndexFor(scene.imageVersions[arrIdx], arrIdx, imageType);
       const bestIndex = pickBestVersionIndex(scene.imageVersions);
       const bestScore = bestIndex >= 0 ? computeFinalScore(scene.imageVersions[bestIndex]) : null;
 
@@ -4827,7 +4861,7 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
         // Entity-repair has no score but scored alternatives exist — re-eval likely failed,
         // switch to best scored version since we can't confirm the repair is good
         syncVersionToRoot(scene, scene.imageVersions[bestIndex]);
-        const dbIndex = arrayToDbIndex(bestIndex, imageType);
+        const dbIndex = toDbIndex(bestIndex);
         const versionId = pickVersionKey;
         await setActiveVersion(id, versionId, dbIndex);
         log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: unevaluated entity-repair replaced by scored version ${bestIndex} (score ${bestScore}, re-eval likely failed)`);
@@ -4836,7 +4870,7 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
         // Switch active version
         syncVersionToRoot(scene, scene.imageVersions[bestIndex]);
 
-        const dbIndex = arrayToDbIndex(bestIndex, imageType);
+        const dbIndex = toDbIndex(bestIndex);
 
         const versionId = isCoverPage(pageNumber) ? getCoverType(pageNumber) : pageNumber;
         await setActiveVersion(id, versionId, dbIndex);
@@ -5892,7 +5926,7 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
 
     // Create new edit version entry
     const timestamp = new Date().toISOString();
-    existingCover.imageVersions.push({
+    const editVersion = {
       imageData: editResult.imageData,
       description: existingCover.description,
       createdAt: timestamp,
@@ -5902,7 +5936,8 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       qualityReasoning: qualityReasoning || null,
       lastEditPrompt: editPrompt,
       _alreadySaved: true  // Will be saved explicitly below
-    });
+    };
+    existingCover.imageVersions.push(editVersion);
 
     // Update metadata on the cover object (in-place, no replacement)
     existingCover.wasEdited = true;
@@ -5913,6 +5948,7 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     delete existingCover.imageData;
 
     const newVersionIndex = await getNextVersionIndex(id, coverKey, null);
+    editVersion.dbVersionIndex = newVersionIndex;
 
     // Save the new cover image at the correct version_index
     await saveStoryImage(id, coverKey, null, editResult.imageData, {
@@ -5922,7 +5958,8 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     });
     await saveStoryData(id, storyData);
     // User-triggered cover edit — make the new push canonical (no pickBest).
-    await setActiveVersion(id, coverKey, newVersionIndex);
+    // pinned: any later save's recompute would otherwise revert to pickBest.
+    await setActiveVersion(id, coverKey, newVersionIndex, { pinned: true });
 
     log.info(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore})`);
 

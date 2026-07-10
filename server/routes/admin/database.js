@@ -9,7 +9,7 @@ const express = require('express');
 const router = express.Router();
 
 const { dbQuery, getPool, isDatabaseMode, saveStoryImage, hasStorySeparateImages, extractInlineImagesToR2, stripInlineImagesFromStoryData } = require('../../services/database');
-const { arrayToDbIndex } = require('../../lib/versionManager');
+const { arrayToDbIndex, dbIndexFor } = require('../../lib/versionManager');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 
@@ -489,7 +489,7 @@ router.post('/migrate-story-images/:storyId', authenticateToken, requireAdmin, a
                 await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
                   qualityScore: version.qualityScore,
                   generatedAt: version.generatedAt,
-                  versionIndex: arrayToDbIndex(i, 'scene')
+                  versionIndex: dbIndexFor(version, i, 'scene')
                 });
                 imagesMigrated++;
               }
@@ -578,7 +578,7 @@ router.post('/migrate-all-story-images', authenticateToken, requireAdmin, async 
                     await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
                       qualityScore: version.qualityScore,
                       generatedAt: version.generatedAt,
-                      versionIndex: arrayToDbIndex(i, 'scene')
+                      versionIndex: dbIndexFor(version, i, 'scene')
                     });
                     imagesMigrated++;
                   }

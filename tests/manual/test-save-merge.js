@@ -55,7 +55,46 @@ const px = (c) => 'data:image/jpeg;base64,' + Buffer.from('fake-image-bytes-' + 
   const blob2 = await db.dbQuery('SELECT data FROM stories WHERE id=$1', [id]);
   console.log('   blob bytes leaked after update:', JSON.stringify(blob2[0].data).includes('fake-image-bytes'));
 
-  console.log('3) cleanup...');
+  console.log('3) _alreadySaved is honored for scenes (no double-write at the wrong index)...');
+  // Simulate a regen route: write the bytes explicitly at DB MAX+1 and stamp
+  // the version. The save loop must SKIP it (previously it re-saved at the
+  // array index, which could overwrite an older row on lazy-migrated blobs).
+  const reloaded3 = (await db.dbQuery('SELECT data FROM stories WHERE id=$1', [id]))[0].data;
+  const nextIdx = await db.getNextVersionIndex(id, 'scene', 1);
+  await db.saveStoryImage(id, 'scene', 1, px('Q'), { versionIndex: nextIdx });
+  reloaded3.sceneImages[0].imageVersions.push({
+    imageData: px('Q'), type: 'edit', dbVersionIndex: nextIdx, _alreadySaved: true
+  });
+  const rowsBefore = await db.dbQuery('SELECT version_index, md5(coalesce(image_data,\'\')) AS h FROM story_images WHERE story_id=$1 AND image_type=$2 AND page_number=1 ORDER BY version_index', [id, 'scene']);
+  await db.saveStoryData(id, reloaded3);
+  const rowsAfter = await db.dbQuery('SELECT version_index, md5(coalesce(image_data,\'\')) AS h FROM story_images WHERE story_id=$1 AND image_type=$2 AND page_number=1 ORDER BY version_index', [id, 'scene']);
+  const untouched = JSON.stringify(rowsBefore) === JSON.stringify(rowsAfter);
+  console.log(`   rows unchanged by save (must be true): ${untouched} (${rowsAfter.map(r => 'v' + r.version_index).join(' ')})`);
+
+  console.log('4) pinned active version survives saveStoryData recompute...');
+  // Pin v0 even though a higher-scored version exists — the recompute inside
+  // saveStoryData must leave the pin alone (it used to clobber user picks).
+  await db.setActiveVersion(id, '1', 0, { pinned: true });
+  const reloaded4 = (await db.dbQuery('SELECT data FROM stories WHERE id=$1', [id]))[0].data;
+  await db.saveStoryData(id, reloaded4);
+  const meta = (await db.dbQuery('SELECT image_version_meta AS m FROM stories WHERE id=$1', [id]))[0].m || {};
+  const pinHeld = meta['1']?.activeVersion === 0 && meta['1']?.pinned === true;
+  console.log(`   pin held after save (must be true): ${pinHeld} (meta['1']=${JSON.stringify(meta['1'])})`);
+  // Blob mirror must agree with the pinned choice.
+  const blob4 = (await db.dbQuery('SELECT data FROM stories WHERE id=$1', [id]))[0].data;
+  console.log(`   blob activeVersion mirrors pin (must be 0): ${blob4.sceneImages[0].activeVersion}`);
+  // Unpinned set (pick-best semantics) clears the pin.
+  await db.setActiveVersion(id, '1', 1);
+  const meta2 = (await db.dbQuery('SELECT image_version_meta AS m FROM stories WHERE id=$1', [id]))[0].m || {};
+  console.log(`   plain set cleared pin (must be true): ${meta2['1']?.pinned === undefined}`);
+
+  console.log('5) cover NULL-page upsert dedups (no duplicate frontCover v0)...');
+  await db.saveStoryImage(id, 'frontCover', null, px('F'), { versionIndex: 0 });
+  await db.saveStoryImage(id, 'frontCover', null, px('F'), { versionIndex: 0 });
+  const coverRows = await db.dbQuery('SELECT count(*) AS n FROM story_images WHERE story_id=$1 AND image_type=$2 AND version_index=0', [id, 'frontCover']);
+  console.log(`   frontCover v0 rows after double upsert (must be 1): ${coverRows[0].n}`);
+
+  console.log('6) cleanup...');
   await db.dbQuery('DELETE FROM stories WHERE id=$1', [id]);
   const gone = await db.dbQuery('SELECT count(*) AS n FROM story_images WHERE story_id=$1', [id]);
   console.log('   cascade cleaned story_images:', gone[0].n === '0' || gone[0].n === 0);

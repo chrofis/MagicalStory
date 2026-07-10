@@ -53,8 +53,8 @@
  * → qualityScore. Same chain everywhere. No more divergence.
  */
 
-const { setActiveVersion } = require('../services/database');
-const { arrayToDbIndex } = require('./versionManager');
+const { setActiveVersion, getActiveVersionMeta } = require('../services/database');
+const { dbIndexFor, arrayIndexForDb } = require('./versionManager');
 const { log } = require('../utils/logger');
 
 // =====================================================================
@@ -556,19 +556,29 @@ function pickBestVersionIndex(versions, { tieBreak = 'latest' } = {}) {
  * Safe to call when no version has a score yet — falls back to leaving the
  * existing activeVersion alone.
  *
+ * Respects a user pin: when image_version_meta[key].pinned is true (manual
+ * version pick, iterate, style-transfer, scale-repair, regen), the explicit
+ * choice wins and this recompute leaves the pointer alone. Pass metaEntry
+ * when the caller already fetched the meta map (recomputeAllActiveVersions)
+ * to avoid a per-key query.
+ *
  * @param {string} storyId
  * @param {number|string} key  pageNumber for scenes, coverType for covers
  * @param {Array<object>} versions  imageVersions[] from the blob
  * @param {string} type  'scene' | 'frontCover' | 'initialPage' | 'backCover'
- *                       (used for arrayToDbIndex mapping)
+ *                       (used for the array→DB index mapping)
+ * @param {object} [opts]
+ * @param {object|null} [opts.metaEntry]  pre-fetched image_version_meta[key]
  * @returns {Promise<{activeIndex: number, finalScore: number|null}|null>}
  */
-async function recomputeActiveVersion(storyId, key, versions, type = 'scene') {
+async function recomputeActiveVersion(storyId, key, versions, type = 'scene', { metaEntry } = {}) {
+  const meta = metaEntry !== undefined
+    ? metaEntry
+    : (await getActiveVersionMeta(storyId))[String(key)];
+  if (meta?.pinned) return null;
   const idx = pickBestVersionIndex(versions || []);
   if (idx < 0) return null;
-  // arrayToDbIndex maps blob array index → DB version_index. For scenes
-  // it's identity; for covers there's a +1 offset historically.
-  const dbIdx = arrayToDbIndex(idx, type);
+  const dbIdx = dbIndexFor(versions[idx], idx, type);
   await setActiveVersion(storyId, key, dbIdx);
   return { activeIndex: idx, finalScore: computeFinalScore(versions[idx]) };
 }
@@ -589,10 +599,29 @@ async function recomputeAllActiveVersions(storyId, storyData) {
   if (!storyId || !storyData) return { scenes: 0, covers: 0, switches: 0 };
   let scenes = 0, covers = 0, switches = 0;
 
+  // One meta fetch for the whole story — recomputeActiveVersion skips
+  // user-pinned keys, and for those we still mirror the pinned choice onto
+  // the blob so blob readers agree with the meta column.
+  let versionMeta = {};
+  try {
+    versionMeta = await getActiveVersionMeta(storyId);
+  } catch (err) {
+    // Non-fatal: without meta we recompute everything (pre-pin behaviour).
+  }
+
+  // Mirror a pinned meta choice (DB version_index) back onto the blob's
+  // array-index activeVersion field so blob readers agree with the pin.
+  const mirrorPinned = (entry, metaEntry, type) => {
+    if (!metaEntry?.pinned || typeof metaEntry.activeVersion !== 'number') return;
+    const arrayIdx = arrayIndexForDb(entry.imageVersions, metaEntry.activeVersion, type);
+    if (arrayIdx >= 0 && arrayIdx < entry.imageVersions.length) entry.activeVersion = arrayIdx;
+  };
+
   if (Array.isArray(storyData.sceneImages)) {
     for (const s of storyData.sceneImages) {
       if (!s?.pageNumber || !Array.isArray(s.imageVersions) || s.imageVersions.length === 0) continue;
-      const r = await recomputeActiveVersion(storyId, s.pageNumber, s.imageVersions, 'scene');
+      const metaEntry = versionMeta[String(s.pageNumber)] ?? null;
+      const r = await recomputeActiveVersion(storyId, s.pageNumber, s.imageVersions, 'scene', { metaEntry });
       scenes++;
       if (r) {
         switches++;
@@ -603,6 +632,8 @@ async function recomputeAllActiveVersions(storyId, storyData) {
         // story job_1778925296736 where every page's blob activeVersion was
         // undefined while the meta correctly tracked the best version.
         s.activeVersion = r.activeIndex;
+      } else {
+        mirrorPinned(s, metaEntry, 'scene');
       }
     }
   }
@@ -610,11 +641,14 @@ async function recomputeAllActiveVersions(storyId, storyData) {
     for (const kind of ['frontCover', 'initialPage', 'backCover']) {
       const cv = storyData.coverImages[kind];
       if (!cv?.imageVersions || cv.imageVersions.length === 0) continue;
-      const r = await recomputeActiveVersion(storyId, kind, cv.imageVersions, kind);
+      const metaEntry = versionMeta[kind] ?? null;
+      const r = await recomputeActiveVersion(storyId, kind, cv.imageVersions, kind, { metaEntry });
       covers++;
       if (r) {
         switches++;
         cv.activeVersion = r.activeIndex;
+      } else {
+        mirrorPinned(cv, metaEntry, kind);
       }
     }
   }

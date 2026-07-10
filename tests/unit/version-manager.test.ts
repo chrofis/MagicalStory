@@ -73,31 +73,60 @@ describe('versionManager', () => {
       expect(getActiveIndexAfterPush(undefined, 'scene')).toBe(0);
     });
 
-    it('scene with 1 version → DB index 0', () => {
-      expect(getActiveIndexAfterPush([{ imageData: 'data1' }], 'scene')).toBe(0);
-    });
-
-    it('scene with 3 versions → DB index 2', () => {
+    it('all versions unscored → falls back to newest', () => {
       const versions = [{ imageData: 'v1' }, { imageData: 'v2' }, { imageData: 'v3' }];
       expect(getActiveIndexAfterPush(versions, 'scene')).toBe(2);
-    });
-
-    it('cover with 1 version → DB index 0', () => {
-      expect(getActiveIndexAfterPush([{ imageData: 'data1' }], 'frontCover')).toBe(0);
-    });
-
-    it('cover with 3 versions → DB index 2', () => {
-      const versions = [{ imageData: 'v1' }, { imageData: 'v2' }, { imageData: 'v3' }];
       expect(getActiveIndexAfterPush(versions, 'frontCover')).toBe(2);
     });
 
-    it('consistent across all types (scenes and covers)', () => {
-      const versions = [{ imageData: 'v1' }, { imageData: 'v2' }];
-      const expected = 1; // length - 1
-      expect(getActiveIndexAfterPush(versions, 'scene')).toBe(expected);
-      expect(getActiveIndexAfterPush(versions, 'frontCover')).toBe(expected);
-      expect(getActiveIndexAfterPush(versions, 'initialPage')).toBe(expected);
-      expect(getActiveIndexAfterPush(versions, 'backCover')).toBe(expected);
+    // The whole point of this helper (54d3c14d): the BEST-scoring version
+    // wins, not the LAST-pushed one. These cases guard the score-based path
+    // the old suite never exercised (its fixtures were all unscored, so the
+    // newest-fallback made "length - 1" look like the contract).
+    it('best-scored version wins over a newer, lower-scored push', () => {
+      const versions = [
+        { imageData: 'v1', finalScore: 9 },
+        { imageData: 'v2', finalScore: 6 },
+        { imageData: 'v3', finalScore: 7 },
+      ];
+      expect(getActiveIndexAfterPush(versions, 'scene')).toBe(0);
+      expect(getActiveIndexAfterPush(versions, 'frontCover')).toBe(0);
+    });
+
+    it('newest wins when it is also the best', () => {
+      const versions = [
+        { imageData: 'v1', finalScore: 6 },
+        { imageData: 'v2', finalScore: 9 },
+      ];
+      expect(getActiveIndexAfterPush(versions, 'scene')).toBe(1);
+    });
+
+    it('scored version beats unscored newer push', () => {
+      const versions = [
+        { imageData: 'v1', finalScore: 8 },
+        { imageData: 'v2' }, // just pushed, not yet evaluated
+      ];
+      expect(getActiveIndexAfterPush(versions, 'scene')).toBe(0);
+    });
+
+    it('explicit dbVersionIndex stamp wins over identity mapping', () => {
+      // Lazy-migrated story: blob array has 2 entries but the DB already
+      // held rows 0..3, so the regen wrote the new version at index 4 and
+      // stamped it. The active pointer must target the stamped DB row, not
+      // the array position.
+      const versions = [
+        { imageData: 'v1' },
+        { imageData: 'v2', dbVersionIndex: 4 },
+      ];
+      expect(getActiveIndexAfterPush(versions, 'scene')).toBe(4);
+    });
+
+    it('stamped + scored: best version reports its stamped DB index', () => {
+      const versions = [
+        { imageData: 'v1', finalScore: 5 },
+        { imageData: 'v2', finalScore: 9, dbVersionIndex: 7 },
+      ];
+      expect(getActiveIndexAfterPush(versions, 'scene')).toBe(7);
     });
   });
 });

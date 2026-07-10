@@ -1,6 +1,6 @@
 // Database Service - PostgreSQL connection and query utilities
 const { Pool } = require('pg');
-const { arrayToDbIndex } = require('../lib/versionManager');
+const { arrayToDbIndex, dbIndexFor } = require('../lib/versionManager');
 const r2 = require('../lib/r2');
 const { log } = require('../utils/logger');
 
@@ -1704,7 +1704,7 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
         // the redundant top-level v0 write whenever the versions[0] write will
         // happen, so v0 has exactly one writer.
         const v0 = Array.isArray(img.imageVersions) ? img.imageVersions[0] : null;
-        const versionZeroWillWrite = !!(v0 && v0.imageData && !v0._rehydrated);
+        const versionZeroWillWrite = !!(v0 && v0.imageData && !v0._rehydrated && !v0._alreadySaved);
         if (!hasSeparateImages && !versionZeroWillWrite) {
           // First-time extraction: save v0 to story_images. Capture imageData
           // before the delete below strips it from the blob.
@@ -1726,13 +1726,17 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
         for (let i = 0; i < img.imageVersions.length; i++) {
           const version = img.imageVersions[i];
           if (version.imageData) {
-            // Skip versions that were rehydrated from DB (marked by rehydrateStoryImages)
-            if (!version._rehydrated) {
+            // Skip versions that were rehydrated from DB (marked by
+            // rehydrateStoryImages) or already written by the regen route at
+            // an explicit dbVersionIndex — re-saving those at the array index
+            // could land on a DIFFERENT row when the blob array is shorter
+            // than the DB row set (lazy-migrated stories).
+            if (!version._rehydrated && !version._alreadySaved) {
               const versionImageData = version.imageData;
               const pageNumber = img.pageNumber;
               const qualityScore = version.finalScore ?? version.qualityScore ?? version.score;
               const generatedAt = version.generatedAt;
-              const versionIndex = arrayToDbIndex(i, 'scene');
+              const versionIndex = dbIndexFor(version, i, 'scene');
               imageSaveTasks.push(() => saveStoryImage(storyId, 'scene', pageNumber, versionImageData, {
                 qualityScore,
                 generatedAt,
@@ -1743,6 +1747,7 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
             delete version.imageData;
           }
           delete version._rehydrated;
+          delete version._alreadySaved;
         }
       }
 
@@ -1819,7 +1824,7 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
               const versionImageData = version.imageData;
               const qualityScore = version.finalScore ?? version.qualityScore;
               const generatedAt = version.createdAt || version.generatedAt;
-              const versionIndex = arrayToDbIndex(i, coverType);
+              const versionIndex = dbIndexFor(version, i, coverType);
               imageSaveTasks.push(() => saveStoryImage(storyId, coverType, null, versionImageData, {
                 qualityScore,
                 generatedAt,
@@ -1861,20 +1866,15 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
   // characters table, story_images, and R2.
   stripInlineImagesFromStoryData(dataForStorage);
 
-  const metadata = buildStoryMetadata(storyData);
-  if (imagesSaved > 0) {
-    console.log(`💾 [${TAG}] Extracted ${imagesSaved} images to story_images for ${storyId}`);
-  }
-  await dbQuery(
-    'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3',
-    [JSON.stringify(dataForStorage), JSON.stringify(metadata), storyId]
-  );
-
   // Recompute the canonical active version for every scene + cover from the
   // current scoreBreakdown / finalScore on each version. Without this hook,
   // the regen routes' "stamp newest as active" calls would survive past the
   // eval that scored the new version, leaving an unevaluated or low-score
   // version active. See server/lib/scoring.js for the picker.
+  // MUST run before the UPDATE below: it mirrors the picked activeVersion
+  // onto the blob (dataForStorage), and dataForStorage is a clone — mutating
+  // it after the write used to silently discard the mirror, leaving blob
+  // activeVersion undefined while the meta column tracked the right version.
   try {
     const { recomputeAllActiveVersions } = require('../lib/scoring');
     const summary = await recomputeAllActiveVersions(storyId, dataForStorage);
@@ -1884,6 +1884,15 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
   } catch (err) {
     console.warn(`⚠️  [${TAG}] Active version recompute failed for ${storyId}: ${err.message}`);
   }
+
+  const metadata = buildStoryMetadata(storyData);
+  if (imagesSaved > 0) {
+    console.log(`💾 [${TAG}] Extracted ${imagesSaved} images to story_images for ${storyId}`);
+  }
+  await dbQuery(
+    'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3',
+    [JSON.stringify(dataForStorage), JSON.stringify(metadata), storyId]
+  );
 }
 
 /**
@@ -1911,16 +1920,17 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
   if (dataForStorage.imageVersions && Array.isArray(dataForStorage.imageVersions)) {
     for (let i = 0; i < dataForStorage.imageVersions.length; i++) {
       const version = dataForStorage.imageVersions[i];
-      if (version.imageData && !version._rehydrated) {
+      if (version.imageData && !version._rehydrated && !version._alreadySaved) {
         await saveStoryImage(storyId, 'scene', pageNumber, version.imageData, {
           qualityScore: version.finalScore ?? version.qualityScore ?? version.score,
           generatedAt: version.generatedAt,
-          versionIndex: arrayToDbIndex(i, 'scene')
+          versionIndex: dbIndexFor(version, i, 'scene')
         });
         imagesSaved++;
       }
       delete version.imageData;
       delete version._rehydrated;
+      delete version._alreadySaved;
     }
   }
 
@@ -1968,6 +1978,22 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
     console.log(`💾 [SAVE-SCENE] Extracted ${imagesSaved} images to story_images for ${storyId} page ${pageNumber}`);
   }
 
+  // Recompute active version for THIS scene before the write below, so the
+  // picked activeVersion is mirrored into the persisted scene entry (same
+  // ordering rule as persistStoryToDatabase — mutating dataForStorage after
+  // the write would discard the mirror).
+  try {
+    const { recomputeActiveVersion } = require('../lib/scoring');
+    if (Array.isArray(dataForStorage.imageVersions) && dataForStorage.imageVersions.length > 0) {
+      const r = await recomputeActiveVersion(storyId, pageNumber, dataForStorage.imageVersions, 'scene');
+      if (r) {
+        dataForStorage.activeVersion = r.activeIndex;
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️  [SAVE-SCENE] Active version recompute failed for page ${pageNumber}: ${err.message}`);
+  }
+
   // Atomically update just this scene entry in the sceneImages array using jsonb_set.
   // The subquery finds the array index of the matching pageNumber.
   // Only updates if the page exists in the array (WHERE clause checks existence).
@@ -1996,116 +2022,7 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
     console.warn(`⚠️ [SAVE-SCENE] Page ${pageNumber} not found in sceneImages for story ${storyId}, falling back to full save`);
     return false; // Signal caller to fall back to saveStoryData
   }
-
-  // Recompute active version for THIS scene (atomic save → atomic recompute).
-  // Same hook as saveStoryData; keeps the canonical pick consistent across
-  // both the bulk and per-scene save paths.
-  try {
-    const { recomputeActiveVersion } = require('../lib/scoring');
-    if (Array.isArray(dataForStorage.imageVersions) && dataForStorage.imageVersions.length > 0) {
-      await recomputeActiveVersion(storyId, pageNumber, dataForStorage.imageVersions, 'scene');
-    }
-  } catch (err) {
-    console.warn(`⚠️  [SAVE-SCENE] Active version recompute failed for page ${pageNumber}: ${err.message}`);
-  }
   return true;
-}
-
-/**
- * Update story data metadata only (without re-saving images).
- * Use this for lightweight updates like changing isActive flags.
- * Images are stripped from the data but NOT re-saved to story_images.
- */
-async function updateStoryDataOnly(storyId, storyData) {
-  if (!isDatabaseMode()) {
-    throw new Error('Database mode required');
-  }
-
-  // Clone so we can strip inline image bytes without mutating the caller's
-  // object. cloneForStorage avoids the 512MB-string RangeError a JSON round-trip
-  // throws on large stories (25 pages + full-repair versions + composites).
-  const dataForStorage = cloneForStorage(storyData);
-  let imagesSaved = 0;
-
-  // Strip imageData from scenes (but don't save them - they're already in story_images)
-  if (dataForStorage.sceneImages && Array.isArray(dataForStorage.sceneImages)) {
-    for (const img of dataForStorage.sceneImages) {
-      delete img.imageData;
-      if (img.imageVersions && Array.isArray(img.imageVersions)) {
-        for (const version of img.imageVersions) {
-          delete version.imageData;
-          delete version._rehydrated;
-        }
-      }
-      // Strip retry history images (they're already in story_retry_images)
-      if (img.retryHistory) {
-        for (const entry of img.retryHistory) {
-          delete entry.imageData;
-          delete entry.bboxOverlayImage;
-          delete entry.originalImage;
-          delete entry.annotatedOriginal;
-          if (entry.grids) {
-            for (const grid of entry.grids) {
-              // Handle both property naming conventions
-              delete grid.imageData;
-              delete grid.repairedImageData;
-              delete grid.original;
-              delete grid.repaired;
-            }
-          }
-        }
-      }
-      // Save empty scene image separately and set flag for lazy loading
-      if (img.emptySceneImage) {
-        await saveStoryImage(storyId, 'empty_scene', img.pageNumber, img.emptySceneImage);
-        imagesSaved++;
-        img.hasEmptySceneImage = true;
-      }
-      delete img.originalImage;
-      delete img.preEntityRepairImage;
-      delete img.emptySceneImage;
-    }
-  }
-
-  // Strip cover images (normalize to object format first)
-  const coverTypes = ['frontCover', 'initialPage', 'backCover'];
-  for (const coverType of coverTypes) {
-    if (dataForStorage.coverImages?.[coverType]) {
-      dataForStorage.coverImages[coverType] = normalizeCoverValue(dataForStorage.coverImages[coverType]);
-      // Save main cover imageData to story_images
-      if (dataForStorage.coverImages[coverType].imageData) {
-        await saveStoryImage(storyId, coverType, null, dataForStorage.coverImages[coverType].imageData, {
-          qualityScore: dataForStorage.coverImages[coverType].finalScore ?? dataForStorage.coverImages[coverType].qualityScore,
-          generatedAt: dataForStorage.coverImages[coverType].generatedAt,
-          versionIndex: 0
-        });
-        imagesSaved++;
-      }
-      delete dataForStorage.coverImages[coverType].imageData;
-      // Save cover imageVersions to story_images (same as scene versions)
-      if (dataForStorage.coverImages[coverType].imageVersions) {
-        for (let i = 0; i < dataForStorage.coverImages[coverType].imageVersions.length; i++) {
-          const version = dataForStorage.coverImages[coverType].imageVersions[i];
-          if (version.imageData && !version._rehydrated) {
-            await saveStoryImage(storyId, coverType, null, version.imageData, {
-              qualityScore: version.finalScore ?? version.qualityScore ?? version.score,
-              generatedAt: version.generatedAt,
-              versionIndex: arrayToDbIndex(i, coverType)
-            });
-            imagesSaved++;
-          }
-          delete version.imageData;
-          delete version._rehydrated;
-        }
-      }
-    }
-  }
-
-  const metadata = buildStoryMetadata(storyData);
-  await dbQuery(
-    'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3',
-    [JSON.stringify(dataForStorage), JSON.stringify(metadata), storyId]
-  );
 }
 
 /**
@@ -2803,11 +2720,17 @@ async function getActiveVersion(storyId, pageNumber) {
     const pageNum = parseInt(pageNumber);
     const scene = dataRows[0].scene_images.find(s => s.pageNumber === pageNum);
     if (scene?.imageVersions) {
+      const imageType = isNaN(pageNum) ? pageNumber : 'scene';
+      // Modern blobs carry a numeric activeVersion (array index) mirrored by
+      // the recompute hook; the boolean isActive flag only exists on legacy
+      // blobs. Check numeric first — keying off isActive alone returned 0 for
+      // every modern blob that lacked a meta entry.
+      if (typeof scene.activeVersion === 'number') {
+        return dbIndexFor(scene.imageVersions[scene.activeVersion], scene.activeVersion, imageType);
+      }
       const activeIdx = scene.imageVersions.findIndex(v => v.isActive);
       if (activeIdx >= 0) {
         // Convert array index to DB version_index (what setActiveVersion stores)
-        const pageNum = parseInt(pageNumber);
-        const imageType = isNaN(pageNum) ? pageNumber : 'scene';
         return arrayToDbIndex(activeIdx, imageType);
       }
       return 0;
@@ -2820,11 +2743,21 @@ async function getActiveVersion(storyId, pageNumber) {
 /**
  * Set active version for a page in image_version_meta column.
  * Uses jsonb_set for O(1) targeted update instead of full data blob rewrite.
+ *
+ * pinned semantics: an explicit choice (manual version pick, iterate,
+ * style-transfer, scale-repair, regen) sets pinned=true so the score-based
+ * recompute hook in every save path leaves it alone. A plain (unpinned) call
+ * REPLACES the whole meta entry and thereby clears any existing pin — that is
+ * deliberate: scoring flows (pipeline, pick-best) reclaim the page for
+ * score-based selection.
+ *
  * @param {string} storyId - Story ID
  * @param {number|string} pageNumber - Page number or cover type
- * @param {number} versionIndex - Version index to set as active (0-based)
+ * @param {number} versionIndex - DB version_index to set as active (0-based)
+ * @param {object} [options]
+ * @param {boolean} [options.pinned=false] - Protect from score-based recompute
  */
-async function setActiveVersion(storyId, pageNumber, versionIndex) {
+async function setActiveVersion(storyId, pageNumber, versionIndex, { pinned = false } = {}) {
   if (!isDatabaseMode()) {
     throw new Error('Database mode required');
   }
@@ -2840,7 +2773,7 @@ async function setActiveVersion(storyId, pageNumber, versionIndex) {
        $2::jsonb
      )
      WHERE id = $3`,
-    [[pageKey], JSON.stringify({ activeVersion: versionIndex }), storyId]
+    [[pageKey], JSON.stringify(pinned ? { activeVersion: versionIndex, pinned: true } : { activeVersion: versionIndex }), storyId]
   );
 }
 
@@ -2869,6 +2802,25 @@ async function getAllActiveVersions(storyId) {
     result[pageKey] = meta.activeVersion ?? 0;
   }
   return result;
+}
+
+/**
+ * Raw image_version_meta map including the pinned flag:
+ * { "<pageNumber|coverType>": { activeVersion, pinned? } }.
+ * Used by the recompute hook to skip user-pinned pages; most readers only
+ * need the flattened getAllActiveVersions above.
+ * @param {string} storyId
+ * @returns {Promise<object>}
+ */
+async function getActiveVersionMeta(storyId) {
+  if (!isDatabaseMode()) {
+    return {};
+  }
+  const rows = await dbQuery(
+    `SELECT image_version_meta FROM stories WHERE id = $1`,
+    [storyId]
+  );
+  return rows[0]?.image_version_meta || {};
 }
 
 /**
@@ -2973,7 +2925,7 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
       if (scene.imageVersions && scene.imageVersions.length > 0) {
         await Promise.all(scene.imageVersions.map(async (version, vIdx) => {
           if (!version.imageData) {
-            const dbVersionIndex = arrayToDbIndex(vIdx, 'scene');
+            const dbVersionIndex = dbIndexFor(version, vIdx, 'scene');
             const versionImg = allVersionImages.find(
               i => i.image_type === 'scene' && i.page_number === scene.pageNumber && i.version_index === dbVersionIndex
             );
@@ -3015,7 +2967,7 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
       if (cover && cover.imageVersions && cover.imageVersions.length > 0) {
         await Promise.all(cover.imageVersions.map(async (version, vIdx) => {
           if (!version.imageData) {
-            const dbVersionIndex = arrayToDbIndex(vIdx, coverType);
+            const dbVersionIndex = dbIndexFor(version, vIdx, coverType);
             const versionImg = allVersionImages.find(
               i => i.image_type === coverType && i.version_index === dbVersionIndex
             );
@@ -3237,9 +3189,7 @@ module.exports = {
   saveStoryData,
   saveScenePageData,
   stripInlineImagesFromStoryData,
-  extractInlineImagesToR2,
-  updateStoryDataOnly,
-  upsertStory,
+  extractInlineImagesToR2,  upsertStory,
   // Image functions
   saveStoryImage,
   getNextVersionIndex,
@@ -3262,6 +3212,7 @@ module.exports = {
   getActiveVersion,
   setActiveVersion,
   getAllActiveVersions,
+  getActiveVersionMeta,
   // Retry history image functions
   saveRetryHistoryImages,
   getRetryHistoryImages,

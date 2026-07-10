@@ -13,7 +13,7 @@ const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryIm
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
-const { dbToArrayIndex } = require('../lib/versionManager');
+const { dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
 const { generateTextOverlay } = require('../lib/textOverlayRenderer');
 const { enforceSpreadTextPosition, updatePageText } = require('../lib/storyHelpers');
 const { getTextAreaMask } = require('../lib/textMasks');
@@ -574,8 +574,11 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           scene.hasImage = true;
           scene.activeVersion = activeVersion;
           const pageMeta = versionMetaByPage.get(row.page_number) || [];
+          // Stamped dbVersionIndex wins over identity mapping — the two
+          // diverge on lazy-migrated stories whose blob array is shorter
+          // than the DB row set.
           const versionMeta = row.version_index > 0
-            ? (pageMeta[dbToArrayIndex(row.version_index, 'scene')] || {})
+            ? (pageMeta[arrayIndexForDb(pageMeta, row.version_index, 'scene')] || {})
             : { bboxDetection: sceneBboxByPage.get(row.page_number) || null };
           const versionDate = row.generated_at || versionMeta.createdAt;
           const isActiveVersion = row.version_index === activeVersion;
@@ -686,6 +689,23 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       const { characters: fullCharacters, ...storyWithoutCharacters } = story;
       // Extract just id/name from characters for GenerationSettingsPanel
       const charactersMini = (fullCharacters || []).map(c => ({ id: c.id, name: c.name }));
+      // Resolve active versions from image_version_meta for blobs whose
+      // activeVersion mirror is missing (legacy / never re-saved). Without
+      // this, the client falls back to "last version" while the serving
+      // paths (PDF, print, share) resolve via the meta column — the two can
+      // show different images for the same page.
+      const slowActiveVersions = await getAllActiveVersions(id);
+      const coverMeta = (coverType) => {
+        const cv = story.coverImages?.[coverType];
+        if (!cv) return null;
+        return {
+          ...cv,
+          imageData: undefined,
+          imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
+          activeVersion: typeof cv.activeVersion === 'number' ? cv.activeVersion : slowActiveVersions[coverType],
+          hasImage: !!cv.imageData
+        };
+      };
       metadata = {
         ...storyWithoutCharacters,
         characters: charactersMini,
@@ -693,6 +713,9 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           ...img,
           imageData: undefined,
           hasImage: !!img.imageData,
+          activeVersion: typeof img.activeVersion === 'number'
+            ? img.activeVersion
+            : slowActiveVersions[String(img.pageNumber)],
           imageVersions: img.imageVersions?.map(v => ({
             ...v,
             imageData: undefined,
@@ -700,24 +723,9 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           }))
         })),
         coverImages: story.coverImages ? {
-          frontCover: story.coverImages.frontCover ? {
-            ...story.coverImages.frontCover,
-            imageData: undefined,
-            imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
-            hasImage: !!story.coverImages.frontCover?.imageData
-          } : null,
-          initialPage: story.coverImages.initialPage ? {
-            ...story.coverImages.initialPage,
-            imageData: undefined,
-            imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
-            hasImage: !!story.coverImages.initialPage?.imageData
-          } : null,
-          backCover: story.coverImages.backCover ? {
-            ...story.coverImages.backCover,
-            imageData: undefined,
-            imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
-            hasImage: !!story.coverImages.backCover?.imageData
-          } : null
+          frontCover: coverMeta('frontCover'),
+          initialPage: coverMeta('initialPage'),
+          backCover: coverMeta('backCover')
         } : null,
         totalImages: (story.sceneImages?.length || 0) + (story.coverImages ? 3 : 0)
       };
@@ -2289,18 +2297,23 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         }
       }
 
-      // Bounds-check: clamp activeVersion to a version that actually exists
-      // in the DB. Without this, a stale active pointer (e.g. story_images
-      // row deleted but image_version_meta not updated) would result in the
-      // response showing null imageData on the active page.
+      // Bounds-check: a stale active pointer (e.g. story_images row deleted
+      // but image_version_meta not updated) would result in the response
+      // showing null imageData on the active page. Fall back to the version
+      // that byte-serving falls back to (getActiveStoryImages → version 0) so
+      // this endpoint and PDFs/prints/share show the SAME image — clamping to
+      // the max index here used to show the newest while serving showed v0.
       if (!activeOnly) {
         const clampActive = (entry, label, key) => {
           if (!entry?.imageVersions?.length) return;
-          const maxIdx = Math.max(...entry.imageVersions.map(v => v.versionIndex));
-          if (entry.activeVersion > maxIdx) {
-            console.warn(`⚠️ [/images] ${label}=${key} activeVersion=${entry.activeVersion} exceeds max=${maxIdx}; clamping`);
-            entry.activeVersion = maxIdx;
-            const active = entry.imageVersions.find(v => v.versionIndex === maxIdx);
+          const exists = entry.imageVersions.some(v => v.versionIndex === entry.activeVersion);
+          if (!exists) {
+            const fallbackIdx = entry.imageVersions.some(v => v.versionIndex === 0)
+              ? 0
+              : Math.min(...entry.imageVersions.map(v => v.versionIndex));
+            console.warn(`⚠️ [/images] ${label}=${key} activeVersion=${entry.activeVersion} has no row; falling back to ${fallbackIdx} (serving parity)`);
+            entry.activeVersion = fallbackIdx;
+            const active = entry.imageVersions.find(v => v.versionIndex === fallbackIdx);
             if (active) {
               entry.imageData = active.imageData;
               entry.imageUrl = active.imageUrl;
@@ -2470,8 +2483,8 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
                 }
               } else {
                 // v1+: map DB version_index to blob imageVersions array index
-                const blobIdx = dbToArrayIndex(dbVersionIdx, 'scene');
-                const blobVersion = blobScene.imageVersions?.[blobIdx];
+                // (stamped dbVersionIndex first, identity otherwise).
+                const blobVersion = blobScene.imageVersions?.[arrayIndexForDb(blobScene.imageVersions, dbVersionIdx, 'scene')];
                 if (blobVersion) {
                   mergeFields(scene.imageVersions[i], blobVersion);
                 }
@@ -2654,10 +2667,12 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
     const versionsCount = sceneImage.imageVersions?.length || 0;
     console.log(`📷 [IMAGE-FALLBACK] ${id}/page${pageNum} - ${Math.round(imageSize/1024)}KB, ${versionsCount} versions, ${Date.now() - startTime}ms`);
 
+    // Meta stores a DB version_index; the response's activeVersion is an
+    // array index. Stamped versions win over identity mapping.
     res.json({
       pageNumber: pageNum,
       imageData: normalizeImageData(sceneImage.imageData),
-      activeVersion: dbToArrayIndex(activeVersion, 'scene'),
+      activeVersion: arrayIndexForDb(sceneImage.imageVersions, activeVersion, 'scene'),
       imageVersions: sceneImage.imageVersions?.map((v, i) => ({
         ...v,
         versionIndex: i
@@ -2863,11 +2878,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
           for (const scene of story.sceneImages) {
             if (scene.imageVersions && scene.imageVersions.length > 0) {
               const activeDbIndex = activeVersions[scene.pageNumber] ?? 0;
-              const activeArrayIdx = dbToArrayIndex(activeDbIndex, 'scene');
-              const { arrayToDbIndex: toDbIdx } = require('../lib/versionManager');
+              // Stamped dbVersionIndex wins over identity mapping.
+              const activeArrayIdx = arrayIndexForDb(scene.imageVersions, activeDbIndex, 'scene');
               scene.imageVersions.forEach((v, idx) => {
                 if (v.versionIndex === undefined) {
-                  v.versionIndex = toDbIdx(idx, 'scene');
+                  v.versionIndex = dbIndexFor(v, idx, 'scene');
                 }
                 // Strip imageData from non-active versions — frontend loads via /images endpoint
                 if (idx !== activeArrayIdx) {
@@ -3379,7 +3394,9 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
     console.log(`🖼️ Setting active version: DB idx ${dbVersionIndex} for page ${pageNum}`);
 
     // Single targeted update using image_version_meta column (~1ms vs 6+ seconds)
-    await setActiveVersion(id, pageNum, dbVersionIndex);
+    // pinned: a manual user pick must survive the score-based recompute that
+    // runs inside every subsequent save (it used to be silently reverted).
+    await setActiveVersion(id, pageNum, dbVersionIndex, { pinned: true });
 
     // Also update metadata timestamp
     await pool.query(
@@ -3459,7 +3476,9 @@ router.put('/:id/covers/:coverType/active-image', authenticateToken, async (req,
     }
 
     // Single targeted update using image_version_meta column (~1ms vs 6+ seconds)
-    await setActiveVersion(id, coverType, versionIndex);
+    // pinned: a manual user pick must survive the score-based recompute that
+    // runs inside every subsequent save (it used to be silently reverted).
+    await setActiveVersion(id, coverType, versionIndex, { pinned: true });
 
     // Also update metadata timestamp
     await pool.query(

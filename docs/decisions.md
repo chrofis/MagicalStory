@@ -1183,3 +1183,59 @@ doorway-page territory. seoMeta route handlers kept (direct visits still
 get correct meta). Re-add the sitemap loop only when the pages become real
 (route + prerender + own content).
 **Touched:** server/lib/seoMeta.js (generateSitemap).
+
+## 2026-07-10 — Image versioning: pinned active versions + explicit DB index stamps
+
+**Context:** Version-handling audit (write paths, read paths, git history)
+found one recurring root cause behind years of "wrong version shows" bugs:
+`recomputeAllActiveVersions` (score-based, runs inside EVERY save) fought
+every path that sets an explicit active version. Style-transfer/scale-repair
+set active then called saveStoryData — the recompute immediately reverted to
+the best-scored older version (the new one is unscored, so it could NEVER win);
+manual version picks survived only until the next save. Second cause: two
+index allocators — `getNextVersionIndex` (DB MAX+1) vs `imageVersions.length-1`
+— diverge on lazy-migrated stories, and `_alreadySaved` was honored for covers
+but ignored by both scene save loops (double-write, possibly at a WRONG index,
+overwriting an older version's bytes). Third: the blob `activeVersion` mirror
+ran AFTER the `UPDATE stories SET data` on a clone, so it never persisted —
+blob readers (client, entityConsistency) fell back to "latest" while serving
+paths (PDF/print/share) resolve meta = best-score.
+
+**Decision:**
+- `image_version_meta[key]` gains `pinned: true`. Pinners (explicit user
+  choice): manual active-image PUT, iterate, style-transfer, scale-repair,
+  inpaint auto-repair, cover regen/iterate/edit. The recompute (and
+  scripts/admin/recompute-active-versions.js) skips pinned keys but still
+  mirrors the pinned choice onto the blob. A PLAIN `setActiveVersion` call
+  replaces the meta entry and thereby CLEARS the pin — deliberate: pipeline +
+  repair-workflow pick-best hand the page back to score-based selection.
+- Version entries written by regen routes carry `dbVersionIndex` (the real DB
+  version_index) + `_alreadySaved`. Save loops (scenes now too) skip
+  `_alreadySaved` and write at `dbVersionIndex ?? arrayToDbIndex(i)`; all
+  pickers/mappers (`getActiveIndexAfterPush`, recompute, rehydrate, GET
+  merges) prefer the stamp over identity mapping.
+- Both `length-1` allocation sites (iterate scene, auto-repair) now use
+  `getNextVersionIndex`.
+- Recompute moved BEFORE the blob UPDATE in `persistStoryToDatabase` and
+  `saveScenePageData` so the `activeVersion` mirror actually persists.
+- Stale-pointer fallback unified on v0 (serving parity): `/images` full mode
+  no longer clamps to max. `resolveActiveVersionData` (entityConsistency)
+  prefers numeric activeVersion, then ROOT imageData (= meta-active after
+  rehydrate), and "latest" only as a last resort. GET slow path attaches
+  meta-resolved activeVersion. `getActiveVersion` blob fallback checks numeric
+  `activeVersion` before the legacy `isActive` boolean.
+- `updateStoryDataOnly` deleted (zero callers; saved cover versions but not
+  scenes, never recomputed).
+
+**Rationale:** one selection rule needs one escape hatch, not seven endpoints
+racing it. Score-based selection stays the default; a pin is the single,
+explicit, durable way to override it. Explicit DB stamps make the blob↔DB
+mapping self-describing instead of relying on identity that lazy migration
+breaks.
+
+**Touched:** server/services/database.js, server/lib/scoring.js,
+server/lib/versionManager.js, server/lib/entityConsistency.js,
+server/routes/regeneration.js, server/routes/stories.js,
+server/routes/admin/database.js, scripts/admin/recompute-active-versions.js,
+tests/unit/version-manager.test.ts, tests/unit/active-version-recompute.test.ts,
+tests/manual/test-save-merge.js.

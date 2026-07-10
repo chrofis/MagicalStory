@@ -42,14 +42,43 @@ const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5
 function resolveActiveVersionData(img) {
   const versions = Array.isArray(img.imageVersions) ? img.imageVersions : [];
   const lastIdx = versions.length - 1;
-  const activeIdx = (typeof img.activeVersion === 'number')
-    ? Math.max(0, Math.min(img.activeVersion, lastIdx))
-    : lastIdx;
-  const activeVersion = lastIdx >= 0 ? versions[activeIdx] : null;
-  const imageData = activeVersion?.imageData || img.imageData;
-  const versionIndex = lastIdx >= 0 ? activeIdx : null;
-  const bboxDetection = img.sharedBboxDetection || activeVersion?.bboxDetection || img.bboxDetection || null;
-  return { activeIdx, activeVersion, imageData, bboxDetection, versionIndex };
+
+  if (typeof img.activeVersion === 'number' && lastIdx >= 0) {
+    const activeIdx = Math.max(0, Math.min(img.activeVersion, lastIdx));
+    const activeVersion = versions[activeIdx];
+    return {
+      activeIdx,
+      activeVersion,
+      imageData: activeVersion?.imageData || img.imageData,
+      bboxDetection: img.sharedBboxDetection || activeVersion?.bboxDetection || img.bboxDetection || null,
+      versionIndex: activeIdx
+    };
+  }
+
+  // No numeric activeVersion (legacy blob or mid-pipeline). Prefer the ROOT
+  // imageData: rehydrate fills it with the meta-active version (what PDFs,
+  // prints and the share viewer serve), and the pipeline keeps it current.
+  // Defaulting to the LAST version here made post-hoc consistency checks
+  // evaluate a different image than the one users actually get whenever the
+  // best-scored version wasn't the newest. Last version stays as a final
+  // fallback for callers that stripped the root but kept version bytes.
+  if (img.imageData) {
+    return {
+      activeIdx: -1,
+      activeVersion: null,
+      imageData: img.imageData,
+      bboxDetection: img.sharedBboxDetection || img.bboxDetection || null,
+      versionIndex: null
+    };
+  }
+  const activeVersion = lastIdx >= 0 ? versions[lastIdx] : null;
+  return {
+    activeIdx: lastIdx,
+    activeVersion,
+    imageData: activeVersion?.imageData || null,
+    bboxDetection: img.sharedBboxDetection || activeVersion?.bboxDetection || img.bboxDetection || null,
+    versionIndex: lastIdx >= 0 ? lastIdx : null
+  };
 }
 
 /**

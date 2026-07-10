@@ -33,6 +33,39 @@ function dbToArrayIndex(dbIndex, _imageType) {
 }
 
 /**
+ * DB version_index for one version entry: an explicit dbVersionIndex stamp
+ * (regen routes allocate via getNextVersionIndex, which can run ahead of the
+ * array position on lazy-migrated stories) wins over the identity mapping.
+ *
+ * @param {object|null} version - imageVersions[arrayIndex]
+ * @param {number} arrayIndex - Position in imageVersions[]
+ * @param {string} imageType
+ * @returns {number}
+ */
+function dbIndexFor(version, arrayIndex, imageType) {
+  return Number.isInteger(version?.dbVersionIndex)
+    ? version.dbVersionIndex
+    : arrayToDbIndex(arrayIndex, imageType);
+}
+
+/**
+ * Inverse of dbIndexFor: locate the imageVersions[] position for a DB
+ * version_index — stamped entry first, identity mapping otherwise. No bounds
+ * check (matches dbToArrayIndex); callers that need one clamp themselves.
+ *
+ * @param {Array|null} versions - imageVersions[]
+ * @param {number} dbIndex - version_index from the DB / meta column
+ * @param {string} imageType
+ * @returns {number}
+ */
+function arrayIndexForDb(versions, dbIndex, imageType) {
+  const stamped = Array.isArray(versions)
+    ? versions.findIndex(v => v?.dbVersionIndex === dbIndex)
+    : -1;
+  return stamped >= 0 ? stamped : dbToArrayIndex(dbIndex, imageType);
+}
+
+/**
  * After pushing a new version onto imageVersions, return the DB version_index
  * that should be set as the active version.
  *
@@ -58,13 +91,15 @@ function getActiveIndexAfterPush(imageVersions, imageType) {
   const arrayIdx = pickBestVersionIndex(imageVersions);
   if (arrayIdx < 0) {
     // No version has a score yet (all-null) — fall back to newest.
-    return arrayToDbIndex(imageVersions.length - 1, imageType);
+    return dbIndexFor(imageVersions[imageVersions.length - 1], imageVersions.length - 1, imageType);
   }
-  return arrayToDbIndex(arrayIdx, imageType);
+  return dbIndexFor(imageVersions[arrayIdx], arrayIdx, imageType);
 }
 
 module.exports = {
   arrayToDbIndex,
   dbToArrayIndex,
+  dbIndexFor,
+  arrayIndexForDb,
   getActiveIndexAfterPush
 };

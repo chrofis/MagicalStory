@@ -27,7 +27,7 @@ const SINGLE = (() => {
   const { initializePool, setActiveVersion, getActiveVersion } = require('../../server/services/database');
   initializePool();
   const { pickBestVersionIndex, computeFinalScore } = require('../../server/lib/scoring');
-  const { arrayToDbIndex } = require('../../server/lib/versionManager');
+  const { dbIndexFor } = require('../../server/lib/versionManager');
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -52,9 +52,13 @@ const SINGLE = (() => {
 
     const tryRecompute = async (versionsArr, key, type) => {
       if (!Array.isArray(versionsArr) || versionsArr.length === 0) return;
+      // Respect user pins (manual pick / iterate / style-transfer etc.) —
+      // same rule as recomputeActiveVersion in server/lib/scoring.js.
+      const metaEntry = meta[key] ?? meta[String(key)];
+      if (metaEntry?.pinned) return;
       const bestIdx = pickBestVersionIndex(versionsArr);
       if (bestIdx < 0) return;  // un-evaluated, leave alone
-      const dbIdx = arrayToDbIndex(bestIdx, type);
+      const dbIdx = dbIndexFor(versionsArr[bestIdx], bestIdx, type);
       const currentActive = meta[key]?.activeVersion ?? meta[String(key)]?.activeVersion ?? 0;
       totalPages++;
       if (dbIdx === currentActive) return;
