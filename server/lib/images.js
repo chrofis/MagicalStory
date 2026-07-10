@@ -8902,6 +8902,48 @@ async function fetchSilhouettePng(cropJpegBuffer) {
 }
 
 /**
+ * Figure mask for char-repair blend masks — backend-selectable.
+ * MODEL_DEFAULTS.figureMaskBackend 'mobilesam' → box-prompted /figure-mask
+ * in photo_analyzer (selects ONLY the target figure; won the 2026-07-10
+ * mask shootout — docs/research-log.html). Any failure, and every other
+ * backend value, falls back to the rembg silhouette (fetchSilhouettePng),
+ * which masks every salient figure in the crop.
+ */
+async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop) {
+  const backend = CONFIG_DEFAULTS.figureMaskBackend || 'rembg';
+  if (backend === 'mobilesam' && Array.isArray(boxInCrop) && boxInCrop.length === 4) {
+    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+    try {
+      const res = await fetch(`${photoAnalyzerUrl}/figure-mask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: `data:image/jpeg;base64,${cropJpegBuffer.toString('base64')}`,
+          box: boxInCrop,
+          color: [255, 255, 255],
+          alpha: 255,
+        }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (res.ok) {
+        const j = await res.json();
+        const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
+        if (j?.success && m && j.fill_pixels > 0) {
+          log.info(`👤 [FIGURE MASK] mobilesam mask, ${j.fill_pixels}px filled`);
+          return Buffer.from(m[1], 'base64');
+        }
+        log.warn(`⚠️ [FIGURE MASK] mobilesam returned ${j?.success ? 'an empty mask' : `no mask (${j?.error || 'unknown'})`} — falling back to rembg`);
+      } else {
+        log.warn(`⚠️ [FIGURE MASK] /figure-mask HTTP ${res.status} — falling back to rembg`);
+      }
+    } catch (err) {
+      log.warn(`⚠️ [FIGURE MASK] mobilesam failed (${err.message}) — falling back to rembg`);
+    }
+  }
+  return fetchSilhouettePng(cropJpegBuffer);
+}
+
+/**
  * Resize a Grok edit-API output buffer to the source scene's exact dims.
  * Handles aspect-ratio mismatches: Grok sometimes returns the closest preset
  * (e.g. 1024×1024 for a 3:4 ask). Same aspect → proportional `fit:fill`
@@ -9570,7 +9612,16 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         .extract({ left: tCropLeft, top: tCropTop, width: tCropWidth, height: tCropHeight })
         .jpeg({ quality: 90 })
         .toBuffer();
-      const silhouettePng = await fetchSilhouettePng(cropForSilhouette);
+      // Box prompt for the mobilesam backend: the UNPADDED target box mapped
+      // into crop pixel coords (face box in face mode, body box in body mode).
+      const targetBoxNorm = whiteoutTarget === 'face' && faceBbox ? faceBbox : [ymin, xmin, ymax, xmax];
+      const figureBoxInCrop = [
+        Math.round(targetBoxNorm[1] * sceneMeta.width) - tCropLeft,
+        Math.round(targetBoxNorm[0] * sceneMeta.height) - tCropTop,
+        Math.round(targetBoxNorm[3] * sceneMeta.width) - tCropLeft,
+        Math.round(targetBoxNorm[2] * sceneMeta.height) - tCropTop,
+      ];
+      const silhouettePng = await fetchFigureMaskPng(cropForSilhouette, figureBoxInCrop);
       if (silhouettePng) {
         // Place the silhouette on a black scene-sized canvas, then crop to
         // the blend region so each pixel of `silhouetteAlphaInBlend` lines up
@@ -9599,7 +9650,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
             .extract({ left: tCropLeft, top: tCropTop, width: tCropWidth, height: tCropHeight })
             .jpeg({ quality: 90 })
             .toBuffer();
-          const grokSilhouettePng = await fetchSilhouettePng(grokCropForSilhouette);
+          const grokSilhouettePng = await fetchFigureMaskPng(grokCropForSilhouette, figureBoxInCrop);
           if (grokSilhouettePng) {
             const grokSilRGBA = await sharp({
               create: { width: sceneMeta.width, height: sceneMeta.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },

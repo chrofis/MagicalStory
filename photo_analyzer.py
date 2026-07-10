@@ -1315,6 +1315,104 @@ def silhouette_edge_endpoint():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+# MobileSAM for box-prompted figure masks (lazy loaded, ~570MB peak RSS)
+_mobilesam_model = None
+
+
+def get_mobilesam():
+    global _mobilesam_model
+    if _mobilesam_model is None:
+        from ultralytics import SAM  # optional dep — endpoint 503s if missing
+        weights = os.environ.get('MOBILESAM_WEIGHTS', 'mobile_sam.pt')
+        print(f"[FIGURE-MASK] Loading MobileSAM ({weights})...")
+        _mobilesam_model = SAM(weights)
+    return _mobilesam_model
+
+
+@app.route('/figure-mask', methods=['POST'])
+def figure_mask_endpoint():
+    """
+    Box-prompted MobileSAM figure mask. Same response contract as
+    /silhouette-edge (transparent PNG, silhouette interior filled), but
+    segments the single figure inside the prompt box instead of rembg's
+    "every salient object in the crop". Chosen for char-repair after the
+    2026-07-10 mask shootout (docs/research-log.html): selects one of two
+    touching figures, includes feet rembg misses.
+
+    Expected JSON:
+    {
+        "image": "data:image/jpeg;base64,...",  # crop of the scene
+        "box": [x1, y1, x2, y2],                # figure bbox in crop pixel coords
+        "color": [255, 255, 255],               # fill RGB (default white)
+        "alpha": 255                            # fill alpha (default solid)
+    }
+
+    Returns: { "success": true, "image": "data:image/png;base64,...", "fill_pixels": N }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({"success": False, "error": "No image provided"}), 400
+        box = data.get('box')
+        if not (isinstance(box, list) and len(box) == 4):
+            return jsonify({"success": False, "error": "box [x1,y1,x2,y2] required"}), 400
+
+        try:
+            model = get_mobilesam()
+        except Exception as load_err:
+            print(f"[FIGURE-MASK] MobileSAM unavailable: {load_err}")
+            return jsonify({"success": False, "error": f"mobilesam unavailable: {load_err}"}), 503
+
+        color_rgb = data.get('color', [255, 255, 255])
+        if not (isinstance(color_rgb, list) and len(color_rgb) == 3):
+            color_rgb = [255, 255, 255]
+        alpha = max(0, min(255, int(data.get('alpha', 255))))
+
+        image_data = data['image']
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+        img_array = np.frombuffer(base64.b64decode(image_data), np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        if img is None:
+            return jsonify({"success": False, "error": "Failed to decode image"}), 400
+        h, w = img.shape[:2]
+
+        # Clamp box to image bounds
+        x1 = max(0, min(w - 1, int(box[0]))); y1 = max(0, min(h - 1, int(box[1])))
+        x2 = max(x1 + 1, min(w, int(box[2]))); y2 = max(y1 + 1, min(h, int(box[3])))
+
+        # imgsz 1024 keeps memory bounded (16GB rule); measured 573MB peak
+        results = model(img, bboxes=[[x1, y1, x2, y2]], imgsz=1024, verbose=False)
+        res = results[0]
+        if res.masks is None or len(res.masks.data) == 0:
+            return jsonify({"success": False, "error": "no mask returned"}), 200
+
+        m = res.masks.data.cpu().numpy()  # [n, mh, mw] at inference scale
+        union = (m.max(axis=0) > 0.5).astype(np.uint8) * 255
+        union = cv2.resize(union, (w, h), interpolation=cv2.INTER_NEAREST)
+        binary = union > 128
+
+        out = np.zeros((h, w, 4), dtype=np.uint8)
+        out[binary, 0] = int(color_rgb[2])  # BGR
+        out[binary, 1] = int(color_rgb[1])
+        out[binary, 2] = int(color_rgb[0])
+        out[binary, 3] = alpha
+
+        _, buffer = cv2.imencode('.png', out, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+        fill_pixels = int(binary.sum())
+        print(f"[FIGURE-MASK] {w}x{h} crop, box=({x1},{y1},{x2},{y2}), fill px={fill_pixels}, out={len(buffer)//1024}KB")
+        return jsonify({
+            "success": True,
+            "image": f"data:image/png;base64,{base64.b64encode(buffer).decode('utf-8')}",
+            "fill_pixels": fill_pixels,
+        })
+
+    except Exception as e:
+        print(f"[FIGURE-MASK] Error: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""

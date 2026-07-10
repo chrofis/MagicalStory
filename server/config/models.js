@@ -118,6 +118,14 @@ const MODEL_DEFAULTS = {
   // Changing this value changes NOTHING. Kept per user decision (mark, not delete).
   inpaintBackend: 'grok',              // 'gemini', 'runware', or 'grok' ($0.02/repair via Grok edit)
 
+  // Figure-silhouette backend for char-repair blend masks.
+  // 'rembg' = U2-Net salient-object (masks every figure in the crop);
+  // 'mobilesam' = box-prompted MobileSAM in photo_analyzer (/figure-mask) —
+  // selects only the target figure, won the 2026-07-10 mask shootout
+  // (docs/research-log.html). Falls back to rembg when the endpoint is
+  // unavailable or returns nothing. Env override for staged rollout.
+  figureMaskBackend: process.env.FIGURE_MASK_BACKEND || 'rembg',
+
   // Image generation backend (can be overridden in dev mode)
   // 'grok' = Grok Imagine (default — $0.02/image, half of Gemini)
   // 'gemini' = Gemini 2.5 Flash Image ($0.04/image, better cross-page style consistency)

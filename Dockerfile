@@ -31,6 +31,14 @@ COPY requirements.txt ./
 # --production flag).
 RUN npm install --omit=dev
 
+# Torch CPU build FIRST — requirements.txt's ultralytics depends on torch,
+# and without a preinstalled CPU build pip resolves the default Linux wheels,
+# which drag in ~2.5GB of CUDA libraries this CPU-only container can't use.
+RUN pip3 install --no-cache-dir --break-system-packages \
+    --timeout 120 --retries 5 \
+    --index-url https://download.pytorch.org/whl/cpu \
+    torch torchvision
+
 # Install Python dependencies. mediapipe / opencv are large (>30 MB each) and
 # files.pythonhosted.org occasionally stalls mid-download — give pip more
 # breathing room and let it retry rather than failing the whole build.
@@ -38,6 +46,12 @@ RUN npm install --omit=dev
 RUN pip3 install --no-cache-dir --break-system-packages \
     --timeout 120 --retries 5 \
     -r requirements.txt
+
+# MobileSAM weights baked into the image so cold starts don't re-download.
+# photo_analyzer.py reads MOBILESAM_WEIGHTS (get_mobilesam).
+RUN curl -fL -o /app/mobile_sam.pt \
+    https://github.com/ultralytics/assets/releases/download/v8.3.0/mobile_sam.pt
+ENV MOBILESAM_WEIGHTS=/app/mobile_sam.pt
 
 # Copy client package files and install dependencies
 COPY client/package*.json ./client/

@@ -7,3 +7,7 @@ mediapipe==0.10.9
 mtcnn-opencv>=1.0.0
 onnxruntime>=1.16.0
 rembg>=2.0.50
+# MobileSAM figure masks (/figure-mask endpoint). Torch must already be
+# installed as the CPU build (the Dockerfile does this BEFORE installing this
+# file) — otherwise ultralytics pulls the multi-GB CUDA wheels on Linux.
+ultralytics>=8.3
