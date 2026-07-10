@@ -1169,3 +1169,17 @@ sharpness (not absolute) so soft art styles (watercolor) pass. Thresholds:
 
 **Touched:** server/lib/images.js (helpers + blended + cutout branches),
 prompts/image-evaluation.txt, docs/image-generation-methods.html.
+
+## 2026-07-10 — /geschichten-aus town URLs removed from the sitemap
+
+**Context:** Organic-decline investigation found 51 towns × 3 langs (153
+URLs) submitted in the sitemap since 2026-03 that never had a client route
+or prerendered page — every one served the generic SPA shell (soft-404 /
+duplicate ballast). GSC data showed the only thing they attracted was
+zero-intent trivia impressions.
+**Decision:** de-sitemap (not build): /stadt/:city already covers city SEO
+with real prerendered pages; a second thin city-page family would be
+doorway-page territory. seoMeta route handlers kept (direct visits still
+get correct meta). Re-add the sitemap loop only when the pages become real
+(route + prerender + own content).
+**Touched:** server/lib/seoMeta.js (generateSitemap).

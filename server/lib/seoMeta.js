@@ -1330,7 +1330,7 @@ function generateSitemap() {
     '/try': '0.9',
     '/pricing': '0.9',
     '/themes': '0.8',
-    '/geschichten-aus': '0.7',
+    // '/geschichten-aus' hub removed — see the town-pages note below.
     '/stadt': '0.7',
     '/anlass': '0.7',
     '/geschenk': '0.8',
@@ -1377,15 +1377,13 @@ function generateSitemap() {
     }
   }
 
-  // Town pages
-  for (const townSlug of Object.keys(TOWNS)) {
-    paths.push({
-      path: `/geschichten-aus/${townSlug}`,
-      lastmod: today,
-      changefreq: 'monthly',
-      priority: '0.7',
-    });
-  }
+  // Town pages (/geschichten-aus/:town) intentionally NOT in the sitemap:
+  // they were added 2026-03 as server-side meta only and never got a client
+  // route or prerendered page — every sitemap'd town URL served the generic
+  // SPA shell (soft-404/duplicate ballast, 153 URLs; found in the 2026-07-10
+  // organic-decline investigation). The /stadt/:city pages cover city SEO.
+  // If "Geschichten aus {town}" ever becomes a real page (route + prerender
+  // + own content), re-add the loop over Object.keys(TOWNS) here.
 
   // Comparison pages
   for (const compSlug of Object.keys(COMPARISONS)) {
