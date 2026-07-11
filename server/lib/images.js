@@ -10662,17 +10662,21 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       // the blended branch uses.
       const grokAtSourceDims = await resizeGrokToSceneDims(grokRawBuf, sceneMeta.width, sceneMeta.height);
 
-      // Fitness check: rembg the Grok output's hatch crop → new silhouette.
-      // Compare alpha pixel-by-pixel against the old silhouette. If a large
-      // fraction of the new silhouette lies OUTSIDE the old silhouette, the
-      // figure moved/grew and feathering would clip it.
+      // Fitness check: silhouette the Grok output's hatch crop → new
+      // silhouette. Compare alpha pixel-by-pixel against the old silhouette.
+      // If a large fraction of the new silhouette lies OUTSIDE the old
+      // silhouette, the figure moved/grew substantially.
       let canFeather = false;
       let leakRatio = null;
+      let newSilBuf = null;
       try {
         const grokHatchCrop = await sharp(grokAtSourceDims)
           .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
           .jpeg({ quality: 90 }).toBuffer();
-        const newSilBuf = await fetchSilhouettePng(grokHatchCrop);
+        // Same backend as the input-side hatch silhouette (MobileSAM box
+        // prompt with rembg fallback). Mixing backends made the two masks
+        // disagree on shape even for a perfectly-placed repaint.
+        newSilBuf = await fetchFigureMaskPng(grokHatchCrop, [0, 0, hatchWidth, hatchHeight]);
         if (newSilBuf) {
           const oldAlpha = await sharp(silhouetteMaskBuf).extractChannel(3).raw().toBuffer();
           const newAlpha = await sharp(newSilBuf).extractChannel(3).raw().toBuffer();
@@ -10746,49 +10750,50 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           .toBuffer();
       };
 
-      if (canFeather) {
-        finalBuf = await compositeWithMask(silhouetteMaskBuf, hatchTop, hatchLeft);
-        featherDecision = `ON (newOnly ${(leakRatio * 100).toFixed(1)}%, feather ${FEATHER_PX}px)`;
-      } else {
-        // Fitness check failed: figure drifted enough that the OLD silhouette
-        // alone would clip the new figure. Don't fall back to using Grok's
-        // whole-image bytes (kills the entire scene). Instead build a UNION
-        // mask of old silhouette + new silhouette → feather over the union.
-        // Result: figure intact (covered by both old + new), background outside
-        // the union still byte-exact from sceneBuffer.
+      // The repaint never lands pixel-perfect, so the OLD silhouette alone is
+      // never a safe blend mask: it clips the new figure's overhang and leaves
+      // old-figure pixels standing where the new one doesn't cover — "raw
+      // correct, final smeared" (staging back-cover, 2026-07-11). Same
+      // mechanism the blended branch fixed with old∪new. Whenever the
+      // repaint's own silhouette exists, feather over the UNION; the figure
+      // is intact (covered by both), background outside the union stays
+      // byte-exact from sceneBuffer. leakRatio is kept as telemetry only.
+      if (newSilBuf) {
         try {
-          const grokHatchCrop = await sharp(grokAtSourceDims)
-            .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
-            .jpeg({ quality: 90 }).toBuffer();
-          const newSilBuf = await fetchSilhouettePng(grokHatchCrop);
-          if (newSilBuf) {
-            // Union via add: pixel-wise OR of two alpha channels. Use sharp's
-            // composite blend:'add' on the alpha layer.
-            const oldAlphaPng = await sharp(silhouetteMaskBuf).extractChannel(3).toColorspace('b-w').png().toBuffer();
-            const newAlphaPng = await sharp(newSilBuf).extractChannel(3).toColorspace('b-w').png().toBuffer();
-            const unionAlpha = await sharp(oldAlphaPng)
-              .composite([{ input: newAlphaPng, blend: 'add' }])
-              .png()
-              .toBuffer();
-            // Re-attach an opaque RGB so it behaves like the original silhouette
-            // PNG (3 colour channels + alpha = the union mask).
-            const unionSilhouette = await sharp({
-              create: { width: hatchWidth, height: hatchHeight, channels: 3, background: { r: 255, g: 0, b: 255 } }
-            })
-              .joinChannel(unionAlpha)
-              .png()
-              .toBuffer();
-            finalBuf = await compositeWithMask(unionSilhouette, hatchTop, hatchLeft);
-            featherDecision = `ON-UNION (newOnly ${(leakRatio * 100).toFixed(1)}% > 15% — feathered over old∪new silhouette, background preserved)`;
+          // Union via add: pixel-wise OR of two alpha channels. Use sharp's
+          // composite blend:'add' on the alpha layer.
+          const oldAlphaPng = await sharp(silhouetteMaskBuf).extractChannel(3).toColorspace('b-w').png().toBuffer();
+          const newAlphaPng = await sharp(newSilBuf).extractChannel(3).toColorspace('b-w').png().toBuffer();
+          const unionAlpha = await sharp(oldAlphaPng)
+            .composite([{ input: newAlphaPng, blend: 'add' }])
+            .png()
+            .toBuffer();
+          // Re-attach an opaque RGB so it behaves like the original silhouette
+          // PNG (3 colour channels + alpha = the union mask).
+          const unionSilhouette = await sharp({
+            create: { width: hatchWidth, height: hatchHeight, channels: 3, background: { r: 255, g: 0, b: 255 } }
+          })
+            .joinChannel(unionAlpha)
+            .png()
+            .toBuffer();
+          finalBuf = await compositeWithMask(unionSilhouette, hatchTop, hatchLeft);
+          featherDecision = `ON-UNION (newOnly ${(leakRatio * 100).toFixed(1)}%, feather ${FEATHER_PX}px — old∪new silhouette, background preserved)`;
+        } catch (unionErr) {
+          log.warn(`⚠️ [CHAR REPAIR GROK] Union mask build failed (${unionErr.message})`);
+          if (canFeather) {
+            // Drift was small — old-only feather is an acceptable degraded mode.
+            finalBuf = await compositeWithMask(silhouetteMaskBuf, hatchTop, hatchLeft);
+            featherDecision = `ON (union failed, old-only; newOnly ${(leakRatio * 100).toFixed(1)}%)`;
           } else {
             finalBuf = grokRawBuf;
-            featherDecision = `OFF-VERBATIM (newOnly ${(leakRatio * 100).toFixed(1)}% > 15% AND new silhouette unavailable for union)`;
+            featherDecision = `OFF-VERBATIM (union mask error: ${unionErr.message})`;
           }
-        } catch (unionErr) {
-          log.warn(`⚠️ [CHAR REPAIR GROK] Union mask build failed (${unionErr.message}) — using Grok verbatim`);
-          finalBuf = grokRawBuf;
-          featherDecision = `OFF-VERBATIM (union mask error: ${unionErr.message})`;
         }
+      } else {
+        // No silhouette of the repaint → can't build a safe mask. Grok bytes
+        // verbatim (figure intact, scene re-quantised) beats blind clipping.
+        finalBuf = grokRawBuf;
+        featherDecision = 'OFF-VERBATIM (repaint silhouette unavailable)';
       }
     } else if (silhouetteMaskBuf && !featherEnabled) {
       finalBuf = grokRawBuf;
