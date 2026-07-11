@@ -787,11 +787,34 @@ Set pass=true if:
 }
 
 /**
+ * Split a loaded avatar prompt template into { task, catalogue } at the
+ * `---` + newline + `CLOTHING_STYLES:` separator. CRLF-SAFE — the single
+ * splitting implementation for every consumer. The old sites split on the
+ * literal '---\nCLOTHING_STYLES:'; on Windows checkouts the template loads
+ * with \r\n, the token never matched, split() returned the whole file, and
+ * every dev-run avatar prompt shipped the chosen outfit PLUS all 8
+ * catalogue outfit blocks.
+ *
+ * No separator found → whole text is the task, catalogue '' (same
+ * fallback the old sites had on no-match).
+ */
+const CATALOGUE_SEPARATOR = /-{3}\r?\nCLOTHING_STYLES:/;
+function splitPromptFromCatalogue(text) {
+  const s = String(text || '');
+  const m = s.match(CATALOGUE_SEPARATOR);
+  if (!m) return { task: s, catalogue: '' };
+  return {
+    task: s.slice(0, m.index),
+    catalogue: s.slice(m.index + m[0].length),
+  };
+}
+
+/**
  * Get clothing style prompt for a given category and gender
  */
 function getClothingStylePrompt(category, isFemale) {
   const template = PROMPT_TEMPLATES.avatarMainPrompt || '';
-  const styleSection = template.split('CLOTHING_STYLES:')[1] || '';
+  const styleSection = splitPromptFromCatalogue(template).catalogue;
 
   let tag;
   if (category === 'winter') {
@@ -820,7 +843,7 @@ function getClothingStylePrompt(category, isFemale) {
  * Get clothing style prompt from ACE++ template (shorter, optimized version)
  */
 function getClothingStylePromptFromAce(category, isFemale, aceTemplate) {
-  const styleSection = aceTemplate.split('CLOTHING_STYLES:')[1] || '';
+  const styleSection = splitPromptFromCatalogue(aceTemplate).catalogue;
 
   let tag;
   if (category === 'winter') {
@@ -926,7 +949,7 @@ async function generateDynamicAvatar(character, category, config) {
       return { success: false, error: `Avatar prompt templates not loaded: ${missing}` };
     }
     // Build the prompt
-    const promptPart = PROMPT_TEMPLATES.avatarMainPrompt.split('---\nCLOTHING_STYLES:')[0].trim();
+    const promptPart = splitPromptFromCatalogue(PROMPT_TEMPLATES.avatarMainPrompt).task.trim();
     const clothingPrompt = getDynamicClothingPrompt(category, config, isFemale);
     const avatarPrompt = fillTemplate(promptPart, {
       'CLOTHING_STYLE': clothingPrompt
@@ -1401,7 +1424,7 @@ router.get('/avatar-prompt', authenticateToken, async (req, res) => {
     const isFemale = gender === 'female';
 
     // Build the prompt from template
-    const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
+    const promptPart = splitPromptFromCatalogue(PROMPT_TEMPLATES.avatarMainPrompt).task.trim();
     const clothingStyle = getClothingStylePrompt(category, isFemale);
     const avatarPrompt = fillTemplate(promptPart, {
       'CLOTHING_STYLE': clothingStyle
@@ -1606,7 +1629,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       let totalOutputTokens = 0;
 
       try {
-        const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
+        const promptPart = splitPromptFromCatalogue(PROMPT_TEMPLATES.avatarMainPrompt).task.trim();
         const clothingStylePrompt = getClothingStylePrompt(category, isFemale);
         let avatarPrompt = fillTemplate(promptPart, { 'CLOTHING_STYLE': clothingStylePrompt });
 
@@ -2772,7 +2795,7 @@ These corrections OVERRIDE what is visible in the reference photo.
         const clothingStylePrompt = getClothingStylePromptFromAce(category, isFemale, aceTemplate);
 
         // Build final prompt: base template + clothing + user traits
-        const basePrompt = aceTemplate.split('---')[0].trim();
+        const basePrompt = splitPromptFromCatalogue(aceTemplate).task.trim();
         let acePrompt = fillTemplate(basePrompt, { 'CLOTHING_STYLE': clothingStylePrompt });
 
         // Add user traits (hair color, build, etc.) - ACE++ won't get these from face reference
@@ -2839,7 +2862,7 @@ These corrections OVERRIDE what is visible in the reference photo.
         log.debug(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name || 'unnamed'} (${gender || 'unknown'}), model: ${selectedModel}...`);
 
         // Build the prompt from template
-        const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
+        const promptPart = splitPromptFromCatalogue(PROMPT_TEMPLATES.avatarMainPrompt).task.trim();
         const clothingStylePrompt = getClothingStylePrompt(category, isFemale);
         log.debug(`   [CLOTHING] Style for ${category}: "${clothingStylePrompt}"`);
         let avatarPrompt = fillTemplate(promptPart, {
