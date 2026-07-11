@@ -39,6 +39,8 @@ const pageTexts: Record<string, {
   ctaButton: string;
   yearLabel: string;
   personLabel: string;
+  heroPitchChallenge: string;
+  heroPitchGeneric: string;
 }> = {
   en: {
     breadcrumbRoot: 'Themes',
@@ -57,6 +59,8 @@ const pageTexts: Record<string, {
     ctaButton: 'Create Your Free Story',
     yearLabel: 'Year',
     personLabel: 'Historical figure',
+    heroPitchChallenge: 'A personalized picture book in which your child is the hero — and masters this challenge themselves. The first story is free.',
+    heroPitchGeneric: 'A personalized picture book in which your child is the hero and experiences this story themselves. The first story is free.',
   },
   de: {
     breadcrumbRoot: 'Themen',
@@ -75,6 +79,8 @@ const pageTexts: Record<string, {
     ctaButton: 'Gratis-Geschichte erstellen',
     yearLabel: 'Jahr',
     personLabel: 'Historische Persönlichkeit',
+    heroPitchChallenge: 'Ein personalisiertes Bilderbuch, in dem dein Kind die Hauptfigur ist — und diese Herausforderung selbst meistert. Die erste Geschichte ist gratis.',
+    heroPitchGeneric: 'Ein personalisiertes Bilderbuch, in dem dein Kind die Hauptfigur ist und diese Geschichte selbst erlebt. Die erste Geschichte ist gratis.',
   },
   fr: {
     breadcrumbRoot: 'Thèmes',
@@ -93,6 +99,8 @@ const pageTexts: Record<string, {
     ctaButton: 'Créer votre histoire gratuite',
     yearLabel: 'Année',
     personLabel: 'Personnage historique',
+    heroPitchChallenge: 'Un livre illustré personnalisé où votre enfant est le héros — et surmonte ce défi lui-même. La première histoire est gratuite.',
+    heroPitchGeneric: 'Un livre illustré personnalisé où votre enfant est le héros et vit cette histoire lui-même. La première histoire est gratuite.',
   },
 };
 
@@ -288,7 +296,11 @@ export default function ThemePage() {
             </div>
           )}
 
-          <p className="text-stone-500 text-lg max-w-xl mx-auto mb-6">{description}</p>
+          <p className="text-stone-500 text-lg max-w-xl mx-auto mb-4">{description}</p>
+
+          <p className="text-stone-800 font-medium max-w-xl mx-auto mb-6">
+            {catSlug === 'life-challenges' ? t.heroPitchChallenge : t.heroPitchGeneric}
+          </p>
 
           {(() => {
             // Map URL category slugs to internal category IDs for StoryWizard
