@@ -17,7 +17,7 @@ GRID REQUIREMENTS:
 VISUAL REQUIREMENTS:
 - Face: 100% identical to reference photo. Direct replication, not averaged.
 - Body: Generate age-appropriate body proportions based on apparent age in reference.
-- Setting: Pure clean white background (#FFFFFF) in each quadrant.
+- Setting: Solid light grey studio background in each quadrant.
 - Lighting: Natural, even, studio-style diffused light.
 - Top quadrants: Face only - forehead to chin. No shoulders, no neck, no clothing visible. Tight crop on face.
 - Bottom quadrants: Full body, head to toe. Shoes visible.
