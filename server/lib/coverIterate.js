@@ -716,7 +716,10 @@ async function buildCoverReferences({
         // across the bottom or the figures land in whatever is there — on a
         // beach/lakeside/river scene that is open water, and the single Grok
         // pass cannot reliably carve a bank out of a "preserve the water" plate.
-        characterSpace: 'The bottom fifth of the frame must be solid dry standing ground spanning the full width — sand above the waterline, beach berm, boardwalk, grass, path, stone, or deck — where the characters will stand. Any ocean, river, lake, surf, pool, or open water stays in the mid-ground or higher and never touches the bottom edge of the frame.',
+        // Plate-level variant of the canonical SOLID-GROUND rule (docs/
+        // decisions.md) — plates prepare the ground BEFORE figures exist,
+        // so this speaks about the frame band, not about feet.
+        characterSpace: 'The bottom fifth of the frame must be solid dry standing ground spanning the full width — sand above the waterline, beach berm, boardwalk, grass, path, stone, or deck — where the characters will stand firmly. Any ocean, river, lake, surf, pool, or open water stays in the mid-ground or higher and never touches the bottom edge of the frame.',
         description: emptyDesc,
         // Named landmark-fidelity block when a landmark photo is attached
         // below — '' otherwise (was trial-only).

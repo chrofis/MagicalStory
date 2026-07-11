@@ -53,6 +53,12 @@ const { getStandardAvatar } = require('./characterPhotos');
 
 const XAI_API_URL = 'https://api.x.ai/v1';
 
+// Canonical solid-ground repaint instruction (decision 2026-07-11, docs/
+// decisions.md "SOLID-GROUND rule"). ONE formulation shared by pass-1
+// (single-pass refinement) and pass-2 (landmark restyle) — the two used to
+// carry drifted variants of the same rule.
+const SOLID_GROUND_REPAINT = `Every figure must stand on SOLID GROUND — feet flat on a stable surface. NO figure stands in or on water: if a figure's feet fall over water or any unstable surface, paint a small natural bank, shoreline, or stepping stones under them so they stand firmly on land. Keep this repaint to the small area directly beneath each figure's feet — never pave over the wider water, the buildings, or the foliage elsewhere.`;
+
 // ─── Real-world heights by age (cm) — for figure scale ─────────────────
 const TARGET_TALLEST_PX = 920; // tallest adult on a 1024×1365 canvas
 function heightCm(age) {
@@ -798,14 +804,14 @@ ${actionSection}${propRefSection}${vbGridSection}
 ═══ POSE REDRAW (mandatory — do every line) ═══
 ${POSES.join('\n')}
 
-After fixing poses: render every figure as if painted directly into the scene — the same brush texture, palette, and lighting direction as the background, their hair and body edges flowing into their surroundings as one continuous illustration. Repaint each figure's outline so it belongs to the scene. Match the lighting direction of the background. Every figure must stand on SOLID GROUND — feet flat on a stable surface (bank, cobblestones, path, grass, stone). NO figure stands in or on water. REPAINT the ground patch directly beneath each figure's feet (a small area, only beneath/around the feet): if their feet fall over water or any unstable surface, paint a small natural bank, shoreline, or stepping stones under them so they stand firmly on land. Keep this to the small area right under the feet — do NOT pave over the wider river, the buildings, or the foliage elsewhere.${textLine}
+After fixing poses: render every figure as if painted directly into the scene — the same brush texture, palette, and lighting direction as the background, their hair and body edges flowing into their surroundings as one continuous illustration. Repaint each figure's outline so it belongs to the scene. Match the lighting direction of the background. ${SOLID_GROUND_REPAINT}${textLine}
 
 PRESERVE EXACTLY:
-- The background scene: every building, window, roofline, doorway, foliage, river, sky — pixel-faithful to the input, EXCEPT the narrow strip directly beneath each figure's feet, which you may repaint into dry standing ground (sand, bank, path, stone, deck) as instructed above so no figure stands in water.
+- The background scene: every building, window, roofline, doorway, foliage, river, sky — pixel-faithful to the input, EXCEPT the small area directly beneath each figure's feet, which you may repaint into dry standing ground per the SOLID GROUND rule above.
 - Every figure's face, hair, skin tone, clothing — keep their identity exact, only fix the pose and soften the edges.
 - The ${artStyle} aesthetic — do not change the style, do not photo-realize, do not add color if the background is monochrome.
 
-DO NOT regenerate the scene. DO NOT shift the landmark. DO NOT add or remove characters. DO NOT add frames, borders, or vignettes.`
+DO NOT regenerate the scene. DO NOT shift the landmark. DO NOT add or remove characters. DO NOT add frames, borders, or vignettes. Object names in this prompt say what to draw — never paint an object's name as lettering on the object or anywhere in the scene.`
     : `PASS 1: REPOSE FIGURES ONLY.
 
 The first input image shows ${n} character cutout${n === 1 ? '' : 's'} on a plain background. ${n === 1 && !propName ? 'Redraw the pose per the line below.' : 'The figures are pasted with ARMS AT THEIR SIDES — this is wrong, and your only job is to redraw their poses per the lines below.'} Keep the plain background. Keep every face/hair/skin/clothing exactly. Just change the poses.
@@ -922,7 +928,7 @@ The background of this image is a real photograph of a specific landmark. DO NOT
 YOUR EDIT (in this order):
 1. Apply ${styleHint} stylistically across the whole image — soft watercolor brushstrokes, paper texture, gentle wash. The buildings keep their EXACT geometry, only their rendering changes from photographic to painted.
 2. The figures (already painted with interactive poses) are the foreground — render them as if painted directly into the scene: the same watercolor texture, palette, and lighting as the background, their hair and body edges flowing naturally into their surroundings as one continuous illustration. Repaint each figure's outline so it belongs to the scene. DO NOT change their poses.
-3. REPAINT THE GROUND ONLY beneath/around the figures' feet so it reads as a continuation of the actual ground material the landmark stands on (cobblestone, paving stones, plaza, dirt, grass, sand, snow — whichever matches the landmark). Every figure must stand on SOLID GROUND — feet flat on a stable surface. NO figure stands in or on water: if a figure's feet fall over water, paint a small natural bank, shoreline, or stepping stones under them so they stand firmly on land. Make the transition invisible. Keep this to the small area right under the feet — do not extend ground OVER the buildings or pave over the wider water.${textLine}
+3. REPAINT THE GROUND ONLY beneath/around the figures' feet so it reads as a continuation of the actual ground material the landmark stands on (cobblestone, paving stones, plaza, dirt, grass, sand, snow — whichever matches the landmark), the transition invisible. ${SOLID_GROUND_REPAINT}${textLine}
 
 PRESERVE EXACTLY:
 - Every building, window, roofline, doorway — they are correct in the input.
@@ -930,7 +936,7 @@ PRESERVE EXACTLY:
 - Every prop's silhouette and material.
 - Every figure's GAZE — each figure keeps looking straight at the viewer (covers are head-on portraits). Do NOT redirect any gaze down at props or at other figures.
 
-DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generic city. DO NOT change which figures appear or their order. DO NOT add new objects, animals, or extra characters. NOT photoreal — watercolor texture only.${textLine ? '' : ' NO text, no signage, no letters anywhere.'}${sceneSectionPass2}`;
+DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generic city. DO NOT change which figures appear or their order. DO NOT add new objects, animals, or extra characters. NOT photoreal — watercolor texture only.${textLine ? '' : ' NO text, no signage, no letters anywhere.'} Object names in this prompt say what to draw — never paint an object's name as lettering on the object or anywhere in the scene.${sceneSectionPass2}`;
 
   // Final scrub — same post-VEH001 chokepoint as pass 1. The scene prose
   // (proseForPass2) and hint-synthesized action phrases can carry raw ids.

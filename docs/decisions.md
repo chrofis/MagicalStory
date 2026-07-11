@@ -1339,3 +1339,28 @@ buildCharacterReferenceList includeClothing), `server/lib/entityConsistency.js`
 `server/lib/coverIterate.js` + `server.js` (cover clothing text +
 threading, primaryClothing), `server/routes/regeneration.js`.
 **Status:** ✅ active.
+
+## 2026-07-11 — SOLID-GROUND rule: one canonical wording per prompt layer
+**Context:** "Characters stand on solid ground, never in water" lived in six
+drifted formulations (3 cover templates, coverComposite pass-1 + its
+PRESERVE carve-out + pass-2, coverIterate plate characterSpace).
+**Decision:** Three canonical formulations, one per layer:
+1. Cover templates (front-cover / initial-page-with-dedication /
+   initial-page-no-dedication), identical bullet: "All characters stand
+   firmly on solid ground — feet flat on a stable surface (floor, pavement,
+   cobblestones, grass, path). Never standing in or on water, never
+   floating, never mid-air; feet visible on the ground and level with each
+   other."
+2. Composite edit prompts: module const `SOLID_GROUND_REPAINT`
+   (coverComposite.js) shared by pass-1 and pass-2; the PRESERVE carve-out
+   references "per the SOLID GROUND rule above" instead of restating it.
+3. Empty-scene plates (coverIterate characterSpace): band-level variant —
+   plates prepare ground before figures exist, so it speaks about the
+   bottom fifth of the frame, not about feet.
+**Rationale:** Six drifted statements of one rule invite partial edits;
+each layer genuinely needs different phrasing (generation bullet, edit
+repaint instruction, plate preparation) but not six.
+**Touched:** prompts/front-cover.txt, prompts/initial-page-*.txt,
+server/lib/coverComposite.js, server/lib/coverIterate.js
+**Status:** ✅ active. (Note: back-cover.txt has no solid-ground rule at
+all — pre-existing gap, not added here.)

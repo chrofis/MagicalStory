@@ -1,4 +1,4 @@
-Generate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show.
+Generate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show. Object names in the prompt say what to draw — never paint an object's name as lettering on the object or anywhere in the scene.
 
 Create a front cover illustration for a children's book.
 
@@ -12,7 +12,7 @@ Create a front cover illustration for a children's book.
 **COMPOSITION GUIDELINES:**
 - ALL MAIN CHARACTERS should be prominently featured and clearly recognizable
 - Characters should be arranged in a balanced composition (side by side, or grouped naturally)
-- All characters stand firmly on solid ground — feet flat on a stable surface (pavement, cobblestones, grass, floor, path). Never standing in or on water, never floating, never mid-air, feet always visible on the ground and level with each other.
+- All characters stand firmly on solid ground — feet flat on a stable surface (floor, pavement, cobblestones, grass, path). Never standing in or on water, never floating, never mid-air; feet visible on the ground and level with each other.
 - Keep the composition simple and uncluttered
 - Leave clear space at the TOP for the title text
 - Each character has 2 hands. Show at most 2 items held per character — if more are mentioned, drop the rest.
