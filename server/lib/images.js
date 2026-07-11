@@ -5250,9 +5250,10 @@ async function evaluateImageBatch(images, options = {}) {
           let clothingDescriptions = char.avatars?.clothing || {};
           if (clothingRequirements) {
             const { buildClothingDescription } = require('./entityConsistency');
+            const { resolveCharacterReqs } = require('./clothingCategories');
             const categories = new Set([
               ...Object.keys(char.avatars?.clothing || {}),
-              ...Object.keys(clothingRequirements?.[char.name] || {}),
+              ...Object.keys(resolveCharacterReqs(clothingRequirements, char.name) || {}),
             ]);
             const resolved = {};
             for (const cat of categories) {
@@ -5829,7 +5830,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       // Merge the story-level spec so resolveClothingDescription finds
       // clothingRequirements[name][category].signature/description (this
       // story's clothing) before falling back to stale avatars.clothing.
-      const storyReqs = clothingRequirements?.[name];
+      const storyReqs = require('./clothingCategories').resolveCharacterReqs(clothingRequirements, name);
       charReqs[name] = {
         ...(storyReqs && typeof storyReqs === 'object' ? storyReqs : {}),
         _currentClothing: variant,
@@ -6979,7 +6980,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // colour mismatch — repair runs N times for nothing. Same priority as
     // storyHelpers.resolveClothingDescription.
     const clothingDesc = (() => {
-      const reqs = storyData?.clothingRequirements?.[charName];
+      const reqs = require('./clothingCategories').resolveCharacterReqs(storyData?.clothingRequirements, charName);
       if (reqs && reqs[clothingCategory]) {
         const cat = reqs[clothingCategory];
         if (cat.signature && cat.signature !== 'none') return cat.signature;
@@ -8628,7 +8629,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       imagePrompt, refApplied.characterPhotos, previousImage, 'scene', null, usageTracker, null,
       { imageModel: imageModelOverride },
       `PAGE ${pageNumber} ITERATE`,
-      { landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, aspectRatio: sceneAspect, sceneBackground: refApplied.sceneBackground, visualBible: storyData?.visualBible || null }
+      { landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, aspectRatio: sceneAspect, sceneBackground: refApplied.sceneBackground, visualBible: storyData?.visualBible || null, clothingRequirements, artStyle }
     );
   }
 
@@ -9337,6 +9338,24 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     if (bboxArea > 0.5 || bboxW > 0.85 || bboxH > 0.85) {
       log.warn(`👤 [CHAR REPAIR GROK] ${charName}: bbox is ${Math.round(bboxW * 100)}%×${Math.round(bboxH * 100)}% (area ${Math.round(bboxArea * 100)}%) — cutout would repaint most of the page; falling back to full-scene inpaint`);
       useCutout = false;
+      useFullScene = true;
+    }
+  }
+
+  // Guard: a "face" box spanning (nearly) the whole figure is not a face box —
+  // bbox detection sometimes returns faceBox == bodyBox, especially on covers.
+  // Blended face mode would then blur the ENTIRE figure, plus body-sized rect
+  // blurs on every protected neighbour — on a group cover most of the image
+  // turns to mush and Grok recomposes the whole scene instead of fixing one
+  // face (staging back-cover, 2026-07-11). Downgrade to full-scene inpaint,
+  // whose magenta hatch handles whole-figure repaints.
+  if (useBlended && Array.isArray(options.faceBbox) && Array.isArray(bbox)) {
+    const fb = options.faceBbox;
+    const faceArea = Math.max(0, fb[2] - fb[0]) * Math.max(0, fb[3] - fb[1]);
+    const bodyArea = Math.max(1e-6, (ymax - ymin) * (xmax - xmin));
+    if (faceArea / bodyArea >= 0.6) {
+      log.warn(`👤 [CHAR REPAIR GROK] ${charName}: face box covers ${Math.round((faceArea / bodyArea) * 100)}% of the body box — not a real face box; downgrading blended face repair to full-scene inpaint`);
+      useBlended = false;
       useFullScene = true;
     }
   }
@@ -11149,6 +11168,10 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // gets sent to the bbox detector with no traits and is reported as UNKNOWN.
     visualBible = null,
     artStyle = null,
+    // Story clothingRequirements — source of truth for per-story outfits,
+    // resolved into bbox/eval character descriptions (stale avatars.clothing
+    // otherwise becomes the canonical and repairs revert story outfits).
+    clothingRequirements = null,
   } = options;
 
   // Extract forceRepairThreshold from incrementalConsistency if not provided directly
@@ -11443,7 +11466,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // Build character descriptions — primary characters + Visual Bible
     // secondaries/animals named in expectedCharacterPositions. Single helper,
     // same shape as the regeneration routes use.
-    const storyShape = { characters: sceneCharacters, visualBible };
+    const storyShape = { characters: sceneCharacters, visualBible, clothingRequirements, artStyle };
     let characterDescriptions = getStoryHelpers().buildCharacterDescriptionsForBbox(storyShape, expectedCharacterPositions);
     if (Object.keys(characterDescriptions).length === 0) {
       // No primary characters parsed and no VB matches — fall back to prompt parsing
