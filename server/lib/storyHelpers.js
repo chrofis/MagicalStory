@@ -4974,6 +4974,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       SCENE_DESCRIPTION: cleanSceneDescription,
       CHARACTER_REFERENCE_LIST: characterReferenceList,
       REQUIRED_OBJECTS: requiredObjectsSection,
+      // Text fallback when the scene has no metadata.objects and no VB grid
+      // image — '' on the normal path (fillTemplate strips the placeholder).
+      // Was computed + logged but never passed (only the template-missing
+      // hardcoded fallback below used it).
+      VISUAL_BIBLE: visualBibleSection,
       TEXT_AREA_INSTRUCTION: textAreaInstruction,
       ERA_GUARD: eraGuard,
       SCENE_INTENT: sceneIntentLine,
