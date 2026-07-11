@@ -1364,3 +1364,17 @@ repaint instruction, plate preparation) but not six.
 server/lib/coverComposite.js, server/lib/coverIterate.js
 **Status:** ✅ active. (Note: back-cover.txt has no solid-ground rule at
 all — pre-existing gap, not added here.)
+
+## 2026-07-11 — OPEN QUESTION: cover text baked into the image vs app-side overlay
+**Context:** Cover titles / dedications / the back-cover URL are painted by
+the image model (front-cover.txt TITLE block, composite textLine). Model
+lettering is the top source of garbled cover text; an app-side overlay
+(like the story-text overlay) would be pixel-perfect but loses the
+hand-painted look and needs per-style font work.
+**Decision:** OPEN — no implementation. Current state: baked-in. The
+composite flow renders text exactly once (two-pass: pass-2 only; single
+pass: pass-1 only, no pass-2), so no re-lettering pass exists.
+**Rationale:** Product call (aesthetics vs reliability) — needs owner
+input, not an engineering default.
+**Touched:** (none — question only)
+**Status:** 🟡 open product question.

@@ -15,7 +15,7 @@ Create a back cover illustration for a children's book.
 - If more than one character is listed, arrange them as a balanced group with equal prominence.
 - Characters should look happy and relaxed — smiling, laughing, or at ease after the adventure.
 - Warm lighting, relaxed poses.
-- Each character has 2 hands. Show at most 2 items held per character.
+- Each character has 2 hands. Show at most 2 items held per character — if more are mentioned, drop the rest.
 
 **TEXT:**
 Paint "magicalstory.ch" as small hand-lettered text directly on the scene in the lower-left, roughly 5% in from both edges. Not in a separate band, strip, footer, or caption area — painted onto the scene like a signature. No other text.

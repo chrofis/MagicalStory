@@ -821,9 +821,7 @@ ${POSES.join('\n')}
 
 PRESERVE: every face, hair colour, skin tone, clothing detail, every prop, plain background, relative left-to-right positions.
 
-DO NOT add or remove characters. DO NOT add a landscape, sky, ground, buildings, foliage, or any scenic background — no forest, no street, no room. The background stays plain (white, gray, or a flat neutral tone — any of these are acceptable since pass 2 composites onto the real landmark photo and rembg cleanly separates figures from any plain background). NO TEXT, no signage, no letters anywhere.
-
-${n === 1 && !propName ? '' : 'If any figure still has arms at their sides, the task has failed. '}If the background contains a scene (forest, street, building, sky with clouds, etc.) instead of staying plain, the task has failed.`;
+Keep the same characters — no additions, no removals. The background stays a plain flat tone (white, gray, or neutral — pass 2 composites the figures onto the real landmark photo). No landscape, sky, ground, buildings, or foliage. No text, signage, or letters anywhere.${n === 1 && !propName ? '' : ' Every figure ends the edit with the redrawn pose — arms away from the sides.'}`;
 
   // Final scrub — post-VEH001 rule: every prompt path runs
   // sanitizeVbIdsInPrompt before the image model sees it. Resolves any
@@ -922,8 +920,8 @@ ${n === 1 && !propName ? '' : 'If any figure still has arms at their sides, the 
     ? `\n\nSTORY SCENE CONTEXT (do not change poses; this is for atmosphere matching only):\n${proseForPass2}`
     : '';
 
-  let pass2Prompt = `LANDMARK PROTECTION (CRITICAL — read first):
-The background of this image is a real photograph of a specific landmark. DO NOT redraw it. DO NOT move buildings. DO NOT change architecture. DO NOT change the skyline. DO NOT add or remove windows. The buildings, the position of every window, the roofline, and the silhouette must remain pixel-faithful to the input photograph. Your edit is a TEXTURE / STYLE pass on top of the existing pixels — not a regeneration of the scene.
+  let pass2Prompt = `LANDMARK PROTECTION:
+The background of this image is a real photograph of a specific landmark. Keep it as-is: buildings, every window's position, the roofline, and the silhouette stay pixel-faithful to the input photograph — no redrawing, no moved buildings, no changed architecture or skyline. Your edit is a TEXTURE / STYLE pass on top of the existing pixels — not a regeneration of the scene.
 
 YOUR EDIT (in this order):
 1. Apply ${styleHint} stylistically across the whole image — soft watercolor brushstrokes, paper texture, gentle wash. The buildings keep their EXACT geometry, only their rendering changes from photographic to painted.
