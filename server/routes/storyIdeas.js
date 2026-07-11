@@ -16,6 +16,7 @@ const { storyIdeasLimiter } = require('../middleware/rateLimit');
 
 // Services
 const { log } = require('../utils/logger');
+const { fillTemplate } = require('../services/prompts');
 
 // Landmark functions
 const { discoverLandmarksForLocation, getIndexedLandmarks } = require('../lib/landmarkPhotos');
@@ -232,28 +233,32 @@ ${adventureGuideContent}`
   const storyTopicLabel = storyTopic || (effectiveCategory === 'custom' ? (customThemeText || 'None') : 'None');
   const languageInstruction = getLanguageInstruction(language);
 
-  // Helper to apply replacements to any template
-  const applyReplacements = (template, extraReplacements = {}) => {
-    let result = template
-      .replace('{STORY_CATEGORY}', storyCategoryLabel)
-      .replace('{STORY_TYPE_NAME}', storyTypeNameLabel)
-      .replace('{STORY_TOPIC}', storyTopicLabel)
-      .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
-      .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
-      .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
-      .replace('{SCENE_COMPLEXITY_GUIDE}', sceneComplexityGuide)
-      .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
-      .replace('{TOPIC_GUIDE}', topicGuideText)
-      .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
-      .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
-      .replace('{AVAILABLE_LANDMARKS}', availableLandmarksSection)
-      .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
-      .replace('{LANGUAGE_INSTRUCTION}', languageInstruction);
-    for (const [key, value] of Object.entries(extraReplacements)) {
-      result = result.replace(key, value);
-    }
-    return result;
-  };
+  // Fill templates via the shared fillTemplate (services/prompts.js) —
+  // global replacement, $-escaped values, WARN + strip on unfilled
+  // {UPPERCASE} placeholders. The old hand-rolled chained String.replace
+  // was first-occurrence only (the SECOND {STORY_LENGTH_CATEGORY} in
+  // generate-story-ideas.txt shipped to the model literally) and
+  // interpreted $-sequences in user-derived values (characterDescriptions,
+  // customThemeText), silently mangling them.
+  // extraReplacements keys are bare placeholder names (no braces), same as
+  // every other fillTemplate call site.
+  const applyReplacements = (template, extraReplacements = {}) => fillTemplate(template, {
+    STORY_CATEGORY: storyCategoryLabel,
+    STORY_TYPE_NAME: storyTypeNameLabel,
+    STORY_TOPIC: storyTopicLabel,
+    CHARACTER_DESCRIPTIONS: characterDescriptions,
+    RELATIONSHIP_DESCRIPTIONS: relationshipDescriptions || 'No specific relationships defined.',
+    READING_LEVEL_DESCRIPTION: readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'],
+    SCENE_COMPLEXITY_GUIDE: sceneComplexityGuide,
+    CATEGORY_INSTRUCTIONS: categoryInstructions,
+    TOPIC_GUIDE: topicGuideText,
+    ADVENTURE_SETTING_GUIDE: adventureSettingGuide,
+    USER_LOCATION_INSTRUCTION: userLocationInstruction,
+    AVAILABLE_LANDMARKS: availableLandmarksSection,
+    STORY_LENGTH_CATEGORY: storyLengthCategory,
+    LANGUAGE_INSTRUCTION: languageInstruction,
+    ...extraReplacements,
+  });
 
   return {
     effectiveCategory,
@@ -441,7 +446,7 @@ ${landmarkEntries}`;
     });
 
     const prompt = ctx.applyReplacements(ctx.promptTemplate, {
-      '{STORY_REQUIREMENTS}': ctx.storyRequirements1 + '\n\n' + ctx.storyRequirements2
+      STORY_REQUIREMENTS: ctx.storyRequirements1 + '\n\n' + ctx.storyRequirements2
     });
 
     // Call the text model (using the imported function)
@@ -714,8 +719,8 @@ ${landmarkEntries}`;
     const buildSinglePrompt = (storyNum, variantInstruction) => {
       const requirements = storyNum === 1 ? ctx.storyRequirements1 : ctx.storyRequirements2;
       return ctx.applyReplacements(ctx.singlePromptTemplate, {
-        '{STORY_VARIANT_INSTRUCTION}': variantInstruction,
-        '{STORY_REQUIREMENTS}': requirements
+        STORY_VARIANT_INSTRUCTION: variantInstruction,
+        STORY_REQUIREMENTS: requirements
       });
     };
 
