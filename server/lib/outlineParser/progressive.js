@@ -95,12 +95,30 @@ class ProgressiveUnifiedParser {
 
     const block = fixesMatch[1];
     const numbers = new Set();
-    // Match "Pages 2,3,5: TEXT,SCENE: ..." or "Pages 5: ..." (with or without leading dash/bullet)
-    const linePattern = /^[\s\-*•]*Pages?\s+([\d,\s]+?)\s*:/gim;
+    // Match "Pages 2,3,5: TEXT,SCENE: ..." or "Pages 5: ..." (with or without
+    // leading dash/bullet). Ranges ("Pages 2-6:", en-dash "2–4", mixed
+    // "1,3-5") are parsed DEFENSIVELY even though the prompt forbids them —
+    // a model-emitted range used to fail the whole line, leave those pages
+    // out of patchedSet, and _emitDraftOnlyPage shipped them from the
+    // unpatched draft while the stored text got the patch.
+    const MAX_PAGE = 200; // sanity cap — a garbage token must not explode the set
+    const linePattern = /^[\s\-*•]*Pages?\s+([\d,\s\-–]+?)\s*:/gim;
     let m;
     while ((m = linePattern.exec(block)) !== null) {
-      const list = m[1].split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n));
-      for (const n of list) numbers.add(n);
+      for (const token of m[1].split(',')) {
+        const t = token.trim();
+        if (!t) continue;
+        const range = t.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+        if (range) {
+          const lo = parseInt(range[1], 10);
+          const hi = parseInt(range[2], 10);
+          if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo < 1 || hi < lo || hi > MAX_PAGE) continue;
+          for (let n = lo; n <= hi; n++) numbers.add(n);
+        } else {
+          const n = parseInt(t, 10);
+          if (Number.isFinite(n) && n >= 1 && n <= MAX_PAGE) numbers.add(n);
+        }
+      }
     }
 
     this._patchedPageNumbers = numbers;
