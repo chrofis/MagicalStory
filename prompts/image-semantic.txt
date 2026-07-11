@@ -66,23 +66,27 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 
 ---
 
-**SCORING**
+**SEVERITIES**
 
-Start at 10. Only these deductions exist:
-- Missing character (listed in SCENE_HINT or IMAGE_PROMPT — depth label "foreground/midground/background" is not part of the requirement): -3
-- Character merged into or clipped through an object (AI compositing artifact): -3
-- Declared interaction missing or in a genuinely different category (e.g. object in pocket drawn as large held plush, on-head drawn in-hand): -3. Any left/right mirror (arm, hand, foot, shoulder, pocket, or compound body-part swap) is equivalent and does NOT deduct — score as if the interaction matched. Pose details in the scene prose that are NOT in DECLARED INTERACTIONS do NOT deduct.
-- Wrong setting/location: -2
-- Wrong main action: -2
-- Missing key object: -2
-- Wrong emotion (happy in danger, scared in calm scene): -1
-- Wrong gaze (two characters listed in DECLARED INTERACTIONS facing away from each other, OR character listed as watching a specific named object looking elsewhere): -1
-- Wrong clothing type on a character: -1
-- Wrong proportions / age band for a named character (grade-school / teenage / adult / senior mismatch): -2
+Tag every `semantic_issues[]` entry with a severity — the pipeline computes the deduction from these tags. Only these defects exist:
+- Missing character (listed in SCENE_HINT or IMAGE_PROMPT — depth label "foreground/midground/background" is not part of the requirement): CRITICAL
+- Character merged into or clipped through an object (AI compositing artifact): CRITICAL
+- Declared interaction missing or in a genuinely different category (e.g. object in pocket drawn as large held plush, on-head drawn in-hand): CRITICAL. Any left/right mirror (arm, hand, foot, shoulder, pocket, or compound body-part swap) is equivalent and does NOT deduct — treat the interaction as matched. Pose details in the scene prose that are NOT in DECLARED INTERACTIONS do NOT deduct.
+- Wrong setting/location: MAJOR
+- Wrong main action: MAJOR
+- Missing key object: MAJOR
+- Wrong proportions / age band for a named character (grade-school / teenage / adult / senior mismatch): MAJOR
+- Wrong emotion (happy in danger, scared in calm scene): MODERATE
+- Wrong gaze (two characters listed in DECLARED INTERACTIONS facing away from each other, OR character listed as watching a specific named object looking elsewhere): MODERATE
+- Wrong clothing type on a character: MODERATE
 
-No other deductions. Extra objects, background people, non-declared spatial arrangement, characters from STORY_TEXT not in SCENE_HINT — all score 10.
+No other issues. Extra objects, background people, non-declared spatial arrangement, characters from STORY_TEXT not in SCENE_HINT — never issues.
 
-VERDICT: PASS (7+), FAIL (0-6)
+**SCORING (audit + wrong-scene tripwire)**
+
+`score` 0-10 reflects overall scene fidelity: start at 10 and lower it in proportion to the severities found. The pipeline uses it only as the wrong-scene tripwire (a very low score routes the page to full regeneration) and for display — the severity tags above drive the actual deduction.
+
+VERDICT: PASS (7+), FAIL (0-6) — audit/display only.
 
 ---
 
