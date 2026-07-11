@@ -1529,14 +1529,18 @@ export function StoryDisplay({
         const token = localStorage.getItem('auth_token');
         const headers = { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) };
 
-        // First try loading existing bbox (fast, no API call to vision model)
+        // First try loading existing bbox (fast, no API call to vision model).
+        // Parse each response exactly once — a Response body is a one-shot
+        // stream, and re-reading it (the old code did on the identified-
+        // figures path) throws "body stream already read" → the misleading
+        // "Erkennung fehlgeschlagen" alert even though the server succeeded.
         let response = await fetch(`/api/stories/${storyId}/refresh-bbox/${pageNumber}`, {
           method: 'POST', headers, body: JSON.stringify({ loadOnly: true })
         });
+        let data = response.ok ? await response.json() : null;
 
         // Check if existing bbox has figures (even if not identified by name)
-        if (response.ok) {
-          const data = await response.json();
+        if (data) {
           const figureCount = data.bboxDetection?.figures?.length || 0;
           const identifiedCount = data.bboxDetection?.figures
             ?.filter((f: { name?: string }) => f.name && f.name !== 'UNKNOWN').length || 0;
@@ -1546,6 +1550,7 @@ export function StoryDisplay({
             response = await fetch(`/api/stories/${storyId}/refresh-bbox/${pageNumber}`, {
               method: 'POST', headers, body: '{}'
             });
+            data = response.ok ? await response.json() : null;
           } else if (identifiedCount === 0 && figureCount > 0) {
             // Figures exist but none identified — use bbox as-is, show all characters
             setBboxOverrides(prev => ({ ...prev, [overrideKey]: data.bboxDetection }));
@@ -1556,8 +1561,7 @@ export function StoryDisplay({
             return;
           }
         }
-        if (response.ok) {
-          const data = await response.json();
+        if (data) {
           if (data.bboxDetection) {
             setBboxOverrides(prev => ({ ...prev, [overrideKey]: data.bboxDetection }));
             const hasFigs = (data.bboxDetection.figures?.length || 0) > 0;
