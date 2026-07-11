@@ -568,14 +568,12 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       let clothingDescription = null;
       if (!clothingCategory.startsWith('costumed:') && clothingCategory !== 'costumed') {
         // Look up the outline's clothingRequirements for this character
-        let charReqs = clothingRequirements?.[charName] || clothingRequirements?.[charName.trim()];
+        const charReqs = require('./clothingCategories').resolveCharacterReqs(clothingRequirements, charName);
         if (!charReqs && clothingRequirements) {
-          const charNameLower = charName.trim().toLowerCase();
-          const matchingKey = Object.keys(clothingRequirements).find(k => k.trim().toLowerCase() === charNameLower);
-          if (matchingKey) {
-            charReqs = clothingRequirements[matchingKey];
-            log.debug(`🔍 [STYLED AVATARS] ${charName}: found clothingRequirements via case-insensitive match: "${matchingKey}"`);
-          }
+          // Falling to stored clothing here makes outfitChanged compute false,
+          // which silently skips the realistic redress — the story outfit then
+          // never renders. Must be loud.
+          log.error(`❌ [STYLED AVATARS] "${charName}" missing from clothingRequirements (keys: ${Object.keys(clothingRequirements).join(', ')}) — using stored clothing, redress may be skipped`);
         }
         const catReqs = charReqs?.[clothingCategory];
 
@@ -1059,8 +1057,16 @@ function applyStyledAvatars(characterPhotos, artStyle) {
     if (photo.photoType?.startsWith('costumed-')) {
       return photo;
     }
-    const styledAvatar = getStyledAvatar(photo.name, photo.clothingCategory, artStyle);
+    // Prefer the ORIGINALLY REQUESTED category: after a winter→standard photo
+    // fallback in getCharacterPhotoDetails, photo.clothingCategory reports
+    // 'standard' — but a styled winter avatar in cache is the correct ref.
+    const lookupCategory = photo.requestedClothingCategory || photo.clothingCategory;
+    const styledAvatar = getStyledAvatar(photo.name, lookupCategory, artStyle);
     if (styledAvatar) {
+      if (photo.requestedClothingCategory && photo.clothingCategory
+          && photo.requestedClothingCategory !== photo.clothingCategory) {
+        log.info(`🧥 [STYLED AVATARS] ${photo.name}: styled ${lookupCategory} avatar restored over ${photo.clothingCategory} photo fallback`);
+      }
       appliedCount++;
       // Handle legacy object format {imageData, clothing} if present in cache
       const styledPhotoUrl = (typeof styledAvatar === 'object' && styledAvatar.imageData)

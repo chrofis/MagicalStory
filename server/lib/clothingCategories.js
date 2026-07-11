@@ -174,10 +174,55 @@ function reconcileCoverClothingWithRequirements(coverHints, clothingRequirements
   return { overrides };
 }
 
+/**
+ * Resolve a character's entry in the story's clothingRequirements blob.
+ * The blob is keyed by the character name as the outline model wrote it,
+ * which can drift from character.name in case/whitespace — an exact-key
+ * miss must NOT silently fall back to stale stored clothing, so every
+ * reader goes through this one resolver.
+ *
+ * @param {object|null} clothingRequirements - stories.data.clothingRequirements
+ * @param {string|null|undefined} name - character name
+ * @returns {object|null} the per-category requirements for this character
+ */
+function resolveCharacterReqs(clothingRequirements, name) {
+  if (!clothingRequirements || !name) return null;
+  const direct = clothingRequirements[name] || clothingRequirements[String(name).trim()];
+  if (direct) return direct;
+  const lower = String(name).trim().toLowerCase();
+  const key = Object.keys(clothingRequirements).find(k => k.trim().toLowerCase() === lower);
+  return key ? clothingRequirements[key] : null;
+}
+
+/**
+ * Resolve a page's clothing category for one character from the stored
+ * pageClothing blob ({ primaryClothing, pageClothing: { [pageNum]:
+ * string | {charName: category} } }). Used by repair paths as the fallback
+ * BEFORE defaulting to 'standard' — a bare 'standard' default hands the
+ * repair a standard avatar and repaints the story outfit away.
+ *
+ * @returns {string|null} canonical category, or null when nothing stored
+ */
+function resolvePageClothingCategory(storyData, pageNumber, charName) {
+  const pc = storyData?.pageClothing;
+  const entry = pc?.pageClothing?.[pageNumber] ?? pc?.[pageNumber];
+  if (typeof entry === 'string' && entry.trim()) return normalizeClothingCategory(entry);
+  if (entry && typeof entry === 'object') {
+    const lower = String(charName || '').trim().toLowerCase();
+    const key = Object.keys(entry).find(k => k.trim().toLowerCase() === lower);
+    if (key && entry[key]) return normalizeClothingCategory(entry[key]);
+    const first = Object.values(entry).find(v => typeof v === 'string' && v.trim());
+    if (first) return normalizeClothingCategory(first);
+  }
+  return null;
+}
+
 module.exports = {
   CANONICAL,
   AVATAR_SLOTS,
   normalizeClothingCategory,
   getUsedClothingCategories,
   reconcileCoverClothingWithRequirements,
+  resolveCharacterReqs,
+  resolvePageClothingCategory,
 };

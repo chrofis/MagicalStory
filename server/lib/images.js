@@ -6936,7 +6936,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // miss silently degraded the repair to 'standard' clothing.
     const perCharClothingKey = Object.keys(img.perCharClothing || {})
       .find(k => k.toLowerCase() === charName.toLowerCase());
-    const clothingCategory = (perCharClothingKey && img.perCharClothing[perCharClothingKey]) || 'standard';
+    const { normalizeClothingCategory: normCat, resolvePageClothingCategory: pageCat } = require('./clothingCategories');
+    const rawCharClothing = perCharClothingKey && img.perCharClothing[perCharClothingKey];
+    const clothingCategory = rawCharClothing
+      ? normCat(rawCharClothing)
+      : (pageCat(storyData, pageNumber, charName) || 'standard');
+    if (!rawCharClothing) {
+      log.warn(`⚠️ [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: no perCharClothing entry — resolved "${clothingCategory}" from pageClothing/default`);
+    }
     const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
     const avatarPhoto = styledAvatar || getFacePhoto(character);
     const avatarPhotoType = styledAvatar

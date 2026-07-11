@@ -1300,3 +1300,42 @@ agrees (keep looking at the viewer) instead of contradicting.
   synth prose (constant gaze), pass-2 PRESERVE line aligned
 - `server/lib/compositeCastBuilder.js` — buildAction (constant gaze)
 **Status:** ✅ active (extends "cover portraits: viewer-gaze not a defect").
+
+## 2026-07-11 — Story clothingRequirements is the ONE canonical clothing source; entity eval was repainting story outfits back to stored
+**Context:** Realistic showcase (staging, "Die rote Dose"): redress pass,
+page prompts, and cover refs were all CORRECT (story outfits), but the
+entity-consistency eval judged against the character-level stored
+`avatars.clothing[category]` — its canonical came from
+`buildCharacterDescriptionsForBbox`, which fed raw stored clothing into
+`bboxDetection.characterDescriptions`. It flagged every page + cover as
+`clothing_inconsistent`, issued fixInstructions like "change the bright
+pink jacket to the dark blue butterfly jacket", the cover repair executed
+one, and the scorer (same wrong canonical) ranked the reverted cover ABOVE
+the correct v0 (73 vs 55). The July-8 fix (591b19a2) covered
+evaluateImageBatch but not this sibling builder.
+**Decision:** Every canonical clothing text resolves through
+`buildClothingDescription` with the story's `clothingRequirements`
+(signature → description → stored fallback), and every reader of
+`clothingRequirements[name]` goes through the shared case-insensitive
+`resolveCharacterReqs` (clothingCategories.js). Supporting fixes: cover
+prompts now carry a per-character CLOTHING block (previously image-refs
+only — no text anchor); redress name-miss logs ERROR instead of silently
+skipping; `getStyledAvatarForClothing` normalizes its category at entry;
+repair paths resolve the page's stored clothing before defaulting to
+'standard'; `applyStyledAvatars` prefers the originally requested category
+over a photo-fallback category; `primaryClothing` is computed (dominant
+category) instead of hardcoded 'standard'.
+**Rationale:** One source of truth per concept. Image refs and prompt text
+previously desynchronized through independent fallback ladders; the eval
+loop then actively reverted correct images because its reference text was
+from a different (stale) source than the generation path.
+**Touched:** `server/lib/clothingCategories.js` (resolveCharacterReqs,
+resolvePageClothingCategory), `server/lib/storyHelpers.js`
+(buildCharacterDescriptionsForBbox, getCharacterPhotoDetails,
+buildCharacterReferenceList includeClothing), `server/lib/entityConsistency.js`
+(buildClothingDescription, getStyledAvatarForClothing, repairSinglePage),
+`server/lib/images.js` (quality-retry threading, char-fix category),
+`server/lib/styledAvatars.js` (redress name guard, applyStyledAvatars),
+`server/lib/coverIterate.js` + `server.js` (cover clothing text +
+threading, primaryClothing), `server/routes/regeneration.js`.
+**Status:** ✅ active.

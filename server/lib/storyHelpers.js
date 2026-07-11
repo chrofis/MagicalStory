@@ -928,12 +928,33 @@ function parseCharacterDescriptions(prompt) {
  */
 function buildCharacterDescriptionsForBbox(storyData, expectedPositions) {
   const out = {};
+  // Per-story clothingRequirements is the source of truth — raw
+  // avatars.clothing is character-level metadata that can be stale across
+  // stories. Resolving here keeps the detector/eval canonical in sync with
+  // the redressed avatars (a stored-clothing canonical made the consistency
+  // eval flag correct story outfits and repaint them back to stored).
+  const clothingRequirements = storyData?.clothingRequirements || null;
+  const artStyle = storyData?.artStyle || null;
+  const { buildClothingDescription } = require('./entityConsistency');
+  const { resolveCharacterReqs } = require('./clothingCategories');
   // Primary characters first — they have richer data (clothing variants etc.)
   for (const char of (storyData?.characters || [])) {
     if (!char?.name) continue;
+    let clothingDescriptions = char.avatars?.clothing || {};
+    if (clothingRequirements) {
+      const categories = new Set([
+        ...Object.keys(char.avatars?.clothing || {}),
+        ...Object.keys(resolveCharacterReqs(clothingRequirements, char.name) || {}),
+      ]);
+      const resolved = {};
+      for (const cat of categories) {
+        resolved[cat] = buildClothingDescription(char, cat, artStyle, clothingRequirements);
+      }
+      clothingDescriptions = resolved;
+    }
     out[char.name] = {
       richDescription: buildCharacterPhysicalDescription(char),
-      clothingDescriptions: char.avatars?.clothing || {},
+      clothingDescriptions,
     };
   }
   // Enrich with Visual Bible secondaries / animals whose name or VB-id is in
@@ -2703,7 +2724,7 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
       //      fell back to the raw user photo (modern clothes leak into the
       //      costumed scene). Accepting the bare-string shape here closes that.
       let resolvedClothing = defaultClothing;
-      const charReqs = clothingRequirements?.[char.name];
+      const charReqs = require('./clothingCategories').resolveCharacterReqs(clothingRequirements, char.name);
       if (typeof charReqs === 'string' && charReqs.length > 0) {
         resolvedClothing = charReqs;
         log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing (flat-map) = ${resolvedClothing}`);
@@ -2732,9 +2753,12 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         log.warn(`🧥 [AVATAR LOOKUP] ${char.name}: _currentClothing was "${charReqs._currentClothing}" but only costumed is used — resolving to ${resolvedClothing}`);
       }
 
-      // Normalize: costumed:anything → costumed (only one costume per story)
-      if (resolvedClothing && resolvedClothing.startsWith('costumed')) {
-        resolvedClothing = 'costumed';
+      // Normalize: costumed:anything → costumed (only one costume per story),
+      // and canonicalize case/format — resolvedClothing keys the case-sensitive
+      // styledAvatars[artStyle][…] lookup below, so 'Winter' must become
+      // 'winter' or the styled avatar is silently bypassed for the base one.
+      if (resolvedClothing) {
+        resolvedClothing = require('./clothingCategories').normalizeClothingCategory(resolvedClothing);
       }
 
       // Resolve a styled-avatar slot value to an image src string. The Phase 1e
@@ -2828,7 +2852,16 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         }
         actualClothingUsed = resolvedClothing;
         clothingDescription = resolveClothingDescription(char.name, resolvedClothing, avatars);
-        log.debug(`[AVATAR LOOKUP] ${char.name}: using unstyled ${resolvedClothing} (no styled avatar found)`);
+        // Desync detector: the ref image shows the STORED outfit while the
+        // resolved text says the STORY outfit — the visual ref usually wins,
+        // so the story outfit won't render. Benign when they match (realistic
+        // non-redressed categories are exactly this case).
+        const storedDesc = String(avatars?.clothing?.[resolvedClothing] || '').trim();
+        if (clothingDescription && storedDesc && clothingDescription.trim() !== storedDesc) {
+          log.warn(`⚠️ [AVATAR] ${char.name}: no styled ${resolvedClothing} avatar for ${artStyle} but story outfit differs from stored — ref image shows stored clothing while text says "${clothingDescription.substring(0, 60)}…"`);
+        } else {
+          log.debug(`[AVATAR LOOKUP] ${char.name}: using unstyled ${resolvedClothing} (no styled avatar found)`);
+        }
       }
 
 
@@ -2948,6 +2981,11 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         photoUrl,
         photoHash: getImagesModule().hashImageData(photoUrl),  // For dev mode verification
         clothingCategory: actualClothingUsed || resolvedClothing || null,
+        // Originally requested category, before any fallback. applyStyledAvatars
+        // prefers this for its cache lookup — after a winter→standard photo
+        // fallback, a styled WINTER avatar that exists in cache must still win
+        // over the standard one the fallback photo reports.
+        requestedClothingCategory: resolvedClothing || null,
         clothingDescription,  // Exact clothing from avatar eval (e.g., "red winter parka, blue jeans")
         variantUrls: {
           face: faceVariantUrl,
@@ -3418,7 +3456,7 @@ function buildRelativeHeightDescription(characters) {
  * @param {Array} characters - Original character data with physical descriptions
  * @returns {string} Formatted character reference list
  */
-function buildCharacterReferenceList(photos, characters = null) {
+function buildCharacterReferenceList(photos, characters = null, { includeClothing = false } = {}) {
   if (!photos || photos.length === 0) return '';
 
   // Each character is already named with their physical description in the
@@ -3427,8 +3465,20 @@ function buildCharacterReferenceList(photos, characters = null) {
   // attached image carries a `[Name]:` label in the parts array. Repeating
   // the description here was triple-binding the same info — drop it.
   // Just list the names so the model knows which images to expect.
+  // Exception: covers set includeClothing — their scene prose carries no
+  // clothing, so without a text anchor the outfit rides on the reference
+  // pixels alone and repairs can drift it.
   const names = photos.map(p => `[${p.name}]`).join(', ');
   let result = `\n**CHARACTER REFERENCE PHOTOS (one per character, labeled images attached below):** ${names}\n`;
+
+  if (includeClothing) {
+    const clothingLines = photos
+      .filter(p => p.name && p.clothingDescription)
+      .map(p => `- ${p.name} wears: ${p.clothingDescription}`);
+    if (clothingLines.length > 0) {
+      result += `\n**CLOTHING (match the reference photos):**\n${clothingLines.join('\n')}\n`;
+    }
+  }
 
   if (characters && characters.length >= 2) {
     const sceneCharacters = characters.filter(c => photos.some(ph => ph.name === c.name));
@@ -4111,8 +4161,14 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
   // scene and pulling a previously-safe character into the text zone.
   // Even pages → text on RIGHT → shift everyone LEFT (far-right→right, right→center, center→left, left→far-left).
   // Odd pages  → text on LEFT  → shift everyone RIGHT (far-left→left, left→center, center→right, right→far-right).
+  //
+  // PAGE-GATED: story pages only (pageNumber > 0). Covers use negative page
+  // numbers and must never receive text-zone language (the model bakes
+  // "open, darkening" empty space into the cover composition). The
+  // template's {TEXT_ZONE_OVERRIDE} placeholder is filled '' for any
+  // non-page call, so fillTemplate strips it and the fill stays clean.
   let textZoneOverride = '';
-  try {
+  if (pageNumber > 0) try {
     const hintObj = JSON.parse(draftSceneDescription.match(/\{[\s\S]*\}/)?.[0] || '{}');
     const forbiddenSide = pageNumber % 2 === 0 ? 'right' : 'left';
     const expectedTextPos = pageNumber % 2 === 0 ? 'bottom-right or top-right' : 'bottom-left or top-left';

@@ -439,7 +439,7 @@ const MAX_GRID_CELLS = 9;     // Maximum cells per grid (3x3)
 // Canonical clothing category normalizer — single source of truth lives in
 // clothingCategories.js. Re-exported here for backwards compat with existing
 // callers in this module.
-const { normalizeClothingCategory } = require('./clothingCategories');
+const { normalizeClothingCategory, resolveCharacterReqs } = require('./clothingCategories');
 
 /**
  * Group appearances by clothing category
@@ -472,6 +472,15 @@ function groupAppearancesByClothing(appearances) {
 async function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
   const avatars = character.avatars;
   const charName = character.name || 'Unknown';
+  // Normalize at the single entry point — callers pass raw scene-metadata
+  // values ('Winter', 'costumed:pirate') and a case/format miss on the
+  // exact-key lookup below silently cascades into the standard-avatar
+  // fallbacks (repairs then repaint the story outfit into standard).
+  const requestedCategory = clothingCategory;
+  clothingCategory = normalizeClothingCategory(clothingCategory);
+  if (clothingCategory !== String(requestedCategory || '').trim()) {
+    log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: normalized clothing category "${requestedCategory}" → "${clothingCategory}"`);
+  }
 
   // Helper to get fallback photo - uses centralized helper
   const getFallbackPhoto = () => getFacePhoto(character);
@@ -2564,7 +2573,10 @@ function buildClothingDescription(character, clothingCategory, artStyle, clothin
   // stale across stories. Priority: signature → description → avatars.
   // Per the 2026-05-22 codebase-audit decision, avatars.clothing is kept as
   // a fallback rather than removed.
-  const charReqs = clothingRequirements?.[character?.name];
+  const charReqs = resolveCharacterReqs(clothingRequirements, character?.name);
+  if (!charReqs && clothingRequirements && character?.name) {
+    log.error(`❌ [CLOTHING] "${character.name}" missing from clothingRequirements (keys: ${Object.keys(clothingRequirements).join(', ')}) — falling back to stored clothing, story outfit may be wrong`);
+  }
 
   // Handle costumed clothing — bare 'costumed' (Phase 5) or legacy 'costumed:<sub>'.
   if (clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:')) {
@@ -2665,8 +2677,16 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
       return { success: false, error: `Failed to extract crop for page ${pageNumber}` };
     }
 
-    // Determine clothing category for target page
-    const clothingCategory = targetCrop.clothing || 'standard';
+    // Determine clothing category for target page — crop metadata first,
+    // then the stored per-page clothing; a bare 'standard' default makes the
+    // repair repaint the story outfit into standard clothes.
+    const { resolvePageClothingCategory } = require('./clothingCategories');
+    const clothingCategory = targetCrop.clothing
+      ? normalizeClothingCategory(targetCrop.clothing)
+      : (resolvePageClothingCategory(storyData, pageNumber, charName) || 'standard');
+    if (!targetCrop.clothing) {
+      log.warn(`⚠️ [SINGLE-PAGE-REPAIR] Page ${pageNumber} crop has no clothing metadata — resolved "${clothingCategory}" from pageClothing/default`);
+    }
     log.info(`🔧 [SINGLE-PAGE-REPAIR] Target page ${pageNumber} has clothing: ${clothingCategory}`);
 
     // Get styled avatar for this clothing category

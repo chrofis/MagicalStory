@@ -286,7 +286,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
       TITLE_PAGE_SCENE: sceneDescription,
       STYLE_DESCRIPTION: styleDescription,
       STORY_TITLE: storyTitle,
-      CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
+      CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),
       VISUAL_BIBLE: visualBiblePrompt
     });
   } else if (normalizedCoverType === 'initialPage') {
@@ -295,21 +295,21 @@ async function iterateCover(coverKey, storyData, options = {}) {
           INITIAL_PAGE_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
           DEDICATION: coverDedication,
-          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
+          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),
           VISUAL_BIBLE: visualBiblePrompt
         })
       : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
           INITIAL_PAGE_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
           STORY_TITLE: storyTitle,
-          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
+          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),
           VISUAL_BIBLE: visualBiblePrompt
         });
   } else {
     coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
       BACK_COVER_SCENE: sceneDescription,
       STYLE_DESCRIPTION: styleDescription,
-      CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
+      CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),
       VISUAL_BIBLE: visualBiblePrompt
     });
   }
@@ -528,7 +528,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, usageTracker, null,
     { imageModel: imageModel || null },
     `${coverLabelStr} ITERATE`,
-    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground }
+    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground, clothingRequirements: storyData.clothingRequirements || null, artStyle: artStyleId }
   );
 
   log.info(`🔄 [COVER-ITERATE] ${coverKey}: Generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);

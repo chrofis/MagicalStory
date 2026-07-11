@@ -740,7 +740,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       imagePrompt, referencePhotos, null, 'scene', null, null, null,
       { imageModel: imageModelId },
       `PAGE ${pageNumber}`,
-      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata, aspectRatio: sceneAspect }
+      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata, aspectRatio: sceneAspect, clothingRequirements: storyData.clothingRequirements || null, artStyle: storyData.artStyle || null }
     );
 
     // Log API costs for this regeneration
@@ -5204,7 +5204,13 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               log.warn(`[REPAIR-WORKFLOW] No bounding box for ${characterName} on page ${pageNumber}`);
               repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
             } else {
-              const clothingCategory = appearance.clothing || 'standard';
+              const { normalizeClothingCategory, resolvePageClothingCategory } = require('../lib/clothingCategories');
+              const clothingCategory = appearance.clothing
+                ? normalizeClothingCategory(appearance.clothing)
+                : (resolvePageClothingCategory(storyData, pageNumber, characterName) || 'standard');
+              if (!appearance.clothing) {
+                log.warn(`⚠️ [REPAIR-WORKFLOW] ${characterName} p${pageNumber}: no appearance clothing — resolved "${clothingCategory}" from pageClothing/default`);
+              }
               const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
 
               const sceneBuffer = styledAvatar ? await r2.bytesFromAnyImage(sceneImage.imageData) : null;
@@ -5377,7 +5383,13 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             }
           }
 
-          const clothingCategory = storedAppearance.clothing || 'standard';
+          const { normalizeClothingCategory, resolvePageClothingCategory } = require('../lib/clothingCategories');
+          const clothingCategory = storedAppearance.clothing
+            ? normalizeClothingCategory(storedAppearance.clothing)
+            : (resolvePageClothingCategory(storyData, pageNumber, characterName) || 'standard');
+          if (!storedAppearance.clothing) {
+            log.warn(`⚠️ [CHAR REPAIR] ${characterName} p${pageNumber}: no stored appearance clothing — resolved "${clothingCategory}" from pageClothing/default`);
+          }
           const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
           const avatarData = styledAvatar || character.avatars?.standard || character.avatarUrl;
           const avatarPhotoType = styledAvatar ? (clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`) : 'face';

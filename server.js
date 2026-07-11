@@ -3792,7 +3792,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Cover prompt setup — routed model/backend determined after scene expansion.
         const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true }) : '';
-        let characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters);
+        let characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters, { includeClothing: true });
 
         // Run the cover hint through scene expansion (same as pages) so covers get
         // a structured description with emptyScenePrompt and objects metadata.
@@ -3944,7 +3944,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
 
         const coverResult = await generateImageWithQualityRetry(
-          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: charactersForCover, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground, visualBible }
+          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: charactersForCover, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground, visualBible, clothingRequirements: streamingClothingRequirements || null, artStyle: inputData.artStyle || null }
         );
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
         // Track scene rewrite usage if a safety block triggered a rewrite
@@ -4281,7 +4281,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const pageImageModel = MODEL_DEFAULTS.simplePageImage;
             const pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'grok';
             const styleDescription = resolveArtStyle(artStyle, pageImageBackend) || resolveArtStyle('pixar');
-            const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters);
+            const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters, { includeClothing: true });
             const visualBibleText = buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true });
 
             let coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
@@ -4975,9 +4975,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         pageClothing[index + 1] = page.characterClothing;
       }
     });
-    // pageClothingData now stores per-character clothing objects
+    // pageClothingData now stores per-character clothing objects.
+    // primaryClothing = dominant category across all pages — it is a live
+    // fallback in repair/regen paths, so a hardcoded 'standard' fed standard
+    // avatars into repairs on winter-only stories.
+    const categoryCounts = {};
+    for (const entry of Object.values(pageClothing)) {
+      for (const cat of Object.values(entry)) {
+        const norm = require('./server/lib/clothingCategories').normalizeClothingCategory(cat);
+        categoryCounts[norm] = (categoryCounts[norm] || 0) + 1;
+      }
+    }
+    const primaryClothing = Object.entries(categoryCounts)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'standard';
     const pageClothingData = {
-      primaryClothing: 'standard',  // Legacy field, kept for compatibility
+      primaryClothing,
       pageClothing
     };
 
