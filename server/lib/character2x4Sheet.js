@@ -25,7 +25,7 @@ const path = require('path');
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { editWithGrok, GROK_MODELS } = require('./grok');
-const { PROMPT_TEMPLATES } = require('../services/prompts');
+const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const r2 = require('./r2');
 const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
 
@@ -332,16 +332,17 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
 
   let prompt = PROMPT_TEMPLATES.sheet2x4Evaluation;
   if (!prompt) throw new Error('sheet2x4Evaluation prompt template not loaded');
-  if (costumeDescription) {
-    prompt = prompt.replace(/REQUESTED_OUTFIT/g, `REQUESTED_OUTFIT: ${costumeDescription}`);
-  }
-  // Inject the character profile block, or drop the placeholder when none.
-  if (characterDescription && characterDescription.trim()) {
-    prompt = prompt.replace(/CHARACTER_PROFILE_BLOCK/g,
-      `CHARACTER PROFILE (declared spec for this person — authoritative on age, gender, build):\n${characterDescription.trim()}\n`);
-  } else {
-    prompt = prompt.replace(/CHARACTER_PROFILE_BLOCK\n?/g, '');
-  }
+  // Braced placeholders via fillTemplate ($-safe, global, strips unfilled).
+  // The old bare-word .replace(/REQUESTED_OUTFIT/g, ...) also rewrote the
+  // PROSE references to the placeholder name ("Read REQUESTED_OUTFIT
+  // below...") — those references stay bare words in the template and are
+  // untouched now.
+  prompt = fillTemplate(prompt, {
+    REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '',
+    CHARACTER_PROFILE_BLOCK: (characterDescription && characterDescription.trim())
+      ? `CHARACTER PROFILE (declared spec for this person — authoritative on age, gender, build):\n${characterDescription.trim()}\n`
+      : '',
+  });
 
   // Image order matters — prompt labels Image 1 = source face, Image 2 =
   // standard avatar (when supplied), Image LAST = generated sheet. The eval

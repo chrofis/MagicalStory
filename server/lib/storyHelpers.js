@@ -4434,14 +4434,6 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // Critical: do NOT say "white", "blank", "empty", or "negative space" — the model
   // will paint a literal white box. Instead say "continue the scene but keep it simple".
   const areaPct = langLevel === '1st-grade' ? '10%' : langLevel === 'advanced' ? '40%' : '30%';
-  const cornerDesc = {
-    'top-left': 'upper left corner',
-    'top-right': 'upper right corner',
-    'bottom-left': 'lower left corner',
-    'bottom-right': 'lower right corner',
-    'top-full': 'upper third',
-    'bottom-full': 'lower third',
-  };
   const textAreaInstruction = (textInImage && textPosition)
     ? buildTextZoneInstruction(textPosition, textZoneDescForPrompt, areaPct, { isEmptyScene: false })
     : '';
@@ -4773,9 +4765,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       VISUAL_BIBLE: visualBibleSection,
       TEXT_AREA_INSTRUCTION: textAreaInstruction,
       ERA_GUARD: eraGuard,
-      SCENE_INTENT: sceneIntentLine,
-      AGE_FROM: inputData.ageFrom || 3,
-      AGE_TO: inputData.ageTo || 8
+      SCENE_INTENT: sceneIntentLine
     })));
   }
 

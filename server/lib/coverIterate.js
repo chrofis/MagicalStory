@@ -301,7 +301,8 @@ async function iterateCover(coverKey, storyData, options = {}) {
       : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
           INITIAL_PAGE_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
-          STORY_TITLE: storyTitle,
+          // No STORY_TITLE — initial-page-no-dedication has no title
+          // placeholder (the page is deliberately text-free).
           CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),
           VISUAL_BIBLE: visualBiblePrompt
         });

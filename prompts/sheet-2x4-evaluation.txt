@@ -5,7 +5,7 @@ You receive UP TO THREE images:
   - Image 2: the STANDARD AVATAR — a single-image body reference of the SAME PERSON in modern standard clothing. Use it as an identity anchor alongside Image 1 (body proportions, apparent age, build, identity confirmation). Only present when supplied — when absent, fall back to using Image 1 + the character profile as the only anchors.
   - Image LAST: the GENERATED 2×4 sheet to evaluate. When all three images are supplied, this is Image 3; when no avatar is supplied, it's Image 2.
 
-CHARACTER_PROFILE_BLOCK
+{CHARACTER_PROFILE_BLOCK}
 
 Image LAST is a single grid: 4 columns × 2 rows = 8 cells, separated by thin white gutters. Intended layout:
 
@@ -64,7 +64,7 @@ TASK 5: CLEAN RENDER (no stray markings)
 `finalScore` = LOWEST of layoutScore, identityScore, outfitScore, sourceMatchScore, cleanScore.
 `valid` = (finalScore ≥ 6).
 
-REQUESTED_OUTFIT
+{REQUESTED_OUTFIT}
 
 Return EXACTLY this JSON shape:
 

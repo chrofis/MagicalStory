@@ -138,7 +138,7 @@ function fillTemplate(template, replacements) {
  *
  * The empty-scene template (prompts/empty-scene.txt) has six placeholders:
  *   STYLE_DESCRIPTION, EMPTY_SCENE_DESCRIPTION, CHARACTER_SPACE,
- *   REQUIRED_OBJECTS, TEXT_AREA_INSTRUCTION, ERA_GUARD, LANDMARK_FIDELITY.
+ *   TEXT_AREA_INSTRUCTION, ERA_GUARD, LANDMARK_FIDELITY.
  *
  * Before this helper, every empty-scene call site (server.js × 3,
  * coverIterate.js, images.js × 1) hand-built the replacements bag and
@@ -155,7 +155,6 @@ function fillTemplate(template, replacements) {
  * @param {string} opts.style              - Resolved style description (paragraph form)
  * @param {string} opts.description        - Empty-scene description body
  * @param {string} [opts.characterSpace]   - Optional character-space instruction
- * @param {string} [opts.requiredObjects]  - Optional required-objects block
  * @param {string} [opts.textAreaInstruction] - Optional text-zone instruction
  * @param {string} [opts.eraGuard]         - Optional era-guard guidance
  * @param {string} [opts.landmarkFidelity] - Optional landmark-fidelity block
@@ -165,11 +164,18 @@ function buildEmptyScenePrompt(opts = {}) {
   if (!PROMPT_TEMPLATES.emptyScene) {
     throw new Error('buildEmptyScenePrompt: empty-scene template not loaded');
   }
+  // The template's framing rule says "Use the camera angle named in the
+  // **SHOT** line above" — the vantage path includes one in its description,
+  // but the cover-plate and trial paths don't. Prepend a default so the
+  // reference never dangles.
+  let description = opts.description || '';
+  if (!/\*\*SHOT:\*\*|\*\*CAMERA:\*\*/i.test(description)) {
+    description = `**SHOT:** wide\n\n${description}`;
+  }
   return fillTemplate(PROMPT_TEMPLATES.emptyScene, {
     STYLE_DESCRIPTION: opts.style || '',
-    EMPTY_SCENE_DESCRIPTION: opts.description || '',
+    EMPTY_SCENE_DESCRIPTION: description,
     CHARACTER_SPACE: opts.characterSpace || '',
-    REQUIRED_OBJECTS: opts.requiredObjects || '',
     TEXT_AREA_INSTRUCTION: opts.textAreaInstruction || '',
     ERA_GUARD: opts.eraGuard || '',
     LANDMARK_FIDELITY: opts.landmarkFidelity || '',
