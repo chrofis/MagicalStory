@@ -4288,13 +4288,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters);
             const visualBibleText = buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true });
 
-            const coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+            let coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
               TITLE_PAGE_SCENE: sceneDescription,
               STORY_TITLE: coverTitle,
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_REFERENCE_LIST: characterRefList,
               VISUAL_BIBLE: visualBibleText
             });
+
+            // Final chokepoint — same VB-id protection the full-account cover
+            // path applies (streaming cover + coverIterate). The code-fenced
+            // cover-hint JSON above carries raw ART/CHR ids that the image
+            // model paints as literal signs.
+            {
+              const { sanitizeVbIdsInPrompt } = require('./server/lib/storyHelpers');
+              coverPrompt = sanitizeVbIdsInPrompt(coverPrompt, streamingVisualBible, -1);
+            }
 
             // Build metadata directly — extractSceneMetadata can't parse our code-fenced JSON
             const sceneMetadata = {

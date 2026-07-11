@@ -45,7 +45,7 @@
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
-const { coverLabel } = require('./coverKeys');
+const { coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
 const { stripDataUriPrefix } = require('./r2');
 const { rembgRemoveBackground } = require('./rembg');
 const { getStandardAvatar } = require('./characterPhotos');
@@ -507,6 +507,10 @@ async function generateCoverViaComposite({
   sceneDescription = '',
   vbGrid = null,
   usageTracker = null,
+  // Full story Visual Bible — id→name resolution for held/gazed props whose
+  // ids aren't in coverHint.objects (holds ⊄ objects happens), plus the
+  // final sanitizeVbIdsInPrompt scrub on both pass prompts.
+  visualBible = null,
 }) {
   const W = 1024;
   const H = 1365;
@@ -624,7 +628,21 @@ async function generateCoverViaComposite({
   // 5. Build pass 1 prompt (pose redraw only, no landmark, no style)
   const n = figures.length;
   const centerIdx = Math.floor(n / 2);
-  const propName = propIds[0] ? (coverHint._artifactNames?.[propIds[0]] || 'central prop') : null;
+  // Id → name map from the FULL Visual Bible, with coverHint._artifactNames
+  // (curated by the caller) taking precedence. The old map was built only
+  // from coverHint.objects — a `holds` id outside that list (holds ⊄
+  // objects, documented occurrence) fell through `|| holds` and the RAW id
+  // ("BOTH HANDS hold the ART005") shipped to the image model, which paints
+  // unknown ids as literal signs (post-VEH001 rule).
+  const artNames = {};
+  const vbPools = ['artifacts', 'animals', 'locations', 'vehicles'];
+  for (const pool of vbPools) {
+    for (const entry of (visualBible?.[pool] || [])) {
+      if (entry?.id && entry?.name) artNames[String(entry.id).toUpperCase()] = entry.name;
+    }
+  }
+  Object.assign(artNames, (coverHint && coverHint._artifactNames) || {});
+  const propName = propIds[0] ? (artNames[String(propIds[0]).toUpperCase()] || 'central prop') : null;
   const POSES = [];
   for (let i = 0; i < n; i++) {
     const me = visualIdentifier(i, n, figures[i].age);
@@ -657,7 +675,7 @@ async function generateCoverViaComposite({
   const PRIO_RANK = { essential: 0, normal: 1, low: 2 };
   const interactionLines = [];
   const details = (coverHint && coverHint.characterDetails) || {};
-  const artNames = (coverHint && coverHint._artifactNames) || {};
+  // artNames (full-VB id → name map) built above at the propName resolution.
   const detailEntries = Object.values(details)
     .filter(d => d && d.name)
     .sort((a, b) => (PRIO_RANK[a.priority] ?? 1) - (PRIO_RANK[b.priority] ?? 1));
@@ -669,7 +687,7 @@ async function generateCoverViaComposite({
     // Resolve ART### references to the artifact's name when known.
     let holdsPhrase = '';
     if (holds && holds.toLowerCase() !== 'nothing') {
-      const artMatch = holds.match(/^(ART\d+)/i);
+      const artMatch = holds.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
       if (artMatch && artNames[artMatch[1].toUpperCase()]) {
         holdsPhrase = `holds the ${artNames[artMatch[1].toUpperCase()]}, both hands visibly gripping it`;
       } else {
@@ -678,7 +696,7 @@ async function generateCoverViaComposite({
     }
     let gazePhrase = '';
     if (gaze) {
-      const gazeArtMatch = gaze.match(/^(ART\d+)/i);
+      const gazeArtMatch = gaze.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
       if (gazeArtMatch && artNames[gazeArtMatch[1].toUpperCase()]) {
         gazePhrase = `eyes fixed on the ${artNames[gazeArtMatch[1].toUpperCase()]}`;
       } else if (/^the viewer$/i.test(gaze)) {
@@ -772,7 +790,7 @@ async function generateCoverViaComposite({
   // ground, and render text — all in one call, no separate pass-2. Two-pass:
   // legacy figures-on-white prompt (pass 2 composites onto the raw landmark
   // photo + applies style).
-  const pass1Prompt = sceneBackground
+  let pass1Prompt = sceneBackground
     ? `SINGLE-PASS COVER REFINEMENT.
 
 The input image is a children's book cover composite: a fully-styled ${artStyle} scene with ${n} character cutouts placed in the foreground. The background scene (landscape, buildings, sky, landmark) is ALREADY CORRECTLY STYLED AND PLACED — do NOT change buildings, do NOT move the landmark, do NOT repaint the sky.
@@ -802,6 +820,23 @@ PRESERVE: every face, hair colour, skin tone, clothing detail, every prop, plain
 DO NOT add or remove characters. DO NOT add a landscape, sky, ground, buildings, foliage, or any scenic background — no forest, no street, no room. The background stays plain (white, gray, or a flat neutral tone — any of these are acceptable since pass 2 composites onto the real landmark photo and rembg cleanly separates figures from any plain background). NO TEXT, no signage, no letters anywhere.
 
 If any figure still has arms at their sides, the task has failed. If the background contains a scene (forest, street, building, sky with clouds, etc.) instead of staying plain, the task has failed.`;
+
+  // Final scrub — post-VEH001 rule: every prompt path runs
+  // sanitizeVbIdsInPrompt before the image model sees it. Resolves any
+  // remaining VB ids (non-artifact holds, feedback echoes) to names,
+  // drops the line + WARNs on orphans. Same chokepoint semantics as
+  // coverIterate.js and the streaming cover path in server.js.
+  const coverPageNumber = COVER_PAGE_NUMBERS[coverKey] ?? -1;
+  const sanitizePrompt = (p) => {
+    try {
+      const { sanitizeVbIdsInPrompt } = require('./storyHelpers');
+      return sanitizeVbIdsInPrompt(p, visualBible, coverPageNumber);
+    } catch (err) {
+      log.warn(`🎨 [COVER-COMPOSITE] ${label}: prompt sanitize failed (${err.message}) — sending unsanitized`);
+      return p;
+    }
+  };
+  pass1Prompt = sanitizePrompt(pass1Prompt);
 
   // 6. Call Grok pass 1 — figures-on-white as primary edit target, VB grid as
   // a second reference image when available so the model knows exactly what
@@ -868,12 +903,12 @@ If any figure still has arms at their sides, the task has failed. If the backgro
       const gaze = String(d.gazesAt || '').trim();
       let phrase = d.name;
       if (holds && holds.toLowerCase() !== 'nothing') {
-        const m = holds.match(/^(ART\d+)/i);
+        const m = holds.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
         const name = m && artNames[m[1].toUpperCase()] ? artNames[m[1].toUpperCase()] : holds;
         phrase += ` holds the ${name}`;
       }
       if (gaze) {
-        const m = gaze.match(/^(ART\d+)/i);
+        const m = gaze.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
         const target = m && artNames[m[1].toUpperCase()]
           ? `the ${artNames[m[1].toUpperCase()]}`
           : (/^the (viewer|distance)$/i.test(gaze) ? gaze : gaze);
@@ -888,7 +923,7 @@ If any figure still has arms at their sides, the task has failed. If the backgro
     ? `\n\nSTORY SCENE CONTEXT (do not change poses; this is for atmosphere matching only):\n${proseForPass2}`
     : '';
 
-  const pass2Prompt = `LANDMARK PROTECTION (CRITICAL — read first):
+  let pass2Prompt = `LANDMARK PROTECTION (CRITICAL — read first):
 The background of this image is a real photograph of a specific landmark. DO NOT redraw it. DO NOT move buildings. DO NOT change architecture. DO NOT change the skyline. DO NOT add or remove windows. The buildings, the position of every window, the roofline, and the silhouette must remain pixel-faithful to the input photograph. Your edit is a TEXTURE / STYLE pass on top of the existing pixels — not a regeneration of the scene.
 
 YOUR EDIT (in this order):
@@ -903,6 +938,10 @@ PRESERVE EXACTLY:
 - Every figure's GAZE DIRECTION — if a character is looking down at a held prop in the input, they are still looking down at that prop in the output. Do NOT redirect any gaze toward the camera.
 
 DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generic city. DO NOT change which figures appear or their order. DO NOT add new objects, animals, or extra characters. NOT photoreal — watercolor texture only.${textLine ? '' : ' NO text, no signage, no letters anywhere.'}${sceneSectionPass2}`;
+
+  // Final scrub — same post-VEH001 chokepoint as pass 1. The scene prose
+  // (proseForPass2) and hint-synthesized action phrases can carry raw ids.
+  pass2Prompt = sanitizePrompt(pass2Prompt);
 
   // 10. Call Grok pass 2
   log.info(`🎨 [COVER-COMPOSITE] ${label}: pass 2 (watercolor + landmark) — Grok edit`);

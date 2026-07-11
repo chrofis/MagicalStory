@@ -313,7 +313,7 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
     const parts = [];
     const holds = String(d.holds || '').trim();
     if (holds && holds.toLowerCase() !== 'nothing') {
-      const m = holds.match(/^(ART\d+)/i);
+      const m = holds.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
       if (m && artNames[m[1].toUpperCase()]) {
         parts.push(`holds the ${artNames[m[1].toUpperCase()]}, both hands visibly gripping it`);
       } else {
@@ -322,7 +322,7 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
     }
     const gaze = String(d.gazesAt || '').trim();
     if (gaze) {
-      const m = gaze.match(/^(ART\d+)/i);
+      const m = gaze.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
       if (m && artNames[m[1].toUpperCase()]) {
         parts.push(`eyes fixed on the ${artNames[m[1].toUpperCase()]}`);
       } else if (/^the viewer$/i.test(gaze)) {

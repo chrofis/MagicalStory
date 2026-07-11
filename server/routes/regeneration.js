@@ -1386,11 +1386,21 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           const enrichedHint = { ...coverHint };
           enrichedHint._artifactImages = enrichedHint._artifactImages || {};
           enrichedHint._artifactNames = enrichedHint._artifactNames || {};
+          // Names resolve from the FULL Visual Bible — `holds` can reference
+          // an id outside coverHint.objects and the raw id would otherwise
+          // leak into the cast action phrases (same widening as
+          // coverIterate's composite enrichment).
+          for (const pool of ['artifacts', 'animals', 'locations', 'vehicles']) {
+            for (const entry of (visualBible?.[pool] || [])) {
+              if (entry?.id && entry?.name && !enrichedHint._artifactNames[entry.id]) {
+                enrichedHint._artifactNames[entry.id] = entry.name;
+              }
+            }
+          }
           for (const oid of (coverHint.objects || [])) {
             if (!/^ART\d+/.test(String(oid))) continue;
             const art = (visualBible?.artifacts || []).find(a => a?.id === oid);
             if (!art) continue;
-            enrichedHint._artifactNames[oid] = art.name || oid;
             const src = art.referenceImageUrl || art.referenceImageData;
             if (src) enrichedHint._artifactImages[oid] = src;
           }

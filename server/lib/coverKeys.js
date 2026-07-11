@@ -12,6 +12,15 @@
 
 const COVER_KEYS = ['frontCover', 'initialPage', 'backCover'];
 
+// Negative page-number convention for covers — used for log attribution and
+// the sanitizeVbIdsInPrompt pageNumber argument. Single source of truth
+// (was duplicated as a local constant in coverIterate.js).
+const COVER_PAGE_NUMBERS = Object.freeze({
+  frontCover: -1,
+  initialPage: -2,
+  backCover: -3
+});
+
 const COVER_HINT_KEY = Object.freeze({
   frontCover: 'titlePage',
   initialPage: 'initialPage',
@@ -52,6 +61,7 @@ function coverLabel(keyOrType) {
 
 module.exports = {
   COVER_KEYS,
+  COVER_PAGE_NUMBERS,
   COVER_HINT_KEY,
   coverKeyToType,
   coverTypeToKey,

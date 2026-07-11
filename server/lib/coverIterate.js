@@ -11,16 +11,11 @@ const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 const { resolveArtStyle, resolveArtStyleForEmptyScene } = require('./storyHelpers');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
-const { coverKeyToType, coverKeyToHintKey, coverLabel } = require('./coverKeys');
+const { coverKeyToType, coverKeyToHintKey, coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
 
 function getStoryHelpers() {
   return require('./storyHelpers');
 }
-
-// Cover page numbers follow the convention used across entityConsistency,
-// repair workflow, and the streaming generator: -1 frontCover, -2 initialPage,
-// -3 backCover.
-const COVER_PAGE_NUMBERS = { frontCover: -1, initialPage: -2, backCover: -3 };
 
 /**
  * Drop sentences that mention a character by name. Used on the cover
@@ -431,11 +426,21 @@ async function iterateCover(coverKey, storyData, options = {}) {
       const enrichedHint = { ...(coverHint || {}) };
       enrichedHint._artifactImages = {};
       enrichedHint._artifactNames = {};
+      // Names resolve from the FULL Visual Bible, not just coverHint.objects —
+      // a character's `holds` can reference an id outside the objects list
+      // (holds ⊄ objects, documented) and the raw id would otherwise leak
+      // into the pose prompt as paintable text.
+      for (const pool of ['artifacts', 'animals', 'locations', 'vehicles']) {
+        for (const entry of (visualBible?.[pool] || [])) {
+          if (entry?.id && entry?.name) enrichedHint._artifactNames[entry.id] = entry.name;
+        }
+      }
+      // Image bytes stay limited to the declared cover objects (only pasted
+      // props need their reference bytes).
       for (const id of (coverHint?.objects || [])) {
         if (!/^ART\d+/.test(String(id))) continue;
         const art = (visualBible?.artifacts || []).find(a => a?.id === id);
         if (!art) continue;
-        enrichedHint._artifactNames[id] = art.name || id;
         const src = art.referenceImageUrl || art.referenceImageData;
         if (src) enrichedHint._artifactImages[id] = src;
       }
@@ -491,6 +496,9 @@ async function iterateCover(coverKey, storyData, options = {}) {
         dedication: storyData.dedication || '',
         styleHint: styleDescription,
         usageTracker,
+        // Full VB — id→name resolution + final sanitizeVbIdsInPrompt scrub
+        // on both pass prompts (post-VEH001 rule).
+        visualBible,
       });
       log.info(`🎨 [COVER-ITERATE] ${coverKey}: composite-cover generated (modelId=${compositeResult.modelId})`);
       return {
