@@ -50,7 +50,7 @@ The following block lists each character's actual physical traits. When you desc
 - **Distinctive marks**: any entry on the `Distinctive marks:` line must be visible in every scene where that character's face/body is rendered.
 - **Build / eye colour / face shape**: same verbatim rule.
 
-The mood of the scene (medieval, Wilhelm Tell, fantasy battle, peaceful village) does not change a character's appearance. If the scene mood pulls you toward "grizzled" / "weathered" / "ageing" / "salt-and-pepper", suppress that pull — write the action and setting in mood-language, but the character's traits stay verbatim from CHARACTER DETAILS.
+The mood of the scene (medieval, a folk-legend setting, fantasy battle, peaceful village) does not change a character's appearance. If the scene mood pulls you toward "grizzled" / "weathered" / "ageing" / "salt-and-pepper", suppress that pull — write the action and setting in mood-language, but the character's traits stay verbatim from CHARACTER DETAILS.
 
 {CHARACTER_PHYSICAL_BLOCK}
 
@@ -587,7 +587,7 @@ VARY ANGLE — each of the 5 must hit a different facet:
 4. emotion/relationship-focused
 5. pivotal-moment or unexpected-detail focused
 
-Do not produce 5 variations of the same iconic phrase. If your first candidate is the most-obvious-line-from-the-source (e.g. "Der zweite Bolzen" for a Tell story, "Apfel und Bolzen" for the same), the other 4 must come from totally different angles — a side character, a quiet moment, a setting nobody else would name.
+Do not produce 5 variations of the same iconic phrase. If your first candidate is the most-obvious-line-from-the-source (the iconic object or deed every reader would name first), the other 4 must come from totally different angles — a side character, a quiet moment, a setting nobody else would name.
 
 TITLE_CANDIDATES:
 1. [first candidate]
