@@ -1,11 +1,12 @@
-# COVER EXPANSION ONLY — used at server.js:3331 to expand front-cover, initial-
-# page, and back-cover hints into prose. The primary story pipeline uses the
-# unified outline prompt (`story-unified.txt`) which generates page prose and
-# METADATA inline; that path no longer touches this file (server.js:2843
-# always takes the unified branch). Do NOT add page-only rules here (text
-# overlays, calm zones, textPosition) — covers don't have text overlays and
-# the model would just bake unwanted "open and darkening" empty space into
-# the cover composition. Edit `story-unified.txt` for page-related rules.
+# UNIFIED PAGE FALLBACK — used at server.js:3239 to expand a story page's
+# scene hint into prose + METADATA when the unified pass produced no usable
+# sceneProse. Covers do NOT use this file (buildCoverSceneFromHint in
+# coverIterate.js templates cover hints without an LLM call). Page-only
+# composition rules (text overlay / calm zone) are BUILDER-GATED: the
+# TEXT_ZONE_OVERRIDE placeholder is filled only for story-page calls and
+# left empty otherwise, so a cover fill renders without any text-zone
+# language. Do NOT add UNGATED page-only rules to the shared body — gate
+# them through a builder-filled placeholder like TEXT_ZONE_OVERRIDE.
 
 **ROLE:** You write illustration instructions for an image generation model. Each page of a children's book gets one scene brief. The output feeds directly into Grok/Gemini — not a human reader.
 
@@ -50,6 +51,7 @@
 
 {AVAILABLE_AVATARS}
 {LOCKED_PERSPECTIVES}
+{TEXT_ZONE_OVERRIDE}
 
 **RECURRING VISUAL ELEMENTS (when one appears in the scene, name it and weave its detail into the prose):**
 {RECURRING_ELEMENTS}
@@ -95,6 +97,8 @@ Then a single-line JSON object:
     {"character": "CharacterA", "object": "an item", "where": "carries the item in a pocket", "storyRelevant": false, "priority": "low"},
     {"character": "CharacterB", "object": "wooden ladder", "where": "climbs the wooden ladder", "storyRelevant": true, "priority": "essential"}
   ],
+  "textPosition": "top-left|top-right|bottom-left|bottom-right|top-full|bottom-full",
+  "textZoneDescription": "5–15 words naming the saturated, high-contrast surface in that corner",
   "emptyScenePrompt": "..."
 }
 ```
@@ -134,6 +138,10 @@ Every entry must also appear in the prose as the same physical contact.
 Back-view rule: for characters with `perspective: back view`, every held object must be visible from behind — peeking over shoulder, visible under arm, strapped to back, dangling at the side.
 
 Distance rule: when the verb implies action across a gap ('shoots', 'aims at', 'throws at', 'calls to', 'gestures across'), `where` must include an explicit separation phrase ('across the room', 'a few paces apart', 'across the square', 'down the valley'). For these scenes `shot` MUST be `ultra-wide` so both endpoints fit visibly, and the prose must place each figure at the correct end of the frame.
+
+**`textPosition` / `textZoneDescription`** (story pages only — when a TEXT ZONE POSITION FIXES block appears above, `textPosition` matches the position it names)
+- `textPosition`: the corner reserved for the white story-text overlay. Even pages use a right corner (`top-right` / `bottom-right`), odd pages a left corner.
+- `textZoneDescription`: 5–15 words naming the saturated, high-contrast surface in that corner (e.g. "deep evening sky in rich indigo", "dark green pine foliage"). Describe what's there, not what it's for — never "rectangle", "blank area", "for text".
 
 **`emptyScenePrompt`**
 - 2-3 sentences describing only the background.
