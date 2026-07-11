@@ -5608,8 +5608,10 @@ function chooseRepairStrategy(evaluation) {
   //
   // Counts CRITICALs across every source on the version: quality eval,
   // three-stage compliance, semantic. Severity casing varies by source
-  // ('CRITICAL' / 'critical') so the match is case-insensitive.
-  const isCritical = (s) => String(s || '').toLowerCase() === 'critical';
+  // ('CRITICAL' / 'critical') so the match is case-insensitive. CATASTROPHIC
+  // counts as critical-or-stronger — an exact 'critical' match let a lone
+  // catastrophic issue fall through to inpaint.
+  const isCritical = (s) => /catastrophic|critical/i.test(String(s || ''));
   const fixable = evaluation.fixableIssues || [];
   const semIssues = evaluation.semanticResult?.semanticIssues
     || evaluation.semanticResult?.issues

@@ -201,6 +201,21 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   if (semanticScore < 30) {
     return { method: 'iterate', reason: `wrong scene (semantic=${semanticScore})` };
   }
+  // Severity-based catastrophic gate: a CATASTROPHIC finding (large wrong
+  // text, unrecognisable figure) is beyond what inpaint can recover even when
+  // the numeric subscores stay above the floors — the eval rubric reserves
+  // this severity for defects only a full regen can fix. Same case-insensitive
+  // match the round loop's unresolved-issue surfacing uses (images.js).
+  const severityIssues = [
+    ...(evaluator.fixableIssues || []),
+    ...(evaluator.semanticResult?.semanticIssues || evaluator.semanticResult?.issues || []),
+    ...(Array.isArray(evaluator.consolidatedPlan?.deduped_issues) ? evaluator.consolidatedPlan.deduped_issues : []),
+  ];
+  const catastrophicIssue = severityIssues.find(i => /catastrophic/i.test(String(i?.severity || '')));
+  if (catastrophicIssue) {
+    const desc = String(catastrophicIssue.description || catastrophicIssue.problem || '').slice(0, 80);
+    return { method: 'iterate', reason: `CATASTROPHIC issue — ${desc || 'full regen required'}` };
+  }
 
   // 2. Entity issue — char-fix wins. Scene-only (covers fall through).
   if (pageNumber > 0 && entityReport?.characters) {
