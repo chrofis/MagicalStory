@@ -30,16 +30,19 @@ const WIZARD_TIMEOUT = 90 * 60 * 1000;  // 90 min — full UI create (5 chars ×
 
 const ART_STYLE_LABELS: Record<DemoLanguage, Record<string, string>> = {
   de: {
+    realistic: 'Realistisch',
     watercolor: 'Aquarell', concept: 'Konzeptkunst', anime: 'Anime', pixar: 'Pixar 3D',
     cartoon: 'Cartoon', comic: 'Comic', oil: 'Ölgemälde', steampunk: 'Steampunk',
     cyber: 'Cyberpunk', chibi: 'Chibi', manga: 'Manga', pixel: 'Pixelkunst', lowpoly: 'Low Poly',
   },
   en: {
+    realistic: 'Realistic',
     watercolor: 'Watercolor', concept: 'Concept Art', anime: 'Anime', pixar: 'Pixar 3D',
     cartoon: 'Cartoon', comic: 'Comic', oil: 'Oil Painting', steampunk: 'Steampunk',
     cyber: 'Cyberpunk', chibi: 'Chibi', manga: 'Manga', pixel: 'Pixel Art', lowpoly: 'Low Poly',
   },
   fr: {
+    realistic: 'Réaliste',
     watercolor: 'Aquarelle', concept: 'Art Conceptuel', anime: 'Anime', pixar: 'Pixar 3D',
     cartoon: 'Dessin animé', comic: 'Bande dessinée', oil: 'Peinture à l\'huile', steampunk: 'Steampunk',
     cyber: 'Cyberpunk', chibi: 'Chibi', manga: 'Manga', pixel: 'Pixel Art', lowpoly: 'Low Poly',
@@ -936,7 +939,11 @@ test.describe('Demo Story Generation', () => {
 
     const categoryPattern = CATEGORY_PATTERNS[entry.storyCategory];
     const topicPattern = TOPIC_PATTERNS[entry.storyTopic];
-    const artStyleLabel = ART_STYLE_LABELS[entry.language][entry.artStyle];
+    // DEMO_ART_STYLE overrides the rotation entry's style (smoke tests of a
+    // specific style, same pattern as DEMO_PAGES).
+    const artStyleId = process.env.DEMO_ART_STYLE || entry.artStyle;
+    const artStyleLabel = ART_STYLE_LABELS[entry.language][artStyleId];
+    if (!artStyleLabel) throw new Error(`Unknown art style '${artStyleId}' for language ${entry.language}`);
 
     console.log('\n=== Demo Story Generation ===');
     console.log(`  Rotation index: ${entry.index}`);
@@ -944,7 +951,7 @@ test.describe('Demo Story Generation', () => {
     console.log(`  Language:       ${entry.language}`);
     console.log(`  Category:       ${entry.storyCategory}`);
     console.log(`  Topic:          ${entry.storyTopic}`);
-    console.log(`  Art Style:      ${entry.artStyle} (${artStyleLabel})`);
+    console.log(`  Art Style:      ${artStyleId} (${artStyleLabel})`);
     console.log(`  Pages:          ${STORY_PAGES}`);
     console.log('================================\n');
 
@@ -1208,7 +1215,7 @@ test.describe('Demo Story Generation', () => {
       await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
       const onStep5 = await isAlreadyOnStep5();
       throw new Error(
-        `Art style "${artStyleLabel}" not selectable (entry requested ${entry.artStyle}). ` +
+        `Art style "${artStyleLabel}" not selectable (requested ${artStyleId}). ` +
         `${onStep5 ? 'Wizard auto-advanced to Step 5 AND nav-back-to-Step-4 failed.' : 'Step 4 showing but style button not found anywhere on the page — locator may need updating.'} ` +
         `Screenshot: ${shotPath}`
       );
