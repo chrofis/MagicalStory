@@ -11,10 +11,10 @@ ROLES:
 ```
 
 Example outputs:
-- Moon landing: "ROLES:\nEmma: Neil Armstrong (first human to walk on the moon)\nMax: Mission Control Director (guides the mission from Houston)"
-- Wright Brothers: "ROLES:\nSophie: Orville Wright (pilot of the first flight)\nMax: Wilbur Wright (runs alongside the plane)"
-- Light bulb: "ROLES:\nEmma: Thomas Edison (inventor testing thousands of materials)"
-- Pyramids: "ROLES:\nEmma: Imhotep (chief architect)\nMax: Foreman (organizes the workers)\nSophie: Engineer (solves construction puzzles)"
+- Moon landing: "ROLES:\nChildA: Neil Armstrong (first human to walk on the moon)\nChildB: Mission Control Director (guides the mission from Houston)"
+- Wright Brothers: "ROLES:\nChildC: Orville Wright (pilot of the first flight)\nChildB: Wilbur Wright (runs alongside the plane)"
+- Light bulb: "ROLES:\nChildA: Thomas Edison (inventor testing thousands of materials)"
+- Pyramids: "ROLES:\nChildA: Imhotep (chief architect)\nChildB: Foreman (organizes the workers)\nChildC: Engineer (solves construction puzzles)"
 
 - List all main characters with their assigned historical roles first
 - Then write the story outline
