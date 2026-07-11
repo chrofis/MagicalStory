@@ -141,74 +141,6 @@ class UnifiedStoryParser {
   }
 
   /**
-   * Extract character arcs section
-   * @returns {Object|null} - Map of character name to arc details
-   */
-  extractCharacterArcs() {
-    if (this._cache.characterArcs !== undefined) return this._cache.characterArcs;
-
-    const sectionMatch = this.response.match(/---CHARACTER ARCS---\s*([\s\S]*?)(?=---[A-Z\s]+---|$)/i);
-    if (!sectionMatch) {
-      this._cache.characterArcs = null;
-      return null;
-    }
-
-    const section = sectionMatch[1];
-    const arcs = {};
-
-    // Match character arc blocks: ### CharacterName followed by fields
-    const charPattern = /###\s*(.+?)\s*\n([\s\S]*?)(?=###\s|$)/g;
-    let match;
-    while ((match = charPattern.exec(section)) !== null) {
-      const name = match[1].trim();
-      const content = match[2];
-
-      arcs[name] = {
-        startingPoint: this._extractField(content, 'Starting Point'),
-        keyChallenges: this._extractField(content, 'Key Challenges'),
-        turningPoints: this._extractField(content, 'Turning Points'),
-        endState: this._extractField(content, 'End State'),
-        keyMoments: this._extractField(content, 'Key Moments')
-      };
-    }
-
-    this._cache.characterArcs = Object.keys(arcs).length > 0 ? arcs : null;
-    log.debug(`[UNIFIED-PARSER] Character arcs for ${Object.keys(arcs).length} characters`);
-    return this._cache.characterArcs;
-  }
-
-  /**
-   * Extract plot structure section
-   * @returns {Object|null}
-   */
-  extractPlotStructure() {
-    if (this._cache.plotStructure !== undefined) return this._cache.plotStructure;
-
-    const sectionMatch = this.response.match(/---PLOT STRUCTURE---\s*([\s\S]*?)(?=---[A-Z\s]+---|$)/i);
-    if (!sectionMatch) {
-      this._cache.plotStructure = null;
-      return null;
-    }
-
-    const section = sectionMatch[1];
-    const structure = {
-      primaryClothing: this._extractField(section, 'Primary Clothing') || 'standard',
-      clothingChanges: this._extractField(section, 'Clothing Changes'),
-      incitingIncident: this._extractField(section, 'Inciting Incident'),
-      risingAction: this._extractField(section, 'Rising Action'),
-      climax: this._extractField(section, 'Climax'),
-      fallingAction: this._extractField(section, 'Falling Action'),
-      resolution: this._extractField(section, 'Resolution'),
-      themes: this._extractField(section, 'Themes'),
-      tone: this._extractField(section, 'Tone')
-    };
-
-    this._cache.plotStructure = structure;
-    log.debug(`[UNIFIED-PARSER] Plot structure extracted (primary clothing: ${structure.primaryClothing})`);
-    return this._cache.plotStructure;
-  }
-
-  /**
    * Extract Visual Bible JSON
    * @returns {Object|null}
    */
@@ -483,9 +415,9 @@ class UnifiedStoryParser {
 
     log.debug(`[UNIFIED-PARSER] Merging ${patchPages.size} patch pages onto ${draftPages.size} draft pages`);
 
-    // Determine which page numbers to materialize. Use the union; if neither
-    // produced anything (legacy responses without DRAFT/PATCH), fall back to
-    // re-running the old single-pass extractor against the whole response.
+    // Determine which page numbers to materialize (union of draft + patch).
+    // When neither produced anything, return the empty list — there is no
+    // single-pass extractor fallback (the old comment claiming one lied).
     const pageNums = new Set([...draftPages.keys(), ...patchPages.keys()]);
     if (pageNums.size === 0) {
       this._cache.pages = pages;
@@ -604,24 +536,6 @@ class UnifiedStoryParser {
     return plainMatch ? plainMatch[1].trim() : null;
   }
 
-  /**
-   * Get a summary of what was parsed
-   * @returns {Object}
-   */
-  getSummary() {
-    return {
-      hasTitle: !!this.extractTitle(),
-      hasClothingRequirements: !!this.extractClothingRequirements(),
-      hasCharacterArcs: !!this.extractCharacterArcs(),
-      hasPlotStructure: !!this.extractPlotStructure(),
-      hasVisualBible: !!this.extractVisualBible(),
-      hasCoverHints: (() => {
-        const t = this.extractCoverHints().titlePage;
-        return !!(t.hint || t.mood || (t.objects && t.objects.length > 0) || (t.characters && t.characters.length > 0));
-      })(),
-      pageCount: this.extractPages().length
-    };
-  }
 }
 
 module.exports = { UnifiedStoryParser };

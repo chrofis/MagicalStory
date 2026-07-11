@@ -235,7 +235,6 @@ const {
   extractCoverScenes,
   extractPageClothing,
   buildBasePrompt,
-  buildStoryPrompt,
   buildSceneExpansionPrompt,
   buildSceneDescriptionPrompt,
   buildImagePrompt,
@@ -7871,7 +7870,7 @@ async function _processStoryJobImpl(jobId) {
 // Build base prompt with character/setting info for story text generation
 // textPageCount: the actual number of text pages/scenes (not total PDF pages)
 // NOTE: Prompt builder functions moved to server/lib/storyHelpers.js
-// Exports: buildBasePrompt, buildStoryPrompt, parseSceneDescriptions,
+// Exports: buildBasePrompt, parseSceneDescriptions,
 // buildRelativeHeightDescription, buildImagePrompt
 
 

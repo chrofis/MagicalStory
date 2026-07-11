@@ -32,8 +32,6 @@ async function loadPromptTemplates() {
 
   // Each line: [key, filename]. Order doesn't matter — failures are isolated.
   const FILES = [
-    ['outline', 'outline.txt'],
-    ['storyText', 'story-text.txt'],
     ['sceneExpansion', 'scene-expansion.txt'],
     ['sceneIteration', 'scene-iteration.txt'],
     ['sceneIterationFree', 'scene-iteration-free.txt'],
@@ -52,7 +50,6 @@ async function loadPromptTemplates() {
     ['initialPageWithDedication', 'initial-page-with-dedication.txt'],
     ['initialPageNoDedication', 'initial-page-no-dedication.txt'],
     ['backCover', 'back-cover.txt'],
-    ['storybookCombined', 'storybook-combined.txt'],
     ['rewriteBlockedScene', 'rewrite-blocked-scene.txt'],
     ['characterAnalysis', 'character-analysis.txt'],
     ['imageSystemInstruction', 'image-system-instruction.txt'],
