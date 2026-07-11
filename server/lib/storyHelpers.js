@@ -1142,6 +1142,42 @@ function buildEraGuard(era) {
 }
 
 /**
+ * Strong landmark-fidelity block for empty-scene / plate prompts — fills the
+ * empty-scene template's {LANDMARK_FIDELITY} placeholder. Anchors the
+ * attached reference photo by NAME so the image model knows which building
+ * it's looking at and preserves its silhouette; without the name the photo
+ * reads as one style hint among many and the distinctive shape gets
+ * stylized away. Extracted from the trial empty-scene path (server.js) —
+ * previously ONLY that path built it; every other empty-scene caller
+ * shipped the generic unnamed block.
+ *
+ * Only meaningful when the caller ALSO attaches the landmark photo to the
+ * generation call (the FRAMING section references "the reference photo").
+ *
+ * @param {{name?: string}|string|null} landmark - landmark object (any shape
+ *        carrying `name`) or a bare name string. Null-safe.
+ * @returns {string} the fidelity block, or '' when no named landmark.
+ */
+function buildLandmarkFidelityBlock(landmark) {
+  const name = typeof landmark === 'string'
+    ? landmark.trim()
+    : String(landmark?.name || '').trim();
+  if (!name) return '';
+  return `**LANDMARK IN THIS SCENE: ${name}.** The attached reference photo shows this exact real-world landmark. The scene MUST depict this specific building (or part of it), not a generic version.
+
+**FRAMING (must match the photo):**
+- Match the camera distance and framing of the reference photo. If the photo is a close-up of the landmark filling 60-80% of the frame, your scene shows the landmark filling 60-80% of the frame at the same elevation and angle. DO NOT zoom out to show the surrounding city or wide context unless the reference photo itself is a wide shot.
+- Match the camera elevation (ground-level / low / eye-level / high / aerial) shown in the photo.
+- Match the viewing angle (front / three-quarter / side / oblique) shown in the photo.
+- The landmark must occupy approximately the same fraction of the rendered frame as it does in the reference photo. A common failure is rendering the landmark tiny in the distance against a wide cityscape — DO NOT do this. If the photo crops in, you crop in.
+
+**IDENTITY:**
+- Preserve the silhouette, architectural details, distinctive features, and overall proportions exactly as in the photo. Do NOT stylize away its identity. Someone who has seen the real building must immediately recognise it.
+
+**EXCLUDE modern intrusions visible in the photo:** cars, parked vehicles, traffic signs, road markings, street lights, utility poles, power lines, billboards, commercial advertising, shopfront price tags, plastic bins, satellite dishes, air conditioners, modern pedestrians. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure. Keep the landmark itself unchanged; only remove the modern surroundings.`;
+}
+
+/**
  * Apply a reference mode to a page's image-generation inputs. The mode controls
  * how many character / landmark photos get attached to the model call. The
  * Visual Bible grid is ALWAYS kept (it carries identity for proper-named
@@ -6123,6 +6159,7 @@ module.exports = {
   buildCharacterDescriptionsForBbox,
   buildTextZoneInstruction,
   buildEraGuard,
+  buildLandmarkFidelityBlock,
   applyReferenceMode,
 
   // Parsers

@@ -718,6 +718,9 @@ async function buildCoverReferences({
         // pass cannot reliably carve a bank out of a "preserve the water" plate.
         characterSpace: 'The bottom fifth of the frame must be solid dry standing ground spanning the full width — sand above the waterline, beach berm, boardwalk, grass, path, stone, or deck — where the characters will stand. Any ocean, river, lake, surf, pool, or open water stays in the mid-ground or higher and never touches the bottom edge of the frame.',
         description: emptyDesc,
+        // Named landmark-fidelity block when a landmark photo is attached
+        // below — '' otherwise (was trial-only).
+        landmarkFidelity: getStoryHelpers().buildLandmarkFidelityBlock(landmarkPhotos?.[0]),
       });
       const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, coverPageNumber, landmarkPhotos);
       const emptyOptions = {

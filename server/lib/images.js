@@ -8503,16 +8503,18 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         const { buildTextZoneInstruction, buildEraGuard } = getStoryHelpers();
         const iterateTextZoneDesc = iterateSceneMetadata?.textZoneDescription || null;
         const iterateEra = iterateSceneMetadata?.era || null;
-        // Iterate path doesn't have landmark-fidelity context at hand —
-        // buildEmptyScenePrompt defaults landmarkFidelity to '' so the
-        // placeholder strips cleanly. Initial generation at server.js:4087
-        // builds the proper block when a landmark exists.
+        // Named landmark-fidelity block when this page attaches a landmark
+        // photo (pageLandmarkPhotos below) — '' otherwise. Shared builder
+        // in storyHelpers; used to be built only on the TRIAL empty-scene
+        // path while every other caller shipped the generic unnamed block.
         const { buildEmptyScenePrompt } = require('../services/prompts');
+        const { buildLandmarkFidelityBlock } = getStoryHelpers();
         const emptyPrompt = buildEmptyScenePrompt({
           style: artStyleDesc,
           description: iterateSceneMetadata.emptyScenePrompt,
           textAreaInstruction: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
           eraGuard: buildEraGuard(iterateEra),
+          landmarkFidelity: buildLandmarkFidelityBlock(pageLandmarkPhotos?.[0]),
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;

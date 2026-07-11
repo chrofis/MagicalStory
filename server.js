@@ -4153,26 +4153,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const bgLandmark = bg.pages.map(pn => pageLandmarkLookup[pn]).find(Boolean);
             const emptySceneLandmarkPhotos = bgLandmark ? [bgLandmark] : [];
             // Strong landmark-fidelity block — only included when a landmark
-            // is actually attached. Anchors the photo by NAME so Grok knows
-            // which building it's looking at, and asks for silhouette
-            // preservation (the previous prompt told Grok "use the photo
-            // for shape" but never named the landmark — without the name
-            // Grok would treat the photo as one style hint among many and
-            // stylize away the distinctive shape).
-            const landmarkFidelityBlock = bgLandmark
-              ? `**LANDMARK IN THIS SCENE: ${bgLandmark.name}.** The attached reference photo shows this exact real-world landmark. The scene MUST depict this specific building (or part of it), not a generic version.
-
-**FRAMING (must match the photo):**
-- Match the camera distance and framing of the reference photo. If the photo is a close-up of the landmark filling 60-80% of the frame, your scene shows the landmark filling 60-80% of the frame at the same elevation and angle. DO NOT zoom out to show the surrounding city or wide context unless the reference photo itself is a wide shot.
-- Match the camera elevation (ground-level / low / eye-level / high / aerial) shown in the photo.
-- Match the viewing angle (front / three-quarter / side / oblique) shown in the photo.
-- The landmark must occupy approximately the same fraction of the rendered frame as it does in the reference photo. A common failure is rendering the landmark tiny in the distance against a wide cityscape — DO NOT do this. If the photo crops in, you crop in.
-
-**IDENTITY:**
-- Preserve the silhouette, architectural details, distinctive features, and overall proportions exactly as in the photo. Do NOT stylize away its identity. Someone who has seen the real building must immediately recognise it.
-
-**EXCLUDE modern intrusions visible in the photo:** cars, parked vehicles, traffic signs, road markings, street lights, utility poles, power lines, billboards, commercial advertising, shopfront price tags, plastic bins, satellite dishes, air conditioners, modern pedestrians. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure. Keep the landmark itself unchanged; only remove the modern surroundings.`
-              : '';
+            // is actually attached. Shared builder (storyHelpers) anchors the
+            // photo by NAME so Grok knows which building it's looking at and
+            // preserves its silhouette; '' when no landmark.
+            const { buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
+            const landmarkFidelityBlock = buildLandmarkFidelityBlock(bgLandmark);
             for (const pageNum of bg.pages) {
               bgPromises.push(bgLimit(async () => {
                 try {
@@ -5395,11 +5380,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const landmarkPhotos = (v.location?.isRealLandmark && v.location?.referencePhotoData)
               ? [{ name: v.location.name, photoData: v.location.referencePhotoData, attribution: v.location.photoAttribution, source: v.location.photoSource }]
               : (repPageData.landmarkPhotos || []);
+            const { buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
             const emptyPrompt = buildEmptyScenePrompt({
               style: artStyleDesc,
               description: emptySceneDesc,
               characterSpace,
               eraGuard,
+              // Named fidelity block whenever a landmark photo is attached
+              // below — '' otherwise (was trial-only; paid stories shipped
+              // the generic unnamed plate prompt).
+              landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos[0]),
             });
             try {
               const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, repPageNum, landmarkPhotos);
@@ -5577,6 +5567,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               : '';
 
             const eraGuard = buildEraGuard(sceneMetadata?.era || null);
+            // Named fidelity block whenever this page attaches a landmark
+            // photo — '' otherwise (was trial-only).
+            const { buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
+            const pageLandmarkFidelity = buildLandmarkFidelityBlock(pageData.landmarkPhotos?.[0]);
 
             const emptyPrompt = buildEmptyScenePrompt({
               style: artStyleDesc,
@@ -5584,6 +5578,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               characterSpace,
               textAreaInstruction: emptyTextAreaInstr,
               eraGuard,
+              landmarkFidelity: pageLandmarkFidelity,
             });
 
             try {
@@ -5670,6 +5665,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     characterSpace,
                     textAreaInstruction: softerTextInstr,
                     eraGuard,
+                    landmarkFidelity: pageLandmarkFidelity,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,
