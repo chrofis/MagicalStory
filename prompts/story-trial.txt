@@ -56,7 +56,7 @@ It must be detailed enough to illustrate without additional context.
       }
     ],
     "objects": [
-      {"id": "[OBJ001]", "name": "[Object name]", "position": "[where in scene]"}
+      {"id": "[ART001]", "name": "[Object name]", "position": "[where in scene]"}
     ],
     "background": "[empty|a few passersby|busy crowd|dense forest|etc.]"
   }
