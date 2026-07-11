@@ -6487,7 +6487,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // =========================================================================
   // Shared helpers for the round loop
   // =========================================================================
-  const ENTITY_PENALTIES = { critical: 30, major: 20, minor: 10 };
+  // Entity penalty per issue — SINGLE SCALE with the charged score (scoring
+  // audit 2026-07-11): derived from SEVERITY_POINTS so the displayed/ranked
+  // entity penalty (version.entityPenalty, scoreBreakdown.entity.penalty)
+  // equals what computeMathFinalScore actually deducts. The old independent
+  // table {30/20/10} made the dev panel show −10 where the score charged −2.
+  // Client mirror: useRepairWorkflow.ts ENTITY_PENALTIES — keep in sync.
+  const { SEVERITY_POINTS: ENTITY_SEV_POINTS } = require('./scoring');
+  const ENTITY_PENALTIES = {
+    critical: ENTITY_SEV_POINTS.critical,
+    major: ENTITY_SEV_POINTS.major,
+    minor: ENTITY_SEV_POINTS.minor,
+  };
   // Returns { penalty, issues } so callers can persist BOTH the number AND the
   // source issues on each version. Without the issues, the dev panel shows a
   // mysterious "−N" deduction that the user can't drill into.

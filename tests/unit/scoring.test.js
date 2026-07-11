@@ -151,6 +151,21 @@ test('fail-soft without consolidation: math over raw (undeduped) issues', () => 
   assert.strictEqual(v.finalScore, 35);          // 100 − 25 − 25 − 15 (raw, undeduped)
   assert.strictEqual(v.scoreSource, 'raw');
 });
+test('entity minor: displayed (table) penalty equals charged (SEVERITY_POINTS) penalty', () => {
+  // The pipeline's ENTITY_PENALTIES table (images.js getEntityPenaltyAndIssues,
+  // mirrored in useRepairWorkflow.ts) derives from SEVERITY_POINTS — the dev
+  // panel number and the score charge must be the same scale.
+  const { SEVERITY_POINTS } = require('../../server/lib/scoring');
+  const ENTITY_PENALTIES = { critical: SEVERITY_POINTS.critical, major: SEVERITY_POINTS.major, minor: SEVERITY_POINTS.minor };
+  const issues = [{ name: 'X', severity: 'minor', description: 'hair tie colour drifted on this page' }];
+  const displayed = issues.reduce((s, i) => s + ENTITY_PENALTIES[i.severity], 0);
+  const v = {};
+  applyScore(v, { evalResult: { qualityScore: 90, fixableIssues: [] }, entityResult: { issues, penalty: displayed } });
+  assert.strictEqual(displayed, 2);                              // minor = 2, not 10
+  assert.strictEqual(v.entityPenalty, displayed);                // charged == displayed
+  assert.strictEqual(v.scoreBreakdown.entity.penalty, displayed);
+  assert.strictEqual(v.finalScore, 100 - displayed);
+});
 test('entity-only deduped issues keep the capped entity bucket', () => {
   const consolidatedPlan = {
     deduped_issues: [

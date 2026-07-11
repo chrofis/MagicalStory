@@ -19,8 +19,11 @@ const COVER_PAGES: Record<string, number> = { frontCover: -1, initialPage: -2, b
 // Concurrency limit for parallel image operations (redo, character repair)
 const IMAGE_CONCURRENCY = 50;
 
-// Entity penalty values by severity (must match backend re-evaluate logic)
-const ENTITY_PENALTIES = { critical: 30, major: 20, minor: 10 } as const;
+// Entity penalty values by severity — mirrors the backend's single scale:
+// SEVERITY_POINTS in server/lib/scoring.js (critical 25 / major 15 / minor 2),
+// which is what computeMathFinalScore actually charges. Keep in sync with
+// the derived ENTITY_PENALTIES in server/lib/images.js.
+const ENTITY_PENALTIES = { critical: 25, major: 15, minor: 2 } as const;
 
 /** Simple concurrency limiter (like p-limit) */
 function pLimit(concurrency: number) {
