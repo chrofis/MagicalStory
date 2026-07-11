@@ -414,7 +414,8 @@ export interface FinalChecksImageIssue {
   details?: Record<string, string>;  // Per-image details (e.g., { "image2": "red hair", "image4": "blonde hair" })
   canonicalVersion?: string;  // What the correct/target appearance should be
   recommendation?: string;  // Specific fix suggestion (single action, not "either/or")
-  severity: 'low' | 'medium' | 'high';
+  // 'critical'|'major'|'minor' is the canonical vocabulary (final-consistency-check.txt); low/medium/high kept for stored legacy reports.
+  severity: 'critical' | 'major' | 'minor' | 'low' | 'medium' | 'high';
 }
 
 export interface FinalChecksTextIssue {
@@ -425,7 +426,8 @@ export interface FinalChecksTextIssue {
   correctedText?: string;  // The corrected version
   issue: string;
   suggestion?: string;  // Legacy field
-  severity: 'low' | 'medium' | 'high';
+  // 'critical'|'major'|'minor' is the canonical vocabulary (final-consistency-check.txt); low/medium/high kept for stored legacy reports.
+  severity: 'critical' | 'major' | 'minor' | 'low' | 'medium' | 'high';
 }
 
 export interface FinalChecksImageCheck {

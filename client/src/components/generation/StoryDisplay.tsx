@@ -3927,14 +3927,14 @@ export function StoryDisplay({
                           <div className="space-y-2 mt-2">
                             {check.issues.map((issue, issueIdx) => (
                               <div key={issueIdx} className={`text-xs p-2 rounded ${
-                                issue.severity === 'high' ? 'bg-red-50 border-l-4 border-red-400' :
-                                issue.severity === 'medium' ? 'bg-amber-50 border-l-4 border-amber-400' :
+                                (issue.severity === 'high' || issue.severity === 'critical') ? 'bg-red-50 border-l-4 border-red-400' :
+                                (issue.severity === 'medium' || issue.severity === 'major') ? 'bg-amber-50 border-l-4 border-amber-400' :
                                 'bg-gray-50 border-l-4 border-gray-300'
                               }`}>
                                 <div className="flex items-start gap-2 flex-wrap">
                                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                    issue.severity === 'high' ? 'bg-red-200 text-red-800' :
-                                    issue.severity === 'medium' ? 'bg-amber-200 text-amber-800' :
+                                    (issue.severity === 'high' || issue.severity === 'critical') ? 'bg-red-200 text-red-800' :
+                                    (issue.severity === 'medium' || issue.severity === 'major') ? 'bg-amber-200 text-amber-800' :
                                     'bg-gray-200 text-gray-700'
                                   }`}>
                                     {issue.severity}
@@ -4103,14 +4103,14 @@ export function StoryDisplay({
                         <div className="space-y-2 mt-2">
                           {finalChecksReport.textCheck.issues.map((issue, issueIdx) => (
                             <div key={issueIdx} className={`text-xs p-2 rounded ${
-                              issue.severity === 'high' ? 'bg-red-50 border-l-4 border-red-400' :
-                              issue.severity === 'medium' ? 'bg-amber-50 border-l-4 border-amber-400' :
+                              (issue.severity === 'high' || issue.severity === 'critical') ? 'bg-red-50 border-l-4 border-red-400' :
+                              (issue.severity === 'medium' || issue.severity === 'major') ? 'bg-amber-50 border-l-4 border-amber-400' :
                               'bg-gray-50 border-l-4 border-gray-300'
                             }`}>
                               <div className="flex items-start gap-2 flex-wrap">
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                  issue.severity === 'high' ? 'bg-red-200 text-red-800' :
-                                  issue.severity === 'medium' ? 'bg-amber-200 text-amber-800' :
+                                  (issue.severity === 'high' || issue.severity === 'critical') ? 'bg-red-200 text-red-800' :
+                                  (issue.severity === 'medium' || issue.severity === 'major') ? 'bg-amber-200 text-amber-800' :
                                   'bg-gray-200 text-gray-700'
                                 }`}>
                                   {issue.severity}

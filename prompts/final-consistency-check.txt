@@ -70,7 +70,7 @@ Return ONLY valid JSON (no markdown, no explanation):
       },
       "canonicalVersion": "Description of what the correct/target appearance should be (e.g., 'red hair as shown in image 2')",
       "recommendation": "Single specific action to fix (e.g., 'Regenerate page 4: change hair to red to match page 2')",
-      "severity": "low" | "medium" | "high"
+      "severity": "critical" | "major" | "minor"
     }
   ],
   "summary": "Brief overall assessment"
@@ -95,9 +95,9 @@ Example:
 - CORRECT: `"pagesToFix": [3]`, `"canonicalVersion": "no scarf, as shown in images 1 and 2"`, `"recommendation": "Regenerate page 3: remove the scarf from CharacterA to match images 1 and 2"`
 
 ## Severity Guide
-- **high**: Obvious inconsistency that readers will immediately notice (wrong hair color, character looks completely different)
-- **medium**: Noticeable on closer inspection (clothing color slightly off, character proportions vary)
-- **low**: Minor variation that most readers won't notice (slight style differences, minor prop changes)
+- **critical**: Obvious inconsistency that readers will immediately notice (wrong hair color, character looks completely different)
+- **major**: Noticeable on closer inspection (clothing color slightly off, character proportions vary)
+- **minor**: Minor variation that most readers won't notice (slight style differences, minor prop changes)
 
 If no issues found, return:
 {

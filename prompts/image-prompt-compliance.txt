@@ -119,4 +119,4 @@ Return JSON only:
 - Base ALL assessments on the visual inventory, NOT assumptions
 - Clothing TYPE mismatch (modern vs costume) is CRITICAL, not just a color issue
 - Facing direction is as important as clothing — characters must face what they interact with
-- `fixable_issues`: ONE entry per issue, only if fixable by inpainting
+- `fixable_issues`: ONE entry per issue found — the code decides the repair method (inpaint, regenerate, character-fix)
