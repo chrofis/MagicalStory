@@ -6515,6 +6515,63 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // Backward-compat shim — existing callers that only need the number.
   const getEntityPenalty = (pageNumber, report) => getEntityPenaltyAndIssues(pageNumber, report).penalty;
 
+  // ---------------------------------------------------------------------
+  // Eval consolidation (owner decision Jul 2026: "3-4 different evals, then
+  // ONE prompt to summarize"). Every full evaluation goes through the
+  // feedback consolidator, whose deduped_issues become the deductions that
+  // applyScore's math runs over — the same defect flagged by quality +
+  // semantic + compliance + entity counts ONCE. One Sonnet call per
+  // evaluated version (zero-issue evals skip the call), parallelized.
+  // The plan lands on the version as `consolidatedPlan`; the finalize
+  // stampScores pass reuses it — no second LLM call.
+  // ---------------------------------------------------------------------
+  const { consolidateEvaluation } = require('./feedbackConsolidator');
+  const consolidatorStoryId = storyData?.id || jobId || null;
+  const consolidateLimit = pLimit(Math.min(evalConcurrency, 20));
+  const consolidatePageEval = async (ev, entityIssues, pageNumber, round) => {
+    try {
+      const orig = rawImages.find(i => i.pageNumber === pageNumber);
+      const res = await consolidateEvaluation({
+        evalResult: ev,
+        entityIssues,
+        sceneDescription: orig?.sceneDescription || '',
+        characters: characters || [],
+        storyId: consolidatorStoryId,
+        pageNumber,
+        round,
+      });
+      if (res.usage && usageTracker) {
+        usageTracker('anthropic', res.usage, 'eval_consolidation', 'claude-sonnet');
+      }
+      if (res.error) {
+        log.warn(`🧠 [EVAL-CONSOLIDATION] P${pageNumber}: failed (${res.error}) — scoring falls back to raw issues`);
+      }
+      return res.plan || null;
+    } catch (err) {
+      log.warn(`🧠 [EVAL-CONSOLIDATION] P${pageNumber}: threw (${err.message}) — scoring falls back to raw issues`);
+      return null;
+    }
+  };
+
+  // Consolidate the initial-pass evaluations (winner images + the non-winner
+  // original baselines) in parallel.
+  const consolidatedByPage = new Map();
+  const baselineConsolidatedByPage = new Map();
+  await Promise.all([
+    ...rawImages.map(img => consolidateLimit(async () => {
+      const ev = evalMap.get(img.pageNumber);
+      if (!ev) return;
+      const entityResult = getEntityPenaltyAndIssues(img.pageNumber, entityReport);
+      const plan = await consolidatePageEval(ev, entityResult.issues, img.pageNumber, 0);
+      if (plan) consolidatedByPage.set(img.pageNumber, plan);
+    })),
+    ...[...baselineEvalsByPage.entries()].map(([pageNumber, ev]) => consolidateLimit(async () => {
+      const entityResult = getEntityPenaltyAndIssues(pageNumber, entityReport);
+      const plan = await consolidatePageEval(ev, entityResult.issues, pageNumber, 0);
+      if (plan) baselineConsolidatedByPage.set(pageNumber, plan);
+    })),
+  ]);
+
   // Track all versions per page: { pageNumber -> [{ imageData, score, source, evaluation, entityPenalty, evaluatedAt }] }
   const pageVersions = new Map();
   for (const img of rawImages) {
@@ -6571,6 +6628,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           finalScore: baseFinalScore,
           source: 'original',
           evaluation: ev || null,
+          consolidatedPlan: consolidatedByPage.get(img.pageNumber) || null,
           modelId: img.modelId,
           grokRefImages: img.grokRefImages || null,
           referencePhotos: img.referencePhotos || null,
@@ -6590,6 +6648,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           source: 'scale-repair',
           type: 'repair',
           evaluation: ev || null,
+          consolidatedPlan: consolidatedByPage.get(img.pageNumber) || null,
           modelId: img.modelId,
           grokRefImages: img.scaleRepairGrokRefImages || null,
           inpaintInstruction: img.scaleRepairPrompt || null,
@@ -6621,6 +6680,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           score: scoreForThis,
           source: c.source,
           evaluation: evalForThis,
+          consolidatedPlan: isWinner
+            ? (consolidatedByPage.get(img.pageNumber) || null)
+            : (isOriginal ? (baselineConsolidatedByPage.get(img.pageNumber) || null) : null),
           modelId: c.modelId || baseVersion.modelId,
           // Each candidate now carries its own refs (original inherits from
           // the initial Grok call; repair attempts capture refs from their
@@ -7371,6 +7433,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         roundEvals = [];
       }
 
+      // Consolidate each round evaluation before scoring — same dedupe step
+      // as the initial pass (one Sonnet call per repaired page, parallel).
+      const roundConsolidated = new Map();
+      await Promise.all(roundEvals.map(ev => consolidateLimit(async () => {
+        const entityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
+        const plan = await consolidatePageEval(ev, entityResult.issues, ev.pageNumber, round);
+        if (plan) roundConsolidated.set(ev.pageNumber, plan);
+      })));
+
       // pageVersions append is intentionally sequential here. Earlier audits
       // raised a concern about parallel .set() races — that concern was based
       // on a different code shape. Today each page picks ONE repair method
@@ -7431,6 +7502,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             evalResult: ev,
             entityResult: evEntityResult,
             promptFinalScore: evScore,
+            // Deduped issue list drives the math score; also persisted on
+            // the version (consolidatedPlan) for the dev panel + finalize
+            // re-stamp.
+            consolidatedPlan: roundConsolidated.get(ev.pageNumber) || null,
           });
           versions.push(newVersion);
         }
@@ -7497,8 +7572,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         entry.version.entityIssues = entityResult.issues;
         entry.version.evaluatedAt = new Date().toISOString();
         entry.version.pageNumber = ev.pageNumber;
-        // Canonical stamp — same single-scale math as every other writer.
-        rescueApplyScore(entry.version, { evalResult: ev, entityResult, promptFinalScore: evScore });
+        // Consolidate the rescue evaluation (same dedupe step as every other
+        // eval), then canonical stamp — same single-scale math as every
+        // other writer.
+        const rescuePlan = await consolidatePageEval(ev, entityResult.issues, ev.pageNumber, null);
+        rescueApplyScore(entry.version, { evalResult: ev, entityResult, promptFinalScore: evScore, consolidatedPlan: rescuePlan });
         const repicked = selectBestVersion(pageVersions.get(ev.pageNumber));
         const prevBest = finalBestPerPage.get(ev.pageNumber);
         finalBestPerPage.set(ev.pageNumber, repicked);
@@ -7752,6 +7830,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         entityResult,
         // Audit-only: the evaluator's merged score. finalScore is always math.
         promptFinalScore: v.evaluation?.score ?? v.evaluation?.qualityScore ?? null,
+        // Deduped issue list from the eval-time consolidation (attached at
+        // version creation) — reused here, no second LLM call.
+        consolidatedPlan: v.consolidatedPlan || null,
       });
     };
     const buildVersionEntry = (v) => {
@@ -7768,6 +7849,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       mathFinalScore: v.mathFinalScore ?? null,
       promptFinalScore: v.promptFinalScore ?? null,
       scoreModel: v.scoreModel || null,
+      // Eval-time consolidation: deduped issue list that fed the math score
+      // (dev panel shows the dedupe) + which issue set was scored.
+      consolidatedPlan: v.consolidatedPlan || null,
+      scoreSource: v.scoreSource || null,
       evalScore: v.evalScore ?? null,
       entityPenalty: v.entityPenalty ?? 0,
       // Detailed evaluator outputs — kept verbatim because the dev panel uses

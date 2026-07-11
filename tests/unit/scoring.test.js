@@ -114,6 +114,59 @@ test('three-stage issue merged into fixableIssues is deducted once, not twice', 
   assert.strictEqual(v.scoreBreakdown.threeStage.issues.length, 1);
 });
 
+console.log('\napplyScore — consolidated (deduped) scoring');
+test('consolidatedPlan.deduped_issues drive the math — raw overlapping issues ignored', () => {
+  // Three evaluators flagged the same defect; the consolidator merged them
+  // into ONE deduped entry. finalScore must deduct once (25), not 65.
+  const evalResult = {
+    qualityScore: 60,
+    fixableIssues: [{ description: 'hero not holding the wooden lantern', severity: 'CRITICAL' }],
+    semanticResult: { score: 70, semanticIssues: [{ description: 'wooden lantern absent, hero should carry it', severity: 'CRITICAL' }] },
+    threeStageResult: { score: 80, fixableIssues: [{ description: 'declared object wooden lantern not visible', severity: 'MAJOR' }] },
+  };
+  const consolidatedPlan = {
+    deduped_issues: [
+      { description: 'Hero is not holding the wooden lantern', severity: 'CRITICAL', sources: ['quality', 'semantic', 'compliance'] },
+    ],
+  };
+  const v = {};
+  applyScore(v, { evalResult, consolidatedPlan });
+  assert.strictEqual(v.finalScore, 75);                       // 100 − 25 once
+  assert.strictEqual(v.scoreSource, 'consolidated');
+  assert.strictEqual(v.deductions.consolidated.length, 1);
+  assert.strictEqual(v.deductions.quality.length, 0);         // raw lists not double-counted
+  assert.strictEqual(v.deductions.semantic.length, 0);
+  assert.strictEqual(v.deductions.compliance.length, 0);
+  assert.deepStrictEqual(v.consolidatedPlan, consolidatedPlan); // persisted for dev panel
+});
+test('fail-soft without consolidation: math over raw (undeduped) issues', () => {
+  const evalResult = {
+    qualityScore: 60,
+    fixableIssues: [{ description: 'hero not holding the wooden lantern', severity: 'CRITICAL' }],
+    semanticResult: { score: 70, semanticIssues: [{ description: 'wooden lantern absent, hero should carry it', severity: 'CRITICAL' }] },
+    threeStageResult: { score: 80, fixableIssues: [{ description: 'declared object wooden lantern not visible', severity: 'MAJOR' }] },
+  };
+  const v = {};
+  applyScore(v, { evalResult });
+  assert.strictEqual(v.finalScore, 35);          // 100 − 25 − 25 − 15 (raw, undeduped)
+  assert.strictEqual(v.scoreSource, 'raw');
+});
+test('entity-only deduped issues keep the capped entity bucket', () => {
+  const consolidatedPlan = {
+    deduped_issues: [
+      { description: 'Character hair colour drifted to blonde on this page', severity: 'CRITICAL', sources: ['entity'] },
+      { description: 'Character glasses missing versus reference portrait', severity: 'CRITICAL', sources: ['entity'] },
+    ],
+  };
+  const v = {};
+  applyScore(v, { evalResult: { qualityScore: 90, fixableIssues: [] }, consolidatedPlan });
+  // 2 × 25 = 50 raw entity points, capped at 40 → finalScore 60.
+  assert.strictEqual(v.entityPenalty, 40);
+  assert.strictEqual(v.finalScore, 60);
+  assert.strictEqual(v.deductions.entity.length, 2);
+  assert.strictEqual(v.deductions.consolidated.length, 0);
+});
+
 console.log('\npickBestVersionIndex');
 test('empty array → -1', () => {
   assert.strictEqual(pickBestVersionIndex([]), -1);

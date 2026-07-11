@@ -45,7 +45,15 @@ const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
 // passed only as the promptFinalScore AUDIT field; it no longer drives
 // finalScore (it used to be laundered through the prompt-model branch,
 // leaving two incomparable scales in one array).
-function stampCanonicalScore(version, imageResult, opts = {}) {
+// EVAL CONSOLIDATION (Jul 2026, owner decision "3-4 evals, ONE summarize"):
+// pass `opts.consolidation = { sceneDescription, characters, sceneClothing,
+// storyId, pageNumber, round }` and the evaluation is deduped through the
+// feedback consolidator before scoring — applyScore's math then runs over
+// the deduped issue list (same defect flagged by several evaluators counts
+// once). Absent/failed consolidation fail-softs to math over the raw lists
+// (applyScore WARNs). Score-only stamps (no evaluator issues) don't need a
+// consolidation context — there is nothing to dedupe.
+async function stampCanonicalScore(version, imageResult, opts = {}) {
   if (!version || typeof version !== 'object') return;
   const { applyScore } = require('../lib/scoring');
   const evalResult = imageResult ? {
@@ -58,10 +66,32 @@ function stampCanonicalScore(version, imageResult, opts = {}) {
   const entityResult = (opts.entityIssues || opts.entityPenalty != null)
     ? { issues: opts.entityIssues || [], penalty: opts.entityPenalty || 0 }
     : null;
+  let consolidatedPlan = null;
+  const ctx = opts.consolidation;
+  if (ctx && evalResult) {
+    try {
+      const { consolidateEvaluation } = require('../lib/feedbackConsolidator');
+      const res = await consolidateEvaluation({
+        evalResult,
+        entityIssues: entityResult?.issues || [],
+        sceneDescription: ctx.sceneDescription || version.description || '',
+        characters: ctx.characters || [],
+        sceneClothing: ctx.sceneClothing || null,
+        storyId: ctx.storyId || null,
+        pageNumber: ctx.pageNumber ?? null,
+        round: ctx.round ?? null,
+      });
+      if (res.plan) consolidatedPlan = res.plan;
+      else if (res.error) log.warn(`🧠 [EVAL-CONSOLIDATION] ${ctx.pageNumber != null ? `P${ctx.pageNumber}` : 'version'}: failed (${res.error}) — scoring falls back to raw issues`);
+    } catch (err) {
+      log.warn(`🧠 [EVAL-CONSOLIDATION] consolidation threw (${err.message}) — scoring falls back to raw issues`);
+    }
+  }
   applyScore(version, {
     evalResult,
     entityResult,
     promptFinalScore: imageResult?.score ?? null,
+    consolidatedPlan,
   });
 }
 
@@ -795,7 +825,14 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
       })),
     };
-    stampCanonicalScore(newVersion, imageResult);
+    await stampCanonicalScore(newVersion, imageResult, {
+      consolidation: {
+        sceneDescription: expandedDescription,
+        characters: storyData.characters || [],
+        storyId: id,
+        pageNumber,
+      },
+    });
 
     if (existingIndex >= 0) {
       if (sceneImages[existingIndex].imageVersions) {
@@ -2290,7 +2327,14 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         bboxDetection: imageResult.bboxDetection || null,
         compositeAttempts,
       };
-      stampCanonicalScore(newVersion, imageResult);
+      await stampCanonicalScore(newVersion, imageResult, {
+        consolidation: {
+          sceneDescription,
+          characters: storyData.characters || [],
+          storyId: id,
+          pageNumber: null, // cover
+        },
+      });
       existingCover.imageVersions.push(newVersion);
 
       // Also update cover-level bboxDetection to match new active image
@@ -2652,7 +2696,14 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       bboxDetection: iterResult.bboxDetection || null,
       grokRefImages: iterResult.grokRefImages || null,
     };
-    stampCanonicalScore(newVersion, iterResult);
+    await stampCanonicalScore(newVersion, iterResult, {
+      consolidation: {
+        sceneDescription: newSceneDescription,
+        characters: storyData.characters || [],
+        storyId: id,
+        pageNumber,
+      },
+    });
 
     // DB-authoritative allocation (MAX(version_index)+1). The old
     // `imageVersions.length - 1` diverges from the DB row set on
@@ -3009,7 +3060,14 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       source: compositeAttempts ? 'composite-regenerate' : 'regenerate',
       compositeAttempts,
     };
-    stampCanonicalScore(newVersion, coverResult);
+    await stampCanonicalScore(newVersion, coverResult, {
+      consolidation: {
+        sceneDescription,
+        characters: (freshCharacters && freshCharacters.length ? freshCharacters : storyData.characters) || [],
+        storyId: id,
+        pageNumber: null, // cover
+      },
+    });
 
     // Add new version
     const updatedVersions = [...(existingCover.imageVersions || []), newVersion];
@@ -3612,7 +3670,9 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           qualityScore: repairScore,
           repairHistory: allRepairHistory,
         };
-        stampCanonicalScore(repairVersion, { score: repairScore });
+        // Score-only stamp — the repair loop stores its evals in retryHistory;
+        // no issue lists on this version, so nothing to consolidate.
+        await stampCanonicalScore(repairVersion, { score: repairScore });
         // DB-authoritative allocation — see iterate: `length - 1` diverges
         // from the DB row set on lazy-migrated stories.
         repairVersion.dbVersionIndex = await getNextVersionIndex(id, 'scene', pageNumber);
@@ -3891,14 +3951,23 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           // Canonical scoring fields alongside legacy (legacy kept for in-flight
           // consumers — step-6 cleanup will drop them once frontend + DB
           // writer migrations land).
-          stampCanonicalScore(activeVersion, {
+          await stampCanonicalScore(activeVersion, {
             score: adjustedScore,
             qualityScore: evaluation.qualityScore ?? evaluation.score,
             fixableIssues: allIssues,
             reasoning: evaluation.reasoning,
             semanticResult: evaluation.semanticResult || null,
             threeStageResult: evaluation.threeStageResult || null,
-          }, { entityIssues, entityPenalty: entityPenalty || 0 });
+          }, {
+            entityIssues,
+            entityPenalty: entityPenalty || 0,
+            consolidation: {
+              sceneDescription: scene.description || scene.prompt || '',
+              characters: storyData.characters || [],
+              storyId: id,
+              pageNumber,
+            },
+          });
         }
 
         // Update scene with adjusted score
@@ -5618,7 +5687,14 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               newVersion.qualityReasoning = afterReasoning;
               newVersion.issuesSummary = evalResult.issuesSummary || '';
               newVersion.evaluatedAt = new Date().toISOString();
-              stampCanonicalScore(newVersion, evalResult);
+              await stampCanonicalScore(newVersion, evalResult, {
+                consolidation: {
+                  sceneDescription: existingImage.description || existingImage.prompt || '',
+                  characters: storyData.characters || [],
+                  storyId: id,
+                  pageNumber: isCover ? null : update.pageNumber,
+                },
+              });
               const delta = beforeScore != null && afterScore != null ? afterScore - beforeScore : null;
               log.info(`🔍 [CHAR REPAIR] ${pageLabel} After: ${afterScore}% (before: ${beforeScore}%, delta: ${delta != null ? (delta >= 0 ? '+' : '') + delta : 'n/a'})`);
             }

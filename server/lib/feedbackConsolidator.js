@@ -24,6 +24,7 @@ function buildFeedbackInput({
   sceneDescription,
   fixableIssues = [],
   semanticIssues = [],
+  complianceIssues = [],
   entityIssues = [],
   finalCheckIssues = [],
   bboxFigures = [],
@@ -85,6 +86,20 @@ function buildFeedbackInput({
       const expected = iss.expected ? ` — expected: ${iss.expected}` : '';
       const observed = iss.observed ? ` — observed: ${iss.observed}` : '';
       parts.push(`- [${sev}] (${type})${item} ${problem}${expected}${observed}`);
+    }
+  }
+  parts.push('');
+
+  parts.push('## Compliance evaluation issues (prompt-compliance evaluator)');
+  if (complianceIssues.length === 0) {
+    parts.push('(none)');
+  } else {
+    for (const iss of complianceIssues) {
+      const sev = iss.severity || 'MODERATE';
+      const type = iss.type || 'general';
+      const desc = iss.description || iss.issue || '(no description)';
+      const fix = iss.fix ? ` — suggested: ${iss.fix}` : '';
+      parts.push(`- [${sev}] (${type}) ${desc}${fix}`);
     }
   }
   parts.push('');
@@ -163,6 +178,11 @@ async function consolidateFeedback({
   sceneDescription,
   evaluation = {},
   entityReport = null,
+  // Pre-flattened per-page entity issues ({ characterName|name, severity,
+  // description }). When provided, used directly instead of flattening +
+  // page-filtering entityReport — the eval-consolidation path already has
+  // the per-page issues from getEntityPenaltyAndIssues.
+  entityIssues: entityIssuesInput = null,
   pageNumber = null,
   characters = [],
   // Per-scene clothing text keyed by character name. Overrides each
@@ -181,17 +201,37 @@ async function consolidateFeedback({
       return { plan: null, usage: null, error: 'feedbackConsolidator prompt template not loaded' };
     }
 
-    const fixableIssues = evaluation.fixableIssues || [];
+    // evaluateImageQuality merges the compliance (three-stage) findings into
+    // fixableIssues tagged `source: 'three-stage'` — split them back out so
+    // each evaluator's findings appear under its own section (and the
+    // consolidator's `sources` attribution is accurate). threeStageResult is
+    // the single source for compliance; the tagged copies are display-only.
+    const rawFixable = evaluation.fixableIssues || [];
+    const fixableIssues = rawFixable.filter(i => i?.source !== 'three-stage');
+    const complianceIssues =
+      evaluation.threeStageResult?.fixableIssues ||
+      evaluation.threeStageResult?.issues ||
+      rawFixable.filter(i => i?.source === 'three-stage');
     const semanticIssues =
       evaluation.semanticResult?.semanticIssues ||
       evaluation.semanticResult?.issues ||
       [];
     const bboxFigures = evaluation.bboxDetection?.figures || evaluation.bboxDetection?.detectionHistory?.figures || [];
 
-    // Filter entity issues to this page if we have pageNumber
-    let entityIssues = flattenEntityIssues(entityReport);
-    if (pageNumber != null) {
-      entityIssues = entityIssues.filter(e => !e.pageNumbers || e.pageNumbers.includes(pageNumber));
+    // Entity issues: pre-flattened list wins; else flatten the report and
+    // filter to this page if we have pageNumber.
+    let entityIssues;
+    if (Array.isArray(entityIssuesInput)) {
+      entityIssues = entityIssuesInput.map(e => ({
+        characterName: e.characterName || e.name || '(unknown)',
+        description: e.description || e.issue || '',
+        severity: e.severity || 'MODERATE',
+      }));
+    } else {
+      entityIssues = flattenEntityIssues(entityReport);
+      if (pageNumber != null) {
+        entityIssues = entityIssues.filter(e => !e.pageNumbers || e.pageNumbers.includes(pageNumber));
+      }
     }
 
     // Build character descriptions from the character profile (source of truth).
@@ -233,6 +273,7 @@ async function consolidateFeedback({
       sceneDescription,
       fixableIssues,
       semanticIssues,
+      complianceIssues,
       entityIssues,
       bboxFigures,
       characterDescriptions,
@@ -293,7 +334,7 @@ async function consolidateFeedback({
     // When Grok is handed more than 3 fixes, it usually executes none of them —
     // empirically a 6-fix inpaint often changes nothing. Cap severity-first and
     // move the overflow into dropped_issues so the next round picks them up.
-    const SEVERITY_RANK = { CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1, NONE: 0 };
+    const SEVERITY_RANK = { CATASTROPHIC: 5, CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1, NONE: 0 };
     const rank = (s) => SEVERITY_RANK[String(s || 'MODERATE').toUpperCase()] ?? 2;
     const sceneSev = plan.scene_fix.instruction ? rank(plan.scene_fix.severity) : 0;
     // Sort per-char fixes by severity (highest first) so the cap preserves the
@@ -367,8 +408,87 @@ async function persistConsolidatorCall({ storyId, pageNumber, round, fullPrompt,
   );
 }
 
+/**
+ * Consolidate one full evaluation into a deduped issue list for SCORING.
+ *
+ * The single dedupe step for every evaluation (owner decision Jul 2026:
+ * "3-4 different evals, then ONE prompt to summarize"): quality, semantic,
+ * compliance, and entity evaluators overlap heavily — the same defect gets
+ * flagged by several of them, and summing raw findings deducts it once per
+ * evaluator. This wrapper runs the consolidator on the combined outputs and
+ * returns `plan.deduped_issues`, which applyScore (scoring.js) uses as the
+ * deductions source instead of the raw lists.
+ *
+ * Zero-issue evaluations skip the LLM call entirely — nothing to dedupe —
+ * and return a synthetic empty plan (finalScore math on [] yields 100, same
+ * as the raw path).
+ *
+ * @param {object} args
+ * @param {object} args.evalResult    evaluateImageQuality output (fixableIssues, semanticResult, threeStageResult, bboxDetection)
+ * @param {Array}  [args.entityIssues] per-page entity issues from getEntityPenaltyAndIssues ({ name, severity, description })
+ * @param {string} [args.sceneDescription]
+ * @param {Array}  [args.characters]
+ * @param {object} [args.sceneClothing]
+ * @param {string} [args.storyId]
+ * @param {number} [args.pageNumber]
+ * @param {number|string} [args.round]
+ * @returns {Promise<{plan: object|null, dedupedIssues: Array|null, usage: object|null, error: string|null, skipped: boolean}>}
+ */
+async function consolidateEvaluation({
+  evalResult,
+  entityIssues = [],
+  sceneDescription = '',
+  characters = [],
+  sceneClothing = null,
+  storyId = null,
+  pageNumber = null,
+  round = null,
+} = {}) {
+  if (!evalResult || typeof evalResult !== 'object') {
+    return { plan: null, dedupedIssues: null, usage: null, error: 'no evalResult', skipped: true };
+  }
+
+  const rawFixable = evalResult.fixableIssues || [];
+  const qualityCount = rawFixable.filter(i => i?.source !== 'three-stage').length;
+  const complianceCount = (evalResult.threeStageResult?.fixableIssues
+    || evalResult.threeStageResult?.issues
+    || rawFixable.filter(i => i?.source === 'three-stage')).length;
+  const semanticCount = (evalResult.semanticResult?.semanticIssues
+    || evalResult.semanticResult?.issues || []).length;
+  const entityCount = Array.isArray(entityIssues) ? entityIssues.length : 0;
+
+  if (qualityCount + complianceCount + semanticCount + entityCount === 0) {
+    const plan = {
+      per_character_fixes: [],
+      scene_fix: { severity: 'NONE', instruction: '', preserve: [] },
+      dropped_issues: [],
+      final_score: 100,
+      final_score_reason: 'no evaluator issues',
+      deduped_issues: [],
+      skipped: true,
+    };
+    return { plan, dedupedIssues: [], usage: null, error: null, skipped: true };
+  }
+
+  const { plan, usage, error } = await consolidateFeedback({
+    sceneDescription,
+    evaluation: evalResult,
+    entityIssues: Array.isArray(entityIssues) ? entityIssues : [],
+    pageNumber,
+    characters,
+    sceneClothing,
+    storyId,
+    round,
+  });
+  if (!plan) {
+    return { plan: null, dedupedIssues: null, usage, error: error || 'consolidation failed', skipped: false };
+  }
+  return { plan, dedupedIssues: plan.deduped_issues, usage, error: null, skipped: false };
+}
+
 module.exports = {
   consolidateFeedback,
+  consolidateEvaluation,
   buildFeedbackInput, // exported for testing
   flattenEntityIssues, // exported for testing
 };

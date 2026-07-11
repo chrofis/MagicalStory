@@ -134,6 +134,9 @@ function normalizeIssues(rawIssues, source) {
       type: it.type || it.category || null,
       name: it.character || it.name || it.element || null,
       source,
+      // Consolidator deduped issues carry the evaluator names that flagged
+      // them — keep for the dev panel's dedupe display.
+      ...(Array.isArray(it.sources) && it.sources.length ? { sources: it.sources } : {}),
     });
   }
   return out;
@@ -143,12 +146,33 @@ function normalizeIssues(rawIssues, source) {
  * Build the deductions structure from evaluator outputs. Each input is
  * the raw eval result; the helper extracts the issues lists and normalizes.
  *
+ * CONSOLIDATED MODE (Jul 2026, owner decision "3-4 evals, ONE summarize"):
+ * when `consolidated` is an array (the feedback consolidator's deduped_issues
+ * — one entry per unique defect, highest severity, cross-evaluator sources),
+ * the deductions come from IT instead of the raw evaluator lists — the same
+ * defect flagged by quality + semantic + compliance counts ONCE. Entity-only
+ * findings (sources === ['entity']) keep their own capped bucket
+ * (capEntityPenalty chokepoint), mirroring the raw path's entity handling.
+ *
  * @param {object} params
  * @param {object} [params.evalResult]       output of evaluateImageQuality (has fixableIssues, semanticResult, threeStageResult)
  * @param {object} [params.entityResult]     { issues: [{name, severity, description, ...}], ... }
- * @returns {{quality, semantic, compliance, entity}}
+ * @param {Array|null} [params.consolidated] consolidator deduped_issues ([{description, severity, sources}])
+ * @returns {{quality, semantic, compliance, consolidated, entity}}
  */
-function composeDeductions({ evalResult = null, entityResult = null } = {}) {
+function composeDeductions({ evalResult = null, entityResult = null, consolidated = null } = {}) {
+  if (Array.isArray(consolidated)) {
+    const entityOnly = (i) => Array.isArray(i?.sources)
+      && i.sources.length > 0
+      && i.sources.every(s => s === 'entity');
+    return {
+      quality: [],
+      semantic: [],
+      compliance: [],
+      consolidated: normalizeIssues(consolidated.filter(i => !entityOnly(i)), 'consolidated'),
+      entity: normalizeIssues(consolidated.filter(entityOnly), 'entity'),
+    };
+  }
   // evaluateImageQuality merges threeStageResult.fixableIssues into
   // evalResult.fixableIssues for display (tagged `source: 'three-stage'`,
   // images.js). The compliance bucket below reads threeStageResult directly —
@@ -162,7 +186,7 @@ function composeDeductions({ evalResult = null, entityResult = null } = {}) {
   const compliance = normalizeIssues(evalResult?.threeStageResult?.fixableIssues
                                   || evalResult?.threeStageResult?.issues, 'compliance');
   const entity     = normalizeIssues(entityResult?.issues, 'entity');
-  return { quality, semantic, compliance, entity };
+  return { quality, semantic, compliance, consolidated: [], entity };
 }
 
 /**
@@ -171,7 +195,10 @@ function composeDeductions({ evalResult = null, entityResult = null } = {}) {
 function computeMathFinalScore(deductions) {
   if (!deductions || typeof deductions !== 'object') return 100;
   let total = 0;
-  for (const cat of ['quality', 'semantic', 'compliance']) {
+  // `consolidated` is the deduped cross-evaluator list (one entry per unique
+  // defect) — mutually exclusive with the raw buckets by construction in
+  // composeDeductions, so summing all four never double-counts.
+  for (const cat of ['quality', 'semantic', 'compliance', 'consolidated']) {
     const list = deductions[cat] || [];
     for (const d of list) total += SEVERITY_POINTS[d.severity] || 0;
   }
@@ -197,15 +224,33 @@ function computeMathFinalScore(deductions) {
  * imageVersions[] arrays that pickBestVersionIndex compared directly.
  * promptFinalScore is kept as an AUDIT field only; it never drives finalScore.
  *
+ * CONSOLIDATED SCORING (Jul 2026): pass `consolidatedPlan` (the feedback
+ * consolidator's plan for THIS evaluation) and the math runs over its
+ * deduped_issues — one deduction per unique defect — instead of the raw
+ * evaluator lists. When absent/failed, fail-soft to math over the raw
+ * (undeduped) lists with a WARN so missed consolidation is visible in logs.
+ *
  * @param {object} version  mutated in place
  * @param {object} params
  * @param {object} [params.evalResult]     evaluateImageQuality output
  * @param {object} [params.entityResult]   { penalty, issues } from getEntityPenaltyAndIssues
  * @param {number|null} [params.promptFinalScore]   audit-only: the evaluator/consolidator combined score, if any
+ * @param {object|null} [params.consolidatedPlan]   consolidator plan whose deduped_issues drive the deductions
  */
-function applyScore(version, { evalResult = null, entityResult = null, promptFinalScore = null } = {}) {
+function applyScore(version, { evalResult = null, entityResult = null, promptFinalScore = null, consolidatedPlan = null } = {}) {
   if (!version || typeof version !== 'object') return;
-  const deductions = composeDeductions({ evalResult, entityResult });
+  const dedupedIssues = Array.isArray(consolidatedPlan?.deduped_issues)
+    ? consolidatedPlan.deduped_issues
+    : null;
+  const deductions = composeDeductions({ evalResult, entityResult, consolidated: dedupedIssues });
+  if (!dedupedIssues) {
+    const rawCount = deductions.quality.length + deductions.semantic.length
+      + deductions.compliance.length + deductions.entity.length;
+    if (rawCount > 0) {
+      const pnWarn = version.pageNumber != null ? `page ${version.pageNumber}` : 'version';
+      log.warn(`[SCORE] ${pnWarn}: no consolidated evaluation — scoring ${rawCount} raw (undeduped) evaluator issue(s)`);
+    }
+  }
   const mathFinalScore = computeMathFinalScore(deductions);
   const finalScore = mathFinalScore;
 
@@ -215,6 +260,11 @@ function applyScore(version, { evalResult = null, entityResult = null, promptFin
   version.promptFinalScore = (typeof promptFinalScore === 'number') ? promptFinalScore : null;
   version.finalScore = finalScore;
   version.scoreModel = 'math';
+  // Which issue set fed the math: 'consolidated' (deduped) or 'raw'.
+  version.scoreSource = dedupedIssues ? 'consolidated' : 'raw';
+  // Persist the consolidator output on the version (same shape/field the
+  // repair paths already store) so the dev panel can show the dedupe.
+  if (consolidatedPlan) version.consolidatedPlan = consolidatedPlan;
 
   // scoreBreakdown — per-evaluator card for the dev panel's breakdown view.
   // Built from the same evalResult so it stays consistent with deductions.
@@ -237,7 +287,7 @@ function applyScore(version, { evalResult = null, entityResult = null, promptFin
   // consolidator (lenient) or the math fallback (conservative) — meaning the
   // 60-threshold can't be tuned from logs alone.
   const pn = version.pageNumber != null ? `page ${version.pageNumber}` : 'version';
-  log.info(`[SCORE] ${pn}: math model → finalScore=${finalScore} (evalAudit=${promptFinalScore}, entity=−${entityPoints})`);
+  log.info(`[SCORE] ${pn}: math model (${version.scoreSource}) → finalScore=${finalScore} (evalAudit=${promptFinalScore}, entity=−${entityPoints})`);
 
   return version;
 }
