@@ -82,6 +82,19 @@ const { log } = require('../utils/logger');
 //
 // Severity points calibrated for tolerance — minor wobbles shouldn't
 // trip the redo gate.
+//
+// THREE severity→number tables exist ON PURPOSE — do not "unify" one
+// against the others:
+//   SEVERITY_POINTS (here)          — the SCORE: what finalScore charges.
+//   RANK_SEVERITY_WEIGHT (below)    — the RANKING tiebreak: deliberately
+//                                     different calibration (un-clamped,
+//                                     dedup-clustered) for pick-best.
+//   SEVERITY_PENALTY (images.js)    — the legacy 0-10 audit blend + the
+//                                     repair-method gates; feeds
+//                                     qualityScore/rawScore, never
+//                                     finalScore.
+// Entity display/rank derives from SEVERITY_POINTS (see images.js
+// ENTITY_PENALTIES).
 // =====================================================================
 const SEVERITY_POINTS = {
   catastrophic: 50,
@@ -380,6 +393,8 @@ function computeFinalScore(version) {
 }
 
 // Canonical severity → weight for the un-clamped ranking tiebreak below.
+// DELIBERATELY different calibration from SEVERITY_POINTS (the score) —
+// see the three-tables note above SEVERITY_POINTS before changing either.
 const RANK_SEVERITY_WEIGHT = { CATASTROPHIC: 50, CRITICAL: 30, MAJOR: 20, MODERATE: 10, MINOR: 5 };
 
 // Words too common to signal that two issue descriptions are about the same

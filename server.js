@@ -5646,15 +5646,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   storyEra,
                 });
                 if (!qc.pass) {
-                  // Retry with a modified prompt that incorporates Gemini's feedback.
-                  // Don't just drop the text area instruction — soften it and add the fix hint.
+                  // Retry with Gemini's feedback appended to the description.
+                  // The text-area instruction is rebuilt with the SAME shared
+                  // builder and parameters as the first attempt — only the
+                  // fixHint differs between the two prompts. (An earlier
+                  // comment claimed the retry "softens" the instruction; it
+                  // never did.)
                   const fixHint = qc.visionFeedback
                     ? `\n\nIMPORTANT: The previous attempt had this problem: ${qc.visionFeedback}. Fix this in the new version.`
                     : '';
-                  // Soften the text area instruction using the shared builder. White
-                  // text will be overlaid, so the zone must be a saturated, high-
-                  // contrast surface — never a flat black rectangle or blank patch.
-                  const softerTextInstr = textPos
+                  const retryTextInstr = textPos
                     ? buildTextZoneInstruction(textPos, textZoneDesc, emptyAreaPct, { isEmptyScene: true })
                     : '';
                   log.info(`🔄 [EMPTY SCENE] P${pageData.pageNumber} failed QC (${qc.issues.join(', ')}), retrying with feedback...`);
@@ -5662,7 +5663,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     style: artStyleDesc,
                     description: emptySceneDesc + fixHint,
                     characterSpace,
-                    textAreaInstruction: softerTextInstr,
+                    textAreaInstruction: retryTextInstr,
                     eraGuard,
                     landmarkFidelity: pageLandmarkFidelity,
                   });

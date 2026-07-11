@@ -1750,6 +1750,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // = 0/10 on an image the model itself rated 8/10), so the computed
       // score can only pull at most 3 points below the model's own judgment:
       // final = max(computed, model − 3). See blendVisualScore.
+      // One of THREE severity→number tables that exist on purpose — see the
+      // note above SEVERITY_POINTS in scoring.js. This one is the legacy
+      // 0-10 audit blend (qualityScore/rawScore) + repair-method gates; it
+      // never feeds finalScore (that's SEVERITY_POINTS).
       const SEVERITY_PENALTY = { CATASTROPHIC: 5, CRITICAL: 3, MAJOR: 2, MODERATE: 1, MINOR: 0.5 };
       const totalPenalty = fixableIssues.reduce(
         (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1),
