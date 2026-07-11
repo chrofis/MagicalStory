@@ -11,9 +11,9 @@ REFERENCE IMAGES:
 - For element references (animals, objects): match EXACT appearance from reference.
 
 CHARACTER COUNT RULE:
-- Include ONLY the characters listed in the prompt with reference photos. No extras.
-- Do NOT add background figures, bystanders, supporting cast, or unnamed people.
-- Every person visible in the image must correspond to one of the provided reference photos.
+- Include ONLY the characters listed in the prompt with reference photos, plus any unnamed figures the prompt's BACKGROUND section explicitly places (guards, soldiers, a crowd). No other extras.
+- Do NOT invent background figures, bystanders, supporting cast, or unnamed people beyond that.
+- Every named character must correspond to one of the provided reference photos; BACKGROUND figures have no reference photos and stay in the background.
 
 CHARACTER CONSISTENCY (THIS IS YOUR PRIMARY TASK):
 - Each character must look IDENTICAL to their reference - same face, same person.
