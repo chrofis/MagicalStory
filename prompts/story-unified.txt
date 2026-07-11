@@ -161,8 +161,8 @@ METADATA:
   ],
   "objects": ["LOC001", "ANI001"],
   "interactions": [
-    { "character": "Name", "object": "wooden ladder", "where": "climbs the wooden ladder, both hands gripping the third rung", "priority": "essential" },
-    { "character": "Other", "object": "ART001", "where": "gazes at the dragon a few paces apart", "priority": "normal" }
+    { "character": "Name", "object": "wooden ladder", "where": "climbs the wooden ladder, both hands gripping the third rung", "storyRelevant": true, "priority": "essential" },
+    { "character": "Other", "object": "ART001", "where": "gazes at the dragon a few paces apart", "storyRelevant": false, "priority": "normal" }
   ],
   "background": "busy crowd in hats and coats",
   "setting": "indoor|outdoor",
@@ -213,15 +213,15 @@ Mark `storyRelevant: true` only when the contact is the page's plot beat, identi
 
 Omit entirely (do not include with `false`): pure ground/floor/path contact, leaning on walls, sitting on generic chairs.
 
-Field shape: `{character, object, where, storyRelevant}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "aims the crossbow down the path", "hands the letter to the messenger"). No body-part positioning, no pose detail.
+Field shape: `{character, object, where, storyRelevant, priority}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "aims the crossbow down the path", "hands the letter to the messenger"). No body-part positioning, no pose detail.
 
-Cap: 1–4 entries per page, 0–2 with `storyRelevant: true`.
+Cap: 1–6 entries per page, 0–2 with `storyRelevant: true`.
 
 Example:
 ```
 [
-  { character:"the main character", object:"ART002", where:"holds the parchment map", storyRelevant:true },
-  { character:"the secondary character", object:"the main character", where:"reads over the main character's shoulder", storyRelevant:false }
+  { character:"the main character", object:"ART002", where:"holds the parchment map", storyRelevant:true, priority:"essential" },
+  { character:"the secondary character", object:"the main character", where:"reads over the main character's shoulder", storyRelevant:false, priority:"normal" }
 ]
 ```
 
@@ -229,9 +229,9 @@ Every person named in `interactions[]` must appear in this scene's `characters[]
 
 **Interactions at a distance.** When the verb implies action across a gap rather than touching contact ('shoots', 'aims at', 'throws at', 'calls to', 'watches from afar', 'spots across', 'runs toward across', 'gestures across', 'looks at' over distance), `where` must include an explicit separation phrase: 'across the room', 'a few paces apart', 'across the square', 'across the field', 'down the valley', 'from one rooftop to another'. Without it the image renders the two figures inside touching distance and the dramatic moment collapses. For these scenes `shot` MUST be `ultra-wide` so both endpoints fit visibly in the frame at the named separation, and the prose must place each figure at the correct end of the frame.
 
-**Shared objects (two or more characters jointly using ONE thing).** When the same physical object is held / carried / lifted / pushed / pulled by multiple characters at once — the same picnic basket carried by two, the same banner held aloft by three, the same rope pulled by a team — emit ONE `interactions[]` entry, not one per character. The `character` field joins the names with ` + `, and the `where` sentence describes each grip in one sentence. ✓ `{ "character": "CharacterF + CharacterD", "object": "ART001", "where": "CharacterF grips the front handle, CharacterD grips the back, walking together with the wicker picnic basket between them" }`. ✗ Two separate entries with the same `object` (the model renders one separate object per entry — duplicates appear). Same rule for any shared scene element where the joint nature matters (sharing a bench they sit on, holding hands, pulling the same cart). For independent identical objects (each character has their OWN basket / sword / lantern), keep separate entries — the duplication is intentional there.
+**Shared objects (two or more characters jointly using ONE thing).** When the same physical object is held / carried / lifted / pushed / pulled by multiple characters at once — the same picnic basket carried by two, the same banner held aloft by three, the same rope pulled by a team — emit ONE `interactions[]` entry, not one per character. The `character` field joins the names with ` + `, and the `where` sentence describes each grip in one sentence. ✓ `{ "character": "CharacterF + CharacterD", "object": "ART001", "where": "CharacterF grips the front handle, CharacterD grips the back, walking together with the wicker picnic basket between them", "storyRelevant": true, "priority": "essential" }`. ✗ Two separate entries with the same `object` (the model renders one separate object per entry — duplicates appear). Same rule for any shared scene element where the joint nature matters (sharing a bench they sit on, holding hands, pulling the same cart). For independent identical objects (each character has their OWN basket / sword / lantern), keep separate entries — the duplication is intentional there.
 
-**Coverage and priority.** Every foreground or midground character in `characters[]` should appear in `interactions[]` exactly once. If a character has no plot-relevant action, give them a low-priority interaction (e.g. `{ "character": "Other", "object": "the campfire", "where": "watches the campfire", "priority": "low" }`) — the goal is to break the model's default camera-facing portrait, not to choreograph every gaze. Use `priority: "essential"` for the page's central action (held prop, traced line, key gesture), `"normal"` for supporting action, `"low"` for incidental gaze/pose. Background characters are exempt.
+**Coverage and priority.** Every foreground or midground character in `characters[]` should appear in `interactions[]` exactly once. If a character has no plot-relevant action, give them a low-priority interaction (e.g. `{ "character": "Other", "object": "the campfire", "where": "watches the campfire", "storyRelevant": false, "priority": "low" }`) — the goal is to break the model's default camera-facing portrait, not to choreograph every gaze. Use `priority: "essential"` for the page's central action (held prop, traced line, key gesture), `"normal"` for supporting action, `"low"` for incidental gaze/pose. Background characters are exempt.
 
 **emptyScenePrompt** (required): Background only — location, architecture, landscape, ground, lighting, weather, sky. No figures, characters, animals, creatures (named or generic). Reserved space is described as the scene's natural ground continuing through (cobblestones, grass, floor, road, sand, water surface) — never as "open space for X", "blank area", "room for figure", "spot reserved for", "leave room". Those phrases make the model render literal blankness or unfinished building fragments. ✓ "warm sunlit cobblestones stretch unbroken across the right foreground" ✗ "open space at right background for a small distant figure". Fixed anchor artifacts (throne, pole-with-banner, monument, signpost) are allowed and, when the page text centers on them, must be the focal point with their key visual marker named. Atmospheric crowd silhouettes are allowed only for inherently populated settings (market, square, festival).
 
@@ -662,7 +662,7 @@ The main character ran to the window. Snow was falling!
 SCENE:
 The main character — a slim grade-school girl with shoulder-length brown hair and freckles, wearing her striped sweater and dark leggings — stands at the right side of the frame in a softly lit bedroom, both hands pressed flat against a cold winter window, her breath fogging a patch on the glass as she leans close. Beyond the pane, large snowflakes drift past the pale grey dawn sky over the neighbouring rooftops. A pale wooden desk sits behind her in the shadowed left-background corner, quiet and simple. Close-up shot, warm soft morning light from inside the room, quiet wondering atmosphere.
 METADATA:
-{"characters":[{"name":"MainCharacter","position":"right foreground","clothing":"standard"}],"objects":[],"interactions":[{"character":"MainCharacter","object":"window","where":"presses hands on"}],"background":"empty bedroom, falling snow visible through window","setting":"indoor","time":"morning","weather":"snowy","shot":"close-up","textPosition":"top-left","emptyScenePrompt":"Simple bedroom interior at dawn, a tall frosted window on the right looking out onto falling snow against a pale grey sky, pale wooden desk in the shadowed left background, soft warm morning light. Top-left corner in shadowed wall tone for text."}
+{"characters":[{"name":"MainCharacter","position":"right foreground","clothing":"standard"}],"objects":[],"interactions":[{"character":"MainCharacter","object":"window","where":"presses both hands on the window","storyRelevant":true,"priority":"essential"}],"background":"empty bedroom, falling snow visible through window","setting":"indoor","time":"morning","weather":"snowy","shot":"close-up","textPosition":"top-left","emptyScenePrompt":"Simple bedroom interior at dawn, a tall frosted window on the right looking out onto falling snow against a pale grey sky, pale wooden desk in the shadowed left background, soft warm morning light. Top-left corner in shadowed wall tone for text."}
 
 ---ANALYSIS---
 **A. NARRATIVE:**
