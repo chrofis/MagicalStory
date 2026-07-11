@@ -1357,7 +1357,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       promptForEval = `COVER NOTE: a book-cover portrait. Do not deduct for characters facing or looking at the viewer, or for the title being flat 2D rather than three-dimensional.\n\n${promptForEval}`;
 
       if (expectedText) {
-        promptForEval = `⚠️ TEXT RULES FOR THIS IMAGE (HARD FAIL):\nAllowed text: "${expectedText}" — and NOTHING else.\nScore MUST be 0 if ANY of the following are true:\n- The allowed text is missing or misspelled (even one wrong letter).\n- The image shows ANY other text anywhere (character names, labels, watermarks, captions, extra words, stray letters on clothing or signs).\nIf the only text on the image is exactly the allowed text, evaluate normally.\n\nWhen you flag a text issue, use these severities:\n- Title or expected text missing/misspelled (any character difference) → severity: CRITICAL.\n- Other unrequested text on the cover (random labels, signs, captions) → severity: MAJOR.\n\nBefore reporting a title misspelling, RE-READ the rendered text letter-by-letter against the allowed text above. Report a mismatch ONLY if you can quote the exact rendered string and it differs from the allowed text. If you are uncertain whether the rendering matches, do NOT flag it.\n\n${promptForEval}`;
+        promptForEval = `⚠️ TEXT RULES FOR THIS IMAGE:\nAllowed text: "${expectedText}" — and nothing else prominent.\nSeverities for text issues:\n- Allowed text missing or misspelled (any character difference) → severity: CATASTROPHIC.\n- Other prominent unrequested text on the cover (labels, captions, watermarks, extra words) → severity: MAJOR.\n- Small incidental in-world signage in the background → do not flag; if garbled → severity: MINOR.\nIf the only text on the image is exactly the allowed text, evaluate normally.\n\nBefore reporting a title misspelling, RE-READ the rendered text letter-by-letter against the allowed text above. Report a mismatch ONLY if you can quote the exact rendered string and it differs from the allowed text. If you are uncertain whether the rendering matches, do NOT flag it.\n\n${promptForEval}`;
       }
     }
 
@@ -1777,12 +1777,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
-      // For covers, classify text issues by severity. The eval prompt at
-      // line ~1304 tells the model:
-      //   - title missing/misspelled         → severity CRITICAL
-      //   - stray unrequested text (a letter
-      //     a kid holds, a shop sign, a label) → severity MAJOR
-      // The two need different handling:
+      // For covers, classify text issues by severity. The eval prompt's
+      // TEXT RULES block above tells the model:
+      //   - title missing/misspelled          → severity CATASTROPHIC
+      //   - other prominent unrequested text  → severity MAJOR
+      //   - small incidental signage          → not flagged (MINOR if garbled)
+      // (CRITICAL matched too for evals stored before the graded-severity
+      // change.) The buckets need different handling:
       //   TITLE_ERROR — full regen; no inpaint can paint a missing title.
       //   STRAY_TEXT  — flows through the normal repair path. Inpaint can
       //                 paint over the unwanted-text region instead of
@@ -1796,7 +1797,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         const textRelated = fixableIssues.filter(i =>
           i?.type === 'rendered_text' || TEXT_RE.test(i?.description || '')
         );
-        if (textRelated.some(i => String(i?.severity || '').toUpperCase() === 'CRITICAL')) {
+        if (textRelated.some(i => /catastrophic|critical/i.test(String(i?.severity || '')))) {
           textIssue = 'TITLE_ERROR';
         } else if (textRelated.length > 0) {
           textIssue = 'STRAY_TEXT';

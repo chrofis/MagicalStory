@@ -1239,3 +1239,34 @@ server/routes/regeneration.js, server/routes/stories.js,
 server/routes/admin/database.js, scripts/admin/recompute-active-versions.js,
 tests/unit/version-manager.test.ts, tests/unit/active-version-recompute.test.ts,
 tests/manual/test-save-merge.js.
+
+## 2026-07-11 — Rendered-text severity is graded: small in-world signage ok, large/wrong text catastrophic
+**Context:** Commit 5792322e (2026-06-07) made every rendered-text leak flat
+CRITICAL so the redo gate would fire ("Holzbank am Stadtturm" painted on a
+bench shipped at 70 ≥ 60). Flat-CRITICAL over-penalised harmless in-world
+signage (a shop sign, a book spine) the same as a garbled caption across the
+sky.
+**Decision:** Owner rule: "minor text on signs is acceptable, large wrong
+text is catastrophic." Graded severities in `image-evaluation.txt`:
+incidental small plausible in-world signage → not flagged (MINOR if
+garbled); prominent/large text, wrong or garbled words,
+captions/watermarks/story-text painted into the image → CATASTROPHIC. Same
+grading applied to `character_marking` (avatar back-panel artifact):
+obvious/prominent marking → CATASTROPHIC, subtle/ambiguous → CRITICAL. Cover
+TEXT RULES block (`images.js` `evaluateImageQuality`): title
+missing/misspelled → CATASTROPHIC (the title is the point of a cover); other
+prominent unrequested text → MAJOR (inpaintable STRAY_TEXT path); the old
+"Score MUST be 0" sentence dropped (the model's numeric score is
+audit-only). The "so the redo gate fires" clauses were deleted — under the
+math scale a CATASTROPHIC (−50) lands the page ≤ 50 < 60 and fires the redo
+arithmetically; `decideRepairMethod` also routes any catastrophic-severity
+issue to iterate (commit "catastrophic severity routes like critical").
+**Rationale:** Grading restores the intended effect (real text leaks always
+redo) without nuking pages for a legible shop sign that belongs in the
+scene. Supersedes the flat-CRITICAL rule from 5792322e.
+**Touched:**
+- `prompts/image-evaluation.txt` — §3 rendered-text definition, STEP 0
+  catastrophic trigger list, STEP 3 RENDERED TEXT + CHARACTER MARKING blocks
+- `server/lib/images.js` — cover TEXT RULES injected block; TITLE_ERROR
+  classifier matches CATASTROPHIC|CRITICAL (old stored evals)
+**Status:** ✅ active (supersedes commit 5792322e's flat-CRITICAL rule).
