@@ -5225,6 +5225,23 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               const charReqs = storyData.clothingRequirements[characterName];
               if (charReqs?.costumed?.used && charReqs.costumed.costume) {
                 pageClothing = `costumed:${charReqs.costumed.costume}`;
+              } else {
+                // Covers have no persisted per-page clothing, so this chain
+                // used to fall through to 'standard' — the repair then sent
+                // the standard avatar and Grok redressed the character out
+                // of the story outfit (staging back-cover, 2026-07-11).
+                // Resolve like cover generation does: parse the description,
+                // else take the single category the story actually uses.
+                const parsed = parseClothingCategory(sceneImage.description || '', false);
+                const usedCats = ['winter', 'summer', 'standard'].filter(k => charReqs?.[k]?.used);
+                if (parsed) {
+                  pageClothing = parsed;
+                } else if (usedCats.length === 1) {
+                  pageClothing = usedCats[0];
+                }
+                if (pageClothing !== 'standard') {
+                  log.info(`👕 [CHAR REPAIR] ${characterName} on page ${pageNumber}: no persisted clothing — resolved "${pageClothing}" (${parsed ? 'parsed from description' : 'single used category'})`);
+                }
               }
             }
           }

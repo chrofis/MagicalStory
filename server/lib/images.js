@@ -10309,13 +10309,15 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // magenta line pixels.
     const hatchOnly = await sharp(Buffer.from(hatchSvg)).png().toBuffer();
 
-    // Fetch the figure's silhouette mask via the shared helper (rembg,
-    // alpha=255 inside figure, 0 outside). Used to clip the crosshatch to
-    // the figure shape.
+    // Fetch the figure's silhouette mask (alpha=255 inside figure, 0
+    // outside), used to clip the crosshatch to the figure shape. Backend-
+    // selectable: box-prompted MobileSAM (targets the single figure — the
+    // hatch region IS the figure bbox, so the prompt box is the full crop)
+    // with rembg fallback.
     const hatchCrop = await sharp(paddedScene)
       .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
       .jpeg({ quality: 90 }).toBuffer();
-    let silhouetteMaskBuf = await fetchSilhouettePng(hatchCrop);
+    let silhouetteMaskBuf = await fetchFigureMaskPng(hatchCrop, [0, 0, hatchWidth, hatchHeight]);
     if (!silhouetteMaskBuf) {
       log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge unavailable — falling back to rectangular hatch`);
     }
