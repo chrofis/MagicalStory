@@ -648,7 +648,16 @@ async function generateCoverViaComposite({
   for (let i = 0; i < n; i++) {
     const me = visualIdentifier(i, n, figures[i].age);
     let pose;
-    if (i === centerIdx) {
+    if (n === 1) {
+      // Single-figure cover (front covers are main-only) — no neighbour
+      // exists, so the centre default "holding hands with the figure to the
+      // immediate right" would order an impossible pose (phantom-figure
+      // risk). Solo with prop: present it; solo without: relaxed open
+      // portrait.
+      pose = propName
+        ? `BOTH HANDS hold the ${propName} up at chest height, both hands visibly gripping it and the object clearly presented to the viewer. Body squared to the camera. NOT arms-at-sides.`
+        : `Standing naturally facing the viewer, arms relaxed at the sides, hands visible, warm confident posture.`;
+    } else if (i === centerIdx) {
       pose = propName
         ? `BOTH HANDS hold the ${propName} up at chest height, both hands visibly gripping it and the object clearly presented to the viewer. Body squared to the camera. NOT arms-at-sides.`
         : `Holding hands with the figure to the immediate right. Body squared to camera. NOT arms-at-sides.`;
@@ -799,7 +808,7 @@ PRESERVE EXACTLY:
 DO NOT regenerate the scene. DO NOT shift the landmark. DO NOT add or remove characters. DO NOT add frames, borders, or vignettes.`
     : `PASS 1: REPOSE FIGURES ONLY.
 
-The first input image shows ${n} character cutouts on a plain background. The figures are pasted with ARMS AT THEIR SIDES — this is wrong, and your only job is to redraw their poses per the lines below. Keep the plain background. Keep every face/hair/skin/clothing exactly. Just change the poses.
+The first input image shows ${n} character cutout${n === 1 ? '' : 's'} on a plain background. ${n === 1 && !propName ? 'Redraw the pose per the line below.' : 'The figures are pasted with ARMS AT THEIR SIDES — this is wrong, and your only job is to redraw their poses per the lines below.'} Keep the plain background. Keep every face/hair/skin/clothing exactly. Just change the poses.
 ${actionSection}${propRefSection}${vbGridSection}
 ═══ POSE REDRAW (mandatory — do every line) ═══
 ${POSES.join('\n')}
@@ -808,7 +817,7 @@ PRESERVE: every face, hair colour, skin tone, clothing detail, every prop, plain
 
 DO NOT add or remove characters. DO NOT add a landscape, sky, ground, buildings, foliage, or any scenic background — no forest, no street, no room. The background stays plain (white, gray, or a flat neutral tone — any of these are acceptable since pass 2 composites onto the real landmark photo and rembg cleanly separates figures from any plain background). NO TEXT, no signage, no letters anywhere.
 
-If any figure still has arms at their sides, the task has failed. If the background contains a scene (forest, street, building, sky with clouds, etc.) instead of staying plain, the task has failed.`;
+${n === 1 && !propName ? '' : 'If any figure still has arms at their sides, the task has failed. '}If the background contains a scene (forest, street, building, sky with clouds, etc.) instead of staying plain, the task has failed.`;
 
   // Final scrub — post-VEH001 rule: every prompt path runs
   // sanitizeVbIdsInPrompt before the image model sees it. Resolves any
