@@ -438,10 +438,14 @@ function buildGridRepairPrompt(manifest) {
   ).join('\n');
 
   const template = getRepairPromptTemplate();
-  return template
-    .replace('{ISSUE_COUNT}', manifest.issues.length)
-    .replace('{LETTERS}', manifest.issues.map(i => i.letter).join(', '))
-    .replace('{INSTRUCTIONS}', instructions);
+  // fillTemplate — global + $-safe (fix instructions can carry $-sequences;
+  // a string .replace would mangle them and only fill the first occurrence).
+  const { fillTemplate } = require('../services/prompts');
+  return fillTemplate(template, {
+    ISSUE_COUNT: manifest.issues.length,
+    LETTERS: manifest.issues.map(i => i.letter).join(', '),
+    INSTRUCTIONS: instructions,
+  });
 }
 
 /**

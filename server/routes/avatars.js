@@ -259,7 +259,10 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
           contents: [{
             parts: [
               {
-                text: (PROMPT_TEMPLATES.characterAnalysis || `Analyze this image of a person for a children's book illustration system. Return JSON with traits (age, gender, height, build, face, hair). Be specific about colors.`).replace('{LANGUAGE_INSTRUCTION}', languageInstruction)
+                text: fillTemplate(
+                  PROMPT_TEMPLATES.characterAnalysis || `Analyze this image of a person for a children's book illustration system. Return JSON with traits (age, gender, height, build, face, hair). Be specific about colors.`,
+                  { LANGUAGE_INSTRUCTION: languageInstruction }
+                )
               },
               {
                 inlineData: {

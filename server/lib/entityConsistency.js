@@ -13,7 +13,7 @@ const fs = require('fs');
 const os = require('os');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { createLabeledGrid, escapeXml } = require('./repairGrid');
-const { PROMPT_TEMPLATES } = require('../services/prompts');
+const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { log } = require('../utils/logger');
 const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersInScene, buildHairDescription, extractJsonFromText } = require('./storyHelpers');
 const { getFacePhoto, loadAvatarBytes } = require('./characterPhotos');
@@ -1983,15 +1983,17 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
     clothingContextInfo = lines.join('\n');
   }
 
-  // Fill template
-  const prompt = promptTemplate
-    .replace('{ENTITY_TYPE}', entityType)
-    .replace('{ENTITY_NAME}', entityName)
-    .replace(/\{ENTITY_NAME\}/g, entityName)  // Replace all occurrences
-    .replace('{REFERENCE_PHOTO_INFO}', refPhotoInfo)
-    .replace('{CLOTHING_CONTEXT}', clothingContextInfo)
-    .replace('{CELL_INFO}', JSON.stringify(cellInfo, null, 2))
-    .replace('{CELL_COUNT}', cellCount.toString());
+  // Fill template — fillTemplate is global + $-safe (entityName is
+  // user-derived; a chained string .replace would interpret $-sequences
+  // and only hit the first occurrence).
+  const prompt = fillTemplate(promptTemplate, {
+    ENTITY_TYPE: entityType,
+    ENTITY_NAME: entityName,
+    REFERENCE_PHOTO_INFO: refPhotoInfo,
+    CLOTHING_CONTEXT: clothingContextInfo,
+    CELL_INFO: JSON.stringify(cellInfo, null, 2),
+    CELL_COUNT: cellCount.toString(),
+  });
 
   try {
     const model = genAI.getGenerativeModel({

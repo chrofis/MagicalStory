@@ -491,9 +491,12 @@ async function validateComposition(sceneJson, imageDescription) {
   // Format scene JSON for the prompt
   const sceneJsonStr = typeof sceneJson === 'string' ? sceneJson : JSON.stringify(sceneJson, null, 2);
 
-  const fullPrompt = COMPARISON_PROMPT
-    .replace('{SCENE_JSON}', sceneJsonStr)
-    .replace('{IMAGE_DESCRIPTION}', imageDescription);
+  // fillTemplate — global + $-safe (sceneJsonStr is a JSON payload; a
+  // string .replace would mangle any $-sequence inside it).
+  const fullPrompt = fillTemplate(COMPARISON_PROMPT, {
+    SCENE_JSON: sceneJsonStr,
+    IMAGE_DESCRIPTION: imageDescription,
+  });
 
   const result = await model.generateContent(fullPrompt);
 
