@@ -2580,7 +2580,9 @@ function parseSceneHintMetadata(sceneHint) {
     const charBlock = charsMatch[1].trim();
     if (charBlock.includes('\n') && /^[-*]\s*\w/m.test(charBlock)) {
       const charEntries = [];
-      const linePattern = /^[-*]\s*([^:\r\n]+:\s*(?:standard|winter|summer|formal|costumed:[^\r\n,]+))/gim;
+      // Bare `costumed` accepted (optional `:type` / `:{type}` suffix) — same
+      // canonical clothing-token pattern as outlineParser/shared.js:117-126.
+      const linePattern = /^[-*]\s*([^:\r\n]+:\s*(?:standard|winter|summer|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+))?))/gim;
       let lineMatch;
       while ((lineMatch = linePattern.exec(charBlock)) !== null) {
         charEntries.push(lineMatch[1].trim());
@@ -4067,7 +4069,11 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
   let lockedPerspectivesText = '';
   if (rawOutlineContext?.currentPage) {
     const lockEntries = [];
-    const lineRegex = /[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?)\s*:\s*(?:standard|winter|summer|formal|costumed:[^,\r\n]+)((?:\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)+)/gi;
+    // Bare `costumed` accepted (optional `:type` / `:{type}` suffix) — same
+    // canonical clothing-token pattern as outlineParser/shared.js:117-126.
+    // Requiring `costumed:type` silently dropped every bare-costumed
+    // character's depth/perspective/position locks.
+    const lineRegex = /[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?)\s*:\s*(?:standard|winter|summer|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+))?)((?:\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)+)/gi;
     let lockMatch;
     const seen = new Set();
     while ((lockMatch = lineRegex.exec(rawOutlineContext.currentPage)) !== null) {
@@ -4435,8 +4441,10 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     const rawForLock = rawOutlineContext?.currentPage || '';
     if (rawForLock) {
       const lockEntries = [];
-      // Match each Characters: line that has perspective or depth annotations
-      const lineRegex = /[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?)\s*:\s*(?:standard|winter|summer|formal|costumed:[^,\r\n]+)((?:\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)+)/gi;
+      // Match each Characters: line that has perspective or depth annotations.
+      // Bare `costumed` accepted (optional `:type` / `:{type}` suffix) — same
+      // canonical clothing-token pattern as outlineParser/shared.js:117-126.
+      const lineRegex = /[-*]?\s*([^(:\r\n]+(?:\([^)]*\))?)\s*:\s*(?:standard|winter|summer|formal|costumed(?::(?:\{[^}]*\}|[^\r\n,]+))?)((?:\s*,\s*(?:depth|perspective|position)\s*:\s*[^,\r\n]+)+)/gi;
       let lockMatch;
       const seen = new Set();
       while ((lockMatch = lineRegex.exec(rawForLock)) !== null) {
