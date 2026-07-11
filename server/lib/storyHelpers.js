@@ -1174,7 +1174,7 @@ function buildLandmarkFidelityBlock(landmark) {
 **IDENTITY:**
 - Preserve the silhouette, architectural details, distinctive features, and overall proportions exactly as in the photo. Do NOT stylize away its identity. Someone who has seen the real building must immediately recognise it.
 
-**EXCLUDE modern intrusions visible in the photo:** cars, parked vehicles, traffic signs, road markings, street lights, utility poles, power lines, billboards, commercial advertising, shopfront price tags, plastic bins, satellite dishes, air conditioners, modern pedestrians. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure. Keep the landmark itself unchanged; only remove the modern surroundings.`;
+**EXCLUDE:** modern-era elements visible in the photo per the STORY ERA rule. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure. Keep the landmark itself unchanged; only remove the modern surroundings.`;
 }
 
 /**
