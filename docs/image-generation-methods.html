@@ -22,7 +22,8 @@
     <li><a href="#aspect">5. Aspect-ratio behaviour by provider</a></li>
     <li><a href="#dispatch">6. Dispatch &amp; override layers</a></li>
     <li><a href="#routing">7. Routing — when each method works best</a></li>
-    <li><a href="#history">8. Why-not table (rejected approaches)</a></li>
+    <li><a href="#clothing">8. Clothing source of truth</a></li>
+    <li><a href="#history">9. Why-not table (rejected approaches)</a></li>
   </ol>
 </nav>
 
@@ -462,7 +463,36 @@
 
 <p>Next roadmap step on routing: replace the global <code>enableSceneComposite</code> with a cast-size-aware dispatcher that picks direct vs composite per page based on the resolved cast count + complexity flag, per the table at the top of this section.</p>
 
-<h2 id="history">8. Why-not table</h2>
+<h2 id="clothing">8. Clothing source of truth</h2>
+
+<p>Per-story <code>clothingRequirements</code> (from the unified outline) is the ONE canonical
+clothing source for this story; <code>character.avatars.clothing[category]</code> is
+character-level metadata that goes stale across stories. Fixed 2026-07-11
+(commit <code>5888643d</code>) after the entity eval — fed raw stored clothing by
+<code>buildCharacterDescriptionsForBbox</code> — flagged correct story outfits on every
+page + cover and repainted the cover back into stored clothes (see
+<code>docs/decisions.md</code> same date).</p>
+
+<ul>
+<li>Clothing TEXT for any eval/repair/prompt: call
+  <code>buildClothingDescription(char, category, artStyle, clothingRequirements)</code>
+  (entityConsistency.js) — never read <code>avatars.clothing</code> directly.</li>
+<li>Any read of <code>clothingRequirements[name]</code> goes through
+  <code>resolveCharacterReqs</code> (clothingCategories.js) — outline name drift
+  (case/whitespace) is real and a silent miss falls back to stale stored clothing.</li>
+<li>Clothing category keys are canonicalized by <code>normalizeClothingCategory</code>;
+  <code>getStyledAvatarForClothing</code> normalizes at entry. Repair paths resolve the
+  page's stored clothing (<code>resolvePageClothingCategory</code>) before defaulting
+  to <code>'standard'</code>.</li>
+<li>Cover prompts carry a per-character <code>**CLOTHING**</code> block
+  (<code>buildCharacterReferenceList(…, {includeClothing:true})</code>) — cover scene prose
+  has no clothing, so without it the outfit rode on reference pixels alone.</li>
+<li>Ref image and prompt text must resolve clothing from the same source; the
+  desync branches in <code>getCharacterPhotoDetails</code> / <code>applyStyledAvatars</code> log
+  WARN/ERROR when they diverge.</li>
+</ul>
+
+<h2 id="history">9. Why-not table</h2>
 
 <p>Approaches we tried, evaluated, and dropped — so future "let's just use X" suggestions can be checked against actual evidence.</p>
 
