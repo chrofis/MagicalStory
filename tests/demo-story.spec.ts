@@ -965,6 +965,14 @@ test.describe('Demo Story Generation', () => {
     // showcase orchestrator to log in as the freshly-provisioned per-run account.
     const loginEmail = process.env.DEMO_EMAIL || family.email;
     console.log(`Step 0: Setting language + logging in as ${loginEmail}...`);
+    // Page counts below the public minimum (10) exist only in developer mode
+    // (WizardStep3BookSettings: minPages = developerMode ? 4 : 10) — the
+    // slider rejects fill("4") otherwise. Requires an admin account (e.g. the
+    // smoke-test account); non-admins ignore the flag.
+    if (STORY_PAGES < 10) {
+      console.log(`  DEMO_PAGES=${STORY_PAGES} < 10 — enabling developer_mode (admin account required)`);
+      await page.addInitScript(() => window.localStorage.setItem('developer_mode', 'true'));
+    }
     await preSeedLanguage(page, entry.language, baseURL || 'https://magicalstory.ch');
     await loginAs(page, loginEmail, DEMO_PASSWORD);
 
