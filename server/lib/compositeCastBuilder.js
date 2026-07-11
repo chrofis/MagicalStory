@@ -256,7 +256,8 @@ function splitCastByStratum(cast) {
  * delegates to buildCompositeCast so the avatar resolution + lazy 2×4 sheet
  * generation logic stays in one place. Covers' equivalent of scene
  * `interactions[]` is `coverHint.characterDetails[name] = { name, holds,
- * gazesAt, priority }` — same shape, different source.
+ * priority }` — same shape, different source. (gazesAt may exist on old
+ * stored stories — ignored; cover gaze is code-owned, always the viewer.)
  *
  * Ordering: when coverHint.characters has explicit positions ("Name (left
  * foreground)"), parseExplicitSequence resolves them; otherwise we fall
@@ -306,8 +307,10 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
     ? coverHint._artifactNames
     : {};
 
-  // Map holds + gazesAt → action phrase. Same wording as
-  // coverComposite.js:650-681 so the two paths produce comparable cast actions.
+  // Map holds → action phrase. Same wording as coverComposite so the two
+  // paths produce comparable cast actions. Cover gaze is code-owned
+  // (decision 2026-07-11): always the viewer — any parsed `gazes at:` value
+  // (old stored stories) is ignored.
   const buildAction = (d) => {
     if (!d) return null;
     const parts = [];
@@ -320,20 +323,8 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
         parts.push(`holds ${holds}`);
       }
     }
-    const gaze = String(d.gazesAt || '').trim();
-    if (gaze) {
-      const m = gaze.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
-      if (m && artNames[m[1].toUpperCase()]) {
-        parts.push(`eyes fixed on the ${artNames[m[1].toUpperCase()]}`);
-      } else if (/^the viewer$/i.test(gaze)) {
-        parts.push('eyes on the viewer');
-      } else if (/^the distance$/i.test(gaze)) {
-        parts.push('eyes looking off into the distance');
-      } else {
-        parts.push(`eyes on ${gaze}`);
-      }
-    }
-    return parts.length > 0 ? parts.join(', ') : null;
+    parts.push('eyes on the viewer');
+    return parts.join(', ');
   };
 
   const interactions = [];

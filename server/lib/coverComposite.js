@@ -30,7 +30,8 @@
  *        - else: gender-alternated centre-out arrangement (main → child → adult)
  *   4. Composite figures + prop onto a WHITE canvas (pass 1 input).
  *   5. Pass 1 → Grok edit, prompt = strict pose-redraw only,
- *      action lines from coverHint.characterDetails (holds + gazesAt + priority).
+ *      action lines from coverHint.characterDetails (holds + priority;
+ *      gaze is code-owned — always the viewer).
  *      VB grid attached as a second image so artifact references are visible.
  *   6. Cut figures from pass 1 result via rembg.
  *   7. Composite cutout onto the landmark photo (pass 2 input).
@@ -666,7 +667,8 @@ async function generateCoverViaComposite({
   //
   // PRIMARY SOURCE: coverHint.characterDetails — the structured per-character
   // data the outline parser populates from the cover hint. Each entry carries
-  // { position, clothing, holds (ART###), gazesAt, priority }. This is one
+  // { position, clothing, holds (ART###), priority } (gazesAt may exist on
+  // old stored stories — ignored; cover gaze is always the viewer). This is one
   // step from Sonnet's outline, no Haiku scene-expansion intermediary, no
   // prose lossy round-trip.
   //
@@ -681,35 +683,22 @@ async function generateCoverViaComposite({
     .sort((a, b) => (PRIO_RANK[a.priority] ?? 1) - (PRIO_RANK[b.priority] ?? 1));
   for (const d of detailEntries) {
     const holds = String(d.holds || '').trim();
-    const gaze = String(d.gazesAt || '').trim();
     const prio = String(d.priority || 'normal').toLowerCase();
-    if ((!holds || holds.toLowerCase() === 'nothing') && !gaze) continue;
+    // Cover gaze is code-owned (decision 2026-07-11): covers are head-on
+    // portraits, every figure looks at the viewer — the POSES lines below
+    // enforce it. Any parsed `gazes at:` value (old stored stories) is
+    // ignored; action lines carry the holds phrase only.
+    if (!holds || holds.toLowerCase() === 'nothing') continue;
     // Resolve ART### references to the artifact's name when known.
-    let holdsPhrase = '';
-    if (holds && holds.toLowerCase() !== 'nothing') {
-      const artMatch = holds.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
-      if (artMatch && artNames[artMatch[1].toUpperCase()]) {
-        holdsPhrase = `holds the ${artNames[artMatch[1].toUpperCase()]}, both hands visibly gripping it`;
-      } else {
-        holdsPhrase = `holds ${holds}`;
-      }
+    let holdsPhrase;
+    const artMatch = holds.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
+    if (artMatch && artNames[artMatch[1].toUpperCase()]) {
+      holdsPhrase = `holds the ${artNames[artMatch[1].toUpperCase()]}, both hands visibly gripping it`;
+    } else {
+      holdsPhrase = `holds ${holds}`;
     }
-    let gazePhrase = '';
-    if (gaze) {
-      const gazeArtMatch = gaze.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
-      if (gazeArtMatch && artNames[gazeArtMatch[1].toUpperCase()]) {
-        gazePhrase = `eyes fixed on the ${artNames[gazeArtMatch[1].toUpperCase()]}`;
-      } else if (/^the viewer$/i.test(gaze)) {
-        gazePhrase = `eyes on the viewer`;
-      } else if (/^the distance$/i.test(gaze)) {
-        gazePhrase = `eyes looking off into the distance`;
-      } else {
-        gazePhrase = `eyes on ${gaze}`;
-      }
-    }
-    const action = [holdsPhrase, gazePhrase].filter(Boolean).join(', ');
     const prioTag = prio === 'essential' ? ' [ESSENTIAL]' : prio === 'low' ? ' [low]' : '';
-    interactionLines.push(`- ${d.name}${prioTag}: ${action}`);
+    interactionLines.push(`- ${d.name}${prioTag}: ${holdsPhrase}`);
   }
   // Legacy fallback: parse scene-metadata interactions[] when no structured
   // details came through.
@@ -895,25 +884,20 @@ If any figure still has arms at their sides, the task has failed. If the backgro
     .replace(/\s+\n/g, '\n')
     .trim();
   // When no prose (structured-only outline), synthesize a short atmospheric
-  // paragraph from coverHint so pass-2 still has gaze + mood reinforcement.
+  // paragraph from coverHint so pass-2 still has action + mood reinforcement.
+  // Cover gaze is code-owned (decision 2026-07-11): always the viewer —
+  // any parsed `gazes at:` value is ignored.
   if (!proseForPass2 && (coverHint?.mood || detailEntries.length > 0)) {
     const moodLine = coverHint?.mood ? `Mood: ${coverHint.mood}.` : '';
     const actionPhrases = detailEntries.map(d => {
       const holds = String(d.holds || '').trim();
-      const gaze = String(d.gazesAt || '').trim();
       let phrase = d.name;
       if (holds && holds.toLowerCase() !== 'nothing') {
         const m = holds.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
         const name = m && artNames[m[1].toUpperCase()] ? artNames[m[1].toUpperCase()] : holds;
         phrase += ` holds the ${name}`;
       }
-      if (gaze) {
-        const m = gaze.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
-        const target = m && artNames[m[1].toUpperCase()]
-          ? `the ${artNames[m[1].toUpperCase()]}`
-          : (/^the (viewer|distance)$/i.test(gaze) ? gaze : gaze);
-        phrase += `, eyes on ${target}`;
-      }
+      phrase += ', eyes on the viewer';
       return phrase + '.';
     });
     proseForPass2 = [moodLine, ...actionPhrases].filter(Boolean).join(' ');
@@ -935,7 +919,7 @@ PRESERVE EXACTLY:
 - Every building, window, roofline, doorway — they are correct in the input.
 - Every figure's pose, face, hair, skin tone, clothing.
 - Every prop's silhouette and material.
-- Every figure's GAZE DIRECTION — if a character is looking down at a held prop in the input, they are still looking down at that prop in the output. Do NOT redirect any gaze toward the camera.
+- Every figure's GAZE — each figure keeps looking straight at the viewer (covers are head-on portraits). Do NOT redirect any gaze down at props or at other figures.
 
 DO NOT redraw or reposition buildings. DO NOT replace the landmark with a generic city. DO NOT change which figures appear or their order. DO NOT add new objects, animals, or extra characters. NOT photoreal — watercolor texture only.${textLine ? '' : ' NO text, no signage, no letters anywhere.'}${sceneSectionPass2}`;
 

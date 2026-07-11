@@ -3591,14 +3591,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               const holdsName = holdsArt ? (resolveId(holdsArt[0])?.name || holdsRaw) : holdsRaw;
               holdsPhrase = ` holding ${holdsName}`;
             }
-            const gazes = (d.gazesAt || '').toString().trim();
-            let gazePhrase = '';
-            if (gazes) {
-              const gazeArt = gazes.match(/(LOC|ART|ANI|VEH|CHR|CLO)\d+/i);
-              const gazeTarget = gazeArt ? (resolveId(gazeArt[0])?.name || gazes) : gazes;
-              gazePhrase = `, gazing at ${gazeTarget}`;
-            }
-            return `${baseName}${pos}${holdsPhrase}${gazePhrase}`;
+            // Cover gaze is code-owned (decision 2026-07-11): covers are
+            // head-on portraits — every figure looks at the viewer. Any
+            // parsed `gazes at:` value (old stored stories) is ignored.
+            return `${baseName}${pos}${holdsPhrase}, gazing at the viewer`;
           }).filter(Boolean);
           if (charLines.length > 0) {
             const moodPhrase = hint.mood ? `, ${hint.mood} mood` : '';

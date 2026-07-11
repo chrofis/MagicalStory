@@ -868,15 +868,16 @@ Each cover is a STRUCTURED render spec, not a prose paragraph. The fields below 
 - **LIST EVERY CHARACTER BY NAME.** Never write "the family", "everyone", "the group", "his family behind him". List each one: `- CharacterA ...`, `- CharacterF ...`.
 - **CLOTHING:** must be one of `standard | winter | summer | costumed` AND must be a category this character has marked `used: true` in their `clothingRequirements`. If the story has any costumed clothing, all cover characters MUST use the costumed variant.
 - **HOLDS:** exactly one item per character (each character has 2 hands but a cover needs one focal prop per figure). Value is an ART### from `Objects:` or the word `nothing`. Never list 2+ items for the same character.
-- **GAZES AT:** every character gazes at `the viewer`. A cover is a head-on portrait and its figures look straight at the camera — this is the one place camera-gaze is wanted. Do not aim cover gazes at props or at other characters.
 - **PRIORITY:** every character is `essential | normal | low`. Essential = central action, dramatic beat (the held prop, the key gesture). Normal = supporting. Low = decorative / atmospheric / there for inclusion only. Higher-priority characters get more compositional weight.
 - **MOOD:** one short phrase (2-5 words) describing the emotional tone of the cover (`wonder and discovery`, `quiet triumph`, `warm reunion`, `mischief unleashed`). Drives atmosphere matching, not literal rendering.
 - **No `perspective` or `depth`** on covers — every cover character faces the viewer and is fully visible. If you can't fit everyone, drop the least-essential, don't hide them in the background.
 
-**Field shape (each character, one line):**
-`- Name (position): clothing, holds: ART### or nothing, gazes at: <target>, priority: <essential|normal|low>`
+Covers are head-on portraits — every figure faces the camera; rendering handles gaze.
 
-Example: `- CharacterC (center-left foreground): costumed, holds: ART005, gazes at: ART005, priority: essential`
+**Field shape (each character, one line):**
+`- Name (position): clothing, holds: ART### or nothing, priority: <essential|normal|low>`
+
+Example: `- CharacterC (center-left foreground): costumed, holds: ART005, priority: essential`
 
 **Title Page**
 (Front cover — what readers see first.)
@@ -885,8 +886,8 @@ ONLY main characters: {MAIN_CHARACTER_NAMES}
 Mood: [one phrase]
 Objects: [LOC### + 1-2 ART### refs that define the cover's visual identity]
 Characters:
-- [MainChar1] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
-- [MainChar2] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
+- [MainChar1] (position): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
+- [MainChar2] (position): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
 
 **Initial Page**
 (Dedication page — group portrait of who's in the story.)
@@ -895,9 +896,9 @@ Pick **UP TO 5** of the most important characters from {MAIN_CHARACTER_NAMES} an
 Mood: [one phrase]
 Objects: [LOC### + 1-2 ART### refs]
 Characters (MAX 5):
-- [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
-- [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
-- [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
+- [Name] (position): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
+- [Name] (position): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
+- [Name] (position): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
 
 **Back Cover**
 (Group portrait of the whole cast at the story's happy conclusion.)
@@ -906,9 +907,9 @@ Pick **UP TO 5** of the most important characters from {MAIN_CHARACTER_NAMES} an
 Mood: [one phrase]
 Objects: [LOC### + 1-2 ART### refs]
 Characters (MAX 5):
-- [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
-- [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
-- [Name] (position): [clothing], holds: [ART### or nothing], gazes at: [target], priority: [essential|normal|low]
+- [Name] (position): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
+- [Name] (position): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
+- [Name] (position): [clothing], holds: [ART### or nothing], priority: [essential|normal|low]
 
 ---STORY PAGES---
 **CRITICAL: NO Visual Bible IDs in story text.** [LOC001], [ART001], [CHR001], [ANI001], [VEH001], [CLO001] etc. are for the Visual Bible JSON and scene hints ONLY. Story text must use natural names ("the old tower", "her amulet") — never bracket IDs.

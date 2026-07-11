@@ -1270,3 +1270,33 @@ scene. Supersedes the flat-CRITICAL rule from 5792322e.
 - `server/lib/images.js` — cover TEXT RULES injected block; TITLE_ERROR
   classifier matches CATASTROPHIC|CRITICAL (old stored evals)
 **Status:** ✅ active (supersedes commit 5792322e's flat-CRITICAL rule).
+
+## 2026-07-11 — Cover gaze is code-owned: `gazes at:` removed from cover hints, always the viewer
+**Context:** The cover-hint per-character `gazes at:` field created a
+three-way conflict (finding #21): the outline could aim a gaze at a prop
+(`gazes at: ART005`), the composite POSES lines hardcoded "Eyes wide OPEN
+looking straight at the viewer", and pass-2 said "do NOT redirect any gaze
+toward the camera". The prompt rule already said every cover gaze must be
+`the viewer` — a field whose only valid value is a constant is not data.
+**Decision:** The field is removed from the cover-hint spec in
+`story-unified.txt` (rule bullet, field shape, example, all template
+lines); one scene-level sentence states covers are head-on portraits.
+Rendering owns gaze: every cover consumer hardcodes "the viewer" /
+"gazing at the viewer" and ignores any parsed `gazesAt` value. Parsers
+(outlineParser/shared.js + unified.js) still ACCEPT `gazes at:` on
+bullets — old stored stories and model habit — the value is simply unused
+on covers. Scene-page gaze semantics (facing-vs-gaze rules,
+interactions[]) are untouched.
+**Rationale:** One owner per fact. Extends the logged viewer-gaze rule
+from prompt-enforced to code-owned; the pass-2 "preserve gaze" line now
+agrees (keep looking at the viewer) instead of contradicting.
+**Touched:**
+- `prompts/story-unified.txt` — cover section (rule deleted, shape/example/
+  templates stripped, portrait sentence added)
+- `server.js` — streaming cover prose composer (constant gaze)
+- `server/lib/coverIterate.js` — buildCoverSceneFromHint (constant gaze,
+  resolveGazeTarget removed)
+- `server/lib/coverComposite.js` — STORY ACTION lines (holds only), pass-2
+  synth prose (constant gaze), pass-2 PRESERVE line aligned
+- `server/lib/compositeCastBuilder.js` — buildAction (constant gaze)
+**Status:** ✅ active (extends "cover portraits: viewer-gaze not a defect").

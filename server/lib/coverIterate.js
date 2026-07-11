@@ -818,7 +818,8 @@ async function buildCoverReferences({
  *
  * This REPLACES the previous Haiku scene-expansion call for covers. The
  * outline already produced everything we need (mood + objects + per-
- * character details with holds/gazesAt/priority); this function templates
+ * character details with holds/priority — gaze is code-owned, always the
+ * viewer); this function templates
  * those structured fields into the SCENE string the cover prompt templates
  * (frontCover.txt / initialPage*.txt / backCover.txt) expect.
  *
@@ -857,18 +858,6 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
     if (art?.name) artMap[o.toUpperCase()] = art.name;
   }
 
-  // Resolve gaze targets — same artifact-name lookup, plus pass-through for
-  // viewer / distance / another character's name.
-  const resolveGazeTarget = (gazesAt) => {
-    if (!gazesAt) return '';
-    const trimmed = String(gazesAt).trim();
-    const m = trimmed.match(/^(ART\d+)/i);
-    if (m && artMap[m[1].toUpperCase()]) return `the ${artMap[m[1].toUpperCase()]}`;
-    if (/^the (viewer|camera)$/i.test(trimmed)) return 'the viewer';
-    if (/^the distance$/i.test(trimmed)) return 'into the distance';
-    return trimmed; // a character name or freeform target
-  };
-
   // Sort characters by priority (essential first, then normal, then low) so
   // the most important figures lead the prose.
   const PRIO_RANK = { essential: 0, normal: 1, low: 2 };
@@ -892,9 +881,10 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
       : '';
     const intro = physTraits ? `${d.name}, ${physTraits},` : `${d.name}`;
 
-    // Action: holds + gaze, resolved.
+    // Action: holds resolved; gaze is code-owned (decision 2026-07-11):
+    // covers are head-on portraits, every figure looks at the viewer. Any
+    // parsed `gazes at:` value (old stored stories) is ignored.
     const holds = String(d.holds || '').trim();
-    const gaze = String(d.gazesAt || '').trim();
     const parts = [];
     if (pos) parts.push(`stands ${pos}`);
     if (holds && holds.toLowerCase() !== 'nothing') {
@@ -902,10 +892,7 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
       const name = m && artMap[m[1].toUpperCase()] ? artMap[m[1].toUpperCase()] : holds;
       parts.push(`holds the ${name}`);
     }
-    if (gaze) {
-      const target = resolveGazeTarget(gaze);
-      if (target) parts.push(`eyes on ${target}`);
-    }
+    parts.push('eyes on the viewer');
     return `${intro} ${parts.join(', ')}.`;
   });
 
