@@ -34,6 +34,7 @@ Compare apparent age AND body proportions between IMAGE 1 and IMAGE 2.
 `ageMatch.score` is a single 1-10 number combining age category + body proportions.
 
 TASK 3: CLOTHING MATCH (only if REQUESTED_CLOTHING is given below)
+REQUESTED_CLOTHING: {REQUESTED_CLOTHING}
 Compare the avatar's visible clothing against REQUESTED_CLOTHING.
 - Completely wrong clothing (e.g. requested medieval jerkin but rendered modern t-shirt) = score 1-3.
 - Right type but wrong colour or missing pieces = 4-6.

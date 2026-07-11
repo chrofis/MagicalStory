@@ -444,12 +444,16 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
     const avatarBase64 = avatarBytes.toString('base64');
     const avatarMime = 'image/jpeg';
 
-    let evalPrompt = PROMPT_TEMPLATES.avatarEvaluation || 'Compare these two faces. Rate similarity 1-10. Output: FINAL SCORE: [number]';
-
-    // Append clothing match task when requested clothing description is provided
-    if (requestedClothing) {
-      evalPrompt += `\n\nTASK 5: CLOTHING MATCH\nThe avatar was requested to wear: "${requestedClothing}"\nScore 1-10 how well the generated avatar's clothing matches this request (10 = perfect match).\nAdd to your JSON response: "clothingMatch": {"score": 8, "reason": "explanation"}`;
-    }
+    // The template's TASK 3 owns the clothing-match check — fill its
+    // REQUESTED_CLOTHING placeholder; '(not provided)' keeps the template's
+    // no-clothing branch (clothingMatch: null, excluded from finalScore)
+    // intact. Previously the call site appended a SECOND conflicting
+    // "TASK 5: CLOTHING MATCH" block onto a template that already had
+    // TASK 3 CLOTHING MATCH and its own TASK 5 (clothing extraction).
+    const evalPrompt = fillTemplate(
+      PROMPT_TEMPLATES.avatarEvaluation || 'Compare these two faces. Rate similarity 1-10. Output: FINAL SCORE: [number]',
+      { REQUESTED_CLOTHING: requestedClothing ? `"${requestedClothing}"` : '(not provided)' }
+    );
 
     const requestBody = {
       contents: [{
