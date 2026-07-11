@@ -9265,9 +9265,24 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   log.info(`👤 [CHAR REPAIR GROK] Starting ${method} repair for ${charName} at bbox [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}]`);
 
   // Crop character reference to front column only for styled avatars (2-column grid: front | side)
-  // Raw photos are single images — cropping cuts the person in half
-  const avatarBase64 = r2Lib.stripDataUriPrefix(characterPhoto);
-  const avatarBuffer = Buffer.from(avatarBase64, 'base64');
+  // Raw photos are single images — cropping cuts the person in half.
+  // Like imageData below, characterPhoto may be an https:// R2 URL after the
+  // avatar migration — stripDataUriPrefix passes URLs through unchanged and
+  // Buffer.from(url, 'base64') decodes to ~60 bytes of noise, which reached
+  // Grok as a 0KB reference and 400'd every repair (staging 2026-07-10).
+  let avatarBuffer;
+  if (typeof characterPhoto === 'string' && /^https?:\/\//i.test(characterPhoto)) {
+    const r2 = require('./r2');
+    avatarBuffer = await r2.fetchImageBytes(characterPhoto);
+    if (!avatarBuffer) {
+      throw new Error(`Failed to fetch character reference from R2: ${characterPhoto}`);
+    }
+  } else {
+    avatarBuffer = Buffer.from(r2Lib.stripDataUriPrefix(characterPhoto), 'base64');
+  }
+  if (!avatarBuffer || avatarBuffer.length < 1000) {
+    throw new Error(`Character reference for ${charName} is empty/invalid (${avatarBuffer?.length || 0} bytes) — refusing to send to Grok`);
+  }
   const isAvatarGrid = options.photoType && (options.photoType.startsWith('styled-') || options.photoType.startsWith('costumed-') || options.photoType.startsWith('clothing-'));
   const croppedAvatar = isAvatarGrid ? await cropToFrontColumn(avatarBuffer) : avatarBuffer;
   const croppedAvatarDataUri = `data:image/jpeg;base64,${croppedAvatar.toString('base64')}`;

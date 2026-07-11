@@ -486,8 +486,20 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory)
   const resolveStyled = async (v) => {
     if (!v) return null;
     if (typeof v === 'string') {
-      // Legacy plain base64 (with or without data: prefix)
-      return v.startsWith('data:') ? v : `data:image/jpeg;base64,${v}`;
+      if (v.startsWith('data:')) return v;
+      // Post-R2-migration shape: the slot is a plain https URL string. The
+      // old base64 wrap turned it into `data:image/jpeg;base64,https://...`,
+      // which decoded to ~60 bytes of noise and 400'd every Grok repair that
+      // used a styled avatar (staging 2026-07-10).
+      if (/^https?:\/\//i.test(v)) {
+        if (_styledFetchCache[v] !== undefined) return _styledFetchCache[v];
+        const buf = await fetchImageBytes(v);
+        const result = buf ? `data:image/jpeg;base64,${buf.toString('base64')}` : null;
+        _styledFetchCache[v] = result;
+        return result;
+      }
+      // Legacy plain base64 (no data: prefix)
+      return `data:image/jpeg;base64,${v}`;
     }
     if (typeof v === 'object') {
       if (typeof v.imageData === 'string' && v.imageData.length > 0) {
@@ -2766,7 +2778,11 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
       return { success: false, error: `No bbox found for ${charName} on page ${pageNumber}` };
     }
 
-    const avatarDataUri = styledAvatar.startsWith('data:') ? styledAvatar : `data:image/jpeg;base64,${styledAvatar}`;
+    // URLs pass through untouched — repairCharacterMismatchWithGrok fetches
+    // them. Blind-wrapping a URL as base64 made a ~60-byte garbage reference.
+    const avatarDataUri = (styledAvatar.startsWith('data:') || /^https?:\/\//i.test(styledAvatar))
+      ? styledAvatar
+      : `data:image/jpeg;base64,${styledAvatar}`;
     const sceneDesc = storyData.sceneDescriptions?.find(s => s.pageNumber === pageNumber)?.description || '';
     const whiteoutTarget = useBodyBox ? 'body' : 'face';
 
