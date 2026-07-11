@@ -149,7 +149,15 @@ function normalizeIssues(rawIssues, source) {
  * @returns {{quality, semantic, compliance, entity}}
  */
 function composeDeductions({ evalResult = null, entityResult = null } = {}) {
-  const quality    = normalizeIssues(evalResult?.fixableIssues, 'quality');
+  // evaluateImageQuality merges threeStageResult.fixableIssues into
+  // evalResult.fixableIssues for display (tagged `source: 'three-stage'`,
+  // images.js). The compliance bucket below reads threeStageResult directly —
+  // the single source for those issues — so drop the merged copies from the
+  // quality bucket or every compliance issue is deducted twice.
+  const qualityRaw = Array.isArray(evalResult?.fixableIssues)
+    ? evalResult.fixableIssues.filter(i => i?.source !== 'three-stage')
+    : evalResult?.fixableIssues;
+  const quality    = normalizeIssues(qualityRaw, 'quality');
   const semantic   = normalizeIssues(evalResult?.semanticResult?.semanticIssues, 'semantic');
   const compliance = normalizeIssues(evalResult?.threeStageResult?.fixableIssues
                                   || evalResult?.threeStageResult?.issues, 'compliance');
@@ -248,7 +256,13 @@ function _buildBreakdownFromEvalResult(evalResult, entityResult) {
       ? evalResult.qualityScore
       : (typeof evalResult.score === 'number' ? evalResult.score : 0),
     reasoning: evalResult.reasoning || null,
-    issues: Array.isArray(evalResult.fixableIssues) ? evalResult.fixableIssues : [],
+    // Same filter as composeDeductions: three-stage issues merged into
+    // fixableIssues are listed on the threeStage card below — keep the
+    // visual card to genuine quality-eval findings so the dev panel
+    // doesn't show each compliance issue twice.
+    issues: Array.isArray(evalResult.fixableIssues)
+      ? evalResult.fixableIssues.filter(i => i?.source !== 'three-stage')
+      : [],
   } : { score: 0, reasoning: null, issues: [] };
   const semantic = evalResult?.semanticResult ? {
     score: typeof evalResult.semanticResult.score === 'number' ? evalResult.semanticResult.score : 0,

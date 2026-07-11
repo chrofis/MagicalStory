@@ -10,6 +10,7 @@ const {
   composeEvalScore,
   composeFinalScore,
   applyScoreBreakdown,
+  applyScore,
   pickBestVersionIndex,
   shouldRedo,
   SCORE_THRESHOLDS,
@@ -89,6 +90,28 @@ test('stamps evalScore + entityPenalty + finalScore on version', () => {
   assert.strictEqual(v.entityPenalty, 20);
   assert.strictEqual(v.finalScore, 50);
   assert.deepStrictEqual(v.scoreBreakdown, bd);
+});
+
+console.log('\napplyScore — compliance issues counted once');
+test('three-stage issue merged into fixableIssues is deducted once, not twice', () => {
+  // evaluateImageQuality merges threeStageResult.fixableIssues into the
+  // returned fixableIssues list, tagged source:'three-stage'. composeDeductions
+  // must not count those copies in the quality bucket on top of the
+  // compliance bucket (which reads threeStageResult directly).
+  const tsIssue = { description: 'guard missing from the marketplace scene', severity: 'CRITICAL', type: 'compliance', source: 'three-stage' };
+  const evalResult = {
+    qualityScore: 75,
+    fixableIssues: [tsIssue],                                  // merged display copy
+    threeStageResult: { score: 75, fixableIssues: [tsIssue] }, // single source
+  };
+  const v = {};
+  applyScore(v, { evalResult });
+  assert.strictEqual(v.finalScore, 75);  // 100 − 25 once, not 100 − 50
+  assert.strictEqual(v.deductions.quality.length, 0);
+  assert.strictEqual(v.deductions.compliance.length, 1);
+  // Dev panel breakdown: visual card must not re-list the three-stage issue
+  assert.strictEqual(v.scoreBreakdown.visual.issues.length, 0);
+  assert.strictEqual(v.scoreBreakdown.threeStage.issues.length, 1);
 });
 
 console.log('\npickBestVersionIndex');
