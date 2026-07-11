@@ -9077,6 +9077,66 @@ async function resizeGrokToSceneDims(grokBuffer, sceneWidth, sceneHeight) {
 }
 
 /**
+ * Round-trip a full-scene buffer through Grok's edit endpoint WITHOUT scale
+ * drift. Grok only returns preset aspect ratios; when the scene's own aspect
+ * sits between presets (square-book pages, some covers), resizing the output
+ * back cover-crops — a uniform scale+shift misregistration that scene-space
+ * blend masks can't tolerate, and that the translation-only registration
+ * guard correctly refuses to "fix". Instead: mirror-pad the scene to EXACTLY
+ * the closest preset before the call and unpad afterwards — every original
+ * pixel returns to its original coordinates by construction.
+ *
+ * @param {string} prompt
+ * @param {string[]} referenceUris - data URIs placed BEFORE the scene slot
+ * @param {Buffer} sceneBuf - the (whited-out / hatched) scene to edit
+ * @param {number} sceneW  @param {number} sceneH
+ * @param {object} [opts]  - encode: 'jpeg'|'png' for the padded scene (png
+ *                           keeps hatch/whiteout edges crisp), plus any
+ *                           editWithGrok passthrough options.
+ * @returns {Promise<{buffer: Buffer|null, grokResult: object, aspectStr: string}>}
+ *          buffer is at exactly sceneW×sceneH.
+ */
+async function grokEditSceneExact(prompt, referenceUris, sceneBuf, sceneW, sceneH, opts = {}) {
+  const { encode = 'jpeg', ...grokOptions } = opts;
+  const aspectStr = closestGrokAspect(sceneW, sceneH);
+  const [aw, ah] = aspectStr.split(':').map(Number);
+  const target = aw / ah;
+  const current = sceneW / sceneH;
+  let padLeft = 0, padRight = 0, padTop = 0, padBottom = 0;
+  if (current < target - 1e-6) {
+    const targetW = Math.round(sceneH * target);
+    padLeft = Math.floor((targetW - sceneW) / 2);
+    padRight = targetW - sceneW - padLeft;
+  } else if (current > target + 1e-6) {
+    const targetH = Math.round(sceneW / target);
+    padTop = Math.floor((targetH - sceneH) / 2);
+    padBottom = targetH - sceneH - padTop;
+  }
+  const changed = (padLeft + padRight + padTop + padBottom) > 0;
+  const paddedW = sceneW + padLeft + padRight;
+  const paddedH = sceneH + padTop + padBottom;
+  let paddedBuf = sceneBuf;
+  if (changed) {
+    const pipeline = sharp(sceneBuf).extend({ top: padTop, bottom: padBottom, left: padLeft, right: padRight, extendWith: 'mirror' });
+    paddedBuf = encode === 'png'
+      ? await pipeline.png().toBuffer()
+      : await pipeline.jpeg({ quality: 92 }).toBuffer();
+    log.info(`📐 [CHAR REPAIR GROK] Scene ${sceneW}x${sceneH} mirror-padded to ${paddedW}x${paddedH} (preset ${aspectStr}) — exact-aspect round-trip`);
+  }
+  const mime = encode === 'png' ? 'image/png' : 'image/jpeg';
+  const sceneUri = `data:${mime};base64,${paddedBuf.toString('base64')}`;
+  const grokResult = await editWithGrok(prompt, [...referenceUris, sceneUri], { aspectRatio: aspectStr, skipOutputPadding: true, ...grokOptions });
+  if (!grokResult.imageData) return { buffer: null, grokResult, aspectStr };
+  // Same-aspect proportional resize (no crop), then strip the padding.
+  let out = Buffer.from(r2Lib.stripDataUriPrefix(grokResult.imageData), 'base64');
+  out = await resizeGrokToSceneDims(out, paddedW, paddedH);
+  if (changed) {
+    out = await sharp(out).extract({ left: padLeft, top: padTop, width: sceneW, height: sceneH }).jpeg({ quality: 95 }).toBuffer();
+  }
+  return { buffer: out, grokResult, aspectStr };
+}
+
+/**
  * Detect a border that Grok ADDED to its output that wasn't in the input.
  * Compares border of both images — returns content box only when output has
  * significantly more border than input.
@@ -9634,25 +9694,20 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         })
       : `This is a children's book illustration. All character faces have been blurred. Redraw ALL blurred faces to look like ${charName} from the reference photo. Match face, hair, skin tone exactly. CRITICAL: preserve the original expression (look at body language and scene context — match the emotion, do not default to a smile) and gaze direction (do not make the character face the camera if they were not). Bodies, poses and clothing are fully visible — preserve these. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}`;
 
-    // Pick the closest Grok-supported preset to the scene's actual aspect so
-    // editWithGrok's internal pad loop doesn't letterbox the scene to 1:1
-    // (which then makes Grok return a square image, which our resize back to
-    // the non-square scene would stretch). Grok only accepts specific preset
-    // ratios for edits — can't pass raw "1024:768".
-    const sceneAspectStr = closestGrokAspect(sceneMeta.width, sceneMeta.height);
-    log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), head ${faceBbox ? 'blurred' : 'intact'}, scene=${sceneMeta.width}x${sceneMeta.height} (aspect preset=${sceneAspectStr}), sending to Grok...`);
-    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, sceneDataUri], { aspectRatio: sceneAspectStr, skipOutputPadding: true });
+    // C. Exact-aspect round-trip: mirror-pad the scene to the closest Grok
+    // preset, edit, unpad. Off-preset scenes (square books, some covers)
+    // otherwise come back at the preset aspect and the cover-crop recovery
+    // introduces a uniform scale drift the scene-space blend masks below
+    // can't tolerate (staging back-cover 864x1222 vs 2:3, 2026-07-11).
+    log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), head ${faceBbox ? 'blurred' : 'intact'}, scene=${sceneMeta.width}x${sceneMeta.height}, sending to Grok...`);
+    const exact = await grokEditSceneExact(prompt, [croppedAvatarDataUri], sceneForGrok, sceneMeta.width, sceneMeta.height, { encode: 'jpeg' });
+    const grokResult = exact.grokResult;
 
-    if (!grokResult.imageData) {
+    if (!exact.buffer) {
       log.warn('⚠️ [CHAR REPAIR GROK] No image in Grok response');
       return { imageData: null, character: charName, method };
     }
-
-    // C. Decode Grok result. Resize to scene dimensions aspect-preserving
-    // (fit:'inside') and letterbox-crop if Grok returned a slightly
-    // different aspect. Never fit:'fill' — that stretches the image.
-    let grokBuffer = Buffer.from(r2Lib.stripDataUriPrefix(grokResult.imageData), 'base64');
-    grokBuffer = await resizeGrokToSceneDims(grokBuffer, sceneMeta.width, sceneMeta.height);
+    let grokBuffer = exact.buffer;
 
     // C2. Registration guard: Grok redraws the page freehand and the resize
     // back to scene dims can center-crop — both shift the content a few px.
@@ -10654,15 +10709,16 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         })
       : `Inpaint task: paint ${charName} into this children's book illustration. Magenta marks (at the ${regionDesc}) show what to repaint — crosshatch over body, solid block over face. Replace ALL magenta with ${charName} from the reference photo.${actionContext}\n\nPreserve the exact figure count. Do not add, remove, or duplicate any character — only the marked area is repainted.\n\nMatch the reference's face, hair, skin tone, and build. Preserve framing — do not zoom in or crop. Keep other characters and background unchanged.${clothingContext}${issueContext}${artStyleContext}`;
 
-    // Step 7 — send to Grok at the scene's native aspect.
-    const sceneAspectStr = closestGrokAspect(sceneMeta.width, sceneMeta.height);
-    log.info(`👤 [CHAR REPAIR GROK] Sending inpaint canvas ${paddedW}x${paddedH} to Grok (aspect=${sceneAspectStr})`);
-    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, `data:image/png;base64,${masked.toString('base64')}`], {
-      aspectRatio: sceneAspectStr,
-      skipOutputPadding: true,
-    });
+    // Step 7 — send to Grok via the exact-aspect round-trip (mirror-pad to
+    // the closest preset, edit, unpad) so off-preset scenes come back with
+    // every pixel at its original coordinates — the feather composite below
+    // works in scene space and can't tolerate the cover-crop scale drift.
+    // PNG keeps the magenta hatch edges crisp.
+    log.info(`👤 [CHAR REPAIR GROK] Sending inpaint canvas ${paddedW}x${paddedH} to Grok`);
+    const exact = await grokEditSceneExact(prompt, [croppedAvatarDataUri], masked, sceneMeta.width, sceneMeta.height, { encode: 'png' });
+    const grokResult = exact.grokResult;
 
-    if (!grokResult.imageData) {
+    if (!exact.buffer) {
       log.warn(`⚠️ [CHAR REPAIR GROK] No image in Grok response (inpaint mode)`);
       return { imageData: null, character: charName, method };
     }
@@ -10688,16 +10744,15 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     //
     // The user can also force feather OFF via options.featherComposite=false
     // for A/B debugging (rare; the auto-detect handles the normal case).
-    const grokRawBuf = Buffer.from(r2Lib.stripDataUriPrefix(grokResult.imageData), 'base64');
+    // exact.buffer is already at scene dims and in register (exact-aspect
+    // round-trip above) — no resize/crop recovery needed.
+    const grokRawBuf = exact.buffer;
     const featherEnabled = options.featherComposite !== false;
     let finalBuf;
     let featherDecision = 'OFF (no silhouette)';
 
     if (silhouetteMaskBuf && featherEnabled) {
-      // Resize Grok output to source dims so we can compare like-for-like
-      // and (later) composite at scene dims. Aspect-aware — same helper
-      // the blended branch uses.
-      const grokAtSourceDims = await resizeGrokToSceneDims(grokRawBuf, sceneMeta.width, sceneMeta.height);
+      const grokAtSourceDims = grokRawBuf;
 
       // Fitness check: silhouette the Grok output's hatch crop → new
       // silhouette. Compare alpha pixel-by-pixel against the old silhouette.
