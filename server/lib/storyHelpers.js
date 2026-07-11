@@ -5327,12 +5327,15 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
     // Build avatar selection section (only if costume available)
     let avatarSelection = '';
     if (costume) {
+      // Bare `costumed` — the flat clothing enum (one costume per character
+      // per story; the specific costume lives in clothingRequirements, not
+      // in the enum value). `costumed:subtype` was legacy shape.
       avatarSelection = `# Avatar Selection
 The main character has two avatar styles available:
 - \`standard\` — everyday modern clothes
-- \`costumed:${costume.costumeType}\` — ${costume.description}
+- \`costumed\` — ${costume.description}
 
-**IMPORTANT**: The MAJORITY of scenes (at least 3 out of 5) MUST use \`costumed:${costume.costumeType}\` for the main character's clothing in scene hints. Use \`standard\` only for 1-2 scenes where it makes narrative sense (e.g., before a transformation, or a brief real-world moment).`;
+**IMPORTANT**: The MAJORITY of scenes (at least 3 out of 5) MUST use \`costumed\` for the main character's clothing in scene hints. Use \`standard\` only for 1-2 scenes where it makes narrative sense (e.g., before a transformation, or a brief real-world moment).`;
     }
 
     // Build landmarks instruction for the visual bible.
