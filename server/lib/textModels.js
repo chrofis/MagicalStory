@@ -998,7 +998,7 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
     // Use 16000 tokens (same as image evaluation) to avoid truncation.
     // callTextModel(prompt, maxTokens, modelOverride, options) — pass the
     // model id in the override slot, not the options slot.
-    const result = await callTextModel(prompt, 16000, modelToUse);
+    const result = await callTextModel(prompt, 16000, modelToUse, { usageLabel: 'text_check' });
 
     if (!result?.text) {
       log.warn('⚠️  [TEXT CHECK] No response from text model');

@@ -2883,7 +2883,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       tokenUsage.byFunction[functionName].thinking_tokens += usage?.thinking_tokens || 0;
       tokenUsage.byFunction[functionName].calls += 1;
       tokenUsage.byFunction[functionName].provider = provider;
-      if (modelName) tokenUsage.byFunction[functionName].models.add(modelName);
+      // Coerce to a string id — a mis-wired caller can pass a model OBJECT,
+      // which otherwise renders as "[object Object]" in the api_usage log.
+      if (modelName) tokenUsage.byFunction[functionName].models.add(typeof modelName === 'string' ? modelName : (modelName.modelId || modelName.model || String(modelName)));
       // Accumulate direct_cost on byFunction entries that support it
       if (usage?.direct_cost != null && tokenUsage.byFunction[functionName].direct_cost !== undefined) {
         tokenUsage.byFunction[functionName].direct_cost += usage.direct_cost;
@@ -3913,15 +3915,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
 
         // Usage tracker for cover images
-        const coverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
-          if (imgUsage) {
-            const isRunware = imgModel && imgModel.startsWith('runware:');
-            const isGrok = imgModel && imgModel.startsWith('grok-imagine');
-            const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
-            addUsage(provider, imgUsage, 'cover_images', imgModel);
-          }
-          if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
-        };
+        // generateImageWithQualityRetry now emits provider-style usage
+        // (image → cover_images, quality → cover_quality) directly via the
+        // tracker, so pass addUsage straight through.
+        const coverUsageTracker = addUsage;
 
         // Build cover references via the shared helper — same one iterate uses,
         // so v0 / iterate / legacy streaming all share one source of truth.
@@ -6575,12 +6572,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Calculate image costs using per-image pricing (not token-based)
     const byFunc = tokenUsage.byFunction;
     const getModels = (func) => Array.from(func.models).join(', ') || func.provider || 'unknown';
-    const imageCost = ['cover_images', 'page_images', 'avatar_styled', 'avatar_costumed']
-      .reduce((sum, fn) => sum + (byFunc[fn]?.calls > 0 ? calculateImageCost(getModels(byFunc[fn]), byFunc[fn].calls) : 0), 0);
-    // Grok/Runware direct costs are already included in imageCost via calculateImageCost — use these for logging only
+    const getCostModel = (func) => func.models?.size > 0 ? Array.from(func.models)[0] : (func.provider || 'anthropic');
+    // Per-function cost — the SAME logic the api_usage events use, so the
+    // headline totalCost is exactly the sum of the per-call breakdown. The old
+    // formula summed provider aggregates + a hardcoded 4-bucket imageCost and
+    // dropped every Grok direct-cost bucket (composite, scale_repair, char_fix)
+    // — under-reporting the true cost.
+    const IMAGE_FN = ['cover_images', 'page_images', 'avatar_styled', 'avatar_costumed'];
+    const functionCost = (funcName, func) => {
+      if (!(func?.calls > 0)) return 0;
+      if ((func.direct_cost || 0) > 0) return func.direct_cost;
+      if (IMAGE_FN.includes(funcName)) return calculateImageCost(getModels(func), func.calls);
+      return calculateCost(getCostModel(func), func.input_tokens, func.output_tokens, func.thinking_tokens).total;
+    };
+    const imageCost = IMAGE_FN.reduce((sum, fn) => sum + (byFunc[fn]?.calls > 0 ? calculateImageCost(getModels(byFunc[fn]), byFunc[fn].calls) : 0), 0);
     const grokDirectCost = tokenUsage.grok?.direct_cost || 0;
     const runwareDirectCost = tokenUsage.runware?.direct_cost || 0;
-    const totalCost = anthropicCost.total + geminiTextCost.total + imageCost + geminiQualityCost.total;
+    // Authoritative total = sum of every per-function cost (== sum of the
+    // api_usage events emitted below).
+    const totalCost = Object.entries(byFunc).reduce((sum, [fn, fd]) => sum + functionCost(fn, fd), 0);
 
     log.debug(`📊 [UNIFIED] Token usage & cost summary:`);
     log.debug(`   BY PROVIDER:`);
@@ -6600,8 +6610,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // Log by function
     log.debug(`   BY FUNCTION:`);
-    // Use first model for cost calculation (model-specific pricing), fall back to provider
-    const getCostModel = (func) => func.models?.size > 0 ? Array.from(func.models)[0] : (func.provider || 'anthropic');
+    // getCostModel + functionCost defined above (shared with totalCost).
 
     if (byFunc.unified_story?.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.unified_story), byFunc.unified_story.input_tokens, byFunc.unified_story.output_tokens, byFunc.unified_story.thinking_tokens);
@@ -6710,21 +6719,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Log API usage to generationLog BEFORE saving story (so it's included in the saved data)
     genLog.setStage('finalize');
     log.debug(`📊 [UNIFIED] Logging API usage to generationLog. Functions with calls:`);
-    // Image generation functions use per-image pricing, not token-based
-    const IMAGE_FUNCTIONS = ['cover_images', 'page_images', 'avatar_styled', 'avatar_costumed'];
+    let emittedCostSum = 0;
     for (const [funcName, funcData] of Object.entries(byFunc)) {
       log.debug(`   - ${funcName}: ${funcData.calls} calls, ${funcData.input_tokens} in, ${funcData.output_tokens} out, thinking: ${funcData.thinking_tokens || 0}`);
       if (funcData.calls > 0) {
         const model = getModels(funcData);
         const directCost = funcData.direct_cost || 0;
-        let cost;
-        if (directCost > 0) {
-          cost = directCost;
-        } else if (IMAGE_FUNCTIONS.includes(funcName)) {
-          cost = calculateImageCost(model, funcData.calls);
-        } else {
-          cost = calculateCost(getCostModel(funcData), funcData.input_tokens, funcData.output_tokens, funcData.thinking_tokens).total;
-        }
+        // Same helper that computes totalCost — per-event cost and the headline
+        // total are identical by construction.
+        const cost = functionCost(funcName, funcData);
+        emittedCostSum += cost;
         log.debug(`   >>> genLog.apiUsage('${funcName}', '${model}', {in: ${funcData.input_tokens}, out: ${funcData.output_tokens}}, cost: $${cost.toFixed(4)})`);
         genLog.apiUsage(funcName, model, {
           inputTokens: funcData.input_tokens,
@@ -6732,6 +6736,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           thinkingTokens: funcData.thinking_tokens,
           directCost: directCost
         }, cost);
+      }
+    }
+    // Reconciliation guard — surfaces future accounting drift instead of it
+    // silently returning. (1) headline totalCost must equal the sum of the
+    // emitted per-call costs; (2) each token provider's total must equal the
+    // sum of its per-function buckets — a mismatch means a call recorded to a
+    // provider total but not to any bucket (or vice-versa).
+    if (Math.abs(emittedCostSum - totalCost) > 0.001) {
+      log.warn(`⚠️ [ACCOUNTING] totalCost $${totalCost.toFixed(4)} != sum of per-call costs $${emittedCostSum.toFixed(4)} — cost breakdown drift`);
+    }
+    for (const prov of ['anthropic', 'gemini_text', 'gemini_quality']) {
+      const pt = tokenUsage[prov]; if (!pt) continue;
+      let binp = 0, bout = 0;
+      for (const fd of Object.values(byFunc)) {
+        if (fd.provider === prov) { binp += fd.input_tokens || 0; bout += fd.output_tokens || 0; }
+      }
+      if (Math.abs(binp - (pt.input_tokens || 0)) > 1 || Math.abs(bout - (pt.output_tokens || 0)) > 1) {
+        log.warn(`⚠️ [ACCOUNTING] ${prov}: provider total ${pt.input_tokens}/${pt.output_tokens} != bucket sum ${binp}/${bout} — a call escaped per-function tracking`);
       }
     }
     // Add total cost summary to generation log
@@ -7464,8 +7486,9 @@ async function _processStoryJobImpl(jobId) {
       func.direct_cost = (func.direct_cost || 0) + (usage.direct_cost || 0);
       func.calls += 1;
       func.provider = provider; // Track actual provider used
+      // Coerce to a string id (a mis-wired caller can pass a model object).
       if (modelName) {
-        func.models.add(modelName);
+        func.models.add(typeof modelName === 'string' ? modelName : (modelName.modelId || modelName.model || String(modelName)));
       }
     }
   };

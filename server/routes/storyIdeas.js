@@ -457,7 +457,7 @@ ${landmarkEntries}`;
     const modelToUse = (req.user.role === 'admin' && ideaModel) ? ideaModel : modelDefaults.idea;
 
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
-    const result = await callTextModel(prompt, 6000, modelToUse);
+    const result = await callTextModel(prompt, 6000, modelToUse, { usageLabel: 'story_ideas' });
 
     // Parse the response to extract 2 ideas
     // Support multiple formats: [FINAL_1], ## STORY 1, STORY 1:, etc.

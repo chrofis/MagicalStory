@@ -1097,7 +1097,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // Stage 2 uses Sonnet — Haiku didn't reliably follow the "ignore prose
     // decoration unless it's a DECLARED INTERACTION" rule and kept flagging
     // false-positive gaze/facing issues that drove pointless repair rounds.
-    const sonnetResult = await callTextModel(complianceInput, 4096, 'claude-sonnet');
+    const sonnetResult = await callTextModel(complianceInput, 4096, 'claude-sonnet', { usageLabel: 'semantic_compliance' });
 
     stage2Usage = {
       input_tokens: sonnetResult.usage?.input_tokens || 0,
@@ -2354,7 +2354,7 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
       log.info(`🔲 [BBOX-DETECT] ${pageLabel}Using Claude vision: ${modelId}`);
       const { callTextModel } = require('./textModels');
       const imageDataUri = `data:${mimeType};base64,${base64Data}`;
-      const claudeResult = await callTextModel(prompt, 16000, modelId, { images: [imageDataUri] });
+      const claudeResult = await callTextModel(prompt, 16000, modelId, { images: [imageDataUri], usageLabel: 'bbox_detect' });
       if (!claudeResult?.text) {
         log.warn('⚠️  [BBOX-DETECT] Claude returned no text response');
         return null;
@@ -11328,9 +11328,21 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       const qualityModelOverride = modelOverrides?.qualityModel || null;
       const imageBackendOverride = modelOverrides?.imageBackend || null;
       result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos, sceneCharacterCount, visualBibleGrid, storyText, sceneHint, sceneBackground, aspectRatioOverride, sceneCharacters);
-      // Track usage if tracker provided
+      // Track usage. usageTracker is the provider-style addUsage(provider,
+      // usage, fn, model). Emit image + quality as separate provider calls.
+      // (Was a legacy 2-usage signature `(imgUsage, qualUsage, imgModel,
+      // qualModel)` that only the cover wrapper implemented — callers passing
+      // addUsage directly produced a bogus 'grok-imagine-image' bucket once
+      // dynamic buckets were added.)
       if (usageTracker && result) {
-        usageTracker(result.imageUsage, result.qualityUsage, result.modelId, result.qualityModelId);
+        if (result.imageUsage) {
+          const m = result.modelId || '';
+          const imgProvider = m.startsWith('runware:') ? 'runware' : m.startsWith('grok-imagine') ? 'grok' : 'gemini_image';
+          usageTracker(imgProvider, result.imageUsage, evaluationType === 'cover' ? 'cover_images' : 'page_images', result.modelId);
+        }
+        if (result.qualityUsage) {
+          usageTracker('gemini_quality', result.qualityUsage, evaluationType === 'cover' ? 'cover_quality' : 'page_quality', result.qualityModelId);
+        }
       }
     } catch (error) {
       // Check if this is a safety/content block error
