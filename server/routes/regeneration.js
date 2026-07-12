@@ -4300,6 +4300,85 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
   }
 });
 
+// TEMP DEBUG — compare raw batched vs per-figure GroundingDINO on a stored page.
+// Admin-only. Runs both methods (no collision guard, no Gemini fallback) so the
+// caller sees exactly what each method locates + every per-figure score. Scoped
+// to characters actually on the page (sceneCharacters). Remove after debugging.
+router.post('/:id/debug-gdino/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && !req.user.impersonating) {
+      return res.status(403).json({ error: 'Admin only' });
+    }
+    const { id, pageNum } = req.params;
+    const pageNumber = parseInt(pageNum);
+    if (isNaN(pageNumber)) return res.status(400).json({ error: 'Invalid page number' });
+
+    const storyResult = await getPool().query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+    let storyData = typeof storyResult.rows[0].data === 'string'
+      ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
+    storyData = await rehydrateActivePageImage(id, storyData, pageNumber);
+
+    const scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+    const imageData = scene?.imageData;
+    if (!scene || !imageData?.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'No valid image for this page' });
+    }
+
+    // Present characters only (the exact scoping the generation pipeline uses).
+    const sceneMeta = scene.sceneMetadata || extractSceneMetadata(scene.description || '');
+    const present = Array.isArray(scene.sceneCharacters) && scene.sceneCharacters.length
+      ? scene.sceneCharacters
+      : Object.keys(sceneMeta?.characterPositions || {});
+    const chars = present
+      .map(name => (storyData.characters || []).find(c => c.name === name))
+      .filter(Boolean);
+    if (!chars.length) return res.status(400).json({ error: 'No present characters resolved' });
+
+    const prompts = chars.map(c => ({ name: c.name, text: buildCharacterPhysicalDescription(c) || c.name }));
+    const analyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+    const callGdino = async (ps) => {
+      const r = await fetch(`${analyzerUrl}/detect-figures-text`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageData, prompts: ps }),
+      });
+      if (!r.ok) throw new Error(`gdino HTTP ${r.status}`);
+      return r.json();
+    };
+    const normFig = (name, box, W, H) => box ? {
+      name, bodyBox: [box[1] / H, box[0] / W, box[3] / H, box[2] / W],
+    } : { name, bodyBox: null };
+
+    // Batched: one call, all prompts. Per-figure: one call per prompt.
+    const batched = await callGdino(prompts);
+    const perFigureRaw = [];
+    for (const p of prompts) perFigureRaw.push((await callGdino([p])).figures?.[0] || { name: p.name, box: null, score: null });
+
+    const bW = batched.width, bH = batched.height;
+    const scoreTable = chars.map(c => {
+      const bf = (batched.figures || []).find(f => f.name === c.name) || {};
+      const pf = perFigureRaw.find(f => f.name === c.name) || {};
+      return { name: c.name, batchedScore: bf.score ?? null, perFigureScore: pf.score ?? null };
+    });
+
+    const batchedDet = { figures: chars.map(c => normFig(c.name, ((batched.figures || []).find(f => f.name === c.name) || {}).box, bW, bH)).filter(f => f.bodyBox) };
+    const perFigureDet = { figures: perFigureRaw.map(f => normFig(f.name, f.box, bW, bH)).filter(f => f.bodyBox) };
+
+    const [batchedOverlay, perFigureOverlay] = await Promise.all([
+      createBboxOverlayImage(imageData, batchedDet),
+      createBboxOverlayImage(imageData, perFigureDet),
+    ]);
+
+    log.info(`🧪 [DEBUG-GDINO] page ${pageNumber}: ${chars.map(c => c.name).join(', ')} | scores ` +
+      scoreTable.map(s => `${s.name} b=${s.batchedScore} pf=${s.perFigureScore}`).join(' | '));
+    return res.json({ pageNumber, present: chars.map(c => c.name), scoreTable, batchedOverlay, perFigureOverlay });
+  } catch (err) {
+    log.error('❌ [DEBUG-GDINO] Failed:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Refresh bbox detection for a single page (runs on active image, saves result)
 router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) => {
   try {
