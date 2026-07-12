@@ -1378,3 +1378,40 @@ pass: pass-1 only, no pass-2), so no re-lettering pass exists.
 input, not an engineering default.
 **Touched:** (none — question only)
 **Status:** 🟡 open product question.
+
+## 2026-07-12 — Text-usage accounting: chokepoint is the single source of truth
+**Context:** Token/cost accounting undercounted Anthropic usage by ~3.5x per
+story (and the Anthropic console showed ~12M tokens/week vs the pipeline's
+logged ~0.7M). Root cause: every Claude/Gemini/xAI text call had to remember
+to call the job's `addUsage()` closure, and most didn't — or only
+conditionally, or into a `byFunction` bucket that had to be pre-declared or the
+entry was silently dropped. Whole stages (scene expansion, phantom patch,
+eval consolidation, VB dedup, and every unlabeled eval/repair Claude call) were
+invisible.
+**Decision:** The two text dispatchers `callTextModel` / `callTextModelStreaming`
+are the ONLY place text usage is recorded. A new AsyncLocalStorage usage context
+(`server/lib/usageContext.js`) holds the running job's sink; the chokepoint
+records every call into it automatically. Guarantees: (1) no call escapes —
+unlabeled calls land under `text_uncategorized`; (2) no double-count — a
+dedup-by-usage-object-identity guard in `addUsage`, plus removal of the two
+`phantom_patch` manual adds (that helper returns a COPY of the usage, the one
+case identity-dedup can't catch); (3) clean breakdown — callers pass
+`options.usageLabel`, and unknown labels auto-create their `byFunction` bucket
+instead of being dropped. Concurrency-safe (per-job async context, mirrors the
+styled-avatar cache scoping), no-op outside a job, never throws into the render.
+**Rationale:** One chokepoint that can't be bypassed beats N scattered
+conditional call sites. Verified on staging (job_1783832998294_vzhyem13c):
+per-story Claude capture rose 88K → 313K; previously-invisible
+`eval_consolidation` (100K) and `text_uncategorized` (140K) now appear; no
+doubling.
+**Touched:** `server/lib/usageContext.js` (new), `server/lib/textModels.js`
+(chokepoint), `server.js` (both addUsage closures: sink + dynamic buckets +
+dedup; removed phantom double-adds; usageLabels), `server/lib/phantomCharacters.js`,
+`server/lib/feedbackConsolidator.js`, `server/lib/images.js`,
+`server/lib/visualBible.js` (internal usageLabels).
+**Follow-up:** `text_uncategorized` (~140K/story) bundles the remaining
+unlabeled Claude eval/repair calls — label them individually if finer
+attribution is wanted. The landmark-indexing batch calls Claude via
+`callAnthropicAPI` directly (bypasses the dispatcher) but runs outside a job,
+so it's out of scope for per-story accounting.
+**Status:** ✅ active.
