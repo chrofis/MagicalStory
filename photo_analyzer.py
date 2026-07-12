@@ -1425,6 +1425,11 @@ def figure_mask_endpoint():
 _gdino_model = None
 _gdino_processor = None
 _gdino_last_used = 0.0
+# Serialize model load AND the transformers import. Per-page detection runs
+# concurrently, so without this lock two threads race `from transformers
+# import ...` on a half-initialised module → "cannot import name AutoProcessor"
+# 503s on the first calls (observed on staging), plus a double 1.9GB load.
+_gdino_lock = threading.Lock()
 # Free the ~1.9GB model after this many idle seconds so we don't pay for RAM
 # 24/7 when detection runs only occasionally (e.g. one story/week on staging).
 # Railway bills actual RAM per minute, so an unloaded model costs nothing.
@@ -1434,16 +1439,23 @@ _GDINO_IDLE_UNLOAD_S = int(os.environ.get('GROUNDINGDINO_IDLE_UNLOAD_S', '600'))
 def get_groundingdino():
     global _gdino_model, _gdino_processor, _gdino_last_used
     _gdino_last_used = time.time()
-    if _gdino_model is None:
-        # transformers is an optional dep — endpoint 503s if missing so Node
-        # falls back to the Gemini bbox.
-        from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
-        model_id = os.environ.get('GROUNDINGDINO_MODEL', 'IDEA-Research/grounding-dino-base')
-        print(f"[GDINO] Loading GroundingDINO ({model_id})...")
-        _gdino_processor = AutoProcessor.from_pretrained(model_id)
-        _gdino_model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id)
-        _gdino_model.eval()
-        print("[GDINO] GroundingDINO loaded")
+    if _gdino_model is not None:
+        return _gdino_model, _gdino_processor
+    with _gdino_lock:
+        # Re-check under the lock — another thread may have loaded it while we waited.
+        if _gdino_model is None:
+            # transformers is an optional dep — endpoint 503s if missing so Node
+            # falls back to the Gemini bbox.
+            from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
+            model_id = os.environ.get('GROUNDINGDINO_MODEL', 'IDEA-Research/grounding-dino-base')
+            print(f"[GDINO] Loading GroundingDINO ({model_id})...")
+            proc = AutoProcessor.from_pretrained(model_id)
+            model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id)
+            model.eval()
+            _gdino_processor = proc
+            _gdino_model = model
+            _gdino_last_used = time.time()
+            print("[GDINO] GroundingDINO loaded")
     return _gdino_model, _gdino_processor
 
 
