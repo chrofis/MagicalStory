@@ -167,9 +167,9 @@ const MODEL_DEFAULTS = {
   // (photo_analyzer /detect-figures-text) text->box from each character's full
   // identity, then MobileSAM (/figure-mask) box->silhouette. Validated 5/5 on a
   // 5-figure page incl. an occluded figure (docs/research-log.html). Free/local
-  // but ~15s/figure CPU + ~1.9GB RAM. Fails open to gemini at every step
-  // (retry-in-dino -> Replicate Grounded-SAM API -> gemini). Env override for
-  // staged rollout; prod stays 'gemini'.
+  // but ~15s/figure CPU + ~1.9GB RAM. Fully local — on a collision it retries
+  // in DINO, else falls back to today's Gemini 2-pass bbox (no external API).
+  // Env override for staged rollout; prod stays 'gemini'.
   figureDetectionBackend: process.env.FIGURE_DETECTION_BACKEND || 'gemini',
 
   // Image generation backend (can be overridden in dev mode)

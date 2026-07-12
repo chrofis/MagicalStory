@@ -2263,8 +2263,9 @@ function getBboxCacheStats() {
 // character's full-identity prose into a box. Stage 2: /figure-mask (MobileSAM)
 // turns the box into the tight silhouette; bodyBox = silhouette bounds. The
 // per-figure masks power the overlap guard (mask overlap, not box overlap — two
-// adjacent standing figures have overlapping boxes but disjoint masks). 3-tier
-// fallback: retry-in-DINO → Replicate Grounded-SAM API → return null (→ Gemini).
+// adjacent standing figures have overlapping boxes but disjoint masks). Fallback
+// on a collision: retry-in-DINO (local) → return null → today's Gemini 2-pass
+// bbox. Fully local; no external API anywhere.
 const GDINO_OVERLAP_THRESHOLD = 0.30;   // overlapFrac ≥ this → collision
 const GDINO_SAME_FIGURE = 0.95;         // ≈ 100% → both prompts hit the same person
 const GDINO_LOW_CONFIDENCE = 0.45;      // DINO score below this → unreliable
@@ -2283,13 +2284,12 @@ function _pxBoxToNorm(box, W, H) {
   ];
 }
 
-// Decode a raw binary mask (alpha or grayscale white-on-black) PNG to a
+// Decode the MobileSAM mask PNG (figure at alpha=255 on transparent) to a
 // {alpha:Uint8Array(0/1), width, height, area, bbox:[x1,y1,x2,y2]} at W×H.
-async function _binMaskFromBuffer(buf, W, H, channel) {
+async function _binMaskFromBuffer(buf, W, H) {
   try {
-    let pipe = sharp(buf).resize(W, H, { fit: 'fill' });
-    pipe = channel === 'alpha' ? pipe.ensureAlpha().extractChannel(3) : pipe.greyscale();
-    const { data } = await pipe.raw().toBuffer({ resolveWithObject: true });
+    const { data } = await sharp(buf).resize(W, H, { fit: 'fill' })
+      .ensureAlpha().extractChannel(3).raw().toBuffer({ resolveWithObject: true });
     const bin = new Uint8Array(W * H);
     let area = 0, minx = W, miny = H, maxx = -1, maxy = -1;
     for (let i = 0; i < W * H; i++) {
@@ -2332,7 +2332,7 @@ async function _mobilesamMaskFull(imageDataUri, boxPx, W, H) {
     const j = await res.json();
     const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
     if (!j?.success || !m || !(j.fill_pixels > 0)) return null;
-    return _binMaskFromBuffer(Buffer.from(m[1], 'base64'), W, H, 'alpha');
+    return _binMaskFromBuffer(Buffer.from(m[1], 'base64'), W, H);
   } catch (e) { log.warn(`⚠️ [GDINO-DETECT] mask failed: ${e.message}`); return null; }
 }
 
@@ -2435,23 +2435,11 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
         }
       }
     }
-    // Tier 2 — Replicate Grounded-SAM with negative = other characters' clothing.
+    // Unresolved after the local retries — the whole detection defers to
+    // today's Gemini 2-pass bbox (the Gemini path in detectAllBoundingBoxes).
+    // No external API anywhere: local first, Gemini as the only fallback.
     if (!resolved) {
-      const neg = names.filter(x => x !== n).map(x => byName.get(x).clothing).filter(Boolean).join(', ');
-      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} API fallback (negative "${neg}")`);
-      const { segmentByText } = require('./groundedSam');
-      const maskPng = await segmentByText(imageDataUri, r.promptText, neg);
-      if (maskPng) {
-        const m = await _binMaskFromBuffer(maskPng, W, H, 'grey');
-        if (m && overlapsOthers(m, n) < GDINO_OVERLAP_THRESHOLD) {
-          r.mask = m; r.bodyBox = _pxBoxToNorm(m.bbox, W, H);
-          resolved = true;
-        }
-      }
-    }
-    // Tier 3 — unresolved: the whole detection defers to Gemini.
-    if (!resolved) {
-      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} unresolved after retry — falling back to Gemini bbox`);
+      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} unresolved after local retry — falling back to Gemini bbox`);
       return null;
     }
   }

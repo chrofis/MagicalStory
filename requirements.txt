@@ -11,3 +11,6 @@ rembg>=2.0.50
 # installed as the CPU build (the Dockerfile does this BEFORE installing this
 # file) — otherwise ultralytics pulls the multi-GB CUDA wheels on Linux.
 ultralytics>=8.3
+# GroundingDINO text->box figure detection (/detect-figures-text endpoint).
+# Same torch-CPU requirement. Weights are pre-downloaded in the Dockerfile.
+transformers>=4.44

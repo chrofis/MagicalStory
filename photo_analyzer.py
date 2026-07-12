@@ -1413,6 +1413,125 @@ def figure_mask_endpoint():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+# GroundingDINO for text-prompted figure DETECTION (lazy loaded, ~1.9GB peak RSS).
+# Stage 1 of the local Grounded-SAM detection path: a full-identity text prompt
+# -> the loose box for WHICH character is where. The box then goes to
+# /figure-mask (MobileSAM) for the tight silhouette. Validated 5/5 on a real
+# 5-figure page incl. an occluded figure (grounding-dino-base) — see
+# docs/research-log.html. base > tiny: tiny missed the occluded figure.
+_gdino_model = None
+_gdino_processor = None
+
+
+def get_groundingdino():
+    global _gdino_model, _gdino_processor
+    if _gdino_model is None:
+        # transformers is an optional dep — endpoint 503s if missing so Node
+        # falls back to the Gemini bbox.
+        from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
+        model_id = os.environ.get('GROUNDINGDINO_MODEL', 'IDEA-Research/grounding-dino-base')
+        print(f"[GDINO] Loading GroundingDINO ({model_id})...")
+        _gdino_processor = AutoProcessor.from_pretrained(model_id)
+        _gdino_model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id)
+        _gdino_model.eval()
+        print("[GDINO] GroundingDINO loaded")
+    return _gdino_model, _gdino_processor
+
+
+@app.route('/detect-figures-text', methods=['POST'])
+def detect_figures_text_endpoint():
+    """
+    Text-prompted figure detection (GroundingDINO). For each character's
+    full-identity prompt, returns the best box + score + all candidate boxes.
+    The Node caller feeds each best box to /figure-mask for the tight
+    silhouette, and uses the candidates + scores for the overlap guard /
+    retry.
+
+    Expected JSON:
+    {
+        "image": "data:image/jpeg;base64,...",       # full page
+        "prompts": [{"name": "Emma", "text": "a preschooler girl with brown hair in a pink top"}],
+        "box_threshold": 0.25,   # optional
+        "text_threshold": 0.20   # optional
+    }
+
+    Returns:
+    {
+        "success": true,
+        "width": W, "height": H,
+        "figures": [
+          {"name": "Emma", "box": [x1,y1,x2,y2], "score": 0.80,
+           "candidates": [{"box":[...], "score":0.80}, ...]}   # box null if none found
+        ]
+    }
+    Box coords are pixels in the input image. 503 if the model is unavailable.
+    """
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({"success": False, "error": "No image provided"}), 400
+        prompts = data.get('prompts')
+        if not (isinstance(prompts, list) and len(prompts) > 0):
+            return jsonify({"success": False, "error": "prompts [{name,text}] required"}), 400
+
+        try:
+            model, processor = get_groundingdino()
+        except Exception as load_err:
+            print(f"[GDINO] GroundingDINO unavailable: {load_err}")
+            return jsonify({"success": False, "error": f"groundingdino unavailable: {load_err}"}), 503
+
+        import torch
+        box_threshold = float(data.get('box_threshold', 0.25))
+        text_threshold = float(data.get('text_threshold', 0.20))
+
+        image_data = data['image']
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+        img_bgr = cv2.imdecode(np.frombuffer(base64.b64decode(image_data), np.uint8), cv2.IMREAD_COLOR)
+        if img_bgr is None:
+            return jsonify({"success": False, "error": "Failed to decode image"}), 400
+        h, w = img_bgr.shape[:2]
+        pil = Image.fromarray(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
+
+        figures = []
+        for p in prompts:
+            name = (p or {}).get('name')
+            text = str((p or {}).get('text') or '').lower().strip()
+            if not name or not text:
+                figures.append({"name": name, "box": None, "score": None, "candidates": []})
+                continue
+            if not text.endswith('.'):
+                text += '.'
+            inputs = processor(images=pil, text=text, return_tensors="pt")
+            with torch.no_grad():
+                out = model(**inputs)
+            # transformers renamed the box_threshold kwarg and made input_ids
+            # optional across versions — handle both.
+            try:
+                res = processor.post_process_grounded_object_detection(
+                    out, inputs["input_ids"], threshold=box_threshold,
+                    text_threshold=text_threshold, target_sizes=[pil.size[::-1]])[0]
+            except TypeError:
+                res = processor.post_process_grounded_object_detection(
+                    out, threshold=box_threshold, text_threshold=text_threshold,
+                    target_sizes=[pil.size[::-1]])[0]
+            boxes = res["boxes"].cpu().numpy() if len(res["boxes"]) else np.zeros((0, 4))
+            scores = res["scores"].cpu().numpy() if len(res["scores"]) else np.zeros((0,))
+            cand = []
+            for b, s in sorted(zip(boxes.tolist(), scores.tolist()), key=lambda z: -z[1]):
+                cand.append({"box": [int(round(v)) for v in b], "score": round(float(s), 3)})
+            best = cand[0] if cand else {"box": None, "score": None}
+            figures.append({"name": name, "box": best["box"], "score": best["score"], "candidates": cand})
+            print(f"[GDINO] {name}: {len(cand)} boxes, best score {best['score']}")
+
+        return jsonify({"success": True, "width": w, "height": h, "figures": figures})
+
+    except Exception as e:
+        print(f"[GDINO] Error: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""

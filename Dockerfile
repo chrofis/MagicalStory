@@ -63,6 +63,19 @@ RUN curl -fL -o /app/mobile_sam.pt \
     https://github.com/ultralytics/assets/releases/download/v8.3.0/mobile_sam.pt
 ENV MOBILESAM_WEIGHTS=/app/mobile_sam.pt
 
+# GroundingDINO-base weights pre-fetched into the image (~900MB) so the
+# /detect-figures-text cold start doesn't download from HuggingFace at runtime.
+# Cache lives under HF_HOME; photo_analyzer.py reads GROUNDINGDINO_MODEL. Only
+# used when FIGURE_DETECTION_BACKEND=grounding-dino. NON-FATAL: prod defaults to
+# 'gemini' and never needs this, so a flaky HF fetch must not break the build —
+# if the pre-fetch fails, get_groundingdino() downloads it lazily on first use.
+ENV HF_HOME=/app/.hf_cache
+ENV GROUNDINGDINO_MODEL=IDEA-Research/grounding-dino-base
+RUN python3 -c "from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection; \
+    AutoProcessor.from_pretrained('IDEA-Research/grounding-dino-base'); \
+    AutoModelForZeroShotObjectDetection.from_pretrained('IDEA-Research/grounding-dino-base')" \
+    || echo "WARN: GroundingDINO pre-fetch failed — will download lazily at runtime if used"
+
 # Copy client package files and install dependencies
 COPY client/package*.json ./client/
 RUN cd client && npm install
