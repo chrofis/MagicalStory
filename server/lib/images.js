@@ -2382,6 +2382,25 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       promptText: prompts.find(p => p.name === f.name)?.text || f.name,
     });
   }
+  // Recall recovery — the batched pass encodes the image once and attributes
+  // boxes by label, which is fast but can miss a character whose distinctive
+  // tokens didn't surface in any box label. Re-query each missing character
+  // individually (the old per-figure behaviour, but only for the few misses).
+  for (const c of expectedCharacters) {
+    if (byName.has(c.name)) continue;
+    const promptText = prompts.find(p => p.name === c.name)?.text || c.name;
+    const re = await _gdinoDetect(imageDataUri, [{ name: c.name, text: promptText }]);
+    const rf = re?.figures?.[0];
+    if (!rf?.box) continue;
+    const mask = await _mobilesamMaskFull(imageDataUri, rf.box, W, H);
+    const bodyBox = mask ? _pxBoxToNorm(mask.bbox, W, H) : _pxBoxToNorm(rf.box, W, H);
+    byName.set(c.name, {
+      name: c.name, score: rf.score, candidates: rf.candidates || [], mask, bodyBox,
+      clothing: c.clothing || '', position: c.position || '', promptText,
+    });
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${c.name} recovered via single-prompt re-query`);
+  }
+
   if (byName.size === 0) return null;
   const names = [...byName.keys()];
 
