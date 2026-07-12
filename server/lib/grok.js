@@ -485,8 +485,15 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   }
 }
 
-// Shared constants for character composition
-const CHAR_BG = { r: 220, g: 220, b: 220 };
+// Shared constants for character composition.
+// CHAR_BG is the canvas fill behind composed character slots (rows, stacks,
+// aspect-pad). WHITE, not grey: the source avatars sit on white backgrounds,
+// so a white fill makes the leftover blank invisible and only the per-avatar
+// coloured identity frame (frameCharacterImage) reads as a border. A grey fill
+// (the old { 220,220,220 }) painted the whole blank as a visible colour panel
+// that Grok sometimes copied into the scene — the "fills the entire blank with
+// a colour" bug. The frame borders, not the fill, separate the avatars.
+const CHAR_BG = { r: 255, g: 255, b: 255 };
 const CHAR_GAP = 4;
 
 /**
@@ -1524,7 +1531,11 @@ async function stitchImagesHorizontally(buffers, targetHeight = 768, options = {
       width: totalWidth,
       height: targetHeight,
       channels: 3,
-      background: { r: 220, g: 220, b: 220 },
+      // White, not grey: avatars are on white backgrounds, so blanks between
+      // differently-sized refs stay invisible instead of a visible grey panel
+      // (matches CHAR_BG — see its note). Identity is carried by the per-avatar
+      // coloured frame, not by the fill colour.
+      background: { r: 255, g: 255, b: 255 },
     },
   })
     .composite(composites)
