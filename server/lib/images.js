@@ -2522,7 +2522,7 @@ function _gdinoFigDiag(r, batched, wasLowConf) {
  * @returns {Promise<{figures: Array, objects: Array, usage: Object}|null>}
  */
 async function detectAllBoundingBoxes(imageData, options = {}) {
-  const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '', skipCache = false } = options;
+  const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '', skipCache = false, artStyle = null } = options;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
   // Cache check — content-hashed by image bytes + expected names. Hits skip
@@ -2540,9 +2540,13 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
   // Figure detection only — object detection stays with Gemini, so this path is
   // used when there are expected characters (the common repair / figure case);
   // it emits no objects (missingObjects empty → no false "missing object" flags).
-  // Fails open: any null/error → the Gemini path below runs and caches.
+  // Gated to the REALISTIC art style only: GroundingDINO is photo-trained and
+  // reliable on realistic renders (0.75-0.85), but on stylized/painterly styles
+  // (watercolor, cartoon, anime, …) it mislocates or misses figures entirely —
+  // there Gemini owns detection. Fails open: any null/error → Gemini below.
   let gdinoDiag = null;  // persisted with whichever backend produces the result
-  if (CONFIG_DEFAULTS.figureDetectionBackend === 'grounding-dino' && expectedCharacters.length > 0) {
+  const gdinoEligible = CONFIG_DEFAULTS.figureDetectionBackend === 'grounding-dino' && artStyle === 'realistic';
+  if (gdinoEligible && expectedCharacters.length > 0) {
     try {
       const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, { pageLabel });
       gdinoDiag = gd?.diag || null;
@@ -3574,7 +3578,7 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
  * @param {Array<{reference: string, type: string, position: string, appearance: string, confidence: number}>} objectMatches - Object/animal/landmark matches from quality eval (legacy, not used)
  * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
-async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null, bboxModelOverride = null, pageContext = '', sharedBboxDetection = null) {
+async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null, bboxModelOverride = null, pageContext = '', sharedBboxDetection = null, artStyle = null) {
   // Build expected characters for bbox detection (AI will identify by name)
   const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing);
 
@@ -3592,7 +3596,8 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
       expectedObjects,
       sceneContext,
       bboxModelOverride,
-      pageContext
+      pageContext,
+      artStyle
     });
   }
 
@@ -5647,7 +5652,8 @@ async function evaluateImageBatch(images, options = {}) {
           null,
           null,
           `PAGE ${img.pageNumber}`,
-          img.sharedBboxDetection || null // Reuse pre-detected bbox if available
+          img.sharedBboxDetection || null, // Reuse pre-detected bbox if available
+          artStyle
         );
         bboxDetection = enrichResult.detectionHistory;
         enrichedFixTargets = enrichResult.targets || [];
@@ -8135,6 +8141,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       try {
         const fresh = await detectAllBoundingBoxes(best.imageData, {
           pageContext: `P${pageNumber}-final-bbox`,
+          artStyle,
         });
         if (fresh && Array.isArray(fresh.figures) && fresh.figures.length > 0) {
           freshBboxMap.set(pageNumber, fresh);
@@ -11930,7 +11937,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     const bboxSceneContext = buildBboxSceneContext(sceneMetadata, sceneCharacters, expectedCharacterClothing);
 
     log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}${objectMatches.length > 0 ? `, ${objectMatches.length} object matches` : ''}${allExpectedObjects.length > 0 ? `, ${allExpectedObjects.length} expected objects` : ''}...`);
-    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, allExpectedObjects, characterDescriptions, expectedCharacterClothing, bboxSceneContext, null, pageContext);
+    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, allExpectedObjects, characterDescriptions, expectedCharacterClothing, bboxSceneContext, null, pageContext, null, artStyle);
     bboxDetectionHistory = enrichResult.detectionHistory;
     // Track bbox detection tokens (Gemini quality-category)
     if (bboxDetectionHistory?.usage && usageTracker) {

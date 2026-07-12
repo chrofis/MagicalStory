@@ -353,7 +353,7 @@ function buildCoverSceneImages(coverImages, characters, totalStoryPages) {
  * @param {Array} characters - Array of character objects from the story
  * @returns {Promise<Object>} Updated coverImages with bboxDetection and bboxOverlayImage
  */
-async function detectBboxOnCovers(coverImages, characters) {
+async function detectBboxOnCovers(coverImages, characters, artStyle = null) {
   if (!coverImages) return coverImages;
 
   const coverTypes = ['frontCover', 'initialPage', 'backCover'];
@@ -393,7 +393,8 @@ async function detectBboxOnCovers(coverImages, characters) {
 
       const bboxDetection = await detectAllBoundingBoxes(imageData, {
         expectedCharacters,
-        expectedObjects: []
+        expectedObjects: [],
+        artStyle
       });
 
       if (bboxDetection) {
@@ -6312,6 +6313,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               expectedObjects,
               sceneContext: img.sceneDescription || null,
               pageContext: `PAGE ${img.pageNumber}`,
+              artStyle,
             });
             const figCount = img.sharedBboxDetection?.figures?.length || 0;
             const idCount = img.sharedBboxDetection?.figures?.filter(f => f.name && f.name !== 'UNKNOWN').length || 0;
@@ -6552,7 +6554,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Skip when quality evaluation is disabled (trial mode) — bbox data won't be used
         if (!inputData.skipQualityEval) {
           try {
-            await detectBboxOnCovers(coverImages, inputData.characters);
+            await detectBboxOnCovers(coverImages, inputData.characters, artStyle);
           } catch (bboxErr) {
             log.warn(`⚠️ [UNIFIED] Cover bbox detection failed: ${bboxErr.message}`);
           }

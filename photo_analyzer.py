@@ -1531,58 +1531,26 @@ def detect_figures_text_endpoint():
         h, w = img_bgr.shape[:2]
         pil = Image.fromarray(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
 
-        # BATCHED: all prompts in ONE forward pass (image encoded once, not
-        # per figure — ~Nx faster on CPU). GroundingDINO returns a label per
-        # box (the matched sub-phrase), so each box is attributed to the prompt
-        # whose distinctive tokens it best matches. This also avoids the
-        # per-prompt "two figures both grab the salient box" collision.
-        names = [str((p or {}).get('name') or '') for p in prompts]
-        texts = [str((p or {}).get('text') or '').lower().strip().rstrip('.') for p in prompts]
-
-        # Distinctive attribution tokens per prompt (age/gender/colour/hair) —
-        # the words that separate one character from another.
-        DISTINCTIVE = {
-            'girl', 'boy', 'man', 'woman', 'elderly', 'preschooler', 'kindergartner',
-            'young', 'adult', 'old', 'grandfather', 'grandmother', 'baby', 'toddler',
-            'red', 'green', 'blue', 'navy', 'teal', 'yellow', 'brown', 'white', 'black',
-            'pink', 'orange', 'purple', 'grey', 'gray', 'blonde', 'blond',
-            'beard', 'mustache', 'moustache', 'glasses', 'bald',
-        }
-        def key_tokens(t):
-            return set(w for w in t.replace('.', '').replace(',', ' ').split() if w in DISTINCTIVE)
-        prompt_keys = [key_tokens(t) for t in texts]
-
-        # Token-budget chunking — GroundingDINO's text encoder caps at 256 tokens
-        # (max_text_len); joining many full-identity prompts overflows it and the
-        # forward pass throws a tensor-size mismatch. Pack prompts into chunks
-        # under a safe budget: each chunk is one forward pass (a chunk of 1 = the
-        # safe per-figure case, chunks of several = the speedup, never a crash).
-        def tok_len(t):
-            try:
-                return len(processor.tokenizer(t, add_special_tokens=False)["input_ids"])
-            except Exception:
-                return max(1, len(t.split()))
-        TOKEN_BUDGET = 200
-        chunks, cur, cur_tok = [], [], 0
-        for i in range(len(texts)):
-            if not texts[i]:
+        # PER-FIGURE — one forward pass per character (image re-encoded per
+        # prompt). Batching all prompts into one query was tried and reverted:
+        # multi-phrase attention dilution collapsed scores and missed figures on
+        # non-photographic styles (near-zero on watercolour). GroundingDINO now
+        # only runs for the realistic art style (gated Node-side), where
+        # per-figure is reliable; one short prompt never hits the 256-token cap.
+        figures = []
+        for p in prompts:
+            name = (p or {}).get('name')
+            text = str((p or {}).get('text') or '').lower().strip()
+            if not name or not text:
+                figures.append({"name": name, "box": None, "score": None, "candidates": []})
                 continue
-            tl = tok_len(texts[i])
-            if cur and cur_tok + tl + 1 > TOKEN_BUDGET:
-                chunks.append(cur); cur, cur_tok = [], 0
-            cur.append(i); cur_tok += tl + 1
-        if cur:
-            chunks.append(cur)
-
-        # Attribute each box to the prompt (within its chunk) whose distinctive
-        # tokens overlap the box label most. Collect per-name candidates.
-        per_name = {i: [] for i in range(len(prompts))}
-        total_boxes = 0
-        for chunk in chunks:
-            combined = '. '.join(texts[i] for i in chunk) + '.'
-            inputs = processor(images=pil, text=combined, return_tensors="pt")
+            if not text.endswith('.'):
+                text += '.'
+            inputs = processor(images=pil, text=text, return_tensors="pt")
             with torch.no_grad():
                 out = model(**inputs)
+            # transformers renamed the box_threshold kwarg and made input_ids
+            # optional across versions — handle both.
             try:
                 res = processor.post_process_grounded_object_detection(
                     out, inputs["input_ids"], threshold=box_threshold,
@@ -1593,35 +1561,12 @@ def detect_figures_text_endpoint():
                     target_sizes=[pil.size[::-1]])[0]
             boxes = res["boxes"].cpu().numpy() if len(res["boxes"]) else np.zeros((0, 4))
             scores = res["scores"].cpu().numpy() if len(res["scores"]) else np.zeros((0,))
-            # Prefer the string phrase field. Newer transformers return the matched
-            # sub-phrase in "text_labels" and reuse "labels" for integer class ids;
-            # older versions put the strings in "labels". Take the string one.
-            labels = res.get("text_labels")
-            if not labels:
-                labels = res.get("labels")
-            if labels is None or len(labels) != len(boxes):
-                labels = [""] * len(boxes)
-            total_boxes += len(boxes)
-            for b, s, lab in zip(boxes.tolist(), scores.tolist(), list(labels)):
-                lt = set(str(lab).lower().replace('.', '').replace(',', ' ').split())
-                best_i, best_ov = None, 0
-                for i in chunk:
-                    ov = len(prompt_keys[i] & lt)
-                    if ov > best_ov:
-                        best_ov, best_i = ov, i
-                # No distinctive overlap → a solo-prompt chunk owns it, else drop.
-                if best_i is None:
-                    best_i = chunk[0] if len(chunk) == 1 else None
-                if best_i is not None:
-                    per_name[best_i].append({"box": [int(round(v)) for v in b], "score": round(float(s), 3)})
-
-        figures = []
-        for i, name in enumerate(names):
-            cand = sorted(per_name[i], key=lambda z: -z["score"])
+            cand = []
+            for b, s in sorted(zip(boxes.tolist(), scores.tolist()), key=lambda z: -z[1]):
+                cand.append({"box": [int(round(v)) for v in b], "score": round(float(s), 3)})
             best = cand[0] if cand else {"box": None, "score": None}
             figures.append({"name": name, "box": best["box"], "score": best["score"], "candidates": cand})
-        print(f"[GDINO] {len(chunks)} chunk(s), {len(prompts)} prompts, {total_boxes} boxes -> " +
-              ", ".join(f"{f['name']}:{f['score']}" for f in figures))
+            print(f"[GDINO] {name}: {len(cand)} boxes, best score {best['score']}")
 
         return jsonify({"success": True, "width": w, "height": h, "figures": figures})
 

@@ -1388,7 +1388,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
 
         log.info(`🔍 [ENTITY-COLLECT] Page ${pageNumber}: Running fallback bbox detection for ${pageCharNames.join(', ')}${sceneContext ? ' (with scene context)' : ''}`);
         try {
-          const detection = await detectAllBoundingBoxes(imageData, { expectedCharacters: expectedChars, sceneContext });
+          const detection = await detectAllBoundingBoxes(imageData, { expectedCharacters: expectedChars, sceneContext, artStyle });
           if (detection) {
             bboxDetection = detection;
             figures = detection.figures || [];
