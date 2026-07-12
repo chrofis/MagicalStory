@@ -19,6 +19,9 @@ from PIL import Image
 import traceback
 import logging
 import sys
+import time
+import threading
+import gc
 
 # Fix Windows encoding issues - force UTF-8 for stdout/stderr
 if sys.platform == 'win32':
@@ -1421,10 +1424,16 @@ def figure_mask_endpoint():
 # docs/research-log.html. base > tiny: tiny missed the occluded figure.
 _gdino_model = None
 _gdino_processor = None
+_gdino_last_used = 0.0
+# Free the ~1.9GB model after this many idle seconds so we don't pay for RAM
+# 24/7 when detection runs only occasionally (e.g. one story/week on staging).
+# Railway bills actual RAM per minute, so an unloaded model costs nothing.
+_GDINO_IDLE_UNLOAD_S = int(os.environ.get('GROUNDINGDINO_IDLE_UNLOAD_S', '600'))
 
 
 def get_groundingdino():
-    global _gdino_model, _gdino_processor
+    global _gdino_model, _gdino_processor, _gdino_last_used
+    _gdino_last_used = time.time()
     if _gdino_model is None:
         # transformers is an optional dep — endpoint 503s if missing so Node
         # falls back to the Gemini bbox.
@@ -1436,6 +1445,23 @@ def get_groundingdino():
         _gdino_model.eval()
         print("[GDINO] GroundingDINO loaded")
     return _gdino_model, _gdino_processor
+
+
+def _gdino_idle_reaper():
+    """Unload GroundingDINO after _GDINO_IDLE_UNLOAD_S of no use, freeing ~1.9GB.
+    Reloading from the local weights cache on the next call is fast (~3s)."""
+    global _gdino_model, _gdino_processor
+    while True:
+        time.sleep(60)
+        if _gdino_model is not None and (time.time() - _gdino_last_used) > _GDINO_IDLE_UNLOAD_S:
+            print(f"[GDINO] idle {int(time.time() - _gdino_last_used)}s — unloading model to free RAM")
+            _gdino_model = None
+            _gdino_processor = None
+            gc.collect()
+
+
+# Daemon reaper — stamps started once; the model itself is still lazy-loaded.
+threading.Thread(target=_gdino_idle_reaper, daemon=True).start()
 
 
 @app.route('/detect-figures-text', methods=['POST'])
