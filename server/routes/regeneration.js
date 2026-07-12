@@ -4372,9 +4372,25 @@ router.post('/:id/debug-gdino/:pageNum', authenticateToken, async (req, res) => 
       createBboxOverlayImage(imageData, perFigureDet),
     ]);
 
+    // MobileSAM silhouette from each (mostly-correct) per-figure box — shows how
+    // SAM holds up on watercolour when it IS given a good box to segment.
+    const samMasks = [];
+    for (const f of perFigureRaw) {
+      if (!f.box) { samMasks.push({ name: f.name, mask: null, fillPixels: 0 }); continue; }
+      try {
+        const mr = await fetch(`${analyzerUrl}/figure-mask`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: imageData, box: f.box }),
+        });
+        const mj = mr.ok ? await mr.json() : {};
+        samMasks.push({ name: f.name, mask: mj?.image || null, fillPixels: mj?.fill_pixels || 0 });
+      } catch { samMasks.push({ name: f.name, mask: null, fillPixels: 0 }); }
+    }
+
     log.info(`🧪 [DEBUG-GDINO] page ${pageNumber}: ${chars.map(c => c.name).join(', ')} | scores ` +
-      scoreTable.map(s => `${s.name} b=${s.batchedScore} pf=${s.perFigureScore}`).join(' | '));
-    return res.json({ pageNumber, present: chars.map(c => c.name), scoreTable, batchedOverlay, perFigureOverlay });
+      scoreTable.map(s => `${s.name} b=${s.batchedScore} pf=${s.perFigureScore}`).join(' | ') +
+      ` | sam fills ${samMasks.map(s => `${s.name}:${s.fillPixels}`).join(',')}`);
+    return res.json({ pageNumber, present: chars.map(c => c.name), scoreTable, batchedOverlay, perFigureOverlay, samMasks });
   } catch (err) {
     log.error('❌ [DEBUG-GDINO] Failed:', err);
     res.status(500).json({ error: err.message });
