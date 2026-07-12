@@ -2369,6 +2369,14 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   if (!det || !Array.isArray(det.figures)) return null;
   const W = det.width, H = det.height;
 
+  // Diagnostics — every intermediate score/decision, persisted with the
+  // detection so a page's detection can be debugged after the fact (raw
+  // batched score per character, recovery, low-conf flags, mask collisions,
+  // how each was resolved, and whether/why the whole page fell back to Gemini).
+  const diag = { backend: 'grounding-dino', perFigure: [], collisions: [], fellBack: false, reason: null };
+  const batchedScore = {};
+  for (const f of det.figures) batchedScore[f.name] = f.box ? f.score : null;
+
   // Stage 2 — MobileSAM mask per figure → tight bbox + mask for the overlap guard.
   const byName = new Map();
   for (const f of det.figures) {
@@ -2396,7 +2404,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     const bodyBox = mask ? _pxBoxToNorm(mask.bbox, W, H) : _pxBoxToNorm(rf.box, W, H);
     byName.set(c.name, {
       name: c.name, score: rf.score, candidates: rf.candidates || [], mask, bodyBox,
-      clothing: c.clothing || '', position: c.position || '', promptText,
+      clothing: c.clothing || '', position: c.position || '', promptText, recovered: true,
     });
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${c.name} recovered via single-prompt re-query`);
   }
@@ -2406,11 +2414,12 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
 
   // GUARD — low confidence + pairwise mask overlap.
   const flagged = new Set();
+  const lowConf = new Set();
   for (const n of names) {
     const r = byName.get(n);
     if (r.score != null && r.score < GDINO_LOW_CONFIDENCE) {
       log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} low confidence ${r.score}`);
-      flagged.add(n);
+      flagged.add(n); lowConf.add(n);
     }
   }
   for (let i = 0; i < names.length; i++) {
@@ -2419,6 +2428,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       const ov = _maskOverlapFrac(A.mask, B.mask);
       if (ov >= GDINO_OVERLAP_THRESHOLD) {
         log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${A.name} & ${B.name} masks overlap ${Math.round(ov * 100)}%${ov >= GDINO_SAME_FIGURE ? ' (≈same figure)' : ' (>30%)'}`);
+        diag.collisions.push({ a: A.name, b: B.name, overlapPct: Math.round(ov * 100) });
         flagged.add((A.score ?? 0) <= (B.score ?? 0) ? A.name : B.name);
       }
     }
@@ -2436,6 +2446,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       const m = await _mobilesamMaskFull(imageDataUri, cand.box, W, H);
       if (m && overlapsOthers(m, n) < GDINO_OVERLAP_THRESHOLD) {
         r.mask = m; r.bodyBox = _pxBoxToNorm(m.bbox, W, H); r.score = cand.score;
+        r.resolvedVia = 'alternate-candidate';
         log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} resolved via alternate candidate box`);
         resolved = true; break;
       }
@@ -2450,7 +2461,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
         const m = await _mobilesamMaskFull(imageDataUri, rf.box, W, H);
         if (m && overlapsOthers(m, n) < GDINO_OVERLAP_THRESHOLD) {
           r.mask = m; r.bodyBox = _pxBoxToNorm(m.bbox, W, H); r.score = rf.score;
-          resolved = true;
+          r.resolvedVia = 'retry-in-dino'; resolved = true;
         }
       }
     }
@@ -2459,7 +2470,10 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     // No external API anywhere: local first, Gemini as the only fallback.
     if (!resolved) {
       log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} unresolved after local retry — falling back to Gemini bbox`);
-      return null;
+      diag.fellBack = true;
+      diag.reason = `${n} unresolved (${lowConf.has(n) ? 'low-confidence' : ''}${diag.collisions.some(c => c.a === n || c.b === n) ? ' collision' : ''})`.trim();
+      diag.perFigure = names.map(m => _gdinoFigDiag(byName.get(m), batchedScore[m], lowConf.has(m)));
+      return { figures: null, diag };
     }
   }
 
@@ -2476,8 +2490,22 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       confidence: r.score == null ? 'low' : r.score >= 0.65 ? 'high' : r.score >= 0.45 ? 'medium' : 'low',
     };
   });
+  diag.perFigure = names.map(m => _gdinoFigDiag(byName.get(m), batchedScore[m], lowConf.has(m)));
   log.info(`🦖 [GDINO-DETECT] ${pageLabel}detected ${figures.length}/${expectedCharacters.length} figures (GroundingDINO→MobileSAM)`);
-  return { figures };
+  return { figures, diag };
+}
+
+// One character's detection diagnostics — batched score, whether it was
+// recovered/low-conf, how it was resolved, and its final score.
+function _gdinoFigDiag(r, batched, wasLowConf) {
+  return {
+    name: r.name,
+    batchedScore: batched ?? null,
+    finalScore: r.score ?? null,
+    recovered: !!r.recovered,
+    lowConf: !!wasLowConf,
+    resolvedVia: r.resolvedVia || null,
+  };
 }
 
 /**
@@ -2513,9 +2541,11 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
   // used when there are expected characters (the common repair / figure case);
   // it emits no objects (missingObjects empty → no false "missing object" flags).
   // Fails open: any null/error → the Gemini path below runs and caches.
+  let gdinoDiag = null;  // persisted with whichever backend produces the result
   if (CONFIG_DEFAULTS.figureDetectionBackend === 'grounding-dino' && expectedCharacters.length > 0) {
     try {
       const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, { pageLabel });
+      gdinoDiag = gd?.diag || null;
       if (gd && Array.isArray(gd.figures) && gd.figures.length > 0) {
         let finalFigures = gd.figures;
         // Same cascade-face merge the Gemini path runs, so faceBoxes get filled.
@@ -2549,6 +2579,7 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
           rawResponse: null,
           refinementResponse: null,
           detectionBackend: 'grounding-dino',
+          gdinoDiag: gd.diag || null,
         };
         if (!skipCache && cacheKey) _bboxCacheSet(cacheKey, result);
         log.info(`🦖 [BBOX-DETECT] ${pageLabel}GroundingDINO backend (${finalFigures.length} figures)`);
@@ -3071,7 +3102,12 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
       // Include raw prompt and response for dev mode debugging
       rawPrompt: prompt,
       rawResponse: responseText,
-      refinementResponse
+      refinementResponse,
+      // When the flag is on but GroundingDINO fell back to Gemini, keep its
+      // diagnostics (raw batched scores + why it fell back) on the result so
+      // the page is still debuggable.
+      detectionBackend: gdinoDiag ? 'gemini-fallback' : undefined,
+      gdinoDiag: gdinoDiag || undefined,
     };
 
     // Populate the cache so the entity-consistency pass can reuse this on
@@ -3641,6 +3677,11 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     usage: allDetections.usage,
     rawPrompt: allDetections.rawPrompt,
     rawResponse: allDetections.rawResponse,
+    // Which backend produced this + GroundingDINO per-figure diagnostics (raw
+    // batched scores, recovery, low-conf flags, collisions, fallback reason) so
+    // detection is debuggable from the stored record, not only live logs.
+    detectionBackend: allDetections.detectionBackend,
+    gdinoDiag: allDetections.gdinoDiag,
     timestamp: new Date().toISOString()
   };
 
