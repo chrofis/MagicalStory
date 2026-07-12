@@ -8619,7 +8619,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // plus the iterate-specific `previewMismatches`, `checks`, `issues`, `corrections`,
   // `draftValidation` fields inside the metadata JSON). No JSON prefill — the response starts
   // with the prose directly.
-  const effectiveSceneModel = modelOverrides?.sceneIterationModel || modelOverrides?.sceneModel || CONFIG_DEFAULTS.sceneIteration;
+  // Default (CONFIG_DEFAULTS.sceneIteration = qwen-plus) is key-guarded to
+  // sonnet when OPENROUTER_API_KEY is unset; explicit overrides pass through.
+  const effectiveSceneModel = modelOverrides?.sceneIterationModel || modelOverrides?.sceneModel || require('../config/models').resolveSceneIterationModel();
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 18 validation checks with ${effectiveSceneModel}...`);
   const sceneResult = await callClaudeAPI(scenePrompt, 16000, effectiveSceneModel, { usageLabel: 'scene_iterate' });
   const newSceneDescription = sceneResult.text;

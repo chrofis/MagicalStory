@@ -118,7 +118,13 @@ const MODEL_DEFAULTS = {
                                         // huntsman" instead of the canonical "costumed:medieval")
                                         // and inconsistent metadata. Unified mode normally skips
                                         // this call entirely; only used when prose is missing.
-  sceneIteration: 'claude-sonnet',      // Scene iteration/retry — Sonnet only, same reason.
+  // Scene iteration/retry — the full-scene re-expansion during repair. Moved to
+  // Qwen for cost (2026-07-12): its diagnosis + fix quality matched Sonnet in the
+  // A/B; the one gap (copying German Visual-Bible names into English prose) is
+  // handled by the tightened LANGUAGE RULES in scene-iteration.txt. Key-guarded
+  // to sonnet via resolveSceneIterationModel(). NOTE: initial sceneDescription
+  // expansion stays on Sonnet — only the repair-iterate moved.
+  sceneIteration: process.env.SCENE_ITERATE_MODEL || 'qwen-plus',
 
   // Eval/consolidation model — the swappable, cost-sensitive stage (NOT story
   // prose). Changed to Qwen for the cost A/B (2026-07-12). resolveEvalModel()
@@ -542,29 +548,32 @@ function formatCostSummary(modelId, usage, cost) {
 }
 
 /**
- * Resolve the eval/consolidation model, guarding against a missing OpenRouter
- * key: if MODEL_DEFAULTS.evalModel is an OpenRouter model (Qwen/DeepSeek) but
- * OPENROUTER_API_KEY isn't set, fall back to claude-sonnet so a forgotten key
- * degrades quality instead of throwing mid-generation. Logs the fallback once.
+ * Guard any model key against a missing OpenRouter key: if it resolves to an
+ * OpenRouter model (Qwen/DeepSeek) but OPENROUTER_API_KEY isn't set, fall back
+ * to claude-sonnet so a forgotten key degrades quality instead of throwing
+ * mid-generation. Warns once per label.
  */
-let _evalFallbackWarned = false;
-function resolveEvalModel() {
-  const m = MODEL_DEFAULTS.evalModel || 'claude-sonnet';
+const _guardWarned = new Set();
+function guardModel(modelKey, label = 'model') {
+  const m = modelKey || 'claude-sonnet';
   const cfg = TEXT_MODELS[m];
   if (cfg?.provider === 'openrouter' && !process.env.OPENROUTER_API_KEY) {
-    if (!_evalFallbackWarned) {
-      _evalFallbackWarned = true;
-      try { require('../utils/logger').log.warn(`⚠️ [EVAL MODEL] evalModel="${m}" but OPENROUTER_API_KEY not set — falling back to claude-sonnet`); } catch { /* logger optional */ }
+    if (!_guardWarned.has(label)) {
+      _guardWarned.add(label);
+      try { require('../utils/logger').log.warn(`⚠️ [${label}] "${m}" needs OPENROUTER_API_KEY (not set) — falling back to claude-sonnet`); } catch { /* logger optional */ }
     }
     return 'claude-sonnet';
   }
   return m;
 }
+function resolveEvalModel() { return guardModel(MODEL_DEFAULTS.evalModel, 'EVAL MODEL'); }
+function resolveSceneIterationModel() { return guardModel(MODEL_DEFAULTS.sceneIteration, 'SCENE ITERATE MODEL'); }
 
 module.exports = {
   TEXT_MODELS,
   MODEL_DEFAULTS,
   resolveEvalModel,
+  resolveSceneIterationModel,
   IMAGE_MODELS,
   IMAGE_BACKENDS,
   IMAGE_ASPECTS,

@@ -288,6 +288,8 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 **All prose and metadata fields in English**, except:
 - `translatedSummary` → translate to target language below.
 
+The story text and Visual Bible name characters, objects, and locations in the target language; render every such name in English in the prose and in `objects`/`interactions` — translate or describe it, never copy the foreign-language name (a Visual Bible object named "Goldene Medaillen" is written as "gold medals").
+
 **Target Language for translatedSummary:**
 {LANGUAGE_INSTRUCTION}
 {LANGUAGE_NOTE}
