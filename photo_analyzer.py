@@ -3327,4 +3327,16 @@ if __name__ == '__main__':
     print(f"   Anime cascade available: {ANIME_CASCADE_AVAILABLE}")
     print("   LPIPS: checking on first request")
     print("   Face embeddings: ArcFace via DeepFace (512-D, style-invariant)")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    # Serve via waitress (production WSGI). Flask's dev server dropped large
+    # POST bodies (the base64 page image on /detect-figures-text) under load,
+    # arriving empty at request.get_json() -> 400/500 -> spurious Gemini
+    # fallback. Waitress handles large/chunked bodies and multiple threads
+    # (model load blocks one thread; others keep serving). Falls back to the
+    # dev server only if waitress is missing.
+    try:
+        from waitress import serve
+        print(f"   Serving via waitress (6 threads) on port {port}")
+        serve(app, host='0.0.0.0', port=port, threads=6, channel_timeout=600)
+    except ImportError:
+        print("   waitress unavailable — falling back to Flask dev server")
+        app.run(host='0.0.0.0', port=port, debug=False)
