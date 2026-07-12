@@ -380,7 +380,10 @@ async function consolidateFeedback({
     // Fire-and-forget: any DB failure must not break the repair pipeline.
     // Full prompt (input) + raw Haiku response + parsed plan are captured
     // so `scripts/analysis/inspect-consolidator-call.js` can replay without
-    // re-invoking Haiku.
+    // re-invoking Haiku. The cache refactor split the prompt into template
+    // (cachePrefix) + userInput and dropped the fullPrompt binding; rebuild it
+    // here (referencing it undefined threw and discarded the whole plan).
+    const fullPrompt = `${template}\n\n---\n\n${userInput}`;
     if (storyId && pageNumber != null) {
       persistConsolidatorCall({
         storyId,
