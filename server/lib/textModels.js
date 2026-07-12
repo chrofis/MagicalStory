@@ -14,7 +14,7 @@ const { recordTextUsage } = require('./usageContext');
 // Map a text-model provider to its tokenUsage accounting key. Text Gemini
 // calls bill to gemini_text (image/quality Gemini are tracked on their own
 // paths); xAI text bills to grok.
-const USAGE_PROVIDER_KEY = { anthropic: 'anthropic', google: 'gemini_text', xai: 'grok' };
+const USAGE_PROVIDER_KEY = { anthropic: 'anthropic', google: 'gemini_text', xai: 'grok', openrouter: 'openrouter' };
 
 // Get active model from environment (legacy - prefer MODEL_DEFAULTS)
 const TEXT_MODEL = process.env.TEXT_MODEL || 'claude-sonnet';
@@ -135,11 +135,17 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
   const supportsAssistantPrefill = !modelId.match(/claude-(sonnet|opus|haiku)-[4-9]/);
   let effectivePrompt = prompt;
 
-  // Build user content — support vision (images) if provided in options
+  // Build user content — support vision (images) and/or a cacheable prefix.
+  // options.cachePrefix: a large STABLE string (template/rules/bible) that
+  // repeats across calls of the same type — marked with cache_control so
+  // Anthropic bills it at ~10% on cache hits (5-min TTL). Prompt caching is
+  // GA; no beta header needed on anthropic-version 2023-06-01.
   let userContent;
   if (options.images && options.images.length > 0) {
-    // Vision mode: content is an array of image + text blocks
     userContent = [];
+    if (options.cachePrefix) {
+      userContent.push({ type: 'text', text: options.cachePrefix, cache_control: { type: 'ephemeral' } });
+    }
     for (const img of options.images) {
       const base64 = stripDataUriPrefix(img);
       const mimeType = img.match(/^data:(image\/\w+);base64,/) ? img.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
@@ -149,6 +155,11 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
       });
     }
     userContent.push({ type: 'text', text: prompt });
+  } else if (options.cachePrefix) {
+    userContent = [
+      { type: 'text', text: options.cachePrefix, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: prompt }
+    ];
   } else {
     userContent = prompt;
   }
@@ -187,12 +198,17 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
     return res.json();
   }, { maxRetries: 2, baseDelay: 2000 }));
 
-  // Extract token usage
+  // Extract token usage. With prompt caching, input_tokens is the NON-cached
+  // (full-price) portion; cache_read_input_tokens are billed at ~10% and
+  // cache_creation at ~1.25×. Surface them so cache effectiveness is visible.
   const inputTokens = data.usage?.input_tokens || 0;
   const outputTokens = data.usage?.output_tokens || 0;
+  const cacheReadTokens = data.usage?.cache_read_input_tokens || 0;
+  const cacheCreationTokens = data.usage?.cache_creation_input_tokens || 0;
 
-  if (inputTokens > 0 || outputTokens > 0) {
-    log.debug(`📊 [ANTHROPIC] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+  if (inputTokens > 0 || outputTokens > 0 || cacheReadTokens > 0) {
+    const cacheStr = cacheReadTokens > 0 || cacheCreationTokens > 0 ? ` (cache: ${cacheReadTokens.toLocaleString()} read / ${cacheCreationTokens.toLocaleString()} write)` : '';
+    log.debug(`📊 [ANTHROPIC] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${cacheStr}`);
   }
 
   // Prepend prefill to response only for models that support assistant prefill.
@@ -205,7 +221,9 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
     text: responseText,
     usage: {
       input_tokens: inputTokens,
-      output_tokens: outputTokens
+      output_tokens: outputTokens,
+      cache_read_tokens: cacheReadTokens,
+      cache_creation_tokens: cacheCreationTokens
     }
   };
 }
@@ -623,6 +641,77 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
 }
 
 /**
+ * Call an OpenRouter model (OpenAI-compatible chat/completions). Used for
+ * A/B-testing Qwen / DeepSeek on eval + consolidation. Supports vision via
+ * options.images (image_url content parts) for the Qwen-VL image-eval A/B.
+ * Never the default for German story prose until an A/B proves quality.
+ */
+async function callOpenRouterAPI(prompt, maxTokens, modelId, options = {}) {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error('OpenRouter API key not configured (OPENROUTER_API_KEY)');
+  }
+
+  const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
+
+  // Vision: OpenAI-compatible content array with image_url parts.
+  let userContent;
+  if (options.images && options.images.length > 0) {
+    userContent = options.images.map(img => ({
+      type: 'image_url',
+      image_url: { url: img.startsWith('data:') ? img : `data:image/jpeg;base64,${stripDataUriPrefix(img)}` }
+    }));
+    userContent.push({ type: 'text', text: prompt });
+  } else {
+    userContent = prompt;
+  }
+
+  const messages = [{ role: 'user', content: userContent }];
+  if (options.prefill) {
+    messages.push({ role: 'assistant', content: options.prefill });
+  }
+
+  const data = await withRetry(async () => {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        // Optional attribution headers OpenRouter recommends.
+        'HTTP-Referer': 'https://magicalstory.ch',
+        'X-Title': 'MagicalStory'
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: maxTokens,
+        messages
+      }),
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      const error = new Error(`OpenRouter API error (${res.status}): ${errorText}`);
+      error.status = res.status;
+      throw error;
+    }
+    return res.json();
+  }, { maxRetries: 2, baseDelay: 2000 });
+
+  const inputTokens = data.usage?.prompt_tokens || 0;
+  const outputTokens = data.usage?.completion_tokens || 0;
+  if (inputTokens > 0 || outputTokens > 0) {
+    log.debug(`📊 [OPENROUTER] ${modelId} - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+  }
+
+  const responseText = data.choices?.[0]?.message?.content || '';
+  const fullText = options.prefill ? options.prefill + responseText : responseText;
+  return {
+    text: fullText,
+    usage: { input_tokens: inputTokens, output_tokens: outputTokens }
+  };
+}
+
+/**
  * Call xAI Grok API (OpenAI-compatible)
  */
 async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
@@ -852,6 +941,9 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, opt
     case 'xai':
       result = await callXaiAPI(prompt, effectiveMaxTokens, model.modelId, options);
       break;
+    case 'openrouter':
+      result = await callOpenRouterAPI(prompt, effectiveMaxTokens, model.modelId, options);
+      break;
     default:
       throw new Error(`Unknown provider: ${model.provider}`);
   }
@@ -1061,6 +1153,7 @@ module.exports = {
   callGeminiTextAPIStreaming,
   callXaiAPI,
   callXaiAPIStreaming,
+  callOpenRouterAPI,
   callClaudeAPI,
 
   // Text consistency check

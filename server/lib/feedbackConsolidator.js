@@ -279,14 +279,18 @@ async function consolidateFeedback({
       characterDescriptions,
     });
 
-    const fullPrompt = `${template}\n\n---\n\n${userInput}`;
-
     // Text-only — no image passed. The consolidator's job is to dedupe / sort /
     // trim what evaluators already flagged, not to run its own vision pass.
     // Sonnet — Haiku padded fix instructions with adjectives and negations
     // ("show effort", "rather than X") that Grok cannot execute, and was
     // soft on the "drop trivial flags" rules. Sonnet follows the policy.
-    const result = await callTextModel(fullPrompt, 3000, 'claude-sonnet', { usageLabel: 'eval_consolidation' });
+    // The `template` (rules/instructions) is identical across every
+    // consolidation call in a story, so cache it — the per-page userInput is
+    // the only variable part.
+    const result = await callTextModel(userInput, 3000, 'claude-sonnet', {
+      usageLabel: 'eval_consolidation',
+      cachePrefix: `${template}\n\n---\n\n`
+    });
     if (!result?.text) {
       return { plan: null, usage: result?.usage || null, error: 'no text in consolidator response' };
     }

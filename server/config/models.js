@@ -76,6 +76,34 @@ const TEXT_MODELS = {
     modelId: 'grok-4-1-fast-non-reasoning',
     maxOutputTokens: 65536,
     description: 'Grok 4 Fast - Very cheap, 2M context ($0.20/$0.50 per 1M tokens)'
+  },
+  // OpenRouter-hosted models (OpenAI-compatible) for A/B testing cheap
+  // alternatives on eval/consolidation. Needs OPENROUTER_API_KEY. Use via
+  // model override (dev panel / MODEL_DEFAULTS), never the default for German
+  // story prose until a quality A/B proves it.
+  'qwen-max': {
+    provider: 'openrouter',
+    modelId: 'qwen/qwen-max',
+    maxOutputTokens: 8192,
+    description: 'Qwen-Max (Alibaba) via OpenRouter - strongest Qwen, ~$1.6/$6.4 per 1M'
+  },
+  'qwen-plus': {
+    provider: 'openrouter',
+    modelId: 'qwen/qwen-plus',
+    maxOutputTokens: 8192,
+    description: 'Qwen-Plus (Alibaba) via OpenRouter - cheap reasoning, ~$0.4/$1.2 per 1M'
+  },
+  'qwen-vl': {
+    provider: 'openrouter',
+    modelId: 'qwen/qwen2.5-vl-72b-instruct',
+    maxOutputTokens: 8192,
+    description: 'Qwen2.5-VL 72B (vision) via OpenRouter - for image-eval A/B vs Gemini'
+  },
+  'deepseek-v3': {
+    provider: 'openrouter',
+    modelId: 'deepseek/deepseek-chat',
+    maxOutputTokens: 8192,
+    description: 'DeepSeek V3 via OpenRouter - cheapest strong reasoner, ~$0.27/$1.10 per 1M'
   }
 };
 
@@ -381,6 +409,13 @@ const MODEL_PRICING = {
   'grok-3-mini': { input: 0.30, output: 0.50 },
   'grok-3': { input: 3.00, output: 15.00 },
   'grok-4-1-fast-non-reasoning': { input: 0.20, output: 0.50 },
+
+  // OpenRouter-hosted Qwen / DeepSeek (approx list prices — verify at
+  // openrouter.ai; they vary by upstream provider and shift often).
+  'qwen/qwen-max': { input: 1.60, output: 6.40 },
+  'qwen/qwen-plus': { input: 0.40, output: 1.20 },
+  'qwen/qwen2.5-vl-72b-instruct': { input: 0.70, output: 0.70 },
+  'deepseek/deepseek-chat': { input: 0.27, output: 1.10 },
 
   // Grok Imagine models (fixed cost per image)
   'grok-imagine-image': { perImage: 0.02 },

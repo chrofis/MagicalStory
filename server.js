@@ -2811,6 +2811,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    // OpenRouter-hosted Qwen/DeepSeek (A/B) — token-based like Claude/Gemini.
+    openrouter: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     // Runware/Grok use direct cost instead of tokens
     runware: { direct_cost: 0, calls: 0 },
     grok: { direct_cost: 0, calls: 0 },
@@ -4785,12 +4787,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Base avatars should already exist from character creation.
     // Costumed/signature avatars are produced by prepareStyledAvatars (below).
 
-    // Prepare styled avatars (convert existing avatars to target art style)
-    // Skip if early avatar styling already succeeded (avoids duplicate costumed avatar generation)
-    // If early styling was attempted but failed (promise exists but succeeded=false), run PHASE 2 as fallback
+    // Prepare styled avatars (convert existing avatars to target art style).
     // Realistic runs too — prepareStyledAvatars decides per-category
     // (skips unchanged outfits, redresses changed ones + costumes).
-    if (avatarRequirements.length > 0 && !earlyAvatarStylingSucceeded) {
+    //
+    // This ALWAYS runs when there are requirements — even after early streaming
+    // styling succeeded. `avatarRequirements` (collectAvatarRequirements over
+    // the actual scenes + a cover loop covering every character) is the
+    // COMPLETE cast; the early streaming pass only covers the cast known at
+    // clothing-requirements time and misses characters the outline later casts
+    // into a scene (e.g. family members who only appear in a group/reunion
+    // page). prepareStyledAvatars skips cache-hit avatars (styledAvatarCache),
+    // so when early styling already ran this is a cheap COVERAGE TOP-UP that
+    // only generates the gaps — no duplicate work. Previously this block was
+    // skipped whenever early styling succeeded, leaving those late-cast
+    // characters with no story avatar (text-only reference → worse likeness).
+    if (avatarRequirements.length > 0) {
       // Validate that characters have base avatars
       const charactersWithoutAvatars = (inputData.characters || []).filter(c =>
         !c.avatars?.standard && !c.photoUrl && !c.bodyNoBgUrl
@@ -4799,10 +4811,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         log.warn(`⚠️ [UNIFIED] Characters missing base avatars: ${charactersWithoutAvatars.map(c => c.name).join(', ')}`);
       }
 
-      log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars for ${artStyle} (early styling did not run)`);
+      const mode = earlyAvatarStylingSucceeded
+        ? `coverage top-up (${getStyledAvatarCacheStats().size} already cached)`
+        : 'early styling did not run';
+      log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled-avatar reqs for ${artStyle} (${mode})`);
       await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null);
-    } else if (earlyAvatarStylingSucceeded) {
-      log.debug(`⏭️ [UNIFIED] Skipping PHASE 2 avatar styling - early styling already completed (${getStyledAvatarCacheStats().size} cached)`);
     }
 
     // Start cover generation NOW that avatars are ready (covers need avatars as reference photos)
@@ -7415,6 +7428,8 @@ async function _processStoryJobImpl(jobId) {
     gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    // OpenRouter-hosted Qwen/DeepSeek (A/B) — token-based.
+    openrouter: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     // Runware/Grok use direct cost instead of tokens
     runware: { direct_cost: 0, calls: 0 },
     grok: { direct_cost: 0, calls: 0 },
