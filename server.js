@@ -2855,6 +2855,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   };
 
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
+    // Idempotency guard: the text chokepoint records every callTextModel result;
+    // if a caller ALSO hands the same usage object here, count it once. Marks the
+    // object (non-enumerable) so a second add of the identical reference no-ops.
+    if (usage && usage.__accounted) return;
+    if (usage && typeof usage === 'object') {
+      try { Object.defineProperty(usage, '__accounted', { value: true, configurable: true, enumerable: false }); } catch { /* frozen usage — skip guard */ }
+    }
     if (usage && tokenUsage[provider]) {
       tokenUsage[provider].input_tokens += usage.input_tokens || 0;
       tokenUsage[provider].output_tokens += usage.output_tokens || 0;
@@ -2865,7 +2872,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         tokenUsage[provider].direct_cost += usage.direct_cost;
       }
     }
-    if (functionName && tokenUsage.byFunction[functionName]) {
+    if (functionName) {
+      // Auto-create the bucket so a label the chokepoint emits (e.g. text_check,
+      // vb_chr_dedup) is never silently dropped from the breakdown.
+      if (!tokenUsage.byFunction[functionName]) {
+        tokenUsage.byFunction[functionName] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() };
+      }
       tokenUsage.byFunction[functionName].input_tokens += usage?.input_tokens || 0;
       tokenUsage.byFunction[functionName].output_tokens += usage?.output_tokens || 0;
       tokenUsage.byFunction[functionName].thinking_tokens += usage?.thinking_tokens || 0;
@@ -2878,6 +2890,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
     }
   };
+  // Register addUsage as the text-usage sink for this job's async context, so
+  // every callTextModel/callTextModelStreaming records automatically (the
+  // chokepoint is the single source of truth — see usageContext.js).
+  require('./server/lib/usageContext').setUsageSink(addUsage);
 
   const calculateCost = (modelOrProvider, inputTokens, outputTokens, thinkingTokens = 0) => {
     const pricing = MODEL_PRICING[modelOrProvider] || PROVIDER_PRICING[modelOrProvider] || { input: 0, output: 0 };
@@ -3255,9 +3271,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // 24 parallel scene expansions can each take 30-60s; without heartbeating,
           // the row would only get updated when the first one finishes.
           const expansionHeartbeat = createJobHeartbeat(jobId, dbPool);
-          expansionResult = await callTextModelStreaming(expansionPrompt, 10000, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel);
-          const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
-          addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
+          expansionResult = await callTextModelStreaming(expansionPrompt, 10000, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel, { usageLabel: 'scene_expansion' });
+          // Usage recorded by the callTextModelStreaming chokepoint (usageLabel above).
           finalSceneDescription = expansionResult.text;
 
           log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} scene expanded (Haiku)`);
@@ -4434,7 +4449,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const unifiedResult = await callTextModelStreaming(unifiedPrompt, 64000, (chunk, fullText) => {
       progressiveParser.processChunk(chunk, fullText);
       unifiedHeartbeat();  // throttled — fires at most every 30s
-    }, modelOverrides.outlineModel);
+    }, modelOverrides.outlineModel, { usageLabel: 'unified_story' });
     timing.storyGenEnd = Date.now();
     const unifiedResponse = unifiedResult.text;
     const unifiedModelId = unifiedResult.modelId;
@@ -4443,7 +4458,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const isGeminiModel = unifiedModelId?.startsWith('gemini') || false;
     const unifiedProvider = isGeminiModel ? 'gemini_text' : 'anthropic';
     log.debug(`📊 [UNIFIED] Story usage - model: ${unifiedModelId}, provider: ${unifiedProvider}, input: ${unifiedUsage.input_tokens}, output: ${unifiedUsage.output_tokens}`);
-    addUsage(unifiedProvider, unifiedUsage, 'unified_story', unifiedModelId);
+    // Usage recorded by the callTextModelStreaming chokepoint (usageLabel above).
     log.debug(`⏱️ [UNIFIED] Story generation: ${((timing.storyGenEnd - timing.storyGenStart) / 1000).toFixed(1)}s`);
 
     // Finalize streaming parser
@@ -4532,26 +4547,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // invents a different person for the same name on every page.
     try {
       const { detectAndPatchPhantomCharacters, detectAndPatchOrphanObjectIds } = require('./server/lib/phantomCharacters');
-      const phantomUsage = await detectAndPatchPhantomCharacters({
+      await detectAndPatchPhantomCharacters({
         storyPages,
         visualBible,
         inputCharacters: inputData.characters || [],
         modelId: MODEL_DEFAULTS.sceneIteration || 'claude-haiku-4-5',
       });
-      if (phantomUsage) {
-        addUsage('anthropic', phantomUsage, 'phantom_patch', phantomUsage.modelId || MODEL_DEFAULTS.sceneIteration);
-      }
+      // Usage recorded by the callClaudeAPI chokepoint inside the helper
+      // (usageLabel 'phantom_patch'). The helper returns a COPY of the usage,
+      // so re-adding it here would double-count.
       // Same repair for object ids (ART/ANI/VEH/LOC/CLO) referenced in page
       // metadata but never defined — the image-prompt sanitizer drops lines
       // with unresolved ids, so an orphan id silently erases scene content.
-      const orphanUsage = await detectAndPatchOrphanObjectIds({
+      await detectAndPatchOrphanObjectIds({
         storyPages,
         visualBible,
         modelId: MODEL_DEFAULTS.sceneIteration || 'claude-haiku-4-5',
       });
-      if (orphanUsage) {
-        addUsage('anthropic', orphanUsage, 'phantom_patch', orphanUsage.modelId || MODEL_DEFAULTS.sceneIteration);
-      }
     } catch (err) {
       log.warn(`👻 [PHANTOM] Detection/patch failed (continuing): ${err.message}`);
     }
@@ -4933,7 +4945,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const langInstruction = getLanguageInstruction(lang);
           const translationPrompt = `Translate each scene summary below to the target language. Output ONLY the translations, one per line, in the same order. Keep it concise (1-2 sentences each).\n\nTarget language: ${langInstruction}\n\n${summaries}`;
           const { callTextModelStreaming } = require('./server/lib/textModels');
-          const transResult = await callTextModelStreaming(translationPrompt, 2000, null, 'claude-haiku-4-5-20251001');
+          const transResult = await callTextModelStreaming(translationPrompt, 2000, null, 'claude-haiku-4-5-20251001', { usageLabel: 'scene_translation' });
           if (transResult?.text) {
             const translations = transResult.text.trim().split('\n').filter(l => l.trim());
             let tIdx = 0;
@@ -7422,6 +7434,11 @@ async function _processStoryJobImpl(jobId) {
 
   // Helper to add usage - now supports function-level tracking with model names, thinking tokens, and direct costs
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
+    // Idempotency guard — see the create-story pipeline's addUsage for rationale.
+    if (usage && usage.__accounted) return;
+    if (usage && typeof usage === 'object') {
+      try { Object.defineProperty(usage, '__accounted', { value: true, configurable: true, enumerable: false }); } catch { /* frozen — skip */ }
+    }
     if (usage && tokenUsage[provider]) {
       // Handle Runware/Grok (direct cost) vs token-based providers
       if (provider === 'runware' || provider === 'grok') {
@@ -7434,8 +7451,12 @@ async function _processStoryJobImpl(jobId) {
         tokenUsage[provider].calls += 1;
       }
     }
-    // Also track by function if specified
-    if (functionName && tokenUsage.byFunction[functionName]) {
+    // Also track by function if specified. Auto-create the bucket so any label
+    // the text chokepoint emits is captured (never silently dropped).
+    if (functionName) {
+      if (!tokenUsage.byFunction[functionName]) {
+        tokenUsage.byFunction[functionName] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() };
+      }
       const func = tokenUsage.byFunction[functionName];
       func.input_tokens += usage.input_tokens || 0;
       func.output_tokens += usage.output_tokens || 0;
@@ -7448,6 +7469,8 @@ async function _processStoryJobImpl(jobId) {
       }
     }
   };
+  // Register this job's sink so every text call records automatically.
+  require('./server/lib/usageContext').setUsageSink(addUsage);
 
   // Helper to calculate cost - uses model-specific pricing if available
   // Thinking tokens are billed at output rate for Gemini 2.5 models

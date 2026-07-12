@@ -9,6 +9,12 @@ const { TEXT_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { withAnthropic, withGemini, withGrok } = require('./aiConcurrency');
 const apiHealth = require('./apiHealth');
 const { stripDataUriPrefix } = require('./r2');
+const { recordTextUsage } = require('./usageContext');
+
+// Map a text-model provider to its tokenUsage accounting key. Text Gemini
+// calls bill to gemini_text (image/quality Gemini are tracked on their own
+// paths); xAI text bills to grok.
+const USAGE_PROVIDER_KEY = { anthropic: 'anthropic', google: 'gemini_text', xai: 'grok' };
 
 // Get active model from environment (legacy - prefer MODEL_DEFAULTS)
 const TEXT_MODEL = process.env.TEXT_MODEL || 'claude-sonnet';
@@ -849,6 +855,9 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, opt
     default:
       throw new Error(`Unknown provider: ${model.provider}`);
   }
+  // Single source of truth for text usage: record EVERY call here so no caller
+  // can silently escape accounting (see usageContext.js). No-op outside a job.
+  recordTextUsage(USAGE_PROVIDER_KEY[model.provider] || model.provider, result.usage, options.usageLabel, model.modelId);
   return { ...result, modelId: model.modelId };
 }
 
@@ -893,7 +902,11 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
       if (onChunk) {
         onChunk(result.text, result.text);
       }
+      // callTextModel already recorded usage for this fallback path — return early
+      // to avoid double-counting.
+      return { ...result, modelId: model.modelId };
   }
+  recordTextUsage(USAGE_PROVIDER_KEY[model.provider] || model.provider, result.usage, options.usageLabel, model.modelId);
   return { ...result, modelId: model.modelId };
 }
 

@@ -2050,7 +2050,7 @@ async function dedupeSecondaryCharacterIds(visualBible, addUsage = null) {
           `Entry B:\n  name: ${other.name || '(none)'}\n  description: ${other.description || '(none)'}\n  pages: ${(other.appearsInPages || []).join(',')}\n\n` +
           `Question: are these two entries the same person (one character referenced in two different ways — e.g. by relation and by attribute) or two genuinely distinct characters?\n\n` +
           `Answer with exactly one word on the first line: SAME or DIFFERENT. Optionally add a short one-sentence reason on the next line.`;
-        const resp = await callClaudeAPI(prompt, 80, 'claude-haiku-4-5');
+        const resp = await callClaudeAPI(prompt, 80, 'claude-haiku-4-5', { usageLabel: 'vb_chr_dedup' });
         const text = (resp?.text || '').trim();
         if (/^\s*SAME\b/i.test(text)) decision = 'merge';
         else if (/^\s*DIFFERENT\b/i.test(text)) decision = 'split';

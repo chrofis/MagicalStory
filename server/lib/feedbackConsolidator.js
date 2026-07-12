@@ -286,7 +286,7 @@ async function consolidateFeedback({
     // Sonnet — Haiku padded fix instructions with adjectives and negations
     // ("show effort", "rather than X") that Grok cannot execute, and was
     // soft on the "drop trivial flags" rules. Sonnet follows the policy.
-    const result = await callTextModel(fullPrompt, 3000, 'claude-sonnet', {});
+    const result = await callTextModel(fullPrompt, 3000, 'claude-sonnet', { usageLabel: 'eval_consolidation' });
     if (!result?.text) {
       return { plan: null, usage: result?.usage || null, error: 'no text in consolidator response' };
     }

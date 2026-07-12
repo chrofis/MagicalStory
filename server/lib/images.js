@@ -3562,7 +3562,7 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
       SCENE_DESCRIPTION: sceneDescription
     });
 
-    const rewriteResult = await callTextModel(rewritePrompt, 1000);
+    const rewriteResult = await callTextModel(rewritePrompt, 1000, null, { usageLabel: 'scene_rewrite' });
     const rewrittenScene = rewriteResult.text;
 
     // Log token usage
@@ -8289,7 +8289,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // with the prose directly.
   const effectiveSceneModel = modelOverrides?.sceneIterationModel || modelOverrides?.sceneModel || CONFIG_DEFAULTS.sceneIteration;
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 18 validation checks with ${effectiveSceneModel}...`);
-  const sceneResult = await callClaudeAPI(scenePrompt, 16000, effectiveSceneModel);
+  const sceneResult = await callClaudeAPI(scenePrompt, 16000, effectiveSceneModel, { usageLabel: 'scene_iterate' });
   const newSceneDescription = sceneResult.text;
 
   // Track usage (Claude Haiku scene re-expansion)
