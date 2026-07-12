@@ -654,6 +654,11 @@ async function callOpenRouterAPI(prompt, maxTokens, modelId, options = {}) {
 
   const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
 
+  // OpenRouter can't do Anthropic-style prompt caching, but a cachePrefix still
+  // carries required content (template/rules) — prepend it so the model gets the
+  // full prompt, just without the cache discount.
+  const fullPrompt = (options.cachePrefix || '') + prompt;
+
   // Vision: OpenAI-compatible content array with image_url parts.
   let userContent;
   if (options.images && options.images.length > 0) {
@@ -661,9 +666,9 @@ async function callOpenRouterAPI(prompt, maxTokens, modelId, options = {}) {
       type: 'image_url',
       image_url: { url: img.startsWith('data:') ? img : `data:image/jpeg;base64,${stripDataUriPrefix(img)}` }
     }));
-    userContent.push({ type: 'text', text: prompt });
+    userContent.push({ type: 'text', text: fullPrompt });
   } else {
-    userContent = prompt;
+    userContent = fullPrompt;
   }
 
   const messages = [{ role: 'user', content: userContent }];

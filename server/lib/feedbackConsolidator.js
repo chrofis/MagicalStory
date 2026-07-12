@@ -194,6 +194,9 @@ async function consolidateFeedback({
   // inspect any past call later without reconstructing from partial state.
   storyId = null,
   round = null,
+  // Model override — defaults to the configured eval model (resolveEvalModel,
+  // key-guarded). The A/B replay passes an explicit model to compare.
+  modelOverride = null,
 }) {
   try {
     const template = PROMPT_TEMPLATES.feedbackConsolidator;
@@ -287,7 +290,11 @@ async function consolidateFeedback({
     // The `template` (rules/instructions) is identical across every
     // consolidation call in a story, so cache it — the per-page userInput is
     // the only variable part.
-    const result = await callTextModel(userInput, 3000, 'claude-sonnet', {
+    const { resolveEvalModel } = require('../config/models');
+    const evalModel = modelOverride || resolveEvalModel();
+    // cachePrefix caches the stable template — Anthropic-only; harmless (ignored)
+    // for OpenRouter models, which don't take the cache_control block.
+    const result = await callTextModel(userInput, 3000, evalModel, {
       usageLabel: 'eval_consolidation',
       cachePrefix: `${template}\n\n---\n\n`
     });

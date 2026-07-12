@@ -1094,10 +1094,12 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     });
 
     const { callTextModel } = require('./textModels');
-    // Stage 2 uses Sonnet — Haiku didn't reliably follow the "ignore prose
+    // Stage 2 was Sonnet — Haiku didn't reliably follow the "ignore prose
     // decoration unless it's a DECLARED INTERACTION" rule and kept flagging
     // false-positive gaze/facing issues that drove pointless repair rounds.
-    const sonnetResult = await callTextModel(complianceInput, 4096, 'claude-sonnet', { usageLabel: 'semantic_compliance' });
+    // Now configurable (resolveEvalModel, key-guarded to sonnet). NOTE: this is
+    // quality-critical and NOT yet A/B-validated on Qwen — watch repair churn.
+    const sonnetResult = await callTextModel(complianceInput, 4096, require('../config/models').resolveEvalModel(), { usageLabel: 'semantic_compliance' });
 
     stage2Usage = {
       input_tokens: sonnetResult.usage?.input_tokens || 0,
@@ -2255,6 +2257,222 @@ function getBboxCacheStats() {
   return { ..._bboxCacheStats, size: _bboxCache.size };
 }
 
+// ── Local Grounded-SAM figure detection (GroundingDINO → MobileSAM) ──
+// Alternative to the Gemini bbox, selected by MODEL_DEFAULTS.figureDetectionBackend
+// === 'grounding-dino'. Stage 1: /detect-figures-text (GroundingDINO) turns each
+// character's full-identity prose into a box. Stage 2: /figure-mask (MobileSAM)
+// turns the box into the tight silhouette; bodyBox = silhouette bounds. The
+// per-figure masks power the overlap guard (mask overlap, not box overlap — two
+// adjacent standing figures have overlapping boxes but disjoint masks). 3-tier
+// fallback: retry-in-DINO → Replicate Grounded-SAM API → return null (→ Gemini).
+const GDINO_OVERLAP_THRESHOLD = 0.30;   // overlapFrac ≥ this → collision
+const GDINO_SAME_FIGURE = 0.95;         // ≈ 100% → both prompts hit the same person
+const GDINO_LOW_CONFIDENCE = 0.45;      // DINO score below this → unreliable
+
+function _photoAnalyzerUrl() {
+  return process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+}
+
+function _pxBoxToNorm(box, W, H) {
+  const [x1, y1, x2, y2] = box;
+  return [
+    Math.max(0, Math.min(1, y1 / H)),
+    Math.max(0, Math.min(1, x1 / W)),
+    Math.max(0, Math.min(1, y2 / H)),
+    Math.max(0, Math.min(1, x2 / W)),
+  ];
+}
+
+// Decode a raw binary mask (alpha or grayscale white-on-black) PNG to a
+// {alpha:Uint8Array(0/1), width, height, area, bbox:[x1,y1,x2,y2]} at W×H.
+async function _binMaskFromBuffer(buf, W, H, channel) {
+  try {
+    let pipe = sharp(buf).resize(W, H, { fit: 'fill' });
+    pipe = channel === 'alpha' ? pipe.ensureAlpha().extractChannel(3) : pipe.greyscale();
+    const { data } = await pipe.raw().toBuffer({ resolveWithObject: true });
+    const bin = new Uint8Array(W * H);
+    let area = 0, minx = W, miny = H, maxx = -1, maxy = -1;
+    for (let i = 0; i < W * H; i++) {
+      if (data[i] > 128) {
+        bin[i] = 1; area++;
+        const x = i % W, y = (i / W) | 0;
+        if (x < minx) minx = x; if (x > maxx) maxx = x;
+        if (y < miny) miny = y; if (y > maxy) maxy = y;
+      }
+    }
+    if (area === 0) return null;
+    return { alpha: bin, width: W, height: H, area, bbox: [minx, miny, maxx + 1, maxy + 1] };
+  } catch { return null; }
+}
+
+// GroundingDINO text→box for a set of prompts.
+async function _gdinoDetect(imageDataUri, prompts) {
+  try {
+    const res = await fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageDataUri, prompts }),
+      signal: AbortSignal.timeout(180_000),
+    });
+    if (!res.ok) { log.warn(`⚠️ [GDINO-DETECT] /detect-figures-text HTTP ${res.status}`); return null; }
+    const j = await res.json();
+    if (!j?.success) { log.warn(`⚠️ [GDINO-DETECT] endpoint error: ${j?.error}`); return null; }
+    return j;
+  } catch (e) { log.warn(`⚠️ [GDINO-DETECT] detect failed: ${e.message}`); return null; }
+}
+
+// MobileSAM box→mask on the full page (box in full-page pixel coords).
+async function _mobilesamMaskFull(imageDataUri, boxPx, W, H) {
+  try {
+    const res = await fetch(`${_photoAnalyzerUrl()}/figure-mask`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageDataUri, box: boxPx }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
+    if (!j?.success || !m || !(j.fill_pixels > 0)) return null;
+    return _binMaskFromBuffer(Buffer.from(m[1], 'base64'), W, H, 'alpha');
+  } catch (e) { log.warn(`⚠️ [GDINO-DETECT] mask failed: ${e.message}`); return null; }
+}
+
+function _maskOverlapFrac(a, b) {
+  if (!a || !b || a.width !== b.width || a.height !== b.height) return 0;
+  let inter = 0;
+  const n = a.width * a.height;
+  for (let i = 0; i < n; i++) if (a.alpha[i] && b.alpha[i]) inter++;
+  return inter / Math.max(1, Math.min(a.area, b.area));
+}
+
+/**
+ * Detect figures with the local Grounded-SAM path. Returns { figures: [...] }
+ * in the detectAllBoundingBoxes contract (name/label/position/bodyBox/
+ * faceBox:null/confidence), or null to signal "fall back to Gemini".
+ */
+async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opts = {}) {
+  const { pageLabel = '' } = opts;
+  if (!Array.isArray(expectedCharacters) || expectedCharacters.length === 0) return null;
+
+  // The endpoints need base64 bytes — resolve http(s)/data/base64 to a data URI.
+  let imageDataUri;
+  if (typeof imageData === 'string' && /^https?:\/\//i.test(imageData)) {
+    const buf = await require('./r2').fetchImageBytes(imageData);
+    if (!buf) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}could not fetch image bytes`); return null; }
+    imageDataUri = `data:image/jpeg;base64,${buf.toString('base64')}`;
+  } else {
+    imageDataUri = imageData.startsWith('data:') ? imageData : `data:image/jpeg;base64,${r2Lib.stripDataUriPrefix(imageData)}`;
+  }
+
+  // Stage 1 — GroundingDINO on all prompts.
+  const prompts = expectedCharacters.map(c => ({ name: c.name, text: c.description || c.name }));
+  const det = await _gdinoDetect(imageDataUri, prompts);
+  if (!det || !Array.isArray(det.figures)) return null;
+  const W = det.width, H = det.height;
+
+  // Stage 2 — MobileSAM mask per figure → tight bbox + mask for the overlap guard.
+  const byName = new Map();
+  for (const f of det.figures) {
+    if (!f.box) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${f.name}: no box from DINO`); continue; }
+    const ec = expectedCharacters.find(c => c.name === f.name);
+    const mask = await _mobilesamMaskFull(imageDataUri, f.box, W, H);
+    const bodyBox = mask ? _pxBoxToNorm(mask.bbox, W, H) : _pxBoxToNorm(f.box, W, H);
+    byName.set(f.name, {
+      name: f.name, score: f.score, candidates: f.candidates || [], mask, bodyBox,
+      clothing: ec?.clothing || '', position: ec?.position || '',
+      promptText: prompts.find(p => p.name === f.name)?.text || f.name,
+    });
+  }
+  if (byName.size === 0) return null;
+  const names = [...byName.keys()];
+
+  // GUARD — low confidence + pairwise mask overlap.
+  const flagged = new Set();
+  for (const n of names) {
+    const r = byName.get(n);
+    if (r.score != null && r.score < GDINO_LOW_CONFIDENCE) {
+      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} low confidence ${r.score}`);
+      flagged.add(n);
+    }
+  }
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      const A = byName.get(names[i]), B = byName.get(names[j]);
+      const ov = _maskOverlapFrac(A.mask, B.mask);
+      if (ov >= GDINO_OVERLAP_THRESHOLD) {
+        log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${A.name} & ${B.name} masks overlap ${Math.round(ov * 100)}%${ov >= GDINO_SAME_FIGURE ? ' (≈same figure)' : ' (>30%)'}`);
+        flagged.add((A.score ?? 0) <= (B.score ?? 0) ? A.name : B.name);
+      }
+    }
+  }
+
+  // FALLBACK CHAIN per flagged figure.
+  const overlapsOthers = (mask, self) => Math.max(0, ...names.filter(x => x !== self).map(x => _maskOverlapFrac(mask, byName.get(x).mask)));
+  for (const n of flagged) {
+    const r = byName.get(n);
+    let resolved = false;
+
+    // Tier 1a — a non-overlapping candidate box already returned by DINO.
+    for (const cand of r.candidates) {
+      if (!cand.box) continue;
+      const m = await _mobilesamMaskFull(imageDataUri, cand.box, W, H);
+      if (m && overlapsOthers(m, n) < GDINO_OVERLAP_THRESHOLD) {
+        r.mask = m; r.bodyBox = _pxBoxToNorm(m.bbox, W, H); r.score = cand.score;
+        log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} resolved via alternate candidate box`);
+        resolved = true; break;
+      }
+    }
+    // Tier 1b — retry-in-DINO with clothing + position appended.
+    if (!resolved && (r.clothing || r.position)) {
+      const extra = [r.clothing, r.position && `on the ${r.position}`].filter(Boolean).join(', ');
+      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} retry-in-dino (clothing+position)`);
+      const re = await _gdinoDetect(imageDataUri, [{ name: n, text: `${r.promptText}${extra ? ` (${extra})` : ''}` }]);
+      const rf = re?.figures?.[0];
+      if (rf?.box) {
+        const m = await _mobilesamMaskFull(imageDataUri, rf.box, W, H);
+        if (m && overlapsOthers(m, n) < GDINO_OVERLAP_THRESHOLD) {
+          r.mask = m; r.bodyBox = _pxBoxToNorm(m.bbox, W, H); r.score = rf.score;
+          resolved = true;
+        }
+      }
+    }
+    // Tier 2 — Replicate Grounded-SAM with negative = other characters' clothing.
+    if (!resolved) {
+      const neg = names.filter(x => x !== n).map(x => byName.get(x).clothing).filter(Boolean).join(', ');
+      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} API fallback (negative "${neg}")`);
+      const { segmentByText } = require('./groundedSam');
+      const maskPng = await segmentByText(imageDataUri, r.promptText, neg);
+      if (maskPng) {
+        const m = await _binMaskFromBuffer(maskPng, W, H, 'grey');
+        if (m && overlapsOthers(m, n) < GDINO_OVERLAP_THRESHOLD) {
+          r.mask = m; r.bodyBox = _pxBoxToNorm(m.bbox, W, H);
+          resolved = true;
+        }
+      }
+    }
+    // Tier 3 — unresolved: the whole detection defers to Gemini.
+    if (!resolved) {
+      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} unresolved after retry — falling back to Gemini bbox`);
+      return null;
+    }
+  }
+
+  // Assemble the figures[] contract (cascade merge fills faceBoxes downstream).
+  const figures = names.map(n => {
+    const r = byName.get(n);
+    const cx = (r.bodyBox[1] + r.bodyBox[3]) / 2;
+    return {
+      name: n,
+      label: (expectedCharacters.find(c => c.name === n)?.description || '').slice(0, 120),
+      position: cx < 0.33 ? 'left' : cx > 0.66 ? 'right' : 'center',
+      faceBox: null,
+      bodyBox: r.bodyBox,
+      confidence: r.score == null ? 'low' : r.score >= 0.65 ? 'high' : r.score >= 0.45 ? 'medium' : 'low',
+    };
+  });
+  log.info(`🦖 [GDINO-DETECT] ${pageLabel}detected ${figures.length}/${expectedCharacters.length} figures (GroundingDINO→MobileSAM)`);
+  return { figures };
+}
+
 /**
  * Detect bounding boxes for a specific issue using Gemini's native detection
  * This is stage 2 of the two-stage detection approach:
@@ -2280,6 +2498,58 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
     if (cached) {
       log.debug(`♻️ [BBOX-CACHE] ${pageLabel}hit (${cached.figures?.length || 0} figures)`);
       return cached;
+    }
+  }
+
+  // Alternative detection backend: local Grounded-SAM (GroundingDINO → MobileSAM).
+  // Figure detection only — object detection stays with Gemini, so this path is
+  // used when there are expected characters (the common repair / figure case);
+  // it emits no objects (missingObjects empty → no false "missing object" flags).
+  // Fails open: any null/error → the Gemini path below runs and caches.
+  if (CONFIG_DEFAULTS.figureDetectionBackend === 'grounding-dino' && expectedCharacters.length > 0) {
+    try {
+      const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, { pageLabel });
+      if (gd && Array.isArray(gd.figures) && gd.figures.length > 0) {
+        let finalFigures = gd.figures;
+        // Same cascade-face merge the Gemini path runs, so faceBoxes get filled.
+        try {
+          const { detectIllustrationFaces, mergeCascadeFacesWithGemini } = require('./entityConsistency');
+          const cascadeFaces = await detectIllustrationFaces(imageData, 60);
+          if (cascadeFaces.length > 0) {
+            let imgW = 1024, imgH = 1024;
+            try {
+              const meta = await sharp(Buffer.from(r2Lib.stripDataUriPrefix(imageData), 'base64')).metadata();
+              imgW = meta.width || 1024; imgH = meta.height || 1024;
+            } catch { /* defaults */ }
+            finalFigures = await mergeCascadeFacesWithGemini(finalFigures, cascadeFaces, imgW, imgH, expectedCharacters);
+          }
+        } catch (cascadeErr) {
+          log.debug(`[GDINO-DETECT] ${pageLabel}cascade merge skipped: ${cascadeErr.message}`);
+        }
+        if (expectedObjects.length > 0) {
+          log.debug(`[GDINO-DETECT] ${pageLabel}${expectedObjects.length} expected object(s) not detected by GroundingDINO backend (figures only)`);
+        }
+        const result = {
+          figures: finalFigures,
+          objects: [],
+          expectedCharacters,
+          expectedObjects,
+          foundObjects: [],
+          missingObjects: [],
+          unknownFigures: finalFigures.filter(f => f.name === 'UNKNOWN').length,
+          usage: { input_tokens: 0, output_tokens: 0 },
+          rawPrompt: 'grounding-dino',
+          rawResponse: null,
+          refinementResponse: null,
+          detectionBackend: 'grounding-dino',
+        };
+        if (!skipCache && cacheKey) _bboxCacheSet(cacheKey, result);
+        log.info(`🦖 [BBOX-DETECT] ${pageLabel}GroundingDINO backend (${finalFigures.length} figures)`);
+        return result;
+      }
+      log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}GroundingDINO backend returned nothing — falling back to Gemini`);
+    } catch (gdErr) {
+      log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}GroundingDINO backend error (${gdErr.message}) — falling back to Gemini`);
     }
   }
 
@@ -3095,7 +3365,11 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
     chars.push({
       name,
       description,
-      position
+      position,
+      // Clothing kept separate (in addition to being inside `description`) so the
+      // GroundingDINO detection path can build negative/disambiguation prompts
+      // from the OTHER characters' clothing on an overlap retry.
+      clothing: clothing || ''
     });
     addedNames.add(name.toLowerCase());
   }
@@ -3114,7 +3388,8 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
     chars.push({
       name,
       description: clothing || 'character',
-      position
+      position,
+      clothing: clothing || ''
     });
     addedNames.add(name.toLowerCase());
     log.debug(`📦 [BBOX-BUILD] Added character "${name}" from expectedPositions (clothing: ${clothing || 'none'})`);

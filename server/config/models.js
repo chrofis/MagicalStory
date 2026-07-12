@@ -120,6 +120,13 @@ const MODEL_DEFAULTS = {
                                         // this call entirely; only used when prose is missing.
   sceneIteration: 'claude-sonnet',      // Scene iteration/retry — Sonnet only, same reason.
 
+  // Eval/consolidation model — the swappable, cost-sensitive stage (NOT story
+  // prose). Changed to Qwen for the cost A/B (2026-07-12). resolveEvalModel()
+  // below falls back to claude-sonnet when OPENROUTER_API_KEY is unset, so a
+  // forgotten key degrades to Sonnet rather than breaking generation.
+  // Env override (EVAL_MODEL) lets staging flip without a deploy.
+  evalModel: process.env.EVAL_MODEL || 'qwen-plus',
+
   // Image models
   pageImage: 'grok-imagine',                 // Regular page images ($0.02/image — vs $0.04 Gemini)
   coverImage: 'grok-imagine',                // Cover images ($0.02/image)
@@ -153,6 +160,17 @@ const MODEL_DEFAULTS = {
   // (docs/research-log.html). Falls back to rembg when the endpoint is
   // unavailable or returns nothing. Env override for staged rollout.
   figureMaskBackend: process.env.FIGURE_MASK_BACKEND || 'rembg',
+
+  // Figure DETECTION backend (which figure boxes the pipeline uses).
+  // 'gemini' = the Gemini vision bbox call (detectAllBoundingBoxes) — today's
+  // default, cheap + fast. 'grounding-dino' = local Grounded-SAM: GroundingDINO
+  // (photo_analyzer /detect-figures-text) text->box from each character's full
+  // identity, then MobileSAM (/figure-mask) box->silhouette. Validated 5/5 on a
+  // 5-figure page incl. an occluded figure (docs/research-log.html). Free/local
+  // but ~15s/figure CPU + ~1.9GB RAM. Fails open to gemini at every step
+  // (retry-in-dino -> Replicate Grounded-SAM API -> gemini). Env override for
+  // staged rollout; prod stays 'gemini'.
+  figureDetectionBackend: process.env.FIGURE_DETECTION_BACKEND || 'gemini',
 
   // Image generation backend (can be overridden in dev mode)
   // 'grok' = Grok Imagine (default — $0.02/image, half of Gemini)
@@ -523,9 +541,30 @@ function formatCostSummary(modelId, usage, cost) {
   }
 }
 
+/**
+ * Resolve the eval/consolidation model, guarding against a missing OpenRouter
+ * key: if MODEL_DEFAULTS.evalModel is an OpenRouter model (Qwen/DeepSeek) but
+ * OPENROUTER_API_KEY isn't set, fall back to claude-sonnet so a forgotten key
+ * degrades quality instead of throwing mid-generation. Logs the fallback once.
+ */
+let _evalFallbackWarned = false;
+function resolveEvalModel() {
+  const m = MODEL_DEFAULTS.evalModel || 'claude-sonnet';
+  const cfg = TEXT_MODELS[m];
+  if (cfg?.provider === 'openrouter' && !process.env.OPENROUTER_API_KEY) {
+    if (!_evalFallbackWarned) {
+      _evalFallbackWarned = true;
+      try { require('../utils/logger').log.warn(`⚠️ [EVAL MODEL] evalModel="${m}" but OPENROUTER_API_KEY not set — falling back to claude-sonnet`); } catch { /* logger optional */ }
+    }
+    return 'claude-sonnet';
+  }
+  return m;
+}
+
 module.exports = {
   TEXT_MODELS,
   MODEL_DEFAULTS,
+  resolveEvalModel,
   IMAGE_MODELS,
   IMAGE_BACKENDS,
   IMAGE_ASPECTS,
