@@ -4327,13 +4327,15 @@ router.post('/:id/debug-gdino/:pageNum', authenticateToken, async (req, res) => 
     }
 
     // Present characters only (the exact scoping the generation pipeline uses).
+    // scene.sceneCharacters entries are full character objects; fall back to
+    // sceneMetadata position names → look up the full char object.
     const sceneMeta = scene.sceneMetadata || extractSceneMetadata(scene.description || '');
     const present = Array.isArray(scene.sceneCharacters) && scene.sceneCharacters.length
       ? scene.sceneCharacters
       : Object.keys(sceneMeta?.characterPositions || {});
     const chars = present
-      .map(name => (storyData.characters || []).find(c => c.name === name))
-      .filter(Boolean);
+      .map(p => typeof p === 'string' ? (storyData.characters || []).find(c => c.name === p) : p)
+      .filter(c => c && c.name);
     if (!chars.length) return res.status(400).json({ error: 'No present characters resolved' });
 
     const prompts = chars.map(c => ({ name: c.name, text: buildCharacterPhysicalDescription(c) || c.name }));
