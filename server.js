@@ -6734,7 +6734,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           inputTokens: funcData.input_tokens,
           outputTokens: funcData.output_tokens,
           thinkingTokens: funcData.thinking_tokens,
-          directCost: directCost
+          directCost: directCost,
+          // Pass the real call count — the emission previously omitted it, so
+          // every event defaulted to "1 call" even when a bucket aggregated 15+.
+          calls: funcData.calls
         }, cost);
       }
     }
