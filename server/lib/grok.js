@@ -516,11 +516,14 @@ async function frameCharacterImage(buffer, color) {
   const height = meta.height;
   if (!width || !height) return buffer;
 
-  // Border proportional to HEIGHT, not min(w,h): packReferences resizes every
-  // slot to a common height, so a height-relative border lands at the SAME
-  // visible thickness on every card regardless of its original size. Thin enough
-  // to read as a clean frame, not a thick band that swamps the white card.
-  const border = Math.max(8, Math.round(height * 0.02));
+  // Border proportional to the card's SMALLER dimension. A height-relative
+  // border (height * 0.02) swamps a tall, NARROW card — a single full-body
+  // portrait is ~4x taller than wide, so 2% of its height was ~17% of its
+  // width per side, painting the slot ~35% red ("completely red" single-
+  // character slots). Using min(w,h) makes a narrow card get a border scaled
+  // to its narrow width, so the red reads as a thin frame on every shape.
+  // Multi-character cards are wider, so their border is unchanged in practice.
+  const border = Math.max(8, Math.round(Math.min(width, height) * 0.02));
   const gap = Math.max(4, Math.round(border * 0.4)); // white gap → reads as a frame, not an aura
   // White gap first, then the solid colour border around it.
   const withGap = await sharp(buffer)
