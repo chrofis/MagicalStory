@@ -294,7 +294,11 @@ async function consolidateFeedback({
     const evalModel = modelOverride || resolveEvalModel();
     // cachePrefix caches the stable template — Anthropic-only; harmless (ignored)
     // for OpenRouter models, which don't take the cache_control block.
-    const result = await callTextModel(userInput, 3000, evalModel, {
+    // 6000 out (was 3000): busy pages with many issues + per-fix critiques
+    // overran 3000 and truncated the JSON, which failed the parse and dropped
+    // the whole page to the legacy raw-issue fallback. Extra headroom only
+    // costs more when the output is genuinely longer (the failing case).
+    const result = await callTextModel(userInput, 6000, evalModel, {
       usageLabel: 'eval_consolidation',
       cachePrefix: `${template}\n\n---\n\n`
     });

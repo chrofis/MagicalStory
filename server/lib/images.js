@@ -6234,9 +6234,18 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       log.debug(`[INPAINT PAGE] P${pageNumber}: deferred to next round — "${issueText}"`);
     }
   } else {
-    // Fallback: legacy concat
-    editInstruction = combinedIssues.map(i => i.description).filter(Boolean).join('. ');
-    log.warn(`[INPAINT PAGE] Consolidator failed (${consolidation?.error || 'no plan'}), falling back to legacy instruction`);
+    // Fallback (consolidation returned no plan — usually its JSON was truncated
+    // at the output cap on a busy page). Do NOT concatenate every issue: that
+    // sent Grok a 4-issue blob it cannot execute atomically (observed on
+    // job_1783845868262 P4). Rank by severity, keep the top few, and emit a
+    // numbered atomic list — same shape and ≤3 cap as the plan path.
+    const SEV = { CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1, NONE: 0 };
+    const ranked = combinedIssues
+      .filter(i => i.description)
+      .sort((a, b) => (SEV[String(b.severity || 'MODERATE').toUpperCase()] ?? 2) - (SEV[String(a.severity || 'MODERATE').toUpperCase()] ?? 2))
+      .slice(0, 3);
+    editInstruction = ranked.map((it, i) => `${i + 1}. ${sanitizeIssueForInpaint(it.description)}`).join('\n');
+    log.warn(`[INPAINT PAGE] Consolidator failed (${consolidation?.error || 'no plan'}), fallback to top-${ranked.length} of ${combinedIssues.length} issues by severity`);
   }
 
   // Find reference images for missing characters/animals from Visual Bible (still useful)
