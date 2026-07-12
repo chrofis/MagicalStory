@@ -396,3 +396,22 @@ else. Never touch database.js initializeDatabase() or the dead
 REMOVED_initializeDatabase_DEAD() in server.js. After deploy, verify the
 column/table actually exists in the target environment's information_schema
 before shipping dependent code to the next environment.
+
+## Editing a call's options can silently drop a sibling line — execute it
+
+**2026-07-12:** An Edit to `_gdinoDetect` that only meant to change
+`AbortSignal.timeout(180_000)` → `300_000` also dropped the
+`body: JSON.stringify({image, prompts})` line in the replacement. Every
+GroundingDINO POST then went out with no body → Flask `get_json()` raised on
+"char 0" → 400/500 → silent Gemini fallback on every realistic detection. I
+parse-checked and module-loaded, but never EXECUTED the changed fetch, so the
+runtime-only symptom slipped through — then I burned hours misdiagnosing it as
+a Flask-dev-server / WSGI issue and shipped an unnecessary waitress migration.
+
+**Rule:** when an Edit rewrites a multi-line object/args literal (fetch options,
+config objects, function-call arg lists), re-read the FULL new block and diff it
+line-by-line against the old — a dropped `body`/`headers`/positional arg passes
+parse + load and only fails at runtime. And per smoke-testing-before-push:
+actually execute the changed call path (stub the endpoint if needed), don't stop
+at `node --check`. If a request suddenly "returns nothing / empty body", suspect
+the CLIENT is sending nothing before blaming the server.
