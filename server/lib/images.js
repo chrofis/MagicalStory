@@ -2310,6 +2310,7 @@ async function _gdinoDetect(imageDataUri, prompts) {
   try {
     const res = await fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageDataUri, prompts }),
       // The first call after a cold start (or post-idle-unload) pays the ~90s
       // model load on top of one forward pass per character; 180s wasn't enough
       // for a 4-5 char page and the endpoint's completed work was abandoned for
