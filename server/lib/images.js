@@ -2310,8 +2310,12 @@ async function _gdinoDetect(imageDataUri, prompts) {
   try {
     const res = await fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: imageDataUri, prompts }),
-      signal: AbortSignal.timeout(180_000),
+      // The first call after a cold start (or post-idle-unload) pays the ~90s
+      // model load on top of one forward pass per character; 180s wasn't enough
+      // for a 4-5 char page and the endpoint's completed work was abandoned for
+      // a spurious Gemini fallback. 300s covers cold load + passes; warm calls
+      // finish in ~60-100s. Genuine hangs still fall back to Gemini after this.
+      signal: AbortSignal.timeout(300_000),
     });
     if (!res.ok) { log.warn(`⚠️ [GDINO-DETECT] /detect-figures-text HTTP ${res.status}`); return null; }
     const j = await res.json();
