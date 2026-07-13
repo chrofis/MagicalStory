@@ -43,25 +43,13 @@ function resolveActiveVersionData(img) {
   const versions = Array.isArray(img.imageVersions) ? img.imageVersions : [];
   const lastIdx = versions.length - 1;
 
-  if (typeof img.activeVersion === 'number' && lastIdx >= 0) {
-    const activeIdx = Math.max(0, Math.min(img.activeVersion, lastIdx));
-    const activeVersion = versions[activeIdx];
-    return {
-      activeIdx,
-      activeVersion,
-      imageData: activeVersion?.imageData || img.imageData,
-      bboxDetection: img.sharedBboxDetection || activeVersion?.bboxDetection || img.bboxDetection || null,
-      versionIndex: activeIdx
-    };
-  }
-
-  // No numeric activeVersion (legacy blob or mid-pipeline). Prefer the ROOT
-  // imageData: rehydrate fills it with the meta-active version (what PDFs,
-  // prints and the share viewer serve), and the pipeline keeps it current.
-  // Defaulting to the LAST version here made post-hoc consistency checks
-  // evaluate a different image than the one users actually get whenever the
-  // best-scored version wasn't the newest. Last version stays as a final
-  // fallback for callers that stripped the root but kept version bytes.
+  // Prefer the ROOT imageData/bboxDetection: rehydrate fills the root with the
+  // image_version_meta-active version (the single source of truth — what PDFs,
+  // prints and the share viewer serve), and the pipeline keeps it current
+  // mid-generation. The old blob `img.activeVersion` branch was deleted; it was
+  // a second source of truth that diverged from meta after a manual version pin.
+  // Last version stays as a final fallback for callers that stripped the root
+  // but kept version bytes.
   if (img.imageData) {
     return {
       activeIdx: -1,
@@ -702,15 +690,15 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           // reading only it meant post-repair consistency checks silently
           // evaluated the stale v0 image. Kept as fallback for old blob data
           // saved before the numeric index existed.
+          // Active version resolved via resolveActiveVersionData → the
+          // image_version_meta-active root (single source of truth), never the
+          // deprecated blob activeVersion/isActive.
           let imageData = cover.imageData;
           let coverBbox = cover.bboxDetection || null;
           if (cover.imageVersions?.length > 0) {
-            const legacyActive = (typeof cover.activeVersion !== 'number')
-              ? cover.imageVersions.find(v => v.isActive)
-              : null;
-            const activeVersion = legacyActive || resolveActiveVersionData(cover).activeVersion;
-            if (activeVersion?.imageData) imageData = activeVersion.imageData;
-            if (activeVersion?.bboxDetection) coverBbox = activeVersion.bboxDetection;
+            const resolved = resolveActiveVersionData(cover);
+            if (resolved.imageData) imageData = resolved.imageData;
+            if (resolved.bboxDetection) coverBbox = resolved.bboxDetection;
           }
           if (imageData) {
             // Pull per-cover characterClothing from outline coverHints so the entity

@@ -702,7 +702,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           ...cv,
           imageData: undefined,
           imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
-          activeVersion: typeof cv.activeVersion === 'number' ? cv.activeVersion : slowActiveVersions[coverType],
+          activeVersion: slowActiveVersions[coverType] ?? 0, // image_version_meta is the single source of truth
           hasImage: !!cv.imageData
         };
       };
@@ -713,9 +713,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           ...img,
           imageData: undefined,
           hasImage: !!img.imageData,
-          activeVersion: typeof img.activeVersion === 'number'
-            ? img.activeVersion
-            : slowActiveVersions[String(img.pageNumber)],
+          activeVersion: slowActiveVersions[String(img.pageNumber)] ?? 0, // meta = single source of truth
           imageVersions: img.imageVersions?.map(v => ({
             ...v,
             imageData: undefined,

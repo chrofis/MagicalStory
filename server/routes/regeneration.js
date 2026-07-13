@@ -214,14 +214,19 @@ async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
   const sceneEntry = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
   if (!sceneEntry) return storyData; // page absent — route will 404 downstream
 
-  // bboxDetection mirror (pure in-memory, no bytes) — same as rehydrate.
-  // Numeric activeVersion first; boolean isActive only on legacy blobs.
-  const activeV = (typeof sceneEntry.activeVersion === 'number'
-    ? sceneEntry.imageVersions?.[sceneEntry.activeVersion]
-    : null) || sceneEntry.imageVersions?.find(v => v.isActive);
-  if (activeV?.bboxDetection) sceneEntry.bboxDetection = activeV.bboxDetection;
+  // Active version = image_version_meta (single source of truth), as a DB
+  // version_index. Default to 0 when unset (legacy rows). Resolves BOTH the
+  // bbox mirror and the image bytes — no more reading a stale blob activeVersion.
+  const metaRows = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [storyId]);
+  const versionMeta = metaRows[0]?.image_version_meta || {};
+  const activeDbIndex = versionMeta[String(pageNumber)]?.activeVersion ?? 0;
 
-  if (sceneEntry.imageData) return storyData; // already inline (legacy blob)
+  // bboxDetection mirror — always reflect the active version (map DB index →
+  // array position via arrayIndexForDb).
+  if (Array.isArray(sceneEntry.imageVersions)) {
+    const arrIdx = arrayIndexForDb(sceneEntry.imageVersions, activeDbIndex, 'scene');
+    sceneEntry.bboxDetection = sceneEntry.imageVersions[arrIdx]?.bboxDetection;
+  }
 
   const rows = await dbQuery(
     `SELECT version_index, image_data, image_url FROM story_images
@@ -229,12 +234,12 @@ async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
      ORDER BY version_index`,
     [storyId, pageNumber]
   );
-  if (rows.length === 0) return storyData; // no separate rows → images still inline
+  // No separate rows → images still inline in the blob (legacy); keep as-is.
+  if (rows.length === 0) return storyData;
 
-  const metaRows = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [storyId]);
-  const versionMeta = metaRows[0]?.image_version_meta || {};
-  const activeVersion = versionMeta[String(pageNumber)]?.activeVersion || 0;
-  const activeRow = rows.find(r => r.version_index === activeVersion)
+  // Always load the ACTIVE version's bytes (overwriting any stale inline blob,
+  // which may hold a different version than the pinned active one).
+  const activeRow = rows.find(r => r.version_index === activeDbIndex)
     || rows.find(r => r.version_index === 0);
   sceneEntry.imageData = await imgRowToBytes(activeRow);
   return storyData;
@@ -3712,7 +3717,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
       : null;
     const repairActiveVersion = anyRepaired && lastVersion
       ? dbIndexFor(lastVersion, currentScene.imageVersions.length - 1, 'scene')
-      : (typeof currentScene.activeVersion === 'number' ? currentScene.activeVersion : 0);
+      : await getActiveVersion(id, pageNumber); // keep the meta-active version
     if (anyRepaired) {
       // Persist the override so a refresh + the wire response agree.
       // pinned: without it the NEXT save's recompute reverts to pickBest.
@@ -4760,10 +4765,9 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
           if (!cover) continue;
           cover.bboxDetection = bbox;
           if (cover.imageVersions?.length > 0) {
-            // Numeric activeVersion first; boolean isActive only on legacy blobs.
-            const activeVer = (typeof cover.activeVersion === 'number'
-              ? cover.imageVersions[cover.activeVersion]
-              : null) || cover.imageVersions.find(v => v.isActive);
+            // Active version from image_version_meta (single source of truth).
+            const activeDbIdx = await getActiveVersion(id, coverType);
+            const activeVer = cover.imageVersions[arrayIndexForDb(cover.imageVersions, activeDbIdx, coverType)];
             if (activeVer) activeVer.bboxDetection = bbox;
           }
           log.info(`🔍 [REPAIR-WORKFLOW] Cached cover bbox for ${coverType} (${bbox.figures?.length || 0} figures)`);

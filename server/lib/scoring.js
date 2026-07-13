@@ -679,8 +679,9 @@ async function recomputeAllActiveVersions(storyId, storyData) {
   let scenes = 0, covers = 0, switches = 0;
 
   // One meta fetch for the whole story — recomputeActiveVersion skips
-  // user-pinned keys, and for those we still mirror the pinned choice onto
-  // the blob so blob readers agree with the meta column.
+  // user-pinned keys (their pin already lives in image_version_meta, the single
+  // source of truth). No blob mirror: the legacy sceneImages[].activeVersion /
+  // coverImages[].activeVersion field was deleted; all readers resolve from meta.
   let versionMeta = {};
   try {
     versionMeta = await getActiveVersionMeta(storyId);
@@ -688,32 +689,13 @@ async function recomputeAllActiveVersions(storyId, storyData) {
     // Non-fatal: without meta we recompute everything (pre-pin behaviour).
   }
 
-  // Mirror a pinned meta choice (DB version_index) back onto the blob's
-  // array-index activeVersion field so blob readers agree with the pin.
-  const mirrorPinned = (entry, metaEntry, type) => {
-    if (!metaEntry?.pinned || typeof metaEntry.activeVersion !== 'number') return;
-    const arrayIdx = arrayIndexForDb(entry.imageVersions, metaEntry.activeVersion, type);
-    if (arrayIdx >= 0 && arrayIdx < entry.imageVersions.length) entry.activeVersion = arrayIdx;
-  };
-
   if (Array.isArray(storyData.sceneImages)) {
     for (const s of storyData.sceneImages) {
       if (!s?.pageNumber || !Array.isArray(s.imageVersions) || s.imageVersions.length === 0) continue;
       const metaEntry = versionMeta[String(s.pageNumber)] ?? null;
       const r = await recomputeActiveVersion(storyId, s.pageNumber, s.imageVersions, 'scene', { metaEntry });
       scenes++;
-      if (r) {
-        switches++;
-        // Mirror the canonical active version onto the JSONB blob too. Without
-        // this, stories.data.sceneImages[N].activeVersion stays undefined and
-        // any client/code path that reads from the blob (instead of from the
-        // image_version_meta column) falls back to "last index" — see staging
-        // story job_1778925296736 where every page's blob activeVersion was
-        // undefined while the meta correctly tracked the best version.
-        s.activeVersion = r.activeIndex;
-      } else {
-        mirrorPinned(s, metaEntry, 'scene');
-      }
+      if (r) switches++;
     }
   }
   if (storyData.coverImages && typeof storyData.coverImages === 'object') {
@@ -723,12 +705,7 @@ async function recomputeAllActiveVersions(storyId, storyData) {
       const metaEntry = versionMeta[kind] ?? null;
       const r = await recomputeActiveVersion(storyId, kind, cv.imageVersions, kind, { metaEntry });
       covers++;
-      if (r) {
-        switches++;
-        cv.activeVersion = r.activeIndex;
-      } else {
-        mirrorPinned(cv, metaEntry, kind);
-      }
+      if (r) switches++;
     }
   }
   return { scenes, covers, switches };

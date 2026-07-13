@@ -1,6 +1,6 @@
 // Database Service - PostgreSQL connection and query utilities
 const { Pool } = require('pg');
-const { arrayToDbIndex, dbIndexFor } = require('../lib/versionManager');
+const { dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
 const r2 = require('../lib/r2');
 const { log } = require('../utils/logger');
 
@@ -1814,6 +1814,16 @@ async function persistStoryToDatabase(storyId, storyData, { firstSave = false } 
         delete coverData.imageData;
       }
 
+      // App-side cover typography: persist the TEXTLESS art (server/lib/coverTypography.js keeps it
+      // in artImageData) under `${coverType}Art` so a title / dedication edit can re-composite with
+      // no AI call. One row (version 0) — the active art. Captured before the strip below.
+      if (coverData.artImageData) {
+        const artData = coverData.artImageData;
+        imageSaveTasks.push(() => saveStoryImage(storyId, `${coverType}Art`, null, artData, { versionIndex: 0 }));
+        imagesSaved++;
+        delete coverData.artImageData;
+      }
+
       // Also save additional cover versions (imageVersions array)
       if (coverData.imageVersions && Array.isArray(coverData.imageVersions)) {
         for (let i = 0; i < coverData.imageVersions.length; i++) {
@@ -1978,17 +1988,13 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
     console.log(`💾 [SAVE-SCENE] Extracted ${imagesSaved} images to story_images for ${storyId} page ${pageNumber}`);
   }
 
-  // Recompute active version for THIS scene before the write below, so the
-  // picked activeVersion is mirrored into the persisted scene entry (same
-  // ordering rule as persistStoryToDatabase — mutating dataForStorage after
-  // the write would discard the mirror).
+  // Recompute the active version for THIS scene — recomputeActiveVersion writes
+  // it to image_version_meta (the single source of truth). No blob mirror: the
+  // legacy dataForStorage.activeVersion field was deleted; readers use meta.
   try {
     const { recomputeActiveVersion } = require('../lib/scoring');
     if (Array.isArray(dataForStorage.imageVersions) && dataForStorage.imageVersions.length > 0) {
-      const r = await recomputeActiveVersion(storyId, pageNumber, dataForStorage.imageVersions, 'scene');
-      if (r) {
-        dataForStorage.activeVersion = r.activeIndex;
-      }
+      await recomputeActiveVersion(storyId, pageNumber, dataForStorage.imageVersions, 'scene');
     }
   } catch (err) {
     console.warn(`⚠️  [SAVE-SCENE] Active version recompute failed for page ${pageNumber}: ${err.message}`);
@@ -2405,7 +2411,7 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
   // aspect is owned by the story's layout (advanced/Jugendbuch wants 1:1
   // square + text below; standard wants 3:4 with text overlay). Forcing
   // every scene to A4 here was cropping square scenes into portrait.
-  const COVER_A4_TYPES = new Set(['frontCover', 'initialPage', 'backCover']);
+  const COVER_A4_TYPES = new Set(['frontCover', 'initialPage', 'backCover', 'frontCoverArt', 'initialPageArt', 'backCoverArt']);
   if (imageData && COVER_A4_TYPES.has(imageType)) {
     const { normalizeImageToA4 } = require('../lib/aspectNormalize');
     imageData = await normalizeImageToA4(imageData);
@@ -2710,33 +2716,12 @@ async function getActiveVersion(storyId, pageNumber) {
     return metaRows[0].meta.activeVersion;
   }
 
-  // Fall back to data.sceneImages for backwards compatibility
-  const dataRows = await dbQuery(
-    `SELECT data->'sceneImages' as scene_images FROM stories WHERE id = $1`,
-    [storyId]
-  );
-
-  if (dataRows.length > 0 && dataRows[0].scene_images) {
-    const pageNum = parseInt(pageNumber);
-    const scene = dataRows[0].scene_images.find(s => s.pageNumber === pageNum);
-    if (scene?.imageVersions) {
-      const imageType = isNaN(pageNum) ? pageNumber : 'scene';
-      // Modern blobs carry a numeric activeVersion (array index) mirrored by
-      // the recompute hook; the boolean isActive flag only exists on legacy
-      // blobs. Check numeric first — keying off isActive alone returned 0 for
-      // every modern blob that lacked a meta entry.
-      if (typeof scene.activeVersion === 'number') {
-        return dbIndexFor(scene.imageVersions[scene.activeVersion], scene.activeVersion, imageType);
-      }
-      const activeIdx = scene.imageVersions.findIndex(v => v.isActive);
-      if (activeIdx >= 0) {
-        // Convert array index to DB version_index (what setActiveVersion stores)
-        return arrayToDbIndex(activeIdx, imageType);
-      }
-      return 0;
-    }
-  }
-
+  // image_version_meta is the single source of truth for the active version.
+  // No meta entry (legacy pre-column rows, or a page never recomputed) → the
+  // original, version 0 — same default getActiveStoryImages uses (COALESCE→0).
+  // The old data.sceneImages activeVersion/isActive fallback was deleted: it
+  // was a second source of truth that silently diverged from meta (a pinned
+  // meta version showing the stale blob version's data).
   return 0;
 }
 
@@ -2848,18 +2833,17 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
     // metadata, semantic eval) get base64 like before the migration.
     if (storyData.sceneImages) {
       await Promise.all(storyData.sceneImages.map(async (scene) => {
-        if (!scene.imageData) {
-          const img = activeImages.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber);
-          if (img) scene.imageData = await imgBytesAsync(img);
-        }
-        // Numeric activeVersion is the live mechanism; the boolean isActive
-        // flag only exists on pre-migration blob data. Reading only the flag
-        // meant this bbox mirror never fired for modern rows.
-        const activeV = (typeof scene.activeVersion === 'number'
-          ? scene.imageVersions?.[scene.activeVersion]
-          : null) || scene.imageVersions?.find(v => v.isActive);
-        if (activeV?.bboxDetection) {
-          scene.bboxDetection = activeV.bboxDetection;
+        const img = activeImages.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber);
+        if (!scene.imageData && img) scene.imageData = await imgBytesAsync(img);
+        // Mirror the ACTIVE version's bboxDetection. Source of truth is
+        // image_version_meta, encoded in the active row's version_index
+        // (getActiveStoryImages resolved it). arrayIndexForDb maps that DB
+        // index to the imageVersions[] position. Always reflect the active
+        // version (even if it has no bbox → undefined) so the top-level never
+        // shows a different version's boxes than the shown image.
+        if (img && Array.isArray(scene.imageVersions)) {
+          const arrIdx = arrayIndexForDb(scene.imageVersions, img.version_index, 'scene');
+          scene.bboxDetection = scene.imageVersions[arrIdx]?.bboxDetection;
         }
       }));
     }
@@ -2869,8 +2853,15 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
       await Promise.all(['frontCover', 'backCover', 'initialPage'].map(async (coverType) => {
         storyData.coverImages[coverType] = normalizeCoverValue(storyData.coverImages[coverType]);
         const cover = storyData.coverImages[coverType];
+        const img = activeImages.find(i => i.image_type === coverType);
+        // Mirror the active version's bboxDetection for covers too (previously
+        // never mirrored → covers always showed the last-written blob bbox
+        // regardless of the pinned version).
+        if (cover && img && Array.isArray(cover.imageVersions)) {
+          const arrIdx = arrayIndexForDb(cover.imageVersions, img.version_index, coverType);
+          cover.bboxDetection = cover.imageVersions[arrIdx]?.bboxDetection;
+        }
         if (cover && !getCoverData(cover)) {
-          const img = activeImages.find(i => i.image_type === coverType);
           if (img) cover.imageData = await imgBytesAsync(img);
         }
       }));
@@ -2937,14 +2928,12 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
         }));
       }
 
-      // Numeric activeVersion first; boolean isActive only on legacy blobs
-      // (see mirror above).
-      const activeV = (typeof scene.activeVersion === 'number'
-        ? scene.imageVersions?.[scene.activeVersion]
-        : null) || scene.imageVersions?.find(v => v.isActive);
-      if (activeV?.bboxDetection) {
-        scene.bboxDetection = activeV.bboxDetection;
-      }
+      // Mirror the active version's bboxDetection — active resolved from
+      // image_version_meta (single source of truth), mapped to the array
+      // position via arrayIndexForDb. Always reflect the active version.
+      const activeDbIdx = versionMeta[String(scene.pageNumber)]?.activeVersion ?? 0;
+      const arrIdx = arrayIndexForDb(scene.imageVersions, activeDbIdx, 'scene');
+      scene.bboxDetection = scene.imageVersions?.[arrIdx]?.bboxDetection;
     }));
   }
 
@@ -2977,6 +2966,13 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
             }
           }
         }));
+      }
+
+      // Mirror the active cover version's bboxDetection (active from meta).
+      if (cover && Array.isArray(cover.imageVersions)) {
+        const activeDbIdx = versionMeta[coverType]?.activeVersion ?? 0;
+        const arrIdx = arrayIndexForDb(cover.imageVersions, activeDbIdx, coverType);
+        cover.bboxDetection = cover.imageVersions[arrIdx]?.bboxDetection;
       }
     }));
   }
