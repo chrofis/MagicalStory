@@ -1340,6 +1340,39 @@ buildCharacterReferenceList includeClothing), `server/lib/entityConsistency.js`
 threading, primaryClothing), `server/routes/regeneration.js`.
 **Status:** ✅ active.
 
+## 2026-07-14 — Last clothing-default leak closed: vision analysis primed iterate rounds with the stored outfit
+**Context:** Continuation of the 2026-07-11 sweep above — one leak site was
+missed. On job_1783889777354 ("Grossvaters Kiste") P1, v0 rendered Hans
+correctly in his story polo, but every iterate round (v2+) repainted him in
+his base-character default (red plaid + suspenders); Emma the same (default
+butterfly shirt instead of her story cotton top). The scene prose was NOT
+dropping the outfit — it was being FED the wrong one. `formatCharacterContext`
+(sceneValidator.js), which builds the character context that primes
+`analyzeGeneratedImage` (the vision analysis feeding `previewFeedback.composition`
+into scene iteration), read `char.avatars.clothing[category]` directly — the
+stored default — instead of the story clothing. The vision model then described
+the default outfit even though the image showed the correct one, and the iterate
+adopted that description.
+**Decision:** `formatCharacterContext` resolves clothing through the same
+`buildClothingDescription(char, category, null, clothingRequirements)` every
+other path uses (story `clothingRequirements` → `avatars` fallback). Swept all
+remaining `avatars.clothing[category]` reads in `server/lib`; every other one
+already prioritizes `clothingRequirements`, so this was the sole unguarded site.
+Reverted the interim prose-mandate attempt (84790ac7) — it was built on the
+false premise that the model was DROPPING correctly-supplied clothing, and its
+"mandatory" banner wording violated the terse-prompt rule; the real input fix
+makes it redundant.
+**Rationale:** The stored per-character default must never enter a story — only
+the per-story `clothingRequirements` is authoritative. A vision-analysis prompt
+primed with the wrong outfit silently propagates it through the whole repair loop.
+**Touched:** `server/lib/sceneValidator.js` (formatCharacterContext +
+buildClothingDescription import), `server/lib/storyHelpers.js` (corrected the
+buildImagePrompt comment), `prompts/scene-expansion.txt`,
+`prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt` (reverted
+prose mandate). The entity-eval costumed-promotion guard (943c0198 Part B) is a
+separate, still-active fix.
+**Status:** ✅ active.
+
 ## 2026-07-11 — SOLID-GROUND rule: one canonical wording per prompt layer
 **Context:** "Characters stand on solid ground, never in water" lived in six
 drifted formulations (3 cover templates, coverComposite pass-1 + its

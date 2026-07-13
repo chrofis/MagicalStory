@@ -20,6 +20,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { log } = require('../utils/logger');
 const { expandPositionAbbreviations, stripEntityIds, buildHairDescription } = require('./storyHelpers');
 const { getPhysical } = require('./characterPhysical');
+const { buildClothingDescription } = require('./entityConsistency');
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -302,7 +303,12 @@ function formatCharacterContext(characters, clothingRequirements = {}) {
 
   return characters.map(char => {
     const clothing = clothingRequirements[char.name]?._currentClothing || 'standard';
-    const clothingDesc = char.avatars?.clothing?.[clothing] || 'unknown clothing';
+    // Per-story clothing is the source of truth. Use the SAME resolver as image
+    // generation (clothingRequirements → avatars fallback), never the raw
+    // avatars.clothing[category] default — that leaks the base-character outfit
+    // (e.g. red plaid) into the vision analysis, which then propagates into
+    // iterate rounds even though the rendered image shows the correct story outfit.
+    const clothingDesc = buildClothingDescription(char, clothing, null, clothingRequirements) || 'unknown clothing';
     const physical = getPhysical(char);
 
     const traits = [];

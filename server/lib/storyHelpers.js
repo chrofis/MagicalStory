@@ -4488,12 +4488,12 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     log.debug(`[IMAGE PROMPT] Scene characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
 
     // Per-character clothing reaches the image model through the scene prose
-    // (SCENE_DESCRIPTION), which the scene-expansion / scene-iteration model
-    // writes from each character's "Wearing:" input. The correct worn outfit is
-    // ALWAYS supplied as input (verified: Emma page-1 got "light pink cotton
-    // top…"); the failure mode is the model dropping it and narrating a HELD
-    // costume instead. That is fixed in scene-expansion.txt / scene-iteration.txt
-    // (mandatory worn-clothing rule), not by duplicating a clothing block here.
+    // (SCENE_DESCRIPTION), written from each character's "Wearing:" input. That
+    // input must resolve from the per-story clothingRequirements, never the
+    // base-character avatars.clothing default — see the buildClothingDescription
+    // routing in formatCharacterContext (sceneValidator.js), which was leaking
+    // the default outfit into the vision analysis and, via iterate rounds, into
+    // this prose. No separate clothing block is injected here.
     if (referencePhotos && referencePhotos.length > 0) {
       referencePhotos.forEach(photo => {
         if (photo.name && photo.clothingDescription) {
