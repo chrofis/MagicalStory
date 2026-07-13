@@ -776,8 +776,12 @@ async function generateCoverViaComposite({
 
   // Text line — used by single-pass (in pass-1 prompt) AND by legacy two-pass
   // (in pass-2 prompt). Computed once here so both branches stay in sync.
+  // App-side cover typography → bake NO text; the title / dedication / branding
+  // are composited afterwards by server/lib/coverTypography.js.
   let textLine = '';
-  if (coverKey === 'backCover') {
+  if (MODEL_DEFAULTS.appSideCoverType) {
+    textLine = `\nNO TEXT: do not render any title, dedication, footer, letters, numbers, signs, banners, or captions anywhere in the image. Keep the illustration purely visual with calm, uncluttered space.`;
+  } else if (coverKey === 'backCover') {
     textLine = `\nFOOTER TEXT: render exactly the text "magicalstory.ch" inset from the bottom-left corner (roughly 5% in from both the left edge and the bottom edge, sitting clearly inside the frame, not flush against the border). Hand-painted ${artStyle} letterforms — NOT a system font. Do NOT render the story title. Do NOT add any other text, names, or labels — only "magicalstory.ch".`;
   } else if (coverKey === 'initialPage') {
     if (dedication) {

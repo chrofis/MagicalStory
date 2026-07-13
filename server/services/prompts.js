@@ -94,6 +94,15 @@ async function loadPromptTemplates() {
   // Backwards-compat aliases (computed AFTER loads so the source key is set)
   PROMPT_TEMPLATES.sceneDescriptions = PROMPT_TEMPLATES.sceneIteration;
 
+  // Textless cover variants (for app-side cover typography — MODEL_DEFAULTS.appSideCoverType).
+  // Derived from the base templates so composition edits auto-sync: the labelled text-baking block
+  // (**TITLE:** / **TEXT:**) is replaced with an explicit no-text directive. The initial page just
+  // uses the existing initialPageNoDedication when the flag is on. Kept off the two paint paths.
+  const NO_TEXT = '**NO TEXT:**\nLeave the illustration completely free of any title, caption, letters, numbers, or written text — the text is added afterwards. Keep the composition clean with calm, uncluttered space.\n';
+  const makeTextless = (tpl, label) => tpl ? tpl.replace(new RegExp(`\\*\\*${label}:\\*\\*[\\s\\S]*?(?=\\n\\*\\*)`), NO_TEXT) : tpl;
+  PROMPT_TEMPLATES.frontCoverTextless = makeTextless(PROMPT_TEMPLATES.frontCover, 'TITLE');
+  PROMPT_TEMPLATES.backCoverTextless = makeTextless(PROMPT_TEMPLATES.backCover, 'TEXT');
+
   if (failures.length > 0) {
     log.error(`❌ Prompt template load: ${failures.length} file(s) failed:`);
     for (const f of failures) {

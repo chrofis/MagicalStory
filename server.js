@@ -434,6 +434,35 @@ async function detectBboxOnCovers(coverImages, characters, artStyle = null) {
   return coverImages;
 }
 
+// App-side cover typography (MODEL_DEFAULTS.appSideCoverType). Runs AFTER detectBboxOnCovers so the
+// figure boxes are available for placement. For each cover: composite the title / dedication /
+// "magicalstory.ch" onto the (textless) art via server/lib/coverTypography.js, keep the textless art
+// in `artImageData` (so title/dedication edits re-render with no AI call), and store the layout spec.
+async function applyCoverTypography(coverImages, { title, dedication, seed, trial = false } = {}) {
+  if (!coverImages) return coverImages;
+  const coverTypography = require('./server/lib/coverTypography');
+  const toBuffer = (d) => Buffer.from(String(d).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const JOBS = [['frontCover', 'front'], ['initialPage', 'initial'], ['backCover', 'back']];
+  await Promise.all(JOBS.map(async ([key, kind]) => {
+    const cover = coverImages[key];
+    if (!cover || !cover.imageData || cover.artImageData) return; // missing, or already composited
+    try {
+      const artBuffer = toBuffer(cover.imageData);
+      const figures = cover.bboxDetection?.figures || [];
+      const { buffer, spec } = await coverTypography.composeCover({
+        artBuffer, kind, title: title || '', dedication: trial ? '' : (dedication || ''), seed: seed || title, figures,
+      });
+      cover.artImageData = cover.imageData;                                   // textless original
+      cover.imageData = 'data:image/jpeg;base64,' + buffer.toString('base64'); // composited (displayed)
+      cover.typography = spec;
+      log.debug(`🅰️ [COVER TYPO] ${key}: ${spec.kind || kind}${spec.fontId ? ` ${spec.fontId}/${spec.layout} ${spec.face}` : ''}${spec.skipped ? ` (skipped: ${spec.skipped})` : ''}`);
+    } catch (err) {
+      log.warn(`⚠️ [COVER TYPO] ${key}: ${err.message}`);
+    }
+  }));
+  return coverImages;
+}
+
 // (Firebase Admin SDK removed — Google sign-in now uses google-auth-library directly,
 //  see server/routes/auth.js POST /api/auth/google and server/routes/trial.js claim flows.)
 if (!process.env.GOOGLE_OAUTH_CLIENT_ID) {
@@ -3869,11 +3898,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Build style description using the routed backend (same as pages at buildImagePrompt time)
         const styleDescription = resolveArtStyle(artStyle, coverImageBackend) || resolveArtStyle('pixar');
 
+        // App-side cover typography: generate the art TEXTLESS (title / dedication /
+        // branding are composited afterwards by server/lib/coverTypography.js).
+        const textlessCovers = MODEL_DEFAULTS.appSideCoverType;
         let coverPrompt;
         if (coverType === 'titlePage') {
-          // Front cover: include title for text rendering
+          // Front cover: include title for text rendering (skipped when textless)
           const storyTitle = streamingTitle || inputData.title || 'My Story';
-          coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+          coverPrompt = fillTemplate(textlessCovers ? PROMPT_TEMPLATES.frontCoverTextless : PROMPT_TEMPLATES.frontCover, {
             TITLE_PAGE_SCENE: sceneDescription,
             STYLE_DESCRIPTION: styleDescription,
             STORY_TITLE: storyTitle,
@@ -3881,8 +3913,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             VISUAL_BIBLE: visualBibleText
           });
         } else if (coverType === 'initialPage') {
-          // Initial page: with or without dedication
-          coverPrompt = inputData.dedication && inputData.dedication.trim()
+          // Initial page: with or without dedication (textless → always the no-text scene)
+          coverPrompt = (!textlessCovers && inputData.dedication && inputData.dedication.trim())
             ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
                 INITIAL_PAGE_SCENE: sceneDescription,
                 STYLE_DESCRIPTION: styleDescription,
@@ -3898,7 +3930,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               });
         } else {
           // Back cover
-          coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
+          coverPrompt = fillTemplate(textlessCovers ? PROMPT_TEMPLATES.backCoverTextless : PROMPT_TEMPLATES.backCover, {
             BACK_COVER_SCENE: sceneDescription,
             STYLE_DESCRIPTION: styleDescription,
             CHARACTER_REFERENCE_LIST: characterRefList,
@@ -6557,6 +6589,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             await detectBboxOnCovers(coverImages, inputData.characters, artStyle);
           } catch (bboxErr) {
             log.warn(`⚠️ [UNIFIED] Cover bbox detection failed: ${bboxErr.message}`);
+          }
+        }
+
+        // App-side cover typography — composite title/dedication/branding onto the textless art.
+        // Runs after bbox detection so figure boxes drive placement (trial: title only, empty figures).
+        if (MODEL_DEFAULTS.appSideCoverType) {
+          try {
+            await applyCoverTypography(coverImages, {
+              title, dedication: inputData.dedication, seed: jobId, trial: !!inputData.skipQualityEval,
+            });
+          } catch (typoErr) {
+            log.warn(`⚠️ [UNIFIED] Cover typography failed: ${typoErr.message}`);
           }
         }
       } catch (coverErr) {

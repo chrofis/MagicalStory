@@ -912,6 +912,11 @@ export interface CoverImageData {
   imageVersions?: ImageVersion[];
   // Index of the active version in imageVersions (replaces isActive on individual versions)
   activeVersion?: number;
+  // App-side cover typography (MODEL_DEFAULTS.appSideCoverType): the TEXTLESS art the title /
+  // dedication / branding was composited onto (persisted as `${coverType}Art` in story_images),
+  // plus the computed layout spec. artImageData is stripped from the blob on save (bytes live in R2).
+  artImageData?: string;  // Base64 data URL — textless source art (re-composite on title/dedication edit)
+  typography?: { kind?: string; fontId?: string; layout?: string; face?: string; lines?: string[]; skipped?: string; [k: string]: unknown } | null;
 }
 
 export interface CoverImages {

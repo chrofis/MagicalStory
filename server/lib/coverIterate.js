@@ -280,9 +280,11 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const storyTitle = storyData.title || 'My Story';
   const coverDedication = storyData.dedication;
 
+  // App-side cover typography → regenerate the art TEXTLESS too (text composited afterwards).
+  const textlessCovers = MODEL_DEFAULTS.appSideCoverType;
   let coverPrompt;
   if (normalizedCoverType === 'front') {
-    coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+    coverPrompt = fillTemplate(textlessCovers ? PROMPT_TEMPLATES.frontCoverTextless : PROMPT_TEMPLATES.frontCover, {
       TITLE_PAGE_SCENE: sceneDescription,
       STYLE_DESCRIPTION: styleDescription,
       STORY_TITLE: storyTitle,
@@ -290,7 +292,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
       VISUAL_BIBLE: visualBiblePrompt
     });
   } else if (normalizedCoverType === 'initialPage') {
-    coverPrompt = coverDedication
+    coverPrompt = (!textlessCovers && coverDedication)
       ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
           INITIAL_PAGE_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
@@ -307,7 +309,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
           VISUAL_BIBLE: visualBiblePrompt
         });
   } else {
-    coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
+    coverPrompt = fillTemplate(textlessCovers ? PROMPT_TEMPLATES.backCoverTextless : PROMPT_TEMPLATES.backCover, {
       BACK_COVER_SCENE: sceneDescription,
       STYLE_DESCRIPTION: styleDescription,
       CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),

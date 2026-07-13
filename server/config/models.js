@@ -276,6 +276,19 @@ const MODEL_DEFAULTS = {
   // Off by default — flip to true once validated on production stories.
   // Both initial cover gen and iterate-cover honor this flag.
   compositeCovers: true,
+
+  // ─── App-side cover typography ───────────────────────────────────────
+  // When true, covers are generated TEXTLESS (no baked title / dedication /
+  // "magicalstory.ch") and the typography is composited app-side by
+  // server/lib/coverTypography.js onto the textless art:
+  //   • frontCover → colored 3D title (colour + font + placement from the art
+  //     and the hero garment, placed clear of the figure boxes)
+  //   • initialPage → the user's dedication (Widmung), high-contrast script
+  //   • backCover → "magicalstory.ch", consistent small mark in a bottom corner
+  // The textless art is stored alongside the composited image so title /
+  // dedication edits re-render instantly with no AI call.
+  // Off by default — enable on staging first (env: APP_SIDE_COVER_TYPE=true).
+  appSideCoverType: process.env.APP_SIDE_COVER_TYPE === 'true',
 };
 
 // Available inpaint backends
