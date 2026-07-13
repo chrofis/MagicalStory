@@ -1435,12 +1435,15 @@ and evaluation resolved her per-page clothing from DIFFERENT data.
 **Decision:** One canonical per-page, per-character clothing category
 (`characterClothing[name]`) → `buildClothingDescription`/`clothingDescription`
 feeds BOTH sides.
-- (A) buildImagePrompt (storyHelpers.js ~4491) now injects an explicit "WORN
-  CLOTHING" block per character from `referencePhotos[].clothingDescription`
-  (same clothingRequirements source the evaluator uses; capped 160 chars/line),
-  with a note that a costume named only as a held/nearby object is NOT worn. The
-  image model and the prose-reading semantic eval now get the worn outfit
-  explicitly, not just ambiguous prose.
+- (A) The worn outfit is ALWAYS supplied as input to the scene prose (each
+  character's `Wearing:` line, resolved from the characterClothing category —
+  verified: Emma page-1 got "light pink cotton top…"). The failure was the
+  scene-expansion / scene-iteration model DROPPING it and narrating a HELD
+  costume instead. Fixed at the source: scene-expansion.txt / scene-iteration.txt
+  / scene-iteration-free.txt now mandate stating every character's WORN clothing
+  in the prose and clarify that a costume held/found/nearby is NOT worn. (An
+  earlier attempt injected a separate WORN CLOTHING block into the image prompt;
+  reverted — it duplicated data already carried by the prose and lengthened it.)
 - (B) entityConsistency.js collectEntityAppearances fallback only assumes
   `costumed` when the costume is the character's SOLE outfit across the story
   (no standard/winter/summer used); otherwise keeps the standard default. Emma →

@@ -4487,31 +4487,19 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   if (sceneCharacters && sceneCharacters.length > 0) {
     log.debug(`[IMAGE PROMPT] Scene characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
 
-    // Per-character WORN clothing, injected explicitly so generation and
-    // evaluation share ONE clothing source. photo.clothingDescription is
-    // resolved from the page's characterClothing category via the same
-    // clothingRequirements data the evaluator's buildClothingDescription
-    // reads — so the string the model is TOLD to render is identical to the
-    // string the evaluator checks against. Without this, the only textual
-    // clothing signal was the free scene prose, which can omit the worn
-    // outfit and mention a HELD costume ("gripping a folded ninja costume"),
-    // making the model + the semantic evaluator disagree with the avatar and
-    // the metadata (Emma page-1 flip-flop, job_1783889777354). Capped per line
-    // to bound the char budget (Grok ~7500) — the block was removed in the
-    // past for that reason; correctness of worn clothing wins over a few
-    // pose chars, and repair recovers a clipped pose but not a wrong outfit.
-    const clothingLines = [];
+    // Per-character clothing reaches the image model through the scene prose
+    // (SCENE_DESCRIPTION), which the scene-expansion / scene-iteration model
+    // writes from each character's "Wearing:" input. The correct worn outfit is
+    // ALWAYS supplied as input (verified: Emma page-1 got "light pink cotton
+    // top…"); the failure mode is the model dropping it and narrating a HELD
+    // costume instead. That is fixed in scene-expansion.txt / scene-iteration.txt
+    // (mandatory worn-clothing rule), not by duplicating a clothing block here.
     if (referencePhotos && referencePhotos.length > 0) {
-      for (const photo of referencePhotos) {
+      referencePhotos.forEach(photo => {
         if (photo.name && photo.clothingDescription) {
-          const desc = String(photo.clothingDescription).replace(/\s+/g, ' ').trim().slice(0, 160);
-          clothingLines.push(`- ${photo.name} wears: ${desc}`);
-          log.debug(`[IMAGE PROMPT] ${photo.name} wears: "${desc}" (${photo.clothingCategory})`);
+          log.debug(`[IMAGE PROMPT] ${photo.name} wears: "${photo.clothingDescription}" (${photo.clothingCategory})`);
         }
-      }
-    }
-    if (clothingLines.length > 0) {
-      characterReferenceList += `\n**WORN CLOTHING (each character wears exactly this; a costume named only as a held/nearby object is NOT worn):**\n${clothingLines.join('\n')}\n`;
+      });
     }
 
     const heightDescription = buildRelativeHeightDescription(sceneCharacters);
