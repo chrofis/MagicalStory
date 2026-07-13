@@ -670,7 +670,6 @@ export interface ImageVersion {
   prompt?: string;       // Full API prompt (for dev mode)
   modelId?: string;
   createdAt: string;
-  isActive?: boolean;  // DEPRECATED: kept for backward compat with old blob data. Use page.activeVersion instead.
   type?: 'original' | 'regeneration' | 'iteration' | 'edit' | 'repair' | 'entity-repair' | 'scale-repair' | 'text-space-repair';
   // Specific method that produced this version. Finer-grained than `type`:
   //   - "original"

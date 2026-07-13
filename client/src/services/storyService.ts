@@ -454,7 +454,6 @@ export const storyService = {
         userInput: string | null;
         modelId: string | null;
         createdAt: string | null;
-        isActive?: boolean;
         type: string | null;
         qualityScore: number | null;
         qualityReasoning: string | null;
@@ -818,13 +817,11 @@ export const storyService = {
       pageNumber: number;
       imageData: string;
       qualityScore?: number;
-      isActive?: boolean;
       versionCount?: number;
       activeVersion?: number;
       imageVersions?: Array<{
         imageData: string;
         qualityScore?: number;
-        isActive?: boolean;
         createdAt?: string;
         generatedAt?: string;
         description?: string;
@@ -848,13 +845,11 @@ export const storyService = {
           pageNumber: number;
           imageData: string;
           qualityScore?: number;
-          isActive?: boolean;
           versionCount?: number;
           activeVersion?: number;
           imageVersions?: Array<{
             imageData: string;
             qualityScore?: number;
-            isActive?: boolean;
             createdAt?: string;
             generatedAt?: string;
             description?: string;
@@ -1288,7 +1283,6 @@ export const storyService = {
       prompt?: string;
       modelId?: string;
       createdAt?: string;
-      isActive?: boolean;
       type?: string;
       qualityScore?: number;
       imageData?: string;
@@ -1333,7 +1327,6 @@ export const storyService = {
         prompt?: string;
         modelId?: string;
         createdAt?: string;
-        isActive?: boolean;
         type?: string;
         qualityScore?: number;
         imageData?: string;

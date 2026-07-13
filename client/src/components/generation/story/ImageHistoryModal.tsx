@@ -466,7 +466,8 @@ export function ImageHistoryModal({
                     </div>
                   )}
                   {(() => {
-                    const refs = detailVersion.grokRefImages || (detailVersion.isActive ? sceneLevelGrokRefImages : null);
+                    const isActiveVersion = activeVersionIndex != null ? detailIndex === activeVersionIndex : detailIndex === versions.length - 1;
+                    const refs = detailVersion.grokRefImages || (isActiveVersion ? sceneLevelGrokRefImages : null);
                     if (!refs || refs.length === 0) return null;
                     return (
                       <div>
