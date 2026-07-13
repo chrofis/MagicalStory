@@ -1097,9 +1097,20 @@ async function packReferences(refs = {}, options = {}) {
     // slots (and nudging a touch above the source) keeps the composite visually
     // close to the originals.
     const resized = await sharp(slotBuf).resize({ height: 1024, withoutEnlargement: true }).jpeg({ quality: 92 }).toBuffer();
-    const rm = await sharp(resized).metadata();
+    // Pad the char slot to the target aspect with WHITE here, BEFORE it reaches
+    // packReferences' final aspect-pad. That pad samples the per-side EDGE
+    // colour (a feature for blending landmark-photo bars) — but a character
+    // slot's left/right edge IS the coloured identity frame (frameCharacterImage),
+    // so it would sample the frame colour and extend it across the whole side
+    // bar, turning a thin 5px frame into a ~60px colour fill ("all blue/red"
+    // single-character slots). White bars keep the frame a thin border and make
+    // packReferences' aspect-pad a no-op. The non-VB branch already gets this
+    // via buildCharacterGroupSlot's own pad; this covers the VB-row branch,
+    // which skips that pad (skipAspectPad: willAddVb).
+    const atAspect = await padCharacterSlotToAspect(resized, aspectRatio);
+    const rm = await sharp(atAspect).metadata();
     const vbLabel = vbCount > 0 ? ` + ${vbCount} VB cell(s)` : '';
-    slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+    slots.push(`data:image/jpeg;base64,${atAspect.toString('base64')}`);
     log.info(`🎨 ${tag} Slot ${slots.length}: ${group.length} character${group.length > 1 ? 's' : ''}${vbLabel} composed (${rm.width}x${rm.height})`);
   };
 
