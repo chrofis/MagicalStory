@@ -1235,16 +1235,24 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
     }
 
     // Safety net: use story-level clothingRequirements when per-page clothing is still missing
-    // This handles edge cases where clothing data was lost (e.g., old stories before this fix)
+    // (old stories, or lost metadata). Only assume a character is COSTUMED when
+    // the costume is their SOLE outfit across the whole story — clothingRequirements
+    // is page-agnostic, so promoting anyone who wears a costume ANYWHERE to costumed
+    // on EVERY page mis-flagged Emma (uses standard + costumed:ninja) as costumed on
+    // page 1, where she is standard and merely HOLDS the costume — the entity check
+    // then pulled her ninja avatar and repainted her (job_1783889777354 P1). A
+    // character who also uses standard/winter/summer keeps the standard default.
     if (Object.keys(characterClothing).length === 0 && clothingRequirements) {
+      const NON_COSTUMED = ['standard', 'winter', 'summer', 'formal'];
       for (const char of characters) {
         const charReqs = clothingRequirements[char.name];
-        if (charReqs?.costumed?.used && charReqs.costumed.costume) {
-          characterClothing[char.name] = `costumed:${charReqs.costumed.costume}`;
-        }
+        if (!charReqs?.costumed?.used || !charReqs.costumed.costume) continue;
+        const usesNonCostumed = NON_COSTUMED.some(cat => charReqs[cat]?.used);
+        if (usesNonCostumed) continue; // ambiguous — can't infer this page; keep standard default
+        characterClothing[char.name] = `costumed:${charReqs.costumed.costume}`;
       }
       if (Object.keys(characterClothing).length > 0) {
-        log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: Using story clothingRequirements fallback: ${JSON.stringify(characterClothing)}`);
+        log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: Using story clothingRequirements fallback (costume-only chars): ${JSON.stringify(characterClothing)}`);
       }
     }
 

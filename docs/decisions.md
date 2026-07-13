@@ -1415,3 +1415,43 @@ attribution is wanted. The landmark-indexing batch calls Claude via
 `callAnthropicAPI` directly (bypasses the dispatcher) but runs outside a job,
 so it's out of scope for per-story accounting.
 **Status:** ✅ active.
+
+## 2026-07-13 — Generation and evaluation share ONE per-page clothing source
+**Context:** On a costume-change page (job_1783889777354 P1: Noah has donned the
+ninja suit, Emma is still in standard clothes holding hers), the pipeline
+flip-flopped Emma's outfit between repair rounds — iterate rendered her standard
+(correct), a later inpaint repainted her into ninja (wrong). Root: generation
+and evaluation resolved her per-page clothing from DIFFERENT data.
+- **Generation** learned clothing only from the free scene PROSE + avatar pixels;
+  the canonical per-character clothing STRING computed in buildImagePrompt was
+  logged and discarded (removed once to save Grok chars). The prose said Emma was
+  "gripping a folded black ninja costume" (held, not worn) and never stated her
+  worn standard outfit — so "ninja" was the only textual clothing token.
+- **Evaluation** judged against characterClothing category → buildClothingDescription.
+  Two evaluators diverged: the semantic-compliance eval reads the PROSE (misreads
+  held-vs-worn), and entityConsistency.js collectEntityAppearances had a
+  page-agnostic fallback that promoted ANY character with a costume anywhere in
+  the story to `costumed` on EVERY page (Emma uses standard + costumed:ninja).
+**Decision:** One canonical per-page, per-character clothing category
+(`characterClothing[name]`) → `buildClothingDescription`/`clothingDescription`
+feeds BOTH sides.
+- (A) buildImagePrompt (storyHelpers.js ~4491) now injects an explicit "WORN
+  CLOTHING" block per character from `referencePhotos[].clothingDescription`
+  (same clothingRequirements source the evaluator uses; capped 160 chars/line),
+  with a note that a costume named only as a held/nearby object is NOT worn. The
+  image model and the prose-reading semantic eval now get the worn outfit
+  explicitly, not just ambiguous prose.
+- (B) entityConsistency.js collectEntityAppearances fallback only assumes
+  `costumed` when the costume is the character's SOLE outfit across the story
+  (no standard/winter/summer used); otherwise keeps the standard default. Emma →
+  standard, Noah (costume-only) → costumed.
+**Rationale:** generation and evaluation must be driven by the same clothing
+field or they contradict and repair oscillates. clothingRequirements is
+page-agnostic (lists every outfit a character wears anywhere) — never use it to
+DECIDE a per-page category, only to describe one already chosen.
+**Touched:** server/lib/storyHelpers.js (buildImagePrompt worn-clothing block),
+server/lib/entityConsistency.js (costume-only fallback guard).
+**Follow-up:** scene-expansion prose could also be tightened to always state
+worn clothing + mark held items; and the >7500-char prompt truncation should
+protect the WORN CLOTHING block over trailing prose.
+**Status:** ✅ active.
