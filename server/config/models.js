@@ -287,8 +287,8 @@ const MODEL_DEFAULTS = {
   //   • backCover → "magicalstory.ch", consistent small mark in a bottom corner
   // The textless art is stored alongside the composited image so title /
   // dedication edits re-render instantly with no AI call.
-  // Off by default — enable on staging first (env: APP_SIDE_COVER_TYPE=true).
-  appSideCoverType: process.env.APP_SIDE_COVER_TYPE === 'true',
+  // ON by default — set APP_SIDE_COVER_TYPE=false to fall back to baked-in cover text.
+  appSideCoverType: process.env.APP_SIDE_COVER_TYPE !== 'false',
 };
 
 // Available inpaint backends
