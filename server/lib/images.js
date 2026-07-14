@@ -6746,6 +6746,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         description: orig.sceneDescription || ''
       };
     }),
+    // Per-story clothing is the canonical source the entity checker resolves
+    // expectedClothing from (via buildClothingDescription). Without it,
+    // buildClothingDescription falls through to avatars.clothing[category] —
+    // the stale base-character DEFAULT — and the evaluator flags correctly-
+    // rendered story outfits as mismatches and emits fixInstructions to repaint
+    // them into the default.
+    clothingRequirements: storyData?.clothingRequirements || null,
     artStyle: artStyle || 'pixar'
   });
 
