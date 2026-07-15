@@ -1244,7 +1244,10 @@ function blendVisualScore(modelRawScore, computedRawScore) {
   return Math.max(computedRawScore, modelRawScore - 3);
 }
 
-async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null) {
+async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
+  // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
+  // variants — full replacement template strings used instead of the loaded
+  // files for THIS call only (PROMPT_TEMPLATES is never mutated).
   // Hoisted outside try so the catch/finally below can reference them.
   // `let` is block-scoped to the try body — without these declarations here,
   // the finally's `if (qualityFiguresResolve)` throws ReferenceError on every
@@ -1298,7 +1301,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // or cover brief).
     if (runFidelity) {
       const { evaluateSemanticFidelity } = require('./sceneValidator');
-      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint);
+      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null);
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
 
@@ -1325,7 +1328,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Use standard evaluation for all images (scenes + covers)
     // Covers get the expected text prepended so the evaluator checks text accuracy too
     let evaluationTemplate;
-    if (PROMPT_TEMPLATES.imageEvaluation) {
+    if (evalOptions.evalTemplateOverride) {
+      evaluationTemplate = evalOptions.evalTemplateOverride;
+      log.verbose(`📊 [EVAL] Using OVERRIDE evaluation template (${evaluationType})`);
+    } else if (PROMPT_TEMPLATES.imageEvaluation) {
       evaluationTemplate = PROMPT_TEMPLATES.imageEvaluation;
       log.verbose(`📊 [EVAL] Using standard evaluation (${evaluationType})`);
     } else {
@@ -1417,6 +1423,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           interactionsBlock,
           figureProportions: figureProportionsBlock,
           sceneIntent: sceneIntentBlock,
+          template: evalOptions.evalTemplateOverride || undefined,
         })
       : 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
 
@@ -1565,6 +1572,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             interactionsBlock,
             figureProportions: figureProportionsBlock,
             sceneIntent: sceneIntentBlock,
+            template: evalOptions.evalTemplateOverride || undefined,
           })
         : evaluationPrompt;
       parts[parts.length - 1] = { text: fullEvalPrompt };
@@ -10859,13 +10867,41 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
 
     // Fetch the figure's silhouette mask (alpha=255 inside figure, 0
     // outside), used to clip the crosshatch to the figure shape. Backend-
-    // selectable: box-prompted MobileSAM (targets the single figure — the
-    // hatch region IS the figure bbox, so the prompt box is the full crop)
-    // with rembg fallback.
-    const hatchCrop = await sharp(paddedScene)
-      .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
-      .jpeg({ quality: 90 }).toBuffer();
-    let silhouetteMaskBuf = await fetchFigureMaskPng(hatchCrop, [0, 0, hatchWidth, hatchHeight]);
+    // selectable: box-prompted MobileSAM (targets the single figure) with
+    // rembg fallback.
+    //
+    // The box MUST give the segmenter real spatial context. Cropping tight to
+    // the figure box and prompting with the whole crop ([0,0,cropW,cropH])
+    // strips that context: on a loose box that also spans a bright doorway /
+    // window, both SAM and rembg grab that background object instead of the
+    // figure, and the magenta lands on the background (investigation: p4
+    // grok_inpaint on job_1783981243217_bhub4d1ji hatched the doorway, the
+    // target stayed unrepaired). Instead crop with generous padding and pass
+    // the REAL figure box mapped into crop pixel coords — the same pattern the
+    // blended path uses — then crop the returned mask back to the hatch region
+    // so downstream code (occluder-subtract, feather) is unchanged. Works for
+    // both backends: SAM anchors on the box, rembg runs on a figure-centred
+    // crop.
+    const figureMaskForHatch = async (srcBuffer) => {
+      const PAD = 0.5;
+      const padL = Math.max(0, Math.floor(hatchLeft - hatchWidth * PAD));
+      const padT = Math.max(0, Math.floor(hatchTop - hatchHeight * PAD));
+      const padR = Math.min(paddedW, Math.ceil(hatchLeft + hatchWidth + hatchWidth * PAD));
+      const padB = Math.min(paddedH, Math.ceil(hatchTop + hatchHeight + hatchHeight * PAD));
+      const padW = padR - padL, padH = padB - padT;
+      const crop = await sharp(srcBuffer)
+        .extract({ left: padL, top: padT, width: padW, height: padH })
+        .jpeg({ quality: 90 }).toBuffer();
+      const boxInCrop = [hatchLeft - padL, hatchTop - padT, hatchLeft + hatchWidth - padL, hatchTop + hatchHeight - padT];
+      const mask = await fetchFigureMaskPng(crop, boxInCrop);
+      if (!mask) return null;
+      // Crop the mask back to the hatch region so it lines up with hatchOnly
+      // and every downstream consumer (all at hatchWidth × hatchHeight).
+      return await sharp(mask)
+        .extract({ left: hatchLeft - padL, top: hatchTop - padT, width: hatchWidth, height: hatchHeight })
+        .png().toBuffer();
+    };
+    let silhouetteMaskBuf = await figureMaskForHatch(paddedScene);
     if (!silhouetteMaskBuf) {
       log.warn(`⚠️ [CHAR REPAIR GROK] silhouette-edge unavailable — falling back to rectangular hatch`);
     }
@@ -11130,13 +11166,11 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       let leakRatio = null;
       let newSilBuf = null;
       try {
-        const grokHatchCrop = await sharp(grokAtSourceDims)
-          .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
-          .jpeg({ quality: 90 }).toBuffer();
-        // Same backend as the input-side hatch silhouette (MobileSAM box
-        // prompt with rembg fallback). Mixing backends made the two masks
-        // disagree on shape even for a perfectly-placed repaint.
-        newSilBuf = await fetchFigureMaskPng(grokHatchCrop, [0, 0, hatchWidth, hatchHeight]);
+        // Same masking path as the input-side hatch silhouette (padded-crop +
+        // real box-in-crop, MobileSAM with rembg fallback) so the two masks
+        // agree on shape for a perfectly-placed repaint. Mixing backends OR
+        // box conventions made them disagree even when the figure didn't move.
+        newSilBuf = await figureMaskForHatch(grokAtSourceDims);
         if (newSilBuf) {
           const oldAlpha = await sharp(silhouetteMaskBuf).extractChannel(3).raw().toBuffer();
           const newAlpha = await sharp(newSilBuf).extractChannel(3).raw().toBuffer();

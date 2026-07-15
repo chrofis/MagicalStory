@@ -164,8 +164,11 @@ const MODEL_DEFAULTS = {
   // 'mobilesam' = box-prompted MobileSAM in photo_analyzer (/figure-mask) —
   // selects only the target figure, won the 2026-07-10 mask shootout
   // (docs/research-log.html). Falls back to rembg when the endpoint is
-  // unavailable or returns nothing. Env override for staged rollout.
-  figureMaskBackend: process.env.FIGURE_MASK_BACKEND || 'rembg',
+  // unavailable or returns nothing. Default since 2026-07-15: box-prompted SAM
+  // isolates the single figure; rembg (salient-object, no box) grabbed the
+  // wrong object on loose boxes that also span a bright doorway/window. Set
+  // FIGURE_MASK_BACKEND=rembg to revert.
+  figureMaskBackend: process.env.FIGURE_MASK_BACKEND || 'mobilesam',
 
   // Figure DETECTION backend (which figure boxes the pipeline uses).
   // 'gemini' = the Gemini vision bbox call (detectAllBoundingBoxes) — today's

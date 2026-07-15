@@ -1491,3 +1491,29 @@ server/lib/entityConsistency.js (costume-only fallback guard).
 worn clothing + mark held items; and the >7500-char prompt truncation should
 protect the WORN CLOTHING block over trailing prose.
 **Status:** ✅ active.
+
+## Char-repair figure mask: box-prompted SAM on a padded crop, not a whole-crop box (2026-07-15)
+**Context:** The fullScene inpaint char-repair (`grok_inpaint`) built its magenta
+crosshatch by cropping the scene tight to the figure box, then asking the
+silhouette endpoint for `[0,0,cropW,cropH]` — the entire crop. On a loose box
+that also spans a bright doorway/window (background figures standing near an
+opening), both SAM and rembg segment that background object instead of the
+figure, so the magenta landed on the background. Grok then repainted the
+background (a no-op) and the target stayed unrepaired. Reproduced deterministically
+on p4 of `job_1783981243217_bhub4d1ji` (Daniel, anime): magenta hatched the
+covered-bridge doorway; SAM on `[0,0,cropW,cropH]` returned the doorway (62% fill),
+SAM on the full image + Daniel's real box returned a clean Daniel silhouette.
+**Decision:** (1) `figureMaskForHatch` crops with 50% padding around the figure box
+and passes the REAL figure box mapped into crop pixel coords — the same pattern the
+blended path (`fetchFigureMaskPng(cropForSilhouette, figureBoxInCrop)`) already used.
+Both fullScene call sites (input hatch + feather fitness-check) go through it.
+(2) Default `figureMaskBackend` flipped `rembg` → `mobilesam`: box-prompted SAM
+isolates the single figure; rembg (salient-object, no box) cannot. rembg stays the
+graceful fallback when SAM is unavailable/empty.
+**Rationale:** Padded-crop + real-box gives the segmenter spatial context (verified to
+isolate the figure) while keeping the rembg fallback correct (it runs on a
+figure-centred crop, not the full scene where it would mask every figure). Chosen over
+literal full-image + box specifically so the rembg fallback doesn't segment all figures.
+**Touched:** `server/lib/images.js` (`figureMaskForHatch` in the useFullScene branch;
+both hatch + feather call sites), `server/config/models.js` (`figureMaskBackend` default).
+**Status:** ✅ active. Staging-first; prod default flip pending staging validation.
