@@ -580,8 +580,10 @@ function ResultCard({ result, stage, onRedo, redoing }: { result: ExperimentResu
   const [promoted, setPromoted] = useState(false);
   const producesImage = result.versionIndex !== undefined && result.imageType;
   // Avatar-sheet entries (stage 'avatars') have no page; "baseline" is the
-  // realistic pass-1 sheet instead of a story page.
+  // realistic pass-1 sheet instead of a story page. Pass-1 entries have no
+  // baseline at all — the anchor IS the result.
   const isAvatar = result.imageType === 'tl_avatar';
+  const isPass1 = isAvatar && (result as { pass?: number }).pass === 1;
   const hasPage = typeof result.pageNumber === 'number';
 
   const loadImages = async () => {
@@ -659,14 +661,16 @@ function ResultCard({ result, stage, onRedo, redoing }: { result: ExperimentResu
               {isAvatar ? 'Load avatar sheets' : producesImage ? 'Load baseline vs variant' : 'Load page image'}
             </button>
           ) : (
-            <div className={`grid gap-4 mt-3 ${producesImage ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
-              <div>
-                <div className="text-xs font-medium text-gray-500 mb-1">{isAvatar ? 'Realistic anchor (pass 1)' : 'Baseline (active version)'}</div>
-                {baseline ? <img src={baseline} alt="baseline" className="rounded-lg w-full" /> : <div className="text-xs text-gray-400">unavailable</div>}
-              </div>
+            <div className={`grid gap-4 mt-3 ${producesImage && !isPass1 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+              {!isPass1 && (
+                <div>
+                  <div className="text-xs font-medium text-gray-500 mb-1">{isAvatar ? 'Realistic anchor (pass 1)' : 'Baseline (active version)'}</div>
+                  {baseline ? <img src={baseline} alt="baseline" className="rounded-lg w-full" /> : <div className="text-xs text-gray-400">unavailable</div>}
+                </div>
+              )}
               {producesImage && (
                 <div>
-                  <div className="text-xs font-medium text-gray-500 mb-1">{isAvatar ? `Styled sheet (test v${result.versionIndex})` : `Variant (test v${result.versionIndex})`}</div>
+                  <div className="text-xs font-medium text-gray-500 mb-1">{isPass1 ? `Realistic anchor (pass 1, test v${result.versionIndex})` : isAvatar ? `Styled sheet (pass 2, test v${result.versionIndex})` : `Variant (test v${result.versionIndex})`}</div>
                   {variant ? <img src={variant} alt="variant" className="rounded-lg w-full" /> : <div className="text-xs text-gray-400">unavailable</div>}
                   {result.imageType === 'scene' && !promoted && (
                     <div className="mt-2">
