@@ -493,6 +493,8 @@ async function loadCharacterContext(storyId, characterName) {
 
 /** Pass 1: realistic anchor sheet (generated once per character, reused). */
 async function runAvatarRealisticStage(target, { experimentId }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
   const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
   const { character, costume } = await loadCharacterContext(target.storyId, target.character);
   const t0 = Date.now();
@@ -513,6 +515,8 @@ async function runAvatarRealisticStage(target, { experimentId }) {
 
 /** Pass 2: style transfer of an existing realistic sheet (never re-runs Pass 1). */
 async function runAvatarStyleStage(target, { experimentId, promptOverride, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
   const { runStyleTransferPass, resolveFacePhoto } = require('./character2x4Sheet');
   const artStyle = params.artStyle || target.artStyle;
   const realisticVersionIndex = params.realisticVersionIndex ?? target.realisticVersionIndex;
