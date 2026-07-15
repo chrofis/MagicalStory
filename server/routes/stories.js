@@ -66,6 +66,14 @@ function normalizeImageData(imageData) {
   return `data:image/jpeg;base64,${imageData}`;
 }
 
+// Read-only cross-user access: plain admins may READ any story (Test Lab,
+// support) without impersonating; impersonating admins keep their existing
+// fallback. Write endpoints deliberately do NOT use this — they stay
+// owner/impersonation-gated.
+function canReadAnyStory(req) {
+  return req.user?.role === 'admin' || (req.user?.impersonating && req.user?.originalAdminId);
+}
+
 // ============================================
 // HISTORICAL EVENTS API
 // ============================================
@@ -124,8 +132,8 @@ router.get('/', authenticateToken, async (req, res) => {
       // Also check story_images for frontCover (metadata.hasThumbnail can be stale)
       const rows = await dbQuery(
         `SELECT s.metadata, s.share_token, CASE WHEN s.metadata IS NULL THEN s.data ELSE NULL END as data,
-         EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'frontCover') as has_cover_image,
-         EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'scene') as has_any_image
+         EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'frontCover' AND NOT si.is_test) as has_cover_image,
+         EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'scene' AND NOT si.is_test) as has_any_image
          FROM stories s WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
         [req.user.id, limit, offset]
       );
@@ -275,8 +283,8 @@ router.get('/:id/quick-metadata', authenticateToken, async (req, res) => {
     ]);
 
     if (metaResult.length === 0) {
-      // Check if impersonating admin
-      if (req.user.impersonating && req.user.originalAdminId) {
+      // Check if admin (plain-admin read or impersonating)
+      if (canReadAnyStory(req)) {
         const adminResult = await dbQuery(`SELECT id, metadata FROM stories WHERE id = $1`, [id]);
         if (adminResult.length === 0) {
           return res.status(404).json({ error: 'Story not found' });
@@ -332,7 +340,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
 
     // First verify access (fast query)
     let accessRows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       accessRows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
       if (accessRows.length === 0) {
         accessRows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
@@ -415,7 +423,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       // Get image info from story_images table (fast - no large data)
       const imageInfoRows = await dbQuery(
         `SELECT image_type, page_number, version_index, quality_score, generated_at
-         FROM story_images WHERE story_id = $1 ORDER BY image_type, page_number, version_index`,
+         FROM story_images WHERE story_id = $1 AND NOT is_test ORDER BY image_type, page_number, version_index`,
         [id]
       );
 
@@ -763,7 +771,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
       data->'costumedAvatarGeneration' as "costumedAvatarGeneration", data->'finalChecksReport' as "finalChecksReport",
       data->>'languageLevel' as "languageLevel"`;
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery(`SELECT ${devFields} FROM stories WHERE id = $1 AND user_id = $2`, [id, req.user.id]);
       if (rows.length === 0) {
         rows = await dbQuery(`SELECT ${devFields} FROM stories WHERE id = $1`, [id]);
@@ -1352,7 +1360,7 @@ router.get('/:id/evaluation-data', authenticateToken, async (req, res) => {
 
     // Verify access
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
       if (rows.length === 0) {
         rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
@@ -1453,7 +1461,7 @@ router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
 
     // Verify user access
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
     } else {
       rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
@@ -1531,7 +1539,7 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
 
     // Verify user access
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
     } else {
       rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
@@ -1844,7 +1852,7 @@ router.get('/:id/avatar-generation-image', authenticateToken, async (req, res) =
 
     // Verify user access
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
     } else {
       rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
@@ -1926,7 +1934,7 @@ router.get('/:id/retry-images/:pageNumber', authenticateToken, async (req, res) 
 
     // Verify user has access to this story
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
     } else {
       rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
@@ -1969,7 +1977,7 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
     // remember which user the story belongs to so we can fetch their 2×4
     // character sheets to display alongside the composite stages.
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT id, user_id FROM stories WHERE id = $1', [id]);
     } else {
       rows = await dbQuery('SELECT id, user_id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
@@ -2188,7 +2196,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
 
     // Verify user has access to this story (fast query, no data loading)
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
       if (rows.length === 0) {
         rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
@@ -2559,7 +2567,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
 
     // First, verify user has access to this story (fast query, no data loading)
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
       if (rows.length === 0) {
         rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
@@ -2694,7 +2702,7 @@ router.get('/:id/cover-image/:coverType', authenticateToken, async (req, res) =>
 
     // First, verify user has access to this story (fast query, no data loading)
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
       if (rows.length === 0) {
         rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
@@ -2850,13 +2858,13 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     if (isDatabaseMode()) {
       let rows;
-      if (req.user.impersonating && req.user.originalAdminId) {
-        // Admin impersonating - try impersonated user first, then any story
+      if (canReadAnyStory(req)) {
+        // Admin (plain or impersonating) - try own/impersonated user first, then any story
         rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
         if (rows.length === 0) {
           rows = await dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [id]);
           if (rows.length > 0) {
-            console.log(`📖 [IMPERSONATE] Admin viewing story owned by user_id: ${rows[0].user_id}`);
+            console.log(`📖 [ADMIN-READ] Admin viewing story owned by user_id: ${rows[0].user_id}`);
           }
         }
       } else {
@@ -2923,10 +2931,9 @@ router.get('/:id/cover', authenticateToken, async (req, res) => {
     // orders can reference stories the user later deleted. Returning 404
     // floods the console without offering any real security benefit (the
     // endpoint leaks no data either way).
-    const accessCheck = await dbQuery(
-      'SELECT id FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const accessCheck = canReadAnyStory(req)
+      ? await dbQuery('SELECT id FROM stories WHERE id = $1', [id])
+      : await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     if (accessCheck.length === 0) {
       return res.json({ coverImage: null });
     }
@@ -3349,7 +3356,7 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
     // Validate version exists in story_images table (try direct DB index first)
     let versionCheck = await pool.query(
       `SELECT 1 FROM story_images
-       WHERE story_id = $1 AND page_number = $2 AND version_index = $3`,
+       WHERE story_id = $1 AND page_number = $2 AND version_index = $3 AND NOT is_test`,
       [id, pageNum, dbVersionIndex]
     );
 
@@ -3360,7 +3367,7 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
       if (legacyDbIndex !== dbVersionIndex) {
         const legacyCheck = await pool.query(
           `SELECT 1 FROM story_images
-           WHERE story_id = $1 AND page_number = $2 AND version_index = $3`,
+           WHERE story_id = $1 AND page_number = $2 AND version_index = $3 AND NOT is_test`,
           [id, pageNum, legacyDbIndex]
         );
         if (legacyCheck.rows.length > 0) {
@@ -3455,7 +3462,7 @@ router.put('/:id/covers/:coverType/active-image', authenticateToken, async (req,
     // Validate version exists in story_images table
     const versionCheck = await pool.query(
       `SELECT 1 FROM story_images
-       WHERE story_id = $1 AND image_type = $2 AND version_index = $3`,
+       WHERE story_id = $1 AND image_type = $2 AND version_index = $3 AND NOT is_test`,
       [id, coverType, versionIndex]
     );
 

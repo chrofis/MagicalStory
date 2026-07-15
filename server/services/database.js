@@ -2403,7 +2403,9 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
     throw new Error('Database mode required');
   }
 
-  const { qualityScore = null, generatedAt = null, versionIndex = 0 } = options;
+  // isTest/experimentId: Test Lab sandbox versions — excluded from every
+  // user-facing read (see is_test filters below); promoted by flipping the flag.
+  const { qualityScore = null, generatedAt = null, versionIndex = 0, isTest = false, experimentId = null } = options;
 
   // Normalize covers to exact A4 aspect at write time — every cover render
   // is the full bleed page, so a 1% Grok drift would show as a misaligned
@@ -2440,20 +2442,20 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
   if (pageNumber == null) {
     // Covers: use partial index ON CONFLICT for NULL page_number
     await dbQuery(
-      `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, image_url, quality_score, generated_at)
-       VALUES ($1, $2, NULL, $3, $4, $5, $6, $7)
+      `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, image_url, quality_score, generated_at, is_test, experiment_id)
+       VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (story_id, image_type, version_index) WHERE page_number IS NULL
-       DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at`,
-      [storyId, imageType, versionIndex, persistedImageData, imageUrl, qualityScore, generatedAt]
+       DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at, is_test = EXCLUDED.is_test, experiment_id = EXCLUDED.experiment_id`,
+      [storyId, imageType, versionIndex, persistedImageData, imageUrl, qualityScore, generatedAt, isTest, experimentId]
     );
   } else {
     // Scenes: use partial index ON CONFLICT for non-NULL page_number
     await dbQuery(
-      `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, image_url, quality_score, generated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, image_url, quality_score, generated_at, is_test, experiment_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (story_id, image_type, page_number, version_index) WHERE page_number IS NOT NULL
-       DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at`,
-      [storyId, imageType, pageNumber, versionIndex, persistedImageData, imageUrl, qualityScore, generatedAt]
+       DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at, is_test = EXCLUDED.is_test, experiment_id = EXCLUDED.experiment_id`,
+      [storyId, imageType, pageNumber, versionIndex, persistedImageData, imageUrl, qualityScore, generatedAt, isTest, experimentId]
     );
   }
 }
@@ -2473,7 +2475,7 @@ async function getStoryImage(storyId, imageType, pageNumber, versionIndex = 0) {
 
   const rows = await dbQuery(
     `SELECT image_data, image_url, quality_score, generated_at FROM story_images
-     WHERE story_id = $1 AND image_type = $2 AND page_number IS NOT DISTINCT FROM $3 AND version_index = $4`,
+     WHERE story_id = $1 AND image_type = $2 AND page_number IS NOT DISTINCT FROM $3 AND version_index = $4 AND NOT is_test`,
     [storyId, imageType, pageNumber, versionIndex]
   );
 
@@ -2505,7 +2507,7 @@ async function getStoryImageWithVersions(storyId, imageType, pageNumber) {
 
   const rows = await dbQuery(
     `SELECT version_index, image_data, image_url, quality_score, generated_at FROM story_images
-     WHERE story_id = $1 AND image_type = $2 AND page_number IS NOT DISTINCT FROM $3
+     WHERE story_id = $1 AND image_type = $2 AND page_number IS NOT DISTINCT FROM $3 AND NOT is_test
      ORDER BY version_index`,
     [storyId, imageType, pageNumber]
   );
@@ -2552,7 +2554,7 @@ async function getAllStoryImages(storyId) {
 
   return await dbQuery(
     `SELECT image_type, page_number, version_index, image_data, image_url, quality_score, generated_at
-     FROM story_images WHERE story_id = $1 ORDER BY image_type, page_number, version_index`,
+     FROM story_images WHERE story_id = $1 AND NOT is_test ORDER BY image_type, page_number, version_index`,
     [storyId]
   );
 }
@@ -2584,7 +2586,7 @@ async function getActiveStoryImages(storyId) {
     version_counts AS (
       SELECT story_id, image_type, page_number, COUNT(*) as version_count
       FROM story_images
-      WHERE story_id = $1
+      WHERE story_id = $1 AND NOT is_test
       GROUP BY story_id, image_type, page_number
     ),
     target_versions AS (
@@ -2598,12 +2600,13 @@ async function getActiveStoryImages(storyId) {
               AND si2.image_type = si.image_type
               AND si2.page_number IS NOT DISTINCT FROM si.page_number
               AND si2.version_index = COALESCE(av.active_version, 0)
+              AND NOT si2.is_test
           ) THEN COALESCE(av.active_version, 0)
           ELSE 0
         END as effective_version
       FROM (
         SELECT DISTINCT story_id, image_type, page_number
-        FROM story_images WHERE story_id = $1
+        FROM story_images WHERE story_id = $1 AND NOT is_test
       ) si
       LEFT JOIN active_versions av ON (
         (si.image_type = 'scene' AND av.page_key = si.page_number::text) OR
@@ -2624,7 +2627,7 @@ async function getActiveStoryImages(storyId) {
       AND vc.image_type = si.image_type
       AND vc.page_number IS NOT DISTINCT FROM si.page_number
     )
-    WHERE si.story_id = $1
+    WHERE si.story_id = $1 AND NOT si.is_test
     ORDER BY si.image_type, si.page_number`,
     [storyId]
   );
@@ -2693,6 +2696,7 @@ async function imagesExistByType(storyId, imageTypes) {
     `SELECT DISTINCT image_type FROM story_images
      WHERE story_id = $1
        AND image_type = ANY($2::text[])
+       AND NOT is_test
        AND (image_data IS NOT NULL OR image_url IS NOT NULL)`,
     [storyId, imageTypes]
   );
@@ -2873,7 +2877,7 @@ async function rehydrateStoryImages(storyId, storyData, { activeOnly = true } = 
   // Full path: load ALL versions (for version picker / full rehydration)
   const allVersionImages = await dbQuery(
     `SELECT image_type, page_number, version_index, image_data, image_url
-     FROM story_images WHERE story_id = $1
+     FROM story_images WHERE story_id = $1 AND NOT is_test
      ORDER BY page_number, version_index`,
     [storyId]
   );

@@ -230,7 +230,7 @@ async function rehydrateActivePageImage(storyId, storyData, pageNumber) {
 
   const rows = await dbQuery(
     `SELECT version_index, image_data, image_url FROM story_images
-     WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2
+     WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2 AND NOT is_test
      ORDER BY version_index`,
     [storyId, pageNumber]
   );
@@ -456,7 +456,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     // 503 crashes when multiple regenerations fire concurrently.
     const pageImages = await dbQuery(
       `SELECT version_index, image_data FROM story_images
-       WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2
+       WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2 AND NOT is_test
        ORDER BY version_index`,
       [id, pageNumber]
     );
@@ -934,7 +934,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     // Build complete imageVersions from DB (blob may only have the new version, not v0)
     const allVersionRows = await dbQuery(
       `SELECT version_index, image_data, quality_score, generated_at
-       FROM story_images WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2
+       FROM story_images WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2 AND NOT is_test
        ORDER BY version_index`,
       [id, pageNumber]
     );

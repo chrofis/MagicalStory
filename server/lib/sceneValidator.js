@@ -747,7 +747,7 @@ async function validateAndRepairScene(sceneJson, options = {}) {
  * @param {string} sceneHint - Direct statement of what image should show (most authoritative)
  * @returns {Promise<{score: number, verdict: string, semanticIssues: Array, usage: Object}>}
  */
-async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, sceneHint = null) {
+async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, sceneHint = null, templateOverride = null) {
   if (!storyText || !imageData) {
     log.debug('[SEMANTIC] Skipping semantic evaluation - missing storyText or imageData');
     return null;
@@ -768,8 +768,8 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   }, EVAL_REQUEST_OPTIONS);
   const startTime = Date.now();
 
-  // Load semantic evaluation template
-  const template = PROMPT_TEMPLATES.imageSemantic;
+  // Load semantic evaluation template (templateOverride = Test Lab A/B variant)
+  const template = templateOverride || PROMPT_TEMPLATES.imageSemantic;
   if (!template) {
     log.warn('[SEMANTIC] Semantic evaluation prompt not loaded, skipping');
     return null;

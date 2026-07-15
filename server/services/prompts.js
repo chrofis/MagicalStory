@@ -170,7 +170,9 @@ function fillTemplate(template, replacements) {
  * @returns {string} Filled prompt ready for the image model.
  */
 function buildEmptyScenePrompt(opts = {}) {
-  if (!PROMPT_TEMPLATES.emptyScene) {
+  // opts.template: Test Lab A/B override — a full replacement template string
+  // used instead of the loaded file (never mutates PROMPT_TEMPLATES).
+  if (!opts.template && !PROMPT_TEMPLATES.emptyScene) {
     throw new Error('buildEmptyScenePrompt: empty-scene template not loaded');
   }
   // The template's framing rule says "Use the camera angle named in the
@@ -181,7 +183,7 @@ function buildEmptyScenePrompt(opts = {}) {
   if (!/\*\*SHOT:\*\*|\*\*CAMERA:\*\*/i.test(description)) {
     description = `**SHOT:** wide\n\n${description}`;
   }
-  return fillTemplate(PROMPT_TEMPLATES.emptyScene, {
+  return fillTemplate(opts.template || PROMPT_TEMPLATES.emptyScene, {
     STYLE_DESCRIPTION: opts.style || '',
     EMPTY_SCENE_DESCRIPTION: description,
     CHARACTER_SPACE: opts.characterSpace || '',
@@ -212,10 +214,12 @@ function buildEmptyScenePrompt(opts = {}) {
  * @returns {string} Filled prompt ready for Gemini eval.
  */
 function buildEvaluationPrompt(opts = {}) {
-  if (!PROMPT_TEMPLATES.imageEvaluation) {
+  // opts.template: Test Lab A/B override — a full replacement template string
+  // used instead of the loaded file (never mutates PROMPT_TEMPLATES).
+  if (!opts.template && !PROMPT_TEMPLATES.imageEvaluation) {
     throw new Error('buildEvaluationPrompt: imageEvaluation template not loaded');
   }
-  return fillTemplate(PROMPT_TEMPLATES.imageEvaluation, {
+  return fillTemplate(opts.template || PROMPT_TEMPLATES.imageEvaluation, {
     ORIGINAL_PROMPT: opts.originalPrompt || '',
     INTERACTIONS_BLOCK: opts.interactionsBlock || '',
     SCENE_INTENT: opts.sceneIntent || '',

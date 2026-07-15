@@ -716,6 +716,12 @@ export default function AdminDashboard() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => navigate('/admin/test-lab')}
+            className="px-4 py-2 rounded-lg font-medium transition-colors bg-white text-gray-700 hover:bg-gray-100"
+          >
+            Test Lab
+          </button>
         </div>
 
         {activeTab === 'activity' && (

@@ -313,7 +313,7 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
     const sceneCount = data.sceneImages?.length || data.totalScenes || data.pages || 10;
     const sceneRows = await dbQuery(
       `SELECT DISTINCT page_number FROM story_images
-       WHERE story_id = $1 AND image_type = 'scene'
+       WHERE story_id = $1 AND image_type = 'scene' AND NOT is_test
          AND (image_data IS NOT NULL OR image_url IS NOT NULL)`,
       [story.id]
     );
