@@ -263,7 +263,7 @@ function BenchmarkTab() {
               {previews[b.id] === undefined ? (
                 <button className="text-xs text-indigo-600 hover:underline" onClick={() => loadPreview(b)}>Load preview</button>
               ) : previews[b.id] ? (
-                <img src={previews[b.id]} alt={`P${b.pageNumber}`} className="rounded-lg w-full object-cover max-h-64" />
+                <img src={previews[b.id]} alt={`P${b.pageNumber}`} className="rounded-lg w-full" />
               ) : (
                 <span className="text-xs text-gray-400">Preview unavailable</span>
               )}
@@ -550,16 +550,31 @@ function ResultCard({ result, stage }: { result: ExperimentResult; stage: string
   const [showDetails, setShowDetails] = useState(false);
   const [promoted, setPromoted] = useState(false);
   const producesImage = result.versionIndex !== undefined && result.imageType;
+  // Avatar-sheet entries (stage 'avatars') have no page; "baseline" is the
+  // realistic pass-1 sheet instead of a story page.
+  const isAvatar = result.imageType === 'tl_avatar';
+  const hasPage = typeof result.pageNumber === 'number';
 
   const loadImages = async () => {
     setLoaded(true);
     try {
-      const base = await testlabService.getBaselineImage(result.storyId, result.pageNumber);
-      setBaseline(base.imageData);
+      if (isAvatar) {
+        if (result.realisticVersionIndex != null) {
+          const base = await testlabService.getTestImage(result.storyId, 'tl_avatar', null, result.realisticVersionIndex);
+          setBaseline(base.imageData);
+        } else {
+          setBaseline('');
+        }
+      } else if (hasPage) {
+        const base = await testlabService.getBaselineImage(result.storyId, result.pageNumber);
+        setBaseline(base.imageData);
+      } else {
+        setBaseline('');
+      }
     } catch { setBaseline(''); }
     if (producesImage) {
       try {
-        const v = await testlabService.getTestImage(result.storyId, result.imageType!, result.pageNumber, result.versionIndex!);
+        const v = await testlabService.getTestImage(result.storyId, result.imageType!, isAvatar ? null : result.pageNumber, result.versionIndex!);
         setVariant(v.imageData);
       } catch { setVariant(''); }
     }
@@ -580,7 +595,7 @@ function ResultCard({ result, stage }: { result: ExperimentResult; stage: string
     <div className="bg-white rounded-2xl shadow-lg p-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-sm font-semibold">
-          {result.storyId} · P{result.pageNumber}
+          {result.character ? result.character : `${result.storyId} · P${result.pageNumber}`}
           {result.artStyle && <span className="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{result.artStyle}</span>}
           {!result.ok && <span className="ml-2 bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full">failed</span>}
           {promoted && <span className="ml-2 bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">promoted</span>}
@@ -607,17 +622,17 @@ function ResultCard({ result, stage }: { result: ExperimentResult; stage: string
 
           {!loaded ? (
             <button className="text-xs text-indigo-600 hover:underline mt-3" onClick={loadImages}>
-              {producesImage ? 'Load baseline vs variant' : 'Load page image'}
+              {isAvatar ? 'Load avatar sheets' : producesImage ? 'Load baseline vs variant' : 'Load page image'}
             </button>
           ) : (
             <div className={`grid gap-4 mt-3 ${producesImage ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
               <div>
-                <div className="text-xs font-medium text-gray-500 mb-1">Baseline (active version)</div>
+                <div className="text-xs font-medium text-gray-500 mb-1">{isAvatar ? 'Realistic anchor (pass 1)' : 'Baseline (active version)'}</div>
                 {baseline ? <img src={baseline} alt="baseline" className="rounded-lg w-full" /> : <div className="text-xs text-gray-400">unavailable</div>}
               </div>
               {producesImage && (
                 <div>
-                  <div className="text-xs font-medium text-gray-500 mb-1">Variant (test v{result.versionIndex})</div>
+                  <div className="text-xs font-medium text-gray-500 mb-1">{isAvatar ? `Styled sheet (test v${result.versionIndex})` : `Variant (test v${result.versionIndex})`}</div>
                   {variant ? <img src={variant} alt="variant" className="rounded-lg w-full" /> : <div className="text-xs text-gray-400">unavailable</div>}
                   {result.imageType === 'scene' && !promoted && (
                     <div className="mt-2">

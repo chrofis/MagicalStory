@@ -66,6 +66,9 @@ export interface ExperimentSummary {
 export interface ExperimentResult {
   storyId: string;
   pageNumber: number;
+  character?: string;
+  realisticVersionIndex?: number | null;
+  finalScore?: number | null;
   ok: boolean;
   error?: string;
   imageType?: string;
@@ -162,9 +165,9 @@ export const testlabService = {
     return api.get<ExperimentDetail>(`/api/admin/testlab/experiments/${id}`);
   },
 
-  getTestImage(storyId: string, imageType: string, pageNumber: number, versionIndex: number) {
+  getTestImage(storyId: string, imageType: string, pageNumber: number | null, versionIndex: number) {
     return api.get<{ imageData: string; isTest: boolean }>(
-      `/api/admin/testlab/test-image/${encodeURIComponent(storyId)}/${imageType}/${pageNumber}/${versionIndex}`
+      `/api/admin/testlab/test-image/${encodeURIComponent(storyId)}/${imageType}/${pageNumber ?? 'null'}/${versionIndex}`
     );
   },
 
