@@ -363,23 +363,17 @@ router.get('/experiments/:id', async (req, res) => {
 // button. Appends a new entry to the same experiment (redoOf marks the source).
 // Avatar redos reuse the stored realistic anchor; style-matrix image redos
 // regenerate their empty scene in the same style first.
-router.post('/experiments/:id/redo', async (req, res) => {
+// Redos run in the background (the request returns immediately; the client
+// polls the experiment detail until the new entry appears). Up to 3 redos may
+// run concurrently — each is a single bounded-cost unit, unlike experiments.
+let redosInFlight = 0;
+const MAX_CONCURRENT_REDOS = 3;
+
+async function executeRedo(experimentId, exp, entry, resultIndex, override) {
+  const { runStageOnTarget } = require('../../lib/testlab');
   try {
-    const experimentId = parseInt(req.params.id, 10);
-    const { resultIndex, promptOverride } = req.body;
-    const rows = await dbQuery('SELECT * FROM testlab_experiments WHERE id = $1', [experimentId]);
-    if (!rows.length) return res.status(404).json({ error: 'Experiment not found' });
-    const exp = rows[0];
-    const entry = (exp.results || [])[resultIndex];
-    if (!entry) return res.status(400).json({ error: `No result at index ${resultIndex}` });
-    if (experimentRunning) return res.status(409).json({ error: 'Another experiment is running — wait for it to finish' });
-
-    const { runStageOnTarget } = require('../../lib/testlab');
-    const override = promptOverride ?? exp.prompt_override ?? null;
-
-    experimentRunning = true;
     let redo;
-    try {
+    {
       if (entry.character && (exp.stage === 'avatars' || exp.stage === 'avatar_style')) {
         // Avatar style pass — always transfer from the character's NEWEST
         // realistic anchor (a pass-1 redo supersedes the one recorded here).
@@ -414,16 +408,41 @@ router.post('/experiments/:id/redo', async (req, res) => {
         }
         redo = await runStageOnTarget(exp.stage, target, { experimentId, promptOverride: override, params, autoEval: params.autoEval !== false });
       }
-      const newEntry = { ...entry, ...redo, ok: true, error: undefined, redoOf: resultIndex, redoneAt: new Date().toISOString(), promptOverridden: !!promptOverride };
+      const newEntry = { ...entry, ...redo, ok: true, error: undefined, redoOf: resultIndex, redoneAt: new Date().toISOString(), promptOverridden: !!override };
       if (newEntry.promptUsed && newEntry.promptUsed.length > 30000) newEntry.promptUsed = newEntry.promptUsed.slice(0, 30000) + '\n…[truncated]';
       await dbQuery(`UPDATE testlab_experiments SET results = results || $2::jsonb WHERE id = $1`, [experimentId, JSON.stringify([newEntry])]);
-      res.json({ success: true, entry: newEntry });
-    } finally {
-      experimentRunning = false;
+      log.info(`[TESTLAB] redo done: exp ${experimentId} result ${resultIndex}`);
     }
   } catch (err) {
     log.error(`[TESTLAB] redo failed: ${err.message}`);
-    res.status(500).json({ error: 'Redo failed', details: err.message });
+    const failedEntry = { ...entry, ok: false, error: err.message, redoOf: resultIndex, redoneAt: new Date().toISOString(), versionIndex: undefined, imageType: entry.imageType };
+    await dbQuery(`UPDATE testlab_experiments SET results = results || $2::jsonb WHERE id = $1`,
+      [experimentId, JSON.stringify([failedEntry])]).catch(() => {});
+  } finally {
+    redosInFlight--;
+  }
+}
+
+router.post('/experiments/:id/redo', async (req, res) => {
+  try {
+    const experimentId = parseInt(req.params.id, 10);
+    const { resultIndex, promptOverride } = req.body;
+    const rows = await dbQuery('SELECT * FROM testlab_experiments WHERE id = $1', [experimentId]);
+    if (!rows.length) return res.status(404).json({ error: 'Experiment not found' });
+    const exp = rows[0];
+    const entry = (exp.results || [])[resultIndex];
+    if (!entry) return res.status(400).json({ error: `No result at index ${resultIndex}` });
+    if (redosInFlight >= MAX_CONCURRENT_REDOS) {
+      return res.status(429).json({ error: `Max ${MAX_CONCURRENT_REDOS} redos at a time — wait for one to finish` });
+    }
+    redosInFlight++;
+    const override = promptOverride ?? exp.prompt_override ?? null;
+    // Fire and forget — the client polls GET /experiments/:id for the new entry.
+    executeRedo(experimentId, exp, entry, resultIndex, override);
+    res.json({ started: true });
+  } catch (err) {
+    log.error(`[TESTLAB] redo start failed: ${err.message}`);
+    res.status(500).json({ error: 'Redo failed to start', details: err.message });
   }
 });
 

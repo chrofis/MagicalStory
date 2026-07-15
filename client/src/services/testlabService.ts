@@ -94,6 +94,10 @@ export interface ExperimentResult {
   storedBaseline?: { qualityScore?: number | null; semanticScore?: number | null };
   characterName?: string;
   artStyle?: string;
+  pass?: number;
+  redoOf?: number | string;
+  redoneAt?: string;
+  promptOverridden?: boolean;
 }
 
 export interface ExperimentDetail {
@@ -166,7 +170,7 @@ export const testlabService = {
   },
 
   redo(experimentId: number, resultIndex: number, promptOverride?: string | null) {
-    return api.post<{ success: boolean; entry: ExperimentResult }>(
+    return api.post<{ started: boolean }>(
       `/api/admin/testlab/experiments/${experimentId}/redo`,
       { resultIndex, promptOverride: promptOverride || undefined }
     );

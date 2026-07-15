@@ -503,19 +503,47 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
   const [showPrompt, setShowPrompt] = useState(false);
   const [redoOverride, setRedoOverride] = useState('');
   const [showRedoOverride, setShowRedoOverride] = useState(false);
-  const [redoing, setRedoing] = useState<number | null>(null);
+  // index -> number of redo entries we expect to see before the spinner stops
+  const [pendingRedos, setPendingRedos] = useState<Record<number, number>>({});
+
+  const countRedos = (results: ExperimentResult[], index: number) =>
+    results.filter(r => r.redoOf === index).length;
 
   const redo = async (index: number) => {
-    setRedoing(index);
     try {
       await testlabService.redo(detail.id, index, redoOverride.trim() || undefined);
-      onRefresh();
+      setPendingRedos(p => ({ ...p, [index]: countRedos(detail.results, index) + 1 }));
     } catch (e) {
       alert(`Redo failed: ${e instanceof Error ? e.message : e}`);
-    } finally {
-      setRedoing(null);
     }
   };
+
+  // Poll while any redo is in flight; clear pendings once their entry lands.
+  useEffect(() => {
+    if (Object.keys(pendingRedos).length === 0) return;
+    const t = setInterval(onRefresh, 5000);
+    return () => clearInterval(t);
+  }, [pendingRedos, onRefresh]);
+  useEffect(() => {
+    setPendingRedos(p => {
+      const next = { ...p };
+      let changed = false;
+      for (const k of Object.keys(next)) {
+        if (countRedos(detail.results, Number(k)) >= next[Number(k)]) { delete next[Number(k)]; changed = true; }
+      }
+      return changed ? next : p;
+    });
+  }, [detail]);
+
+  // Display order: originals in sequence, each followed by its redos;
+  // an original with redos is shown dimmed (superseded).
+  const displayList: { r: ExperimentResult; i: number; isRedo: boolean; superseded: boolean }[] = [];
+  detail.results.forEach((r, i) => {
+    if (typeof r.redoOf === 'number') return; // attached below its original
+    const redos = detail.results.map((x, j) => ({ x, j })).filter(({ x }) => x.redoOf === i);
+    displayList.push({ r, i, isRedo: false, superseded: redos.length > 0 });
+    redos.forEach(({ x, j }) => displayList.push({ r: x, i: j, isRedo: true, superseded: false }));
+  });
 
   return (
     <div className="space-y-4">
@@ -559,9 +587,10 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
         </div>
       </div>
 
-      {detail.results.map((r, i) => (
+      {displayList.map(({ r, i, isRedo, superseded }) => (
         <ResultCard key={`${r.storyId}-${r.pageNumber}-${i}`} result={r} stage={detail.stage}
-          onRedo={() => redo(i)} redoing={redoing === i} />
+          onRedo={() => redo(i)} redoing={pendingRedos[i] !== undefined}
+          isRedo={isRedo} superseded={superseded} />
       ))}
       {detail.status === 'running' && (
         <div className="bg-white rounded-2xl shadow-lg p-6 text-center text-sm text-gray-500">
@@ -572,7 +601,7 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
   );
 }
 
-function ResultCard({ result, stage, onRedo, redoing }: { result: ExperimentResult; stage: string; onRedo?: () => void; redoing?: boolean }) {
+function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { result: ExperimentResult; stage: string; onRedo?: () => void; redoing?: boolean; isRedo?: boolean; superseded?: boolean }) {
   const [baseline, setBaseline] = useState<string | null>(null);
   const [variant, setVariant] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -623,18 +652,20 @@ function ResultCard({ result, stage, onRedo, redoing }: { result: ExperimentResu
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-4">
+    <div className={`bg-white rounded-2xl shadow-lg p-4 ${superseded ? 'opacity-60' : ''} ${isRedo ? 'ml-6 border-l-4 border-indigo-200' : ''}`}>
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-sm font-semibold">
           {result.character ? result.character : `${result.storyId} · P${result.pageNumber}`}
           {result.artStyle && <span className="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{result.artStyle}</span>}
+          {isRedo && <span className="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">redo{result.promptOverridden ? ' · edited prompt' : ''}</span>}
+          {superseded && <span className="ml-2 bg-gray-200 text-gray-600 text-xs px-2 py-0.5 rounded-full">superseded</span>}
           {!result.ok && <span className="ml-2 bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full">failed</span>}
           {promoted && <span className="ml-2 bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">promoted</span>}
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-500">
           {onRedo && (
             <Button variant="secondary" size="sm" onClick={onRedo} disabled={redoing}>
-              {redoing ? 'Redoing…' : 'Redo'}
+              {redoing ? (<><RefreshCw size={14} className="animate-spin" /> Redoing…</>) : 'Redo'}
             </Button>
           )}
           {result.elapsedMs !== undefined && <span>{(result.elapsedMs / 1000).toFixed(1)}s</span>}
