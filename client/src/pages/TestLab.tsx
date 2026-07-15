@@ -581,6 +581,7 @@ function ResultCard({ result, stage }: { result: ExperimentResult; stage: string
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-sm font-semibold">
           {result.storyId} · P{result.pageNumber}
+          {result.artStyle && <span className="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{result.artStyle}</span>}
           {!result.ok && <span className="ml-2 bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full">failed</span>}
           {promoted && <span className="ml-2 bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">promoted</span>}
         </div>

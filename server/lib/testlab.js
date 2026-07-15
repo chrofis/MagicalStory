@@ -158,7 +158,7 @@ async function saveTestVersion(storyId, imageType, pageNumber, imageData, experi
 // images are referenced by {imageType, versionIndex} test rows).
 // ─────────────────────────────────────────────────────────────────────
 
-async function runImageStage(ctx, { promptOverride, experimentId, autoEval = true }) {
+async function runImageStage(ctx, { promptOverride, experimentId, autoEval = true, params = {} }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
   const { buildImagePrompt } = require('./storyHelpers');
@@ -166,8 +166,12 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   const { getTextAreaMask } = require('./textMasks');
   const { MODEL_DEFAULTS } = require('../config/models');
 
+  // artStyleOverride: render the page in a different art style than the story's
+  // (style-matrix benchmark runs). Caveat: reference photos stay the story's
+  // original styled avatars — the style prompt dominates rendering.
+  const artStyle = params.artStyleOverride || ctx.artStyle;
   const inputData = {
-    artStyle: ctx.artStyle,
+    artStyle,
     language: ctx.language,
     ageFrom: 3,
     ageTo: 8,
@@ -194,7 +198,16 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     PROMPT_TEMPLATES.imageGeneration = origTemplate;
   }
 
-  const emptyScene = await loadEmptyScene(ctx.storyId, ctx.pageNumber);
+  // backgroundRef: use a specific (test) empty-scene version as the background
+  // anchor — style-matrix runs chain empty_scene(style) → image(style, that bg).
+  let emptyScene;
+  if (params.backgroundRef?.versionIndex !== undefined) {
+    const bg = await loadTestImage(ctx.storyId, params.backgroundRef.imageType || 'empty_scene', ctx.pageNumber, params.backgroundRef.versionIndex);
+    emptyScene = bg?.imageData || null;
+    if (!emptyScene) throw new Error(`backgroundRef v${params.backgroundRef.versionIndex} not found`);
+  } else {
+    emptyScene = await loadEmptyScene(ctx.storyId, ctx.pageNumber);
+  }
   const textInImage = ctx.layout?.textInImage !== false;
   const textAreaMask = textInImage ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null;
 
@@ -240,10 +253,10 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     scores?.final != null ? Math.round(scores.final) : null
   );
 
-  return { imageType: 'scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, scores };
+  return { imageType: 'scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, scores, artStyle: params.artStyleOverride || undefined };
 }
 
-async function runEmptySceneStage(ctx, { promptOverride, experimentId }) {
+async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = {} }) {
   const { loadPromptTemplates, buildEmptyScenePrompt } = require('../services/prompts');
   await loadPromptTemplates();
   const { buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, resolveArtStyleForEmptyScene } = require('./storyHelpers');
@@ -257,7 +270,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId }) {
 
   const prompt = buildEmptyScenePrompt({
     template: promptOverride || undefined,
-    style: resolveArtStyleForEmptyScene(ctx.artStyle, null),
+    style: resolveArtStyleForEmptyScene(params.artStyleOverride || ctx.artStyle, null),
     description,
     characterSpace: meta.characterSpace || '',
     textAreaInstruction: buildTextZoneInstruction(ctx.textPosition, meta.textZoneDescription || null, 'a quarter of the frame', { isEmptyScene: true }),
@@ -278,7 +291,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId }) {
   if (!result?.imageData) throw new Error('Empty-scene generation returned no image');
 
   const versionIndex = await saveTestVersion(ctx.storyId, 'empty_scene', ctx.pageNumber, result.imageData, experimentId);
-  return { imageType: 'empty_scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs };
+  return { imageType: 'empty_scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, artStyle: params.artStyleOverride || undefined };
 }
 
 async function runQualityEvalStage(ctx, { promptOverride, experimentId }) {

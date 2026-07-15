@@ -90,6 +90,7 @@ export interface ExperimentResult {
   report?: unknown;
   storedBaseline?: { qualityScore?: number | null; semanticScore?: number | null };
   characterName?: string;
+  artStyle?: string;
 }
 
 export interface ExperimentDetail {
