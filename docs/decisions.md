@@ -1569,3 +1569,12 @@ render vs photo-trained backbone) — keep it on Gemini.
 prompt source, export), `scripts/analysis/validate-gdino-figures.js` (harness).
 **Status:** ✅ active (staging). Does NOT change the realistic-only detection gate — only improves the
 prompt. Broadening the gate to anime/pixar is a separate future decision informed by this data.
+
+## Correction (2026-07-15): watercolour is NOT weak once the prompt is concise
+The entry above said "Watercolour stays weak … keep it on Gemini." Re-validation with the concise
+`buildGroundingPrompt` disproved that: watercolour scored 0.632 (vs 0.34–0.50 with the verbose prompt),
+comparable to anime (0.585) and realistic (0.688). The realistic-only gate is an artifact of the old
+verbose prompt, not a real style boundary. Broadening GDINO to all styles is data-supported; the only
+real cost is ~15s/figure CPU latency. Remaining soft spots (same-outfit kids, batched-attribution
+collapse) are not style-specific. **Status:** ✅ correction active; gate still realistic-only in code
+pending a broadening decision.
