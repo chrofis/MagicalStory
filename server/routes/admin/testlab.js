@@ -357,6 +357,62 @@ router.get('/experiments/:id', async (req, res) => {
   }
 });
 
+// POST /api/admin/testlab/experiments/:id/redo { resultIndex, promptOverride? }
+// Rerun ONE unit of an experiment (avatar pass 2, page image, eval, …) with an
+// optional prompt override — the "test a prompt change on this one result"
+// button. Appends a new entry to the same experiment (redoOf marks the source).
+// Avatar redos reuse the stored realistic anchor; style-matrix image redos
+// regenerate their empty scene in the same style first.
+router.post('/experiments/:id/redo', async (req, res) => {
+  try {
+    const experimentId = parseInt(req.params.id, 10);
+    const { resultIndex, promptOverride } = req.body;
+    const rows = await dbQuery('SELECT * FROM testlab_experiments WHERE id = $1', [experimentId]);
+    if (!rows.length) return res.status(404).json({ error: 'Experiment not found' });
+    const exp = rows[0];
+    const entry = (exp.results || [])[resultIndex];
+    if (!entry) return res.status(400).json({ error: `No result at index ${resultIndex}` });
+    if (experimentRunning) return res.status(409).json({ error: 'Another experiment is running — wait for it to finish' });
+
+    const { runStageOnTarget } = require('../../lib/testlab');
+    const override = promptOverride ?? exp.prompt_override ?? null;
+
+    experimentRunning = true;
+    let redo;
+    try {
+      if (entry.character && (exp.stage === 'avatars' || exp.stage === 'avatar_style')) {
+        // Avatar style pass — reuse the stored realistic anchor.
+        redo = await runStageOnTarget('avatar_style', { storyId: entry.storyId, character: entry.character }, {
+          experimentId,
+          promptOverride: override,
+          params: { artStyle: entry.artStyle, realisticVersionIndex: entry.realisticVersionIndex },
+        });
+      } else if (entry.character && exp.stage === 'avatar_realistic') {
+        redo = await runStageOnTarget('avatar_realistic', { storyId: entry.storyId, character: entry.character }, { experimentId });
+      } else {
+        const target = { storyId: entry.storyId, pageNumber: entry.pageNumber };
+        let params = { ...(exp.params || {}) };
+        delete params.styleMatrix;
+        if (exp.stage === 'image' && entry.artStyle) {
+          const empty = await runStageOnTarget('empty_scene', target, { experimentId, params: { artStyleOverride: entry.artStyle } });
+          params = { ...params, artStyleOverride: entry.artStyle, backgroundRef: { imageType: 'empty_scene', versionIndex: empty.versionIndex } };
+          if (entry.avatarSheets) params.avatarSheets = entry.avatarSheets;
+        }
+        redo = await runStageOnTarget(exp.stage, target, { experimentId, promptOverride: override, params, autoEval: params.autoEval !== false });
+      }
+      const newEntry = { ...entry, ...redo, ok: true, error: undefined, redoOf: resultIndex, redoneAt: new Date().toISOString(), promptOverridden: !!promptOverride };
+      if (newEntry.promptUsed && newEntry.promptUsed.length > 30000) newEntry.promptUsed = newEntry.promptUsed.slice(0, 30000) + '\n…[truncated]';
+      await dbQuery(`UPDATE testlab_experiments SET results = results || $2::jsonb WHERE id = $1`, [experimentId, JSON.stringify([newEntry])]);
+      res.json({ success: true, entry: newEntry });
+    } finally {
+      experimentRunning = false;
+    }
+  } catch (err) {
+    log.error(`[TESTLAB] redo failed: ${err.message}`);
+    res.status(500).json({ error: 'Redo failed', details: err.message });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────
 // Test image serving + promote
 // ─────────────────────────────────────────────────────────────────────

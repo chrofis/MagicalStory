@@ -687,8 +687,10 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
  * style match + costume preserved. Returns the same shape as Pass 1's
  * collected fields so the dev panel can render both passes uniformly.
  */
-async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, usageTracker }) {
-  const prompt = buildStyleTransferPrompt(artStyle);
+async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, usageTracker, promptOverride = null }) {
+  // promptOverride: Test Lab A/B — full replacement for the style-transfer
+  // prompt (buildStyleTransferPrompt output), this call only.
+  const prompt = promptOverride || buildStyleTransferPrompt(artStyle);
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
   const attempts = [];
   let best = null;
@@ -761,6 +763,12 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
 module.exports = {
   generateCharacter2x4Sheet,
   loadPhantom,
+  // Standalone Pass 2 (style transfer from an existing realistic sheet) +
+  // face-photo resolver — used by Test Lab to reuse one realistic anchor
+  // across many style transfers.
+  runStyleTransferPass,
+  resolveFacePhoto,
+  buildStyleTransferPrompt,
   // exposed for tests
   _internal: { buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass },
 };

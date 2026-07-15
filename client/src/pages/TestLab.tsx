@@ -501,6 +501,21 @@ function ExperimentsTab() {
 
 function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: ExperimentDetail; onBack: () => void; onRefresh: () => void }) {
   const [showPrompt, setShowPrompt] = useState(false);
+  const [redoOverride, setRedoOverride] = useState('');
+  const [showRedoOverride, setShowRedoOverride] = useState(false);
+  const [redoing, setRedoing] = useState<number | null>(null);
+
+  const redo = async (index: number) => {
+    setRedoing(index);
+    try {
+      await testlabService.redo(detail.id, index, redoOverride.trim() || undefined);
+      onRefresh();
+    } catch (e) {
+      alert(`Redo failed: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setRedoing(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -529,10 +544,24 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
             {showPrompt && <pre className="mt-2 text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64">{detail.promptOverride}</pre>}
           </div>
         )}
+        <div className="mt-3">
+          <button className="text-xs text-indigo-600 hover:underline" onClick={() => setShowRedoOverride(v => !v)}>
+            {showRedoOverride ? 'Hide' : 'Set'} prompt override for redos
+          </button>
+          {showRedoOverride && (
+            <textarea
+              className="border rounded-lg px-3 py-2 text-xs font-mono w-full h-40 mt-2"
+              placeholder="Paste + edit a prompt here, then hit Redo on any result below — it reruns that single unit with this prompt. Empty = redo with the current templates."
+              value={redoOverride}
+              onChange={e => setRedoOverride(e.target.value)}
+            />
+          )}
+        </div>
       </div>
 
       {detail.results.map((r, i) => (
-        <ResultCard key={`${r.storyId}-${r.pageNumber}-${i}`} result={r} stage={detail.stage} />
+        <ResultCard key={`${r.storyId}-${r.pageNumber}-${i}`} result={r} stage={detail.stage}
+          onRedo={() => redo(i)} redoing={redoing === i} />
       ))}
       {detail.status === 'running' && (
         <div className="bg-white rounded-2xl shadow-lg p-6 text-center text-sm text-gray-500">
@@ -543,7 +572,7 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
   );
 }
 
-function ResultCard({ result, stage }: { result: ExperimentResult; stage: string }) {
+function ResultCard({ result, stage, onRedo, redoing }: { result: ExperimentResult; stage: string; onRedo?: () => void; redoing?: boolean }) {
   const [baseline, setBaseline] = useState<string | null>(null);
   const [variant, setVariant] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -601,6 +630,11 @@ function ResultCard({ result, stage }: { result: ExperimentResult; stage: string
           {promoted && <span className="ml-2 bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">promoted</span>}
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-500">
+          {onRedo && (
+            <Button variant="secondary" size="sm" onClick={onRedo} disabled={redoing}>
+              {redoing ? 'Redoing…' : 'Redo'}
+            </Button>
+          )}
           {result.elapsedMs !== undefined && <span>{(result.elapsedMs / 1000).toFixed(1)}s</span>}
           {result.modelId && <span>{result.modelId}</span>}
           {result.scores?.final != null && <span className="font-semibold text-gray-700">final {result.scores.final}</span>}

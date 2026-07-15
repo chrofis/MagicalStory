@@ -165,6 +165,13 @@ export const testlabService = {
     return api.get<ExperimentDetail>(`/api/admin/testlab/experiments/${id}`);
   },
 
+  redo(experimentId: number, resultIndex: number, promptOverride?: string | null) {
+    return api.post<{ success: boolean; entry: ExperimentResult }>(
+      `/api/admin/testlab/experiments/${experimentId}/redo`,
+      { resultIndex, promptOverride: promptOverride || undefined }
+    );
+  },
+
   getTestImage(storyId: string, imageType: string, pageNumber: number | null, versionIndex: number) {
     return api.get<{ imageData: string; isTest: boolean }>(
       `/api/admin/testlab/test-image/${encodeURIComponent(storyId)}/${imageType}/${pageNumber ?? 'null'}/${versionIndex}`

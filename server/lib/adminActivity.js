@@ -122,6 +122,9 @@ async function buildActivityFeed(dbPool, hours = 24) {
   events.sort((a, b) => new Date(b.ts) - new Date(a.ts));
 
   const count = (t) => events.filter(e => e.type === t).length;
+  const { getApiHealth } = require('./apiHealth');
+  const health = await getApiHealth(dbPool, h); // AI provider rate-limit/overload hits
+
   return {
     since: new Date(Date.now() - h * 3600 * 1000).toISOString(),
     hours: h,
@@ -135,6 +138,7 @@ async function buildActivityFeed(dbPool, hours = 24) {
       orders: count('order'),
       creditTopUps: count('credits'),
     },
+    health,
     events,
   };
 }

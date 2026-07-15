@@ -459,6 +459,90 @@ async function runEntityStage(ctx, { experimentId }) {
   return { elapsedMs, report: safe };
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Avatar stages — production two-pass sheet flow, split so the realistic
+// anchor (Pass 1) is generated once per character and every style transfer
+// (Pass 2) reuses it.
+// ─────────────────────────────────────────────────────────────────────
+
+/** Character record + story costume description for one character. */
+async function loadCharacterContext(storyId, characterName) {
+  const { dbQuery } = require('../services/database');
+  const rows = await dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [storyId]);
+  if (!rows.length) throw new Error(`Story ${storyId} not found`);
+  const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+
+  let characters = data.characters || [];
+  const charRows = await dbQuery('SELECT data FROM characters WHERE id = $1', [`characters_${rows[0].user_id}`]);
+  if (charRows.length) {
+    const cd = typeof charRows[0].data === 'string' ? JSON.parse(charRows[0].data) : charRows[0].data;
+    const canonical = Array.isArray(cd) ? cd : (cd.characters || []);
+    if (canonical.length) characters = canonical;
+  }
+  const character = characters.find(c => c.name === characterName)
+    || characters.find(c => (c.name || '').toLowerCase() === characterName.toLowerCase());
+  if (!character) throw new Error(`Character "${characterName}" not found`);
+
+  let costume = { category: 'standard', description: null };
+  for (const scene of data.sceneImages || []) {
+    const rp = (scene.referencePhotos || []).find(r => (r.name || '').toLowerCase() === characterName.toLowerCase());
+    if (rp) { costume = { category: rp.clothingCategory || 'standard', description: rp.clothingDescription || null }; break; }
+  }
+  return { storyId, character, costume };
+}
+
+/** Pass 1: realistic anchor sheet (generated once per character, reused). */
+async function runAvatarRealisticStage(target, { experimentId }) {
+  const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
+  const { character, costume } = await loadCharacterContext(target.storyId, target.character);
+  const t0 = Date.now();
+  const result = await generateCharacter2x4Sheet(character, {
+    clothingCategory: costume.category,
+    costumeDescription: costume.description || 'standard outfit',
+    artStyle: 'realistic',
+  });
+  if (!result?.imageData) throw new Error('no realistic sheet returned');
+  const versionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, result.imageData, experimentId,
+    result.finalScore != null ? Math.round(result.finalScore) : null);
+  return {
+    character: character.name, imageType: 'tl_avatar', versionIndex,
+    pass: 1, artStyle: 'realistic', clothingCategory: costume.category,
+    finalScore: result.finalScore ?? null, elapsedMs: Date.now() - t0,
+  };
+}
+
+/** Pass 2: style transfer of an existing realistic sheet (never re-runs Pass 1). */
+async function runAvatarStyleStage(target, { experimentId, promptOverride, params = {} }) {
+  const { runStyleTransferPass, resolveFacePhoto } = require('./character2x4Sheet');
+  const artStyle = params.artStyle || target.artStyle;
+  const realisticVersionIndex = params.realisticVersionIndex ?? target.realisticVersionIndex;
+  if (!artStyle) throw new Error('avatar_style requires artStyle');
+  if (realisticVersionIndex === undefined || realisticVersionIndex === null) {
+    throw new Error('avatar_style requires realisticVersionIndex (run avatar_realistic first)');
+  }
+  const { character } = await loadCharacterContext(target.storyId, target.character);
+  const sheet = await loadTestImage(target.storyId, 'tl_avatar', null, realisticVersionIndex);
+  if (!sheet?.imageData) throw new Error(`realistic sheet v${realisticVersionIndex} not found`);
+  const facePhoto = await resolveFacePhoto(character);
+
+  const t0 = Date.now();
+  const result = await runStyleTransferPass({
+    pass1ImageData: sheet.imageData,
+    facePhoto,
+    artStyle,
+    characterName: character.name,
+    promptOverride: promptOverride || null,
+  });
+  if (!result?.imageData) throw new Error('style transfer returned no image');
+  const versionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, result.imageData, experimentId,
+    result.finalScore != null ? Math.round(result.finalScore) : null);
+  return {
+    character: character.name, imageType: 'tl_avatar', versionIndex,
+    pass: 2, artStyle, realisticVersionIndex,
+    finalScore: result.finalScore ?? null, elapsedMs: Date.now() - t0,
+  };
+}
+
 const STAGE_RUNNERS = {
   image: runImageStage,
   empty_scene: runEmptySceneStage,
@@ -469,21 +553,33 @@ const STAGE_RUNNERS = {
   entity: runEntityStage,
 };
 
+// Avatar stages take {storyId, character} targets, not page targets.
+const AVATAR_STAGES = {
+  avatar_realistic: runAvatarRealisticStage,
+  avatar_style: runAvatarStyleStage,
+};
+
 /**
- * Run one stage against one target page. Returns a JSON-safe result;
+ * Run one stage against one target. Page stages take {storyId, pageNumber};
+ * avatar stages take {storyId, character}. Returns a JSON-safe result;
  * throws on unrecoverable errors (caller records per-target failure).
  */
 async function runStageOnTarget(stage, target, opts) {
+  if (AVATAR_STAGES[stage]) {
+    if (!target.character) throw new Error(`${stage} requires target.character`);
+    return AVATAR_STAGES[stage](target, opts);
+  }
   const runner = STAGE_RUNNERS[stage];
-  if (!runner) throw new Error(`Unknown stage: ${stage}. Valid: ${Object.keys(STAGE_RUNNERS).join(', ')}`);
+  if (!runner) throw new Error(`Unknown stage: ${stage}. Valid: ${[...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES)].join(', ')}`);
   const ctx = await loadSceneContext(target.storyId, target.pageNumber);
   return runner(ctx, opts);
 }
 
 module.exports = {
-  STAGES: Object.keys(STAGE_RUNNERS),
+  STAGES: [...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES)],
   runStageOnTarget,
   loadSceneContext,
+  loadCharacterContext,
   loadTestImage,
   loadActivePageImage,
 };
