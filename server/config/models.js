@@ -181,6 +181,18 @@ const MODEL_DEFAULTS = {
   // Env override for staged rollout; prod stays 'gemini'.
   figureDetectionBackend: process.env.FIGURE_DETECTION_BACKEND || 'gemini',
 
+  // Art styles GroundingDINO detection is allowed on. GDINO grounds on the
+  // clothed-figure shape + clothing colour (via the concise buildGroundingPrompt),
+  // so any style that renders a recognisable human figure works — validated
+  // 2026-07-15 across the range: realistic 0.69, anime 0.59, watercolor 0.63.
+  // The ONLY exclusions are styles that break the human-figure assumption:
+  // chibi (super-deformed head/body), pixel (blocky low-res), lowpoly (geometric
+  // faceted). steampunk/cyber/comic/cartoon/manga/concept/oil/pixar all render a
+  // clothed human and are eligible. Env override: FIGURE_DETECTION_STYLES=a,b,c.
+  figureDetectionEligibleStyles: (process.env.FIGURE_DETECTION_STYLES
+    ? process.env.FIGURE_DETECTION_STYLES.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    : ['realistic', 'anime', 'watercolor', 'steampunk', 'cyber', 'pixar', 'comic', 'cartoon', 'manga', 'concept', 'oil']),
+
   // Image generation backend (can be overridden in dev mode)
   // 'grok' = Grok Imagine (default — $0.02/image, half of Gemini)
   // 'gemini' = Gemini 2.5 Flash Image ($0.04/image, better cross-page style consistency)

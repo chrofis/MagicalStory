@@ -2556,12 +2556,16 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
   // Figure detection only — object detection stays with Gemini, so this path is
   // used when there are expected characters (the common repair / figure case);
   // it emits no objects (missingObjects empty → no false "missing object" flags).
-  // Gated to the REALISTIC art style only: GroundingDINO is photo-trained and
-  // reliable on realistic renders (0.75-0.85), but on stylized/painterly styles
-  // (watercolor, cartoon, anime, …) it mislocates or misses figures entirely —
-  // there Gemini owns detection. Fails open: any null/error → Gemini below.
+  // Gated to styles that render a recognisable clothed human figure (see
+  // MODEL_DEFAULTS.figureDetectionEligibleStyles). With the concise
+  // buildGroundingPrompt, GDINO grounds on figure shape + clothing colour and
+  // works across the range (realistic 0.69, anime 0.59, watercolor 0.63,
+  // 2026-07-15). Only super-deformed/abstract styles (chibi, pixel, lowpoly)
+  // stay on Gemini. Fails open: any null/error → Gemini below.
   let gdinoDiag = null;  // persisted with whichever backend produces the result
-  const gdinoEligible = CONFIG_DEFAULTS.figureDetectionBackend === 'grounding-dino' && artStyle === 'realistic';
+  const eligibleStyles = CONFIG_DEFAULTS.figureDetectionEligibleStyles || ['realistic'];
+  const gdinoEligible = CONFIG_DEFAULTS.figureDetectionBackend === 'grounding-dino'
+    && !!artStyle && eligibleStyles.includes(String(artStyle).toLowerCase());
   if (gdinoEligible && expectedCharacters.length > 0) {
     try {
       const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, { pageLabel });

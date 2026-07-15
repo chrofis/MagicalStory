@@ -1578,3 +1578,22 @@ verbose prompt, not a real style boundary. Broadening GDINO to all styles is dat
 real cost is ~15s/figure CPU latency. Remaining soft spots (same-outfit kids, batched-attribution
 collapse) are not style-specific. **Status:** ✅ correction active; gate still realistic-only in code
 pending a broadening decision.
+
+## GroundingDINO gate broadened from realistic-only to all figure-rendering styles (2026-07-15)
+**Context:** GDINO detection was gated to `artStyle === 'realistic'` (73cf220f), set when the verbose
+prompt made stylized styles look weak. Once the concise buildGroundingPrompt landed, re-validation
+showed all three tested styles land together (realistic 0.69, anime 0.59, watercolor 0.63) — the gate
+was an artifact of the bad prompt, not a style boundary.
+**Decision:** New `MODEL_DEFAULTS.figureDetectionEligibleStyles` allow-list; the gate is now membership
+in it. Enabled: realistic, anime, watercolor (tested) + steampunk, cyber, pixar (user-requested,
+anime/3D-render family) + comic, cartoon, manga, concept, oil (same clothed-human clean render,
+inferred). Excluded (stay on Gemini): chibi (super-deformed head/body), pixel (blocky low-res),
+lowpoly (geometric faceted) — these break GDINO's human-figure assumption. Env override
+FIGURE_DETECTION_STYLES=a,b,c.
+**Rationale:** GDINO + concise prompt grounds on clothed-figure shape + clothing colour, which every
+non-abstract style renders. Validated across the widest span (photo-realistic / cel-anime /
+painterly-watercolor). comic..oil untested but structurally identical to what passed; chibi/pixel/lowpoly
+genuinely differ. Still fails open (GDINO error → Gemini). Backend still env-gated to grounding-dino
+(prod stays gemini).
+**Touched:** `server/config/models.js` (figureDetectionEligibleStyles), `server/lib/images.js` (gate).
+**Status:** ✅ active (staging). Latency unchanged (~15s/figure CPU) — only widens where GDINO may run.
