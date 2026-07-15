@@ -381,11 +381,25 @@ router.post('/experiments/:id/redo', async (req, res) => {
     let redo;
     try {
       if (entry.character && (exp.stage === 'avatars' || exp.stage === 'avatar_style')) {
-        // Avatar style pass — reuse the stored realistic anchor.
+        // Avatar style pass — always transfer from the character's NEWEST
+        // realistic anchor (a pass-1 redo supersedes the one recorded here).
+        const anchors = await dbQuery(
+          `SELECT e.value AS entry FROM testlab_experiments x, jsonb_array_elements(x.results) e
+           WHERE x.stage IN ('avatars', 'avatar_realistic')
+             AND (e.value->>'ok')::boolean
+             AND e.value->>'storyId' = $1
+             AND LOWER(e.value->>'character') = LOWER($2)
+           ORDER BY x.id DESC, (e.value->>'versionIndex')::int DESC`,
+          [entry.storyId, entry.character]
+        );
+        const latest = anchors.map(a => a.entry).find(e => e.pass === 1 || e.realisticVersionIndex != null);
+        const realisticVersionIndex = latest
+          ? (latest.pass === 1 ? latest.versionIndex : latest.realisticVersionIndex)
+          : entry.realisticVersionIndex;
         redo = await runStageOnTarget('avatar_style', { storyId: entry.storyId, character: entry.character }, {
           experimentId,
           promptOverride: override,
-          params: { artStyle: entry.artStyle, realisticVersionIndex: entry.realisticVersionIndex },
+          params: { artStyle: entry.artStyle, realisticVersionIndex },
         });
       } else if (entry.character && exp.stage === 'avatar_realistic') {
         redo = await runStageOnTarget('avatar_realistic', { storyId: entry.storyId, character: entry.character }, { experimentId });
