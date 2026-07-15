@@ -954,6 +954,9 @@ function buildCharacterDescriptionsForBbox(storyData, expectedPositions) {
     }
     out[char.name] = {
       richDescription: buildCharacterPhysicalDescription(char),
+      // Concise grounding prompt for the GroundingDINO detection path (clothing
+      // appended per-page in buildExpectedCharactersForBbox).
+      gdinoIdentity: buildGroundingPrompt(char),
       clothingDescriptions,
     };
   }
@@ -3274,6 +3277,35 @@ function buildCharacterPhysicalDescription(char, clothingOverride = null) {
   if (!isNone(p.other)) s += `, ${stripAgeWords(p.other)}`;
   if (p.clothing) s += `. Wearing: ${p.clothing}`;
   return s;
+}
+
+/**
+ * Concise GroundingDINO grounding prompt for figure DETECTION — NOT the
+ * image-gen description. GDINO localises on visually-groundable tokens (age,
+ * gender, hair COLOUR, facial hair, glasses, clothing colour) and has a
+ * 256-token text cap. Feeding it buildCharacterPhysicalDescription's ~250
+ * chars of face geometry (jawline/chin/nose-tip/cheekbones/lips) — which GDINO
+ * cannot see in a render — fills the budget and buries/truncates the groundable
+ * tokens, tanking localisation and causing figure misattribution. Measured on
+ * an anime page (2026-07-15): verbose prompt 0.45 + wrong boxes vs this concise
+ * form 0.86 + tight boxes. Clothing is appended per-page by the caller
+ * (buildExpectedCharactersForBbox) because the worn outfit is page-specific.
+ */
+function buildGroundingPrompt(char) {
+  const p = extractCharacterVisualProfile(char, {});
+  const genderLabel = p.genderTerm
+    || (p.gender === 'male' ? 'boy' : p.gender === 'female' ? 'girl' : 'child');
+  const noun = p.ageCategory ? `${p.ageCategory} ${genderLabel}` : genderLabel;
+  const art = /^[aeiou]/i.test(noun) ? 'an' : 'a';
+  const parts = [];
+  // Hair COLOUR only (first comma-segment of the full hair prose), not style.
+  const hairColour = p.hair ? String(p.hair).split(',')[0].trim() : '';
+  if (hairColour) parts.push(`${hairColour} hair`);
+  if (p.gender === 'male' && !isNone(p.facialHair) && p.facialHair.toLowerCase() !== 'clean-shaven') {
+    parts.push('a beard');
+  }
+  if (!isNone(p.glasses)) parts.push('glasses');
+  return parts.length ? `${art} ${noun} with ${parts.join(' and ')}` : `${art} ${noun}`;
 }
 
 /**
@@ -5887,6 +5919,7 @@ module.exports = {
   getCharacterPhotoDetails,
   prefetchAvatarBytesForCharacters,
   buildCharacterPhysicalDescription,
+  buildGroundingPrompt,
   resolveClothingForPage,
   buildSceneClothingRequirements,
   buildCharacterPromptBlock,

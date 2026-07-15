@@ -1545,3 +1545,27 @@ server/routes/admin/testlab.js, server/routes/stories.js, server/services/
 database.js, server/services/prompts.js, server/lib/images.js,
 server/lib/sceneValidator.js, client/src/pages/TestLab.tsx.
 **Status:** ✅ active (staging-first; migration runs at boot).
+
+## GroundingDINO uses a concise grounding prompt, not the image-gen description (2026-07-15)
+**Context:** The GDINO figure-detection path fed each character `buildCharacterPhysicalDescription`
+(+ `Wearing:` appended) — ~250 chars of face geometry (jawline/chin/nose-tip/cheekbones/lips) that
+GDINO can't see in a render, filling its 256-token cap and truncating the one groundable token
+(clothing colour). Measured across styles (staging, char-repair p4 investigation): verbose prompt
+scored anime 0.445 / realistic 0.422, both with figure MISATTRIBUTION (one character's box collapsed
+onto another's). A short "adult man with a beard wearing a green shirt" scored 0.86 on the same page.
+**Decision:** New `buildGroundingPrompt(char)` (storyHelpers) emits a concise grounding prompt —
+`a[n] {ageCategory} {genderTerm} with {hairColour} hair [and a beard] [glasses]` — carried as
+`gdinoIdentity` through `buildCharacterDescriptionsForBbox`, then `buildExpectedCharactersForBbox`
+appends the per-page clothing colour (short, capped) as `gdinoPrompt`. `detectFiguresWithGroundingDino`
+prefers `c.gdinoPrompt` over the verbose `c.description` (falls back to it). The verbose description
+stays the Gemini bbox prompt (Gemini reads face geometry fine).
+**Rationale:** GDINO grounds on visually-locatable tokens, not fine facial features. Re-validated with
+production wiring: anime 0.445→0.585, realistic 0.422→0.688, misattribution gone, all figures found.
+Same-outfit same-age figures (e.g. two kids in identical kimonos) can still collapse in BATCHED
+multi-figure detection; single-figure queries (char-repair) avoid it. Watercolour stays weak (painterly
+render vs photo-trained backbone) — keep it on Gemini.
+**Touched:** `server/lib/storyHelpers.js` (buildGroundingPrompt + gdinoIdentity + export),
+`server/lib/images.js` (buildExpectedCharactersForBbox gdinoPrompt, detectFiguresWithGroundingDino
+prompt source, export), `scripts/analysis/validate-gdino-figures.js` (harness).
+**Status:** ✅ active (staging). Does NOT change the realistic-only detection gate — only improves the
+prompt. Broadening the gate to anime/pixar is a separate future decision informed by this data.

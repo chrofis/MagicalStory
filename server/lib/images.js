@@ -2377,7 +2377,10 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   }
 
   // Stage 1 — GroundingDINO on all prompts.
-  const prompts = expectedCharacters.map(c => ({ name: c.name, text: c.description || c.name }));
+  // Prefer the concise grounding prompt (age/gender/hair/beard/glasses + short
+  // clothing colour); GDINO grounds far better on it than the verbose image-gen
+  // description (0.86 vs 0.45 on an anime page). Falls back to description/name.
+  const prompts = expectedCharacters.map(c => ({ name: c.name, text: c.gdinoPrompt || c.description || c.name }));
   const det = await _gdinoDetect(imageDataUri, prompts);
   if (!det || !Array.isArray(det.figures)) return null;
   const W = det.width, H = det.height;
@@ -3422,6 +3425,16 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
       if (clothing) descParts.push(clothing);
       description = descParts.join(', ');
     }
+    // Concise GroundingDINO prompt: the identity (age/gender/hair/beard/glasses)
+    // + the per-page clothing colour, clothing kept SHORT (first clause, capped)
+    // so the whole prompt stays well under GDINO's 256-token cap. Verbose face
+    // geometry (in `description`, for Gemini) tanks GDINO grounding.
+    const gdinoIdentity = desc.gdinoIdentity || null;
+    let gdinoPrompt = null;
+    if (gdinoIdentity) {
+      const shortClothing = clothing ? String(clothing).split(/[.;]/)[0].trim().slice(0, 50) : '';
+      gdinoPrompt = shortClothing ? `${gdinoIdentity} wearing ${shortClothing}` : gdinoIdentity;
+    }
     chars.push({
       name,
       description,
@@ -3429,7 +3442,9 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
       // Clothing kept separate (in addition to being inside `description`) so the
       // GroundingDINO detection path can build negative/disambiguation prompts
       // from the OTHER characters' clothing on an overlap retry.
-      clothing: clothing || ''
+      clothing: clothing || '',
+      // Concise prompt for GroundingDINO (null → detector falls back to `description`).
+      gdinoPrompt,
     });
     addedNames.add(name.toLowerCase());
   }
@@ -15363,6 +15378,7 @@ module.exports = {
   generateImageCacheKey,
   cropImageForSequential,
   compressImageToJPEG,
+  buildExpectedCharactersForBbox,
 
   // Core image functions
   validateEmptyScene,
