@@ -198,6 +198,19 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     PROMPT_TEMPLATES.imageGeneration = origTemplate;
   }
 
+  // avatarSheets: { characterName: tl_avatar versionIndex } — swap this page's
+  // character refs to cell crops from Test Lab avatar sheets (the production
+  // applyStoryCellRefs path), e.g. style-matrix runs with per-style avatars.
+  if (params.avatarSheets && typeof params.avatarSheets === 'object') {
+    const storyCharacterAvatars = {};
+    for (const [name, vIdx] of Object.entries(params.avatarSheets)) {
+      const sheet = await loadTestImage(ctx.storyId, 'tl_avatar', null, vIdx);
+      if (sheet?.imageData) storyCharacterAvatars[name] = { costumed: sheet.imageData };
+    }
+    const { applyStoryCellRefs } = require('./storyAvatars');
+    await applyStoryCellRefs(ctx.referencePhotos, storyCharacterAvatars, ctx.scene.sceneCharacters || []);
+  }
+
   // backgroundRef: use a specific (test) empty-scene version as the background
   // anchor — style-matrix runs chain empty_scene(style) → image(style, that bg).
   let emptyScene;

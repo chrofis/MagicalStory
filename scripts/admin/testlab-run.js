@@ -22,6 +22,8 @@
  *   --label <text>     experiment label shown in the UI
  *   --character <name> character name (char_repair only)
  *   --no-eval          skip auto-eval on image stage results
+ *   --avatars-exp <id> avatar experiment id: use its styled sheets (character →
+ *                      tl_avatar version) as scene refs, matched by artStyle
  *   --styles <list|all>  STYLE MATRIX mode (stage must be image): for each
  *                      target and each style, generate an empty scene in that
  *                      style, then the page image on top of it. 'all' = every
@@ -69,7 +71,8 @@ async function main() {
   const { STAGES, runStageOnTarget } = require('../../server/lib/testlab');
   if (!stage || !STAGES.includes(stage)) die(`--stage required. Valid: ${STAGES.join(', ')}`);
 
-  const { dbQuery } = require('../../server/services/database');
+  const { dbQuery, initializePool } = require('../../server/services/database');
+  initializePool();
   const { loadPromptTemplates } = require('../../server/services/prompts');
   await loadPromptTemplates();
 
@@ -109,10 +112,22 @@ async function main() {
     params.styleMatrix = styles;
   }
 
+  // Avatar sheets from a prior 'avatars' experiment: {artStyle: {name: versionIndex}}
+  const avatarSheetsByStyle = {};
+  if (flags['avatars-exp']) {
+    const exp = await dbQuery('SELECT results FROM testlab_experiments WHERE id = $1', [parseInt(flags['avatars-exp'], 10)]);
+    if (!exp.length) die(`avatars experiment ${flags['avatars-exp']} not found`);
+    for (const e of exp[0].results || []) {
+      if (!e.ok || e.versionIndex === undefined) continue;
+      (avatarSheetsByStyle[e.artStyle] ||= {})[e.character] = e.versionIndex;
+    }
+    console.log(`Avatar sheets loaded: ${Object.entries(avatarSheetsByStyle).map(([s, m]) => `${s}(${Object.keys(m).length})`).join(', ')}`);
+  }
+
   const ins = await dbQuery(
     `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by)
      VALUES ($1, $2, $3, $4, 'running', $5, $6) RETURNING id`,
-    [stage, flags.label || null, promptOverride, JSON.stringify(params), JSON.stringify(targets), 'testlab-cli']
+    [stage, flags.label || null, promptOverride, JSON.stringify({ ...params, avatarsExp: flags['avatars-exp'] || null }), JSON.stringify(targets), 'testlab-cli']
   );
   const experimentId = ins[0].id;
   const units = styles ? targets.length * styles.length : targets.length;
@@ -133,6 +148,8 @@ async function main() {
     const tag = `${target.storyId} P${target.pageNumber}${styleOverride ? ` [${styleOverride}]` : ''}`;
     try {
       let unitParams = { ...params };
+      const sheets = avatarSheetsByStyle[styleOverride || 'default'];
+      if (sheets) unitParams.avatarSheets = sheets;
       if (styleOverride) {
         // Empty scene in the target style first, then the page image on top of it.
         const empty = await runStageOnTarget('empty_scene', target, {
@@ -140,7 +157,7 @@ async function main() {
           params: { artStyleOverride: styleOverride },
           experimentId,
         });
-        unitParams = { ...params, artStyleOverride: styleOverride, backgroundRef: { imageType: 'empty_scene', versionIndex: empty.versionIndex } };
+        unitParams = { ...unitParams, artStyleOverride: styleOverride, backgroundRef: { imageType: 'empty_scene', versionIndex: empty.versionIndex } };
       }
       const result = await runStageOnTarget(stage, target, {
         promptOverride,
