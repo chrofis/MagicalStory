@@ -1517,3 +1517,31 @@ literal full-image + box specifically so the rembg fallback doesn't segment all 
 **Touched:** `server/lib/images.js` (`figureMaskForHatch` in the useFullScene branch;
 both hatch + feather call sites), `server/config/models.js` (`figureMaskBackend` default).
 **Status:** ✅ active. Staging-first; prod default flip pending staging validation.
+
+## Test Lab: is_test sandbox versions + explicit-template prompt overrides (2026-07-15)
+**Context:** Prompt changes were validated on whatever single story was at hand —
+no way to check a change across art styles/story types, and viewing other users'
+stories required impersonation (2h token, lossy switch-back). Test generations
+also polluted the story owner's version list.
+**Decision:** (1) Plain admins may READ any story (`canReadAnyStory` in
+stories.js) — write endpoints stay owner/impersonation-gated. (2) Test Lab
+generations write `story_images` rows flagged `is_test` (+`experiment_id`);
+every user-facing read filters `NOT is_test`, while `getNextVersionIndex`
+deliberately counts test rows so promote = flip the flag with no re-index.
+Promote appends a dbVersionIndex-stamped entry to the data blob and pins active.
+(3) Prompt A/B overrides pass an explicit template into the builders
+(`buildEmptyScenePrompt`/`buildEvaluationPrompt` `opts.template`,
+`evaluateImageQuality` `evalOptions`, `evaluateSemanticFidelity` 5th param) —
+never mutate `PROMPT_TEMPLATES` across an await; the only swap-based path
+(`buildImagePrompt`) is synchronous, so no concurrent generation can observe it.
+(4) Experiments run sequentially in-process, max 25 targets — bounded cost, no
+queue infra; per-target results persist to `testlab_experiments.results`.
+**Rationale:** Flag-on-rows reuses all existing versioning/R2/eval plumbing with
+one column; a separate table would duplicate the byte-serving and promote paths.
+Explicit-template params beat a global swap because prod generations share the
+process.
+**Touched:** migrations/008_testlab.sql, server/lib/testlab.js,
+server/routes/admin/testlab.js, server/routes/stories.js, server/services/
+database.js, server/services/prompts.js, server/lib/images.js,
+server/lib/sceneValidator.js, client/src/pages/TestLab.tsx.
+**Status:** ✅ active (staging-first; migration runs at boot).
