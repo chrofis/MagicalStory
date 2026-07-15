@@ -2399,9 +2399,11 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     if (!f.box) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${f.name}: no box from DINO`); continue; }
     const ec = expectedCharacters.find(c => c.name === f.name);
     const mask = await _mobilesamMaskFull(imageDataUri, f.box, W, H);
-    const bodyBox = mask ? _pxBoxToNorm(mask.bbox, W, H) : _pxBoxToNorm(f.box, W, H);
+    const gdinoBox = _pxBoxToNorm(f.box, W, H);
+    const bodyBox = mask ? _pxBoxToNorm(mask.bbox, W, H) : gdinoBox;
     byName.set(f.name, {
-      name: f.name, score: f.score, candidates: f.candidates || [], mask, bodyBox,
+      name: f.name, score: f.score, candidates: f.candidates || [], mask, bodyBox, gdinoBox,
+      samApplied: !!mask,
       clothing: ec?.clothing || '', position: ec?.position || '',
       promptText: prompts.find(p => p.name === f.name)?.text || f.name,
     });
@@ -2417,9 +2419,11 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     const rf = re?.figures?.[0];
     if (!rf?.box) continue;
     const mask = await _mobilesamMaskFull(imageDataUri, rf.box, W, H);
-    const bodyBox = mask ? _pxBoxToNorm(mask.bbox, W, H) : _pxBoxToNorm(rf.box, W, H);
+    const gdinoBox = _pxBoxToNorm(rf.box, W, H);
+    const bodyBox = mask ? _pxBoxToNorm(mask.bbox, W, H) : gdinoBox;
     byName.set(c.name, {
-      name: c.name, score: rf.score, candidates: rf.candidates || [], mask, bodyBox,
+      name: c.name, score: rf.score, candidates: rf.candidates || [], mask, bodyBox, gdinoBox,
+      samApplied: !!mask,
       clothing: c.clothing || '', position: c.position || '', promptText, recovered: true,
     });
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${c.name} recovered via single-prompt re-query`);
@@ -2521,6 +2525,14 @@ function _gdinoFigDiag(r, batched, wasLowConf) {
     recovered: !!r.recovered,
     lowConf: !!wasLowConf,
     resolvedVia: r.resolvedVia || null,
+    // Stage boxes persisted for debugging: raw GroundingDINO box vs the
+    // MobileSAM-tightened box (== bodyBox at emit time). Comparing samBox here
+    // to the final figures[].bodyBox on the stored story reveals any downstream
+    // corruption (cascade-merge / normalization / auto-refine) — the box is
+    // otherwise thrown away and the corruption is invisible without a re-run.
+    gdinoBox: r.gdinoBox || null,     // [ymin,xmin,ymax,xmax] normalized, raw DINO
+    samBox: r.bodyBox || null,        // [ymin,xmin,ymax,xmax] normalized, after SAM
+    samApplied: !!r.samApplied,       // false → SAM failed, samBox === gdinoBox
   };
 }
 
