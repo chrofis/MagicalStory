@@ -295,6 +295,8 @@ function ExperimentsTab() {
   const [autoEval, setAutoEval] = useState(true);
   const [charName, setCharName] = useState('');
   const [repairBackend, setRepairBackend] = useState('grok');
+  const [whiteoutTarget, setWhiteoutTarget] = useState('face');
+  const [freshDetection, setFreshDetection] = useState(false);
   const [paramsJson, setParamsJson] = useState('');
   const [storyIdInput, setStoryIdInput] = useState('');
   const [coverType, setCoverType] = useState('frontCover');
@@ -376,7 +378,12 @@ function ExperimentsTab() {
     try {
       let params: Record<string, unknown> = { autoEval };
       if (needsCharacter) params.characterName = charName.trim();
-      if (stage === 'char_repair') params.backend = repairBackend;
+      if (stage === 'char_repair') {
+        params.backend = repairBackend;
+        if (repairBackend === 'grok') params.whiteoutTarget = whiteoutTarget;
+        if (freshDetection) params.freshDetection = true;
+      }
+      if (stage === 'qwen_insert' && freshDetection) params.freshDetection = true;
       if (stage === 'cover') params.coverType = coverType;
       if (paramsJson.trim()) {
         try { params = { ...params, ...JSON.parse(paramsJson) }; }
@@ -443,11 +450,31 @@ function ExperimentsTab() {
             />
           ))}
           {stage === 'char_repair' && (
-            <select className="border rounded-lg px-3 py-2 text-sm" value={repairBackend} onChange={e => setRepairBackend(e.target.value)}>
-              <option value="grok">Grok (blended)</option>
-              <option value="gemini">Gemini</option>
-              <option value="qwen">Qwen (crop insert)</option>
-            </select>
+            <>
+              <label className="text-sm flex items-center gap-1.5">
+                Engine
+                <select className="border rounded-lg px-3 py-2 text-sm" value={repairBackend} onChange={e => setRepairBackend(e.target.value)}>
+                  <option value="grok">Grok (blended)</option>
+                  <option value="gemini">Gemini</option>
+                  <option value="qwen">Qwen (crop insert)</option>
+                </select>
+              </label>
+              {repairBackend === 'grok' && (
+                <label className="text-sm flex items-center gap-1.5">
+                  Repair
+                  <select className="border rounded-lg px-3 py-2 text-sm" value={whiteoutTarget} onChange={e => setWhiteoutTarget(e.target.value)}>
+                    <option value="face">Face only</option>
+                    <option value="body">Whole figure</option>
+                  </select>
+                </label>
+              )}
+            </>
+          )}
+          {(stage === 'char_repair' || stage === 'qwen_insert') && (
+            <label className="text-sm flex items-center gap-1.5">
+              <input type="checkbox" checked={freshDetection} onChange={e => setFreshDetection(e.target.checked)} />
+              Re-detect character (ignore stored box)
+            </label>
           )}
           {stage === 'cover' && (
             <select className="border rounded-lg px-3 py-2 text-sm" value={coverType} onChange={e => setCoverType(e.target.value)}>
@@ -701,6 +728,17 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
   );
 }
 
+// One-line scene headline from an Art Director description: the JSON
+// imageSummary when present, else the first prose line. This is the line a
+// human actually reads to compare variants — raw diffs are backup detail.
+function sceneHeadline(desc: string | null | undefined): string {
+  if (!desc) return '';
+  const m = desc.match(/"imageSummary"\s*:\s*"([^"]+)"/);
+  if (m) return m[1];
+  const line = desc.split('\n').map(l => l.trim()).find(l => l && !l.startsWith('#') && !l.startsWith('{') && !l.startsWith('```'));
+  return (line || '').slice(0, 220);
+}
+
 // Line-level A/B diff: lines only in A (removed, red) / only in B (added,
 // green). Set-based — good enough to surface what a prompt rule changed in
 // the Art Director's output without a full LCS diff.
@@ -722,6 +760,38 @@ function DescriptionDiff({ a, b }: { a: string; b: string }) {
       {added.map((l, i) => (
         <div key={`a${i}`} className="text-emerald-700 bg-emerald-50 rounded px-1 whitespace-pre-wrap">+ {l}</div>
       ))}
+    </div>
+  );
+}
+
+/** Intermediate-step image strip (whiteout, model raw output, crop, …). */
+function StepsStrip({ storyId, pageNumber, steps }: { storyId: string; pageNumber: number | null; steps: { label: string; imageType: string; versionIndex: number }[] }) {
+  const [images, setImages] = useState<Record<number, string>>({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      for (const s of steps) {
+        try {
+          const img = await testlabService.getTestImage(storyId, s.imageType, pageNumber, s.versionIndex);
+          if (alive) setImages(prev => ({ ...prev, [s.versionIndex]: img.imageData }));
+        } catch { /* leave placeholder */ }
+      }
+    })();
+    return () => { alive = false; };
+  }, [storyId, pageNumber, steps]);
+  return (
+    <div className="mt-3">
+      <div className="text-xs font-medium text-gray-500 mb-1">Pipeline steps</div>
+      <div className="flex gap-3 overflow-x-auto">
+        {steps.map(s => (
+          <div key={s.versionIndex} className="shrink-0 w-56">
+            <div className="text-[11px] text-gray-500 mb-1">{s.label}</div>
+            {images[s.versionIndex]
+              ? <img src={images[s.versionIndex]} alt={s.label} className="rounded-lg w-full" />
+              : <div className="text-xs text-gray-400 border rounded-lg p-6 text-center">loading…</div>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -840,8 +910,33 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
             <div className={`grid gap-4 mt-3 ${result.variantVersionIndex !== undefined ? 'grid-cols-1 md:grid-cols-3' : producesImage && !isPass1 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
               {!isPass1 && (
                 <div>
-                  <div className="text-xs font-medium text-gray-500 mb-1">{isAvatar ? 'Realistic anchor (pass 1)' : 'Baseline (active version)'}</div>
-                  {baseline ? <img src={baseline} alt="baseline" className="rounded-lg w-full" /> : <div className="text-xs text-gray-400">unavailable</div>}
+                  <div className="text-xs font-medium text-gray-500 mb-1">
+                    {isAvatar ? 'Realistic anchor (pass 1)' : 'Baseline (active version)'}
+                    {result.bbox && result.characterName && <> — <span className="text-indigo-600">red box = "{result.characterName}" ({result.boxSource || 'box'})</span></>}
+                  </div>
+                  {baseline ? (
+                    <div className="relative">
+                      <img src={baseline} alt="baseline" className="rounded-lg w-full" />
+                      {result.bbox?.length === 4 && (
+                        <div
+                          className="absolute border-2 border-red-500 pointer-events-none"
+                          style={{
+                            top: `${result.bbox[0] * 100}%`, left: `${result.bbox[1] * 100}%`,
+                            height: `${(result.bbox[2] - result.bbox[0]) * 100}%`, width: `${(result.bbox[3] - result.bbox[1]) * 100}%`,
+                          }}
+                        />
+                      )}
+                      {result.crop && (
+                        <div
+                          className="absolute border-2 border-red-500 pointer-events-none"
+                          style={{
+                            top: `${result.crop.y * 100}%`, left: `${result.crop.x * 100}%`,
+                            height: `${result.crop.h * 100}%`, width: `${result.crop.w * 100}%`,
+                          }}
+                        />
+                      )}
+                    </div>
+                  ) : <div className="text-xs text-gray-400">unavailable</div>}
                 </div>
               )}
               {producesImage && (
@@ -870,7 +965,8 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
             </div>
           )}
 
-          {/* A/B stage: what changed in the prompt + what it changed in the output — always visible */}
+          {/* A/B stage: readable summary first — the rule + one headline per
+              variant. The raw line diff is backup detail behind a toggle. */}
           {result.variantVersionIndex !== undefined && (
             <div className="mt-3 space-y-2">
               <div>
@@ -881,13 +977,27 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
                   <div className="text-xs font-mono text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5 whitespace-pre-wrap">+ {result.extraRule}</div>
                 )}
               </div>
-              {result.newSceneDescriptionA && result.newSceneDescriptionB && (
-                <div>
-                  <div className="text-xs font-medium text-gray-500 mb-1">Scene-description diff (A − / B +)</div>
-                  <DescriptionDiff a={result.newSceneDescriptionA} b={result.newSceneDescriptionB} />
+              {result.newSceneDescriptionA && (
+                <div className="text-xs bg-gray-50 rounded-lg px-2 py-1.5">
+                  <span className="font-semibold text-gray-600">A:</span> {sceneHeadline(result.newSceneDescriptionA)}
                 </div>
               )}
+              {result.newSceneDescriptionB && (
+                <div className="text-xs bg-indigo-50 rounded-lg px-2 py-1.5">
+                  <span className="font-semibold text-indigo-700">B:</span> {sceneHeadline(result.newSceneDescriptionB)}
+                </div>
+              )}
+              {result.newSceneDescriptionA && result.newSceneDescriptionB && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-indigo-600">Line diff (A − / B +)</summary>
+                  <div className="mt-1"><DescriptionDiff a={result.newSceneDescriptionA} b={result.newSceneDescriptionB} /></div>
+                </details>
+              )}
             </div>
+          )}
+
+          {!!result.steps?.length && loaded && (
+            <StepsStrip storyId={result.storyId} pageNumber={result.pageNumber ?? null} steps={result.steps} />
           )}
 
           {result.decision && (

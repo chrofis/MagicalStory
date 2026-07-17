@@ -483,7 +483,7 @@ async function resolveCharacterBox(ctx, imageData, charName) {
     const bbox = fig.bodyBox || fig.bbox || fig.box_2d || null;
     return bbox?.length === 4 ? { bbox, faceBbox: fig.faceBox || fig.faceBbox || null } : null;
   };
-  const stored = fromDet(ctx.scene.bboxDetection);
+  const stored = ctx._skipStoredBox ? null : fromDet(ctx.scene.bboxDetection);
   if (stored) return { ...stored, source: 'stored' };
 
   const { detectAllBoundingBoxes } = require('./images');
@@ -523,11 +523,15 @@ async function runCharRepairStage(ctx, opts) {
   }
 
   // Bbox: explicit param → stored detection → fresh detection on the image.
+  // params.freshDetection skips the stored box (stale/misattributed names on
+  // older stories) and always re-detects.
   let bbox = params.bbox || null;
   let faceBbox = params.faceBbox || null;
   let boxSource = bbox ? 'param' : null;
   if (!bbox) {
+    if (params.freshDetection) ctx._skipStoredBox = true;
     const resolved = await resolveCharacterBox(ctx, imageData, charName);
+    delete ctx._skipStoredBox;
     if (resolved) { bbox = resolved.bbox; faceBbox = faceBbox || resolved.faceBbox; boxSource = resolved.source; }
   }
   if (!bbox || bbox.length !== 4) {
@@ -566,11 +570,25 @@ async function runCharRepairStage(ctx, opts) {
   const repairedImage = result?.imageData || result?.repairedImage || null;
   if (!repairedImage) throw new Error('Character repair returned no image');
 
+  // Every intermediate the repair produced, saved as tl_step test versions so
+  // the UI can show the full chain, not just the final composite.
+  const steps = [];
+  const stepImages = [
+    ['sent to model (whiteout)', result?.blackoutImage || result?.comparison?.blackoutImage || result?.debug?.sceneSent],
+    ['model raw output', result?.grokRawResult || result?.comparison?.grokRawResult],
+  ];
+  for (const [label, img] of stepImages) {
+    if (typeof img === 'string' && img.startsWith('data:image')) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, img, experimentId);
+      steps.push({ label, imageType: 'tl_step', versionIndex: v });
+    }
+  }
+
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, repairedImage, experimentId);
   return {
-    imageType: 'scene', versionIndex, characterName: charName, bbox, boxSource, backend,
+    imageType: 'scene', versionIndex, characterName: charName, bbox, faceBbox: faceBbox || undefined, boxSource, backend,
     repairMode: backend === 'grok' ? repairMode : null,
-    method: result?.method || null, elapsedMs,
+    method: result?.method || null, steps, elapsedMs,
   };
 }
 
@@ -1361,8 +1379,11 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       w: Math.round(params.crop.w * W), h: Math.round(params.crop.h * H),
     };
   } else {
-    // Stored detection first, else fresh detection (resolveCharacterBox).
+    // Stored detection first, else fresh detection (resolveCharacterBox);
+    // params.freshDetection forces a re-detect.
+    if (params.freshDetection) ctx._skipStoredBox = true;
     const resolved = await resolveCharacterBox(ctx, baseUri, charName).catch(() => null);
+    delete ctx._skipStoredBox;
     const box = resolved?.bbox; // [ymin,xmin,ymax,xmax] 0-1
     if (box?.length === 4) {
       const padX = (box[3] - box[1]) * 0.35, padY = (box[2] - box[0]) * 0.2;
@@ -1429,6 +1450,14 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   }
   const composed = await sharp(baseBuf).composite([{ input: feathered, left: crop.x, top: crop.y }]).jpeg({ quality: 95 }).toBuffer();
 
+  // Intermediates: the crop the model saw and its raw output before gating.
+  const steps = [];
+  for (const [label, buf] of [['crop sent to model', cropBuf], ['model raw output', outBuf]]) {
+    const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber,
+      `data:image/jpeg;base64,${buf.toString('base64')}`, experimentId);
+    steps.push({ label, imageType: 'tl_step', versionIndex: v });
+  }
+
   const versionIndex = await saveTestVersion(
     ctx.storyId, 'scene', ctx.pageNumber,
     `data:image/jpeg;base64,${composed.toString('base64')}`, experimentId
@@ -1437,7 +1466,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     imageType: 'scene', versionIndex, characterName: ref.name, elapsedMs,
     modelId: result.modelId, promptUsed: prompt,
     crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H },
-    cost: result.cost,
+    steps, cost: result.cost,
   };
 }
 

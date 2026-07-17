@@ -117,6 +117,9 @@ export interface ExperimentResult {
   boxSource?: string;
   cost?: number;
   crop?: { x: number; y: number; w: number; h: number };
+  bbox?: number[];
+  faceBbox?: number[];
+  steps?: { label: string; imageType: string; versionIndex: number }[];
   variantScores?: ExperimentResult['scores'];
   newSceneDescriptionA?: string | null;
   newSceneDescriptionB?: string | null;
