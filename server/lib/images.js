@@ -3663,8 +3663,10 @@ function _shortGarmentPhrase(clothing, maxLen = 60) {
   // First clause of the chosen phrase, word-boundary cap.
   phrase = phrase.split(/[,.]/)[0].trim();
   if (phrase.length > maxLen) phrase = phrase.slice(0, maxLen).replace(/\s+\S*$/, '');
-  // No dangling connective after the cap ("…rolled sleeves under").
-  phrase = phrase.replace(/\s+(under|over|with|and|on|in|at|of)$/i, '');
+  // No dangling connectives/articles after the cap ("…rolled sleeves under",
+  // "…lacing at the") — strip repeatedly since they stack.
+  let prev;
+  do { prev = phrase; phrase = phrase.replace(/\s+(under|over|with|and|on|in|at|of|the|a|an)$/i, ''); } while (phrase !== prev);
   return phrase;
 }
 
