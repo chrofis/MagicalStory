@@ -302,6 +302,13 @@ function ExperimentsTab() {
 
   const stageInfo = TESTLAB_STAGES.find(s => s.id === stage);
   const isStoryLevel = !!(stageInfo as { storyLevel?: boolean } | undefined)?.storyLevel;
+  const needsCharacter = stage === 'char_repair' || stage === 'qwen_insert';
+  // Characters on the selected benchmark pages (from their snapshots).
+  const charOptions = [...new Set(
+    benchmarks
+      .filter(b => selectedBench.includes(b.id))
+      .flatMap(b => b.snapshot?.characterNames || [])
+  )];
 
   const load = useCallback(async () => {
     try {
@@ -352,12 +359,12 @@ function ExperimentsTab() {
     } else if (selectedBench.length === 0) {
       alert('Select at least one benchmark target.'); return;
     }
-    if ((stage === 'char_repair' || stage === 'qwen_insert') && !charName.trim()) { alert('This stage needs a character name.'); return; }
+    if (needsCharacter && !charName.trim()) { alert('This stage needs a character — pick one from the dropdown.'); return; }
     setStarting(true);
     setError(null);
     try {
       let params: Record<string, unknown> = { autoEval };
-      if (stage === 'char_repair' || stage === 'qwen_insert') params.characterName = charName.trim();
+      if (needsCharacter) params.characterName = charName.trim();
       if (stage === 'cover') params.coverType = coverType;
       if (paramsJson.trim()) {
         try { params = { ...params, ...JSON.parse(paramsJson) }; }
@@ -406,14 +413,23 @@ function ExperimentsTab() {
               Auto-eval result
             </label>
           )}
-          {(stage === 'char_repair' || stage === 'qwen_insert') && (
+          {needsCharacter && (charOptions.length > 0 ? (
+            <select
+              className="border rounded-lg px-3 py-2 text-sm w-44"
+              value={charName}
+              onChange={e => setCharName(e.target.value)}
+            >
+              <option value="">Character…</option>
+              {charOptions.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          ) : (
             <input
               className="border rounded-lg px-3 py-2 text-sm w-44"
-              placeholder="Character name"
+              placeholder="Character name (select target pages first)"
               value={charName}
               onChange={e => setCharName(e.target.value)}
             />
-          )}
+          ))}
           {stage === 'cover' && (
             <select className="border rounded-lg px-3 py-2 text-sm" value={coverType} onChange={e => setCoverType(e.target.value)}>
               <option value="frontCover">Front cover</option>

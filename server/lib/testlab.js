@@ -442,6 +442,36 @@ async function runBboxStage(ctx, { experimentId }) {
   };
 }
 
+/**
+ * Character box for a page: stored detection first, else run a fresh bbox
+ * detection on the image (same call the bbox stage uses). Returns
+ * {bbox, faceBbox, source} or null.
+ */
+async function resolveCharacterBox(ctx, imageData, charName) {
+  const fromDet = (det) => {
+    const fig = (det?.figures || det?.characters || []).find(f => (f.name || '').toLowerCase() === charName.toLowerCase());
+    if (!fig) return null;
+    const bbox = fig.bbox || fig.box_2d || null;
+    return bbox?.length === 4 ? { bbox, faceBbox: fig.faceBbox || null } : null;
+  };
+  const stored = fromDet(ctx.scene.bboxDetection);
+  if (stored) return { ...stored, source: 'stored' };
+
+  const { detectAllBoundingBoxes } = require('./images');
+  const expectedCharacters = (ctx.scene.sceneCharacters || ctx.referencePhotos || [])
+    .map(c => ({ name: c.name, description: c.description || '', position: c.position || '' }))
+    .filter(c => c.name);
+  const det = await detectAllBoundingBoxes(imageData, {
+    expectedCharacters,
+    sceneContext: (ctx.scene.sceneDescription || '').slice(0, 2000),
+    artStyle: ctx.artStyle,
+    skipCache: true,
+    pageContext: `testlab-boxresolve-P${ctx.pageNumber}`,
+  });
+  const fresh = fromDet(det);
+  return fresh ? { ...fresh, source: 'fresh-detection' } : null;
+}
+
 async function runCharRepairStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
@@ -452,18 +482,22 @@ async function runCharRepairStage(ctx, { experimentId, params = {} }) {
 
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
   const ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === charName.toLowerCase());
-  if (!ref) throw new Error(`No reference photo for character "${charName}" on this page`);
+  if (!ref) {
+    const avail = ctx.referencePhotos.map(p => p.name).filter(Boolean).join(', ');
+    throw new Error(`No reference photo for character "${charName}" on this page (available: ${avail || 'none'})`);
+  }
 
-  // Bbox: explicit param wins; otherwise take the stored detection for this character.
+  // Bbox: explicit param → stored detection → fresh detection on the image.
   let bbox = params.bbox || null;
   let faceBbox = params.faceBbox || null;
+  let boxSource = bbox ? 'param' : null;
   if (!bbox) {
-    const det = ctx.scene.bboxDetection;
-    const fig = (det?.figures || det?.characters || []).find(f => (f.name || '').toLowerCase() === charName.toLowerCase());
-    bbox = fig?.bbox || fig?.box_2d || null;
-    if (!faceBbox) faceBbox = fig?.faceBbox || null;
+    const resolved = await resolveCharacterBox(ctx, imageData, charName);
+    if (resolved) { bbox = resolved.bbox; faceBbox = faceBbox || resolved.faceBbox; boxSource = resolved.source; }
   }
-  if (!bbox || bbox.length !== 4) throw new Error(`No bounding box for "${charName}" — pass params.bbox [ymin,xmin,ymax,xmax] (0-1)`);
+  if (!bbox || bbox.length !== 4) {
+    throw new Error(`"${charName}" not found on the page image (stored detection AND fresh detection both missed) — is the character actually visible?`);
+  }
 
   // Mode mapping — the real repair options are the useBlended/useCutout/
   // useFullScene flags; 'auto' passes none and lets whiteoutTarget pick the
@@ -491,7 +525,7 @@ async function runCharRepairStage(ctx, { experimentId, params = {} }) {
   if (!repairedImage) throw new Error('Character repair returned no image');
 
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, repairedImage, experimentId);
-  return { imageType: 'scene', versionIndex, characterName: charName, bbox, backend, repairMode, method: result?.method || null, elapsedMs };
+  return { imageType: 'scene', versionIndex, characterName: charName, bbox, boxSource, backend, repairMode, method: result?.method || null, elapsedMs };
 }
 
 async function runEntityStage(ctx, { experimentId }) {
@@ -1122,9 +1156,9 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       w: Math.round(params.crop.w * W), h: Math.round(params.crop.h * H),
     };
   } else {
-    const det = ctx.scene.bboxDetection;
-    const fig = (det?.figures || det?.characters || []).find(f => (f.name || '').toLowerCase() === charName.toLowerCase());
-    const box = fig?.bbox || fig?.box_2d; // [ymin,xmin,ymax,xmax] 0-1
+    // Stored detection first, else fresh detection (resolveCharacterBox).
+    const resolved = await resolveCharacterBox(ctx, baseUri, charName).catch(() => null);
+    const box = resolved?.bbox; // [ymin,xmin,ymax,xmax] 0-1
     if (box?.length === 4) {
       const padX = (box[3] - box[1]) * 0.35, padY = (box[2] - box[0]) * 0.2;
       crop = {
@@ -1135,7 +1169,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       };
     }
   }
-  if (!crop) throw new Error('qwen_insert needs params.crop {x,y,w,h} (normalized 0-1) — no stored detection box to fall back on');
+  if (!crop) throw new Error('qwen_insert needs params.crop {x,y,w,h} (normalized 0-1) — the character was not found on the base image either');
   crop.x = Math.max(0, Math.min(W - 64, crop.x));
   crop.y = Math.max(0, Math.min(H - 64, crop.y));
   crop.w = Math.min(W - crop.x, crop.w);
