@@ -1628,3 +1628,22 @@ Sarah's generic-prompt box matched ground truth within ~4px. Point-only SAM is u
 **Rationale:** One source of truth per repair method; Test Lab results stay representative of production behaviour (same fn, same params), and prompt A/B runs can't leak overrides into concurrent prod generations.
 
 **Touched files:** server/lib/testlab.js, server/routes/admin/testlab.js, server/lib/coverIterate.js (promptTemplateOverride), client/src/pages/TestLab.tsx, client/src/services/testlabService.ts.
+
+## Identity via Set-of-Mark (letter badges + Gemini recognition), layout matching demoted to fallback (2026-07-17)
+**Context:** Generic DINO detection names figures by matching the scene plan (position prose + depth +
+size + gender) to detected boxes. That cannot separate same-gender same-depth casts — three girls, two
+women with no L/R prose — and fails silently (coin-flip). User insight: mark the figures A, B, C on the
+image and ask Gemini who is who.
+**Decision:** Primary identity is Set-of-Mark: letter badges drawn on each detected figure (below the
+face), one gemini-2.5-flash call answers {"A": "<name>|unknown", ...} from age/gender/hair/clothing.
+Gemini returns letters only — never coordinates — so its spatial sloppiness cannot corrupt the local
+DINO/SAM geometry. Duplicate names or non-JSON → answer rejected. Fallback: the deterministic
+layout+gender matching. diag.identity records method + raw answers.
+**Rationale:** Splits the labor by proven strengths: DINO/SAM = exact geometry, semantically blind;
+Gemini = strong recognition, spatially sloppy. Verified 8/8 correct on the two multi-adult test pages
+incl. the page layout had coin-flipped. Costs one cheap Flash call per page (fraction of a cent, ~1-2s)
+— affordable since these pages no longer make the expensive Gemini bbox call. Gotcha: gemini-2.5-flash
+thinking ate small maxOutputTokens budgets → thinkingBudget 0, thought parts filtered, tolerant JSON
+extraction.
+**Touched:** `server/lib/images.js` (_somIdentifyFigures, Stage 4 restructure). Commit bbd1e55e.
+**Status:** ✅ live on staging.
