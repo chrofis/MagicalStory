@@ -113,6 +113,8 @@ export interface ExperimentResult {
   newSceneDescriptionA?: string | null;
   newSceneDescriptionB?: string | null;
   extraRule?: string | null;
+  promptUsedA?: string | null;
+  promptUsedB?: string | null;
   versions?: unknown[];
   winner?: unknown;
   styled?: boolean;
@@ -161,9 +163,12 @@ export const TESTLAB_STAGES = [
   { id: 'scene_description', label: 'Scene description (iterate)', producesImage: false, overridable: true },
   { id: 'rewrite_blocked', label: 'Rewrite blocked scene', producesImage: false, overridable: true },
   { id: 'repair_verify', label: 'Repair verification (diff)', producesImage: true, overridable: false },
-  { id: 'qwen_insert', label: 'Qwen insert (crop-bounded)', producesImage: true, overridable: true },
+  { id: 'qwen_insert', label: 'Qwen insert (crop-bounded)', producesImage: true, overridable: true, noTemplate: true },
   { id: 'cover', label: 'Cover render', producesImage: true, overridable: true, storyLevel: true },
   { id: 'style_check', label: 'Style consistency check', producesImage: false, overridable: false, storyLevel: true },
+  { id: 'avatar_realistic', label: 'Avatar pass 1 (realistic anchor)', producesImage: true, overridable: false, characterLevel: true },
+  { id: 'avatar_style', label: 'Avatar pass 2 (style transfer)', producesImage: true, overridable: true, characterLevel: true },
+  { id: 'avatar_eval', label: 'Avatar sheet eval', producesImage: false, overridable: false, characterLevel: true },
 ] as const;
 
 export const testlabService = {

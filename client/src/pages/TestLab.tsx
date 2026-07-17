@@ -303,13 +303,19 @@ function ExperimentsTab() {
 
   const stageInfo = TESTLAB_STAGES.find(s => s.id === stage);
   const isStoryLevel = !!(stageInfo as { storyLevel?: boolean } | undefined)?.storyLevel;
-  const needsCharacter = stage === 'char_repair' || stage === 'qwen_insert';
+  const isCharacterLevel = !!(stageInfo as { characterLevel?: boolean } | undefined)?.characterLevel;
+  const needsCharacter = stage === 'char_repair' || stage === 'qwen_insert' || isCharacterLevel;
   // Characters on the selected benchmark pages (from their snapshots).
   const charOptions = [...new Set(
     benchmarks
       .filter(b => selectedBench.includes(b.id))
       .flatMap(b => b.snapshot?.characterNames || [])
   )];
+  // How many targets the Run button would fire on.
+  const targetCount = isStoryLevel || isCharacterLevel
+    ? (storyIdInput.trim() ? 1 : [...new Set(benchmarks.filter(b => selectedBench.includes(b.id)).map(b => b.storyId))].length)
+    : selectedBench.length;
+  const canStart = targetCount > 0 && (!needsCharacter || !!charName.trim());
 
   const load = useCallback(async () => {
     try {
@@ -348,15 +354,19 @@ function ExperimentsTab() {
   };
 
   const start = async () => {
-    // Story-level stages take story targets (from the input or the selected
-    // benchmarks' stories); page stages take benchmark pages.
-    let storyTargets: { storyId: string; coverType?: string }[] = [];
-    if (isStoryLevel) {
+    // Story-level and character-level stages take story targets (from the
+    // input or the selected benchmarks' stories); page stages take pages.
+    let storyTargets: { storyId: string; coverType?: string; character?: string }[] = [];
+    if (isStoryLevel || isCharacterLevel) {
       const ids = storyIdInput.trim()
         ? [storyIdInput.trim()]
         : [...new Set(benchmarks.filter(b => selectedBench.includes(b.id)).map(b => b.storyId))];
       if (ids.length === 0) { alert('Enter a story ID or select benchmark pages (their stories are used).'); return; }
-      storyTargets = ids.map(id => stage === 'cover' ? { storyId: id, coverType } : { storyId: id });
+      storyTargets = ids.map(id => {
+        if (stage === 'cover') return { storyId: id, coverType };
+        if (isCharacterLevel) return { storyId: id, character: charName.trim() };
+        return { storyId: id };
+      });
     } else if (selectedBench.length === 0) {
       alert('Select at least one benchmark target.'); return;
     }
@@ -377,7 +387,7 @@ function ExperimentsTab() {
         label: label || undefined,
         promptOverride: override.trim() ? override : null,
         params,
-        ...(isStoryLevel ? { targets: storyTargets } : { benchmarkIds: selectedBench }),
+        ...(isStoryLevel || isCharacterLevel ? { targets: storyTargets } : { benchmarkIds: selectedBench }),
       });
       setLabel('');
       await load();
@@ -446,7 +456,7 @@ function ExperimentsTab() {
               <option value="backCover">Back cover</option>
             </select>
           )}
-          {isStoryLevel && (
+          {(isStoryLevel || isCharacterLevel) && (
             <input
               className="border rounded-lg px-3 py-2 text-sm w-72"
               placeholder="Story ID (empty = selected benchmarks' stories)"
@@ -495,8 +505,12 @@ function ExperimentsTab() {
         {stageInfo?.overridable && (
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-medium text-gray-700">Prompt override (empty = current template)</div>
-              <button className="text-xs text-indigo-600 hover:underline" onClick={loadTemplate}>Load current template</button>
+              <div className="text-sm font-medium text-gray-700">
+                {(stageInfo as { noTemplate?: boolean }).noTemplate ? 'Instruction text' : 'Prompt override (empty = current template)'}
+              </div>
+              {!(stageInfo as { noTemplate?: boolean }).noTemplate && (
+                <button className="text-xs text-indigo-600 hover:underline" onClick={loadTemplate}>Load current template</button>
+              )}
             </div>
             <textarea
               className="border rounded-lg px-3 py-2 text-xs font-mono w-full h-48"
@@ -508,14 +522,14 @@ function ExperimentsTab() {
         )}
 
         <div className="flex items-center gap-3">
-          <Button onClick={start} disabled={starting || selectedBench.length === 0}>
-            {starting ? 'Starting…' : `Run on ${selectedBench.length} page(s)`}
+          <Button onClick={start} disabled={starting || !canStart}>
+            {starting ? 'Starting…' : `Run on ${targetCount} target(s)`}
           </Button>
-          {stageInfo?.producesImage && (
-            <span className="text-xs text-gray-500">
-              Generates {selectedBench.length} image(s) — results stored as test versions, invisible to users.
-            </span>
-          )}
+          <span className="text-xs text-gray-500">
+            {stageInfo?.producesImage
+              ? `~$${(targetCount * 0.05).toFixed(2)} est. (${targetCount} × image gen + eval) — stored as test versions, invisible to users.`
+              : `~$${(targetCount * 0.01).toFixed(2)} est. (LLM/eval only, no images saved to the story).`}
+          </span>
         </div>
       </div>
 
@@ -581,7 +595,11 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
 
   const redo = async (index: number) => {
     try {
-      await testlabService.redo(detail.id, index, redoOverride.trim() || undefined);
+      // Empty textarea on an A/B experiment would silently reuse the stored
+      // override — pass useCurrentTemplates so "empty = current templates"
+      // actually holds, matching the placeholder text.
+      const text = redoOverride.trim();
+      await testlabService.redo(detail.id, index, text || undefined, !text && !!detail.promptOverride);
       setPendingRedos(p => ({ ...p, [index]: countRedos(detail.results, index) + 1 }));
     } catch (e) {
       alert(`Redo failed: ${e instanceof Error ? e.message : e}`);
@@ -605,12 +623,24 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
     });
   }, [detail]);
 
-  // Display order: originals in sequence, each followed by its redos;
-  // an original with redos is shown dimmed (superseded).
+  // Display order: originals in sequence, each followed by ALL its redos —
+  // including redos of redos: every redo entry resolves its redoOf CHAIN back
+  // to the root original, so second-level redos still render (they used to
+  // vanish: their redoOf pointed at a redo entry, not an original).
+  const rootOf = (idx: number): number => {
+    const seen = new Set<number>();
+    let cur = idx;
+    while (typeof detail.results[cur]?.redoOf === 'number' && !seen.has(cur)) {
+      seen.add(cur);
+      cur = detail.results[cur].redoOf as number;
+    }
+    return cur;
+  };
   const displayList: { r: ExperimentResult; i: number; isRedo: boolean; superseded: boolean }[] = [];
   detail.results.forEach((r, i) => {
-    if (typeof r.redoOf === 'number') return; // attached below its original
-    const redos = detail.results.map((x, j) => ({ x, j })).filter(({ x }) => x.redoOf === i);
+    if (typeof r.redoOf === 'number') return; // attached below its root original
+    const redos = detail.results.map((x, j) => ({ x, j }))
+      .filter(({ x, j }) => typeof x.redoOf === 'number' && rootOf(j) === i);
     displayList.push({ r, i, isRedo: false, superseded: redos.length > 0 });
     redos.forEach(({ x, j }) => displayList.push({ r: x, i: j, isRedo: true, superseded: false }));
   });
@@ -649,7 +679,7 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
           {showRedoOverride && (
             <textarea
               className="border rounded-lg px-3 py-2 text-xs font-mono w-full h-40 mt-2"
-              placeholder="Paste + edit a prompt here, then hit Redo on any result below — it reruns that single unit with this prompt. Empty = redo with the current templates."
+              placeholder="Paste + edit a prompt here, then hit Redo on any result below — it reruns that single unit with this prompt. Empty = redo with the CURRENT templates (to redo with this experiment's A/B prompt, copy it from 'Show prompt override' above)."
               value={redoOverride}
               onChange={e => setRedoOverride(e.target.value)}
             />
@@ -667,6 +697,31 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
           Running… next target in progress (auto-refreshes every 5s)
         </div>
       )}
+    </div>
+  );
+}
+
+// Line-level A/B diff: lines only in A (removed, red) / only in B (added,
+// green). Set-based — good enough to surface what a prompt rule changed in
+// the Art Director's output without a full LCS diff.
+function DescriptionDiff({ a, b }: { a: string; b: string }) {
+  const linesA = a.split('\n').map(l => l.trim()).filter(Boolean);
+  const linesB = b.split('\n').map(l => l.trim()).filter(Boolean);
+  const setA = new Set(linesA);
+  const setB = new Set(linesB);
+  const removed = linesA.filter(l => !setB.has(l));
+  const added = linesB.filter(l => !setA.has(l));
+  if (removed.length === 0 && added.length === 0) {
+    return <div className="text-xs text-gray-400 italic">Scene descriptions are identical.</div>;
+  }
+  return (
+    <div className="text-xs font-mono bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-72 overflow-y-auto space-y-0.5">
+      {removed.map((l, i) => (
+        <div key={`r${i}`} className="text-red-700 bg-red-50 rounded px-1 whitespace-pre-wrap">− {l}</div>
+      ))}
+      {added.map((l, i) => (
+        <div key={`a${i}`} className="text-emerald-700 bg-emerald-50 rounded px-1 whitespace-pre-wrap">+ {l}</div>
+      ))}
     </div>
   );
 }
@@ -697,6 +752,9 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
         } else {
           setBaseline('');
         }
+      } else if (isCover) {
+        const base = await testlabService.getBaselineCover(result.storyId, result.imageType!);
+        setBaseline(base.imageData);
       } else if (hasPage) {
         const base = await testlabService.getBaselineImage(result.storyId, result.pageNumber);
         setBaseline(base.imageData);
@@ -760,6 +818,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
             </span>
           )}
           {result.method && <span>{result.method}</span>}
+          {result.scores?.error && <span className="text-red-600 font-semibold" title={result.scores.error}>eval failed</span>}
         </div>
       </div>
 
@@ -806,7 +865,26 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
                   {result.variantScores?.final != null && (
                     <div className="text-xs text-gray-600 mt-1">final {result.variantScores.final}</div>
                   )}
-                  {result.extraRule && <div className="text-[11px] text-gray-400 mt-1 italic">{result.extraRule}</div>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* A/B stage: what changed in the prompt + what it changed in the output — always visible */}
+          {result.variantVersionIndex !== undefined && (
+            <div className="mt-3 space-y-2">
+              <div>
+                <div className="text-xs font-medium text-gray-500 mb-1">Prompt change (B vs A)</div>
+                {result.promptOverridden ? (
+                  <div className="text-xs text-gray-600">Custom variant-B template (full override) — see "Show details" for both prompts.</div>
+                ) : (
+                  <div className="text-xs font-mono text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5 whitespace-pre-wrap">+ {result.extraRule}</div>
+                )}
+              </div>
+              {result.newSceneDescriptionA && result.newSceneDescriptionB && (
+                <div>
+                  <div className="text-xs font-medium text-gray-500 mb-1">Scene-description diff (A − / B +)</div>
+                  <DescriptionDiff a={result.newSceneDescriptionA} b={result.newSceneDescriptionB} />
                 </div>
               )}
             </div>
@@ -818,7 +896,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
               {result.skippedRepair && <span className="text-gray-400"> (nothing to repair)</span>}
             </div>
           )}
-          {(result.issuesSummary || result.semanticIssues?.length || result.figures?.length || result.report || result.fixableIssues?.length || result.promptUsed || result.plan || result.textZone || result.newSceneDescription || result.newSceneDescriptionA || result.versions?.length || result.inpaintInstruction || result.artifactRepair) && (
+          {(result.issuesSummary || result.scores?.issuesSummary || result.semanticIssues?.length || result.figures?.length || result.report || result.fixableIssues?.length || result.promptUsed || result.plan || result.dedupedIssues != null || result.consolidateError || result.skipped === true || result.textZone || result.newSceneDescription || result.newSceneDescriptionA || result.versions?.length || result.note || result.comparedVersions || result.inpaintInstruction || result.artifactRepair) && (
             <div className="mt-3">
               <button className="text-xs text-indigo-600 hover:underline" onClick={() => setShowDetails(v => !v)}>
                 {showDetails ? 'Hide' : 'Show'} details
@@ -841,8 +919,26 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
                   {stage === 'bbox' && (result.figures || result.objects) && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ backend: result.detectionBackend, figures: result.figures, objects: result.objects }, null, 2)}</pre>
                   )}
-                  {(stage === 'entity' || stage === 'style_check' || stage === 'avatar_eval') && result.report != null && (
+                  {(stage === 'entity' || stage === 'style_check' || stage === 'avatar_eval' || stage === 'repair_verify') && result.report != null && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64">{JSON.stringify(result.report, null, 2)}</pre>
+                  )}
+                  {result.comparedVersions && (
+                    <div className="text-xs text-gray-600"><b>Compared:</b> original v{String(result.comparedVersions.original)} vs repaired v{String(result.comparedVersions.repaired)}</div>
+                  )}
+                  {stage === 'quality_eval' && !!result.figures?.length && (
+                    <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify(result.figures, null, 2)}</pre>
+                  )}
+                  {result.scores?.issuesSummary && (
+                    <div className="text-xs text-gray-600"><b>Eval issues:</b> {result.scores.issuesSummary}</div>
+                  )}
+                  {result.dedupedIssues != null && (
+                    <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify(result.dedupedIssues, null, 2)}</pre>
+                  )}
+                  {result.consolidateError && (
+                    <div className="text-xs text-red-600"><b>Consolidator error:</b> {result.consolidateError}</div>
+                  )}
+                  {result.skipped === true && stage === 'consolidate' && (
+                    <div className="text-xs text-gray-500">Consolidator skipped — no issues to consolidate on this page.</div>
                   )}
                   {result.inpaintInstruction && (
                     <div className="text-xs text-gray-600"><b>Inpaint instruction:</b> {result.inpaintInstruction}</div>
@@ -857,8 +953,9 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
                     <div className="text-xs text-gray-600"><b>Artifact repair:</b> fixed {result.artifactRepair.fixedCount}/{result.artifactRepair.totalIssues} (failed {result.artifactRepair.failedCount})</div>
                   )}
                   {!!result.versions?.length && (
-                    <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ versions: result.versions, winner: result.winner }, null, 2)}</pre>
+                    <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ versions: result.versions, winner: result.winner, active: result.active }, null, 2)}</pre>
                   )}
+                  {result.note && <div className="text-xs text-gray-500">{result.note}</div>}
                   {result.newSceneDescription && (
                     <div className="grid md:grid-cols-2 gap-3">
                       <div>
@@ -887,6 +984,18 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
                     <details className="text-xs">
                       <summary className="cursor-pointer text-indigo-600">Prompt sent</summary>
                       <pre className="bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64 mt-1">{result.promptUsed}</pre>
+                    </details>
+                  )}
+                  {result.promptUsedA && (
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-indigo-600">Prompt A (current template)</summary>
+                      <pre className="bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64 mt-1">{result.promptUsedA}</pre>
+                    </details>
+                  )}
+                  {result.promptUsedB && (
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-indigo-600">Prompt B (variant)</summary>
+                      <pre className="bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64 mt-1">{result.promptUsedB}</pre>
                     </details>
                   )}
                 </div>

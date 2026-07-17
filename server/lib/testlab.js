@@ -93,7 +93,12 @@ async function loadSceneContext(storyId, pageNumber) {
     title: rows[0].title || null,
     referencePhotos,
     landmarkPhotos,
-    textPosition: scene.textPosition || scene.sceneMetadata?.textPosition || 'top-left',
+    // null when the story renders text below the image (layout square-below) —
+    // stages must NOT invent a text zone then (production omits it too).
+    textPosition: scene.textPosition || scene.sceneMetadata?.textPosition || null,
+    // Outline hint for evals — stored as outlineExtract/sceneHint on the
+    // scene (there is no sceneMetadata.hint field; production reads these).
+    outlineHint: scene.outlineExtract || scene.sceneHint || null,
   };
 }
 
@@ -103,7 +108,7 @@ async function bytesFor(img) {
   return imgBytesAsync({ image_data: img.imageData || img.image_data || null, image_url: img.imageUrl || img.image_url || null });
 }
 
-/** Baseline empty scene for a page (non-test rows only; blob fallback). */
+/** Baseline empty scene for a page (non-test rows only). */
 async function loadEmptyScene(storyId, pageNumber) {
   const { dbQuery } = require('../services/database');
   const rows = await dbQuery(
@@ -112,14 +117,7 @@ async function loadEmptyScene(storyId, pageNumber) {
      ORDER BY version_index LIMIT 1`,
     [storyId, pageNumber]
   );
-  if (rows.length > 0) return bytesFor(rows[0]);
-  const blob = await dbQuery(
-    `SELECT scene->>'emptySceneImage' AS img
-     FROM stories, jsonb_array_elements(data->'sceneImages') scene
-     WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
-    [storyId, pageNumber]
-  );
-  return blob[0]?.img || null;
+  return rows.length > 0 ? bytesFor(rows[0]) : null;
 }
 
 /** Active (user-visible) page image as a data URI. */
@@ -146,17 +144,29 @@ async function loadTestImage(storyId, imageType, pageNumber, versionIndex) {
   return { imageData: await bytesFor(rows[0]), isTest: rows[0].is_test, experimentId: rows[0].experiment_id };
 }
 
+// Per-slot promise chain so concurrent saves (3 parallel redos + a running
+// experiment on the same page) can't compute the same next version index and
+// silently overwrite each other (saveStoryImage upserts on conflict).
+const _saveChains = new Map();
+
 async function saveTestVersion(storyId, imageType, pageNumber, imageData, experimentId, qualityScore = null) {
-  const { getNextVersionIndex, saveStoryImage } = require('../services/database');
-  const versionIndex = await getNextVersionIndex(storyId, imageType, pageNumber);
-  await saveStoryImage(storyId, imageType, pageNumber, imageData, {
-    versionIndex,
-    isTest: true,
-    experimentId,
-    qualityScore,
-    generatedAt: new Date().toISOString(),
+  const key = `${storyId}|${imageType}|${pageNumber}`;
+  const prev = _saveChains.get(key) || Promise.resolve();
+  const run = prev.catch(() => {}).then(async () => {
+    const { getNextVersionIndex, saveStoryImage } = require('../services/database');
+    const versionIndex = await getNextVersionIndex(storyId, imageType, pageNumber);
+    await saveStoryImage(storyId, imageType, pageNumber, imageData, {
+      versionIndex,
+      isTest: true,
+      experimentId,
+      qualityScore,
+      generatedAt: new Date().toISOString(),
+    });
+    return versionIndex;
   });
-  return versionIndex;
+  _saveChains.set(key, run);
+  run.finally(() => { if (_saveChains.get(key) === run) _saveChains.delete(key); }).catch(() => {});
+  return run;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -203,7 +213,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
       ctx.visualBible,
       ctx.pageNumber,
       ctx.referencePhotos,
-      { textPosition: ctx.textPosition, skipVisualBible: isGrokImage }
+      { textPositionOverride: ctx.textPosition || undefined, skipVisualBible: isGrokImage }
     );
   } finally {
     PROMPT_TEMPLATES.imageGeneration = origTemplate;
@@ -233,7 +243,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     emptyScene = await loadEmptyScene(ctx.storyId, ctx.pageNumber);
   }
   const textInImage = ctx.layout?.textInImage !== false;
-  const textAreaMask = textInImage ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null;
+  const textAreaMask = textInImage && ctx.textPosition ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null;
 
   // Visual Bible grid — same construction as the production page path: page
   // elements (minus locations when a background anchors the location already)
@@ -262,7 +272,6 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     textAreaMask,
     pageNumber: ctx.pageNumber,
     skipCache: true,
-    pageContext: `testlab-exp${experimentId}`,
   });
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('Image generation returned no image');
@@ -274,7 +283,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
       const evalRes = await evaluateImageQuality(
         result.imageData, ctx.scene.sceneDescription, ctx.referencePhotos, 'scene',
         null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-        ctx.scene.text || null, ctx.scene.sceneMetadata?.hint || null, ctx.scene.sceneCharacters || null
+        ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null
       );
       if (evalRes) {
         scores = {
@@ -311,12 +320,17 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   const description = meta.emptyScenePrompt || ctx.scene.emptyScenePrompt || ctx.scene.sceneDescription;
   if (!description) throw new Error('No empty-scene description available for this page');
 
+  // Text zone only when this story overlays text on the image AND the scene
+  // has a position — production omits it for text-below layouts.
+  const wantsTextZone = ctx.layout?.textInImage !== false && !!ctx.textPosition;
   const prompt = buildEmptyScenePrompt({
     template: promptOverride || undefined,
     style: resolveArtStyleForEmptyScene(params.artStyleOverride || ctx.artStyle, null),
     description,
     characterSpace: meta.characterSpace || '',
-    textAreaInstruction: buildTextZoneInstruction(ctx.textPosition, meta.textZoneDescription || null, 'a quarter of the frame', { isEmptyScene: true }),
+    textAreaInstruction: wantsTextZone
+      ? buildTextZoneInstruction(ctx.textPosition, meta.textZoneDescription || null, 'a quarter of the frame', { isEmptyScene: true })
+      : '',
     eraGuard: buildEraGuard(meta.era),
     landmarkFidelity: buildLandmarkFidelityBlock(ctx.landmarkPhotos[0] || null),
   });
@@ -325,18 +339,20 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   const result = await generateImageOnly(prompt, [], {
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
     landmarkPhotos: ctx.landmarkPhotos,
-    textAreaMask: getTextAreaMask(ctx.textPosition, ctx.languageLevel),
+    textAreaMask: wantsTextZone ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null,
     pageNumber: ctx.pageNumber,
     skipCache: true,
-    pageContext: `testlab-exp${experimentId}`,
   });
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('Empty-scene generation returned no image');
 
   // Same QC the pipeline runs (pixel + Gemini vision) — report-only here, no
   // retry loop: the point is seeing whether a prompt variant passes the gate.
+  // The calm-zone half needs a text position, so QC is skipped for text-below
+  // layouts (production never validates those either).
   let qc = null;
-  try {
+  if (!wantsTextZone) qc = { pass: true, issues: [], skipped: 'no text zone (text-below layout)' };
+  else try {
     const { validateEmptyScene } = require('./images');
     const qcRes = await validateEmptyScene(result.imageData, ctx.textPosition, `testlab-exp${experimentId}-P${ctx.pageNumber}`, {
       sceneDescription: description,
@@ -363,7 +379,7 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId }) {
   const result = await evaluateImageQuality(
     imageData, ctx.scene.sceneDescription, ctx.referencePhotos, 'scene',
     null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-    ctx.scene.text || null, ctx.scene.sceneMetadata?.hint || null, ctx.scene.sceneCharacters || null,
+    ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
     { evalTemplateOverride: promptOverride || null }
   );
   const elapsedMs = Date.now() - t0;
@@ -396,7 +412,7 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
   const t0 = Date.now();
   const result = await evaluateSemanticFidelity(
     imageData, storyText, ctx.scene.sceneDescription,
-    ctx.scene.sceneMetadata?.hint || null, promptOverride || null
+    ctx.outlineHint, promptOverride || null
   );
   const elapsedMs = Date.now() - t0;
   if (!result) throw new Error('Semantic evaluation returned null');
@@ -411,17 +427,28 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
   };
 }
 
+/**
+ * Expected-characters list for detection. Scene characters carry only names —
+ * descriptions live in the prior detection's characterDescriptions and
+ * positions in sceneMetadata.characterPositions.
+ */
+function buildExpectedCharacters(ctx) {
+  const descriptions = ctx.scene.bboxDetection?.characterDescriptions || {};
+  const positions = ctx.scene.sceneMetadata?.characterPositions || {};
+  return (ctx.scene.sceneCharacters || ctx.referencePhotos || []).map(c => ({
+    name: c.name,
+    description: descriptions[c.name]?.richDescription || descriptions[c.name] || c.description || '',
+    position: positions[c.name] || c.position || '',
+  })).filter(c => c.name);
+}
+
 async function runBboxStage(ctx, { experimentId }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { detectAllBoundingBoxes } = require('./images');
 
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
-  const expectedCharacters = (ctx.scene.sceneCharacters || ctx.referencePhotos || []).map(c => ({
-    name: c.name,
-    description: c.description || '',
-    position: c.position || '',
-  })).filter(c => c.name);
+  const expectedCharacters = buildExpectedCharacters(ctx);
 
   const t0 = Date.now();
   const result = await detectAllBoundingBoxes(imageData, {
@@ -460,9 +487,7 @@ async function resolveCharacterBox(ctx, imageData, charName) {
   if (stored) return { ...stored, source: 'stored' };
 
   const { detectAllBoundingBoxes } = require('./images');
-  const expectedCharacters = (ctx.scene.sceneCharacters || ctx.referencePhotos || [])
-    .map(c => ({ name: c.name, description: c.description || '', position: c.position || '' }))
-    .filter(c => c.name);
+  const expectedCharacters = buildExpectedCharacters(ctx);
   const det = await detectAllBoundingBoxes(imageData, {
     expectedCharacters,
     sceneContext: (ctx.scene.sceneDescription || '').slice(0, 2000),
@@ -520,22 +545,33 @@ async function runCharRepairStage(ctx, opts) {
   else if (repairMode !== 'auto') throw new Error(`Unknown repairMode "${repairMode}" — use blended|cutout|fullscene|auto`);
 
   const backend = params.backend || 'grok';
-  if (!['grok', 'gemini'].includes(backend)) throw new Error(`Unknown backend "${backend}" — use grok|gemini`);
+  if (!['grok', 'gemini'].includes(backend)) throw new Error(`Unknown backend "${backend}" — use grok|gemini|qwen`);
+  // The Gemini path is a single full-image repaint — it consumes NONE of the
+  // mode flags / whiteoutTarget / faceBbox. Refuse a mode request it would
+  // silently ignore instead of reporting it as honored.
+  if (backend === 'gemini' && params.repairMode && params.repairMode !== 'auto') {
+    throw new Error(`backend "gemini" ignores repairMode — it always does a full-image repaint. Use grok for blended/cutout/fullscene.`);
+  }
 
   const t0 = Date.now();
   const result = await repairCharacterMismatch(imageData, ref.photoUrl, bbox, charName, {
     imageBackend: backend,
-    ...modeFlags,
-    faceBbox,
-    whiteoutTarget: params.whiteoutTarget || 'face',
-    pageContext: `testlab-exp${experimentId}-P${ctx.pageNumber}`,
+    ...(backend === 'grok' ? {
+      ...modeFlags,
+      faceBbox,
+      whiteoutTarget: params.whiteoutTarget || 'face',
+    } : {}),
   });
   const elapsedMs = Date.now() - t0;
   const repairedImage = result?.imageData || result?.repairedImage || null;
   if (!repairedImage) throw new Error('Character repair returned no image');
 
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, repairedImage, experimentId);
-  return { imageType: 'scene', versionIndex, characterName: charName, bbox, boxSource, backend, repairMode, method: result?.method || null, elapsedMs };
+  return {
+    imageType: 'scene', versionIndex, characterName: charName, bbox, boxSource, backend,
+    repairMode: backend === 'grok' ? repairMode : null,
+    method: result?.method || null, elapsedMs,
+  };
 }
 
 async function runEntityStage(ctx, { experimentId }) {
@@ -657,16 +693,16 @@ async function runAvatarStyleStage(target, { experimentId, promptOverride, param
 // Shared loaders for the repair-side stages
 // ─────────────────────────────────────────────────────────────────────
 
-/** Full story data (optionally rehydrated: full or single page). */
-async function loadStoryDataFull(storyId, { pageNumber = null, rehydrate = true } = {}) {
+/** Full story data (optionally rehydrated — always a full rehydrate; a
+ * per-page fast path would need a proper single-page helper, none is exported
+ * from services/database today). */
+async function loadStoryDataFull(storyId, { rehydrate = true } = {}) {
   const db = require('../services/database');
   const rows = await db.dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [storyId]);
   if (!rows.length) throw new Error(`Story ${storyId} not found`);
   let storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
   if (rehydrate) {
-    storyData = pageNumber != null && typeof db.rehydrateActivePageImage === 'function'
-      ? await db.rehydrateActivePageImage(storyId, storyData, pageNumber)
-      : await db.rehydrateStoryImages(storyId, storyData);
+    storyData = await db.rehydrateStoryImages(storyId, storyData);
   }
   return { storyData, userId: rows[0].user_id };
 }
@@ -674,19 +710,35 @@ async function loadStoryDataFull(storyId, { pageNumber = null, rehydrate = true 
 /**
  * Rebuild an evaluation-shaped object from the fields persisted on a scene —
  * what decideRepairMethod / the consolidator / inpaint read in the pipeline.
+ * New-pipeline stories persist scoreBreakdown/consolidatedPlan/finalScore on
+ * the imageVersions entries, not the scene root — fall back to the newest
+ * version entry carrying each field.
  */
 function storedEvalFromScene(scene) {
+  const versions = Array.isArray(scene.imageVersions) ? scene.imageVersions : [];
+  const newestWith = (field) => {
+    for (let i = versions.length - 1; i >= 0; i--) {
+      if (versions[i] && versions[i][field] != null) return versions[i][field];
+    }
+    return null;
+  };
+  const finalScore = scene.finalScore
+    ?? newestWith('finalScore')
+    ?? newestWith('evalScore')
+    ?? scene.qualityScore
+    ?? null;
   return {
-    qualityScore: scene.qualityScore ?? null,
-    score: scene.qualityScore ?? null,
-    finalScore: scene.finalScore ?? scene.qualityScore ?? null,
+    qualityScore: scene.qualityScore ?? newestWith('evalScore') ?? null,
+    score: finalScore,
+    finalScore,
     semanticScore: scene.semanticScore ?? null,
-    scoreBreakdown: scene.scoreBreakdown || null,
+    scoreBreakdown: scene.scoreBreakdown || newestWith('scoreBreakdown') || null,
     fixableIssues: scene.fixableIssues || [],
+    fixTargets: scene.fixTargets || [],
     issuesSummary: scene.qualityReasoning || scene.issuesSummary || null,
     semanticResult: scene.semanticResult
       || (scene.semanticIssues ? { semanticIssues: scene.semanticIssues } : null),
-    consolidatedPlan: scene.consolidatedPlan || null,
+    consolidatedPlan: scene.consolidatedPlan || newestWith('consolidatedPlan') || null,
   };
 }
 
@@ -712,11 +764,16 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
     throw new Error(`cover requires coverType frontCover|initialPage|backCover (got "${coverKey}")`);
   }
   const { storyData, userId } = await loadStoryDataFull(target.storyId);
+  if (!storyData.coverImages?.[coverKey]) {
+    throw new Error(`Story has no ${coverKey} (covers were skipped for this story) — pick a story generated with covers`);
+  }
 
   // Fresh canonical characters (avatar fallback), same as the regen endpoint.
+  // characters.data can be array-shaped or {characters:[...]} — handle both.
   const charRows = await dbQuery('SELECT data FROM characters WHERE user_id = $1', [userId]);
-  const freshCharData = charRows[0]?.data || {};
-  const freshCharacters = (typeof freshCharData === 'string' ? JSON.parse(freshCharData) : freshCharData).characters || [];
+  let freshCharData = charRows[0]?.data || {};
+  if (typeof freshCharData === 'string') freshCharData = JSON.parse(freshCharData);
+  const freshCharacters = Array.isArray(freshCharData) ? freshCharData : (freshCharData.characters || []);
 
   const t0 = Date.now();
   const result = await iterateCover(coverKey, storyData, {
@@ -771,6 +828,9 @@ async function runTextZoneStage(ctx, { experimentId, params = {} }) {
 
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
   const textPosition = params.textPosition || ctx.textPosition;
+  if (!textPosition) {
+    throw new Error('This story renders text below the image (no text zone) — text_zone does not apply. Pass params.textPosition to force one.');
+  }
   const textAreaMask = getTextAreaMask(textPosition, ctx.languageLevel);
 
   // Same wrapper the pipeline builds (ensureCalmZone never imports images.js).
@@ -873,7 +933,7 @@ async function runIterateStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { iteratePageCore } = require('./images');
-  const { storyData } = await loadStoryDataFull(ctx.storyId, { pageNumber: ctx.pageNumber });
+  const { storyData } = await loadStoryDataFull(ctx.storyId);
 
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
   const t0 = Date.now();
@@ -918,7 +978,9 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
     return { ...base, ...r };
   }
   if (decision.method === 'iterate') {
-    const r = await runIterateStage(ctx, { experimentId, params: { ...params, feedback: latestEval.issuesSummary || null } });
+    // iteratePageCore expects the evaluation OBJECT ({score, fixableIssues, …}),
+    // same as the pipeline passes — not a text summary.
+    const r = await runIterateStage(ctx, { experimentId, params: { ...params, feedback: latestEval } });
     return { ...base, ...r };
   }
   if (decision.method === 'char-fix') {
@@ -948,19 +1010,46 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
   if (!edited) throw new Error('edit produced no image');
 
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, edited, experimentId);
-  return { imageType: 'scene', versionIndex, elapsedMs, modelId: result.modelId || null, promptUsed: instruction };
+  // editImageWithPrompt reports the model at usage.model (no top-level modelId).
+  return { imageType: 'scene', versionIndex, elapsedMs, modelId: result.usage?.model || null, promptUsed: instruction };
 }
 
-/** Grid-based artifact repair (same core as repair-workflow/artifact-repair). */
+/**
+ * Grid-based artifact repair. Contract (gridBasedRepair.js):
+ * (imageDataUri, pageNumber, {quality, incremental, final}, {outputDir, ...})
+ * — same call shape as images.js generateImageWithQualityRetry.
+ */
 async function runArtifactRepairStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { gridBasedRepair } = require('./gridBasedRepair');
+  const os = require('os');
+  const path = require('path');
+  const fs = require('fs');
 
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
-  const scene = { ...ctx.scene, imageData };
+  const stored = storedEvalFromScene(ctx.scene);
+  const evalResults = {
+    quality: {
+      score: stored.finalScore,
+      fixTargets: stored.fixTargets.length ? stored.fixTargets : stored.fixableIssues,
+      reasoning: stored.issuesSummary,
+      matches: [],
+    },
+    incremental: null,
+    final: null,
+  };
+  const outputDir = path.join(os.tmpdir(), `testlab-grid-${ctx.storyId}-P${ctx.pageNumber}`);
+  fs.mkdirSync(outputDir, { recursive: true });
+
   const t0 = Date.now();
-  const result = await gridBasedRepair(scene, { retryHistory: ctx.scene.retryHistory || [] });
+  const result = await gridBasedRepair(imageData, ctx.pageNumber, evalResults, {
+    outputDir,
+    storyId: ctx.storyId,
+    skipVerification: false,
+    saveIntermediates: false,
+    bboxDetection: ctx.scene.bboxDetection || null,
+  });
   const elapsedMs = Date.now() - t0;
   if (!result?.repaired || !result?.imageData) {
     throw new Error(`artifact repair made no changes (fixed ${result?.fixedCount || 0}/${result?.totalIssues || 0} issues)`);
@@ -1011,22 +1100,35 @@ async function runStyleTransferStage(ctx, { experimentId, params = {} }) {
   return { imageType: 'scene', versionIndex, elapsedMs, artStyle, modelId: result.modelId || null };
 }
 
-/** Report which stored version pick-best would choose (best score, later wins ties). */
+/**
+ * Report which stored version pick-best would choose — delegates to the
+ * CANONICAL scorer (scoring.js computeFinalScore/pickBestVersionIndex; handles
+ * every version shape: finalScore, evalScore−entityPenalty, legacy
+ * qualityScore). Pinning lives in stories.image_version_meta, not on the scene.
+ */
 async function runPickBestStage(ctx, { experimentId }) {
-  const versions = (ctx.scene.imageVersions || []).map((v, i) => ({
+  const { computeFinalScore, pickBestVersionIndex } = require('./scoring');
+  const { dbQuery } = require('../services/database');
+
+  const raw = ctx.scene.imageVersions || [];
+  const versions = raw.map((v, i) => ({
     index: i,
-    dbVersionIndex: v.dbVersionIndex ?? v.versionIndex ?? null,
     type: v.type || null,
-    qualityScore: v.qualityScore ?? null,
-    createdAt: v.createdAt || null,
+    finalScore: computeFinalScore(v),
+    generatedAt: v.generatedAt || v.evaluatedAt || null,
   }));
-  if (versions.length === 0) return { versions: [], winner: null, elapsedMs: 0 };
-  let winner = null;
-  for (const v of versions) {
-    const score = v.qualityScore ?? -1;
-    if (!winner || score >= (winner.qualityScore ?? -1)) winner = v; // later wins ties
+  if (versions.length === 0) {
+    return { versions: [], winner: null, note: 'Page has no imageVersions entries — nothing to rank', elapsedMs: 0 };
   }
-  return { versions, winner, activeIsPinned: ctx.scene.activeVersionPinned ?? null, elapsedMs: 0 };
+  const winnerIdx = pickBestVersionIndex(raw, { tieBreak: 'latest' });
+  const metaRows = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [ctx.storyId]);
+  const pageMeta = metaRows[0]?.image_version_meta?.[String(ctx.pageNumber)] || null;
+  return {
+    versions,
+    winner: winnerIdx >= 0 ? versions[winnerIdx] : null,
+    active: pageMeta ? { activeVersion: pageMeta.activeVersion ?? null, pinned: !!pageMeta.pinned } : null,
+    elapsedMs: 0,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -1061,7 +1163,7 @@ async function runSceneExpansionStage(ctx, { experimentId, promptOverride, param
       ctx.visualBible,
       availableAvatars,
       null,
-      { artStyleId: ctx.artStyle, referencePhotos: ctx.referencePhotos }
+      { referencePhotos: ctx.referencePhotos }
     );
   } finally {
     PROMPT_TEMPLATES.sceneExpansion = orig;
@@ -1122,7 +1224,7 @@ async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, par
         ctx.visualBible,
         availableAvatars,
         null,
-        { artStyleId: ctx.artStyle, referencePhotos: ctx.referencePhotos }
+        { referencePhotos: ctx.referencePhotos }
       );
     } finally {
       PROMPT_TEMPLATES.sceneExpansion = orig;
@@ -1159,6 +1261,10 @@ async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, par
     newSceneDescriptionA: resA.text,
     newSceneDescriptionB: resB.text,
     extraRule,
+    promptOverridden: !!promptOverride,
+    // Full prompts for the details view — the card itself shows the diff.
+    promptUsedA: promptA,
+    promptUsedB: promptB,
     elapsedMs,
     modelId: imgA.modelId || null,
   };
@@ -1170,7 +1276,9 @@ async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, par
   await loadPromptTemplates();
   const { buildSceneDescriptionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
   const { callClaudeAPI } = require('./textModels');
-  const { MODEL_DEFAULTS } = require('../config/models');
+  // resolveSceneIterationModel guards the OpenRouter-hosted default and falls
+  // back to Sonnet without the key — raw MODEL_DEFAULTS.sceneIteration throws.
+  const { resolveSceneIterationModel } = require('../config/models');
   const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
 
   const availableAvatars = buildAvailableAvatarsForPrompt
@@ -1190,7 +1298,7 @@ async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, par
   }
 
   const t0 = Date.now();
-  const result = await callClaudeAPI(prompt, 10000, MODEL_DEFAULTS.sceneIteration, {
+  const result = await callClaudeAPI(prompt, 10000, resolveSceneIterationModel(), {
     prefill: '{"previewMismatches":[', usageLabel: 'testlab_scene_description',
   });
   const elapsedMs = Date.now() - t0;
@@ -1389,11 +1497,18 @@ async function runRepairVerifyStage(ctx, { experimentId, params = {} }) {
     const diffUri = `data:image/jpeg;base64,${Buffer.isBuffer(diff) ? diff.toString('base64') : diff}`;
     diffVersionIndex = await saveTestVersion(ctx.storyId, 'tl_diff', ctx.pageNumber, diffUri, experimentId);
   }
+  // verifyRepairWithGemini returns comparisonImage as a raw JPEG Buffer —
+  // strip Buffers before the result lands in the experiment's JSONB row.
+  const safeVerdict = JSON.parse(JSON.stringify(verdict, (key, value) => {
+    if (value && value.type === 'Buffer' && Array.isArray(value.data)) return `[image ${Math.round(value.data.length / 1024)}KB]`;
+    if (typeof value === 'string' && value.startsWith('data:image')) return `[image ${Math.round(value.length / 1024)}KB]`;
+    return value;
+  }));
   return {
     elapsedMs,
     imageType: diffVersionIndex !== undefined ? 'tl_diff' : undefined,
     versionIndex: diffVersionIndex,
-    report: verdict,
+    report: safeVerdict,
     comparedVersions: { original: params.originalVersionIndex ?? 'active', repaired: repairedIdx },
   };
 }
