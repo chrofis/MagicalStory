@@ -6504,7 +6504,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           qualityRawOutput: img.qualityRawOutput || null,
           evalTemplateHash: img.evalTemplateHash || null,
           issuesSummary: img.issuesSummary || null,
-          verdict: img.verdict || null,
           imageVersions: img.imageVersions || [],
           retryHistory: img.retryHistory || [],
           entityReport: img.entityReport || null,
@@ -6544,7 +6543,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               coverImages[coverKey].semanticResult = img.semanticResult;
               coverImages[coverKey].semanticScore = img.semanticScore;
               coverImages[coverKey].issuesSummary = img.issuesSummary;
-              coverImages[coverKey].verdict = img.verdict;
               coverImages[coverKey].bboxDetection = img.bboxDetection;
               coverImages[coverKey].bboxOverlayImage = img.bboxOverlayImage;
               // Copy imageVersions if pipeline produced new ones (regen, character fix, or first time)

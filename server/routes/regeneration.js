@@ -4905,7 +4905,7 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
       if (version.fixTargets) scene.fixTargets = version.fixTargets;
       if (version.fixableIssues) scene.fixableIssues = version.fixableIssues;
       if (version.issuesSummary != null) scene.issuesSummary = version.issuesSummary;
-      if (version.verdict != null) scene.verdict = version.verdict;
+      // scene-level verdict dropped (contradicted finalScore, nothing branches on it)
       if (version.bboxDetection) scene.bboxDetection = version.bboxDetection;
     };
 

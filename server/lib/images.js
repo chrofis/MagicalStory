@@ -8843,7 +8843,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       threeStageResult: finalEval?.threeStageResult ?? null,
       evalTemplateHash: finalEval?.evalTemplateHash ?? null,
       issuesSummary: finalEval?.issuesSummary ?? null,
-      verdict: finalEval?.verdict ?? null,
+      // No scene-level verdict: the evaluator's self-assessed PASS/FAIL word
+      // routinely contradicted the canonical finalScore ("PASS" at 5/100) and
+      // nothing branches on it. It survives only inside version eval records
+      // as verbatim model output (audit).
       fixTargets: finalEval?.enrichedFixTargets || finalEval?.fixTargets || [],
       fixableIssues: finalEval?.fixableIssues || [],
       bboxDetection: freshBboxMap.get(pageNumber) || finalEval?.bboxDetection || null,
