@@ -1597,3 +1597,24 @@ genuinely differ. Still fails open (GDINO error → Gemini). Backend still env-g
 (prod stays gemini).
 **Touched:** `server/config/models.js` (figureDetectionEligibleStyles), `server/lib/images.js` (gate).
 **Status:** ✅ active (staging). Latency unchanged (~15s/figure CPU) — only widens where GDINO may run.
+
+## DINO goes generic: "person"/"face" prompts for geometry, identity resolved separately (2026-07-17)
+**Context:** Even the concise identity prompt (age+gender+hair+clothing) produced bad production
+boxes — Sarah's bodyBox collapsed to her head, Hans to a 0.046-height sliver, Noah lost entirely
+(watercolor job_1784149662006). User insight: semantic vision (Gemini) trivially tells the young girl
+from the old woman; the failure was always box GEOMETRY. Asking one text prompt to do detection AND
+identity attribution is the design flaw.
+**Decision:** Split the jobs. DINO gets generic prompts only: `"person"` for figure boxes (best +
+candidates, NMS 0.5), `"face"` for face boxes (filter out person-sized leaks by IoU>0.5 vs person
+boxes; keep box_threshold 0.20 — small-object face scores run 0.27–0.51). MobileSAM masks each person
+box (box-only; face points optional via new `/figure-mask` points param but not needed when the box is
+tight — and a bad point can drag the mask out of the box). Identity (which box is which character) is
+a separate assignment step (Gemini face names / position prose), never a grounding-prompt job. DINO
+`"face"` also replaces the Haar/anime cascade for face anchoring — it found a background elderly face
+Haar missed and has no phantom problem after the size filter.
+**Rationale:** Validated on 12 pages / 28 figures across watercolor, anime, realistic, comic (incl.
+the exact production-failure pages): 100% figure recall, scores 0.59–0.73, zero head-only collapses;
+Sarah's generic-prompt box matched ground truth within ~4px. Point-only SAM is unusable (control).
+**Touched:** `photo_analyzer.py` (/figure-mask points/point_labels), `scripts/analysis/test-figure-cutouts.js`,
+`scripts/analysis/test-sam-face-point.js` (validation harnesses). Commit 787e160f.
+**Status:** ✅ validated; production wiring of detectFiguresWithGroundingDino to this design still pending.
