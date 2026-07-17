@@ -2391,6 +2391,86 @@ function _maskOverlapFrac(a, b) {
   return inter / Math.max(1, Math.min(a.area, b.area));
 }
 
+/**
+ * Set-of-Mark identity: draw letter badges (A, B, …) on the detected figures
+ * and ask Gemini Flash which letter is which expected character — recognition
+ * by age/gender/hair/clothing, the task vision LLMs are reliably good at.
+ * Gemini returns letters only, never coordinates, so its spatial sloppiness
+ * cannot corrupt the local DINO/SAM geometry.
+ *
+ * Returns { nameByDet: Map(detIdx → name), answers } or null (caller falls
+ * back to layout+gender matching). Answers with duplicate names are invalid.
+ */
+async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel = '') {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || dets.length === 0) return null;
+  const LETTERS = 'ABCDEFGH';
+  if (dets.length > LETTERS.length) return null;
+
+  // Badge on the upper torso: below the face if one is paired, else at 1/4
+  // of the box height — keeps the badge off the face so it can't obscure
+  // the features Gemini needs.
+  const badges = dets.map((d, i) => {
+    const [x1, y1, x2, y2] = d.box;
+    const cx = (x1 + x2) / 2;
+    const by = d.face ? Math.min(y2 - 20, d.face.box[3] + (d.face.box[3] - d.face.box[1]) * 0.6) : y1 + (y2 - y1) * 0.25;
+    return { letter: LETTERS[i], x: Math.round(cx), y: Math.round(by) };
+  });
+  const R = Math.max(22, Math.round(Math.min(W, H) * 0.028));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${badges.map(b =>
+    `<circle cx="${b.x}" cy="${b.y}" r="${R}" fill="black" stroke="white" stroke-width="4"/>` +
+    `<text x="${b.x}" y="${b.y + R * 0.38}" font-family="Arial" font-size="${Math.round(R * 1.15)}" font-weight="bold" fill="white" text-anchor="middle">${b.letter}</text>`).join('')}</svg>`;
+  const sceneBuf = Buffer.from(r2Lib.stripDataUriPrefix(imageDataUri), 'base64');
+  const marked = await sharp(sceneBuf).composite([{ input: Buffer.from(svg) }]).jpeg({ quality: 88 }).toBuffer();
+
+  const charLines = expectedCharacters.map(c => {
+    const identity = c.gdinoPrompt || c.description || c.name;
+    const clothing = c.clothing ? ` Wearing: ${String(c.clothing).split(/[.;]/)[0].trim()}.` : '';
+    return `- ${c.name}: ${identity}.${clothing}`;
+  }).join('\n');
+  const prompt = `Figures in this illustration are marked with black letter badges (${badges.map(b => b.letter).join(', ')}).
+Match each letter to one of these characters by age, gender, hair, and clothing:
+${charLines}
+Answer JSON only, e.g. {"A": "name"}. Use "unknown" if a letter matches none of the characters. Each name at most once.`;
+
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [
+        { inlineData: { mimeType: 'image/jpeg', data: marked.toString('base64') } },
+        { text: prompt },
+      ] }],
+      generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } },
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM Gemini HTTP ${res.status}`); return null; }
+  const j = await res.json();
+  const text = (j?.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('') || '';
+  let answers;
+  // Tolerate prose/fence wrapping around the JSON ("Here is the JSON…").
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  try { answers = JSON.parse(jsonMatch ? jsonMatch[0] : text); } catch { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM answer not JSON: ${text.slice(0, 120)}`); return null; }
+  if (!answers || typeof answers !== 'object') return null;
+
+  const validNames = new Set(expectedCharacters.map(c => c.name));
+  const nameByDet = new Map();
+  const claimed = new Set();
+  for (let i = 0; i < dets.length; i++) {
+    const raw = String(answers[LETTERS[i]] || '').trim();
+    if (!raw || /^unknown$/i.test(raw)) continue;
+    const name = [...validNames].find(n => n.toLowerCase() === raw.toLowerCase());
+    if (!name) continue;
+    if (claimed.has(name)) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM duplicate name "${name}" — answer invalid`); return null; }
+    claimed.add(name);
+    nameByDet.set(i, name);
+  }
+  if (nameByDet.size === 0) return null;
+  log.info(`🔤 [GDINO-DETECT] ${pageLabel}SoM identity: ${[...nameByDet.entries()].map(([i, n]) => `${LETTERS[i]}=${n}`).join(' ')}${dets.length > nameByDet.size ? ` (${dets.length - nameByDet.size} unknown)` : ''}`);
+  return { nameByDet, answers };
+}
+
 // Binary mask → white-on-transparent PNG (same encoding /figure-mask returns).
 async function _maskToPng(mask) {
   const raw = Buffer.alloc(mask.width * mask.height * 4);
@@ -2642,28 +2722,45 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     if (holder) holder.face = f;
   }
 
-  // Stage 4 — names from the intended layout (never from grounding).
-  const sh = getStoryHelpers();
-  const chars = expectedCharacters.map(c => {
-    const lcr = c.position ? sh.normalizePositionToLCR(c.position) : null;
-    return {
-      name: c.name,
-      xTarget: lcr === 'left' ? 0.18 : lcr === 'right' ? 0.82 : lcr === 'center' ? 0.5 : null,
-      depthRank: _depthRankFromProse(c.position),
-      isChild: _isChildFromText(`${c.gdinoPrompt || ''} ${c.description || ''}`),
-      gender: _genderFromText(`${c.gdinoPrompt || ''} ${c.description || ''}`),
-    };
-  });
-  const geo = dets.map(d => ({
-    cx: (d.bodyBox[1] + d.bodyBox[3]) / 2,
-    h: d.bodyBox[2] - d.bodyBox[0],
-    bottom: d.bodyBox[2],
-    femaleNorm: femaleNormFor(d.box),
-  }));
-  const asg = _assignFiguresByLayout(chars, geo);
-  diag.assignment = chars.map((c, i) => ({ name: c.name, boxIdx: asg.map[i], xTarget: c.xTarget, depthRank: c.depthRank, isChild: c.isChild, gender: c.gender, femaleNorm: asg.map[i] != null ? +(geo[asg.map[i]]?.femaleNorm ?? 0).toFixed(2) : null }));
-  diag.assignmentCost = Number.isFinite(asg.cost) ? +asg.cost.toFixed(3) : null;
-  diag.assignmentMargin = Number.isFinite(asg.margin) ? +asg.margin.toFixed(3) : null;
+  // Stage 4 — identity. Primary: Set-of-Mark — letter badges are drawn on the
+  // detected figures and Gemini Flash answers WHICH letter is WHICH character
+  // (pure recognition by age/gender/hair/clothing; no coordinates ever come
+  // back, so Gemini's spatial sloppiness cannot corrupt the boxes). Fallback:
+  // deterministic layout+gender matching — which cannot separate e.g. three
+  // girls, hence SoM first.
+  let nameByDet = null; // detIdx → character name
+  try {
+    const som = await _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel);
+    if (som) { nameByDet = som.nameByDet; diag.identity = { method: 'som-gemini', answers: som.answers }; }
+  } catch (e) {
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM identity failed (${e.message}) — layout fallback`);
+  }
+  if (!nameByDet) {
+    const sh = getStoryHelpers();
+    const chars = expectedCharacters.map(c => {
+      const lcr = c.position ? sh.normalizePositionToLCR(c.position) : null;
+      return {
+        name: c.name,
+        xTarget: lcr === 'left' ? 0.18 : lcr === 'right' ? 0.82 : lcr === 'center' ? 0.5 : null,
+        depthRank: _depthRankFromProse(c.position),
+        isChild: _isChildFromText(`${c.gdinoPrompt || ''} ${c.description || ''}`),
+        gender: _genderFromText(`${c.gdinoPrompt || ''} ${c.description || ''}`),
+      };
+    });
+    const geo = dets.map(d => ({
+      cx: (d.bodyBox[1] + d.bodyBox[3]) / 2,
+      h: d.bodyBox[2] - d.bodyBox[0],
+      bottom: d.bodyBox[2],
+      femaleNorm: femaleNormFor(d.box),
+    }));
+    const asg = _assignFiguresByLayout(chars, geo);
+    nameByDet = new Map();
+    chars.forEach((c, i) => { if (asg.map[i] != null) nameByDet.set(asg.map[i], c.name); });
+    diag.identity = { method: 'layout-fallback' };
+    diag.assignment = chars.map((c, i) => ({ name: c.name, boxIdx: asg.map[i], xTarget: c.xTarget, depthRank: c.depthRank, isChild: c.isChild, gender: c.gender, femaleNorm: asg.map[i] != null ? +(geo[asg.map[i]]?.femaleNorm ?? 0).toFixed(2) : null }));
+    diag.assignmentCost = Number.isFinite(asg.cost) ? +asg.cost.toFixed(3) : null;
+    diag.assignmentMargin = Number.isFinite(asg.margin) ? +asg.margin.toFixed(3) : null;
+  }
 
   const lcrOf = (bodyBox) => {
     const cx = (bodyBox[1] + bodyBox[3]) / 2;
@@ -2682,14 +2779,12 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   };
   const figures = [];
   const masks = [];
-  const usedDet = new Set();
-  chars.forEach((c, i) => {
-    const d = dets[asg.map[i]];
-    if (!d) return;
-    usedDet.add(asg.map[i]);
+  dets.forEach((d, j) => {
+    const name = nameByDet.get(j) || 'UNKNOWN';
+    const ec = name !== 'UNKNOWN' ? expectedCharacters.find(c => c.name === name) : null;
     figures.push({
-      name: c.name,
-      label: (expectedCharacters[i].description || '').slice(0, 120),
+      name,
+      label: ec ? (ec.description || '').slice(0, 120) : 'unmatched person',
       position: lcrOf(d.bodyBox),
       faceBox: d.face ? paddedFaceBox(d.face.box) : null,
       bodyBox: d.bodyBox,
@@ -2697,25 +2792,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       samApplied: d.samApplied,
       _faceSource: d.face ? 'dino' : undefined,
       _faceScore: d.face ? +d.face.score.toFixed(3) : undefined,
-      confidence: d.score >= 0.6 ? 'high' : d.score >= 0.4 ? 'medium' : 'low',
-      score: +d.score.toFixed(3),
-    });
-    masks.push(d.mask?.pngBuf || null);
-  });
-  // Extra person boxes → UNKNOWN figures (visible in the dev overlay; ignored
-  // by character matching downstream, same as the Gemini path's unknowns).
-  dets.forEach((d, j) => {
-    if (usedDet.has(j)) return;
-    figures.push({
-      name: 'UNKNOWN',
-      label: 'unmatched person',
-      position: lcrOf(d.bodyBox),
-      faceBox: d.face ? paddedFaceBox(d.face.box) : null,
-      bodyBox: d.bodyBox,
-      gdinoBox: d.gdinoBox,
-      samApplied: d.samApplied,
-      _faceSource: d.face ? 'dino' : undefined,
-      confidence: 'low',
+      confidence: name === 'UNKNOWN' ? 'low' : d.score >= 0.6 ? 'high' : d.score >= 0.4 ? 'medium' : 'low',
       score: +d.score.toFixed(3),
     });
     masks.push(d.mask?.pngBuf || null);
