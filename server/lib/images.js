@@ -2448,10 +2448,20 @@ function _isChildFromText(t) {
   return /\b(girl|boy|child|kid|toddler|baby|preschooler|kindergartner|schoolboy|schoolgirl)\b/i.test(String(t || ''));
 }
 
+// Character gender from the identity prose ('f' | 'm' | null). Layout alone
+// cannot separate two adults with identical position prose — gender can.
+function _genderFromText(t) {
+  const s = String(t || '');
+  if (/\b(woman|girl|female|mother|mom|grandma|grandmother|lady|aunt|sister)\b/i.test(s)) return 'f';
+  if (/\b(man|boy|male|father|dad|grandpa|grandfather|uncle|brother)\b/i.test(s)) return 'm';
+  return null;
+}
+
 /**
- * Deterministic name→box matching from the intended scene layout.
- * chars: [{name, xTarget|null, depthRank, isChild}]; dets: [{cx, h, bottom}]
- * (normalized). Brute-force min-cost injective assignment (N,M ≤ ~6).
+ * Deterministic name→box matching from the intended scene layout + gender.
+ * chars: [{name, xTarget|null, depthRank, isChild, gender}]; dets: [{cx, h,
+ * bottom, femaleNorm}] (normalized; femaleNorm 0..1 from the generic
+ * "woman . girl" DINO pass). Brute-force min-cost injective assignment.
  */
 function _assignFiguresByLayout(chars, dets) {
   const N = chars.length, M = dets.length;
@@ -2471,6 +2481,10 @@ function _assignFiguresByLayout(chars, dets) {
     else k += 0.3 * Math.abs(0.5 - dets[j].cx);
     k += 0.25 * Math.abs(c.depthRank - detDepth[j]) / 2;
     if (ageMix) k += 0.3 * (c.isChild ? (1 - detSizePct[j]) : detSizePct[j]);
+    // Gender: the tiebreaker layout can't provide (two adults, no L/R prose).
+    if (c.gender && dets[j].femaleNorm != null) {
+      k += 0.6 * (c.gender === 'f' ? (1 - dets[j].femaleNorm) : dets[j].femaleNorm);
+    }
     return k;
   };
   let best = null, bestCost = Infinity, second = Infinity;
@@ -2533,6 +2547,18 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   }
   diag.faces = faces.map(f => ({ box: f.box.map(Math.round), score: +f.score.toFixed(3) }));
 
+  // Stage 1c — femaleness per person box, from a generic "woman . girl" pass.
+  // Two adults with identical position prose (the common midground pair) are
+  // indistinguishable to layout matching — gender breaks the tie.
+  let femaleBoxes = [];
+  const gdet = await _gdinoDetect(imageDataUri, [{ name: 'female', text: 'woman . girl' }]);
+  if (gdet?.figures?.[0]) femaleBoxes = _collectNmsBoxes(gdet.figures[0], GDINO_PERSON_NMS_IOU);
+  const femaleNormFor = (personBox) => {
+    const s = Math.max(0, ...femaleBoxes.filter(f => _boxIouXyxy(f.box, personBox) > 0.6).map(f => f.score));
+    return Math.min(1, s / 0.45);
+  };
+  diag.femaleBoxes = femaleBoxes.map(f => ({ box: f.box.map(Math.round), score: +f.score.toFixed(3) }));
+
   // Stage 2 — MobileSAM silhouette per person box; bodyBox = mask bounds.
   const dets = [];
   for (const p of persons) {
@@ -2583,21 +2609,34 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       xTarget: lcr === 'left' ? 0.18 : lcr === 'right' ? 0.82 : lcr === 'center' ? 0.5 : null,
       depthRank: _depthRankFromProse(c.position),
       isChild: _isChildFromText(`${c.gdinoPrompt || ''} ${c.description || ''}`),
+      gender: _genderFromText(`${c.gdinoPrompt || ''} ${c.description || ''}`),
     };
   });
   const geo = dets.map(d => ({
     cx: (d.bodyBox[1] + d.bodyBox[3]) / 2,
     h: d.bodyBox[2] - d.bodyBox[0],
     bottom: d.bodyBox[2],
+    femaleNorm: femaleNormFor(d.box),
   }));
   const asg = _assignFiguresByLayout(chars, geo);
-  diag.assignment = chars.map((c, i) => ({ name: c.name, boxIdx: asg.map[i], xTarget: c.xTarget, depthRank: c.depthRank, isChild: c.isChild }));
+  diag.assignment = chars.map((c, i) => ({ name: c.name, boxIdx: asg.map[i], xTarget: c.xTarget, depthRank: c.depthRank, isChild: c.isChild, gender: c.gender, femaleNorm: asg.map[i] != null ? +(geo[asg.map[i]]?.femaleNorm ?? 0).toFixed(2) : null }));
   diag.assignmentCost = Number.isFinite(asg.cost) ? +asg.cost.toFixed(3) : null;
   diag.assignmentMargin = Number.isFinite(asg.margin) ? +asg.margin.toFixed(3) : null;
 
   const lcrOf = (bodyBox) => {
     const cx = (bodyBox[1] + bodyBox[3]) / 2;
     return cx < 0.33 ? 'left' : cx > 0.66 ? 'right' : 'center';
+  };
+  // DINO face boxes hug the facial features tightly; downstream face repair
+  // needs the full head (hair, chin, ears). Pad 100% (50% per side) around
+  // the center, clamped to the image.
+  const paddedFaceBox = (facePxBox) => {
+    const [x1, y1, x2, y2] = facePxBox;
+    const pw = (x2 - x1) * 0.5, ph = (y2 - y1) * 0.5;
+    return _pxBoxToNorm([
+      Math.max(0, x1 - pw), Math.max(0, y1 - ph),
+      Math.min(W, x2 + pw), Math.min(H, y2 + ph),
+    ], W, H);
   };
   const figures = [];
   const masks = [];
@@ -2610,7 +2649,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       name: c.name,
       label: (expectedCharacters[i].description || '').slice(0, 120),
       position: lcrOf(d.bodyBox),
-      faceBox: d.face ? _pxBoxToNorm(d.face.box, W, H) : null,
+      faceBox: d.face ? paddedFaceBox(d.face.box) : null,
       bodyBox: d.bodyBox,
       gdinoBox: d.gdinoBox,
       samApplied: d.samApplied,
@@ -2629,7 +2668,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       name: 'UNKNOWN',
       label: 'unmatched person',
       position: lcrOf(d.bodyBox),
-      faceBox: d.face ? _pxBoxToNorm(d.face.box, W, H) : null,
+      faceBox: d.face ? paddedFaceBox(d.face.box) : null,
       bodyBox: d.bodyBox,
       gdinoBox: d.gdinoBox,
       samApplied: d.samApplied,

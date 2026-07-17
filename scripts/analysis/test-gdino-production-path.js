@@ -74,4 +74,4 @@ async function main() {
   fs.writeFileSync(out, Buffer.from(overlay.split(',')[1], 'base64'));
   console.log(`\noverlay -> ${out}`);
 }
-main().catch(e => { console.error(e); process.exit(1); });
+main().then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); });
