@@ -1647,3 +1647,21 @@ thinking ate small maxOutputTokens budgets → thinkingBudget 0, thought parts f
 extraction.
 **Touched:** `server/lib/images.js` (_somIdentifyFigures, Stage 4 restructure). Commit bbd1e55e.
 **Status:** ✅ live on staging.
+
+## Repaired versions are evaluated against their OWN scene contract (2026-07-18)
+**Context:** Tell-story p2: the page text includes a third character, the outline plan dropped her, the
+iterate rewrite (built from story text) re-included her — and the evaluator, reading the ORIGINAL page
+metadata, flagged her as "extra character not in prompt or metadata", so round 3 inpaint REMOVED a
+character the story text says is present. Root cause: iteratePageCore returns newScene/newSceneMetadata
+but the pipeline dropped them — buildEvalInputs/buildEntityCheckData always judged round results against
+orig.prompt/sceneMetadata/sceneCharacters. Sister defect: the eval flagged a character's canonical
+glasses as "anachronistic for medieval Switzerland" (v0) and their ABSENCE as critical (v2) — whipsaw.
+**Decision:** A version's prompt IS its evaluation contract. Iterate results carry newScene,
+newSceneMetadata, newSceneCharacters onto the round entry and version record; buildEvalInputs and
+buildEntityCheckData prefer the entry's own contract over the original page's; at final assembly the
+PICKED version's contract (description/prompt/sceneMetadata/sceneCharacters) is promoted to scene level
+so all later consumers judge the picked image against what was asked of it. Eval prompt: canonical
+character features (glasses, hearing aids, braces) are identity, never anachronism.
+**Touched:** `server/lib/images.js` (iteratePageCore return, round-entry fields, buildEvalInputs,
+buildEntityCheckData, buildVersionEntry, final assembly), `prompts/image-evaluation.txt`.
+**Status:** ✅ staging.

@@ -7104,15 +7104,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // completely different — because every round eval got the same
     // sharedBboxDetection forwarded.
     const isOriginalImage = entry.imageData === orig.imageData;
+    // A repaired version is evaluated against ITS OWN contract when it has
+    // one (iterate rewrites the scene — prompt, description, characters,
+    // metadata can all legitimately differ from the original plan). Falling
+    // back to orig.* for entries without a rewrite (inpaint, char-fix keep
+    // the original scene contract).
     return {
       imageData: entry.imageData,
       pageNumber: entry.pageNumber,
-      prompt: orig.prompt,
+      prompt: entry.prompt || orig.prompt,
       characterPhotos: orig.characterPhotos,
       allCharacterPhotos,
-      sceneDescription: orig.sceneDescription,
-      sceneCharacters: orig.sceneCharacters,
-      sceneMetadata: orig.sceneMetadata,
+      sceneDescription: entry.description || orig.sceneDescription,
+      sceneCharacters: entry.sceneCharacters || orig.sceneCharacters,
+      sceneMetadata: entry.sceneMetadata || orig.sceneMetadata,
       pageText: orig.text,
       sceneHint: orig.scene?.outlineExtract || orig.scene?.sceneHint || null,
       evaluationType: orig.evaluationType,
@@ -7127,7 +7132,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const buildEntityCheckData = (imageEntries) => ({
     sceneImages: imageEntries.map(entry => {
       const orig = rawImages.find(r => r.pageNumber === entry.pageNumber) || entry;
-      const metadata = extractSceneMetadata(orig.sceneDescription) || {};
+      // Prefer the entry's own rewritten scene (iterate) over the original.
+      const entryDescription = entry.description || orig.sceneDescription;
+      const metadata = extractSceneMetadata(entryDescription) || {};
       // Build per-character clothing from multiple sources (covers don't have
       // prose metadata, so we fall back to characterPhotos / referencePhotos).
       const clothingFromPhotos = (orig.characterPhotos || []).reduce((acc, p) => {
@@ -7140,8 +7147,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       let sceneSummary = '';
       if (metadata.fullData?.imageSummary) {
         sceneSummary = metadata.fullData.imageSummary.substring(0, 150);
-      } else if (orig.sceneDescription) {
-        const beforeJson = orig.sceneDescription.split('```json')[0].trim();
+      } else if (entryDescription) {
+        const beforeJson = entryDescription.split('```json')[0].trim();
         const lines = beforeJson.split('\n').filter(l => l.trim() && !l.startsWith('#'));
         sceneSummary = lines[0]?.substring(0, 150) || '';
       }
@@ -7170,7 +7177,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const orig = rawImages.find(r => r.pageNumber === entry.pageNumber) || entry;
       return {
         pageNumber: entry.pageNumber,
-        description: orig.sceneDescription || ''
+        description: entry.description || orig.sceneDescription || ''
       };
     }),
     // Per-story clothing is the canonical source the entity checker resolves
@@ -8136,6 +8143,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 // appended.
                 prompt: result.imagePrompt || null,
                 description: result.newScene || null,
+                // The iterate's rewritten scene contract — evaluation of this
+                // version MUST use these, not the original page metadata (a
+                // rewrite that re-includes a character the plan dropped was
+                // evaluated against the old plan, flagged as "extra character",
+                // and inpaint-removed; see docs/decisions.md).
+                sceneMetadata: result.newSceneMetadata || null,
+                sceneCharacters: result.newSceneCharacters || null,
                 compositeAttempts,
               };
             }
@@ -8190,10 +8204,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     if (roundSuccess.length > 0) {
       // Build entity check inputs (snapshot of latest images: repaired pages
       // from this round + best-so-far for pages not touched this round).
-      const roundImageMap = new Map(roundSuccess.map(r => [r.pageNumber, r.imageData]));
+      const roundImageMap = new Map(roundSuccess.map(r => [r.pageNumber, r]));
       const latestImages = rawImages.filter(img => img.imageData).map(img => {
         if (roundImageMap.has(img.pageNumber)) {
-          return { imageData: roundImageMap.get(img.pageNumber), pageNumber: img.pageNumber };
+          const re = roundImageMap.get(img.pageNumber);
+          // Carry the round entry's own scene contract (iterate rewrites it)
+          // so the entity check judges the repaired image against what was
+          // actually asked of it.
+          return { imageData: re.imageData, pageNumber: img.pageNumber, description: re.description || null };
         }
         const versions = pageVersions.get(img.pageNumber) || [];
         const best = selectBestVersion(versions);
@@ -8686,9 +8704,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       bboxDetection: v.evaluation?.bboxDetection || null,
       // Prefer per-version prompt/description (iterate stores its own
       // feedback-augmented prompt + new scene). Original generations and
-      // inpaints fall back to the page's prompt/description.
+      // inpaints fall back to the page's prompt/description. sceneMetadata /
+      // sceneCharacters follow the same rule — an iterate's rewritten scene
+      // is a new contract, and the picked version's contract is promoted to
+      // the scene level at final assembly.
       description: v.description || img.sceneDescription || null,
       prompt: v.prompt || img.prompt || null,
+      sceneMetadata: v.sceneMetadata || null,
+      sceneCharacters: v.sceneCharacters || null,
       grokRefImages: v.grokRefImages || null,
       referencePhotos: v.referencePhotos || null,
       // O6: direct-path cover refs (landmark photo, VB grid) — captured by
@@ -8740,9 +8763,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       pageNumber,
       imageData: finalImageData,
       text: img.text,
-      sceneDescription: img.sceneDescription,
+      // Scene contract follows the PICKED version: an iterate rewrite carries
+      // its own description/prompt/characters/metadata, and every later
+      // consumer (repairs, entity checks, detection, dev panel) must judge the
+      // picked image against what was actually asked of it — not the original
+      // plan it superseded.
+      sceneDescription: best?.description || img.sceneDescription,
       scene: img.scene,
-      prompt: img.prompt,
+      prompt: best?.prompt || img.prompt,
       characterPhotos: img.characterPhotos,
       landmarkPhotos: img.landmarkPhotos,
       visualBibleGrid: img.visualBibleGrid,
@@ -8753,8 +8781,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       textAreaMask: img.textAreaMask || null,
       emptySceneVbGrid: img.emptySceneVbGrid || null,
       textCoverageReport: img.textCoverageReport || null,
-      sceneCharacters: img.sceneCharacters,
-      sceneMetadata: img.sceneMetadata,
+      sceneCharacters: best?.sceneCharacters || img.sceneCharacters,
+      sceneMetadata: best?.sceneMetadata || img.sceneMetadata,
       perCharClothing: img.perCharClothing,
       modelId: best?.modelId || img.modelId,
       thinkingText: img.thinkingText || null,
@@ -9453,6 +9481,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     imagePrompt,
     newScene: newSceneDescription,
     newSceneMetadata,
+    // The rewritten scene is a NEW contract — its character set can legitimately
+    // differ from the original plan (e.g. the rewrite re-includes a character
+    // the outline dropped but the page text mentions). Callers must evaluate
+    // the result against THIS contract, not the original page metadata.
+    newSceneCharacters: sceneCharacters,
     previewMismatches,
     checksRun,
     compositionAnalysis: previewFeedback.composition,
