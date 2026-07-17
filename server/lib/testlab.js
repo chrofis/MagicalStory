@@ -54,7 +54,8 @@ async function loadSceneContext(storyId, pageNumber) {
             data->>'languageLevel' AS language_level,
             data->>'storyType' AS story_type,
             data->>'title' AS title,
-            data->'layout' AS layout
+            data->'layout' AS layout,
+            (data->'visualBible')::text AS visual_bible
      FROM stories, jsonb_array_elements(data->'sceneImages') scene
      WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
     [storyId, pageNumber]
@@ -63,6 +64,10 @@ async function loadSceneContext(storyId, pageNumber) {
 
   const scene = JSON.parse(rows[0].scene_text);
   const layout = typeof rows[0].layout === 'string' ? JSON.parse(rows[0].layout) : (rows[0].layout || {});
+  let visualBible = null;
+  try {
+    visualBible = rows[0].visual_bible ? JSON.parse(rows[0].visual_bible) : null;
+  } catch { /* malformed VB — run without grid refs */ }
 
   const referencePhotos = [];
   for (const p of (scene.referencePhotos || [])) {
@@ -80,6 +85,7 @@ async function loadSceneContext(storyId, pageNumber) {
     pageNumber,
     scene,
     layout,
+    visualBible,
     artStyle: rows[0].art_style || 'pixar',
     language: rows[0].language || 'de',
     languageLevel: rows[0].language_level || 'standard',
@@ -162,9 +168,10 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
   const { buildImagePrompt } = require('./storyHelpers');
-  const { generateImageOnly } = require('./images');
+  const { generateImageOnly, buildVisualBibleGrid } = require('./images');
+  const { getElementReferenceImagesForPage } = require('./visualBible');
   const { getTextAreaMask } = require('./textMasks');
-  const { MODEL_DEFAULTS } = require('../config/models');
+  const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 
   // artStyleOverride: render the page in a different art style than the story's
   // (style-matrix benchmark runs). Caveat: reference photos stay the story's
@@ -178,6 +185,10 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     languageLevel: ctx.languageLevel,
   };
 
+  // Same VB-text rule as production: Grok's 8000-char limit means the VB prose
+  // is skipped and the grid image carries the references instead.
+  const isGrokImage = IMAGE_MODELS[MODEL_DEFAULTS.pageImage]?.backend === 'grok';
+
   // buildImagePrompt reads PROMPT_TEMPLATES.imageGeneration internally and is
   // SYNCHRONOUS — swap the key only around this call (no await inside the
   // window, so concurrent generations can never observe the override).
@@ -189,10 +200,10 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
       ctx.scene.sceneDescription,
       inputData,
       ctx.scene.sceneCharacters || null,
-      null,
+      ctx.visualBible,
       ctx.pageNumber,
       ctx.referencePhotos,
-      { textPosition: ctx.textPosition }
+      { textPosition: ctx.textPosition, skipVisualBible: isGrokImage }
     );
   } finally {
     PROMPT_TEMPLATES.imageGeneration = origTemplate;
@@ -224,10 +235,29 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   const textInImage = ctx.layout?.textInImage !== false;
   const textAreaMask = textInImage ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null;
 
+  // Visual Bible grid — same construction as the production page path: page
+  // elements (minus locations when a background anchors the location already)
+  // plus secondary landmarks, composited into one reference grid image.
+  let visualBibleGrid = null;
+  if (ctx.visualBible) {
+    let elementReferences = getElementReferenceImagesForPage(ctx.visualBible, ctx.pageNumber, 6);
+    if (emptyScene) elementReferences = elementReferences.filter(e => e.type !== 'location');
+    const secondaryLandmarks = ctx.landmarkPhotos.slice(1);
+    if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+      try {
+        visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+      } catch (err) {
+        log.warn(`[TESTLAB] VB grid build failed (continuing without): ${err.message}`);
+      }
+    }
+  }
+
   const t0 = Date.now();
   const result = await generateImageOnly(prompt, ctx.referencePhotos, {
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
     landmarkPhotos: ctx.landmarkPhotos,
+    visualBibleGrid,
+    artStyle,
     sceneBackground: emptyScene,
     textAreaMask,
     pageNumber: ctx.pageNumber,
@@ -303,8 +333,24 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('Empty-scene generation returned no image');
 
+  // Same QC the pipeline runs (pixel + Gemini vision) — report-only here, no
+  // retry loop: the point is seeing whether a prompt variant passes the gate.
+  let qc = null;
+  try {
+    const { validateEmptyScene } = require('./images');
+    const qcRes = await validateEmptyScene(result.imageData, ctx.textPosition, `testlab-exp${experimentId}-P${ctx.pageNumber}`, {
+      sceneDescription: description,
+      mainScenePrompt: ctx.scene.sceneDescription || null,
+      storyEra: meta.era || null,
+    });
+    qc = { pass: qcRes.pass, issues: qcRes.issues || [], visionFeedback: qcRes.visionFeedback || null };
+  } catch (err) {
+    log.warn(`[TESTLAB] empty-scene QC failed: ${err.message}`);
+    qc = { error: err.message };
+  }
+
   const versionIndex = await saveTestVersion(ctx.storyId, 'empty_scene', ctx.pageNumber, result.imageData, experimentId);
-  return { imageType: 'empty_scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, artStyle: params.artStyleOverride || undefined };
+  return { imageType: 'empty_scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, qc, artStyle: params.artStyleOverride || undefined };
 }
 
 async function runQualityEvalStage(ctx, { promptOverride, experimentId }) {
@@ -410,17 +456,33 @@ async function runCharRepairStage(ctx, { experimentId, params = {} }) {
 
   // Bbox: explicit param wins; otherwise take the stored detection for this character.
   let bbox = params.bbox || null;
+  let faceBbox = params.faceBbox || null;
   if (!bbox) {
     const det = ctx.scene.bboxDetection;
     const fig = (det?.figures || det?.characters || []).find(f => (f.name || '').toLowerCase() === charName.toLowerCase());
     bbox = fig?.bbox || fig?.box_2d || null;
+    if (!faceBbox) faceBbox = fig?.faceBbox || null;
   }
   if (!bbox || bbox.length !== 4) throw new Error(`No bounding box for "${charName}" — pass params.bbox [ymin,xmin,ymax,xmax] (0-1)`);
 
+  // Mode mapping — the real repair options are the useBlended/useCutout/
+  // useFullScene flags; 'auto' passes none and lets whiteoutTarget pick the
+  // default exactly as the automatic pipeline does.
+  const repairMode = params.repairMode || 'blended';
+  const modeFlags = {};
+  if (repairMode === 'blended') modeFlags.useBlended = true;
+  else if (repairMode === 'cutout') modeFlags.useCutout = true;
+  else if (repairMode === 'fullscene') modeFlags.useFullScene = true;
+  else if (repairMode !== 'auto') throw new Error(`Unknown repairMode "${repairMode}" — use blended|cutout|fullscene|auto`);
+
+  const backend = params.backend || 'grok';
+  if (!['grok', 'gemini'].includes(backend)) throw new Error(`Unknown backend "${backend}" — use grok|gemini`);
+
   const t0 = Date.now();
   const result = await repairCharacterMismatch(imageData, ref.photoUrl, bbox, charName, {
-    imageBackend: 'grok',
-    repairMode: params.repairMode || 'blended',
+    imageBackend: backend,
+    ...modeFlags,
+    faceBbox,
     whiteoutTarget: params.whiteoutTarget || 'face',
     pageContext: `testlab-exp${experimentId}-P${ctx.pageNumber}`,
   });
@@ -429,7 +491,7 @@ async function runCharRepairStage(ctx, { experimentId, params = {} }) {
   if (!repairedImage) throw new Error('Character repair returned no image');
 
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, repairedImage, experimentId);
-  return { imageType: 'scene', versionIndex, characterName: charName, bbox, elapsedMs };
+  return { imageType: 'scene', versionIndex, characterName: charName, bbox, backend, repairMode, method: result?.method || null, elapsedMs };
 }
 
 async function runEntityStage(ctx, { experimentId }) {

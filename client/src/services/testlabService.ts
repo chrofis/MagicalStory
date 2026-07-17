@@ -93,6 +93,10 @@ export interface ExperimentResult {
   report?: unknown;
   storedBaseline?: { qualityScore?: number | null; semanticScore?: number | null };
   characterName?: string;
+  qc?: { pass?: boolean; issues?: string[]; visionFeedback?: string | null; error?: string };
+  method?: string | null;
+  backend?: string;
+  repairMode?: string;
   artStyle?: string;
   pass?: number;
   redoOf?: number | string;

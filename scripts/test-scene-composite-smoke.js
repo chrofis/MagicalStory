@@ -61,6 +61,9 @@ const PHANTOM_MODE = arg('phantom', 'true').toLowerCase();
 // Composite pipeline variant. 'auto' omits the override; pipeline default is
 // 'stratified' once the new path lands.
 const STRATEGY_MODE = arg('strategy', 'auto').toLowerCase();
+// --skipEval=false runs the FULL pipeline (quality/semantic eval + repair
+// scoring) — for Test Lab benchmark stories. Default true = original smoke.
+const SKIP_EVAL = arg('skipEval', 'true').toLowerCase() !== 'false';
 
 const basicHeader = BASIC_USER && BASIC_PASS
   ? `Basic ${Buffer.from(`${BASIC_USER}:${BASIC_PASS}`).toString('base64')}`
@@ -156,7 +159,7 @@ async function api(pathSegment, { method = 'GET', body = null, token = null, con
     relationshipTexts: {},
     skipCovers: true,
     enableFullRepair: false,
-    skipQualityEval: true,
+    skipQualityEval: SKIP_EVAL,
     idempotencyKey,
   };
   if (COMPOSITE_MODE === 'true') payload.composite = true;

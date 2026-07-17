@@ -32,7 +32,7 @@
 
 <h3>Two-pass flow</h3>
 <ol>
-  <li><strong>Pass 1</strong> — Gemini 2.5 Flash runs the prompt in <code>prompts/bbox-detection.txt</code> and returns figures with <code>bbox: [ymin, xmin, ymax, xmax]</code> normalised 0-1.</li>
+  <li><strong>Pass 1</strong> — Gemini 2.5 Flash runs the prompt in <code>prompts/bounding-box-detection.txt</code> and returns figures with <code>bbox: [ymin, xmin, ymax, xmax]</code> normalised 0-1.</li>
   <li><strong>Pass 2 (refine)</strong> — Cascade face detector (Python anime + Haar) runs on the same image; results merged with Gemini bboxes. Catches faces Gemini missed.</li>
   <li><strong>Object name canonicalisation</strong> — detected names mapped back to Visual Bible IDs (e.g. "the wooden bow" → <code>ART012</code>).</li>
 </ol>

@@ -62,7 +62,7 @@ A push to <code>master</code> auto-deploys to Railway, kills the Node process, a
 
 <h2 id="unified">3. Unified Claude pass</h2>
 
-<p>One <code>messages.create</code> call returns the entire story payload — outline, visual bible (characters + objects + locations), per-page text, and per-scene hints (shot, framing, primary characters, optional location reference). Prompt: <code>prompts/unified-pipeline.txt</code> (and language-specific variants).</p>
+<p>One <code>messages.create</code> call returns the entire story payload — outline, visual bible (characters + objects + locations), per-page text, and per-scene hints (shot, framing, primary characters, optional location reference). Prompt: <code>prompts/story-unified.txt</code> (trial variant: <code>prompts/story-trial.txt</code>).</p>
 
 <p>Why one call: keeping outline + text + scene hints in the same context guarantees consistency. A page's text references the same hat the outline introduced; a scene hint about "the marketplace at dusk" aligns with the outline's Act II setup.</p>
 

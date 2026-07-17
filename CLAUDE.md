@@ -295,7 +295,8 @@ Grok-vs-Gemini strengths and prompting tips → `docs/codebase-guide.md`.
 
 ## Prompt Templates
 
-All prompts are in `/prompts/*.txt` and loaded via `server/services/prompts.js`:
+All prompts are in `/prompts/*.txt` and loaded via `server/services/prompts.js`.
+**Full inventory of all ~72 templates (consumer + stage + hardcoded JS prompts) → `docs/prompt-inventory.md`** — keep it updated when adding/renaming a template. Most-touched ones:
 - `scene-expansion.txt` - Art Director: expands outline hints into illustration briefs (includes interactions, textPosition, emptyScenePrompt)
 - `image-generation.txt` - Scene illustration prompt (unified template, includes COPY SPACE instruction)
 - `image-evaluation.txt` - Quality evaluation criteria (includes declared interactions check)

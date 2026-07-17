@@ -674,6 +674,12 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
           {result.scores?.quality != null && <span>quality {result.scores.quality}</span>}
           {result.scores?.semantic != null && <span>semantic {result.scores.semantic}</span>}
           {result.scores?.verdict && <span>{result.scores.verdict}</span>}
+          {result.qc && !result.qc.error && (
+            <span className={result.qc.pass ? 'text-emerald-600 font-semibold' : 'text-red-600 font-semibold'}>
+              QC {result.qc.pass ? 'pass' : 'fail'}
+            </span>
+          )}
+          {result.method && <span>{result.method}</span>}
         </div>
       </div>
 
@@ -721,6 +727,12 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
               {showDetails && (
                 <div className="mt-2 space-y-2">
                   {result.issuesSummary && <div className="text-xs text-gray-600"><b>Issues:</b> {result.issuesSummary}</div>}
+                  {result.qc && !result.qc.pass && !result.qc.error && (
+                    <div className="text-xs text-gray-600">
+                      <b>QC issues:</b> {(result.qc.issues || []).join('; ') || '—'}
+                      {result.qc.visionFeedback && <> · <b>Vision:</b> {result.qc.visionFeedback}</>}
+                    </div>
+                  )}
                   {!!result.semanticIssues?.length && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify(result.semanticIssues, null, 2)}</pre>
                   )}
