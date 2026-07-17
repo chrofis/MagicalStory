@@ -2345,7 +2345,10 @@ async function _mobilesamMaskFull(imageDataUri, boxPx, W, H) {
     const j = await res.json();
     const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
     if (!j?.success || !m || !(j.fill_pixels > 0)) return null;
-    return _binMaskFromBuffer(Buffer.from(m[1], 'base64'), W, H);
+    const pngBuf = Buffer.from(m[1], 'base64');
+    const mask = await _binMaskFromBuffer(pngBuf, W, H);
+    if (mask) mask.pngBuf = pngBuf; // kept for the overlay's cutout strip (never persisted)
+    return mask;
   } catch (e) { log.warn(`⚠️ [GDINO-DETECT] mask failed: ${e.message}`); return null; }
 }
 
@@ -2358,12 +2361,110 @@ function _maskOverlapFrac(a, b) {
 }
 
 /**
- * Detect figures with the local Grounded-SAM path. Returns { figures: [...] }
- * in the detectAllBoundingBoxes contract (name/label/position/bodyBox/
- * faceBox:null/confidence), or null to signal "fall back to Gemini".
+ * Detect figures with the local Grounded-SAM path — generic prompts.
+ *
+ * Design (2026-07-17, docs/decisions.md "DINO goes generic"): DINO answers
+ * WHERE, never WHO. Identity prose in grounding prompts produced bad boxes
+ * (head-only collapses, sliver boxes, misattribution), so detection is now:
+ *   1. GroundingDINO "person"  → all figure boxes (best + candidates, NMS)
+ *   2. GroundingDINO "face"    → face boxes (replaces the Haar cascade;
+ *      person-sized leaks filtered by IoU vs person boxes)
+ *   3. MobileSAM per person box → tight silhouette; bodyBox = mask bounds
+ *   4. face → figure pairing by containment
+ *   5. name assignment from the scene layout (position-prose x-band + depth
+ *      tier + adult/child size) — deterministic min-cost matching, no grounding
+ *   6. expected VB objects grounded individually with short generic labels
+ *
+ * Returns { figures, objects, masks, diag } (masks = per-figure mask PNG
+ * buffers, index-aligned with figures, for the overlay cutout strip — never
+ * persisted), or { figures: null, diag } to signal "fall back to Gemini"
+ * (no persons found, or fewer persons than expected characters).
  */
+const GDINO_PERSON_NMS_IOU = 0.5;   // person candidates closer than this are one figure
+const GDINO_FACE_NMS_IOU = 0.4;
+const GDINO_FACE_LEAK_IOU = 0.5;    // "face" box this close to a person box IS the person box
+const GDINO_OBJECT_MIN_SCORE = 0.25;
+
+function _boxIouXyxy(a, b) {
+  const ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0]));
+  const iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const inter = ix * iy;
+  const union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter;
+  return union > 0 ? inter / union : 0;
+}
+
+// Best box + candidates from one _gdinoDetect figure, NMS-deduped, score-desc.
+function _collectNmsBoxes(fig, nmsIou) {
+  const all = [];
+  if (fig?.box) all.push({ box: fig.box, score: fig.score });
+  for (const c of (fig?.candidates || [])) if (c.box) all.push({ box: c.box, score: c.score });
+  all.sort((a, b) => b.score - a.score);
+  const out = [];
+  for (const p of all) if (!out.some(k => _boxIouXyxy(k.box, p.box) > nmsIou)) out.push(p);
+  return out;
+}
+
+// Scene-metadata position prose carries a depth token ("left foreground",
+// "right background, seated on the bench") — 0 fore, 1 mid, 2 back.
+function _depthRankFromProse(pos) {
+  const s = String(pos || '').toLowerCase();
+  if (/\bforeground\b/.test(s)) return 0;
+  if (/\bbackground\b/.test(s)) return 2;
+  return 1;
+}
+
+function _isChildFromText(t) {
+  return /\b(girl|boy|child|kid|toddler|baby|preschooler|kindergartner|schoolboy|schoolgirl)\b/i.test(String(t || ''));
+}
+
+/**
+ * Deterministic name→box matching from the intended scene layout.
+ * chars: [{name, xTarget|null, depthRank, isChild}]; dets: [{cx, h, bottom}]
+ * (normalized). Brute-force min-cost injective assignment (N,M ≤ ~6).
+ */
+function _assignFiguresByLayout(chars, dets) {
+  const N = chars.length, M = dets.length;
+  // Depth proxy per detection: lower in frame = more foreground. Rank scaled 0..2.
+  const byBottom = dets.map((d, i) => ({ i, b: d.bottom })).sort((a, b) => b.b - a.b);
+  const detDepth = new Array(M);
+  byBottom.forEach((e, r) => { detDepth[e.i] = M > 1 ? (r * 2) / (M - 1) : 0; });
+  // Size percentile per detection: 0 = tallest.
+  const byH = dets.map((d, i) => ({ i, h: d.h })).sort((a, b) => b.h - a.h);
+  const detSizePct = new Array(M);
+  byH.forEach((e, r) => { detSizePct[e.i] = M > 1 ? r / (M - 1) : 0.5; });
+  // Size only separates when the cast mixes adults and children.
+  const ageMix = chars.some(c => c.isChild) && chars.some(c => !c.isChild);
+  const cost = (c, j) => {
+    let k = 0;
+    if (c.xTarget != null) k += 1.0 * Math.abs(c.xTarget - dets[j].cx);
+    else k += 0.3 * Math.abs(0.5 - dets[j].cx);
+    k += 0.25 * Math.abs(c.depthRank - detDepth[j]) / 2;
+    if (ageMix) k += 0.3 * (c.isChild ? (1 - detSizePct[j]) : detSizePct[j]);
+    return k;
+  };
+  let best = null, bestCost = Infinity, second = Infinity;
+  const chosen = [], used = new Set();
+  const walk = () => {
+    if (chosen.length === N) {
+      let t = 0;
+      for (let i = 0; i < N; i++) t += cost(chars[i], chosen[i]);
+      if (t < bestCost) { second = bestCost; bestCost = t; best = chosen.slice(); }
+      else if (t < second) second = t;
+      return;
+    }
+    for (let j = 0; j < M; j++) {
+      if (used.has(j)) continue;
+      used.add(j); chosen.push(j);
+      walk();
+      chosen.pop(); used.delete(j);
+    }
+  };
+  walk();
+  return { map: best || [], cost: bestCost, margin: second - bestCost };
+}
+
 async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opts = {}) {
-  const { pageLabel = '' } = opts;
+  const { pageLabel = '', expectedObjects = [] } = opts;
   if (!Array.isArray(expectedCharacters) || expectedCharacters.length === 0) return null;
 
   // The endpoints need base64 bytes — resolve http(s)/data/base64 to a data URI.
@@ -2376,164 +2477,159 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     imageDataUri = imageData.startsWith('data:') ? imageData : `data:image/jpeg;base64,${r2Lib.stripDataUriPrefix(imageData)}`;
   }
 
-  // Stage 1 — GroundingDINO on all prompts.
-  // Prefer the concise grounding prompt (age/gender/hair/beard/glasses + short
-  // clothing colour); GDINO grounds far better on it than the verbose image-gen
-  // description (0.86 vs 0.45 on an anime page). Falls back to description/name.
-  const prompts = expectedCharacters.map(c => ({ name: c.name, text: c.gdinoPrompt || c.description || c.name }));
-  const det = await _gdinoDetect(imageDataUri, prompts);
+  const diag = { backend: 'grounding-dino', mode: 'generic', persons: [], faces: [], assignment: [], objects: [], fellBack: false, reason: null };
+
+  // Stage 1 — generic person boxes.
+  const det = await _gdinoDetect(imageDataUri, [{ name: 'person', text: 'person' }]);
   if (!det || !Array.isArray(det.figures)) return null;
   const W = det.width, H = det.height;
+  const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU);
+  diag.persons = persons.map(p => ({ box: p.box.map(Math.round), score: +p.score.toFixed(3) }));
+  if (persons.length === 0) {
+    diag.fellBack = true; diag.reason = 'no person boxes';
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}no person boxes — falling back to Gemini`);
+    return { figures: null, diag };
+  }
 
-  // Diagnostics — every intermediate score/decision, persisted with the
-  // detection so a page's detection can be debugged after the fact (raw
-  // batched score per character, recovery, low-conf flags, mask collisions,
-  // how each was resolved, and whether/why the whole page fell back to Gemini).
-  const diag = { backend: 'grounding-dino', perFigure: [], collisions: [], fellBack: false, reason: null };
-  const batchedScore = {};
-  for (const f of det.figures) batchedScore[f.name] = f.box ? f.score : null;
+  // Stage 1b — generic face boxes (DINO replaces the Haar cascade here; it
+  // found background faces Haar missed and has no phantom problem once
+  // person-sized leaks are filtered).
+  let faces = [];
+  const fdet = await _gdinoDetect(imageDataUri, [{ name: 'face', text: 'face' }]);
+  if (fdet?.figures?.[0]) {
+    faces = _collectNmsBoxes(fdet.figures[0], GDINO_FACE_NMS_IOU)
+      .filter(f => !persons.some(p => _boxIouXyxy(f.box, p.box) > GDINO_FACE_LEAK_IOU));
+  }
+  diag.faces = faces.map(f => ({ box: f.box.map(Math.round), score: +f.score.toFixed(3) }));
 
-  // Stage 2 — MobileSAM mask per figure → tight bbox + mask for the overlap guard.
-  const byName = new Map();
-  for (const f of det.figures) {
-    if (!f.box) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${f.name}: no box from DINO`); continue; }
-    const ec = expectedCharacters.find(c => c.name === f.name);
-    const mask = await _mobilesamMaskFull(imageDataUri, f.box, W, H);
-    const gdinoBox = _pxBoxToNorm(f.box, W, H);
-    const bodyBox = mask ? _pxBoxToNorm(mask.bbox, W, H) : gdinoBox;
-    byName.set(f.name, {
-      name: f.name, score: f.score, candidates: f.candidates || [], mask, bodyBox, gdinoBox,
+  // Stage 2 — MobileSAM silhouette per person box; bodyBox = mask bounds.
+  const dets = [];
+  for (const p of persons) {
+    const mask = await _mobilesamMaskFull(imageDataUri, p.box, W, H);
+    dets.push({
+      box: p.box, score: p.score, mask,
+      bodyBox: mask ? _pxBoxToNorm(mask.bbox, W, H) : _pxBoxToNorm(p.box, W, H),
+      gdinoBox: _pxBoxToNorm(p.box, W, H),
       samApplied: !!mask,
-      clothing: ec?.clothing || '', position: ec?.position || '',
-      promptText: prompts.find(p => p.name === f.name)?.text || f.name,
     });
   }
-  // Recall recovery — the batched pass encodes the image once and attributes
-  // boxes by label, which is fast but can miss a character whose distinctive
-  // tokens didn't surface in any box label. Re-query each missing character
-  // individually (the old per-figure behaviour, but only for the few misses).
-  for (const c of expectedCharacters) {
-    if (byName.has(c.name)) continue;
-    const promptText = prompts.find(p => p.name === c.name)?.text || c.name;
-    const re = await _gdinoDetect(imageDataUri, [{ name: c.name, text: promptText }]);
-    const rf = re?.figures?.[0];
-    if (!rf?.box) continue;
-    const mask = await _mobilesamMaskFull(imageDataUri, rf.box, W, H);
-    const gdinoBox = _pxBoxToNorm(rf.box, W, H);
-    const bodyBox = mask ? _pxBoxToNorm(mask.bbox, W, H) : gdinoBox;
-    byName.set(c.name, {
-      name: c.name, score: rf.score, candidates: rf.candidates || [], mask, bodyBox, gdinoBox,
-      samApplied: !!mask,
-      clothing: c.clothing || '', position: c.position || '', promptText, recovered: true,
-    });
-    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${c.name} recovered via single-prompt re-query`);
-  }
-
-  if (byName.size === 0) return null;
-  const names = [...byName.keys()];
-
-  // GUARD — low confidence + pairwise mask overlap.
-  const flagged = new Set();
-  const lowConf = new Set();
-  for (const n of names) {
-    const r = byName.get(n);
-    if (r.score != null && r.score < GDINO_LOW_CONFIDENCE) {
-      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} low confidence ${r.score}`);
-      flagged.add(n); lowConf.add(n);
-    }
-  }
-  for (let i = 0; i < names.length; i++) {
-    for (let j = i + 1; j < names.length; j++) {
-      const A = byName.get(names[i]), B = byName.get(names[j]);
-      const ov = _maskOverlapFrac(A.mask, B.mask);
-      if (ov >= GDINO_OVERLAP_THRESHOLD) {
-        log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${A.name} & ${B.name} masks overlap ${Math.round(ov * 100)}%${ov >= GDINO_SAME_FIGURE ? ' (≈same figure)' : ' (>30%)'}`);
-        diag.collisions.push({ a: A.name, b: B.name, overlapPct: Math.round(ov * 100) });
-        flagged.add((A.score ?? 0) <= (B.score ?? 0) ? A.name : B.name);
+  // Two masks ≈ the same figure → keep the higher-score one.
+  for (let i = dets.length - 1; i >= 1; i--) {
+    for (let j = 0; j < i; j++) {
+      if (_maskOverlapFrac(dets[i].mask, dets[j].mask) >= GDINO_SAME_FIGURE) {
+        diag.persons[i].droppedDuplicateOf = j;
+        dets.splice(i, 1);
+        break;
       }
     }
   }
-
-  // FALLBACK CHAIN per flagged figure.
-  const overlapsOthers = (mask, self) => Math.max(0, ...names.filter(x => x !== self).map(x => _maskOverlapFrac(mask, byName.get(x).mask)));
-  for (const n of flagged) {
-    const r = byName.get(n);
-    let resolved = false;
-
-    // Tier 1a — a non-overlapping candidate box already returned by DINO.
-    for (const cand of r.candidates) {
-      if (!cand.box) continue;
-      const m = await _mobilesamMaskFull(imageDataUri, cand.box, W, H);
-      if (m && overlapsOthers(m, n) < GDINO_OVERLAP_THRESHOLD) {
-        r.mask = m; r.bodyBox = _pxBoxToNorm(m.bbox, W, H); r.score = cand.score;
-        r.resolvedVia = 'alternate-candidate';
-        log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} resolved via alternate candidate box`);
-        resolved = true; break;
-      }
-    }
-    // Tier 1b — retry-in-DINO with clothing + position appended.
-    if (!resolved && (r.clothing || r.position)) {
-      const extra = [r.clothing, r.position && `on the ${r.position}`].filter(Boolean).join(', ');
-      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} retry-in-dino (clothing+position)`);
-      const re = await _gdinoDetect(imageDataUri, [{ name: n, text: `${r.promptText}${extra ? ` (${extra})` : ''}` }]);
-      const rf = re?.figures?.[0];
-      if (rf?.box) {
-        const m = await _mobilesamMaskFull(imageDataUri, rf.box, W, H);
-        if (m && overlapsOthers(m, n) < GDINO_OVERLAP_THRESHOLD) {
-          r.mask = m; r.bodyBox = _pxBoxToNorm(m.bbox, W, H); r.score = rf.score;
-          r.resolvedVia = 'retry-in-dino'; resolved = true;
-        }
-      }
-    }
-    // Unresolved after the local retries — the whole detection defers to
-    // today's Gemini 2-pass bbox (the Gemini path in detectAllBoundingBoxes).
-    // No external API anywhere: local first, Gemini as the only fallback.
-    if (!resolved) {
-      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${n} unresolved after local retry — falling back to Gemini bbox`);
-      diag.fellBack = true;
-      diag.reason = `${n} unresolved (${lowConf.has(n) ? 'low-confidence' : ''}${diag.collisions.some(c => c.a === n || c.b === n) ? ' collision' : ''})`.trim();
-      diag.perFigure = names.map(m => _gdinoFigDiag(byName.get(m), batchedScore[m], lowConf.has(m)));
-      return { figures: null, diag };
-    }
+  if (dets.length < expectedCharacters.length) {
+    diag.fellBack = true;
+    diag.reason = `${dets.length} persons < ${expectedCharacters.length} expected`;
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${diag.reason} — falling back to Gemini`);
+    return { figures: null, diag };
   }
 
-  // Assemble the figures[] contract (cascade merge fills faceBoxes downstream).
-  const figures = names.map(n => {
-    const r = byName.get(n);
-    const cx = (r.bodyBox[1] + r.bodyBox[3]) / 2;
+  // Stage 3 — face → figure pairing: face center inside a containing person
+  // box, smallest first; when overlapping figures compete for the same box,
+  // the face falls through to the next containing box that still has none
+  // (faces iterate score-desc, so each figure keeps its best face).
+  for (const f of faces) {
+    const cx = (f.box[0] + f.box[2]) / 2, cy = (f.box[1] + f.box[3]) / 2;
+    const holders = dets
+      .filter(d => cx >= d.box[0] && cx <= d.box[2] && cy >= d.box[1] && cy <= d.box[3])
+      .sort((a, b) => (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]) - (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]));
+    const holder = holders.find(h => !h.face);
+    if (holder) holder.face = f;
+  }
+
+  // Stage 4 — names from the intended layout (never from grounding).
+  const sh = getStoryHelpers();
+  const chars = expectedCharacters.map(c => {
+    const lcr = c.position ? sh.normalizePositionToLCR(c.position) : null;
     return {
-      name: n,
-      label: (expectedCharacters.find(c => c.name === n)?.description || '').slice(0, 120),
-      position: cx < 0.33 ? 'left' : cx > 0.66 ? 'right' : 'center',
-      faceBox: null,
-      bodyBox: r.bodyBox,
-      confidence: r.score == null ? 'low' : r.score >= 0.65 ? 'high' : r.score >= 0.45 ? 'medium' : 'low',
+      name: c.name,
+      xTarget: lcr === 'left' ? 0.18 : lcr === 'right' ? 0.82 : lcr === 'center' ? 0.5 : null,
+      depthRank: _depthRankFromProse(c.position),
+      isChild: _isChildFromText(`${c.gdinoPrompt || ''} ${c.description || ''}`),
     };
   });
-  diag.perFigure = names.map(m => _gdinoFigDiag(byName.get(m), batchedScore[m], lowConf.has(m)));
-  log.info(`🦖 [GDINO-DETECT] ${pageLabel}detected ${figures.length}/${expectedCharacters.length} figures (GroundingDINO→MobileSAM)`);
-  return { figures, diag };
-}
+  const geo = dets.map(d => ({
+    cx: (d.bodyBox[1] + d.bodyBox[3]) / 2,
+    h: d.bodyBox[2] - d.bodyBox[0],
+    bottom: d.bodyBox[2],
+  }));
+  const asg = _assignFiguresByLayout(chars, geo);
+  diag.assignment = chars.map((c, i) => ({ name: c.name, boxIdx: asg.map[i], xTarget: c.xTarget, depthRank: c.depthRank, isChild: c.isChild }));
+  diag.assignmentCost = Number.isFinite(asg.cost) ? +asg.cost.toFixed(3) : null;
+  diag.assignmentMargin = Number.isFinite(asg.margin) ? +asg.margin.toFixed(3) : null;
 
-// One character's detection diagnostics — batched score, whether it was
-// recovered/low-conf, how it was resolved, and its final score.
-function _gdinoFigDiag(r, batched, wasLowConf) {
-  return {
-    name: r.name,
-    batchedScore: batched ?? null,
-    finalScore: r.score ?? null,
-    recovered: !!r.recovered,
-    lowConf: !!wasLowConf,
-    resolvedVia: r.resolvedVia || null,
-    // Stage boxes persisted for debugging: raw GroundingDINO box vs the
-    // MobileSAM-tightened box (== bodyBox at emit time). Comparing samBox here
-    // to the final figures[].bodyBox on the stored story reveals any downstream
-    // corruption (cascade-merge / normalization / auto-refine) — the box is
-    // otherwise thrown away and the corruption is invisible without a re-run.
-    gdinoBox: r.gdinoBox || null,     // [ymin,xmin,ymax,xmax] normalized, raw DINO
-    samBox: r.bodyBox || null,        // [ymin,xmin,ymax,xmax] normalized, after SAM
-    samApplied: !!r.samApplied,       // false → SAM failed, samBox === gdinoBox
+  const lcrOf = (bodyBox) => {
+    const cx = (bodyBox[1] + bodyBox[3]) / 2;
+    return cx < 0.33 ? 'left' : cx > 0.66 ? 'right' : 'center';
   };
+  const figures = [];
+  const masks = [];
+  const usedDet = new Set();
+  chars.forEach((c, i) => {
+    const d = dets[asg.map[i]];
+    if (!d) return;
+    usedDet.add(asg.map[i]);
+    figures.push({
+      name: c.name,
+      label: (expectedCharacters[i].description || '').slice(0, 120),
+      position: lcrOf(d.bodyBox),
+      faceBox: d.face ? _pxBoxToNorm(d.face.box, W, H) : null,
+      bodyBox: d.bodyBox,
+      gdinoBox: d.gdinoBox,
+      samApplied: d.samApplied,
+      _faceSource: d.face ? 'dino' : undefined,
+      _faceScore: d.face ? +d.face.score.toFixed(3) : undefined,
+      confidence: d.score >= 0.6 ? 'high' : d.score >= 0.4 ? 'medium' : 'low',
+      score: +d.score.toFixed(3),
+    });
+    masks.push(d.mask?.pngBuf || null);
+  });
+  // Extra person boxes → UNKNOWN figures (visible in the dev overlay; ignored
+  // by character matching downstream, same as the Gemini path's unknowns).
+  dets.forEach((d, j) => {
+    if (usedDet.has(j)) return;
+    figures.push({
+      name: 'UNKNOWN',
+      label: 'unmatched person',
+      position: lcrOf(d.bodyBox),
+      faceBox: d.face ? _pxBoxToNorm(d.face.box, W, H) : null,
+      bodyBox: d.bodyBox,
+      gdinoBox: d.gdinoBox,
+      samApplied: d.samApplied,
+      _faceSource: d.face ? 'dino' : undefined,
+      confidence: 'low',
+      score: +d.score.toFixed(3),
+    });
+    masks.push(d.mask?.pngBuf || null);
+  });
+
+  // Stage 5 — Visual-Bible objects, grounded individually with a short generic
+  // label. A DINO miss is NOT reported as a missing object (miss ≠ absent —
+  // see docs/decisions.md); unfound objects only appear in the diag.
+  const objects = [];
+  for (const raw of expectedObjects) {
+    const cleaned = String(raw || '').trim();
+    if (!cleaned || /^[A-Z]{3}\d{3}(\.\d+)?$/.test(cleaned)) continue; // opaque VB id — nothing to ground
+    const text = cleaned.split(/[,;(]/)[0].trim().toLowerCase().slice(0, 60);
+    const od = await _gdinoDetect(imageDataUri, [{ name: cleaned, text }]);
+    const obj = od?.figures?.[0];
+    if (obj?.box && obj.score >= GDINO_OBJECT_MIN_SCORE) {
+      const bodyBox = _pxBoxToNorm(obj.box, W, H);
+      objects.push({ name: cleaned, found: true, label: cleaned, bodyBox, position: lcrOf(bodyBox), score: +obj.score.toFixed(3) });
+      diag.objects.push({ name: cleaned, score: +obj.score.toFixed(3), found: true });
+    } else {
+      diag.objects.push({ name: cleaned, score: obj?.score != null ? +obj.score.toFixed(3) : null, found: false });
+    }
+  }
+
+  log.info(`🦖 [GDINO-DETECT] ${pageLabel}${figures.length} figures (${expectedCharacters.length} named, ${figures.length - expectedCharacters.length} unknown), ${faces.length} faces, ${objects.length}/${expectedObjects.length} objects (generic DINO→SAM)`);
+  return { figures, objects, masks, diag };
 }
 
 /**
@@ -2580,36 +2676,22 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
     && !!artStyle && eligibleStyles.includes(String(artStyle).toLowerCase());
   if (gdinoEligible && expectedCharacters.length > 0) {
     try {
-      const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, { pageLabel });
+      const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, { pageLabel, expectedObjects });
       gdinoDiag = gd?.diag || null;
       if (gd && Array.isArray(gd.figures) && gd.figures.length > 0) {
-        let finalFigures = gd.figures;
-        // Same cascade-face merge the Gemini path runs, so faceBoxes get filled.
-        try {
-          const { detectIllustrationFaces, mergeCascadeFacesWithGemini } = require('./entityConsistency');
-          const cascadeFaces = await detectIllustrationFaces(imageData, 60);
-          if (cascadeFaces.length > 0) {
-            let imgW = 1024, imgH = 1024;
-            try {
-              const meta = await sharp(Buffer.from(r2Lib.stripDataUriPrefix(imageData), 'base64')).metadata();
-              imgW = meta.width || 1024; imgH = meta.height || 1024;
-            } catch { /* defaults */ }
-            finalFigures = await mergeCascadeFacesWithGemini(finalFigures, cascadeFaces, imgW, imgH, expectedCharacters);
-          }
-        } catch (cascadeErr) {
-          log.debug(`[GDINO-DETECT] ${pageLabel}cascade merge skipped: ${cascadeErr.message}`);
-        }
-        if (expectedObjects.length > 0) {
-          log.debug(`[GDINO-DETECT] ${pageLabel}${expectedObjects.length} expected object(s) not detected by GroundingDINO backend (figures only)`);
-        }
+        // No Haar cascade merge here — faceBoxes come from DINO "face" boxes
+        // (cleaner: no phantom faces, found background faces Haar missed).
+        const foundObjects = (gd.objects || []).filter(o => o.found).map(o => o.name);
         const result = {
-          figures: finalFigures,
-          objects: [],
+          figures: gd.figures,
+          objects: gd.objects || [],
           expectedCharacters,
           expectedObjects,
-          foundObjects: [],
+          foundObjects,
+          // Deliberately empty: a DINO miss is not evidence of absence, so it
+          // must not raise missing-object flags (docs/decisions.md).
           missingObjects: [],
-          unknownFigures: finalFigures.filter(f => f.name === 'UNKNOWN').length,
+          unknownFigures: gd.figures.filter(f => f.name === 'UNKNOWN').length,
           usage: { input_tokens: 0, output_tokens: 0 },
           rawPrompt: 'grounding-dino',
           rawResponse: null,
@@ -2617,8 +2699,12 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
           detectionBackend: 'grounding-dino',
           gdinoDiag: gd.diag || null,
         };
+        // Per-figure mask PNGs ride along non-enumerably: the overlay renderer
+        // uses them for the cutout strip, JSON persistence (stories.data JSONB)
+        // and the raw API response never see them.
+        Object.defineProperty(result, '_gdinoMasks', { value: gd.masks || [], enumerable: false });
         if (!skipCache && cacheKey) _bboxCacheSet(cacheKey, result);
-        log.info(`🦖 [BBOX-DETECT] ${pageLabel}GroundingDINO backend (${finalFigures.length} figures)`);
+        log.info(`🦖 [BBOX-DETECT] ${pageLabel}GroundingDINO backend (${gd.figures.length} figures, ${foundObjects.length} objects)`);
         return result;
       }
       log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}GroundingDINO backend returned nothing — falling back to Gemini`);
@@ -3510,7 +3596,7 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
     const metadata = await sharp(imageBuffer).metadata();
     const { width, height } = metadata;
 
-    // Build SVG overlay — figures and faces only (no object boxes to reduce noise)
+    // Build SVG overlay — figures, faces, and detected VB object boxes
     const svgParts = [`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`];
 
     const unknownColor = '#888888'; // Gray for unidentified figures
@@ -3538,6 +3624,18 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
         svgParts.push(`<text x="${x + 5}" y="${Math.max(16, y - 5)}" font-family="Arial" font-size="13" font-weight="bold" fill="white">${escapeXml(label)}</text>`);
       }
 
+      // Raw GroundingDINO person box (dashed, dimmer) — shown when SAM tightened
+      // it into the bodyBox above, so drift between the two is visible.
+      if (fig.gdinoBox) {
+        const [ymin, xmin, ymax, xmax] = fig.gdinoBox;
+        const x = Math.round(xmin * width);
+        const y = Math.round(ymin * height);
+        const w = Math.round((xmax - xmin) * width);
+        const h = Math.round((ymax - ymin) * height);
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${figColor}" stroke-width="2" stroke-dasharray="6,4" opacity="0.55"/>`);
+        svgParts.push(`<text x="${x + 2}" y="${y + h - 4}" font-family="Arial" font-size="9" fill="${figColor}" opacity="0.7">dino${fig.score != null ? ` ${fig.score}` : ''}</text>`);
+      }
+
       // Original Gemini face box (dashed, dimmer) — shown when cascade improved the face
       if (fig._geminiFaceBox && fig._cascadeFace) {
         const [ymin, xmin, ymax, xmax] = fig._geminiFaceBox;
@@ -3557,11 +3655,16 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
         const w = Math.round((xmax - xmin) * width);
         const h = Math.round((ymax - ymin) * height);
         const isCascade = !!fig._cascadeFace;
-        const strokeStyle = isCascade ? '' : ' stroke-dasharray="8,4"'; // solid if cascade, dashed if gemini-only
-        const strokeWidth = isCascade ? 4 : 3;
+        const isDinoFace = fig._faceSource === 'dino';
+        const strokeStyle = (isCascade || isDinoFace) ? '' : ' stroke-dasharray="8,4"'; // solid if local detector, dashed if gemini-only
+        const strokeWidth = (isCascade || isDinoFace) ? 4 : 3;
         svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${figColor}" stroke-width="${strokeWidth}"${strokeStyle}/>`);
+        // DINO face anchor — red dot at the face center
+        if (isDinoFace) {
+          svgParts.push(`<circle cx="${x + w / 2}" cy="${y + h / 2}" r="8" fill="#FF2D55" stroke="white" stroke-width="2.5"/>`);
+        }
         // Face label
-        const sourceTag = isCascade ? ` [${fig._cascadeFace}]` : '';
+        const sourceTag = isCascade ? ` [${fig._cascadeFace}]` : isDinoFace ? ` [dino${fig._faceScore != null ? ` ${fig._faceScore}` : ''}]` : '';
         const faceLabel = isIdentified ? `FACE ${fig.name}${sourceTag}` : `FACE ${i + 1}${sourceTag}`;
         const faceLabelWidth = Math.min(faceLabel.length * 7 + 10, 200);
         svgParts.push(`<rect x="${x}" y="${y + h}" width="${faceLabelWidth}" height="16" fill="${figColor}" opacity="0.9" rx="2"/>`);
@@ -3569,18 +3672,86 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
       }
     }
 
+    // Detected object boxes (VB props) — yellow dashed so they read apart from figures
+    const objColor = '#FFD60A';
+    for (const obj of (bboxDetection.objects || [])) {
+      if (!obj?.bodyBox || obj.found === false) continue;
+      const [ymin, xmin, ymax, xmax] = obj.bodyBox;
+      const x = Math.round(xmin * width);
+      const y = Math.round(ymin * height);
+      const w = Math.round((xmax - xmin) * width);
+      const h = Math.round((ymax - ymin) * height);
+      svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${objColor}" stroke-width="3" stroke-dasharray="10,5"/>`);
+      const objLabel = `${obj.label || obj.name}${obj.score != null ? ` ${obj.score}` : ''}`.substring(0, 40);
+      const objLabelWidth = Math.min(objLabel.length * 7 + 10, 280);
+      svgParts.push(`<rect x="${x}" y="${Math.min(height - 18, y + h)}" width="${objLabelWidth}" height="18" fill="${objColor}" opacity="0.9" rx="2"/>`);
+      svgParts.push(`<text x="${x + 4}" y="${Math.min(height - 5, y + h + 13)}" font-family="Arial" font-size="11" font-weight="bold" fill="black">${escapeXml(objLabel)}</text>`);
+    }
+
     svgParts.push('</svg>');
     const svgBuffer = Buffer.from(svgParts.join(''));
 
     // Composite SVG over image
-    const resultBuffer = await sharp(imageBuffer)
+    let resultBuffer = await sharp(imageBuffer)
       .composite([{ input: svgBuffer, top: 0, left: 0 }])
       .jpeg({ quality: 85 })
       .toBuffer();
 
+    // Cutout strip — per-figure SAM cutouts appended below the annotated page.
+    // Masks arrive as a non-enumerable `_gdinoMasks` (index-aligned with
+    // figures) so they exist only in-process, never in stories.data.
+    const gdinoMasks = bboxDetection._gdinoMasks;
+    if (Array.isArray(gdinoMasks) && gdinoMasks.some(Boolean)) {
+      try {
+        const STRIP_H = 260, GAP = 8, LABEL_H = 20;
+        const tiles = [];
+        for (let i = 0; i < (bboxDetection.figures || []).length; i++) {
+          const maskPng = gdinoMasks[i];
+          const fig = bboxDetection.figures[i];
+          if (!maskPng || !fig?.bodyBox) continue;
+          const [ymin, xmin, ymax, xmax] = fig.bodyBox;
+          const pad = 12;
+          const ex = Math.max(0, Math.round(xmin * width) - pad);
+          const ey = Math.max(0, Math.round(ymin * height) - pad);
+          const ew = Math.min(width, Math.round(xmax * width) + pad) - ex;
+          const eh = Math.min(height, Math.round(ymax * height) + pad) - ey;
+          if (ew < 4 || eh < 4) continue;
+          const cut = await sharp(imageBuffer).ensureAlpha()
+            .composite([{ input: maskPng, blend: 'dest-in' }])
+            .extract({ left: ex, top: ey, width: ew, height: eh })
+            .resize({ height: STRIP_H - LABEL_H })
+            .png().toBuffer();
+          const cutMeta = await sharp(cut).metadata();
+          tiles.push({ png: cut, w: cutMeta.width, name: fig.name || `Figure ${i + 1}` });
+        }
+        if (tiles.length > 0) {
+          const stripW = width;
+          let cursor = GAP;
+          const comps = [];
+          const labelSvg = [`<svg width="${stripW}" height="${STRIP_H}" xmlns="http://www.w3.org/2000/svg">`];
+          for (const t of tiles) {
+            if (cursor + t.w > stripW) break; // strip full — remaining tiles skipped
+            comps.push({ input: t.png, left: cursor, top: GAP });
+            labelSvg.push(`<text x="${cursor + 4}" y="${STRIP_H - 6}" font-family="Arial" font-size="14" font-weight="bold" fill="white">${escapeXml(t.name)}</text>`);
+            cursor += t.w + GAP;
+          }
+          labelSvg.push('</svg>');
+          const strip = await sharp({ create: { width: stripW, height: STRIP_H, channels: 3, background: { r: 34, g: 34, b: 34 } } })
+            .composite([...comps, { input: Buffer.from(labelSvg.join('')), top: 0, left: 0 }])
+            .jpeg({ quality: 85 }).toBuffer();
+          resultBuffer = await sharp({ create: { width, height: height + STRIP_H, channels: 3, background: { r: 34, g: 34, b: 34 } } })
+            .composite([{ input: resultBuffer, top: 0, left: 0 }, { input: strip, top: height, left: 0 }])
+            .jpeg({ quality: 85 }).toBuffer();
+        }
+      } catch (stripErr) {
+        log.debug(`📦 [BBOX-OVERLAY] cutout strip skipped: ${stripErr.message}`);
+      }
+    }
+
     const result = 'data:image/jpeg;base64,' + resultBuffer.toString('base64');
     const figCount = bboxDetection.figures?.length || 0;
-    log.debug(`📦 [BBOX-OVERLAY] Created overlay image: ${figCount} figures (${Math.round(resultBuffer.length / 1024)}KB)`);
+    const objCount = (bboxDetection.objects || []).filter(o => o.found !== false && o.bodyBox).length;
+    log.debug(`📦 [BBOX-OVERLAY] Created overlay image: ${figCount} figures, ${objCount} objects (${Math.round(resultBuffer.length / 1024)}KB)`);
     return result;
 
   } catch (error) {
@@ -3733,6 +3904,11 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     gdinoDiag: allDetections.gdinoDiag,
     timestamp: new Date().toISOString()
   };
+  // Carry the in-process SAM mask PNGs across to the overlay renderer
+  // (non-enumerable — never serialized into stories.data).
+  if (allDetections._gdinoMasks) {
+    Object.defineProperty(detectionHistory, '_gdinoMasks', { value: allDetections._gdinoMasks, enumerable: false });
+  }
 
   // If no issues to fix, just return the detections
   if (!fixableIssues || fixableIssues.length === 0) {
