@@ -735,6 +735,12 @@ function sceneHeadline(desc: string | null | undefined): string {
   if (!desc) return '';
   const m = desc.match(/"imageSummary"\s*:\s*"([^"]+)"/);
   if (m) return m[1];
+  // No summary field → compose one from the interactions: who does what.
+  // That's the staging info a human compares variants by ("is anyone
+  // rowing?"), unlike the first prose line (a character-clothing wall).
+  const inter = [...desc.matchAll(/"character"\s*:\s*"([^"]+)"[^}]*?"where"\s*:\s*"([^"]+)"/g)]
+    .map(x => `${x[1]}: ${x[2]}`);
+  if (inter.length) return inter.join(' · ').slice(0, 300);
   const line = desc.split('\n').map(l => l.trim()).find(l => l && !l.startsWith('#') && !l.startsWith('{') && !l.startsWith('```'));
   return (line || '').slice(0, 220);
 }
