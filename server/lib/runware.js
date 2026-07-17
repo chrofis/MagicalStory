@@ -568,6 +568,63 @@ function isRunwareConfigured() {
   return !!RUNWARE_API_KEY;
 }
 
+/**
+ * Qwen-Image-Edit via Runware — reference-based edit (person+scene insertion,
+ * person+person merge). Trained on concatenation-style compositing, so it
+ * preserves input images far better than free-form editors. Validated
+ * 2026-07-17 (docs/tests/qwen-composite-experiment.html): reliable ONLY on
+ * crop-bounded canvases — full-page edits with placement instructions get
+ * re-imagined. Callers crop first, paste back mechanically.
+ *
+ * @param {string} prompt - Edit instruction
+ * @param {string[]} referenceImages - 1-3 data URIs; first = scene/canvas, rest = person refs
+ * @param {Object} options - { width, height, model }
+ *   width/height must be multiples of 64 in [128, 2048].
+ * @returns {Promise<{imageData: string, cost: number, modelId: string}>}
+ */
+async function editWithQwen(prompt, referenceImages, options = {}) {
+  const {
+    width = 1024,
+    height = 1024,
+    model = 'alibaba:qwen-image-edit@2511',
+  } = options;
+  if (!RUNWARE_API_KEY) throw new Error('RUNWARE_API_KEY not configured');
+  if (!Array.isArray(referenceImages) || referenceImages.length === 0) {
+    throw new Error('editWithQwen requires 1-3 reference images');
+  }
+
+  const payload = [{
+    taskType: 'imageInference',
+    taskUUID: crypto.randomUUID(),
+    positivePrompt: prompt,
+    model,
+    width,
+    height,
+    numberResults: 1,
+    outputFormat: 'JPEG',
+    includeCost: true,
+    referenceImages,
+  }];
+
+  const response = await runwareFetchWithRetry(payload, { timeoutMs: 120000 });
+  const result = await response.json();
+  if (result.errors?.length) {
+    throw new Error(`Qwen edit API error: ${JSON.stringify(result.errors).slice(0, 300)}`);
+  }
+  const img = result.data?.find(d => d.taskType === 'imageInference');
+  if (!img) throw new Error('Qwen edit returned no image task');
+  let imageData;
+  if (img.imageBase64Data) {
+    imageData = `data:image/jpeg;base64,${img.imageBase64Data}`;
+  } else if (img.imageURL) {
+    imageData = await downloadRunwareImage(img.imageURL);
+  } else {
+    throw new Error('Qwen edit returned neither imageBase64Data nor imageURL');
+  }
+  log.info(`🎨 [QWEN-EDIT] ${model} ${width}x${height} $${img.cost ?? '?'}`);
+  return { imageData, cost: img.cost ?? 0, modelId: model };
+}
+
 module.exports = {
   inpaintWithRunware,
   generateWithRunware,
@@ -575,5 +632,6 @@ module.exports = {
   generateWithPuLID,
   downloadRunwareImage,
   isRunwareConfigured,
+  editWithQwen,
   RUNWARE_MODELS
 };

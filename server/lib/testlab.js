@@ -1070,6 +1070,138 @@ async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, par
   };
 }
 
+/**
+ * Crop-bounded Qwen character insertion (composite-v2 recipe, validated
+ * 2026-07-17 — docs/tests/qwen-composite-experiment.html). Crops the target
+ * region + margin, has Qwen-Image-Edit-2511 insert the character into the
+ * CROP (the model never sees the rest of the page, so the background is
+ * pixel-immutable by construction), then pastes the crop back with a
+ * feathered edge. Full-page Qwen edits re-imagine the layout — never widen
+ * the canvas.
+ *
+ * params:
+ *   characterName  (required) — matched against the scene's referencePhotos
+ *   crop           {x,y,w,h} normalized 0-1 — target region. Falls back to
+ *                  the character's stored detection box, padded.
+ *   pose           short pose/scale phrase woven into the prompt
+ *   base           'active' (default) | 'empty_scene' | {imageType, versionIndex}
+ * promptOverride replaces the whole built prompt (crop refs stay).
+ * Crops for different figures must NOT overlap — a later crop repaints
+ * whatever the earlier one inserted.
+ */
+async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = {} }) {
+  const sharp = require('sharp');
+  const { editWithQwen } = require('./runware');
+
+  const charName = params.characterName;
+  if (!charName) throw new Error('qwen_insert requires params.characterName');
+  const ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === charName.toLowerCase());
+  if (!ref) throw new Error(`No reference photo for "${charName}" on this page`);
+
+  // Base canvas
+  let baseUri;
+  if (params.base === 'empty_scene') {
+    baseUri = await loadEmptyScene(ctx.storyId, ctx.pageNumber);
+    if (!baseUri) throw new Error('No empty scene stored for this page');
+  } else if (params.base && typeof params.base === 'object') {
+    const img = await loadTestImage(ctx.storyId, params.base.imageType || 'scene', ctx.pageNumber, params.base.versionIndex);
+    baseUri = img?.imageData;
+    if (!baseUri) throw new Error(`base version v${params.base.versionIndex} not found`);
+  } else {
+    baseUri = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  }
+  const baseBuf = Buffer.from(baseUri.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const meta = await sharp(baseBuf).metadata();
+  const W = meta.width, H = meta.height;
+
+  // Crop region: explicit normalized rect, else padded detection box.
+  let crop = null;
+  if (params.crop && [params.crop.x, params.crop.y, params.crop.w, params.crop.h].every(v => typeof v === 'number')) {
+    crop = {
+      x: Math.round(params.crop.x * W), y: Math.round(params.crop.y * H),
+      w: Math.round(params.crop.w * W), h: Math.round(params.crop.h * H),
+    };
+  } else {
+    const det = ctx.scene.bboxDetection;
+    const fig = (det?.figures || det?.characters || []).find(f => (f.name || '').toLowerCase() === charName.toLowerCase());
+    const box = fig?.bbox || fig?.box_2d; // [ymin,xmin,ymax,xmax] 0-1
+    if (box?.length === 4) {
+      const padX = (box[3] - box[1]) * 0.35, padY = (box[2] - box[0]) * 0.2;
+      crop = {
+        x: Math.round(Math.max(0, box[1] - padX) * W),
+        y: Math.round(Math.max(0, box[0] - padY) * H),
+        w: Math.round(Math.min(1, box[3] - box[1] + 2 * padX) * W),
+        h: Math.round(Math.min(1, box[2] - box[0] + 2 * padY) * H),
+      };
+    }
+  }
+  if (!crop) throw new Error('qwen_insert needs params.crop {x,y,w,h} (normalized 0-1) — no stored detection box to fall back on');
+  crop.x = Math.max(0, Math.min(W - 64, crop.x));
+  crop.y = Math.max(0, Math.min(H - 64, crop.y));
+  crop.w = Math.min(W - crop.x, crop.w);
+  crop.h = Math.min(H - crop.y, crop.h);
+
+  const cropBuf = await sharp(baseBuf).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).jpeg({ quality: 95 }).toBuffer();
+  // Render at ~2x for detail; Runware dims must be multiples of 64 in [128,2048].
+  const snap = v => Math.max(128, Math.min(2048, Math.round(v / 64) * 64));
+  const rw = snap(crop.w * 2), rh = snap(crop.h * 2);
+
+  const pose = params.pose || 'standing naturally, scale matching the scene perspective';
+  const prompt = promptOverride
+    || `Insert the person from the second image into the watercolor scene from the first image: ${pose}. Keep the background of the scene exactly as it is — same objects, same colors, same framing. Match the illustration style and lighting, add a soft contact shadow.`;
+
+  const t0 = Date.now();
+  const result = await editWithQwen(prompt, [
+    `data:image/jpeg;base64,${cropBuf.toString('base64')}`,
+    ref.photoUrl,
+  ], { width: rw, height: rh });
+  const elapsedMs = Date.now() - t0;
+
+  // Paste back. Default 'figure' mode: within the crop, keep ONLY the changed
+  // blob (the inserted figure + its shadow, diff vs the original crop,
+  // despeckled + dilated + feathered) — the model's incidental background
+  // repaint inside the crop is discarded, so no rectangle seam. 'crop' mode
+  // pastes the whole crop with a rectangular feather (debug/fallback).
+  const outBuf = Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const back = await sharp(outBuf).resize(crop.w, crop.h, { fit: 'fill' }).toBuffer();
+  let feathered;
+  if ((params.pasteMode || 'figure') === 'figure') {
+    const origRaw = await sharp(cropBuf).resize(crop.w, crop.h, { fit: 'fill' }).raw().toBuffer();
+    const newRaw = await sharp(back).raw().toBuffer();
+    const bin = Buffer.alloc(crop.w * crop.h);
+    for (let i = 0; i < crop.w * crop.h; i++) {
+      const d = Math.max(
+        Math.abs(origRaw[i * 3] - newRaw[i * 3]),
+        Math.abs(origRaw[i * 3 + 1] - newRaw[i * 3 + 1]),
+        Math.abs(origRaw[i * 3 + 2] - newRaw[i * 3 + 2]));
+      bin[i] = d > 30 ? 255 : 0;
+    }
+    const raw1 = { raw: { width: crop.w, height: crop.h, channels: 1 } };
+    const dense = await sharp(bin, raw1).blur(4).threshold(96).toBuffer();     // despeckle
+    const alpha = await sharp(dense, raw1).blur(5).threshold(20).blur(4).raw().toBuffer(); // dilate + feather
+    feathered = await sharp(back).ensureAlpha()
+      .joinChannel(Buffer.from(alpha), raw1).png().toBuffer();
+  } else {
+    const fe = Math.max(8, Math.round(Math.min(crop.w, crop.h) * 0.04));
+    const maskSvg = `<svg width="${crop.w}" height="${crop.h}"><defs><filter id="f"><feGaussianBlur stdDeviation="${fe / 2}"/></filter></defs><rect x="${fe}" y="${fe}" width="${crop.w - 2 * fe}" height="${crop.h - 2 * fe}" fill="white" filter="url(#f)"/></svg>`;
+    const mask = await sharp(Buffer.from(maskSvg)).resize(crop.w, crop.h).ensureAlpha().extractChannel(3).raw().toBuffer();
+    feathered = await sharp(back).ensureAlpha()
+      .joinChannel(mask, { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
+  }
+  const composed = await sharp(baseBuf).composite([{ input: feathered, left: crop.x, top: crop.y }]).jpeg({ quality: 95 }).toBuffer();
+
+  const versionIndex = await saveTestVersion(
+    ctx.storyId, 'scene', ctx.pageNumber,
+    `data:image/jpeg;base64,${composed.toString('base64')}`, experimentId
+  );
+  return {
+    imageType: 'scene', versionIndex, characterName: ref.name, elapsedMs,
+    modelId: result.modelId, promptUsed: prompt,
+    crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H },
+    cost: result.cost,
+  };
+}
+
 /** Rewrite a provider-blocked scene description (rewrite-blocked-scene.txt). */
 async function runRewriteBlockedStage(ctx, { experimentId, promptOverride, params = {} }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
@@ -1193,6 +1325,7 @@ const STAGE_RUNNERS = {
   scene_description: runSceneDescriptionStage,
   rewrite_blocked: runRewriteBlockedStage,
   repair_verify: runRepairVerifyStage,
+  qwen_insert: runQwenInsertStage,
 };
 
 // Story-level stages: target {storyId} (+ coverType for cover). No page context.

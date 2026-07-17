@@ -154,6 +154,7 @@ export const TESTLAB_STAGES = [
   { id: 'scene_description', label: 'Scene description (iterate)', producesImage: false, overridable: true },
   { id: 'rewrite_blocked', label: 'Rewrite blocked scene', producesImage: false, overridable: true },
   { id: 'repair_verify', label: 'Repair verification (diff)', producesImage: true, overridable: false },
+  { id: 'qwen_insert', label: 'Qwen insert (crop-bounded)', producesImage: true, overridable: true },
   { id: 'cover', label: 'Cover render', producesImage: true, overridable: true, storyLevel: true },
   { id: 'style_check', label: 'Style consistency check', producesImage: false, overridable: false, storyLevel: true },
 ] as const;

@@ -294,6 +294,7 @@ function ExperimentsTab() {
   const [override, setOverride] = useState('');
   const [autoEval, setAutoEval] = useState(true);
   const [charName, setCharName] = useState('');
+  const [paramsJson, setParamsJson] = useState('');
   const [storyIdInput, setStoryIdInput] = useState('');
   const [coverType, setCoverType] = useState('frontCover');
   const [starting, setStarting] = useState(false);
@@ -351,13 +352,17 @@ function ExperimentsTab() {
     } else if (selectedBench.length === 0) {
       alert('Select at least one benchmark target.'); return;
     }
-    if (stage === 'char_repair' && !charName.trim()) { alert('Character repair needs a character name.'); return; }
+    if ((stage === 'char_repair' || stage === 'qwen_insert') && !charName.trim()) { alert('This stage needs a character name.'); return; }
     setStarting(true);
     setError(null);
     try {
-      const params: Record<string, unknown> = { autoEval };
-      if (stage === 'char_repair') params.characterName = charName.trim();
+      let params: Record<string, unknown> = { autoEval };
+      if (stage === 'char_repair' || stage === 'qwen_insert') params.characterName = charName.trim();
       if (stage === 'cover') params.coverType = coverType;
+      if (paramsJson.trim()) {
+        try { params = { ...params, ...JSON.parse(paramsJson) }; }
+        catch { alert('Params JSON is not valid JSON.'); setStarting(false); return; }
+      }
       const res = await testlabService.createExperiment({
         stage,
         label: label || undefined,
@@ -401,7 +406,7 @@ function ExperimentsTab() {
               Auto-eval result
             </label>
           )}
-          {stage === 'char_repair' && (
+          {(stage === 'char_repair' || stage === 'qwen_insert') && (
             <input
               className="border rounded-lg px-3 py-2 text-sm w-44"
               placeholder="Character name"
@@ -424,6 +429,16 @@ function ExperimentsTab() {
               onChange={e => setStoryIdInput(e.target.value)}
             />
           )}
+        </div>
+        <div className="mb-4">
+          <input
+            className="border rounded-lg px-3 py-2 text-sm w-full font-mono"
+            placeholder={stage === 'qwen_insert'
+              ? 'Params JSON — e.g. {"crop":{"x":0.1,"y":0.5,"w":0.3,"h":0.45},"pose":"standing on the grass, arms raised","base":"empty_scene"}'
+              : 'Params JSON (optional — extra stage parameters)'}
+            value={paramsJson}
+            onChange={e => setParamsJson(e.target.value)}
+          />
         </div>
 
         <div className="mb-4">
