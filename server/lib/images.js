@@ -2391,6 +2391,15 @@ function _maskOverlapFrac(a, b) {
   return inter / Math.max(1, Math.min(a.area, b.area));
 }
 
+// Binary mask → white-on-transparent PNG (same encoding /figure-mask returns).
+async function _maskToPng(mask) {
+  const raw = Buffer.alloc(mask.width * mask.height * 4);
+  for (let i = 0; i < mask.width * mask.height; i++) {
+    if (mask.alpha[i]) { const o = i * 4; raw[o] = 255; raw[o + 1] = 255; raw[o + 2] = 255; raw[o + 3] = 255; }
+  }
+  return sharp(raw, { raw: { width: mask.width, height: mask.height, channels: 4 } }).png().toBuffer();
+}
+
 /**
  * Detect figures with the local Grounded-SAM path — generic prompts.
  *
@@ -2577,6 +2586,39 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
         diag.persons[i].droppedDuplicateOf = j;
         dets.splice(i, 1);
         break;
+      }
+    }
+  }
+  // Occlusion carve-out: a figure standing in front of another sits inside the
+  // background figure's box, so SAM includes its pixels in BOTH masks. Where
+  // two masks overlap, the smaller (foreground) figure keeps the pixels and
+  // they are subtracted from the bigger (background) figure's mask; its
+  // bodyBox is recomputed from the cleaned mask.
+  for (let i = 0; i < dets.length; i++) {
+    for (let j = 0; j < dets.length; j++) {
+      if (i === j) continue;
+      const big = dets[i].mask, small = dets[j].mask;
+      if (!big || !small || small.area >= big.area) continue;
+      const ov = _maskOverlapFrac(big, small); // intersect / smaller area
+      if (ov < 0.02) continue;
+      let removed = 0;
+      const n = big.width * big.height;
+      for (let k = 0; k < n; k++) if (big.alpha[k] && small.alpha[k]) { big.alpha[k] = 0; removed++; }
+      if (removed === 0) continue;
+      big.area -= removed;
+      // Recompute bbox + png of the carved mask.
+      let minx = big.width, miny = big.height, maxx = -1, maxy = -1;
+      for (let k = 0; k < n; k++) {
+        if (!big.alpha[k]) continue;
+        const x = k % big.width, y = (k / big.width) | 0;
+        if (x < minx) minx = x; if (x > maxx) maxx = x;
+        if (y < miny) miny = y; if (y > maxy) maxy = y;
+      }
+      if (big.area > 0 && maxx >= 0) {
+        big.bbox = [minx, miny, maxx + 1, maxy + 1];
+        big.pngBuf = await _maskToPng(big);
+        dets[i].bodyBox = _pxBoxToNorm(big.bbox, W, H);
+        log.debug(`[GDINO-DETECT] ${pageLabel}carved ${removed}px of a foreground figure out of an occluded figure's mask (${Math.round(ov * 100)}% of the smaller mask overlapped)`);
       }
     }
   }
