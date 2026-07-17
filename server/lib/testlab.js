@@ -1377,6 +1377,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
 
   // Crop region: explicit normalized rect, else padded detection box.
   let crop = null;
+  let figureBox = null; // page-normalized [ymin,xmin,ymax,xmax] when detection-derived
   if (params.crop && [params.crop.x, params.crop.y, params.crop.w, params.crop.h].every(v => typeof v === 'number')) {
     crop = {
       x: Math.round(params.crop.x * W), y: Math.round(params.crop.y * H),
@@ -1389,6 +1390,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     const resolved = await resolveCharacterBox(ctx, baseUri, charName).catch(() => null);
     delete ctx._skipStoredBox;
     const box = resolved?.bbox; // [ymin,xmin,ymax,xmax] 0-1
+    if (box?.length === 4) figureBox = box;
     if (box?.length === 4) {
       const pad = params.cropPad ?? 0.35;
       const padX = (box[3] - box[1]) * pad, padY = (box[2] - box[0]) * pad * 0.6;
@@ -1407,6 +1409,32 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   crop.h = Math.min(H - crop.y, crop.h);
 
   const cropBuf = await sharp(baseBuf).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).jpeg({ quality: 95 }).toBuffer();
+
+  // Repair mode: white-out the target figure's SILHOUETTE inside the crop
+  // (same trick Grok blended repair uses) — turns "replace" into "paint into
+  // the white gap", the operation Qwen actually performs faithfully. Plain
+  // replace-wording made the model re-imagine the whole crop (exp #11/#12).
+  let sentBuf = cropBuf;
+  let whiteoutApplied = false;
+  if (params.repairMode && figureBox) {
+    try {
+      const { fetchFigureMaskPng } = require('./images');
+      const boxInCrop = [
+        Math.max(0, Math.round(figureBox[1] * W) - crop.x),
+        Math.max(0, Math.round(figureBox[0] * H) - crop.y),
+        Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
+        Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
+      ];
+      const maskPng = await fetchFigureMaskPng(cropBuf, boxInCrop);
+      if (maskPng) {
+        sentBuf = await sharp(cropBuf).composite([{ input: maskPng, left: 0, top: 0 }]).jpeg({ quality: 95 }).toBuffer();
+        whiteoutApplied = true;
+      }
+    } catch (err) {
+      log.warn(`[TESTLAB] qwen repair whiteout unavailable (${err.message}) — falling back to replace wording`);
+    }
+  }
+
   // Render at ~2x for detail; Runware dims must be multiples of 64 in [128,2048].
   const snap = v => Math.max(128, Math.min(2048, Math.round(v / 64) * 64));
   const rw = snap(crop.w * 2), rh = snap(crop.h * 2);
@@ -1414,12 +1442,14 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   const pose = params.pose || 'standing naturally, scale matching the scene perspective';
   const prompt = promptOverride
     || (params.repairMode
-      ? `Replace the person in the first image with the person from the second image: SAME position, SAME pose, SAME scale as the existing figure — only the face and appearance change to match the second image. Keep everything else in the first image exactly unchanged: same background, same other people, same objects, same colors, same framing. Match the illustration style.`
+      ? (whiteoutApplied
+        ? `Paint the person from the second image into the white silhouette area of the first image. The silhouette shows their exact position, pose and scale — fill it with that person in that pose. Keep everything outside the white area exactly unchanged: same background, same other people, same objects, same colors, same framing. Match the illustration style and lighting.`
+        : `Replace the person in the first image with the person from the second image: SAME position, SAME pose, SAME scale as the existing figure — only the face and appearance change to match the second image. Keep everything else in the first image exactly unchanged: same background, same other people, same objects, same colors, same framing. Match the illustration style.`)
       : `Insert the person from the second image into the watercolor scene from the first image: ${pose}. Keep the background of the scene exactly as it is — same objects, same colors, same framing. Match the illustration style and lighting, add a soft contact shadow.`);
 
   const t0 = Date.now();
   const result = await editWithQwen(prompt, [
-    `data:image/jpeg;base64,${cropBuf.toString('base64')}`,
+    `data:image/jpeg;base64,${sentBuf.toString('base64')}`,
     ref.photoUrl,
   ], { width: rw, height: rh });
   const elapsedMs = Date.now() - t0;
@@ -1449,14 +1479,25 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     // Re-imagination guard: a figure change owns a figure-sized blob. If the
     // model repainted (almost) the whole crop, gating would degrade to a
     // visible rectangle paste — fail loudly instead of shipping that.
+    // (alpha may come back multi-channel from sharp's raw round-trip — stride it.)
+    const n = crop.w * crop.h;
+    const stride = Math.max(1, Math.round(alpha.length / n));
     let ownedPx = 0;
-    for (let i = 0; i < alpha.length; i++) if (alpha[i] > 128) ownedPx++;
-    const ownedFrac = ownedPx / (crop.w * crop.h);
-    if (ownedFrac > 0.8) {
+    for (let i = 0; i < n; i++) if (alpha[i * stride] > 128) ownedPx++;
+    const ownedFrac = ownedPx / n;
+    // Repair whiteout legitimately changes the whole silhouette (~most of a
+    // tight crop) — allow more there.
+    const guardMax = params.repairMode ? 0.92 : 0.8;
+    if (ownedFrac > guardMax) {
       throw new Error(`Model re-imagined the whole crop (${Math.round(ownedFrac * 100)}% changed) instead of editing the figure — retry, or use a tighter crop / simpler pose instruction`);
     }
+    let alpha1 = alpha;
+    if (stride > 1) {
+      alpha1 = Buffer.alloc(n);
+      for (let i = 0; i < n; i++) alpha1[i] = alpha[i * stride];
+    }
     feathered = await sharp(back).ensureAlpha()
-      .joinChannel(Buffer.from(alpha), raw1).png().toBuffer();
+      .joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
   } else {
     const fe = Math.max(8, Math.round(Math.min(crop.w, crop.h) * 0.04));
     const maskSvg = `<svg width="${crop.w}" height="${crop.h}"><defs><filter id="f"><feGaussianBlur stdDeviation="${fe / 2}"/></filter></defs><rect x="${fe}" y="${fe}" width="${crop.w - 2 * fe}" height="${crop.h - 2 * fe}" fill="white" filter="url(#f)"/></svg>`;
@@ -1466,9 +1507,10 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   }
   const composed = await sharp(baseBuf).composite([{ input: feathered, left: crop.x, top: crop.y }]).jpeg({ quality: 95 }).toBuffer();
 
-  // Intermediates: the crop the model saw and its raw output before gating.
+  // Intermediates: the crop the model saw (whiteouted in repair mode) and its
+  // raw output before gating.
   const steps = [];
-  for (const [label, buf] of [['crop sent to model', cropBuf], ['model raw output', outBuf]]) {
+  for (const [label, buf] of [[whiteoutApplied ? 'crop sent to model (figure whiteout)' : 'crop sent to model', sentBuf], ['model raw output', outBuf]]) {
     const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber,
       `data:image/jpeg;base64,${buf.toString('base64')}`, experimentId);
     steps.push({ label, imageType: 'tl_step', versionIndex: v });

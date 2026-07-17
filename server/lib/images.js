@@ -15916,6 +15916,7 @@ module.exports = {
 
   // Two-stage bounding box detection
   detectAllBoundingBoxes,
+  fetchFigureMaskPng,
   detectSubRegion,  // Sub-region detection for targeted repairs (shoes, shirt, hands, etc.)
   createBboxOverlayImage,  // Create overlay image with boxes drawn
   getBboxCacheStats, // Telemetry for the content-hashed bbox cache
