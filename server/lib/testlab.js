@@ -508,11 +508,15 @@ async function runCharRepairStage(ctx, opts) {
   const charName = params.characterName;
   if (!charName) throw new Error('char_repair requires params.characterName');
 
-  // backend 'qwen' → crop-bounded Qwen re-insertion at the character's box
-  // (runQwenInsertStage with base 'active'; crop auto-resolves from detection).
+  // backend 'qwen' → crop-bounded Qwen REPLACEMENT at the character's box.
+  // Repair mode: tight crop (large crops with other figures trigger full
+  // re-imagination) + replace-wording (the scene already contains the figure).
   if (params.backend === 'qwen') {
-    const r = await runQwenInsertStage(ctx, { ...opts, params: { ...params, base: params.base || 'active' } });
-    return { ...r, backend: 'qwen', repairMode: 'qwen-insert' };
+    const r = await runQwenInsertStage(ctx, {
+      ...opts,
+      params: { ...params, base: params.base || 'active', repairMode: true, cropPad: params.cropPad ?? 0.15 },
+    });
+    return { ...r, backend: 'qwen', repairMode: 'qwen-replace' };
   }
 
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
@@ -1386,7 +1390,8 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     delete ctx._skipStoredBox;
     const box = resolved?.bbox; // [ymin,xmin,ymax,xmax] 0-1
     if (box?.length === 4) {
-      const padX = (box[3] - box[1]) * 0.35, padY = (box[2] - box[0]) * 0.2;
+      const pad = params.cropPad ?? 0.35;
+      const padX = (box[3] - box[1]) * pad, padY = (box[2] - box[0]) * pad * 0.6;
       crop = {
         x: Math.round(Math.max(0, box[1] - padX) * W),
         y: Math.round(Math.max(0, box[0] - padY) * H),
@@ -1408,7 +1413,9 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
 
   const pose = params.pose || 'standing naturally, scale matching the scene perspective';
   const prompt = promptOverride
-    || `Insert the person from the second image into the watercolor scene from the first image: ${pose}. Keep the background of the scene exactly as it is — same objects, same colors, same framing. Match the illustration style and lighting, add a soft contact shadow.`;
+    || (params.repairMode
+      ? `Replace the person in the first image with the person from the second image: SAME position, SAME pose, SAME scale as the existing figure — only the face and appearance change to match the second image. Keep everything else in the first image exactly unchanged: same background, same other people, same objects, same colors, same framing. Match the illustration style.`
+      : `Insert the person from the second image into the watercolor scene from the first image: ${pose}. Keep the background of the scene exactly as it is — same objects, same colors, same framing. Match the illustration style and lighting, add a soft contact shadow.`);
 
   const t0 = Date.now();
   const result = await editWithQwen(prompt, [
@@ -1439,6 +1446,15 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     const raw1 = { raw: { width: crop.w, height: crop.h, channels: 1 } };
     const dense = await sharp(bin, raw1).blur(4).threshold(96).toBuffer();     // despeckle
     const alpha = await sharp(dense, raw1).blur(5).threshold(20).blur(4).raw().toBuffer(); // dilate + feather
+    // Re-imagination guard: a figure change owns a figure-sized blob. If the
+    // model repainted (almost) the whole crop, gating would degrade to a
+    // visible rectangle paste — fail loudly instead of shipping that.
+    let ownedPx = 0;
+    for (let i = 0; i < alpha.length; i++) if (alpha[i] > 128) ownedPx++;
+    const ownedFrac = ownedPx / (crop.w * crop.h);
+    if (ownedFrac > 0.8) {
+      throw new Error(`Model re-imagined the whole crop (${Math.round(ownedFrac * 100)}% changed) instead of editing the figure — retry, or use a tighter crop / simpler pose instruction`);
+    }
     feathered = await sharp(back).ensureAlpha()
       .joinChannel(Buffer.from(alpha), raw1).png().toBuffer();
   } else {
