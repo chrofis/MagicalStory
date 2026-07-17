@@ -2424,9 +2424,11 @@ async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H,
   const marked = await sharp(sceneBuf).composite([{ input: Buffer.from(svg) }]).jpeg({ quality: 88 }).toBuffer();
 
   const charLines = expectedCharacters.map(c => {
+    // gdinoPrompt already ends in "wearing <garment>" (built via
+    // _shortGarmentPhrase); only add clothing when it isn't there yet.
     const identity = c.gdinoPrompt || c.description || c.name;
-    const clothing = c.clothing ? ` Wearing: ${String(c.clothing).split(/[.;]/)[0].trim()}.` : '';
-    return `- ${c.name}: ${identity}.${clothing}`;
+    const garment = /\bwearing\b/i.test(identity) ? '' : _shortGarmentPhrase(c.clothing);
+    return `- ${c.name}: ${identity}.${garment ? ` Wearing: ${garment}.` : ''}`;
   }).join('\n');
   const prompt = `Figures in this illustration are marked with black letter badges (${badges.map(b => b.letter).join(', ')}).
 Match each letter to one of these characters by age, gender, hair, and clothing:
@@ -3635,6 +3637,37 @@ function buildBboxSceneContext(sceneMetadata, sceneCharacters = [], characterClo
  * @param {Object} characterClothing - Map of charName → clothing description string
  * @returns {Array<{name: string, description: string, position: string}>}
  */
+/**
+ * Short visible-garment phrase from a clothing description, for grounding /
+ * SoM identity lines. Handles both shapes clothing strings come in:
+ *   structured — "headwear: none; top: red striped shirt under a vest; …"
+ *                → the `top:` value (else first non-"none" value)
+ *   plain prose — "Pink long-sleeved t-shirt, dark jeans, sandals"
+ *                → the first clause
+ * Word-boundary capped; "key: none" segments never leak.
+ */
+function _shortGarmentPhrase(clothing, maxLen = 60) {
+  if (!clothing) return '';
+  const s = String(clothing).trim();
+  let phrase = '';
+  const segments = s.split(';').map(seg => seg.trim()).filter(Boolean);
+  const keyed = segments
+    .map(seg => { const m = seg.match(/^([a-z][a-z/ -]{2,20}):\s*(.+)$/i); return m ? { key: m[1].toLowerCase(), value: m[2].trim() } : null; })
+    .filter(Boolean)
+    .filter(kv => kv.value && !/^none$/i.test(kv.value));
+  if (keyed.length > 0) {
+    phrase = (keyed.find(kv => kv.key === 'top') || keyed[0]).value;
+  } else {
+    phrase = s.split(/[.;]/)[0].trim();
+  }
+  // First clause of the chosen phrase, word-boundary cap.
+  phrase = phrase.split(/[,.]/)[0].trim();
+  if (phrase.length > maxLen) phrase = phrase.slice(0, maxLen).replace(/\s+\S*$/, '');
+  // No dangling connective after the cap ("…rolled sleeves under").
+  phrase = phrase.replace(/\s+(under|over|with|and|on|in|at|of)$/i, '');
+  return phrase;
+}
+
 function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing = {}) {
   const chars = [];
   const addedNames = new Set();
@@ -3733,14 +3766,16 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
       if (clothing) descParts.push(clothing);
       description = descParts.join(', ');
     }
-    // Concise GroundingDINO prompt: the identity (age/gender/hair/beard/glasses)
-    // + the per-page clothing colour, clothing kept SHORT (first clause, capped)
-    // so the whole prompt stays well under GDINO's 256-token cap. Verbose face
-    // geometry (in `description`, for Gemini) tanks GDINO grounding.
+    // Concise grounding/identity prompt: identity (age/gender/hair/beard/
+    // glasses) + a SHORT garment phrase. Feeds the SoM character lines (and
+    // the layout fallback), so the garment must be a real visible garment:
+    // structured clothing strings ("headwear: none; top: red striped shirt
+    // under a leather vest; bottom: …") previously produced "wearing
+    // headwear: none" (first segment naively taken) or a mid-word 50-char cut.
     const gdinoIdentity = desc.gdinoIdentity || null;
     let gdinoPrompt = null;
     if (gdinoIdentity) {
-      const shortClothing = clothing ? String(clothing).split(/[.;]/)[0].trim().slice(0, 50) : '';
+      const shortClothing = _shortGarmentPhrase(clothing);
       gdinoPrompt = shortClothing ? `${gdinoIdentity} wearing ${shortClothing}` : gdinoIdentity;
     }
     chars.push({
