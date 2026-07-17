@@ -109,6 +109,14 @@ export interface ExperimentResult {
   storedSceneDescription?: string | null;
   // scene_expansion_ab: variant B rides alongside the standard (A) fields
   variantVersionIndex?: number;
+  comparedVersions?: { original: number | string; repaired: number };
+  note?: string;
+  active?: { activeVersion: number | null; pinned: boolean } | null;
+  consolidateError?: string | null;
+  skipped?: boolean;
+  boxSource?: string;
+  cost?: number;
+  crop?: { x: number; y: number; w: number; h: number };
   variantScores?: ExperimentResult['scores'];
   newSceneDescriptionA?: string | null;
   newSceneDescriptionB?: string | null;
@@ -153,7 +161,7 @@ export const TESTLAB_STAGES = [
   { id: 'inpaint', label: 'Inpaint repair', producesImage: true, overridable: false },
   { id: 'iterate', label: 'Iterate (full regen)', producesImage: true, overridable: false },
   { id: 'repair_round', label: 'Auto repair round', producesImage: true, overridable: false },
-  { id: 'edit_image', label: 'Edit image (freeform)', producesImage: true, overridable: true },
+  { id: 'edit_image', label: 'Edit image (freeform)', producesImage: true, overridable: true, noTemplate: true },
   { id: 'artifact_repair', label: 'Artifact repair (grid)', producesImage: true, overridable: false },
   { id: 'scale_repair', label: 'Scale repair (bg figures)', producesImage: true, overridable: false },
   { id: 'style_transfer', label: 'Style transfer', producesImage: true, overridable: false },
@@ -215,10 +223,10 @@ export const testlabService = {
     return api.get<ExperimentDetail>(`/api/admin/testlab/experiments/${id}`);
   },
 
-  redo(experimentId: number, resultIndex: number, promptOverride?: string | null) {
+  redo(experimentId: number, resultIndex: number, promptOverride?: string | null, useCurrentTemplates?: boolean) {
     return api.post<{ started: boolean }>(
       `/api/admin/testlab/experiments/${experimentId}/redo`,
-      { resultIndex, promptOverride: promptOverride || undefined }
+      { resultIndex, promptOverride: promptOverride || undefined, ...(useCurrentTemplates ? { useCurrentTemplates: true } : {}) }
     );
   },
 
@@ -231,6 +239,12 @@ export const testlabService = {
   getBaselineImage(storyId: string, pageNumber: number) {
     return api.get<{ imageData: string }>(
       `/api/admin/testlab/baseline-image/${encodeURIComponent(storyId)}/${pageNumber}`
+    );
+  },
+
+  getBaselineCover(storyId: string, coverType: string) {
+    return api.get<{ imageData: string }>(
+      `/api/admin/testlab/baseline-cover/${encodeURIComponent(storyId)}/${coverType}`
     );
   },
 

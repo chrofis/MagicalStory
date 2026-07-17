@@ -264,6 +264,7 @@ async function executeExperiment(experimentId, stage, targets, opts) {
 // POST /api/admin/testlab/experiments
 // body: { stage, label?, promptOverride?, params?, targets?: [{storyId,pageNumber}], benchmarkIds?: [id] }
 router.post('/experiments', async (req, res) => {
+  let runnerStarted = false;
   try {
     const { stage, label, promptOverride, params, benchmarkIds } = req.body;
     const { STAGES } = require('../../lib/testlab');
@@ -273,6 +274,9 @@ router.post('/experiments', async (req, res) => {
     if (experimentRunning) {
       return res.status(409).json({ error: 'Another experiment is already running — wait for it to finish' });
     }
+    // Claim the single-flight slot NOW — the awaits below (benchmark resolve,
+    // INSERT) left a window where two rapid POSTs both passed the check.
+    experimentRunning = true;
 
     let targets = Array.isArray(req.body.targets) ? req.body.targets : [];
     if (Array.isArray(benchmarkIds) && benchmarkIds.length > 0) {
@@ -300,8 +304,8 @@ router.post('/experiments', async (req, res) => {
         .map(t => ({ storyId: String(t.storyId), pageNumber: parseInt(t.pageNumber, 10) }))
         .filter(t => t.storyId && Number.isFinite(t.pageNumber));
     }
-    if (targets.length === 0) return res.status(400).json({ error: 'No valid targets' });
-    if (targets.length > 25) return res.status(400).json({ error: 'Max 25 targets per experiment' });
+    if (targets.length === 0) { experimentRunning = false; return res.status(400).json({ error: 'No valid targets' }); }
+    if (targets.length > 25) { experimentRunning = false; return res.status(400).json({ error: 'Max 25 targets per experiment' }); }
 
     const rows = await dbQuery(
       `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by)
@@ -311,6 +315,7 @@ router.post('/experiments', async (req, res) => {
     const experimentId = rows[0].id;
 
     // Fire and forget — client polls GET /experiments/:id.
+    runnerStarted = true;
     executeExperiment(experimentId, stage, targets, {
       promptOverride: promptOverride || null,
       params: params || {},
@@ -320,6 +325,8 @@ router.post('/experiments', async (req, res) => {
     log.info(`[TESTLAB] Experiment ${experimentId} started: stage=${stage}, targets=${targets.length}, override=${promptOverride ? 'yes' : 'no'}`);
     res.json({ id: experimentId, stage, targets });
   } catch (err) {
+    // Release the slot only if the runner never started (its finally owns it after).
+    if (!runnerStarted) experimentRunning = false;
     log.error(`[TESTLAB] create experiment failed: ${err.message}`);
     res.status(500).json({ error: 'Failed to create experiment', details: err.message });
   }
@@ -328,6 +335,15 @@ router.post('/experiments', async (req, res) => {
 // GET /api/admin/testlab/experiments
 router.get('/experiments', async (req, res) => {
   try {
+    // Reap zombies: 'running' rows survive a server restart forever (the
+    // single-flight flag is in-process). If nothing is running in THIS
+    // process, anything still 'running' after 2h died with a previous one.
+    if (!experimentRunning) {
+      await dbQuery(
+        `UPDATE testlab_experiments SET status = 'failed', error = 'server restarted mid-run', completed_at = NOW()
+         WHERE status = 'running' AND created_at < NOW() - INTERVAL '2 hours'`
+      ).catch(() => {});
+    }
     const rows = await dbQuery(
       `SELECT id, stage, label, status, created_by, created_at, completed_at,
               (prompt_override IS NOT NULL) AS has_override,
@@ -420,9 +436,17 @@ async function executeRedo(experimentId, exp, entry, resultIndex, override) {
       } else if (entry.character && exp.stage === 'avatar_realistic') {
         redo = await runStageOnTarget('avatar_realistic', { storyId: entry.storyId, character: entry.character }, { experimentId });
       } else if (entry.character) {
-        // Other character-target stages (avatar_eval, future ones).
+        // Other character-target stages (avatar_eval, future ones). Per-entry
+        // fields (evaluated sheet version, styled flag) win over experiment
+        // params so an API-created per-target run redoes the SAME unit.
         redo = await runStageOnTarget(exp.stage, { storyId: entry.storyId, character: entry.character }, {
-          experimentId, promptOverride: override, params: exp.params || {},
+          experimentId, promptOverride: override,
+          params: {
+            ...(exp.params || {}),
+            ...(entry.versionIndex != null ? { versionIndex: entry.versionIndex } : {}),
+            ...(entry.styled != null ? { styled: entry.styled } : {}),
+            ...(entry.realisticVersionIndex != null ? { realisticVersionIndex: entry.realisticVersionIndex } : {}),
+          },
         });
       } else if (entry.coverType || ['cover', 'style_check'].includes(exp.stage)) {
         // Story-level stages: no page context.
@@ -468,7 +492,12 @@ router.post('/experiments/:id/redo', async (req, res) => {
       return res.status(429).json({ error: `Max ${MAX_CONCURRENT_REDOS} redos at a time — wait for one to finish` });
     }
     redosInFlight++;
-    const override = promptOverride ?? exp.prompt_override ?? null;
+    // Override precedence: explicit text > experiment's stored override.
+    // useCurrentTemplates: true redoes with the CURRENT deployed templates
+    // even when the experiment has a stored A/B override.
+    const override = req.body.useCurrentTemplates === true
+      ? null
+      : (promptOverride ?? exp.prompt_override ?? null);
     // Fire and forget — the client polls GET /experiments/:id for the new entry.
     executeRedo(experimentId, exp, entry, resultIndex, override);
     res.json({ started: true });
@@ -494,6 +523,33 @@ router.get('/test-image/:storyId/:imageType/:pageNumber/:versionIndex', async (r
     res.json({ imageData: img.imageData, isTest: img.isTest, experimentId: img.experimentId });
   } catch (err) {
     res.status(500).json({ error: 'Failed to load image', details: err.message });
+  }
+});
+
+// GET /api/admin/testlab/baseline-cover/:storyId/:coverType — active cover
+// (pinned version from image_version_meta, else newest non-test row).
+router.get('/baseline-cover/:storyId/:coverType', async (req, res) => {
+  try {
+    const { storyId, coverType } = req.params;
+    if (!['frontCover', 'initialPage', 'backCover'].includes(coverType)) {
+      return res.status(400).json({ error: 'coverType must be frontCover|initialPage|backCover' });
+    }
+    const metaRows = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [storyId]);
+    const activeVersion = metaRows[0]?.image_version_meta?.[coverType]?.activeVersion;
+    const rows = await dbQuery(
+      `SELECT image_data, image_url FROM story_images
+       WHERE story_id = $1 AND image_type = $2 AND page_number IS NULL AND NOT is_test
+       ${activeVersion != null ? 'AND version_index = $3' : ''}
+       ORDER BY version_index DESC LIMIT 1`,
+      activeVersion != null ? [storyId, coverType, activeVersion] : [storyId, coverType]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'No cover stored' });
+    const { imgBytesAsync } = require('../../services/database');
+    const imageData = await imgBytesAsync({ image_data: rows[0].image_data, image_url: rows[0].image_url });
+    if (!imageData) return res.status(404).json({ error: 'Cover bytes unavailable' });
+    res.json({ imageData });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load cover', details: err.message });
   }
 });
 
