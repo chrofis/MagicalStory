@@ -294,6 +294,7 @@ function ExperimentsTab() {
   const [override, setOverride] = useState('');
   const [autoEval, setAutoEval] = useState(true);
   const [charName, setCharName] = useState('');
+  const [repairBackend, setRepairBackend] = useState('grok');
   const [paramsJson, setParamsJson] = useState('');
   const [storyIdInput, setStoryIdInput] = useState('');
   const [coverType, setCoverType] = useState('frontCover');
@@ -365,6 +366,7 @@ function ExperimentsTab() {
     try {
       let params: Record<string, unknown> = { autoEval };
       if (needsCharacter) params.characterName = charName.trim();
+      if (stage === 'char_repair') params.backend = repairBackend;
       if (stage === 'cover') params.coverType = coverType;
       if (paramsJson.trim()) {
         try { params = { ...params, ...JSON.parse(paramsJson) }; }
@@ -430,6 +432,13 @@ function ExperimentsTab() {
               onChange={e => setCharName(e.target.value)}
             />
           ))}
+          {stage === 'char_repair' && (
+            <select className="border rounded-lg px-3 py-2 text-sm" value={repairBackend} onChange={e => setRepairBackend(e.target.value)}>
+              <option value="grok">Grok (blended)</option>
+              <option value="gemini">Gemini</option>
+              <option value="qwen">Qwen (crop insert)</option>
+            </select>
+          )}
           {stage === 'cover' && (
             <select className="border rounded-lg px-3 py-2 text-sm" value={coverType} onChange={e => setCoverType(e.target.value)}>
               <option value="frontCover">Front cover</option>

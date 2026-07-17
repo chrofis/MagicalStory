@@ -437,8 +437,8 @@ async function runBboxStage(ctx, { experimentId }) {
   return {
     elapsedMs,
     detectionBackend: result.detectionBackend || null,
-    figures: (result.figures || []).map(f => ({ name: f.name, bbox: f.bbox || f.box_2d, faceBbox: f.faceBbox || null, confidence: f.confidence })),
-    objects: (result.objects || []).map(o => ({ name: o.name, bbox: o.bbox || o.box_2d })),
+    figures: (result.figures || []).map(f => ({ name: f.name, bbox: f.bodyBox || f.bbox || f.box_2d, faceBbox: f.faceBox || f.faceBbox || null, confidence: f.confidence })),
+    objects: (result.objects || []).map(o => ({ name: o.name, bbox: o.bodyBox || o.bbox || o.box_2d })),
   };
 }
 
@@ -448,11 +448,13 @@ async function runBboxStage(ctx, { experimentId }) {
  * {bbox, faceBbox, source} or null.
  */
 async function resolveCharacterBox(ctx, imageData, charName) {
+  // Figure boxes appear as bodyBox/faceBox (detection contract) or bbox/box_2d
+  // (older records / repair params) depending on the writer.
   const fromDet = (det) => {
     const fig = (det?.figures || det?.characters || []).find(f => (f.name || '').toLowerCase() === charName.toLowerCase());
     if (!fig) return null;
-    const bbox = fig.bbox || fig.box_2d || null;
-    return bbox?.length === 4 ? { bbox, faceBbox: fig.faceBbox || null } : null;
+    const bbox = fig.bodyBox || fig.bbox || fig.box_2d || null;
+    return bbox?.length === 4 ? { bbox, faceBbox: fig.faceBox || fig.faceBbox || null } : null;
   };
   const stored = fromDet(ctx.scene.bboxDetection);
   if (stored) return { ...stored, source: 'stored' };
@@ -472,13 +474,21 @@ async function resolveCharacterBox(ctx, imageData, charName) {
   return fresh ? { ...fresh, source: 'fresh-detection' } : null;
 }
 
-async function runCharRepairStage(ctx, { experimentId, params = {} }) {
+async function runCharRepairStage(ctx, opts) {
+  const { experimentId, params = {} } = opts;
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { repairCharacterMismatch } = require('./images');
 
   const charName = params.characterName;
   if (!charName) throw new Error('char_repair requires params.characterName');
+
+  // backend 'qwen' → crop-bounded Qwen re-insertion at the character's box
+  // (runQwenInsertStage with base 'active'; crop auto-resolves from detection).
+  if (params.backend === 'qwen') {
+    const r = await runQwenInsertStage(ctx, { ...opts, params: { ...params, base: params.base || 'active' } });
+    return { ...r, backend: 'qwen', repairMode: 'qwen-insert' };
+  }
 
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
   const ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === charName.toLowerCase());
