@@ -152,6 +152,8 @@ export const TESTLAB_STAGES = [
   { id: 'pick_best', label: 'Pick-best report', producesImage: false, overridable: false },
   { id: 'scene_expansion', label: 'Scene expansion (Art Director)', producesImage: false, overridable: true },
   { id: 'scene_description', label: 'Scene description (iterate)', producesImage: false, overridable: true },
+  { id: 'rewrite_blocked', label: 'Rewrite blocked scene', producesImage: false, overridable: true },
+  { id: 'repair_verify', label: 'Repair verification (diff)', producesImage: true, overridable: false },
   { id: 'cover', label: 'Cover render', producesImage: true, overridable: true, storyLevel: true },
   { id: 'style_check', label: 'Style consistency check', producesImage: false, overridable: false, storyLevel: true },
 ] as const;

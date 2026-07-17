@@ -111,6 +111,7 @@ const STAGE_TEMPLATE_KEYS = {
   semantic_eval: 'imageSemantic',
   scene_expansion: 'sceneExpansion',
   scene_description: 'sceneIteration',
+  rewrite_blocked: 'rewriteBlockedScene',
   // Cover prefill shows the front-cover template; the override replaces
   // whichever cover template the target's coverType selects.
   cover: 'frontCover',

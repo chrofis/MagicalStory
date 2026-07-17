@@ -1070,6 +1070,71 @@ async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, par
   };
 }
 
+/** Rewrite a provider-blocked scene description (rewrite-blocked-scene.txt). */
+async function runRewriteBlockedStage(ctx, { experimentId, promptOverride, params = {} }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { callTextModel } = require('./textModels');
+
+  // Prompt built explicitly (no PROMPT_TEMPLATES swap across the model await).
+  const template = promptOverride || PROMPT_TEMPLATES.rewriteBlockedScene;
+  if (!template) throw new Error('rewriteBlockedScene template not loaded');
+  const prompt = fillTemplate(template, { SCENE_DESCRIPTION: ctx.scene.sceneDescription || '' });
+
+  const t0 = Date.now();
+  const result = await callTextModel(prompt, 1000, null, { usageLabel: 'testlab_scene_rewrite' });
+  return {
+    elapsedMs: Date.now() - t0,
+    promptUsed: prompt,
+    newSceneDescription: (result?.text || '').trim() || null,
+    storedSceneDescription: ctx.scene.sceneDescription || null,
+  };
+}
+
+/**
+ * Repair verification on two stored versions of a page: diff image + Gemini
+ * verdict (same core the automatic repair chain uses). params:
+ * {originalVersionIndex?, repairedVersionIndex, issueType?, issueDescription?}.
+ */
+async function runRepairVerifyStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { verifyRepairWithGemini, createDiffImage } = require('./repairVerification');
+  const r2Lib = require('./r2');
+
+  const repairedIdx = params.repairedVersionIndex;
+  if (repairedIdx == null) throw new Error('repair_verify requires params.repairedVersionIndex (a test or stored version)');
+  const repaired = await loadTestImage(ctx.storyId, 'scene', ctx.pageNumber, repairedIdx);
+  if (!repaired?.imageData) throw new Error(`scene v${repairedIdx} not found`);
+  const original = params.originalVersionIndex != null
+    ? (await loadTestImage(ctx.storyId, 'scene', ctx.pageNumber, params.originalVersionIndex))?.imageData
+    : await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  if (!original) throw new Error('original image not found');
+
+  const toBuf = (d) => Buffer.from(r2Lib.stripDataUriPrefix(d), 'base64');
+  const issue = { type: params.issueType || 'object', description: params.issueDescription || 'repair quality check' };
+
+  const t0 = Date.now();
+  const [verdict, diff] = await Promise.all([
+    verifyRepairWithGemini(toBuf(original), toBuf(repaired.imageData), issue),
+    createDiffImage(toBuf(original), toBuf(repaired.imageData)).catch(() => null),
+  ]);
+  const elapsedMs = Date.now() - t0;
+
+  let diffVersionIndex;
+  if (diff) {
+    const diffUri = `data:image/jpeg;base64,${Buffer.isBuffer(diff) ? diff.toString('base64') : diff}`;
+    diffVersionIndex = await saveTestVersion(ctx.storyId, 'tl_diff', ctx.pageNumber, diffUri, experimentId);
+  }
+  return {
+    elapsedMs,
+    imageType: diffVersionIndex !== undefined ? 'tl_diff' : undefined,
+    versionIndex: diffVersionIndex,
+    report: verdict,
+    comparedVersions: { original: params.originalVersionIndex ?? 'active', repaired: repairedIdx },
+  };
+}
+
 /** Standalone avatar-sheet evaluation on a stored tl_avatar test version. */
 async function runAvatarEvalStage(target, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
@@ -1126,6 +1191,8 @@ const STAGE_RUNNERS = {
   pick_best: runPickBestStage,
   scene_expansion: runSceneExpansionStage,
   scene_description: runSceneDescriptionStage,
+  rewrite_blocked: runRewriteBlockedStage,
+  repair_verify: runRepairVerifyStage,
 };
 
 // Story-level stages: target {storyId} (+ coverType for cover). No page context.
