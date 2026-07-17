@@ -1346,9 +1346,14 @@ def figure_mask_endpoint():
     {
         "image": "data:image/jpeg;base64,...",  # crop of the scene
         "box": [x1, y1, x2, y2],                # figure bbox in crop pixel coords
+        "points": [[x, y], ...],                # optional point prompts (pixel coords)
+        "point_labels": [1, ...],               # optional per-point labels (1=fg, 0=bg)
         "color": [255, 255, 255],               # fill RGB (default white)
         "alpha": 255                            # fill alpha (default solid)
     }
+
+    box and points may be combined (face-anchored figure mask) or either used
+    alone; at least one is required.
 
     Returns: { "success": true, "image": "data:image/png;base64,...", "fill_pixels": N }
     """
@@ -1357,8 +1362,14 @@ def figure_mask_endpoint():
         if not data or 'image' not in data:
             return jsonify({"success": False, "error": "No image provided"}), 400
         box = data.get('box')
-        if not (isinstance(box, list) and len(box) == 4):
-            return jsonify({"success": False, "error": "box [x1,y1,x2,y2] required"}), 400
+        points = data.get('points')
+        if box is not None and not (isinstance(box, list) and len(box) == 4):
+            return jsonify({"success": False, "error": "box must be [x1,y1,x2,y2]"}), 400
+        if points is not None and not (isinstance(points, list) and len(points) > 0
+                                       and all(isinstance(p, list) and len(p) == 2 for p in points)):
+            return jsonify({"success": False, "error": "points must be [[x,y],...]"}), 400
+        if box is None and points is None:
+            return jsonify({"success": False, "error": "box or points required"}), 400
 
         try:
             model = get_mobilesam()
@@ -1380,12 +1391,23 @@ def figure_mask_endpoint():
             return jsonify({"success": False, "error": "Failed to decode image"}), 400
         h, w = img.shape[:2]
 
-        # Clamp box to image bounds
-        x1 = max(0, min(w - 1, int(box[0]))); y1 = max(0, min(h - 1, int(box[1])))
-        x2 = max(x1 + 1, min(w, int(box[2]))); y2 = max(y1 + 1, min(h, int(box[3])))
+        # Build prompt kwargs — box and/or points, both clamped to image bounds.
+        prompt_kwargs = {}
+        box_str = 'none'
+        if box is not None:
+            x1 = max(0, min(w - 1, int(box[0]))); y1 = max(0, min(h - 1, int(box[1])))
+            x2 = max(x1 + 1, min(w, int(box[2]))); y2 = max(y1 + 1, min(h, int(box[3])))
+            prompt_kwargs['bboxes'] = [[x1, y1, x2, y2]]
+            box_str = f"({x1},{y1},{x2},{y2})"
+        if points is not None:
+            pts = [[max(0, min(w - 1, int(p[0]))), max(0, min(h - 1, int(p[1])))] for p in points]
+            raw_labels = data.get('point_labels')
+            labels = [int(l) for l in raw_labels] if isinstance(raw_labels, list) and len(raw_labels) == len(pts) else [1] * len(pts)
+            prompt_kwargs['points'] = pts
+            prompt_kwargs['labels'] = labels
 
         # imgsz 1024 keeps memory bounded (16GB rule); measured 573MB peak
-        results = model(img, bboxes=[[x1, y1, x2, y2]], imgsz=1024, verbose=False)
+        results = model(img, imgsz=1024, verbose=False, **prompt_kwargs)
         res = results[0]
         if res.masks is None or len(res.masks.data) == 0:
             return jsonify({"success": False, "error": "no mask returned"}), 200
@@ -1403,7 +1425,8 @@ def figure_mask_endpoint():
 
         _, buffer = cv2.imencode('.png', out, [cv2.IMWRITE_PNG_COMPRESSION, 9])
         fill_pixels = int(binary.sum())
-        print(f"[FIGURE-MASK] {w}x{h} crop, box=({x1},{y1},{x2},{y2}), fill px={fill_pixels}, out={len(buffer)//1024}KB")
+        pts_str = f", points={prompt_kwargs.get('points')}" if 'points' in prompt_kwargs else ''
+        print(f"[FIGURE-MASK] {w}x{h} crop, box={box_str}{pts_str}, fill px={fill_pixels}, out={len(buffer)//1024}KB")
         return jsonify({
             "success": True,
             "image": f"data:image/png;base64,{base64.b64encode(buffer).decode('utf-8')}",
