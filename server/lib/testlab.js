@@ -1077,6 +1077,93 @@ async function runSceneExpansionStage(ctx, { experimentId, promptOverride, param
   };
 }
 
+/**
+ * Scene-expansion A/B with images: run the Art Director twice on the same
+ * page — variant A = current scene-expansion template, variant B = template
+ * + an extra rule (params.extraRule; promptOverride, when set, IS the full
+ * variant-B template) — then render one image per resulting scene
+ * description. Both images save as test versions; the result carries both
+ * pointers for a side-by-side card.
+ *
+ * Default extraRule tests the near-touch choreography fix: "reaching toward
+ * but not touching" specs collapse into touching in generated images, then
+ * fail evaluation round after round.
+ */
+const DEFAULT_AB_EXTRA_RULE = 'Interactions must show either clear contact or clear separation; never a hand reaching toward another character without touching.';
+
+async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, params = {} }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
+  const { callTextModel } = require('./textModels');
+  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+
+  const characters = (storyData.characters || []).filter(c =>
+    (ctx.scene.sceneCharacters || []).some(sc => (sc.name || sc) === c.name)
+  );
+  const availableAvatars = buildAvailableAvatarsForPrompt
+    ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
+    : '';
+
+  const baseTemplate = PROMPT_TEMPLATES.sceneExpansion;
+  const extraRule = params.extraRule || DEFAULT_AB_EXTRA_RULE;
+  const variantTemplate = promptOverride || `${baseTemplate}\n${extraRule}`;
+
+  // Build both prompts with the same safe synchronous swap window.
+  const buildWith = (template) => {
+    const orig = PROMPT_TEMPLATES.sceneExpansion;
+    PROMPT_TEMPLATES.sceneExpansion = template;
+    try {
+      return buildSceneExpansionPrompt(
+        ctx.pageNumber,
+        ctx.scene.text || '',
+        characters.length ? characters : (storyData.characters || []),
+        ctx.language,
+        ctx.visualBible,
+        availableAvatars,
+        null,
+        { artStyleId: ctx.artStyle, referencePhotos: ctx.referencePhotos }
+      );
+    } finally {
+      PROMPT_TEMPLATES.sceneExpansion = orig;
+    }
+  };
+  const promptA = buildWith(baseTemplate);
+  const promptB = buildWith(variantTemplate);
+
+  const t0 = Date.now();
+  const [resA, resB] = await Promise.all([
+    callTextModel(promptA, 10000, null, { usageLabel: 'testlab_scene_expansion_ab' }),
+    callTextModel(promptB, 10000, null, { usageLabel: 'testlab_scene_expansion_ab' }),
+  ]);
+
+  // Render each variant's scene description through the standard image stage
+  // (shallow ctx clone with the description swapped — reuses refs, VB grid,
+  // background anchor, eval, and test-version storage unchanged).
+  const renderFor = (sceneDescription) => runImageStage(
+    { ...ctx, scene: { ...ctx.scene, sceneDescription } },
+    { experimentId, autoEval: params.autoEval !== false, params: {} }
+  );
+  const imgA = await renderFor(resA.text);
+  const imgB = await renderFor(resB.text);
+  const elapsedMs = Date.now() - t0;
+
+  return {
+    imageType: 'scene',
+    // A occupies the standard slot (versionIndex) so existing promote/render
+    // paths work; B rides in variant fields.
+    versionIndex: imgA.versionIndex,
+    variantVersionIndex: imgB.versionIndex,
+    scores: imgA.scores,
+    variantScores: imgB.scores,
+    newSceneDescriptionA: resA.text,
+    newSceneDescriptionB: resB.text,
+    extraRule,
+    elapsedMs,
+    modelId: imgA.modelId || null,
+  };
+}
+
 /** Re-run the scene-description regen (scene-iteration.txt, same as /regenerate/scene-description). */
 async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, params = {} }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
@@ -1366,6 +1453,7 @@ const STAGE_RUNNERS = {
   style_transfer: runStyleTransferStage,
   pick_best: runPickBestStage,
   scene_expansion: runSceneExpansionStage,
+  scene_expansion_ab: runSceneExpansionAbStage,
   scene_description: runSceneDescriptionStage,
   rewrite_blocked: runRewriteBlockedStage,
   repair_verify: runRepairVerifyStage,

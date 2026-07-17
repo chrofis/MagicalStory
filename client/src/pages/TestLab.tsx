@@ -674,6 +674,7 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
 function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { result: ExperimentResult; stage: string; onRedo?: () => void; redoing?: boolean; isRedo?: boolean; superseded?: boolean }) {
   const [baseline, setBaseline] = useState<string | null>(null);
   const [variant, setVariant] = useState<string | null>(null);
+  const [variantB, setVariantB] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [promoted, setPromoted] = useState(false);
@@ -708,6 +709,13 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
         const v = await testlabService.getTestImage(result.storyId, result.imageType!, isAvatar || isCover ? null : result.pageNumber ?? null, result.versionIndex!);
         setVariant(v.imageData);
       } catch { setVariant(''); }
+    }
+    // scene_expansion_ab: second (rule-variant) image rides in variantVersionIndex
+    if (result.variantVersionIndex !== undefined) {
+      try {
+        const vb = await testlabService.getTestImage(result.storyId, result.imageType!, result.pageNumber ?? null, result.variantVersionIndex);
+        setVariantB(vb.imageData);
+      } catch { setVariantB(''); }
     }
   };
 
@@ -770,7 +778,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
               {isAvatar ? 'Load avatar sheets' : producesImage ? 'Load baseline vs variant' : 'Load page image'}
             </button>
           ) : (
-            <div className={`grid gap-4 mt-3 ${producesImage && !isPass1 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+            <div className={`grid gap-4 mt-3 ${result.variantVersionIndex !== undefined ? 'grid-cols-1 md:grid-cols-3' : producesImage && !isPass1 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
               {!isPass1 && (
                 <div>
                   <div className="text-xs font-medium text-gray-500 mb-1">{isAvatar ? 'Realistic anchor (pass 1)' : 'Baseline (active version)'}</div>
@@ -779,13 +787,26 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
               )}
               {producesImage && (
                 <div>
-                  <div className="text-xs font-medium text-gray-500 mb-1">{isPass1 ? `Realistic anchor (pass 1, test v${result.versionIndex})` : isAvatar ? `Styled sheet (pass 2, test v${result.versionIndex})` : `Variant (test v${result.versionIndex})`}</div>
+                  <div className="text-xs font-medium text-gray-500 mb-1">{isPass1 ? `Realistic anchor (pass 1, test v${result.versionIndex})` : isAvatar ? `Styled sheet (pass 2, test v${result.versionIndex})` : result.variantVersionIndex !== undefined ? `A: current template (test v${result.versionIndex})` : `Variant (test v${result.versionIndex})`}</div>
                   {variant ? <img src={variant} alt="variant" className="rounded-lg w-full" /> : <div className="text-xs text-gray-400">unavailable</div>}
+                  {result.variantVersionIndex !== undefined && result.scores?.final != null && (
+                    <div className="text-xs text-gray-600 mt-1">final {result.scores.final}</div>
+                  )}
                   {promotable && !promoted && (
                     <div className="mt-2">
                       <Button variant="secondary" size="sm" onClick={promote}>Promote to story</Button>
                     </div>
                   )}
+                </div>
+              )}
+              {result.variantVersionIndex !== undefined && (
+                <div>
+                  <div className="text-xs font-medium text-gray-500 mb-1">B: with extra rule (test v{result.variantVersionIndex})</div>
+                  {variantB ? <img src={variantB} alt="variant B" className="rounded-lg w-full" /> : <div className="text-xs text-gray-400">unavailable</div>}
+                  {result.variantScores?.final != null && (
+                    <div className="text-xs text-gray-600 mt-1">final {result.variantScores.final}</div>
+                  )}
+                  {result.extraRule && <div className="text-[11px] text-gray-400 mt-1 italic">{result.extraRule}</div>}
                 </div>
               )}
             </div>
@@ -797,7 +818,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
               {result.skippedRepair && <span className="text-gray-400"> (nothing to repair)</span>}
             </div>
           )}
-          {(result.issuesSummary || result.semanticIssues?.length || result.figures?.length || result.report || result.fixableIssues?.length || result.promptUsed || result.plan || result.textZone || result.newSceneDescription || result.versions?.length || result.inpaintInstruction || result.artifactRepair) && (
+          {(result.issuesSummary || result.semanticIssues?.length || result.figures?.length || result.report || result.fixableIssues?.length || result.promptUsed || result.plan || result.textZone || result.newSceneDescription || result.newSceneDescriptionA || result.versions?.length || result.inpaintInstruction || result.artifactRepair) && (
             <div className="mt-3">
               <button className="text-xs text-indigo-600 hover:underline" onClick={() => setShowDetails(v => !v)}>
                 {showDetails ? 'Hide' : 'Show'} details
@@ -847,6 +868,18 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
                       <div>
                         <div className="text-xs font-medium text-gray-500 mb-1">New (this run)</div>
                         <pre className="text-xs bg-indigo-50 rounded-lg p-3 overflow-x-auto max-h-64 whitespace-pre-wrap">{result.newSceneDescription}</pre>
+                      </div>
+                    </div>
+                  )}
+                  {result.newSceneDescriptionA && (
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-xs font-medium text-gray-500 mb-1">Scene description A (current template)</div>
+                        <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64 whitespace-pre-wrap">{result.newSceneDescriptionA}</pre>
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-gray-500 mb-1">Scene description B (with extra rule)</div>
+                        <pre className="text-xs bg-indigo-50 rounded-lg p-3 overflow-x-auto max-h-64 whitespace-pre-wrap">{result.newSceneDescriptionB}</pre>
                       </div>
                     </div>
                   )}

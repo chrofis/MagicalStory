@@ -107,6 +107,12 @@ export interface ExperimentResult {
   artifactRepair?: { fixedCount: number; failedCount: number; totalIssues: number };
   newSceneDescription?: string | null;
   storedSceneDescription?: string | null;
+  // scene_expansion_ab: variant B rides alongside the standard (A) fields
+  variantVersionIndex?: number;
+  variantScores?: ExperimentResult['scores'];
+  newSceneDescriptionA?: string | null;
+  newSceneDescriptionB?: string | null;
+  extraRule?: string | null;
   versions?: unknown[];
   winner?: unknown;
   styled?: boolean;
@@ -151,6 +157,7 @@ export const TESTLAB_STAGES = [
   { id: 'style_transfer', label: 'Style transfer', producesImage: true, overridable: false },
   { id: 'pick_best', label: 'Pick-best report', producesImage: false, overridable: false },
   { id: 'scene_expansion', label: 'Scene expansion (Art Director)', producesImage: false, overridable: true },
+  { id: 'scene_expansion_ab', label: 'Scene expansion A/B → image (extra-rule test)', producesImage: true, overridable: true },
   { id: 'scene_description', label: 'Scene description (iterate)', producesImage: false, overridable: true },
   { id: 'rewrite_blocked', label: 'Rewrite blocked scene', producesImage: false, overridable: true },
   { id: 'repair_verify', label: 'Repair verification (diff)', producesImage: true, overridable: false },
