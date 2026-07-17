@@ -33,7 +33,7 @@ async function main() {
   const buf = Buffer.from(await (await fetch(url)).arrayBuffer());
   const imageData = `data:image/jpeg;base64,${buf.toString('base64')}`;
 
-  const { detectAllBoundingBoxes, createBboxOverlayImage, buildExpectedCharactersForBbox } = require('../../server/lib/images');
+  const { detectAllBoundingBoxes, createBboxOverlayImage, buildExpectedCharactersForBbox, buildObjectGroundingHints } = require('../../server/lib/images');
   const { buildCharacterDescriptionsForBbox } = require('../../server/lib/storyHelpers');
 
   const expectedPositions = meta.characterPositions || {};
@@ -60,6 +60,7 @@ async function main() {
     expectedCharacters, expectedObjects,
     pageContext: `TEST p${pn}`, skipCache: true,
     artStyle: d.artStyle,
+    objectGroundingHints: buildObjectGroundingHints(expectedObjects, d.visualBible),
   });
   console.log(`\ndetection in ${((Date.now() - t0) / 1000).toFixed(0)}s, backend=${det?.detectionBackend}`);
   console.log('figures:', JSON.stringify(det?.figures?.map(f => ({ name: f.name, bodyBox: f.bodyBox?.map(v => +v.toFixed(3)), face: !!f.faceBox, conf: f.confidence, score: f.score })), null, 1));

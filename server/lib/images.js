@@ -2211,6 +2211,37 @@ function resolveExpectedObjectLabels(entries, visualBible) {
   return out;
 }
 
+/**
+ * Per-label grounding hints for the GroundingDINO object pass. VB names are
+ * story-language (often German), which DINO's English text encoder grounds
+ * poorly — German labels latch onto salient figures instead of the prop. The
+ * VB descriptions are English, so DINO grounds on those. Locations are marked
+ * so the object pass can skip them (a location IS the scene — grounding it
+ * yields a useless whole-frame or random box).
+ *
+ * @returns {Object} label(lowercase) → { text: english description, kind }
+ */
+function buildObjectGroundingHints(entries, visualBible) {
+  const vb = visualBible || {};
+  const byName = new Map();
+  const addPool = (list, kind) => {
+    for (const e of (list || [])) {
+      if (e && e.name) byName.set(String(e.name).toLowerCase(), { text: String(e.description || ''), kind });
+    }
+  };
+  addPool(vb.artifacts, 'artifact');
+  addPool(vb.animals, 'animal');
+  addPool(vb.vehicles, 'vehicle');
+  addPool(vb.secondaryCharacters, 'secondary');
+  addPool(vb.locations, 'location');
+  const hints = {};
+  for (const label of (entries || [])) {
+    const h = byName.get(String(label).toLowerCase());
+    if (h) hints[String(label).toLowerCase()] = h;
+  }
+  return hints;
+}
+
 // Content-hashed bbox cache. Without this, the eval + entity-consistency
 // passes each detect bboxes for the same regenerated image — burning a
 // Gemini call per redundant pair (~$0.30-0.60/story across a 3-pass repair).
@@ -2464,7 +2495,7 @@ function _assignFiguresByLayout(chars, dets) {
 }
 
 async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opts = {}) {
-  const { pageLabel = '', expectedObjects = [] } = opts;
+  const { pageLabel = '', expectedObjects = [], objectGroundingHints = null } = opts;
   if (!Array.isArray(expectedCharacters) || expectedCharacters.length === 0) return null;
 
   // The endpoints need base64 bytes — resolve http(s)/data/base64 to a data URI.
@@ -2609,22 +2640,39 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     masks.push(d.mask?.pngBuf || null);
   });
 
-  // Stage 5 — Visual-Bible objects, grounded individually with a short generic
-  // label. A DINO miss is NOT reported as a missing object (miss ≠ absent —
-  // see docs/decisions.md); unfound objects only appear in the diag.
+  // Stage 5 — Visual-Bible objects, grounded individually. Grounding text is
+  // the English VB description (first clause) when a hint exists — DINO's
+  // English text encoder grounds story-language names (German) onto salient
+  // figures instead of the prop. Locations are skipped (a location IS the
+  // scene). A found box that ≈coincides with a figure is dropped as a
+  // grounding failure. A DINO miss is NOT reported as a missing object
+  // (miss ≠ absent — see docs/decisions.md); unfound objects only appear in
+  // the diag.
   const objects = [];
+  const iouWithFigure = (bodyBox) => Math.max(0, ...figures.map(f =>
+    _boxIouXyxy([bodyBox[1], bodyBox[0], bodyBox[3], bodyBox[2]], [f.bodyBox[1], f.bodyBox[0], f.bodyBox[3], f.bodyBox[2]])));
   for (const raw of expectedObjects) {
     const cleaned = String(raw || '').trim();
     if (!cleaned || /^[A-Z]{3}\d{3}(\.\d+)?$/.test(cleaned)) continue; // opaque VB id — nothing to ground
-    const text = cleaned.split(/[,;(]/)[0].trim().toLowerCase().slice(0, 60);
+    const hint = objectGroundingHints?.[cleaned.toLowerCase()];
+    if (hint?.kind === 'location') { diag.objects.push({ name: cleaned, skipped: 'location' }); continue; }
+    const src = (hint?.text || cleaned);
+    let text = src.split(/[—,;(.]/)[0].trim().toLowerCase();
+    if (text.length > 60) text = text.slice(0, 60).replace(/\s+\S*$/, ''); // word-boundary cap
+    if (!text) text = cleaned.toLowerCase();
     const od = await _gdinoDetect(imageDataUri, [{ name: cleaned, text }]);
     const obj = od?.figures?.[0];
     if (obj?.box && obj.score >= GDINO_OBJECT_MIN_SCORE) {
       const bodyBox = _pxBoxToNorm(obj.box, W, H);
+      const figIou = iouWithFigure(bodyBox);
+      if (figIou > 0.7) {
+        diag.objects.push({ name: cleaned, text, score: +obj.score.toFixed(3), found: false, dropped: `box ≈ figure (IoU ${figIou.toFixed(2)})` });
+        continue;
+      }
       objects.push({ name: cleaned, found: true, label: cleaned, bodyBox, position: lcrOf(bodyBox), score: +obj.score.toFixed(3) });
-      diag.objects.push({ name: cleaned, score: +obj.score.toFixed(3), found: true });
+      diag.objects.push({ name: cleaned, text, score: +obj.score.toFixed(3), found: true });
     } else {
-      diag.objects.push({ name: cleaned, score: obj?.score != null ? +obj.score.toFixed(3) : null, found: false });
+      diag.objects.push({ name: cleaned, text, score: obj?.score != null ? +obj.score.toFixed(3) : null, found: false });
     }
   }
 
@@ -2646,7 +2694,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
  * @returns {Promise<{figures: Array, objects: Array, usage: Object}|null>}
  */
 async function detectAllBoundingBoxes(imageData, options = {}) {
-  const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '', skipCache = false, artStyle = null } = options;
+  const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '', skipCache = false, artStyle = null, objectGroundingHints = null } = options;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
   // Cache check — content-hashed by image bytes + expected names. Hits skip
@@ -2676,7 +2724,7 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
     && !!artStyle && eligibleStyles.includes(String(artStyle).toLowerCase());
   if (gdinoEligible && expectedCharacters.length > 0) {
     try {
-      const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, { pageLabel, expectedObjects });
+      const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, { pageLabel, expectedObjects, objectGroundingHints });
       gdinoDiag = gd?.diag || null;
       if (gd && Array.isArray(gd.figures) && gd.figures.length > 0) {
         // No Haar cascade merge here — faceBoxes come from DINO "face" boxes
@@ -3716,8 +3764,12 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
           const ew = Math.min(width, Math.round(xmax * width) + pad) - ex;
           const eh = Math.min(height, Math.round(ymax * height) + pad) - ey;
           if (ew < 4 || eh < 4) continue;
-          const cut = await sharp(imageBuffer).ensureAlpha()
+          // Two steps — sharp applies extract BEFORE composite regardless of
+          // call order, so masking and cropping must be separate pipelines.
+          const masked = await sharp(imageBuffer).ensureAlpha()
             .composite([{ input: maskPng, blend: 'dest-in' }])
+            .png().toBuffer();
+          const cut = await sharp(masked)
             .extract({ left: ex, top: ey, width: ew, height: eh })
             .resize({ height: STRIP_H - LABEL_H })
             .png().toBuffer();
@@ -3793,7 +3845,7 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
  * @param {Array<{reference: string, type: string, position: string, appearance: string, confidence: number}>} objectMatches - Object/animal/landmark matches from quality eval (legacy, not used)
  * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
-async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null, bboxModelOverride = null, pageContext = '', sharedBboxDetection = null, artStyle = null) {
+async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null, bboxModelOverride = null, pageContext = '', sharedBboxDetection = null, artStyle = null, objectGroundingHints = null) {
   // Build expected characters for bbox detection (AI will identify by name)
   const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing);
 
@@ -3812,7 +3864,8 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
       sceneContext,
       bboxModelOverride,
       pageContext,
-      artStyle
+      artStyle,
+      objectGroundingHints
     });
   }
 
@@ -5873,7 +5926,8 @@ async function evaluateImageBatch(images, options = {}) {
           null,
           `PAGE ${img.pageNumber}`,
           img.sharedBboxDetection || null, // Reuse pre-detected bbox if available
-          artStyle
+          artStyle,
+          buildObjectGroundingHints(allExpectedObjects, visualBible)
         );
         bboxDetection = enrichResult.detectionHistory;
         enrichedFixTargets = enrichResult.targets || [];
@@ -12190,7 +12244,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     const bboxSceneContext = buildBboxSceneContext(sceneMetadata, sceneCharacters, expectedCharacterClothing);
 
     log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}${objectMatches.length > 0 ? `, ${objectMatches.length} object matches` : ''}${allExpectedObjects.length > 0 ? `, ${allExpectedObjects.length} expected objects` : ''}...`);
-    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, allExpectedObjects, characterDescriptions, expectedCharacterClothing, bboxSceneContext, null, pageContext, null, artStyle);
+    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, allExpectedObjects, characterDescriptions, expectedCharacterClothing, bboxSceneContext, null, pageContext, null, artStyle, buildObjectGroundingHints(allExpectedObjects, visualBible));
     bboxDetectionHistory = enrichResult.detectionHistory;
     // Track bbox detection tokens (Gemini quality-category)
     if (bboxDetectionHistory?.usage && usageTracker) {
@@ -15571,6 +15625,7 @@ module.exports = {
   cropImageForSequential,
   compressImageToJPEG,
   buildExpectedCharactersForBbox,
+  buildObjectGroundingHints,
 
   // Core image functions
   validateEmptyScene,
