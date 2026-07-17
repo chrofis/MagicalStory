@@ -609,6 +609,503 @@ async function runAvatarStyleStage(target, { experimentId, promptOverride, param
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Shared loaders for the repair-side stages
+// ─────────────────────────────────────────────────────────────────────
+
+/** Full story data (optionally rehydrated: full or single page). */
+async function loadStoryDataFull(storyId, { pageNumber = null, rehydrate = true } = {}) {
+  const db = require('../services/database');
+  const rows = await db.dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [storyId]);
+  if (!rows.length) throw new Error(`Story ${storyId} not found`);
+  let storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+  if (rehydrate) {
+    storyData = pageNumber != null && typeof db.rehydrateActivePageImage === 'function'
+      ? await db.rehydrateActivePageImage(storyId, storyData, pageNumber)
+      : await db.rehydrateStoryImages(storyId, storyData);
+  }
+  return { storyData, userId: rows[0].user_id };
+}
+
+/**
+ * Rebuild an evaluation-shaped object from the fields persisted on a scene —
+ * what decideRepairMethod / the consolidator / inpaint read in the pipeline.
+ */
+function storedEvalFromScene(scene) {
+  return {
+    qualityScore: scene.qualityScore ?? null,
+    score: scene.qualityScore ?? null,
+    finalScore: scene.finalScore ?? scene.qualityScore ?? null,
+    semanticScore: scene.semanticScore ?? null,
+    scoreBreakdown: scene.scoreBreakdown || null,
+    fixableIssues: scene.fixableIssues || [],
+    issuesSummary: scene.qualityReasoning || scene.issuesSummary || null,
+    semanticResult: scene.semanticResult
+      || (scene.semanticIssues ? { semanticIssues: scene.semanticIssues } : null),
+    consolidatedPlan: scene.consolidatedPlan || null,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Cover + story-level stages
+// ─────────────────────────────────────────────────────────────────────
+
+const COVER_KEYS_SET = new Set(['frontCover', 'initialPage', 'backCover']);
+
+/**
+ * Cover render — same single entry point every production cover path uses
+ * (iterateCover). Target: {storyId, coverType: frontCover|initialPage|backCover}.
+ */
+async function runCoverStage(target, { experimentId, promptOverride, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { iterateCover } = require('./coverIterate');
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const { dbQuery } = require('../services/database');
+
+  const coverKey = params.coverType || target.coverType;
+  if (!COVER_KEYS_SET.has(coverKey)) {
+    throw new Error(`cover requires coverType frontCover|initialPage|backCover (got "${coverKey}")`);
+  }
+  const { storyData, userId } = await loadStoryDataFull(target.storyId);
+
+  // Fresh canonical characters (avatar fallback), same as the regen endpoint.
+  const charRows = await dbQuery('SELECT data FROM characters WHERE user_id = $1', [userId]);
+  const freshCharData = charRows[0]?.data || {};
+  const freshCharacters = (typeof freshCharData === 'string' ? JSON.parse(freshCharData) : freshCharData).characters || [];
+
+  const t0 = Date.now();
+  const result = await iterateCover(coverKey, storyData, {
+    imageModel: MODEL_DEFAULTS.coverImage,
+    freshCharacters,
+    compositeCovers: false,
+    promptTemplateOverride: promptOverride || null,
+  });
+  const elapsedMs = Date.now() - t0;
+  if (!result?.imageData) throw new Error('Cover render returned no image');
+
+  const versionIndex = await saveTestVersion(
+    target.storyId, coverKey, null, result.imageData, experimentId,
+    result.score != null ? Math.round(result.score) : null
+  );
+  return {
+    imageType: coverKey, coverType: coverKey, versionIndex,
+    promptUsed: result.prompt || null, modelId: result.modelId || null, elapsedMs,
+    scores: { final: result.score ?? null },
+    issuesSummary: result.reasoning || null,
+  };
+}
+
+/** Cross-page style consistency check (report only). Target: {storyId}. */
+async function runStyleCheckStage(target, { experimentId }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { checkStoryStyleConsistency } = require('./styleConsistency');
+  const { storyData } = await loadStoryDataFull(target.storyId);
+  const t0 = Date.now();
+  const result = await checkStoryStyleConsistency(storyData);
+  const elapsedMs = Date.now() - t0;
+  const safe = JSON.parse(JSON.stringify(result, (key, value) => {
+    if (typeof value === 'string' && value.startsWith('data:image')) return `[image ${Math.round(value.length / 1024)}KB]`;
+    return value;
+  }));
+  return { elapsedMs, report: safe };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Text-zone + repair-side page stages
+// ─────────────────────────────────────────────────────────────────────
+
+/** Calm-zone detection + white-wash/retry — the production text-space path. */
+async function runTextZoneStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { ensureCalmZone } = require('./textSpaceRepair');
+  const { generateImageOnly } = require('./images');
+  const { getTextAreaMask } = require('./textMasks');
+  const { MODEL_DEFAULTS } = require('../config/models');
+
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  const textPosition = params.textPosition || ctx.textPosition;
+  const textAreaMask = getTextAreaMask(textPosition, ctx.languageLevel);
+
+  // Same wrapper the pipeline builds (ensureCalmZone never imports images.js).
+  const generateImage = (repairPrompt, opts) => generateImageOnly(repairPrompt, ctx.referencePhotos, {
+    landmarkPhotos: ctx.landmarkPhotos,
+    previousImage: opts.previousImage,
+    textAreaMask: opts.textAreaMask,
+    pageNumber: ctx.pageNumber,
+    skipCache: true,
+    aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+  });
+
+  const t0 = Date.now();
+  const result = await ensureCalmZone({
+    imageData,
+    text: ctx.scene.text || '',
+    textPosition,
+    pageNumber: ctx.pageNumber,
+    languageLevel: ctx.languageLevel,
+    textAreaMask,
+    sceneDescription: ctx.scene.sceneDescription || '',
+    generateImage,
+    label: 'TESTLAB-TEXT-SPACE',
+  });
+  const elapsedMs = Date.now() - t0;
+  if (!result?.winnerImageData) throw new Error('ensureCalmZone returned no winner image');
+
+  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, result.winnerImageData, experimentId);
+  return {
+    imageType: 'scene', versionIndex, elapsedMs,
+    textZone: {
+      candidates: (result.candidates || []).map(c => ({
+        source: c.source, position: c.position, rect: c.rect,
+        calmFoundPx: c.calmFoundPx, areaPx: c.areaPx,
+      })),
+      winnerSource: (result.candidates || []).find(c => c.imageData === result.winnerImageData)?.source || null,
+    },
+  };
+}
+
+/** Feedback consolidator on the page's stored eval + entity issues (report only). */
+async function runConsolidateStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { consolidateEvaluation } = require('./feedbackConsolidator');
+  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+
+  const evalResult = params.evaluation || storedEvalFromScene(ctx.scene);
+  const t0 = Date.now();
+  const result = await consolidateEvaluation({
+    evalResult,
+    entityIssues: params.entityIssues || [],
+    sceneDescription: ctx.scene.sceneDescription || '',
+    characters: storyData.characters || [],
+    storyId: ctx.storyId,
+    pageNumber: ctx.pageNumber,
+    round: 0,
+  });
+  const elapsedMs = Date.now() - t0;
+  return { elapsedMs, plan: result?.plan || null, dedupedIssues: result?.dedupedIssues || null, skipped: !!result?.skipped, consolidateError: result?.error || null };
+}
+
+/** Targeted inpaint from the stored (or supplied) eval — the pipeline's inpaintPage. */
+async function runInpaintStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { inpaintPage } = require('./images');
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  const evaluation = params.evaluation || storedEvalFromScene(ctx.scene);
+
+  const t0 = Date.now();
+  const result = await inpaintPage(imageData, evaluation, {
+    visualBible: ctx.visualBible,
+    characters: storyData.characters || [],
+    pageNumber: ctx.pageNumber,
+    sceneDescription: ctx.scene.sceneDescription || '',
+    artStyle: ctx.artStyle,
+    clothingRequirements: storyData.clothingRequirements || null,
+    storyId: ctx.storyId,
+    aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+  });
+  const elapsedMs = Date.now() - t0;
+  if (!result?.repaired || !result?.imageData) {
+    throw new Error(result?.error || 'inpaint produced no result (nothing actionable?)');
+  }
+
+  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, result.imageData, experimentId);
+  return {
+    imageType: 'scene', versionIndex, elapsedMs,
+    inpaintInstruction: result.instruction || null,
+    plan: result.consolidatedPlan || null,
+  };
+}
+
+/** Full page re-render via the iterate path (iteratePageCore). */
+async function runIterateStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { iteratePageCore } = require('./images');
+  const { storyData } = await loadStoryDataFull(ctx.storyId, { pageNumber: ctx.pageNumber });
+
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  const t0 = Date.now();
+  const result = await iteratePageCore(imageData, ctx.pageNumber, storyData, {
+    evaluationFeedback: params.feedback || null,
+    useOriginalAsReference: params.useOriginalAsReference === true,
+    freeIterate: params.freeIterate === true,
+    aspectRatio: ctx.layout?.imageAspect || null,
+  });
+  const elapsedMs = Date.now() - t0;
+  if (!result?.imageData) throw new Error('iterate produced no image');
+
+  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, result.imageData, experimentId);
+  return {
+    imageType: 'scene', versionIndex, elapsedMs, modelId: result.modelId || null,
+    promptUsed: result.imagePrompt || null,
+    newSceneDescription: result.newScene || null,
+  };
+}
+
+/**
+ * ONE full automatic repair round on one page, exactly as the pipeline decides:
+ * stored eval + entity report → decideRepairMethod → inpaint / iterate /
+ * char-fix (auto mode). The truest test of the automatic repair chain.
+ */
+async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { decideRepairMethod } = require('./repairLogic');
+  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+
+  const latestEval = params.evaluation || storedEvalFromScene(ctx.scene);
+  const entityReport = params.entityReport || storyData.finalChecksReport?.entity || null;
+  const decision = decideRepairMethod(ctx.pageNumber, latestEval, entityReport);
+
+  const base = { decision: { method: decision.method, reason: decision.reason, charName: decision.charName || null } };
+  if (decision.method === 'skip') {
+    return { ...base, skippedRepair: true, elapsedMs: 0 };
+  }
+  if (decision.method === 'inpaint') {
+    const r = await runInpaintStage(ctx, { experimentId, params });
+    return { ...base, ...r };
+  }
+  if (decision.method === 'iterate') {
+    const r = await runIterateStage(ctx, { experimentId, params: { ...params, feedback: latestEval.issuesSummary || null } });
+    return { ...base, ...r };
+  }
+  if (decision.method === 'char-fix') {
+    const r = await runCharRepairStage(ctx, {
+      experimentId,
+      params: { ...params, characterName: decision.charName, repairMode: 'auto' },
+    });
+    return { ...base, ...r };
+  }
+  throw new Error(`Unknown repair decision "${decision.method}"`);
+}
+
+/** Freeform prompt edit of the page image (editImageWithPrompt). */
+async function runEditImageStage(ctx, { experimentId, promptOverride, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { editImageWithPrompt } = require('./images');
+
+  const instruction = params.instruction || promptOverride;
+  if (!instruction) throw new Error('edit_image requires params.instruction (or a prompt override) — the edit text');
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+
+  const t0 = Date.now();
+  const result = await editImageWithPrompt(imageData, instruction, null, [], ctx.artStyle);
+  const elapsedMs = Date.now() - t0;
+  const edited = result?.imageData || null;
+  if (!edited) throw new Error('edit produced no image');
+
+  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, edited, experimentId);
+  return { imageType: 'scene', versionIndex, elapsedMs, modelId: result.modelId || null, promptUsed: instruction };
+}
+
+/** Grid-based artifact repair (same core as repair-workflow/artifact-repair). */
+async function runArtifactRepairStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { gridBasedRepair } = require('./gridBasedRepair');
+
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  const scene = { ...ctx.scene, imageData };
+  const t0 = Date.now();
+  const result = await gridBasedRepair(scene, { retryHistory: ctx.scene.retryHistory || [] });
+  const elapsedMs = Date.now() - t0;
+  if (!result?.repaired || !result?.imageData) {
+    throw new Error(`artifact repair made no changes (fixed ${result?.fixedCount || 0}/${result?.totalIssues || 0} issues)`);
+  }
+
+  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, result.imageData, experimentId);
+  return {
+    imageType: 'scene', versionIndex, elapsedMs,
+    artifactRepair: { fixedCount: result.fixedCount || 0, failedCount: result.failedCount || 0, totalIssues: result.totalIssues || 0 },
+  };
+}
+
+/** Tiny-background-figure scale repair (needs depth=background in metadata). */
+async function runScaleRepairStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { needsScaleRepair, runScaleRepair } = require('./scaleRepair');
+  const { extractSceneMetadata } = require('./storyHelpers');
+
+  const sceneMetadata = ctx.scene.sceneMetadata || extractSceneMetadata(ctx.scene.sceneDescription || '') || {};
+  if (!needsScaleRepair(sceneMetadata)) {
+    throw new Error('Scene does not need scale repair (no depth=background characters in metadata)');
+  }
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  const t0 = Date.now();
+  const result = await runScaleRepair(imageData, sceneMetadata, { pageNumber: ctx.pageNumber });
+  const elapsedMs = Date.now() - t0;
+  if (!result?.imageData) throw new Error('scale repair produced no image');
+
+  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, result.imageData, experimentId);
+  return { imageType: 'scene', versionIndex, elapsedMs };
+}
+
+/** Restyle the page image (applyStyleTransfer, style-transfer.txt). */
+async function runStyleTransferStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { applyStyleTransfer } = require('./images');
+
+  const artStyle = params.artStyle || ctx.artStyle;
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  const t0 = Date.now();
+  const result = await applyStyleTransfer(imageData, artStyle);
+  const elapsedMs = Date.now() - t0;
+  if (!result?.imageData) throw new Error('style transfer produced no image');
+
+  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, result.imageData, experimentId);
+  return { imageType: 'scene', versionIndex, elapsedMs, artStyle, modelId: result.modelId || null };
+}
+
+/** Report which stored version pick-best would choose (best score, later wins ties). */
+async function runPickBestStage(ctx, { experimentId }) {
+  const versions = (ctx.scene.imageVersions || []).map((v, i) => ({
+    index: i,
+    dbVersionIndex: v.dbVersionIndex ?? v.versionIndex ?? null,
+    type: v.type || null,
+    qualityScore: v.qualityScore ?? null,
+    createdAt: v.createdAt || null,
+  }));
+  if (versions.length === 0) return { versions: [], winner: null, elapsedMs: 0 };
+  let winner = null;
+  for (const v of versions) {
+    const score = v.qualityScore ?? -1;
+    if (!winner || score >= (winner.qualityScore ?? -1)) winner = v; // later wins ties
+  }
+  return { versions, winner, activeIsPinned: ctx.scene.activeVersionPinned ?? null, elapsedMs: 0 };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Text-side stages (LLM only)
+// ─────────────────────────────────────────────────────────────────────
+
+/** Re-run the Art Director expansion for one page (scene-expansion.txt). */
+async function runSceneExpansionStage(ctx, { experimentId, promptOverride, params = {} }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
+  const { callTextModel } = require('./textModels');
+  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+
+  const characters = (storyData.characters || []).filter(c =>
+    (ctx.scene.sceneCharacters || []).some(sc => (sc.name || sc) === c.name)
+  );
+  const availableAvatars = buildAvailableAvatarsForPrompt
+    ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
+    : '';
+
+  // buildSceneExpansionPrompt is synchronous — same safe swap window as image.
+  let prompt;
+  const orig = PROMPT_TEMPLATES.sceneExpansion;
+  if (promptOverride) PROMPT_TEMPLATES.sceneExpansion = promptOverride;
+  try {
+    prompt = buildSceneExpansionPrompt(
+      ctx.pageNumber,
+      ctx.scene.text || '',
+      characters.length ? characters : (storyData.characters || []),
+      ctx.language,
+      ctx.visualBible,
+      availableAvatars,
+      null,
+      { artStyleId: ctx.artStyle, referencePhotos: ctx.referencePhotos }
+    );
+  } finally {
+    PROMPT_TEMPLATES.sceneExpansion = orig;
+  }
+
+  const t0 = Date.now();
+  const result = await callTextModel(prompt, 10000, null, { usageLabel: 'testlab_scene_expansion' });
+  const elapsedMs = Date.now() - t0;
+  return {
+    elapsedMs, modelId: result.modelId || null, promptUsed: prompt,
+    newSceneDescription: result.text,
+    storedSceneDescription: ctx.scene.sceneDescription || null,
+  };
+}
+
+/** Re-run the scene-description regen (scene-iteration.txt, same as /regenerate/scene-description). */
+async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, params = {} }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildSceneDescriptionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
+  const { callClaudeAPI } = require('./textModels');
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+
+  const availableAvatars = buildAvailableAvatarsForPrompt
+    ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
+    : '';
+
+  let prompt;
+  const orig = PROMPT_TEMPLATES.sceneDescriptions;
+  if (promptOverride) PROMPT_TEMPLATES.sceneDescriptions = promptOverride;
+  try {
+    prompt = buildSceneDescriptionPrompt(
+      ctx.pageNumber, ctx.scene.text || '', storyData.characters || [], '',
+      ctx.language, ctx.visualBible, [], 'standard', '', availableAvatars
+    );
+  } finally {
+    PROMPT_TEMPLATES.sceneDescriptions = orig;
+  }
+
+  const t0 = Date.now();
+  const result = await callClaudeAPI(prompt, 10000, MODEL_DEFAULTS.sceneIteration, {
+    prefill: '{"previewMismatches":[', usageLabel: 'testlab_scene_description',
+  });
+  const elapsedMs = Date.now() - t0;
+  return {
+    elapsedMs, modelId: result.modelId || null, promptUsed: prompt,
+    newSceneDescription: result.text,
+    storedSceneDescription: ctx.scene.sceneDescription || null,
+  };
+}
+
+/** Standalone avatar-sheet evaluation on a stored tl_avatar test version. */
+async function runAvatarEvalStage(target, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { _internal, resolveFacePhoto } = require('./character2x4Sheet');
+  const { character, costume } = await loadCharacterContext(target.storyId, target.character);
+
+  const versionIndex = params.versionIndex ?? target.versionIndex;
+  if (versionIndex == null) throw new Error('avatar_eval requires versionIndex (a tl_avatar test version)');
+  const sheet = await loadTestImage(target.storyId, 'tl_avatar', null, versionIndex);
+  if (!sheet?.imageData) throw new Error(`tl_avatar v${versionIndex} not found`);
+  const facePhoto = await resolveFacePhoto(character);
+
+  const t0 = Date.now();
+  let evalResult;
+  if (params.styled) {
+    const realisticVersionIndex = params.realisticVersionIndex;
+    if (realisticVersionIndex == null) throw new Error('styled avatar_eval requires realisticVersionIndex');
+    const anchor = await loadTestImage(target.storyId, 'tl_avatar', null, realisticVersionIndex);
+    if (!anchor?.imageData) throw new Error(`realistic anchor v${realisticVersionIndex} not found`);
+    evalResult = await _internal.evaluateStyledSheetWithGemini(
+      facePhoto, anchor.imageData, sheet.imageData,
+      params.artStyle || target.artStyle || 'pixar',
+      process.env.GEMINI_API_KEY
+    );
+  } else {
+    evalResult = await _internal.evaluateSheetWithGemini(
+      sheet.imageData, costume.description || 'standard outfit',
+      process.env.GEMINI_API_KEY, facePhoto, null,
+      { characterDescription: character.description || '' }
+    );
+  }
+  const elapsedMs = Date.now() - t0;
+  return { character: character.name, versionIndex, styled: !!params.styled, elapsedMs, report: evalResult };
+}
+
 const STAGE_RUNNERS = {
   image: runImageStage,
   empty_scene: runEmptySceneStage,
@@ -617,32 +1114,58 @@ const STAGE_RUNNERS = {
   bbox: runBboxStage,
   char_repair: runCharRepairStage,
   entity: runEntityStage,
+  text_zone: runTextZoneStage,
+  consolidate: runConsolidateStage,
+  inpaint: runInpaintStage,
+  iterate: runIterateStage,
+  repair_round: runRepairRoundStage,
+  edit_image: runEditImageStage,
+  artifact_repair: runArtifactRepairStage,
+  scale_repair: runScaleRepairStage,
+  style_transfer: runStyleTransferStage,
+  pick_best: runPickBestStage,
+  scene_expansion: runSceneExpansionStage,
+  scene_description: runSceneDescriptionStage,
+};
+
+// Story-level stages: target {storyId} (+ coverType for cover). No page context.
+const STORY_STAGES = {
+  cover: runCoverStage,
+  style_check: runStyleCheckStage,
 };
 
 // Avatar stages take {storyId, character} targets, not page targets.
 const AVATAR_STAGES = {
   avatar_realistic: runAvatarRealisticStage,
   avatar_style: runAvatarStyleStage,
+  avatar_eval: runAvatarEvalStage,
 };
 
 /**
  * Run one stage against one target. Page stages take {storyId, pageNumber};
- * avatar stages take {storyId, character}. Returns a JSON-safe result;
- * throws on unrecoverable errors (caller records per-target failure).
+ * avatar stages take {storyId, character}; story-level stages take {storyId}
+ * (+ coverType for cover). Returns a JSON-safe result; throws on
+ * unrecoverable errors (caller records per-target failure).
  */
 async function runStageOnTarget(stage, target, opts) {
   if (AVATAR_STAGES[stage]) {
     if (!target.character) throw new Error(`${stage} requires target.character`);
     return AVATAR_STAGES[stage](target, opts);
   }
+  if (STORY_STAGES[stage]) {
+    if (!target.storyId) throw new Error(`${stage} requires target.storyId`);
+    return STORY_STAGES[stage](target, opts);
+  }
   const runner = STAGE_RUNNERS[stage];
-  if (!runner) throw new Error(`Unknown stage: ${stage}. Valid: ${[...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES)].join(', ')}`);
+  if (!runner) throw new Error(`Unknown stage: ${stage}. Valid: ${[...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES), ...Object.keys(STORY_STAGES)].join(', ')}`);
   const ctx = await loadSceneContext(target.storyId, target.pageNumber);
   return runner(ctx, opts);
 }
 
 module.exports = {
-  STAGES: [...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES)],
+  STAGES: [...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES), ...Object.keys(STORY_STAGES)],
+  STORY_STAGES: Object.keys(STORY_STAGES),
+  AVATAR_STAGE_NAMES: Object.keys(AVATAR_STAGES),
   runStageOnTarget,
   loadSceneContext,
   loadCharacterContext,

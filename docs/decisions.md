@@ -1618,3 +1618,13 @@ Sarah's generic-prompt box matched ground truth within ~4px. Point-only SAM is u
 **Touched:** `photo_analyzer.py` (/figure-mask points/point_labels), `scripts/analysis/test-figure-cutouts.js`,
 `scripts/analysis/test-sam-face-point.js` (validation harnesses). Commit 787e160f.
 **Status:** ✅ validated; production wiring of detectFiguresWithGroundingDino to this design still pending.
+
+## Test Lab — full-coverage stages (2026-07-17)
+
+**Context:** Coverage audit found Test Lab could re-run only 9 of 37 pipeline features; the whole repair loop, covers, and text zone had no isolated re-run path.
+
+**Decision:** Every new stage wraps the exact core function the existing regeneration.js endpoints / repair pipeline already call — zero new pipeline logic. New stages: text_zone (ensureCalmZone), consolidate (consolidateEvaluation), inpaint (inpaintPage), iterate (iteratePageCore), repair_round (decideRepairMethod → inpaint/iterate/char-fix auto — one full automatic round on one page), edit_image (editImageWithPrompt), artifact_repair (gridBasedRepair), scale_repair (runScaleRepair), style_transfer (applyStyleTransfer), pick_best (report-only version ranking), scene_expansion + scene_description (LLM diff stages, sync template swap), avatar_eval (sheet evals standalone), cover (iterateCover with new explicit promptTemplateOverride option — never a PROMPT_TEMPLATES swap across await), style_check (checkStoryStyleConsistency, report-only). Cover/style_check are story-level targets ({storyId, coverType}); promote now supports cover types (pin via coverType key in image_version_meta). repairMode on char_repair was silently ignored before (no such option) — now mapped to useBlended/useCutout/useFullScene.
+
+**Rationale:** One source of truth per repair method; Test Lab results stay representative of production behaviour (same fn, same params), and prompt A/B runs can't leak overrides into concurrent prod generations.
+
+**Touched files:** server/lib/testlab.js, server/routes/admin/testlab.js, server/lib/coverIterate.js (promptTemplateOverride), client/src/pages/TestLab.tsx, client/src/services/testlabService.ts.

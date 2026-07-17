@@ -97,6 +97,10 @@ async function iterateCover(coverKey, storyData, options = {}) {
     usageTracker = null,
     freshCharacters = null,
     selectedCharacterIds = null,
+    // Explicit template override (Test Lab A/B runs) — replaces whichever
+    // cover template would be selected below. Never swap PROMPT_TEMPLATES
+    // keys around this async function; pass the override here instead.
+    promptTemplateOverride = null,
   } = options;
 
   const {
@@ -284,7 +288,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const textlessCovers = MODEL_DEFAULTS.appSideCoverType;
   let coverPrompt;
   if (normalizedCoverType === 'front') {
-    coverPrompt = fillTemplate(textlessCovers ? PROMPT_TEMPLATES.frontCoverTextless : PROMPT_TEMPLATES.frontCover, {
+    coverPrompt = fillTemplate(promptTemplateOverride || (textlessCovers ? PROMPT_TEMPLATES.frontCoverTextless : PROMPT_TEMPLATES.frontCover), {
       TITLE_PAGE_SCENE: sceneDescription,
       STYLE_DESCRIPTION: styleDescription,
       STORY_TITLE: storyTitle,
@@ -293,14 +297,14 @@ async function iterateCover(coverKey, storyData, options = {}) {
     });
   } else if (normalizedCoverType === 'initialPage') {
     coverPrompt = (!textlessCovers && coverDedication)
-      ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
+      ? fillTemplate(promptTemplateOverride || PROMPT_TEMPLATES.initialPageWithDedication, {
           INITIAL_PAGE_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
           DEDICATION: coverDedication,
           CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),
           VISUAL_BIBLE: visualBiblePrompt
         })
-      : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
+      : fillTemplate(promptTemplateOverride || PROMPT_TEMPLATES.initialPageNoDedication, {
           INITIAL_PAGE_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
           // No STORY_TITLE — initial-page-no-dedication has no title
@@ -309,7 +313,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
           VISUAL_BIBLE: visualBiblePrompt
         });
   } else {
-    coverPrompt = fillTemplate(textlessCovers ? PROMPT_TEMPLATES.backCoverTextless : PROMPT_TEMPLATES.backCover, {
+    coverPrompt = fillTemplate(promptTemplateOverride || (textlessCovers ? PROMPT_TEMPLATES.backCoverTextless : PROMPT_TEMPLATES.backCover), {
       BACK_COVER_SCENE: sceneDescription,
       STYLE_DESCRIPTION: styleDescription,
       CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),

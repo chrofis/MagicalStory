@@ -97,6 +97,19 @@ export interface ExperimentResult {
   method?: string | null;
   backend?: string;
   repairMode?: string;
+  coverType?: string;
+  decision?: { method: string; reason: string; charName?: string | null };
+  skippedRepair?: boolean;
+  inpaintInstruction?: string | null;
+  plan?: unknown;
+  dedupedIssues?: unknown;
+  textZone?: { candidates: unknown[]; winnerSource?: string | null };
+  artifactRepair?: { fixedCount: number; failedCount: number; totalIssues: number };
+  newSceneDescription?: string | null;
+  storedSceneDescription?: string | null;
+  versions?: unknown[];
+  winner?: unknown;
+  styled?: boolean;
   artStyle?: string;
   pass?: number;
   redoOf?: number | string;
@@ -127,6 +140,20 @@ export const TESTLAB_STAGES = [
   { id: 'bbox', label: 'Bbox detection', producesImage: false, overridable: false },
   { id: 'char_repair', label: 'Character repair', producesImage: true, overridable: false },
   { id: 'entity', label: 'Entity consistency', producesImage: false, overridable: false },
+  { id: 'text_zone', label: 'Text zone (calm + wash)', producesImage: true, overridable: false },
+  { id: 'consolidate', label: 'Feedback consolidator', producesImage: false, overridable: false },
+  { id: 'inpaint', label: 'Inpaint repair', producesImage: true, overridable: false },
+  { id: 'iterate', label: 'Iterate (full regen)', producesImage: true, overridable: false },
+  { id: 'repair_round', label: 'Auto repair round', producesImage: true, overridable: false },
+  { id: 'edit_image', label: 'Edit image (freeform)', producesImage: true, overridable: true },
+  { id: 'artifact_repair', label: 'Artifact repair (grid)', producesImage: true, overridable: false },
+  { id: 'scale_repair', label: 'Scale repair (bg figures)', producesImage: true, overridable: false },
+  { id: 'style_transfer', label: 'Style transfer', producesImage: true, overridable: false },
+  { id: 'pick_best', label: 'Pick-best report', producesImage: false, overridable: false },
+  { id: 'scene_expansion', label: 'Scene expansion (Art Director)', producesImage: false, overridable: true },
+  { id: 'scene_description', label: 'Scene description (iterate)', producesImage: false, overridable: true },
+  { id: 'cover', label: 'Cover render', producesImage: true, overridable: true, storyLevel: true },
+  { id: 'style_check', label: 'Style consistency check', producesImage: false, overridable: false, storyLevel: true },
 ] as const;
 
 export const testlabService = {
@@ -159,7 +186,7 @@ export const testlabService = {
     label?: string;
     promptOverride?: string | null;
     params?: Record<string, unknown>;
-    targets?: { storyId: string; pageNumber: number }[];
+    targets?: { storyId: string; pageNumber?: number; coverType?: string; character?: string }[];
     benchmarkIds?: number[];
   }) {
     return api.post<{ id: number }>('/api/admin/testlab/experiments', body);
@@ -192,7 +219,7 @@ export const testlabService = {
     );
   },
 
-  promote(storyId: string, pageNumber: number, versionIndex: number, setActive = true) {
-    return api.post<{ success: boolean }>('/api/admin/testlab/promote', { storyId, pageNumber, versionIndex, setActive });
+  promote(storyId: string, pageNumber: number | null, versionIndex: number, setActive = true, imageType?: string) {
+    return api.post<{ success: boolean }>('/api/admin/testlab/promote', { storyId, pageNumber, versionIndex, setActive, ...(imageType ? { imageType } : {}) });
   },
 };

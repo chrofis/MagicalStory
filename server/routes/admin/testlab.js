@@ -109,6 +109,11 @@ const STAGE_TEMPLATE_KEYS = {
   empty_scene: 'emptyScene',
   quality_eval: 'imageEvaluation',
   semantic_eval: 'imageSemantic',
+  scene_expansion: 'sceneExpansion',
+  scene_description: 'sceneIteration',
+  // Cover prefill shows the front-cover template; the override replaces
+  // whichever cover template the target's coverType selects.
+  cover: 'frontCover',
 };
 
 // GET /api/admin/testlab/templates — current template text per overridable stage
@@ -275,9 +280,24 @@ router.post('/experiments', async (req, res) => {
       );
       targets = targets.concat(rows.map(r => ({ storyId: r.story_id, pageNumber: r.page_number })));
     }
-    targets = targets
-      .map(t => ({ storyId: String(t.storyId), pageNumber: parseInt(t.pageNumber, 10) }))
-      .filter(t => t.storyId && Number.isFinite(t.pageNumber));
+    // Target shape depends on the stage family:
+    //   avatar stages  → {storyId, character}
+    //   story stages   → {storyId} (+ coverType for cover)
+    //   page stages    → {storyId, pageNumber}
+    const { STORY_STAGES, AVATAR_STAGE_NAMES } = require('../../lib/testlab');
+    if (AVATAR_STAGE_NAMES.includes(stage)) {
+      targets = targets
+        .map(t => ({ storyId: String(t.storyId), character: t.character ? String(t.character) : null }))
+        .filter(t => t.storyId && t.character);
+    } else if (STORY_STAGES.includes(stage)) {
+      targets = targets
+        .map(t => ({ storyId: String(t.storyId), ...(t.coverType ? { coverType: String(t.coverType) } : {}) }))
+        .filter(t => t.storyId && (stage !== 'cover' || t.coverType));
+    } else {
+      targets = targets
+        .map(t => ({ storyId: String(t.storyId), pageNumber: parseInt(t.pageNumber, 10) }))
+        .filter(t => t.storyId && Number.isFinite(t.pageNumber));
+    }
     if (targets.length === 0) return res.status(400).json({ error: 'No valid targets' });
     if (targets.length > 25) return res.status(400).json({ error: 'Max 25 targets per experiment' });
 
@@ -397,6 +417,16 @@ async function executeRedo(experimentId, exp, entry, resultIndex, override) {
         });
       } else if (entry.character && exp.stage === 'avatar_realistic') {
         redo = await runStageOnTarget('avatar_realistic', { storyId: entry.storyId, character: entry.character }, { experimentId });
+      } else if (entry.character) {
+        // Other character-target stages (avatar_eval, future ones).
+        redo = await runStageOnTarget(exp.stage, { storyId: entry.storyId, character: entry.character }, {
+          experimentId, promptOverride: override, params: exp.params || {},
+        });
+      } else if (entry.coverType || ['cover', 'style_check'].includes(exp.stage)) {
+        // Story-level stages: no page context.
+        redo = await runStageOnTarget(exp.stage, { storyId: entry.storyId, ...(entry.coverType ? { coverType: entry.coverType } : {}) }, {
+          experimentId, promptOverride: override, params: exp.params || {},
+        });
       } else {
         const target = { storyId: entry.storyId, pageNumber: entry.pageNumber };
         let params = { ...(exp.params || {}) };
@@ -476,16 +506,55 @@ router.get('/baseline-image/:storyId/:pageNumber', async (req, res) => {
   }
 });
 
-// POST /api/admin/testlab/promote { storyId, pageNumber, versionIndex, setActive? }
+// POST /api/admin/testlab/promote { storyId, pageNumber, versionIndex, imageType?, setActive? }
 // Flips is_test → the version enters the user-visible version list; optionally
 // pins it as the active version (explicit choice ⇒ pinned, per version contract).
+// imageType 'scene' (default) uses pageNumber; cover types use pageNumber NULL
+// and pin via the coverType key in image_version_meta.
 router.post('/promote', async (req, res) => {
   try {
-    const { storyId, pageNumber, versionIndex, setActive = true } = req.body;
+    const { storyId, pageNumber, versionIndex, imageType = 'scene', setActive = true } = req.body;
+    const isCover = ['frontCover', 'initialPage', 'backCover'].includes(imageType);
+    if (imageType !== 'scene' && !isCover) {
+      return res.status(400).json({ error: `imageType must be scene|frontCover|initialPage|backCover` });
+    }
     const pageNum = parseInt(pageNumber, 10);
     const vIdx = parseInt(versionIndex, 10);
-    if (!storyId || !Number.isFinite(pageNum) || !Number.isFinite(vIdx)) {
-      return res.status(400).json({ error: 'storyId, pageNumber, versionIndex required' });
+    if (!storyId || !Number.isFinite(vIdx) || (!isCover && !Number.isFinite(pageNum))) {
+      return res.status(400).json({ error: 'storyId, versionIndex (and pageNumber for scenes) required' });
+    }
+
+    if (isCover) {
+      const updated = await dbQuery(
+        `UPDATE story_images SET is_test = FALSE
+         WHERE story_id = $1 AND image_type = $2 AND page_number IS NULL AND version_index = $3 AND is_test
+         RETURNING version_index`,
+        [storyId, imageType, vIdx]
+      );
+      if (updated.length === 0) return res.status(404).json({ error: 'Test cover version not found (already promoted?)' });
+
+      // Append provenance to coverImages[key].imageVersions (dbVersionIndex stamp).
+      const coverEntry = {
+        dbVersionIndex: vIdx,
+        versionIndex: vIdx,
+        type: 'regeneration',
+        description: 'Promoted from Test Lab',
+        createdAt: new Date().toISOString(),
+        _alreadySaved: true,
+      };
+      await dbQuery(
+        `UPDATE stories SET data = jsonb_set(
+           data,
+           ARRAY['coverImages', $2::text, 'imageVersions'],
+           COALESCE(data->'coverImages'->$2->'imageVersions', '[]'::jsonb) || $3::jsonb
+         ) WHERE id = $1 AND data->'coverImages' ? $2`,
+        [storyId, imageType, JSON.stringify([coverEntry])]
+      );
+      if (setActive) {
+        await setActiveVersion(storyId, imageType, vIdx, { pinned: true });
+      }
+      log.info(`[TESTLAB] Promoted ${storyId} ${imageType} v${vIdx} (setActive=${setActive})`);
+      return res.json({ success: true, imageType, versionIndex: vIdx, setActive });
     }
 
     const updated = await dbQuery(

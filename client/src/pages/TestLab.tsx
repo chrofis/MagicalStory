@@ -294,10 +294,13 @@ function ExperimentsTab() {
   const [override, setOverride] = useState('');
   const [autoEval, setAutoEval] = useState(true);
   const [charName, setCharName] = useState('');
+  const [storyIdInput, setStoryIdInput] = useState('');
+  const [coverType, setCoverType] = useState('frontCover');
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const stageInfo = TESTLAB_STAGES.find(s => s.id === stage);
+  const isStoryLevel = !!(stageInfo as { storyLevel?: boolean } | undefined)?.storyLevel;
 
   const load = useCallback(async () => {
     try {
@@ -336,19 +339,31 @@ function ExperimentsTab() {
   };
 
   const start = async () => {
-    if (selectedBench.length === 0) { alert('Select at least one benchmark target.'); return; }
+    // Story-level stages take story targets (from the input or the selected
+    // benchmarks' stories); page stages take benchmark pages.
+    let storyTargets: { storyId: string; coverType?: string }[] = [];
+    if (isStoryLevel) {
+      const ids = storyIdInput.trim()
+        ? [storyIdInput.trim()]
+        : [...new Set(benchmarks.filter(b => selectedBench.includes(b.id)).map(b => b.storyId))];
+      if (ids.length === 0) { alert('Enter a story ID or select benchmark pages (their stories are used).'); return; }
+      storyTargets = ids.map(id => stage === 'cover' ? { storyId: id, coverType } : { storyId: id });
+    } else if (selectedBench.length === 0) {
+      alert('Select at least one benchmark target.'); return;
+    }
     if (stage === 'char_repair' && !charName.trim()) { alert('Character repair needs a character name.'); return; }
     setStarting(true);
     setError(null);
     try {
       const params: Record<string, unknown> = { autoEval };
       if (stage === 'char_repair') params.characterName = charName.trim();
+      if (stage === 'cover') params.coverType = coverType;
       const res = await testlabService.createExperiment({
         stage,
         label: label || undefined,
         promptOverride: override.trim() ? override : null,
         params,
-        benchmarkIds: selectedBench,
+        ...(isStoryLevel ? { targets: storyTargets } : { benchmarkIds: selectedBench }),
       });
       setLabel('');
       await load();
@@ -392,6 +407,21 @@ function ExperimentsTab() {
               placeholder="Character name"
               value={charName}
               onChange={e => setCharName(e.target.value)}
+            />
+          )}
+          {stage === 'cover' && (
+            <select className="border rounded-lg px-3 py-2 text-sm" value={coverType} onChange={e => setCoverType(e.target.value)}>
+              <option value="frontCover">Front cover</option>
+              <option value="initialPage">Initial page</option>
+              <option value="backCover">Back cover</option>
+            </select>
+          )}
+          {isStoryLevel && (
+            <input
+              className="border rounded-lg px-3 py-2 text-sm w-72"
+              placeholder="Story ID (empty = selected benchmarks' stories)"
+              value={storyIdInput}
+              onChange={e => setStoryIdInput(e.target.value)}
             />
           )}
         </div>
@@ -613,6 +643,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
   // baseline at all — the anchor IS the result.
   const isAvatar = result.imageType === 'tl_avatar';
   const isPass1 = isAvatar && (result as { pass?: number }).pass === 1;
+  const isCover = ['frontCover', 'initialPage', 'backCover'].includes(result.imageType || '');
   const hasPage = typeof result.pageNumber === 'number';
 
   const loadImages = async () => {
@@ -634,17 +665,18 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
     } catch { setBaseline(''); }
     if (producesImage) {
       try {
-        const v = await testlabService.getTestImage(result.storyId, result.imageType!, isAvatar ? null : result.pageNumber, result.versionIndex!);
+        const v = await testlabService.getTestImage(result.storyId, result.imageType!, isAvatar || isCover ? null : result.pageNumber ?? null, result.versionIndex!);
         setVariant(v.imageData);
       } catch { setVariant(''); }
     }
   };
 
+  const promotable = producesImage && (result.imageType === 'scene' || isCover);
   const promote = async () => {
-    if (!producesImage || result.imageType !== 'scene') return;
+    if (!promotable) return;
     if (!window.confirm(`Promote this test image into the story's real version list and set it active (pinned)? The story owner will see it.`)) return;
     try {
-      await testlabService.promote(result.storyId, result.pageNumber, result.versionIndex!);
+      await testlabService.promote(result.storyId, result.pageNumber ?? null, result.versionIndex!, true, isCover ? result.imageType! : undefined);
       setPromoted(true);
     } catch (e) {
       alert(`Promote failed: ${e instanceof Error ? e.message : e}`);
@@ -655,7 +687,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
     <div className={`bg-white rounded-2xl shadow-lg p-4 ${superseded ? 'opacity-60' : ''} ${isRedo ? 'ml-6 border-l-4 border-indigo-200' : ''}`}>
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-sm font-semibold">
-          {result.character ? result.character : `${result.storyId} · P${result.pageNumber}`}
+          {result.character ? result.character : `${result.storyId}${typeof result.pageNumber === 'number' ? ` · P${result.pageNumber}` : result.coverType ? ` · ${result.coverType}` : ''}`}
           {result.artStyle && <span className="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{result.artStyle}</span>}
           {isRedo && <span className="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">redo{result.promptOverridden ? ' · edited prompt' : ''}</span>}
           {superseded && <span className="ml-2 bg-gray-200 text-gray-600 text-xs px-2 py-0.5 rounded-full">superseded</span>}
@@ -709,7 +741,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
                 <div>
                   <div className="text-xs font-medium text-gray-500 mb-1">{isPass1 ? `Realistic anchor (pass 1, test v${result.versionIndex})` : isAvatar ? `Styled sheet (pass 2, test v${result.versionIndex})` : `Variant (test v${result.versionIndex})`}</div>
                   {variant ? <img src={variant} alt="variant" className="rounded-lg w-full" /> : <div className="text-xs text-gray-400">unavailable</div>}
-                  {result.imageType === 'scene' && !promoted && (
+                  {promotable && !promoted && (
                     <div className="mt-2">
                       <Button variant="secondary" size="sm" onClick={promote}>Promote to story</Button>
                     </div>
@@ -719,7 +751,13 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
             </div>
           )}
 
-          {(result.issuesSummary || result.semanticIssues?.length || result.figures?.length || result.report || result.fixableIssues?.length || result.promptUsed) && (
+          {result.decision && (
+            <div className="text-xs text-gray-600 mt-2">
+              <b>Repair decision:</b> {result.decision.method}{result.decision.charName ? ` [${result.decision.charName}]` : ''} — {result.decision.reason}
+              {result.skippedRepair && <span className="text-gray-400"> (nothing to repair)</span>}
+            </div>
+          )}
+          {(result.issuesSummary || result.semanticIssues?.length || result.figures?.length || result.report || result.fixableIssues?.length || result.promptUsed || result.plan || result.textZone || result.newSceneDescription || result.versions?.length || result.inpaintInstruction || result.artifactRepair) && (
             <div className="mt-3">
               <button className="text-xs text-indigo-600 hover:underline" onClick={() => setShowDetails(v => !v)}>
                 {showDetails ? 'Hide' : 'Show'} details
@@ -742,8 +780,35 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
                   {stage === 'bbox' && (result.figures || result.objects) && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ backend: result.detectionBackend, figures: result.figures, objects: result.objects }, null, 2)}</pre>
                   )}
-                  {stage === 'entity' && result.report != null && (
+                  {(stage === 'entity' || stage === 'style_check' || stage === 'avatar_eval') && result.report != null && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64">{JSON.stringify(result.report, null, 2)}</pre>
+                  )}
+                  {result.inpaintInstruction && (
+                    <div className="text-xs text-gray-600"><b>Inpaint instruction:</b> {result.inpaintInstruction}</div>
+                  )}
+                  {result.plan != null && (
+                    <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64">{JSON.stringify(result.plan, null, 2)}</pre>
+                  )}
+                  {result.textZone && (
+                    <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify(result.textZone, null, 2)}</pre>
+                  )}
+                  {result.artifactRepair && (
+                    <div className="text-xs text-gray-600"><b>Artifact repair:</b> fixed {result.artifactRepair.fixedCount}/{result.artifactRepair.totalIssues} (failed {result.artifactRepair.failedCount})</div>
+                  )}
+                  {!!result.versions?.length && (
+                    <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ versions: result.versions, winner: result.winner }, null, 2)}</pre>
+                  )}
+                  {result.newSceneDescription && (
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-xs font-medium text-gray-500 mb-1">Stored scene description</div>
+                        <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64 whitespace-pre-wrap">{result.storedSceneDescription || '—'}</pre>
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-gray-500 mb-1">New (this run)</div>
+                        <pre className="text-xs bg-indigo-50 rounded-lg p-3 overflow-x-auto max-h-64 whitespace-pre-wrap">{result.newSceneDescription}</pre>
+                      </div>
+                    </div>
                   )}
                   {result.promptUsed && (
                     <details className="text-xs">
