@@ -1625,6 +1625,17 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
         const retryEntry = sceneImage.retryHistory?.find(r => r.bboxOverlayImage);
         return res.json({ bboxOverlayImage: retryEntry?.bboxOverlayImage || null });
       }
+      // Prefer the stored generation-time overlay for this detection — it
+      // includes the SAM cutout strip, which cannot be rebuilt here (the
+      // masks are in-process only, never persisted). Regenerating below is
+      // the fallback and yields boxes without the strip. Guard: only when
+      // the stored overlay belongs to the SAME detection object we would
+      // draw, so version browsing never shows stale boxes.
+      const storedOverlay = versionEntry?.bboxOverlayImage
+        || (detection === sceneImage.bboxDetection ? sceneImage.bboxOverlayImage : null);
+      if (storedOverlay) {
+        return res.json({ bboxOverlayImage: storedOverlay });
+      }
       // Load THIS version's image bytes (not the active one) so the overlay
       // is drawn on the image the detection was actually run against.
       let imageData = null;
