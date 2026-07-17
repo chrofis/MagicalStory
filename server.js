@@ -6461,6 +6461,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
           sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
           qualityScore: img.qualityScore,
+          // The canonical single score (picked version's finalScore). This
+          // whitelist mapping predated the scoring unification and silently
+          // dropped it — every stored scene had finalScore undefined while
+          // qualityScore carried legacy junk.
+          finalScore: img.finalScore ?? null,
           qualityReasoning: img.qualityReasoning,
           thinkingText: img.thinkingText || null,
           wasRegenerated: img.wasRegenerated,

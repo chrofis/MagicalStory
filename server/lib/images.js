@@ -8786,12 +8786,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       perCharClothing: img.perCharClothing,
       modelId: best?.modelId || img.modelId,
       thinkingText: img.thinkingText || null,
-      qualityScore: best?.score ?? finalEval?.qualityScore ?? null,
-      // Single score the UI shows — the canonical reader (handles the stamped
-      // finalScore plus every legacy fallback shape in one place).
+      // Scene-level scores are MIRRORS of the picked version's canonical
+      // record — never independently computed. qualityScore = the picked
+      // version's evalScore (visual − semantic/compliance penalties, stamped
+      // by applyScore); finalScore = the one number everything reads
+      // (evalScore − entityPenalty via the canonical reader). The old code
+      // used best.score — a generation-time retry score on a different
+      // scale — which wrote junk like qualityScore:0 next to a picked
+      // version scoring 50.
+      qualityScore: best?.evalScore ?? finalEval?.qualityScore ?? null,
       finalScore: best ? require('./scoring').computeFinalScore(best) : null,
       qualityReasoning: finalEval?.reasoning ?? null,
-      semanticScore: finalEval?.semanticScore ?? null,
+      semanticScore: finalEval?.semanticResult?.score ?? finalEval?.semanticScore ?? null,
       semanticResult: finalEval?.semanticResult ?? null,
       // O7: verbatim eval model output (quality JSON + three-stage) and the
       // template hash — evaluateImageQuality returns rawOutput, but this

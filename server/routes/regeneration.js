@@ -3321,8 +3321,10 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
     if (existingIndex >= 0) {
       const scene = sceneImages[existingIndex];
 
-      // Update scene-level metadata
+      // Update scene-level metadata (finalScore = canonical single score;
+      // scene-level score fields are always mirrors, never computed here)
       scene.qualityScore = qualityScore;
+      scene.finalScore = qualityScore;
       scene.qualityReasoning = qualityReasoning;
       scene.wasEdited = true;
       scene.lastEditPrompt = editPrompt;
@@ -3646,8 +3648,9 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
         const lastEntry = newRetryEntries[newRetryEntries.length - 1];
         const repairScore = lastEntry?.postRepairScore || null;
 
-        // Update scene-level quality data
+        // Update scene-level quality data (mirror; finalScore is canonical)
         currentScene.qualityScore = repairScore;
+        currentScene.finalScore = repairScore;
 
         // --- Version management (same pattern as iterate endpoint) ---
         // Lazy-migrate imageVersions if missing
@@ -3893,8 +3896,9 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           log.info(`📊 [REPAIR-WORKFLOW] ${pageLabel} - issues: ${evaluation.issuesSummary}`);
         }
 
-        // Update scene with new evaluation
+        // Update scene with new evaluation (finalScore = the combined number)
         scene.qualityScore = evaluation.qualityScore ?? evaluation.score;
+        scene.finalScore = evaluation.score ?? null;
         scene.qualityReasoning = evaluation.reasoning;
         scene.semanticScore = evaluation.semanticScore ?? null;
         scene.semanticResult = evaluation.semanticResult ?? null;
@@ -3986,8 +3990,9 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           });
         }
 
-        // Update scene with adjusted score
+        // Update scene with adjusted score (mirror; finalScore canonical)
         scene.qualityScore = adjustedScore;
+        scene.finalScore = adjustedScore;
 
         pages[pageNumber] = {
           score: adjustedScore,                       // Combined final score (quality - semantic - entity penalties)
@@ -4891,6 +4896,8 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
     // (so evaluation-data endpoint and Collect Feedback see the active version's scores)
     const syncVersionToRoot = (scene, version) => {
       if (!version) return;
+      // Canonical single score always mirrors the active version.
+      try { scene.finalScore = require('../lib/scoring').computeFinalScore(version); } catch { /* legacy shapes */ }
       if (version.qualityScore != null) scene.qualityScore = version.qualityScore;
       if (version.qualityReasoning != null) scene.qualityReasoning = version.qualityReasoning;
       if (version.semanticScore != null) scene.semanticScore = version.semanticScore;

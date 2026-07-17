@@ -1665,3 +1665,20 @@ character features (glasses, hearing aids, braces) are identity, never anachroni
 **Touched:** `server/lib/images.js` (iteratePageCore return, round-entry fields, buildEvalInputs,
 buildEntityCheckData, buildVersionEntry, final assembly), `prompts/image-evaluation.txt`.
 **Status:** ✅ staging.
+
+## Scene-level scores are mirrors of the picked version — finalScore everywhere (2026-07-18)
+**Context:** "One score" was unified at the VERSION level long ago (applyScore/computeFinalScore,
+scoring.js) — but scene-level display fields never joined: the unified pipeline stamped
+scene.qualityScore from best.score (a generation-time retry score on a different scale → junk like 0
+next to a picked version scoring 50), scene.semanticScore from a legacy field, and scene.finalScore —
+written at assembly — was silently DROPPED by the server.js whitelist mapping (predates the field), so
+every stored scene had finalScore undefined. Five more legacy stamp sites in regeneration.js each wrote
+their own notion of score into scene.qualityScore with no finalScore.
+**Decision:** Scene-level score fields are MIRRORS of the picked/active version's canonical record,
+never independently computed. Pipeline assembly: qualityScore = picked version's evalScore,
+semanticScore from its semanticResult, finalScore via computeFinalScore. server.js whitelist carries
+finalScore. All five regeneration.js stamp sites also stamp scene.finalScore; syncVersionToRoot mirrors
+computeFinalScore(version). Readers (client StoryDisplay, database.js story_images writer) already
+prefer finalScore with legacy fallback — no reader changes needed.
+**Touched:** `server/lib/images.js` (final assembly), `server.js` (whitelist), `server/routes/regeneration.js` (5 sites).
+**Status:** ✅ staging. Legacy qualityScore kept as fallback for old stories; new writes always carry finalScore.
