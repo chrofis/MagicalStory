@@ -1617,7 +1617,7 @@ the exact production-failure pages): 100% figure recall, scores 0.59–0.73, zer
 Sarah's generic-prompt box matched ground truth within ~4px. Point-only SAM is unusable (control).
 **Touched:** `photo_analyzer.py` (/figure-mask points/point_labels), `scripts/analysis/test-figure-cutouts.js`,
 `scripts/analysis/test-sam-face-point.js` (validation harnesses). Commit 787e160f.
-**Status:** ✅ validated; production wiring of detectFiguresWithGroundingDino to this design still pending.
+**Status:** ✅ WIRED TO PRODUCTION (6d6fb635, staging): detectFiguresWithGroundingDino now runs the generic design; overlay shows dashed DINO boxes, red face dots, yellow VB-object boxes, and a per-figure SAM cutout strip (masks travel non-enumerably, never into stories.data). Falls back to Gemini when persons < expected. Known limitation: German VB object labels ground weakly (English text encoder) — translate labels before grounding as a follow-up.
 
 ## Test Lab — full-coverage stages (2026-07-17)
 
