@@ -61,9 +61,14 @@ async function main() {
     process.exit(1);
   }
 
-  const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
+  // --staging reads the staging DB (DATABASE_PUBLIC_URL otherwise wins over
+  // any env override, which silently pointed every lookup at prod).
+  const useStaging = process.argv.includes('--staging');
+  const dbUrl = useStaging
+    ? process.env.STAGING_DATABASE_URL
+    : (process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL);
   if (!dbUrl) {
-    console.error('Set DATABASE_URL or DATABASE_PUBLIC_URL');
+    console.error(useStaging ? 'Set STAGING_DATABASE_URL' : 'Set DATABASE_URL or DATABASE_PUBLIC_URL');
     process.exit(1);
   }
   const pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });

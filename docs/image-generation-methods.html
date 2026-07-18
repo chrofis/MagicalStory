@@ -513,8 +513,24 @@ page + cover and repainted the cover back into stored clothes (see
 
 <p class="note">When adding a new provider or model, update this page in the same PR that introduces it — otherwise the doc starts lying within a week.</p>
 
+<h2 id="detection">10. Figure detection, identity &amp; repair routing (2026-07-17/18, staging)</h2>
+
+<p>Behind <code>FIGURE_DETECTION_BACKEND=grounding-dino</code> (staging; prod stays <code>gemini</code>). Gated to styles in <code>MODEL_DEFAULTS.figureDetectionEligibleStyles</code> — all 11 now validated on real pages.</p>
+
+<table>
+<thead><tr><th>Step</th><th>How</th><th>Entry point</th></tr></thead>
+<tbody>
+<tr><td>Geometry</td><td>GroundingDINO with GENERIC prompts only (<code>person</code>, <code>face</code>, <code>woman . girl</code>) → MobileSAM mask per box → occlusion carve-out (foreground figure's pixels removed from occluded figures) → <code>bodyBox</code> = mask bounds; faceBox = DINO face padded 100% for repair. Identity prose in DINO prompts is banned — it produced head-only collapses and misattribution.</td><td><code>detectFiguresWithGroundingDino</code> (images.js)</td></tr>
+<tr><td>Identity</td><td>Set-of-Mark: letter badges (A–Z; &gt;26 → largest figures) drawn on detections, one Gemini Flash call answers which letter is which expected character (thinking disabled). Fallback: deterministic layout+gender matching. Extra persons → UNKNOWN.</td><td><code>_somIdentifyFigures</code> (images.js)</td></tr>
+<tr><td>VB objects</td><td>Grounded per object on the ENGLISH VB description (German names latch onto figures); locations skipped; found box with IoU&gt;0.7 vs a figure dropped. A DINO miss is never reported as a missing object.</td><td><code>buildObjectGroundingHints</code> + object stage in <code>detectFiguresWithGroundingDino</code></td></tr>
+<tr><td>Spec conflicts</td><td>Deterministic code check on the DECLARED interactions (body part committed in one, targeted in another) fills <code>consolidatedPlan.spec_conflicts</code> at every eval-time consolidation; model findings merge on top. Routing gate 0: any conflict → iterate, never repaint; iterate feedback leads with the conflict and <code>scene-iteration.txt</code> lets it override the declared interactions.</td><td><code>detectDeclaredSpecConflicts</code> (feedbackConsolidator.js), <code>decideRepairMethod</code> (repairLogic.js)</td></tr>
+<tr><td>Iterate hygiene</td><td><code>sceneIntent</code> enforced (retry once, loud error — the DEPICTS header must describe THIS image); object additions gated by an anchored allow-list (original metadata ∪ eval feedback ∪ page text) after a rewrite painted an unrelated statue into a lake scene; round/rescue consolidation uses the version's OWN rewritten contract.</td><td><code>iteratePageCore</code> (images.js)</td></tr>
+<tr><td>Audit</td><td>Everything persists: <code>gdinoDiag</code> (persons/faces/assignment/SoM answers/objects), dashed DINO boxes + red face dots + SAM cutout strip on the bboxOverlay, both contracts (DEPICTS + EXACT POSES) on Test-Lab cards.</td><td>Objekterkennung panel; <code>/admin/test-lab</code></td></tr>
+</tbody>
+</table>
+
 <footer>
-  <p>Last reviewed: 2026-07-09. Source of truth: <code>server/config/models.js</code> + the call sites linked above.</p>
+  <p>Last reviewed: 2026-07-18. Source of truth: <code>server/config/models.js</code> + the call sites linked above.</p>
 </footer>
 
 </body>
