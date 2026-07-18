@@ -517,20 +517,42 @@ async function runBboxStage(ctx, { experimentId }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { detectAllBoundingBoxes } = require('./images');
+  const { MODEL_DEFAULTS } = require('../config/models');
 
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
   const expectedCharacters = buildExpectedCharacters(ctx);
 
+  // When grounding-dino is the configured backend, a cold analyzer (every
+  // deploy restarts it; DINO loads ~90s+) makes detectAllBoundingBoxes fall
+  // back to the Gemini bbox SILENTLY — exps #70-#74 ran on Gemini's sloppy
+  // left-shifted face boxes without anyone knowing, which made runs
+  // incomparable ("what changed? DINO is deterministic"). The lab demands
+  // the configured backend: retry until DINO answers, fail loudly if it
+  // never does. Production keeps its silent fallback (resilience there is
+  // deliberate); comparability is the lab's whole point.
+  const wantDino = (process.env.FIGURE_DETECTION_BACKEND || MODEL_DEFAULTS.figureDetectionBackend) === 'grounding-dino';
   const t0 = Date.now();
-  const result = await detectAllBoundingBoxes(imageData, {
-    expectedCharacters,
-    sceneContext: (ctx.scene.sceneDescription || '').slice(0, 2000),
-    artStyle: ctx.artStyle,
-    skipCache: true,
-    pageContext: `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-  });
+  let result = null;
+  const ATTEMPTS = 5;
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    result = await detectAllBoundingBoxes(imageData, {
+      expectedCharacters,
+      sceneContext: (ctx.scene.sceneDescription || '').slice(0, 2000),
+      artStyle: ctx.artStyle,
+      skipCache: true,
+      pageContext: `testlab-exp${experimentId}-P${ctx.pageNumber}`,
+    });
+    if (!wantDino || result?.detectionBackend === 'grounding-dino') break;
+    if (attempt < ATTEMPTS) {
+      log.info(`[TESTLAB] detection fell back to ${result?.detectionBackend || 'gemini'} (DINO cold after deploy?) — retry ${attempt}/${ATTEMPTS - 1} in 45s`);
+      await new Promise(r => setTimeout(r, 45000));
+    }
+  }
   const elapsedMs = Date.now() - t0;
   if (!result) throw new Error('Bbox detection returned null');
+  if (wantDino && result.detectionBackend !== 'grounding-dino') {
+    throw new Error(`Detection fell back to ${result.detectionBackend || 'gemini'} on every attempt — GroundingDINO unreachable (cold analyzer after deploy?). Rerun when the service is warm; refusing to chain repairs onto fallback boxes.`);
+  }
 
   return {
     elapsedMs,
