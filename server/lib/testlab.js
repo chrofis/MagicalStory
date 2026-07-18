@@ -1755,8 +1755,12 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     if (params.freshDetection) ctx._skipStoredBox = true;
     const resolved = await resolveCharacterBox(ctx, baseUri, charName, { detection: params.detection || null }).catch(() => null);
     delete ctx._skipStoredBox;
-    const box = resolved?.bbox; // [ymin,xmin,ymax,xmax] 0-1
+    // Face-only repair: the detection's faceBox becomes the target — the SAM
+    // whiteout, union and paste all scope to the head, body/pose untouched.
+    const faceMode = params.whiteoutTarget === 'face' && resolved?.faceBbox?.length === 4;
+    const box = faceMode ? resolved.faceBbox : resolved?.bbox; // [ymin,xmin,ymax,xmax] 0-1
     if (box?.length === 4) figureBox = box;
+    if (faceMode) params._faceMode = true;
     if (box?.length === 4) {
       const pad = params.cropPad ?? 0.35;
       const padX = (box[3] - box[1]) * pad, padY = (box[2] - box[0]) * pad * 0.6;
@@ -1810,7 +1814,9 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   const prompt = promptOverride
     || (params.repairMode
       ? (whiteoutApplied
-        ? `Paint the person from the second image into the white silhouette area of the first image. The silhouette shows their exact position, pose and scale — fill it with that person in that pose. The painted person must have the EXACT same face, age, hair color and clothing as shown in the second image${ref.clothingDescription ? ` (${ref.clothingDescription})` : ''}. Keep everything outside the white area exactly unchanged: same background, same other people, same objects, same colors, same framing. Match the illustration style and lighting.`
+        ? (params._faceMode
+          ? `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. The painted face must have the EXACT same features, age, glasses and hair color as the second image. Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people. Match the illustration style and lighting.`
+          : `Paint the person from the second image into the white silhouette area of the first image. The silhouette shows their exact position, pose and scale — fill it with that person in that pose. The painted person must have the EXACT same face, age, hair color and clothing as shown in the second image${ref.clothingDescription ? ` (${ref.clothingDescription})` : ''}. Keep everything outside the white area exactly unchanged: same background, same other people, same objects, same colors, same framing. Match the illustration style and lighting.`)
         : `Replace the person in the first image with the person from the second image: SAME position, SAME pose, SAME scale as the existing figure — only the face and appearance change to match the second image. Keep everything else in the first image exactly unchanged: same background, same other people, same objects, same colors, same framing. Match the illustration style.`)
       : `Insert the person from the second image into the watercolor scene from the first image: ${pose}. Keep the background of the scene exactly as it is — same objects, same colors, same framing. Match the illustration style and lighting, add a soft contact shadow.`);
 

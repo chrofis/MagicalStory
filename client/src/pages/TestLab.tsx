@@ -425,7 +425,7 @@ function ExperimentsTab() {
           ];
         } else {
           params.backend = repairBackend;
-          if (repairBackend === 'grok') params.whiteoutTarget = whiteoutTarget;
+          if (repairBackend === 'grok' || repairBackend === 'qwen') params.whiteoutTarget = whiteoutTarget;
           if (freshDetection) params.freshDetection = true;
         }
       }
@@ -509,7 +509,7 @@ function ExperimentsTab() {
                   <option value="qwen">Qwen (crop insert)</option>
                 </select>
               </label>
-              {repairBackend === 'grok' && (
+              {(repairBackend === 'grok' || repairBackend === 'qwen') && (
                 <label className="text-sm flex items-center gap-1.5">
                   Repair
                   <select className="border rounded-lg px-3 py-2 text-sm" value={whiteoutTarget} onChange={e => setWhiteoutTarget(e.target.value)}>
