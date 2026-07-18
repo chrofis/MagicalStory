@@ -295,6 +295,7 @@ function ExperimentsTab() {
   const [autoEval, setAutoEval] = useState(true);
   const [charName, setCharName] = useState('');
   const [repairBackend, setRepairBackend] = useState('grok');
+  const [compareAll, setCompareAll] = useState(false);
   const [whiteoutTarget, setWhiteoutTarget] = useState('face');
   const [freshDetection, setFreshDetection] = useState(false);
   const [paramsJson, setParamsJson] = useState('');
@@ -379,9 +380,23 @@ function ExperimentsTab() {
       let params: Record<string, unknown> = { autoEval };
       if (needsCharacter) params.characterName = charName.trim();
       if (stage === 'char_repair') {
-        params.backend = repairBackend;
-        if (repairBackend === 'grok') params.whiteoutTarget = whiteoutTarget;
-        if (freshDetection) params.freshDetection = true;
+        if (compareAll) {
+          // ONE experiment: fresh detection first, then every engine/mode as
+          // Options A–F against the same fresh boxes.
+          params.rerunDetection = true;
+          params.variants = [
+            { label: 'A: Grok blended face', params: { backend: 'grok', repairMode: 'blended', whiteoutTarget: 'face' } },
+            { label: 'B: Grok blended body', params: { backend: 'grok', repairMode: 'blended', whiteoutTarget: 'body' } },
+            { label: 'C: Grok cutout', params: { backend: 'grok', repairMode: 'cutout' } },
+            { label: 'D: Grok fullscene inpaint', params: { backend: 'grok', repairMode: 'fullscene' } },
+            { label: 'E: Gemini repaint', params: { backend: 'gemini', repairMode: 'auto' } },
+            { label: 'F: Qwen whiteout+SAM blend', params: { backend: 'qwen' } },
+          ];
+        } else {
+          params.backend = repairBackend;
+          if (repairBackend === 'grok') params.whiteoutTarget = whiteoutTarget;
+          if (freshDetection) params.freshDetection = true;
+        }
       }
       if (stage === 'qwen_insert' && freshDetection) params.freshDetection = true;
       if (stage === 'cover') params.coverType = coverType;
@@ -451,6 +466,10 @@ function ExperimentsTab() {
           ))}
           {stage === 'char_repair' && (
             <>
+              <label className="text-sm flex items-center gap-1.5 font-medium text-indigo-700">
+                <input type="checkbox" checked={compareAll} onChange={e => setCompareAll(e.target.checked)} />
+                Compare ALL engines (fresh detection + Options A–F, one experiment)
+              </label>
               <label className="text-sm flex items-center gap-1.5">
                 Engine
                 <select className="border rounded-lg px-3 py-2 text-sm" value={repairBackend} onChange={e => setRepairBackend(e.target.value)}>
@@ -883,6 +902,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
         <div className="text-sm font-semibold">
           {result.character ? result.character : `${result.storyId}${typeof result.pageNumber === 'number' ? ` · P${result.pageNumber}` : result.coverType ? ` · ${result.coverType}` : ''}`}
           {result.artStyle && <span className="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{result.artStyle}</span>}
+          {result.label && <span className="ml-2 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">{result.label}</span>}
           {isRedo && <span className="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">redo{result.promptOverridden ? ' · edited prompt' : ''}</span>}
           {superseded && <span className="ml-2 bg-gray-200 text-gray-600 text-xs px-2 py-0.5 rounded-full">superseded</span>}
           {!result.ok && <span className="ml-2 bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full">failed</span>}
@@ -986,33 +1006,40 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
             </div>
           )}
 
-          {/* Single-variant stage (scene_variant). The image prompt is the
-              CONTRACT: scene overview (top) + interactions (bottom) are the
-              headline; the full prompt is always visible — mandatory. */}
-          {result.variantVersionIndex === undefined && (result.extraRule || result.imagePrompt) && (
-            <div className="mt-3 space-y-2">
-              {result.extraRule && (
-                <div className="text-xs font-mono text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5 whitespace-pre-wrap">+ {result.extraRule}</div>
-              )}
-              {result.imagePrompt && (() => {
-                const depicts = result.imagePrompt.match(/THIS IMAGE DEPICTS:\*{0,2}\s*([^\n]+)/)?.[1]?.trim();
-                return depicts ? (
-                  <div className="text-sm bg-indigo-50 rounded-lg px-2 py-1.5 font-medium text-indigo-900">{depicts}</div>
-                ) : null;
-              })()}
-              {result.newSceneDescription && (
-                <div className="text-xs bg-indigo-50 rounded-lg px-2 py-1.5">
-                  <span className="font-semibold text-indigo-700">Interactions:</span> {sceneHeadline(result.newSceneDescription)}
-                </div>
-              )}
-              {result.imagePrompt && (
-                <div>
-                  <div className="text-xs font-medium text-gray-500 mb-1">Full image prompt sent</div>
-                  <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto overflow-y-auto max-h-80 whitespace-pre-wrap">{result.imagePrompt}</pre>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Single-variant stage (scene_variant). The CONTRACT — and the only
+              always-visible text: THIS IMAGE DEPICTS + EXACT POSES, both
+              verbatim from the prompt that was sent. Everything else (rule,
+              full prompt) toggles. */}
+          {result.variantVersionIndex === undefined && (result.extraRule || result.imagePrompt) && (() => {
+            const depicts = result.imagePrompt?.match(/THIS IMAGE DEPICTS:\*{0,2}\s*([^\n]+)/)?.[1]?.trim();
+            const poses = result.imagePrompt?.match(/EXACT POSES:\s*\n((?:\s*-[^\n]*\n?)+)/)?.[1]?.trimEnd();
+            return (
+              <div className="mt-3 space-y-2">
+                {depicts && (
+                  <div className="text-sm bg-indigo-50 rounded-lg px-3 py-2 text-indigo-900">
+                    <b>THIS IMAGE DEPICTS:</b> {depicts}
+                  </div>
+                )}
+                {poses && (
+                  <pre className="text-sm bg-indigo-50 rounded-lg px-3 py-2 text-indigo-900 whitespace-pre-wrap font-sans"><b>EXACT POSES:</b>{'\n'}{poses}</pre>
+                )}
+                {!depicts && !poses && result.imagePrompt && (
+                  <div className="text-xs text-red-600">Prompt sent without DEPICTS/EXACT POSES sections — contract violation, inspect the full prompt below.</div>
+                )}
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-indigo-600">Rule + full prompt</summary>
+                  <div className="mt-1 space-y-2">
+                    {result.extraRule && (
+                      <div className="font-mono text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5 whitespace-pre-wrap">+ {result.extraRule}</div>
+                    )}
+                    {result.imagePrompt && (
+                      <pre className="bg-gray-50 rounded-lg p-3 overflow-x-auto overflow-y-auto max-h-80 whitespace-pre-wrap">{result.imagePrompt}</pre>
+                    )}
+                  </div>
+                </details>
+              </div>
+            );
+          })()}
 
           {/* A/B stage: readable summary first — the rule + one headline per
               variant. The raw line diff is backup detail behind a toggle. */}
@@ -1075,7 +1102,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
                   {!!result.fixableIssues?.length && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify(result.fixableIssues, null, 2)}</pre>
                   )}
-                  {stage === 'bbox' && (result.figures || result.objects) && (
+                  {(stage === 'bbox' || result.detectionBackend) && (result.figures || result.objects) && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ backend: result.detectionBackend, figures: result.figures, objects: result.objects }, null, 2)}</pre>
                   )}
                   {(stage === 'entity' || stage === 'style_check' || stage === 'avatar_eval' || stage === 'repair_verify') && result.report != null && (

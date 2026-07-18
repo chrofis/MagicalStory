@@ -226,26 +226,56 @@ let experimentRunning = false;
 async function executeExperiment(experimentId, stage, targets, opts) {
   const { runStageOnTarget } = require('../../lib/testlab');
   experimentRunning = true;
+  const appendEntry = async (entry) => {
+    // Cap stored prompt size so results stay listable.
+    if (entry.promptUsed && entry.promptUsed.length > 30000) {
+      entry.promptUsed = entry.promptUsed.slice(0, 30000) + '\n…[truncated]';
+    }
+    await dbQuery(
+      `UPDATE testlab_experiments SET results = results || $2::jsonb WHERE id = $1`,
+      [experimentId, JSON.stringify([entry])]
+    );
+  };
   try {
+    // One experiment can be a CHAIN: optionally rerun detection first (its
+    // fresh boxes feed every unit), and run multiple option VARIANTS against
+    // the same target — "Option A/B/C" comparisons live in ONE experiment.
+    const baseParams = { ...(opts.params || {}) };
+    const variants = Array.isArray(baseParams.variants) && baseParams.variants.length > 0
+      ? baseParams.variants : null;
+    const rerunDetection = baseParams.rerunDetection === true;
+    delete baseParams.variants;
+    delete baseParams.rerunDetection;
+
     for (const target of targets) {
-      let entry;
-      const startedAt = new Date().toISOString();
-      try {
-        const result = await runStageOnTarget(stage, target, { ...opts, experimentId });
-        entry = { ...target, ok: true, startedAt, ...result };
-      } catch (err) {
-        log.warn(`[TESTLAB] exp ${experimentId} ${target.storyId} P${target.pageNumber} failed: ${err.message}`);
-        // Failed runs keep any intermediates the runner attached (steps etc.).
-        entry = { ...target, ok: false, startedAt, error: err.message, ...(err.partialResult || {}) };
+      let detection = null;
+      if (rerunDetection && target.pageNumber != null) {
+        const startedAt = new Date().toISOString();
+        try {
+          const det = await runStageOnTarget('bbox', target, { experimentId, params: {} });
+          detection = { figures: det.figures || [] };
+          await appendEntry({ ...target, ok: true, startedAt, label: 'fresh detection (used by all options below)', ...det });
+        } catch (err) {
+          await appendEntry({ ...target, ok: false, startedAt, label: 'fresh detection', error: err.message });
+          log.warn(`[TESTLAB] exp ${experimentId} fresh detection failed: ${err.message} — options fall back to stored boxes`);
+        }
       }
-      // Cap stored prompt size so results stay listable.
-      if (entry.promptUsed && entry.promptUsed.length > 30000) {
-        entry.promptUsed = entry.promptUsed.slice(0, 30000) + '\n…[truncated]';
+
+      for (const variant of (variants || [null])) {
+        const unitParams = { ...baseParams, ...(variant?.params || {}) };
+        if (detection) unitParams.detection = detection;
+        let entry;
+        const startedAt = new Date().toISOString();
+        try {
+          const result = await runStageOnTarget(stage, target, { ...opts, params: unitParams, experimentId });
+          entry = { ...target, ok: true, startedAt, ...(variant?.label ? { label: variant.label } : {}), ...result };
+        } catch (err) {
+          log.warn(`[TESTLAB] exp ${experimentId} ${target.storyId} P${target.pageNumber}${variant ? ` [${variant.label}]` : ''} failed: ${err.message}`);
+          // Failed runs keep any intermediates the runner attached (steps etc.).
+          entry = { ...target, ok: false, startedAt, ...(variant?.label ? { label: variant.label } : {}), error: err.message, ...(err.partialResult || {}) };
+        }
+        await appendEntry(entry);
       }
-      await dbQuery(
-        `UPDATE testlab_experiments SET results = results || $2::jsonb WHERE id = $1`,
-        [experimentId, JSON.stringify([entry])]
-      );
     }
     await dbQuery(
       `UPDATE testlab_experiments SET status = 'completed', completed_at = NOW() WHERE id = $1`,

@@ -132,6 +132,7 @@ export interface ExperimentResult {
   styled?: boolean;
   artStyle?: string;
   pass?: number;
+  label?: string;
   redoOf?: number | string;
   redoneAt?: string;
   promptOverridden?: boolean;

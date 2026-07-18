@@ -474,7 +474,7 @@ async function runBboxStage(ctx, { experimentId }) {
  * detection on the image (same call the bbox stage uses). Returns
  * {bbox, faceBbox, source} or null.
  */
-async function resolveCharacterBox(ctx, imageData, charName) {
+async function resolveCharacterBox(ctx, imageData, charName, { detection = null } = {}) {
   // Figure boxes appear as bodyBox/faceBox (detection contract) or bbox/box_2d
   // (older records / repair params) depending on the writer.
   const fromDet = (det) => {
@@ -483,6 +483,12 @@ async function resolveCharacterBox(ctx, imageData, charName) {
     const bbox = fig.bodyBox || fig.bbox || fig.box_2d || null;
     return bbox?.length === 4 ? { bbox, faceBbox: fig.faceBox || fig.faceBbox || null } : null;
   };
+  // Chained-experiment detection (fresh, from a bbox step in the SAME
+  // experiment) always wins over whatever generation-time data is stored.
+  if (detection) {
+    const chained = fromDet(detection);
+    if (chained) return { ...chained, source: 'chained-detection' };
+  }
   const stored = ctx._skipStoredBox ? null : fromDet(ctx.scene.bboxDetection);
   if (stored) return { ...stored, source: 'stored' };
 
@@ -534,7 +540,7 @@ async function runCharRepairStage(ctx, opts) {
   let boxSource = bbox ? 'param' : null;
   if (!bbox) {
     if (params.freshDetection) ctx._skipStoredBox = true;
-    const resolved = await resolveCharacterBox(ctx, imageData, charName);
+    const resolved = await resolveCharacterBox(ctx, imageData, charName, { detection: params.detection || null });
     delete ctx._skipStoredBox;
     if (resolved) { bbox = resolved.bbox; faceBbox = faceBbox || resolved.faceBbox; boxSource = resolved.source; }
   }
@@ -1467,7 +1473,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     // Stored detection first, else fresh detection (resolveCharacterBox);
     // params.freshDetection forces a re-detect.
     if (params.freshDetection) ctx._skipStoredBox = true;
-    const resolved = await resolveCharacterBox(ctx, baseUri, charName).catch(() => null);
+    const resolved = await resolveCharacterBox(ctx, baseUri, charName, { detection: params.detection || null }).catch(() => null);
     delete ctx._skipStoredBox;
     const box = resolved?.bbox; // [ymin,xmin,ymax,xmax] 0-1
     if (box?.length === 4) figureBox = box;
@@ -1577,12 +1583,24 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // Repair blend: SAM SILHOUETTE UNION (production Grok-blended technique) —
   // mask of the OLD figure (already fetched for the whiteout) ∪ mask of the
   // NEW figure in the model output. Exact figure pixels, no diff-blob
-  // guessing, no half-mixed colors. Falls through to the diff blob only when
-  // SAM is unavailable.
-  if ((params.pasteMode || 'figure') === 'figure' && params.repairMode && oldMaskPng && boxInCrop) {
-    try {
+  // guessing, no half-mixed colors. MANDATORY in repair mode: if the output
+  // mask can't be built, the model almost certainly painted the figure
+  // wrong/elsewhere — fail loudly, never degrade to the diff blob (exp #30
+  // shipped grey-smear garbage that way).
+  if ((params.pasteMode || 'figure') === 'figure' && params.repairMode) {
+    if (!oldMaskPng || !boxInCrop) {
+      const err = new Error('Repair blend needs the figure silhouette and the mask service did not deliver one (cold Python service?) — retry.');
+      err.partialResult = { steps, crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H }, characterName: ref.name };
+      throw err;
+    }
+    {
       const newMaskPng = await fetchMaskWithRetry(back, boxInCrop);
-      if (newMaskPng) {
+      if (!newMaskPng) {
+        const err = new Error('SAM found no figure in the model output inside the target box — the model likely painted the figure elsewhere or not at all. See the raw output step; Redo.');
+        err.partialResult = { steps, crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H }, characterName: ref.name };
+        throw err;
+      }
+      {
         const raw1 = { raw: { width: crop.w, height: crop.h, channels: 1 } };
         const oldA = await sharp(oldMaskPng).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
         const newA = await sharp(newMaskPng).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
@@ -1698,8 +1716,6 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         }
         feathered = await sharp(sourceJpeg).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
       }
-    } catch (err) {
-      log.warn(`[TESTLAB] SAM union blend unavailable (${err.message}) — falling back to diff blob`);
     }
   }
 
