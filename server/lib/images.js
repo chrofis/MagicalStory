@@ -16076,7 +16076,7 @@ async function checkStyleMatch(imageDataA, imageDataB) {
         part(imageDataA),
         { text: 'Image B (candidate repaint of the same scene):' },
         part(imageDataB),
-        { text: 'Is Image B rendered in the SAME artistic medium and stylization as Image A? Judge ONLY the rendering technique of faces and figures: painterly/watercolor vs flat vector cartoon vs anime vs 3D vs photo. Content and layout differences are irrelevant. A face rendered with flat fills, hard clean outlines and simplified features when A has painterly texture = NOT the same style. JSON only: {"sameStyle": true/false, "styleA": "...", "styleB": "..."}' },
+        { text: 'Is Image B rendered in the SAME artistic medium and stylization CLASS as Image A? The classes: painterly/watercolor, flat vector cartoon, anime/manga, 3D render, photo. Judge ONLY the rendering technique of faces and figures; content and layout differences are irrelevant. Answer false ONLY when the class differs (e.g. a flat-vector cartoon face in a watercolor scene, an anime face in a photo). Variation WITHIN a class — smoother vs more textured watercolor, more or less visible brushstrokes, softer edges — is the SAME style: answer true. JSON only: {"sameStyle": true/false, "styleA": "...", "styleB": "..."}' },
       ] }],
       generationConfig: { temperature: 0, maxOutputTokens: 300, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     }),
