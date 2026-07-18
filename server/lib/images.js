@@ -10002,7 +10002,7 @@ async function fetchSilhouettePng(cropJpegBuffer) {
  * backend value, falls back to the rembg silhouette (fetchSilhouettePng),
  * which masks every salient figure in the crop.
  */
-async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop) {
+async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop, opts = {}) {
   const backend = CONFIG_DEFAULTS.figureMaskBackend || 'rembg';
   if (backend === 'mobilesam' && Array.isArray(boxInCrop) && boxInCrop.length === 4) {
     const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
@@ -10013,6 +10013,9 @@ async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop) {
         body: JSON.stringify({
           image: `data:image/jpeg;base64,${cropJpegBuffer.toString('base64')}`,
           box: boxInCrop,
+          // Optional positive point prompts ([x,y] pairs) — face repairs pass
+          // a hair point so SAM includes the hair, not just the face.
+          ...(Array.isArray(opts.points) && opts.points.length ? { points: opts.points, point_labels: opts.pointLabels || opts.points.map(() => 1) } : {}),
           color: [255, 255, 255],
           alpha: 255,
         }),

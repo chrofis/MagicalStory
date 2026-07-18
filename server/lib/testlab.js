@@ -632,6 +632,14 @@ async function runCharRepairStage(ctx, opts) {
       Math.min(chh, Math.round(bbox[2] * om.height) - cy),
     ];
     const failCtx = { steps, characterName: charName, bbox, boxSource, backend };
+    // Face repairs: clip the blend to the faceBox — the union must never
+    // include body pixels regardless of what SAM returns.
+    const faceClip = params.whiteoutTarget === 'face' && faceBbox?.length === 4 ? [
+      Math.max(0, Math.round(faceBbox[1] * om.width) - cx),
+      Math.max(0, Math.round(faceBbox[0] * om.height) - cy),
+      Math.min(cw, Math.round(faceBbox[3] * om.width) - cx),
+      Math.min(chh, Math.round(faceBbox[2] * om.height) - cy),
+    ] : null;
     const blend = await samUnionBlend({
       originalCropBuf: origCrop,
       candidateCropBuf: candCrop,
@@ -640,6 +648,7 @@ async function runCharRepairStage(ctx, opts) {
       cropH: chh,
       addStep,
       failCtx,
+      clipRect: faceClip,
     });
     const composed = await sharp(origBuf).composite([{ input: blend.feathered, left: cx, top: cy }]).jpeg({ quality: 95 }).toBuffer();
     finalImage = `data:image/jpeg;base64,${composed.toString('base64')}`;
@@ -1557,10 +1566,10 @@ function warmupFigureMask() {
   })();
 }
 
-async function fetchMaskWithRetry(buf, box, tries = 5) {
+async function fetchMaskWithRetry(buf, box, tries = 5, opts = {}) {
   const { fetchFigureMaskPng } = require('./images');
   for (let i = 0; i < tries; i++) {
-    const m = await fetchFigureMaskPng(buf, box);
+    const m = await fetchFigureMaskPng(buf, box, opts);
     if (m) return m;
     if (i < tries - 1) {
       log.info(`[TESTLAB] figure mask unavailable (attempt ${i + 1}/${tries}) — waiting for model warm-up`);
@@ -1585,7 +1594,7 @@ async function fetchMaskWithRetry(buf, box, tries = 5) {
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -1593,9 +1602,9 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     return err;
   };
 
-  const oldMask = oldMaskPng || await fetchMaskWithRetry(originalCropBuf, boxInCrop);
+  const oldMask = oldMaskPng || await fetchMaskWithRetry(originalCropBuf, boxInCrop, 5, maskPoints || {});
   if (!oldMask) throw fail('SAM could not mask the original figure (mask service unavailable?) — retry.');
-  const newMask = await fetchMaskWithRetry(candidateCropBuf, boxInCrop);
+  const newMask = await fetchMaskWithRetry(candidateCropBuf, boxInCrop, 5, maskPoints || {});
   if (!newMask) throw fail('SAM found no figure in the model output inside the target box — the model likely painted the figure elsewhere or not at all. See the raw output step; Redo.');
 
   const raw1 = { raw: { width: cropW, height: cropH, channels: 1 } };
@@ -1613,13 +1622,15 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const emitMaskViews = async (roundLabel, imgBuf, maskPngBuf) => {
     const sharpL = require('sharp');
     const img = await sharpL(imgBuf).resize(cropW, cropH, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
-    const mask = await sharpL(maskPngBuf).resize(cropW, cropH, { fit: 'fill' }).png().toBuffer();
+    // Binarize the SAM alpha — soft mask edges would read as feathering.
+    const mAlphaRaw = await sharpL(maskPngBuf).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+    const s2 = Math.max(1, Math.round(mAlphaRaw.length / n));
+    const mAlpha = Buffer.alloc(n);
+    for (let i = 0; i < n; i++) mAlpha[i] = mAlphaRaw[i * s2] > 128 ? 255 : 0;
+    const mask = await sharpL(Buffer.alloc(n * 3, 255), { raw: { width: cropW, height: cropH, channels: 3 } })
+      .ensureAlpha().joinChannel(Buffer.from(mAlpha), raw1).png().toBuffer();
     const white = await sharpL(img).composite([{ input: mask, left: 0, top: 0 }]).jpeg().toBuffer();
     await addStep(`${roundLabel}: region whited out`, `data:image/jpeg;base64,${white.toString('base64')}`);
-    const mAlphaRaw = await sharpL(mask).ensureAlpha().extractChannel(3).raw().toBuffer();
-    const s2 = Math.max(1, Math.round(mAlphaRaw.length / n));
-    let mAlpha = mAlphaRaw;
-    if (s2 > 1) { mAlpha = Buffer.alloc(n); for (let i = 0; i < n; i++) mAlpha[i] = mAlphaRaw[i * s2]; }
     const figPng = await sharpL(img).ensureAlpha().joinChannel(Buffer.from(mAlpha), raw1).png().toBuffer();
     const cut = await sharpL({ create: { width: cropW, height: cropH, channels: 3, background: { r: 30, g: 30, b: 30 } } })
       .composite([{ input: figPng }]).jpeg().toBuffer();
@@ -1630,6 +1641,18 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
 
   const oldA = await sharp(oldMask).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
   const newA = await sharp(newMask).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+
+  // Face-scoped repairs: BOTH masks hard-clipped to the target region —
+  // round 2's SAM may grab head+torso otherwise and balloon the union.
+  if (clipRect?.length === 4) {
+    for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
+      if (x < clipRect[0] || x >= clipRect[2] || y < clipRect[1] || y >= clipRect[3]) {
+        const i = y * cropW + x;
+        oldA[i * Math.max(1, Math.round(oldA.length / n))] = 0;
+        newA[i * Math.max(1, Math.round(newA.length / n))] = 0;
+      }
+    }
+  }
 
   const union = Buffer.alloc(n);
   const newBin = Buffer.alloc(n);
@@ -1667,11 +1690,12 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // and leaves a background fringe against the figure. Feathering exists only
   // OUTSIDE the padded union: a falloff band where the model's background
   // fades into the original background.
+  // NO FEATHERING — the blend is the hard padded union, nothing else.
+  // Every pixel in the union comes from the new image at 255; every pixel
+  // outside stays original at 255. Binary, no falloff band.
   const padPx = 6;
-  const unionPadded = strip(await sharp(union, raw1).blur(padPx / 1.5).threshold(16).raw().toBuffer()); // ≈3px dilation, still binary
-  const softOut = strip(await sharp(Buffer.from(unionPadded), raw1).blur(4).raw().toBuffer());
-  const alpha1 = Buffer.alloc(n);
-  for (let i = 0; i < n; i++) alpha1[i] = Math.max(unionPadded[i], softOut[i]);
+  const unionPadded = strip(await sharp(union, raw1).blur(padPx / 1.5).threshold(16).raw().toBuffer()); // ≈6px dilation, binary
+  const alpha1 = Buffer.from(unionPadded);
 
   // Applied mask views instead of raw black/white masks: (a) the original
   // with the padded union whited out — the region the blend treats as
@@ -1694,7 +1718,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
 // Stamped on every blended entry so the UI can show WHICH blend generation
 // produced an image — mixed-generation comparisons were repeatedly mistaken
 // for bugs. Bump on every blend-behavior change.
-const BLEND_RULE_VERSION = 'union-solid-pad6';
+const BLEND_RULE_VERSION = 'union-hard-pad6';
 
 /**
  * Crop-bounded Qwen character insertion (composite-v2 recipe, validated
@@ -1799,40 +1823,46 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   let boxInCrop = null;
   if (params.repairMode && figureBox) {
     try {
-      // Face mode: the detection emits faceBox padded 100% — counter-shrink
-      // it for the SAM prompt so the mask is the FACE/HEAD, not head+torso,
-      // and clip the mask to the face region as a hard bound.
-      let samBox = figureBox;
-      if (params._faceMode) {
-        const fw = figureBox[3] - figureBox[1], fh = figureBox[2] - figureBox[0];
-        samBox = [figureBox[0] + fh * 0.18, figureBox[1] + fw * 0.18, figureBox[2] - fh * 0.18, figureBox[3] - fw * 0.18];
-      }
       boxInCrop = [
-        Math.max(0, Math.round(samBox[1] * W) - crop.x),
-        Math.max(0, Math.round(samBox[0] * H) - crop.y),
-        Math.min(crop.w, Math.round(samBox[3] * W) - crop.x),
-        Math.min(crop.h, Math.round(samBox[2] * H) - crop.y),
+        Math.max(0, Math.round(figureBox[1] * W) - crop.x),
+        Math.max(0, Math.round(figureBox[0] * H) - crop.y),
+        Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
+        Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
       ];
-      oldMaskPng = await fetchMaskWithRetry(cropBuf, boxInCrop);
-      if (oldMaskPng && params._faceMode) {
-        // Hard-clip the mask to the (padded) faceBox region — never the body.
-        const clipRect = [
+      // Face mode: SAM box prompts anchor on the face and miss the HAIR —
+      // add positive point prompts (face center + hair region near the box
+      // top) so the whole head masks; the faceBox clip below still bounds it.
+      if (params._faceMode) {
+        const bcx = Math.round((boxInCrop[0] + boxInCrop[2]) / 2);
+        const bh2 = boxInCrop[3] - boxInCrop[1];
+        params._maskPoints = {
+          points: [
+            [bcx, Math.round(boxInCrop[1] + bh2 * 0.5)],  // face center
+            [bcx, Math.round(boxInCrop[1] + bh2 * 0.15)], // hair
+          ],
+        };
+      }
+      oldMaskPng = await fetchMaskWithRetry(cropBuf, boxInCrop, 5, params._maskPoints || {});
+      if (oldMaskPng) {
+        // Rebuild the whiteout mask BINARIZED (no soft SAM edges = no
+        // feathered-looking whiteout), hard-clipped to the face region in
+        // face mode — never the body.
+        const clipRect = params._faceMode ? [
           Math.max(0, Math.round(figureBox[1] * W) - crop.x),
           Math.max(0, Math.round(figureBox[0] * H) - crop.y),
           Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
           Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
-        ];
+        ] : null;
         const a = await sharp(oldMaskPng).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
         const stride = Math.max(1, Math.round(a.length / (crop.w * crop.h)));
-        const clipped = Buffer.alloc(crop.w * crop.h);
+        const hard = Buffer.alloc(crop.w * crop.h);
         for (let y = 0; y < crop.h; y++) for (let x = 0; x < crop.w; x++) {
           const i = y * crop.w + x;
-          clipped[i] = (x >= clipRect[0] && x < clipRect[2] && y >= clipRect[1] && y < clipRect[3]) ? a[i * stride] : 0;
+          const inClip = !clipRect || (x >= clipRect[0] && x < clipRect[2] && y >= clipRect[1] && y < clipRect[3]);
+          hard[i] = inClip && a[i * stride] > 128 ? 255 : 0;
         }
         oldMaskPng = await sharp(Buffer.alloc(crop.w * crop.h * 3, 255), { raw: { width: crop.w, height: crop.h, channels: 3 } })
-          .ensureAlpha().joinChannel(Buffer.from(clipped), { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
-      }
-      if (oldMaskPng) {
+          .ensureAlpha().joinChannel(Buffer.from(hard), { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
         sentBuf = await sharp(cropBuf).composite([{ input: oldMaskPng, left: 0, top: 0 }]).jpeg({ quality: 95 }).toBuffer();
         whiteoutApplied = true;
       }
@@ -1910,6 +1940,15 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       oldMaskPng,
       addStep,
       failCtx,
+      maskPoints: params._maskPoints || null,
+      // Face mode: union hard-clipped to the face region — body pixels never
+      // enter the union no matter what round-2 SAM returns.
+      clipRect: params._faceMode && figureBox ? [
+        Math.max(0, Math.round(figureBox[1] * W) - crop.x),
+        Math.max(0, Math.round(figureBox[0] * H) - crop.y),
+        Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
+        Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
+      ] : null,
     });
     feathered = blend.feathered;
   }
