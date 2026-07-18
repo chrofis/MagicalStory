@@ -41,7 +41,7 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 ## Spec check (required)
 
-Fill `spec_conflicts[]` before writing any fixes. Compare the declared requirements pairwise and list every pair where the same body part appears in both (committed in one, held or reached-for in the other), or where one requires almost-touching without contact. These combinations are not reliably renderable together — the scene must be rewritten, not repainted. Empty array when none. For every listed pair: emit NO fixes for it; record its issues in `dropped_issues` with reason `"spec_conflict"`.
+Fill `spec_conflicts[]` before writing any fixes. This is the one exception to rule 1: read the declared interactions in the scene description directly and compare them pairwise. List every pair where the same body part appears in both (committed in one, held or reached-for in the other), or where one requires almost-touching without contact. These combinations are not reliably renderable together — the scene must be rewritten, not repainted. Empty array when none. For every listed pair: emit NO fixes for it; record its issues in `dropped_issues` with reason `"spec_conflict"`.
 
 ## Final score (0–100) — audit only
 
