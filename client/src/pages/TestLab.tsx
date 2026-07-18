@@ -9,7 +9,7 @@
  *    current templates or a prompt-override variant; compare baseline vs
  *    variant side-by-side with eval scores; promote a test image if wanted.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { FlaskConical, RefreshCw, Trash2, ExternalLink, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -846,6 +846,8 @@ function LightboxHost() {
   const [state, setState] = useState<{ imgs: LightboxImage[]; index: number } | null>(null);
   const [zoom, setZoom] = useState(1); // 1 = fit; 2/3/4 = 200/300/400% of NATIVE pixels
   const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
   useEffect(() => { _openLightbox = (imgs, index) => { setState({ imgs, index }); setZoom(1); setNat(null); }; return () => { _openLightbox = () => {}; }; }, []);
   useEffect(() => {
     if (!state) return;
@@ -866,9 +868,9 @@ function LightboxHost() {
       <div className="flex items-center justify-between px-6 py-3 text-white" onClick={e => e.stopPropagation()}>
         <div className="text-sm font-medium">{cur.label} <span className="text-white/50 ml-2">{state.index + 1} / {state.imgs.length}</span></div>
         <div className="flex items-center gap-3">
-          <button className="text-white/70 hover:text-white text-xl px-2" onClick={() => setZoom(z => Math.max(1, z - 1))}>−</button>
-          <span className="text-sm text-white/70 w-14 text-center">{zoom === 1 ? 'fit' : `${zoom * 100}%`}</span>
-          <button className="text-white/70 hover:text-white text-xl px-2" onClick={() => setZoom(z => Math.min(4, z + 1))}>+</button>
+          <button className="text-white/70 hover:text-white text-xl px-2" onClick={() => setZoom(z => Math.max(1, +(z - 0.5).toFixed(2)))}>−</button>
+          <span className="text-sm text-white/70 w-14 text-center">{zoom <= 1 ? 'fit' : `${Math.round(zoom * 100)}%`}</span>
+          <button className="text-white/70 hover:text-white text-xl px-2" onClick={() => setZoom(z => Math.min(6, +(z + 0.5).toFixed(2)))}>+</button>
           <button className="text-white/70 hover:text-white text-2xl leading-none ml-4" onClick={() => setState(null)}>×</button>
         </div>
       </div>
@@ -877,31 +879,49 @@ function LightboxHost() {
           className="absolute left-2 top-1/2 -translate-y-1/2 z-10 text-white/70 hover:text-white text-4xl px-3 py-6 bg-black/40 rounded-r-lg"
           onClick={() => { setState(s => s && { ...s, index: (s.index - 1 + s.imgs.length) % s.imgs.length }); setZoom(1); }}
         >‹</button>
-        {zoom === 1 ? (
-          <div className="absolute inset-0 flex items-center justify-center px-16">
+        {/* Mouse wheel = zoom (true pixel scale), click-drag = pan. */}
+        <div
+          ref={scrollRef}
+          className={`absolute inset-0 overflow-auto ${zoom > 1 ? (dragRef.current ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
+          onWheel={e => {
+            e.preventDefault();
+            setZoom(z => Math.min(6, Math.max(1, +(z * (e.deltaY < 0 ? 1.25 : 0.8)).toFixed(2))));
+          }}
+          onPointerDown={e => {
+            if (zoom <= 1 || !scrollRef.current) return;
+            dragRef.current = { x: e.clientX, y: e.clientY, sl: scrollRef.current.scrollLeft, st: scrollRef.current.scrollTop };
+            (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+          }}
+          onPointerMove={e => {
+            if (!dragRef.current || !scrollRef.current) return;
+            scrollRef.current.scrollLeft = dragRef.current.sl - (e.clientX - dragRef.current.x);
+            scrollRef.current.scrollTop = dragRef.current.st - (e.clientY - dragRef.current.y);
+          }}
+          onPointerUp={() => { dragRef.current = null; }}
+          onPointerCancel={() => { dragRef.current = null; }}
+        >
+          {zoom <= 1 ? (
+            <div className="w-full h-full flex items-center justify-center px-16">
+              <img
+                src={cur.src} alt={cur.label}
+                className="max-h-full max-w-full object-contain"
+                draggable={false}
+                onLoad={e => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+              />
+            </div>
+          ) : (
             <img
               src={cur.src} alt={cur.label}
-              className="max-h-full max-w-full object-contain cursor-zoom-in"
-              onLoad={e => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-              onClick={() => setZoom(2)}
-            />
-          </div>
-        ) : (
-          // Zoomed: TRUE pixel scale — width = naturalWidth × zoom, nothing
-          // else may cap it. Scroll to pan; click cycles 200→300→400→fit.
-          <div className="absolute inset-0 overflow-auto">
-            <img
-              src={cur.src} alt={cur.label}
-              className="cursor-zoom-in"
+              draggable={false}
               style={{
-                width: nat ? `${nat.w * zoom}px` : `${zoom * 100}%`,
+                width: nat ? `${Math.round(nat.w * zoom)}px` : `${zoom * 100}%`,
                 maxWidth: 'none', maxHeight: 'none', display: 'block', margin: '0 auto',
+                userSelect: 'none',
               }}
               onLoad={e => { if (!nat) setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }); }}
-              onClick={() => setZoom(z => (z >= 4 ? 1 : z + 1))}
             />
-          </div>
-        )}
+          )}
+        </div>
         <button
           className="absolute right-2 top-1/2 -translate-y-1/2 z-10 text-white/70 hover:text-white text-4xl px-3 py-6 bg-black/40 rounded-l-lg"
           onClick={() => { setState(s => s && { ...s, index: (s.index + 1) % s.imgs.length }); setZoom(1); }}

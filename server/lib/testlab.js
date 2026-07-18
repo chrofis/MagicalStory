@@ -1644,56 +1644,18 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   await addStep('mask difference (red = old-only, green = new-only)',
     `data:image/jpeg;base64,${(await sharp(diffRgb, { raw: { width: cropW, height: cropH, channels: 3 } }).jpeg().toBuffer()).toString('base64')}`);
 
-  // Red-zone restore: diffusion-fill from the real background around the union.
-  const backRaw = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).raw().toBuffer();
-  let source = backRaw;
-  if (redPx > 0) {
-    const origRawFill = await sharp(originalCropBuf).resize(cropW, cropH, { fit: 'fill' }).raw().toBuffer();
-    const valid = new Uint8Array(n);
-    const fillR = Buffer.from(origRawFill);
-    for (let i = 0; i < n; i++) valid[i] = union[i] > 128 ? 0 : 1;
-    for (let pass = 0; pass < 80; pass++) {
-      let progressed = false;
-      for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
-        const i = y * cropW + x;
-        if (valid[i]) continue;
-        let r = 0, g = 0, b = 0, c = 0;
-        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-          const yy = y + dy, xx = x + dx;
-          if (yy < 0 || yy >= cropH || xx < 0 || xx >= cropW) continue;
-          const j = yy * cropW + xx;
-          if (valid[j]) { r += fillR[j * 3]; g += fillR[j * 3 + 1]; b += fillR[j * 3 + 2]; c++; }
-        }
-        if (c > 0) {
-          fillR[i * 3] = Math.round(r / c); fillR[i * 3 + 1] = Math.round(g / c); fillR[i * 3 + 2] = Math.round(b / c);
-          valid[i] = 2; progressed = true;
-        }
-      }
-      for (let i = 0; i < n; i++) if (valid[i] === 2) valid[i] = 1;
-      if (!progressed) break;
-    }
-    source = Buffer.from(backRaw);
-    for (let i = 0; i < n; i++) {
-      if (redMask[i]) { source[i * 3] = fillR[i * 3]; source[i * 3 + 1] = fillR[i * 3 + 1]; source[i * 3 + 2] = fillR[i * 3 + 2]; }
-    }
-  }
-
-  // Alpha: crisp new-figure edge everywhere (1px soften for SAM binarization),
-  // feather ONLY the red-zone borders (restored background meets original).
-  const crispNew = strip(await sharp(newBin, raw1).blur(1).raw().toBuffer());
-  const redSoft = redPx > 0
-    ? strip(await sharp(redMask, raw1).blur(2).threshold(16).blur(4).raw().toBuffer())
-    : null;
+  // THE RULE: every pixel in EITHER mask (the union) comes from the NEW image
+  // at FULL opacity — the figure is never feathered. Feathering exists only
+  // OUTSIDE the union: a falloff band where the model's background fades into
+  // the original background. alpha = max(hard union, outward blur tail).
+  const softOut = strip(await sharp(union, raw1).blur(4).raw().toBuffer());
   const alpha1 = Buffer.alloc(n);
-  for (let i = 0; i < n; i++) alpha1[i] = Math.max(crispNew[i], redSoft ? redSoft[i] : 0);
+  for (let i = 0; i < n; i++) alpha1[i] = Math.max(union[i], softOut[i]);
 
-  await addStep('blend mask (crisp figure edge, feathered red zones)',
+  await addStep('blend mask (union solid from new image, feather only outside)',
     `data:image/jpeg;base64,${(await sharp(Buffer.from(alpha1), raw1).jpeg().toBuffer()).toString('base64')}`);
-  const sourceJpeg = await sharp(source, { raw: { width: cropW, height: cropH, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
-  if (redPx > 0) {
-    await addStep(`red-zone background restore (${redPx}px filled from real background)`, `data:image/jpeg;base64,${sourceJpeg.toString('base64')}`);
-  }
-  const feathered = await sharp(sourceJpeg).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
+  const candResized = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
+  const feathered = await sharp(candResized).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
   return { feathered, iou, redPx };
 }
 
