@@ -228,10 +228,10 @@ export const testlabService = {
     return api.get<ExperimentDetail>(`/api/admin/testlab/experiments/${id}`);
   },
 
-  redo(experimentId: number, resultIndex: number, promptOverride?: string | null, useCurrentTemplates?: boolean) {
+  redo(experimentId: number, resultIndex: number, promptOverride?: string | null, useCurrentTemplates?: boolean, extraRule?: string | null) {
     return api.post<{ started: boolean }>(
       `/api/admin/testlab/experiments/${experimentId}/redo`,
-      { resultIndex, promptOverride: promptOverride || undefined, ...(useCurrentTemplates ? { useCurrentTemplates: true } : {}) }
+      { resultIndex, promptOverride: promptOverride || undefined, ...(useCurrentTemplates ? { useCurrentTemplates: true } : {}), ...(extraRule ? { extraRule } : {}) }
     );
   },
 

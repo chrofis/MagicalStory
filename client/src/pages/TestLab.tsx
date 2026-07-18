@@ -626,7 +626,13 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
       // override — pass useCurrentTemplates so "empty = current templates"
       // actually holds, matching the placeholder text.
       const text = redoOverride.trim();
-      await testlabService.redo(detail.id, index, text || undefined, !text && !!detail.promptOverride);
+      // scene_variant: the redo textarea is the NEXT RULE attempt (appended
+      // to the current template), not a full template override.
+      if (detail.stage === 'scene_variant') {
+        await testlabService.redo(detail.id, index, undefined, false, text || undefined);
+      } else {
+        await testlabService.redo(detail.id, index, text || undefined, !text && !!detail.promptOverride);
+      }
       setPendingRedos(p => ({ ...p, [index]: countRedos(detail.results, index) + 1 }));
     } catch (e) {
       alert(`Redo failed: ${e instanceof Error ? e.message : e}`);

@@ -428,7 +428,7 @@ router.get('/experiments/:id', async (req, res) => {
 let redosInFlight = 0;
 const MAX_CONCURRENT_REDOS = 3;
 
-async function executeRedo(experimentId, exp, entry, resultIndex, override) {
+async function executeRedo(experimentId, exp, entry, resultIndex, override, extraRule = null) {
   const { runStageOnTarget } = require('../../lib/testlab');
   try {
     let redo;
@@ -503,7 +503,7 @@ async function executeRedo(experimentId, exp, entry, resultIndex, override) {
 router.post('/experiments/:id/redo', async (req, res) => {
   try {
     const experimentId = parseInt(req.params.id, 10);
-    const { resultIndex, promptOverride } = req.body;
+    const { resultIndex, promptOverride, extraRule } = req.body;
     const rows = await dbQuery('SELECT * FROM testlab_experiments WHERE id = $1', [experimentId]);
     if (!rows.length) return res.status(404).json({ error: 'Experiment not found' });
     const exp = rows[0];
@@ -520,7 +520,9 @@ router.post('/experiments/:id/redo', async (req, res) => {
       ? null
       : (promptOverride ?? exp.prompt_override ?? null);
     // Fire and forget — the client polls GET /experiments/:id for the new entry.
-    executeRedo(experimentId, exp, entry, resultIndex, override);
+    // extraRule: per-redo rule for scene_variant — each redo is the next
+    // attempt (C, D, E, …) inside the SAME experiment.
+    executeRedo(experimentId, exp, entry, resultIndex, override, extraRule ?? null);
     res.json({ started: true });
   } catch (err) {
     log.error(`[TESTLAB] redo start failed: ${err.message}`);
