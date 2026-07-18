@@ -1665,6 +1665,7 @@ character features (glasses, hearing aids, braces) are identity, never anachroni
 **Touched:** `server/lib/images.js` (iteratePageCore return, round-entry fields, buildEvalInputs,
 buildEntityCheckData, buildVersionEntry, final assembly), `prompts/image-evaluation.txt`.
 **Status:** ✅ staging.
+**Addendum (same day):** model-side detection proved input-dependent (~2/3 — it keyed off eval wording; 5/5 stable given identical input). Detection is now DETERMINISTIC CODE on the declared interactions (`detectDeclaredSpecConflicts` in feedbackConsolidator.js: body part committed in one interaction + targeted in another → spec_conflicts, merged with model findings). 3/3 identical routing verified. Also: iterate object additions are gated by an anchored allow-list (original metadata ∪ eval feedback ∪ page text — language-tolerant matching) after a rewrite swapped the scene vehicle for an unrelated statue.
 
 ## Scene-level scores are mirrors of the picked version — finalScore everywhere (2026-07-18)
 **Context:** "One score" was unified at the VERSION level long ago (applyScore/computeFinalScore,
