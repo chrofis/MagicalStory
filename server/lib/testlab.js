@@ -1051,6 +1051,25 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
       ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null
     );
     if (!fresh) throw new Error('Fresh evaluation returned null');
+    // Production stamps the consolidated plan onto the eval at scoring time;
+    // decideRepairMethod's spec-conflict gate and iterate's conflict feedback
+    // both read it. Without this the fresh-eval path under-reproduces the
+    // pipeline (gate falls through to the score floors).
+    try {
+      const { consolidateEvaluation } = require('./feedbackConsolidator');
+      const cons = await consolidateEvaluation({
+        evalResult: fresh,
+        entityIssues: [],
+        sceneDescription: ctx.scene.sceneDescription || '',
+        characters: storyData.characters || [],
+        storyId: ctx.storyId,
+        pageNumber: ctx.pageNumber,
+        round: 0,
+      });
+      if (cons?.plan) fresh.consolidatedPlan = cons.plan;
+    } catch (cErr) {
+      log.warn(`[TESTLAB] fresh-eval consolidation failed (continuing): ${cErr.message}`);
+    }
     latestEval = fresh;
   }
   const entityReport = params.entityReport || storyData.finalChecksReport?.entity || null;
