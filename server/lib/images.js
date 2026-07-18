@@ -2396,14 +2396,30 @@ function _maskOverlapFrac(a, b) {
   return inter / Math.max(1, Math.min(a.area, b.area));
 }
 
+// DINO face boxes hug the facial features tightly; downstream face repair
+// needs the full head (hair, chin, ears). Pad 100% (50% per side) around
+// the center, clamped to the image. SINGLE source of truth — used by the
+// full-page detection assembly AND recoverFaceBox, so a recovered face box
+// is byte-identical in shape to a normally-detected one.
+function _padDinoFaceBox(facePxBox, W, H) {
+  const [x1, y1, x2, y2] = facePxBox;
+  const pw = (x2 - x1) * 0.5, ph = (y2 - y1) * 0.5;
+  return _pxBoxToNorm([
+    Math.max(0, x1 - pw), Math.max(0, y1 - ph),
+    Math.min(W, x2 + pw), Math.min(H, y2 + ph),
+  ], W, H);
+}
+
 /**
  * Face-box recovery for a figure whose full-page face detection came back
  * empty (small/distant faces): crop the KNOWN body box, upscale it, and run
- * the GroundingDINO 'face' prompt on the crop — a 40px face on the full page
- * is 150px+ in the upscaled crop, where detection is reliable. Maps the best
- * box back to page-normalized [ymin,xmin,ymax,xmax]. Returns null when even
- * the zoomed crop has no detectable face (caller must then fail the face
- * repair loudly — never silently downgrade to a body repair).
+ * the SAME GroundingDINO 'face' prompt + NMS + padding as full-page detection
+ * — a 40px face on the full page is 150px+ in the upscaled crop, where
+ * detection is reliable. Maps the best box back to page coords and pads it
+ * with the shared _padDinoFaceBox rule (full head, not just facial features).
+ * Returns page-normalized [ymin,xmin,ymax,xmax], or null when even the zoomed
+ * crop has no detectable face (caller must then fail the face repair loudly —
+ * never silently downgrade to a body repair).
  */
 async function recoverFaceBox(imageDataUri, bodyBoxNorm, pageLabel = '') {
   try {
@@ -2430,14 +2446,13 @@ async function recoverFaceBox(imageDataUri, bodyBoxNorm, pageLabel = '') {
       .filter(f => (f.box[2] - f.box[0]) * (f.box[3] - f.box[1]) < 0.4 * sw * sh);
     if (faces.length === 0) return null;
     const best = faces[0].box; // px in the scaled crop, score-desc
-    const pageBox = [
-      Math.max(0, Math.min(1, (cy + best[1] / scale) / H)),
-      Math.max(0, Math.min(1, (cx + best[0] / scale) / W)),
-      Math.max(0, Math.min(1, (cy + best[3] / scale) / H)),
-      Math.max(0, Math.min(1, (cx + best[2] / scale) / W)),
+    // Back to PAGE pixel coords, then the shared production padding.
+    const pagePxBox = [
+      cx + best[0] / scale, cy + best[1] / scale,
+      cx + best[2] / scale, cy + best[3] / scale,
     ];
     log.info(`🔎 [GDINO-DETECT] ${pageLabel}face recovered via body-crop zoom (score ${faces[0].score?.toFixed?.(2) ?? '?'})`);
-    return pageBox;
+    return _padDinoFaceBox(pagePxBox, W, H);
   } catch (e) {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}face recovery failed: ${e.message}`);
     return null;
@@ -2840,17 +2855,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     const cx = (bodyBox[1] + bodyBox[3]) / 2;
     return cx < 0.33 ? 'left' : cx > 0.66 ? 'right' : 'center';
   };
-  // DINO face boxes hug the facial features tightly; downstream face repair
-  // needs the full head (hair, chin, ears). Pad 100% (50% per side) around
-  // the center, clamped to the image.
-  const paddedFaceBox = (facePxBox) => {
-    const [x1, y1, x2, y2] = facePxBox;
-    const pw = (x2 - x1) * 0.5, ph = (y2 - y1) * 0.5;
-    return _pxBoxToNorm([
-      Math.max(0, x1 - pw), Math.max(0, y1 - ph),
-      Math.min(W, x2 + pw), Math.min(H, y2 + ph),
-    ], W, H);
-  };
+  const paddedFaceBox = (facePxBox) => _padDinoFaceBox(facePxBox, W, H);
   const figures = [];
   const masks = [];
   dets.forEach((d, j) => {

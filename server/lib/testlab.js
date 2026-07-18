@@ -2114,25 +2114,40 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   const rw = snap(crop.w * 2), rh = snap(crop.h * 2);
 
   const pose = params.pose || 'standing naturally, scale matching the scene perspective';
+  // Name the story's actual art style — the generic "match the style" phrase
+  // left Qwen free to flip the crop into a flat vector look (exp #69).
+  const styleLine = (() => {
+    try {
+      const { ART_STYLES } = require('./storyHelpers');
+      const raw = ART_STYLES[ctx.artStyle];
+      const txt = typeof raw === 'string' ? raw : (raw && raw.default) || '';
+      const first = (txt.match(/^[^.]*\./) || [''])[0].trim();
+      return first ? ` Match the illustration style of the first image: ${first}` : ' Match the illustration style and lighting.';
+    } catch { return ' Match the illustration style and lighting.'; }
+  })();
   const prompt = promptOverride
     || (params.repairMode
       ? (whiteoutApplied
         ? (params._faceMode
-          ? `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. IDENTITY comes from the second image: exact same facial features, age, glasses and hair color. HEAD POSE comes from the third image (the original scene): copy its exact head direction, gaze direction, tilt and facial expression — if the person was looking left, the painted face looks left. Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people. Match the illustration style and lighting.`
-          : `Paint the person from the second image into the white silhouette area of the first image. The silhouette shows their exact position, pose and scale — fill it with that person in that pose. The painted person must have the EXACT same face, age, hair color and clothing as shown in the second image${ref.clothingDescription ? ` (${ref.clothingDescription})` : ''}. Keep everything outside the white area exactly unchanged: same background, same other people, same objects, same colors, same framing. Match the illustration style and lighting.`)
-        : `Replace the person in the first image with the person from the second image: SAME position, SAME pose, SAME scale as the existing figure — only the face and appearance change to match the second image. Keep everything else in the first image exactly unchanged: same background, same other people, same objects, same colors, same framing. Match the illustration style.`)
-      : `Insert the person from the second image into the watercolor scene from the first image: ${pose}. Keep the background of the scene exactly as it is — same objects, same colors, same framing. Match the illustration style and lighting, add a soft contact shadow.`);
+          ? `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. IDENTITY comes from the second image: exact same facial features, age, glasses and hair color. HEAD POSE comes from the third image (blurred on purpose): copy only its head direction, gaze direction, tilt and facial expression — if the person was looking left, the painted face looks left; never copy its blurry detail. Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people.${styleLine}`
+          : `Paint the person from the second image into the white silhouette area of the first image. The silhouette shows their exact position, pose and scale — fill it with that person in that pose. The painted person must have the EXACT same face, age, hair color and clothing as shown in the second image${ref.clothingDescription ? ` (${ref.clothingDescription})` : ''}. Keep everything outside the white area exactly unchanged: same background, same other people, same objects, same colors, same framing.${styleLine}`)
+        : `Replace the person in the first image with the person from the second image: SAME position, SAME pose, SAME scale as the existing figure — only the face and appearance change to match the second image. Keep everything else in the first image exactly unchanged: same background, same other people, same objects, same colors, same framing.${styleLine}`)
+      : `Insert the person from the second image into the scene from the first image: ${pose}. Keep the background of the scene exactly as it is — same objects, same colors, same framing. Add a soft contact shadow.${styleLine}`);
 
   const t0 = Date.now();
   const qwenRefs = [
     `data:image/jpeg;base64,${sentBuf.toString('base64')}`,
     ref.photoUrl,
   ];
-  // Face mode: third reference = the ORIGINAL un-whited crop, so the model
-  // can copy head pose / gaze direction / expression while taking identity
-  // from the character reference.
+  // Face mode: third reference = the ORIGINAL crop, BLURRED on purpose — it
+  // conveys head direction / gaze / expression only. Unblurred, Qwen copies
+  // its pixels (including the flawed face it is supposed to replace) instead
+  // of repainting identity from the character reference.
+  let poseRefBuf = null;
   if (params._faceMode && whiteoutApplied) {
-    qwenRefs.push(`data:image/jpeg;base64,${cropBuf.toString('base64')}`);
+    const sigma = Math.max(4, Math.round(Math.min(crop.w, crop.h) / 80));
+    poseRefBuf = await sharp(cropBuf).blur(sigma).jpeg({ quality: 90 }).toBuffer();
+    qwenRefs.push(`data:image/jpeg;base64,${poseRefBuf.toString('base64')}`);
   }
   const result = await editWithQwen(prompt, qwenRefs, { width: rw, height: rh });
   const elapsedMs = Date.now() - t0;
@@ -2149,8 +2164,32 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   };
   await addStep(whiteoutApplied ? 'input 1: crop (figure whiteout)' : 'input 1: crop sent to model', `data:image/jpeg;base64,${sentBuf.toString('base64')}`);
   await addStep('input 2: character reference', ref.photoUrl);
-  if (params._faceMode && whiteoutApplied) await addStep('input 3: original crop (pose/gaze reference)', `data:image/jpeg;base64,${cropBuf.toString('base64')}`);
+  if (poseRefBuf) await addStep('input 3: pose/gaze reference (blurred original)', `data:image/jpeg;base64,${poseRefBuf.toString('base64')}`);
   await addStep('model raw output', `data:image/jpeg;base64,${outBufEarly.toString('base64')}`);
+
+  // STYLE GATE — Qwen occasionally flips the whole crop into a flat vector/
+  // anime look (exp #69 Franziska); the geometry gates can't see that.
+  // Production's compareImageStyles judges rendering style only, content
+  // ignored. Gate unavailability (no Gemini key, transient error) is logged
+  // and skipped — it must not turn a good repair into a failure.
+  let styleCompare = null;
+  if (params.repairMode) {
+    try {
+      const { compareImageStyles } = require('./images');
+      styleCompare = await compareImageStyles(
+        `data:image/jpeg;base64,${cropBuf.toString('base64')}`,
+        `data:image/jpeg;base64,${outBufEarly.toString('base64')}`
+      );
+      if (typeof styleCompare?.similarity === 'number' && styleCompare.similarity < 55) {
+        const err = new Error(`Style drift: model output scored ${styleCompare.similarity}/100 style similarity vs the original crop (${(styleCompare.summary || '').slice(0, 160)}) — Redo.`);
+        err.partialResult = { steps, crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H }, characterName: ref.name, styleCompare };
+        throw err;
+      }
+    } catch (err) {
+      if (err.partialResult) throw err;
+      log.warn(`[TESTLAB] style gate unavailable (${err.message}) — continuing without`);
+    }
+  }
 
   // Paste back. Default 'figure' mode: within the crop, keep ONLY the changed
   // blob (the inserted figure + its shadow, diff vs the original crop,
@@ -2253,6 +2292,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     modelId: result.modelId, promptUsed: prompt,
     crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H },
     blendRule: params.repairMode ? BLEND_RULE_VERSION : undefined,
+    styleSimilarity: styleCompare?.similarity,
     steps, cost: result.cost,
   };
 }
