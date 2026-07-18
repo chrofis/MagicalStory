@@ -9203,7 +9203,47 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const sceneCharacters = getCharactersInScene(newSceneDescription, characters);
 
   // Extract metadata from the new scene description for per-character clothing
-  const newSceneMetadata = extractSceneMetadata(newSceneDescription);
+  let newSceneMetadata = extractSceneMetadata(newSceneDescription);
+
+  // ANCHORED OBJECT ALLOW-LIST (user decision 2026-07-18): the rewrite may
+  // keep/drop objects freely and may ADD an object only when something asked
+  // for it — the original scene metadata, the eval feedback (e.g. "rowing
+  // boat missing"), or the page text. Unanchored additions are scrubbed
+  // (observed: a rewrite swapped the scene's vehicle for an unrelated statue
+  // and the model painted it into the scene). Matching is tolerant across
+  // the language boundary: entity id, entity name, or ≥5-char words from the
+  // name/English VB description against feedback + page text.
+  const rewriteObjects = Array.isArray(newSceneMetadata?.objects) ? newSceneMetadata.objects : [];
+  const origObjects = (savedScene.sceneMetadata?.objects || savedScene.sceneMetadata?.fullData?.objects || []);
+  if (rewriteObjects.length > 0) {
+    const baseId = (o) => String(o).trim().toUpperCase().split('.')[0];
+    const origSet = new Set(origObjects.map(baseId));
+    const haystack = `${JSON.stringify(evaluationFeedback || {})}\n${pageText || ''}`.toLowerCase();
+    const vbEntityById = new Map();
+    for (const pool of [visualBible?.artifacts, visualBible?.animals, visualBible?.vehicles, visualBible?.locations, visualBible?.secondaryCharacters]) {
+      for (const e of (pool || [])) if (e?.id) vbEntityById.set(baseId(e.id), e);
+    }
+    const isAnchored = (obj) => {
+      const id = baseId(obj);
+      if (origSet.has(id)) return true;
+      if (haystack.includes(id.toLowerCase())) return true;
+      const ent = vbEntityById.get(id);
+      if (!ent) return true; // not a VB id — plain names pass through
+      const tokens = [String(ent.name || ''), ...String(ent.name || '').split(/\s|-/), ...String(ent.description || '').split(/[^A-Za-zÀ-ž]+/)]
+        .map(t => t.trim().toLowerCase()).filter(t => t.length >= 5);
+      return tokens.some(t => haystack.includes(t));
+    };
+    const scrubbed = rewriteObjects.filter(o => !isAnchored(o));
+    if (scrubbed.length > 0) {
+      const kept = rewriteObjects.filter(o => !scrubbed.includes(o));
+      log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite added unanchored VB object(s) ${JSON.stringify(scrubbed)} — scrubbed (not in original metadata, feedback, or page text)`);
+      const objRe = /"objects"\s*:\s*\[[^\]]*\]/;
+      if (objRe.test(newSceneDescription)) {
+        newSceneDescription = newSceneDescription.replace(objRe, `"objects": ${JSON.stringify(kept)}`);
+        newSceneMetadata = extractSceneMetadata(newSceneDescription);
+      }
+    }
+  }
 
 // Resolve clothing. The stored pageClothing was set by the unified Sonnet
   // call at generation time and reflects the canonical per-page costume
