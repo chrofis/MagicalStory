@@ -39,6 +39,10 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
    - Never exceed 3, even if every issue is CRITICAL. A fourth CRITICAL goes into `dropped_issues` — the next pass will catch it once the first three are fixed.
    - CRITICAL/MAJOR issues that DON'T make the top 3 are still dropped with the "capped" reason — this is the one case where rule "never drop CRITICAL/MAJOR" is overridden, because asking Grok to fix 4+ things makes the repair effectively useless.
 
+## Impossible spec
+
+If the declared requirements contradict each other (one body part claimed by two interactions, or a pose no body can hold), do not emit repaint fixes for it. Output `scene_fix.instruction` as one sentence stating the spec is impossible and which two requirements conflict — the scene must be rewritten to resolve it.
+
 ## Final score (0–100) — audit only
 
 9. After deduplication, compute `final_score` as the page's overall quality on a 0–100 scale. The pipeline scores the page from `deduped_issues`; `final_score` and the deduction table below are recorded for audit.

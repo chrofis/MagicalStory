@@ -223,6 +223,8 @@ Each defect gets a `fixable_issues` entry with `type: physics`.
 
 For `storyRelevant: false` entries: no deduction on pose, position, or styling differences. Only flag if the object is completely missing AND the absence breaks the visible scene narrative — then **MAJOR**.
 
+If two declared interactions cannot both be true at once (the same body part claimed by both), flag ONE issue: `type: spec_conflict`, **CRITICAL**, naming the two conflicting entries — the spec must be rewritten; do not also flag the individual interactions as render failures.
+
 Skip this sub-check if DECLARED INTERACTIONS is empty. Entries without a `storyRelevant` field default to `true`.
 
 **OBJECT SCALE** (everyday objects in the scene):
