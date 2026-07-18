@@ -971,6 +971,19 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
             </div>
           )}
 
+          {/* Single-variant stage (scene_variant): the rule + the staging
+              headline — the two lines a human compares attempts by. */}
+          {result.variantVersionIndex === undefined && result.extraRule && (
+            <div className="mt-3 space-y-2">
+              <div className="text-xs font-mono text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5 whitespace-pre-wrap">+ {result.extraRule}</div>
+              {result.newSceneDescription && (
+                <div className="text-xs bg-indigo-50 rounded-lg px-2 py-1.5">
+                  <span className="font-semibold text-indigo-700">Staging:</span> {sceneHeadline(result.newSceneDescription)}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* A/B stage: readable summary first — the rule + one headline per
               variant. The raw line diff is backup detail behind a toggle. */}
           {result.variantVersionIndex !== undefined && (

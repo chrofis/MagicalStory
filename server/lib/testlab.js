@@ -1292,6 +1292,69 @@ async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, par
   };
 }
 
+/**
+ * Single scene-expansion variant: base template + params.extraRule (or a
+ * full promptOverride template) → one scene description → one image → eval.
+ * The iterative sibling of scene_expansion_ab: run it as many times as
+ * there are rule ideas (C, D, E, …); each experiment is one attempt, the
+ * experiments list accumulates the series, and a winning rule is then run
+ * across more benchmark targets.
+ */
+async function runSceneVariantStage(ctx, { experimentId, promptOverride, params = {} }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
+  const { callTextModel } = require('./textModels');
+  const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+
+  const characters = (storyData.characters || []).filter(c =>
+    (ctx.scene.sceneCharacters || []).some(sc => (sc.name || sc) === c.name)
+  );
+  const availableAvatars = buildAvailableAvatarsForPrompt
+    ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
+    : '';
+
+  const extraRule = params.extraRule || null;
+  const template = promptOverride || (extraRule ? `${PROMPT_TEMPLATES.sceneExpansion}\n${extraRule}` : PROMPT_TEMPLATES.sceneExpansion);
+
+  let prompt;
+  const orig = PROMPT_TEMPLATES.sceneExpansion;
+  PROMPT_TEMPLATES.sceneExpansion = template;
+  try {
+    prompt = buildSceneExpansionPrompt(
+      ctx.pageNumber,
+      ctx.scene.text || '',
+      characters.length ? characters : (storyData.characters || []),
+      ctx.language,
+      ctx.visualBible,
+      availableAvatars,
+      null,
+      { artStyleId: ctx.artStyle, referencePhotos: ctx.referencePhotos }
+    );
+  } finally {
+    PROMPT_TEMPLATES.sceneExpansion = orig;
+  }
+
+  const t0 = Date.now();
+  const res = await callTextModel(prompt, 10000, null, { usageLabel: 'testlab_scene_variant' });
+  const img = await runImageStage(
+    { ...ctx, scene: { ...ctx.scene, sceneDescription: res.text } },
+    { experimentId, autoEval: params.autoEval !== false, params: {} }
+  );
+  return {
+    imageType: 'scene',
+    versionIndex: img.versionIndex,
+    scores: img.scores,
+    newSceneDescription: res.text,
+    storedSceneDescription: ctx.scene.sceneDescription || null,
+    extraRule,
+    promptOverridden: !!promptOverride,
+    promptUsed: prompt,
+    elapsedMs: Date.now() - t0,
+    modelId: img.modelId || null,
+  };
+}
+
 /** Re-run the scene-description regen (scene-iteration.txt, same as /regenerate/scene-description). */
 async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, params = {} }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
@@ -1454,6 +1517,17 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   ], { width: rw, height: rh });
   const elapsedMs = Date.now() - t0;
 
+  // Save the intermediates IMMEDIATELY — before gating can throw. A failed
+  // run must still show what was sent and what the model produced, otherwise
+  // the failure is undiagnosable from the UI.
+  const outBufEarly = Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const steps = [];
+  for (const [label, buf] of [[whiteoutApplied ? 'crop sent to model (figure whiteout)' : 'crop sent to model', sentBuf], ['model raw output', outBufEarly]]) {
+    const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber,
+      `data:image/jpeg;base64,${buf.toString('base64')}`, experimentId);
+    steps.push({ label, imageType: 'tl_step', versionIndex: v });
+  }
+
   // Paste back. Default 'figure' mode: within the crop, keep ONLY the changed
   // blob (the inserted figure + its shadow, diff vs the original crop,
   // despeckled + dilated + feathered) — the model's incidental background
@@ -1506,15 +1580,6 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       .joinChannel(mask, { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
   }
   const composed = await sharp(baseBuf).composite([{ input: feathered, left: crop.x, top: crop.y }]).jpeg({ quality: 95 }).toBuffer();
-
-  // Intermediates: the crop the model saw (whiteouted in repair mode) and its
-  // raw output before gating.
-  const steps = [];
-  for (const [label, buf] of [[whiteoutApplied ? 'crop sent to model (figure whiteout)' : 'crop sent to model', sentBuf], ['model raw output', outBuf]]) {
-    const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber,
-      `data:image/jpeg;base64,${buf.toString('base64')}`, experimentId);
-    steps.push({ label, imageType: 'tl_step', versionIndex: v });
-  }
 
   const versionIndex = await saveTestVersion(
     ctx.storyId, 'scene', ctx.pageNumber,
@@ -1656,6 +1721,7 @@ const STAGE_RUNNERS = {
   pick_best: runPickBestStage,
   scene_expansion: runSceneExpansionStage,
   scene_expansion_ab: runSceneExpansionAbStage,
+  scene_variant: runSceneVariantStage,
   scene_description: runSceneDescriptionStage,
   rewrite_blocked: runRewriteBlockedStage,
   repair_verify: runRepairVerifyStage,

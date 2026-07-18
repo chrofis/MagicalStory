@@ -170,6 +170,7 @@ export const TESTLAB_STAGES = [
   { id: 'style_transfer', label: 'Style transfer', producesImage: true, overridable: false },
   { id: 'pick_best', label: 'Pick-best report', producesImage: false, overridable: false },
   { id: 'scene_expansion', label: 'Scene expansion (Art Director)', producesImage: false, overridable: true },
+  { id: 'scene_variant', label: 'Scene variant (rule attempt → image)', producesImage: true, overridable: true },
   { id: 'scene_expansion_ab', label: 'Scene expansion A/B → image (extra-rule test)', producesImage: true, overridable: true },
   { id: 'scene_description', label: 'Scene description (iterate)', producesImage: false, overridable: true },
   { id: 'rewrite_blocked', label: 'Rewrite blocked scene', producesImage: false, overridable: true },
