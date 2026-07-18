@@ -1645,12 +1645,17 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     `data:image/jpeg;base64,${(await sharp(diffRgb, { raw: { width: cropW, height: cropH, channels: 3 } }).jpeg().toBuffer()).toString('base64')}`);
 
   // THE RULE: every pixel in EITHER mask (the union) comes from the NEW image
-  // at FULL opacity — the figure is never feathered. Feathering exists only
-  // OUTSIDE the union: a falloff band where the model's background fades into
-  // the original background. alpha = max(hard union, outward blur tail).
-  const softOut = strip(await sharp(union, raw1).blur(4).raw().toBuffer());
+  // at FULL opacity — the figure is never feathered. The union is DILATED a
+  // few px first: SAM masks are tight and the figure's anti-aliased edge
+  // pixels sit just outside them — a zero-pad hard cut slices that soft edge
+  // and leaves a background fringe against the figure. Feathering exists only
+  // OUTSIDE the padded union: a falloff band where the model's background
+  // fades into the original background.
+  const padPx = 3;
+  const unionPadded = strip(await sharp(union, raw1).blur(padPx / 1.5).threshold(16).raw().toBuffer()); // ≈3px dilation, still binary
+  const softOut = strip(await sharp(Buffer.from(unionPadded), raw1).blur(4).raw().toBuffer());
   const alpha1 = Buffer.alloc(n);
-  for (let i = 0; i < n; i++) alpha1[i] = Math.max(union[i], softOut[i]);
+  for (let i = 0; i < n; i++) alpha1[i] = Math.max(unionPadded[i], softOut[i]);
 
   await addStep('blend mask (union solid from new image, feather only outside)',
     `data:image/jpeg;base64,${(await sharp(Buffer.from(alpha1), raw1).jpeg().toBuffer()).toString('base64')}`);
