@@ -1773,6 +1773,15 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     }
   }
   if (!crop) throw new Error('qwen_insert needs params.crop {x,y,w,h} (normalized 0-1) — the character was not found on the base image either');
+  // Face mode: instead of upscaling a tiny crop, send MORE of the image —
+  // grow the context around the head until the crop is natively >= 512px.
+  if (params._faceMode) {
+    const MIN = 512;
+    const cx0 = crop.x + crop.w / 2, cy0 = crop.y + crop.h / 2;
+    const w2 = Math.max(crop.w, Math.min(W, MIN));
+    const h2 = Math.max(crop.h, Math.min(H, MIN));
+    crop = { x: Math.round(cx0 - w2 / 2), y: Math.round(cy0 - h2 / 2), w: Math.round(w2), h: Math.round(h2) };
+  }
   crop.x = Math.max(0, Math.min(W - 64, crop.x));
   crop.y = Math.max(0, Math.min(H - 64, crop.y));
   crop.w = Math.min(W - crop.x, crop.w);
@@ -1790,13 +1799,39 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   let boxInCrop = null;
   if (params.repairMode && figureBox) {
     try {
+      // Face mode: the detection emits faceBox padded 100% — counter-shrink
+      // it for the SAM prompt so the mask is the FACE/HEAD, not head+torso,
+      // and clip the mask to the face region as a hard bound.
+      let samBox = figureBox;
+      if (params._faceMode) {
+        const fw = figureBox[3] - figureBox[1], fh = figureBox[2] - figureBox[0];
+        samBox = [figureBox[0] + fh * 0.18, figureBox[1] + fw * 0.18, figureBox[2] - fh * 0.18, figureBox[3] - fw * 0.18];
+      }
       boxInCrop = [
-        Math.max(0, Math.round(figureBox[1] * W) - crop.x),
-        Math.max(0, Math.round(figureBox[0] * H) - crop.y),
-        Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
-        Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
+        Math.max(0, Math.round(samBox[1] * W) - crop.x),
+        Math.max(0, Math.round(samBox[0] * H) - crop.y),
+        Math.min(crop.w, Math.round(samBox[3] * W) - crop.x),
+        Math.min(crop.h, Math.round(samBox[2] * H) - crop.y),
       ];
       oldMaskPng = await fetchMaskWithRetry(cropBuf, boxInCrop);
+      if (oldMaskPng && params._faceMode) {
+        // Hard-clip the mask to the (padded) faceBox region — never the body.
+        const clipRect = [
+          Math.max(0, Math.round(figureBox[1] * W) - crop.x),
+          Math.max(0, Math.round(figureBox[0] * H) - crop.y),
+          Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
+          Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
+        ];
+        const a = await sharp(oldMaskPng).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+        const stride = Math.max(1, Math.round(a.length / (crop.w * crop.h)));
+        const clipped = Buffer.alloc(crop.w * crop.h);
+        for (let y = 0; y < crop.h; y++) for (let x = 0; x < crop.w; x++) {
+          const i = y * crop.w + x;
+          clipped[i] = (x >= clipRect[0] && x < clipRect[2] && y >= clipRect[1] && y < clipRect[3]) ? a[i * stride] : 0;
+        }
+        oldMaskPng = await sharp(Buffer.alloc(crop.w * crop.h * 3, 255), { raw: { width: crop.w, height: crop.h, channels: 3 } })
+          .ensureAlpha().joinChannel(Buffer.from(clipped), { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
+      }
       if (oldMaskPng) {
         sentBuf = await sharp(cropBuf).composite([{ input: oldMaskPng, left: 0, top: 0 }]).jpeg({ quality: 95 }).toBuffer();
         whiteoutApplied = true;
@@ -1815,16 +1850,23 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     || (params.repairMode
       ? (whiteoutApplied
         ? (params._faceMode
-          ? `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. The painted face must have the EXACT same features, age, glasses and hair color as the second image. Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people. Match the illustration style and lighting.`
+          ? `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. IDENTITY comes from the second image: exact same facial features, age, glasses and hair color. HEAD POSE comes from the third image (the original scene): copy its exact head direction, gaze direction, tilt and facial expression — if the person was looking left, the painted face looks left. Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people. Match the illustration style and lighting.`
           : `Paint the person from the second image into the white silhouette area of the first image. The silhouette shows their exact position, pose and scale — fill it with that person in that pose. The painted person must have the EXACT same face, age, hair color and clothing as shown in the second image${ref.clothingDescription ? ` (${ref.clothingDescription})` : ''}. Keep everything outside the white area exactly unchanged: same background, same other people, same objects, same colors, same framing. Match the illustration style and lighting.`)
         : `Replace the person in the first image with the person from the second image: SAME position, SAME pose, SAME scale as the existing figure — only the face and appearance change to match the second image. Keep everything else in the first image exactly unchanged: same background, same other people, same objects, same colors, same framing. Match the illustration style.`)
       : `Insert the person from the second image into the watercolor scene from the first image: ${pose}. Keep the background of the scene exactly as it is — same objects, same colors, same framing. Match the illustration style and lighting, add a soft contact shadow.`);
 
   const t0 = Date.now();
-  const result = await editWithQwen(prompt, [
+  const qwenRefs = [
     `data:image/jpeg;base64,${sentBuf.toString('base64')}`,
     ref.photoUrl,
-  ], { width: rw, height: rh });
+  ];
+  // Face mode: third reference = the ORIGINAL un-whited crop, so the model
+  // can copy head pose / gaze direction / expression while taking identity
+  // from the character reference.
+  if (params._faceMode && whiteoutApplied) {
+    qwenRefs.push(`data:image/jpeg;base64,${cropBuf.toString('base64')}`);
+  }
+  const result = await editWithQwen(prompt, qwenRefs, { width: rw, height: rh });
   const elapsedMs = Date.now() - t0;
 
   // Save the intermediates IMMEDIATELY — before gating can throw. A failed
@@ -1839,6 +1881,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   };
   await addStep(whiteoutApplied ? 'input 1: crop (figure whiteout)' : 'input 1: crop sent to model', `data:image/jpeg;base64,${sentBuf.toString('base64')}`);
   await addStep('input 2: character reference', ref.photoUrl);
+  if (params._faceMode && whiteoutApplied) await addStep('input 3: original crop (pose/gaze reference)', `data:image/jpeg;base64,${cropBuf.toString('base64')}`);
   await addStep('model raw output', `data:image/jpeg;base64,${outBufEarly.toString('base64')}`);
 
   // Paste back. Default 'figure' mode: within the crop, keep ONLY the changed
