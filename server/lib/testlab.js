@@ -535,7 +535,17 @@ async function runBboxStage(ctx, { experimentId }) {
   return {
     elapsedMs,
     detectionBackend: result.detectionBackend || null,
-    figures: (result.figures || []).map(f => ({ name: f.name, bbox: f.bodyBox || f.bbox || f.box_2d, faceBbox: f.faceBox || f.faceBbox || null, confidence: f.confidence })),
+    figures: (result.figures || []).map(f => ({
+      name: f.name,
+      bbox: f.bodyBox || f.bbox || f.box_2d,
+      faceBbox: f.faceBox || f.faceBbox || null,
+      // Raw detector boxes for debugging drift: DINO person box (pre-SAM)
+      // and unpadded DINO face box + its score.
+      gdinoBox: f.gdinoBox || null,
+      faceBboxRaw: f.faceBoxRaw || null,
+      faceScore: f.faceScore,
+      confidence: f.confidence,
+    })),
     objects: (result.objects || []).map(o => ({ name: o.name, bbox: o.bodyBox || o.bbox || o.box_2d })),
   };
 }

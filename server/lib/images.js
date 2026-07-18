@@ -1102,7 +1102,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // Now configurable (resolveEvalModel, key-guarded to sonnet). NOTE: this is
     // quality-critical and NOT yet A/B-validated on Qwen — watch repair churn.
     const complianceModel = complianceModelOverride || require('../config/models').resolveEvalModel();
-    const sonnetResult = await callTextModel(complianceInput, 4096, complianceModel, { usageLabel: 'semantic_compliance' });
+    const sonnetResult = await callTextModel(complianceInput, 8192, complianceModel, { usageLabel: 'semantic_compliance' });
 
     stage2Usage = {
       input_tokens: sonnetResult.usage?.input_tokens || 0,
@@ -2872,6 +2872,11 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       label: ec ? (ec.description || '').slice(0, 120) : 'unmatched person',
       position: lcrOf(d.bodyBox),
       faceBox: d.face ? paddedFaceBox(d.face.box) : null,
+      // Raw (unpadded) DINO face box — debugging: when the padded faceBox
+      // looks off-target, this shows whether DINO itself boxed the wrong
+      // spot or the padding/pairing shifted it.
+      faceBoxRaw: d.face ? _pxBoxToNorm(d.face.box, W, H) : null,
+      faceScore: d.face?.score,
       bodyBox: d.bodyBox,
       gdinoBox: d.gdinoBox,
       samApplied: d.samApplied,
