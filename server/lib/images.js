@@ -2404,17 +2404,29 @@ function _maskOverlapFrac(a, b) {
 async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel = '') {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || dets.length === 0) return null;
-  const LETTERS = 'ABCDEFGH';
-  if (dets.length > LETTERS.length) return null;
+  const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  // More detections than letters (extreme crowd): badge the largest figures —
+  // expected characters are essentially never tiny background crowd. The
+  // unbadged rest stays UNKNOWN. Never bail to the layout fallback for this.
+  let badgeIdx = dets.map((_, i) => i);
+  if (dets.length > LETTERS.length) {
+    badgeIdx = badgeIdx
+      .sort((a, b) => {
+        const area = (d) => (d.box[2] - d.box[0]) * (d.box[3] - d.box[1]);
+        return area(dets[b]) - area(dets[a]);
+      })
+      .slice(0, LETTERS.length);
+  }
 
   // Badge on the upper torso: below the face if one is paired, else at 1/4
   // of the box height — keeps the badge off the face so it can't obscure
   // the features Gemini needs.
-  const badges = dets.map((d, i) => {
+  const badges = badgeIdx.map((detIdx, i) => {
+    const d = dets[detIdx];
     const [x1, y1, x2, y2] = d.box;
     const cx = (x1 + x2) / 2;
     const by = d.face ? Math.min(y2 - 20, d.face.box[3] + (d.face.box[3] - d.face.box[1]) * 0.6) : y1 + (y2 - y1) * 0.25;
-    return { letter: LETTERS[i], x: Math.round(cx), y: Math.round(by) };
+    return { letter: LETTERS[i], detIdx, x: Math.round(cx), y: Math.round(by) };
   });
   const R = Math.max(22, Math.round(Math.min(W, H) * 0.028));
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${badges.map(b =>
@@ -2459,17 +2471,18 @@ Answer JSON only, e.g. {"A": "name"}. Use "unknown" if a letter matches none of 
   const validNames = new Set(expectedCharacters.map(c => c.name));
   const nameByDet = new Map();
   const claimed = new Set();
-  for (let i = 0; i < dets.length; i++) {
-    const raw = String(answers[LETTERS[i]] || '').trim();
+  for (const b of badges) {
+    const raw = String(answers[b.letter] || '').trim();
     if (!raw || /^unknown$/i.test(raw)) continue;
     const name = [...validNames].find(n => n.toLowerCase() === raw.toLowerCase());
     if (!name) continue;
     if (claimed.has(name)) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM duplicate name "${name}" — answer invalid`); return null; }
     claimed.add(name);
-    nameByDet.set(i, name);
+    nameByDet.set(b.detIdx, name);
   }
   if (nameByDet.size === 0) return null;
-  log.info(`🔤 [GDINO-DETECT] ${pageLabel}SoM identity: ${[...nameByDet.entries()].map(([i, n]) => `${LETTERS[i]}=${n}`).join(' ')}${dets.length > nameByDet.size ? ` (${dets.length - nameByDet.size} unknown)` : ''}`);
+  const letterByDet = new Map(badges.map(b => [b.detIdx, b.letter]));
+  log.info(`🔤 [GDINO-DETECT] ${pageLabel}SoM identity: ${[...nameByDet.entries()].map(([i, n]) => `${letterByDet.get(i)}=${n}`).join(' ')}${dets.length > nameByDet.size ? ` (${dets.length - nameByDet.size} unknown)` : ''}`);
   return { nameByDet, answers };
 }
 
