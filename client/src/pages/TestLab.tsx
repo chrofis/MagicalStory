@@ -932,21 +932,13 @@ function LightboxHost() {
   );
 }
 
-/** Intermediate-step image strip (whiteout, model raw output, crop, …). */
-function StepsStrip({ storyId, pageNumber, steps }: { storyId: string; pageNumber: number | null; steps: { label: string; imageType: string; versionIndex: number }[] }) {
-  const [images, setImages] = useState<Record<number, string>>({});
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      for (const s of steps) {
-        try {
-          const img = await testlabService.getTestImage(storyId, s.imageType, pageNumber, s.versionIndex);
-          if (alive) setImages(prev => ({ ...prev, [s.versionIndex]: img.imageData }));
-        } catch { /* leave placeholder */ }
-      }
-    })();
-    return () => { alive = false; };
-  }, [storyId, pageNumber, steps]);
+/** Intermediate-step image strip (presentational — the card owns loading so
+ * the lightbox can arrow through ORIGINAL → steps → FINAL as one sequence). */
+function StepsStrip({ steps, images, onOpen }: {
+  steps: { label: string; imageType: string; versionIndex: number }[];
+  images: Record<number, string>;
+  onOpen: (versionIndex: number) => void;
+}) {
   return (
     <div className="mt-3">
       <div className="text-xs font-medium text-gray-500 mb-1">Pipeline steps</div>
@@ -955,14 +947,7 @@ function StepsStrip({ storyId, pageNumber, steps }: { storyId: string; pageNumbe
           <div key={s.versionIndex} className="shrink-0 w-56">
             <div className="text-[11px] text-gray-500 mb-1">{s.label}</div>
             {images[s.versionIndex]
-              ? <img
-                  src={images[s.versionIndex]} alt={s.label}
-                  className="rounded-lg w-full cursor-zoom-in"
-                  onClick={() => {
-                    const loadedImgs = steps.filter(x => images[x.versionIndex]).map(x => ({ src: images[x.versionIndex], label: x.label }));
-                    openLightbox(loadedImgs, loadedImgs.findIndex(x => x.src === images[s.versionIndex]));
-                  }}
-                />
+              ? <img src={images[s.versionIndex]} alt={s.label} className="rounded-lg w-full cursor-zoom-in" onClick={() => onOpen(s.versionIndex)} />
               : <div className="text-xs text-gray-400 border rounded-lg p-6 text-center">loading…</div>}
           </div>
         ))}
@@ -975,6 +960,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
   const [baseline, setBaseline] = useState<string | null>(null);
   const [variant, setVariant] = useState<string | null>(null);
   const [variantB, setVariantB] = useState<string | null>(null);
+  const [stepImgs, setStepImgs] = useState<Record<number, string>>({});
   const [loaded, setLoaded] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [promoted, setPromoted] = useState(false);
@@ -990,6 +976,35 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
   // Auto-load — the final image is the whole point of a run; a manual
   // "Load" click hid it while the steps strip showed automatically.
   useEffect(() => { if (result.ok && !loaded) loadImages(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  // Step images load here (not in StepsStrip) so ORIGINAL → steps → FINAL is
+  // one lightbox sequence.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      for (const s of result.steps || []) {
+        try {
+          const img = await testlabService.getTestImage(result.storyId, s.imageType, result.pageNumber ?? null, s.versionIndex);
+          if (alive) setStepImgs(prev => ({ ...prev, [s.versionIndex]: img.imageData }));
+        } catch { /* placeholder stays */ }
+      }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result.steps]);
+
+  // The full inspection sequence: ORIGINAL → every pipeline step → FINAL.
+  const gallery = (): { src: string; label: string }[] => [
+    ...(baseline ? [{ src: baseline, label: 'ORIGINAL (baseline / active version)' }] : []),
+    ...(result.steps || []).filter(s => stepImgs[s.versionIndex]).map(s => ({ src: stepImgs[s.versionIndex], label: s.label })),
+    ...(variant ? [{ src: variant, label: `FINAL result (test v${result.versionIndex})` }] : []),
+    ...(variantB ? [{ src: variantB, label: `Variant B (test v${result.variantVersionIndex})` }] : []),
+  ];
+  const openAt = (label: string) => {
+    const g = gallery();
+    const idx = g.findIndex(x => x.label === label);
+    openLightbox(g, idx >= 0 ? idx : 0);
+  };
 
   const loadImages = async () => {
     setLoaded(true);
@@ -1076,7 +1091,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
 
       {!result.ok && <div className="text-sm text-red-600 mt-2">{result.error}</div>}
       {!result.ok && !!result.steps?.length && (
-        <StepsStrip storyId={result.storyId} pageNumber={result.pageNumber ?? null} steps={result.steps} />
+        <StepsStrip steps={result.steps} images={stepImgs} onOpen={vi => { const g = gallery(); const s = (result.steps || []).find(x => x.versionIndex === vi); const idx = s ? g.findIndex(x => x.label === s.label) : 0; openLightbox(g, idx >= 0 ? idx : 0); }} />
       )}
 
       {result.ok && (
@@ -1101,14 +1116,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
                     <div className="relative">
                       <img
                         src={baseline} alt="baseline" className="rounded-lg w-full cursor-zoom-in"
-                        onClick={() => {
-                          const g = [
-                            { src: baseline, label: 'Baseline (active version)' },
-                            ...(variant ? [{ src: variant, label: `FINAL result (test v${result.versionIndex})` }] : []),
-                            ...(variantB ? [{ src: variantB, label: `Variant B (test v${result.variantVersionIndex})` }] : []),
-                          ];
-                          openLightbox(g, 0);
-                        }}
+                        onClick={() => openAt('ORIGINAL (baseline / active version)')}
                       />
                       {result.bbox?.length === 4 && (
                         <div
@@ -1138,14 +1146,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
                   {variant ? (
                     <img
                       src={variant} alt="final result" className="rounded-lg w-full cursor-zoom-in"
-                      onClick={() => {
-                        const g = [
-                          ...(baseline ? [{ src: baseline, label: 'Baseline (active version)' }] : []),
-                          { src: variant, label: `FINAL result (test v${result.versionIndex})` },
-                          ...(variantB ? [{ src: variantB, label: `Variant B (test v${result.variantVersionIndex})` }] : []),
-                        ];
-                        openLightbox(g, baseline ? 1 : 0);
-                      }}
+                      onClick={() => openAt(`FINAL result (test v${result.versionIndex})`)}
                     />
                   ) : <div className="text-xs text-gray-400">unavailable</div>}
                   {result.variantVersionIndex !== undefined && result.scores?.final != null && (
@@ -1253,7 +1254,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
           )}
 
           {!!result.steps?.length && (
-            <StepsStrip storyId={result.storyId} pageNumber={result.pageNumber ?? null} steps={result.steps} />
+            <StepsStrip steps={result.steps} images={stepImgs} onOpen={vi => { const g = gallery(); const s = (result.steps || []).find(x => x.versionIndex === vi); const idx = s ? g.findIndex(x => x.label === s.label) : 0; openLightbox(g, idx >= 0 ? idx : 0); }} />
           )}
 
           {result.decision && (

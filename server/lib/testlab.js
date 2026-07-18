@@ -1658,9 +1658,20 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const alpha1 = Buffer.alloc(n);
   for (let i = 0; i < n; i++) alpha1[i] = Math.max(unionPadded[i], softOut[i]);
 
-  await addStep('blend mask (union solid from new image, feather only outside)',
-    `data:image/jpeg;base64,${(await sharp(Buffer.from(alpha1), raw1).jpeg().toBuffer()).toString('base64')}`);
+  // Applied mask views instead of raw black/white masks: (a) the original
+  // with the padded union whited out — the region the blend treats as
+  // figure; (b) the pixels actually TAKEN from the new image.
   const candResized = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
+  const origResized = await sharp(originalCropBuf).resize(cropW, cropH, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
+  const unionAlphaPng = await sharp(Buffer.alloc(n * 3, 255), { raw: { width: cropW, height: cropH, channels: 3 } })
+    .ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer();
+  const whiteVis = await sharp(origResized).composite([{ input: unionAlphaPng }]).jpeg().toBuffer();
+  await addStep('original with SAM union whited out (padded 3px)', `data:image/jpeg;base64,${whiteVis.toString('base64')}`);
+  const cutoutPng = await sharp(candResized).ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer();
+  const cutVis = await sharp({ create: { width: cropW, height: cropH, channels: 3, background: { r: 30, g: 30, b: 30 } } })
+    .composite([{ input: cutoutPng }]).jpeg().toBuffer();
+  await addStep('SAM-identified region — pixels taken from the new image', `data:image/jpeg;base64,${cutVis.toString('base64')}`);
+
   const feathered = await sharp(candResized).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
   return { feathered, iou, redPx, blendRule: BLEND_RULE_VERSION };
 }
