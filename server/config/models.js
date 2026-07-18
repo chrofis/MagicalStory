@@ -139,6 +139,15 @@ const MODEL_DEFAULTS = {
   // Env override (EVAL_MODEL) lets staging flip without a deploy.
   evalModel: process.env.EVAL_MODEL || 'qwen-plus',
 
+  // Stage-2 prompt-compliance model — SEPARATE from evalModel (2026-07-19).
+  // A/B on the Pixar showcase: qwen-plus/haiku/deepseek/kimi all flood false
+  // CRITICALs (expression, left/right mirror, motion verbs, "missing" on a
+  // matched figure) → tanked good pages to 0 and drove 12-13 wasted repair
+  // units/round. qwen3-max + the fixed compliance prompt (presence-is-input +
+  // never-CRITICAL gate) tracks Sonnet on the good pages at ~$0.56/story vs
+  // Sonnet's $2.16. Sonnet stays the key-missing fallback. Env COMPLIANCE_MODEL.
+  complianceModel: process.env.COMPLIANCE_MODEL || 'qwen3-max',
+
   // Image models
   pageImage: 'grok-imagine',                 // Regular page images ($0.02/image — vs $0.04 Gemini)
   coverImage: 'grok-imagine',                // Cover images ($0.02/image)
@@ -609,12 +618,14 @@ function guardModel(modelKey, label = 'model') {
   return m;
 }
 function resolveEvalModel() { return guardModel(MODEL_DEFAULTS.evalModel, 'EVAL MODEL'); }
+function resolveComplianceModel() { return guardModel(MODEL_DEFAULTS.complianceModel, 'COMPLIANCE MODEL'); }
 function resolveSceneIterationModel() { return guardModel(MODEL_DEFAULTS.sceneIteration, 'SCENE ITERATE MODEL'); }
 
 module.exports = {
   TEXT_MODELS,
   MODEL_DEFAULTS,
   resolveEvalModel,
+  resolveComplianceModel,
   resolveSceneIterationModel,
   IMAGE_MODELS,
   IMAGE_BACKENDS,

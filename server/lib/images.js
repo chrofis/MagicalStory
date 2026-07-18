@@ -1101,7 +1101,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // false-positive gaze/facing issues that drove pointless repair rounds.
     // Now configurable (resolveEvalModel, key-guarded to sonnet). NOTE: this is
     // quality-critical and NOT yet A/B-validated on Qwen — watch repair churn.
-    const complianceModel = complianceModelOverride || require('../config/models').resolveEvalModel();
+    const complianceModel = complianceModelOverride || require('../config/models').resolveComplianceModel();
     const sonnetResult = await callTextModel(complianceInput, 8192, complianceModel, { usageLabel: 'semantic_compliance' });
 
     stage2Usage = {
