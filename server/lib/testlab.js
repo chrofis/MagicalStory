@@ -1807,7 +1807,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   }
 
   // Render at ~2x for detail; Runware dims must be multiples of 64 in [128,2048].
-  const snap = v => Math.max(128, Math.min(2048, Math.round(v / 64) * 64));
+  const snap = v => Math.max(512, Math.min(2048, Math.round(v / 64) * 64)); // qwen rejects tiny dims
   const rw = snap(crop.w * 2), rh = snap(crop.h * 2);
 
   const pose = params.pose || 'standing naturally, scale matching the scene perspective';
