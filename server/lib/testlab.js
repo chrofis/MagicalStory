@@ -485,9 +485,19 @@ async function resolveCharacterBox(ctx, imageData, charName, { detection = null 
   };
   // Chained-experiment detection (fresh, from a bbox step in the SAME
   // experiment) always wins over whatever generation-time data is stored.
+  // GDINO→SAM bodyBoxes are MASK-TIGHT bounds — they clip hair/fingertips/
+  // feet. Pad slightly for repair use; the detection entry keeps raw truth.
   if (detection) {
     const chained = fromDet(detection);
-    if (chained) return { ...chained, source: 'chained-detection' };
+    if (chained) {
+      const [y0, x0, y1, x1] = chained.bbox;
+      const padY = (y1 - y0) * 0.04, padX = (x1 - x0) * 0.05;
+      return {
+        ...chained,
+        bbox: [Math.max(0, y0 - padY), Math.max(0, x0 - padX), Math.min(1, y1 + padY), Math.min(1, x1 + padX)],
+        source: 'chained-detection (padded 4-5%)',
+      };
+    }
   }
   const stored = ctx._skipStoredBox ? null : fromDet(ctx.scene.bboxDetection);
   if (stored) return { ...stored, source: 'stored' };
@@ -587,6 +597,7 @@ async function runCharRepairStage(ctx, opts) {
     ['input: character reference', ref.photoUrl],
     ['sent to model (whiteout)', result?.blackoutImage || result?.comparison?.blackoutImage || result?.debug?.sceneSent],
     ['model raw output', result?.grokRawResult || result?.comparison?.grokRawResult],
+    ['blend mask (production silhouette gate)', result?.blendMask || result?.comparison?.blendMask],
   ];
   for (const [label, img] of stepImages) {
     if (typeof img === 'string' && img.startsWith('data:image')) {

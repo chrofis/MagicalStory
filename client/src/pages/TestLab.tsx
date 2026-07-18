@@ -29,6 +29,33 @@ type Tab = 'stories' | 'benchmark' | 'experiments';
 const tabBtn = (active: boolean) =>
   `px-4 py-2 rounded-lg font-medium transition-colors ${active ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`;
 
+/** Banner when a new deploy landed while this tab was open — stale SPA
+ * bundles caused repeated "I can't see the new feature" confusion. */
+function NewVersionBanner() {
+  const [newVersion, setNewVersion] = useState(false);
+  useEffect(() => {
+    let initial: string | null = null;
+    const check = async () => {
+      try {
+        const h = await (await fetch('/api/health')).json();
+        if (!h?.commit) return;
+        if (initial === null) initial = h.commit;
+        else if (h.commit !== initial) setNewVersion(true);
+      } catch { /* offline — ignore */ }
+    };
+    check();
+    const t = setInterval(check, 60000);
+    return () => clearInterval(t);
+  }, []);
+  if (!newVersion) return null;
+  return (
+    <div className="bg-amber-500 text-white rounded-lg px-4 py-2 mb-4 flex items-center justify-between">
+      <span className="text-sm font-medium">A new version was deployed — this tab is running old code.</span>
+      <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>Reload now</Button>
+    </div>
+  );
+}
+
 export default function TestLab() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('stories');
@@ -36,6 +63,7 @@ export default function TestLab() {
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
+        <NewVersionBanner />
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <FlaskConical className="text-indigo-500" size={28} /> Test Lab

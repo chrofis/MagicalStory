@@ -266,13 +266,16 @@ async function executeExperiment(experimentId, stage, targets, opts) {
         if (detection) unitParams.detection = detection;
         let entry;
         const startedAt = new Date().toISOString();
+        // Snapshot the variant's own params on the entry so a Redo reruns
+        // THIS option, not the base experiment params.
+        const variantMeta = variant ? { label: variant.label, variantParams: variant.params || {} } : {};
         try {
           const result = await runStageOnTarget(stage, target, { ...opts, params: unitParams, experimentId });
-          entry = { ...target, ok: true, startedAt, ...(variant?.label ? { label: variant.label } : {}), ...result };
+          entry = { ...target, ok: true, startedAt, ...variantMeta, ...result };
         } catch (err) {
           log.warn(`[TESTLAB] exp ${experimentId} ${target.storyId} P${target.pageNumber}${variant ? ` [${variant.label}]` : ''} failed: ${err.message}`);
           // Failed runs keep any intermediates the runner attached (steps etc.).
-          entry = { ...target, ok: false, startedAt, ...(variant?.label ? { label: variant.label } : {}), error: err.message, ...(err.partialResult || {}) };
+          entry = { ...target, ok: false, startedAt, ...variantMeta, error: err.message, ...(err.partialResult || {}) };
         }
         await appendEntry(entry);
       }
@@ -510,6 +513,11 @@ async function executeRedo(experimentId, exp, entry, resultIndex, override, extr
         // redo is the NEXT attempt in the series.
         let params = { ...(exp.params || {}), ...(extraRule != null ? { extraRule } : {}) };
         delete params.styleMatrix;
+        // Variant entries rerun THEIR option (snapshotted params) with a fresh
+        // detection when the experiment chained one.
+        delete params.variants;
+        if (params.rerunDetection) { params.freshDetection = true; delete params.rerunDetection; }
+        if (entry.variantParams) params = { ...params, ...entry.variantParams };
         if (exp.stage === 'image' && entry.artStyle) {
           const empty = await runStageOnTarget('empty_scene', target, { experimentId, params: { artStyleOverride: entry.artStyle } });
           params = { ...params, artStyleOverride: entry.artStyle, backgroundRef: { imageType: 'empty_scene', versionIndex: empty.versionIndex } };
