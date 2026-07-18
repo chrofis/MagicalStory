@@ -578,6 +578,7 @@ async function runCharRepairStage(ctx, opts) {
   // the UI can show the full chain, not just the final composite.
   const steps = [];
   const stepImages = [
+    ['input: character reference', ref.photoUrl],
     ['sent to model (whiteout)', result?.blackoutImage || result?.comparison?.blackoutImage || result?.debug?.sceneSent],
     ['model raw output', result?.grokRawResult || result?.comparison?.grokRawResult],
   ];
@@ -1519,14 +1520,17 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
 
   // Save the intermediates IMMEDIATELY — before gating can throw. A failed
   // run must still show what was sent and what the model produced, otherwise
-  // the failure is undiagnosable from the UI.
+  // the failure is undiagnosable from the UI. ALL inputs appear: the crop,
+  // the character reference, and the model's raw output.
   const outBufEarly = Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
   const steps = [];
-  for (const [label, buf] of [[whiteoutApplied ? 'crop sent to model (figure whiteout)' : 'crop sent to model', sentBuf], ['model raw output', outBufEarly]]) {
-    const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber,
-      `data:image/jpeg;base64,${buf.toString('base64')}`, experimentId);
+  const addStep = async (label, dataUri) => {
+    const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, dataUri, experimentId);
     steps.push({ label, imageType: 'tl_step', versionIndex: v });
-  }
+  };
+  await addStep(whiteoutApplied ? 'input 1: crop (figure whiteout)' : 'input 1: crop sent to model', `data:image/jpeg;base64,${sentBuf.toString('base64')}`);
+  await addStep('input 2: character reference', ref.photoUrl);
+  await addStep('model raw output', `data:image/jpeg;base64,${outBufEarly.toString('base64')}`);
 
   // Paste back. Default 'figure' mode: within the crop, keep ONLY the changed
   // blob (the inserted figure + its shadow, diff vs the original crop,
@@ -1573,6 +1577,9 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       alpha1 = Buffer.alloc(n);
       for (let i = 0; i < n; i++) alpha1[i] = alpha[i * stride];
     }
+    // The blend mask itself (white = pixels taken from the model output).
+    const maskJpeg = await sharp(Buffer.from(alpha1), raw1).jpeg().toBuffer();
+    await addStep('blend mask (white = model pixels kept)', `data:image/jpeg;base64,${maskJpeg.toString('base64')}`);
     feathered = await sharp(back).ensureAlpha()
       .joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
   } else {
