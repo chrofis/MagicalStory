@@ -131,6 +131,8 @@ Field shape: `{character, object, where, storyRelevant, priority}`. `where` is a
 
 **Coverage:** every foreground/midground character should appear in `interactions[]` exactly once. If a character has no real action, give them a `priority: "low"` entry (e.g. `{character, object: "the campfire", where: "watches the campfire", storyRelevant: false, priority: "low"}`) — without it the image model defaults to a camera-facing portrait. Background characters exempt.
 
+A vehicle under way MUST have exactly one character actively operating it — declare that operation as an essential interaction for that character.
+
 Cap: 1–6 entries, 0–2 with `storyRelevant: true`.
 
 Every entry must also appear in the prose as the same physical contact.
