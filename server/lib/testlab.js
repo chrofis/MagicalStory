@@ -1576,15 +1576,52 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         const oldA = await sharp(oldMaskPng).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
         const newA = await sharp(newMaskPng).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
         const n = crop.w * crop.h;
+
+        // Union = every pixel that must come from the model output (new figure
+        // pixels, plus the model's background infill where the old figure was).
+        // XOR = the DISAGREEMENT band — where the model filled more or less of
+        // the silhouette than the original figure occupied. That band is where
+        // seams appear; agreed edges are true figure edges and stay crisp.
         const union = Buffer.alloc(n);
-        for (let i = 0; i < n; i++) union[i] = Math.max(oldA[i] || 0, newA[i] || 0);
-        // Small dilation + feather so the seam melts into the background.
-        const alphaU = await sharp(union, raw1).blur(3).threshold(24).blur(3).raw().toBuffer();
-        const nStride = Math.max(1, Math.round(alphaU.length / n));
-        let alpha1 = alphaU;
-        if (nStride > 1) { alpha1 = Buffer.alloc(n); for (let i = 0; i < n; i++) alpha1[i] = alphaU[i * nStride]; }
+        const xor = Buffer.alloc(n);
+        for (let i = 0; i < n; i++) {
+          const o = (oldA[i] || 0) > 128 ? 255 : 0;
+          const w = (newA[i] || 0) > 128 ? 255 : 0;
+          union[i] = Math.max(o, w);
+          xor[i] = o !== w ? 255 : 0;
+        }
+
+        // Visualize the disagreement: red = old-only (model infilled background
+        // there), green = new-only (figure grew beyond the old silhouette).
+        const diffRgb = Buffer.alloc(n * 3);
+        for (let i = 0; i < n; i++) {
+          const o = (oldA[i] || 0) > 128, w = (newA[i] || 0) > 128;
+          diffRgb[i * 3] = o && !w ? 255 : 40;
+          diffRgb[i * 3 + 1] = w && !o ? 255 : 40;
+          diffRgb[i * 3 + 2] = 40;
+        }
+        const diffJpeg = await sharp(diffRgb, { raw: { width: crop.w, height: crop.h, channels: 3 } }).jpeg().toBuffer();
+        await addStep('mask difference (red = old-only, green = new-only)', `data:image/jpeg;base64,${diffJpeg.toString('base64')}`);
+
+        // Selective feathering: crisp alpha (1px soften) everywhere, WIDE
+        // feather only inside the dilated disagreement zone.
+        const strip = (buf) => {
+          const s = Math.max(1, Math.round(buf.length / n));
+          if (s === 1) return buf;
+          const out = Buffer.alloc(n);
+          for (let i = 0; i < n; i++) out[i] = buf[i * s];
+          return out;
+        };
+        const crisp = strip(await sharp(union, raw1).blur(1).raw().toBuffer());
+        const soft = strip(await sharp(union, raw1).blur(6).raw().toBuffer());
+        const zone = strip(await sharp(xor, raw1).blur(5).threshold(16).blur(2).raw().toBuffer()); // dilated disagreement
+        const alpha1 = Buffer.alloc(n);
+        for (let i = 0; i < n; i++) {
+          const z = zone[i] / 255;
+          alpha1[i] = Math.round(crisp[i] * (1 - z) + soft[i] * z);
+        }
         const maskJpeg = await sharp(Buffer.from(alpha1), raw1).jpeg().toBuffer();
-        await addStep('blend mask (SAM union: old ∪ new figure)', `data:image/jpeg;base64,${maskJpeg.toString('base64')}`);
+        await addStep('blend mask (crisp on agreed edges, feathered on disagreement)', `data:image/jpeg;base64,${maskJpeg.toString('base64')}`);
         feathered = await sharp(back).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
       }
     } catch (err) {
