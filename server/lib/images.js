@@ -9143,12 +9143,34 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // sonnet when OPENROUTER_API_KEY is unset; explicit overrides pass through.
   const effectiveSceneModel = modelOverrides?.sceneIterationModel || modelOverrides?.sceneModel || require('../config/models').resolveSceneIterationModel();
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 18 validation checks with ${effectiveSceneModel}...`);
-  const sceneResult = await callClaudeAPI(scenePrompt, 16000, effectiveSceneModel, { usageLabel: 'scene_iterate' });
-  const newSceneDescription = sceneResult.text;
+  let sceneResult = await callClaudeAPI(scenePrompt, 16000, effectiveSceneModel, { usageLabel: 'scene_iterate' });
+  let newSceneDescription = sceneResult.text;
 
   // Track usage (Claude Haiku scene re-expansion)
   if (usageTracker && sceneResult.usage) {
     usageTracker('anthropic', sceneResult.usage, 'scene_iterate', sceneResult.modelId || effectiveSceneModel);
+  }
+
+  // ENFORCE the sceneIntent contract. The template requires it (it becomes
+  // the image prompt's THIS IMAGE DEPICTS overview) but the model
+  // occasionally omits it and the prompt then shipped WITHOUT its overview
+  // (observed: an iterate-round version rendered from a header-less prompt).
+  // One retry; still missing → loud error, never a silent header-less send.
+  if (!extractSceneMetadata(newSceneDescription)?.sceneIntent) {
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: scene iteration omitted sceneIntent — retrying once`);
+    const retry = await callClaudeAPI(
+      `${scenePrompt}\n\nYour previous answer omitted the required "sceneIntent" field in the metadata JSON. It is mandatory — include it.`,
+      16000, effectiveSceneModel, { usageLabel: 'scene_iterate_retry' }
+    );
+    if (usageTracker && retry.usage) {
+      usageTracker('anthropic', retry.usage, 'scene_iterate', retry.modelId || effectiveSceneModel);
+    }
+    if (extractSceneMetadata(retry.text)?.sceneIntent) {
+      sceneResult = retry;
+      newSceneDescription = retry.text;
+    } else {
+      log.error(`❌ [ITERATE] Page ${pageNumber}: sceneIntent still missing after retry — the image prompt will lack its overview line`);
+    }
   }
 
   // Extract previewMismatches + checks from the metadata JSON block. parseProseMetadataFormat
