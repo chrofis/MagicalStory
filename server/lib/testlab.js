@@ -2033,13 +2033,17 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     }
   }
   if (!crop) throw new Error('qwen_insert needs params.crop {x,y,w,h} (normalized 0-1) — the character was not found on the base image either');
-  // Face mode: instead of upscaling a tiny crop, send MORE of the image —
-  // grow the context around the head until the crop is natively >= 512px.
+  // Face mode: context scales WITH the head — ~3× the head box, floor 384px
+  // native (references below 384px get upscaled by editWithQwen). The old
+  // fixed 512px floor sent up to 5× the face for small heads, and that much
+  // scene invites Qwen to re-compose the whole crop (layout drift → the
+  // union blend pastes a shifted face that the face clip then cuts off).
   if (params._faceMode) {
-    const MIN = 512;
+    const fw = Math.round((figureBox[3] - figureBox[1]) * W);
+    const fh = Math.round((figureBox[2] - figureBox[0]) * H);
     const cx0 = crop.x + crop.w / 2, cy0 = crop.y + crop.h / 2;
-    const w2 = Math.max(crop.w, Math.min(W, MIN));
-    const h2 = Math.max(crop.h, Math.min(H, MIN));
+    const w2 = Math.min(W, Math.max(3 * fw, 384));
+    const h2 = Math.min(H, Math.max(3 * fh, 384));
     crop = { x: Math.round(cx0 - w2 / 2), y: Math.round(cy0 - h2 / 2), w: Math.round(w2), h: Math.round(h2) };
   }
   crop.x = Math.max(0, Math.min(W - 64, crop.x));
