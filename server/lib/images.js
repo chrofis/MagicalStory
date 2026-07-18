@@ -2439,11 +2439,17 @@ async function recoverFaceBox(imageDataUri, bodyBoxNorm, pageLabel = '') {
     const sw = Math.round(cw * scale), sh = Math.round(ch * scale);
     const cropJpeg = await sharp(buf).extract({ left: cx, top: cy, width: cw, height: ch })
       .resize(sw, sh, { fit: 'fill' }).jpeg({ quality: 92 }).toBuffer();
-    const det = await _gdinoDetect(`data:image/jpeg;base64,${cropJpeg.toString('base64')}`, [{ name: 'face', text: 'face' }]);
+    // Same prompts + leak filter as full-page detection: a "face" box that
+    // largely coincides with a person box IS the person box (head+torso —
+    // exp #70 whited out Lukas's shirt with one). Faces must also stay small
+    // relative to the crop, which is the whole body plus padding.
+    const det = await _gdinoDetect(`data:image/jpeg;base64,${cropJpeg.toString('base64')}`,
+      [{ name: 'face', text: 'face' }, { name: 'person', text: 'person' }]);
     if (!det?.figures?.[0]) return null;
+    const persons = det.figures[1] ? _collectNmsBoxes(det.figures[1], GDINO_PERSON_NMS_IOU) : [];
     const faces = _collectNmsBoxes(det.figures[0], GDINO_FACE_NMS_IOU)
-      // A "face" box covering most of the crop is the body leaking through.
-      .filter(f => (f.box[2] - f.box[0]) * (f.box[3] - f.box[1]) < 0.4 * sw * sh);
+      .filter(f => !persons.some(p => _boxIouXyxy(f.box, p.box) > GDINO_FACE_LEAK_IOU))
+      .filter(f => (f.box[2] - f.box[0]) * (f.box[3] - f.box[1]) < 0.15 * sw * sh);
     if (faces.length === 0) return null;
     const best = faces[0].box; // px in the scaled crop, score-desc
     // Back to PAGE pixel coords, then the shared production padding.
@@ -13568,7 +13574,7 @@ Output JSON only:
     };
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility}:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -13586,7 +13592,7 @@ Output JSON only:
     // Log token usage
     const inputTokens = data.usageMetadata?.promptTokenCount || 0;
     const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    const modelId = 'gemini-2.0-flash';
+    const modelId = MODEL_DEFAULTS.utility;
     log.debug(`📊 [INPAINT VERIFY] Token usage - input: ${inputTokens}, output: ${outputTokens}, model: ${modelId}`);
 
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
@@ -15995,7 +16001,7 @@ async function analyzeImageStyle(imageData) {
   const base64Data = r2Lib.stripDataUriPrefix(imageData);
   const mimeType = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility || 'gemini-2.0-flash'}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility || 'gemini-2.5-flash'}:generateContent?key=${apiKey}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -16044,7 +16050,7 @@ async function compareImageStyles(imageDataA, imageDataB) {
   const toBase64 = (img) => r2Lib.stripDataUriPrefix(img);
   const getMime = (img) => img.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility || 'gemini-2.0-flash'}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility || 'gemini-2.5-flash'}:generateContent?key=${apiKey}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

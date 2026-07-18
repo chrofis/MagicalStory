@@ -883,7 +883,7 @@ Cover BOTH of:
 
 Write 3-5 sentences total. Be specific and visual. Do NOT mention the photo itself or use phrases like "The image shows".`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -1076,7 +1076,7 @@ Respond in this exact JSON format:
 
 IMPORTANT for isActualPhoto: Set to FALSE if this is a painting, drawing, illustration, engraving, historical artwork, or any non-photographic image. Only set TRUE for actual photographs.`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',

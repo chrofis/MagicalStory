@@ -93,6 +93,12 @@ const TEXT_MODELS = {
     maxOutputTokens: 8192,
     description: 'Qwen-Plus (Alibaba) via OpenRouter - cheap reasoning, ~$0.4/$1.2 per 1M'
   },
+  // Compliance-eval candidates (A/B 2026-07-18). Stronger reasoners than
+  // qwen-plus for severity discipline, still far cheaper than Sonnet.
+  'qwen3-max': { provider: 'openrouter', modelId: 'qwen/qwen3-max', maxOutputTokens: 8192, description: 'Qwen3-Max via OpenRouter (~$0.78/$3.9)' },
+  'deepseek-v32': { provider: 'openrouter', modelId: 'deepseek/deepseek-v3.2', maxOutputTokens: 8192, description: 'DeepSeek V3.2 via OpenRouter (~$0.27/$0.4)' },
+  'glm-46': { provider: 'openrouter', modelId: 'z-ai/glm-4.6', maxOutputTokens: 8192, description: 'GLM-4.6 (Zhipu) via OpenRouter (~$0.5/$2.0)' },
+  'kimi-k2': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2', maxOutputTokens: 8192, description: 'Kimi K2 (Moonshot) via OpenRouter (~$0.57/$2.3)' },
   'qwen-vl': {
     provider: 'openrouter',
     modelId: 'qwen/qwen2.5-vl-72b-instruct',
@@ -151,7 +157,11 @@ const MODEL_DEFAULTS = {
   bboxDetection: 'gemini-2.5-flash',        // Bounding box detection — kept on the same tier as qualityEval so missing-object detection lines up with the eval that uses it.
 
   // Utility models (inspection, visual bible, etc.)
-  utility: 'gemini-2.0-flash',         // Fast utility tasks
+  utility: 'gemini-2.5-flash',         // Fast utility tasks. 2.0-flash RETIRED by Google
+                                       // (404 "no longer available", found 2026-07-18 when the
+                                       // Test Lab style gate silently skipped) — every
+                                       // compareImageStyles/analyzeImageStyle/VB-utility call
+                                       // was failing with it.
 
   // DEAD CONFIG (audit 2026-07-09): only read by the never-wired mask-inpaint
   // dispatcher (inpaintWithMask etc. in images.js — see DEAD CODE banners).
@@ -466,6 +476,10 @@ const MODEL_PRICING = {
   // openrouter.ai; they vary by upstream provider and shift often).
   'qwen/qwen-max': { input: 1.60, output: 6.40 },
   'qwen/qwen-plus': { input: 0.40, output: 1.20 },
+  'qwen/qwen3-max': { input: 0.78, output: 3.9 },
+  'deepseek/deepseek-v3.2': { input: 0.27, output: 0.4 },
+  'z-ai/glm-4.6': { input: 0.5, output: 2.0 },
+  'moonshotai/kimi-k2': { input: 0.57, output: 2.3 },
   'qwen/qwen2.5-vl-72b-instruct': { input: 0.70, output: 0.70 },
   'deepseek/deepseek-chat': { input: 0.27, output: 1.10 },
 
