@@ -7377,13 +7377,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const { consolidateEvaluation } = require('./feedbackConsolidator');
   const consolidatorStoryId = storyData?.id || jobId || null;
   const consolidateLimit = pLimit(Math.min(evalConcurrency, 20));
-  const consolidatePageEval = async (ev, entityIssues, pageNumber, round) => {
+  const consolidatePageEval = async (ev, entityIssues, pageNumber, round, sceneDescriptionOverride = null) => {
     try {
       const orig = rawImages.find(i => i.pageNumber === pageNumber);
       const res = await consolidateEvaluation({
         evalResult: ev,
         entityIssues,
-        sceneDescription: orig?.sceneDescription || '',
+        // A repaired version is consolidated against ITS OWN contract (an
+        // iterate rewrite resolves spec conflicts — checking the ORIGINAL
+        // description would re-flag the fixed version and loop the repair).
+        sceneDescription: sceneDescriptionOverride || orig?.sceneDescription || '',
         characters: characters || [],
         storyId: consolidatorStoryId,
         pageNumber,
@@ -8305,7 +8308,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const roundConsolidated = new Map();
       await Promise.all(roundEvals.map(ev => consolidateLimit(async () => {
         const entityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
-        const plan = await consolidatePageEval(ev, entityResult.issues, ev.pageNumber, round);
+        // Consolidate against the round entry's OWN scene contract when the
+        // repair rewrote it (iterate) — the original description would
+        // re-flag spec conflicts the rewrite just resolved.
+        const roundEntry = roundImageMap.get(ev.pageNumber);
+        const plan = await consolidatePageEval(ev, entityResult.issues, ev.pageNumber, round, roundEntry?.description || null);
         if (plan) roundConsolidated.set(ev.pageNumber, plan);
       })));
 
@@ -8441,8 +8448,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         entry.version.pageNumber = ev.pageNumber;
         // Consolidate the rescue evaluation (same dedupe step as every other
         // eval), then canonical stamp — same single-scale math as every
-        // other writer.
-        const rescuePlan = await consolidatePageEval(ev, entityResult.issues, ev.pageNumber, null);
+        // other writer. Same contract rule as round evals: an unscored
+        // version with its own rewritten description is consolidated against
+        // THAT, not the original.
+        const rescuePlan = await consolidatePageEval(ev, entityResult.issues, ev.pageNumber, null, entry.version?.description || null);
         rescueApplyScore(entry.version, { evalResult: ev, entityResult, promptFinalScore: evScore, consolidatedPlan: rescuePlan });
         const repicked = selectBestVersion(pageVersions.get(ev.pageNumber));
         const prevBest = finalBestPerPage.get(ev.pageNumber);
