@@ -1533,8 +1533,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // despeckled + dilated + feathered) — the model's incidental background
   // repaint inside the crop is discarded, so no rectangle seam. 'crop' mode
   // pastes the whole crop with a rectangular feather (debug/fallback).
-  const outBuf = Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-  const back = await sharp(outBuf).resize(crop.w, crop.h, { fit: 'fill' }).toBuffer();
+  const back = await sharp(outBufEarly).resize(crop.w, crop.h, { fit: 'fill' }).toBuffer();
   let feathered;
   if ((params.pasteMode || 'figure') === 'figure') {
     const origRaw = await sharp(cropBuf).resize(crop.w, crop.h, { fit: 'fill' }).raw().toBuffer();
@@ -1563,7 +1562,11 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     // tight crop) — allow more there.
     const guardMax = params.repairMode ? 0.92 : 0.8;
     if (ownedFrac > guardMax) {
-      throw new Error(`Model re-imagined the whole crop (${Math.round(ownedFrac * 100)}% changed) instead of editing the figure — retry, or use a tighter crop / simpler pose instruction`);
+      const err = new Error(`Model re-imagined the whole crop (${Math.round(ownedFrac * 100)}% changed) instead of editing the figure — retry, or use a tighter crop / simpler pose instruction. The steps below show what it produced.`);
+      // Failed runs keep their intermediates — the caller merges this into
+      // the failed entry so the UI can show what the model actually did.
+      err.partialResult = { steps, crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H }, characterName: ref.name };
+      throw err;
     }
     let alpha1 = alpha;
     if (stride > 1) {

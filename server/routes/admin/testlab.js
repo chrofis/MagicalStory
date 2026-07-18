@@ -235,7 +235,8 @@ async function executeExperiment(experimentId, stage, targets, opts) {
         entry = { ...target, ok: true, startedAt, ...result };
       } catch (err) {
         log.warn(`[TESTLAB] exp ${experimentId} ${target.storyId} P${target.pageNumber} failed: ${err.message}`);
-        entry = { ...target, ok: false, startedAt, error: err.message };
+        // Failed runs keep any intermediates the runner attached (steps etc.).
+        entry = { ...target, ok: false, startedAt, error: err.message, ...(err.partialResult || {}) };
       }
       // Cap stored prompt size so results stay listable.
       if (entry.promptUsed && entry.promptUsed.length > 30000) {
@@ -472,7 +473,7 @@ async function executeRedo(experimentId, exp, entry, resultIndex, override) {
     }
   } catch (err) {
     log.error(`[TESTLAB] redo failed: ${err.message}`);
-    const failedEntry = { ...entry, ok: false, error: err.message, redoOf: resultIndex, redoneAt: new Date().toISOString(), versionIndex: undefined, imageType: entry.imageType };
+    const failedEntry = { ...entry, ok: false, error: err.message, redoOf: resultIndex, redoneAt: new Date().toISOString(), versionIndex: undefined, imageType: entry.imageType, ...(err.partialResult || {}) };
     await dbQuery(`UPDATE testlab_experiments SET results = results || $2::jsonb WHERE id = $1`,
       [experimentId, JSON.stringify([failedEntry])]).catch(() => {});
   } finally {

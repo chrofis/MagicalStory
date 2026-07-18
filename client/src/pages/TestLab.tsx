@@ -899,6 +899,9 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
       </div>
 
       {!result.ok && <div className="text-sm text-red-600 mt-2">{result.error}</div>}
+      {!result.ok && !!result.steps?.length && (
+        <StepsStrip storyId={result.storyId} pageNumber={result.pageNumber ?? null} steps={result.steps} />
+      )}
 
       {result.ok && (
         <>
@@ -1015,7 +1018,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
             </div>
           )}
 
-          {!!result.steps?.length && loaded && (
+          {!!result.steps?.length && (
             <StepsStrip storyId={result.storyId} pageNumber={result.pageNumber ?? null} steps={result.steps} />
           )}
 
