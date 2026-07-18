@@ -801,6 +801,11 @@ function storedEvalFromScene(scene) {
     issuesSummary: scene.qualityReasoning || scene.issuesSummary || null,
     semanticResult: scene.semanticResult
       || (scene.semanticIssues ? { semanticIssues: scene.semanticIssues } : null),
+    // Compliance issues — production consolidation always receives these;
+    // omitting them made lab consolidate runs materially weaker than the
+    // real pipeline (spec-conflict check fired in production-shaped local
+    // runs but not in the lab).
+    threeStageResult: scene.threeStageResult || newestWith('threeStageResult') || null,
     consolidatedPlan: scene.consolidatedPlan || newestWith('consolidatedPlan') || null,
   };
 }
