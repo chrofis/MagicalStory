@@ -554,8 +554,24 @@ async function runBboxStage(ctx, { experimentId }) {
     throw new Error(`Detection fell back to ${result.detectionBackend || 'gemini'} on every attempt — GroundingDINO unreachable (cold analyzer after deploy?). Rerun when the service is warm; refusing to chain repairs onto fallback boxes.`);
   }
 
+  // ALWAYS attach the box overlay as a step image (production renderer) —
+  // the detector's body+face boxes must be inspectable on every detection
+  // entry, not reconstructed by hand when something looks off.
+  const steps = [];
+  try {
+    const { createBboxOverlayImage } = require('./images');
+    const overlay = await createBboxOverlayImage(imageData, result);
+    if (overlay) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, overlay, experimentId);
+      steps.push({ label: `detected boxes (${result.detectionBackend || 'gemini'}): body solid, face dashed`, imageType: 'tl_step', versionIndex: v });
+    }
+  } catch (err) {
+    log.warn(`[TESTLAB] bbox overlay failed (${err.message}) — entry has numeric boxes only`);
+  }
+
   return {
     elapsedMs,
+    steps: steps.length ? steps : undefined,
     detectionBackend: result.detectionBackend || null,
     figures: (result.figures || []).map(f => ({
       name: f.name,
@@ -2165,7 +2181,16 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     || (params.repairMode
       ? (whiteoutApplied
         ? (params._faceMode
-          ? `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. IDENTITY comes from the second image: exact same facial features, age, glasses and hair color. HEAD POSE comes from the third image (blurred on purpose): copy only its head direction, gaze direction, tilt and facial expression — if the person was looking left, the painted face looks left; never copy its blurry detail. Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people.${styleLine}`
+          ? (() => {
+              // "glasses" only for characters who wear them — the generic
+              // enumeration made Qwen ADD glasses to glasses-free characters
+              // (all-5 chain: Lukas and Franziska came back bespectacled).
+              const desc = ctx.scene.bboxDetection?.characterDescriptions?.[charName];
+              const rich = (typeof desc === 'string' ? desc : desc?.richDescription) || '';
+              const hasGlasses = /\bglasses\b|\bbrille\b/i.test(rich);
+              const glassesClause = hasGlasses ? ', including the same glasses' : '. The person does NOT wear glasses — do not add any';
+              return `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. IDENTITY comes from the second image: exact same facial features, age and hair color${glassesClause}. HEAD POSE comes from the third image (blurred on purpose): copy only its head direction, gaze direction, tilt and facial expression — if the person was looking left, the painted face looks left; never copy its blurry detail. Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people.${styleLine}`;
+            })()
           : `Paint the person from the second image into the white silhouette area of the first image. The silhouette shows their exact position, pose and scale — fill it with that person in that pose. The painted person must have the EXACT same face, age, hair color and clothing as shown in the second image${ref.clothingDescription ? ` (${ref.clothingDescription})` : ''}. Keep everything outside the white area exactly unchanged: same background, same other people, same objects, same colors, same framing.${styleLine}`)
         : `Replace the person in the first image with the person from the second image: SAME position, SAME pose, SAME scale as the existing figure — only the face and appearance change to match the second image. Keep everything else in the first image exactly unchanged: same background, same other people, same objects, same colors, same framing.${styleLine}`)
       : `Insert the person from the second image into the scene from the first image: ${pose}. Keep the background of the scene exactly as it is — same objects, same colors, same framing. Add a soft contact shadow.${styleLine}`);

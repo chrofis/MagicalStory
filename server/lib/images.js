@@ -2401,9 +2401,19 @@ function _maskOverlapFrac(a, b) {
 // the center, clamped to the image. SINGLE source of truth — used by the
 // full-page detection assembly AND recoverFaceBox, so a recovered face box
 // is byte-identical in shape to a normally-detected one.
-function _padDinoFaceBox(facePxBox, W, H) {
+// Adaptive: when the raw face is already LARGE relative to its body (anime
+// proportions, lying poses, close-ups) the full pad balloons the box to
+// half the figure — the whiteout stops reading as "a face to fill in" and
+// the edit model draws a floating portrait instead. Large faces get 40%.
+function _padDinoFaceBox(facePxBox, W, H, bodyBoxNorm = null) {
   const [x1, y1, x2, y2] = facePxBox;
-  const pw = (x2 - x1) * 0.5, ph = (y2 - y1) * 0.5;
+  let padFrac = 0.5;
+  if (bodyBoxNorm?.length === 4) {
+    const faceArea = ((x2 - x1) / W) * ((y2 - y1) / H);
+    const bodyArea = (bodyBoxNorm[3] - bodyBoxNorm[1]) * (bodyBoxNorm[2] - bodyBoxNorm[0]);
+    if (bodyArea > 0 && faceArea / bodyArea > 0.18) padFrac = 0.2;
+  }
+  const pw = (x2 - x1) * padFrac, ph = (y2 - y1) * padFrac;
   return _pxBoxToNorm([
     Math.max(0, x1 - pw), Math.max(0, y1 - ph),
     Math.min(W, x2 + pw), Math.min(H, y2 + ph),
@@ -2458,7 +2468,7 @@ async function recoverFaceBox(imageDataUri, bodyBoxNorm, pageLabel = '') {
       cx + best[2] / scale, cy + best[3] / scale,
     ];
     log.info(`🔎 [GDINO-DETECT] ${pageLabel}face recovered via body-crop zoom (score ${faces[0].score?.toFixed?.(2) ?? '?'})`);
-    return _padDinoFaceBox(pagePxBox, W, H);
+    return _padDinoFaceBox(pagePxBox, W, H, bodyBoxNorm);
   } catch (e) {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}face recovery failed: ${e.message}`);
     return null;
@@ -2861,7 +2871,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     const cx = (bodyBox[1] + bodyBox[3]) / 2;
     return cx < 0.33 ? 'left' : cx > 0.66 ? 'right' : 'center';
   };
-  const paddedFaceBox = (facePxBox) => _padDinoFaceBox(facePxBox, W, H);
+  const paddedFaceBox = (facePxBox, bodyBoxNorm) => _padDinoFaceBox(facePxBox, W, H, bodyBoxNorm);
   const figures = [];
   const masks = [];
   dets.forEach((d, j) => {
@@ -2871,7 +2881,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       name,
       label: ec ? (ec.description || '').slice(0, 120) : 'unmatched person',
       position: lcrOf(d.bodyBox),
-      faceBox: d.face ? paddedFaceBox(d.face.box) : null,
+      faceBox: d.face ? paddedFaceBox(d.face.box, d.bodyBox) : null,
       // Raw (unpadded) DINO face box — debugging: when the padded faceBox
       // looks off-target, this shows whether DINO itself boxed the wrong
       // spot or the padding/pairing shifted it.
