@@ -517,6 +517,7 @@ async function resolveCharacterBox(ctx, imageData, charName, { detection = null 
 
 async function runCharRepairStage(ctx, opts) {
   const { experimentId, params = {} } = opts;
+  if (opts.params?.samBlend || opts.params?.backend === 'qwen') warmupFigureMask();
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { repairCharacterMismatch } = require('./images');
@@ -1563,7 +1564,25 @@ async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, par
  * MobileSAM (~90s cold after a deploy) against a 30s HTTP timeout — the
  * first call after a restart reliably times out. Retry while it warms.
  */
-async function fetchMaskWithRetry(buf, box, tries = 3) {
+// Fire-and-forget SAM warm-up: deploys restart the Python service and the
+// first real mask call would eat the ~90s model load. Fired at stage start,
+// in parallel with the 15-60s model generation, so SAM is warm by blend time.
+let _maskWarmupFired = false;
+function warmupFigureMask() {
+  if (_maskWarmupFired) return;
+  _maskWarmupFired = true;
+  (async () => {
+    try {
+      const sharp = require('sharp');
+      const buf = await sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 128, g: 128, b: 128 } } }).jpeg().toBuffer();
+      const { fetchFigureMaskPng } = require('./images');
+      await fetchFigureMaskPng(buf, [8, 8, 56, 56]);
+      log.info('[TESTLAB] SAM warm-up complete');
+    } catch { /* warm-up is best-effort */ }
+  })();
+}
+
+async function fetchMaskWithRetry(buf, box, tries = 5) {
   const { fetchFigureMaskPng } = require('./images');
   for (let i = 0; i < tries; i++) {
     const m = await fetchFigureMaskPng(buf, box);
@@ -1702,6 +1721,7 @@ const BLEND_RULE_VERSION = 'union-solid-pad6';
  */
 async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = {} }) {
   const sharp = require('sharp');
+  if (params.repairMode) warmupFigureMask();
   const { editWithQwen } = require('./runware');
 
   const charName = params.characterName;
