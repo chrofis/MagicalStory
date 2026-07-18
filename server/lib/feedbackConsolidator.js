@@ -482,15 +482,20 @@ function detectDeclaredSpecConflicts(sceneDescription) {
       const partRoot = part.replace(/s$/, '');
       // A commits that same body part in its own interaction
       if (!new RegExp(`\\b${partRoot}s?\\b`, 'i').test(String(A.where || ''))) continue;
+      // Dedupe mirrored pairs — the loop visits (i,j) and (j,i); the same
+      // physical conflict must be listed once, not twice.
+      const key = [i, j].sort((x, y) => x - y).join('-');
+      if (out.some(o => o._pair === key)) continue;
       out.push({
         a: `${A.character}: ${A.where}`,
         b: `${B.character}: ${B.where}`,
         why: `${aName}'s ${partRoot} is committed in one interaction and targeted in the other`,
         source: 'declared-spec-check',
+        _pair: key,
       });
     }
   }
-  return out;
+  return out.map(({ _pair, ...rest }) => rest);
 }
 
 async function consolidateEvaluation({
