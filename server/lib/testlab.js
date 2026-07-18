@@ -1595,11 +1595,23 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         // seams appear; agreed edges are true figure edges and stay crisp.
         const union = Buffer.alloc(n);
         const xor = Buffer.alloc(n);
+        let interPx = 0, unionPx = 0;
         for (let i = 0; i < n; i++) {
           const o = (oldA[i] || 0) > 128 ? 255 : 0;
           const w = (newA[i] || 0) > 128 ? 255 : 0;
           union[i] = Math.max(o, w);
           xor[i] = o !== w ? 255 : 0;
+          if (o && w) interPx++;
+          if (o || w) unionPx++;
+        }
+
+        // IoU gate: barely-overlapping masks mean the figure MOVED or changed
+        // pose — no mask arithmetic fixes that; characters would misalign.
+        const iou = unionPx > 0 ? interPx / unionPx : 0;
+        if (iou < 0.55) {
+          const err = new Error(`Painted figure barely overlaps the original (mask IoU ${(iou * 100).toFixed(0)}%) — the figure moved or changed pose. Redo instead of blending a misaligned figure.`);
+          err.partialResult = { steps, crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H }, characterName: ref.name };
+          throw err;
         }
 
         // Visualize the disagreement: red = old-only (model infilled background
@@ -1613,6 +1625,53 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         }
         const diffJpeg = await sharp(diffRgb, { raw: { width: crop.w, height: crop.h, channels: 3 } }).jpeg().toBuffer();
         await addStep('mask difference (red = old-only, green = new-only)', `data:image/jpeg;base64,${diffJpeg.toString('base64')}`);
+
+        // RED zones (old-only: the new figure fills LESS than the old
+        // silhouette) can't keep the original (old-figure remnants) and
+        // shouldn't trust the model's hallucinated background infill either.
+        // Restore them from the REAL background: diffusion-fill from the
+        // surrounding non-figure pixels of the original crop.
+        const origRawFill = await sharp(cropBuf).resize(crop.w, crop.h, { fit: 'fill' }).raw().toBuffer();
+        const backRaw = await sharp(back).raw().toBuffer();
+        const redMask = Buffer.alloc(n);
+        let redPx = 0;
+        for (let i = 0; i < n; i++) {
+          if ((oldA[i] || 0) > 128 && (newA[i] || 0) <= 128) { redMask[i] = 255; redPx++; }
+        }
+        let source = backRaw; // pixels taken inside the union
+        if (redPx > 0) {
+          // Diffusion fill: background colors spread inward from outside the
+          // union until every red pixel is covered (classic hole filling).
+          const valid = new Uint8Array(n);
+          const fillR = Buffer.from(origRawFill);
+          for (let i = 0; i < n; i++) valid[i] = union[i] > 128 ? 0 : 1;
+          for (let pass = 0; pass < 80 && redPx > 0; pass++) {
+            let progressed = false;
+            for (let y = 0; y < crop.h; y++) for (let x = 0; x < crop.w; x++) {
+              const i = y * crop.w + x;
+              if (valid[i]) continue;
+              let r = 0, g = 0, b = 0, c = 0;
+              for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                const yy = y + dy, xx = x + dx;
+                if (yy < 0 || yy >= crop.h || xx < 0 || xx >= crop.w) continue;
+                const j = yy * crop.w + xx;
+                if (valid[j]) { r += fillR[j * 3]; g += fillR[j * 3 + 1]; b += fillR[j * 3 + 2]; c++; }
+              }
+              if (c > 0) {
+                fillR[i * 3] = Math.round(r / c); fillR[i * 3 + 1] = Math.round(g / c); fillR[i * 3 + 2] = Math.round(b / c);
+                valid[i] = 2; progressed = true;
+              }
+            }
+            for (let i = 0; i < n; i++) if (valid[i] === 2) valid[i] = 1;
+            if (!progressed) break;
+          }
+          // Source image inside the union: model pixels, except red zones which
+          // take the diffusion-filled real background.
+          source = Buffer.from(backRaw);
+          for (let i = 0; i < n; i++) {
+            if (redMask[i]) { source[i * 3] = fillR[i * 3]; source[i * 3 + 1] = fillR[i * 3 + 1]; source[i * 3 + 2] = fillR[i * 3 + 2]; }
+          }
+        }
 
         // Selective feathering: crisp alpha (1px soften) everywhere, WIDE
         // feather only inside the dilated disagreement zone.
@@ -1633,7 +1692,11 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         }
         const maskJpeg = await sharp(Buffer.from(alpha1), raw1).jpeg().toBuffer();
         await addStep('blend mask (crisp on agreed edges, feathered on disagreement)', `data:image/jpeg;base64,${maskJpeg.toString('base64')}`);
-        feathered = await sharp(back).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
+        const sourceJpeg = await sharp(source, { raw: { width: crop.w, height: crop.h, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
+        if (redPx > 0) {
+          await addStep(`red-zone background restore (${redPx}px filled from real background)`, `data:image/jpeg;base64,${sourceJpeg.toString('base64')}`);
+        }
+        feathered = await sharp(sourceJpeg).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
       }
     } catch (err) {
       log.warn(`[TESTLAB] SAM union blend unavailable (${err.message}) — falling back to diff blob`);
