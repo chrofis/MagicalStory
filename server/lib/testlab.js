@@ -649,6 +649,7 @@ async function runCharRepairStage(ctx, opts) {
       addStep,
       failCtx,
       clipRect: faceClip,
+      maskFetcher: faceClip ? (buf) => fetchFaceHeadMask(buf, faceClip, cw, chh) : null,
     });
     const composed = await sharp(origBuf).composite([{ input: blend.feathered, left: cx, top: cy }]).jpeg({ quality: 95 }).toBuffer();
     finalImage = `data:image/jpeg;base64,${composed.toString('base64')}`;
@@ -1594,7 +1595,40 @@ async function fetchMaskWithRetry(buf, box, tries = 5, opts = {}) {
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null }) {
+/**
+ * Head mask for face repairs: MobileSAM segments hair as a SEPARATE object
+ * from the face even with hair point prompts — so union TWO prompts: the
+ * face box (with face+hair points) and a dedicated hair box (upper part of
+ * the head). Returns a binarized white-on-transparent PNG at cropW×cropH.
+ */
+async function fetchFaceHeadMask(buf, faceBox, cropW, cropH) {
+  const sharp = require('sharp');
+  const bcx = Math.round((faceBox[0] + faceBox[2]) / 2);
+  const bh = faceBox[3] - faceBox[1];
+  const points = { points: [[bcx, Math.round(faceBox[1] + bh * 0.5)], [bcx, Math.round(faceBox[1] + bh * 0.15)]] };
+  const hairBox = [faceBox[0], faceBox[1], faceBox[2], Math.round(faceBox[1] + bh * 0.55)];
+  const [m1, m2] = await Promise.all([
+    fetchMaskWithRetry(buf, faceBox, 5, points),
+    fetchMaskWithRetry(buf, hairBox, 2),
+  ]);
+  if (!m1 && !m2) return null;
+  const n = cropW * cropH;
+  const decode = async (png) => {
+    if (!png) return null;
+    const raw = await sharp(png).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+    const s = Math.max(1, Math.round(raw.length / n));
+    const out = Buffer.alloc(n);
+    for (let i = 0; i < n; i++) out[i] = raw[i * s] > 128 ? 255 : 0;
+    return out;
+  };
+  const [a1, a2] = await Promise.all([decode(m1), decode(m2)]);
+  const merged = Buffer.alloc(n);
+  for (let i = 0; i < n; i++) merged[i] = Math.max(a1 ? a1[i] : 0, a2 ? a2[i] : 0);
+  return sharp(Buffer.alloc(n * 3, 255), { raw: { width: cropW, height: cropH, channels: 3 } })
+    .ensureAlpha().joinChannel(merged, { raw: { width: cropW, height: cropH, channels: 1 } }).png().toBuffer();
+}
+
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -1602,9 +1636,9 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     return err;
   };
 
-  const oldMask = oldMaskPng || await fetchMaskWithRetry(originalCropBuf, boxInCrop, 5, maskPoints || {});
+  const oldMask = oldMaskPng || (maskFetcher ? await maskFetcher(originalCropBuf) : await fetchMaskWithRetry(originalCropBuf, boxInCrop, 5, maskPoints || {}));
   if (!oldMask) throw fail('SAM could not mask the original figure (mask service unavailable?) — retry.');
-  const newMask = await fetchMaskWithRetry(candidateCropBuf, boxInCrop, 5, maskPoints || {});
+  const newMask = maskFetcher ? await maskFetcher(candidateCropBuf) : await fetchMaskWithRetry(candidateCropBuf, boxInCrop, 5, maskPoints || {});
   if (!newMask) throw fail('SAM found no figure in the model output inside the target box — the model likely painted the figure elsewhere or not at all. See the raw output step; Redo.');
 
   const raw1 = { raw: { width: cropW, height: cropH, channels: 1 } };
@@ -1842,7 +1876,9 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
           ],
         };
       }
-      oldMaskPng = await fetchMaskWithRetry(cropBuf, boxInCrop, 5, params._maskPoints || {});
+      oldMaskPng = params._faceMode
+        ? await fetchFaceHeadMask(cropBuf, boxInCrop, crop.w, crop.h)
+        : await fetchMaskWithRetry(cropBuf, boxInCrop, 5, params._maskPoints || {});
       if (oldMaskPng) {
         // Rebuild the whiteout mask BINARIZED (no soft SAM edges = no
         // feathered-looking whiteout), hard-clipped to the face region in
@@ -1941,6 +1977,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       addStep,
       failCtx,
       maskPoints: params._maskPoints || null,
+      maskFetcher: params._faceMode ? (buf) => fetchFaceHeadMask(buf, boxInCrop, crop.w, crop.h) : null,
       // Face mode: union hard-clipped to the face region — body pixels never
       // enter the union no matter what round-2 SAM returns.
       clipRect: params._faceMode && figureBox ? [
