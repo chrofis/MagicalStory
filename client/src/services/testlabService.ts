@@ -115,6 +115,7 @@ export interface ExperimentResult {
   consolidateError?: string | null;
   skipped?: boolean;
   boxSource?: string;
+  samBlend?: boolean;
   cost?: number;
   crop?: { x: number; y: number; w: number; h: number };
   bbox?: number[];

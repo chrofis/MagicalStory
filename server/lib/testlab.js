@@ -615,24 +615,66 @@ async function runCharRepairStage(ctx, opts) {
   }
 
   const steps = [];
-  const stepImages = [
-    ['input: character reference', ref.photoUrl],
-    ['SAM silhouette of target figure (as used by the repair)', samDisplay],
-    ['sent to model (whiteout)', result?.blackoutImage || result?.comparison?.blackoutImage || result?.debug?.sceneSent],
-    ['model raw output', result?.grokRawResult || result?.comparison?.grokRawResult],
-    ['blend mask (production silhouette gate)', result?.blendMask || result?.comparison?.blendMask],
-  ];
-  for (const [label, img] of stepImages) {
-    if (typeof img === 'string' && img.startsWith('data:image')) {
-      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, img, experimentId);
-      steps.push({ label, imageType: 'tl_step', versionIndex: v });
-    }
+  const addStep = async (label, dataUri) => {
+    if (typeof dataUri !== 'string' || !dataUri.startsWith('data:image')) return;
+    const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, dataUri, experimentId);
+    steps.push({ label, imageType: 'tl_step', versionIndex: v });
+  };
+  await addStep('input: character reference', ref.photoUrl);
+  await addStep('SAM silhouette of target figure (as used by the repair)', samDisplay);
+  await addStep('sent to model (whiteout)', result?.blackoutImage || result?.comparison?.blackoutImage || result?.debug?.sceneSent);
+  await addStep('model raw output', result?.grokRawResult || result?.comparison?.grokRawResult);
+  await addStep('blend mask (production silhouette gate)', result?.blendMask || result?.comparison?.blendMask);
+
+  // params.samBlend: instead of the production paste, run the SHARED SAM-union
+  // blend on the engine's output — identical blending across all engines, and
+  // the background outside the figure is mechanically guaranteed (this also
+  // upgrades fullscene/crosshatch, whose production path trusts the model
+  // with the entire page).
+  let finalImage = repairedImage;
+  let samBlendApplied = false;
+  if (params.samBlend) {
+    const sharp = require('sharp');
+    const origBuf = Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const candBufFull = Buffer.from(repairedImage.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const om = await sharp(origBuf).metadata();
+    const pad = 0.15;
+    const bw = bbox[3] - bbox[1], bh = bbox[2] - bbox[0];
+    const cx = Math.max(0, Math.round((bbox[1] - bw * pad) * om.width));
+    const cy = Math.max(0, Math.round((bbox[0] - bh * pad * 0.6) * om.height));
+    const cw = Math.min(om.width - cx, Math.round(bw * (1 + 2 * pad) * om.width));
+    const chh = Math.min(om.height - cy, Math.round(bh * (1 + 2 * pad * 0.6) * om.height));
+    const origCrop = await sharp(origBuf).extract({ left: cx, top: cy, width: cw, height: chh }).jpeg({ quality: 95 }).toBuffer();
+    // Candidate page may differ in dims (Grok preset coercion) — normalize
+    // to the original page size before cropping the same region.
+    const candCrop = await sharp(candBufFull).resize(om.width, om.height, { fit: 'fill' })
+      .extract({ left: cx, top: cy, width: cw, height: chh }).jpeg({ quality: 95 }).toBuffer();
+    const boxInCrop = [
+      Math.max(0, Math.round(bbox[1] * om.width) - cx),
+      Math.max(0, Math.round(bbox[0] * om.height) - cy),
+      Math.min(cw, Math.round(bbox[3] * om.width) - cx),
+      Math.min(chh, Math.round(bbox[2] * om.height) - cy),
+    ];
+    const failCtx = { steps, characterName: charName, bbox, boxSource, backend };
+    const blend = await samUnionBlend({
+      originalCropBuf: origCrop,
+      candidateCropBuf: candCrop,
+      boxInCrop,
+      cropW: cw,
+      cropH: chh,
+      addStep,
+      failCtx,
+    });
+    const composed = await sharp(origBuf).composite([{ input: blend.feathered, left: cx, top: cy }]).jpeg({ quality: 95 }).toBuffer();
+    finalImage = `data:image/jpeg;base64,${composed.toString('base64')}`;
+    samBlendApplied = true;
   }
 
-  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, repairedImage, experimentId);
+  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, finalImage, experimentId);
   return {
     imageType: 'scene', versionIndex, characterName: charName, bbox, faceBbox: faceBbox || undefined, boxSource, backend,
     repairMode: backend === 'grok' ? repairMode : null,
+    samBlend: samBlendApplied || undefined,
     method: result?.method || null, steps, elapsedMs,
   };
 }
@@ -1516,6 +1558,146 @@ async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, par
 }
 
 /**
+ * Figure-mask fetch with warm-up retries: the Python service lazy-loads
+ * MobileSAM (~90s cold after a deploy) against a 30s HTTP timeout — the
+ * first call after a restart reliably times out. Retry while it warms.
+ */
+async function fetchMaskWithRetry(buf, box, tries = 3) {
+  const { fetchFigureMaskPng } = require('./images');
+  for (let i = 0; i < tries; i++) {
+    const m = await fetchFigureMaskPng(buf, box);
+    if (m) return m;
+    if (i < tries - 1) {
+      log.info(`[TESTLAB] figure mask unavailable (attempt ${i + 1}/${tries}) — waiting for model warm-up`);
+      await new Promise(r => setTimeout(r, 10000));
+    }
+  }
+  return null;
+}
+
+/**
+ * THE shared repair blend — engine-agnostic. Given the original crop and a
+ * candidate crop (any model's output for the same region), put ONLY the
+ * repainted figure back:
+ *   1. SAM masks the figure in BOTH crops (old mask reusable by the caller).
+ *   2. IoU gate: masks barely overlapping = the figure moved → reject.
+ *   3. Union = pixels owned by the candidate. RED zones (figure shrank —
+ *      old-figure remnants underneath) are restored from the REAL background
+ *      via diffusion fill, never the model's hallucinated infill.
+ *   4. Alpha: CRISP along the entire new-figure edge (a real figure boundary
+ *      — agreed or grown), feather ONLY the red-zone borders (background
+ *      meeting background, where feathering is safe and useful).
+ * Returns a feathered RGBA PNG to composite at the crop position; throws
+ * (with steps attached) on gate failures. Every mask is emitted as a step.
+ */
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx }) {
+  const sharp = require('sharp');
+  const fail = (msg) => {
+    const err = new Error(msg);
+    err.partialResult = failCtx;
+    return err;
+  };
+
+  const oldMask = oldMaskPng || await fetchMaskWithRetry(originalCropBuf, boxInCrop);
+  if (!oldMask) throw fail('SAM could not mask the original figure (mask service unavailable?) — retry.');
+  const newMask = await fetchMaskWithRetry(candidateCropBuf, boxInCrop);
+  if (!newMask) throw fail('SAM found no figure in the model output inside the target box — the model likely painted the figure elsewhere or not at all. See the raw output step; Redo.');
+
+  const raw1 = { raw: { width: cropW, height: cropH, channels: 1 } };
+  const n = cropW * cropH;
+  const strip = (buf) => {
+    const s = Math.max(1, Math.round(buf.length / n));
+    if (s === 1) return buf;
+    const out = Buffer.alloc(n);
+    for (let i = 0; i < n; i++) out[i] = buf[i * s];
+    return out;
+  };
+  const oldA = await sharp(oldMask).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+  const newA = await sharp(newMask).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+
+  const union = Buffer.alloc(n);
+  const newBin = Buffer.alloc(n);
+  const redMask = Buffer.alloc(n);
+  let interPx = 0, unionPx = 0, redPx = 0;
+  for (let i = 0; i < n; i++) {
+    const o = (oldA[i] || 0) > 128 ? 255 : 0;
+    const w = (newA[i] || 0) > 128 ? 255 : 0;
+    union[i] = Math.max(o, w);
+    newBin[i] = w;
+    if (o && w) interPx++;
+    if (o || w) unionPx++;
+    if (o && !w) { redMask[i] = 255; redPx++; }
+  }
+  const iou = unionPx > 0 ? interPx / unionPx : 0;
+  if (iou < 0.55) {
+    throw fail(`Painted figure barely overlaps the original (mask IoU ${(iou * 100).toFixed(0)}%) — the figure moved or changed pose. Redo instead of blending a misaligned figure.`);
+  }
+
+  // Disagreement visualization: red = old-only, green = new-only.
+  const diffRgb = Buffer.alloc(n * 3);
+  for (let i = 0; i < n; i++) {
+    const o = (oldA[i] || 0) > 128, w = (newA[i] || 0) > 128;
+    diffRgb[i * 3] = o && !w ? 255 : 40;
+    diffRgb[i * 3 + 1] = w && !o ? 255 : 40;
+    diffRgb[i * 3 + 2] = 40;
+  }
+  await addStep('mask difference (red = old-only, green = new-only)',
+    `data:image/jpeg;base64,${(await sharp(diffRgb, { raw: { width: cropW, height: cropH, channels: 3 } }).jpeg().toBuffer()).toString('base64')}`);
+
+  // Red-zone restore: diffusion-fill from the real background around the union.
+  const backRaw = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).raw().toBuffer();
+  let source = backRaw;
+  if (redPx > 0) {
+    const origRawFill = await sharp(originalCropBuf).resize(cropW, cropH, { fit: 'fill' }).raw().toBuffer();
+    const valid = new Uint8Array(n);
+    const fillR = Buffer.from(origRawFill);
+    for (let i = 0; i < n; i++) valid[i] = union[i] > 128 ? 0 : 1;
+    for (let pass = 0; pass < 80; pass++) {
+      let progressed = false;
+      for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
+        const i = y * cropW + x;
+        if (valid[i]) continue;
+        let r = 0, g = 0, b = 0, c = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const yy = y + dy, xx = x + dx;
+          if (yy < 0 || yy >= cropH || xx < 0 || xx >= cropW) continue;
+          const j = yy * cropW + xx;
+          if (valid[j]) { r += fillR[j * 3]; g += fillR[j * 3 + 1]; b += fillR[j * 3 + 2]; c++; }
+        }
+        if (c > 0) {
+          fillR[i * 3] = Math.round(r / c); fillR[i * 3 + 1] = Math.round(g / c); fillR[i * 3 + 2] = Math.round(b / c);
+          valid[i] = 2; progressed = true;
+        }
+      }
+      for (let i = 0; i < n; i++) if (valid[i] === 2) valid[i] = 1;
+      if (!progressed) break;
+    }
+    source = Buffer.from(backRaw);
+    for (let i = 0; i < n; i++) {
+      if (redMask[i]) { source[i * 3] = fillR[i * 3]; source[i * 3 + 1] = fillR[i * 3 + 1]; source[i * 3 + 2] = fillR[i * 3 + 2]; }
+    }
+  }
+
+  // Alpha: crisp new-figure edge everywhere (1px soften for SAM binarization),
+  // feather ONLY the red-zone borders (restored background meets original).
+  const crispNew = strip(await sharp(newBin, raw1).blur(1).raw().toBuffer());
+  const redSoft = redPx > 0
+    ? strip(await sharp(redMask, raw1).blur(2).threshold(16).blur(4).raw().toBuffer())
+    : null;
+  const alpha1 = Buffer.alloc(n);
+  for (let i = 0; i < n; i++) alpha1[i] = Math.max(crispNew[i], redSoft ? redSoft[i] : 0);
+
+  await addStep('blend mask (crisp figure edge, feathered red zones)',
+    `data:image/jpeg;base64,${(await sharp(Buffer.from(alpha1), raw1).jpeg().toBuffer()).toString('base64')}`);
+  const sourceJpeg = await sharp(source, { raw: { width: cropW, height: cropH, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
+  if (redPx > 0) {
+    await addStep(`red-zone background restore (${redPx}px filled from real background)`, `data:image/jpeg;base64,${sourceJpeg.toString('base64')}`);
+  }
+  const feathered = await sharp(sourceJpeg).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
+  return { feathered, iou, redPx };
+}
+
+/**
  * Crop-bounded Qwen character insertion (composite-v2 recipe, validated
  * 2026-07-17 — docs/tests/qwen-composite-experiment.html). Crops the target
  * region + margin, has Qwen-Image-Edit-2511 insert the character into the
@@ -1598,29 +1780,12 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // (same trick Grok blended repair uses) — turns "replace" into "paint into
   // the white gap", the operation Qwen actually performs faithfully. Plain
   // replace-wording made the model re-imagine the whole crop (exp #11/#12).
-  // Figure-mask fetch with warm-up retries: the Python service lazy-loads
-  // MobileSAM (~90s cold after a deploy) against a 30s HTTP timeout — the
-  // first call after a restart reliably times out. Retry while it warms.
-  const fetchMaskWithRetry = async (buf, box, tries = 3) => {
-    const { fetchFigureMaskPng } = require('./images');
-    for (let i = 0; i < tries; i++) {
-      const m = await fetchFigureMaskPng(buf, box);
-      if (m) return m;
-      if (i < tries - 1) {
-        log.info(`[TESTLAB] figure mask unavailable (attempt ${i + 1}/${tries}) — waiting for model warm-up`);
-        await new Promise(r => setTimeout(r, 10000));
-      }
-    }
-    return null;
-  };
-
   let sentBuf = cropBuf;
   let whiteoutApplied = false;
   let oldMaskPng = null; // SAM silhouette of the ORIGINAL figure — reused for the blend
   let boxInCrop = null;
   if (params.repairMode && figureBox) {
     try {
-      const { fetchFigureMaskPng } = require('./images');
       boxInCrop = [
         Math.max(0, Math.round(figureBox[1] * W) - crop.x),
         Math.max(0, Math.round(figureBox[0] * H) - crop.y),
@@ -1678,143 +1843,26 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   const back = await sharp(outBufEarly).resize(crop.w, crop.h, { fit: 'fill' }).toBuffer();
   let feathered;
 
-  // Repair blend: SAM SILHOUETTE UNION (production Grok-blended technique) —
-  // mask of the OLD figure (already fetched for the whiteout) ∪ mask of the
-  // NEW figure in the model output. Exact figure pixels, no diff-blob
-  // guessing, no half-mixed colors. MANDATORY in repair mode: if the output
-  // mask can't be built, the model almost certainly painted the figure
-  // wrong/elsewhere — fail loudly, never degrade to the diff blob (exp #30
-  // shipped grey-smear garbage that way).
+  // Repair blend: the shared engine-agnostic SAM-union blend (samUnionBlend).
+  // MANDATORY in repair mode — no silent diff-blob degradation (exp #30).
   if ((params.pasteMode || 'figure') === 'figure' && params.repairMode) {
+    const failCtx = { steps, crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H }, characterName: ref.name };
     if (!oldMaskPng || !boxInCrop) {
       const err = new Error('Repair blend needs the figure silhouette and the mask service did not deliver one (cold Python service?) — retry.');
-      err.partialResult = { steps, crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H }, characterName: ref.name };
+      err.partialResult = failCtx;
       throw err;
     }
-    {
-      const newMaskPng = await fetchMaskWithRetry(back, boxInCrop);
-      if (!newMaskPng) {
-        const err = new Error('SAM found no figure in the model output inside the target box — the model likely painted the figure elsewhere or not at all. See the raw output step; Redo.');
-        err.partialResult = { steps, crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H }, characterName: ref.name };
-        throw err;
-      }
-      {
-        const raw1 = { raw: { width: crop.w, height: crop.h, channels: 1 } };
-        const oldA = await sharp(oldMaskPng).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
-        const newA = await sharp(newMaskPng).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
-        const n = crop.w * crop.h;
-
-        // Union = every pixel that must come from the model output (new figure
-        // pixels, plus the model's background infill where the old figure was).
-        // XOR = the DISAGREEMENT band — where the model filled more or less of
-        // the silhouette than the original figure occupied. That band is where
-        // seams appear; agreed edges are true figure edges and stay crisp.
-        const union = Buffer.alloc(n);
-        const xor = Buffer.alloc(n);
-        let interPx = 0, unionPx = 0;
-        for (let i = 0; i < n; i++) {
-          const o = (oldA[i] || 0) > 128 ? 255 : 0;
-          const w = (newA[i] || 0) > 128 ? 255 : 0;
-          union[i] = Math.max(o, w);
-          xor[i] = o !== w ? 255 : 0;
-          if (o && w) interPx++;
-          if (o || w) unionPx++;
-        }
-
-        // IoU gate: barely-overlapping masks mean the figure MOVED or changed
-        // pose — no mask arithmetic fixes that; characters would misalign.
-        const iou = unionPx > 0 ? interPx / unionPx : 0;
-        if (iou < 0.55) {
-          const err = new Error(`Painted figure barely overlaps the original (mask IoU ${(iou * 100).toFixed(0)}%) — the figure moved or changed pose. Redo instead of blending a misaligned figure.`);
-          err.partialResult = { steps, crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H }, characterName: ref.name };
-          throw err;
-        }
-
-        // Visualize the disagreement: red = old-only (model infilled background
-        // there), green = new-only (figure grew beyond the old silhouette).
-        const diffRgb = Buffer.alloc(n * 3);
-        for (let i = 0; i < n; i++) {
-          const o = (oldA[i] || 0) > 128, w = (newA[i] || 0) > 128;
-          diffRgb[i * 3] = o && !w ? 255 : 40;
-          diffRgb[i * 3 + 1] = w && !o ? 255 : 40;
-          diffRgb[i * 3 + 2] = 40;
-        }
-        const diffJpeg = await sharp(diffRgb, { raw: { width: crop.w, height: crop.h, channels: 3 } }).jpeg().toBuffer();
-        await addStep('mask difference (red = old-only, green = new-only)', `data:image/jpeg;base64,${diffJpeg.toString('base64')}`);
-
-        // RED zones (old-only: the new figure fills LESS than the old
-        // silhouette) can't keep the original (old-figure remnants) and
-        // shouldn't trust the model's hallucinated background infill either.
-        // Restore them from the REAL background: diffusion-fill from the
-        // surrounding non-figure pixels of the original crop.
-        const origRawFill = await sharp(cropBuf).resize(crop.w, crop.h, { fit: 'fill' }).raw().toBuffer();
-        const backRaw = await sharp(back).raw().toBuffer();
-        const redMask = Buffer.alloc(n);
-        let redPx = 0;
-        for (let i = 0; i < n; i++) {
-          if ((oldA[i] || 0) > 128 && (newA[i] || 0) <= 128) { redMask[i] = 255; redPx++; }
-        }
-        let source = backRaw; // pixels taken inside the union
-        if (redPx > 0) {
-          // Diffusion fill: background colors spread inward from outside the
-          // union until every red pixel is covered (classic hole filling).
-          const valid = new Uint8Array(n);
-          const fillR = Buffer.from(origRawFill);
-          for (let i = 0; i < n; i++) valid[i] = union[i] > 128 ? 0 : 1;
-          for (let pass = 0; pass < 80 && redPx > 0; pass++) {
-            let progressed = false;
-            for (let y = 0; y < crop.h; y++) for (let x = 0; x < crop.w; x++) {
-              const i = y * crop.w + x;
-              if (valid[i]) continue;
-              let r = 0, g = 0, b = 0, c = 0;
-              for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-                const yy = y + dy, xx = x + dx;
-                if (yy < 0 || yy >= crop.h || xx < 0 || xx >= crop.w) continue;
-                const j = yy * crop.w + xx;
-                if (valid[j]) { r += fillR[j * 3]; g += fillR[j * 3 + 1]; b += fillR[j * 3 + 2]; c++; }
-              }
-              if (c > 0) {
-                fillR[i * 3] = Math.round(r / c); fillR[i * 3 + 1] = Math.round(g / c); fillR[i * 3 + 2] = Math.round(b / c);
-                valid[i] = 2; progressed = true;
-              }
-            }
-            for (let i = 0; i < n; i++) if (valid[i] === 2) valid[i] = 1;
-            if (!progressed) break;
-          }
-          // Source image inside the union: model pixels, except red zones which
-          // take the diffusion-filled real background.
-          source = Buffer.from(backRaw);
-          for (let i = 0; i < n; i++) {
-            if (redMask[i]) { source[i * 3] = fillR[i * 3]; source[i * 3 + 1] = fillR[i * 3 + 1]; source[i * 3 + 2] = fillR[i * 3 + 2]; }
-          }
-        }
-
-        // Selective feathering: crisp alpha (1px soften) everywhere, WIDE
-        // feather only inside the dilated disagreement zone.
-        const strip = (buf) => {
-          const s = Math.max(1, Math.round(buf.length / n));
-          if (s === 1) return buf;
-          const out = Buffer.alloc(n);
-          for (let i = 0; i < n; i++) out[i] = buf[i * s];
-          return out;
-        };
-        const crisp = strip(await sharp(union, raw1).blur(1).raw().toBuffer());
-        const soft = strip(await sharp(union, raw1).blur(6).raw().toBuffer());
-        const zone = strip(await sharp(xor, raw1).blur(5).threshold(16).blur(2).raw().toBuffer()); // dilated disagreement
-        const alpha1 = Buffer.alloc(n);
-        for (let i = 0; i < n; i++) {
-          const z = zone[i] / 255;
-          alpha1[i] = Math.round(crisp[i] * (1 - z) + soft[i] * z);
-        }
-        const maskJpeg = await sharp(Buffer.from(alpha1), raw1).jpeg().toBuffer();
-        await addStep('blend mask (crisp on agreed edges, feathered on disagreement)', `data:image/jpeg;base64,${maskJpeg.toString('base64')}`);
-        const sourceJpeg = await sharp(source, { raw: { width: crop.w, height: crop.h, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
-        if (redPx > 0) {
-          await addStep(`red-zone background restore (${redPx}px filled from real background)`, `data:image/jpeg;base64,${sourceJpeg.toString('base64')}`);
-        }
-        feathered = await sharp(sourceJpeg).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
-      }
-    }
+    const blend = await samUnionBlend({
+      originalCropBuf: cropBuf,
+      candidateCropBuf: back,
+      boxInCrop,
+      cropW: crop.w,
+      cropH: crop.h,
+      oldMaskPng,
+      addStep,
+      failCtx,
+    });
+    feathered = blend.feathered;
   }
 
   if (!feathered && (params.pasteMode || 'figure') === 'figure') {

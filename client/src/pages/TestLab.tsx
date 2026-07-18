@@ -421,6 +421,8 @@ function ExperimentsTab() {
             { label: 'D: Grok fullscene inpaint', params: { backend: 'grok', repairMode: 'fullscene' } },
             { label: 'E: Gemini repaint', params: { backend: 'gemini', repairMode: 'auto' } },
             { label: 'F: Qwen whiteout+SAM blend', params: { backend: 'qwen' } },
+            { label: 'G: Grok crosshatch + shared SAM blend', params: { backend: 'grok', repairMode: 'fullscene', samBlend: true } },
+            { label: 'H: Grok crop-input + shared SAM blend', params: { backend: 'grok', repairMode: 'cutout', samBlend: true } },
           ];
         } else {
           params.backend = repairBackend;
@@ -842,13 +844,16 @@ export const openLightbox = (imgs: LightboxImage[], index: number) => _openLight
 
 function LightboxHost() {
   const [state, setState] = useState<{ imgs: LightboxImage[]; index: number } | null>(null);
-  useEffect(() => { _openLightbox = (imgs, index) => setState({ imgs, index }); return () => { _openLightbox = () => {}; }; }, []);
+  const [zoom, setZoom] = useState(1); // 1 = fit, 2 = 200%, 3 = 300%
+  useEffect(() => { _openLightbox = (imgs, index) => { setState({ imgs, index }); setZoom(1); }; return () => { _openLightbox = () => {}; }; }, []);
   useEffect(() => {
     if (!state) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setState(null);
-      if (e.key === 'ArrowRight') setState(s => s && { ...s, index: (s.index + 1) % s.imgs.length });
-      if (e.key === 'ArrowLeft') setState(s => s && { ...s, index: (s.index - 1 + s.imgs.length) % s.imgs.length });
+      if (e.key === 'ArrowRight') { setState(s => s && { ...s, index: (s.index + 1) % s.imgs.length }); setZoom(1); }
+      if (e.key === 'ArrowLeft') { setState(s => s && { ...s, index: (s.index - 1 + s.imgs.length) % s.imgs.length }); setZoom(1); }
+      if (e.key === '+' || e.key === '=') setZoom(z => Math.min(4, z + 1));
+      if (e.key === '-') setZoom(z => Math.max(1, z - 1));
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -859,17 +864,40 @@ function LightboxHost() {
     <div className="fixed inset-0 z-50 bg-black/90 flex flex-col" onClick={() => setState(null)}>
       <div className="flex items-center justify-between px-6 py-3 text-white" onClick={e => e.stopPropagation()}>
         <div className="text-sm font-medium">{cur.label} <span className="text-white/50 ml-2">{state.index + 1} / {state.imgs.length}</span></div>
-        <button className="text-white/70 hover:text-white text-2xl leading-none" onClick={() => setState(null)}>×</button>
+        <div className="flex items-center gap-3">
+          <button className="text-white/70 hover:text-white text-xl px-2" onClick={() => setZoom(z => Math.max(1, z - 1))}>−</button>
+          <span className="text-sm text-white/70 w-14 text-center">{zoom === 1 ? 'fit' : `${zoom * 100}%`}</span>
+          <button className="text-white/70 hover:text-white text-xl px-2" onClick={() => setZoom(z => Math.min(4, z + 1))}>+</button>
+          <button className="text-white/70 hover:text-white text-2xl leading-none ml-4" onClick={() => setState(null)}>×</button>
+        </div>
       </div>
-      <div className="flex-1 flex items-center justify-center min-h-0 px-16" onClick={e => e.stopPropagation()}>
+      <div className="flex-1 min-h-0 relative" onClick={e => e.stopPropagation()}>
         <button
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl px-3 py-6"
-          onClick={() => setState(s => s && { ...s, index: (s.index - 1 + s.imgs.length) % s.imgs.length })}
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 text-white/70 hover:text-white text-4xl px-3 py-6 bg-black/40 rounded-r-lg"
+          onClick={() => { setState(s => s && { ...s, index: (s.index - 1 + s.imgs.length) % s.imgs.length }); setZoom(1); }}
         >‹</button>
-        <img src={cur.src} alt={cur.label} className="max-h-full max-w-full object-contain" />
+        {zoom === 1 ? (
+          <div className="w-full h-full flex items-center justify-center px-16">
+            <img
+              src={cur.src} alt={cur.label}
+              className="max-h-full max-w-full object-contain cursor-zoom-in"
+              onClick={() => setZoom(2)}
+            />
+          </div>
+        ) : (
+          // Zoomed: real pixel scaling, scroll to pan. Click cycles 200→300→fit.
+          <div className="w-full h-full overflow-auto">
+            <img
+              src={cur.src} alt={cur.label}
+              className="cursor-zoom-in"
+              style={{ width: `${zoom * 100}%`, maxWidth: 'none', display: 'block', margin: '0 auto' }}
+              onClick={() => setZoom(z => (z >= 4 ? 1 : z + 1))}
+            />
+          </div>
+        )}
         <button
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl px-3 py-6"
-          onClick={() => setState(s => s && { ...s, index: (s.index + 1) % s.imgs.length })}
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 text-white/70 hover:text-white text-4xl px-3 py-6 bg-black/40 rounded-l-lg"
+          onClick={() => { setState(s => s && { ...s, index: (s.index + 1) % s.imgs.length }); setZoom(1); }}
         >›</button>
       </div>
     </div>,
