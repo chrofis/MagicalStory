@@ -1084,11 +1084,38 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
           {result.method && <span>{result.method}</span>}
           {result.blendRule && <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">blend: {result.blendRule}</span>}
           {result.samBlend && !result.blendRule && <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">blend: OLD generation</span>}
+          {result.styleMatch && (
+            <span className={`px-2 py-0.5 rounded-full ${result.styleMatch.sameStyle ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}
+              title={`A: ${result.styleMatch.styleA} / B: ${result.styleMatch.styleB}`}>
+              style {result.styleMatch.sameStyle ? 'match' : 'DRIFT'}
+            </span>
+          )}
+          {result.detectionBackend && (
+            <span className={`px-2 py-0.5 rounded-full ${result.detectionBackend === 'grounding-dino' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+              {result.detectionBackend}
+            </span>
+          )}
           {result.scores?.error && <span className="text-red-600 font-semibold" title={result.scores.error}>eval failed</span>}
         </div>
       </div>
 
       {!result.ok && <div className="text-sm text-red-600 mt-2">{result.error}</div>}
+
+      {/* Warnings/faults captured DURING this run — silent fallbacks, gate
+          skips, cold-service retries. Always visible when present; full log
+          behind a toggle so nothing hides in Railway. */}
+      {!!result.logWarnings?.length && (
+        <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-900">
+          <div className="font-semibold mb-1">⚠ {result.logWarnings.length} warning{result.logWarnings.length > 1 ? 's' : ''} during this run</div>
+          {result.logWarnings.map((w, i) => <div key={i} className="font-mono whitespace-pre-wrap">{w}</div>)}
+        </div>
+      )}
+      {!!result.logLines?.length && (
+        <details className="mt-1 text-xs text-gray-500">
+          <summary className="cursor-pointer select-none">run log ({result.logLines.length} lines)</summary>
+          <pre className="mt-1 bg-gray-50 border border-gray-200 rounded-lg p-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-600">{result.logLines.join('\n')}</pre>
+        </details>
+      )}
       {!result.ok && !!result.steps?.length && (
         <StepsStrip steps={result.steps} images={stepImgs} onOpen={vi => { const g = gallery(); const s = (result.steps || []).find(x => x.versionIndex === vi); const idx = s ? g.findIndex(x => x.label === s.label) : 0; openLightbox(g, idx >= 0 ? idx : 0); }} />
       )}

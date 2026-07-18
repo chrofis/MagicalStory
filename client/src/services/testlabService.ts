@@ -117,6 +117,9 @@ export interface ExperimentResult {
   boxSource?: string;
   samBlend?: boolean;
   blendRule?: string;
+  styleMatch?: { sameStyle: boolean; styleA?: string; styleB?: string };
+  logWarnings?: string[];
+  logLines?: string[];
   cost?: number;
   crop?: { x: number; y: number; w: number; h: number };
   bbox?: number[];

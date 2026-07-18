@@ -2489,18 +2489,52 @@ const AVATAR_STAGES = {
  * unrecoverable errors (caller records per-target failure).
  */
 async function runStageOnTarget(stage, target, opts) {
-  if (AVATAR_STAGES[stage]) {
-    if (!target.character) throw new Error(`${stage} requires target.character`);
-    return AVATAR_STAGES[stage](target, opts);
+  // Capture every log line emitted while THIS stage runs and persist it on
+  // the entry — faults (silent fallbacks, gate skips, cold-service retries)
+  // must be visible in the lab UI, not only in Railway. Concurrent runs
+  // (3 parallel redos) may interleave lines into each other's capture;
+  // acceptable for a debugging aid. warn/error stored in full, info capped.
+  const { addLogListener, removeLogListener } = require('../utils/logger');
+  const captured = [];
+  const listener = (level, line) => {
+    if (captured.length >= 400) return;
+    captured.push({ level, line: line.slice(0, 400) });
+  };
+  addLogListener(listener);
+  let result;
+  try {
+    if (AVATAR_STAGES[stage]) {
+      if (!target.character) throw new Error(`${stage} requires target.character`);
+      result = await AVATAR_STAGES[stage](target, opts);
+    } else if (STORY_STAGES[stage]) {
+      if (!target.storyId) throw new Error(`${stage} requires target.storyId`);
+      result = await STORY_STAGES[stage](target, opts);
+    } else {
+      const runner = STAGE_RUNNERS[stage];
+      if (!runner) throw new Error(`Unknown stage: ${stage}. Valid: ${[...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES), ...Object.keys(STORY_STAGES)].join(', ')}`);
+      const ctx = await loadSceneContext(target.storyId, target.pageNumber);
+      result = await runner(ctx, opts);
+    }
+  } catch (err) {
+    // Failed runs need the log MOST — attach it to the partial result the
+    // route stores with the failure entry.
+    removeLogListener(listener);
+    err.partialResult = { ...(err.partialResult || {}), ...buildStageLog(captured) };
+    throw err;
   }
-  if (STORY_STAGES[stage]) {
-    if (!target.storyId) throw new Error(`${stage} requires target.storyId`);
-    return STORY_STAGES[stage](target, opts);
-  }
-  const runner = STAGE_RUNNERS[stage];
-  if (!runner) throw new Error(`Unknown stage: ${stage}. Valid: ${[...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES), ...Object.keys(STORY_STAGES)].join(', ')}`);
-  const ctx = await loadSceneContext(target.storyId, target.pageNumber);
-  return runner(ctx, opts);
+  removeLogListener(listener);
+  return { ...result, ...buildStageLog(captured) };
+}
+
+function buildStageLog(captured) {
+  const warnings = captured.filter(l => l.level === 'warn' || l.level === 'error').map(l => `[${l.level}] ${l.line}`);
+  const infos = captured.filter(l => l.level === 'info').map(l => l.line);
+  // Full info log capped from the END (the tail is where failures happen).
+  const lines = infos.length > 150 ? [`… ${infos.length - 150} earlier lines omitted`, ...infos.slice(-150)] : infos;
+  return {
+    logWarnings: warnings.length ? warnings.slice(0, 80) : undefined,
+    logLines: lines.length ? lines : undefined,
+  };
 }
 
 /**
