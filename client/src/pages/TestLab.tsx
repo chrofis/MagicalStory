@@ -10,6 +10,7 @@
  *    variant side-by-side with eval scores; promote a test image if wanted.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { FlaskConical, RefreshCw, Trash2, ExternalLink, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/common/Button';
@@ -64,6 +65,7 @@ export default function TestLab() {
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
         <NewVersionBanner />
+        <LightboxHost />
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <FlaskConical className="text-indigo-500" size={28} /> Test Lab
@@ -829,6 +831,52 @@ function DescriptionDiff({ a, b }: { a: string; b: string }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Lightbox — click any result/step image to inspect it full-screen and
+// arrow through the set (←/→ or buttons, Esc to close).
+// ─────────────────────────────────────────────────────────────────────
+
+type LightboxImage = { src: string; label: string };
+let _openLightbox: (imgs: LightboxImage[], index: number) => void = () => {};
+export const openLightbox = (imgs: LightboxImage[], index: number) => _openLightbox(imgs, index);
+
+function LightboxHost() {
+  const [state, setState] = useState<{ imgs: LightboxImage[]; index: number } | null>(null);
+  useEffect(() => { _openLightbox = (imgs, index) => setState({ imgs, index }); return () => { _openLightbox = () => {}; }; }, []);
+  useEffect(() => {
+    if (!state) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setState(null);
+      if (e.key === 'ArrowRight') setState(s => s && { ...s, index: (s.index + 1) % s.imgs.length });
+      if (e.key === 'ArrowLeft') setState(s => s && { ...s, index: (s.index - 1 + s.imgs.length) % s.imgs.length });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [state]);
+  if (!state) return null;
+  const cur = state.imgs[state.index];
+  return createPortal(
+    <div className="fixed inset-0 z-50 bg-black/90 flex flex-col" onClick={() => setState(null)}>
+      <div className="flex items-center justify-between px-6 py-3 text-white" onClick={e => e.stopPropagation()}>
+        <div className="text-sm font-medium">{cur.label} <span className="text-white/50 ml-2">{state.index + 1} / {state.imgs.length}</span></div>
+        <button className="text-white/70 hover:text-white text-2xl leading-none" onClick={() => setState(null)}>×</button>
+      </div>
+      <div className="flex-1 flex items-center justify-center min-h-0 px-16" onClick={e => e.stopPropagation()}>
+        <button
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl px-3 py-6"
+          onClick={() => setState(s => s && { ...s, index: (s.index - 1 + s.imgs.length) % s.imgs.length })}
+        >‹</button>
+        <img src={cur.src} alt={cur.label} className="max-h-full max-w-full object-contain" />
+        <button
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-4xl px-3 py-6"
+          onClick={() => setState(s => s && { ...s, index: (s.index + 1) % s.imgs.length })}
+        >›</button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 /** Intermediate-step image strip (whiteout, model raw output, crop, …). */
 function StepsStrip({ storyId, pageNumber, steps }: { storyId: string; pageNumber: number | null; steps: { label: string; imageType: string; versionIndex: number }[] }) {
   const [images, setImages] = useState<Record<number, string>>({});
@@ -852,7 +900,14 @@ function StepsStrip({ storyId, pageNumber, steps }: { storyId: string; pageNumbe
           <div key={s.versionIndex} className="shrink-0 w-56">
             <div className="text-[11px] text-gray-500 mb-1">{s.label}</div>
             {images[s.versionIndex]
-              ? <img src={images[s.versionIndex]} alt={s.label} className="rounded-lg w-full" />
+              ? <img
+                  src={images[s.versionIndex]} alt={s.label}
+                  className="rounded-lg w-full cursor-zoom-in"
+                  onClick={() => {
+                    const loadedImgs = steps.filter(x => images[x.versionIndex]).map(x => ({ src: images[x.versionIndex], label: x.label }));
+                    openLightbox(loadedImgs, loadedImgs.findIndex(x => x.src === images[s.versionIndex]));
+                  }}
+                />
               : <div className="text-xs text-gray-400 border rounded-lg p-6 text-center">loading…</div>}
           </div>
         ))}
@@ -876,6 +931,10 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
   const isPass1 = isAvatar && (result as { pass?: number }).pass === 1;
   const isCover = ['frontCover', 'initialPage', 'backCover'].includes(result.imageType || '');
   const hasPage = typeof result.pageNumber === 'number';
+
+  // Auto-load — the final image is the whole point of a run; a manual
+  // "Load" click hid it while the steps strip showed automatically.
+  useEffect(() => { if (result.ok && !loaded) loadImages(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const loadImages = async () => {
     setLoaded(true);
@@ -972,9 +1031,7 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
           )}
 
           {!loaded ? (
-            <button className="text-xs text-indigo-600 hover:underline mt-3" onClick={loadImages}>
-              {isAvatar ? 'Load avatar sheets' : producesImage ? 'Load baseline vs variant' : 'Load page image'}
-            </button>
+            <div className="text-xs text-gray-400 mt-3">loading images…</div>
           ) : (
             <div className={`grid gap-4 mt-3 ${result.variantVersionIndex !== undefined ? 'grid-cols-1 md:grid-cols-3' : producesImage && !isPass1 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
               {!isPass1 && (
@@ -985,7 +1042,17 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
                   </div>
                   {baseline ? (
                     <div className="relative">
-                      <img src={baseline} alt="baseline" className="rounded-lg w-full" />
+                      <img
+                        src={baseline} alt="baseline" className="rounded-lg w-full cursor-zoom-in"
+                        onClick={() => {
+                          const g = [
+                            { src: baseline, label: 'Baseline (active version)' },
+                            ...(variant ? [{ src: variant, label: `FINAL result (test v${result.versionIndex})` }] : []),
+                            ...(variantB ? [{ src: variantB, label: `Variant B (test v${result.variantVersionIndex})` }] : []),
+                          ];
+                          openLightbox(g, 0);
+                        }}
+                      />
                       {result.bbox?.length === 4 && (
                         <div
                           className="absolute border-2 border-red-500 pointer-events-none"
@@ -1010,8 +1077,20 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
               )}
               {producesImage && (
                 <div>
-                  <div className="text-xs font-medium text-gray-500 mb-1">{isPass1 ? `Realistic anchor (pass 1, test v${result.versionIndex})` : isAvatar ? `Styled sheet (pass 2, test v${result.versionIndex})` : result.variantVersionIndex !== undefined ? `A: current template (test v${result.versionIndex})` : `Variant (test v${result.versionIndex})`}</div>
-                  {variant ? <img src={variant} alt="variant" className="rounded-lg w-full" /> : <div className="text-xs text-gray-400">unavailable</div>}
+                  <div className="text-xs font-medium text-gray-500 mb-1">{isPass1 ? `Realistic anchor (pass 1, test v${result.versionIndex})` : isAvatar ? `Styled sheet (pass 2, test v${result.versionIndex})` : result.variantVersionIndex !== undefined ? `A: current template (test v${result.versionIndex})` : `FINAL result (test v${result.versionIndex})`}</div>
+                  {variant ? (
+                    <img
+                      src={variant} alt="final result" className="rounded-lg w-full cursor-zoom-in"
+                      onClick={() => {
+                        const g = [
+                          ...(baseline ? [{ src: baseline, label: 'Baseline (active version)' }] : []),
+                          { src: variant, label: `FINAL result (test v${result.versionIndex})` },
+                          ...(variantB ? [{ src: variantB, label: `Variant B (test v${result.variantVersionIndex})` }] : []),
+                        ];
+                        openLightbox(g, baseline ? 1 : 0);
+                      }}
+                    />
+                  ) : <div className="text-xs text-gray-400">unavailable</div>}
                   {result.variantVersionIndex !== undefined && result.scores?.final != null && (
                     <div className="text-xs text-gray-600 mt-1">final {result.scores.final}</div>
                   )}
