@@ -592,9 +592,32 @@ async function runCharRepairStage(ctx, opts) {
 
   // Every intermediate the repair produced, saved as tl_step test versions so
   // the UI can show the full chain, not just the final composite.
+  // SAM silhouette of the target figure — production uses this internally but
+  // doesn't return it; recompute for display so the mask is inspectable.
+  let samDisplay = null;
+  try {
+    const sharp = require('sharp');
+    const meta = await sharp(Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
+    const boxPx = [
+      Math.round(bbox[1] * meta.width), Math.round(bbox[0] * meta.height),
+      Math.round(bbox[3] * meta.width), Math.round(bbox[2] * meta.height),
+    ];
+    const { fetchFigureMaskPng } = require('./images');
+    const maskPng = await fetchFigureMaskPng(Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'), boxPx);
+    if (maskPng) {
+      // Render white silhouette on black for visibility.
+      const vis = await sharp({ create: { width: meta.width, height: meta.height, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+        .composite([{ input: maskPng, left: 0, top: 0 }]).jpeg().toBuffer();
+      samDisplay = `data:image/jpeg;base64,${vis.toString('base64')}`;
+    }
+  } catch (err) {
+    log.warn(`[TESTLAB] SAM display mask unavailable: ${err.message}`);
+  }
+
   const steps = [];
   const stepImages = [
     ['input: character reference', ref.photoUrl],
+    ['SAM silhouette of target figure (as used by the repair)', samDisplay],
     ['sent to model (whiteout)', result?.blackoutImage || result?.comparison?.blackoutImage || result?.debug?.sceneSent],
     ['model raw output', result?.grokRawResult || result?.comparison?.grokRawResult],
     ['blend mask (production silhouette gate)', result?.blendMask || result?.comparison?.blendMask],
