@@ -593,6 +593,31 @@ async function editWithQwen(prompt, referenceImages, options = {}) {
     throw new Error('editWithQwen requires 1-3 reference images');
   }
 
+  // Runware rejects small reference inputs (invalidReferenceImageWidth —
+  // face crops undershoot the minimum). Upscale any reference whose short
+  // side is below 384px, preserving aspect.
+  const sharp = require('sharp');
+  const safeRefs = [];
+  for (const refUri of referenceImages) {
+    try {
+      const m = String(refUri).match(/^data:image\/\w+;base64,(.+)$/);
+      if (!m) { safeRefs.push(refUri); continue; }
+      const buf = Buffer.from(m[1], 'base64');
+      const meta = await sharp(buf).metadata();
+      const short = Math.min(meta.width || 0, meta.height || 0);
+      if (short > 0 && short < 384) {
+        const scale = 384 / short;
+        const up = await sharp(buf)
+          .resize(Math.min(2048, Math.round(meta.width * scale)), Math.min(2048, Math.round(meta.height * scale)), { fit: 'fill' })
+          .jpeg({ quality: 95 }).toBuffer();
+        safeRefs.push(`data:image/jpeg;base64,${up.toString('base64')}`);
+        log.debug(`🎨 [QWEN-EDIT] upscaled small reference ${meta.width}x${meta.height} → min side 384`);
+      } else {
+        safeRefs.push(refUri);
+      }
+    } catch { safeRefs.push(refUri); }
+  }
+
   const payload = [{
     taskType: 'imageInference',
     taskUUID: crypto.randomUUID(),
@@ -603,7 +628,7 @@ async function editWithQwen(prompt, referenceImages, options = {}) {
     numberResults: 1,
     outputFormat: 'JPEG',
     includeCost: true,
-    referenceImages,
+    referenceImages: safeRefs,
   }];
 
   const response = await runwareFetchWithRetry(payload, { timeoutMs: 120000 });
