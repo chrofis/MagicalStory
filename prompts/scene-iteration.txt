@@ -32,6 +32,8 @@
 **Preview / evaluator feedback:**
 {PREVIEW_FEEDBACK}
 
+A feedback line marked SPEC CONFLICT overrides the declared interactions: rewrite the conflicting interactions so each body part serves one purpose, keeping the story moment.
+
 **Context (previous scenes):**
 {PREVIOUS_SCENES}
 

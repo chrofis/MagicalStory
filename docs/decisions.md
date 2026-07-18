@@ -1682,3 +1682,30 @@ computeFinalScore(version). Readers (client StoryDisplay, database.js story_imag
 prefer finalScore with legacy fallback — no reader changes needed.
 **Touched:** `server/lib/images.js` (final assembly), `server.js` (whitelist), `server/routes/regeneration.js` (5 sites).
 **Status:** ✅ staging. Legacy qualityScore kept as fallback for old stories; new writes always carry finalScore.
+
+## Spec-conflict pipeline: detect → declare → route → resolve, first attempt (2026-07-18)
+**Context:** The Tell boat page proved a structural loop: the outline declared choreography that
+double-books a body part (grip the rim with both hands + the other child reaches for/holds that hand),
+renders always collapse to hand-holding, every eval blamed the render, iterate re-transcribed the same
+spec from the story text, and after two failed iterates the anti-loop flip burned an inpaint. Nothing
+ever said "the spec itself is the problem."
+**Decision (four pieces, all lab-validated on the failing page):**
+1. Consolidator: REQUIRED `spec_conflicts[]` output field — pairwise comparison of declared
+   requirements (same body part in two, or almost-touching-without-contact), explicitly exempted from
+   rule 1 (pass-through-only). Passive rules failed 6× — models decline "impossible" judgments and rule
+   1 forbade the comparison; a mandatory schema field + mechanical question + exemption fires reliably.
+2. Routing (code, not model): decideRepairMethod gate 0 — any spec_conflict → iterate, reason carries
+   the conflict; repaint methods can never be chosen for a broken contract.
+3. Iterate feedback leads with "SPEC CONFLICT — rewrite the interactions to resolve: A vs B".
+4. scene-iteration.txt: a SPEC CONFLICT feedback line overrides the declared interactions — rewrite so
+   each body part serves one purpose, keeping the story moment.
+End-to-end result on the failing page: decision reason "spec conflict — scene rewrite required: the
+same hand cannot be gripping the boat rim and be held at once"; the rewritten EXACT POSES kept Emma's
+rim grip (the story beat) and dropped the competing hand claim.
+**Also fixed (test-harness gaps this exposed):** storedEvalFromScene omitted threeStageResult; the lab
+fresh-eval repair round skipped scoring-time consolidation — both made lab runs weaker than production
+and masked working behavior.
+**Touched:** `prompts/feedback-consolidator.txt`, `prompts/image-evaluation.txt`, `prompts/image-semantic.txt`,
+`prompts/scene-iteration.txt`, `server/lib/repairLogic.js`, `server/lib/images.js` (previewFeedback),
+`server/lib/testlab.js`, `scripts/analysis/test-spec-conflict-local.js`.
+**Status:** ✅ staging.
