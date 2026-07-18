@@ -994,11 +994,43 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
   const { decideRepairMethod } = require('./repairLogic');
   const { storyData } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
 
-  const latestEval = params.evaluation || storedEvalFromScene(ctx.scene);
+  let latestEval = params.evaluation || storedEvalFromScene(ctx.scene);
+  const t0 = Date.now();
+  // freshEval: run the full evaluation NOW on the active image instead of
+  // reusing the stored one — for decision-reliability runs ("does this page
+  // reliably route to iterate?") the stored eval would make every repeat
+  // identical and prove nothing.
+  if (params.freshEval) {
+    const { evaluateImageQuality } = require('./images');
+    const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+    const fresh = await evaluateImageQuality(
+      imageData, ctx.scene.sceneDescription, ctx.referencePhotos, 'scene',
+      null, `testlab-exp${experimentId}-P${ctx.pageNumber}-decide`,
+      ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null
+    );
+    if (!fresh) throw new Error('Fresh evaluation returned null');
+    latestEval = fresh;
+  }
   const entityReport = params.entityReport || storyData.finalChecksReport?.entity || null;
   const decision = decideRepairMethod(ctx.pageNumber, latestEval, entityReport);
 
   const base = { decision: { method: decision.method, reason: decision.reason, charName: decision.charName || null } };
+  // decideOnly: report the routing decision + the scores that drove it and
+  // STOP — no repair executed, no image credits spent. For "is the routing
+  // reliable on this page" experiments.
+  if (params.decideOnly) {
+    return {
+      ...base,
+      decideOnly: true,
+      scores: {
+        quality: latestEval.qualityScore ?? latestEval.scoreBreakdown?.visual?.score ?? null,
+        semantic: latestEval.semanticScore ?? latestEval.scoreBreakdown?.semantic?.score ?? null,
+        final: latestEval.score ?? latestEval.finalScore ?? null,
+      },
+      issuesSummary: latestEval.issuesSummary || null,
+      elapsedMs: Date.now() - t0,
+    };
+  }
   if (decision.method === 'skip') {
     return { ...base, skippedRepair: true, elapsedMs: 0 };
   }
