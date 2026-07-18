@@ -1216,6 +1216,11 @@ async function runSceneExpansionStage(ctx, { experimentId, promptOverride, param
  */
 const DEFAULT_AB_EXTRA_RULE = 'Interactions must show either clear contact or clear separation; never a hand reaching toward another character without touching.';
 
+// Appended to every Test-Lab expansion run (stage-level, not a user rule):
+// production scenes get their sceneIntent from the unified outline, which a
+// standalone expansion run doesn't have.
+const SCENE_INTENT_FIELD_INSTRUCTION = 'In the metadata JSON also include "sceneIntent": one short present-tense sentence naming who does what, where — it becomes the top overview line of the image prompt.';
+
 async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, params = {} }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
@@ -1253,8 +1258,8 @@ async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, par
       PROMPT_TEMPLATES.sceneExpansion = orig;
     }
   };
-  const promptA = buildWith(baseTemplate);
-  const promptB = buildWith(variantTemplate);
+  const promptA = buildWith(`${baseTemplate}\n${SCENE_INTENT_FIELD_INSTRUCTION}`);
+  const promptB = buildWith(`${variantTemplate}\n${SCENE_INTENT_FIELD_INSTRUCTION}`);
 
   const t0 = Date.now();
   const [resA, resB] = await Promise.all([
@@ -1316,7 +1321,13 @@ async function runSceneVariantStage(ctx, { experimentId, promptOverride, params 
     : '';
 
   const extraRule = params.extraRule || null;
-  const template = promptOverride || (extraRule ? `${PROMPT_TEMPLATES.sceneExpansion}\n${extraRule}` : PROMPT_TEMPLATES.sceneExpansion);
+  // In production the DEPICTS overview (sceneIntent) comes from the unified
+  // OUTLINE and is merged into the scene metadata — a fresh Test-Lab
+  // expansion has no outline pass, so the stage asks the expansion to emit
+  // its own (consistent with its own staging). Without this the rendered
+  // image prompt loses its top overview line.
+  const template = (promptOverride || (extraRule ? `${PROMPT_TEMPLATES.sceneExpansion}\n${extraRule}` : PROMPT_TEMPLATES.sceneExpansion))
+    + `\n${SCENE_INTENT_FIELD_INSTRUCTION}`;
 
   let prompt;
   const orig = PROMPT_TEMPLATES.sceneExpansion;
