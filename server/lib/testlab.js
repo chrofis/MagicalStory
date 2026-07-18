@@ -1652,7 +1652,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // and leaves a background fringe against the figure. Feathering exists only
   // OUTSIDE the padded union: a falloff band where the model's background
   // fades into the original background.
-  const padPx = 3;
+  const padPx = 6;
   const unionPadded = strip(await sharp(union, raw1).blur(padPx / 1.5).threshold(16).raw().toBuffer()); // ≈3px dilation, still binary
   const softOut = strip(await sharp(Buffer.from(unionPadded), raw1).blur(4).raw().toBuffer());
   const alpha1 = Buffer.alloc(n);
@@ -1666,7 +1666,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const unionAlphaPng = await sharp(Buffer.alloc(n * 3, 255), { raw: { width: cropW, height: cropH, channels: 3 } })
     .ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer();
   const whiteVis = await sharp(origResized).composite([{ input: unionAlphaPng }]).jpeg().toBuffer();
-  await addStep('original with SAM union whited out (padded 3px)', `data:image/jpeg;base64,${whiteVis.toString('base64')}`);
+  await addStep('original with SAM union whited out (padded 6px)', `data:image/jpeg;base64,${whiteVis.toString('base64')}`);
   const cutoutPng = await sharp(candResized).ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer();
   const cutVis = await sharp({ create: { width: cropW, height: cropH, channels: 3, background: { r: 30, g: 30, b: 30 } } })
     .composite([{ input: cutoutPng }]).jpeg().toBuffer();
@@ -1679,7 +1679,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
 // Stamped on every blended entry so the UI can show WHICH blend generation
 // produced an image — mixed-generation comparisons were repeatedly mistaken
 // for bugs. Bump on every blend-behavior change.
-const BLEND_RULE_VERSION = 'union-solid-pad3';
+const BLEND_RULE_VERSION = 'union-solid-pad6';
 
 /**
  * Crop-bounded Qwen character insertion (composite-v2 recipe, validated
