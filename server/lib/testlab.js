@@ -1485,18 +1485,20 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // replace-wording made the model re-imagine the whole crop (exp #11/#12).
   let sentBuf = cropBuf;
   let whiteoutApplied = false;
+  let oldMaskPng = null; // SAM silhouette of the ORIGINAL figure — reused for the blend
+  let boxInCrop = null;
   if (params.repairMode && figureBox) {
     try {
       const { fetchFigureMaskPng } = require('./images');
-      const boxInCrop = [
+      boxInCrop = [
         Math.max(0, Math.round(figureBox[1] * W) - crop.x),
         Math.max(0, Math.round(figureBox[0] * H) - crop.y),
         Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
         Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
       ];
-      const maskPng = await fetchFigureMaskPng(cropBuf, boxInCrop);
-      if (maskPng) {
-        sentBuf = await sharp(cropBuf).composite([{ input: maskPng, left: 0, top: 0 }]).jpeg({ quality: 95 }).toBuffer();
+      oldMaskPng = await fetchFigureMaskPng(cropBuf, boxInCrop);
+      if (oldMaskPng) {
+        sentBuf = await sharp(cropBuf).composite([{ input: oldMaskPng, left: 0, top: 0 }]).jpeg({ quality: 95 }).toBuffer();
         whiteoutApplied = true;
       }
     } catch (err) {
@@ -1544,7 +1546,38 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // pastes the whole crop with a rectangular feather (debug/fallback).
   const back = await sharp(outBufEarly).resize(crop.w, crop.h, { fit: 'fill' }).toBuffer();
   let feathered;
-  if ((params.pasteMode || 'figure') === 'figure') {
+
+  // Repair blend: SAM SILHOUETTE UNION (production Grok-blended technique) —
+  // mask of the OLD figure (already fetched for the whiteout) ∪ mask of the
+  // NEW figure in the model output. Exact figure pixels, no diff-blob
+  // guessing, no half-mixed colors. Falls through to the diff blob only when
+  // SAM is unavailable.
+  if ((params.pasteMode || 'figure') === 'figure' && params.repairMode && oldMaskPng && boxInCrop) {
+    try {
+      const { fetchFigureMaskPng } = require('./images');
+      const newMaskPng = await fetchFigureMaskPng(back, boxInCrop);
+      if (newMaskPng) {
+        const raw1 = { raw: { width: crop.w, height: crop.h, channels: 1 } };
+        const oldA = await sharp(oldMaskPng).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+        const newA = await sharp(newMaskPng).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+        const n = crop.w * crop.h;
+        const union = Buffer.alloc(n);
+        for (let i = 0; i < n; i++) union[i] = Math.max(oldA[i] || 0, newA[i] || 0);
+        // Small dilation + feather so the seam melts into the background.
+        const alphaU = await sharp(union, raw1).blur(3).threshold(24).blur(3).raw().toBuffer();
+        const nStride = Math.max(1, Math.round(alphaU.length / n));
+        let alpha1 = alphaU;
+        if (nStride > 1) { alpha1 = Buffer.alloc(n); for (let i = 0; i < n; i++) alpha1[i] = alphaU[i * nStride]; }
+        const maskJpeg = await sharp(Buffer.from(alpha1), raw1).jpeg().toBuffer();
+        await addStep('blend mask (SAM union: old ∪ new figure)', `data:image/jpeg;base64,${maskJpeg.toString('base64')}`);
+        feathered = await sharp(back).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
+      }
+    } catch (err) {
+      log.warn(`[TESTLAB] SAM union blend unavailable (${err.message}) — falling back to diff blob`);
+    }
+  }
+
+  if (!feathered && (params.pasteMode || 'figure') === 'figure') {
     const origRaw = await sharp(cropBuf).resize(crop.w, crop.h, { fit: 'fill' }).raw().toBuffer();
     const newRaw = await sharp(back).raw().toBuffer();
     const bin = Buffer.alloc(crop.w * crop.h);
@@ -1587,7 +1620,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     await addStep('blend mask (white = model pixels kept)', `data:image/jpeg;base64,${maskJpeg.toString('base64')}`);
     feathered = await sharp(back).ensureAlpha()
       .joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
-  } else {
+  } else if (!feathered) {
     const fe = Math.max(8, Math.round(Math.min(crop.w, crop.h) * 0.04));
     const maskSvg = `<svg width="${crop.w}" height="${crop.h}"><defs><filter id="f"><feGaussianBlur stdDeviation="${fe / 2}"/></filter></defs><rect x="${fe}" y="${fe}" width="${crop.w - 2 * fe}" height="${crop.h - 2 * fe}" fill="white" filter="url(#f)"/></svg>`;
     const mask = await sharp(Buffer.from(maskSvg)).resize(crop.w, crop.h).ensureAlpha().extractChannel(3).raw().toBuffer();
