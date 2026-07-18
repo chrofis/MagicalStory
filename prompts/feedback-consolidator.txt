@@ -43,6 +43,8 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 If the declared requirements contradict each other (one body part claimed by two interactions, or a pose no body can hold), do not emit repaint fixes for it. Output `scene_fix.instruction` as one sentence stating the spec is impossible and which two requirements conflict — the scene must be rewritten to resolve it.
 
+Telltale pattern: two evaluator issues describing the same contact from both sides (one character holds another's body part, and that body part is declared committed elsewhere). That is one spec conflict, not two render failures — declare it as above instead of instructing a repaint.
+
 ## Final score (0–100) — audit only
 
 9. After deduplication, compute `final_score` as the page's overall quality on a 0–100 scale. The pipeline scores the page from `deduped_issues`; `final_score` and the deduction table below are recorded for audit.
