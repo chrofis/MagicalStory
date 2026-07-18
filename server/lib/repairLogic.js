@@ -194,6 +194,17 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     ?? evaluator.semanticScore
     ?? 100;
 
+  // 0. Spec conflict — the consolidator judged the declared requirements
+  // mutually unsatisfiable. No render can fix a broken contract: iterate
+  // (scene rewrite) is the only method that can resolve it, and repaint
+  // methods must never be chosen for it.
+  const specConflicts = evaluator.consolidatedPlan?.spec_conflicts;
+  if (Array.isArray(specConflicts) && specConflicts.length > 0) {
+    const c = specConflicts[0] || {};
+    const why = String(c.why || `${c.a || '?'} vs ${c.b || '?'}`).slice(0, 140);
+    return { method: 'iterate', reason: `spec conflict — scene rewrite required: ${why}` };
+  }
+
   // 1. Catastrophic — iterate immediately (figure unrecognisable).
   if (visualScore < 50) {
     return { method: 'iterate', reason: `image visually broken (visual=${visualScore})` };

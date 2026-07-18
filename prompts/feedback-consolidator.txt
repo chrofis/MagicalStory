@@ -39,11 +39,9 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
    - Never exceed 3, even if every issue is CRITICAL. A fourth CRITICAL goes into `dropped_issues` — the next pass will catch it once the first three are fixed.
    - CRITICAL/MAJOR issues that DON'T make the top 3 are still dropped with the "capped" reason — this is the one case where rule "never drop CRITICAL/MAJOR" is overridden, because asking Grok to fix 4+ things makes the repair effectively useless.
 
-## Impossible spec
+## Spec check (required)
 
-If the declared requirements contradict each other (one body part claimed by two interactions, or a pose no body can hold), do not emit repaint fixes for it. Output `scene_fix.instruction` as one sentence stating the spec is impossible and which two requirements conflict — the scene must be rewritten to resolve it.
-
-Telltale pattern: two evaluator issues describing the same contact from both sides (one character holds another's body part, and that body part is declared committed elsewhere). That is one spec conflict, not two render failures — declare it as above instead of instructing a repaint.
+Fill `spec_conflicts[]` before writing any fixes. Compare the declared requirements pairwise: list every pair that cannot both hold in one picture, or that the issues show colliding (the same contact reported from both sides — one character holds a body part that another requirement commits elsewhere). Empty array when none. For every listed pair: emit NO fixes for it — the scene must be rewritten; record its issues in `dropped_issues` with reason `"spec_conflict"`.
 
 ## Final score (0–100) — audit only
 
@@ -104,6 +102,9 @@ Final: `"Open the eyes wide."`
 
 ```json
 {
+  "spec_conflicts": [
+    {"a": "the child grips the rail with both hands", "b": "the other child holds the first child's hand", "why": "the same hand cannot be gripping the rail and be held at once"}
+  ],
   "per_character_fixes": [
     {
       "characterName": "CharacterA",

@@ -9038,7 +9038,16 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     fixIssues: (() => {
       if (!evaluationFeedback) return [];
       const src = evaluationFeedback.fixableIssues || [];
-      return src.slice(0, 10).map(i => i?.description || i?.issue || String(i));
+      const issues = src.slice(0, 10).map(i => i?.description || i?.issue || String(i));
+      // Consolidator-declared spec conflicts lead the list: the rewrite's
+      // primary job is resolving them (change the interactions), not
+      // re-transcribing the conflicting requirements from the story text.
+      const conflicts = evaluationFeedback.consolidatedPlan?.spec_conflicts;
+      if (Array.isArray(conflicts) && conflicts.length > 0) {
+        issues.unshift(...conflicts.map(c =>
+          `SPEC CONFLICT — rewrite the interactions to resolve: "${c.a}" vs "${c.b}"${c.why ? ` (${c.why})` : ''}`));
+      }
+      return issues;
     })(),
     previousScore: evaluationFeedback?.score ?? null,
   };
