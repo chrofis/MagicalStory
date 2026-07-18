@@ -675,6 +675,7 @@ async function runCharRepairStage(ctx, opts) {
     imageType: 'scene', versionIndex, characterName: charName, bbox, faceBbox: faceBbox || undefined, boxSource, backend,
     repairMode: backend === 'grok' ? repairMode : null,
     samBlend: samBlendApplied || undefined,
+    blendRule: samBlendApplied ? BLEND_RULE_VERSION : undefined,
     method: result?.method || null, steps, elapsedMs,
   };
 }
@@ -1661,8 +1662,13 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     `data:image/jpeg;base64,${(await sharp(Buffer.from(alpha1), raw1).jpeg().toBuffer()).toString('base64')}`);
   const candResized = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
   const feathered = await sharp(candResized).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
-  return { feathered, iou, redPx };
+  return { feathered, iou, redPx, blendRule: BLEND_RULE_VERSION };
 }
+
+// Stamped on every blended entry so the UI can show WHICH blend generation
+// produced an image — mixed-generation comparisons were repeatedly mistaken
+// for bugs. Bump on every blend-behavior change.
+const BLEND_RULE_VERSION = 'union-solid-pad3';
 
 /**
  * Crop-bounded Qwen character insertion (composite-v2 recipe, validated
@@ -1892,6 +1898,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     imageType: 'scene', versionIndex, characterName: ref.name, elapsedMs,
     modelId: result.modelId, promptUsed: prompt,
     crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H },
+    blendRule: params.repairMode ? BLEND_RULE_VERSION : undefined,
     steps, cost: result.cost,
   };
 }

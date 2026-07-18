@@ -116,6 +116,7 @@ export interface ExperimentResult {
   skipped?: boolean;
   boxSource?: string;
   samBlend?: boolean;
+  blendRule?: string;
   cost?: number;
   crop?: { x: number; y: number; w: number; h: number };
   bbox?: number[];

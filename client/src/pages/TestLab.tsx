@@ -1068,6 +1068,8 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
             </span>
           )}
           {result.method && <span>{result.method}</span>}
+          {result.blendRule && <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">blend: {result.blendRule}</span>}
+          {result.samBlend && !result.blendRule && <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">blend: OLD generation</span>}
           {result.scores?.error && <span className="text-red-600 font-semibold" title={result.scores.error}>eval failed</span>}
         </div>
       </div>
