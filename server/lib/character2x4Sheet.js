@@ -140,7 +140,7 @@ Output a 2×4 grid with thin black dividing lines and pure white background, in 
 The horizontal mid-row divider must be drawn as one unbroken thin black line running edge to edge. The three vertical column dividers must be drawn the same way. Nothing crosses any divider: every figure stays fully inside its own cell, surrounded by white space on all four sides. No head, no hair, no hand, no foot, no shadow, no clothing detail extends beyond the cell's borders. If a figure would not fit inside its cell, scale it down so it fits.
 
 Cells 1-4 (top row): head and neck only, no shoulders, no torso, no clothing. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 back of head. The head occupies roughly the middle of the cell with white margin above the hairline and below the neck — the neck stops cleanly, it never continues into the bottom row.
-Cells 5-8 (bottom row): full body from head to feet wearing the costume. Cell 5 front, cell 6 three-quarter, cell 7 profile, cell 8 back. The full figure fits entirely between the mid-row divider and the bottom edge — the head of a bottom-row body never extends up into the top row.
+Cells 5-8 (bottom row): full body from head to feet wearing the costume. Cell 5 front, cell 6 three-quarter, cell 7 profile, cell 8 back. The full figure fits entirely between the mid-row divider and the bottom edge — the head of a bottom-row body never extends up into the top row. Body proportions must match the person's apparent age in Image 3: an adult is roughly 7 to 8 heads tall, a teenager about 7, a young child about 5 to 6, a toddler about 4. Do NOT render an adult with child-like short/stubby proportions or an oversized head on a small body — the full-body figures must read as the same age as the head cells.
 
 Every cell faces in the same direction as the matching cell in Image 1. Every head in cells 1-4 and every body in cells 5-8 shows THE SAME PERSON as Image 3 — same face structure, same hair, same skin tone, same apparent age. The same costume — every accessory — appears in cells 5, 6, 7, and 8. No text, no numbers, no labels, no arrows, no symbols, no coloured direction markers anywhere in the output.`;
 }
@@ -415,10 +415,12 @@ function buildStyleTransferPrompt(artStyle) {
   const styleLine = resolveStyleLineForSheet(artStyle);
   return `Re-render this 2×4 character reference sheet in ${styleLine}.
 
+Apply this exact same art style to ALL 8 cells equally. Every one of the 8 cells shows the SAME character rendered in the identical ${styleLine} treatment — the four head cells (top row) and the four full-body cells (bottom row) must match in rendering style, shading, skin finish, and degree of stylisation. No cell may stay photographic or semi-realistic while the others are stylised; the bottom-row full-body figures must look rendered in exactly the same style as the top-row heads.
+
 Preserve EVERYTHING except the visual style:
 - Same 4-column × 2-row grid layout, same thin black dividers, same pure white background.
 - Top row cells 1-4: head and neck only, in the same order (front, three-quarter, profile, back). Same hair, same beard if any, same skin tone, same facial features — the same person.
-- Bottom row cells 5-8: full body in the same poses (front, three-quarter, profile, back). Same proportions, same age. Same costume — every accessory, every garment colour, every cut identical.
+- Bottom row cells 5-8: full body in the same poses (front, three-quarter, profile, back). Same costume — every accessory, every garment colour, every cut identical. Keep body proportions age-appropriate and matched to the head: an adult is roughly 7 to 8 heads tall, a teenager about 7 heads, a young child about 5 to 6 heads, a toddler about 4 heads. Do NOT shrink an adult into child-like proportions and do NOT put an oversized head on a small body — the full-body figures must read as the same age as the head cells.
 - No text, no numbers, no labels.
 
 Only the surface treatment changes from photographic to ${styleLine}.`;
