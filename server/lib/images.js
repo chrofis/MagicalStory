@@ -16091,6 +16091,40 @@ async function checkStyleMatch(imageDataA, imageDataB) {
 }
 
 /**
+ * Head pose/expression facts for face repair — replaces the blurred pose
+ * reference image: blur removes facial detail but PRESERVES silhouette, so
+ * the original (possibly wrong) HAIRSTYLE leaked from the pose ref into the
+ * repaint (two side pigtails instead of one ponytail). Text carries
+ * direction/emotion with zero pixel leakage. The Grok repair prompt states
+ * the same rules in words ("match the gaze, a head seen from behind stays
+ * seen from behind") but Grok sees the whole scene; the Qwen crop has the
+ * face whited out, so the facts are measured here and injected explicitly.
+ * Returns { facing, headTilt, gaze, expression, mouth } (short phrases).
+ */
+async function describeHeadPose(imageDataUri) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured');
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility}:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [
+        { inline_data: { mime_type: imageDataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2Lib.stripDataUriPrefix(imageDataUri) } },
+        { text: 'This crop shows one person\'s head (an illustration). Describe the head for a repainting task. JSON only: {"facing":"...","headTilt":"...","gaze":"...","expression":"...","mouth":"..."} — each a short phrase, e.g. "three-quarter left", "tilted slightly down", "looking down at the object in their hands", "gentle concerned smile", "closed".' },
+      ] }],
+      generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) throw new Error(`Gemini head-pose failed: ${(await response.text()).substring(0, 200)}`);
+  const data = await response.json();
+  const text = (data.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
+  const parsed = getStoryHelpers().extractJsonFromText(text);
+  if (!parsed || typeof parsed !== 'object') throw new Error(`Invalid head-pose response: ${text.slice(0, 120)}`);
+  return parsed;
+}
+
+/**
  * Compare two images for art style similarity.
  * Sends both images to Gemini and returns a similarity score + breakdown.
  */
@@ -16194,6 +16228,7 @@ module.exports = {
   analyzeImageStyle,
   compareImageStyles,
   checkStyleMatch,
+  describeHeadPose,
   evaluateImageBatch,
 
   // Unified repair pipeline (the only active repair pipeline)

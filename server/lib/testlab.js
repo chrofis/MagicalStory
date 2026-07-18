@@ -2151,6 +2151,15 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
           const inClip = !clipRect || (x >= clipRect[0] && x < clipRect[2] && y >= clipRect[1] && y < clipRect[3]);
           hard[i] = inClip && a[i * stride] > 128 ? 255 : 0;
         }
+        // SAM sanity: a mask filling nearly the whole face region means SAM
+        // returned the box, not a face silhouette (huge anime faces) — the
+        // warning lands in the run log; the repaint gates still decide.
+        let cov = 0;
+        for (let i = 0; i < hard.length; i++) if (hard[i]) cov++;
+        const clipArea = clipRect ? Math.max(1, (clipRect[2] - clipRect[0]) * (clipRect[3] - clipRect[1])) : hard.length;
+        if (cov > 0.9 * clipArea) {
+          log.warn(`[TESTLAB] head mask fills ${Math.round(100 * cov / clipArea)}% of the face region — SAM likely returned the whole box, not a face silhouette`);
+        }
         oldMaskPng = await sharp(Buffer.alloc(crop.w * crop.h * 3, 255), { raw: { width: crop.w, height: crop.h, channels: 3 } })
           .ensureAlpha().joinChannel(Buffer.from(hard), { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
         sentBuf = await sharp(cropBuf).composite([{ input: oldMaskPng, left: 0, top: 0 }]).jpeg({ quality: 95 }).toBuffer();
@@ -2164,6 +2173,45 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // Render at ~2x for detail; Runware dims must be multiples of 64 in [128,2048].
   const snap = v => Math.max(512, Math.min(2048, Math.round(v / 64) * 64)); // qwen rejects tiny dims
   const rw = snap(crop.w * 2), rh = snap(crop.h * 2);
+
+  // Face mode: measured head-pose facts (text) replace the blurred pose
+  // reference image — blur preserves silhouette, so the original hairstyle
+  // leaked into repaints (two side pigtails instead of one ponytail). The
+  // facts are read from the ORIGINAL face region by a cheap vision call;
+  // fallback to the blurred image if the call fails.
+  let poseText = null;
+  if (params._faceMode && whiteoutApplied && figureBox) {
+    try {
+      const fp = 0.3;
+      const fh = figureBox[2] - figureBox[0], fw = figureBox[3] - figureBox[1];
+      const fx = Math.max(0, Math.round((figureBox[1] - fw * fp) * W));
+      const fy = Math.max(0, Math.round((figureBox[0] - fh * fp) * H));
+      const fww = Math.min(W - fx, Math.round(fw * (1 + 2 * fp) * W));
+      const fhh = Math.min(H - fy, Math.round(fh * (1 + 2 * fp) * H));
+      const faceCrop = await sharp(baseBuf).extract({ left: fx, top: fy, width: fww, height: fhh }).jpeg({ quality: 92 }).toBuffer();
+      const { describeHeadPose } = require('./images');
+      const p = await describeHeadPose(`data:image/jpeg;base64,${faceCrop.toString('base64')}`);
+      poseText = [
+        p.facing ? `facing ${p.facing}` : null,
+        p.headTilt ? `head ${p.headTilt}` : null,
+        p.gaze ? `gaze ${p.gaze}` : null,
+        p.expression ? `expression: ${p.expression}` : null,
+        p.mouth ? `mouth ${p.mouth}` : null,
+      ].filter(Boolean).join('; ');
+    } catch (err) {
+      log.warn(`[TESTLAB] head-pose description failed (${err.message}) — falling back to blurred pose reference image`);
+    }
+  }
+
+  // Face identity facts from the character description (hair style/color,
+  // glasses, facial hair) — same information the Grok repair prompt carries.
+  const faceFacts = (() => {
+    if (!params._faceMode) return '';
+    const desc = ctx.scene.bboxDetection?.characterDescriptions?.[charName];
+    const rich = (typeof desc === 'string' ? desc : desc?.richDescription) || '';
+    const t = rich.split(/Wearing:/i)[0].replace(/\s+/g, ' ').trim();
+    return t ? ` The person: ${t.slice(0, 380)}` : '';
+  })();
 
   const pose = params.pose || 'standing naturally, scale matching the scene perspective';
   // Name the story's actual art style — the generic "match the style" phrase
@@ -2189,7 +2237,10 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
               const rich = (typeof desc === 'string' ? desc : desc?.richDescription) || '';
               const hasGlasses = /\bglasses\b|\bbrille\b/i.test(rich);
               const glassesClause = hasGlasses ? ', including the same glasses' : '. The person does NOT wear glasses — do not add any';
-              return `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. IDENTITY comes from the second image: exact same facial features, age and hair color${glassesClause}. HEAD POSE comes from the third image (blurred on purpose): copy only its head direction, gaze direction, tilt and facial expression — if the person was looking left, the painted face looks left; never copy its blurry detail. Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people.${styleLine}`;
+              const poseClause = poseText
+                ? ` HEAD POSE AND EXPRESSION (from the original scene): ${poseText}. Paint the head in exactly this pose — never turn it toward the camera unless stated.`
+                : ` HEAD POSE comes from the third image (blurred on purpose): copy only its head direction, gaze direction, tilt and facial expression — if the person was looking left, the painted face looks left; never copy its blurry detail.`;
+              return `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. IDENTITY comes from the second image: exact same facial features, age, hair style and hair color${glassesClause}.${faceFacts}${poseClause} Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people.${styleLine}`;
             })()
           : `Paint the person from the second image into the white silhouette area of the first image. The silhouette shows their exact position, pose and scale — fill it with that person in that pose. The painted person must have the EXACT same face, age, hair color and clothing as shown in the second image${ref.clothingDescription ? ` (${ref.clothingDescription})` : ''}. Keep everything outside the white area exactly unchanged: same background, same other people, same objects, same colors, same framing.${styleLine}`)
         : `Replace the person in the first image with the person from the second image: SAME position, SAME pose, SAME scale as the existing figure — only the face and appearance change to match the second image. Keep everything else in the first image exactly unchanged: same background, same other people, same objects, same colors, same framing.${styleLine}`)
@@ -2200,12 +2251,12 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     `data:image/jpeg;base64,${sentBuf.toString('base64')}`,
     ref.photoUrl,
   ];
-  // Face mode: third reference = the ORIGINAL crop, BLURRED on purpose — it
-  // conveys head direction / gaze / expression only. Unblurred, Qwen copies
-  // its pixels (including the flawed face it is supposed to replace) instead
-  // of repainting identity from the character reference.
+  // Face mode fallback only: when the text pose facts are unavailable, the
+  // third reference = the ORIGINAL crop, BLURRED. (With poseText the blurred
+  // image is NOT sent — blur preserves silhouette and the wrong hairstyle
+  // leaked from it into repaints.)
   let poseRefBuf = null;
-  if (params._faceMode && whiteoutApplied) {
+  if (params._faceMode && whiteoutApplied && !poseText) {
     const sigma = Math.max(4, Math.round(Math.min(crop.w, crop.h) / 80));
     poseRefBuf = await sharp(cropBuf).blur(sigma).jpeg({ quality: 90 }).toBuffer();
     qwenRefs.push(`data:image/jpeg;base64,${poseRefBuf.toString('base64')}`);
@@ -2355,6 +2406,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H },
     blendRule: params.repairMode ? BLEND_RULE_VERSION : undefined,
     styleMatch: styleMatch || undefined,
+    headPose: poseText || undefined,
     steps, cost: result.cost,
   };
 }
