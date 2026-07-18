@@ -1710,3 +1710,48 @@ and masked working behavior.
 `prompts/scene-iteration.txt`, `server/lib/repairLogic.js`, `server/lib/images.js` (previewFeedback),
 `server/lib/testlab.js`, `scripts/analysis/test-spec-conflict-local.js`.
 **Status:** ✅ staging.
+
+## Test Lab must reuse production code — detection identity fix package (2026-07-18)
+**Context:** Exp #68 (Qwen face repair, all 5 figures) failed on Roger and Lukas. Diagnosis: the Test
+Lab's hand-rolled `buildExpectedCharacters` passed raw richDescription with the MODERN wardrobe baked
+in ("gray hooded sweatshirt") on a medieval-costume page, so the SoM identity step (Gemini Flash,
+letter badges, matches BY CLOTHING) tagged occluded Roger UNKNOWN; his variant then silently fell back
+to a stale generation-time box that sat on another figure and the repair whited out the wrong person.
+Lukas had faceBbox:null and the face repair silently downgraded to a whole-body whiteout with no pose
+reference — Qwen re-imagined a studio catalogue shot. Production had already solved the clothing
+problem (`buildExpectedCharactersForBbox` overrides Wearing: with resolved per-page clothing) — the
+lab had drifted from it. Principle (user-set): **the Test Lab only assembles stored inputs; every
+piece of pipeline logic must be an import from production. A parallel implementation is allowed only
+when it IS the thing under test.**
+**Decision (fix package, all local):**
+1. testlab `buildExpectedCharacters` → thin wrapper over production `buildExpectedCharactersForBbox`
+   (costume resolution, age-strip, VB-id skip, gdinoPrompt). Positions: sceneMetadata →
+   extractSceneMetadata(prose) → outlineExtract characters (position incl. action).
+2. SoM prompt (production `_somIdentifyFigures`): per-character "Expected position/action" hint from
+   the scene plan ("center-right background being led away") — often the only usable cue for occluded
+   figures. Hint only; identity cues stay primary (repairs sometimes run BECAUSE a figure is misplaced).
+3. Chained fresh detection is AUTHORITATIVE in `resolveCharacterBox`: character missing → loud error,
+   never the stored generation-time box (older, worse detector; mislabeled boxes repaint the wrong person).
+4. Face repair with no faceBox: `recoverFaceBox` (new, images.js) crops the KNOWN body box, upscales,
+   re-runs the GDINO 'face' prompt on the crop (small faces detect reliably zoomed), maps back to page
+   coords. Still nothing → loud failure. NEVER a silent body-whiteout downgrade.
+5. Lab eval stages prepend the production CHARACTER CLOTHING REFERENCE header (extracted as
+   `buildEvalClothingHeader`) — raw-description evals scored systematically harsher than production
+   and biased every A/B.
+6. Lab char_repair passes production-parity inputs: clothing-scoped styled avatar
+   (getStyledAvatarForClothing), resolved clothingDescription (clothingRequirements canonical),
+   protectedFaces/protectedBodies for other named figures, sceneDescription, textPosition.
+7. VB page-grid refs extracted to shared `buildPageCompositeRefs` (plate → drop vehicles/locations/
+   landmarks; else drop locations) — used by the iterate path AND the lab image stage; regeneration.js
+   + coverIterate.js still carry inline copies (follow-up).
+8. samUnionBlend SAM round 2: same box padded 4% + interior seed points sampled from round 1's mask
+   (erode, widest-run centers at 25/50/75% height) — the original box on a changed image can straddle
+   background and SAM latched onto a mountain. NO re-run of DINO on the new image (it would chase a
+   moved figure we must reject anyway).
+**Deliberate parallel path (explicit decision):** the lab's engine-agnostic samUnionBlend replaces
+production's composite for char_repair outputs — intentional while the union blend is the candidate
+production blend; revisit when the production port lands.
+**Touched:** `server/lib/images.js` (_somIdentifyFigures, recoverFaceBox, buildEvalClothingHeader,
+buildPageCompositeRefs, exports), `server/lib/testlab.js` (buildExpectedCharacters, resolveCharacterBox,
+runQwenInsertStage face gate, runCharRepairStage parity, evalSceneDescription, samUnionBlend round 2).
+**Status:** local only — push freeze in effect (story in flight).

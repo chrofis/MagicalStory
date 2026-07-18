@@ -959,11 +959,13 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     pageContext = '',
     storyText = null,
     qualityFiguresPromise = null,
+    complianceModelOverride = null,   // Stage-2 model A/B (default evalModel = qwen-plus)
+    compliancePromptOverride = null,  // Stage-2 template A/B
   } = options;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
   const visionPrompt = PROMPT_TEMPLATES.imageVisionInventory;
-  const complianceTemplate = PROMPT_TEMPLATES.imagePromptCompliance;
+  const complianceTemplate = compliancePromptOverride || PROMPT_TEMPLATES.imagePromptCompliance;
 
   if (!visionPrompt || !complianceTemplate) {
     log.warn(`[THREE-STAGE] ${pageLabel}Templates not loaded, skipping`);
@@ -1099,7 +1101,8 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // false-positive gaze/facing issues that drove pointless repair rounds.
     // Now configurable (resolveEvalModel, key-guarded to sonnet). NOTE: this is
     // quality-critical and NOT yet A/B-validated on Qwen — watch repair churn.
-    const sonnetResult = await callTextModel(complianceInput, 4096, require('../config/models').resolveEvalModel(), { usageLabel: 'semantic_compliance' });
+    const complianceModel = complianceModelOverride || require('../config/models').resolveEvalModel();
+    const sonnetResult = await callTextModel(complianceInput, 4096, complianceModel, { usageLabel: 'semantic_compliance' });
 
     stage2Usage = {
       input_tokens: sonnetResult.usage?.input_tokens || 0,
@@ -1316,6 +1319,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         pageContext,
         storyText: fidelityRef,
         qualityFiguresPromise,
+        complianceModelOverride: evalOptions.complianceModelOverride || null,
+        compliancePromptOverride: evalOptions.compliancePromptOverride || null,
       });
       log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
     }
@@ -2392,6 +2397,54 @@ function _maskOverlapFrac(a, b) {
 }
 
 /**
+ * Face-box recovery for a figure whose full-page face detection came back
+ * empty (small/distant faces): crop the KNOWN body box, upscale it, and run
+ * the GroundingDINO 'face' prompt on the crop — a 40px face on the full page
+ * is 150px+ in the upscaled crop, where detection is reliable. Maps the best
+ * box back to page-normalized [ymin,xmin,ymax,xmax]. Returns null when even
+ * the zoomed crop has no detectable face (caller must then fail the face
+ * repair loudly — never silently downgrade to a body repair).
+ */
+async function recoverFaceBox(imageDataUri, bodyBoxNorm, pageLabel = '') {
+  try {
+    if (!bodyBoxNorm || bodyBoxNorm.length !== 4) return null;
+    const buf = Buffer.from(r2Lib.stripDataUriPrefix(imageDataUri), 'base64');
+    const meta = await sharp(buf).metadata();
+    const W = meta.width, H = meta.height;
+    const [y0, x0, y1, x1] = bodyBoxNorm;
+    const padX = (x1 - x0) * 0.10, padY = (y1 - y0) * 0.10;
+    const cx = Math.max(0, Math.round((x0 - padX) * W));
+    const cy = Math.max(0, Math.round((y0 - padY) * H));
+    const cw = Math.min(W - cx, Math.round((x1 - x0 + 2 * padX) * W));
+    const ch = Math.min(H - cy, Math.round((y1 - y0 + 2 * padY) * H));
+    if (cw < 16 || ch < 16) return null;
+    // Upscale small crops so the face has enough pixels for DINO.
+    const scale = cw < 640 ? 640 / cw : 1;
+    const sw = Math.round(cw * scale), sh = Math.round(ch * scale);
+    const cropJpeg = await sharp(buf).extract({ left: cx, top: cy, width: cw, height: ch })
+      .resize(sw, sh, { fit: 'fill' }).jpeg({ quality: 92 }).toBuffer();
+    const det = await _gdinoDetect(`data:image/jpeg;base64,${cropJpeg.toString('base64')}`, [{ name: 'face', text: 'face' }]);
+    if (!det?.figures?.[0]) return null;
+    const faces = _collectNmsBoxes(det.figures[0], GDINO_FACE_NMS_IOU)
+      // A "face" box covering most of the crop is the body leaking through.
+      .filter(f => (f.box[2] - f.box[0]) * (f.box[3] - f.box[1]) < 0.4 * sw * sh);
+    if (faces.length === 0) return null;
+    const best = faces[0].box; // px in the scaled crop, score-desc
+    const pageBox = [
+      Math.max(0, Math.min(1, (cy + best[1] / scale) / H)),
+      Math.max(0, Math.min(1, (cx + best[0] / scale) / W)),
+      Math.max(0, Math.min(1, (cy + best[3] / scale) / H)),
+      Math.max(0, Math.min(1, (cx + best[2] / scale) / W)),
+    ];
+    log.info(`🔎 [GDINO-DETECT] ${pageLabel}face recovered via body-crop zoom (score ${faces[0].score?.toFixed?.(2) ?? '?'})`);
+    return pageBox;
+  } catch (e) {
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}face recovery failed: ${e.message}`);
+    return null;
+  }
+}
+
+/**
  * Set-of-Mark identity: draw letter badges (A, B, …) on the detected figures
  * and ask Gemini Flash which letter is which expected character — recognition
  * by age/gender/hair/clothing, the task vision LLMs are reliably good at.
@@ -2440,10 +2493,16 @@ async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H,
     // _shortGarmentPhrase); only add clothing when it isn't there yet.
     const identity = c.gdinoPrompt || c.description || c.name;
     const garment = /\bwearing\b/i.test(identity) ? '' : _shortGarmentPhrase(c.clothing);
-    return `- ${c.name}: ${identity}.${garment ? ` Wearing: ${garment}.` : ''}`;
+    // Expected position/action from the scene plan ("center-right background
+    // being led away") — often the only usable cue for occluded or partially
+    // visible figures whose clothing/hair the badge crop doesn't show. Hint
+    // only: repairs sometimes run BECAUSE a figure was painted in the wrong
+    // spot, so identity cues stay primary.
+    const posHint = c.position ? ` Expected position/action (hint from the scene plan; the image may differ): ${c.position}.` : '';
+    return `- ${c.name}: ${identity}.${garment ? ` Wearing: ${garment}.` : ''}${posHint}`;
   }).join('\n');
   const prompt = `Figures in this illustration are marked with black letter badges (${badges.map(b => b.letter).join(', ')}).
-Match each letter to one of these characters by age, gender, hair, and clothing:
+Match each letter to one of these characters by age, gender, hair, and clothing; use the expected position/action as a supporting hint only:
 ${charLines}
 Answer JSON only, e.g. {"A": "name"}. Use "unknown" if a letter matches none of the characters. Each name at most once.`;
 
@@ -5994,6 +6053,25 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
 // =============================================================================
 
 /**
+ * CHARACTER CLOTHING REFERENCE block for quality/semantic eval prompts, built
+ * from the canonical per-page clothing description (resolved by the pipeline
+ * against the outline's clothingRequirements[char][category].description).
+ * Without this the eval doesn't know what each character's "standard" outfit
+ * actually IS — it sees a butterfly graphic on Emma's shirt, doesn't know the
+ * butterfly is canonical, and flags it MAJOR as an off-spec addition. Every
+ * caller of evaluateImageQuality must prepend this to the scene description
+ * (the batch path below does; the Test Lab eval stages call it too).
+ */
+function buildEvalClothingHeader(photos) {
+  const lines = (photos || [])
+    .filter(p => p?.name && p?.clothingDescription)
+    .map(p => `- ${p.name}: ${p.clothingDescription}`);
+  return lines.length > 0
+    ? `CHARACTER CLOTHING REFERENCE (the canonical outfit each character is wearing — treat anything matching this as correct, NOT as an off-spec addition):\n${lines.join('\n')}\n\n`
+    : '';
+}
+
+/**
  * Evaluate multiple images in parallel for quality and issues
  * This is used by the separated evaluation pipeline to evaluate all generated images at once
  *
@@ -6041,21 +6119,7 @@ async function evaluateImageBatch(images, options = {}) {
         };
       }
 
-      // Build a CHARACTER CLOTHING REFERENCE block from the canonical
-      // per-page clothing description (resolved by the pipeline against the
-      // outline's clothingRequirements[char][category].description). Without
-      // this the eval doesn't know what each character's "standard" outfit
-      // actually IS — it sees a butterfly graphic on Emma's shirt, doesn't
-      // know the butterfly is canonical, and flags it MAJOR as an off-spec
-      // addition. With this block prepended, Gemini knows the intended
-      // outfit and only flags actual mismatches.
-      const clothingContextLines = (img.allCharacterPhotos || img.characterPhotos || [])
-        .filter(p => p?.name && p?.clothingDescription)
-        .map(p => `- ${p.name}: ${p.clothingDescription}`);
-      const clothingHeader = clothingContextLines.length > 0
-        ? `CHARACTER CLOTHING REFERENCE (the canonical outfit each character is wearing — treat anything matching this as correct, NOT as an off-spec addition):\n${clothingContextLines.join('\n')}\n\n`
-        : '';
-      const sceneDescWithClothing = `${clothingHeader}${img.sceneDescription || img.prompt || ''}`;
+      const sceneDescWithClothing = `${buildEvalClothingHeader(img.allCharacterPhotos || img.characterPhotos || [])}${img.sceneDescription || img.prompt || ''}`;
 
       // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
       // Use img.evaluationType if set (covers use 'cover' for text-focused eval)
@@ -9523,23 +9587,15 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
 
   // Build VB grid — when sceneBackground is set, vehicles/locations/landmarks are already
   // painted into the empty scene plate, so drop them from the composite refs.
-  let visualBibleGrid = null;
-  let finalLandmarkPhotos = pageLandmarkPhotos;
-  if (visualBible) {
-    let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
-    let secondaryLandmarks = pageLandmarkPhotos.slice(1);
-    if (sceneBackground) {
-      elementReferences = elementReferences.filter(e => e.type !== 'vehicle' && e.type !== 'location');
-      secondaryLandmarks = [];
-      finalLandmarkPhotos = [];
-      log.debug(`🔲 [ITERATE] Page ${pageNumber}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs`);
-    } else if (useOriginalAsReference || pageLandmarkPhotos.length > 0) {
-      elementReferences = elementReferences.filter(e => e.type !== 'location');
-    }
-    if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-      visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
-    }
-  }
+  const pageRefs = visualBible
+    ? await buildPageCompositeRefs(visualBible, pageNumber, pageLandmarkPhotos, {
+        hasBackground: !!sceneBackground,
+        hasOtherRefs: !!useOriginalAsReference,
+        logTag: 'ITERATE',
+      })
+    : { visualBibleGrid: null, landmarkPhotos: pageLandmarkPhotos };
+  const visualBibleGrid = pageRefs.visualBibleGrid;
+  const finalLandmarkPhotos = pageRefs.landmarkPhotos;
 
   // The iterate output is prose + ---METADATA--- + JSON (same shape as initial
   // expansion). buildImagePrompt's prose branch strips the metadata block and
@@ -15558,6 +15614,37 @@ async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos
   return buildVisualBibleGrid(vehicleAndLocationRefs, secondaryLandmarks);
 }
 
+/**
+ * Composite references for a PAGE render: which VB elements + landmarks go
+ * into the grid, with the canonical filter rules (single source of truth —
+ * the iterate path and the Test Lab image stage both call this):
+ *   - background plate set → vehicles/locations/landmarks are already painted
+ *     into the plate; drop them all.
+ *   - other refs present (original image, landmark photos) → drop locations
+ *     only (the location anchor is covered), keep the rest.
+ * Returns { visualBibleGrid, landmarkPhotos } — landmarkPhotos is what the
+ * caller should pass to image generation (emptied when the plate covers it).
+ */
+async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = [], { hasBackground = false, hasOtherRefs = false, logTag = 'PAGE-REFS' } = {}) {
+  const { getElementReferenceImagesForPage } = require('./visualBible');
+  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
+  let secondaryLandmarks = (landmarkPhotos || []).slice(1);
+  let finalLandmarkPhotos = landmarkPhotos || [];
+  if (hasBackground) {
+    elementReferences = elementReferences.filter(e => e.type !== 'vehicle' && e.type !== 'location');
+    secondaryLandmarks = [];
+    finalLandmarkPhotos = [];
+    log.debug(`🔲 [${logTag}] Page ${pageNumber}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs`);
+  } else if (hasOtherRefs || (landmarkPhotos || []).length > 0) {
+    elementReferences = elementReferences.filter(e => e.type !== 'location');
+  }
+  let visualBibleGrid = null;
+  if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+    visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+  }
+  return { visualBibleGrid, landmarkPhotos: finalLandmarkPhotos };
+}
+
 async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], options = {}) {
   // stripLabels: 'all' (default, or `true`) omits the text strip on every cell.
   // Characters now flow as separate cropped cell-refs (see images.js:7633), so
@@ -16077,6 +16164,9 @@ module.exports = {
   detectAllBoundingBoxes,
   fetchFigureMaskPng,
   fetchFaceHeadMaskPng,
+  recoverFaceBox,
+  buildEvalClothingHeader,
+  buildPageCompositeRefs,
   detectSubRegion,  // Sub-region detection for targeted repairs (shoes, shirt, hands, etc.)
   createBboxOverlayImage,  // Create overlay image with boxes drawn
   getBboxCacheStats, // Telemetry for the content-hashed bbox cache

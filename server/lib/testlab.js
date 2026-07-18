@@ -55,7 +55,9 @@ async function loadSceneContext(storyId, pageNumber) {
             data->>'storyType' AS story_type,
             data->>'title' AS title,
             data->'layout' AS layout,
-            (data->'visualBible')::text AS visual_bible
+            (data->'visualBible')::text AS visual_bible,
+            (data->'clothingRequirements')::text AS clothing_reqs,
+            (data->'characters')::text AS characters_json
      FROM stories, jsonb_array_elements(data->'sceneImages') scene
      WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
     [storyId, pageNumber]
@@ -68,6 +70,14 @@ async function loadSceneContext(storyId, pageNumber) {
   try {
     visualBible = rows[0].visual_bible ? JSON.parse(rows[0].visual_bible) : null;
   } catch { /* malformed VB — run without grid refs */ }
+  let clothingRequirements = null;
+  try {
+    clothingRequirements = rows[0].clothing_reqs ? JSON.parse(rows[0].clothing_reqs) : null;
+  } catch { /* run without — repairs fall back to avatar clothing */ }
+  let characters = [];
+  try {
+    characters = rows[0].characters_json ? JSON.parse(rows[0].characters_json) : [];
+  } catch { /* run without full character objects */ }
 
   const referencePhotos = [];
   for (const p of (scene.referencePhotos || [])) {
@@ -91,6 +101,8 @@ async function loadSceneContext(storyId, pageNumber) {
     languageLevel: rows[0].language_level || 'standard',
     storyType: rows[0].story_type || null,
     title: rows[0].title || null,
+    clothingRequirements,
+    characters,
     referencePhotos,
     landmarkPhotos,
     // null when the story renders text below the image (layout square-below) —
@@ -174,12 +186,29 @@ async function saveTestVersion(storyId, imageType, pageNumber, imageData, experi
 // images are referenced by {imageType, versionIndex} test rows).
 // ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Scene description for quality/semantic eval — production NEVER calls
+ * evaluateImageQuality with the raw description: its batch path prepends the
+ * CHARACTER CLOTHING REFERENCE block first (otherwise the evaluator flags
+ * canonical outfits as off-spec and lab scores run systematically harsher
+ * than production, skewing every A/B). Same header, same helper.
+ */
+function evalSceneDescription(ctx) {
+  const { buildEvalClothingHeader } = require('./images');
+  let photos = (ctx.referencePhotos || []).filter(p => p?.name && p?.clothingDescription);
+  if (photos.length === 0) {
+    photos = buildExpectedCharacters(ctx)
+      .filter(c => c.clothing)
+      .map(c => ({ name: c.name, clothingDescription: c.clothing }));
+  }
+  return `${buildEvalClothingHeader(photos)}${ctx.scene.sceneDescription || ''}`;
+}
+
 async function runImageStage(ctx, { promptOverride, experimentId, autoEval = true, params = {} }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
   const { buildImagePrompt } = require('./storyHelpers');
-  const { generateImageOnly, buildVisualBibleGrid } = require('./images');
-  const { getElementReferenceImagesForPage } = require('./visualBible');
+  const { generateImageOnly, buildPageCompositeRefs } = require('./images');
   const { getTextAreaMask } = require('./textMasks');
   const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 
@@ -245,27 +274,27 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   const textInImage = ctx.layout?.textInImage !== false;
   const textAreaMask = textInImage && ctx.textPosition ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null;
 
-  // Visual Bible grid — same construction as the production page path: page
-  // elements (minus locations when a background anchors the location already)
-  // plus secondary landmarks, composited into one reference grid image.
+  // Visual Bible grid + landmark refs — production's shared helper (a plate
+  // background drops vehicles/locations/landmarks; otherwise locations only).
   let visualBibleGrid = null;
+  let genLandmarkPhotos = ctx.landmarkPhotos;
   if (ctx.visualBible) {
-    let elementReferences = getElementReferenceImagesForPage(ctx.visualBible, ctx.pageNumber, 6);
-    if (emptyScene) elementReferences = elementReferences.filter(e => e.type !== 'location');
-    const secondaryLandmarks = ctx.landmarkPhotos.slice(1);
-    if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-      try {
-        visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
-      } catch (err) {
-        log.warn(`[TESTLAB] VB grid build failed (continuing without): ${err.message}`);
-      }
+    try {
+      const refs = await buildPageCompositeRefs(ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, {
+        hasBackground: !!emptyScene,
+        logTag: 'TESTLAB',
+      });
+      visualBibleGrid = refs.visualBibleGrid;
+      genLandmarkPhotos = refs.landmarkPhotos;
+    } catch (err) {
+      log.warn(`[TESTLAB] VB grid build failed (continuing without): ${err.message}`);
     }
   }
 
   const t0 = Date.now();
   const result = await generateImageOnly(prompt, ctx.referencePhotos, {
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
-    landmarkPhotos: ctx.landmarkPhotos,
+    landmarkPhotos: genLandmarkPhotos,
     visualBibleGrid,
     artStyle,
     sceneBackground: emptyScene,
@@ -281,7 +310,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     try {
       const { evaluateImageQuality } = require('./images');
       const evalRes = await evaluateImageQuality(
-        result.imageData, ctx.scene.sceneDescription, ctx.referencePhotos, 'scene',
+        result.imageData, evalSceneDescription(ctx), ctx.referencePhotos, 'scene',
         null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
         ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null
       );
@@ -369,7 +398,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   return { imageType: 'empty_scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, qc, artStyle: params.artStyleOverride || undefined };
 }
 
-async function runQualityEvalStage(ctx, { promptOverride, experimentId }) {
+async function runQualityEvalStage(ctx, { promptOverride, experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { evaluateImageQuality } = require('./images');
@@ -377,10 +406,16 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId }) {
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
   const t0 = Date.now();
   const result = await evaluateImageQuality(
-    imageData, ctx.scene.sceneDescription, ctx.referencePhotos, 'scene',
+    imageData, evalSceneDescription(ctx), ctx.referencePhotos, 'scene',
     null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
     ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-    { evalTemplateOverride: promptOverride || null }
+    {
+      evalTemplateOverride: promptOverride || null,
+      // Stage-2 compliance A/B: swap the model (default qwen-plus) and/or its
+      // template to test the over-strict-CRITICAL problem.
+      complianceModelOverride: params.complianceModel || null,
+      compliancePromptOverride: params.compliancePrompt || null,
+    }
   );
   const elapsedMs = Date.now() - t0;
   if (!result) throw new Error('Quality evaluation returned null');
@@ -432,13 +467,49 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
  * descriptions live in the prior detection's characterDescriptions and
  * positions in sceneMetadata.characterPositions.
  */
+/**
+ * Expected-characters list for detection — MUST be production's builder
+ * (buildExpectedCharactersForBbox): it resolves per-page/costume clothing and
+ * overrides the modern wardrobe baked into richDescription. The Test Lab's
+ * old hand-rolled version passed raw richDescription ("wearing gray hoodie")
+ * on costume pages, so the SoM identity step matched against the wrong outfit
+ * and tagged figures UNKNOWN (exp #68: Roger unfindable on a medieval page).
+ * The Test Lab only ASSEMBLES the stored inputs; the logic is production's.
+ */
 function buildExpectedCharacters(ctx) {
+  const { buildExpectedCharactersForBbox } = require('./images');
   const descriptions = ctx.scene.bboxDetection?.characterDescriptions || {};
-  const positions = ctx.scene.sceneMetadata?.characterPositions || {};
+
+  // Positions/actions: stored sceneMetadata → production extractor on the Art
+  // Director prose → outlineExtract (structured per-character position incl.
+  // action, e.g. "center-right background being led away" — feeds the SoM
+  // position hint, often the only cue for occluded figures).
+  const positions = { ...(ctx.scene.sceneMetadata?.characterPositions || {}) };
+  if (Object.keys(positions).length === 0 && ctx.scene.sceneDescription) {
+    try {
+      const meta = require('./storyHelpers').extractSceneMetadata(ctx.scene.sceneDescription);
+      Object.assign(positions, meta?.characterPositions || {});
+    } catch { /* prose without metadata — outlineExtract below */ }
+  }
+  try {
+    const oe = typeof ctx.scene.outlineExtract === 'string'
+      ? JSON.parse(ctx.scene.outlineExtract) : ctx.scene.outlineExtract;
+    for (const c of (oe?.characters || [])) {
+      if (c?.name && c.position && !positions[c.name]) positions[c.name] = c.position;
+    }
+  } catch { /* outlineExtract not JSON */ }
+
+  const clothing = ctx.scene.sceneCharacterClothing || ctx.scene.sceneMetadata?.characterClothing || {};
+  if (Object.keys(descriptions).length > 0) {
+    return buildExpectedCharactersForBbox(descriptions, positions, clothing);
+  }
+  // Very old story without stored characterDescriptions — minimal fallback.
   return (ctx.scene.sceneCharacters || ctx.referencePhotos || []).map(c => ({
     name: c.name,
-    description: descriptions[c.name]?.richDescription || descriptions[c.name] || c.description || '',
+    description: c.description || '',
     position: positions[c.name] || c.position || '',
+    clothing: '',
+    gdinoPrompt: null,
   })).filter(c => c.name);
 }
 
@@ -489,15 +560,22 @@ async function resolveCharacterBox(ctx, imageData, charName, { detection = null 
   // feet. Pad slightly for repair use; the detection entry keeps raw truth.
   if (detection) {
     const chained = fromDet(detection);
-    if (chained) {
-      const [y0, x0, y1, x1] = chained.bbox;
-      const padY = (y1 - y0) * 0.04, padX = (x1 - x0) * 0.05;
-      return {
-        ...chained,
-        bbox: [Math.max(0, y0 - padY), Math.max(0, x0 - padX), Math.min(1, y1 + padY), Math.min(1, x1 + padX)],
-        source: 'chained-detection (padded 4-5%)',
-      };
+    // Chained detection is AUTHORITATIVE: when the experiment reran detection
+    // and the character isn't in the result, falling back to the stored
+    // generation-time box silently mixes in an older, worse detector's
+    // opinion — exp #68 repainted the wrong person that way (stale "Roger"
+    // box sat on another figure). Fail honestly instead.
+    if (!chained) {
+      const found = (detection.figures || []).map(f => f.name).filter(Boolean).join(', ');
+      throw new Error(`"${charName}" not found in this experiment's fresh detection (figures found: ${found || 'none'}) — refusing the stored generation-time box, it can point at the wrong figure. The character may be occluded or unidentifiable on this page.`);
     }
+    const [y0, x0, y1, x1] = chained.bbox;
+    const padY = (y1 - y0) * 0.04, padX = (x1 - x0) * 0.05;
+    return {
+      ...chained,
+      bbox: [Math.max(0, y0 - padY), Math.max(0, x0 - padX), Math.min(1, y1 + padY), Math.min(1, x1 + padX)],
+      source: 'chained-detection (padded 4-5%)',
+    };
   }
   const stored = ctx._skipStoredBox ? null : fromDet(ctx.scene.bboxDetection);
   if (stored) return { ...stored, source: 'stored' };
@@ -578,13 +656,81 @@ async function runCharRepairStage(ctx, opts) {
     throw new Error(`backend "gemini" ignores repairMode — it always does a full-image repaint. Use grok for blended/cutout/fullscene.`);
   }
 
+  // Face repair with no face box: recover (zoom into the known body box,
+  // re-run face detection) or fail loudly — never silently repair the body.
+  const whiteoutTarget = params.whiteoutTarget || 'face';
+  if (backend === 'grok' && whiteoutTarget === 'face' && !(faceBbox?.length === 4)) {
+    const { recoverFaceBox } = require('./images');
+    faceBbox = await recoverFaceBox(imageData, bbox, `testlab-P${ctx.pageNumber} ${charName}: `);
+    if (faceBbox) boxSource = `${boxSource} + face-recovered`;
+    else throw new Error(`Face repair requested for "${charName}" but no face box — full-page detection AND body-crop zoom recovery both found no face. Use whiteoutTarget "body" explicitly if a body repair is intended.`);
+  }
+
+  // Production-parity inputs — same as the automatic char-fix path: the
+  // clothing-scoped styled avatar, the story's resolved clothing description
+  // (clothingRequirements is canonical, avatars.clothing can be stale), and
+  // protection boxes for every OTHER named character on the page.
+  const { normalizeClothingCategory, resolveCharacterReqs } = require('./clothingCategories');
+  const { getStyledAvatarForClothing } = require('./entityConsistency');
+  const character = (ctx.characters || []).find(c => (c.name || '').toLowerCase() === charName.toLowerCase()) || null;
+  const clothingKey = Object.keys(ctx.scene.sceneCharacterClothing || {})
+    .find(k => k.toLowerCase() === charName.toLowerCase());
+  const clothingCategory = clothingKey
+    ? normalizeClothingCategory(ctx.scene.sceneCharacterClothing[clothingKey])
+    : 'standard';
+  let avatarPhoto = ref.photoUrl;
+  let avatarPhotoType = 'reference';
+  if (character) {
+    try {
+      const styled = await getStyledAvatarForClothing(character, ctx.artStyle, clothingCategory);
+      if (styled) {
+        avatarPhoto = (await toDataUri(styled)) || avatarPhoto;
+        avatarPhotoType = clothingCategory.startsWith('costumed')
+          ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`;
+      }
+    } catch (err) {
+      log.warn(`[TESTLAB] styled avatar lookup failed for ${charName} (${err.message}) — using page reference photo`);
+    }
+  }
+  const clothingDescription = (() => {
+    const reqs = resolveCharacterReqs(ctx.clothingRequirements, charName);
+    if (reqs?.[clothingCategory]) {
+      const cat = reqs[clothingCategory];
+      if (cat.signature && cat.signature !== 'none') return cat.signature;
+      if (cat.description) return cat.description;
+    }
+    return character?.avatars?.clothing?.[clothingCategory] || '';
+  })();
+  const detFigures = params.detection?.figures
+    || ctx.scene.bboxDetection?.figures || ctx.scene.bboxDetection?.characters || [];
+  const protectedFaces = [];
+  const protectedBodies = [];
+  const protectedNames = [];
+  for (const f of detFigures) {
+    const n = (f?.name || '').trim();
+    // Named characters only — mirrors production, which protects sceneCharacters.
+    if (!n || n.toUpperCase() === 'UNKNOWN' || n.toLowerCase() === charName.toLowerCase()) continue;
+    const fb = f.faceBox || f.faceBbox;
+    const bb = f.bodyBox || f.bbox || f.box_2d;
+    if (fb?.length === 4) protectedFaces.push(fb);
+    if (bb?.length === 4) protectedBodies.push(bb);
+    if (fb?.length === 4 || bb?.length === 4) protectedNames.push(n);
+  }
+
   const t0 = Date.now();
-  const result = await repairCharacterMismatch(imageData, ref.photoUrl, bbox, charName, {
+  const result = await repairCharacterMismatch(imageData, avatarPhoto, bbox, charName, {
     imageBackend: backend,
+    ...(params.issueDescription ? { issueDescription: params.issueDescription } : {}),
+    clothingDescription,
+    photoType: avatarPhotoType,
+    sceneDescription: ctx.scene.sceneDescription || ctx.scene.text || '',
+    textPosition: ctx.textPosition,
     ...(backend === 'grok' ? {
       ...modeFlags,
       faceBbox,
-      whiteoutTarget: params.whiteoutTarget || 'face',
+      protectedFaces,
+      protectedBodies,
+      whiteoutTarget,
     } : {}),
   });
   const elapsedMs = Date.now() - t0;
@@ -600,7 +746,7 @@ async function runCharRepairStage(ctx, opts) {
     const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, dataUri, experimentId);
     steps.push({ label, imageType: 'tl_step', versionIndex: v });
   };
-  await addStep('input: character reference', ref.photoUrl);
+  await addStep(`input: character reference (${avatarPhotoType})`, avatarPhoto);
   await addStep('sent to model (whiteout/crosshatch)', result?.blackoutImage || result?.comparison?.blackoutImage || result?.debug?.sceneSent);
   await addStep('model raw output', result?.grokRawResult || result?.comparison?.grokRawResult);
 
@@ -634,7 +780,7 @@ async function runCharRepairStage(ctx, opts) {
     const failCtx = { steps, characterName: charName, bbox, boxSource, backend };
     // Face repairs: clip the blend to the faceBox — the union must never
     // include body pixels regardless of what SAM returns.
-    const faceClip = params.whiteoutTarget === 'face' && faceBbox?.length === 4 ? [
+    const faceClip = whiteoutTarget === 'face' && faceBbox?.length === 4 ? [
       Math.max(0, Math.round(faceBbox[1] * om.width) - cx),
       Math.max(0, Math.round(faceBbox[0] * om.height) - cy),
       Math.min(cw, Math.round(faceBbox[3] * om.width) - cx),
@@ -660,6 +806,8 @@ async function runCharRepairStage(ctx, opts) {
   return {
     imageType: 'scene', versionIndex, characterName: charName, bbox, faceBbox: faceBbox || undefined, boxSource, backend,
     repairMode: backend === 'grok' ? repairMode : null,
+    clothingCategory, avatarPhotoType,
+    protectedCharacters: protectedNames.length ? protectedNames : undefined,
     samBlend: samBlendApplied || undefined,
     blendRule: samBlendApplied ? BLEND_RULE_VERSION : undefined,
     method: result?.method || null, steps, elapsedMs,
@@ -1609,6 +1757,39 @@ async function fetchFaceHeadMask(buf, faceBox, cropW, cropH) {
   return fetchFaceHeadMaskPng(buf, faceBox, cropW, cropH, (b, box, opts) => fetchMaskWithRetry(b, box, 3, opts));
 }
 
+/**
+ * Interior seed points for SAM round 2, sampled from round 1's mask: erode a
+ * few px (so points sit deep inside the figure) and take the widest-run
+ * centers at 25/50/75% of the mask's height (head/torso/legs).
+ */
+async function _interiorSeedPoints(maskPng, w, h) {
+  try {
+    const sharp = require('sharp');
+    const a = await sharp(maskPng).resize(w, h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+    const s = Math.max(1, Math.round(a.length / (w * h)));
+    const on = (x, y) => x >= 0 && y >= 0 && x < w && y < h && a[(y * w + x) * s] > 128;
+    let minx = w, maxx = -1, miny = h, maxy = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (on(x, y)) {
+      if (x < minx) minx = x; if (x > maxx) maxx = x;
+      if (y < miny) miny = y; if (y > maxy) maxy = y;
+    }
+    if (maxx < 0) return [];
+    const R = 4;
+    const interior = (x, y) => on(x, y) && on(x - R, y) && on(x + R, y) && on(x, y - R) && on(x, y + R);
+    const pts = [];
+    for (const fy of [0.25, 0.5, 0.75]) {
+      const y = Math.round(miny + (maxy - miny) * fy);
+      let best = null, run = 0, start = 0;
+      for (let x = minx; x <= maxx + 1; x++) {
+        if (x <= maxx && interior(x, y)) { if (run === 0) start = x; run++; }
+        else { if (run > 0 && (!best || run > best.run)) best = { run, cx: Math.round(start + run / 2) }; run = 0; }
+      }
+      if (best && best.run >= 2 * R) pts.push([best.cx, y]);
+    }
+    return pts;
+  } catch { return []; }
+}
+
 async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null }) {
   const sharp = require('sharp');
   const fail = (msg) => {
@@ -1619,7 +1800,27 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
 
   const oldMask = oldMaskPng || (maskFetcher ? await maskFetcher(originalCropBuf) : await fetchMaskWithRetry(originalCropBuf, boxInCrop, 5, maskPoints || {}));
   if (!oldMask) throw fail('SAM could not mask the original figure (mask service unavailable?) — retry.');
-  const newMask = maskFetcher ? await maskFetcher(candidateCropBuf) : await fetchMaskWithRetry(candidateCropBuf, boxInCrop, 5, maskPoints || {});
+  let newMask;
+  if (maskFetcher) {
+    newMask = await maskFetcher(candidateCropBuf);
+  } else {
+    // Round 2 runs on the SAME box — a valid repair keeps the figure in place
+    // (the IoU gate rejects moves) — padded 4% for figure growth, and seeded
+    // with points sampled from INSIDE round 1's mask: the original box on a
+    // changed image can straddle background and SAM latches onto whatever
+    // sits there (exp #68: a mountain). Interior points anchor it to the figure.
+    const bw = boxInCrop[2] - boxInCrop[0], bh = boxInCrop[3] - boxInCrop[1];
+    const padBox = [
+      Math.max(0, Math.round(boxInCrop[0] - bw * 0.04)),
+      Math.max(0, Math.round(boxInCrop[1] - bh * 0.04)),
+      Math.min(cropW, Math.round(boxInCrop[2] + bw * 0.04)),
+      Math.min(cropH, Math.round(boxInCrop[3] + bh * 0.04)),
+    ];
+    const seeds = await _interiorSeedPoints(oldMask, cropW, cropH);
+    const r2Opts = { ...(maskPoints || {}) };
+    if (seeds.length) r2Opts.points = [...(r2Opts.points || []), ...seeds];
+    newMask = await fetchMaskWithRetry(candidateCropBuf, padBox, 5, r2Opts);
+  }
   if (!newMask) throw fail('SAM found no figure in the model output inside the target box — the model likely painted the figure elsewhere or not at all. See the raw output step; Redo.');
 
   const raw1 = { raw: { width: cropW, height: cropH, channels: 1 } };
@@ -1790,13 +1991,33 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     };
   } else {
     // Stored detection first, else fresh detection (resolveCharacterBox);
-    // params.freshDetection forces a re-detect.
+    // params.freshDetection forces a re-detect. Resolution errors (character
+    // missing from an authoritative chained detection) propagate — a generic
+    // "needs params.crop" would hide the real cause.
     if (params.freshDetection) ctx._skipStoredBox = true;
-    const resolved = await resolveCharacterBox(ctx, baseUri, charName, { detection: params.detection || null }).catch(() => null);
-    delete ctx._skipStoredBox;
+    let resolved;
+    try {
+      resolved = await resolveCharacterBox(ctx, baseUri, charName, { detection: params.detection || null });
+    } finally {
+      delete ctx._skipStoredBox;
+    }
     // Face-only repair: the detection's faceBox becomes the target — the SAM
     // whiteout, union and paste all scope to the head, body/pose untouched.
-    const faceMode = params.whiteoutTarget === 'face' && resolved?.faceBbox?.length === 4;
+    // A missing faceBox NEVER silently downgrades to a body repair (exp #68:
+    // Lukas's whole body got whited out and Qwen re-imagined a studio shot).
+    // Recovery first (zoom into the known body box, re-run face detection),
+    // loud failure second.
+    let faceMode = false;
+    if (params.whiteoutTarget === 'face') {
+      let fb = resolved?.faceBbox?.length === 4 ? resolved.faceBbox : null;
+      if (!fb && resolved?.bbox?.length === 4) {
+        const { recoverFaceBox } = require('./images');
+        fb = await recoverFaceBox(baseUri, resolved.bbox, `testlab-P${ctx.pageNumber} ${charName}: `);
+        if (fb) resolved = { ...resolved, faceBbox: fb, source: `${resolved.source} + face-recovered` };
+      }
+      if (!fb) throw new Error(`Face repair requested for "${charName}" but no face box — full-page detection AND body-crop zoom recovery both found no face. Not downgrading to a body repair; use whiteoutTarget "body" explicitly if that is intended.`);
+      faceMode = true;
+    }
     const box = faceMode ? resolved.faceBbox : resolved?.bbox; // [ymin,xmin,ymax,xmax] 0-1
     if (box?.length === 4) figureBox = box;
     if (faceMode) params._faceMode = true;
