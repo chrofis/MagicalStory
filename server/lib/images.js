@@ -2532,10 +2532,15 @@ async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H,
     const posHint = c.position ? ` Expected position/action (hint from the scene plan; the image may differ): ${c.position}.` : '';
     return `- ${c.name}: ${identity}.${garment ? ` Wearing: ${garment}.` : ''}${posHint}`;
   }).join('\n');
+  const nBadges = badges.length;
+  const nChars = expectedCharacters.length;
+  const elimHint = nBadges === nChars
+    ? `\nThere are exactly ${nBadges} badges and ${nChars} expected characters — assign each character to one badge, by elimination if needed. Only use "unknown" for a badge that is clearly an extra/background figure, not for an expected character you are merely less sure about (a preschooler among adults, an occluded figure — assign the best remaining match).`
+    : `\nUse "unknown" only for a badge that is an extra/background figure matching none of the expected characters. If a badge is plausibly an expected character (right age band and gender) assign it rather than "unknown".`;
   const prompt = `Figures in this illustration are marked with black letter badges (${badges.map(b => b.letter).join(', ')}).
 Match each letter to one of these characters by age, gender, hair, and clothing; use the expected position/action as a supporting hint only:
-${charLines}
-Answer JSON only, e.g. {"A": "name"}. Use "unknown" if a letter matches none of the characters. Each name at most once.`;
+${charLines}${elimHint}
+Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
 
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: 'POST',
