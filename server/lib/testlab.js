@@ -592,29 +592,8 @@ async function runCharRepairStage(ctx, opts) {
   if (!repairedImage) throw new Error('Character repair returned no image');
 
   // Every intermediate the repair produced, saved as tl_step test versions so
-  // the UI can show the full chain, not just the final composite.
-  // SAM silhouette of the target figure — production uses this internally but
-  // doesn't return it; recompute for display so the mask is inspectable.
-  let samDisplay = null;
-  try {
-    const sharp = require('sharp');
-    const meta = await sharp(Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64')).metadata();
-    const boxPx = [
-      Math.round(bbox[1] * meta.width), Math.round(bbox[0] * meta.height),
-      Math.round(bbox[3] * meta.width), Math.round(bbox[2] * meta.height),
-    ];
-    const { fetchFigureMaskPng } = require('./images');
-    const maskPng = await fetchFigureMaskPng(Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'), boxPx);
-    if (maskPng) {
-      // Render white silhouette on black for visibility.
-      const vis = await sharp({ create: { width: meta.width, height: meta.height, channels: 3, background: { r: 0, g: 0, b: 0 } } })
-        .composite([{ input: maskPng, left: 0, top: 0 }]).jpeg().toBuffer();
-      samDisplay = `data:image/jpeg;base64,${vis.toString('base64')}`;
-    }
-  } catch (err) {
-    log.warn(`[TESTLAB] SAM display mask unavailable: ${err.message}`);
-  }
-
+  // the UI can show the full chain, not just the final composite. SAM round
+  // 1/2 views (region-whited + cutout) come from the shared blend below.
   const steps = [];
   const addStep = async (label, dataUri) => {
     if (typeof dataUri !== 'string' || !dataUri.startsWith('data:image')) return;
@@ -622,19 +601,15 @@ async function runCharRepairStage(ctx, opts) {
     steps.push({ label, imageType: 'tl_step', versionIndex: v });
   };
   await addStep('input: character reference', ref.photoUrl);
-  await addStep('SAM silhouette of target figure (as used by the repair)', samDisplay);
-  await addStep('sent to model (whiteout)', result?.blackoutImage || result?.comparison?.blackoutImage || result?.debug?.sceneSent);
+  await addStep('sent to model (whiteout/crosshatch)', result?.blackoutImage || result?.comparison?.blackoutImage || result?.debug?.sceneSent);
   await addStep('model raw output', result?.grokRawResult || result?.comparison?.grokRawResult);
-  await addStep('blend mask (production silhouette gate)', result?.blendMask || result?.comparison?.blendMask);
 
-  // params.samBlend: instead of the production paste, run the SHARED SAM-union
-  // blend on the engine's output — identical blending across all engines, and
-  // the background outside the figure is mechanically guaranteed (this also
-  // upgrades fullscene/crosshatch, whose production path trusts the model
-  // with the entire page).
+  // EVERY engine's output goes through the shared SAM-union blend — the
+  // production paste is never the final. Identical blending across engines;
+  // the background outside the figure union is mechanically guaranteed.
   let finalImage = repairedImage;
   let samBlendApplied = false;
-  if (params.samBlend) {
+  {
     const sharp = require('sharp');
     const origBuf = Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     const candBufFull = Buffer.from(repairedImage.replace(/^data:image\/\w+;base64,/, ''), 'base64');
@@ -1632,6 +1607,27 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     for (let i = 0; i < n; i++) out[i] = buf[i * s];
     return out;
   };
+
+  // Both SAM rounds as APPLIED views (image-with-region-white + cutout) —
+  // never raw masks.
+  const emitMaskViews = async (roundLabel, imgBuf, maskPngBuf) => {
+    const sharpL = require('sharp');
+    const img = await sharpL(imgBuf).resize(cropW, cropH, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
+    const mask = await sharpL(maskPngBuf).resize(cropW, cropH, { fit: 'fill' }).png().toBuffer();
+    const white = await sharpL(img).composite([{ input: mask, left: 0, top: 0 }]).jpeg().toBuffer();
+    await addStep(`${roundLabel}: region whited out`, `data:image/jpeg;base64,${white.toString('base64')}`);
+    const mAlphaRaw = await sharpL(mask).ensureAlpha().extractChannel(3).raw().toBuffer();
+    const s2 = Math.max(1, Math.round(mAlphaRaw.length / n));
+    let mAlpha = mAlphaRaw;
+    if (s2 > 1) { mAlpha = Buffer.alloc(n); for (let i = 0; i < n; i++) mAlpha[i] = mAlphaRaw[i * s2]; }
+    const figPng = await sharpL(img).ensureAlpha().joinChannel(Buffer.from(mAlpha), raw1).png().toBuffer();
+    const cut = await sharpL({ create: { width: cropW, height: cropH, channels: 3, background: { r: 30, g: 30, b: 30 } } })
+      .composite([{ input: figPng }]).jpeg().toBuffer();
+    await addStep(`${roundLabel}: figure cutout`, `data:image/jpeg;base64,${cut.toString('base64')}`);
+  };
+  await emitMaskViews('SAM round 1 (original)', originalCropBuf, oldMask);
+  await emitMaskViews('SAM round 2 (model output)', candidateCropBuf, newMask);
+
   const oldA = await sharp(oldMask).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
   const newA = await sharp(newMask).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
 

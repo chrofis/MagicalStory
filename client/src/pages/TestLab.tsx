@@ -414,15 +414,14 @@ function ExperimentsTab() {
           // ONE experiment: fresh detection first, then every engine/mode as
           // Options A–F against the same fresh boxes.
           params.rerunDetection = true;
+          // Every option runs through the shared SAM-union blend (mandatory).
           params.variants = [
-            { label: 'A: Grok blended face', params: { backend: 'grok', repairMode: 'blended', whiteoutTarget: 'face' } },
-            { label: 'B: Grok blended body', params: { backend: 'grok', repairMode: 'blended', whiteoutTarget: 'body' } },
-            { label: 'C: Grok cutout', params: { backend: 'grok', repairMode: 'cutout' } },
-            { label: 'D: Grok fullscene inpaint', params: { backend: 'grok', repairMode: 'fullscene' } },
+            { label: 'A: Grok crosshatch', params: { backend: 'grok', repairMode: 'fullscene' } },
+            { label: 'B: Grok crop-input', params: { backend: 'grok', repairMode: 'cutout' } },
+            { label: 'C: Grok blended face', params: { backend: 'grok', repairMode: 'blended', whiteoutTarget: 'face' } },
+            { label: 'D: Grok blended body', params: { backend: 'grok', repairMode: 'blended', whiteoutTarget: 'body' } },
             { label: 'E: Gemini repaint', params: { backend: 'gemini', repairMode: 'auto' } },
-            { label: 'F: Qwen whiteout+SAM blend', params: { backend: 'qwen' } },
-            { label: 'G: Grok crosshatch + shared SAM blend', params: { backend: 'grok', repairMode: 'fullscene', samBlend: true } },
-            { label: 'H: Grok crop-input + shared SAM blend', params: { backend: 'grok', repairMode: 'cutout', samBlend: true } },
+            { label: 'F: Qwen whiteout', params: { backend: 'qwen' } },
           ];
         } else {
           params.backend = repairBackend;
