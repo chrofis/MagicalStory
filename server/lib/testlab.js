@@ -2169,20 +2169,21 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
 
   // STYLE GATE — Qwen occasionally flips the whole crop into a flat vector/
   // anime look (exp #69 Franziska); the geometry gates can't see that.
-  // Production's compareImageStyles judges rendering style only, content
-  // ignored. Gate unavailability (no Gemini key, transient error) is logged
+  // Binary same-style classification (checkStyleMatch): the numeric
+  // similarity score was too lenient (flat repaint of watercolor still hit
+  // 85/100). Gate unavailability (no Gemini key, transient error) is logged
   // and skipped — it must not turn a good repair into a failure.
-  let styleCompare = null;
+  let styleMatch = null;
   if (params.repairMode) {
     try {
-      const { compareImageStyles } = require('./images');
-      styleCompare = await compareImageStyles(
+      const { checkStyleMatch } = require('./images');
+      styleMatch = await checkStyleMatch(
         `data:image/jpeg;base64,${cropBuf.toString('base64')}`,
         `data:image/jpeg;base64,${outBufEarly.toString('base64')}`
       );
-      if (typeof styleCompare?.similarity === 'number' && styleCompare.similarity < 55) {
-        const err = new Error(`Style drift: model output scored ${styleCompare.similarity}/100 style similarity vs the original crop (${(styleCompare.summary || '').slice(0, 160)}) — Redo.`);
-        err.partialResult = { steps, crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H }, characterName: ref.name, styleCompare };
+      if (styleMatch.sameStyle === false) {
+        const err = new Error(`Style drift: model output is "${styleMatch.styleB}" but the scene is "${styleMatch.styleA}" — Redo.`);
+        err.partialResult = { steps, crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H }, characterName: ref.name, styleMatch };
         throw err;
       }
     } catch (err) {
@@ -2292,7 +2293,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     modelId: result.modelId, promptUsed: prompt,
     crop: { x: crop.x / W, y: crop.y / H, w: crop.w / W, h: crop.h / H },
     blendRule: params.repairMode ? BLEND_RULE_VERSION : undefined,
-    styleSimilarity: styleCompare?.similarity,
+    styleMatch: styleMatch || undefined,
     steps, cost: result.cost,
   };
 }

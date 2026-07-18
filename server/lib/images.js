@@ -16022,8 +16022,9 @@ async function analyzeImageStyle(imageData) {
 Output ONLY the style description as a single paragraph (3-5 sentences) that could be used as an art style prompt. No headers, no bullet points, no analysis structure — just the description.` }
         ]
       }],
-      generationConfig: { maxOutputTokens: 500, temperature: 0.3 }
-    })
+      generationConfig: { maxOutputTokens: 500, temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } }
+    }),
+    signal: AbortSignal.timeout(45_000)
   });
 
   if (!response.ok) {
@@ -16032,11 +16033,46 @@ Output ONLY the style description as a single paragraph (3-5 sentences) that cou
   }
 
   const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  const text = (data.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
   if (!text) throw new Error('No style analysis returned');
 
   log.info(`🎨 [STYLE ANALYZE] Result: ${text.substring(0, 150)}...`);
   return { style: text, usage: { input_tokens: data.usageMetadata?.promptTokenCount || 0, output_tokens: data.usageMetadata?.candidatesTokenCount || 0 } };
+}
+
+/**
+ * Binary style-match check: is image B rendered in the same artistic medium/
+ * stylization as image A? Built for repair gating — the numeric
+ * compareImageStyles score is too lenient there (a flat-vector repaint of a
+ * watercolor crop still scored 85/100 because layout/content matched; the
+ * binary classification separates cleanly: watercolor→watercolor true,
+ * watercolor→flat-vector false). Returns { sameStyle, styleA, styleB }.
+ */
+async function checkStyleMatch(imageDataA, imageDataB) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured');
+  const part = (img) => ({ inline_data: { mime_type: img.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2Lib.stripDataUriPrefix(img) } });
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility}:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [
+        { text: 'Image A (original illustration):' },
+        part(imageDataA),
+        { text: 'Image B (candidate repaint of the same scene):' },
+        part(imageDataB),
+        { text: 'Is Image B rendered in the SAME artistic medium and stylization as Image A? Judge ONLY the rendering technique of faces and figures: painterly/watercolor vs flat vector cartoon vs anime vs 3D vs photo. Content and layout differences are irrelevant. A face rendered with flat fills, hard clean outlines and simplified features when A has painterly texture = NOT the same style. JSON only: {"sameStyle": true/false, "styleA": "...", "styleB": "..."}' },
+      ] }],
+      generationConfig: { temperature: 0, maxOutputTokens: 300, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+    }),
+    signal: AbortSignal.timeout(45_000),
+  });
+  if (!response.ok) throw new Error(`Gemini style match failed: ${(await response.text()).substring(0, 200)}`);
+  const data = await response.json();
+  const text = (data.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
+  const parsed = getStoryHelpers().extractJsonFromText(text);
+  if (!parsed || typeof parsed.sameStyle !== 'boolean') throw new Error(`Invalid style match response: ${text.slice(0, 120)}`);
+  return parsed;
 }
 
 /**
@@ -16082,8 +16118,11 @@ Return a JSON object:
 Return ONLY the JSON, no markdown fences.` }
         ]
       }],
-      generationConfig: { maxOutputTokens: 1024, temperature: 0.2 }
-    })
+      // thinkingBudget 0: 2.5-flash otherwise spends the small output budget
+      // on thinking and returns empty text. responseMimeType enforces JSON.
+      generationConfig: { maxOutputTokens: 1024, temperature: 0.2, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
+    }),
+    signal: AbortSignal.timeout(45_000)
   });
 
   if (!response.ok) {
@@ -16092,7 +16131,7 @@ Return ONLY the JSON, no markdown fences.` }
   }
 
   const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  const text = (data.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
   if (!text) throw new Error('No style comparison returned');
 
   // Parse JSON from response (handle markdown fences)
@@ -16139,6 +16178,7 @@ module.exports = {
   applyStyleTransfer,
   analyzeImageStyle,
   compareImageStyles,
+  checkStyleMatch,
   evaluateImageBatch,
 
   // Unified repair pipeline (the only active repair pipeline)
