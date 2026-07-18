@@ -844,14 +844,15 @@ export const openLightbox = (imgs: LightboxImage[], index: number) => _openLight
 
 function LightboxHost() {
   const [state, setState] = useState<{ imgs: LightboxImage[]; index: number } | null>(null);
-  const [zoom, setZoom] = useState(1); // 1 = fit, 2 = 200%, 3 = 300%
-  useEffect(() => { _openLightbox = (imgs, index) => { setState({ imgs, index }); setZoom(1); }; return () => { _openLightbox = () => {}; }; }, []);
+  const [zoom, setZoom] = useState(1); // 1 = fit; 2/3/4 = 200/300/400% of NATIVE pixels
+  const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => { _openLightbox = (imgs, index) => { setState({ imgs, index }); setZoom(1); setNat(null); }; return () => { _openLightbox = () => {}; }; }, []);
   useEffect(() => {
     if (!state) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setState(null);
-      if (e.key === 'ArrowRight') { setState(s => s && { ...s, index: (s.index + 1) % s.imgs.length }); setZoom(1); }
-      if (e.key === 'ArrowLeft') { setState(s => s && { ...s, index: (s.index - 1 + s.imgs.length) % s.imgs.length }); setZoom(1); }
+      if (e.key === 'ArrowRight') { setState(s => s && { ...s, index: (s.index + 1) % s.imgs.length }); setZoom(1); setNat(null); }
+      if (e.key === 'ArrowLeft') { setState(s => s && { ...s, index: (s.index - 1 + s.imgs.length) % s.imgs.length }); setZoom(1); setNat(null); }
       if (e.key === '+' || e.key === '=') setZoom(z => Math.min(4, z + 1));
       if (e.key === '-') setZoom(z => Math.max(1, z - 1));
     };
@@ -877,20 +878,26 @@ function LightboxHost() {
           onClick={() => { setState(s => s && { ...s, index: (s.index - 1 + s.imgs.length) % s.imgs.length }); setZoom(1); }}
         >‹</button>
         {zoom === 1 ? (
-          <div className="w-full h-full flex items-center justify-center px-16">
+          <div className="absolute inset-0 flex items-center justify-center px-16">
             <img
               src={cur.src} alt={cur.label}
               className="max-h-full max-w-full object-contain cursor-zoom-in"
+              onLoad={e => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
               onClick={() => setZoom(2)}
             />
           </div>
         ) : (
-          // Zoomed: real pixel scaling, scroll to pan. Click cycles 200→300→fit.
-          <div className="w-full h-full overflow-auto">
+          // Zoomed: TRUE pixel scale — width = naturalWidth × zoom, nothing
+          // else may cap it. Scroll to pan; click cycles 200→300→400→fit.
+          <div className="absolute inset-0 overflow-auto">
             <img
               src={cur.src} alt={cur.label}
               className="cursor-zoom-in"
-              style={{ width: `${zoom * 100}%`, maxWidth: 'none', display: 'block', margin: '0 auto' }}
+              style={{
+                width: nat ? `${nat.w * zoom}px` : `${zoom * 100}%`,
+                maxWidth: 'none', maxHeight: 'none', display: 'block', margin: '0 auto',
+              }}
+              onLoad={e => { if (!nat) setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }); }}
               onClick={() => setZoom(z => (z >= 4 ? 1 : z + 1))}
             />
           </div>
