@@ -476,7 +476,9 @@ async function executeRedo(experimentId, exp, entry, resultIndex, override, extr
         });
       } else {
         const target = { storyId: entry.storyId, pageNumber: entry.pageNumber };
-        let params = { ...(exp.params || {}) };
+        // Per-redo extraRule wins over the experiment's stored rule — each
+        // redo is the NEXT attempt in the series.
+        let params = { ...(exp.params || {}), ...(extraRule != null ? { extraRule } : {}) };
         delete params.styleMatrix;
         if (exp.stage === 'image' && entry.artStyle) {
           const empty = await runStageOnTarget('empty_scene', target, { experimentId, params: { artStyleOverride: entry.artStyle } });
