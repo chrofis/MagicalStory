@@ -1350,6 +1350,11 @@ async function runSceneVariantStage(ctx, { experimentId, promptOverride, params 
     storedSceneDescription: ctx.scene.sceneDescription || null,
     extraRule,
     promptOverridden: !!promptOverride,
+    // The IMAGE prompt actually sent to the image model — the contract the
+    // result must fulfil (scene overview at top, interactions at bottom).
+    // Always displayed in full on the card. promptUsed = the Art Director
+    // prompt that produced the scene description (detail view).
+    imagePrompt: img.promptUsed || null,
     promptUsed: prompt,
     elapsedMs: Date.now() - t0,
     modelId: img.modelId || null,
@@ -1772,6 +1777,56 @@ async function runStageOnTarget(stage, target, opts) {
   return runner(ctx, opts);
 }
 
+/**
+ * Genericity check for prompt changes. Prompt rules must be story-agnostic
+ * (archetypes only — "the main character", "a vehicle") because every prompt
+ * runs on every story; a scene-specific rule leaks into unrelated stories.
+ * Two layers:
+ *   1. Name scan — the target story's character / VB entity names must not
+ *      appear in the rule (derived from the story, not a hardcoded list).
+ *   2. Archetype check — a small text-model call flags wording that only
+ *      fits one specific scene even without naming it.
+ * Returns { generic, issues: string[] } — advisory (warn, never block).
+ */
+async function checkRuleGenericity(ruleText, storyId) {
+  const issues = [];
+  const text = String(ruleText || '');
+  if (!text.trim()) return { generic: true, issues };
+  try {
+    if (storyId) {
+      const { storyData } = await loadStoryDataFull(storyId, { rehydrate: false });
+      const names = new Set();
+      for (const c of (storyData.characters || [])) if (c?.name) names.add(String(c.name));
+      const vb = storyData.visualBible || {};
+      for (const pool of [vb.characters, vb.artifacts, vb.animals, vb.vehicles, vb.locations, vb.secondaryCharacters]) {
+        for (const e of (pool || [])) if (e?.name) names.add(String(e.name));
+      }
+      for (const n of names) {
+        if (n.length >= 3 && new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text)) {
+          issues.push(`references story entity "${n}" — prompts must use archetypes, never names`);
+        }
+      }
+    }
+  } catch (e) {
+    log.debug(`[TESTLAB] genericity name scan skipped: ${e.message}`);
+  }
+  try {
+    const { callTextModel } = require('./textModels');
+    const check = await callTextModel(
+      `You review a rule that will be appended to an illustration-prompt template used for EVERY story. Rule:\n"${text}"\nFlag wording that is specific to one story or scene: entity names, place names, plot objects, or phrasing that only applies to a single situation. Broad archetypes (a vehicle, a guard, the main character) are fine. Reply JSON only: {"generic": true|false, "issues": ["..."]}.`,
+      500, null, { usageLabel: 'testlab_genericity' }
+    );
+    const m = String(check.text || '').match(/\{[\s\S]*\}/);
+    if (m) {
+      const parsed = JSON.parse(m[0]);
+      if (parsed && parsed.generic === false && Array.isArray(parsed.issues)) issues.push(...parsed.issues.map(String));
+    }
+  } catch (e) {
+    log.debug(`[TESTLAB] genericity model check skipped: ${e.message}`);
+  }
+  return { generic: issues.length === 0, issues };
+}
+
 module.exports = {
   STAGES: [...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES), ...Object.keys(STORY_STAGES)],
   STORY_STAGES: Object.keys(STORY_STAGES),
@@ -1781,4 +1836,5 @@ module.exports = {
   loadCharacterContext,
   loadTestImage,
   loadActivePageImage,
+  checkRuleGenericity,
 };

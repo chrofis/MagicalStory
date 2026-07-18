@@ -691,6 +691,12 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
           </div>
         </div>
         {detail.error && <div className="text-red-600 text-sm mt-2">{detail.error}</div>}
+        {Array.isArray((detail.params as { genericityWarnings?: string[] })?.genericityWarnings) && (
+          <div className="mt-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+            <b>Genericity check:</b> this prompt change may be story-specific —{' '}
+            {((detail.params as { genericityWarnings?: string[] }).genericityWarnings || []).join('; ')}
+          </div>
+        )}
         {detail.promptOverride && (
           <div className="mt-3">
             <button className="text-xs text-indigo-600 hover:underline" onClick={() => setShowPrompt(v => !v)}>
@@ -974,14 +980,29 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
             </div>
           )}
 
-          {/* Single-variant stage (scene_variant): the rule + the staging
-              headline — the two lines a human compares attempts by. */}
-          {result.variantVersionIndex === undefined && result.extraRule && (
+          {/* Single-variant stage (scene_variant). The image prompt is the
+              CONTRACT: scene overview (top) + interactions (bottom) are the
+              headline; the full prompt is always visible — mandatory. */}
+          {result.variantVersionIndex === undefined && (result.extraRule || result.imagePrompt) && (
             <div className="mt-3 space-y-2">
-              <div className="text-xs font-mono text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5 whitespace-pre-wrap">+ {result.extraRule}</div>
+              {result.extraRule && (
+                <div className="text-xs font-mono text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5 whitespace-pre-wrap">+ {result.extraRule}</div>
+              )}
+              {result.imagePrompt && (() => {
+                const depicts = result.imagePrompt.match(/THIS IMAGE DEPICTS:\*{0,2}\s*([^\n]+)/)?.[1]?.trim();
+                return depicts ? (
+                  <div className="text-sm bg-indigo-50 rounded-lg px-2 py-1.5 font-medium text-indigo-900">{depicts}</div>
+                ) : null;
+              })()}
               {result.newSceneDescription && (
                 <div className="text-xs bg-indigo-50 rounded-lg px-2 py-1.5">
-                  <span className="font-semibold text-indigo-700">Staging:</span> {sceneHeadline(result.newSceneDescription)}
+                  <span className="font-semibold text-indigo-700">Interactions:</span> {sceneHeadline(result.newSceneDescription)}
+                </div>
+              )}
+              {result.imagePrompt && (
+                <div>
+                  <div className="text-xs font-medium text-gray-500 mb-1">Full image prompt sent</div>
+                  <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto overflow-y-auto max-h-80 whitespace-pre-wrap">{result.imagePrompt}</pre>
                 </div>
               )}
             </div>

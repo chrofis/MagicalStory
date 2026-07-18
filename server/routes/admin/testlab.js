@@ -309,10 +309,29 @@ router.post('/experiments', async (req, res) => {
     if (targets.length === 0) { experimentRunning = false; return res.status(400).json({ error: 'No valid targets' }); }
     if (targets.length > 25) { experimentRunning = false; return res.status(400).json({ error: 'Max 25 targets per experiment' }); }
 
+    // Genericity gate (advisory): every prompt change — override or extra
+    // rule — is checked for story-specific leakage against the first target
+    // story's entity names + an archetype check. Warnings persist on the
+    // experiment and surface in the UI; creation is never blocked.
+    let genericity = null;
+    const ruleText = params?.extraRule || promptOverride;
+    if (ruleText) {
+      try {
+        const { checkRuleGenericity } = require('../../lib/testlab');
+        genericity = await checkRuleGenericity(ruleText, targets[0]?.storyId || null);
+        if (!genericity.generic) {
+          log.warn(`[TESTLAB] genericity warnings for new experiment: ${genericity.issues.join(' | ')}`);
+        }
+      } catch (gErr) {
+        log.debug(`[TESTLAB] genericity check failed (continuing): ${gErr.message}`);
+      }
+    }
+    const paramsToStore = { ...(params || {}), ...(genericity && !genericity.generic ? { genericityWarnings: genericity.issues } : {}) };
+
     const rows = await dbQuery(
       `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by)
        VALUES ($1, $2, $3, $4, 'running', $5, $6) RETURNING id`,
-      [stage, label || null, promptOverride || null, JSON.stringify(params || {}), JSON.stringify(targets), req.user.username || String(req.user.id)]
+      [stage, label || null, promptOverride || null, JSON.stringify(paramsToStore), JSON.stringify(targets), req.user.username || String(req.user.id)]
     );
     const experimentId = rows[0].id;
 
@@ -325,7 +344,7 @@ router.post('/experiments', async (req, res) => {
     });
 
     log.info(`[TESTLAB] Experiment ${experimentId} started: stage=${stage}, targets=${targets.length}, override=${promptOverride ? 'yes' : 'no'}`);
-    res.json({ id: experimentId, stage, targets });
+    res.json({ id: experimentId, stage, targets, ...(genericity && !genericity.generic ? { genericityWarnings: genericity.issues } : {}) });
   } catch (err) {
     // Release the slot only if the runner never started (its finally owns it after).
     if (!runnerStarted) experimentRunning = false;
