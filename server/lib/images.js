@@ -3982,15 +3982,34 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
             .resize({ height: STRIP_H - LABEL_H })
             .png().toBuffer();
           const cutMeta = await sharp(cut).metadata();
-          tiles.push({ png: cut, w: cutMeta.width, name: fig.name || `Figure ${i + 1}` });
+          tiles.push({ png: cut, w: cutMeta.width, name: fig.name || `Figure ${i + 1}`, named: !!(fig.name && fig.name !== 'UNKNOWN') });
         }
         if (tiles.length > 0) {
           const stripW = width;
+          // Named characters lead the strip — on crowd pages the row must
+          // never cut off a named figure in favour of background UNKNOWNs.
+          tiles.sort((a, b) => Number(b.named) - Number(a.named));
+          // Shrink-to-fit instead of dropping: scale every tile by the same
+          // factor so all cutouts stay visible (floor 35% to keep them
+          // recognisable; below that the smallest UNKNOWNs are dropped).
+          const totalW = tiles.reduce((s, t) => s + t.w, 0) + GAP * (tiles.length + 1);
+          let scale = Math.min(1, (stripW - GAP * (tiles.length + 1)) / Math.max(1, tiles.reduce((s, t) => s + t.w, 0)));
+          while (scale < 0.35 && tiles.length > 1 && !tiles[tiles.length - 1].named) {
+            tiles.pop();
+            scale = Math.min(1, (stripW - GAP * (tiles.length + 1)) / Math.max(1, tiles.reduce((s, t) => s + t.w, 0)));
+          }
+          if (scale < 1) {
+            for (const t of tiles) {
+              const h = Math.max(24, Math.round((STRIP_H - LABEL_H) * scale));
+              t.png = await sharp(t.png).resize({ height: h }).png().toBuffer();
+              t.w = (await sharp(t.png).metadata()).width;
+            }
+          }
           let cursor = GAP;
           const comps = [];
           const labelSvg = [`<svg width="${stripW}" height="${STRIP_H}" xmlns="http://www.w3.org/2000/svg">`];
           for (const t of tiles) {
-            if (cursor + t.w > stripW) break; // strip full — remaining tiles skipped
+            if (cursor + t.w > stripW) break; // safety — should not trigger after scaling
             comps.push({ input: t.png, left: cursor, top: GAP });
             labelSvg.push(`<text x="${cursor + 4}" y="${STRIP_H - 6}" font-family="Arial" font-size="14" font-weight="bold" fill="white">${escapeXml(t.name)}</text>`);
             cursor += t.w + GAP;
