@@ -1602,30 +1602,11 @@ async function fetchMaskWithRetry(buf, box, tries = 5, opts = {}) {
  * the head). Returns a binarized white-on-transparent PNG at cropW×cropH.
  */
 async function fetchFaceHeadMask(buf, faceBox, cropW, cropH) {
-  const sharp = require('sharp');
-  const bcx = Math.round((faceBox[0] + faceBox[2]) / 2);
-  const bh = faceBox[3] - faceBox[1];
-  const points = { points: [[bcx, Math.round(faceBox[1] + bh * 0.5)], [bcx, Math.round(faceBox[1] + bh * 0.15)]] };
-  const hairBox = [faceBox[0], faceBox[1], faceBox[2], Math.round(faceBox[1] + bh * 0.55)];
-  const [m1, m2] = await Promise.all([
-    fetchMaskWithRetry(buf, faceBox, 5, points),
-    fetchMaskWithRetry(buf, hairBox, 2),
-  ]);
-  if (!m1 && !m2) return null;
-  const n = cropW * cropH;
-  const decode = async (png) => {
-    if (!png) return null;
-    const raw = await sharp(png).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
-    const s = Math.max(1, Math.round(raw.length / n));
-    const out = Buffer.alloc(n);
-    for (let i = 0; i < n; i++) out[i] = raw[i * s] > 128 ? 255 : 0;
-    return out;
-  };
-  const [a1, a2] = await Promise.all([decode(m1), decode(m2)]);
-  const merged = Buffer.alloc(n);
-  for (let i = 0; i < n; i++) merged[i] = Math.max(a1 ? a1[i] : 0, a2 ? a2[i] : 0);
-  return sharp(Buffer.alloc(n * 3, 255), { raw: { width: cropW, height: cropH, channels: 3 } })
-    .ensureAlpha().joinChannel(merged, { raw: { width: cropW, height: cropH, channels: 1 } }).png().toBuffer();
+  // Shared implementation lives in images.js (production's blended-face
+  // whiteout uses the identical logic); the Test Lab injects its retry-aware
+  // fetcher for post-deploy SAM cold starts.
+  const { fetchFaceHeadMaskPng } = require('./images');
+  return fetchFaceHeadMaskPng(buf, faceBox, cropW, cropH, (b, box, opts) => fetchMaskWithRetry(b, box, 3, opts));
 }
 
 async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null }) {

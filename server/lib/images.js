@@ -10002,6 +10002,41 @@ async function fetchSilhouettePng(cropJpegBuffer) {
  * backend value, falls back to the rembg silhouette (fetchSilhouettePng),
  * which masks every salient figure in the crop.
  */
+/**
+ * Head mask (face INCLUDING hair) for face repairs. MobileSAM box prompts
+ * anchor on the face and segment hair as a separate object — so union TWO
+ * prompts: the face box (with face+hair positive points) and a dedicated
+ * hair box (upper 55% of the head). Returns a BINARIZED white-on-transparent
+ * PNG at outW×outH, or null when no mask is available.
+ * maskFetch is injectable so callers with retry policies (Test Lab) reuse
+ * this exact logic.
+ */
+async function fetchFaceHeadMaskPng(cropJpegBuffer, faceBoxInCrop, outW, outH, maskFetch = fetchFigureMaskPng) {
+  const bcx = Math.round((faceBoxInCrop[0] + faceBoxInCrop[2]) / 2);
+  const bh = faceBoxInCrop[3] - faceBoxInCrop[1];
+  const points = { points: [[bcx, Math.round(faceBoxInCrop[1] + bh * 0.5)], [bcx, Math.round(faceBoxInCrop[1] + bh * 0.15)]] };
+  const hairBox = [faceBoxInCrop[0], faceBoxInCrop[1], faceBoxInCrop[2], Math.round(faceBoxInCrop[1] + bh * 0.55)];
+  const [m1, m2] = await Promise.all([
+    maskFetch(cropJpegBuffer, faceBoxInCrop, points),
+    maskFetch(cropJpegBuffer, hairBox, {}),
+  ]);
+  if (!m1 && !m2) return null;
+  const n = outW * outH;
+  const decode = async (png) => {
+    if (!png) return null;
+    const raw = await sharp(png).resize(outW, outH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+    const s = Math.max(1, Math.round(raw.length / n));
+    const out = Buffer.alloc(n);
+    for (let i = 0; i < n; i++) out[i] = raw[i * s] > 128 ? 255 : 0;
+    return out;
+  };
+  const [a1, a2] = await Promise.all([decode(m1), decode(m2)]);
+  const merged = Buffer.alloc(n);
+  for (let i = 0; i < n; i++) merged[i] = Math.max(a1 ? a1[i] : 0, a2 ? a2[i] : 0);
+  return sharp(Buffer.alloc(n * 3, 255), { raw: { width: outW, height: outH, channels: 3 } })
+    .ensureAlpha().joinChannel(merged, { raw: { width: outW, height: outH, channels: 1 } }).png().toBuffer();
+}
+
 async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop, opts = {}) {
   const backend = CONFIG_DEFAULTS.figureMaskBackend || 'rembg';
   if (backend === 'mobilesam' && Array.isArray(boxInCrop) && boxInCrop.length === 4) {
@@ -10563,8 +10598,17 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         let composite = { input: blurred, left: fLeft, top: fTop };
         let mode = 'rect';
         if (shapeAware) {
-          // Same shared helper the inpaint branch uses — one source of truth.
-          const silhouettePng = await fetchSilhouettePng(cropJpeg);
+          // Head mask = SAM face-box ∪ hair-box union (rembg silhouettes
+          // missed the hair — the whiteout excluded it and Grok could not
+          // repaint hair color). Fallback: legacy rembg silhouette.
+          const innerFaceBox = [
+            Math.max(0, Math.round(fxmin * sceneMeta.width) - fLeft),
+            Math.max(0, Math.round(fymin * sceneMeta.height) - fTop),
+            Math.min(fWidth, Math.round(fxmax * sceneMeta.width) - fLeft),
+            Math.min(fHeight, Math.round(fymax * sceneMeta.height) - fTop),
+          ];
+          const silhouettePng = await fetchFaceHeadMaskPng(cropJpeg, innerFaceBox, fWidth, fHeight)
+            || await fetchSilhouettePng(cropJpeg);
           if (silhouettePng) {
             const blurredWithAlpha = await sharp(blurred)
               .ensureAlpha()
@@ -16032,6 +16076,7 @@ module.exports = {
   // Two-stage bounding box detection
   detectAllBoundingBoxes,
   fetchFigureMaskPng,
+  fetchFaceHeadMaskPng,
   detectSubRegion,  // Sub-region detection for targeted repairs (shoes, shirt, hands, etc.)
   createBboxOverlayImage,  // Create overlay image with boxes drawn
   getBboxCacheStats, // Telemetry for the content-hashed bbox cache
