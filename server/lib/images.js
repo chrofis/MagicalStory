@@ -9203,7 +9203,29 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const sceneCharacters = getCharactersInScene(newSceneDescription, characters);
 
   // Extract metadata from the new scene description for per-character clothing
-  const newSceneMetadata = extractSceneMetadata(newSceneDescription);
+  let newSceneMetadata = extractSceneMetadata(newSceneDescription);
+
+  // GUARD: the rewrite may DROP objects but never introduce VB entities the
+  // original scene didn't have. Observed: an iterate swapped the scene's
+  // vehicle for an unrelated statue in objects[] — the prompt builder then
+  // resolved the id and the model painted a statue into the scene. Compare
+  // by base id (LOC002.1 → LOC002); scrub invalid entries from the metadata
+  // JSON inside the description so every downstream re-extraction agrees.
+  const origObjects = (savedScene.sceneMetadata?.objects || savedScene.sceneMetadata?.fullData?.objects || []);
+  if (origObjects.length > 0 && Array.isArray(newSceneMetadata?.objects)) {
+    const baseId = (o) => String(o).trim().toUpperCase().split('.')[0];
+    const allowed = new Set(origObjects.map(baseId));
+    const invalid = newSceneMetadata.objects.filter(o => /^[A-Z]{3}\d{3}/i.test(String(o).trim()) && !allowed.has(baseId(o)));
+    if (invalid.length > 0) {
+      const kept = newSceneMetadata.objects.filter(o => !invalid.includes(o));
+      log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite introduced foreign VB objects ${JSON.stringify(invalid)} — removed (original scene objects: ${JSON.stringify(origObjects)})`);
+      const objRe = /"objects"\s*:\s*\[[^\]]*\]/;
+      if (objRe.test(newSceneDescription)) {
+        newSceneDescription = newSceneDescription.replace(objRe, `"objects": ${JSON.stringify(kept)}`);
+        newSceneMetadata = extractSceneMetadata(newSceneDescription);
+      }
+    }
+  }
 
   // Resolve clothing. The stored pageClothing was set by the unified Sonnet
   // call at generation time and reflects the canonical per-page costume

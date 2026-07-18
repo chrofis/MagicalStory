@@ -1021,6 +1021,11 @@ async function runIterateStage(ctx, { experimentId, params = {} }) {
   return {
     imageType: 'scene', versionIndex, elapsedMs, modelId: result.modelId || null,
     promptUsed: result.imagePrompt || null,
+    // Contract display (mandatory): the IMAGE prompt actually sent for this
+    // result, plus the ORIGINAL page's image prompt so the card can show
+    // both contracts (DEPICTS + EXACT POSES) side by side.
+    imagePrompt: result.imagePrompt || null,
+    baselinePrompt: ctx.scene.prompt || null,
     newSceneDescription: result.newScene || null,
   };
 }

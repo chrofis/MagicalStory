@@ -125,6 +125,7 @@ export interface ExperimentResult {
   newSceneDescriptionB?: string | null;
   extraRule?: string | null;
   imagePrompt?: string | null;
+  baselinePrompt?: string | null;
   promptUsedA?: string | null;
   promptUsedB?: string | null;
   versions?: unknown[];

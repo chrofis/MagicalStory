@@ -1118,29 +1118,45 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
               verbatim from the prompt that was sent. Everything else (rule,
               full prompt) toggles. */}
           {result.variantVersionIndex === undefined && (result.extraRule || result.imagePrompt) && (() => {
-            const depicts = result.imagePrompt?.match(/THIS IMAGE DEPICTS:\*{0,2}\s*([^\n]+)/)?.[1]?.trim();
-            const poses = result.imagePrompt?.match(/EXACT POSES:\s*\n((?:\s*-[^\n]*\n?)+)/)?.[1]?.trimEnd();
+            const contract = (p: string | null | undefined) => ({
+              depicts: p?.match(/THIS IMAGE DEPICTS:\*{0,2}\s*([^\n]+)/)?.[1]?.trim(),
+              poses: p?.match(/EXACT POSES:\s*\n((?:\s*-[^\n]*\n?)+)/)?.[1]?.trimEnd(),
+            });
+            const now = contract(result.imagePrompt);
+            const base = contract(result.baselinePrompt);
+            const block = (label: string, c: { depicts?: string; poses?: string }, tone: string) => (
+              (c.depicts || c.poses) ? (
+                <div className={`rounded-lg px-3 py-2 ${tone}`}>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide opacity-60 mb-1">{label}</div>
+                  {c.depicts && <div className="text-sm"><b>THIS IMAGE DEPICTS:</b> {c.depicts}</div>}
+                  {c.poses && <pre className="text-sm whitespace-pre-wrap font-sans mt-1"><b>EXACT POSES:</b>{'\n'}{c.poses}</pre>}
+                </div>
+              ) : null
+            );
             return (
               <div className="mt-3 space-y-2">
-                {depicts && (
-                  <div className="text-sm bg-indigo-50 rounded-lg px-3 py-2 text-indigo-900">
-                    <b>THIS IMAGE DEPICTS:</b> {depicts}
-                  </div>
-                )}
-                {poses && (
-                  <pre className="text-sm bg-indigo-50 rounded-lg px-3 py-2 text-indigo-900 whitespace-pre-wrap font-sans"><b>EXACT POSES:</b>{'\n'}{poses}</pre>
-                )}
-                {!depicts && !poses && result.imagePrompt && (
+                {block('Original contract', base, 'bg-gray-50 text-gray-800')}
+                {block('New contract (this result)', now, 'bg-indigo-50 text-indigo-900')}
+                {!now.depicts && !now.poses && result.imagePrompt && (
                   <div className="text-xs text-red-600">Prompt sent without DEPICTS/EXACT POSES sections — contract violation, inspect the full prompt below.</div>
                 )}
                 <details className="text-xs">
-                  <summary className="cursor-pointer text-indigo-600">Rule + full prompt</summary>
+                  <summary className="cursor-pointer text-indigo-600">Rule + full prompts</summary>
                   <div className="mt-1 space-y-2">
                     {result.extraRule && (
                       <div className="font-mono text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1.5 whitespace-pre-wrap">+ {result.extraRule}</div>
                     )}
                     {result.imagePrompt && (
-                      <pre className="bg-gray-50 rounded-lg p-3 overflow-x-auto overflow-y-auto max-h-80 whitespace-pre-wrap">{result.imagePrompt}</pre>
+                      <div>
+                        <div className="font-medium text-gray-500 mb-1">Full image prompt sent (this result)</div>
+                        <pre className="bg-gray-50 rounded-lg p-3 overflow-x-auto overflow-y-auto max-h-80 whitespace-pre-wrap">{result.imagePrompt}</pre>
+                      </div>
+                    )}
+                    {result.baselinePrompt && (
+                      <div>
+                        <div className="font-medium text-gray-500 mb-1">Full image prompt (original)</div>
+                        <pre className="bg-gray-50 rounded-lg p-3 overflow-x-auto overflow-y-auto max-h-80 whitespace-pre-wrap">{result.baselinePrompt}</pre>
+                      </div>
                     )}
                   </div>
                 </details>
