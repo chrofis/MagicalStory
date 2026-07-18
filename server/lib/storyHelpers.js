@@ -4071,7 +4071,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
  * @param {Object} rawOutlineContext - Optional: raw outline blocks {previousPages: string, currentPage: string} - skips complex parsing
  */
 function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '', availableAvatars = '', rawOutlineContext = null, previewFeedback = null, options = {}) {
-  const { freeIterate = false, textInImage = false } = options;
+  const { freeIterate = false, textInImage = false, extraRule = null } = options;
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];
@@ -4246,9 +4246,12 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
 
   // Use template from file if available. freeIterate switches to the looser
   // template (cast can change, scene can be reframed) — see scene-iteration-free.txt.
-  const activeTemplate = freeIterate
+  // extraRule: Test-Lab rule experiments append to the template here (no
+  // global PROMPT_TEMPLATES swap — safe under concurrency).
+  const baseTemplate = freeIterate
     ? (PROMPT_TEMPLATES.sceneIterationFree || PROMPT_TEMPLATES.sceneDescriptions)
     : PROMPT_TEMPLATES.sceneDescriptions;
+  const activeTemplate = baseTemplate && extraRule ? `${baseTemplate}\n${extraRule}` : baseTemplate;
   if (activeTemplate) {
     // Get the full language instruction with spelling rules (e.g., 'Write in German with Swiss spelling. Use ä,ö,ü...')
     const languageInstruction = getLanguageInstruction(language);

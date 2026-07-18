@@ -982,6 +982,9 @@ async function runIterateStage(ctx, { experimentId, params = {} }) {
     useOriginalAsReference: params.useOriginalAsReference === true,
     freeIterate: params.freeIterate === true,
     aspectRatio: ctx.layout?.imageAspect || null,
+    // Rule experiment: appended to the scene-iteration template (per-call,
+    // no global swap).
+    sceneExtraRule: params.sceneExtraRule || null,
   });
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('iterate produced no image');

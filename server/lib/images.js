@@ -9131,7 +9131,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     availableAvatars,
     null,  // rawOutlineContext
     previewFeedback,  // The actual image analysis feedback!
-    { freeIterate, textInImage: iterateTextInImage }
+    { freeIterate, textInImage: iterateTextInImage, extraRule: options.sceneExtraRule || null }
   );
 
   // Step 4: Call Claude to run 18 checks and generate corrected scene (uses iteration model).
