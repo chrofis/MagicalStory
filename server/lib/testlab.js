@@ -1483,6 +1483,22 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // (same trick Grok blended repair uses) — turns "replace" into "paint into
   // the white gap", the operation Qwen actually performs faithfully. Plain
   // replace-wording made the model re-imagine the whole crop (exp #11/#12).
+  // Figure-mask fetch with warm-up retries: the Python service lazy-loads
+  // MobileSAM (~90s cold after a deploy) against a 30s HTTP timeout — the
+  // first call after a restart reliably times out. Retry while it warms.
+  const fetchMaskWithRetry = async (buf, box, tries = 3) => {
+    const { fetchFigureMaskPng } = require('./images');
+    for (let i = 0; i < tries; i++) {
+      const m = await fetchFigureMaskPng(buf, box);
+      if (m) return m;
+      if (i < tries - 1) {
+        log.info(`[TESTLAB] figure mask unavailable (attempt ${i + 1}/${tries}) — waiting for model warm-up`);
+        await new Promise(r => setTimeout(r, 10000));
+      }
+    }
+    return null;
+  };
+
   let sentBuf = cropBuf;
   let whiteoutApplied = false;
   let oldMaskPng = null; // SAM silhouette of the ORIGINAL figure — reused for the blend
@@ -1496,7 +1512,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
         Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
       ];
-      oldMaskPng = await fetchFigureMaskPng(cropBuf, boxInCrop);
+      oldMaskPng = await fetchMaskWithRetry(cropBuf, boxInCrop);
       if (oldMaskPng) {
         sentBuf = await sharp(cropBuf).composite([{ input: oldMaskPng, left: 0, top: 0 }]).jpeg({ quality: 95 }).toBuffer();
         whiteoutApplied = true;
@@ -1554,8 +1570,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // SAM is unavailable.
   if ((params.pasteMode || 'figure') === 'figure' && params.repairMode && oldMaskPng && boxInCrop) {
     try {
-      const { fetchFigureMaskPng } = require('./images');
-      const newMaskPng = await fetchFigureMaskPng(back, boxInCrop);
+      const newMaskPng = await fetchMaskWithRetry(back, boxInCrop);
       if (newMaskPng) {
         const raw1 = { raw: { width: crop.w, height: crop.h, channels: 1 } };
         const oldA = await sharp(oldMaskPng).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
