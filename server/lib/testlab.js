@@ -2257,6 +2257,26 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   crop.w = Math.min(W - crop.x, crop.w);
   crop.h = Math.min(H - crop.y, crop.h);
 
+  // Snap the crop to the nearest STANDARD aspect. Grok's edit API only accepts
+  // named ratios (1:1, 3:4, …) and its output takes the slot-0 input aspect;
+  // Qwen is aspect-agnostic. Snapping BOTH keeps the Grok-vs-Qwen inputs
+  // identical and the paste-back (resize to crop.w×crop.h) undistorted. Expand
+  // the crop to the target ratio (never crop content), re-center, clamp.
+  {
+    const STD = [[1, 1], [3, 4], [4, 3], [2, 3], [3, 2], [9, 16], [16, 9]];
+    const cr = crop.w / crop.h;
+    let best = STD[0], bd = Infinity;
+    for (const [a, b] of STD) { const d = Math.abs(Math.log((a / b) / cr)); if (d < bd) { bd = d; best = [a, b]; } }
+    params._grokAspect = `${best[0]}:${best[1]}`;
+    const tr = best[0] / best[1];
+    let nw = crop.w, nh = crop.h;
+    if (cr > tr) nh = Math.round(crop.w / tr); else nw = Math.round(crop.h * tr);
+    if (nw <= W && nh <= H) {
+      let nx = Math.round(crop.x + crop.w / 2 - nw / 2), ny = Math.round(crop.y + crop.h / 2 - nh / 2);
+      crop = { x: Math.max(0, Math.min(W - nw, nx)), y: Math.max(0, Math.min(H - nh, ny)), w: nw, h: nh };
+    }
+  }
+
   const cropBuf = await sharp(baseBuf).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).jpeg({ quality: 95 }).toBuffer();
 
   // Repair mode: white-out the target figure's SILHOUETTE inside the crop
@@ -2438,7 +2458,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // aspect keeps the output geometry identical to Qwen's rw:rh; everything
   // downstream (SAM re-detect, union blend, colour-aware correction) is shared.
   const result = params.backend === 'grok'
-    ? await require('./grok').editWithGrok(prompt, qwenRefs, { aspectRatio: `${crop.w}:${crop.h}`, resolution: '1k' })
+    ? await require('./grok').editWithGrok(prompt, qwenRefs, { aspectRatio: params._grokAspect || '3:4', resolution: '1k' })
     : await editWithQwen(prompt, qwenRefs, { width: rw, height: rh });
   const elapsedMs = Date.now() - t0;
 
