@@ -2147,24 +2147,37 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
       log.warn(`[TESTLAB] colour correction skipped (${err.message})`);
     }
   }
-  // Red zone + outer margin → diffused scene background. Exclude BOTH the new
-  // figure (newDil) AND the OLD figure (oldA) as fill sources — otherwise the
-  // fill diffuses the OLD skin around e.g. the old profile's nose and leaves a
-  // skin-toned ghost ("2nd nose"). Excluding both heads, the fill sources only
-  // TRUE scene background, so the old profile is cleanly covered.
+  // Red zone = where the OLD head mask was but the NEW one isn't. The model
+  // repainted this area (usually coherent face/scene — e.g. the crisp chin the
+  // round-2 mask missed by a few px), so KEEP the model's pixels here — there is
+  // no better source. ONLY where the model left GARBAGE (unfilled whiteout white
+  // or a black fill) do we diffuse the TRUE scene background in, so garbage gets
+  // a surrounding-matched colour instead of a white/black halo. Blanket-filling
+  // the whole red zone (the old behaviour) smeared over the good chin.
+  // figExclude = both heads → the diffusion sources only real background, never
+  // the old skin (which would ghost a "2nd nose").
   if (redZonePx > 0) {
     const figExclude = Buffer.alloc(n);
     for (let i = 0; i < n; i++) figExclude[i] = (newDil[i] > 128 || oldA[i * s1r] > 128) ? 255 : 0;
-    const bg = harmonicBackgroundFill(origRaw, redZone, figExclude, cropW, cropH);
-    for (let i = 0; i < n; i++) { if (redZone[i]) { pasteRaw[i * 3] = bg[i * 3]; pasteRaw[i * 3 + 1] = bg[i * 3 + 1]; pasteRaw[i * 3 + 2] = bg[i * 3 + 2]; } }
-    if (colorInfo) colorInfo.redZonePx = redZonePx;
+    const garbage = Buffer.alloc(n);
+    let garbagePx = 0;
+    for (let i = 0; i < n; i++) {
+      if (!redZone[i]) continue;
+      const r = pasteRaw[i * 3], g = pasteRaw[i * 3 + 1], b = pasteRaw[i * 3 + 2];
+      if ((r > 235 && g > 235 && b > 235) || (r < 22 && g < 22 && b < 22)) { garbage[i] = 255; garbagePx++; }
+    }
+    if (garbagePx > 0) {
+      const bg = harmonicBackgroundFill(origRaw, garbage, figExclude, cropW, cropH);
+      for (let i = 0; i < n; i++) { if (garbage[i]) { pasteRaw[i * 3] = bg[i * 3]; pasteRaw[i * 3 + 1] = bg[i * 3 + 1]; pasteRaw[i * 3 + 2] = bg[i * 3 + 2]; } }
+    }
+    if (colorInfo) { colorInfo.redZonePx = redZonePx; colorInfo.garbagePx = garbagePx; }
   }
   const pasteBuf = await sharp(pasteRaw, { raw: { width: cropW, height: cropH, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
   // Applied view: exactly what gets pasted (colour-corrected figure + filled bg).
   const ccCut = await sharp(pasteBuf).ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer();
   const ccVis = await sharp({ create: { width: cropW, height: cropH, channels: 3, background: { r: 30, g: 30, b: 30 } } })
     .composite([{ input: ccCut }]).jpeg().toBuffer();
-  await addStep(`pasted region (colour${colorInfo ? ` ΔE ${colorInfo.deltaEBefore}, seam ${colorInfo.seamBefore}→${colorInfo.seamAfter}` : ' n/a'}${redZonePx ? `, ${redZonePx}px bg-fill` : ''})`, `data:image/jpeg;base64,${ccVis.toString('base64')}`);
+  await addStep(`pasted region (colour${colorInfo ? ` ΔE ${colorInfo.deltaEBefore}, seam ${colorInfo.seamBefore}→${colorInfo.seamAfter}` : ' n/a'}${redZonePx ? `, red-zone ${redZonePx}px kept from model, ${colorInfo?.garbagePx ?? 0}px garbage bg-filled` : ''})`, `data:image/jpeg;base64,${ccVis.toString('base64')}`);
 
   const feathered = await sharp(pasteBuf).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
   return { feathered, iou, redPx, colorInfo, blendRule: BLEND_RULE_VERSION };
