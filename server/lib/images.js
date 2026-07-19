@@ -10323,7 +10323,7 @@ function _seamDeltaE(resultRaw, originalRaw, maskBin, w, h) {
  * After, seamDeltaEBefore/After, histogramRaw }.
  */
 async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, width, height, opts = {}) {
-  const { strength = 0.9, minDeltaE = 4, bins = 128, refMask = null, borderMatch = true, borderIters = 500 } = opts;
+  const { strength = 0.9, minDeltaE = 4, bins = 128, refMask = null, borderMatch = true, borderIters = 500, meanShift = false } = opts;
   const n = width * height;
   const toRaw = async (buf) => (Buffer.isBuffer(buf) && buf.length === n * 3) ? buf : sharp(buf).resize(width, height, { fit: 'fill' }).removeAlpha().raw().toBuffer();
   const O = await toRaw(originalCropBuf);
@@ -10350,12 +10350,19 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
   const deltaEBefore = _deltaE(mo, mc);
   const out = Buffer.from(C);
   if (deltaEBefore < minDeltaE) return { applied: false, deltaEBefore: +deltaEBefore.toFixed(2), reason: 'below threshold', correctedRaw: out };
-  const lut = [0, 1, 2].map(ch => _ccMatchLUT(srcHist[ch], refHist[ch], ch, bins));
+  // meanShift: move the whole face in ONE direction — a single uniform LAB
+  // offset (mean original − mean candidate), no per-pixel distribution
+  // reshaping. This shifts the tone to match the scene without distorting the
+  // face. Default (histogram) reshapes each channel's distribution — heavier.
+  const off = [mo[0] - mc[0], mo[1] - mc[1], mo[2] - mc[2]];
+  const lut = meanShift ? null : [0, 1, 2].map(ch => _ccMatchLUT(srcHist[ch], refHist[ch], ch, bins));
   for (let i = 0; i < n; i++) {
     if (mCand[i] <= 128) continue;
     const lab = [candLab[i * 3], candLab[i * 3 + 1], candLab[i * 3 + 2]];
     const nl = [0, 0, 0];
-    for (let ch = 0; ch < 3; ch++) { const mapped = lut[ch][_ccQuant(lab[ch], ch, bins)]; nl[ch] = lab[ch] + strength * (mapped - lab[ch]); }
+    for (let ch = 0; ch < 3; ch++) {
+      nl[ch] = meanShift ? lab[ch] + strength * off[ch] : lab[ch] + strength * (lut[ch][_ccQuant(lab[ch], ch, bins)] - lab[ch]);
+    }
     const rgb = _labToRgb(nl[0], nl[1], nl[2]);
     out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2];
   }

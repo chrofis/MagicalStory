@@ -2090,7 +2090,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
       // transition is handled separately by the background-fill on the red zone
       // + margin, which never touches the figure. Pass-2 diffusion ran the
       // offset into the face interior (altering it) — that's wrong.
-      const cc = await correctColorShift(origRaw, pasteRaw, Buffer.from(newDil), cropW, cropH, { refMask: refMaskBin, borderMatch: false });
+      const cc = await correctColorShift(origRaw, pasteRaw, Buffer.from(newDil), cropW, cropH, { refMask: refMaskBin, borderMatch: false, meanShift: true });
       if (cc.applied) {
         pasteRaw = Buffer.from(cc.correctedRaw);
         colorInfo = { deltaEBefore: cc.deltaEBefore, seamBefore: cc.seamDeltaEBefore, seamAfter: cc.seamDeltaEAfter };
