@@ -1074,10 +1074,27 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
   // compositeCovers: default false (direct render). Pass params.composite=true
   // to test the cutout+plate composite path (3+ figures / realistic styles —
   // see docs/image-routing.md direct-vs-composite rule).
+  // params.backgroundStoryId + params.backgroundPage: BORROW an empty_scene
+  // plate from any story as the composite background, so the composite path can
+  // run on a landmark-less story (else it silently falls back to direct).
+  // params.artStyle: override the story's art style for the render (e.g. 'oil').
+  let landmarkBufOverride = null;
+  if (params.composite === true && params.backgroundStoryId && params.backgroundPage != null) {
+    const bgRows = await dbQuery(
+      "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type='empty_scene' AND page_number=$2 ORDER BY version_index DESC LIMIT 1",
+      [params.backgroundStoryId, params.backgroundPage]);
+    const bg = bgRows[0];
+    if (!bg) throw new Error(`no empty_scene plate for story ${params.backgroundStoryId} p${params.backgroundPage}`);
+    landmarkBufOverride = bg.image_url
+      ? Buffer.from(await (await fetch(bg.image_url)).arrayBuffer())
+      : Buffer.from(bg.image_data, 'base64');
+  }
+  if (params.artStyle) storyData.artStyle = params.artStyle;
   const result = await iterateCover(coverKey, storyData, {
     imageModel: MODEL_DEFAULTS.coverImage,
     freshCharacters,
     compositeCovers: params.composite === true,
+    landmarkBufOverride,
     promptTemplateOverride: promptOverride || null,
   });
   const elapsedMs = Date.now() - t0;
@@ -2068,7 +2085,12 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
       // glow/red zone can't skew it.
       const refMaskBin = Buffer.alloc(n);
       for (let i = 0; i < n; i++) refMaskBin[i] = oldA[i * s1r] > 128 ? 255 : 0;
-      const cc = await correctColorShift(origRaw, pasteRaw, Buffer.from(newDil), cropW, cropH, { refMask: refMaskBin });
+      // borderMatch:false — do NOT diffuse the seam offset into the face. The
+      // face gets ONLY the histogram tone match (whole-head-to-scene). The edge
+      // transition is handled separately by the background-fill on the red zone
+      // + margin, which never touches the figure. Pass-2 diffusion ran the
+      // offset into the face interior (altering it) — that's wrong.
+      const cc = await correctColorShift(origRaw, pasteRaw, Buffer.from(newDil), cropW, cropH, { refMask: refMaskBin, borderMatch: false });
       if (cc.applied) {
         pasteRaw = Buffer.from(cc.correctedRaw);
         colorInfo = { deltaEBefore: cc.deltaEBefore, seamBefore: cc.seamDeltaEBefore, seamAfter: cc.seamDeltaEAfter };
@@ -2488,6 +2510,28 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   let feathered;
   let colorInfo = null;
 
+  // Round-2 figure re-detect on the FULL PAGE: composite the candidate crop back
+  // into the page, run DINO 'person' on the whole image, pick the person box
+  // that CONTAINS the target face, map it to crop coords. The full page has
+  // scene context so DINO separates the figures cleanly — on the cutout it
+  // grabbed a bigger neighbour (exp #129: the monk → IoU 0%). Falls back to the
+  // copied original box if no person contains the face.
+  params._r2BodyBox = null;
+  if (params._faceMode && figureBox) {
+    try {
+      const { detectPersonBoxInCrop } = require('./images');
+      const candFull = await sharp(baseBuf).composite([{ input: back, left: crop.x, top: crop.y }]).jpeg({ quality: 92 }).toBuffer();
+      const facePagePx = [Math.round(figureBox[1] * W), Math.round(figureBox[0] * H), Math.round(figureBox[3] * W), Math.round(figureBox[2] * H)];
+      const pageBox = await detectPersonBoxInCrop(candFull, facePagePx, `testlab-P${ctx.pageNumber} ${charName} (full-page): `);
+      if (pageBox) {
+        params._r2BodyBox = [
+          Math.max(0, pageBox[0] - crop.x), Math.max(0, pageBox[1] - crop.y),
+          Math.min(crop.w, pageBox[2] - crop.x), Math.min(crop.h, pageBox[3] - crop.y),
+        ];
+      }
+    } catch (err) { log.warn(`[TESTLAB] round-2 full-page re-detect failed (${err.message}) — using copied box`); }
+  }
+
   // Repair blend: the shared engine-agnostic SAM-union blend (samUnionBlend).
   // MANDATORY in repair mode — no silent diff-blob degradation (exp #30).
   if ((params.pasteMode || 'figure') === 'figure' && params.repairMode) {
@@ -2507,13 +2551,11 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       addStep,
       failCtx,
       maskPoints: params._maskPoints || null,
-      // Round 2 (the RESULT) RE-DETECTS the figure on Qwen's output: run DINO
-      // 'person' on the candidate crop for a box aligned to the actual repainted
-      // figure (it can reshape — Verena's fuller bob), then SAM ∩ face box. Falls
-      // back to the copied original box if the re-detect returns nothing.
+      // Round 2 (the RESULT) uses the FULL-PAGE re-detected figure box (computed
+      // above) — aligned to the actual repainted figure — then SAM ∩ face box.
+      // Falls back to the copied original box when the re-detect found nothing.
       maskFetcher: params._faceMode ? (async (buf) => {
-        const { detectPersonBoxInCrop } = require('./images');
-        const fresh = await detectPersonBoxInCrop(buf, boxInCrop, `testlab-P${ctx.pageNumber} ${charName}: `);
+        const fresh = params._r2BodyBox;
         const r2Body = fresh || params._bodyBoxInCrop || [0, 0, crop.w, crop.h];
         let g2 = null;
         const m = await fetchFigureHeadMask(buf, r2Body, boxInCrop, crop.w, crop.h, { onGeom: (g) => { g2 = g; } });
