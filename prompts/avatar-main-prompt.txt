@@ -47,6 +47,7 @@ WARDROBE DETAILS:
 - Style Transfer Rule: copy the exact pattern and colors from the input image. Just change from short to long sleeves / legs, etc.
 - If parts of the clothing are not visible in the input picture use plain/solid neutral colors (black, navy, khaki, gray, brown) to create them. Added / invented parts of the clothing must be different from input image. Don't apply the shirt's pattern or bright colors to the pants.
 - No layered clothing: generate single-layer outfits only. Coats, hoodies, and jackets must be closed/zipped - no visible garments underneath. One top garment only.
+- No carried items: never include backpacks, rucksacks, bags, umbrellas, toys, or other held/worn accessories, even if the input photo shows one. Garments only.
 - Outfit: {CLOTHING_STYLE}
 
 Output Quality: 4k, Photorealistic.

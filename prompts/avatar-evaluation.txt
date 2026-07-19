@@ -45,7 +45,7 @@ TASK 4: PHYSICAL TRAITS EXTRACTION (from IMAGE 2)
 Extract the person's physical characteristics as shown in the GENERATED AVATAR. This captures user corrections that were applied during generation.
 
 TASK 5: CLOTHING EXTRACTION (from IMAGE 2)
-Describe the clothing visible on the avatar. Never include text/logos/slogans — only garment type, colour, fit, style.
+Describe the clothing visible on the avatar. Never include text/logos/slogans — only garment type, colour, fit, style. Never include carried or strapped-on accessories (backpack, rucksack, bag, umbrella, toy) — garments only; if the avatar shows one, omit it from the description.
 Choose ONE: Option A → set `fullBody`, leave upperBody/lowerBody null. Option B → set `upperBody` + `lowerBody`, leave `fullBody` null. Never both.
 
 TASK 6: DETAILED HAIR ANALYSIS (from IMAGE 2)

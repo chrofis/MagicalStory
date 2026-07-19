@@ -1952,3 +1952,25 @@ rendered default pleasant smiles on a stubborn-refusal page 3/4 times.
 **Touched:** `server/lib/storyHelpers.js` (buildImagePrompt clothing backstop,
 buildExactPosesBlock expressions), `prompts/scene-iteration.txt`,
 `prompts/scene-iteration-free.txt`.
+
+## Avatars carry garments only — no carried accessories (2026-07-19)
+
+**Context:** a demo character's uploaded photo showed a red rucksack; avatar
+generation copied it into the standard avatar, the face-match eval's clothing
+extraction wrote it into the wardrobe description, the outline copied it into
+clothingRequirements — and the character wore a backpack in every scene,
+including at the dinner table. Test Lab A/B/C (exps 146/147/149) proved the
+sheet generator follows the TEXT description: stripping the accessory clause
+alone produced a fully clean sheet; the reference photo's backpack does not
+leak through on its own.
+
+**Decision:** fix at the root (avatar creation) only — no code-side filter:
+1. avatar-main-prompt.txt: never include carried items (backpack, bag,
+   umbrella, toys), even if the input photo shows one.
+2. avatar-evaluation.txt clothing extraction: describe garments only; omit
+   carried/strapped-on accessories from the description.
+Existing characters keep the accessory in their stored avatars.clothing until
+their avatars are regenerated — accepted; regenerate on demand.
+
+**Touched:** `prompts/avatar-main-prompt.txt`, `prompts/avatar-evaluation.txt`,
+`server/lib/testlab.js` (avatar_realistic params.costumeDescription for the A/B).
