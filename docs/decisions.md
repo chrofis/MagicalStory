@@ -1922,3 +1922,33 @@ resolveCharBbox + callers, final bbox refresh),
 `server/lib/entityConsistency.js` (resolveActiveVersionData, appearance
 stamping, cover path), `server/routes/regeneration.js` (char-repair sources,
 refresh-bbox loadOnly), `server/lib/testlab.js` (resolveCharacterBox).
+
+## Clothing backstop + EXPRESSIONS tail anchor (2026-07-19)
+
+**Context:** Sonnet's scene prose is the only carrier of per-character clothing
+(deliberate: no separate clothing block, "trust the prose"). On a staging story
+it dropped the main character's outfit — in the unified pass AND both iterate
+re-expansions. The image model then dressed her from her reference card
+(coral-pink top + red rucksack = her CANONICAL clothingRequirements wardrobe),
+and the evaluator — which judges clothing against the prompt — had no contract,
+invented one ("no backpack"), and flagged the correct render for four repair
+rounds. Separately: the unified spec's per-character `expression` field
+("alarmed, mouth open, brows tight") was absent from the iterate templates'
+metadata spec, and nothing re-anchored expressions at the prompt tail, so Grok
+rendered default pleasant smiles on a stubborn-refusal page 3/4 times.
+
+**Decision:**
+1. buildImagePrompt backstop: when <2 of a character's wardrobe terms appear
+   in the prose, append "X wears: <clothingRequirements description>" for just
+   that character (complete prose ⇒ no duplication). Fixes generation AND
+   gives the eval the correct contract in one move.
+2. EXPRESSIONS tail block: buildExactPosesBlock now also emits per-character
+   `expression` lines (foreground/midground only) after EXACT POSES — same
+   tail-weighting rationale as poses.
+3. scene-iteration.txt + scene-iteration-free.txt metadata specs now require
+   `expression` for fg/mg characters (matching story-unified.txt). `depth`
+   stays background-only per the existing rule.
+
+**Touched:** `server/lib/storyHelpers.js` (buildImagePrompt clothing backstop,
+buildExactPosesBlock expressions), `prompts/scene-iteration.txt`,
+`prompts/scene-iteration-free.txt`.

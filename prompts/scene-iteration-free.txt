@@ -233,8 +233,8 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
     "fixesApplied": []
   },
   "characters": [
-    {"name": "CharacterA", "clothing": "winter", "position": "bottom-right foreground"},
-    {"name": "CharacterB", "clothing": "winter", "position": "bottom-left foreground"}
+    {"name": "CharacterA", "clothing": "winter", "position": "bottom-right foreground", "expression": "alarmed, mouth open, brows pulled tight"},
+    {"name": "CharacterB", "clothing": "winter", "position": "bottom-left foreground", "expression": "calm, attentive, neutral mouth"}
   ],
   "objects": ["LOC001"],
   "interactions": [
@@ -261,9 +261,10 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 
 **Scene fields (structural descriptors for the image pipeline):**
 
-- `characters[]`: one entry per character. Always `name`, `clothing`, `position`.
+- `characters[]`: one entry per character. Always `name`, `clothing`, `position`; for foreground/midground characters add `expression`.
   - `position` is a short phrase matching the prose ("right foreground", "center background", "behind the desk").
   - `clothing` must match the outline exactly — if the outline says `costumed`, write `costumed`, not `standard`. Also describe the costume in the prose.
+  - `expression` is a short visible-cue phrase from the page text ("alarmed, mouth open, brows pulled tight"), never an emotion word alone. Keep it consistent with the prose.
   - Add `"perspective": "back view"` or `"side"` only when non-standard; omit otherwise.
   - Add `"depth": "background"` only for tiny/distant figures; omit for foreground/midground.
 

@@ -4528,13 +4528,33 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // base-character avatars.clothing default — see the buildClothingDescription
     // routing in formatCharacterContext (sceneValidator.js), which was leaking
     // the default outfit into the vision analysis and, via iterate rounds, into
-    // this prose. No separate clothing block is injected here.
+    // this prose.
+    //
+    // BACKSTOP: the prose is a single point of failure — Sonnet dropped the
+    // main character's outfit entirely on a page (and again on every iterate
+    // re-expansion), leaving the image model to invent clothing and the
+    // evaluator without a contract (it hallucinated one and flagged the
+    // character's CORRECT wardrobe for four rounds). When a character's
+    // wardrobe items don't appear in the prose, append an explicit wears-line
+    // for just that character. Complete prose ⇒ no duplication.
     if (referencePhotos && referencePhotos.length > 0) {
+      const proseLower = String(cleanSceneDescription || '').toLowerCase();
+      const CLOTHING_STOPWORDS = new Set(['with', 'worn', 'small', 'large', 'light', 'dark', 'pale', 'deep', 'the', 'and', 'over', 'under', 'open', 'closed', 'front', 'back', 'side', 'style', 'pair']);
+      const missingClothingLines = [];
       referencePhotos.forEach(photo => {
-        if (photo.name && photo.clothingDescription) {
-          log.debug(`[IMAGE PROMPT] ${photo.name} wears: "${photo.clothingDescription}" (${photo.clothingCategory})`);
+        if (!photo.name || !photo.clothingDescription) return;
+        log.debug(`[IMAGE PROMPT] ${photo.name} wears: "${photo.clothingDescription}" (${photo.clothingCategory})`);
+        const items = String(photo.clothingDescription).toLowerCase().split(/[^a-zäöüéèà-]+/)
+          .filter(w => w.length >= 4 && !CLOTHING_STOPWORDS.has(w));
+        const hits = new Set(items.filter(w => proseLower.includes(w)));
+        if (hits.size < 2) {
+          missingClothingLines.push(`- ${photo.name} wears: ${photo.clothingDescription}`);
+          log.warn(`[IMAGE PROMPT] Prose omitted ${photo.name}'s outfit (${hits.size} wardrobe terms found) — appending explicit wears-line`);
         }
       });
+      if (missingClothingLines.length > 0) {
+        characterReferenceList += `\nCLOTHING (the scene prose omitted these outfits — they are canonical):\n${missingClothingLines.join('\n')}\n`;
+      }
     }
 
     const heightDescription = buildRelativeHeightDescription(sceneCharacters);
@@ -4979,8 +4999,27 @@ function buildExactPosesBlock(interactions, sceneCharacters = []) {
     lines.push(`- ${name}: looking off into the scene, not at the viewer`);
   }
 
-  if (lines.length === 0) return '';
-  return `EXACT POSES:\n${lines.join('\n')}`;
+  // Re-anchor per-character expressions at the tail, same reason as the poses:
+  // the metadata `expression` field ("alarmed, mouth open mid-shout, brows
+  // pulled tight") is buried mid-prose and Grok defaults every face to a mild
+  // pleasant smile — a stubborn/scared/angry story beat renders as smiling.
+  // Background faces skipped (unreadable at frame size).
+  const exprLines = [];
+  for (const c of (sceneCharacters || [])) {
+    if (!c || typeof c !== 'object') continue;
+    const name = (c.name || '').trim();
+    const expr = typeof c.expression === 'string' ? c.expression.trim() : '';
+    if (!name || !expr) continue;
+    if (String(c.depth || '').toLowerCase() === 'background') continue;
+    exprLines.push(`- ${name}: ${expr}`);
+  }
+  const exprBlock = exprLines.length > 0
+    ? `EXPRESSIONS (each face shows exactly this — no default smiles):\n${exprLines.join('\n')}`
+    : '';
+
+  if (lines.length === 0 && !exprBlock) return '';
+  const poseBlock = lines.length > 0 ? `EXACT POSES:\n${lines.join('\n')}` : '';
+  return [poseBlock, exprBlock].filter(Boolean).join('\n\n');
 }
 
 // ============================================================================
