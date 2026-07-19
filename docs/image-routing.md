@@ -24,7 +24,7 @@ Test Lab: `/admin/test-lab`. Stages run via `server/lib/testlab.js` `STAGE_RUNNE
 | Cover typography (title/Widmung/brand) | `coverTypography.composeCover` baked into served version | `appSideCoverType=true` (default) | ✅ baked into every version (2026-07-19) | via `cover` | image_routing |
 | **Face repair** | **Qwen** `qwen-image-edit@2511` (Runware) + SAM head mask | Face mismatch | ✅ $0.008, union-hard-pad6 blend | `char_repair` / `qwen_insert` / `repair_verify` | image_model_tests SETTLED |
 | **Full-character repair** | **Grok** (crosshatch/blended) | Whole-figure mismatch | ✅ "grok makes better images" for full figures | `char_repair` | image_model_tests SETTLED |
-| Figure detection / masks | GroundingDINO → MobileSAM (local) or Gemini bbox | Detection for repair/composite | ✅ box-prompted MobileSAM winner; full-identity text 5/5 | `bbox` | image_model_tests, local_grounded_sam_detection |
+| Figure detection / masks | GroundingDINO → MobileSAM (local) or Gemini bbox | Detection for repair/composite | ✅ box-prompted MobileSAM winner; full-identity text 5/5. ⚠️ box-prompt mask **blows out** on touching figures (see below) — guarded 2026-07-20 | `bbox` | image_model_tests, local_grounded_sam_detection |
 | Quality eval (bbox fix_targets) | Gemini `2.5-flash` | Page quality | ✅ required for spatial fix_targets | `quality_eval` | CLAUDE.md |
 | Prompt-compliance eval | qwen `qwen3-max` | Stage-2 compliance | ✅ presence-is-input, never-CRITICAL gate | `quality_eval` | project_unified_call |
 | **Scene composite** (non-cover) | — | — | ❌ **KILLED** 2026-05-16 (style drift, label leak) — don't re-enable without gate | — | scene_composite_killed |
@@ -61,6 +61,20 @@ The composite's all-frontal lineup reads flatter than a direct render because th
 - **`frontal`** = old prod behaviour (flat lineup), kept as the control / fallback.
 - Lever lives in `coverComposite.js generateCoverViaComposite({orient})`, threaded through `coverIterate.js` (`options.orient`) and the Test Lab `cover` stage (`params.orient`). Reverses the earlier "every cover figure faces the reader" decision (coverComposite.js ~720) **for outer figures only** — the centre still favours the viewer.
 - **Feet-crop regression (fixed 2026-07-19):** first turn-prompt pass cropped the CENTRAL cluster at the shins (turn + "pulling close" made Grok redraw them larger/lower, feet off the bottom edge; once pass-1 crops, the cutout can't recover shoes). Fixed with a per-pose `feetClause` ("keep the whole figure head-to-feet at the same scale, both feet + footwear visible, never crop at ankles/shins/knees, do not enlarge past the bottom edge") appended to every POSE line — universal (all modes). Re-run: all five shod and full-length in both turn variants.
+
+### Figure-detection blown mask — box-prompt union (✅ FIXED 2026-07-20)
+Local grounding-dino path: MobileSAM is BOX-prompted per DINO person box and `/figure-mask`
+UNIONS every mask it returns. On flat painterly art (watercolour/oil) with touching figures the
+silhouette grabs neighbours + background, so `bodyBox = mask bounds` EXPLODES — measured 2.1×–4.2×
+the DINO box (a whole-frame box for one figure), which breaks text placement AND character repair
+(repair targets the figure box → a blown box has no figure to fix). **The DINO box itself is tight
+and correct** — figures where SAM failed (`samApplied=false`) fell back to the DINO box and were all
+accurate. FaceBox/head point accurate throughout. **Fix** (`server/lib/images.js`, after Stage-3 face
+pairing): any `samApplied` det with `bodyBox ≥ 1.6× gdinoBox` → re-derive the silhouette by
+POINT-prompting SAM from the head point + a torso point one head-height below (`_mobilesamMaskPoints`);
+if that still blows out / fails, drop the mask and keep the tight `gdinoBox`. Verified: −57%…−81%
+area, correct single figure. grounding-dino path only; Gemini bbox path never reaches it. Re-test via
+the `bbox` Test Lab stage on a multi-figure painterly page.
 
 ### Avatar 2×4 LAYOUT validation — split-figure defect (2026-07-19)
 Grok Round-1 sometimes renders ONE figure split across the mid-row divider (top = head+torso, bottom = lower body) instead of 4 head-cells + 4 body-cells. If it ships, the composite extracts cell 5 as a **headless lower body** → broken cover.

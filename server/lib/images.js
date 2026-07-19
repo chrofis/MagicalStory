@@ -2391,6 +2391,30 @@ async function _mobilesamMaskFull(imageDataUri, boxPx, W, H) {
   } catch (e) { log.warn(`⚠️ [GDINO-DETECT] mask failed: ${e.message}`); return null; }
 }
 
+// MobileSAM point→mask on the full page (points in full-page pixel coords, all
+// positive). Used by the blown-mask guard to re-derive a figure silhouette from
+// its accurate head point when the box-prompted mask exploded — /figure-mask
+// UNIONS every mask a box prompt returns, so touching neighbours / background
+// leak into the box mask on flat painterly art. A point prompt segments only
+// the figure under the point.
+async function _mobilesamMaskPoints(imageDataUri, pointsPx, W, H) {
+  try {
+    const res = await fetch(`${_photoAnalyzerUrl()}/figure-mask`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageDataUri, points: pointsPx, point_labels: pointsPx.map(() => 1) }),
+      signal: AbortSignal.timeout(150_000),
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
+    if (!j?.success || !m || !(j.fill_pixels > 0)) return null;
+    const pngBuf = Buffer.from(m[1], 'base64');
+    const mask = await _binMaskFromBuffer(pngBuf, W, H);
+    if (mask) mask.pngBuf = pngBuf;
+    return mask;
+  } catch (e) { log.warn(`⚠️ [GDINO-DETECT] point-mask failed: ${e.message}`); return null; }
+}
+
 /**
  * Fresh figure box on a CROP via GroundingDINO 'person' — used to re-detect the
  * repainted figure on Qwen's output (round-2) instead of reusing the original
@@ -2879,6 +2903,41 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       .sort((a, b) => (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]) - (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]));
     const holder = holders.find(h => !h.face);
     if (holder) holder.face = f;
+  }
+
+  // Blown-mask guard (2026-07-20). MobileSAM's box prompt makes /figure-mask
+  // UNION every salient blob in/around the box, so on flat painterly art with
+  // touching figures the silhouette grabs neighbours / background and
+  // bodyBox = mask bounds EXPLODES (observed 2.1×–4.2× the tight DINO box; a
+  // whole-frame box breaks text placement AND character repair — the repair
+  // targets the figure box, so a blown box has no figure to fix). The paired
+  // head faceBox is accurate, so for any samApplied det whose mask is ≥1.6× its
+  // DINO box, re-derive the silhouette by POINT-prompting SAM from the head
+  // (+ a torso point one head-height below the chin). If the point mask still
+  // blows out or fails, drop the mask and keep the tight gdinoBox — exactly what
+  // samApplied=false dets already do correctly (they were verified accurate).
+  // Runs before Stage-4 identity so the corrected boxes feed layout matching.
+  // grounding-dino path only; the Gemini bbox path never reaches here.
+  const _normArea = (b) => Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
+  const BLOWN_RATIO = 1.6;
+  for (const d of dets) {
+    if (!d.samApplied || !d.face) continue;
+    const gA = _normArea(d.gdinoBox);
+    if (gA <= 0 || _normArea(d.bodyBox) / gA < BLOWN_RATIO) continue;
+    const fb = d.face.box; // px [x0,y0,x1,y1]
+    const headCx = Math.round((fb[0] + fb[2]) / 2), headCy = Math.round((fb[1] + fb[3]) / 2);
+    const faceH = fb[3] - fb[1];
+    const torsoY = Math.min(H - 1, Math.round(fb[3] + faceH * 1.2));
+    const pmask = await _mobilesamMaskPoints(imageDataUri, [[headCx, headCy], [headCx, torsoY]], W, H);
+    let fixed = false;
+    if (pmask) {
+      const newNorm = _pxBoxToNorm(pmask.bbox, W, H);
+      if (_normArea(newNorm) > 0 && _normArea(newNorm) / gA < BLOWN_RATIO) {
+        d.mask = pmask; d.bodyBox = newNorm; d.blownMaskFixed = 'point-sam'; fixed = true;
+      }
+    }
+    if (!fixed) { d.mask = null; d.bodyBox = d.gdinoBox; d.blownMaskFixed = 'gdino-fallback'; }
+    log.debug(`[GDINO-DETECT] ${pageLabel}blown mask (${(_normArea(d.gdinoBox) ? '≥1.6×' : '')}) corrected → ${d.blownMaskFixed}`);
   }
 
   // Stage 4 — identity. Primary: Set-of-Mark — letter badges are drawn on the
