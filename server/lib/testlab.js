@@ -1800,9 +1800,12 @@ async function fetchMaskWithRetry(buf, box, tries = 5, opts = {}) {
 async function fetchFaceHeadMask(buf, faceBox, cropW, cropH) {
   // Shared implementation lives in images.js (production's blended-face
   // whiteout uses the identical logic); the Test Lab injects its retry-aware
-  // fetcher for post-deploy SAM cold starts.
+  // fetcher for post-deploy SAM cold starts. requireMobilesam: rembg's
+  // whole-figure fallback produced garbage head whiteouts during a SAM
+  // outage (rectangle over a church tower) — better to retry/fail loudly.
   const { fetchFaceHeadMaskPng } = require('./images');
-  return fetchFaceHeadMaskPng(buf, faceBox, cropW, cropH, (b, box, opts) => fetchMaskWithRetry(b, box, 3, opts));
+  return fetchFaceHeadMaskPng(buf, faceBox, cropW, cropH,
+    (b, box, opts) => fetchMaskWithRetry(b, box, 4, { ...(opts || {}), requireMobilesam: true }));
 }
 
 /**
@@ -2169,6 +2172,11 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       log.warn(`[TESTLAB] qwen repair whiteout unavailable (${err.message}) — falling back to replace wording`);
     }
   }
+  // Face repair without a head whiteout is not a face repair — the replace-
+  // wording fallback repaints whole figures. Fail loudly (SAM outage etc.).
+  if (params._faceMode && params.repairMode && !whiteoutApplied) {
+    throw new Error('Face repair needs the SAM head whiteout and the mask service did not deliver one (MobileSAM down?) — not degrading to a whole-figure replace. Retry when the analyzer is up.');
+  }
 
   // Render at ~2x for detail; Runware dims must be multiples of 64 in [128,2048].
   const snap = v => Math.max(512, Math.min(2048, Math.round(v / 64) * 64)); // qwen rejects tiny dims
@@ -2238,7 +2246,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
               const hasGlasses = /\bglasses\b|\bbrille\b/i.test(rich);
               const glassesClause = hasGlasses ? ', including the same glasses' : '. The person does NOT wear glasses — do not add any';
               const poseClause = poseText
-                ? ` HEAD POSE AND EXPRESSION (from the original scene): ${poseText}. Paint the head in exactly this pose — never turn it toward the camera unless stated.`
+                ? ` HEAD POSE AND EXPRESSION (from the original scene; directions are from the viewer's perspective): ${poseText}. Paint the head in exactly this pose — never turn it toward the camera unless stated.`
                 : ` HEAD POSE comes from the third image (blurred on purpose): copy only its head direction, gaze direction, tilt and facial expression — if the person was looking left, the painted face looks left; never copy its blurry detail.`;
               return `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. IDENTITY comes from the second image: exact same facial features, age, hair style and hair color${glassesClause}.${faceFacts}${poseClause} Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people.${styleLine}`;
             })()

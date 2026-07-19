@@ -10155,9 +10155,14 @@ async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop, opts = {}) {
         log.warn(`⚠️ [FIGURE MASK] /figure-mask HTTP ${res.status} — falling back to rembg`);
       }
     } catch (err) {
-      log.warn(`⚠️ [FIGURE MASK] mobilesam failed (${err.message}) — falling back to rembg`);
+      log.warn(`⚠️ [FIGURE MASK] mobilesam failed (${err.message}) — ${opts.requireMobilesam ? 'no fallback (caller requires SAM)' : 'falling back to rembg'}`);
     }
   }
+  // Face repairs REQUIRE the box-prompted SAM head mask: rembg's whole-figure
+  // salient mask whited a rectangle over a church tower instead of the head
+  // (all-5 chain during a SAM outage) — for those callers a null (retry/fail
+  // loudly upstream) beats a garbage mask.
+  if (opts.requireMobilesam) return null;
   return fetchSilhouettePng(cropJpegBuffer);
 }
 
@@ -16115,7 +16120,7 @@ async function describeHeadPose(imageDataUri) {
     body: JSON.stringify({
       contents: [{ parts: [
         { inline_data: { mime_type: imageDataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2Lib.stripDataUriPrefix(imageDataUri) } },
-        { text: 'This crop shows one person\'s head (an illustration). Describe the head for a repainting task. JSON only: {"facing":"...","headTilt":"...","gaze":"...","expression":"...","mouth":"..."} — each a short phrase, e.g. "three-quarter left", "tilted slightly down", "looking down at the object in their hands", "gentle concerned smile", "closed".' },
+        { text: 'This crop shows one person\'s head (an illustration). Describe the head for a repainting task. All directions FROM THE VIEWER\'S PERSPECTIVE (the person\'s nose pointing toward the left edge of the image = "left"). JSON only: {"facing":"...","headTilt":"...","gaze":"...","expression":"...","mouth":"..."} — each a short phrase, e.g. "three-quarter left", "tilted slightly down", "looking down at the object in their hands", "gentle concerned smile", "closed".' },
       ] }],
       generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     }),
