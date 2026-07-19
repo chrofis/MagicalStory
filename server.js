@@ -439,7 +439,9 @@ async function detectBboxOnCovers(coverImages, characters, artStyle = null) {
 // textless art AND every version (so the served imageVersions[active] row carries the text everywhere
 // — viewer, share, PDF, print), keeping the textless source in artImageData for no-AI title edits.
 // Implementation lives in server/lib/coverTypography.js (single source of truth, unit-testable).
-const { applyCoverTypography } = require('./server/lib/coverTypography');
+// Cover typography is baked post-persistence via bakeCoverTypographyPostPersist
+// (required inline at its call site). The in-pipeline applyCoverTypography was
+// removed 2026-07-20 (double-brand fix — see cover-typography call site).
 
 // (Firebase Admin SDK removed — Google sign-in now uses google-auth-library directly,
 //  see server/routes/auth.js POST /api/auth/google and server/routes/trial.js claim flows.)
@@ -6584,17 +6586,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
 
-        // App-side cover typography — composite title/dedication/branding onto the textless art.
-        // Runs after bbox detection so figure boxes drive placement (trial: title only, empty figures).
-        if (MODEL_DEFAULTS.appSideCoverType) {
-          try {
-            await applyCoverTypography(coverImages, {
-              title, dedication: inputData.dedication, seed: jobId, trial: !!inputData.skipQualityEval,
-            });
-          } catch (typoErr) {
-            log.warn(`⚠️ [UNIFIED] Cover typography failed: ${typoErr.message}`);
-          }
-        }
+        // App-side cover typography is baked ONCE, post-persistence, by
+        // bakeCoverTypographyPostPersist (after upsertStory below). The old
+        // in-pipeline applyCoverTypography call was removed 2026-07-20: it
+        // branded the in-memory cover JSONB here, so the persisted story_images
+        // rows were ALREADY branded, and the post-persist baker then re-branded
+        // them (saving the already-branded image as the "textless" ${key}Art) →
+        // DOUBLE "magicalstory.ch" / double title. Single baker = single source
+        // of truth; bbox detection above still feeds placement via storyData.
       } catch (coverErr) {
         log.error(`❌ [UNIFIED] Cover generation failed/timed out: ${coverErr.message}`);
         genLog.error('covers_failed', coverErr.message);

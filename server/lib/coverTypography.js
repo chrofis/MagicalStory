@@ -293,14 +293,25 @@ async function inkBBox(png) {
 }
 // build group at nominal size, measure its ink, then scale-to-fill the target box and render final
 async function fitRender(innerGroup, W, H, box, anchor) {
-  const png1 = renderSvg(innerGroup, W, H);
+  // MEASUREMENT PASS on a PADDED canvas. The nominal font-size in buildTitleGroup
+  // is only an approximation (chars × avg-advance) and routinely overshoots the
+  // canvas width for long titles. Rendering the measurement pass on a bare W×H
+  // canvas let resvg CLIP the overflowing left/right letters BEFORE inkBBox saw
+  // them — so a long title lost its first/last letter per line ("Emma und das" →
+  // "mma und da") and the clipped ink was then scaled to fit, baking the loss in.
+  // Padding a full canvas width on every side guarantees the whole title fits in
+  // the measurement raster; we subtract the pad back out so the final transform
+  // stays in unpadded coordinates.
+  const PAD = W;
+  const png1 = renderSvg(`<g transform="translate(${PAD},${PAD})">${innerGroup}</g>`, W + 2 * PAD, H + 2 * PAD);
   const bb = await inkBBox(png1);
   if (!bb) return null;
+  const bx = bb.x - PAD, by = bb.y - PAD; // ink position in unpadded W×H coords
   const targetW = (box.x1 - box.x0) * W * 0.96, targetH = (box.y1 - box.y0) * H;
   const s = Math.min(targetW / bb.w, targetH / bb.h);
   const cx = (box.x0 + box.x1) / 2 * W;
-  const tx = cx - (bb.x + bb.w / 2) * s;
-  const ty = anchor === 'bottom' ? (box.y1 * H - (bb.y + bb.h) * s) : (Math.max(box.y0 * H, H * 0.03) - bb.y * s);
+  const tx = cx - (bx + bb.w / 2) * s;
+  const ty = anchor === 'bottom' ? (box.y1 * H - (by + bb.h) * s) : (Math.max(box.y0 * H, H * 0.03) - by * s);
   return renderSvg(`<g transform="translate(${tx},${ty}) scale(${s})">${innerGroup}</g>`, W, H);
 }
 

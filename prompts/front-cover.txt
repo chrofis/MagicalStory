@@ -14,7 +14,7 @@ Create a front cover illustration for a children's book.
 - Characters should be arranged in a balanced composition (side by side, or grouped naturally)
 - All characters stand firmly on solid ground — feet flat on a stable surface (floor, pavement, cobblestones, grass, path). Never standing in or on water, never floating, never mid-air; feet visible on the ground and level with each other.
 - Keep the composition simple and uncluttered
-- Keep the top third of the canvas clear of characters, heads, hair, and props — open sky or plain background reserved for the title. Position all figures in the lower two-thirds, no head above the top-third line.
+- The entire top third of the canvas is empty sky or plain background — no character, head, hair, hand, or prop may enter it. Scale the whole group down so the tallest head sits at or below the one-third line while feet rest at the bottom; the figures fill only the lower two-thirds. Reserve that empty top third for the title.
 - Each character has 2 hands. Show at most 2 items held per character — if more are mentioned, drop the rest.
 
 **TITLE:**
