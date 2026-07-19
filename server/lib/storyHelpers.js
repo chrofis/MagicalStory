@@ -4539,7 +4539,19 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // for just that character. Complete prose ⇒ no duplication.
     if (referencePhotos && referencePhotos.length > 0) {
       const proseLower = String(cleanSceneDescription || '').toLowerCase();
-      const CLOTHING_STOPWORDS = new Set(['with', 'worn', 'small', 'large', 'light', 'dark', 'pale', 'deep', 'the', 'and', 'over', 'under', 'open', 'closed', 'front', 'back', 'side', 'style', 'pair']);
+      // Colours and generic adjectives are excluded from the match — they
+      // collide across characters and scenery ("white paper", another
+      // character's "light grey blouse") and fake a present outfit. Only
+      // distinctive garment words (leggings, rucksack, blouse, corduroy…)
+      // count as evidence the prose carries the outfit.
+      const CLOTHING_STOPWORDS = new Set([
+        'with', 'worn', 'small', 'large', 'light', 'dark', 'pale', 'deep', 'the', 'and', 'over', 'under',
+        'open', 'closed', 'front', 'back', 'side', 'style', 'pair', 'long', 'short', 'soft', 'wide', 'slim',
+        'white', 'black', 'grey', 'gray', 'brown', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink',
+        'coral', 'navy', 'cream', 'beige', 'olive', 'teal', 'turquoise', 'lavender', 'silver', 'gold',
+        'golden', 'crimson', 'maroon', 'burgundy', 'khaki', 'tan', 'ivory', 'charcoal', 'mustard', 'rose',
+        'dusty', 'heather', 'medium', 'bright', 'muted',
+      ]);
       const missingClothingLines = [];
       referencePhotos.forEach(photo => {
         if (!photo.name || !photo.clothingDescription) return;
