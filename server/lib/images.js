@@ -10321,6 +10321,40 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
   return { applied: true, deltaEBefore: +deltaEBefore.toFixed(2), seamDeltaEBefore: +seamBefore.toFixed(2), seamDeltaEAfter: +seamAfter.toFixed(2), histogramRaw: out, correctedRaw: finalRaw };
 }
 
+/**
+ * Harmonic (Laplace) background fill for the repair RED ZONE — where the OLD
+ * figure was but the NEW figure isn't, the paste must reveal the scene
+ * BACKGROUND, coloured to match the surroundings (not the candidate's unfilled
+ * white fringe, not the old figure edge). Diffuses the ORIGINAL scene pixels
+ * inward through the fill region, never sourcing the new figure's colour.
+ *   originalRaw : RGB(n*3) of the crop — the real scene (background source)
+ *   fillMask    : Buffer(n) 0/255 — the red-zone pixels to fill
+ *   figMask     : Buffer(n) 0/255 — the new figure (excluded as a source)
+ * Returns RGB(n*3) with the fill pixels replaced by diffused background.
+ */
+function harmonicBackgroundFill(originalRaw, fillMask, figMask, W, H, iters = 400) {
+  const n = W * H;
+  const fill = new Uint8Array(n), fig = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { fill[i] = fillMask[i] > 128 ? 1 : 0; fig[i] = figMask[i] > 128 ? 1 : 0; }
+  const out = Buffer.from(originalRaw);
+  const nb = (x, y) => [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
+  for (let it = 0; it < iters; it++) {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (!fill[i]) continue;
+      let c = 0, rs = 0, gs = 0, bs = 0;
+      for (const [nx, ny] of nb(x, y)) {
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        const j = ny * W + nx;
+        if (fig[j]) continue; // never diffuse the new figure's colour into the fill
+        c++; rs += out[j * 3]; gs += out[j * 3 + 1]; bs += out[j * 3 + 2];
+      }
+      if (c) { out[i * 3] = Math.round(rs / c); out[i * 3 + 1] = Math.round(gs / c); out[i * 3 + 2] = Math.round(bs / c); }
+    }
+  }
+  return out;
+}
+
 async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop, opts = {}) {
   const backend = CONFIG_DEFAULTS.figureMaskBackend || 'rembg';
   if (backend === 'mobilesam' && Array.isArray(boxInCrop) && boxInCrop.length === 4) {
@@ -16477,6 +16511,7 @@ module.exports = {
   fetchFaceHeadMaskPng,
   recoverFaceBox,
   correctColorShift,
+  harmonicBackgroundFill,
   fetchFigureHeadMaskPng,
   buildEvalClothingHeader,
   buildPageCompositeRefs,

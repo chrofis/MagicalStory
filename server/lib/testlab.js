@@ -2001,20 +2001,15 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const unionPadded = strip(await sharp(union, raw1).blur(padPx / 1.5).threshold(16).raw().toBuffer()); // ≈6px dilation, binary
   const alpha1 = Buffer.from(unionPadded);
 
-  // Exclude the white HALO: union/pad pixels that are NOT part of the new
-  // figure (newBin) and are near-white in the candidate. Where the new head
-  // does not reach the OLD head's extent (red zone in the mask-diff), Qwen
-  // leaves an unfilled white fringe; the hard union pastes it and colour
-  // correction tone-shifts it into a visible ring. The actual new figure —
-  // including light/silver hair (which IS in newBin) — is kept untouched.
-  {
-    const candRaw = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
-    let dropped = 0;
-    for (let i = 0; i < n; i++) {
-      if (!alpha1[i] || newBin[i] > 128) continue;   // keep the real new figure
-      if (candRaw[i * 3] >= 240 && candRaw[i * 3 + 1] >= 240 && candRaw[i * 3 + 2] >= 240) { alpha1[i] = 0; dropped++; }
-    }
-    if (dropped) log.info(`[TESTLAB] excluded ${dropped} near-white halo px (old-only / pad region, not in the new figure)`);
+  // Red-zone background fill: where the OLD figure was but the NEW figure
+  // isn't (oldBin && !newBin), the paste must reveal the scene BACKGROUND
+  // coloured to match the surroundings — not the candidate's unfilled white
+  // fringe (halo). Computed here; applied to the paste buffer below.
+  const s1r = Math.max(1, Math.round(oldA.length / n));
+  const redZone = Buffer.alloc(n);
+  let redZonePx = 0;
+  for (let i = 0; i < n; i++) {
+    if (alpha1[i] && oldA[i * s1r] > 128 && newBin[i] <= 128) { redZone[i] = 255; redZonePx++; }
   }
 
   // White-card gate: a face painted on a white panel passes IoU (geometry
@@ -2054,29 +2049,38 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // paste doesn't read as a different-coloured patch. No-op below threshold.
   // Reference distribution = the ORIGINAL figure mask (oldA), applied to the
   // union being pasted (alpha1).
-  let pasteBuf = candResized;
+  // Build the paste as RAW RGB: start from the candidate, colour-correct the
+  // figure, then replace the red zone with the harmonic background fill.
+  const { correctColorShift, harmonicBackgroundFill } = require('./images');
+  const origRaw = await sharp(origResized).removeAlpha().raw().toBuffer();
+  let pasteRaw = await sharp(candResized).removeAlpha().raw().toBuffer();
   let colorInfo = null;
   if (colorCorrect) {
     try {
-      const { correctColorShift } = require('./images');
-      const s1 = Math.max(1, Math.round(oldA.length / n));
       const refMaskBin = Buffer.alloc(n);
-      for (let i = 0; i < n; i++) refMaskBin[i] = oldA[i * s1] > 128 ? 255 : 0;
-      const cc = await correctColorShift(origResized, candResized, Buffer.from(alpha1), cropW, cropH, { refMask: refMaskBin });
+      for (let i = 0; i < n; i++) refMaskBin[i] = oldA[i * s1r] > 128 ? 255 : 0;
+      const cc = await correctColorShift(origRaw, pasteRaw, Buffer.from(alpha1), cropW, cropH, { refMask: refMaskBin });
       if (cc.applied) {
-        pasteBuf = await sharp(Buffer.from(cc.correctedRaw), { raw: { width: cropW, height: cropH, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
+        pasteRaw = Buffer.from(cc.correctedRaw);
         colorInfo = { deltaEBefore: cc.deltaEBefore, seamBefore: cc.seamDeltaEBefore, seamAfter: cc.seamDeltaEAfter };
-        // Applied view: the corrected pixels that will be pasted.
-        const ccCut = await sharp(await sharp(pasteBuf).ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer())
-          .toBuffer();
-        const ccVis = await sharp({ create: { width: cropW, height: cropH, channels: 3, background: { r: 30, g: 30, b: 30 } } })
-          .composite([{ input: ccCut }]).jpeg().toBuffer();
-        await addStep(`colour-corrected region (tone ΔE ${cc.deltaEBefore} fixed, seam ${cc.seamDeltaEBefore}→${cc.seamDeltaEAfter})`, `data:image/jpeg;base64,${ccVis.toString('base64')}`);
       }
     } catch (err) {
       log.warn(`[TESTLAB] colour correction skipped (${err.message})`);
     }
   }
+  // Overwrite the red zone with diffused scene background (never the old figure
+  // edge, never the candidate's white fringe).
+  if (redZonePx > 0) {
+    const bg = harmonicBackgroundFill(origRaw, redZone, newBin, cropW, cropH);
+    for (let i = 0; i < n; i++) { if (redZone[i]) { pasteRaw[i * 3] = bg[i * 3]; pasteRaw[i * 3 + 1] = bg[i * 3 + 1]; pasteRaw[i * 3 + 2] = bg[i * 3 + 2]; } }
+    if (colorInfo) colorInfo.redZonePx = redZonePx;
+  }
+  const pasteBuf = await sharp(pasteRaw, { raw: { width: cropW, height: cropH, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
+  // Applied view: exactly what gets pasted (colour-corrected figure + filled bg).
+  const ccCut = await sharp(pasteBuf).ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer();
+  const ccVis = await sharp({ create: { width: cropW, height: cropH, channels: 3, background: { r: 30, g: 30, b: 30 } } })
+    .composite([{ input: ccCut }]).jpeg().toBuffer();
+  await addStep(`pasted region (colour${colorInfo ? ` ΔE ${colorInfo.deltaEBefore}, seam ${colorInfo.seamBefore}→${colorInfo.seamAfter}` : ' n/a'}${redZonePx ? `, ${redZonePx}px bg-fill` : ''})`, `data:image/jpeg;base64,${ccVis.toString('base64')}`);
 
   const feathered = await sharp(pasteBuf).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
   return { feathered, iou, redPx, colorInfo, blendRule: BLEND_RULE_VERSION };
@@ -2406,6 +2410,39 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   await addStep('input 2: character reference', ref.photoUrl);
   if (poseRefBuf) await addStep('input 3: pose/gaze reference (blurred original)', `data:image/jpeg;base64,${poseRefBuf.toString('base64')}`);
   await addStep('model raw output', `data:image/jpeg;base64,${outBufEarly.toString('base64')}`);
+
+  // ALWAYS-ON geometry overlay — every box and dot the SAM prompts could use,
+  // drawn on BOTH the original crop and the redone (model output), so the full
+  // geometry is always inspectable (even though the live head mask uses only
+  // the body box ∩ face box). body=yellow, face=cyan, hair=magenta boxes;
+  // face=red, hair=orange dots.
+  if (params._faceMode && boxInCrop) {
+    try {
+      const bodyBox = params._bodyBoxInCrop || [0, 0, crop.w, crop.h];
+      const faceBox = boxInCrop;
+      const rb = (params._faceMode && rawFigureBox?.length === 4) ? [
+        Math.max(0, Math.round(rawFigureBox[1] * W) - crop.x),
+        Math.max(0, Math.round(rawFigureBox[0] * H) - crop.y),
+        Math.min(crop.w, Math.round(rawFigureBox[3] * W) - crop.x),
+        Math.min(crop.h, Math.round(rawFigureBox[2] * H) - crop.y),
+      ] : faceBox;
+      const hairBox = [faceBox[0], faceBox[1], faceBox[2], Math.round(faceBox[1] + (faceBox[3] - faceBox[1]) * 0.55)];
+      const rh = rb[3] - rb[1], rcx = (rb[0] + rb[2]) / 2;
+      const facePt = [Math.round(rcx), Math.round(rb[1] + rh * 0.45)];
+      const hbcx = (hairBox[0] + hairBox[2]) / 2, hbcy = (hairBox[1] + hairBox[3]) / 2;
+      const hairPt = [Math.round(hbcx + 0.25 * (facePt[0] - hbcx)), Math.round(hbcy + 0.25 * (facePt[1] - hbcy))];
+      const rect = (b, st, d) => `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="none" stroke="${st}" stroke-width="3"${d ? ` stroke-dasharray="${d}"` : ''}/>`;
+      const dot = (p, f) => `<circle cx="${p[0]}" cy="${p[1]}" r="7" fill="${f}" stroke="white" stroke-width="2"/>`;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${crop.w}" height="${crop.h}">`
+        + rect(bodyBox, '#ffcc00') + rect(faceBox, '#00e0ff', '6,4') + rect(hairBox, '#ff44ff', '4,3')
+        + dot(facePt, '#ff2222') + dot(hairPt, '#ff9900') + `</svg>`;
+      const svgBuf = Buffer.from(svg);
+      const orig = await sharp(cropBuf).composite([{ input: svgBuf }]).jpeg({ quality: 95 }).toBuffer();
+      const redone = await sharp(outBufEarly).resize(crop.w, crop.h, { fit: 'fill' }).composite([{ input: svgBuf }]).jpeg({ quality: 95 }).toBuffer();
+      await addStep('geometry — ORIGINAL (body=yellow, face=cyan, hair=magenta; dots: face=red, hair=orange)', `data:image/jpeg;base64,${orig.toString('base64')}`);
+      await addStep('geometry — REDONE (same boxes/dots on the model output)', `data:image/jpeg;base64,${redone.toString('base64')}`);
+    } catch (err) { log.warn(`[TESTLAB] geometry overlay failed: ${err.message}`); }
+  }
 
   // STYLE GATE — Qwen occasionally flips the whole crop into a flat vector/
   // anime look (exp #69 Franziska); the geometry gates can't see that.
