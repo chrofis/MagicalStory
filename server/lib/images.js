@@ -2391,6 +2391,29 @@ async function _mobilesamMaskFull(imageDataUri, boxPx, W, H) {
   } catch (e) { log.warn(`⚠️ [GDINO-DETECT] mask failed: ${e.message}`); return null; }
 }
 
+/**
+ * Fresh figure box on a CROP via GroundingDINO 'person' — used to re-detect the
+ * repainted figure on Qwen's output (round-2) instead of reusing the original
+ * box, so the head mask is segmented against a box aligned to the ACTUAL new
+ * figure. Returns the largest person box [x1,y1,x2,y2] in crop px, or null
+ * (caller falls back to the copied box). cropJpegBuffer is the crop image.
+ */
+async function detectPersonBoxInCrop(cropJpegBuffer, pageLabel = '') {
+  try {
+    const uri = `data:image/jpeg;base64,${cropJpegBuffer.toString('base64')}`;
+    const det = await _gdinoDetect(uri, [{ name: 'person', text: 'person' }]);
+    if (!det?.figures?.[0]) return null;
+    const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU);
+    if (!persons.length) return null;
+    persons.sort((a, b) => (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]) - (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]));
+    log.info(`🔎 [GDINO-DETECT] ${pageLabel}round-2 person re-detect: ${persons.length} box(es), best score ${persons[0].score?.toFixed?.(2) ?? '?'}`);
+    return persons[0].box.map(v => Math.round(v));
+  } catch (e) {
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}round-2 person re-detect failed: ${e.message}`);
+    return null;
+  }
+}
+
 function _maskOverlapFrac(a, b) {
   if (!a || !b || a.width !== b.width || a.height !== b.height) return 0;
   let inter = 0;
@@ -16510,6 +16533,7 @@ module.exports = {
   fetchFigureMaskPng,
   fetchFaceHeadMaskPng,
   recoverFaceBox,
+  detectPersonBoxInCrop,
   correctColorShift,
   harmonicBackgroundFill,
   fetchFigureHeadMaskPng,

@@ -2509,19 +2509,22 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       addStep,
       failCtx,
       maskPoints: params._maskPoints || null,
-      // Round 2 (the RESULT) uses the SAME box but only the FACE dot — no hair
-      // dot / hair box — to minimise the flood risk on Qwen's repaint. It also
-      // emits its OWN input view (box + face dot drawn on the model output) so
-      // the SAM-2 inputs are visible, not inferred.
+      // Round 2 (the RESULT) RE-DETECTS the figure on Qwen's output: run DINO
+      // 'person' on the candidate crop for a box aligned to the actual repainted
+      // figure (it can reshape — Verena's fuller bob), then SAM ∩ face box. Falls
+      // back to the copied original box if the re-detect returns nothing.
       maskFetcher: params._faceMode ? (async (buf) => {
+        const { detectPersonBoxInCrop } = require('./images');
+        const fresh = await detectPersonBoxInCrop(buf, `testlab-P${ctx.pageNumber} ${charName}: `);
+        const r2Body = fresh || params._bodyBoxInCrop || [0, 0, crop.w, crop.h];
         let g2 = null;
-        const m = await fetchFigureHeadMask(buf, params._bodyBoxInCrop || [0, 0, crop.w, crop.h], boxInCrop, crop.w, crop.h, { onGeom: (g) => { g2 = g; } });
+        const m = await fetchFigureHeadMask(buf, r2Body, boxInCrop, crop.w, crop.h, { onGeom: (g) => { g2 = g; } });
         if (g2) {
           try {
             const rect = (b, st, d) => b ? `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="none" stroke="${st}" stroke-width="3"${d ? ` stroke-dasharray="${d}"` : ''}/>` : '';
             const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${crop.w}" height="${crop.h}">${rect(g2.samBox, '#ffcc00')}${rect(g2.faceClip, '#00e0ff', '6,4')}</svg>`;
             const viz = await sharp(buf).composite([{ input: Buffer.from(svg) }]).jpeg({ quality: 95 }).toBuffer();
-            await addStep('SAM-2 input (result): body box ∩ face box on the model output', `data:image/jpeg;base64,${viz.toString('base64')}`);
+            await addStep(`SAM-2 input (result): ${fresh ? 'RE-DETECTED' : 'copied'} body box ∩ face box on the model output`, `data:image/jpeg;base64,${viz.toString('base64')}`);
           } catch { /* viz only */ }
         }
         return m;
