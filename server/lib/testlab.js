@@ -1071,10 +1071,13 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
   const freshCharacters = Array.isArray(freshCharData) ? freshCharData : (freshCharData.characters || []);
 
   const t0 = Date.now();
+  // compositeCovers: default false (direct render). Pass params.composite=true
+  // to test the cutout+plate composite path (3+ figures / realistic styles —
+  // see docs/image-routing.md direct-vs-composite rule).
   const result = await iterateCover(coverKey, storyData, {
     imageModel: MODEL_DEFAULTS.coverImage,
     freshCharacters,
-    compositeCovers: false,
+    compositeCovers: params.composite === true,
     promptTemplateOverride: promptOverride || null,
   });
   const elapsedMs = Date.now() - t0;
@@ -1812,6 +1815,15 @@ async function fetchFaceHeadMask(buf, faceBox, cropW, cropH, opts = {}) {
     opts);
 }
 
+// Head mask via the whole figure (robust): SAM the figure from the body box,
+// keep only the pixels inside the face box. No fragile face-region dots.
+async function fetchFigureHeadMask(buf, bodyBoxInCrop, faceBoxInCrop, cropW, cropH, opts = {}) {
+  const { fetchFigureHeadMaskPng } = require('./images');
+  return fetchFigureHeadMaskPng(buf, bodyBoxInCrop, faceBoxInCrop, cropW, cropH,
+    (b, box, o) => fetchMaskWithRetry(b, box, 4, { ...(o || {}), requireMobilesam: true }),
+    opts);
+}
+
 /**
  * Interior seed points for SAM round 2, sampled from round 1's mask: erode a
  * few px (so points sit deep inside the figure) and take the widest-run
@@ -2108,6 +2120,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   let crop = null;
   let figureBox = null; // page-normalized [ymin,xmin,ymax,xmax] when detection-derived
   let rawFigureBox = null; // tight unpadded face box (page-normalized) for SAM dots
+  let bodyFigureBox = null; // body box (page-normalized) — SAM segments the whole figure
   if (params.crop && [params.crop.x, params.crop.y, params.crop.w, params.crop.h].every(v => typeof v === 'number')) {
     crop = {
       x: Math.round(params.crop.x * W), y: Math.round(params.crop.y * H),
@@ -2147,6 +2160,8 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     // Tight (unpadded) face box for SAM dot placement — falls back to the
     // padded box when a recovered/older detection has no raw box.
     if (faceMode && resolved?.faceBboxRaw?.length === 4) rawFigureBox = resolved.faceBboxRaw;
+    // Body box → SAM segments the whole figure, then we clip to the face box.
+    if (faceMode && resolved?.bbox?.length === 4) bodyFigureBox = resolved.bbox;
     if (faceMode) params._faceMode = true;
     if (box?.length === 4) {
       const pad = params.cropPad ?? 0.35;
@@ -2196,24 +2211,20 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
         Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
       ];
-      // Face mode: dots are placed by fetchFaceHeadMaskPng — on the RAW face
-      // box when available (boxScale set), so the hair dot lands on real hair
-      // instead of the padded box's empty margin. samBoxScale (e.g. 1.5) sizes
-      // the SAM box off the tight face box; null → legacy padded-box behaviour.
-      const rawBoxInCrop = (params._faceMode && rawFigureBox?.length === 4) ? [
-        Math.max(0, Math.round(rawFigureBox[1] * W) - crop.x),
-        Math.max(0, Math.round(rawFigureBox[0] * H) - crop.y),
-        Math.min(crop.w, Math.round(rawFigureBox[3] * W) - crop.x),
-        Math.min(crop.h, Math.round(rawFigureBox[2] * H) - crop.y),
-      ] : null;
-      params._faceMaskOpts = params._faceMode ? {
-        rawFaceBox: rawBoxInCrop,
-        boxScale: params.samBoxScale || null,
-        singleCall: !!params.singleMaskCall,
-        onGeom: (g) => { params._samGeom = g; },
-      } : {};
+      // Face mode: head mask = whole-figure SAM (body box) ∩ face box. Robust
+      // where face-region dots over-segment (exp #123 Verena). The body box in
+      // crop coords (clamped); if detection had no body box, fall back to the
+      // whole crop as the SAM prompt (segment the dominant figure).
+      const bodyBoxInCrop = (params._faceMode && bodyFigureBox?.length === 4) ? [
+        Math.max(0, Math.round(bodyFigureBox[1] * W) - crop.x),
+        Math.max(0, Math.round(bodyFigureBox[0] * H) - crop.y),
+        Math.min(crop.w, Math.round(bodyFigureBox[3] * W) - crop.x),
+        Math.min(crop.h, Math.round(bodyFigureBox[2] * H) - crop.y),
+      ] : [0, 0, crop.w, crop.h];
+      params._bodyBoxInCrop = bodyBoxInCrop;
+      params._faceBoxInCrop = boxInCrop;
       oldMaskPng = params._faceMode
-        ? await fetchFaceHeadMask(cropBuf, boxInCrop, crop.w, crop.h, params._faceMaskOpts)
+        ? await fetchFigureHeadMask(cropBuf, bodyBoxInCrop, boxInCrop, crop.w, crop.h, { onGeom: (g) => { params._samGeom = g; } })
         : await fetchMaskWithRetry(cropBuf, boxInCrop, 5, params._maskPoints || {});
       if (oldMaskPng) {
         // Rebuild the whiteout mask BINARIZED (no soft SAM edges = no
@@ -2369,10 +2380,11 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     try {
       const g = params._samGeom;
       const rect = (b, stroke, dash) => b ? `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="none" stroke="${stroke}" stroke-width="3"${dash ? ` stroke-dasharray="${dash}"` : ''}/>` : '';
-      const dot = (p, fill) => p ? `<circle cx="${p[0]}" cy="${p[1]}" r="7" fill="${fill}" stroke="white" stroke-width="2"/>` : '';
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${crop.w}" height="${crop.h}">${rect(g.samBox, '#ffcc00')}${rect(g.hairBox, '#00e0ff', '6,4')}${dot(g.facePt, '#ff2222')}${dot(g.hairPt, '#ff22ff')}</svg>`;
+      // Figure-head approach: yellow = body box (SAM segments the figure here),
+      // cyan = face box (the figure mask is clipped to this → head silhouette).
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${crop.w}" height="${crop.h}">${rect(g.samBox, '#ffcc00')}${rect(g.faceClip, '#00e0ff', '6,4')}</svg>`;
       const viz = await sharp(cropBuf).composite([{ input: Buffer.from(svg) }]).jpeg({ quality: 95 }).toBuffer();
-      await addStep('SAM prompt: face box (yellow) + dots (red=face, magenta=hair)', `data:image/jpeg;base64,${viz.toString('base64')}`);
+      await addStep('SAM prompt: body box (yellow=figure) ∩ face box (cyan=clip)', `data:image/jpeg;base64,${viz.toString('base64')}`);
     } catch (err) { log.warn(`[TESTLAB] SAM-geom viz failed: ${err.message}`); }
   }
   await addStep('input 2: character reference', ref.photoUrl);
@@ -2438,14 +2450,13 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       // the SAM-2 inputs are visible, not inferred.
       maskFetcher: params._faceMode ? (async (buf) => {
         let g2 = null;
-        const m = await fetchFaceHeadMask(buf, boxInCrop, crop.w, crop.h, { ...(params._faceMaskOpts || {}), faceDotOnly: true, onGeom: (g) => { g2 = g; } });
+        const m = await fetchFigureHeadMask(buf, params._bodyBoxInCrop || [0, 0, crop.w, crop.h], boxInCrop, crop.w, crop.h, { onGeom: (g) => { g2 = g; } });
         if (g2) {
           try {
-            const rect = (b, st) => b ? `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="none" stroke="${st}" stroke-width="3"/>` : '';
-            const dot = (p, f) => p ? `<circle cx="${p[0]}" cy="${p[1]}" r="7" fill="${f}" stroke="white" stroke-width="2"/>` : '';
-            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${crop.w}" height="${crop.h}">${rect(g2.samBox, '#ffcc00')}${dot(g2.facePt, '#ff2222')}</svg>`;
+            const rect = (b, st, d) => b ? `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="none" stroke="${st}" stroke-width="3"${d ? ` stroke-dasharray="${d}"` : ''}/>` : '';
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${crop.w}" height="${crop.h}">${rect(g2.samBox, '#ffcc00')}${rect(g2.faceClip, '#00e0ff', '6,4')}</svg>`;
             const viz = await sharp(buf).composite([{ input: Buffer.from(svg) }]).jpeg({ quality: 95 }).toBuffer();
-            await addStep('SAM-2 input (result): face box + face dot on the model output', `data:image/jpeg;base64,${viz.toString('base64')}`);
+            await addStep('SAM-2 input (result): body box ∩ face box on the model output', `data:image/jpeg;base64,${viz.toString('base64')}`);
           } catch { /* viz only */ }
         }
         return m;
