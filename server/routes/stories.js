@@ -285,7 +285,10 @@ router.get('/:id/quick-metadata', authenticateToken, async (req, res) => {
     if (metaResult.length === 0) {
       // Check if admin (plain-admin read or impersonating)
       if (canReadAnyStory(req)) {
-        const adminResult = await dbQuery(`SELECT id, metadata FROM stories WHERE id = $1`, [id]);
+        // Same shape as the owner branch below — incl. shareToken, without
+        // which the client hides the "Geschichte ansehen" read/share button
+        // (hit when admins open another account's story, e.g. from Test Lab).
+        const adminResult = await dbQuery(`SELECT id, metadata, share_token FROM stories WHERE id = $1`, [id]);
         if (adminResult.length === 0) {
           return res.status(404).json({ error: 'Story not found' });
         }
@@ -300,7 +303,8 @@ router.get('/:id/quick-metadata', authenticateToken, async (req, res) => {
           language: meta.language,
           languageLevel: meta.languageLevel,
           pageCount: meta.sceneCount || 0,
-          hasFrontCover: coverCheck.length > 0 || meta.hasThumbnail
+          hasFrontCover: coverCheck.length > 0 || meta.hasThumbnail,
+          shareToken: adminResult[0].share_token || null,
         });
       }
       return res.status(404).json({ error: 'Story not found' });
