@@ -2432,9 +2432,24 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       addStep,
       failCtx,
       maskPoints: params._maskPoints || null,
-      // Round 2 uses the SAME box + dot geometry as round 1 (onGeom stripped
-      // so the visualization isn't re-emitted for the candidate).
-      maskFetcher: params._faceMode ? (buf) => fetchFaceHeadMask(buf, boxInCrop, crop.w, crop.h, { ...(params._faceMaskOpts || {}), onGeom: null }) : null,
+      // Round 2 (the RESULT) uses the SAME box but only the FACE dot — no hair
+      // dot / hair box — to minimise the flood risk on Qwen's repaint. It also
+      // emits its OWN input view (box + face dot drawn on the model output) so
+      // the SAM-2 inputs are visible, not inferred.
+      maskFetcher: params._faceMode ? (async (buf) => {
+        let g2 = null;
+        const m = await fetchFaceHeadMask(buf, boxInCrop, crop.w, crop.h, { ...(params._faceMaskOpts || {}), faceDotOnly: true, onGeom: (g) => { g2 = g; } });
+        if (g2) {
+          try {
+            const rect = (b, st) => b ? `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="none" stroke="${st}" stroke-width="3"/>` : '';
+            const dot = (p, f) => p ? `<circle cx="${p[0]}" cy="${p[1]}" r="7" fill="${f}" stroke="white" stroke-width="2"/>` : '';
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${crop.w}" height="${crop.h}">${rect(g2.samBox, '#ffcc00')}${dot(g2.facePt, '#ff2222')}</svg>`;
+            const viz = await sharp(buf).composite([{ input: Buffer.from(svg) }]).jpeg({ quality: 95 }).toBuffer();
+            await addStep('SAM-2 input (result): face box + face dot on the model output', `data:image/jpeg;base64,${viz.toString('base64')}`);
+          } catch { /* viz only */ }
+        }
+        return m;
+      }) : null,
       // Face mode: union hard-clipped to the face region — body pixels never
       // enter the union no matter what round-2 SAM returns.
       clipRect: params._faceMode && figureBox ? [

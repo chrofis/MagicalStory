@@ -10108,41 +10108,36 @@ async function fetchFaceHeadMaskPng(cropJpegBuffer, faceBoxInCrop, outW, outH, m
   //   boxScale    SAM box = boxScale × the raw face box, centered (e.g. 1.5).
   //   singleCall  one SAM call (box + 2 dots), no separate hair box.
   //   onGeom      callback({samBox, hairBox, facePt, hairPt}) for visualization.
-  const { rawFaceBox = null, boxScale = null, singleCall = false, onGeom = null } = opts;
+  const { rawFaceBox = null, boxScale = null, singleCall = false, faceDotOnly = false, onGeom = null } = opts;
   let samBox = faceBoxInCrop.slice();
-  let facePt, hairPt;
+  let facePt;
   if (rawFaceBox && rawFaceBox.length === 4) {
     // Dots anchored to the REAL (tight) face box — independent of box sizing.
-    // The padded box's proportions put the hair dot up in the background; the
-    // raw face box puts the face dot on the face and the hair dot into the hair.
     const [rx1, ry1, rx2, ry2] = rawFaceBox;
     const cx = (rx1 + rx2) / 2, cy = (ry1 + ry2) / 2;
     const rw = rx2 - rx1, rh = ry2 - ry1;
     if (boxScale) {
-      samBox = [
-        Math.max(0, Math.round(cx - rw * boxScale / 2)),
-        Math.max(0, Math.round(cy - rh * boxScale / 2)),
-        Math.min(outW, Math.round(cx + rw * boxScale / 2)),
-        Math.min(outH, Math.round(cy + rh * boxScale / 2)),
-      ];
+      samBox = [Math.max(0, Math.round(cx - rw * boxScale / 2)), Math.max(0, Math.round(cy - rh * boxScale / 2)),
+        Math.min(outW, Math.round(cx + rw * boxScale / 2)), Math.min(outH, Math.round(cy + rh * boxScale / 2))];
     }
     facePt = [Math.round(cx), Math.round(ry1 + rh * 0.45)];          // eyes/nose of the real face
-    // Hair dot: JUST above the hairline (raw face-box top), staying ON the head.
-    // A positive point placed higher risks the background above the head — and a
-    // positive seed in the background makes SAM flood the whole background
-    // (exp #122 Verena: 11.9×/107× balloon). Small offset = near-hair, safe.
-    hairPt = [Math.round(cx), Math.max(0, Math.round(ry1 - rh * 0.08))];
   } else {
-    const bcx = Math.round((samBox[0] + samBox[2]) / 2);
-    const bh = samBox[3] - samBox[1];
-    facePt = [bcx, Math.round(samBox[1] + bh * 0.5)];
-    hairPt = [bcx, Math.round(samBox[1] + bh * 0.15)];
+    facePt = [Math.round((samBox[0] + samBox[2]) / 2), Math.round(samBox[1] + (samBox[3] - samBox[1]) * 0.5)];
   }
-  const points = { points: [facePt, hairPt] };
+  // Hair box = upper part of the head region; hair DOT = its centre nudged 25%
+  // toward the face dot (recommended). That keeps the hair dot solidly ON the
+  // head (never in the background above it — a positive seed there makes SAM
+  // flood the whole background: exp #122 Verena 11.9×/107× balloon).
   const hairBox = [samBox[0], samBox[1], samBox[2], Math.round(samBox[1] + (samBox[3] - samBox[1]) * 0.55)];
-  if (onGeom) { try { onGeom({ samBox, hairBox: singleCall ? null : hairBox, facePt, hairPt }); } catch { /* viz only */ } }
+  const hbcx = (hairBox[0] + hairBox[2]) / 2, hbcy = (hairBox[1] + hairBox[3]) / 2;
+  const hairPt = [Math.round(hbcx + 0.25 * (facePt[0] - hbcx)), Math.round(hbcy + 0.25 * (facePt[1] - hbcy))];
+  // faceDotOnly (used for the RESULT/round-2): a single face point, no hair dot
+  // and no hair box — just locate the repainted face, minimise flood risk. The
+  // over-segmentation salvage falls back to round 1 if this still balloons.
+  const points = { points: faceDotOnly ? [facePt] : [facePt, hairPt] };
+  if (onGeom) { try { onGeom({ samBox, hairBox: (singleCall || faceDotOnly) ? null : hairBox, facePt, hairPt: faceDotOnly ? null : hairPt }); } catch { /* viz only */ } }
   const calls = [maskFetch(cropJpegBuffer, samBox, points)];
-  if (!singleCall) calls.push(maskFetch(cropJpegBuffer, hairBox, {}));
+  if (!singleCall && !faceDotOnly) calls.push(maskFetch(cropJpegBuffer, hairBox, {}));
   const masks = await Promise.all(calls);
   if (masks.every(m => !m)) return null;
   const n = outW * outH;
