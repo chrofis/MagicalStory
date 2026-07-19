@@ -6874,14 +6874,28 @@ async function inpaintPage(imageData, evaluation, options = {}) {
         visualIdByName.set(pcf.characterName.toLowerCase(), pcf.visual_identifier);
       }
     }
+    // Fallback identifier when a name has no per_character_fixes entry: a
+    // short age/gender descriptor from the character data. "the character"
+    // loses WHO — observed: "Add <object> held in one of the character'
+    // hands" let Grok pick the wrong figure entirely.
+    const descriptorByName = new Map();
+    for (const c of (characters || [])) {
+      if (!c?.name) continue;
+      const bits = [c.age ? `${c.age}-year-old` : null, c.gender || null].filter(Boolean).join(' ');
+      descriptorByName.set(c.name.toLowerCase(), bits ? `the ${bits} figure` : 'the character');
+    }
     const stripNames = (text, ownVisualId) => {
       if (!text || typeof text !== 'string' || characterNames.length === 0) return text;
       let out = text;
       for (const name of characterNames) {
         // Prefer the per-name visual identifier, else the current entry's own
-        // identifier, else a neutral placeholder.
-        const vid = visualIdByName.get(name.toLowerCase()) || ownVisualId || 'the character';
-        const possRe = new RegExp(`\\b${escapeRe(name)}['’]s\\b`, 'g');
+        // identifier, else an age/gender descriptor built from character data.
+        const vid = visualIdByName.get(name.toLowerCase()) || ownVisualId
+          || descriptorByName.get(name.toLowerCase()) || 'the character';
+        // Possessives: both "Hans's" and bare-apostrophe "Hans'" — the bare
+        // form otherwise falls through to the name regex and leaves a
+        // dangling apostrophe ("the character' hands").
+        const possRe = new RegExp(`\\b${escapeRe(name)}['’]s?(?!\\w)`, 'g');
         out = out.replace(possRe, `${vid}'s`);
         const bareRe = new RegExp(`\\b${escapeRe(name)}\\b`, 'g');
         out = out.replace(bareRe, vid);
@@ -7067,6 +7081,14 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   // before the instruction reaches the image model — image models DRAW what
   // a prompt names. Previously only character-repair prompts were guarded.
   editInstruction = sanitizeIssueForInpaint(editInstruction);
+  // Resolve raw VB ids that evals quote back verbatim ("missing ART001") —
+  // an unresolved id makes Grok invent an object with the id painted on it
+  // as lettering (observed: gadget labelled "ART001" instead of the VB
+  // artifact, a child's backpack).
+  {
+    const { sanitizeVbIdsInPrompt } = require('./storyHelpers');
+    editInstruction = sanitizeVbIdsInPrompt(editInstruction, visualBible, pageNumber);
+  }
   const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${quietZoneSuffix}${coverTextSuffix}`;
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
@@ -7365,6 +7387,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const lines = beforeJson.split('\n').filter(l => l.trim() && !l.startsWith('#'));
         sceneSummary = lines[0]?.substring(0, 150) || '';
       }
+      // Same guard as buildEvalInputs: the shared bbox from the pre-step was
+      // computed on the ORIGINAL bytes. Forwarding it for a repaired/iterated
+      // entry made the entity check crop new pixels with old-version boxes
+      // (figure crops misaligned — box of version A on pixels of version B).
+      const isOriginalImage = entry.imageData === orig.imageData;
       return {
         imageData: entry.imageData,
         pageNumber: entry.pageNumber,
@@ -7378,8 +7405,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           return acc;
         }, {}),
         retryHistory: [],
-        // Shared bbox detection from pre-step (avoids redundant Gemini call)
-        sharedBboxDetection: orig.sharedBboxDetection || null,
+        // Shared bbox detection from pre-step (avoids redundant Gemini call) —
+        // only when the bytes are the ones it was computed on; otherwise the
+        // entity check re-detects on the current pixels.
+        sharedBboxDetection: isOriginalImage ? (orig.sharedBboxDetection || null) : null,
       };
     }),
     // Pass scene descriptions so entity-collect can determine per-page characters.

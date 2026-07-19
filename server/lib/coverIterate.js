@@ -864,14 +864,22 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
     : null;
   const landmarkName = loc?.name || (locId ? 'the landmark' : 'a scenic outdoor setting');
 
-  // Resolve artifact names from any ART### in objects
-  const artMap = {};
-  const artifacts = Array.isArray(visualBible?.artifacts) ? visualBible.artifacts : [];
-  for (const o of objects) {
-    if (typeof o !== 'string' || !/^ART\d+/i.test(o)) continue;
-    const art = artifacts.find(a => a?.id && a.id.toUpperCase() === o.toUpperCase());
-    if (art?.name) artMap[o.toUpperCase()] = art.name;
-  }
+  // Resolve any VB id (ART/ANI/VEH/CLO) to its VB name across all pools.
+  // The outline sometimes declares `holds: ART001` without listing ART001 in
+  // hint.objects (spec gap: holds ⊆ objects is not enforced), so resolution
+  // must NOT depend on the objects list — an unresolved id here propagates
+  // into the scene description, where the final sanitizer used to drop the
+  // entire single-line description (empty SCENE section, lost layout).
+  const holdablePools = ['artifacts', 'animals', 'vehicles', 'clothing'];
+  const resolveHoldableId = (id) => {
+    const upper = String(id || '').toUpperCase();
+    for (const pool of holdablePools) {
+      const arr = Array.isArray(visualBible?.[pool]) ? visualBible[pool] : [];
+      const hit = arr.find(e => e?.id && String(e.id).toUpperCase() === upper);
+      if (hit?.name) return hit.name;
+    }
+    return null;
+  };
 
   // Sort characters by priority (essential first, then normal, then low) so
   // the most important figures lead the prose.
@@ -903,8 +911,8 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
     const parts = [];
     if (pos) parts.push(`stands ${pos}`);
     if (holds && holds.toLowerCase() !== 'nothing') {
-      const m = holds.match(/^(ART\d+)/i);
-      const name = m && artMap[m[1].toUpperCase()] ? artMap[m[1].toUpperCase()] : holds;
+      const m = holds.match(/^((?:ART|ANI|VEH|CLO)\d+)/i);
+      const name = m ? (resolveHoldableId(m[1]) || holds) : holds;
       parts.push(`holds the ${name}`);
     }
     parts.push('eyes on the viewer');

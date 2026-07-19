@@ -1825,3 +1825,68 @@ harmonicBackgroundFill, recoverFaceBox).
 **Status:** staging (Test Lab). Production repairCharacterMismatch NOT yet ported.
 **Known residual:** a faint light edge halo where the 3px protected ring keeps a
 sliver of Qwen's glow — edge-matting limit, minor.
+
+## VB-id sanitizer substitutes generic nouns — never drops lines (2026-07-19)
+
+**Context:** The initial-page cover of a staging story shipped with an EMPTY
+`**SCENE:**` section: the whole cover scene description is ONE line, the outline
+declared `holds: ART001` without listing ART001 in `hint.objects` (holds ⊆ objects
+is not enforced), `buildCoverSceneFromHint` only resolved ids present in
+`hint.objects`, and `sanitizeVbIdsInPrompt` dropped the ENTIRE line containing the
+orphan id — deleting every character position from the prompt. Result: shuffled
+line-up + missing artifact, three repair rounds chasing "ART001" (Grok painted the
+raw id as lettering on invented gadgets), evaluator rejected a CORRECT render
+("blue backpack instead of the ART001 object") because it too only knew the id.
+
+**Decision:**
+1. `sanitizeVbIdsInPrompt` now substitutes a pool-generic noun for orphan ids
+   (ART→object, CHR→person, ANI→animal, LOC→place, VEH→vehicle, CLO→outfit) and
+   KEEPS the line. WARN unchanged. Dropping a line is never safe when prose is
+   single-line.
+2. `buildCoverSceneFromHint` resolves `holds` ids against the full VB pools
+   (artifacts/animals/vehicles/clothing), independent of `hint.objects`.
+3. `inpaintPage` runs `sanitizeVbIdsInPrompt` on the consolidated edit
+   instruction (evals quote raw ids back verbatim).
+4. `stripNames` (consolidated-plan safety net) handles bare-apostrophe
+   possessives ("Hans'" — previously produced "the character' hands") and falls
+   back to an age/gender descriptor instead of the anonymous "the character",
+   which lost WHO should receive an object fix.
+
+**Rationale:** an unresolved id must degrade to something harmless ("object"),
+never delete layout information; every prompt path that can carry an id must
+resolve it before an image model sees it.
+
+**Touched:** `server/lib/storyHelpers.js` (sanitizeVbIdsInPrompt),
+`server/lib/coverIterate.js` (buildCoverSceneFromHint),
+`server/lib/images.js` (inpaintPage sanitize + stripNames).
+
+## Entity check never reuses pre-step bbox on changed bytes (2026-07-19)
+
+**Context:** figure crops in the character-consistency check misaligned — box of
+version A cut from pixels of version B. `buildEvalInputs` had the
+`isOriginalImage` guard (only forward `sharedBboxDetection` when
+`entry.imageData === orig.imageData`) but sibling `buildEntityCheckData` did not,
+so the post-repair round re-check cropped repaired pixels with v0 boxes
+(`resolveActiveVersionData` prefers `sharedBboxDetection`, and present figures
+suppress the fallback re-detect).
+
+**Decision:** mirror the guard into `buildEntityCheckData`; repaired/iterated
+entries carry `sharedBboxDetection: null` and the entity check re-detects on the
+current pixels.
+
+**Touched:** `server/lib/images.js` (buildEntityCheckData).
+
+## Test Lab targets covers via negative page numbers (2026-07-19)
+
+**Context:** figure-detection experiments (Gemini vs GroundingDINO/SAM) need to
+run on cover images; `loadSceneContext`/`loadActivePageImage` only addressed
+`sceneImages` pages.
+
+**Decision:** pageNumber -1/-2/-3 = frontCover/initialPage/backCover (same
+convention as refresh-bbox/repair). Cover prose is exposed as
+`scene.sceneDescription`; image bytes load from `story_images`
+(image_type=coverKey, page_number NULL, active-version meta keyed by coverKey).
+`benchmark_scenes.page_number` already accepts negatives.
+
+**Touched:** `server/lib/testlab.js` (COVER_KEY_BY_PAGE, loadSceneContext,
+loadActivePageImage).

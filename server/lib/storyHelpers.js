@@ -4765,9 +4765,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   const appendExactPoses = (s) => exactPosesBlock ? `${s}\n\n${exactPosesBlock}` : s;
   // Final chokepoint — sanitises VB IDs that survived upstream builders.
   // Resolves CHR###/ANI###/ART###/LOC###/VEH###/CLO### tokens to their real
-  // names from the Visual Bible. When an id has no matching VB entry, drops
-  // the ENTIRE LINE containing it and logs a WARN so we see upstream bugs
-  // instead of letting the orphan id reach Grok.
+  // names from the Visual Bible. When an id has no matching VB entry,
+  // substitutes a pool-generic noun and logs a WARN so we see upstream bugs
+  // instead of letting the orphan id reach Grok as paintable text.
   const finalize = (s) => sanitizeVbIdsInPrompt(s, visualBible, pageNumber);
 
   // Use template if available, otherwise fall back to hardcoded prompt
@@ -4817,8 +4817,10 @@ Important:
  * Final-pass sanitiser for image prompts. Walks the assembled prompt for
  * Visual Bible IDs (CHR### / ANI### / ART### / LOC### / VEH### / CLO###),
  * resolves each to the matching VB entry's `name`. When an id has no
- * matching entry — orphan — drops the entire line that contained the id
- * and logs a WARN so the upstream bug surfaces in logs.
+ * matching entry — orphan — substitutes a generic noun for its pool
+ * (ART→object, CHR→person, …) and logs a WARN so the upstream bug surfaces
+ * in logs. (Never drops the line: the cover scene description is a single
+ * line, and dropping it deleted the whole layout from the prompt.)
  *
  * Single chokepoint for the buildImagePrompt return path so adding a new
  * builder upstream (interactions, secondaries, brief, EXACT POSES, future)
@@ -4850,30 +4852,33 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   }
 
   const ID_PATTERN = /(CHR|ANI|ART|LOC|VEH|CLO)\d+/g;
+  // Orphan ids (no VB entry) are replaced with a pool-generic noun instead of
+  // dropping the containing line. Dropping was catastrophic for single-line
+  // prose: the whole cover scene description lived on ONE line, so one orphan
+  // "ART001" deleted every character position from the prompt (empty SCENE
+  // section — observed 2026-07-19, initial page shuffled + missing object).
+  // A generic noun keeps the layout and still prevents the model from
+  // painting the raw id as lettering.
+  const GENERIC_NOUN = { CHR: 'person', ANI: 'animal', ART: 'object', LOC: 'place', VEH: 'vehicle', CLO: 'outfit' };
   const lines = prompt.split('\n');
   const out = [];
   const orphans = [];
   for (const line of lines) {
-    let dropLine = false;
     const lineOrphans = [];
     const resolved = line.replace(ID_PATTERN, (id) => {
       const name = idToName.get(id.toUpperCase());
       if (name) return name;
       lineOrphans.push(id);
-      dropLine = true;
-      return id; // value irrelevant — line will be dropped
+      return GENERIC_NOUN[id.slice(0, 3).toUpperCase()] || 'object';
     });
-    if (dropLine) {
-      orphans.push({ line: line.trim(), ids: lineOrphans });
-      continue;
-    }
+    if (lineOrphans.length > 0) orphans.push({ line: line.trim(), ids: lineOrphans });
     out.push(resolved);
   }
 
   if (orphans.length > 0) {
     const tag = pageNumber !== null && pageNumber !== undefined ? `[PROMPT-SANITISE P${pageNumber}]` : '[PROMPT-SANITISE]';
     for (const orphan of orphans) {
-      log.warn(`${tag} Dropped line with unresolved VB id(s) ${orphan.ids.join(', ')}: "${orphan.line.slice(0, 160)}"`);
+      log.warn(`${tag} Replaced unresolved VB id(s) ${orphan.ids.join(', ')} with generic noun in: "${orphan.line.slice(0, 160)}"`);
     }
   }
   return out.join('\n');

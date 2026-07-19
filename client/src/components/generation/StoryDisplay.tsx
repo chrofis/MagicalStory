@@ -239,6 +239,18 @@ function activeBboxOverlay(image: any): string | null {
   return (v?.bboxOverlayImage as string | undefined) ?? (image?.bboxOverlayImage ?? null);
 }
 
+// bboxOverrides cache key: per page/cover AND per active version. A
+// version-less key survived version switches, so after one manual re-detect
+// the Object Detection panel stayed pinned to that stale detection no matter
+// which version the user activated.
+function bboxKey(base: string, image: any): string {
+  const versions = image?.imageVersions;
+  const idx = Array.isArray(versions) && versions.length > 0
+    ? Math.min(Math.max(0, image?.activeVersion ?? versions.length - 1), versions.length - 1)
+    : 0;
+  return `${base}:v${idx}`;
+}
+
 // Active version index — sent to the server's bboxOverlay endpoint so the
 // overlay is drawn on the same version's image the user is viewing. Without
 // it, server fell back to scene-level detection and produced stale overlays.
@@ -1503,7 +1515,7 @@ export function StoryDisplay({
   };
 
   // Character repair button + inline popover for selecting character and face/body target
-  const renderCharRepairButton = (pageNumber: number, bboxDetection?: { figures?: Array<{ name?: string }> } | null) => {
+  const renderCharRepairButton = (pageNumber: number, bboxDetection?: { figures?: Array<{ name?: string }> } | null, overrideKeyProp?: string) => {
     if (!onRepairCharacter) return null;
     const isRepairing = charRepairingPages.has(pageNumber);
     const isDetecting = charDetectingBbox.has(pageNumber);
@@ -1522,7 +1534,7 @@ export function StoryDisplay({
     const detectAndOpen = async () => {
       if (!storyId) return;
       const COVER_PAGE_MAP: Record<number, string> = { [-1]: 'cover:front', [-2]: 'cover:initial', [-3]: 'cover:back' };
-      const overrideKey = COVER_PAGE_MAP[pageNumber] || `page:${pageNumber}`;
+      const overrideKey = overrideKeyProp || COVER_PAGE_MAP[pageNumber] || `page:${pageNumber}`;
 
       setCharDetectingBbox(prev => new Set(prev).add(pageNumber));
       try {
@@ -4384,7 +4396,7 @@ export function StoryDisplay({
                     <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
-                {renderCharRepairButton(-1, bboxOverrides['cover:front'] ?? frontCoverObj?.bboxDetection)}
+                {renderCharRepairButton(-1, bboxOverrides[bboxKey('cover:front', frontCoverObj)] ?? frontCoverObj?.bboxDetection, bboxKey('cover:front', frontCoverObj))}
                 </div>
               </div>
             )}
@@ -4527,12 +4539,12 @@ export function StoryDisplay({
                 {/* Object Detection for Cover */}
                 <ObjectDetectionDisplay
                   retryHistory={frontCoverObj.retryHistory}
-                  bboxDetection={bboxOverrides['cover:front'] ?? activeBboxDetection(frontCoverObj)}
-                  bboxOverlayImage={bboxOverrides['cover:front'] ? null : activeBboxOverlay(frontCoverObj)}
+                  bboxDetection={bboxOverrides[bboxKey('cover:front', frontCoverObj)] ?? activeBboxDetection(frontCoverObj)}
+                  bboxOverlayImage={bboxOverrides[bboxKey('cover:front', frontCoverObj)] ? null : activeBboxOverlay(frontCoverObj)}
                   language={language}
                   storyId={storyId}
                   coverType="front"
-                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, 'cover:front': bbox }))}
+                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey('cover:front', frontCoverObj)]: bbox }))}
                 />
 
                 {/* Previous / Original Image */}
@@ -4658,7 +4670,7 @@ export function StoryDisplay({
                     <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
-                {renderCharRepairButton(-2, bboxOverrides['cover:initial'] ?? initialPageObj?.bboxDetection)}
+                {renderCharRepairButton(-2, bboxOverrides[bboxKey('cover:initial', initialPageObj)] ?? initialPageObj?.bboxDetection, bboxKey('cover:initial', initialPageObj))}
                 </div>
               </div>
             )}
@@ -4796,12 +4808,12 @@ export function StoryDisplay({
                 {/* Object Detection for Cover */}
                 <ObjectDetectionDisplay
                   retryHistory={initialPageObj.retryHistory}
-                  bboxDetection={bboxOverrides['cover:initial'] ?? activeBboxDetection(initialPageObj)}
-                  bboxOverlayImage={bboxOverrides['cover:initial'] ? null : activeBboxOverlay(initialPageObj)}
+                  bboxDetection={bboxOverrides[bboxKey('cover:initial', initialPageObj)] ?? activeBboxDetection(initialPageObj)}
+                  bboxOverlayImage={bboxOverrides[bboxKey('cover:initial', initialPageObj)] ? null : activeBboxOverlay(initialPageObj)}
                   language={language}
                   storyId={storyId}
                   coverType="initial"
-                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, 'cover:initial': bbox }))}
+                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey('cover:initial', initialPageObj)]: bbox }))}
                 />
 
                 {/* Previous / Original Image */}
@@ -5003,7 +5015,7 @@ export function StoryDisplay({
                                   <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                                 </button>
                               )}
-                              {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection ?? (image?.retryHistory?.find((r: any) => r.bboxDetection?.figures)?.bboxDetection as any))}
+                              {renderCharRepairButton(pageNumber, bboxOverrides[bboxKey(`page:${pageNumber}`, image)] ?? image?.bboxDetection ?? (image?.retryHistory?.find((r: any) => r.bboxDetection?.figures)?.bboxDetection as any), bboxKey(`page:${pageNumber}`, image))}
                             </div>
                             {/* Row 2: Text edit + version history — 2 cols on PC, full width each on mobile */}
                             {(onSaveStoryText || getImageVersions(pageNumber).length > 1) && (
@@ -5501,13 +5513,13 @@ export function StoryDisplay({
                             {/* Object Detection (separate from retry history for visibility) */}
                             <ObjectDetectionDisplay
                               retryHistory={image?.retryHistory}
-                              bboxDetection={bboxOverrides[`page:${image?.pageNumber}`] ?? activeBboxDetection(image)}
-                              bboxOverlayImage={bboxOverrides[`page:${image?.pageNumber}`] ? null : activeBboxOverlay(image)}
+                              bboxDetection={bboxOverrides[bboxKey(`page:${image?.pageNumber}`, image)] ?? activeBboxDetection(image)}
+                              bboxOverlayImage={bboxOverrides[bboxKey(`page:${image?.pageNumber}`, image)] ? null : activeBboxOverlay(image)}
                               language={language}
                               storyId={storyId}
                               pageNumber={image?.pageNumber}
                               versionIndex={activeVersionIndex(image)}
-                              onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [`page:${image?.pageNumber}`]: bbox }))}
+                              onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey(`page:${image?.pageNumber}`, image)]: bbox }))}
                             />
 
                             {/* Eval Testing (per-page evaluation in dev mode) */}
@@ -5692,7 +5704,7 @@ export function StoryDisplay({
                                   <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                                 </button>
                               )}
-                              {renderCharRepairButton(pageNumber, bboxOverrides[`page:${pageNumber}`] ?? image?.bboxDetection ?? (image?.retryHistory?.find((r: any) => r.bboxDetection?.figures)?.bboxDetection as any))}
+                              {renderCharRepairButton(pageNumber, bboxOverrides[bboxKey(`page:${pageNumber}`, image)] ?? image?.bboxDetection ?? (image?.retryHistory?.find((r: any) => r.bboxDetection?.figures)?.bboxDetection as any), bboxKey(`page:${pageNumber}`, image))}
                             </div>
                             {/* Row 2: Text edit + version history — 2 cols on PC, full width each on mobile */}
                             {(onSaveStoryText || getImageVersions(pageNumber).length > 1) && (
@@ -6187,13 +6199,13 @@ export function StoryDisplay({
                             {/* Object Detection (separate from retry history for visibility) */}
                             <ObjectDetectionDisplay
                               retryHistory={image.retryHistory}
-                              bboxDetection={bboxOverrides[`page:${image.pageNumber}`] ?? activeBboxDetection(image)}
-                              bboxOverlayImage={bboxOverrides[`page:${image.pageNumber}`] ? null : activeBboxOverlay(image)}
+                              bboxDetection={bboxOverrides[bboxKey(`page:${image.pageNumber}`, image)] ?? activeBboxDetection(image)}
+                              bboxOverlayImage={bboxOverrides[bboxKey(`page:${image.pageNumber}`, image)] ? null : activeBboxOverlay(image)}
                               language={language}
                               storyId={storyId}
                               pageNumber={image.pageNumber}
                               versionIndex={activeVersionIndex(image)}
-                              onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [`page:${image.pageNumber}`]: bbox }))}
+                              onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey(`page:${image.pageNumber}`, image)]: bbox }))}
                             />
 
                             {/* Eval Testing (per-page evaluation in dev mode) */}
@@ -6372,7 +6384,7 @@ export function StoryDisplay({
                     <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
-                {renderCharRepairButton(-3, bboxOverrides['cover:back'] ?? backCoverObj?.bboxDetection)}
+                {renderCharRepairButton(-3, bboxOverrides[bboxKey('cover:back', backCoverObj)] ?? backCoverObj?.bboxDetection, bboxKey('cover:back', backCoverObj))}
                 </div>
               </div>
             )}
@@ -6510,12 +6522,12 @@ export function StoryDisplay({
                 {/* Object Detection for Cover */}
                 <ObjectDetectionDisplay
                   retryHistory={backCoverObj.retryHistory}
-                  bboxDetection={bboxOverrides['cover:back'] ?? activeBboxDetection(backCoverObj)}
-                  bboxOverlayImage={bboxOverrides['cover:back'] ? null : activeBboxOverlay(backCoverObj)}
+                  bboxDetection={bboxOverrides[bboxKey('cover:back', backCoverObj)] ?? activeBboxDetection(backCoverObj)}
+                  bboxOverlayImage={bboxOverrides[bboxKey('cover:back', backCoverObj)] ? null : activeBboxOverlay(backCoverObj)}
                   language={language}
                   storyId={storyId}
                   coverType="back"
-                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, 'cover:back': bbox }))}
+                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey('cover:back', backCoverObj)]: bbox }))}
                 />
 
                 {/* Previous / Original Image */}

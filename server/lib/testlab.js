@@ -45,26 +45,54 @@ async function toDataUri(src) {
  * Load one scene + the story-level fields the stage runners need.
  * Reference/landmark photos are resolved to data URIs (R2 URLs fetched).
  */
+// Covers addressable as negative page numbers — same convention the
+// regeneration routes use (refresh-bbox, repair). Lets detection/eval stages
+// run on cover images, not only story pages.
+const COVER_KEY_BY_PAGE = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
+
 async function loadSceneContext(storyId, pageNumber) {
   const { dbQuery } = require('../services/database');
-  const rows = await dbQuery(
-    `SELECT (scene)::text AS scene_text,
-            data->>'artStyle' AS art_style,
-            data->>'language' AS language,
-            data->>'languageLevel' AS language_level,
-            data->>'storyType' AS story_type,
-            data->>'title' AS title,
-            data->'layout' AS layout,
-            (data->'visualBible')::text AS visual_bible,
-            (data->'clothingRequirements')::text AS clothing_reqs,
-            (data->'characters')::text AS characters_json
-     FROM stories, jsonb_array_elements(data->'sceneImages') scene
-     WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
-    [storyId, pageNumber]
-  );
-  if (rows.length === 0) throw new Error(`Scene not found: ${storyId} page ${pageNumber}`);
+  const coverKey = pageNumber < 0 ? COVER_KEY_BY_PAGE[String(pageNumber)] : null;
+  if (pageNumber < 0 && !coverKey) throw new Error(`Invalid cover page number: ${pageNumber}`);
+  const rows = coverKey
+    ? await dbQuery(
+      `SELECT (data->'coverImages'->$2)::text AS scene_text,
+              data->>'artStyle' AS art_style,
+              data->>'language' AS language,
+              data->>'languageLevel' AS language_level,
+              data->>'storyType' AS story_type,
+              data->>'title' AS title,
+              data->'layout' AS layout,
+              (data->'visualBible')::text AS visual_bible,
+              (data->'clothingRequirements')::text AS clothing_reqs,
+              (data->'characters')::text AS characters_json
+       FROM stories WHERE stories.id = $1`,
+      [storyId, coverKey]
+    )
+    : await dbQuery(
+      `SELECT (scene)::text AS scene_text,
+              data->>'artStyle' AS art_style,
+              data->>'language' AS language,
+              data->>'languageLevel' AS language_level,
+              data->>'storyType' AS story_type,
+              data->>'title' AS title,
+              data->'layout' AS layout,
+              (data->'visualBible')::text AS visual_bible,
+              (data->'clothingRequirements')::text AS clothing_reqs,
+              (data->'characters')::text AS characters_json
+       FROM stories, jsonb_array_elements(data->'sceneImages') scene
+       WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
+      [storyId, pageNumber]
+    );
+  if (rows.length === 0 || !rows[0].scene_text) throw new Error(`Scene not found: ${storyId} page ${pageNumber}`);
 
   const scene = JSON.parse(rows[0].scene_text);
+  if (coverKey) {
+    // Covers store their prose under `description`; stage runners read
+    // scene.sceneDescription and scene.pageNumber.
+    scene.pageNumber = pageNumber;
+    if (!scene.sceneDescription) scene.sceneDescription = scene.description || '';
+  }
   const layout = typeof rows[0].layout === 'string' ? JSON.parse(rows[0].layout) : (rows[0].layout || {});
   let visualBible = null;
   try {
@@ -132,12 +160,18 @@ async function loadEmptyScene(storyId, pageNumber) {
   return rows.length > 0 ? bytesFor(rows[0]) : null;
 }
 
-/** Active (user-visible) page image as a data URI. */
+/** Active (user-visible) page image as a data URI. Covers via -1/-2/-3. */
 async function loadActivePageImage(storyId, pageNumber) {
   const { getActiveVersion, getStoryImage } = require('../services/database');
-  const activeIdx = await getActiveVersion(storyId, pageNumber);
-  const img = await getStoryImage(storyId, 'scene', pageNumber, activeIdx)
-    || await getStoryImage(storyId, 'scene', pageNumber, 0);
+  const coverKey = pageNumber < 0 ? COVER_KEY_BY_PAGE[String(pageNumber)] : null;
+  // Cover rows live in story_images as image_type=<coverKey> with NULL
+  // page_number; active-version meta is keyed by the cover key string.
+  const activeIdx = await getActiveVersion(storyId, coverKey || pageNumber);
+  const img = coverKey
+    ? (await getStoryImage(storyId, coverKey, null, activeIdx)
+      || await getStoryImage(storyId, coverKey, null, 0))
+    : (await getStoryImage(storyId, 'scene', pageNumber, activeIdx)
+      || await getStoryImage(storyId, 'scene', pageNumber, 0));
   if (!img) throw new Error(`No image for ${storyId} page ${pageNumber}`);
   const data = await bytesFor(img);
   if (!data) throw new Error(`Image bytes unavailable for ${storyId} page ${pageNumber}`);
