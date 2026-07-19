@@ -2921,23 +2921,29 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   const _normArea = (b) => Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
   const BLOWN_RATIO = 1.6;
   for (const d of dets) {
-    if (!d.samApplied || !d.face) continue;
+    if (!d.samApplied) continue;                       // samApplied=false already uses the tight gdinoBox
     const gA = _normArea(d.gdinoBox);
     if (gA <= 0 || _normArea(d.bodyBox) / gA < BLOWN_RATIO) continue;
-    const fb = d.face.box; // px [x0,y0,x1,y1]
-    const headCx = Math.round((fb[0] + fb[2]) / 2), headCy = Math.round((fb[1] + fb[3]) / 2);
-    const faceH = fb[3] - fb[1];
-    const torsoY = Math.min(H - 1, Math.round(fb[3] + faceH * 1.2));
-    const pmask = await _mobilesamMaskPoints(imageDataUri, [[headCx, headCy], [headCx, torsoY]], W, H);
+    // A blown mask ALWAYS gets corrected. With a paired head we first try the
+    // tighter point-prompt silhouette (feet-inclusive, best for repair); with no
+    // face — or if the point mask still blows out / fails — we drop the mask and
+    // fall back to the tight gdinoBox (verified-correct, same as samApplied=false).
     let fixed = false;
-    if (pmask) {
-      const newNorm = _pxBoxToNorm(pmask.bbox, W, H);
-      if (_normArea(newNorm) > 0 && _normArea(newNorm) / gA < BLOWN_RATIO) {
-        d.mask = pmask; d.bodyBox = newNorm; d.blownMaskFixed = 'point-sam'; fixed = true;
+    if (d.face) {
+      const fb = d.face.box; // px [x0,y0,x1,y1]
+      const headCx = Math.round((fb[0] + fb[2]) / 2), headCy = Math.round((fb[1] + fb[3]) / 2);
+      const faceH = fb[3] - fb[1];
+      const torsoY = Math.min(H - 1, Math.round(fb[3] + faceH * 1.2));
+      const pmask = await _mobilesamMaskPoints(imageDataUri, [[headCx, headCy], [headCx, torsoY]], W, H);
+      if (pmask) {
+        const newNorm = _pxBoxToNorm(pmask.bbox, W, H);
+        if (_normArea(newNorm) > 0 && _normArea(newNorm) / gA < BLOWN_RATIO) {
+          d.mask = pmask; d.bodyBox = newNorm; d.blownMaskFixed = 'point-sam'; fixed = true;
+        }
       }
     }
-    if (!fixed) { d.mask = null; d.bodyBox = d.gdinoBox; d.blownMaskFixed = 'gdino-fallback'; }
-    log.debug(`[GDINO-DETECT] ${pageLabel}blown mask (${(_normArea(d.gdinoBox) ? '≥1.6×' : '')}) corrected → ${d.blownMaskFixed}`);
+    if (!fixed) { d.mask = null; d.bodyBox = d.gdinoBox; d.blownMaskFixed = d.face ? 'gdino-fallback' : 'gdino-fallback-noface'; }
+    log.debug(`[GDINO-DETECT] ${pageLabel}blown mask corrected → ${d.blownMaskFixed}`);
   }
 
   // Stage 4 — identity. Primary: Set-of-Mark — letter badges are drawn on the
@@ -3003,6 +3009,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       bodyBox: d.bodyBox,
       gdinoBox: d.gdinoBox,
       samApplied: d.samApplied,
+      blownMaskFixed: d.blownMaskFixed,   // 'point-sam' | 'gdino-fallback' | 'gdino-fallback-noface' | undefined — blown-mask guard outcome
       _faceSource: d.face ? 'dino' : undefined,
       _faceScore: d.face ? +d.face.score.toFixed(3) : undefined,
       confidence: name === 'UNKNOWN' ? 'low' : d.score >= 0.6 ? 'high' : d.score >= 0.4 ? 'medium' : 'low',
