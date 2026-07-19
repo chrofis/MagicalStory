@@ -264,7 +264,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 - `characters[]`: one entry per character. Always `name`, `clothing`, `position`; for foreground/midground characters add `expression`.
   - `position` is a short phrase matching the prose ("right foreground", "center background", "behind the desk").
   - `clothing` must match the outline exactly — if the outline says `costumed`, write `costumed`, not `standard`. Also describe the costume in the prose.
-  - `expression` is a short visible-cue phrase from the page text ("alarmed, mouth open, brows pulled tight"), never an emotion word alone. Keep it consistent with the prose.
+  - `expression` is a short visible-cue phrase from the page text ("alarmed, mouth open, brows pulled tight"), never an emotion word alone. Keep it consistent with the prose. The underlying emotion comes from the page text and the draft — you may strengthen the visible cue, never replace the emotion itself.
   - Add `"perspective": "back view"` or `"side"` only when non-standard; omit otherwise.
   - Add `"depth": "background"` only for tiny/distant figures; omit for foreground/midground.
 
