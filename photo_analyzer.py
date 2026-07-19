@@ -1318,6 +1318,42 @@ def silhouette_edge_endpoint():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+# ── Memory hygiene ──────────────────────────────────────────────────────────
+# Long-running CPU inference process: torch/numpy free their objects but glibc
+# does NOT return the freed pages to the OS, so RSS creeps up across hundreds of
+# mask calls until an allocation fails and /figure-mask throws HTTP 500 (observed
+# on staging: SAM works on a fresh deploy, 500s after many repairs). gc.collect()
+# frees Python objects; malloc_trim(0) hands the freed arenas back to the OS so
+# RSS actually drops. Both models STAY loaded — this is per-call cleanup, not an
+# unload. Called after every heavy inference.
+try:
+    import ctypes
+    _libc = ctypes.CDLL("libc.so.6")
+except Exception:
+    _libc = None
+
+
+def _release_memory():
+    try:
+        gc.collect()
+        if _libc is not None:
+            _libc.malloc_trim(0)
+    except Exception:
+        pass
+
+
+def _rss_mb():
+    """Current resident set size in MB (Linux /proc), or None."""
+    try:
+        with open('/proc/self/status') as f:
+            for line in f:
+                if line.startswith('VmRSS:'):
+                    return round(int(line.split()[1]) / 1024, 1)
+    except Exception:
+        return None
+    return None
+
+
 # MobileSAM for box-prompted figure masks (lazy loaded, ~570MB peak RSS)
 _mobilesam_model = None
 
@@ -1426,16 +1462,22 @@ def figure_mask_endpoint():
         _, buffer = cv2.imencode('.png', out, [cv2.IMWRITE_PNG_COMPRESSION, 9])
         fill_pixels = int(binary.sum())
         pts_str = f", points={prompt_kwargs.get('points')}" if 'points' in prompt_kwargs else ''
-        print(f"[FIGURE-MASK] {w}x{h} crop, box={box_str}{pts_str}, fill px={fill_pixels}, out={len(buffer)//1024}KB")
-        return jsonify({
+        payload = jsonify({
             "success": True,
             "image": f"data:image/png;base64,{base64.b64encode(buffer).decode('utf-8')}",
             "fill_pixels": fill_pixels,
         })
+        # Drop the big per-call intermediates, then hand freed RSS back to the OS
+        # so this long-running process doesn't creep up into an OOM 500.
+        del results, res, m, union, binary, out, buffer, img, img_array
+        _release_memory()
+        print(f"[FIGURE-MASK] {w}x{h} crop, box={box_str}{pts_str}, fill px={fill_pixels}, rss={_rss_mb()}MB")
+        return payload
 
     except Exception as e:
-        print(f"[FIGURE-MASK] Error: {e}")
+        print(f"[FIGURE-MASK] Error: {e} (rss={_rss_mb()}MB)")
         traceback.print_exc()
+        _release_memory()
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1589,8 +1631,12 @@ def detect_figures_text_endpoint():
                 cand.append({"box": [int(round(v)) for v in b], "score": round(float(s), 3)})
             best = cand[0] if cand else {"box": None, "score": None}
             figures.append({"name": name, "box": best["box"], "score": best["score"], "candidates": cand})
+            del inputs, out, res, boxes, scores
             print(f"[GDINO] {name}: {len(cand)} boxes, best score {best['score']}")
 
+        # Detection runs many times per story (per page) — release the per-call
+        # transients so RSS doesn't accumulate while both models stay loaded.
+        _release_memory()
         return jsonify({"success": True, "width": w, "height": h, "figures": figures})
 
     except Exception as e:
@@ -1601,21 +1647,42 @@ def detect_figures_text_endpoint():
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
-    # Check LPIPS availability
+    """Health check endpoint.
+
+    Reports process RSS and which heavy models are resident so the caller can
+    see memory pressure (the SAM-500 root cause) without guessing. ?probe=sam
+    runs a tiny box-prompt MobileSAM inference and reports whether it actually
+    works right now — a real readiness check, not just 'process is up'."""
     lpips_available = False
     try:
         import lpips
         lpips_available = True
     except ImportError:
         pass
-    return jsonify({
+    body = {
         "status": "ok",
         "service": "photo-analyzer",
         "mediapipe_available": MEDIAPIPE_AVAILABLE,
         "rembg_available": REMBG_AVAILABLE,
-        "lpips_available": lpips_available
-    })
+        "lpips_available": lpips_available,
+        "rss_mb": _rss_mb(),
+        "mobilesam_loaded": _mobilesam_model is not None,
+        "groundingdino_loaded": _gdino_model is not None,
+    }
+    if request.args.get('probe') == 'sam':
+        try:
+            model = get_mobilesam()
+            probe_img = np.full((64, 64, 3), 128, dtype=np.uint8)
+            r = model(probe_img, imgsz=1024, verbose=False, bboxes=[[8, 8, 56, 56]])
+            ok = r and r[0].masks is not None
+            del r
+            _release_memory()
+            body["sam_probe"] = "ok" if ok else "no_mask"
+        except Exception as e:
+            body["sam_probe"] = f"fail: {e}"
+            body["status"] = "degraded"
+            _release_memory()
+    return jsonify(body)
 
 
 @app.route('/analyze', methods=['POST'])
