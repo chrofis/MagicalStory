@@ -18,7 +18,7 @@ Your job: rate the sheet on FOUR checks and return a JSON verdict.
 
 TASK 1: LAYOUT
 - Top row: 4 head-and-neck portraits, no shoulders or torso. Score 1-10.
-- Bottom row: 4 full-body figures, head to feet. Score 1-10.
+- Bottom row: 4 full-body figures showing the COMPLETE figure from head to feet, with both feet and shoes visible inside the cell. A bottom-row figure cropped at the thigh, knee, or ankle — feet or shoes not visible — is NOT full-body: score 1-3. Score 1-10.
 - Horizontal gutter between rows: clean white space, no figure crosses it. Score 1-10.
 - Cell containment: every figure inside its own cell with white margin on all four sides. No hair, hand, foot, or shadow extends across a cell border. A figure whose head is in the top row and feet are in the bottom row is the most common failure — score 1-2 if you see this in any cell. Score 1-10.
 - `layoutScore` = lowest of the four. A waist-cutting failure or any figure spanning two cells must score 1-3.
@@ -71,7 +71,7 @@ Return EXACTLY this JSON shape:
 {
   "layout": {
     "topRowHeadsOnly":   {"score": 9, "reason": "All 4 top cells show head + neck only, no torso"},
-    "bottomRowFullBody": {"score": 8, "reason": "All 4 bottom cells show head-to-feet figures"},
+    "bottomRowFullBody": {"score": 8, "reason": "All 4 bottom cells show complete head-to-feet figures with feet and shoes visible"},
     "cleanGutter":       {"score": 10, "reason": "Horizontal gutter is white; no figure crosses it"},
     "cellContainment":   {"score": 9, "reason": "Each figure sits inside its cell with white margin on all four sides"},
     "layoutScore": 8
