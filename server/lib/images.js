@@ -2375,7 +2375,10 @@ async function _mobilesamMaskFull(imageDataUri, boxPx, W, H) {
     const res = await fetch(`${_photoAnalyzerUrl()}/figure-mask`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: imageDataUri, box: boxPx }),
-      signal: AbortSignal.timeout(60_000),
+      // 150s: an aborted request does NOT cancel the analyzer's computation —
+      // short timeouts under CPU contention stack zombie work until the
+      // service starves (observed SAM outage). Waiting beats re-firing.
+      signal: AbortSignal.timeout(150_000),
     });
     if (!res.ok) return null;
     const j = await res.json();
@@ -10141,7 +10144,10 @@ async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop, opts = {}) {
           color: [255, 255, 255],
           alpha: 255,
         }),
-        signal: AbortSignal.timeout(30_000),
+        // 150s: an aborted request does NOT cancel the analyzer's computation —
+        // short timeouts under CPU contention stack zombie work until the
+        // service starves (observed SAM outage: 12 consecutive 30s aborts).
+        signal: AbortSignal.timeout(150_000),
       });
       if (res.ok) {
         const j = await res.json();
