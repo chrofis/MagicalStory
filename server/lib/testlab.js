@@ -1909,6 +1909,21 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const oldA = await sharp(oldMask).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
   const newA = await sharp(newMask).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
 
+  // Round-2 mask plausibility (PRE-clip): exp #115's round-2 SAM returned a
+  // sprawling multi-blob ~5× round 1 (Qwen had drifted the layout and painted
+  // a white-card face); the face clip salvaged the geometry so IoU passed,
+  // and the blend copied card pixels. A round-2 mask that dwarfs round 1 is
+  // a mis-segmentation, never a grown figure.
+  {
+    const s1 = Math.max(1, Math.round(oldA.length / n));
+    const s2 = Math.max(1, Math.round(newA.length / n));
+    let po = 0, pn = 0;
+    for (let i = 0; i < n; i++) { if (oldA[i * s1] > 128) po++; if (newA[i * s2] > 128) pn++; }
+    if (po > 0 && pn > po * 4) {
+      throw fail(`Round-2 SAM mask is ${(pn / po).toFixed(1)}x the size of round 1 — mis-segmentation of the model output (layout drift / painted-on-card). Redo.`);
+    }
+  }
+
   // Face-scoped repairs: BOTH masks hard-clipped to the target region —
   // round 2's SAM may grab head+torso otherwise and balloon the union.
   if (clipRect?.length === 4) {
@@ -1963,6 +1978,24 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const padPx = 6;
   const unionPadded = strip(await sharp(union, raw1).blur(padPx / 1.5).threshold(16).raw().toBuffer()); // ≈6px dilation, binary
   const alpha1 = Buffer.from(unionPadded);
+
+  // White-card gate: a face painted on a white panel passes IoU (geometry
+  // aligns) and the style gate (a colorless panel has no "style") — v92's
+  // Roger shipped exactly that. Mechanical check: the pixels TAKEN from the
+  // new image must not be substantially near-white.
+  {
+    const candRaw0 = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+    let unionCnt = 0, whiteCnt = 0;
+    for (let i = 0; i < n; i++) {
+      if (!alpha1[i]) continue;
+      unionCnt++;
+      if (candRaw0[i * 3] >= 243 && candRaw0[i * 3 + 1] >= 243 && candRaw0[i * 3 + 2] >= 243) whiteCnt++;
+    }
+    const whiteFrac = unionCnt ? whiteCnt / unionCnt : 0;
+    if (whiteFrac > 0.22) {
+      throw fail(`Blended region is ${(whiteFrac * 100).toFixed(0)}% near-white — the model painted the face on a white card. Redo.`);
+    }
+  }
 
   // Applied mask views instead of raw black/white masks: (a) the original
   // with the padded union whited out — the region the blend treats as
