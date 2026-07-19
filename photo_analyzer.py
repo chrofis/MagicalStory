@@ -3425,8 +3425,15 @@ if __name__ == '__main__':
     # dev server only if waitress is missing.
     try:
         from waitress import serve
-        print(f"   Serving via waitress (6 threads) on port {port}")
-        serve(app, host='0.0.0.0', port=port, threads=6, channel_timeout=600)
+        # Match worker threads to the container's vCPUs so mask/detect inference
+        # (MobileSAM/GDINO via torch — releases the GIL during compute) actually
+        # runs in PARALLEL across the cores instead of ≤6 at a time while the rest
+        # queue past the 150s client timeout. Tune via ANALYZER_THREADS. Was
+        # hard-coded 6 → left most vCPUs idle under a full multi-page story.
+        _cores = os.cpu_count() or 6
+        _threads = int(os.environ.get('ANALYZER_THREADS') or _cores)
+        print(f"   Serving via waitress ({_threads} threads, {_cores} vCPUs detected) on port {port}")
+        serve(app, host='0.0.0.0', port=port, threads=_threads, channel_timeout=600)
     except ImportError:
         print("   waitress unavailable — falling back to Flask dev server")
         app.run(host='0.0.0.0', port=port, debug=False)

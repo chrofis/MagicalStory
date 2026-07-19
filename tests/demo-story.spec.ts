@@ -1040,6 +1040,20 @@ test.describe('Demo Story Generation', () => {
       await slider.fill(String(STORY_PAGES));
       await page.waitForTimeout(500);
     }
+    // Widmung (dedication): fill the textarea directly. The localStorage seed in
+    // preSeedLanguage gets wiped by the wizard's new-story reset (setDedication('')),
+    // so the UI field is the only reliable path — and it exercises the real flow.
+    const ded = process.env.DEMO_DEDICATION || '';
+    if (ded) {
+      const dedField = page.getByPlaceholder(/für meine|pour ma|for my/i).first();
+      if (await dedField.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await dedField.fill(ded);
+        console.log(`  Widmung set: "${ded}"`);
+        await page.waitForTimeout(300);
+      } else {
+        console.log('  Widmung textarea not found on Book Settings step — skipping');
+      }
+    }
     await clickNext(page);
 
     // ── Step 3: Story Type ──

@@ -391,16 +391,23 @@ async function composeCover({ artBuffer, kind, title, dedication, seed, figures 
 async function applyCoverTypography(coverImages, { title, dedication, seed, trial = false } = {}) {
   if (!coverImages) return coverImages;
   const { log } = require('../utils/logger');
-  const toBuffer = (d) => Buffer.from(String(d).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const r2 = require('./r2');
   const JOBS = [['frontCover', 'front'], ['initialPage', 'initial'], ['backCover', 'back']];
   await Promise.all(JOBS.map(async ([key, kind]) => {
     const cover = coverImages[key];
     if (!cover || !cover.imageData || cover.artImageData) return; // missing, or already composited
     const figures = cover.bboxDetection?.figures || [];
     const ded = trial ? '' : (dedication || '');
-    const composite = async (b64) => {
+    // Resolve to real bytes via bytesFromAnyImage — by this point the cover's
+    // imageData is usually an R2 URL (streaming offloads the bytes and keeps only
+    // the URL), so the old base64-decode produced garbage and composeCover threw
+    // → the catch swallowed it and NO title was ever baked. bytesFromAnyImage
+    // handles data-URI / raw base64 / https URL alike.
+    const composite = async (src) => {
+      const bytes = await r2.bytesFromAnyImage(src);
+      if (!bytes) throw new Error('could not resolve cover image bytes');
       const { buffer, spec } = await composeCover({
-        artBuffer: toBuffer(b64), kind, title: title || '', dedication: ded, seed: seed || title, figures,
+        artBuffer: bytes, kind, title: title || '', dedication: ded, seed: seed || title, figures,
       });
       return { data: 'data:image/jpeg;base64,' + buffer.toString('base64'), spec };
     };
@@ -422,7 +429,7 @@ async function applyCoverTypography(coverImages, { title, dedication, seed, tria
         }
       }
       const spec = top.spec;
-      log.debug(`🅰️ [COVER TYPO] ${key}: ${spec.kind || kind}${spec.fontId ? ` ${spec.fontId}/${spec.layout} ${spec.face}` : ''}${spec.skipped ? ` (skipped: ${spec.skipped})` : ''}`);
+      log.info(`🅰️ [COVER TYPO] ${key}: baked title${ded ? '+dedication' : ''} (${spec.fontId || '?'}/${spec.layout || '?'})${spec.skipped ? ` (skipped: ${spec.skipped})` : ''}`);
     } catch (err) {
       log.warn(`⚠️ [COVER TYPO] ${key}: ${err.message}`);
     }
