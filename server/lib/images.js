@@ -10156,6 +10156,34 @@ async function fetchFaceHeadMaskPng(cropJpegBuffer, faceBoxInCrop, outW, outH, m
     .ensureAlpha().joinChannel(merged, { raw: { width: outW, height: outH, channels: 1 } }).png().toBuffer();
 }
 
+/**
+ * Head mask via the WHOLE FIGURE — robust alternative to segmenting the face
+ * directly. SAM segments a whole figure from its body box reliably (it's the
+ * detection path, validated 5/5); segmenting a profile/occluded FACE from a
+ * box+dots is fragile and over-segments (exp #123 Verena: loose blob on the
+ * original, balloon on the repaint, same prompt). So: segment the figure with
+ * the body box, then keep only the pixels inside the face box → a clean head
+ * silhouette, no dots. bodyBoxInCrop / faceBoxInCrop are [x1,y1,x2,y2] px in
+ * the crop. Returns a binarized white-on-transparent PNG, or null.
+ */
+async function fetchFigureHeadMaskPng(cropJpegBuffer, bodyBoxInCrop, faceBoxInCrop, outW, outH, maskFetch = fetchFigureMaskPng, opts = {}) {
+  const { onGeom = null } = opts;
+  if (onGeom) { try { onGeom({ samBox: bodyBoxInCrop, faceClip: faceBoxInCrop }); } catch { /* viz only */ } }
+  const figPng = await maskFetch(cropJpegBuffer, bodyBoxInCrop, {});
+  if (!figPng) return null;
+  const n = outW * outH;
+  const raw = await sharp(figPng).resize(outW, outH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+  const s = Math.max(1, Math.round(raw.length / n));
+  const [fx1, fy1, fx2, fy2] = faceBoxInCrop;
+  const out = Buffer.alloc(n);
+  for (let y = 0; y < outH; y++) for (let x = 0; x < outW; x++) {
+    const i = y * outW + x;
+    out[i] = (x >= fx1 && x < fx2 && y >= fy1 && y < fy2 && raw[i * s] > 128) ? 255 : 0;
+  }
+  return sharp(Buffer.alloc(n * 3, 255), { raw: { width: outW, height: outH, channels: 3 } })
+    .ensureAlpha().joinChannel(out, { raw: { width: outW, height: outH, channels: 1 } }).png().toBuffer();
+}
+
 // ── Qwen colour-shift correction for the repair blend ───────────────────────
 // Qwen-Image-Edit repaints the masked figure but shifts its colour distribution
 // (measured on staging: skin ΔL +14..+22, Δb +7..+16 — a lighten + warm/yellow
@@ -16449,6 +16477,7 @@ module.exports = {
   fetchFaceHeadMaskPng,
   recoverFaceBox,
   correctColorShift,
+  fetchFigureHeadMaskPng,
   buildEvalClothingHeader,
   buildPageCompositeRefs,
   detectSubRegion,  // Sub-region detection for targeted repairs (shoes, shirt, hands, etc.)
