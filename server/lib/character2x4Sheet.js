@@ -583,17 +583,17 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
       break;
     }
 
-    // Cheap pixel check first — catches the row-gutter failure for free.
+    // Cheap pixel gutter check — ADVISORY ONLY, never a gate. It is over-eager
+    // (documented): it false-positives on structurally-fine sheets, and when it
+    // did that as a hard gate it scored good versions 0 AND skipped the Gemini
+    // eval, so a worse quick-PASSING version won (observed live: 2 good Sarah
+    // versions quick-failed → the crap 3rd version was selected). The Gemini eval
+    // below is authoritative — it scores layout (catching genuine gutter-crossing
+    // via layoutScore), identity, outfit, source-match — so we ALWAYS run it and
+    // select by its finalScore. quick is kept only for the dev-panel signal.
     const quick = await quickLayoutCheck(result.imageData);
     if (!quick.valid) {
-      log.warn(`[CHARACTER 2×4] ${character?.name} attempt ${attempt} failed quick layout check: ${quick.reason}`);
-      // Score the failed-quick attempt as 0 so any later attempt that
-      // passes quick wins, but if every attempt fails quick we still have
-      // SOMETHING to return rather than throwing.
-      const candidate = { result, score: 0, verdict: null, quick, attempt };
-      attemptHistory.push({ attempt, stage: 'quick-fail', score: 0, reason: quick.reason, imageData: result.imageData });
-      if (!bestAttempt || candidate.score > bestAttempt.score) bestAttempt = candidate;
-      continue;
+      log.warn(`[CHARACTER 2×4] ${character?.name} attempt ${attempt} quick-layout advisory: ${quick.reason} — running full Gemini eval anyway (quick check is over-eager, not a gate)`);
     }
 
     // Gemini eval — verifies heads-only / bodies / identity / outfit.
