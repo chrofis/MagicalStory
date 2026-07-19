@@ -2086,14 +2086,17 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
       const refMaskBin = Buffer.alloc(n);
       for (let i = 0; i < n; i++) refMaskBin[i] = oldA[i * s1r] > 128 ? 255 : 0;
       // borderMatch:false — do NOT diffuse the seam offset into the face. The
-      // face gets ONLY the histogram tone match (whole-head-to-scene). The edge
-      // transition is handled separately by the background-fill on the red zone
-      // + margin, which never touches the figure. Pass-2 diffusion ran the
+      // edge transition is handled separately by the background-fill on the red
+      // zone + margin, which never touches the figure. Pass-2 diffusion ran the
       // offset into the face interior (altering it) — that's wrong.
-      const cc = await correctColorShift(origRaw, pasteRaw, Buffer.from(newDil), cropW, cropH, { refMask: refMaskBin, borderMatch: false, meanShift: true });
+      // colorAware — learn the scene palette (skin / hair / cloth) and shift
+      // each pasted pixel by its OWN material's mean offset, so the orange cloth
+      // band inside the head mask matches the original dress instead of getting
+      // the face's skin-tuned shift.
+      const cc = await correctColorShift(origRaw, pasteRaw, Buffer.from(newDil), cropW, cropH, { refMask: refMaskBin, borderMatch: false, colorAware: true });
       if (cc.applied) {
         pasteRaw = Buffer.from(cc.correctedRaw);
-        colorInfo = { deltaEBefore: cc.deltaEBefore, seamBefore: cc.seamDeltaEBefore, seamAfter: cc.seamDeltaEAfter };
+        colorInfo = { deltaEBefore: cc.deltaEBefore, seamBefore: cc.seamDeltaEBefore, seamAfter: cc.seamDeltaEAfter, clusters: cc.clusterInfo };
       }
     } catch (err) {
       log.warn(`[TESTLAB] colour correction skipped (${err.message})`);

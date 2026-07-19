@@ -10329,14 +10329,92 @@ function _seamDeltaE(resultRaw, originalRaw, maskBin, w, h) {
 }
 
 /**
+ * Farthest-point-seeded k-means in LAB. pts = Float32Array(m*3). Returns
+ * { cent:[[L,a,b]..], counts:[..] }. Cheap (few iters) — used to learn the
+ * material palette of a repair region (skin / hair / cloth).
+ */
+function _ccKMeans(pts, K, iters) {
+  const m = pts.length / 3;
+  if (m === 0) return { cent: [], counts: [] };
+  K = Math.min(K, m);
+  const cent = [[pts[0], pts[1], pts[2]]];
+  for (let k = 1; k < K; k++) {
+    let best = -1, bi = 0;
+    for (let i = 0; i < m; i++) {
+      let dmin = Infinity;
+      for (const c of cent) { const dl = pts[i * 3] - c[0], da = pts[i * 3 + 1] - c[1], db = pts[i * 3 + 2] - c[2]; const d = dl * dl + da * da + db * db; if (d < dmin) dmin = d; }
+      if (dmin > best) { best = dmin; bi = i; }
+    }
+    cent.push([pts[bi * 3], pts[bi * 3 + 1], pts[bi * 3 + 2]]);
+  }
+  const assign = new Int32Array(m);
+  for (let it = 0; it < iters; it++) {
+    for (let i = 0; i < m; i++) {
+      let bk = 0, bd = Infinity;
+      for (let k = 0; k < cent.length; k++) { const dl = pts[i * 3] - cent[k][0], da = pts[i * 3 + 1] - cent[k][1], db = pts[i * 3 + 2] - cent[k][2]; const d = dl * dl + da * da + db * db; if (d < bd) { bd = d; bk = k; } }
+      assign[i] = bk;
+    }
+    const s = cent.map(() => [0, 0, 0, 0]);
+    for (let i = 0; i < m; i++) { const k = assign[i]; s[k][0] += pts[i * 3]; s[k][1] += pts[i * 3 + 1]; s[k][2] += pts[i * 3 + 2]; s[k][3]++; }
+    for (let k = 0; k < cent.length; k++) if (s[k][3]) cent[k] = [s[k][0] / s[k][3], s[k][1] / s[k][3], s[k][2] / s[k][3]];
+  }
+  const counts = cent.map(() => 0);
+  for (let i = 0; i < m; i++) counts[assign[i]]++;
+  return { cent, counts };
+}
+
+/**
+ * Border rings of a mask: `inner` = the ringPx band just INSIDE the mask edge,
+ * `outer` = the band just OUTSIDE. Used to seam-match a paste — sample the
+ * candidate on the inner ring and the original on the outer ring.
+ */
+function _ccBorderRings(mask, W, H, ringPx) {
+  const n = W * H;
+  const m = new Uint8Array(n);
+  for (let i = 0; i < n; i++) m[i] = mask[i] > 128 ? 1 : 0;
+  const inner = new Uint8Array(n), outer = new Uint8Array(n);
+  const anyNb = (band, x, y) => {
+    if (x > 0 && band[y * W + x - 1]) return true;
+    if (x < W - 1 && band[y * W + x + 1]) return true;
+    if (y > 0 && band[(y - 1) * W + x]) return true;
+    if (y < H - 1 && band[(y + 1) * W + x]) return true;
+    return false;
+  };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x;
+    let edgeIn = false, edgeOut = false;
+    const nb = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
+    for (const [nx, ny] of nb) { if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const j = ny * W + nx; if (m[i] && !m[j]) edgeIn = true; if (!m[i] && m[j]) edgeOut = true; }
+    if (m[i] && edgeIn) inner[i] = 1;
+    if (!m[i] && edgeOut) outer[i] = 1;
+  }
+  for (let it = 1; it < ringPx; it++) {
+    const iAdd = [], oAdd = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (m[i] && !inner[i]) { if (anyNb(inner, x, y)) iAdd.push(i); }
+      else if (!m[i] && !outer[i]) { if (anyNb(outer, x, y)) oAdd.push(i); }
+    }
+    for (const i of iAdd) inner[i] = 1;
+    for (const i of oAdd) outer[i] = 1;
+  }
+  return { inner, outer };
+}
+
+/**
  * Correct Qwen's colour shift on the masked repair figure. Inputs may be
  * encoded images OR raw RGB (width*height*3). maskAlpha = the union pixels
  * pasted back; opts.refMask = original-side mask to sample the reference tone
  * from (default maskAlpha). Returns { applied, correctedRaw (RGB), deltaEBefore/
  * After, seamDeltaEBefore/After, histogramRaw }.
+ *
+ * opts.colorAware: instead of ONE global mean-shift, learn K material colours
+ * from the original reference region and shift each candidate pixel by its own
+ * material's mean offset (soft colour-weighted blend). Fixes cloth bands inside
+ * a face mask getting a skin-tuned shift. K=1 == the plain mean-shift.
  */
 async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, width, height, opts = {}) {
-  const { strength = 0.9, minDeltaE = 4, bins = 128, refMask = null, borderMatch = true, borderIters = 500, meanShift = false } = opts;
+  const { strength = 0.9, minDeltaE = 4, bins = 128, refMask = null, borderMatch = true, borderIters = 500, meanShift = false, colorAware = false, clusters = 3, sigmaScale = 0.6, maxOffsetDeltaE = 30 } = opts;
   const n = width * height;
   const toRaw = async (buf) => (Buffer.isBuffer(buf) && buf.length === n * 3) ? buf : sharp(buf).resize(width, height, { fit: 'fill' }).removeAlpha().raw().toBuffer();
   const O = await toRaw(originalCropBuf);
@@ -10368,23 +10446,79 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
   // reshaping. This shifts the tone to match the scene without distorting the
   // face. Default (histogram) reshapes each channel's distribution — heavier.
   const off = [mo[0] - mc[0], mo[1] - mc[1], mo[2] - mc[2]];
-  const lut = meanShift ? null : [0, 1, 2].map(ch => _ccMatchLUT(srcHist[ch], refHist[ch], ch, bins));
-  for (let i = 0; i < n; i++) {
-    if (mCand[i] <= 128) continue;
-    const lab = [candLab[i * 3], candLab[i * 3 + 1], candLab[i * 3 + 2]];
-    const nl = [0, 0, 0];
-    for (let ch = 0; ch < 3; ch++) {
-      nl[ch] = meanShift ? lab[ch] + strength * off[ch] : lab[ch] + strength * (lut[ch][_ccQuant(lab[ch], ch, bins)] - lab[ch]);
+  let clusterInfo = null;
+  if (colorAware) {
+    // 1. Learn the scene palette from the ORIGINAL reference region.
+    const refPts = [];
+    for (let i = 0; i < n; i++) if (mRef[i] > 128) { const l = _rgbToLab(O[i * 3], O[i * 3 + 1], O[i * 3 + 2]); refPts.push(l[0], l[1], l[2]); }
+    const { cent, counts } = _ccKMeans(Float32Array.from(refPts), clusters, 8);
+    const totalRef = counts.reduce((a, b) => a + b, 0) || 1;
+    const keep = cent.map((_, k) => counts[k] >= 0.03 * totalRef);
+    // 2. Candidate per-cluster means — assign each pasted pixel by ITS colour.
+    const cs = cent.map(() => [0, 0, 0, 0]);
+    for (let i = 0; i < n; i++) {
+      if (mCand[i] <= 128) continue;
+      const lab = [candLab[i * 3], candLab[i * 3 + 1], candLab[i * 3 + 2]];
+      let bk = -1, bd = Infinity;
+      for (let k = 0; k < cent.length; k++) { if (!keep[k]) continue; const dl = lab[0] - cent[k][0], da = lab[1] - cent[k][1], db = lab[2] - cent[k][2]; const d = dl * dl + da * da + db * db; if (d < bd) { bd = d; bk = k; } }
+      if (bk >= 0) { cs[bk][0] += lab[0]; cs[bk][1] += lab[1]; cs[bk][2] += lab[2]; cs[bk][3]++; }
     }
-    const rgb = _labToRgb(nl[0], nl[1], nl[2]);
-    out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2];
+    // 3. Per-material offset. Prefer the OLD/NEW BORDER: shift each material so
+    //    the candidate on the inner ring matches the original on the outer ring
+    //    → the seam between paste and surroundings is zero. Where a material has
+    //    no same-material neighbour outside (hair/skin against background), fall
+    //    back to the whole-region mean (tone match to scene).
+    const nearestKept = (lab) => { let bk = -1, bd = Infinity; for (let k = 0; k < cent.length; k++) { if (!keep[k]) continue; const dl = lab[0] - cent[k][0], da = lab[1] - cent[k][1], db = lab[2] - cent[k][2]; const d = dl * dl + da * da + db * db; if (d < bd) { bd = d; bk = k; } } return [bk, bd]; };
+    const { inner, outer } = _ccBorderRings(mCand, width, height, 5);
+    const Dmax2 = 30 * 30; // outer pixels farther than this from every material = background, excluded
+    const bIn = cent.map(() => [0, 0, 0, 0]);   // candidate, inner ring, per material
+    const bOut = cent.map(() => [0, 0, 0, 0]);  // original, outer ring, per material
+    for (let i = 0; i < n; i++) {
+      if (inner[i]) { const lab = [candLab[i * 3], candLab[i * 3 + 1], candLab[i * 3 + 2]]; const [bk] = nearestKept(lab); if (bk >= 0) { bIn[bk][0] += lab[0]; bIn[bk][1] += lab[1]; bIn[bk][2] += lab[2]; bIn[bk][3]++; } }
+      if (outer[i]) { const l = _rgbToLab(O[i * 3], O[i * 3 + 1], O[i * 3 + 2]); const [bk, bd] = nearestKept(l); if (bk >= 0 && bd < Dmax2) { bOut[bk][0] += l[0]; bOut[bk][1] += l[1]; bOut[bk][2] += l[2]; bOut[bk][3]++; } }
+    }
+    const MINB = 20;
+    const offK = cent.map((c, k) => {
+      if (!keep[k]) return [0, 0, 0];
+      if (bIn[k][3] >= MINB && bOut[k][3] >= MINB) return [bOut[k][0] / bOut[k][3] - bIn[k][0] / bIn[k][3], bOut[k][1] / bOut[k][3] - bIn[k][1] / bIn[k][3], bOut[k][2] / bOut[k][3] - bIn[k][2] / bIn[k][3]];
+      if (cs[k][3]) return [c[0] - cs[k][0] / cs[k][3], c[1] - cs[k][1] / cs[k][3], c[2] - cs[k][2] / cs[k][3]];
+      return [0, 0, 0];
+    });
+    for (const o of offK) { const mag = Math.hypot(o[0], o[1], o[2]); if (mag > maxOffsetDeltaE) { const s = maxOffsetDeltaE / mag; o[0] *= s; o[1] *= s; o[2] *= s; } }
+    // 4. sigma from the spread of kept centroids → soft colour-weighted blend.
+    const kc = cent.filter((_, k) => keep[k]); const dd = [];
+    for (let a = 0; a < kc.length; a++) for (let b = a + 1; b < kc.length; b++) dd.push(Math.hypot(kc[a][0] - kc[b][0], kc[a][1] - kc[b][1], kc[a][2] - kc[b][2]));
+    dd.sort((x, y) => x - y);
+    const sigma = Math.max(6, sigmaScale * (dd.length ? dd[Math.floor(dd.length / 2)] : 20));
+    for (let i = 0; i < n; i++) {
+      if (mCand[i] <= 128) continue;
+      const lab = [candLab[i * 3], candLab[i * 3 + 1], candLab[i * 3 + 2]];
+      let wsum = 0; const woff = [0, 0, 0];
+      for (let k = 0; k < cent.length; k++) { if (!keep[k]) continue; const dl = lab[0] - cent[k][0], da = lab[1] - cent[k][1], db = lab[2] - cent[k][2]; const w = Math.exp(-(dl * dl + da * da + db * db) / (2 * sigma * sigma)); wsum += w; woff[0] += w * offK[k][0]; woff[1] += w * offK[k][1]; woff[2] += w * offK[k][2]; }
+      if (wsum > 0) { woff[0] /= wsum; woff[1] /= wsum; woff[2] /= wsum; }
+      const rgb = _labToRgb(lab[0] + strength * woff[0], lab[1] + strength * woff[1], lab[2] + strength * woff[2]);
+      out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2];
+    }
+    clusterInfo = cent.map((c, k) => keep[k] ? { lab: c.map(v => +v.toFixed(1)), count: counts[k], off: offK[k].map(v => +v.toFixed(1)), src: (bIn[k][3] >= MINB && bOut[k][3] >= MINB) ? 'border' : 'region' } : null).filter(Boolean);
+  } else {
+    const lut = meanShift ? null : [0, 1, 2].map(ch => _ccMatchLUT(srcHist[ch], refHist[ch], ch, bins));
+    for (let i = 0; i < n; i++) {
+      if (mCand[i] <= 128) continue;
+      const lab = [candLab[i * 3], candLab[i * 3 + 1], candLab[i * 3 + 2]];
+      const nl = [0, 0, 0];
+      for (let ch = 0; ch < 3; ch++) {
+        nl[ch] = meanShift ? lab[ch] + strength * off[ch] : lab[ch] + strength * (lut[ch][_ccQuant(lab[ch], ch, bins)] - lab[ch]);
+      }
+      const rgb = _labToRgb(nl[0], nl[1], nl[2]);
+      out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2];
+    }
   }
   const maskBin = Buffer.alloc(n);
   for (let i = 0; i < n; i++) maskBin[i] = mCand[i] > 128 ? 255 : 0;
   const seamBefore = _seamDeltaE(out, O, maskBin, width, height);
   let finalRaw = out, seamAfter = seamBefore;
   if (borderMatch) { finalRaw = _closeSeamHarmonic(out, O, maskBin, width, height, borderIters); seamAfter = _seamDeltaE(finalRaw, O, maskBin, width, height); }
-  return { applied: true, deltaEBefore: +deltaEBefore.toFixed(2), seamDeltaEBefore: +seamBefore.toFixed(2), seamDeltaEAfter: +seamAfter.toFixed(2), histogramRaw: out, correctedRaw: finalRaw };
+  return { applied: true, deltaEBefore: +deltaEBefore.toFixed(2), seamDeltaEBefore: +seamBefore.toFixed(2), seamDeltaEAfter: +seamAfter.toFixed(2), histogramRaw: out, correctedRaw: finalRaw, clusterInfo };
 }
 
 /**
