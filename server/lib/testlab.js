@@ -2138,7 +2138,13 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
       // each pasted pixel by its OWN material's mean offset, so the orange cloth
       // band inside the head mask matches the original dress instead of getting
       // the face's skin-tuned shift.
-      const cc = await correctColorShift(origRaw, pasteRaw, Buffer.from(newDil), cropW, cropH, { refMask: refMaskBin, borderMatch: false, colorAware: true });
+      // Correct the NEW figure AND the red zone (old-only pixels kept from the
+      // model, e.g. the chin the round-2 mask missed) as ONE region — the
+      // border-match then makes the red-zone outer edge match the surroundings
+      // exactly, instead of leaving raw (uncorrected) model pixels there.
+      const ccMask = Buffer.alloc(n);
+      for (let i = 0; i < n; i++) ccMask[i] = (newDil[i] > 128 || redZone[i] > 128) ? 255 : 0;
+      const cc = await correctColorShift(origRaw, pasteRaw, ccMask, cropW, cropH, { refMask: refMaskBin, borderMatch: false, colorAware: true });
       if (cc.applied) {
         pasteRaw = Buffer.from(cc.correctedRaw);
         colorInfo = { deltaEBefore: cc.deltaEBefore, seamBefore: cc.seamDeltaEBefore, seamAfter: cc.seamDeltaEAfter, clusters: cc.clusterInfo };
@@ -2179,14 +2185,20 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     .composite([{ input: ccCut }]).jpeg().toBuffer();
   await addStep(`pasted region (colour${colorInfo ? ` ΔE ${colorInfo.deltaEBefore}, seam ${colorInfo.seamBefore}→${colorInfo.seamAfter}` : ' n/a'}${redZonePx ? `, red-zone ${redZonePx}px kept from model, ${colorInfo?.garbagePx ?? 0}px garbage bg-filled` : ''})`, `data:image/jpeg;base64,${ccVis.toString('base64')}`);
 
-  const feathered = await sharp(pasteBuf).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
+  // 2px edge feather: soften the hard union boundary so the paste join isn't a
+  // 1px step. Small blur → ~±2px alpha ramp; the interior stays fully opaque.
+  // (sharp's raw blur output can come back multi-channel — stride to 1 channel.)
+  const alphaBlur = await sharp(Buffer.from(alpha1), raw1).blur(1.2).raw().toBuffer();
+  const abStride = Math.max(1, Math.round(alphaBlur.length / n));
+  const alphaSoft = abStride === 1 ? alphaBlur : (() => { const o = Buffer.alloc(n); for (let i = 0; i < n; i++) o[i] = alphaBlur[i * abStride]; return o; })();
+  const feathered = await sharp(pasteBuf).ensureAlpha().joinChannel(alphaSoft, raw1).png().toBuffer();
   return { feathered, iou, redPx, colorInfo, blendRule: BLEND_RULE_VERSION };
 }
 
 // Stamped on every blended entry so the UI can show WHICH blend generation
 // produced an image — mixed-generation comparisons were repeatedly mistaken
 // for bugs. Bump on every blend-behavior change.
-const BLEND_RULE_VERSION = 'union-hard-pad6';
+const BLEND_RULE_VERSION = 'union-soft2-pad6';
 
 /**
  * Crop-bounded Qwen character insertion (composite-v2 recipe, validated
