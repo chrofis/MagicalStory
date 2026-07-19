@@ -243,7 +243,9 @@ async function extractQuadrant(buffer, which = 'body-front') {
   if (aspect < 0.8) {
     const cellW = Math.floor(meta.width / 4);
     const cellH = Math.floor(meta.height / 2);
-    const col = which === 'body-profile' ? 2 : 0;
+    // Body row (row 1): cell 5 front / cell 6 three-quarter (45°) / cell 7
+    // profile (90°) / cell 8 back — see styled-costumed-avatar-2x4.txt.
+    const col = which === 'body-profile' ? 2 : which === 'body-three-quarter' ? 1 : 0;
     const row = 1;
     return sharp(buffer)
       .extract({ left: col * cellW, top: row * cellH, width: cellW, height: cellH })
@@ -518,7 +520,22 @@ async function generateCoverViaComposite({
   // ids aren't in coverHint.objects (holds ⊄ objects happens), plus the
   // final sanitizeVbIdsInPrompt scrub on both pass prompts.
   visualBible = null,
+  // Figure ORIENTATION strategy (2026-07-19 experiment; docs/image-routing.md).
+  // The all-frontal lineup reads flatter than a direct render; two independent
+  // levers break it, tested here as an A/B knob:
+  //   'frontal'       (default) — cutout = body-front cell 5, poses squared to
+  //                    camera, every gaze forced at the viewer. Current prod.
+  //   'turned-source' — outer figures' cutouts come from the 45° body cell
+  //                    (Panel 6), angled inward (flopped on the right side);
+  //                    poses unchanged. Grok reposes from an already-turned base.
+  //   'turned-prompt' — cutout stays frontal, but the repose prompt turns
+  //                    shoulders toward the group and relaxes the forced
+  //                    eyes-at-viewer into a natural mix (some glance inward).
+  //   'both'          — turned-source + turned-prompt together.
+  orient = 'frontal',
 }) {
+  const turnSource = orient === 'turned-source' || orient === 'both';
+  const turnPrompt = orient === 'turned-prompt' || orient === 'both';
   const W = 1024;
   const H = 1365;
   const label = coverLabel(coverKey);
@@ -540,7 +557,14 @@ async function generateCoverViaComposite({
   const tallestCm = Math.max(...sequence.map(c => heightCm(c.age)));
   const sceneScale = 0.62; // village/cover scale
   const pxPerCm = (TARGET_TALLEST_PX * sceneScale) / tallestCm;
+  // Left-to-right slot within the intended arrangement (independent of load
+  // failures) — drives the turned-source cutout choice: centre figure stays
+  // front, left slots use the 45° cell facing right (inward), right slots use
+  // the same cell flopped to face left (inward).
+  const centreSlot = Math.floor(sequence.length / 2);
+  let slot = -1;
   for (const c of sequence) {
+    slot++;
     const src = getCostumedAvatarSrc(c, artStyle);
     if (!src) {
       log.warn(`[COVER-COMPOSITE] ${c.name}: no styled avatar found in style=${artStyle}`);
@@ -548,7 +572,11 @@ async function generateCoverViaComposite({
     }
     const buf = await loadImageAny(src);
     if (!buf) { log.warn(`[COVER-COMPOSITE] ${c.name}: avatar load failed`); continue; }
-    const body = await extractQuadrant(buf, 'body-front');
+    const useTurnedCell = turnSource && slot !== centreSlot;
+    let body = await extractQuadrant(buf, useTurnedCell ? 'body-three-quarter' : 'body-front');
+    // Panel 6 faces image-right. Right-of-centre figures must face inward
+    // (left) → flop. Left-of-centre already face inward (right) → as-is.
+    if (useTurnedCell && slot > centreSlot) body = await sharp(body).flop().toBuffer();
     const cleanRaw = await defringeCutout(await removeBackground(body));
     const trimmed = await sharp(cleanRaw).trim({ threshold: 1 }).toBuffer().catch(() => cleanRaw);
     const targetH = Math.max(40, Math.round(heightCm(c.age) * pxPerCm * 1.2));
@@ -650,6 +678,23 @@ async function generateCoverViaComposite({
   }
   Object.assign(artNames, (coverHint && coverHint._artifactNames) || {});
   const propName = propIds[0] ? (artNames[String(propIds[0]).toUpperCase()] || 'central prop') : null;
+  // turn-prompt lever (orient='turned-prompt'|'both'): soften the centre's
+  // rigid squared-to-camera stance, strengthen the flanking turn toward the
+  // group, and relax the forced eyes-at-viewer into a natural mix (outer
+  // figures may glance inward). Solo covers keep the frontal portrait — no
+  // group to turn toward.
+  const centrePosture = turnPrompt
+    ? 'Body turned slightly off-axis, weight on one leg, relaxed — not rigidly squared to the camera.'
+    : 'Body squared to camera.';
+  const angleRight = turnPrompt
+    ? 'Body clearly turned about 30° to the right, shoulders angled toward the centre of the group.'
+    : 'Body angled slightly to the right.';
+  const angleLeft = turnPrompt
+    ? 'Body clearly turned about 30° to the left, shoulders angled toward the centre of the group.'
+    : 'Body angled slightly to the left.';
+  const gazeSuffix = turnPrompt
+    ? 'Eyes open, bright, and warm — the central figure looks toward the viewer; the others may glance toward the centre of the group or toward the viewer. Never closed, squinting, or downcast.'
+    : 'Eyes wide OPEN looking straight at the viewer with a warm natural smile — never closed, squinting, or downcast.';
   const POSES = [];
   for (let i = 0; i < n; i++) {
     const me = visualIdentifier(i, n, figures[i].age);
@@ -665,16 +710,23 @@ async function generateCoverViaComposite({
         : `Standing naturally facing the viewer, arms relaxed at the sides, hands visible, warm confident posture.`;
     } else if (i === centerIdx) {
       pose = propName
-        ? `BOTH HANDS hold the ${propName} up at chest height, both hands visibly gripping it and the object clearly presented to the viewer. Body squared to the camera. NOT arms-at-sides.`
-        : `Holding hands with the figure to the immediate right. Body squared to camera. NOT arms-at-sides.`;
+        ? `BOTH HANDS hold the ${propName} up at chest height, both hands visibly gripping it and the object clearly presented to the viewer. ${centrePosture} NOT arms-at-sides.`
+        : `Holding hands with the figure to the immediate right. ${centrePosture} NOT arms-at-sides.`;
     } else if (i < centerIdx) {
-      pose = `RIGHT ARM raised and around ${visualIdentifier(i + 1, n, figures[i + 1].age)}'s shoulders, pulling that figure close. Body angled slightly to the right. NOT arms-at-sides.`;
+      pose = `RIGHT ARM raised and around ${visualIdentifier(i + 1, n, figures[i + 1].age)}'s shoulders, pulling that figure close. ${angleRight} NOT arms-at-sides.`;
     } else {
-      pose = `LEFT HAND placed on ${visualIdentifier(i - 1, n, figures[i - 1].age)}'s shoulder, fingers visible. Body angled slightly to the left. NOT arms-at-sides.`;
+      pose = `LEFT HAND placed on ${visualIdentifier(i - 1, n, figures[i - 1].age)}'s shoulder, fingers visible. ${angleLeft} NOT arms-at-sides.`;
     }
-    // Eyes-open-at-viewer default: the old "looks down at the prop" wording made
-    // Grok draw closed / downcast eyes. Every cover figure faces the reader.
-    POSES.push(`- ${me}: REDRAW the pose. New pose: ${pose} Eyes wide OPEN looking straight at the viewer with a warm natural smile — never closed, squinting, or downcast.`);
+    // Eyes-open default: the old "looks down at the prop" wording made Grok
+    // draw closed / downcast eyes. gazeSuffix keeps every figure's eyes open;
+    // under turn-prompt the outer figures may glance inward (natural group),
+    // otherwise all face the reader.
+    // feetClause: turning + "pulling close" made Grok redraw the central
+    // cluster larger/lower and CROP their feet off the bottom edge (once
+    // pass-1 crops them, the cutout can't recover shoes). Per-figure full-body
+    // clause dominates the turn — universal (helps every mode).
+    const feetClause = 'Keep the WHOLE figure in frame from head to feet at the SAME scale as the input — both feet, and whatever footwear they have on, completely visible with a strip of ground painted BENEATH the shoes so the feet sit ABOVE the bottom edge, never touching or running off it. Never crop at the ankles, shins, or knees; do not enlarge, zoom, or lower this figure past the bottom edge.';
+    POSES.push(`- ${me}: REDRAW the pose. New pose: ${pose} ${gazeSuffix} ${feetClause}`);
   }
   // Pass-1 must stay WHITE-BACKGROUND only. We can't dump the full scene
   // prose here — the prose names the landmark explicitly and Grok would paint
@@ -815,6 +867,8 @@ PRESERVE EXACTLY:
 - Every figure's face, hair, skin tone, clothing — keep their identity exact, only fix the pose and soften the edges.
 - The ${artStyle} aesthetic — do not change the style, do not photo-realize, do not add color if the background is monochrome.
 
+BOTTOM MARGIN IS HARD: every figure's feet and shoes stay fully inside the frame with a visible strip of ground painted beneath the lowest shoe — no foot, shoe, leg, or trouser hem may touch or cross the bottom edge. If a figure would reach the bottom, shrink the whole group uniformly rather than crop a single foot.
+
 DO NOT regenerate the scene. DO NOT shift the landmark. DO NOT add or remove characters. DO NOT add frames, borders, or vignettes. Object names in this prompt say what to draw — never paint an object's name as lettering on the object or anywhere in the scene.`
     : `PASS 1: REPOSE FIGURES ONLY.
 
@@ -825,7 +879,7 @@ ${POSES.join('\n')}
 
 PRESERVE: every face, hair colour, skin tone, clothing detail, every prop, plain background, relative left-to-right positions.
 
-FRAMING (mandatory): keep every figure FULL-LENGTH — head to feet, both feet visible and standing on the ground. Do NOT crop at the waist, hips, thighs, or knees. Do NOT zoom in, do NOT reframe to a portrait — preserve the input framing and figure scale, keeping the empty margins above the heads and below the feet exactly as in the input.
+FRAMING (mandatory): keep every figure FULL-LENGTH — head to feet, both feet visible and standing on the ground. Do NOT crop at the waist, hips, thighs, or knees. Do NOT zoom in, do NOT reframe to a portrait — preserve the input framing and figure scale, keeping the empty margins above the heads and below the feet exactly as in the input. BOTTOM MARGIN IS HARD: there must be a visible strip of empty background BELOW the lowest shoe of every figure — no foot, shoe, leg, or trouser hem may touch or cross the bottom edge of the image. If any figure would reach the bottom edge, shrink the WHOLE group uniformly to fit — never crop a single foot.
 
 Keep the same characters — no additions, no removals. The background stays a plain flat tone (white, gray, or neutral — pass 2 composites the figures onto the real landmark photo). No landscape, sky, ground, buildings, or foliage. No text, signage, or letters anywhere.${n === 1 && !propName ? '' : ' Every figure ends the edit with the redrawn pose — arms away from the sides.'}`;
 
@@ -884,15 +938,19 @@ Keep the same characters — no additions, no removals. The background stays a p
   let cutout = await defringeCutout(await removeBackground(pass1.imageData));
   // 8. Composite cutout onto landmark
   const landmarkResized = await sharp(landmarkBuf).resize(W, H, { fit: 'cover', position: 'centre' }).jpeg({ quality: 92 }).toBuffer();
-  const cutoutResized = await sharp(cutout).resize(W, H, { fit: 'inside' }).png().toBuffer();
+  // Fill only ~80% of the canvas (user 2026-07-19): resizing the group to the
+  // FULL W×H maximised it edge-to-edge, leaving no margin — so any pose that
+  // drifted low ran feet off the bottom. Fitting into an 80%-box shrinks the
+  // group ~20%, opening head- and foot-room so shoes always land inside frame.
+  const FILL = 0.80;
+  const cutoutResized = await sharp(cutout).resize(Math.round(W * FILL), Math.round(H * FILL), { fit: 'inside' }).png().toBuffer();
   const cm = await sharp(cutoutResized).metadata();
   const offX = Math.round((W - cm.width) / 2);
-  // GROUND the figures at the bottom — feet at ~0.98*H — instead of centering
-  // them vertically. A wide multi-figure group scales down by width under
-  // fit:inside, so centering floated the feet mid-canvas and the landmark's
-  // foreground (e.g. a cobblestone path) then occluded the lower legs → figures
-  // read as "cut off at the shins". Bottom-aligning stands them on the ground.
-  const offY = Math.max(0, Math.round(H * 0.98) - cm.height);
+  // GROUND the figures near the bottom but leave an ~8% footroom strip below
+  // the lowest shoe (feet at ~0.92*H) instead of jamming them at the edge — a
+  // wide group scales down by width under fit:inside, and bottom-aligning with
+  // margin stands them on the ground with visible earth beneath the shoes.
+  const offY = Math.max(0, Math.round(H * 0.92) - cm.height);
   const pass2Input = await sharp(landmarkResized).composite([{ input: cutoutResized, left: offX, top: offY }]).jpeg({ quality: 92 }).toBuffer();
 
   // 9. Build pass 2 prompt. textLine was computed earlier (shared with the

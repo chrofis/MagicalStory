@@ -519,6 +519,9 @@ async function iterateCover(coverKey, storyData, options = {}) {
         // Full VB — id→name resolution + final sanitizeVbIdsInPrompt scrub
         // on both pass prompts (post-VEH001 rule).
         visualBible,
+        // Figure orientation strategy (Test Lab / docs/image-routing.md).
+        // Default 'frontal' when unset — production behaviour unchanged.
+        orient: options.orient || 'frontal',
       });
       log.info(`🎨 [COVER-ITERATE] ${coverKey}: composite-cover generated (modelId=${compositeResult.modelId})`);
       return {
