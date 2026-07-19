@@ -26,8 +26,41 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { editWithGrok, GROK_MODELS } = require('./grok');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { MODEL_DEFAULTS } = require('../config/models');
 const r2 = require('./r2');
 const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
+
+// Minimal Gemini image-edit for the avatar style-transfer pass. Same contract
+// as editWithGrok (prompt + reference images → { imageData, usage, modelId }).
+// Gemini stylises far better than Grok on this BIG transform (all-5 A/B,
+// project_image_model_tests.md 2026-07-19); Grok stays on Round 1 (identity).
+async function editWithGeminiImage(prompt, refImages, { aspectRatio = '16:9', model = 'gemini-3-pro-image-preview' } = {}) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY missing for avatar style transfer');
+  const parts = [{ text: prompt }, ...refImages.map(img => ({
+    inlineData: { mimeType: (String(img).match(/^data:(image\/\w+);base64,/)?.[1]) || 'image/jpeg', data: r2.stripDataUriPrefix(img) },
+  }))];
+  const body = { contents: [{ parts }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.8, imageConfig: { aspectRatio } } };
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(120000) });
+  if (!resp.ok) throw new Error(`Gemini image HTTP ${resp.status}: ${(await resp.text()).slice(0, 150)}`);
+  const j = await resp.json();
+  const part = (j?.candidates?.[0]?.content?.parts || []).find(p => p.inlineData || p.inline_data);
+  const inline = part?.inlineData || part?.inline_data;
+  if (!inline) throw new Error('Gemini returned no image (style transfer)');
+  const usage = j?.usageMetadata ? { input_tokens: j.usageMetadata.promptTokenCount || 0, output_tokens: j.usageMetadata.candidatesTokenCount || 0 } : null;
+  return { imageData: 'data:image/jpeg;base64,' + inline.data, usage, modelId: model, sentToGrok: refImages };
+}
+
+// Dispatch the Round-2 style transfer to the configured backend.
+async function styleTransferGenerate(prompt, pass1ImageData) {
+  if (MODEL_DEFAULTS.avatarStyleTransferBackend === 'gemini') {
+    const r = await editWithGeminiImage(prompt, [pass1ImageData], { aspectRatio: '16:9', model: MODEL_DEFAULTS.avatarStyleTransferModel });
+    return { ...r, provider: 'gemini_image' };
+  }
+  const r = await editWithGrok(prompt, [pass1ImageData], { aspectRatio: '16:9', model: GROK_MODELS.STANDARD });
+  return { ...r, provider: 'grok' };
+}
 
 // Best-of-N cap: first attempt + N retries. The loop short-circuits on the
 // first valid eval — retries only fire when an attempt fails. If all attempts
@@ -698,9 +731,9 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   let best = null;
 
   for (let attempt = 1; attempt <= totalAttempts; attempt++) {
-    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}) attempt ${attempt}/${totalAttempts}`);
-    const result = await editWithGrok(prompt, [pass1ImageData], { aspectRatio: '16:9', model: GROK_MODELS.STANDARD });
-    if (usageTracker && result.usage) usageTracker('grok', result.usage, 'character_2x4_style_transfer', result.modelId);
+    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}, backend=${MODEL_DEFAULTS.avatarStyleTransferBackend}) attempt ${attempt}/${totalAttempts}`);
+    const result = await styleTransferGenerate(prompt, pass1ImageData);
+    if (usageTracker && result.usage) usageTracker(result.provider || 'grok', result.usage, 'character_2x4_style_transfer', result.modelId);
 
     if (!process.env.GEMINI_API_KEY) {
       log.warn('[CHARACTER 2×4] GEMINI_API_KEY missing — accepting Pass 2 after first attempt');
@@ -712,7 +745,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     let verdict = null;
     try {
       verdict = await evaluateStyledSheetWithGemini(facePhoto, pass1ImageData, result.imageData, artStyle, process.env.GEMINI_API_KEY, usageTracker);
-      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} clean=${verdict.cleanScore} final=${verdict.finalScore} valid=${verdict.valid}`);
+      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       // Mirror Pass-1 behaviour (line 414): a Gemini eval failure should NOT
       // lock in this attempt at the maximum score and break the retry loop.
@@ -734,6 +767,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       styleScore: verdict.styleScore,
       outfitScore: verdict.outfitScore,
       cleanScore: verdict.cleanScore,
+      bodyFaceScore: verdict.bodyFaceScore,
       reasons: verdict.failureReasons || [],
       imageData: result.imageData,
       sentToGrok: result.sentToGrok || null,

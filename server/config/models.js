@@ -296,6 +296,15 @@ const MODEL_DEFAULTS = {
   coverAspect: IMAGE_ASPECTS.A4,
   avatarAspect: IMAGE_ASPECTS.AVATAR,
 
+  // ─── Avatar 2×4 sheet: per-pass backend ──────────────────────────────
+  // Round 1 (realistic identity anchor) stays on Grok — it preserves hair
+  // length + outfit better than Gemini (which drifts identity). Round 2
+  // (art/style transfer, a BIG transform) goes to Gemini — Grok barely
+  // stylises while gemini-3-pro produces a true styled render. Verdict from
+  // the all-5 Grok-vs-Gemini A/B (project_image_model_tests.md, 2026-07-19).
+  avatarStyleTransferBackend: process.env.AVATAR_STYLE_BACKEND || 'gemini', // 'gemini' | 'grok'
+  avatarStyleTransferModel: process.env.AVATAR_STYLE_MODEL || 'gemini-3-pro-image-preview',
+
   // ─── Composite Cover mode ────────────────────────────────────────────
   // When true, cover pages (frontCover, initialPage, backCover) skip the
   // normal generateImageWithQualityRetry path and instead use a manual

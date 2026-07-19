@@ -416,6 +416,12 @@ Also tracked in memory `project_image_model_tests.md` — check there before rec
 speed-critical operations. **When to use Gemini:** Primary story generation, watercolor/whimsical
 styles, any scene requiring consistent style across multiple pages.
 
+**The deciding factor — edit MAGNITUDE (verified avatar A/B, 2026-07-19):**
+- **Gemini is much better at ART / big transformations** — style transfer, full re-render, "make this Pixar/watercolor", large structural change. In the avatar 2×4 A/B, Gemini-3-pro produced real Pixar 3D on the style-transfer pass while Grok barely stylized the same input. Route big transforms to Gemini.
+- **Gemini is LAZY on tiny tweaks** — for a small/precise edit (nudge a hand, minor colour fix, small targeted repair) it often returns the input essentially unchanged. This is what "Gemini returns the source unchanged" actually means: it's magnitude-dependent, not universal. Don't send a small edit to Gemini expecting a change.
+- **Grok reliably applies even small/precise edits** — so Grok (or Qwen for masked repair) is the right backend for targeted tweaks and repairs; Gemini for large stylize/transform passes.
+- Consequence for avatars: the 2×4 pipeline runs BOTH passes on Grok; the realistic anchor (Round 1, identity-preserving) is correct on Grok, but the Pixar style transfer (Round 2, a BIG transform) is exactly where Grok underperforms and Gemini should be used. See `project_image_model_tests.md` → "Avatar 2×4 sheet — Grok vs Gemini per pass".
+
 **Prompting tips for Grok Imagine:**
 - Natural sentences, not tag lists ("a child running through a forest" not "child, forest, running")
 - Specific artist/studio references improve results ("Studio Ghibli", "Craig Mullins")
