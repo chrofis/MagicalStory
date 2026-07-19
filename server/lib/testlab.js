@@ -2001,16 +2001,28 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const unionPadded = strip(await sharp(union, raw1).blur(padPx / 1.5).threshold(16).raw().toBuffer()); // ≈6px dilation, binary
   const alpha1 = Buffer.from(unionPadded);
 
-  // Red-zone background fill: where the OLD figure was but the NEW figure
-  // isn't (oldBin && !newBin), the paste must reveal the scene BACKGROUND
-  // coloured to match the surroundings — not the candidate's unfilled white
-  // fringe (halo). Computed here; applied to the paste buffer below.
+  // Background-fill mask (pixels to replace with diffused scene background):
+  //   (a) RED ZONE — old figure was here, new figure isn't (oldBin && !newBin).
+  //   (b) GLOW — union/pad pixels NOT in the new figure that are clearly
+  //       BRIGHTER than the figure: Qwen paints a light halo where the new hair
+  //       meets the whited-out area, and the union padding pastes it. Threshold
+  //       is relative to the figure's mean luminance (+45), so the actual figure
+  //       — including light/silver hair, which is inside newBin — is protected.
   const s1r = Math.max(1, Math.round(oldA.length / n));
+  const candRawL = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const lumAt = (i) => 0.299 * candRawL[i * 3] + 0.587 * candRawL[i * 3 + 1] + 0.114 * candRawL[i * 3 + 2];
+  let figSum = 0, figCnt = 0;
+  for (let i = 0; i < n; i++) if (newBin[i] > 128) { figSum += lumAt(i); figCnt++; }
+  const figMean = figCnt ? figSum / figCnt : 255;
   const redZone = Buffer.alloc(n);
-  let redZonePx = 0;
+  let redZonePx = 0, glowPx = 0;
   for (let i = 0; i < n; i++) {
-    if (alpha1[i] && oldA[i * s1r] > 128 && newBin[i] <= 128) { redZone[i] = 255; redZonePx++; }
+    if (!alpha1[i] || newBin[i] > 128) continue;   // never fill the real new figure
+    const oldOnly = oldA[i * s1r] > 128;
+    const glow = lumAt(i) > figMean + 45;
+    if (oldOnly || glow) { redZone[i] = 255; redZonePx++; if (glow && !oldOnly) glowPx++; }
   }
+  if (redZonePx) log.info(`[TESTLAB] bg-fill mask: ${redZonePx}px (${redZonePx - glowPx} red-zone + ${glowPx} glow), figMean lum ${figMean.toFixed(0)}`);
 
   // White-card gate: a face painted on a white panel passes IoU (geometry
   // aligns) and the style gate (a colorless panel has no "style") — v92's
