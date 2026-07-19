@@ -45,7 +45,7 @@ const toUri = p => 'data:image/jpeg;base64,' + fs.readFileSync(p).toString('base
     usageTracker: null,
   });
   console.log(`Done in ${Math.round((Date.now() - t0) / 1000)}s. modelId=${result.modelId || 'n/a'}`);
-  if (result.imageData) { fs.writeFileSync(`${OUT}/cover_OIL_COMPOSITE_v2.jpg`, Buffer.from(result.imageData.split(',')[1], 'base64')); console.log('saved cover_OIL_COMPOSITE_v2.jpg'); }
+  if (result.imageData) { fs.writeFileSync(`${OUT}/cover_OIL_COMPOSITE_v4.jpg`, Buffer.from(result.imageData.split(',')[1], 'base64')); console.log('saved cover_OIL_COMPOSITE_v2.jpg'); }
   // also dump the intermediate debug images if present
   if (result.debug) {
     for (const [k, v] of Object.entries(result.debug)) {

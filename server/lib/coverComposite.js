@@ -825,6 +825,8 @@ ${POSES.join('\n')}
 
 PRESERVE: every face, hair colour, skin tone, clothing detail, every prop, plain background, relative left-to-right positions.
 
+FRAMING (mandatory): keep every figure FULL-LENGTH — head to feet, both feet visible and standing on the ground. Do NOT crop at the waist, hips, thighs, or knees. Do NOT zoom in, do NOT reframe to a portrait — preserve the input framing and figure scale, keeping the empty margins above the heads and below the feet exactly as in the input.
+
 Keep the same characters — no additions, no removals. The background stays a plain flat tone (white, gray, or neutral — pass 2 composites the figures onto the real landmark photo). No landscape, sky, ground, buildings, or foliage. No text, signage, or letters anywhere.${n === 1 && !propName ? '' : ' Every figure ends the edit with the redrawn pose — arms away from the sides.'}`;
 
   // Final scrub — post-VEH001 rule: every prompt path runs
@@ -885,7 +887,12 @@ Keep the same characters — no additions, no removals. The background stays a p
   const cutoutResized = await sharp(cutout).resize(W, H, { fit: 'inside' }).png().toBuffer();
   const cm = await sharp(cutoutResized).metadata();
   const offX = Math.round((W - cm.width) / 2);
-  const offY = Math.round((H - cm.height) / 2);
+  // GROUND the figures at the bottom — feet at ~0.98*H — instead of centering
+  // them vertically. A wide multi-figure group scales down by width under
+  // fit:inside, so centering floated the feet mid-canvas and the landmark's
+  // foreground (e.g. a cobblestone path) then occluded the lower legs → figures
+  // read as "cut off at the shins". Bottom-aligning stands them on the ground.
+  const offY = Math.max(0, Math.round(H * 0.98) - cm.height);
   const pass2Input = await sharp(landmarkResized).composite([{ input: cutoutResized, left: offX, top: offY }]).jpeg({ quality: 92 }).toBuffer();
 
   // 9. Build pass 2 prompt. textLine was computed earlier (shared with the
