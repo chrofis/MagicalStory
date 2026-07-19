@@ -387,11 +387,16 @@ async function deleteStoryArtefacts(storyId) {
 // immediate 429. Send a real UA on every fetch (harmless for our own R2 URLs).
 const IMG_FETCH_UA = 'MagicalStory/1.0 (https://magicalstory.ch; contact@magicalstory.ch) Node.js';
 
-async function fetchImageBytes(url, { retries = 3 } = {}) {
+async function fetchImageBytes(url, { retries = 3, timeoutMs = 30000 } = {}) {
   if (!url) return null;
   for (let attempt = 0; ; attempt++) {
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': IMG_FETCH_UA } });
+      // Bounded per-attempt timeout — a broken/hanging URL (e.g. a stale R2
+      // asset that accepts the connection but never responds) must fail fast
+      // and fall through to the caller's fallback, never hang the pipeline.
+      // Observed: a broken character face-photo URL hung the entire avatar
+      // style-transfer pass indefinitely, so the avatar was never saved.
+      const res = await fetch(url, { headers: { 'User-Agent': IMG_FETCH_UA }, signal: AbortSignal.timeout(timeoutMs) });
       if (res.ok) return Buffer.from(await res.arrayBuffer());
       // 429 (rate limit) / 503: back off and retry. Honour Retry-After when
       // present, else exponential backoff with jitter so a burst of retries
