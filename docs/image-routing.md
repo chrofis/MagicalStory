@@ -43,7 +43,7 @@ Test Lab: `/admin/test-lab`. Stages run via `server/lib/testlab.js` `STAGE_RUNNE
 - **3+ figures → try composite** — but the threshold shifts with style:
   - **Comic / cartoon / abstract avatar styles** → direct tolerates **3, even 4** figures.
   - **Realistic / painterly styles** → even **3** is challenging for direct; composite often needed.
-- **Status: intuition, not tested.** The experiment to validate it = a 5-figure composite cover with the new Gemini-Pixar avatars vs the direct 5-figure cover. Blocked on two enablers (see Open below).
+- **Data point (2026-07-19, Pixar @ 5 figures):** ran composite vs direct on the showcase initialPage with the new Gemini-Pixar avatars injected (`scripts/analysis/cover-composite-vs-direct.js`). BOTH clean; **direct was at least as good as composite** — more natural lighting/grouping, all 5 recognizable. Composite locks each figure's identity tighter but looks slightly posed. ⇒ For **stylized Pixar, direct handles 5 figures** — composite's edge is realistic styles / strict identity, not stylized covers. Confirms the "abstract styles tolerate more figures direct" half of the rule. Realistic-style thresholds still untested.
 
 ---
 
