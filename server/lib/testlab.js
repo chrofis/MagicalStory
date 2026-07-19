@@ -1877,6 +1877,20 @@ async function fetchFaceHeadMask(buf, faceBox, cropW, cropH, opts = {}) {
     opts);
 }
 
+// Blur a binary mask, then threshold the blurred BYTES in JS.
+// sharp's CHAINED .blur(σ).threshold(t) does NOT threshold the blurred pixels —
+// it returns a slightly ERODED mask instead of the intended dilation (verified:
+// a 40px square stays 40px wide with its corners eaten). Splitting the two makes
+// the mask actually grow outward. Returns a single-channel Buffer(w*h).
+async function maskBlurThreshold(buf, w, h, sigma, thr) {
+  const n = w * h;
+  const bl = await sharp(buf, { raw: { width: w, height: h, channels: 1 } }).blur(sigma).raw().toBuffer();
+  const st = Math.max(1, Math.round(bl.length / n));
+  const o = Buffer.alloc(n);
+  for (let i = 0; i < n; i++) o[i] = bl[i * st] >= thr ? 255 : 0;
+  return o;
+}
+
 // Head mask via the whole figure (robust): SAM the figure from the body box,
 // keep only the pixels inside the face box. No fragile face-region dots.
 async function fetchFigureHeadMask(buf, bodyBoxInCrop, faceBoxInCrop, cropW, cropH, opts = {}) {
@@ -2059,8 +2073,12 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // NO FEATHERING — the blend is the hard padded union, nothing else.
   // Every pixel in the union comes from the new image at 255; every pixel
   // outside stays original at 255. Binary, no falloff band.
+  // Real ≈6px OUTWARD dilation via maskBlurThreshold (sharp's chained
+  // blur().threshold() erodes instead — it under-covered the figure, so thin
+  // protrusions like the nose poked past the union → old feature at the border,
+  // the "ghost nose").
   const padPx = 6;
-  const unionPadded = strip(await sharp(union, raw1).blur(padPx / 1.5).threshold(16).raw().toBuffer()); // ≈6px dilation, binary
+  const unionPadded = await maskBlurThreshold(union, cropW, cropH, padPx / 1.5, 16);
   const alpha1 = Buffer.from(unionPadded);
 
   // Split figure vs background by the SAM MASK (newBin), NOT brightness: Qwen
@@ -2072,7 +2090,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   //   FIGURE  = newBin (+3px edge ring) → face correction, kept from candidate
   //   BG-FILL = alpha1 && !dilate(newBin,3) → red zone + outer glow → background
   const s1r = Math.max(1, Math.round(oldA.length / n));
-  const newDil = strip(await sharp(Buffer.from(newBin), raw1).blur(2).threshold(16).raw().toBuffer()); // ≈3px dilation of the figure
+  const newDil = await maskBlurThreshold(Buffer.from(newBin), cropW, cropH, 2, 16); // real ≈3px OUTWARD dilation
   const redZone = Buffer.alloc(n);
   let redZonePx = 0;
   for (let i = 0; i < n; i++) {
@@ -2715,8 +2733,9 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       bin[i] = d > 30 ? 255 : 0;
     }
     const raw1 = { raw: { width: crop.w, height: crop.h, channels: 1 } };
-    const dense = await sharp(bin, raw1).blur(4).threshold(96).toBuffer();     // despeckle
-    const alpha = await sharp(dense, raw1).blur(5).threshold(20).blur(4).raw().toBuffer(); // dilate + feather
+    const dense = await maskBlurThreshold(bin, crop.w, crop.h, 4, 96);          // despeckle
+    const dilated = await maskBlurThreshold(dense, crop.w, crop.h, 5, 20);      // dilate
+    const alpha = await sharp(dilated, raw1).blur(4).raw().toBuffer();          // feather
     // Re-imagination guard: a figure change owns a figure-sized blob. If the
     // model repainted (almost) the whole crop, gating would degrade to a
     // visible rectangle paste — fail loudly instead of shipping that.
