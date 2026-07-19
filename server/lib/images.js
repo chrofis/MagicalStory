@@ -10485,6 +10485,11 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
       return [0, 0, 0];
     });
     for (const o of offK) { const mag = Math.hypot(o[0], o[1], o[2]); if (mag > maxOffsetDeltaE) { const s = maxOffsetDeltaE / mag; o[0] *= s; o[1] *= s; o[2] *= s; } }
+    // Per-group strength: a BORDER-matched material (cloth) gets the FULL offset
+    // (1.0) so its seam colour is exact — the whole point of the border match is
+    // an identical join. Region-fallback materials (face/hair, tone-matched to
+    // the scene) keep the gentle `strength` nudge so the face isn't slammed.
+    const sK = cent.map((_, k) => (keep[k] && bIn[k][3] >= MINB && bOut[k][3] >= MINB) ? 1 : strength);
     // 4. sigma from the spread of kept centroids → soft colour-weighted blend.
     const kc = cent.filter((_, k) => keep[k]); const dd = [];
     for (let a = 0; a < kc.length; a++) for (let b = a + 1; b < kc.length; b++) dd.push(Math.hypot(kc[a][0] - kc[b][0], kc[a][1] - kc[b][1], kc[a][2] - kc[b][2]));
@@ -10494,9 +10499,9 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
       if (mCand[i] <= 128) continue;
       const lab = [candLab[i * 3], candLab[i * 3 + 1], candLab[i * 3 + 2]];
       let wsum = 0; const woff = [0, 0, 0];
-      for (let k = 0; k < cent.length; k++) { if (!keep[k]) continue; const dl = lab[0] - cent[k][0], da = lab[1] - cent[k][1], db = lab[2] - cent[k][2]; const w = Math.exp(-(dl * dl + da * da + db * db) / (2 * sigma * sigma)); wsum += w; woff[0] += w * offK[k][0]; woff[1] += w * offK[k][1]; woff[2] += w * offK[k][2]; }
+      for (let k = 0; k < cent.length; k++) { if (!keep[k]) continue; const dl = lab[0] - cent[k][0], da = lab[1] - cent[k][1], db = lab[2] - cent[k][2]; const w = Math.exp(-(dl * dl + da * da + db * db) / (2 * sigma * sigma)); wsum += w; woff[0] += w * sK[k] * offK[k][0]; woff[1] += w * sK[k] * offK[k][1]; woff[2] += w * sK[k] * offK[k][2]; }
       if (wsum > 0) { woff[0] /= wsum; woff[1] /= wsum; woff[2] /= wsum; }
-      const rgb = _labToRgb(lab[0] + strength * woff[0], lab[1] + strength * woff[1], lab[2] + strength * woff[2]);
+      const rgb = _labToRgb(lab[0] + woff[0], lab[1] + woff[1], lab[2] + woff[2]);
       out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2];
     }
     clusterInfo = cent.map((c, k) => keep[k] ? { lab: c.map(v => +v.toFixed(1)), count: counts[k], off: offK[k].map(v => +v.toFixed(1)), src: (bIn[k][3] >= MINB && bOut[k][3] >= MINB) ? 'border' : 'region' } : null).filter(Boolean);

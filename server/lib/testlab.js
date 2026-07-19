@@ -645,7 +645,9 @@ async function resolveCharacterBox(ctx, imageData, charName, { detection = null 
 
 async function runCharRepairStage(ctx, opts) {
   const { experimentId, params = {} } = opts;
-  if (opts.params?.samBlend || opts.params?.backend === 'qwen') warmupFigureMask();
+  // Warm the SAM figure-mask service for any insert-pipeline run (qwen OR grok);
+  // the legacy Grok blended/cutout path (explicit repairMode) warms it too.
+  if (opts.params?.samBlend || opts.params?.backend === 'qwen' || opts.params?.backend === 'grok') warmupFigureMask();
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { repairCharacterMismatch } = require('./images');
@@ -653,15 +655,18 @@ async function runCharRepairStage(ctx, opts) {
   const charName = params.characterName;
   if (!charName) throw new Error('char_repair requires params.characterName');
 
-  // backend 'qwen' → crop-bounded Qwen REPLACEMENT at the character's box.
-  // Repair mode: tight crop (large crops with other figures trigger full
-  // re-imagination) + replace-wording (the scene already contains the figure).
-  if (params.backend === 'qwen') {
+  // backend 'qwen' | 'grok' → the SAME crop-bounded insert pipeline (SAM face
+  // extraction → union blend → colour-aware correction). The ONLY difference is
+  // the model call inside runQwenInsertStage. This is the head-to-head path.
+  // The legacy Grok blended/cutout/fullscene repair stays reachable via an
+  // explicit repairMode (below); grok with no legacy repairMode = insert.
+  const legacyGrokModes = ['blended', 'cutout', 'fullscene'];
+  if (params.backend === 'qwen' || (params.backend === 'grok' && !legacyGrokModes.includes(params.repairMode))) {
     const r = await runQwenInsertStage(ctx, {
       ...opts,
       params: { ...params, base: params.base || 'active', repairMode: true, cropPad: params.cropPad ?? 0.15 },
     });
-    return { ...r, backend: 'qwen', repairMode: 'qwen-replace' };
+    return { ...r, backend: params.backend, repairMode: `${params.backend}-insert` };
   }
 
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
@@ -2298,13 +2303,11 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         : await fetchMaskWithRetry(cropBuf, boxInCrop, 5, params._maskPoints || {});
       if (oldMaskPng) {
         // Rebuild the whiteout mask BINARIZED (no soft SAM edges = no
-        // feathered-looking whiteout), hard-clipped to the face region in
-        // face mode — never the body.
+        // feathered-looking whiteout). BOTTOM-only clip (full width/top, cut at
+        // the face-box bottom) so round-1 matches round-2 — both rounds share
+        // the same clip. (Was face-box-clipped on all sides; now bottom-only.)
         const clipRect = params._faceMode ? [
-          Math.max(0, Math.round(figureBox[1] * W) - crop.x),
-          Math.max(0, Math.round(figureBox[0] * H) - crop.y),
-          Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
-          Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
+          0, 0, crop.w, Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
         ] : null;
         const a = await sharp(oldMaskPng).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
         const stride = Math.max(1, Math.round(a.length / (crop.w * crop.h)));
@@ -2429,7 +2432,14 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     poseRefBuf = await sharp(cropBuf).blur(sigma).jpeg({ quality: 90 }).toBuffer();
     qwenRefs.push(`data:image/jpeg;base64,${poseRefBuf.toString('base64')}`);
   }
-  const result = await editWithQwen(prompt, qwenRefs, { width: rw, height: rh });
+  // Model dispatch — the ONLY difference between the qwen and grok runs. Same
+  // whiteout crop, same character ref, same prompt, same pose refs. Grok edit
+  // coerces its output to the slot-0 (whiteout crop) aspect, so passing the crop
+  // aspect keeps the output geometry identical to Qwen's rw:rh; everything
+  // downstream (SAM re-detect, union blend, colour-aware correction) is shared.
+  const result = params.backend === 'grok'
+    ? await require('./grok').editWithGrok(prompt, qwenRefs, { aspectRatio: `${crop.w}:${crop.h}`, resolution: '1k' })
+    : await editWithQwen(prompt, qwenRefs, { width: rw, height: rh });
   const elapsedMs = Date.now() - t0;
 
   // Save the intermediates IMMEDIATELY — before gating can throw. A failed
