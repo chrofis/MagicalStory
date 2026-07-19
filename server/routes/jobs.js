@@ -675,12 +675,18 @@ router.get('/my-jobs', authenticateToken, async (req, res) => {
 
       // Mark stale processing/pending jobs as failed before returning.
       // Without this, the client restores a stale job and shows a permanent spinner.
+      // Key on updated_at (no heartbeat for 15 min = the worker died — OOM/crash/
+      // restart), NOT created_at: a legitimately long job keeps bumping updated_at
+      // via progress writes, so it's spared; a dead one stops writing and is caught
+      // within minutes instead of the old 2-hour created_at window (which left
+      // OOM-killed jobs spinning for hours). See sweepStaleJobs() for the proactive
+      // server-side sweep — this per-request pass is the backstop.
       await pool.query(
         `UPDATE story_jobs
-         SET status = 'failed', error_message = 'Job abandoned (server restart or timeout)', updated_at = NOW()
+         SET status = 'failed', error_message = 'Job stalled — no progress for 15 min (worker died: OOM/crash/restart)', updated_at = NOW()
          WHERE user_id = $1
            AND status IN ('pending', 'processing')
-           AND created_at < NOW() - INTERVAL '2 hours'`,
+           AND updated_at < NOW() - INTERVAL '15 minutes'`,
         [userId]
       );
 

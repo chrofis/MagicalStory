@@ -8171,6 +8171,30 @@ initialize().then(() => {
       });
     }, 60 * 60 * 1000); // every hour
 
+    // Proactive stale-job watchdog. A worker death (OOM / crash / infra restart)
+    // leaves the story_job at 'processing' with no chance to write an error, so
+    // without this it spins forever (2026-07-19: two 5-page jobs each orphaned
+    // ~2h). Key on updated_at, not created_at: a live job keeps writing progress,
+    // a dead one goes silent — 15 min of silence = dead. The /my-jobs per-request
+    // pass is only a backstop for users who happen to poll; this catches every
+    // dead job server-side within 5 min.
+    const sweepStaleJobs = async () => {
+      try {
+        const r = await dbPool.query(
+          `UPDATE story_jobs SET status='failed',
+             error_message='Job stalled — no progress for 15 min (worker died: OOM/crash/restart)',
+             updated_at=NOW()
+           WHERE status IN ('pending','processing')
+             AND updated_at < NOW() - INTERVAL '15 minutes'
+           RETURNING id`);
+        if (r.rowCount > 0) log.warn(`[STALE-JOB-SWEEP] failed ${r.rowCount} stalled job(s): ${r.rows.map(x => x.id).join(', ')}`);
+      } catch (err) {
+        log.warn(`[STALE-JOB-SWEEP] sweep failed: ${err.message}`);
+      }
+    };
+    setTimeout(sweepStaleJobs, 60 * 1000);       // first sweep 1 min after boot
+    setInterval(sweepStaleJobs, 5 * 60 * 1000);  // then every 5 min
+
     // Daily admin summary email — same hourly cadence; sends once per
     // Swiss-local day after 07:00 (config row daily_summary_last_sent
     // dedupes across restarts).
