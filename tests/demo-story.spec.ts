@@ -161,7 +161,11 @@ async function preSeedLanguage(page: Page, language: DemoLanguage, baseUrl: stri
   // in the target language from the first paint. The LanguageProvider also accepts ?lang= as
   // an override on the URL, but we set both to be safe.
   await page.goto(`${baseUrl}/?lang=${language}`);
-  await page.evaluate((lang) => {
+  // Rotating Widmung (dedication) chosen by showcase.js, language-matched. The
+  // wizard reads it from localStorage 'story_dedication' at init, so seed it
+  // before the app boots (same as the language). Empty string = no dedication.
+  const dedication = process.env.DEMO_DEDICATION || '';
+  await page.evaluate(({ lang, ded }) => {
     try { localStorage.setItem('magicalstory_language', lang); } catch { /* ignore */ }
     // The wizard's STORY language is separate state read from 'story_language'
     // and hard-defaults to 'de-ch' — without this seed every demo story
@@ -169,7 +173,11 @@ async function preSeedLanguage(page: Page, language: DemoLanguage, baseUrl: stri
     // Miller/EN showcases before 2026-06-13 silently came out de-ch).
     // The wizard normalizes 'en'→'en-gb', 'de'→'de-ch', 'fr'→'fr-ch'.
     try { localStorage.setItem('story_language', lang); } catch { /* ignore */ }
-  }, language);
+    try {
+      if (ded) localStorage.setItem('story_dedication', ded);
+      else localStorage.removeItem('story_dedication');
+    } catch { /* ignore */ }
+  }, { lang: language, ded: dedication });
 }
 
 // ─── Family creation via real wizard UI ─────────────────────────────────────

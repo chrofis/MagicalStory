@@ -1,0 +1,25 @@
+{
+  "_comment": "Rotating Widmung (dedication) pool for showcase demo stories. Picked by scripts/admin/showcase.js language-matched to the rotation entry, rotated by the same cursor as art style / family. Generic children's-book dedications — NEVER story-specific. Swiss orthography (ss, never ß; Swiss guillemets if any quotes are ever added).",
+  "dedications": [
+    { "de": "Für dich, mit ganz viel Liebe.", "fr": "Pour toi, avec tout mon amour.", "it": "Per te, con tanto amore.", "en": "For you, with all my love." },
+    { "de": "Für alle kleinen Träumer und grossen Abenteurer.", "fr": "Pour tous les petits rêveurs et grands aventuriers.", "it": "Per tutti i piccoli sognatori e grandi avventurieri.", "en": "For all little dreamers and big adventurers." },
+    { "de": "Für die mutigsten Kinder der Welt.", "fr": "Pour les enfants les plus courageux du monde.", "it": "Per i bambini più coraggiosi del mondo.", "en": "For the bravest children in the world." },
+    { "de": "Mit Liebe geschrieben, nur für dich.", "fr": "Écrit avec amour, rien que pour toi.", "it": "Scritto con amore, solo per te.", "en": "Written with love, just for you." },
+    { "de": "Für dich – weil du etwas ganz Besonderes bist.", "fr": "Pour toi – parce que tu es quelqu'un d'unique.", "it": "Per te – perché sei davvero speciale.", "en": "For you – because you are truly special." },
+    { "de": "Für alle, die an Wunder glauben.", "fr": "Pour tous ceux qui croient aux merveilles.", "it": "Per tutti coloro che credono nelle meraviglie.", "en": "For everyone who believes in wonders." },
+    { "de": "Für dich, heute und für immer.", "fr": "Pour toi, aujourd'hui et pour toujours.", "it": "Per te, oggi e per sempre.", "en": "For you, today and always." },
+    { "de": "Für die kleinen Helden von morgen.", "fr": "Pour les petits héros de demain.", "it": "Per i piccoli eroi di domani.", "en": "For the little heroes of tomorrow." },
+    { "de": "Für dich, mit einem Herzen voller Geschichten.", "fr": "Pour toi, avec un cœur plein d'histoires.", "it": "Per te, con un cuore pieno di storie.", "en": "For you, with a heart full of stories." },
+    { "de": "Für alle, die gerne träumen.", "fr": "Pour tous ceux qui aiment rêver.", "it": "Per tutti quelli che amano sognare.", "en": "For everyone who loves to dream." },
+    { "de": "Für dich – möge dein Weg voller Abenteuer sein.", "fr": "Pour toi – que ton chemin soit plein d'aventures.", "it": "Per te – che il tuo cammino sia pieno di avventure.", "en": "For you – may your path be full of adventures." },
+    { "de": "Für die neugierigsten kleinen Entdecker.", "fr": "Pour les petits explorateurs les plus curieux.", "it": "Per i piccoli esploratori più curiosi.", "en": "For the most curious little explorers." },
+    { "de": "Für dich, mein kleiner Sonnenschein.", "fr": "Pour toi, mon petit rayon de soleil.", "it": "Per te, mio piccolo raggio di sole.", "en": "For you, my little sunshine." },
+    { "de": "Für alle Kinder mit grossen Träumen.", "fr": "Pour tous les enfants aux grands rêves.", "it": "Per tutti i bambini con grandi sogni.", "en": "For all children with big dreams." },
+    { "de": "Für dich – weil Geschichten uns zusammenhalten.", "fr": "Pour toi – parce que les histoires nous unissent.", "it": "Per te – perché le storie ci tengono uniti.", "en": "For you – because stories hold us together." },
+    { "de": "Für die tapferen kleinen Herzen dieser Welt.", "fr": "Pour les petits cœurs courageux de ce monde.", "it": "Per i piccoli cuori coraggiosi di questo mondo.", "en": "For the brave little hearts of this world." },
+    { "de": "Für dich, mit tausend Umarmungen.", "fr": "Pour toi, avec mille câlins.", "it": "Per te, con mille abbracci.", "en": "For you, with a thousand hugs." },
+    { "de": "Für alle, die das Staunen nie verlernen.", "fr": "Pour tous ceux qui n'oublient jamais de s'émerveiller.", "it": "Per tutti quelli che non smettono mai di stupirsi.", "en": "For everyone who never stops wondering." },
+    { "de": "Für dich – dein ganz eigenes kleines Abenteuer.", "fr": "Pour toi – ta toute petite aventure à toi.", "it": "Per te – la tua piccola avventura tutta tua.", "en": "For you – your very own little adventure." },
+    { "de": "Für dich, weil du so sehr geliebt wirst.", "fr": "Pour toi, parce que tu es tellement aimé.", "it": "Per te, perché sei tanto amato.", "en": "For you, because you are so loved." }
+  ]
+}

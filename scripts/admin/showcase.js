@@ -30,6 +30,7 @@ const { spawnSync } = require('child_process');
 const FAMILIES_PATH = path.join(__dirname, '..', '..', 'tests', 'helpers', 'demo-families.json');
 const ROTATION_PATH = path.join(__dirname, '..', '..', 'tests', 'helpers', 'demo-rotation.json');
 const STATE_PATH = path.join(__dirname, '..', '..', 'tests', 'demo-rotation-state.json');
+const DEDICATIONS_PATH = path.join(__dirname, '..', '..', 'tests', 'helpers', 'demo-dedications.json');
 const PHOTOS_DIR = path.join(__dirname, '..', '..', 'tests', 'fixtures', 'demo-photos');
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'DemoStory2026!';
 
@@ -40,6 +41,17 @@ function parseArgs() {
     if (m) out[m[1]] = m[2] || 'true';
   }
   return out;
+}
+
+// Pick a Widmung (dedication) from the rotating pool, matched to the story
+// language. Rotates by the entry index (same cursor idea as family / art style)
+// so consecutive showcases get different dedications. Falls back to English if
+// the language variant is missing.
+function pickDedication(entry) {
+  const pool = JSON.parse(fs.readFileSync(DEDICATIONS_PATH, 'utf8')).dedications || [];
+  if (!pool.length) return '';
+  const d = pool[entry.index % pool.length];
+  return (d && (d[entry.language] || d.en)) || '';
 }
 
 function shortTimeId() {
@@ -157,6 +169,7 @@ async function main() {
   const entry = pickEntry(args, entries);
   const family = families.find(f => f.id === entry.familyId);
   if (!family) throw new Error(`Family not found: ${entry.familyId}`);
+  const dedication = pickDedication(entry);
 
   console.log('═══ Showcase Run ════════════════════════════════════════');
   console.log(`  Entry:    #${entry.index} — ${entry.description}`);
@@ -164,6 +177,7 @@ async function main() {
   console.log(`  Language: ${entry.language}`);
   console.log(`  Topic:    ${entry.storyCategory} → ${entry.storyTopic}`);
   console.log(`  Style:    ${entry.artStyle}`);
+  console.log(`  Widmung:  ${dedication || '(none)'}`);
   console.log(`  Backend:  ${apiBase}`);
   console.log('═══════════════════════════════════════════════════════════');
 
@@ -204,6 +218,7 @@ async function main() {
     DEMO_EMAIL: email,
     DEMO_PASSWORD,
     DEMO_ENTRY_INDEX: String(entry.index),
+    DEMO_DEDICATION: dedication,
     ...(reuseEmail ? { DEMO_REUSE_ACCOUNT: '1' } : {}),
   };
   const headed = process.env.HEADED === '1' || args.headed === 'true';
