@@ -969,15 +969,18 @@ async function loadCharacterContext(storyId, characterName) {
 }
 
 /** Pass 1: realistic anchor sheet (generated once per character, reused). */
-async function runAvatarRealisticStage(target, { experimentId }) {
+async function runAvatarRealisticStage(target, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
   const { character, costume } = await loadCharacterContext(target.storyId, target.character);
+  // params.costumeDescription: A/B a modified outfit description (e.g.
+  // carried-accessory removal experiments) against the stored wardrobe.
+  const costumeDescription = params.costumeDescription || costume.description || 'standard outfit';
   const t0 = Date.now();
   const result = await generateCharacter2x4Sheet(character, {
     clothingCategory: costume.category,
-    costumeDescription: costume.description || 'standard outfit',
+    costumeDescription,
     artStyle: 'realistic',
   });
   if (!result?.imageData) throw new Error('no realistic sheet returned');
@@ -986,6 +989,7 @@ async function runAvatarRealisticStage(target, { experimentId }) {
   return {
     character: character.name, imageType: 'tl_avatar', versionIndex,
     pass: 1, artStyle: 'realistic', clothingCategory: costume.category,
+    costumeDescription: costumeDescription.slice(0, 300),
     finalScore: result.finalScore ?? null, elapsedMs: Date.now() - t0,
   };
 }
@@ -1140,6 +1144,10 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
     freshCharacters,
     compositeCovers: params.composite === true,
     landmarkBufOverride,
+    // Figure orientation lever for the composite path (2026-07-19):
+    // 'frontal' | 'turned-source' | 'turned-prompt' | 'both'. See
+    // docs/image-routing.md. Only affects params.composite=true runs.
+    orient: params.orient || 'frontal',
     promptTemplateOverride: promptOverride || null,
   });
   const elapsedMs = Date.now() - t0;
@@ -1883,6 +1891,7 @@ async function fetchFaceHeadMask(buf, faceBox, cropW, cropH, opts = {}) {
 // a 40px square stays 40px wide with its corners eaten). Splitting the two makes
 // the mask actually grow outward. Returns a single-channel Buffer(w*h).
 async function maskBlurThreshold(buf, w, h, sigma, thr) {
+  const sharp = require('sharp');
   const n = w * h;
   const bl = await sharp(buf, { raw: { width: w, height: h, channels: 1 } }).blur(sigma).raw().toBuffer();
   const st = Math.max(1, Math.round(bl.length / n));
