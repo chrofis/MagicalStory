@@ -6114,7 +6114,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // -20 because of its OWN title). Same fix possibility for
             // dedication: it lives on coverData / storyData if it's been set.
             let coverEvalPrompt = coverData.description || coverData.prompt || '';
-            if (coverKey === 'frontCover') {
+            // Title / dedication / branding text is handled in one of two modes.
+            // Mode A (appSideCoverType=false): the image model PAINTS the text into
+            // the art, so the eval must verify it is rendered. Mode B (appSideCoverType
+            // =true, the default): the art is generated TEXTLESS and the title /
+            // dedication / "magicalstory.ch" are composited by the app afterward
+            // (server/lib/coverTypography.js) — so the text is NOT in the image the
+            // evaluator sees. Requiring it in Mode B makes the evaluator flag the
+            // intentionally-textless cover as "missing title text" and tanks a good
+            // cover to 0, which then triggers a destructive composite re-iteration.
+            if (MODEL_DEFAULTS.appSideCoverType) {
+              coverEvalPrompt += '\n\nTEXT NOTE: This cover art is intentionally textless. The title, dedication, and "magicalstory.ch" branding are composited by the app after generation and are NOT part of the image you are evaluating. Never flag missing or absent title/dedication/branding text as a defect.';
+            } else if (coverKey === 'frontCover') {
               const titleForEval = title || inputData.title || inputData.storyTitle || '';
               if (titleForEval) coverEvalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact title text: "${titleForEval}"`;
             } else if (coverKey === 'initialPage') {
