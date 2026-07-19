@@ -600,7 +600,9 @@ async function resolveCharacterBox(ctx, imageData, charName, { detection = null 
     const fig = (det?.figures || det?.characters || []).find(f => (f.name || '').toLowerCase() === charName.toLowerCase());
     if (!fig) return null;
     const bbox = fig.bodyBox || fig.bbox || fig.box_2d || null;
-    return bbox?.length === 4 ? { bbox, faceBbox: fig.faceBox || fig.faceBbox || null } : null;
+    // faceBboxRaw = the TIGHT (unpadded) DINO face box — used to place the SAM
+    // dots on the real face/hair, not out in the padded box's empty margin.
+    return bbox?.length === 4 ? { bbox, faceBbox: fig.faceBox || fig.faceBbox || null, faceBboxRaw: fig.faceBboxRaw || null } : null;
   };
   // Chained-experiment detection (fresh, from a bbox step in the SAME
   // experiment) always wins over whatever generation-time data is stored.
@@ -1797,15 +1799,17 @@ async function fetchMaskWithRetry(buf, box, tries = 5, opts = {}) {
  * face box (with face+hair points) and a dedicated hair box (upper part of
  * the head). Returns a binarized white-on-transparent PNG at cropW×cropH.
  */
-async function fetchFaceHeadMask(buf, faceBox, cropW, cropH) {
+async function fetchFaceHeadMask(buf, faceBox, cropW, cropH, opts = {}) {
   // Shared implementation lives in images.js (production's blended-face
   // whiteout uses the identical logic); the Test Lab injects its retry-aware
   // fetcher for post-deploy SAM cold starts. requireMobilesam: rembg's
   // whole-figure fallback produced garbage head whiteouts during a SAM
   // outage (rectangle over a church tower) — better to retry/fail loudly.
+  // opts {rawFaceBox, boxScale, singleCall, onGeom} tune the SAM box + dots.
   const { fetchFaceHeadMaskPng } = require('./images');
   return fetchFaceHeadMaskPng(buf, faceBox, cropW, cropH,
-    (b, box, opts) => fetchMaskWithRetry(b, box, 4, { ...(opts || {}), requireMobilesam: true }));
+    (b, box, o) => fetchMaskWithRetry(b, box, 4, { ...(o || {}), requireMobilesam: true }),
+    opts);
 }
 
 /**
@@ -2068,6 +2072,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // Crop region: explicit normalized rect, else padded detection box.
   let crop = null;
   let figureBox = null; // page-normalized [ymin,xmin,ymax,xmax] when detection-derived
+  let rawFigureBox = null; // tight unpadded face box (page-normalized) for SAM dots
   if (params.crop && [params.crop.x, params.crop.y, params.crop.w, params.crop.h].every(v => typeof v === 'number')) {
     crop = {
       x: Math.round(params.crop.x * W), y: Math.round(params.crop.y * H),
@@ -2104,6 +2109,9 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     }
     const box = faceMode ? resolved.faceBbox : resolved?.bbox; // [ymin,xmin,ymax,xmax] 0-1
     if (box?.length === 4) figureBox = box;
+    // Tight (unpadded) face box for SAM dot placement — falls back to the
+    // padded box when a recovered/older detection has no raw box.
+    if (faceMode && resolved?.faceBboxRaw?.length === 4) rawFigureBox = resolved.faceBboxRaw;
     if (faceMode) params._faceMode = true;
     if (box?.length === 4) {
       const pad = params.cropPad ?? 0.35;
@@ -2153,21 +2161,24 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
         Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
       ];
-      // Face mode: SAM box prompts anchor on the face and miss the HAIR —
-      // add positive point prompts (face center + hair region near the box
-      // top) so the whole head masks; the faceBox clip below still bounds it.
-      if (params._faceMode) {
-        const bcx = Math.round((boxInCrop[0] + boxInCrop[2]) / 2);
-        const bh2 = boxInCrop[3] - boxInCrop[1];
-        params._maskPoints = {
-          points: [
-            [bcx, Math.round(boxInCrop[1] + bh2 * 0.5)],  // face center
-            [bcx, Math.round(boxInCrop[1] + bh2 * 0.15)], // hair
-          ],
-        };
-      }
+      // Face mode: dots are placed by fetchFaceHeadMaskPng — on the RAW face
+      // box when available (boxScale set), so the hair dot lands on real hair
+      // instead of the padded box's empty margin. samBoxScale (e.g. 1.5) sizes
+      // the SAM box off the tight face box; null → legacy padded-box behaviour.
+      const rawBoxInCrop = (params._faceMode && rawFigureBox?.length === 4) ? [
+        Math.max(0, Math.round(rawFigureBox[1] * W) - crop.x),
+        Math.max(0, Math.round(rawFigureBox[0] * H) - crop.y),
+        Math.min(crop.w, Math.round(rawFigureBox[3] * W) - crop.x),
+        Math.min(crop.h, Math.round(rawFigureBox[2] * H) - crop.y),
+      ] : null;
+      params._faceMaskOpts = params._faceMode ? {
+        rawFaceBox: rawBoxInCrop,
+        boxScale: params.samBoxScale || null,
+        singleCall: !!params.singleMaskCall,
+        onGeom: (g) => { params._samGeom = g; },
+      } : {};
       oldMaskPng = params._faceMode
-        ? await fetchFaceHeadMask(cropBuf, boxInCrop, crop.w, crop.h)
+        ? await fetchFaceHeadMask(cropBuf, boxInCrop, crop.w, crop.h, params._faceMaskOpts)
         : await fetchMaskWithRetry(cropBuf, boxInCrop, 5, params._maskPoints || {});
       if (oldMaskPng) {
         // Rebuild the whiteout mask BINARIZED (no soft SAM edges = no
@@ -2316,6 +2327,19 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     steps.push({ label, imageType: 'tl_step', versionIndex: v });
   };
   await addStep(whiteoutApplied ? 'input 1: crop (figure whiteout)' : 'input 1: crop sent to model', `data:image/jpeg;base64,${sentBuf.toString('base64')}`);
+  // What SAM was actually prompted with: the face box (yellow), the hair
+  // sub-box (cyan, if used) and the two point dots (red = face, magenta =
+  // hair) drawn on the crop — so a wrong box/dot is visible, not inferred.
+  if (params._samGeom) {
+    try {
+      const g = params._samGeom;
+      const rect = (b, stroke, dash) => b ? `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="none" stroke="${stroke}" stroke-width="3"${dash ? ` stroke-dasharray="${dash}"` : ''}/>` : '';
+      const dot = (p, fill) => p ? `<circle cx="${p[0]}" cy="${p[1]}" r="7" fill="${fill}" stroke="white" stroke-width="2"/>` : '';
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${crop.w}" height="${crop.h}">${rect(g.samBox, '#ffcc00')}${rect(g.hairBox, '#00e0ff', '6,4')}${dot(g.facePt, '#ff2222')}${dot(g.hairPt, '#ff22ff')}</svg>`;
+      const viz = await sharp(cropBuf).composite([{ input: Buffer.from(svg) }]).jpeg({ quality: 95 }).toBuffer();
+      await addStep('SAM prompt: face box (yellow) + dots (red=face, magenta=hair)', `data:image/jpeg;base64,${viz.toString('base64')}`);
+    } catch (err) { log.warn(`[TESTLAB] SAM-geom viz failed: ${err.message}`); }
+  }
   await addStep('input 2: character reference', ref.photoUrl);
   if (poseRefBuf) await addStep('input 3: pose/gaze reference (blurred original)', `data:image/jpeg;base64,${poseRefBuf.toString('base64')}`);
   await addStep('model raw output', `data:image/jpeg;base64,${outBufEarly.toString('base64')}`);
@@ -2372,7 +2396,9 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       addStep,
       failCtx,
       maskPoints: params._maskPoints || null,
-      maskFetcher: params._faceMode ? (buf) => fetchFaceHeadMask(buf, boxInCrop, crop.w, crop.h) : null,
+      // Round 2 uses the SAME box + dot geometry as round 1 (onGeom stripped
+      // so the visualization isn't re-emitted for the candidate).
+      maskFetcher: params._faceMode ? (buf) => fetchFaceHeadMask(buf, boxInCrop, crop.w, crop.h, { ...(params._faceMaskOpts || {}), onGeom: null }) : null,
       // Face mode: union hard-clipped to the face region — body pixels never
       // enter the union no matter what round-2 SAM returns.
       clipRect: params._faceMode && figureBox ? [

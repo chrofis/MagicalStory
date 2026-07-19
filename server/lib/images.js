@@ -10101,16 +10101,41 @@ async function fetchSilhouettePng(cropJpegBuffer) {
  * maskFetch is injectable so callers with retry policies (Test Lab) reuse
  * this exact logic.
  */
-async function fetchFaceHeadMaskPng(cropJpegBuffer, faceBoxInCrop, outW, outH, maskFetch = fetchFigureMaskPng) {
-  const bcx = Math.round((faceBoxInCrop[0] + faceBoxInCrop[2]) / 2);
-  const bh = faceBoxInCrop[3] - faceBoxInCrop[1];
-  const points = { points: [[bcx, Math.round(faceBoxInCrop[1] + bh * 0.5)], [bcx, Math.round(faceBoxInCrop[1] + bh * 0.15)]] };
-  const hairBox = [faceBoxInCrop[0], faceBoxInCrop[1], faceBoxInCrop[2], Math.round(faceBoxInCrop[1] + bh * 0.55)];
-  const [m1, m2] = await Promise.all([
-    maskFetch(cropJpegBuffer, faceBoxInCrop, points),
-    maskFetch(cropJpegBuffer, hairBox, {}),
-  ]);
-  if (!m1 && !m2) return null;
+async function fetchFaceHeadMaskPng(cropJpegBuffer, faceBoxInCrop, outW, outH, maskFetch = fetchFigureMaskPng, opts = {}) {
+  // opts (all optional — empty = current production behaviour):
+  //   rawFaceBox  [x1,y1,x2,y2] the TIGHT DINO face box (unpadded) — dots are
+  //               placed on it so the hair dot lands on real hair, not padding.
+  //   boxScale    SAM box = boxScale × the raw face box, centered (e.g. 1.5).
+  //   singleCall  one SAM call (box + 2 dots), no separate hair box.
+  //   onGeom      callback({samBox, hairBox, facePt, hairPt}) for visualization.
+  const { rawFaceBox = null, boxScale = null, singleCall = false, onGeom = null } = opts;
+  let samBox = faceBoxInCrop.slice();
+  let facePt, hairPt;
+  if (rawFaceBox && rawFaceBox.length === 4 && boxScale) {
+    const [rx1, ry1, rx2, ry2] = rawFaceBox;
+    const cx = (rx1 + rx2) / 2, cy = (ry1 + ry2) / 2;
+    const rw = rx2 - rx1, rh = ry2 - ry1;
+    samBox = [
+      Math.max(0, Math.round(cx - rw * boxScale / 2)),
+      Math.max(0, Math.round(cy - rh * boxScale / 2)),
+      Math.min(outW, Math.round(cx + rw * boxScale / 2)),
+      Math.min(outH, Math.round(cy + rh * boxScale / 2)),
+    ];
+    facePt = [Math.round(cx), Math.round(ry1 + rh * 0.45)];          // eyes/nose of the real face
+    hairPt = [Math.round(cx), Math.max(0, Math.round(ry1 - rh * 0.20))]; // just above the forehead = hair
+  } else {
+    const bcx = Math.round((samBox[0] + samBox[2]) / 2);
+    const bh = samBox[3] - samBox[1];
+    facePt = [bcx, Math.round(samBox[1] + bh * 0.5)];
+    hairPt = [bcx, Math.round(samBox[1] + bh * 0.15)];
+  }
+  const points = { points: [facePt, hairPt] };
+  const hairBox = [samBox[0], samBox[1], samBox[2], Math.round(samBox[1] + (samBox[3] - samBox[1]) * 0.55)];
+  if (onGeom) { try { onGeom({ samBox, hairBox: singleCall ? null : hairBox, facePt, hairPt }); } catch { /* viz only */ } }
+  const calls = [maskFetch(cropJpegBuffer, samBox, points)];
+  if (!singleCall) calls.push(maskFetch(cropJpegBuffer, hairBox, {}));
+  const masks = await Promise.all(calls);
+  if (masks.every(m => !m)) return null;
   const n = outW * outH;
   const decode = async (png) => {
     if (!png) return null;
@@ -10120,9 +10145,9 @@ async function fetchFaceHeadMaskPng(cropJpegBuffer, faceBoxInCrop, outW, outH, m
     for (let i = 0; i < n; i++) out[i] = raw[i * s] > 128 ? 255 : 0;
     return out;
   };
-  const [a1, a2] = await Promise.all([decode(m1), decode(m2)]);
+  const decoded = await Promise.all(masks.map(decode));
   const merged = Buffer.alloc(n);
-  for (let i = 0; i < n; i++) merged[i] = Math.max(a1 ? a1[i] : 0, a2 ? a2[i] : 0);
+  for (let i = 0; i < n; i++) merged[i] = Math.max(...decoded.map(d => (d ? d[i] : 0)));
   return sharp(Buffer.alloc(n * 3, 255), { raw: { width: outW, height: outH, channels: 3 } })
     .ensureAlpha().joinChannel(merged, { raw: { width: outW, height: outH, channels: 1 } }).png().toBuffer();
 }
