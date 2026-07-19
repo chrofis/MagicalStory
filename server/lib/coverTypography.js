@@ -381,8 +381,57 @@ async function composeCover({ artBuffer, kind, title, dedication, seed, figures 
   throw new Error(`composeCover: unknown kind ${kind}`);
 }
 
+// ---------------------------------------------------------------------------
+// applyCoverTypography — bake the title/dedication/branding onto every cover so
+// the SERVED image (imageVersions[active], which viewer/share/PDF/print all
+// read) carries the text. The composited raster is the single source of truth;
+// each version's textless source stays available via the top-level ${key}Art
+// row so a title/dedication edit re-composites with no AI call.
+// ---------------------------------------------------------------------------
+async function applyCoverTypography(coverImages, { title, dedication, seed, trial = false } = {}) {
+  if (!coverImages) return coverImages;
+  const { log } = require('../utils/logger');
+  const toBuffer = (d) => Buffer.from(String(d).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const JOBS = [['frontCover', 'front'], ['initialPage', 'initial'], ['backCover', 'back']];
+  await Promise.all(JOBS.map(async ([key, kind]) => {
+    const cover = coverImages[key];
+    if (!cover || !cover.imageData || cover.artImageData) return; // missing, or already composited
+    const figures = cover.bboxDetection?.figures || [];
+    const ded = trial ? '' : (dedication || '');
+    const composite = async (b64) => {
+      const { buffer, spec } = await composeCover({
+        artBuffer: toBuffer(b64), kind, title: title || '', dedication: ded, seed: seed || title, figures,
+      });
+      return { data: 'data:image/jpeg;base64,' + buffer.toString('base64'), spec };
+    };
+    try {
+      const top = await composite(cover.imageData);
+      cover.artImageData = cover.imageData;   // textless original (feeds ${key}Art)
+      cover.imageData = top.data;             // titled top-level
+      cover.typography = top.spec;
+      if (Array.isArray(cover.imageVersions)) {
+        for (const v of cover.imageVersions) {
+          if (!v || !v.imageData || v.typography) continue; // missing or already titled
+          try {
+            const vt = await composite(v.imageData);
+            v.imageData = vt.data;   // titled — this is what getActiveStoryImages serves
+            v.typography = vt.spec;  // idempotency marker
+          } catch (verr) {
+            log.warn(`⚠️ [COVER TYPO] ${key} v: ${verr.message}`);
+          }
+        }
+      }
+      const spec = top.spec;
+      log.debug(`🅰️ [COVER TYPO] ${key}: ${spec.kind || kind}${spec.fontId ? ` ${spec.fontId}/${spec.layout} ${spec.face}` : ''}${spec.skipped ? ` (skipped: ${spec.skipped})` : ''}`);
+    } catch (err) {
+      log.warn(`⚠️ [COVER TYPO] ${key}: ${err.message}`);
+    }
+  }));
+  return coverImages;
+}
+
 module.exports = {
-  composeCover, composeFrontTitle, composeDedication, composeBrand,
+  composeCover, composeFrontTitle, composeDedication, composeBrand, applyCoverTypography,
   // exported for the standalone verify CLI / tests
   _internals: { occupancyFromFigures, bestRect, colorCandidates, finalizeColor, palette, garmentColors, FONTS, DEAL, FONT_FILES, renderSvg, buildTitleGroup, fitRender },
 };

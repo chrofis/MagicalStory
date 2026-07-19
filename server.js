@@ -435,33 +435,11 @@ async function detectBboxOnCovers(coverImages, characters, artStyle = null) {
 }
 
 // App-side cover typography (MODEL_DEFAULTS.appSideCoverType). Runs AFTER detectBboxOnCovers so the
-// figure boxes are available for placement. For each cover: composite the title / dedication /
-// "magicalstory.ch" onto the (textless) art via server/lib/coverTypography.js, keep the textless art
-// in `artImageData` (so title/dedication edits re-render with no AI call), and store the layout spec.
-async function applyCoverTypography(coverImages, { title, dedication, seed, trial = false } = {}) {
-  if (!coverImages) return coverImages;
-  const coverTypography = require('./server/lib/coverTypography');
-  const toBuffer = (d) => Buffer.from(String(d).replace(/^data:image\/\w+;base64,/, ''), 'base64');
-  const JOBS = [['frontCover', 'front'], ['initialPage', 'initial'], ['backCover', 'back']];
-  await Promise.all(JOBS.map(async ([key, kind]) => {
-    const cover = coverImages[key];
-    if (!cover || !cover.imageData || cover.artImageData) return; // missing, or already composited
-    try {
-      const artBuffer = toBuffer(cover.imageData);
-      const figures = cover.bboxDetection?.figures || [];
-      const { buffer, spec } = await coverTypography.composeCover({
-        artBuffer, kind, title: title || '', dedication: trial ? '' : (dedication || ''), seed: seed || title, figures,
-      });
-      cover.artImageData = cover.imageData;                                   // textless original
-      cover.imageData = 'data:image/jpeg;base64,' + buffer.toString('base64'); // composited (displayed)
-      cover.typography = spec;
-      log.debug(`🅰️ [COVER TYPO] ${key}: ${spec.kind || kind}${spec.fontId ? ` ${spec.fontId}/${spec.layout} ${spec.face}` : ''}${spec.skipped ? ` (skipped: ${spec.skipped})` : ''}`);
-    } catch (err) {
-      log.warn(`⚠️ [COVER TYPO] ${key}: ${err.message}`);
-    }
-  }));
-  return coverImages;
-}
+// figure boxes are available for placement. Bakes the title / dedication / "magicalstory.ch" onto the
+// textless art AND every version (so the served imageVersions[active] row carries the text everywhere
+// — viewer, share, PDF, print), keeping the textless source in artImageData for no-AI title edits.
+// Implementation lives in server/lib/coverTypography.js (single source of truth, unit-testable).
+const { applyCoverTypography } = require('./server/lib/coverTypography');
 
 // (Firebase Admin SDK removed — Google sign-in now uses google-auth-library directly,
 //  see server/routes/auth.js POST /api/auth/google and server/routes/trial.js claim flows.)
@@ -6124,7 +6102,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // intentionally-textless cover as "missing title text" and tanks a good
             // cover to 0, which then triggers a destructive composite re-iteration.
             if (MODEL_DEFAULTS.appSideCoverType) {
-              coverEvalPrompt += '\n\nTEXT NOTE: This cover art is intentionally textless. The title, dedication, and "magicalstory.ch" branding are composited by the app after generation and are NOT part of the image you are evaluating. Never flag missing or absent title/dedication/branding text as a defect.';
+              coverEvalPrompt += '\n\nTEXT NOTE: The title, dedication, and "magicalstory.ch" branding on this cover are handled by the app as a typographic overlay, not painted by the image model. Never flag missing/absent title/dedication/branding text as a defect, and if such text IS present treat it as the intended app-composited overlay — never flag it as unrequested rendered text.';
             } else if (coverKey === 'frontCover') {
               const titleForEval = title || inputData.title || inputData.storyTitle || '';
               if (titleForEval) coverEvalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact title text: "${titleForEval}"`;
