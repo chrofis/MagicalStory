@@ -1845,7 +1845,7 @@ async function _interiorSeedPoints(maskPng, w, h) {
   } catch { return []; }
 }
 
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -2015,8 +2015,37 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     .composite([{ input: cutoutPng }]).jpeg().toBuffer();
   await addStep('SAM-identified region — pixels taken from the new image', `data:image/jpeg;base64,${cutVis.toString('base64')}`);
 
-  const feathered = await sharp(candResized).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
-  return { feathered, iou, redPx, blendRule: BLEND_RULE_VERSION };
+  // Qwen colour-shift correction — remap the pasted figure's tone back toward
+  // the original (histogram) and close the border gap (harmonic seam) so the
+  // paste doesn't read as a different-coloured patch. No-op below threshold.
+  // Reference distribution = the ORIGINAL figure mask (oldA), applied to the
+  // union being pasted (alpha1).
+  let pasteBuf = candResized;
+  let colorInfo = null;
+  if (colorCorrect) {
+    try {
+      const { correctColorShift } = require('./images');
+      const s1 = Math.max(1, Math.round(oldA.length / n));
+      const refMaskBin = Buffer.alloc(n);
+      for (let i = 0; i < n; i++) refMaskBin[i] = oldA[i * s1] > 128 ? 255 : 0;
+      const cc = await correctColorShift(origResized, candResized, Buffer.from(alpha1), cropW, cropH, { refMask: refMaskBin });
+      if (cc.applied) {
+        pasteBuf = await sharp(Buffer.from(cc.correctedRaw), { raw: { width: cropW, height: cropH, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
+        colorInfo = { deltaEBefore: cc.deltaEBefore, seamBefore: cc.seamDeltaEBefore, seamAfter: cc.seamDeltaEAfter };
+        // Applied view: the corrected pixels that will be pasted.
+        const ccCut = await sharp(await sharp(pasteBuf).ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer())
+          .toBuffer();
+        const ccVis = await sharp({ create: { width: cropW, height: cropH, channels: 3, background: { r: 30, g: 30, b: 30 } } })
+          .composite([{ input: ccCut }]).jpeg().toBuffer();
+        await addStep(`colour-corrected region (tone ΔE ${cc.deltaEBefore} fixed, seam ${cc.seamDeltaEBefore}→${cc.seamDeltaEAfter})`, `data:image/jpeg;base64,${ccVis.toString('base64')}`);
+      }
+    } catch (err) {
+      log.warn(`[TESTLAB] colour correction skipped (${err.message})`);
+    }
+  }
+
+  const feathered = await sharp(pasteBuf).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
+  return { feathered, iou, redPx, colorInfo, blendRule: BLEND_RULE_VERSION };
 }
 
 // Stamped on every blended entry so the UI can show WHICH blend generation
@@ -2376,6 +2405,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // pastes the whole crop with a rectangular feather (debug/fallback).
   const back = await sharp(outBufEarly).resize(crop.w, crop.h, { fit: 'fill' }).toBuffer();
   let feathered;
+  let colorInfo = null;
 
   // Repair blend: the shared engine-agnostic SAM-union blend (samUnionBlend).
   // MANDATORY in repair mode — no silent diff-blob degradation (exp #30).
@@ -2407,8 +2437,10 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
         Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
       ] : null,
+      colorCorrect: params.colorCorrect !== false,
     });
     feathered = blend.feathered;
+    colorInfo = blend.colorInfo || null;
   }
 
   if (!feathered && (params.pasteMode || 'figure') === 'figure') {
@@ -2474,6 +2506,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     blendRule: params.repairMode ? BLEND_RULE_VERSION : undefined,
     styleMatch: styleMatch || undefined,
     headPose: poseText || undefined,
+    colorCorrection: colorInfo || undefined,
     steps, cost: result.cost,
   };
 }

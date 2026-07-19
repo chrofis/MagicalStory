@@ -10152,6 +10152,143 @@ async function fetchFaceHeadMaskPng(cropJpegBuffer, faceBoxInCrop, outW, outH, m
     .ensureAlpha().joinChannel(merged, { raw: { width: outW, height: outH, channels: 1 } }).png().toBuffer();
 }
 
+// ── Qwen colour-shift correction for the repair blend ───────────────────────
+// Qwen-Image-Edit repaints the masked figure but shifts its colour distribution
+// (measured on staging: skin ΔL +14..+22, Δb +7..+16 — a lighten + warm/yellow
+// push; ΔE 16-28). Because only the masked figure is pasted onto the untouched
+// page, that shift shows as a colour discontinuity at the paste boundary. Two
+// passes, restricted to the mask, applied to the candidate BEFORE compositing:
+//   1. LAB histogram-match the masked pixels toward the ORIGINAL figure's
+//      distribution — corrects the overall skin/clothing tone. Monotone
+//      per-channel remap → spatial detail (texture, glasses, edges) preserved.
+//   2. Harmonic seam-close — diffuse the residual (outside-original − inside)
+//      gap across the mask so the BORDER matches the neighbouring page exactly
+//      (seam ΔE → ~0), interior gets only a vanishing nudge. Kills the seam,
+//      worst on clothing at the neck/collar.
+// No pixel outside the mask is touched; no-op below minDeltaE.
+const _LAB_Xn = 0.95047, _LAB_Yn = 1.0, _LAB_Zn = 1.08883;
+function _srgbToLinear(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+function _linearToSrgb(c) { const v = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; return Math.max(0, Math.min(255, Math.round(v * 255))); }
+function _fLab(t) { return t > 0.008856 ? Math.cbrt(t) : (7.787 * t + 16 / 116); }
+function _fInv(t) { const t3 = t * t * t; return t3 > 0.008856 ? t3 : (t - 16 / 116) / 7.787; }
+function _rgbToLab(r, g, b) {
+  const R = _srgbToLinear(r), G = _srgbToLinear(g), B = _srgbToLinear(b);
+  const X = (0.4124 * R + 0.3576 * G + 0.1805 * B) / _LAB_Xn;
+  const Y = (0.2126 * R + 0.7152 * G + 0.0722 * B) / _LAB_Yn;
+  const Z = (0.0193 * R + 0.1192 * G + 0.9505 * B) / _LAB_Zn;
+  const fx = _fLab(X), fy = _fLab(Y), fz = _fLab(Z);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+function _labToRgb(L, a, b) {
+  const fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - b / 200;
+  const X = _LAB_Xn * _fInv(fx), Y = _LAB_Yn * _fInv(fy), Z = _LAB_Zn * _fInv(fz);
+  return [_linearToSrgb(3.2406 * X - 1.5372 * Y - 0.4986 * Z), _linearToSrgb(-0.9689 * X + 1.8758 * Y + 0.0415 * Z), _linearToSrgb(0.0557 * X - 0.2040 * Y + 1.0570 * Z)];
+}
+function _deltaE(l1, l2) { return Math.sqrt((l1[0] - l2[0]) ** 2 + (l1[1] - l2[1]) ** 2 + (l1[2] - l2[2]) ** 2); }
+const _CC_RANGES = [[0, 100], [-110, 110], [-110, 110]];
+function _ccQuant(val, ch, bins) { const [lo, hi] = _CC_RANGES[ch]; const q = Math.floor(((val - lo) / (hi - lo)) * bins); return q < 0 ? 0 : q >= bins ? bins - 1 : q; }
+function _ccBinCenter(q, ch, bins) { const [lo, hi] = _CC_RANGES[ch]; return lo + ((q + 0.5) / bins) * (hi - lo); }
+function _ccMatchLUT(srcHist, refHist, ch, bins) {
+  const cdf = (hh) => { const c = new Float64Array(bins); let acc = 0, tot = 0; for (let i = 0; i < bins; i++) tot += hh[i]; for (let i = 0; i < bins; i++) { acc += hh[i]; c[i] = tot ? acc / tot : 0; } return c; };
+  const sc = cdf(srcHist), rc = cdf(refHist); const lut = new Float64Array(bins); let j = 0;
+  for (let i = 0; i < bins; i++) { while (j < bins - 1 && rc[j] < sc[i]) j++; lut[i] = _ccBinCenter(j, ch, bins); }
+  return lut;
+}
+function _ccStripMask(buf, n) { const s = Math.max(1, Math.round(buf.length / n)); if (s === 1) return buf; const out = Buffer.alloc(n); for (let i = 0; i < n; i++) out[i] = buf[i * s]; return out; }
+function _closeSeamHarmonic(correctedRaw, originalRaw, maskBin, w, h, iters) {
+  const n = w * h; const isMask = new Uint8Array(n);
+  for (let i = 0; i < n; i++) isMask[i] = maskBin[i] > 128 ? 1 : 0;
+  const cL = new Float32Array(n), ca = new Float32Array(n), cb = new Float32Array(n);
+  const oL = new Float32Array(n), oa = new Float32Array(n), ob = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let l = _rgbToLab(correctedRaw[i * 3], correctedRaw[i * 3 + 1], correctedRaw[i * 3 + 2]); cL[i] = l[0]; ca[i] = l[1]; cb[i] = l[2];
+    l = _rgbToLab(originalRaw[i * 3], originalRaw[i * 3 + 1], originalRaw[i * 3 + 2]); oL[i] = l[0]; oa[i] = l[1]; ob[i] = l[2];
+  }
+  const fL = new Float32Array(n), fa = new Float32Array(n), fb = new Float32Array(n); const fixed = new Uint8Array(n);
+  const nb = (x, y) => [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x; if (!isMask[i]) continue;
+    let oCnt = 0, sL = 0, sa = 0, sb = 0;
+    for (const [nx, ny] of nb(x, y)) { if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const j = ny * w + nx; if (!isMask[j]) { oCnt++; sL += oL[j]; sa += oa[j]; sb += ob[j]; } }
+    if (oCnt) { fL[i] = sL / oCnt - cL[i]; fa[i] = sa / oCnt - ca[i]; fb[i] = sb / oCnt - cb[i]; fixed[i] = 1; }
+  }
+  for (let it = 0; it < iters; it++) {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x; if (!isMask[i] || fixed[i]) continue;
+      let c = 0, aL = 0, aa = 0, ab = 0;
+      for (const [nx, ny] of nb(x, y)) { if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const j = ny * w + nx; if (isMask[j]) { c++; aL += fL[j]; aa += fa[j]; ab += fb[j]; } }
+      if (c) { fL[i] = aL / c; fa[i] = aa / c; fb[i] = ab / c; }
+    }
+  }
+  const out = Buffer.from(correctedRaw);
+  for (let i = 0; i < n; i++) { if (!isMask[i]) continue; const rgb = _labToRgb(cL[i] + fL[i], ca[i] + fa[i], cb[i] + fb[i]); out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2]; }
+  return out;
+}
+function _seamDeltaE(resultRaw, originalRaw, maskBin, w, h) {
+  const n = w * h; const isMask = (i) => maskBin[i] > 128;
+  const nb = (x, y) => [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]; let sum = 0, cnt = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x; if (!isMask(i)) continue;
+    let oCnt = 0, sL = 0, sa = 0, sb = 0;
+    for (const [nx, ny] of nb(x, y)) { if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const j = ny * w + nx; if (!isMask(j)) { const l = _rgbToLab(originalRaw[j * 3], originalRaw[j * 3 + 1], originalRaw[j * 3 + 2]); oCnt++; sL += l[0]; sa += l[1]; sb += l[2]; } }
+    if (!oCnt) continue;
+    const r = _rgbToLab(resultRaw[i * 3], resultRaw[i * 3 + 1], resultRaw[i * 3 + 2]); sum += _deltaE(r, [sL / oCnt, sa / oCnt, sb / oCnt]); cnt++;
+  }
+  return cnt ? sum / cnt : 0;
+}
+
+/**
+ * Correct Qwen's colour shift on the masked repair figure. Inputs may be
+ * encoded images OR raw RGB (width*height*3). maskAlpha = the union pixels
+ * pasted back; opts.refMask = original-side mask to sample the reference tone
+ * from (default maskAlpha). Returns { applied, correctedRaw (RGB), deltaEBefore/
+ * After, seamDeltaEBefore/After, histogramRaw }.
+ */
+async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, width, height, opts = {}) {
+  const { strength = 0.9, minDeltaE = 4, bins = 128, refMask = null, borderMatch = true, borderIters = 500 } = opts;
+  const n = width * height;
+  const toRaw = async (buf) => (Buffer.isBuffer(buf) && buf.length === n * 3) ? buf : sharp(buf).resize(width, height, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const O = await toRaw(originalCropBuf);
+  const C = await toRaw(candidateCropBuf);
+  const mCand = _ccStripMask(maskAlpha, n);
+  const mRef = refMask ? _ccStripMask(refMask, n) : mCand;
+  const srcHist = [new Float64Array(bins), new Float64Array(bins), new Float64Array(bins)];
+  const refHist = [new Float64Array(bins), new Float64Array(bins), new Float64Array(bins)];
+  const mo = [0, 0, 0], mc = [0, 0, 0]; let cnt = 0;
+  const candLab = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    if (mCand[i] > 128) {
+      const lab = _rgbToLab(C[i * 3], C[i * 3 + 1], C[i * 3 + 2]);
+      candLab[i * 3] = lab[0]; candLab[i * 3 + 1] = lab[1]; candLab[i * 3 + 2] = lab[2];
+      for (let ch = 0; ch < 3; ch++) srcHist[ch][_ccQuant(lab[ch], ch, bins)]++;
+      const olab = _rgbToLab(O[i * 3], O[i * 3 + 1], O[i * 3 + 2]);
+      for (let ch = 0; ch < 3; ch++) { mo[ch] += olab[ch]; mc[ch] += lab[ch]; }
+      cnt++;
+    }
+    if (mRef[i] > 128) { const olab = _rgbToLab(O[i * 3], O[i * 3 + 1], O[i * 3 + 2]); for (let ch = 0; ch < 3; ch++) refHist[ch][_ccQuant(olab[ch], ch, bins)]++; }
+  }
+  if (!cnt) return { applied: false, reason: 'empty mask', correctedRaw: Buffer.from(C) };
+  for (let ch = 0; ch < 3; ch++) { mo[ch] /= cnt; mc[ch] /= cnt; }
+  const deltaEBefore = _deltaE(mo, mc);
+  const out = Buffer.from(C);
+  if (deltaEBefore < minDeltaE) return { applied: false, deltaEBefore: +deltaEBefore.toFixed(2), reason: 'below threshold', correctedRaw: out };
+  const lut = [0, 1, 2].map(ch => _ccMatchLUT(srcHist[ch], refHist[ch], ch, bins));
+  for (let i = 0; i < n; i++) {
+    if (mCand[i] <= 128) continue;
+    const lab = [candLab[i * 3], candLab[i * 3 + 1], candLab[i * 3 + 2]];
+    const nl = [0, 0, 0];
+    for (let ch = 0; ch < 3; ch++) { const mapped = lut[ch][_ccQuant(lab[ch], ch, bins)]; nl[ch] = lab[ch] + strength * (mapped - lab[ch]); }
+    const rgb = _labToRgb(nl[0], nl[1], nl[2]);
+    out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2];
+  }
+  const maskBin = Buffer.alloc(n);
+  for (let i = 0; i < n; i++) maskBin[i] = mCand[i] > 128 ? 255 : 0;
+  const seamBefore = _seamDeltaE(out, O, maskBin, width, height);
+  let finalRaw = out, seamAfter = seamBefore;
+  if (borderMatch) { finalRaw = _closeSeamHarmonic(out, O, maskBin, width, height, borderIters); seamAfter = _seamDeltaE(finalRaw, O, maskBin, width, height); }
+  return { applied: true, deltaEBefore: +deltaEBefore.toFixed(2), seamDeltaEBefore: +seamBefore.toFixed(2), seamDeltaEAfter: +seamAfter.toFixed(2), histogramRaw: out, correctedRaw: finalRaw };
+}
+
 async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop, opts = {}) {
   const backend = CONFIG_DEFAULTS.figureMaskBackend || 'rembg';
   if (backend === 'mobilesam' && Array.isArray(boxInCrop) && boxInCrop.length === 4) {
@@ -16307,6 +16444,7 @@ module.exports = {
   fetchFigureMaskPng,
   fetchFaceHeadMaskPng,
   recoverFaceBox,
+  correctColorShift,
   buildEvalClothingHeader,
   buildPageCompositeRefs,
   detectSubRegion,  // Sub-region detection for targeted repairs (shoes, shirt, hands, etc.)
