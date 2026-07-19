@@ -38,10 +38,11 @@ Test Lab: `/admin/test-lab`. Stages run via `server/lib/testlab.js` `STAGE_RUNNE
 - **Small/precise tweak** (nudge, minor colour, targeted repair) → **Grok** (or Qwen for masked). Gemini is **lazy** on tiny edits — returns the input essentially unchanged.
 - This is what the old "Gemini returns source unchanged" note actually meant: magnitude-dependent, not universal.
 
-### Direct vs Composite cover — by FIGURE COUNT × STYLE (🟡 PROVISIONAL, user 2026-07-19, not yet lab-verified)
-- **1-2 figures → direct only.** Composite adds no value; extra cost + drift risk.
-- **3+ figures → try composite** — but the threshold shifts with style:
-  - **Comic / cartoon / abstract avatar styles** → direct tolerates **3, even 4** figures.
+### Direct vs Composite cover — by FIGURE COUNT (✅ SETTLED, user decision 2026-07-19)
+- **≤ 5 figures → DIRECT.** Direct renders up to 5 people fine (Pixar @5 verified end-to-end). Composite adds no value at these counts — it's slower, needs the analyzer, and looks more "assembled".
+- **> 5 figures → composite.** Only crowded covers justify the cutout+plate path.
+- **Wired** in `coverIterate.js`: the default `compositeCovers` flag now gates on `coverFigureCount > 5`; an explicit `options.compositeCovers === true` (Test Lab) still forces composite for testing.
+- (Older style-nuanced draft — comic@4, realistic@3 — is SUPERSEDED by the flat >5 rule per the user.)
   - **Realistic / painterly styles** → even **3** is challenging for direct; composite often needed.
 - **⚠️ GATING FACT (2026-07-19): the composite cover path requires a LANDMARK photo.** `generateCoverViaComposite` builds its background plate from a landmark; with no landmark, `coverIterate` logs "no landmark photo for composite path — using normal generation" and **silently falls back to DIRECT** (coverIterate.js ~466). So for landmark-less stories (e.g. first-kindergarten), `compositeCovers:true` never engages — the rule is moot, it's always direct. Composite also needs the Python analyzer (port 5000) up for figure detection/cutouts (cascade-detect); it was down in local runs (`fetch failed`).
 - **CORRECTION:** earlier "Pixar direct ≥ composite @5" and this oil run's "composite" were BOTH the landmark-less fallback — i.e. two DIRECT generations, not a real composite comparison. **Composite vs direct is still UNTESTED.** To test it properly: use a story WITH a landmark (e.g. Wilhelm Tell oil, rotation entry 4) AND the Python analyzer running.

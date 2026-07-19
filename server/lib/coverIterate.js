@@ -422,9 +422,20 @@ async function iterateCover(coverKey, storyData, options = {}) {
   // user-facing "Überarbeiten" (regenerate-from-scratch) endpoint passes it
   // so a from-scratch render never routes through composite — composite
   // stays for iterate (repair panel, auto-pipeline) and initial generation.
+  // Direct render handles up to 5 figures fine (Pixar @5 verified, user decision
+  // 2026-07-19), so composite — which is slower, needs the analyzer, and looks
+  // more "assembled" — is only worth it for CROWDED covers (>5 figures). The
+  // default flag now gates on figure count; an explicit options.compositeCovers
+  // === true (Test Lab) still forces composite for testing.
+  const coverFigureCount = coverCharacterPhotos?.length || 0;
   const compositeOn = options.compositeCovers === false
     ? false
-    : (options.compositeCovers === true || MODEL_DEFAULTS.compositeCovers === true);
+    : options.compositeCovers === true
+      ? true
+      : (MODEL_DEFAULTS.compositeCovers === true && coverFigureCount > 5);
+  if (!compositeOn && MODEL_DEFAULTS.compositeCovers === true && options.compositeCovers == null) {
+    log.info(`🔄 [COVER-ITERATE] ${coverKey}: ${coverFigureCount} figure(s) ≤ 5 — direct render (composite reserved for >5)`);
+  }
   if (compositeOn) {
     try {
       const { generateCoverViaComposite } = require('./coverComposite');
