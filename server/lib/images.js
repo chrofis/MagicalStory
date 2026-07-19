@@ -10111,18 +10111,27 @@ async function fetchFaceHeadMaskPng(cropJpegBuffer, faceBoxInCrop, outW, outH, m
   const { rawFaceBox = null, boxScale = null, singleCall = false, onGeom = null } = opts;
   let samBox = faceBoxInCrop.slice();
   let facePt, hairPt;
-  if (rawFaceBox && rawFaceBox.length === 4 && boxScale) {
+  if (rawFaceBox && rawFaceBox.length === 4) {
+    // Dots anchored to the REAL (tight) face box — independent of box sizing.
+    // The padded box's proportions put the hair dot up in the background; the
+    // raw face box puts the face dot on the face and the hair dot into the hair.
     const [rx1, ry1, rx2, ry2] = rawFaceBox;
     const cx = (rx1 + rx2) / 2, cy = (ry1 + ry2) / 2;
     const rw = rx2 - rx1, rh = ry2 - ry1;
-    samBox = [
-      Math.max(0, Math.round(cx - rw * boxScale / 2)),
-      Math.max(0, Math.round(cy - rh * boxScale / 2)),
-      Math.min(outW, Math.round(cx + rw * boxScale / 2)),
-      Math.min(outH, Math.round(cy + rh * boxScale / 2)),
-    ];
+    if (boxScale) {
+      samBox = [
+        Math.max(0, Math.round(cx - rw * boxScale / 2)),
+        Math.max(0, Math.round(cy - rh * boxScale / 2)),
+        Math.min(outW, Math.round(cx + rw * boxScale / 2)),
+        Math.min(outH, Math.round(cy + rh * boxScale / 2)),
+      ];
+    }
     facePt = [Math.round(cx), Math.round(ry1 + rh * 0.45)];          // eyes/nose of the real face
-    hairPt = [Math.round(cx), Math.max(0, Math.round(ry1 - rh * 0.20))]; // just above the forehead = hair
+    // Hair dot: JUST above the hairline (raw face-box top), staying ON the head.
+    // A positive point placed higher risks the background above the head — and a
+    // positive seed in the background makes SAM flood the whole background
+    // (exp #122 Verena: 11.9×/107× balloon). Small offset = near-hair, safe.
+    hairPt = [Math.round(cx), Math.max(0, Math.round(ry1 - rh * 0.08))];
   } else {
     const bcx = Math.round((samBox[0] + samBox[2]) / 2);
     const bh = samBox[3] - samBox[1];

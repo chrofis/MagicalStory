@@ -1913,23 +1913,12 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const oldA = await sharp(oldMask).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
   const newA = await sharp(newMask).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
 
-  // Round-2 mask plausibility (PRE-clip): exp #115's round-2 SAM returned a
-  // sprawling multi-blob ~5× round 1 (Qwen had drifted the layout and painted
-  // a white-card face); the face clip salvaged the geometry so IoU passed,
-  // and the blend copied card pixels. A round-2 mask that dwarfs round 1 is
-  // a mis-segmentation, never a grown figure.
-  {
-    const s1 = Math.max(1, Math.round(oldA.length / n));
-    const s2 = Math.max(1, Math.round(newA.length / n));
-    let po = 0, pn = 0;
-    for (let i = 0; i < n; i++) { if (oldA[i * s1] > 128) po++; if (newA[i * s2] > 128) pn++; }
-    if (po > 0 && pn > po * 4) {
-      throw fail(`Round-2 SAM mask is ${(pn / po).toFixed(1)}x the size of round 1 — mis-segmentation of the model output (layout drift / painted-on-card). Redo.`);
-    }
-  }
-
-  // Face-scoped repairs: BOTH masks hard-clipped to the target region —
-  // round 2's SAM may grab head+torso otherwise and balloon the union.
+  // Face-scoped repairs: BOTH masks hard-clipped to the target region — round 2
+  // SAM routinely over-segments (grabs head+torso+background) but that raw
+  // sprawl is irrelevant: the clip bounds the union to the face box. (Do NOT
+  // gate on the pre-clip round-2 size — it false-rejected perfect repairs where
+  // SAM merely over-segmented, exp #122 Verena. The real defenses are the
+  // post-clip IoU gate and the white-card gate below.)
   if (clipRect?.length === 4) {
     for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
       if (x < clipRect[0] || x >= clipRect[2] || y < clipRect[1] || y >= clipRect[3]) {
@@ -1937,6 +1926,23 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
         oldA[i * Math.max(1, Math.round(oldA.length / n))] = 0;
         newA[i * Math.max(1, Math.round(newA.length / n))] = 0;
       }
+    }
+  }
+
+  // Round-2 over-segmentation salvage: if, AFTER clipping, round 2 fills nearly
+  // the whole clip box (SAM returned the box, not a silhouette), it carries no
+  // real silhouette — fall back to round 1's head mask for the union. A face
+  // repair keeps the head in place, so round 1 IS the correct paste shape; this
+  // avoids pasting a rectangular face-box patch.
+  if (clipRect?.length === 4) {
+    const s1 = Math.max(1, Math.round(oldA.length / n));
+    const s2 = Math.max(1, Math.round(newA.length / n));
+    const clipArea = Math.max(1, (clipRect[2] - clipRect[0]) * (clipRect[3] - clipRect[1]));
+    let po = 0, pn = 0;
+    for (let i = 0; i < n; i++) { if (oldA[i * s1] > 128) po++; if (newA[i * s2] > 128) pn++; }
+    if (pn > 0.9 * clipArea && po > 0) {
+      for (let i = 0; i < n; i++) newA[i * s2] = oldA[i * s1];
+      log.warn(`[TESTLAB] round-2 mask filled ${Math.round(100 * pn / clipArea)}% of the clip box — using round-1 head silhouette for the union (face stays in place).`);
     }
   }
 
