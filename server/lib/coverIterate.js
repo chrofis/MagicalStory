@@ -451,10 +451,12 @@ async function iterateCover(coverKey, storyData, options = {}) {
         const src = art.referenceImageUrl || art.referenceImageData;
         if (src) enrichedHint._artifactImages[id] = src;
       }
-      // First landmark photo for the cover
-      const landmarkBuf = coverLandmarkPhotos?.[0]
-        ? await loadLandmarkBytes(coverLandmarkPhotos[0])
-        : null;
+      // First landmark photo for the cover. options.landmarkBufOverride lets a
+      // caller (Test Lab) BORROW a background plate from any story so the
+      // composite path can be exercised on a landmark-less story — otherwise
+      // no landmark → composite silently falls back to direct.
+      const landmarkBuf = options.landmarkBufOverride
+        || (coverLandmarkPhotos?.[0] ? await loadLandmarkBytes(coverLandmarkPhotos[0]) : null);
       // Composite path requires a real landmark photo for pass 2 (the
       // photo-protection edit). Without one, pass 2 is skipped and pass 1
       // returns figures-on-white — which then gets padded with gray bars
