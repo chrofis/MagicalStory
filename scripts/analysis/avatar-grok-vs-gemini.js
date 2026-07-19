@@ -12,7 +12,24 @@ const r2 = require('../../server/lib/r2');
 const { getFacePhoto, getStandardAvatar } = require('../../server/lib/characterPhotos');
 const { editWithGrok, GROK_MODELS } = require('../../server/lib/grok');
 const { _internal } = require('../../server/lib/character2x4Sheet');
-const { buildPrompt, buildStyleTransferPrompt } = _internal;
+const { buildPrompt, buildStyleTransferPrompt, quickLayoutCheck } = _internal;
+
+// Round-1 anchor MUST be layout-validated (quickLayoutCheck) or Grok's
+// split-figure failure (one figure across the mid-row gutter → headless cutout)
+// slips into the experiment. Mirrors production generateCharacter2x4Sheet.
+// quickLayoutCheck is reliable here because Round-1 anchors are white-bg realistic.
+async function grokAnchorValidated(prompt, refs, tries = 3) {
+  let last = null;
+  for (let i = 1; i <= tries; i++) {
+    const img = (await editWithGrok(prompt, refs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD })).imageData;
+    last = img;
+    const q = await quickLayoutCheck(img);
+    if (q.valid) return img;
+    console.log(`    R1-grok attempt ${i}/${tries} bad layout (${q.reason}) — retrying`);
+  }
+  console.log('    R1-grok: all attempts failed layout check — using last');
+  return last;
+}
 
 const OUT = 'C:/Users/roger/AppData/Local/Temp/avatar-ab5';
 const USER_ID = 'b020e093-90d9-431a-acd4-372eb8438cbe';
@@ -62,7 +79,7 @@ const tryGen = async (label, fn) => { try { return await fn(); } catch (e) { con
     const p2 = buildStyleTransferPrompt('pixar');
 
     console.log('  Round 1 (anchor)...');
-    const g1 = await tryGen('R1-grok', () => editWithGrok(p1, refs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD }).then(x => x.imageData));
+    const g1 = await tryGen('R1-grok', () => grokAnchorValidated(p1, refs));
     if (g1) save(`${ch.name}_pass1_GROK`, g1);
     const m1 = await tryGen('R1-gemini', () => geminiEdit(p1, refs));
     if (m1) save(`${ch.name}_pass1_GEMINI`, m1);

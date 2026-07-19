@@ -48,6 +48,13 @@ Test Lab: `/admin/test-lab`. Stages run via `server/lib/testlab.js` `STAGE_RUNNE
 - **What IS confirmed (2026-07-19):** with the new Grok-R1→Gemini-R2 avatars, **direct covers with 5 figures are excellent in both Pixar and oil** (all 5 recognizable, style-faithful). So for landmark-less multi-figure covers, direct is the working path today. Harness: `scripts/analysis/cover-composite-vs-direct.js`, `scripts/analysis/oil-experiment.js`.
 - **New avatar creation across styles — ✅ verified:** oil Round-2 (Gemini) scored 5/5 valid at final=9 first attempt (style/identity/bodyFace/clean all 9); painterly brushwork, faces present in body cells. Same pipeline, `artStyle='oil'`.
 
+### Avatar 2×4 LAYOUT validation — split-figure defect (2026-07-19)
+Grok Round-1 sometimes renders ONE figure split across the mid-row divider (top = head+torso, bottom = lower body) instead of 4 head-cells + 4 body-cells. If it ships, the composite extracts cell 5 as a **headless lower body** → broken cover.
+- **Detection:** `quickLayoutCheck` (deterministic gutter-uniformity, `character2x4Sheet.js`) catches it — Emma's split anchor scored 41.5%/57.8% gutter uniformity (< 60% ⇒ fail). Production's `generateCharacter2x4Sheet` runs it + the Gemini Pass-1 eval + **up to 3 retries**; verified live — Emma retried (attempt 1 split → attempt 3 clean) then oil-stylised valid.
+- **⚠️ `quickLayoutCheck` is WHITE-BACKGROUND / REALISTIC-sheet only.** It measures gutter *whiteness*, so painterly/textured styles (oil, watercolor) FALSE-POSITIVE even when the layout is correct (verified: Sarah 25.3% + Noah 57.4% oil sheets were structurally fine but flagged). Documented as "over-eager" in `character2x4Sheet.js` (comment ~672, why the Pass1→Pass2 gate was removed 2026-05-17). **Do NOT wire it as a hard gate on Pass-2 / styled sheets.**
+- **Pass-2 has no deterministic layout guard** — only the Gemini styled-sheet eval, which validates layout *preservation* (styled vs anchor), not *correctness*; a bad anchor passes as "faithfully preserved." So the guarantee lives at Round 1 (validate the anchor), not Round 2.
+- **RULE for experiment harnesses:** never reuse a raw one-shot `editWithGrok` anchor — run Round 1 through `generateCharacter2x4Sheet` (validated + retry) or gate the anchor on `quickLayoutCheck`, or you test on broken sheets (this is why the Pixar/oil A/B harness produced a split Emma).
+
 ---
 
 ## Test Lab stage map (route BACK here to re-test, don't re-script)
