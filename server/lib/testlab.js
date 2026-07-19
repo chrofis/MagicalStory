@@ -2099,11 +2099,15 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
       log.warn(`[TESTLAB] colour correction skipped (${err.message})`);
     }
   }
-  // Red zone + outer margin → diffused scene background (never the old figure
-  // edge, never the candidate's white glow). newDil excluded as a source so the
-  // fill diffuses the real background, not the figure's edge colour.
+  // Red zone + outer margin → diffused scene background. Exclude BOTH the new
+  // figure (newDil) AND the OLD figure (oldA) as fill sources — otherwise the
+  // fill diffuses the OLD skin around e.g. the old profile's nose and leaves a
+  // skin-toned ghost ("2nd nose"). Excluding both heads, the fill sources only
+  // TRUE scene background, so the old profile is cleanly covered.
   if (redZonePx > 0) {
-    const bg = harmonicBackgroundFill(origRaw, redZone, newDil, cropW, cropH);
+    const figExclude = Buffer.alloc(n);
+    for (let i = 0; i < n; i++) figExclude[i] = (newDil[i] > 128 || oldA[i * s1r] > 128) ? 255 : 0;
+    const bg = harmonicBackgroundFill(origRaw, redZone, figExclude, cropW, cropH);
     for (let i = 0; i < n; i++) { if (redZone[i]) { pasteRaw[i * 3] = bg[i * 3]; pasteRaw[i * 3 + 1] = bg[i * 3 + 1]; pasteRaw[i * 3 + 2] = bg[i * 3 + 2]; } }
     if (colorInfo) colorInfo.redZonePx = redZonePx;
   }
@@ -2275,8 +2279,19 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       ] : [0, 0, crop.w, crop.h];
       params._bodyBoxInCrop = bodyBoxInCrop;
       params._faceBoxInCrop = boxInCrop;
+      // Hair box for the 'hairunion' clip variant — widen the face box left/
+      // right (hair frames the head) and up (crown), same bottom.
+      {
+        const fbw = boxInCrop[2] - boxInCrop[0], fbh = boxInCrop[3] - boxInCrop[1];
+        params._hairBoxInCrop = [
+          Math.max(0, Math.round(boxInCrop[0] - fbw * 0.5)),
+          Math.max(0, Math.round(boxInCrop[1] - fbh * 0.35)),
+          Math.min(crop.w, Math.round(boxInCrop[2] + fbw * 0.5)),
+          boxInCrop[3],
+        ];
+      }
       oldMaskPng = params._faceMode
-        ? await fetchFigureHeadMask(cropBuf, bodyBoxInCrop, boxInCrop, crop.w, crop.h, { onGeom: (g) => { params._samGeom = g; } })
+        ? await fetchFigureHeadMask(cropBuf, bodyBoxInCrop, boxInCrop, crop.w, crop.h, { onGeom: (g) => { params._samGeom = g; }, clipMode: params.headClipMode || 'bottom', hairBox: params._hairBoxInCrop })
         : await fetchMaskWithRetry(cropBuf, boxInCrop, 5, params._maskPoints || {});
       if (oldMaskPng) {
         // Rebuild the whiteout mask BINARIZED (no soft SAM edges = no
@@ -2558,7 +2573,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         const fresh = params._r2BodyBox;
         const r2Body = fresh || params._bodyBoxInCrop || [0, 0, crop.w, crop.h];
         let g2 = null;
-        const m = await fetchFigureHeadMask(buf, r2Body, boxInCrop, crop.w, crop.h, { onGeom: (g) => { g2 = g; } });
+        const m = await fetchFigureHeadMask(buf, r2Body, boxInCrop, crop.w, crop.h, { onGeom: (g) => { g2 = g; }, clipMode: params.headClipMode || 'bottom', hairBox: params._hairBoxInCrop });
         if (g2) {
           try {
             const rect = (b, st, d) => b ? `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="none" stroke="${st}" stroke-width="3"${d ? ` stroke-dasharray="${d}"` : ''}/>` : '';
@@ -2571,12 +2586,19 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       }) : null,
       // Face mode: union hard-clipped to the face region — body pixels never
       // enter the union no matter what round-2 SAM returns.
-      clipRect: params._faceMode && figureBox ? [
-        Math.max(0, Math.round(figureBox[1] * W) - crop.x),
-        Math.max(0, Math.round(figureBox[0] * H) - crop.y),
-        Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
-        Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
-      ] : null,
+      // clipRect matches the head-mask clip mode so it doesn't re-cut the hair
+      // the mask deliberately kept. 'bottom' → clip only at the face-box bottom
+      // (full width/top, so side/top hair survives); else the face-box rect.
+      clipRect: params._faceMode && figureBox ? (
+        (params.headClipMode || 'bottom') === 'bottom'
+          ? [0, 0, crop.w, Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y)]
+          : [
+            Math.max(0, Math.round(figureBox[1] * W) - crop.x),
+            Math.max(0, Math.round(figureBox[0] * H) - crop.y),
+            Math.min(crop.w, Math.round(figureBox[3] * W) - crop.x),
+            Math.min(crop.h, Math.round(figureBox[2] * H) - crop.y),
+          ]
+      ) : null,
       colorCorrect: params.colorCorrect !== false,
     });
     feathered = blend.feathered;

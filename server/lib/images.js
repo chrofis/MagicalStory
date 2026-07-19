@@ -10213,18 +10213,31 @@ async function fetchFaceHeadMaskPng(cropJpegBuffer, faceBoxInCrop, outW, outH, m
  * the crop. Returns a binarized white-on-transparent PNG, or null.
  */
 async function fetchFigureHeadMaskPng(cropJpegBuffer, bodyBoxInCrop, faceBoxInCrop, outW, outH, maskFetch = fetchFigureMaskPng, opts = {}) {
-  const { onGeom = null } = opts;
-  if (onGeom) { try { onGeom({ samBox: bodyBoxInCrop, faceClip: faceBoxInCrop }); } catch { /* viz only */ } }
+  // clipMode — how the whole-figure mask is clipped to a HEAD:
+  //   'facebox'  (default): figure ∩ the face box rectangle. A narrow face box
+  //              clips the hair left/right (the figure mask HAS the hair).
+  //   'bottom':  keep the figure ABOVE the face-box bottom, no left/right/top
+  //              clip → captures ALL the hair; only the neck/body below is cut.
+  //   'hairunion': figure ∩ (face box ∪ hairBox) — widen the clip with a hair
+  //              box (opts.hairBox [x1,y1,x2,y2]).
+  const { onGeom = null, clipMode = 'facebox', hairBox = null } = opts;
+  const [fx1, fy1, fx2, fy2] = faceBoxInCrop;
+  if (onGeom) { try { onGeom({ samBox: bodyBoxInCrop, faceClip: faceBoxInCrop, hairBox: clipMode === 'hairunion' ? hairBox : null, clipMode }); } catch { /* viz only */ } }
   const figPng = await maskFetch(cropJpegBuffer, bodyBoxInCrop, {});
   if (!figPng) return null;
   const n = outW * outH;
   const raw = await sharp(figPng).resize(outW, outH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
   const s = Math.max(1, Math.round(raw.length / n));
-  const [fx1, fy1, fx2, fy2] = faceBoxInCrop;
+  const inHair = (x, y) => hairBox && x >= hairBox[0] && x < hairBox[2] && y >= hairBox[1] && y < hairBox[3];
+  const inClip = (x, y) => {
+    if (clipMode === 'bottom') return y < fy2;                       // only the bottom cut
+    if (clipMode === 'hairunion') return (x >= fx1 && x < fx2 && y >= fy1 && y < fy2) || inHair(x, y);
+    return x >= fx1 && x < fx2 && y >= fy1 && y < fy2;               // 'facebox'
+  };
   const out = Buffer.alloc(n);
   for (let y = 0; y < outH; y++) for (let x = 0; x < outW; x++) {
     const i = y * outW + x;
-    out[i] = (x >= fx1 && x < fx2 && y >= fy1 && y < fy2 && raw[i * s] > 128) ? 255 : 0;
+    out[i] = (raw[i * s] > 128 && inClip(x, y)) ? 255 : 0;
   }
   return sharp(Buffer.alloc(n * 3, 255), { raw: { width: outW, height: outH, channels: 3 } })
     .ensureAlpha().joinChannel(out, { raw: { width: outW, height: outH, channels: 1 } }).png().toBuffer();
