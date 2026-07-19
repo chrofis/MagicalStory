@@ -437,8 +437,52 @@ async function applyCoverTypography(coverImages, { title, dedication, seed, tria
   return coverImages;
 }
 
+// ---------------------------------------------------------------------------
+// bakeCoverTypographyPostPersist — the RELIABLE title/dedication baker.
+// The in-pipeline applyCoverTypography silently no-ops because by the time it
+// runs the cover's imageData has been offloaded to R2 (imageData === null), so
+// its guard returns early. This runs AFTER persistence, reading each SERVED
+// cover row straight from story_images (bytes definitely there), composites the
+// title/dedication onto it, overwrites the served version row with the titled
+// render, and keeps the textless original in ${key}Art so a later title/
+// dedication edit re-composites with no AI call. Idempotent: skips a cover whose
+// ${key}Art row already exists.
+// ---------------------------------------------------------------------------
+async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedication, seed, trial = false } = {}) {
+  const { log } = require('../utils/logger');
+  const r2 = require('./r2');
+  const { saveStoryImage, dbQuery } = require('../services/database');
+  const meta = ((await dbQuery('SELECT image_version_meta FROM stories WHERE id=$1', [storyId]))[0]?.image_version_meta) || {};
+  const ded = trial ? '' : (dedication || '');
+  for (const [key, kind] of [['frontCover', 'front'], ['initialPage', 'initial'], ['backCover', 'back']]) {
+    try {
+      const already = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 LIMIT 1", [storyId, `${key}Art`]);
+      if (already.length) { log.debug(`[COVER TYPO POST] ${key}: already baked — skip`); continue; }
+      const activeIdx = meta[key]?.activeVersion ?? 0;
+      const rows = await dbQuery(
+        "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND version_index=$3 AND NOT is_test LIMIT 1",
+        [storyId, key, activeIdx]);
+      const row = rows[0];
+      if (!row) { log.warn(`[COVER TYPO POST] ${key}: no served version v${activeIdx}`); continue; }
+      const src = row.image_url || (row.image_data ? 'data:image/jpeg;base64,' + row.image_data.toString('base64') : null);
+      const bytes = await r2.bytesFromAnyImage(src);
+      if (!bytes) { log.warn(`[COVER TYPO POST] ${key}: could not resolve served bytes`); continue; }
+      const figures = storyData?.coverImages?.[key]?.bboxDetection?.figures || [];
+      const { buffer, spec } = await composeCover({ artBuffer: bytes, kind, title: title || '', dedication: ded, seed: seed || title, figures });
+      // Textless original first (for no-AI re-edits), then overwrite the served
+      // version row with the titled render.
+      await saveStoryImage(storyId, `${key}Art`, null, 'data:image/jpeg;base64,' + bytes.toString('base64'), { versionIndex: 0 });
+      await saveStoryImage(storyId, key, null, 'data:image/jpeg;base64,' + buffer.toString('base64'), { versionIndex: activeIdx });
+      if (storyData?.coverImages?.[key]) storyData.coverImages[key].typography = spec;
+      log.info(`🅰️ [COVER TYPO POST] ${key}: baked title${ded ? '+dedication' : ''} onto served v${activeIdx} (${spec.fontId || '?'}/${spec.layout || '?'})`);
+    } catch (err) {
+      log.warn(`[COVER TYPO POST] ${key}: ${err.message}`);
+    }
+  }
+}
+
 module.exports = {
-  composeCover, composeFrontTitle, composeDedication, composeBrand, applyCoverTypography,
+  composeCover, composeFrontTitle, composeDedication, composeBrand, applyCoverTypography, bakeCoverTypographyPostPersist,
   // exported for the standalone verify CLI / tests
   _internals: { occupancyFromFigures, bestRect, colorCandidates, finalizeColor, palette, garmentColors, FONTS, DEAL, FONT_FILES, renderSvg, buildTitleGroup, fitRender },
 };

@@ -7011,6 +7011,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     await upsertStory(storyId, userId, storyData);
     log.debug(`📚 [UNIFIED] Story ${storyId} saved to stories table`);
 
+    // Post-persistence cover typography — the RELIABLE title/dedication baker.
+    // The in-pipeline applyCoverTypography no-ops when the cover imageData was
+    // already offloaded to R2 (null → its guard returns early), so bake onto the
+    // SERVED cover rows here, after upsertStory has persisted them. Idempotent.
+    if (MODEL_DEFAULTS.appSideCoverType) {
+      try {
+        const { bakeCoverTypographyPostPersist } = require('./server/lib/coverTypography');
+        await bakeCoverTypographyPostPersist(storyId, storyData, {
+          title: storyData.title || '',
+          dedication: storyData.dedication || inputData.dedication || '',
+          seed: jobId,
+          trial: !!inputData.skipQualityEval,
+        });
+      } catch (e) {
+        log.warn(`⚠️ [UNIFIED] Post-persist cover typography failed: ${e.message}`);
+      }
+    }
+
     // Phase 8: append per-character story-history log entries so the dev
     // UI can compare avatar consistency across stories. Best-effort; failure
     // doesn't block story completion.
