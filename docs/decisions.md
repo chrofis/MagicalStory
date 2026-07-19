@@ -1755,3 +1755,73 @@ production blend; revisit when the production port lands.
 buildPageCompositeRefs, exports), `server/lib/testlab.js` (buildExpectedCharacters, resolveCharacterBox,
 runQwenInsertStage face gate, runCharRepairStage parity, evalSceneDescription, samUnionBlend round 2).
 **Status:** local only — push freeze in effect (story in flight).
+
+## Qwen face-repair blend — full architecture (2026-07-19/20)
+**Context:** Wiring Qwen-Image-Edit face repair into the Test Lab blend surfaced a
+long chain of edge-case failures on the hardest figure (Verena — profile, occluded,
+silver hair, in a crowd). This entry records the SETTLED architecture and the
+approaches rejected along the way, so none of it gets re-litigated.
+
+### 1. Detection (WHERE is the figure)
+- **Round 1 (original page):** the normal GroundingDINO → MobileSAM → Set-of-Mark
+  identity chain, run ONCE on the full page. Gives each character a body box +
+  face box. (DINO answers WHERE, Gemini SoM answers WHO — see "DINO goes generic".)
+- **Round 2 (the repainted result):** RE-DETECT on the FULL PAGE, not the cutout.
+  Composite Qwen's crop output back into the page, run DINO 'person' on the whole
+  image, pick the person box whose area CONTAINS the target face-box centre, map it
+  to crop coords. **Rejected:** DINO on the bare cutout — the cutout spans neighbours
+  and DINO grabbed the biggest (the monk, not Verena) → SAM masked the wrong person →
+  IoU 0% (exp #129). **Rejected:** "pick the largest person" fallback — same failure.
+  If no person contains the face, keep the round-1 (copied) box rather than guess.
+
+### 2. Head mask — "face merging" (figure ∩ face box)
+- The head mask is **SAM(whole figure from the body box) ∩ the face box** — NOT a
+  face-region segmentation. SAM segments a whole figure from its body box reliably;
+  segmenting a profile/occluded FACE from a box+dots is fragile and over-segments
+  (exp #123/#124: loose blob on the original, a balloon on the repaint, from the
+  SAME prompt — SAM is cliff-edge sensitive to what sits under the prompt).
+- Done for BOTH round 1 (original crop) and round 2 (candidate crop). The two head
+  silhouettes are UNIONED (`max`) — every pixel in either is taken from the new
+  image. IoU gate rejects a union whose masks barely overlap (figure moved).
+- **Rejected:** face box + face dot + hair dot + hair box, unioned. A positive hair
+  dot that lands in the background above the head makes SAM flood the whole
+  background (exp #122: 11.9×/107× balloon). Dot placement tuning (raw-face anchor,
+  hair-box-centre-nudged-to-face) helped but never made it robust — figure∩facebox
+  replaced it entirely. The dot code remains only on the separate Grok blended path.
+
+### 3. Colour correction (three parts, split by the MASK not brightness)
+Qwen shifts the repainted figure's colour (measured: skin ΔL +14..+22, Δb +7..+16 —
+lighten + warm). Classify figure vs background by the SAM MASK, never brightness
+(Qwen lightens BOTH the background AND the face, so a luminance threshold
+misclassifies lightened face as background — rejected, exp #127).
+- **FACE (the new-figure mask + a 3px edge ring):** a UNIFORM mean shift — one
+  constant LAB offset (mean original head − mean new head) applied to every face
+  pixel, moving the tone toward the scene in ONE direction with no per-pixel
+  distortion. **Rejected:** per-channel LAB histogram matching — it reshapes each
+  channel's distribution and distorts the face; and **rejected:** the harmonic
+  seam-close diffusing its border offset INTO the face interior (it altered the
+  face — the face must not be touched by the border blend).
+- **6px margin + red zone** (padded union minus the figure+edge — old figure was
+  here but the new isn't, plus Qwen's light glow at the edge): a harmonic
+  (Laplace) BACKGROUND fill — diffuse the real scene background from just outside
+  the union INWARD through these pixels, STOPPING at the figure (the figure is
+  excluded as a source). So the transition reveals correctly-coloured background,
+  whatever its colour. The 3px ring protects the figure edge the margin exists to
+  recapture (SAM masks can clip the figure edge). **Rejected:** blanket-filling the
+  whole margin (erodes the figure edge), and near-white-only exclusion (only catches
+  a WHITE fringe, keeps the old-figure edge).
+
+### 4. Gates (fail safe, never ship a bad composite)
+IoU < 0.55 → figure moved, reject. White-card gate (>22% of the paste near-white) →
+Qwen painted the face on a panel, reject. Face repair REQUIRES MobileSAM (no rembg
+whole-figure fallback — it whited a church tower). **Rejected:** a pre-clip round-2
+mask-size ratio gate — it false-rejected a PERFECT repair whose round-2 SAM merely
+over-segmented before the clip bounded it (exp #122).
+
+**Touched:** `server/lib/testlab.js` (samUnionBlend, runQwenInsertStage face path,
+fetchFigureHeadMask), `server/lib/images.js` (fetchFigureHeadMaskPng,
+detectPersonBoxInCrop, correctColorShift {meanShift, borderMatch},
+harmonicBackgroundFill, recoverFaceBox).
+**Status:** staging (Test Lab). Production repairCharacterMismatch NOT yet ported.
+**Known residual:** a faint light edge halo where the 3px protected ring keeps a
+sliver of Qwen's glow — edge-matting limit, minor.
