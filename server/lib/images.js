@@ -3005,7 +3005,42 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
  * @param {boolean} [options.skipCache] - Bypass the bbox cache (force fresh detection)
  * @returns {Promise<{figures: Array, objects: Array, usage: Object}|null>}
  */
+/**
+ * Fingerprint of the exact image bytes a detection was computed on.
+ * Detections are only meaningful for the bytes they ran on — a box from
+ * version A applied to the pixels of version B silently crops/repairs the
+ * wrong region. Every detectAllBoundingBoxes result is stamped with
+ * `sourceImageFp`; consumers verify via bboxPairsWith() before reusing a
+ * stored detection and fall back to fresh detection on mismatch.
+ */
+function imageFingerprint(imageData) {
+  if (!imageData || typeof imageData !== 'string') return null;
+  return require('crypto').createHash('sha1').update(imageData).digest('hex').slice(0, 16);
+}
+
+/**
+ * True when a stored detection may be paired with these image bytes.
+ * Legacy detections (no sourceImageFp stamp) are trusted — they predate the
+ * invariant and are usually stored alongside the bytes they ran on.
+ */
+function bboxPairsWith(detection, imageData) {
+  if (!detection) return false;
+  if (!detection.sourceImageFp) return true;
+  const fp = imageFingerprint(imageData);
+  return !fp || detection.sourceImageFp === fp;
+}
+
+// Public entry — stamps every result with the fingerprint of the bytes it was
+// computed on (see imageFingerprint above). Cache hits keep the stamp from
+// when they were computed; the cache key already includes the image hash, so
+// a hit is always for the same bytes.
 async function detectAllBoundingBoxes(imageData, options = {}) {
+  const result = await _detectAllBoundingBoxesImpl(imageData, options);
+  if (result && !result.sourceImageFp) result.sourceImageFp = imageFingerprint(imageData);
+  return result;
+}
+
+async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
   const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '', skipCache = false, artStyle = null, objectGroundingHints = null } = options;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
@@ -4219,6 +4254,10 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
 
   // Reuse shared bbox detection if provided (avoids redundant API call)
   let allDetections;
+  if (sharedBboxDetection && !bboxPairsWith(sharedBboxDetection, imageData)) {
+    log.warn(`⚠️ [BBOX-ENRICH] ${pageLabel}Shared bbox was computed on DIFFERENT image bytes (stale version) — discarding, re-detecting`);
+    sharedBboxDetection = null;
+  }
   if (sharedBboxDetection) {
     log.info(`♻️  [BBOX-ENRICH] ${pageLabel}Reusing shared bbox detection (${sharedBboxDetection.figures?.length || 0} figures, ${sharedBboxDetection.objects?.length || 0} objects)`);
     allDetections = sharedBboxDetection;
@@ -4321,6 +4360,10 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     // detection is debuggable from the stored record, not only live logs.
     detectionBackend: allDetections.detectionBackend,
     gdinoDiag: allDetections.gdinoDiag,
+    // Byte-pairing stamp (see imageFingerprint) — must survive this rebuild,
+    // detectionHistory IS the object persisted as bboxDetection. The shared
+    // detection was verified against imageData above, so its fp equals ours.
+    sourceImageFp: allDetections.sourceImageFp || imageFingerprint(imageData),
     timestamp: new Date().toISOString()
   };
   // Carry the in-process SAM mask PNGs across to the overlay renderer
@@ -7189,10 +7232,15 @@ async function inpaintPage(imageData, evaluation, options = {}) {
  * @param {number} sources.pageNumber
  * @returns {{ faceBbox: Array|null, bodyBbox: Array|null, source: string|null }}
  */
-function resolveCharBbox(charName, { bestEval, entityReport, pageNumber } = {}) {
+function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageData = null } = {}) {
   if (!charName || charName === 'UNKNOWN') {
     return { faceBbox: null, bodyBbox: null, source: null };
   }
+  // When the caller says which bytes the box will be applied to, skip any
+  // stored box stamped for different bytes (bboxPairsWith) — the entity
+  // report can predate a repair and its boxes then point at the wrong spot
+  // on the repaired pixels.
+  const pairs = (det) => !imageData || bboxPairsWith(det, imageData);
   const lowerName = charName.toLowerCase();
   const toRect = (b) => {
     if (!b) return null;
@@ -7208,7 +7256,7 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber } = {}) 
   if (charEntity?.byClothing) {
     for (const clothingData of Object.values(charEntity.byClothing)) {
       const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
-      if (app && (app.faceBox || app.bodyBox)) {
+      if (app && (app.faceBox || app.bodyBox) && pairs(app)) {
         const faceBbox = toRect(app.faceBox);
         const bodyBbox = toRect(app.bodyBox);
         if (faceBbox || bodyBbox) {
@@ -7219,7 +7267,7 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber } = {}) 
   }
 
   // Tier 2: canonical bbox detection figures
-  const figures = bestEval?.bboxDetection?.figures || [];
+  const figures = pairs(bestEval?.bboxDetection) ? (bestEval?.bboxDetection?.figures || []) : [];
   const figure = figures.find(f => {
     if (!f.name || f.name === 'UNKNOWN') return false;
     return f.name.toLowerCase() === lowerName ||
@@ -7971,7 +8019,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // its internal safety+model retries already exhausted before storing the
     // result, so a re-call just burns another API hit.
     const targetResolved = resolveCharBbox(charName, {
-      bestEval, entityReport: currentEntityReport, pageNumber,
+      bestEval, entityReport: currentEntityReport, pageNumber, imageData: currentImageData,
     });
     const faceBbox = targetResolved.faceBbox;
     const bodyBbox = targetResolved.bodyBbox;
@@ -8024,7 +8072,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     );
     for (const otherChar of otherChars) {
       const r = resolveCharBbox(otherChar.name, {
-        bestEval, entityReport: currentEntityReport, pageNumber,
+        bestEval, entityReport: currentEntityReport, pageNumber, imageData: currentImageData,
       });
       if (r.faceBbox) protectedFaces.push(r.faceBbox);
       if (r.bodyBbox) protectedBodies.push(r.bodyBbox);
@@ -8844,7 +8892,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const versions = pageVersions.get(pageNumber) || [];
     const best = finalBestPerPage.get(pageNumber) || versions[0];
     const bestBbox = best?.evaluation?.bboxDetection;
-    const hasFigures = Array.isArray(bestBbox?.figures) && bestBbox.figures.length > 0;
+    // Figures only count when the detection was computed on this version's
+    // bytes — a stale stamp means the boxes belong to another version.
+    const hasFigures = Array.isArray(bestBbox?.figures) && bestBbox.figures.length > 0
+      && bboxPairsWith(bestBbox, best?.imageData);
     if (best?.imageData && !hasFigures && best.source !== 'original') {
       try {
         const fresh = await detectAllBoundingBoxes(best.imageData, {
@@ -16741,6 +16792,8 @@ module.exports = {
 
   // Two-stage bounding box detection
   detectAllBoundingBoxes,
+  imageFingerprint,
+  bboxPairsWith,
   fetchFigureMaskPng,
   fetchFaceHeadMaskPng,
   recoverFaceBox,

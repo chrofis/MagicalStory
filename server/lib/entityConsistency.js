@@ -42,6 +42,13 @@ const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5
 function resolveActiveVersionData(img) {
   const versions = Array.isArray(img.imageVersions) ? img.imageVersions : [];
   const lastIdx = versions.length - 1;
+  // A detection is only usable with the bytes it was computed on — verify the
+  // sourceImageFp stamp (see images.js bboxPairsWith). A stale candidate is
+  // skipped, so downstream falls through to the next source or to fallback
+  // re-detection on the current pixels.
+  const { bboxPairsWith } = require('./images');
+  const firstPairing = (imageData, ...cands) =>
+    cands.find(d => d && bboxPairsWith(d, imageData)) || null;
 
   // Prefer the ROOT imageData/bboxDetection: rehydrate fills the root with the
   // image_version_meta-active version (the single source of truth — what PDFs,
@@ -55,7 +62,7 @@ function resolveActiveVersionData(img) {
       activeIdx: -1,
       activeVersion: null,
       imageData: img.imageData,
-      bboxDetection: img.sharedBboxDetection || img.bboxDetection || null,
+      bboxDetection: firstPairing(img.imageData, img.sharedBboxDetection, img.bboxDetection),
       versionIndex: null
     };
   }
@@ -64,7 +71,7 @@ function resolveActiveVersionData(img) {
     activeIdx: lastIdx,
     activeVersion,
     imageData: activeVersion?.imageData || null,
-    bboxDetection: img.sharedBboxDetection || activeVersion?.bboxDetection || img.bboxDetection || null,
+    bboxDetection: firstPairing(activeVersion?.imageData, img.sharedBboxDetection, activeVersion?.bboxDetection, img.bboxDetection),
     versionIndex: lastIdx >= 0 ? lastIdx : null
   };
 }
@@ -699,6 +706,12 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             const resolved = resolveActiveVersionData(cover);
             if (resolved.imageData) imageData = resolved.imageData;
             if (resolved.bboxDetection) coverBbox = resolved.bboxDetection;
+          }
+          // Drop a stored cover bbox stamped for different bytes — the
+          // fallback detection in collectEntityAppearances re-detects on the
+          // actual pixels instead of cropping with a stale box.
+          if (coverBbox && !require('./images').bboxPairsWith(coverBbox, imageData)) {
+            coverBbox = null;
           }
           if (imageData) {
             // Pull per-cover characterClothing from outline coverHints so the entity
@@ -1487,7 +1500,11 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           position: matchingFigure.position,
           label: matchingFigure.label,
           clothing,
-          confidence
+          confidence,
+          // Stamp which bytes these boxes belong to — char repair verifies
+          // this before applying a stored appearance box to a page image
+          // (see images.js bboxPairsWith).
+          sourceImageFp: require('./images').imageFingerprint(imageData)
         });
       }
     }

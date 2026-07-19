@@ -4395,11 +4395,17 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     // secondaries/animals named in expectedPositions (CHR003, ANI001, etc.).
     const characterDescriptions = buildCharacterDescriptionsForBbox(storyData, expectedPositions);
 
-    // If loadOnly=true, return existing bbox without re-detecting
-    if (req.body.loadOnly && scene.bboxDetection) {
+    // If loadOnly=true, return existing bbox without re-detecting — but only
+    // when the stored detection was computed on these bytes (sourceImageFp);
+    // else fall through to fresh detection on the current version.
+    const { bboxPairsWith: bboxPairsWithImage } = require('../lib/images');
+    if (req.body.loadOnly && scene.bboxDetection && bboxPairsWithImage(scene.bboxDetection, imageData)) {
       const existingOverlay = await createBboxOverlayImage(imageData, scene.bboxDetection);
       log.info(`📦 [REFRESH-BBOX] Returning existing bbox for page ${pageNumber} (loadOnly)`);
       return res.json({ bboxDetection: scene.bboxDetection, bboxOverlayImage: existingOverlay });
+    }
+    if (req.body.loadOnly && scene.bboxDetection) {
+      log.warn(`⚠️ [REFRESH-BBOX] Stored bbox for page ${pageNumber} was computed on different image bytes (stale version) — running fresh detection`);
     }
 
     // Run enriched bbox detection (optional model override from request body)
@@ -5343,10 +5349,15 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             }
           }
 
+          // Stored boxes are only usable with the bytes they were computed on
+          // (sourceImageFp stamp) — a stale box repaints the wrong region of a
+          // newer version. Mismatch → fall through to fresh detection below.
+          const { bboxPairsWith } = require('../lib/images');
+
           // 1. Try bbox from quality evaluation (stored on scene/version — most reliable)
           let storedAppearance = null;
           const sceneBbox = sceneImage.bboxDetection;
-          if (sceneBbox?.figures) {
+          if (sceneBbox?.figures && bboxPairsWith(sceneBbox, sceneImage.imageData)) {
             const fig = sceneBbox.figures.find(f =>
               f.name?.toLowerCase() === characterName.toLowerCase()
             );
@@ -5354,6 +5365,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               storedAppearance = { faceBox: fig.faceBox, bodyBox: fig.bodyBox, clothing: pageClothing };
               log.info(`✅ [CHAR REPAIR] Found ${characterName} bbox from scene evaluation (page ${pageNumber}, clothing: ${pageClothing})`);
             }
+          } else if (sceneBbox?.figures) {
+            log.warn(`⚠️ [CHAR REPAIR] Stored scene bbox for page ${pageNumber} was computed on different image bytes (stale version) — ignoring`);
           }
 
           // 2. Try entity consistency report (stored during consistency check)
@@ -5364,6 +5377,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               for (const [, clothingData] of Object.entries(charReport.byClothing)) {
                 const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
                 if (app?.faceBox || app?.bodyBox) {
+                  if (!bboxPairsWith(app, sceneImage.imageData)) {
+                    log.warn(`⚠️ [CHAR REPAIR] Entity-report box for ${characterName} page ${pageNumber} was computed on different image bytes (stale version) — ignoring`);
+                    continue;
+                  }
                   storedAppearance = app;
                   log.info(`✅ [CHAR REPAIR] Found ${characterName} bbox from entity report (page ${pageNumber})`);
                   break;

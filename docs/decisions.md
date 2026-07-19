@@ -1890,3 +1890,35 @@ convention as refresh-bbox/repair). Cover prose is exposed as
 
 **Touched:** `server/lib/testlab.js` (COVER_KEY_BY_PAGE, loadSceneContext,
 loadActivePageImage).
+
+## Bbox↔bytes pairing invariant — sourceImageFp stamp (2026-07-19)
+
+**Context:** stored figure detections kept being paired with image bytes from a
+different version (entity re-check, char repair, refresh-bbox loadOnly, test
+lab stored boxes) — box of version A cropping/repairing pixels of version B.
+Point guards (isOriginalImage) existed in some siblings and not others.
+
+**Decision:** structural invariant instead of per-site guards.
+`detectAllBoundingBoxes` stamps every result with `sourceImageFp` (sha1-16 of
+the exact imageData string); `detectionHistory` (the persisted shape) carries
+the stamp. One shared predicate `bboxPairsWith(detection, imageData)` is
+checked at EVERY consumer that pairs a stored detection with bytes:
+enrichWithBoundingBoxes shared reuse, resolveActiveVersionData,
+resolveCharBbox (tiers 1+2, callers pass currentImageData), char-repair
+stored-box sources (scene bbox + entity-report appearances — appearances are
+stamped at creation), refresh-bbox loadOnly, testlab resolveCharacterBox
+stored path, entity cover path, final best-version bbox refresh. Mismatch →
+the stored box is treated as absent and detection re-runs on the actual
+pixels. Legacy detections without a stamp are trusted (fail-open) — they
+predate the invariant; every new detection is stamped.
+
+**Rationale:** boxes are only meaningful for the bytes they were computed on;
+making the pairing verifiable at the producer kills the whole bug class
+instead of patching each consumer as it's discovered.
+
+**Touched:** `server/lib/images.js` (imageFingerprint, bboxPairsWith,
+detectAllBoundingBoxes wrapper, detectionHistory, enrichWithBoundingBoxes,
+resolveCharBbox + callers, final bbox refresh),
+`server/lib/entityConsistency.js` (resolveActiveVersionData, appearance
+stamping, cover path), `server/routes/regeneration.js` (char-repair sources,
+refresh-bbox loadOnly), `server/lib/testlab.js` (resolveCharacterBox).

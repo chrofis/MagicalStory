@@ -661,7 +661,13 @@ async function resolveCharacterBox(ctx, imageData, charName, { detection = null 
       source: 'chained-detection (padded 4-5%)',
     };
   }
-  const stored = ctx._skipStoredBox ? null : fromDet(ctx.scene.bboxDetection);
+  // Stored generation-time detection is only valid for the bytes it ran on
+  // (sourceImageFp stamp) — stale box on newer pixels repaints the wrong
+  // region. Mismatch → fresh detection below.
+  const { bboxPairsWith } = require('./images');
+  const storedDet = (!ctx._skipStoredBox && bboxPairsWith(ctx.scene.bboxDetection, imageData))
+    ? ctx.scene.bboxDetection : null;
+  const stored = fromDet(storedDet);
   if (stored) return { ...stored, source: 'stored' };
 
   const { detectAllBoundingBoxes } = require('./images');
