@@ -2001,6 +2001,22 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const unionPadded = strip(await sharp(union, raw1).blur(padPx / 1.5).threshold(16).raw().toBuffer()); // ≈6px dilation, binary
   const alpha1 = Buffer.from(unionPadded);
 
+  // Exclude the white HALO: union/pad pixels that are NOT part of the new
+  // figure (newBin) and are near-white in the candidate. Where the new head
+  // does not reach the OLD head's extent (red zone in the mask-diff), Qwen
+  // leaves an unfilled white fringe; the hard union pastes it and colour
+  // correction tone-shifts it into a visible ring. The actual new figure —
+  // including light/silver hair (which IS in newBin) — is kept untouched.
+  {
+    const candRaw = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+    let dropped = 0;
+    for (let i = 0; i < n; i++) {
+      if (!alpha1[i] || newBin[i] > 128) continue;   // keep the real new figure
+      if (candRaw[i * 3] >= 240 && candRaw[i * 3 + 1] >= 240 && candRaw[i * 3 + 2] >= 240) { alpha1[i] = 0; dropped++; }
+    }
+    if (dropped) log.info(`[TESTLAB] excluded ${dropped} near-white halo px (old-only / pad region, not in the new figure)`);
+  }
+
   // White-card gate: a face painted on a white panel passes IoU (geometry
   // aligns) and the style gate (a colorless panel has no "style") — v92's
   // Roger shipped exactly that. Mechanical check: the pixels TAKEN from the
