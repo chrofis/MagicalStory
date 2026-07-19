@@ -2001,28 +2001,22 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const unionPadded = strip(await sharp(union, raw1).blur(padPx / 1.5).threshold(16).raw().toBuffer()); // ≈6px dilation, binary
   const alpha1 = Buffer.from(unionPadded);
 
-  // Background-fill mask (pixels to replace with diffused scene background):
-  //   (a) RED ZONE — old figure was here, new figure isn't (oldBin && !newBin).
-  //   (b) GLOW — union/pad pixels NOT in the new figure that are clearly
-  //       BRIGHTER than the figure: Qwen paints a light halo where the new hair
-  //       meets the whited-out area, and the union padding pastes it. Threshold
-  //       is relative to the figure's mean luminance (+45), so the actual figure
-  //       — including light/silver hair, which is inside newBin — is protected.
+  // Split figure vs background by the SAM MASK (newBin), NOT brightness: Qwen
+  // lightens BOTH the background and parts of the face, so a luminance threshold
+  // misclassifies lightened face as background. The 6px margin, though, exists
+  // because SAM's mask is sometimes too tight and clips the figure's edge, so we
+  // must NOT blanket-fill it. Protect a ~3px ring around the figure (its edge),
+  // background-fill only beyond that:
+  //   FIGURE  = newBin (+3px edge ring) → face correction, kept from candidate
+  //   BG-FILL = alpha1 && !dilate(newBin,3) → red zone + outer glow → background
   const s1r = Math.max(1, Math.round(oldA.length / n));
-  const candRawL = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
-  const lumAt = (i) => 0.299 * candRawL[i * 3] + 0.587 * candRawL[i * 3 + 1] + 0.114 * candRawL[i * 3 + 2];
-  let figSum = 0, figCnt = 0;
-  for (let i = 0; i < n; i++) if (newBin[i] > 128) { figSum += lumAt(i); figCnt++; }
-  const figMean = figCnt ? figSum / figCnt : 255;
+  const newDil = strip(await sharp(Buffer.from(newBin), raw1).blur(2).threshold(16).raw().toBuffer()); // ≈3px dilation of the figure
   const redZone = Buffer.alloc(n);
-  let redZonePx = 0, glowPx = 0;
+  let redZonePx = 0;
   for (let i = 0; i < n; i++) {
-    if (!alpha1[i] || newBin[i] > 128) continue;   // never fill the real new figure
-    const oldOnly = oldA[i * s1r] > 128;
-    const glow = lumAt(i) > figMean + 45;
-    if (oldOnly || glow) { redZone[i] = 255; redZonePx++; if (glow && !oldOnly) glowPx++; }
+    if (alpha1[i] && newDil[i] <= 128) { redZone[i] = 255; redZonePx++; }
   }
-  if (redZonePx) log.info(`[TESTLAB] bg-fill mask: ${redZonePx}px (${redZonePx - glowPx} red-zone + ${glowPx} glow), figMean lum ${figMean.toFixed(0)}`);
+  if (redZonePx) log.info(`[TESTLAB] bg-fill mask: ${redZonePx}px (red zone + outer margin beyond the figure's 3px edge ring)`);
 
   // White-card gate: a face painted on a white panel passes IoU (geometry
   // aligns) and the style gate (a colorless panel has no "style") — v92's
@@ -2069,9 +2063,12 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   let colorInfo = null;
   if (colorCorrect) {
     try {
+      // FACE correction on the FIGURE (+ its 3px edge ring), referenced to the
+      // original figure — histogram built from figure pixels only, so the white
+      // glow/red zone can't skew it.
       const refMaskBin = Buffer.alloc(n);
       for (let i = 0; i < n; i++) refMaskBin[i] = oldA[i * s1r] > 128 ? 255 : 0;
-      const cc = await correctColorShift(origRaw, pasteRaw, Buffer.from(alpha1), cropW, cropH, { refMask: refMaskBin });
+      const cc = await correctColorShift(origRaw, pasteRaw, Buffer.from(newDil), cropW, cropH, { refMask: refMaskBin });
       if (cc.applied) {
         pasteRaw = Buffer.from(cc.correctedRaw);
         colorInfo = { deltaEBefore: cc.deltaEBefore, seamBefore: cc.seamDeltaEBefore, seamAfter: cc.seamDeltaEAfter };
@@ -2080,10 +2077,11 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
       log.warn(`[TESTLAB] colour correction skipped (${err.message})`);
     }
   }
-  // Overwrite the red zone with diffused scene background (never the old figure
-  // edge, never the candidate's white fringe).
+  // Red zone + outer margin → diffused scene background (never the old figure
+  // edge, never the candidate's white glow). newDil excluded as a source so the
+  // fill diffuses the real background, not the figure's edge colour.
   if (redZonePx > 0) {
-    const bg = harmonicBackgroundFill(origRaw, redZone, newBin, cropW, cropH);
+    const bg = harmonicBackgroundFill(origRaw, redZone, newDil, cropW, cropH);
     for (let i = 0; i < n; i++) { if (redZone[i]) { pasteRaw[i * 3] = bg[i * 3]; pasteRaw[i * 3 + 1] = bg[i * 3 + 1]; pasteRaw[i * 3 + 2] = bg[i * 3 + 2]; } }
     if (colorInfo) colorInfo.redZonePx = redZonePx;
   }
@@ -2515,7 +2513,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       // back to the copied original box if the re-detect returns nothing.
       maskFetcher: params._faceMode ? (async (buf) => {
         const { detectPersonBoxInCrop } = require('./images');
-        const fresh = await detectPersonBoxInCrop(buf, `testlab-P${ctx.pageNumber} ${charName}: `);
+        const fresh = await detectPersonBoxInCrop(buf, boxInCrop, `testlab-P${ctx.pageNumber} ${charName}: `);
         const r2Body = fresh || params._bodyBoxInCrop || [0, 0, crop.w, crop.h];
         let g2 = null;
         const m = await fetchFigureHeadMask(buf, r2Body, boxInCrop, crop.w, crop.h, { onGeom: (g) => { g2 = g; } });

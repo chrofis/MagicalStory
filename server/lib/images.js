@@ -2398,16 +2398,34 @@ async function _mobilesamMaskFull(imageDataUri, boxPx, W, H) {
  * figure. Returns the largest person box [x1,y1,x2,y2] in crop px, or null
  * (caller falls back to the copied box). cropJpegBuffer is the crop image.
  */
-async function detectPersonBoxInCrop(cropJpegBuffer, pageLabel = '') {
+async function detectPersonBoxInCrop(cropJpegBuffer, faceBoxInCrop = null, pageLabel = '') {
   try {
     const uri = `data:image/jpeg;base64,${cropJpegBuffer.toString('base64')}`;
     const det = await _gdinoDetect(uri, [{ name: 'person', text: 'person' }]);
     if (!det?.figures?.[0]) return null;
     const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU);
     if (!persons.length) return null;
-    persons.sort((a, b) => (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]) - (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]));
-    log.info(`🔎 [GDINO-DETECT] ${pageLabel}round-2 person re-detect: ${persons.length} box(es), best score ${persons[0].score?.toFixed?.(2) ?? '?'}`);
-    return persons[0].box.map(v => Math.round(v));
+    // The crop often contains OTHER people (neighbours in the scene). Pick the
+    // person whose box overlaps the FACE box (the target head) the most — NOT
+    // the largest, which is frequently a bigger adjacent figure (exp: monk /
+    // green-dress woman picked instead of Verena → IoU 0%). Fall back to largest.
+    let pick;
+    if (faceBoxInCrop?.length === 4) {
+      const [fx1, fy1, fx2, fy2] = faceBoxInCrop;
+      const overlap = (b) => {
+        const ix = Math.max(0, Math.min(b[2], fx2) - Math.max(b[0], fx1));
+        const iy = Math.max(0, Math.min(b[3], fy2) - Math.max(b[1], fy1));
+        return ix * iy;
+      };
+      pick = persons.map(p => ({ p, ov: overlap(p.box) })).sort((a, b) => b.ov - a.ov)[0];
+      if (!pick || pick.ov <= 0) pick = null; // no person over the face → fall back
+    }
+    if (!pick) {
+      persons.sort((a, b) => (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]) - (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]));
+      pick = { p: persons[0] };
+    }
+    log.info(`🔎 [GDINO-DETECT] ${pageLabel}round-2 person re-detect: ${persons.length} box(es), picked ${faceBoxInCrop ? 'face-overlapping' : 'largest'} (score ${pick.p.score?.toFixed?.(2) ?? '?'})`);
+    return pick.p.box.map(v => Math.round(v));
   } catch (e) {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}round-2 person re-detect failed: ${e.message}`);
     return null;
