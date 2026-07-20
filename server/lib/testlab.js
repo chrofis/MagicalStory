@@ -2331,42 +2331,28 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     }
   }
   if (!crop) throw new Error('qwen_insert needs params.crop {x,y,w,h} (normalized 0-1) — the character was not found on the base image either');
-  // Face mode: context scales WITH the head — ~3× the head box, floor 384px
-  // native (references below 384px get upscaled by editWithQwen). The old
-  // fixed 512px floor sent up to 5× the face for small heads, and that much
-  // scene invites Qwen to re-compose the whole crop (layout drift → the
-  // union blend pastes a shifted face that the face clip then cuts off).
+  // Face mode: SQUARE crop centered on the head. A 1:1 crop is a valid Grok edit
+  // aspect BY CONSTRUCTION, so there is NO mid-pipeline reshape — the earlier
+  // aspect-snap mutated crop.w/h/x/y AFTER coordinates were derived from it and
+  // desynced the paste (faces landed in empty sky, backgrounds re-imagined). One
+  // square crop feeds detection mapping, SAM, boxInCrop, union, paste AND both
+  // models. Side ≈ 3× the head, floor 384px, capped to the image.
   if (params._faceMode) {
     const fw = Math.round((figureBox[3] - figureBox[1]) * W);
     const fh = Math.round((figureBox[2] - figureBox[0]) * H);
     const cx0 = crop.x + crop.w / 2, cy0 = crop.y + crop.h / 2;
-    const w2 = Math.min(W, Math.max(3 * fw, 384));
-    const h2 = Math.min(H, Math.max(3 * fh, 384));
-    crop = { x: Math.round(cx0 - w2 / 2), y: Math.round(cy0 - h2 / 2), w: Math.round(w2), h: Math.round(h2) };
-  }
-  crop.x = Math.max(0, Math.min(W - 64, crop.x));
-  crop.y = Math.max(0, Math.min(H - 64, crop.y));
-  crop.w = Math.min(W - crop.x, crop.w);
-  crop.h = Math.min(H - crop.y, crop.h);
-
-  // Snap the crop to the nearest STANDARD aspect. Grok's edit API only accepts
-  // named ratios (1:1, 3:4, …) and its output takes the slot-0 input aspect;
-  // Qwen is aspect-agnostic. Snapping BOTH keeps the Grok-vs-Qwen inputs
-  // identical and the paste-back (resize to crop.w×crop.h) undistorted. Expand
-  // the crop to the target ratio (never crop content), re-center, clamp.
-  {
-    const STD = [[1, 1], [3, 4], [4, 3], [2, 3], [3, 2], [9, 16], [16, 9]];
-    const cr = crop.w / crop.h;
-    let best = STD[0], bd = Infinity;
-    for (const [a, b] of STD) { const d = Math.abs(Math.log((a / b) / cr)); if (d < bd) { bd = d; best = [a, b]; } }
-    params._grokAspect = `${best[0]}:${best[1]}`;
-    const tr = best[0] / best[1];
-    let nw = crop.w, nh = crop.h;
-    if (cr > tr) nh = Math.round(crop.w / tr); else nw = Math.round(crop.h * tr);
-    if (nw <= W && nh <= H) {
-      let nx = Math.round(crop.x + crop.w / 2 - nw / 2), ny = Math.round(crop.y + crop.h / 2 - nh / 2);
-      crop = { x: Math.max(0, Math.min(W - nw, nx)), y: Math.max(0, Math.min(H - nh, ny)), w: nw, h: nh };
-    }
+    const side = Math.min(W, H, Math.max(3 * fw, 3 * fh, 384));
+    crop = {
+      x: Math.max(0, Math.min(W - side, Math.round(cx0 - side / 2))),
+      y: Math.max(0, Math.min(H - side, Math.round(cy0 - side / 2))),
+      w: side, h: side,
+    };
+    params._grokAspect = '1:1';
+  } else {
+    crop.x = Math.max(0, Math.min(W - 64, crop.x));
+    crop.y = Math.max(0, Math.min(H - 64, crop.y));
+    crop.w = Math.min(W - crop.x, crop.w);
+    crop.h = Math.min(H - crop.y, crop.h);
   }
 
   const cropBuf = await sharp(baseBuf).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).jpeg({ quality: 95 }).toBuffer();
