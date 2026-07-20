@@ -10617,7 +10617,11 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
   for (let ch = 0; ch < 3; ch++) { mo[ch] /= cnt; mc[ch] /= cnt; }
   const deltaEBefore = _deltaE(mo, mc);
   const out = Buffer.from(C);
-  if (deltaEBefore < minDeltaE) return { applied: false, deltaEBefore: +deltaEBefore.toFixed(2), reason: 'below threshold', correctedRaw: out };
+  // The overall-mean gate applies only to the global mean-shift / histogram path.
+  // colorAware corrects PER MATERIAL, so a small overall mean can still hide an
+  // off material (e.g. the jacket at the bottom clip while skin/hair match) — run
+  // it regardless; each material self-gates via its own offset.
+  if (!colorAware && deltaEBefore < minDeltaE) return { applied: false, deltaEBefore: +deltaEBefore.toFixed(2), reason: 'below threshold', correctedRaw: out };
   // meanShift: move the whole face in ONE direction — a single uniform LAB
   // offset (mean original − mean candidate), no per-pixel distribution
   // reshaping. This shifts the tone to match the scene without distorting the
