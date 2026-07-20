@@ -2237,20 +2237,42 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // figExclude = both heads → the diffusion sources only real background, never
   // the old skin (which would ghost a "2nd nose").
   if (redZonePx > 0) {
+    const { _rgbToLab, _deltaE, _ccKMeans } = require('./images');
     const figExclude = Buffer.alloc(n);
     for (let i = 0; i < n; i++) figExclude[i] = (newDil[i] > 128 || oldA[i * s1r] > 128) ? 255 : 0;
-    const garbage = Buffer.alloc(n);
-    let garbagePx = 0;
+    // Classify each red-zone pixel FIGURE vs BACKGROUND by colour. Figure content
+    // (e.g. the chin the round-2 mask missed) → KEEP the model. Background margin
+    // (the outer dilation ring — the model's slightly-darker snow that made a
+    // dark HALO on flat scenes) → fill from the original scene. Figure palette =
+    // K-cluster the model over the figure (newDil); background = ORIGINAL just
+    // outside the union.
+    const figPts = [];
+    for (let i = 0; i < n; i++) if (newDil[i] > 128) { const l = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]); figPts.push(l[0], l[1], l[2]); }
+    const figCent = (figPts.length ? _ccKMeans(Float32Array.from(figPts), 3, 6).cent : []);
+    const ring = await maskBlurThreshold(Buffer.from(alpha1), cropW, cropH, 4, 16); // union dilated → outer ring
+    const bg = [0, 0, 0]; let bgc = 0;
+    for (let i = 0; i < n; i++) if (ring[i] > 128 && alpha1[i] <= 128) { const l = _rgbToLab(origRaw[i * 3], origRaw[i * 3 + 1], origRaw[i * 3 + 2]); bg[0] += l[0]; bg[1] += l[1]; bg[2] += l[2]; bgc++; }
+    const bgMean = bgc ? [bg[0] / bgc, bg[1] / bgc, bg[2] / bgc] : null;
+    // toFill = garbage (white/black) + background-classified red-zone → diffused
+    // from the ORIGINAL scene (excludes both figures, so no old-skin ghost).
+    const toFill = Buffer.alloc(n);
+    let garbagePx = 0, bgReverted = 0;
     for (let i = 0; i < n; i++) {
       if (!redZone[i]) continue;
       const r = pasteRaw[i * 3], g = pasteRaw[i * 3 + 1], b = pasteRaw[i * 3 + 2];
-      if ((r > 235 && g > 235 && b > 235) || (r < 22 && g < 22 && b < 22)) { garbage[i] = 255; garbagePx++; }
+      if ((r > 235 && g > 235 && b > 235) || (r < 22 && g < 22 && b < 22)) { toFill[i] = 255; garbagePx++; continue; }
+      if (bgMean && figCent.length) {
+        const lab = _rgbToLab(r, g, b);
+        let dFig = Infinity; for (const c of figCent) { const d = _deltaE(lab, c); if (d < dFig) dFig = d; }
+        if (_deltaE(lab, bgMean) < dFig) { toFill[i] = 255; bgReverted++; } // background margin → fill from scene
+      }
     }
-    if (garbagePx > 0) {
-      const bg = harmonicBackgroundFill(origRaw, garbage, figExclude, cropW, cropH);
-      for (let i = 0; i < n; i++) { if (garbage[i]) { pasteRaw[i * 3] = bg[i * 3]; pasteRaw[i * 3 + 1] = bg[i * 3 + 1]; pasteRaw[i * 3 + 2] = bg[i * 3 + 2]; } }
+    if (garbagePx + bgReverted > 0) {
+      const bgFill = harmonicBackgroundFill(origRaw, toFill, figExclude, cropW, cropH);
+      for (let i = 0; i < n; i++) { if (toFill[i]) { pasteRaw[i * 3] = bgFill[i * 3]; pasteRaw[i * 3 + 1] = bgFill[i * 3 + 1]; pasteRaw[i * 3 + 2] = bgFill[i * 3 + 2]; } }
+      if (bgReverted > 0) log.info(`[TESTLAB] red-zone: ${bgReverted}px background margin filled from scene (halo fix), ${garbagePx}px garbage`);
     }
-    if (colorInfo) { colorInfo.redZonePx = redZonePx; colorInfo.garbagePx = garbagePx; }
+    if (colorInfo) { colorInfo.redZonePx = redZonePx; colorInfo.garbagePx = garbagePx; colorInfo.bgReverted = bgReverted; }
   }
   const pasteBuf = await sharp(pasteRaw, { raw: { width: cropW, height: cropH, channels: 3 } }).png().toBuffer(); // PNG: lossless corrected paste
   // Applied view: exactly what gets pasted (colour-corrected figure + filled bg).
