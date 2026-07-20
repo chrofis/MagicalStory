@@ -617,6 +617,12 @@ async function runBboxStage(ctx, { experimentId }) {
       faceBboxRaw: f.faceBoxRaw || null,
       faceScore: f.faceScore,
       confidence: f.confidence,
+      // SAM silhouette decision per figure — this mask is now the shared cutout
+      // for both eval and repair, so its verdict must be inspectable here. The
+      // mask itself is drawn in the overlay cutout strip above; these say whether
+      // it was accepted (bodyBox = mask bounds) or the tight DINO box was kept.
+      samApplied: f.samApplied ?? null,
+      maskVerdict: f.maskVerdict || null,
     })),
     objects: (result.objects || []).map(o => ({ name: o.name, bbox: o.bodyBox || o.bbox || o.box_2d })),
   };

@@ -1491,7 +1491,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         if (!charApps) {
           appearances.set(charName, []);
         }
-        appearances.get(charName).push({
+        const appearance = {
           pageNumber,
           versionIndex,
           imageData,
@@ -1505,7 +1505,18 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           // this before applying a stored appearance box to a page image
           // (see images.js bboxPairsWith).
           sourceImageFp: require('./images').imageFingerprint(imageData)
-        });
+        };
+        // Reuse the detection SAM silhouette for this figure (page-res PNG,
+        // index-aligned with figures via _gdinoMasks — the same source the
+        // overlay strip reads). extractEntityCrops uses it to cut the figure
+        // out of its rectangle. Non-enumerable, like _gdinoMasks itself: never
+        // serialized into stories.data (the persisted appearance shape at the
+        // grid-build site picks fields explicitly). Absent → null → rectangle
+        // crop on reloaded-from-DB detections where masks were never stored.
+        const figIdx = figures.indexOf(matchingFigure);
+        const figMask = (figIdx >= 0 && bboxDetection?._gdinoMasks?.[figIdx]) || null;
+        Object.defineProperty(appearance, 'mask', { value: figMask, enumerable: false });
+        appearances.get(charName).push(appearance);
       }
     }
   }
@@ -1726,7 +1737,11 @@ async function extractEntityCrops(appearances, options = {}) {
         {
           forRegeneration,
           // Asymmetric padding for figures: extend upward to capture full head
-          asymmetricPadding: isObject ? null : { top: 0.10, bottom: 0, left: 0.05, right: 0.05 }
+          asymmetricPadding: isObject ? null : { top: 0.10, bottom: 0, left: 0.05, right: 0.05 },
+          // Detection SAM silhouette for this figure (page-res PNG), when the
+          // appearance was built from an in-process detection; null for objects
+          // and reloaded-from-DB appearances → rectangle crop.
+          mask: app.mask || null
         }
       );
 
@@ -1777,7 +1792,7 @@ async function extractEntityCrops(appearances, options = {}) {
  * @returns {Promise<{buffer: Buffer, paddedBox: number[]}|null>} Cropped image buffer and normalized padded box
  */
 async function extractCropFromImage(imageData, bbox, targetSize, padding = 0, options = {}) {
-  const { forRegeneration = false, asymmetricPadding = null } = options;
+  const { forRegeneration = false, asymmetricPadding = null, mask = null } = options;
 
   try {
     const imgBuffer = await r2.bytesFromAnyImage(imageData);
@@ -1787,6 +1802,31 @@ async function extractCropFromImage(imageData, bbox, targetSize, padding = 0, op
     const metadata = await sharp(imgBuffer).metadata();
     const width = metadata.width;
     const height = metadata.height;
+
+    // SAM cutout: when the detection mask for this figure is supplied, gate the
+    // page pixels to the figure silhouette (dest-in) BEFORE cropping, so the
+    // eval crop is the figure alone on white — no neighbours/background inside
+    // the rectangle. Skipped for forRegeneration crops (those are composited
+    // back and need the true rectangle). Same page bytes → mask dims == page
+    // dims; a mismatch or failure degrades to the rectangle (logged), never
+    // throws. Reuses the strip's mask-then-extract pattern (images.js dest-in).
+    let extractSource = imgBuffer;
+    let didMask = false;
+    if (mask && !forRegeneration) {
+      try {
+        const mMeta = await sharp(mask).metadata();
+        if (mMeta.width === width && mMeta.height === height) {
+          extractSource = await sharp(imgBuffer).ensureAlpha()
+            .composite([{ input: mask, blend: 'dest-in' }])
+            .png().toBuffer();
+          didMask = true;
+        } else {
+          log.warn(`[ENTITY-CROP] SAM mask ${mMeta.width}x${mMeta.height} != page ${width}x${height}; using rectangle crop`);
+        }
+      } catch (e) {
+        log.warn(`[ENTITY-CROP] SAM cutout failed (${e.message}); using rectangle crop`);
+      }
+    }
 
     // Convert normalized bbox to pixel coordinates
     const [ymin, xmin, ymax, xmax] = bbox;
@@ -1834,7 +1874,7 @@ async function extractCropFromImage(imageData, bbox, targetSize, padding = 0, op
     }
 
     // Extract crop (no resize if targetSize is null)
-    let sharpPipeline = sharp(imgBuffer)
+    let sharpPipeline = sharp(extractSource)
       .extract({
         left: x1,
         top: y1,
@@ -1847,10 +1887,14 @@ async function extractCropFromImage(imageData, bbox, targetSize, padding = 0, op
       sharpPipeline = sharpPipeline.resize(targetSize, targetSize, { fit: 'cover' });
     }
 
-    // Use PNG for regeneration (lossless), JPEG otherwise
+    // Use PNG for regeneration (lossless), JPEG otherwise. A masked crop is
+    // flattened onto white so the transparent (non-figure) area reads as a
+    // clean backdrop in the JPEG the evaluator sees.
     const cropBuffer = forRegeneration
       ? await sharpPipeline.png().toBuffer()
-      : await sharpPipeline.jpeg({ quality: 90 }).toBuffer();
+      : didMask
+        ? await sharpPipeline.flatten({ background: '#ffffff' }).jpeg({ quality: 90 }).toBuffer()
+        : await sharpPipeline.jpeg({ quality: 90 }).toBuffer();
 
     return { buffer: cropBuffer, paddedBox };
   } catch (err) {

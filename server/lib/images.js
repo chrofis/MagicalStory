@@ -7367,10 +7367,18 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
       (f.label && f.label.toLowerCase().includes(lowerName));
   });
   if (figure && (figure.faceBox || figure.bodyBox)) {
+    // Reuse the detection SAM silhouette (page-res PNG, _gdinoMasks index-
+    // aligned with figures) so the repair blend gate skips re-segmenting the
+    // ORIGINAL figure. Byte-safe: this tier only runs when pairs() confirmed
+    // the detection matches the pixels being repaired. Absent on reloaded-from-
+    // DB detections → null → the gate falls back to a fresh SAM call.
+    const figIdx = figures.indexOf(figure);
+    const bodyMask = (figIdx >= 0 && bestEval.bboxDetection._gdinoMasks?.[figIdx]) || null;
     return {
       faceBbox: toRect(figure.faceBox),
       bodyBbox: toRect(figure.bodyBox),
       source: 'bbox',
+      bodyMask,
     };
   }
 
@@ -8205,6 +8213,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         protectedFaces,
         protectedBodies,
         whiteoutTarget: useFaceOnly ? 'face' : 'body',
+        // Detection SAM silhouette (page-res) for the ORIGINAL figure so the
+        // blend gate reuses it instead of re-running SAM on the same pixels.
+        // Body mode only — the detection mask is a full-figure silhouette, not
+        // a head mask; null → gate falls back to a fresh /figure-mask call.
+        detectionBodyMask: useFaceOnly ? null : (targetResolved.bodyMask || null),
         textPosition: pageTextPosition,
         includeDebug: true,
       });
@@ -11272,6 +11285,11 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // Grok sees blurred faces + reference avatar → redraws all blurred faces.
     // The feathered blend restores non-target faces from the original.
     const faceBbox = options.faceBbox;
+    // Detection SAM silhouette for the ORIGINAL figure (page-res PNG, same bytes
+    // as sceneBuffer — byte-guarded by resolveCharBbox). When present in body
+    // mode, the silhouette gate below reuses it instead of re-running SAM on the
+    // original figure; null → fresh /figure-mask call (unchanged behaviour).
+    const detectionBodyMask = options.detectionBodyMask || null;
     let sceneForGrok = sceneBuffer;
 
     const composites = [];
@@ -11548,10 +11566,6 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       const tCropBottom = Math.min(sceneMeta.height, Math.ceil(targetCropForSilhouette[2] * sceneMeta.height));
       const tCropWidth  = tCropRight - tCropLeft;
       const tCropHeight = tCropBottom - tCropTop;
-      const cropForSilhouette = await sharp(sceneBuffer)
-        .extract({ left: tCropLeft, top: tCropTop, width: tCropWidth, height: tCropHeight })
-        .jpeg({ quality: 90 })
-        .toBuffer();
       // Box prompt for the mobilesam backend: the UNPADDED target box mapped
       // into crop pixel coords (face box in face mode, body box in body mode).
       const targetBoxNorm = whiteoutTarget === 'face' && faceBbox ? faceBbox : [ymin, xmin, ymax, xmax];
@@ -11561,7 +11575,27 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
         Math.round(targetBoxNorm[3] * sceneMeta.width) - tCropLeft,
         Math.round(targetBoxNorm[2] * sceneMeta.height) - tCropTop,
       ];
-      const silhouettePng = await fetchFigureMaskPng(cropForSilhouette, figureBoxInCrop);
+      // Reuse the detection SAM silhouette when available (body mode only — the
+      // detection mask is a full-figure silhouette, not a head mask). It is
+      // already scene-sized (_maskToPng: white-opaque figure on transparent,
+      // same format fetchFigureMaskPng returns), so cropping it to the same rect
+      // yields a drop-in replacement for the fresh SAM call — every downstream
+      // composite/extractChannel step is byte-identical. Skips one /figure-mask
+      // round-trip. The SECOND (Grok-output) SAM call below cannot be reused —
+      // those pixels did not exist at detection time.
+      let silhouettePng;
+      if (detectionBodyMask && whiteoutTarget !== 'face') {
+        silhouettePng = await sharp(detectionBodyMask)
+          .extract({ left: tCropLeft, top: tCropTop, width: tCropWidth, height: tCropHeight })
+          .png().toBuffer();
+        log.info(`👤 [CHAR REPAIR GROK] Blended body: reusing detection SAM mask for original figure (skipped one /figure-mask)`);
+      } else {
+        const cropForSilhouette = await sharp(sceneBuffer)
+          .extract({ left: tCropLeft, top: tCropTop, width: tCropWidth, height: tCropHeight })
+          .jpeg({ quality: 90 })
+          .toBuffer();
+        silhouettePng = await fetchFigureMaskPng(cropForSilhouette, figureBoxInCrop);
+      }
       if (silhouettePng) {
         // Place the silhouette on a black scene-sized canvas, then crop to
         // the blend region so each pixel of `silhouetteAlphaInBlend` lines up

@@ -1974,3 +1974,38 @@ their avatars are regenerated — accepted; regenerate on demand.
 
 **Touched:** `prompts/avatar-main-prompt.txt`, `prompts/avatar-evaluation.txt`,
 `server/lib/testlab.js` (avatar_realistic params.costumeDescription for the A/B).
+
+## Detection SAM mask is computed once, shared by eval + repair (2026-07-21)
+
+**Context:** GroundingDINO→MobileSAM detection already segments a
+page-resolution silhouette per figure (rides on the detection result as the
+non-enumerable `_gdinoMasks`, index-aligned with `figures[]`, deliberately never
+persisted to `stories.data` to avoid JSONB bloat). But the two downstream
+consumers ignored it: the character eval cropped each figure by its `bodyBox`
+RECTANGLE (so the Gemini consistency evaluator saw neighbours + background inside
+the crop), and character repair re-ran SAM (`/figure-mask`) from scratch to build
+its blend gate on the same pixels detection had just segmented.
+
+**Decision:** consumers READ the mask that already exists; recompute SAM only
+where it is genuinely unreachable.
+1. Eval: `collectEntityAppearances` attaches `_gdinoMasks[figIdx]` to the
+   appearance (non-enumerable, like the source); `extractCropFromImage` gates the
+   page pixels to the silhouette (`dest-in`) before cropping and flattens the
+   crop onto white → the evaluator sees the figure isolated.
+2. Repair: `resolveCharBbox` Tier 2 (already byte-guarded by `bboxPairsWith`)
+   returns the figure's `bodyMask`; the blended silhouette gate reuses it for the
+   ORIGINAL-figure mask instead of a fresh `/figure-mask` call.
+3. Test Lab bbox stage surfaces `samApplied`/`maskVerdict` per figure.
+
+**Deliberately partial / by design:**
+- Masks are in-process only → reuse works within the generation job; reloaded-
+  from-DB detections and old versions have no mask → eval falls back to the
+  rectangle, repair to a fresh SAM call. Unavoidable data-availability fallback.
+- Repair still runs SAM ONCE on Grok's OUTPUT figure (those pixels did not exist
+  at detection time) and for face-mode head masks (`fetchFaceHeadMaskPng`). Only
+  the first, body-mode, original-figure SAM call is eliminated.
+
+**Touched:** `server/lib/entityConsistency.js` (appearance mask attach,
+`extractCropFromImage` cutout), `server/lib/images.js` (`resolveCharBbox`
+`bodyMask`, `executeCharFixAction` thread, silhouette-gate reuse in
+`repairCharacterMismatchWithGrok`), `server/lib/testlab.js` (bbox verdict fields).
