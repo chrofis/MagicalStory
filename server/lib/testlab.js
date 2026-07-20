@@ -2620,9 +2620,24 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // coerces its output to the slot-0 (whiteout crop) aspect, so passing the crop
   // aspect keeps the output geometry identical to Qwen's rw:rh; everything
   // downstream (SAM re-detect, union blend, colour-aware correction) is shared.
-  const result = params.backend === 'grok'
-    ? await require('./grok').editWithGrok(prompt, qwenRefs, { aspectRatio: params._grokAspect || '3:4', resolution: '1k' })
-    : await editWithQwen(prompt, qwenRefs, { width: rw, height: rh });
+  let result;
+  if (params.reuseModelOutput != null) {
+    // ISOLATION HARNESS: reuse a saved model output (a tl_step versionIndex or a
+    // data URI) instead of calling the model, so blend variants run on the SAME
+    // image — only the blend params differ, making an honest A/B. Requires the
+    // SAME detection (→ identical crop/boxes) as the source run.
+    let imageData = params.reuseModelOutput;
+    if (typeof imageData === 'number' || /^\d+$/.test(String(imageData))) {
+      const img = await loadTestImage(ctx.storyId, 'tl_step', ctx.pageNumber, Number(imageData));
+      if (!img?.imageData) throw new Error(`reuseModelOutput: tl_step v${imageData} not found`);
+      imageData = img.imageData;
+    }
+    result = { imageData, modelId: 'reused', cost: 0 };
+  } else {
+    result = params.backend === 'grok'
+      ? await require('./grok').editWithGrok(prompt, qwenRefs, { aspectRatio: params._grokAspect || '3:4', resolution: '1k' })
+      : await editWithQwen(prompt, qwenRefs, { width: rw, height: rh });
+  }
   const elapsedMs = Date.now() - t0;
 
   // Save the intermediates IMMEDIATELY — before gating can throw. A failed
