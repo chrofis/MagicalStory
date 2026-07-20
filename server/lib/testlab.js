@@ -892,8 +892,8 @@ async function runCharRepairStage(ctx, opts) {
       clipRect: faceClip,
       maskFetcher: faceClip ? (buf) => fetchFaceHeadMask(buf, faceClip, cw, chh) : null,
     });
-    const composed = await sharp(origBuf).composite([{ input: blend.feathered, left: cx, top: cy }]).jpeg({ quality: 95 }).toBuffer();
-    finalImage = `data:image/jpeg;base64,${composed.toString('base64')}`;
+    const composed = await sharp(origBuf).composite([{ input: blend.feathered, left: cx, top: cy }]).png().toBuffer(); // PNG: lossless final
+    finalImage = `data:image/png;base64,${composed.toString('base64')}`;
     samBlendApplied = true;
   }
 
@@ -2175,8 +2175,8 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // Applied mask views instead of raw black/white masks: (a) the original
   // with the padded union whited out — the region the blend treats as
   // figure; (b) the pixels actually TAKEN from the new image.
-  const candResized = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
-  const origResized = await sharp(originalCropBuf).resize(cropW, cropH, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
+  const candResized = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).png().toBuffer(); // PNG: lossless paste source
+  const origResized = await sharp(originalCropBuf).resize(cropW, cropH, { fit: 'fill' }).png().toBuffer(); // PNG: lossless colour reference
   const unionAlphaPng = await sharp(Buffer.alloc(n * 3, 255), { raw: { width: cropW, height: cropH, channels: 3 } })
     .ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer();
   const whiteVis = await sharp(origResized).composite([{ input: unionAlphaPng }]).jpeg().toBuffer();
@@ -2252,7 +2252,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     }
     if (colorInfo) { colorInfo.redZonePx = redZonePx; colorInfo.garbagePx = garbagePx; }
   }
-  const pasteBuf = await sharp(pasteRaw, { raw: { width: cropW, height: cropH, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
+  const pasteBuf = await sharp(pasteRaw, { raw: { width: cropW, height: cropH, channels: 3 } }).png().toBuffer(); // PNG: lossless corrected paste
   // Applied view: exactly what gets pasted (colour-corrected figure + filled bg).
   const ccCut = await sharp(pasteBuf).ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer();
   const ccVis = await sharp({ create: { width: cropW, height: cropH, channels: 3, background: { r: 30, g: 30, b: 30 } } })
@@ -2402,7 +2402,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     crop.h = Math.min(H - crop.y, crop.h);
   }
 
-  const cropBuf = await sharp(baseBuf).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).jpeg({ quality: 95 }).toBuffer();
+  const cropBuf = await sharp(baseBuf).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer(); // PNG: pristine original crop (model input + colour reference)
 
   // Repair mode: white-out the target figure's SILHOUETTE inside the crop
   // (same trick Grok blended repair uses) — turns "replace" into "paint into
@@ -2473,7 +2473,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         }
         oldMaskPng = await sharp(Buffer.alloc(crop.w * crop.h * 3, 255), { raw: { width: crop.w, height: crop.h, channels: 3 } })
           .ensureAlpha().joinChannel(Buffer.from(hard), { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
-        sentBuf = await sharp(cropBuf).composite([{ input: oldMaskPng, left: 0, top: 0 }]).jpeg({ quality: 95 }).toBuffer();
+        sentBuf = await sharp(cropBuf).composite([{ input: oldMaskPng, left: 0, top: 0 }]).png().toBuffer(); // PNG: pristine model input
         whiteoutApplied = true;
       }
     } catch (err) {
@@ -2537,9 +2537,13 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       const { ART_STYLES } = require('./storyHelpers');
       const raw = ART_STYLES[ctx.artStyle];
       const txt = typeof raw === 'string' ? raw : (raw && raw.default) || '';
-      const first = (txt.match(/^[^.]*\./) || [''])[0].trim();
-      return first ? ` Match the illustration style of the first image: ${first}` : ' Match the illustration style and lighting.';
-    } catch { return ' Match the illustration style and lighting.'; }
+      // Send the FULL style description — NOT just the first sentence. The old
+      // first-sentence truncation dropped the crucial "photorealistic, real skin
+      // texture, never stylized" guidance for photo styles AND left the word
+      // "illustration", which pushed Qwen to a 3D render on photo scenes. Also
+      // say "medium" so the model keeps photo-as-photo / watercolor-as-watercolor.
+      return txt ? ` Match the exact visual style, medium and rendering of the first image: ${txt}` : ' Match the visual style and lighting of the first image.';
+    } catch { return ' Match the visual style and lighting of the first image.'; }
   })();
   const prompt = promptOverride
     || (params.repairMode
@@ -2693,7 +2697,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   // despeckled + dilated + feathered) — the model's incidental background
   // repaint inside the crop is discarded, so no rectangle seam. 'crop' mode
   // pastes the whole crop with a rectangular feather (debug/fallback).
-  const back = await sharp(outBufEarly).resize(crop.w, crop.h, { fit: 'fill' }).toBuffer();
+  const back = await sharp(outBufEarly).resize(crop.w, crop.h, { fit: 'fill' }).png().toBuffer(); // PNG: no JPEG re-encode on the paste source
   let feathered;
   let colorInfo = null;
 
@@ -2840,11 +2844,11 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     feathered = await sharp(back).ensureAlpha()
       .joinChannel(mask, { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
   }
-  const composed = await sharp(baseBuf).composite([{ input: feathered, left: crop.x, top: crop.y }]).jpeg({ quality: 95 }).toBuffer();
+  const composed = await sharp(baseBuf).composite([{ input: feathered, left: crop.x, top: crop.y }]).png().toBuffer(); // PNG: lossless final — no JPEG artifacts on the paste or the page
 
   const versionIndex = await saveTestVersion(
     ctx.storyId, 'scene', ctx.pageNumber,
-    `data:image/jpeg;base64,${composed.toString('base64')}`, experimentId
+    `data:image/png;base64,${composed.toString('base64')}`, experimentId
   );
   return {
     imageType: 'scene', versionIndex, characterName: ref.name, elapsedMs,

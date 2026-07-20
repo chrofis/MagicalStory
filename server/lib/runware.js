@@ -626,7 +626,7 @@ async function editWithQwen(prompt, referenceImages, options = {}) {
     width,
     height,
     numberResults: 1,
-    outputFormat: 'JPEG',
+    outputFormat: 'PNG', // lossless model output (was JPEG — every other runware call already uses PNG); the repair blend keeps PNG end-to-end
     includeCost: true,
     referenceImages: safeRefs,
   }];
