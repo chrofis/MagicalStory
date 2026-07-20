@@ -16882,6 +16882,7 @@ module.exports = {
   correctColorShift,
   harmonicBackgroundFill,
   _rgbToLab,
+  _labToRgb,
   _deltaE,
   _ccKMeans,
   fetchFigureHeadMaskPng,
