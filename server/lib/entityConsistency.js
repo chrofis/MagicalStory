@@ -1803,31 +1803,6 @@ async function extractCropFromImage(imageData, bbox, targetSize, padding = 0, op
     const width = metadata.width;
     const height = metadata.height;
 
-    // SAM cutout: when the detection mask for this figure is supplied, gate the
-    // page pixels to the figure silhouette (dest-in) BEFORE cropping, so the
-    // eval crop is the figure alone on white — no neighbours/background inside
-    // the rectangle. Skipped for forRegeneration crops (those are composited
-    // back and need the true rectangle). Same page bytes → mask dims == page
-    // dims; a mismatch or failure degrades to the rectangle (logged), never
-    // throws. Reuses the strip's mask-then-extract pattern (images.js dest-in).
-    let extractSource = imgBuffer;
-    let didMask = false;
-    if (mask && !forRegeneration) {
-      try {
-        const mMeta = await sharp(mask).metadata();
-        if (mMeta.width === width && mMeta.height === height) {
-          extractSource = await sharp(imgBuffer).ensureAlpha()
-            .composite([{ input: mask, blend: 'dest-in' }])
-            .png().toBuffer();
-          didMask = true;
-        } else {
-          log.warn(`[ENTITY-CROP] SAM mask ${mMeta.width}x${mMeta.height} != page ${width}x${height}; using rectangle crop`);
-        }
-      } catch (e) {
-        log.warn(`[ENTITY-CROP] SAM cutout failed (${e.message}); using rectangle crop`);
-      }
-    }
-
     // Convert normalized bbox to pixel coordinates
     const [ymin, xmin, ymax, xmax] = bbox;
     let x1 = Math.round(xmin * width);
@@ -1874,13 +1849,50 @@ async function extractCropFromImage(imageData, bbox, targetSize, padding = 0, op
     }
 
     // Extract crop (no resize if targetSize is null)
-    let sharpPipeline = sharp(extractSource)
+    let sharpPipeline = sharp(imgBuffer)
       .extract({
         left: x1,
         top: y1,
         width: cropW,
         height: cropH
       });
+
+    // SAM cutout: gate the crop to the figure silhouette so the eval sees the
+    // figure alone on white — no neighbours/background inside the rectangle.
+    // Done on the SMALL crop region (dest-in the same rect of the page-res mask),
+    // not on the full page — masking a small crop avoids a wasteful full-page
+    // PNG encode per crop. Skipped for forRegeneration crops (composited back,
+    // need the true rectangle). Same page bytes → mask dims == page dims; a
+    // mismatch or failure degrades to the rectangle (logged), never throws.
+    let didMask = false;
+    if (mask && !forRegeneration) {
+      try {
+        const mMeta = await sharp(mask).metadata();
+        if (mMeta.width === width && mMeta.height === height) {
+          const maskCrop = await sharp(mask)
+            .extract({ left: x1, top: y1, width: cropW, height: cropH })
+            .ensureAlpha()
+            .png()
+            .toBuffer();
+          const cropBuf = await sharpPipeline.toBuffer();
+          // Materialize the cutout to a buffer BEFORE the flatten/encode below.
+          // sharp reorders ops within one pipeline (flatten runs before
+          // composite), so a chained .composite().flatten() fills the masked-out
+          // area BLACK. A separate pipeline over the already-transparent buffer
+          // flattens to white correctly. Small crop → cheap (~tens of ms).
+          const maskedBuf = await sharp(cropBuf).ensureAlpha()
+            .composite([{ input: maskCrop, blend: 'dest-in' }])
+            .png()
+            .toBuffer();
+          sharpPipeline = sharp(maskedBuf);
+          didMask = true;
+        } else {
+          log.warn(`[ENTITY-CROP] SAM mask ${mMeta.width}x${mMeta.height} != page ${width}x${height}; using rectangle crop`);
+        }
+      } catch (e) {
+        log.warn(`[ENTITY-CROP] SAM cutout failed (${e.message}); using rectangle crop`);
+      }
+    }
 
     // Only resize if targetSize is specified
     if (targetSize) {
