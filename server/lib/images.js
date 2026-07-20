@@ -2889,6 +2889,20 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     }
     dets.push({ box: p.box, score: p.score, mask, bodyBox, gdinoBox: gdinoNorm, samApplied, maskVerdict });
   }
+  // Persist any SAM mask leak to the STORY log (not just Railway), so a blow-out
+  // is always findable later per-story instead of vanishing into container logs.
+  const leaks = dets.filter(d => d.maskVerdict === 'rejected-all-outside' || d.maskVerdict === 'mask-clipped-outside-box');
+  if (leaks.length) {
+    getCurrentLogger()?.warn?.('sam_mask_leak',
+      `${pageLabel}SAM mask leaked outside the DINO box on ${leaks.length}/${dets.length} figure(s) — kept the DINO box`,
+      null, { pageLabel, verdicts: dets.map(d => d.maskVerdict) });
+  }
+  const noMask = dets.filter(d => d.maskVerdict === 'no-mask');
+  if (dets.length >= 2 && noMask.length >= Math.ceil(dets.length * 0.6)) {
+    getCurrentLogger()?.warn?.('sam_unhealthy',
+      `${pageLabel}MobileSAM returned no mask for ${noMask.length}/${dets.length} figures — analyzer may be degraded (used DINO boxes)`,
+      null, { pageLabel });
+  }
   // Two masks ≈ the same figure → keep the higher-score one.
   for (let i = dets.length - 1; i >= 1; i--) {
     for (let j = 0; j < i; j++) {
@@ -3180,8 +3194,10 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
         return result;
       }
       log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}GroundingDINO backend returned nothing — falling back to Gemini`);
+      getCurrentLogger()?.warn?.('detection_fallback', `${pageLabel}figure detection fell back to Gemini — GroundingDINO returned nothing (analyzer cold/unhealthy?)`, null, { pageLabel, reason: gdinoDiag?.reason || 'no figures' });
     } catch (gdErr) {
       log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}GroundingDINO backend error (${gdErr.message}) — falling back to Gemini`);
+      getCurrentLogger()?.warn?.('detection_fallback', `${pageLabel}figure detection fell back to Gemini — GroundingDINO ERROR: ${gdErr.message} (analyzer down/unhealthy?)`, null, { pageLabel, error: gdErr.message });
     }
   }
 
