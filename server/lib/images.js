@@ -10366,11 +10366,15 @@ async function fetchFigureHeadMaskPng(cropJpegBuffer, bodyBoxInCrop, faceBoxInCr
   //              clip → captures ALL the hair; only the neck/body below is cut.
   //   'hairunion': figure ∩ (face box ∪ hairBox) — widen the clip with a hair
   //              box (opts.hairBox [x1,y1,x2,y2]).
-  const { onGeom = null, clipMode = 'facebox', hairBox = null } = opts;
+  const { onGeom = null, clipMode = 'facebox', hairBox = null, onFullMask = null } = opts;
   const [fx1, fy1, fx2, fy2] = faceBoxInCrop;
   if (onGeom) { try { onGeom({ samBox: bodyBoxInCrop, faceClip: faceBoxInCrop, hairBox: clipMode === 'hairunion' ? hairBox : null, clipMode }); } catch { /* viz only */ } }
   const figPng = await maskFetch(cropJpegBuffer, bodyBoxInCrop, {});
   if (!figPng) return null;
+  // Expose the FULL unclipped figure silhouette (before the head clip) so the
+  // caller can show it — disconnected SAM islands are visible here, before the
+  // connected-component filter drops them.
+  if (onFullMask) { try { await onFullMask(figPng); } catch { /* viz only */ } }
   const n = outW * outH;
   const raw = await sharp(figPng).resize(outW, outH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
   const s = Math.max(1, Math.round(raw.length / n));

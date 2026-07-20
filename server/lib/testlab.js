@@ -2444,7 +2444,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         ];
       }
       oldMaskPng = params._faceMode
-        ? await fetchFigureHeadMask(cropBuf, bodyBoxInCrop, boxInCrop, crop.w, crop.h, { onGeom: (g) => { params._samGeom = g; }, clipMode: params.headClipMode || 'bottom', hairBox: params._hairBoxInCrop })
+        ? await fetchFigureHeadMask(cropBuf, bodyBoxInCrop, boxInCrop, crop.w, crop.h, { onGeom: (g) => { params._samGeom = g; }, onFullMask: (png) => { params._fullSamR1 = png; }, clipMode: params.headClipMode || 'bottom', hairBox: params._hairBoxInCrop })
         : await fetchMaskWithRetry(cropBuf, boxInCrop, 5, params._maskPoints || {});
       if (oldMaskPng) {
         // Rebuild the whiteout mask BINARIZED (no soft SAM edges = no
@@ -2612,6 +2612,20 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       await addStep('SAM prompt: body box (yellow=figure) ∩ face box (cyan=clip)', `data:image/jpeg;base64,${viz.toString('base64')}`);
     } catch (err) { log.warn(`[TESTLAB] SAM-geom viz failed: ${err.message}`); }
   }
+  // FULL SAM (unclipped): the whole-figure silhouette before the head clip and
+  // before the disconnected-island filter — so a stray fragment is visible here.
+  if (params._fullSamR1) {
+    try {
+      const nn = crop.w * crop.h;
+      const alpha = await sharp(params._fullSamR1).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+      const st = Math.max(1, Math.round(alpha.length / nn));
+      const abin = Buffer.alloc(nn);
+      for (let i = 0; i < nn; i++) abin[i] = alpha[i * st] > 128 ? 255 : 0;
+      const figPng = await sharp(cropBuf).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().joinChannel(abin, { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
+      const cut = await sharp({ create: { width: crop.w, height: crop.h, channels: 3, background: { r: 30, g: 30, b: 30 } } }).composite([{ input: figPng }]).jpeg({ quality: 95 }).toBuffer();
+      await addStep('FULL SAM round 1 (unclipped figure — before head clip & island filter)', `data:image/jpeg;base64,${cut.toString('base64')}`);
+    } catch (err) { log.warn(`[TESTLAB] full-SAM viz failed: ${err.message}`); }
+  }
   await addStep('input 2: character reference', ref.photoUrl);
   if (poseRefBuf) await addStep('input 3: pose/gaze reference (blurred original)', `data:image/jpeg;base64,${poseRefBuf.toString('base64')}`);
   await addStep('model raw output', `data:image/jpeg;base64,${outBufEarly.toString('base64')}`);
@@ -2731,7 +2745,19 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
         const fresh = params._r2BodyBox;
         const r2Body = fresh || params._bodyBoxInCrop || [0, 0, crop.w, crop.h];
         let g2 = null;
-        const m = await fetchFigureHeadMask(buf, r2Body, boxInCrop, crop.w, crop.h, { onGeom: (g) => { g2 = g; }, clipMode: params.headClipMode || 'bottom', hairBox: params._hairBoxInCrop });
+        const emitFullSam = async (png) => {
+          try {
+            const nn = crop.w * crop.h;
+            const alpha = await sharp(png).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+            const st = Math.max(1, Math.round(alpha.length / nn));
+            const abin = Buffer.alloc(nn);
+            for (let i = 0; i < nn; i++) abin[i] = alpha[i * st] > 128 ? 255 : 0;
+            const figPng = await sharp(buf).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().joinChannel(abin, { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
+            const cut = await sharp({ create: { width: crop.w, height: crop.h, channels: 3, background: { r: 30, g: 30, b: 30 } } }).composite([{ input: figPng }]).jpeg({ quality: 95 }).toBuffer();
+            await addStep('FULL SAM round 2 (unclipped figure — before head clip & island filter)', `data:image/jpeg;base64,${cut.toString('base64')}`);
+          } catch { /* viz only */ }
+        };
+        const m = await fetchFigureHeadMask(buf, r2Body, boxInCrop, crop.w, crop.h, { onGeom: (g) => { g2 = g; }, onFullMask: emitFullSam, clipMode: params.headClipMode || 'bottom', hairBox: params._hairBoxInCrop });
         if (g2) {
           try {
             const rect = (b, st, d) => b ? `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="none" stroke="${st}" stroke-width="3"${d ? ` stroke-dasharray="${d}"` : ''}/>` : '';
