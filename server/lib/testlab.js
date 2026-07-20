@@ -1885,6 +1885,36 @@ async function fetchFaceHeadMask(buf, faceBox, cropW, cropH, opts = {}) {
     opts);
 }
 
+// Keep only ONE connected component of a binary mask: the one containing the
+// seed (sx,sy) — or, if the seed isn't on the mask, the LARGEST component.
+// Drops disconnected islands (stray SAM fragments of a neighbouring figure).
+// Returns Uint8Array(w*h) with 255 for kept pixels.
+function _faceConnectedComponent(mask, W, H, sx, sy) {
+  const n = W * H;
+  const on = new Uint8Array(n);
+  for (let i = 0; i < n; i++) on[i] = mask[i] > 128 ? 1 : 0;
+  const keep = new Uint8Array(n);
+  const flood = (start, visited) => {
+    const comp = [start]; const stack = [start]; visited[start] = 1;
+    while (stack.length) {
+      const k = stack.pop(); const x = k % W, y = (k / W) | 0;
+      if (x > 0 && on[k - 1] && !visited[k - 1]) { visited[k - 1] = 1; stack.push(k - 1); comp.push(k - 1); }
+      if (x < W - 1 && on[k + 1] && !visited[k + 1]) { visited[k + 1] = 1; stack.push(k + 1); comp.push(k + 1); }
+      if (y > 0 && on[k - W] && !visited[k - W]) { visited[k - W] = 1; stack.push(k - W); comp.push(k - W); }
+      if (y < H - 1 && on[k + W] && !visited[k + W]) { visited[k + W] = 1; stack.push(k + W); comp.push(k + W); }
+    }
+    return comp;
+  };
+  const seedIdx = (sx >= 0 && sy >= 0 && sx < W && sy < H && on[sy * W + sx]) ? sy * W + sx : -1;
+  const visited = new Uint8Array(n);
+  if (seedIdx >= 0) { for (const j of flood(seedIdx, visited)) keep[j] = 255; return keep; }
+  // seed off the mask → keep the largest component
+  let best = [];
+  for (let i = 0; i < n; i++) { if (on[i] && !visited[i]) { const c = flood(i, visited); if (c.length > best.length) best = c; } }
+  for (const j of best) keep[j] = 255;
+  return keep;
+}
+
 // Blur a binary mask, then threshold the blurred BYTES in JS.
 // sharp's CHAINED .blur(σ).threshold(t) does NOT threshold the blurred pixels —
 // it returns a slightly ERODED mask instead of the intended dilation (verified:
@@ -2046,15 +2076,32 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const union = Buffer.alloc(n);
   const newBin = Buffer.alloc(n);
   const redMask = Buffer.alloc(n);
-  let interPx = 0, unionPx = 0, redPx = 0;
   for (let i = 0; i < n; i++) {
     const o = (oldA[i] || 0) > 128 ? 255 : 0;
     const w = (newA[i] || 0) > 128 ? 255 : 0;
     union[i] = Math.max(o, w);
     newBin[i] = w;
-    if (o && w) interPx++;
-    if (o || w) unionPx++;
-    if (o && !w) { redMask[i] = 255; redPx++; }
+  }
+  // Drop disconnected islands — keep ONLY the union component that contains the
+  // FACE. A stray SAM fragment (e.g. a neighbour's clothing the crop caught)
+  // would otherwise get pasted AND fold into the colour-match statistics,
+  // throwing the tone off. Filtering oldA/newA here also cleans every downstream
+  // consumer (colour ref, red zone, figExclude).
+  let interPx = 0, unionPx = 0, redPx = 0;
+  {
+    const cxF = boxInCrop?.length === 4 ? Math.round((boxInCrop[0] + boxInCrop[2]) / 2) : (cropW >> 1);
+    const cyF = boxInCrop?.length === 4 ? Math.round((boxInCrop[1] + boxInCrop[3]) / 2) : (cropH >> 1);
+    const keep = _faceConnectedComponent(union, cropW, cropH, cxF, cyF);
+    let dropped = 0;
+    for (let i = 0; i < n; i++) {
+      if (!keep[i]) { if (union[i]) dropped++; union[i] = 0; newBin[i] = 0; oldA[i] = 0; newA[i] = 0; }
+      const o = oldA[i] > 128, w = newBin[i] > 128;
+      redMask[i] = (o && !w) ? 255 : 0;
+      if (o && w) interPx++;
+      if (o || w) unionPx++;
+      if (o && !w) redPx++;
+    }
+    if (dropped > 0) log.info(`[TESTLAB] dropped ${dropped}px disconnected mask islands (kept the face component)`);
   }
   const iou = unionPx > 0 ? interPx / unionPx : 0;
   if (iou < 0.55) {
