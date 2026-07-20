@@ -2349,15 +2349,16 @@ async function _binMaskFromBuffer(buf, W, H) {
   } catch { return null; }
 }
 
-// Connected-components clean-up + blow-out check for a box-prompted SAM mask.
-// SAM's box prompt makes /figure-mask UNION every blob inside the box, so on
-// flat painterly art with touching figures the silhouette grabs neighbours /
-// background — showing up as DISCONNECTED regions and/or a body box far larger
-// than the tight (accurate) DINO box. Rule (user 2026-07-20): trust the mask
-// ONLY when it is ONE connected figure no more than ~10% larger than the DINO
-// box; always drop specks; otherwise REJECT the mask and fall back to the DINO
-// box. Mutates the mask to its largest component (recomputes bbox/area/pngBuf)
-// and returns { over, disconnected } for the caller's accept/reject decision.
+// Clip a box-prompted SAM mask to its DINO box. The DINO box is the accurate
+// figure extent; SAM refines it to a silhouette. A DISCONNECTED mask is NOT an
+// error — an occluded figure (another figure or a prop in front) is correctly
+// segmented into pieces that all sit INSIDE its box. The only real failure is a
+// piece that lands OUTSIDE the box (SAM grabbed a neighbour, or a degraded
+// analyzer returned garbage). Rule (user 2026-07-20): KEEP every component that
+// is mostly inside the DINO box (occlusion included); DROP components mostly
+// outside it. Mutates the mask to the kept (inside) components and returns
+// { keptBox, droppedOutside }. keptBox === null → nothing inside the box, so the
+// caller keeps the tight DINO box as the bodyBox.
 async function _cleanMaskAndCheck(mask, gdinoBoxPx) {
   const { alpha, width: W, height: H } = mask;
   const lab = new Int32Array(W * H); let n = 0; const comps = [];
@@ -2374,18 +2375,32 @@ async function _cleanMaskAndCheck(mask, gdinoBoxPx) {
     }
     comps.push({ label: n, area, bbox: [minx, miny, maxx + 1, maxy + 1] });
   }
-  if (!comps.length) return { over: Infinity, disconnected: 0 };
-  comps.sort((a, b) => b.area - a.area);
-  const main = comps[0];
-  // A "disconnected" region = a non-main blob big enough to be a real leak
-  // (>3% of the main figure), not a 1-pixel hole/speck.
-  const disconnected = comps.filter(c => c.label !== main.label && c.area > main.area * 0.03).length;
-  // Trim the mask to the main component (drop every speck + leak).
-  for (let i = 0; i < W * H; i++) if (alpha[i] && lab[i] !== main.label) alpha[i] = 0;
-  mask.bbox = main.bbox; mask.area = main.area; mask.pngBuf = await _maskToPng(mask);
-  const boxArea = Math.max(1, (gdinoBoxPx[2] - gdinoBoxPx[0]) * (gdinoBoxPx[3] - gdinoBoxPx[1]));
-  const mArea = (main.bbox[2] - main.bbox[0]) * (main.bbox[3] - main.bbox[1]);
-  return { over: mArea / boxArea - 1, disconnected };
+  if (!comps.length) return { keptBox: null, droppedOutside: 0 };
+  // Fraction of a component's bbox area that overlaps the DINO box, with a small
+  // tolerance so a figure that legitimately overhangs the tight box a little is
+  // still "inside".
+  const [bx0, by0, bx1, by1] = gdinoBoxPx;
+  const tol = 0.12 * Math.max(bx1 - bx0, by1 - by0);
+  const fracInside = (b) => {
+    const ix = Math.max(0, Math.min(b[2], bx1 + tol) - Math.max(b[0], bx0 - tol));
+    const iy = Math.max(0, Math.min(b[3], by1 + tol) - Math.max(b[1], by0 - tol));
+    const a = (b[2] - b[0]) * (b[3] - b[1]);
+    return a > 0 ? (ix * iy) / a : 0;
+  };
+  const drop = new Set(); const kept = []; let droppedOutside = 0;
+  for (const c of comps) {
+    if (fracInside(c.bbox) >= 0.5) kept.push(c);
+    else { drop.add(c.label); if (c.area > 50) droppedOutside++; }  // >50px = a real outside piece, not a speck
+  }
+  if (!kept.length) return { keptBox: null, droppedOutside };       // all outside → use the DINO box
+  if (drop.size) {
+    for (let i = 0; i < W * H; i++) if (alpha[i] && drop.has(lab[i])) alpha[i] = 0;
+  }
+  let mnx = W, mny = H, mxx = -1, mxy = -1;
+  for (const c of kept) { mnx = Math.min(mnx, c.bbox[0]); mny = Math.min(mny, c.bbox[1]); mxx = Math.max(mxx, c.bbox[2]); mxy = Math.max(mxy, c.bbox[3]); }
+  mask.bbox = [mnx, mny, mxx, mxy]; mask.area = kept.reduce((s, c) => s + c.area, 0);
+  if (drop.size) mask.pngBuf = await _maskToPng(mask);
+  return { keptBox: mask.bbox, droppedOutside };
 }
 
 // GroundingDINO text→box for a set of prompts.
@@ -2859,12 +2874,17 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     const gdinoNorm = _pxBoxToNorm(p.box, W, H);
     let bodyBox = gdinoNorm, mask = null, samApplied = false, maskVerdict = 'no-mask';
     if (rawMask) {
-      const { over, disconnected } = await _cleanMaskAndCheck(rawMask, p.box);
-      if (disconnected === 0 && over <= 0.10) {
-        mask = rawMask; bodyBox = _pxBoxToNorm(rawMask.bbox, W, H); samApplied = true; maskVerdict = 'mask-ok';
+      // Keep mask parts INSIDE the DINO box (occlusion is fine); drop parts
+      // outside it (neighbour-grab / degraded-analyzer garbage). bodyBox = the
+      // kept parts; if nothing is inside, keep the tight DINO box.
+      const { keptBox, droppedOutside } = await _cleanMaskAndCheck(rawMask, p.box);
+      if (keptBox) {
+        mask = rawMask; bodyBox = _pxBoxToNorm(keptBox, W, H); samApplied = true;
+        maskVerdict = droppedOutside ? 'mask-clipped-outside-box' : 'mask-ok';
+        if (droppedOutside) log.debug(`[GDINO-DETECT] ${pageLabel}dropped ${droppedOutside} SAM component(s) outside the DINO box`);
       } else {
-        maskVerdict = disconnected > 0 ? 'rejected-disconnected' : 'rejected-over-10pct';
-        log.debug(`[GDINO-DETECT] ${pageLabel}SAM mask rejected (${maskVerdict}, over=${Math.round(over * 100)}%, disc=${disconnected}) — keeping DINO box`);
+        maskVerdict = 'rejected-all-outside';
+        log.debug(`[GDINO-DETECT] ${pageLabel}SAM mask entirely outside the DINO box — keeping DINO box`);
       }
     }
     dets.push({ box: p.box, score: p.score, mask, bodyBox, gdinoBox: gdinoNorm, samApplied, maskVerdict });
