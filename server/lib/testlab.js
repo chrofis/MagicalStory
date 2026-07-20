@@ -1972,7 +1972,7 @@ async function _interiorSeedPoints(maskPng, w, h) {
   } catch { return []; }
 }
 
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, seamClose = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -2285,42 +2285,6 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     }
     if (bgPx > 0) log.info(`[TESTLAB] red-zone: colour-matched ${bgPx}px background (${bgCent.length} materials) to the scene, ${garbagePx}px garbage bg-filled`);
     if (colorInfo) { colorInfo.redZonePx = redZonePx; colorInfo.garbagePx = garbagePx; colorInfo.bgMatchedPx = bgPx; }
-  }
-  // POISSON/HARMONIC SEAM-CLOSE (face-safe). A per-material MEAN shift matches
-  // averages, not the local boundary, so an ~8 ΔE step survives right on the
-  // paste edge (the visible rim). This pins the OUTER boundary to the original
-  // and diffuses the correction inward — but holds the FIGURE (newDil) at ZERO
-  // correction, so only the background margin ramps and the face is never
-  // shifted. Result: the boundary gradient is continuous → the rim drops.
-  // Runs regardless of the figure colour-shift — it only touches the margin.
-  if (seamClose !== false) {
-    const { _rgbToLab: r2l, _labToRgb: l2r } = require('./images');
-    const isMask = new Uint8Array(n), prot = new Uint8Array(n);
-    for (let i = 0; i < n; i++) { isMask[i] = alpha1[i] > 128 ? 1 : 0; prot[i] = newDil[i] > 128 ? 1 : 0; }
-    const cL = new Float32Array(n), ca = new Float32Array(n), cb = new Float32Array(n);
-    const oL = new Float32Array(n), oa = new Float32Array(n), ob = new Float32Array(n);
-    for (let i = 0; i < n; i++) { if (!isMask[i]) continue; let l = r2l(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]); cL[i] = l[0]; ca[i] = l[1]; cb[i] = l[2]; l = r2l(origRaw[i * 3], origRaw[i * 3 + 1], origRaw[i * 3 + 2]); oL[i] = l[0]; oa[i] = l[1]; ob[i] = l[2]; }
-    const fL = new Float32Array(n), fa = new Float32Array(n), fb = new Float32Array(n); const fixed = new Uint8Array(n);
-    for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
-      const i = y * cropW + x; if (!isMask[i]) continue;
-      let oc = 0, sL = 0, sa = 0, sb = 0;
-      if (x > 0 && !isMask[i - 1]) { oc++; sL += oL[i - 1]; sa += oa[i - 1]; sb += ob[i - 1]; }
-      if (x < cropW - 1 && !isMask[i + 1]) { oc++; sL += oL[i + 1]; sa += oa[i + 1]; sb += ob[i + 1]; }
-      if (y > 0 && !isMask[i - cropW]) { oc++; sL += oL[i - cropW]; sa += oa[i - cropW]; sb += ob[i - cropW]; }
-      if (y < cropH - 1 && !isMask[i + cropW]) { oc++; sL += oL[i + cropW]; sa += oa[i + cropW]; sb += ob[i + cropW]; }
-      if (oc) { fL[i] = sL / oc - cL[i]; fa[i] = sa / oc - ca[i]; fb[i] = sb / oc - cb[i]; fixed[i] = 1; } // outer boundary → match original
-      else if (prot[i]) { fixed[i] = 1; } // figure interior → held at 0 (untouched)
-    }
-    for (let it = 0; it < 300; it++) for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
-      const i = y * cropW + x; if (!isMask[i] || fixed[i]) continue;
-      let c = 0, aL = 0, aa = 0, ab = 0;
-      if (x > 0 && isMask[i - 1]) { c++; aL += fL[i - 1]; aa += fa[i - 1]; ab += fb[i - 1]; }
-      if (x < cropW - 1 && isMask[i + 1]) { c++; aL += fL[i + 1]; aa += fa[i + 1]; ab += fb[i + 1]; }
-      if (y > 0 && isMask[i - cropW]) { c++; aL += fL[i - cropW]; aa += fa[i - cropW]; ab += fb[i - cropW]; }
-      if (y < cropH - 1 && isMask[i + cropW]) { c++; aL += fL[i + cropW]; aa += fa[i + cropW]; ab += fb[i + cropW]; }
-      if (c) { fL[i] = aL / c; fa[i] = aa / c; fb[i] = ab / c; }
-    }
-    for (let i = 0; i < n; i++) { if (!isMask[i] || prot[i]) continue; const rgb = l2r(cL[i] + fL[i], ca[i] + fa[i], cb[i] + fb[i]); pasteRaw[i * 3] = rgb[0]; pasteRaw[i * 3 + 1] = rgb[1]; pasteRaw[i * 3 + 2] = rgb[2]; }
   }
   const pasteBuf = await sharp(pasteRaw, { raw: { width: cropW, height: cropH, channels: 3 } }).png().toBuffer(); // PNG: lossless corrected paste
   // Applied view: exactly what gets pasted (colour-corrected figure + filled bg).
@@ -2858,7 +2822,6 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
           ]
       ) : null,
       colorCorrect: params.colorCorrect !== false,
-      seamClose: params.seamClose !== false,
     });
     feathered = blend.feathered;
     colorInfo = blend.colorInfo || null;
