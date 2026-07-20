@@ -2349,6 +2349,45 @@ async function _binMaskFromBuffer(buf, W, H) {
   } catch { return null; }
 }
 
+// Connected-components clean-up + blow-out check for a box-prompted SAM mask.
+// SAM's box prompt makes /figure-mask UNION every blob inside the box, so on
+// flat painterly art with touching figures the silhouette grabs neighbours /
+// background — showing up as DISCONNECTED regions and/or a body box far larger
+// than the tight (accurate) DINO box. Rule (user 2026-07-20): trust the mask
+// ONLY when it is ONE connected figure no more than ~10% larger than the DINO
+// box; always drop specks; otherwise REJECT the mask and fall back to the DINO
+// box. Mutates the mask to its largest component (recomputes bbox/area/pngBuf)
+// and returns { over, disconnected } for the caller's accept/reject decision.
+async function _cleanMaskAndCheck(mask, gdinoBoxPx) {
+  const { alpha, width: W, height: H } = mask;
+  const lab = new Int32Array(W * H); let n = 0; const comps = [];
+  for (let i = 0; i < W * H; i++) {
+    if (!alpha[i] || lab[i]) continue;
+    n++; let area = 0, minx = W, miny = H, maxx = -1, maxy = -1; const st = [i]; lab[i] = n;
+    while (st.length) {
+      const k = st.pop(); area++; const x = k % W, y = (k / W) | 0;
+      if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y;
+      if (x > 0 && alpha[k - 1] && !lab[k - 1]) { lab[k - 1] = n; st.push(k - 1); }
+      if (x < W - 1 && alpha[k + 1] && !lab[k + 1]) { lab[k + 1] = n; st.push(k + 1); }
+      if (y > 0 && alpha[k - W] && !lab[k - W]) { lab[k - W] = n; st.push(k - W); }
+      if (y < H - 1 && alpha[k + W] && !lab[k + W]) { lab[k + W] = n; st.push(k + W); }
+    }
+    comps.push({ label: n, area, bbox: [minx, miny, maxx + 1, maxy + 1] });
+  }
+  if (!comps.length) return { over: Infinity, disconnected: 0 };
+  comps.sort((a, b) => b.area - a.area);
+  const main = comps[0];
+  // A "disconnected" region = a non-main blob big enough to be a real leak
+  // (>3% of the main figure), not a 1-pixel hole/speck.
+  const disconnected = comps.filter(c => c.label !== main.label && c.area > main.area * 0.03).length;
+  // Trim the mask to the main component (drop every speck + leak).
+  for (let i = 0; i < W * H; i++) if (alpha[i] && lab[i] !== main.label) alpha[i] = 0;
+  mask.bbox = main.bbox; mask.area = main.area; mask.pngBuf = await _maskToPng(mask);
+  const boxArea = Math.max(1, (gdinoBoxPx[2] - gdinoBoxPx[0]) * (gdinoBoxPx[3] - gdinoBoxPx[1]));
+  const mArea = (main.bbox[2] - main.bbox[0]) * (main.bbox[3] - main.bbox[1]);
+  return { over: mArea / boxArea - 1, disconnected };
+}
+
 // GroundingDINO text→box for a set of prompts.
 async function _gdinoDetect(imageDataUri, prompts) {
   try {
@@ -2389,30 +2428,6 @@ async function _mobilesamMaskFull(imageDataUri, boxPx, W, H) {
     if (mask) mask.pngBuf = pngBuf; // kept for the overlay's cutout strip (never persisted)
     return mask;
   } catch (e) { log.warn(`⚠️ [GDINO-DETECT] mask failed: ${e.message}`); return null; }
-}
-
-// MobileSAM point→mask on the full page (points in full-page pixel coords, all
-// positive). Used by the blown-mask guard to re-derive a figure silhouette from
-// its accurate head point when the box-prompted mask exploded — /figure-mask
-// UNIONS every mask a box prompt returns, so touching neighbours / background
-// leak into the box mask on flat painterly art. A point prompt segments only
-// the figure under the point.
-async function _mobilesamMaskPoints(imageDataUri, pointsPx, W, H) {
-  try {
-    const res = await fetch(`${_photoAnalyzerUrl()}/figure-mask`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: imageDataUri, points: pointsPx, point_labels: pointsPx.map(() => 1) }),
-      signal: AbortSignal.timeout(150_000),
-    });
-    if (!res.ok) return null;
-    const j = await res.json();
-    const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
-    if (!j?.success || !m || !(j.fill_pixels > 0)) return null;
-    const pngBuf = Buffer.from(m[1], 'base64');
-    const mask = await _binMaskFromBuffer(pngBuf, W, H);
-    if (mask) mask.pngBuf = pngBuf;
-    return mask;
-  } catch (e) { log.warn(`⚠️ [GDINO-DETECT] point-mask failed: ${e.message}`); return null; }
 }
 
 /**
@@ -2831,16 +2846,28 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   };
   diag.femaleBoxes = femaleBoxes.map(f => ({ box: f.box.map(Math.round), score: +f.score.toFixed(3) }));
 
-  // Stage 2 — MobileSAM silhouette per person box; bodyBox = mask bounds.
+  // Stage 2 — MobileSAM silhouette per person box, VALIDATED against the DINO
+  // box. The DINO box is tight/accurate; SAM only refines it to a silhouette.
+  // We accept the mask (and use its bounds as bodyBox) ONLY when it is one
+  // connected figure ≤10% larger than the DINO box; otherwise SAM over-segmented
+  // (grabbed a neighbour / background — disconnected or blown up) and we keep the
+  // tight DINO box. _cleanMaskAndCheck also trims the mask to its largest
+  // component (drops specks) so an accepted mask is clean for the cutout.
   const dets = [];
   for (const p of persons) {
-    const mask = await _mobilesamMaskFull(imageDataUri, p.box, W, H);
-    dets.push({
-      box: p.box, score: p.score, mask,
-      bodyBox: mask ? _pxBoxToNorm(mask.bbox, W, H) : _pxBoxToNorm(p.box, W, H),
-      gdinoBox: _pxBoxToNorm(p.box, W, H),
-      samApplied: !!mask,
-    });
+    const rawMask = await _mobilesamMaskFull(imageDataUri, p.box, W, H);
+    const gdinoNorm = _pxBoxToNorm(p.box, W, H);
+    let bodyBox = gdinoNorm, mask = null, samApplied = false, maskVerdict = 'no-mask';
+    if (rawMask) {
+      const { over, disconnected } = await _cleanMaskAndCheck(rawMask, p.box);
+      if (disconnected === 0 && over <= 0.10) {
+        mask = rawMask; bodyBox = _pxBoxToNorm(rawMask.bbox, W, H); samApplied = true; maskVerdict = 'mask-ok';
+      } else {
+        maskVerdict = disconnected > 0 ? 'rejected-disconnected' : 'rejected-over-10pct';
+        log.debug(`[GDINO-DETECT] ${pageLabel}SAM mask rejected (${maskVerdict}, over=${Math.round(over * 100)}%, disc=${disconnected}) — keeping DINO box`);
+      }
+    }
+    dets.push({ box: p.box, score: p.score, mask, bodyBox, gdinoBox: gdinoNorm, samApplied, maskVerdict });
   }
   // Two masks ≈ the same figure → keep the higher-score one.
   for (let i = dets.length - 1; i >= 1; i--) {
@@ -2905,46 +2932,10 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     if (holder) holder.face = f;
   }
 
-  // Blown-mask guard (2026-07-20). MobileSAM's box prompt makes /figure-mask
-  // UNION every salient blob in/around the box, so on flat painterly art with
-  // touching figures the silhouette grabs neighbours / background and
-  // bodyBox = mask bounds EXPLODES (observed 2.1×–4.2× the tight DINO box; a
-  // whole-frame box breaks text placement AND character repair — the repair
-  // targets the figure box, so a blown box has no figure to fix). The paired
-  // head faceBox is accurate, so for any samApplied det whose mask is ≥1.6× its
-  // DINO box, re-derive the silhouette by POINT-prompting SAM from the head
-  // (+ a torso point one head-height below the chin). If the point mask still
-  // blows out or fails, drop the mask and keep the tight gdinoBox — exactly what
-  // samApplied=false dets already do correctly (they were verified accurate).
-  // Runs before Stage-4 identity so the corrected boxes feed layout matching.
-  // grounding-dino path only; the Gemini bbox path never reaches here.
-  const _normArea = (b) => Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
-  const BLOWN_RATIO = 1.6;
-  for (const d of dets) {
-    if (!d.samApplied) continue;                       // samApplied=false already uses the tight gdinoBox
-    const gA = _normArea(d.gdinoBox);
-    if (gA <= 0 || _normArea(d.bodyBox) / gA < BLOWN_RATIO) continue;
-    // A blown mask ALWAYS gets corrected. With a paired head we first try the
-    // tighter point-prompt silhouette (feet-inclusive, best for repair); with no
-    // face — or if the point mask still blows out / fails — we drop the mask and
-    // fall back to the tight gdinoBox (verified-correct, same as samApplied=false).
-    let fixed = false;
-    if (d.face) {
-      const fb = d.face.box; // px [x0,y0,x1,y1]
-      const headCx = Math.round((fb[0] + fb[2]) / 2), headCy = Math.round((fb[1] + fb[3]) / 2);
-      const faceH = fb[3] - fb[1];
-      const torsoY = Math.min(H - 1, Math.round(fb[3] + faceH * 1.2));
-      const pmask = await _mobilesamMaskPoints(imageDataUri, [[headCx, headCy], [headCx, torsoY]], W, H);
-      if (pmask) {
-        const newNorm = _pxBoxToNorm(pmask.bbox, W, H);
-        if (_normArea(newNorm) > 0 && _normArea(newNorm) / gA < BLOWN_RATIO) {
-          d.mask = pmask; d.bodyBox = newNorm; d.blownMaskFixed = 'point-sam'; fixed = true;
-        }
-      }
-    }
-    if (!fixed) { d.mask = null; d.bodyBox = d.gdinoBox; d.blownMaskFixed = d.face ? 'gdino-fallback' : 'gdino-fallback-noface'; }
-    log.debug(`[GDINO-DETECT] ${pageLabel}blown mask corrected → ${d.blownMaskFixed}`);
-  }
+  // NOTE: blow-out handling moved UPSTREAM to Stage 2 (_cleanMaskAndCheck) —
+  // a SAM mask that is disconnected or >10% larger than its DINO box is rejected
+  // at creation and the tight DINO box is used, so no box ever reaches here
+  // blown. (Replaced the earlier point-prompt guard, 2026-07-20.)
 
   // Stage 4 — identity. Primary: Set-of-Mark — letter badges are drawn on the
   // detected figures and Gemini Flash answers WHICH letter is WHICH character
@@ -3009,7 +3000,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       bodyBox: d.bodyBox,
       gdinoBox: d.gdinoBox,
       samApplied: d.samApplied,
-      blownMaskFixed: d.blownMaskFixed,   // 'point-sam' | 'gdino-fallback' | 'gdino-fallback-noface' | undefined — blown-mask guard outcome
+      maskVerdict: d.maskVerdict,   // 'mask-ok' | 'rejected-disconnected' | 'rejected-over-10pct' | 'no-mask' — SAM mask validation vs DINO box
       _faceSource: d.face ? 'dino' : undefined,
       _faceScore: d.face ? +d.face.score.toFixed(3) : undefined,
       confidence: name === 'UNKNOWN' ? 'low' : d.score >= 0.6 ? 'high' : d.score >= 0.4 ? 'medium' : 'low',

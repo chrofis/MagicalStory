@@ -62,7 +62,16 @@ The composite's all-frontal lineup reads flatter than a direct render because th
 - Lever lives in `coverComposite.js generateCoverViaComposite({orient})`, threaded through `coverIterate.js` (`options.orient`) and the Test Lab `cover` stage (`params.orient`). Reverses the earlier "every cover figure faces the reader" decision (coverComposite.js ~720) **for outer figures only** — the centre still favours the viewer.
 - **Feet-crop regression (fixed 2026-07-19):** first turn-prompt pass cropped the CENTRAL cluster at the shins (turn + "pulling close" made Grok redraw them larger/lower, feet off the bottom edge; once pass-1 crops, the cutout can't recover shoes). Fixed with a per-pose `feetClause` ("keep the whole figure head-to-feet at the same scale, both feet + footwear visible, never crop at ankles/shins/knees, do not enlarge past the bottom edge") appended to every POSE line — universal (all modes). Re-run: all five shod and full-length in both turn variants.
 
-### Figure-detection blown mask — box-prompt union (✅ FIXED 2026-07-20)
+### Figure-detection blown mask — REJECT rule (✅ 2026-07-20, revised)
+The point-prompt-from-head approach was replaced (user preference) with a simpler validation at
+Stage 2 (`server/lib/images.js` `_cleanMaskAndCheck`): the DINO box is trusted; a box-prompted SAM
+mask is ACCEPTED (its bounds become `bodyBox`) ONLY when it is ONE connected figure ≤10% larger than
+the DINO box. Specks are always trimmed (largest connected component kept). If the mask has a real
+disconnected region (>3% of the main figure) OR exceeds the DINO box by >10%, it is REJECTED and the
+tight DINO box is used as `bodyBox`. Output field `maskVerdict` = mask-ok | rejected-disconnected |
+rejected-over-10pct | no-mask. grounding-dino path only; Gemini bbox untouched. (Historical detail below.)
+
+### Figure-detection blown mask — box-prompt union (root cause, 2026-07-20)
 Local grounding-dino path: MobileSAM is BOX-prompted per DINO person box and `/figure-mask`
 UNIONS every mask it returns. On flat painterly art (watercolour/oil) with touching figures the
 silhouette grabs neighbours + background, so `bodyBox = mask bounds` EXPLODES — measured 2.1×–4.2×
