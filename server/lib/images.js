@@ -2899,8 +2899,8 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   }
   const noMask = dets.filter(d => d.maskVerdict === 'no-mask');
   if (dets.length >= 2 && noMask.length >= Math.ceil(dets.length * 0.6)) {
-    getCurrentLogger()?.warn?.('sam_unhealthy',
-      `${pageLabel}MobileSAM returned no mask for ${noMask.length}/${dets.length} figures — analyzer may be degraded (used DINO boxes)`,
+    getCurrentLogger()?.warn?.('sam_no_mask',
+      `${pageLabel}MobileSAM returned no segmentation for ${noMask.length}/${dets.length} figures — mask service unavailable or overloaded (used DINO boxes)`,
       null, { pageLabel });
   }
   // Two masks ≈ the same figure → keep the higher-score one.
