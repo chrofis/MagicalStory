@@ -1978,7 +1978,7 @@ async function _interiorSeedPoints(maskPng, w, h) {
   } catch { return []; }
 }
 
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -2299,12 +2299,20 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     .composite([{ input: ccCut }]).jpeg().toBuffer();
   await addStep(`pasted region (colour${colorInfo ? ` ΔE ${colorInfo.deltaEBefore}, seam ${colorInfo.seamBefore}→${colorInfo.seamAfter}` : ' n/a'}${redZonePx ? `, red-zone ${redZonePx}px kept from model, ${colorInfo?.garbagePx ?? 0}px garbage bg-filled` : ''})`, `data:image/jpeg;base64,${ccVis.toString('base64')}`);
 
-  // 2px edge feather: soften the hard union boundary so the paste join isn't a
-  // 1px step. Small blur → ~±2px alpha ramp; the interior stays fully opaque.
-  // (sharp's raw blur output can come back multi-channel — stride to 1 channel.)
-  const alphaBlur = await sharp(Buffer.from(alpha1), raw1).blur(1.2).raw().toBuffer();
+  // Edge feather — industry paste-back recipe: ERODE the alpha inward by the feather
+  // radius, THEN Gaussian-feather, so the blend ramp lives INSIDE the pasted figure
+  // and the composite never samples original beyond the new content's edge. A wider
+  // feather (vs the old hard ~2px) dissolves the silhouette seam instead of stamping
+  // a 1px step. featherPx/erodeFeather are exposed so the Test Lab can A/B each stage
+  // on the SAME model output. (sharp's raw blur can come back multi-channel — stride.)
+  const fpx = featherPx == null ? 6 : Math.max(0, Number(featherPx));
+  const doErode = erodeFeather !== false && fpx >= 1;
+  let alphaSrc = Buffer.from(alpha1);
+  if (doErode) alphaSrc = await maskBlurThreshold(alphaSrc, cropW, cropH, fpx, 200); // blur+high-thr shrinks ~fpx inward
+  const alphaBlur = await sharp(alphaSrc, raw1).blur(Math.max(0.3, fpx || 1.2)).raw().toBuffer();
   const abStride = Math.max(1, Math.round(alphaBlur.length / n));
   const alphaSoft = abStride === 1 ? alphaBlur : (() => { const o = Buffer.alloc(n); for (let i = 0; i < n; i++) o[i] = alphaBlur[i * abStride]; return o; })();
+  await addStep(`composite alpha (feather ${fpx}px${doErode ? ', eroded-then-feathered' : ', feather only'})`, `data:image/png;base64,${(await sharp(alphaSoft, raw1).png().toBuffer()).toString('base64')}`);
   const feathered = await sharp(pasteBuf).ensureAlpha().joinChannel(alphaSoft, raw1).png().toBuffer();
   return { feathered, iou, redPx, colorInfo, blendRule: BLEND_RULE_VERSION };
 }
@@ -2843,6 +2851,8 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
           ]
       ) : null,
       colorCorrect: params.colorCorrect !== false,
+      featherPx: params.featherPx,
+      erodeFeather: params.erodeFeather,
     });
     feathered = blend.feathered;
     colorInfo = blend.colorInfo || null;

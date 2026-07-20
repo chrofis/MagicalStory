@@ -10664,26 +10664,48 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
     //    back to the whole-region mean (tone match to scene).
     const nearestKept = (lab) => { let bk = -1, bd = Infinity; for (let k = 0; k < cent.length; k++) { if (!keep[k]) continue; const dl = lab[0] - cent[k][0], da = lab[1] - cent[k][1], db = lab[2] - cent[k][2]; const d = dl * dl + da * da + db * db; if (d < bd) { bd = d; bk = k; } } return [bk, bd]; };
     const { inner, outer } = _ccBorderRings(mCand, width, height, 5);
-    const Dmax2 = 30 * 30; // outer pixels farther than this from every material = background, excluded
+    // SAME-MATERIAL border only: match blue coat to blue coat, never to the white/
+    // blue-shadow snow it sits in. A loose gate let snow-shadow (~15-25 ΔE from the
+    // coat) into the coat's outer ring and dragged the whole coat darker. So (1) build
+    // a BACKGROUND palette from outer pixels far from every figure material, then
+    // (2) keep an outer pixel for material k only if it is within a tight same-material
+    // ΔE of k AND closer to k than to any background colour. If a material has no true
+    // same-material neighbour outside, it falls back to the region mean below.
+    const SAME2 = 6 * 6;    // NARROW: outer pixel must be within ~6 ΔE of the figure material.
+    const FARBG = 12 * 12;  // outer pixel this far from every figure material = background
     const bIn = cent.map(() => [0, 0, 0, 0]);   // candidate, inner ring, per material
-    const bOut = cent.map(() => [0, 0, 0, 0]);  // original, outer ring, per material
+    const bOut = cent.map(() => [0, 0, 0, 0]);  // original, outer ring — SAME material only
+    const outerLab = [];
     for (let i = 0; i < n; i++) {
       if (inner[i]) { const lab = [candLab[i * 3], candLab[i * 3 + 1], candLab[i * 3 + 2]]; const [bk] = nearestKept(lab); if (bk >= 0) { bIn[bk][0] += lab[0]; bIn[bk][1] += lab[1]; bIn[bk][2] += lab[2]; bIn[bk][3]++; } }
-      if (outer[i]) { const l = _rgbToLab(O[i * 3], O[i * 3 + 1], O[i * 3 + 2]); const [bk, bd] = nearestKept(l); if (bk >= 0 && bd < Dmax2) { bOut[bk][0] += l[0]; bOut[bk][1] += l[1]; bOut[bk][2] += l[2]; bOut[bk][3]++; } }
+      if (outer[i]) outerLab.push(_rgbToLab(O[i * 3], O[i * 3 + 1], O[i * 3 + 2]));
     }
+    const bgPts = [];
+    for (const l of outerLab) { const [, bd] = nearestKept(l); if (bd > FARBG) bgPts.push(l[0], l[1], l[2]); }
+    const bgCent = bgPts.length >= 90 ? _ccKMeans(Float32Array.from(bgPts), 3, 6).cent : [];
+    const nearestBg = (l) => { let bd = Infinity; for (const c of bgCent) { const dl = l[0] - c[0], da = l[1] - c[1], db = l[2] - c[2]; const d = dl * dl + da * da + db * db; if (d < bd) bd = d; } return bd; };
+    for (const l of outerLab) { const [bk, bd] = nearestKept(l); if (bk >= 0 && bd < SAME2 && (!bgCent.length || bd < nearestBg(l))) { bOut[bk][0] += l[0]; bOut[bk][1] += l[1]; bOut[bk][2] += l[2]; bOut[bk][3]++; } }
     const MINB = 20;
+    const BORDER_MAX = 5; // border is a TINY seam-closer on top of the mean, never a bulk shift
+    // BASE: region mean-match per material (cluster the colour in BOTH images, shift
+    // candidate mean → original mean). Reliable, uses the whole region.
+    const meanOffK = cent.map((c, k) => (keep[k] && cs[k][3]) ? [c[0] - cs[k][0] / cs[k][3], c[1] - cs[k][1] / cs[k][3], c[2] - cs[k][2] / cs[k][3]] : [0, 0, 0]);
+    const hasBorder = cent.map((_, k) => keep[k] && bIn[k][3] >= MINB && bOut[k][3] >= MINB);
+    // REFINE: after the mean match a genuine same-material border sits at ~0 residual,
+    // so add only the small leftover seam (clamped). A stray contaminant can't move
+    // the material much, and if the narrow window found nothing we keep just the mean.
     const offK = cent.map((c, k) => {
       if (!keep[k]) return [0, 0, 0];
-      if (bIn[k][3] >= MINB && bOut[k][3] >= MINB) return [bOut[k][0] / bOut[k][3] - bIn[k][0] / bIn[k][3], bOut[k][1] / bOut[k][3] - bIn[k][1] / bIn[k][3], bOut[k][2] / bOut[k][3] - bIn[k][2] / bIn[k][3]];
-      if (cs[k][3]) return [c[0] - cs[k][0] / cs[k][3], c[1] - cs[k][1] / cs[k][3], c[2] - cs[k][2] / cs[k][3]];
-      return [0, 0, 0];
+      const m = meanOffK[k];
+      if (!hasBorder[k]) return m;
+      const r = [bOut[k][0] / bOut[k][3] - (bIn[k][0] / bIn[k][3] + m[0]), bOut[k][1] / bOut[k][3] - (bIn[k][1] / bIn[k][3] + m[1]), bOut[k][2] / bOut[k][3] - (bIn[k][2] / bIn[k][3] + m[2])];
+      const rm = Math.hypot(r[0], r[1], r[2]); if (rm > BORDER_MAX) { const s = BORDER_MAX / rm; r[0] *= s; r[1] *= s; r[2] *= s; }
+      return [m[0] + r[0], m[1] + r[1], m[2] + r[2]];
     });
     for (const o of offK) { const mag = Math.hypot(o[0], o[1], o[2]); if (mag > maxOffsetDeltaE) { const s = maxOffsetDeltaE / mag; o[0] *= s; o[1] *= s; o[2] *= s; } }
-    // Per-group strength: a BORDER-matched material (cloth) gets the FULL offset
-    // (1.0) so its seam colour is exact — the whole point of the border match is
-    // an identical join. Region-fallback materials (face/hair, tone-matched to
-    // the scene) keep the gentle `strength` nudge so the face isn't slammed.
-    const sK = cent.map((_, k) => (keep[k] && bIn[k][3] >= MINB && bOut[k][3] >= MINB) ? 1 : strength);
+    // Cloth with a real same-material border gets the full offset (exact join); face/
+    // hair (mean-only tone match to scene) keep the gentle nudge so they aren't slammed.
+    const sK = cent.map((_, k) => hasBorder[k] ? 1 : strength);
     // 4. sigma from the spread of kept centroids → soft colour-weighted blend.
     const kc = cent.filter((_, k) => keep[k]); const dd = [];
     for (let a = 0; a < kc.length; a++) for (let b = a + 1; b < kc.length; b++) dd.push(Math.hypot(kc[a][0] - kc[b][0], kc[a][1] - kc[b][1], kc[a][2] - kc[b][2]));
@@ -10698,7 +10720,7 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
       const rgb = _labToRgb(lab[0] + woff[0], lab[1] + woff[1], lab[2] + woff[2]);
       out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2];
     }
-    clusterInfo = cent.map((c, k) => keep[k] ? { lab: c.map(v => +v.toFixed(1)), count: counts[k], off: offK[k].map(v => +v.toFixed(1)), src: (bIn[k][3] >= MINB && bOut[k][3] >= MINB) ? 'border' : 'region' } : null).filter(Boolean);
+    clusterInfo = cent.map((c, k) => keep[k] ? { lab: c.map(v => +v.toFixed(1)), count: counts[k], off: offK[k].map(v => +v.toFixed(1)), mean: meanOffK[k].map(v => +v.toFixed(1)), src: hasBorder[k] ? 'mean+border' : 'mean' } : null).filter(Boolean);
   } else {
     const lut = meanShift ? null : [0, 1, 2].map(ch => _ccMatchLUT(srcHist[ch], refHist[ch], ch, bins));
     for (let i = 0; i < n; i++) {
