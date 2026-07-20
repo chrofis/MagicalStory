@@ -266,7 +266,7 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
  * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL (downsized)
  */
-async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false } = {}) {
+async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false } = {}) {
   const startTime = Date.now();
 
   // CANONICAL PATH (2026-05-14): styled avatars are 2×4 reference sheets
@@ -308,6 +308,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       costumeDescription,
       artStyle,
       usageTracker: addUsage,
+      redress,
     });
     if (!result?.imageData) {
       throw new Error(`[STYLED AVATAR] 2×4 produced no image for ${characterName}/${clothingCategory}/${artStyle}`);
@@ -395,7 +396,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
  * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL
  */
-async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false } = {}) {
+async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false } = {}) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
 
   // Check cache first
@@ -415,7 +416,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
 
   const conversionPromise = (async () => {
     try {
-      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageModelOverride, { skipQualityEval });
+      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageModelOverride, { skipQualityEval, redress });
       styledAvatarCache.set(cacheKey, styledAvatar);
       return styledAvatar;
     } finally {
@@ -633,6 +634,13 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
             originalAvatar,
             facePhoto,
             clothingDescription,
+            // redress=true → the story outfit differs from the stored avatar's
+            // clothing, so the 2×4 sheet must be drawn in clothingDescription and
+            // IGNORE the (old) clothing in the standard-avatar reference. Without
+            // this the sheet mixes old + new (butterfly body / flower head), the
+            // scene reads the body cell, and the eval — which checks the story
+            // outfit — desyncs → repaint loop.
+            redress: outfitChanged,
             character: char  // Pass full character object for physical traits
           });
         }
@@ -715,9 +723,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   }
 
   // Standard style conversion promises (run simultaneously with costumed)
-  for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription, character }] of neededAvatars) {
+  for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription, redress, character }] of neededAvatars) {
     allPromises.push(
-      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageModelOverride, { skipQualityEval })
+      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageModelOverride, { skipQualityEval, redress })
         .then(styledAvatar => ({ type: 'standard', cacheKey, characterName, clothingCategory, character, styledAvatar, success: true }))
         .catch(error => {
           log.error(`❌ [STYLED AVATARS] Failed ${cacheKey}: ${error.message}`);

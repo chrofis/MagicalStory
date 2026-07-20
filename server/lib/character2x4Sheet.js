@@ -159,12 +159,24 @@ function buildHairBlock(character) {
   return `\n${hairBits.join(' ')} Reproduce the hair EXACTLY in every cell — same length, same color, same shape, same parting. The back-of-head cell (cell 4) must show the same hair from behind. Do NOT invent a different cut.\n`;
 }
 
-function buildPrompt(_artStyle, costumeDescription, character = null) {
+function buildPrompt(_artStyle, costumeDescription, character = null, redress = false) {
   const hairBlock = buildHairBlock(character);
+  // redress=true: the story dressed this character in an outfit that DIFFERS
+  // from the clothing shown in Image 2 (the stored avatar). Image 2's clothing
+  // is OLD and must be ignored — the Costume text below is the single source of
+  // truth for the outfit. Without this, the model splits the difference (old
+  // clothing on the body cells, new clothing on the head cells) and the scene,
+  // which reads the body cell, renders the wrong outfit → eval desync → redos.
+  const bodyRef = redress
+    ? `Image 2 shows the character's body shape, build, and identity ONLY — IGNORE the clothing in Image 2, it is the wrong outfit. Image 3 is the character's face.`
+    : `Image 2 is the character's body. Image 3 is the character's face.`;
+  const outfitRule = redress
+    ? `Costume (the ONLY outfit — every body cell wears exactly this, NOT the clothing from Image 2): ${costumeDescription}`
+    : `Costume: ${costumeDescription}`;
   return `Image 1 indicates only the camera angle and facing direction in each cell — ignore its silhouette, body, and face. The coloured arrows (red, green, blue) on each head in Image 1 are direction guides ONLY — never render, copy, or paint them onto the character, the face, the hair, or anywhere in the output. The output contains no arrows.
-Image 2 is the character's body. Image 3 is the character's face.
+${bodyRef}
 
-Costume: ${costumeDescription}
+${outfitRule}
 ${hairBlock}
 Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, with natural proportions matching the person's apparent age in Image 3. No cartoon stylisation, no chibi, no anime, no watercolour — those treatments are applied later by downstream steps. This sheet is an identity anchor.
 
@@ -547,6 +559,10 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     artStyle = 'watercolor',
     usageTracker = null,
     skipQualityEval = false,
+    // redress=true → the story outfit differs from the stored avatar's clothing;
+    // dress the body cells purely from costumeDescription and ignore Image 2's
+    // (old) clothing. Set by the caller when clothingRequirements ≠ stored.
+    redress = false,
   } = opts;
 
   const phantom = loadPhantom(character?.age);
@@ -562,7 +578,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     ? [phantom, standardAvatar, facePhoto]
     : [phantom, facePhoto];
 
-  const prompt = buildPrompt(artStyle, costumeDescription, character);
+  const prompt = buildPrompt(artStyle, costumeDescription, character, redress);
 
   // Track every attempt — when all retries fail to produce a `valid` sheet
   // (per the eval), we pick the highest-scoring attempt instead of throwing.
