@@ -10604,7 +10604,7 @@ function _ccBorderRings(mask, W, H, ringPx) {
  * a face mask getting a skin-tuned shift. K=1 == the plain mean-shift.
  */
 async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, width, height, opts = {}) {
-  const { strength = 0.9, minDeltaE = 4, bins = 128, refMask = null, borderMatch = true, borderIters = 500, meanShift = false, colorAware = false, clusters = 3, sigmaScale = 0.6, maxOffsetDeltaE = 30 } = opts;
+  const { strength = 0.9, minDeltaE = 4, bins = 128, refMask = null, borderMatch = true, borderIters = 500, meanShift = false, colorAware = false, clusters = 3, sigmaScale = 0.6, maxOffsetDeltaE = 30, borderRefine = true } = opts;
   const n = width * height;
   const toRaw = async (buf) => (Buffer.isBuffer(buf) && buf.length === n * 3) ? buf : sharp(buf).resize(width, height, { fit: 'fill' }).removeAlpha().raw().toBuffer();
   const O = await toRaw(originalCropBuf);
@@ -10686,20 +10686,22 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
     const nearestBg = (l) => { let bd = Infinity; for (const c of bgCent) { const dl = l[0] - c[0], da = l[1] - c[1], db = l[2] - c[2]; const d = dl * dl + da * da + db * db; if (d < bd) bd = d; } return bd; };
     for (const l of outerLab) { const [bk, bd] = nearestKept(l); if (bk >= 0 && bd < SAME2 && (!bgCent.length || bd < nearestBg(l))) { bOut[bk][0] += l[0]; bOut[bk][1] += l[1]; bOut[bk][2] += l[2]; bOut[bk][3]++; } }
     const MINB = 20;
-    const BORDER_MAX = 5; // border is a TINY seam-closer on top of the mean, never a bulk shift
     // BASE: region mean-match per material (cluster the colour in BOTH images, shift
     // candidate mean → original mean). Reliable, uses the whole region.
     const meanOffK = cent.map((c, k) => (keep[k] && cs[k][3]) ? [c[0] - cs[k][0] / cs[k][3], c[1] - cs[k][1] / cs[k][3], c[2] - cs[k][2] / cs[k][3]] : [0, 0, 0]);
-    const hasBorder = cent.map((_, k) => keep[k] && bIn[k][3] >= MINB && bOut[k][3] >= MINB);
-    // REFINE: after the mean match a genuine same-material border sits at ~0 residual,
-    // so add only the small leftover seam (clamped). A stray contaminant can't move
-    // the material much, and if the narrow window found nothing we keep just the mean.
+    const hasBorder = cent.map((_, k) => borderRefine && keep[k] && bIn[k][3] >= MINB && bOut[k][3] >= MINB);
+    // REFINE: the border is a SEAM-CLOSER on top of the mean, never a second bulk
+    // shift. Cap it to a small fraction of the mean move (+0.5 ΔE floor): if the
+    // border wants to move MORE than ~20% of the mean, the inner/outer rings are
+    // straddling the material's natural lightness gradient (top-of-clip in shadow
+    // vs lower coat lit) — a gradient, not a tone error — so we clamp it hard.
     const offK = cent.map((c, k) => {
       if (!keep[k]) return [0, 0, 0];
       const m = meanOffK[k];
       if (!hasBorder[k]) return m;
       const r = [bOut[k][0] / bOut[k][3] - (bIn[k][0] / bIn[k][3] + m[0]), bOut[k][1] / bOut[k][3] - (bIn[k][1] / bIn[k][3] + m[1]), bOut[k][2] / bOut[k][3] - (bIn[k][2] / bIn[k][3] + m[2])];
-      const rm = Math.hypot(r[0], r[1], r[2]); if (rm > BORDER_MAX) { const s = BORDER_MAX / rm; r[0] *= s; r[1] *= s; r[2] *= s; }
+      const cap = Math.max(0.5, 0.2 * Math.hypot(m[0], m[1], m[2])); // ≤20% of the mean move
+      const rm = Math.hypot(r[0], r[1], r[2]); if (rm > cap) { const s = cap / rm; r[0] *= s; r[1] *= s; r[2] *= s; }
       return [m[0] + r[0], m[1] + r[1], m[2] + r[2]];
     });
     for (const o of offK) { const mag = Math.hypot(o[0], o[1], o[2]); if (mag > maxOffsetDeltaE) { const s = maxOffsetDeltaE / mag; o[0] *= s; o[1] *= s; o[2] *= s; } }

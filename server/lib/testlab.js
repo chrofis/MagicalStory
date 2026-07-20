@@ -1978,7 +1978,7 @@ async function _interiorSeedPoints(maskPng, w, h) {
   } catch { return []; }
 }
 
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -2224,7 +2224,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
       // exactly, instead of leaving raw (uncorrected) model pixels there.
       const ccMask = Buffer.alloc(n);
       for (let i = 0; i < n; i++) ccMask[i] = (newDil[i] > 128 || redZone[i] > 128) ? 255 : 0;
-      const cc = await correctColorShift(origRaw, pasteRaw, ccMask, cropW, cropH, { refMask: refMaskBin, borderMatch: false, colorAware: true });
+      const cc = await correctColorShift(origRaw, pasteRaw, ccMask, cropW, cropH, { refMask: refMaskBin, borderMatch: false, colorAware: true, borderRefine: colorBorderRefine });
       if (cc.applied) {
         pasteRaw = Buffer.from(cc.correctedRaw);
         colorInfo = { deltaEBefore: cc.deltaEBefore, seamBefore: cc.seamDeltaEBefore, seamAfter: cc.seamDeltaEAfter, clusters: cc.clusterInfo };
@@ -2853,6 +2853,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       colorCorrect: params.colorCorrect !== false,
       featherPx: params.featherPx,
       erodeFeather: params.erodeFeather,
+      colorBorderRefine: params.colorBorderRefine,
     });
     feathered = blend.feathered;
     colorInfo = blend.colorInfo || null;
