@@ -1983,7 +1983,7 @@ async function _interiorSeedPoints(maskPng, w, h) {
   } catch { return []; }
 }
 
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -2263,10 +2263,14 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // material (clustered — snow, grass, wall, sky are separated by colour), shift the
   // model's pixels back to the surrounding original. Multiple materials around one
   // silhouette are matched independently. Texture is kept (shift, not replace).
-  const eroded = await maskBlurThreshold(Buffer.from(alpha1), cropW, cropH, 12, 200); // shrink union ~12px inward
+  // bgBorderMatch toggle: the NEW silhouette-border extension (on by default). Turn
+  // OFF to A/B against the old red-zone-only behaviour. The red zone always runs.
   const borderRing = Buffer.alloc(n);
-  for (let i = 0; i < n; i++) borderRing[i] = (alpha1[i] > 128 && eroded[i] <= 128) ? 255 : 0; // union edge margin
-  if (redZonePx > 0 || borderRing) {
+  if (bgBorderMatch) {
+    const eroded = await maskBlurThreshold(Buffer.from(alpha1), cropW, cropH, 12, 200); // shrink union ~12px inward
+    for (let i = 0; i < n; i++) borderRing[i] = (alpha1[i] > 128 && eroded[i] <= 128) ? 255 : 0; // union edge margin
+  }
+  if (redZonePx > 0 || bgBorderMatch) {
     const { _rgbToLab, _labToRgb, _deltaE, _ccKMeans } = require('./images');
     const figExclude = Buffer.alloc(n);
     for (let i = 0; i < n; i++) figExclude[i] = (newDil[i] > 128 || oldA[i * s1r] > 128) ? 255 : 0;
@@ -2888,6 +2892,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       // FIGURE/BODY repair (not face mode) → protect background at the border, let
       // the redrawn figure colour drift. Override with params.bodyColorMode to A/B.
       bodyColorMode: params.bodyColorMode != null ? params.bodyColorMode : !params._faceMode,
+      bgBorderMatch: params.bgBorderMatch != null ? params.bgBorderMatch : true,
     });
     feathered = blend.feathered;
     colorInfo = blend.colorInfo || null;
