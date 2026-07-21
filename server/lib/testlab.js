@@ -270,7 +270,9 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   if (promptOverride) PROMPT_TEMPLATES.imageGeneration = promptOverride;
   try {
     prompt = buildImagePrompt(
-      ctx.scene.sceneDescription,
+      // sceneDescriptionOverride: test a corrected scene brief (e.g. removing a
+      // duplicated object) without regenerating the story's unified outline.
+      params.sceneDescriptionOverride || ctx.scene.sceneDescription,
       inputData,
       ctx.scene.sceneCharacters || null,
       ctx.visualBible,
@@ -380,7 +382,10 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   const { MODEL_DEFAULTS } = require('../config/models');
 
   const meta = ctx.scene.sceneMetadata || {};
-  const description = meta.emptyScenePrompt || ctx.scene.emptyScenePrompt || ctx.scene.sceneDescription;
+  // descriptionOverride: test a corrected empty-scene brief (e.g. fixing a
+  // contradictory exterior/interior description, or a stair-direction) without
+  // regenerating the whole story. Falls back to the stored per-page description.
+  const description = params.descriptionOverride || meta.emptyScenePrompt || ctx.scene.emptyScenePrompt || ctx.scene.sceneDescription;
   if (!description) throw new Error('No empty-scene description available for this page');
 
   // Text zone only when this story overlays text on the image AND the scene
