@@ -16,7 +16,7 @@ KEEP UNCHANGED:
 - The background and all other elements in the scene
 - The art style and lighting
 - All other characters in the scene
-- The illustration style: render {CHAR_NAME} in the same style as the other characters — do not make this figure more realistic or more photographic than the rest of the scene.
+- The illustration style. {REPAIR_STYLE_GUARD}
 
 CRITICAL: The current face is WRONG. You MUST produce a visibly different result where {CHAR_NAME}'s face matches the reference. If you return the image unchanged, the repair has FAILED.
 

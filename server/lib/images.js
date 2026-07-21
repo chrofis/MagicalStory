@@ -28,14 +28,19 @@ const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
 // services/prompts.js) so this refactor touches only images.js + new prompt
 // files; the fill contract is identical.
 const LOCAL_PROMPTS_DIR = path.join(__dirname, '../../prompts');
+// Shared repair style-match guard (single source of truth in services/prompts.js)
+// — substituted into the repair templates below so it can't drift from the ones
+// loaded via PROMPT_TEMPLATES.
+const { applyRepairStyleGuard } = require('../services/prompts');
+const readPrompt = (f) => applyRepairStyleGuard(fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, f), 'utf-8'));
 const LOCAL_PROMPTS = {
-  bboxRefineOverlay: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'bbox-refine-overlay.txt'), 'utf-8'),
-  iterativePlacementPass1: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'iterative-placement-pass1.txt'), 'utf-8'),
-  iterativePlacementPass2: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'iterative-placement-pass2.txt'), 'utf-8'),
-  characterRepairGemini: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'character-repair-gemini.txt'), 'utf-8'),
-  characterRepairGrokFullscene: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'character-repair-grok-fullscene.txt'), 'utf-8'),
-  inpaintGrokRegions: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'inpaint-grok-regions.txt'), 'utf-8'),
-  styleTransfer: fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'style-transfer.txt'), 'utf-8'),
+  bboxRefineOverlay: readPrompt('bbox-refine-overlay.txt'),
+  iterativePlacementPass1: readPrompt('iterative-placement-pass1.txt'),
+  iterativePlacementPass2: readPrompt('iterative-placement-pass2.txt'),
+  characterRepairGemini: readPrompt('character-repair-gemini.txt'),
+  characterRepairGrokFullscene: readPrompt('character-repair-grok-fullscene.txt'),
+  inpaintGrokRegions: readPrompt('inpaint-grok-regions.txt'),
+  styleTransfer: readPrompt('style-transfer.txt'),
 };
 
 // Maps callGeminiAPIForImage's evaluationType to a stable function-name tag

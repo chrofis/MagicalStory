@@ -16,4 +16,4 @@ Preserve the original emotion and direction:
 
 Each character's body, pose, clothing, and position in IMAGE 2 are fully visible — preserve these exactly. Keep the same age and body proportions — don't make characters look older or younger. Only redraw the blurred face and head areas to match the reference photo while keeping the original expression and gaze.
 
-Maintain the exact same art style, lighting, and color palette as the rest of IMAGE 2. The repaired face blends seamlessly with the existing artwork.{clothingContext}{actionContext}{issueContext}{textPositionContext}
+{REPAIR_STYLE_GUARD} Keep the same lighting and color palette so the repaired face blends seamlessly with the existing artwork.{clothingContext}{actionContext}{issueContext}{textPositionContext}

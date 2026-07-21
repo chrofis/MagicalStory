@@ -10,6 +10,21 @@ const { log } = require('../utils/logger');
 
 const PROMPT_TEMPLATES = {};
 
+// Single source of truth for the character-repair style-match guard. Every
+// repair template includes the `{REPAIR_STYLE_GUARD}` token; it is substituted
+// with this text at LOAD time (before fillTemplate runs, so it never trips the
+// unfilled-placeholder warning). Prevents the guard from drifting across the
+// parallel repair templates — the exact bug where the grok_inpaint, grok
+// blackout, and gemini repair paths each shipped without it and returned
+// photoreal faces in an illustrated scene. Also applied to the LOCAL_PROMPTS
+// repair templates read directly in images.js (imported from here).
+const REPAIR_STYLE_GUARD = 'Render the repainted area in the same illustration style as the rest of the scene — same line work, shading, and level of detail as the other figures. Do not render it more realistically or more photographically than the surrounding artwork.';
+
+/** Substitute the shared repair guard into a template string (load-time). */
+function applyRepairStyleGuard(text) {
+  return typeof text === 'string' ? text.replace(/\{REPAIR_STYLE_GUARD\}/g, REPAIR_STYLE_GUARD) : text;
+}
+
 async function loadPromptTemplates() {
   const promptsDir = path.join(__dirname, '../../prompts');
   // Per-key load wrapper. If one file is missing, log the specific failure
@@ -102,6 +117,12 @@ async function loadPromptTemplates() {
   const makeTextless = (tpl, label) => tpl ? tpl.replace(new RegExp(`\\*\\*${label}:\\*\\*[\\s\\S]*?(?=\\n\\*\\*)`), NO_TEXT) : tpl;
   PROMPT_TEMPLATES.frontCoverTextless = makeTextless(PROMPT_TEMPLATES.frontCover, 'TITLE');
   PROMPT_TEMPLATES.backCoverTextless = makeTextless(PROMPT_TEMPLATES.backCover, 'TEXT');
+
+  // One-source-of-truth repair guard: fill {REPAIR_STYLE_GUARD} in every
+  // template that carries it (all character-repair templates).
+  for (const k of Object.keys(PROMPT_TEMPLATES)) {
+    PROMPT_TEMPLATES[k] = applyRepairStyleGuard(PROMPT_TEMPLATES[k]);
+  }
 
   if (failures.length > 0) {
     log.error(`❌ Prompt template load: ${failures.length} file(s) failed:`);
@@ -233,4 +254,6 @@ module.exports = {
   fillTemplate,
   buildEmptyScenePrompt,
   buildEvaluationPrompt,
+  REPAIR_STYLE_GUARD,
+  applyRepairStyleGuard,
 };
