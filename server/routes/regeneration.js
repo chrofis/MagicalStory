@@ -6043,9 +6043,17 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     try {
       const meta = (await dbQuery('SELECT image_version_meta FROM stories WHERE id=$1', [id]))[0]?.image_version_meta || {};
       const activeIdx = meta[coverKey]?.activeVersion ?? 0;
-      const artRows = await dbQuery(
+      // Prefer the textless art for the ACTIVE version; fall back to the latest
+      // ${key}Art (legacy versions repainted before this fix have no lockstep
+      // art row), then to the titled image for truly legacy covers.
+      let artRows = await dbQuery(
         "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND version_index=$3 AND NOT is_test LIMIT 1",
         [id, `${coverKey}Art`, activeIdx]);
+      if (!artRows.length) {
+        artRows = await dbQuery(
+          "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test ORDER BY version_index DESC LIMIT 1",
+          [id, `${coverKey}Art`]);
+      }
       const artRow = artRows[0];
       const artSrc = artRow ? (artRow.image_url || (artRow.image_data ? 'data:image/jpeg;base64,' + artRow.image_data.toString('base64') : null)) : null;
       if (artSrc) { editBaseSrc = artSrc; editedTextless = true; }
