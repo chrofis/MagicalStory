@@ -5376,6 +5376,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         : MODEL_DEFAULTS.singlePassScene === true;
       log.info(`🎛️ [UNIFIED] referenceMode=${runReferenceMode} singlePassScene=${runSinglePassScene}`);
 
+      // Heartbeat the empty-scene phase: each plate generation bumps
+      // story_jobs.updated_at (throttled to 30s) so the phase never looks
+      // "stuck" to the status endpoint's heartbeat check, no matter how many
+      // plates. Without this a slow batch of parallel image calls went silent
+      // for >5 min and the job was failed mid-generation.
+      const imageGenHeartbeat = createJobHeartbeat(jobId, dbPool);
+
       // Phase 5a-pre-vantage: render ONE backdrop canvas per Visual Bible
       // location vantage and reuse it across every page that uses that vantage.
       // Gated on !runSinglePassScene — when single-pass is on the page is
@@ -5387,44 +5394,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const { groupPagesByVantage, enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
         const groups = groupPagesByVantage(pageDataArray, visualBible);
         const realGroups = Array.from(groups.entries()).filter(([key]) => key !== '__unassigned__');
-        // One VB vantage can be used from genuinely different viewpoints (a
-        // cellar seen from the exterior threshold on one page and from inside on
-        // the next). Those pages carry very different per-page emptyScenePrompts
-        // and need SEPARATE plates — sharing one canvas composited page 4 onto
-        // page 3's exterior plate (staging job_…km769btua). But same-viewpoint
-        // pages differ only in per-page ACTION prose and MUST keep sharing one
-        // plate (consistency + cost): an exact-brief split doubled the empty
-        // scenes on every 10-page story and stalled the job watchdog.
-        // Cluster a group's pages by brief word-overlap (Jaccard); only a
-        // genuinely divergent brief (< SPLIT_SIM) starts a new plate. Threshold
-        // 0.15 keeps normal 10-page stories at their original ~5-6 plates while
-        // still splitting the cellar (its interior/exterior briefs overlap ~0.11).
-        const briefWords = (pd) => new Set((pd?.emptyScenePrompt || pd?.sceneMetadata?.emptyScenePrompt || '')
-          .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 3));
-        const briefSim = (a, b) => { let i = 0; for (const w of a) if (b.has(w)) i++; const u = a.size + b.size - i; return u ? i / u : 1; };
-        const SPLIT_SIM = 0.15;
-        const renderUnits = [];
-        for (const [vantageId, group] of realGroups) {
-          const clusters = []; // { rep:Set<word>, pageNumbers:[] }
-          for (const pn of group.pageNumbers) {
-            const w = briefWords(pageDataArray.find(x => x.pageNumber === pn));
-            const hit = clusters.find(c => briefSim(w, c.rep) >= SPLIT_SIM);
-            if (hit) hit.pageNumbers.push(pn);
-            else clusters.push({ rep: w, pageNumbers: [pn] });
-          }
-          const split = clusters.length > 1;
-          for (const c of clusters) renderUnits.push({ vantageId, vantage: group.vantage, pageNumbers: c.pageNumbers, usePageBrief: split });
-        }
-        if (renderUnits.length > 0) {
-          log.info(`🏛️ [UNIFIED] Phase 5a-pre-vantage: ${realGroups.length} location vantage(s) → ${renderUnits.length} canvas(es) for ${pageDataArray.length} page(s)`);
+        // One canvas per VB vantage, reused across every page that uses it.
+        // Sonnet assigns a distinct vantage (LOC###.N) whenever the same
+        // location is shown from a fundamentally different viewpoint (a cellar
+        // from the exterior threshold vs from inside), so pages that share a
+        // vantage genuinely share the backdrop — the "which pages share a plate"
+        // decision lives in the model, not a code-side text heuristic.
+        if (realGroups.length > 0) {
+          log.info(`🏛️ [UNIFIED] Phase 5a-pre-vantage: ${realGroups.length} location vantage(s) for ${pageDataArray.length} page(s)`);
           const vStart = Date.now();
           const vLimit = pLimit(20);
           const { getTextAreaMask } = require('./server/lib/textMasks');
-          await Promise.all(renderUnits.map((unit) => vLimit(async () => {
+          await Promise.all(realGroups.map(([vantageId, group]) => vLimit(async () => {
             await checkCancellation();
-            const { vantageId, vantage: v } = unit;
+            const v = group.vantage;
             // Pull a representative page so we can inherit aspect / model / landmark refs.
-            const repPageNum = unit.pageNumbers[0];
+            const repPageNum = group.pageNumbers[0];
             const repPageData = pageDataArray.find(pd => pd.pageNumber === repPageNum);
             if (!repPageData) return;
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', repPageData.pageImageBackend) || '';
@@ -5435,12 +5420,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // image render handles those.
             const eraGuard = buildEraGuard(repPageData.sceneMetadata?.era || null);
             const shotPrefix = v.shot ? `**SHOT:** ${v.shot}\n\n` : '';
-            // A split unit (same vantage, different per-page viewpoint) renders
-            // from the representative page's own brief so the plate matches what
-            // that page composites onto; otherwise the generic vantage prose.
-            const repBrief = repPageData.emptyScenePrompt || repPageData.sceneMetadata?.emptyScenePrompt || '';
-            const descBody = (unit.usePageBrief && repBrief) ? repBrief : (v.description || '');
-            const emptySceneDesc = `${shotPrefix}**LOCATION:** ${v.locationName || ''}\n**VANTAGE:** ${v.name || ''}\n\n${descBody}`;
+            const emptySceneDesc = `${shotPrefix}**LOCATION:** ${v.locationName || ''}\n**VANTAGE:** ${v.name || ''}\n\n${v.description || ''}`;
             const characterSpace = `Render this as an empty location backdrop. Foreground, midground and background bands all show the scene's natural ground/floor/water surface continuing unbroken — characters will be composited into them later. No figures, no animals.`;
             // Pull landmark photos for the LOC if real — used as a strict
             // visual reference for the Wikimedia-photo case.
@@ -5479,12 +5459,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
                 addUsage(provider, result.usage, 'page_images', result.modelId);
               }
+              imageGenHeartbeat();  // per-plate heartbeat — keeps the phase alive
               if (!result?.imageData) {
                 log.warn(`⚠️ [VANTAGE] ${vantageId} (${v.locationName} – ${v.name}) produced no image`);
                 return;
               }
-              // Fan out the same canvas to every page in this render unit.
-              for (const pn of unit.pageNumbers) {
+              // Fan out the same canvas to every page in the group.
+              for (const pn of group.pageNumbers) {
                 if (sceneBackgrounds[pn]) continue; // pre-populated (e.g. trial mode)
                 sceneBackgrounds[pn] = {
                   imageData: result.imageData,
@@ -5496,14 +5477,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   locationName: v.locationName,
                 };
               }
-              log.info(`🏛️ [VANTAGE] ${vantageId} ${v.locationName} – ${v.name}: 1 canvas → pages [${unit.pageNumbers.join(',')}]`);
+              log.info(`🏛️ [VANTAGE] ${vantageId} ${v.locationName} – ${v.name}: 1 canvas → pages [${group.pageNumbers.join(',')}]`);
             } catch (err) {
               log.warn(`⚠️ [VANTAGE] ${vantageId} failed: ${err.message}`);
             }
           })));
           const vElapsed = ((Date.now() - vStart) / 1000).toFixed(1);
           const covered = Object.keys(sceneBackgrounds).length;
-          log.info(`🏛️ [UNIFIED] Phase 5a-pre-vantage: ${renderUnits.length} canvases → ${covered} pages covered in ${vElapsed}s (saved ${Math.max(0, covered - renderUnits.length)} redundant generations)`);
+          log.info(`🏛️ [UNIFIED] Phase 5a-pre-vantage: ${realGroups.length} canvases → ${covered} pages covered in ${vElapsed}s (saved ${Math.max(0, covered - realGroups.length)} redundant generations)`);
         }
       }
 
@@ -5679,6 +5660,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
                 addUsage(provider, result.usage, 'page_images', result.modelId);
               }
+              imageGenHeartbeat();  // per-page heartbeat — keeps the phase alive
 
               // Validate the empty scene before using it as a background.
               // Phase 1: pixel analysis (white boxes, too dark, text area calmness) — <50ms, free
@@ -5894,6 +5876,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
               addUsage(provider, genResult.usage, 'page_images', genResult.modelId);
             }
+            imageGenHeartbeat();  // per-page heartbeat — image done, keeps the phase alive
 
             // Scale-repair pass — UNCONDITIONAL on any page where the
             // outline declared one or more characters with depth=background

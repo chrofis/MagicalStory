@@ -193,7 +193,7 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
         // 1. Total timeout: Job running for more than 60 minutes total
         // 2. Heartbeat timeout: No progress update for 5 minutes (something is stuck)
         const TOTAL_TIMEOUT_MINUTES = 60;
-        const HEARTBEAT_TIMEOUT_MINUTES = 5;
+        const HEARTBEAT_TIMEOUT_MINUTES = 10;
 
         const isStale = jobAgeMinutes > TOTAL_TIMEOUT_MINUTES ||
           minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES;
@@ -439,7 +439,7 @@ router.get('/:jobId/status', jobStatusLimiter, authenticateToken, async (req, re
         // 1. Total timeout: Job running for more than 60 minutes total
         // 2. Heartbeat timeout: No progress update for 5 minutes (something is stuck)
         const TOTAL_TIMEOUT_MINUTES = 60;
-        const HEARTBEAT_TIMEOUT_MINUTES = 5;
+        const HEARTBEAT_TIMEOUT_MINUTES = 10;
 
         let errorMessage = null;
 

@@ -204,8 +204,8 @@ If any check fails, rewrite the prose AND fix the metadata before returning. Do 
 - `expression` (required for foreground + midground; optional for background): a short phrase describing the character's facial expression AND visible body language, derived from the PAGE TEXT. Read the page text for emotion cues — explicit (`scared`, `proud`, `worried`, `excited`, `shouted`, `whispered`, `gasped`) and implicit (`pressed against the wall`, `jumped up clapping`, `slumped onto the chair`, `tightened her grip`) — and translate them into a visible cue the image model can render: `alarmed, mouth open mid-shout, brows pulled tight`, `delighted, broad open-mouthed smile, shoulders raised`, `wary, mouth set, leaning slightly back`, `tense, jaw clenched, eyes locked on the door`. Never write the emotion word alone (`scared`, `happy`) — always pair it with the visible signal. If the page text is genuinely neutral / observational, write `calm, attentive, neutral mouth`. The prose paragraph MUST also describe this same expression on the character — the metadata field is a per-character anchor; the prose carries it forward to the renderer. Background-depth characters can omit when their face won't be readable at frame size.
 
 **objects[]** — Visual Bible IDs. The FIRST `LOC###` ID is the page's primary location. Form depends on the location type:
-- Real landmark (`isRealLandmark: true`): use the dotted vantage form `LOC###.N` (e.g. `LOC002.1`). The vantage you pick must be the one whose `pages: []` array includes this page number.
-- Invented location (`isRealLandmark: false`): use the bare form `LOC###` (e.g. `LOC001`). Invented locations have no vantages — the pipeline renders one backdrop per LOC and reuses it.
+- Location with a `vantages[]` array (any place shown from more than one viewpoint): use the dotted form `LOC###.N` (e.g. `LOC002.1`). Pick the vantage whose `pages: []` array includes this page number.
+- Location with no vantages (shown from a single viewpoint): use the bare form `LOC###` (e.g. `LOC001`). The pipeline renders one backdrop per LOC and reuses it.
 
 **interactions[]** — visible character-to-object and character-to-character contacts. The image generator reads all entries; the evaluator only enforces entries marked `storyRelevant: true`.
 
@@ -838,11 +838,11 @@ For famous buildings, monuments, or locations that exist in reality:
 - This helps us show accurate landmark photos in illustrations
 
 **LOCATION VANTAGES:**
-Vantages apply ONLY to real landmarks (`isRealLandmark: true`). Each vantage is one camera angle into the landmark; a single canvas is rendered per vantage and reused across the pages that use it. Pages reference a vantage with the dotted form `LOC001.2` (vantage 2 of LOC001).
+A vantage is one camera viewpoint of a location; a single canvas is rendered per vantage and reused across the pages that use it. Pages reference a vantage with the dotted form `LOC001.2` (vantage 2 of LOC001).
 
-Invented locations (`isRealLandmark: false`) do NOT have a `vantages[]` field. The `features` + `signatureElement` + `setting` already describe the place; the pipeline renders one backdrop per LOC and reuses it across pages. Pages reference an invented LOC with the bare id `LOC001` in their `objects[]` — never dotted.
+A location shown from a single viewpoint needs no `vantages[]` — its `features` + `signatureElement` + `setting` describe it and the pipeline renders one backdrop per LOC, reused across its pages. Pages reference such a LOC with the bare id `LOC001` in their `objects[]`.
 
-For real landmarks, split into multiple vantages when the same place is shown from a fundamentally different camera position or framing — different enough that one canvas image cannot serve both shots. Common splits:
+Give a location a `vantages[]` array — real landmark OR invented — and split it into multiple vantages when the same place is shown from a fundamentally different camera position or framing, different enough that one canvas image cannot serve both shots. Common splits:
 - Exterior / interior of the same building (`LOC###.1` outside, `LOC###.2` inside)
 - On a structure / under or beside it (`LOC###.1` on the bridge deck, `LOC###.2` under the bridge)
 - Wide vista / close-up of one element (`LOC###.1` whole castle, `LOC###.2` close on a battlement)
@@ -850,7 +850,7 @@ For real landmarks, split into multiple vantages when the same place is shown fr
 
 Do NOT split for: lighting changes, weather, time of day, or different characters present.
 
-Each vantage entry (real landmarks only):
+Each vantage entry:
 - `id`: `LOC###.N` where N starts at 1.
 - `name`: short label (3–8 words).
 - `shot`: `wide` / `medium` / `close-up` / `wide-low` / `aerial`.
