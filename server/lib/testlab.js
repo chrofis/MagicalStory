@@ -1983,7 +1983,7 @@ async function _interiorSeedPoints(maskPng, w, h) {
   } catch { return []; }
 }
 
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, bgGrowRegion = true }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -2272,8 +2272,6 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   }
   if (redZonePx > 0 || bgBorderMatch) {
     const { _rgbToLab, _labToRgb, _deltaE, _ccKMeans } = require('./images');
-    const figExclude = Buffer.alloc(n);
-    for (let i = 0; i < n; i++) figExclude[i] = (newDil[i] > 128 || oldA[i * s1r] > 128) ? 255 : 0;
     // FIGURE palette = K-cluster the model over the figure (newDil) → skin/hair/cloth.
     const figPts = [];
     for (let i = 0; i < n; i++) if (newDil[i] > 128) { const l = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]); figPts.push(l[0], l[1], l[2]); }
@@ -2292,47 +2290,63 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     // pushed back to the real snow — snow and grass corrected INDEPENDENTLY, and
     // the figure/other materials untouched. This keeps the model's texture and
     // kills the halo (vs replacing the pixels).
-    const garbage = Buffer.alloc(n);
     const bgAssign = new Int32Array(n).fill(-1); // per-pixel background cluster (or -1)
-    const srcSum = bgCent.map(() => [0, 0, 0, 0]); // model mean per bg material
-    let garbagePx = 0, bgPx = 0;
+    const srcSum = bgCent.map(() => [0, 0, 0, 0]); // model mean per bg material (at border)
+    let bgPx = 0;
+    // No garbage detector: that was for Qwen's white/black whiteout leftovers. Grok
+    // (our only image model now) doesn't produce them — we keep its pixels as-is.
     for (let i = 0; i < n; i++) {
-      // Candidate pixels: the red zone + the silhouette border margin (both modes).
-      // A pixel here is corrected ONLY if it classifies as background below — figure
-      // pixels (hair/coat at the edge) are left to the figure policy.
+      // Seed pixels: the red zone + the silhouette border margin (both modes). A pixel
+      // seeds correction ONLY if it classifies as background — figure pixels (hair/coat
+      // at the edge) are left to the figure policy.
       const inZone = redZone[i] || borderRing[i] > 128;
       if (!inZone) continue;
-      const r = pasteRaw[i * 3], g = pasteRaw[i * 3 + 1], b = pasteRaw[i * 3 + 2];
-      if ((r > 235 && g > 235 && b > 235) || (r < 22 && g < 22 && b < 22)) { garbage[i] = 255; garbagePx++; continue; }
       if (!bgCent.length) continue;
-      const lab = _rgbToLab(r, g, b);
+      const lab = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
       let dFig = Infinity; for (const c of figCent) { const d = _deltaE(lab, c); if (d < dFig) dFig = d; }
       let bk = -1, dBg = Infinity; for (let k = 0; k < bgCent.length; k++) { const d = _deltaE(lab, bgCent[k]); if (d < dBg) { dBg = d; bk = k; } }
       if (bk >= 0 && dBg < dFig) { bgAssign[i] = bk; srcSum[bk][0] += lab[0]; srcSum[bk][1] += lab[1]; srcSum[bk][2] += lab[2]; srcSum[bk][3]++; bgPx++; }
     }
-    // Per-material offset = original target (bgCent) − model source mean.
-    const bgOff = bgCent.map((c, k) => srcSum[k][3] ? [c[0] - srcSum[k][0] / srcSum[k][3], c[1] - srcSum[k][1] / srcSum[k][3], c[2] - srcSum[k][2] / srcSum[k][3]] : [0, 0, 0]);
+    // Per-material model mean at the border, and the offset to the original outside.
+    const srcMean = srcSum.map(s => s[3] ? [s[0] / s[3], s[1] / s[3], s[2] / s[3]] : null);
+    const bgOff = bgCent.map((c, k) => srcMean[k] ? [c[0] - srcMean[k][0], c[1] - srcMean[k][1], c[2] - srcMean[k][2]] : [0, 0, 0]);
+    // GROW to the whole CONNECTED same-colour region (default). Otherwise the shift
+    // only covers the 12px border ring and a step shows where the ring ends (the
+    // "line 12px in"). Connected flood-fill (not "all pixels of this colour") so a
+    // black WALL border grows across the wall but never reaches the black EYES —
+    // they're a separate island, unconnected, so they keep their colour.
+    let grownPx = 0;
+    if (bgGrowRegion) {
+      const GROW_THR = 9; // a neighbour joins the region if within ~9 ΔE of the border material's model mean
+      const queue = []; for (let i = 0; i < n; i++) if (bgAssign[i] >= 0) queue.push(i);
+      for (let qh = 0; qh < queue.length; qh++) {
+        const i = queue[qh], k = bgAssign[i]; if (!srcMean[k]) continue;
+        const x = i % cropW, y = (i / cropW) | 0;
+        for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const xx = x + d[0], yy = y + d[1]; if (xx < 0 || yy < 0 || xx >= cropW || yy >= cropH) continue;
+          const j = yy * cropW + xx;
+          if (alpha1[j] <= 128 || bgAssign[j] >= 0) continue; // inside the paste, not yet claimed
+          const lab = _rgbToLab(pasteRaw[j * 3], pasteRaw[j * 3 + 1], pasteRaw[j * 3 + 2]);
+          if (_deltaE(lab, srcMean[k]) < GROW_THR) { bgAssign[j] = k; queue.push(j); grownPx++; }
+        }
+      }
+    }
     for (let i = 0; i < n; i++) {
       const bk = bgAssign[i]; if (bk < 0) continue;
       const lab = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
       const rgb = _labToRgb(lab[0] + bgOff[bk][0], lab[1] + bgOff[bk][1], lab[2] + bgOff[bk][2]);
       pasteRaw[i * 3] = rgb[0]; pasteRaw[i * 3 + 1] = rgb[1]; pasteRaw[i * 3 + 2] = rgb[2];
     }
-    // Garbage (unfilled white/black) still gets diffused scene background.
-    if (garbagePx > 0) {
-      const bgFill = harmonicBackgroundFill(origRaw, garbage, figExclude, cropW, cropH);
-      for (let i = 0; i < n; i++) { if (garbage[i]) { pasteRaw[i * 3] = bgFill[i * 3]; pasteRaw[i * 3 + 1] = bgFill[i * 3 + 1]; pasteRaw[i * 3 + 2] = bgFill[i * 3 + 2]; } }
-    }
-    if (bgPx > 0) log.info(`[TESTLAB] ${bodyColorMode ? 'figure-mode border' : 'red-zone'}: colour-matched ${bgPx}px background (${bgCent.length} materials) to the scene, ${garbagePx}px garbage bg-filled`);
+    if (bgPx > 0) log.info(`[TESTLAB] ${bodyColorMode ? 'figure-mode border' : 'red-zone'}: colour-matched ${bgPx}px border${bgGrowRegion ? ` → grown to ${bgPx + grownPx}px connected regions` : ''} (${bgCent.length} materials)`);
     if (!colorInfo && bodyColorMode) colorInfo = { deltaEBefore: null, seamBefore: null, seamAfter: null, figureColorKept: true };
-    if (colorInfo) { colorInfo.redZonePx = redZonePx; colorInfo.garbagePx = garbagePx; colorInfo.bgMatchedPx = bgPx; }
+    if (colorInfo) { colorInfo.redZonePx = redZonePx; colorInfo.bgMatchedPx = bgPx; colorInfo.bgGrownPx = grownPx; }
   }
   const pasteBuf = await sharp(pasteRaw, { raw: { width: cropW, height: cropH, channels: 3 } }).png().toBuffer(); // PNG: lossless corrected paste
   // Applied view: exactly what gets pasted (colour-corrected figure + filled bg).
   const ccCut = await sharp(pasteBuf).ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer();
   const ccVis = await sharp({ create: { width: cropW, height: cropH, channels: 3, background: { r: 30, g: 30, b: 30 } } })
     .composite([{ input: ccCut }]).jpeg().toBuffer();
-  await addStep(`pasted region (colour${colorInfo ? ` ΔE ${colorInfo.deltaEBefore}, seam ${colorInfo.seamBefore}→${colorInfo.seamAfter}` : ' n/a'}${redZonePx ? `, red-zone ${redZonePx}px kept from model, ${colorInfo?.garbagePx ?? 0}px garbage bg-filled` : ''})`, `data:image/jpeg;base64,${ccVis.toString('base64')}`);
+  await addStep(`pasted region (colour${colorInfo ? ` ΔE ${colorInfo.deltaEBefore}, seam ${colorInfo.seamBefore}→${colorInfo.seamAfter}` : ' n/a'}${colorInfo?.bgMatchedPx ? `, border-match ${colorInfo.bgMatchedPx}px→${(colorInfo.bgMatchedPx + (colorInfo.bgGrownPx || 0))}px grown` : ''})`, `data:image/jpeg;base64,${ccVis.toString('base64')}`);
 
   // Edge feather — industry paste-back recipe: ERODE the alpha inward by the feather
   // radius, THEN Gaussian-feather, so the blend ramp lives INSIDE the pasted figure
@@ -2896,6 +2910,9 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       // Only colour-match the garment (materials continuing outside the paste); leave
       // Grok's skin/hair. Override with params.garmentOnly=false to match all materials.
       garmentOnly: params.garmentOnly != null ? params.garmentOnly : true,
+      // Grow the border colour-match to the whole CONNECTED same-colour region (no
+      // 12px-band line). Override with params.bgGrowRegion=false to A/B the old band.
+      bgGrowRegion: params.bgGrowRegion != null ? params.bgGrowRegion : true,
     });
     feathered = blend.feathered;
     colorInfo = blend.colorInfo || null;
