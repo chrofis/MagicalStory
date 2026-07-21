@@ -5389,24 +5389,31 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const realGroups = Array.from(groups.entries()).filter(([key]) => key !== '__unassigned__');
         // One VB vantage can be used from genuinely different viewpoints (a
         // cellar seen from the exterior threshold on one page and from inside on
-        // the next). Those pages carry different per-page emptyScenePrompts and
-        // need SEPARATE plates — sharing one canvas across them composited page 4
-        // onto page 3's exterior plate (staging job_…km769btua). Partition each
-        // vantage group by its per-page brief; a split unit renders from the
-        // page's own brief instead of the generic vantage description.
-        const briefSig = (pd) => ((pd?.emptyScenePrompt || pd?.sceneMetadata?.emptyScenePrompt || '')
-          .replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 200));
+        // the next). Those pages carry very different per-page emptyScenePrompts
+        // and need SEPARATE plates — sharing one canvas composited page 4 onto
+        // page 3's exterior plate (staging job_…km769btua). But same-viewpoint
+        // pages differ only in per-page ACTION prose and MUST keep sharing one
+        // plate (consistency + cost): an exact-brief split doubled the empty
+        // scenes on every 10-page story and stalled the job watchdog.
+        // Cluster a group's pages by brief word-overlap (Jaccard); only a
+        // genuinely divergent brief (< SPLIT_SIM) starts a new plate. Threshold
+        // 0.15 keeps normal 10-page stories at their original ~5-6 plates while
+        // still splitting the cellar (its interior/exterior briefs overlap ~0.11).
+        const briefWords = (pd) => new Set((pd?.emptyScenePrompt || pd?.sceneMetadata?.emptyScenePrompt || '')
+          .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 3));
+        const briefSim = (a, b) => { let i = 0; for (const w of a) if (b.has(w)) i++; const u = a.size + b.size - i; return u ? i / u : 1; };
+        const SPLIT_SIM = 0.15;
         const renderUnits = [];
         for (const [vantageId, group] of realGroups) {
-          const byBrief = new Map();
+          const clusters = []; // { rep:Set<word>, pageNumbers:[] }
           for (const pn of group.pageNumbers) {
-            const pd = pageDataArray.find(x => x.pageNumber === pn);
-            const key = briefSig(pd);
-            if (!byBrief.has(key)) byBrief.set(key, []);
-            byBrief.get(key).push(pn);
+            const w = briefWords(pageDataArray.find(x => x.pageNumber === pn));
+            const hit = clusters.find(c => briefSim(w, c.rep) >= SPLIT_SIM);
+            if (hit) hit.pageNumbers.push(pn);
+            else clusters.push({ rep: w, pageNumbers: [pn] });
           }
-          const split = byBrief.size > 1;
-          for (const pns of byBrief.values()) renderUnits.push({ vantageId, vantage: group.vantage, pageNumbers: pns, usePageBrief: split });
+          const split = clusters.length > 1;
+          for (const c of clusters) renderUnits.push({ vantageId, vantage: group.vantage, pageNumbers: c.pageNumbers, usePageBrief: split });
         }
         if (renderUnits.length > 0) {
           log.info(`🏛️ [UNIFIED] Phase 5a-pre-vantage: ${realGroups.length} location vantage(s) → ${renderUnits.length} canvas(es) for ${pageDataArray.length} page(s)`);
