@@ -6890,13 +6890,6 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // path uses. Without this, inpaint can paint a face/hat into the calm
     // zone when the bbox happens to overlap it.
     textPosition = null,
-    // Cover text that the original cover prompt rendered into the image.
-    // When set, inpaint appends a "PRESERVE these texts verbatim" suffix so
-    // Grok keeps the title / dedication / branding intact while fixing the
-    // requested issues. Without this, inpaint regenerates the modified area
-    // and the title text disappears.
-    //   { title?: string, dedication?: string, branding?: string }
-    coverText = null,
   } = options;
 
   // Resolve the current-page clothing category for a character. Case-insensitive.
@@ -7205,18 +7198,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     ? `\n\nQuiet zone: keep the ${TEXT_POSITION_DESC_INPAINT[textPosition]} as ${inpaintTextZoneDesc ? `the established ${inpaintTextZoneDesc} — preserve its existing atmospheric character (clouds, gradient, texture)` : 'soft and visually calm'}. Do not introduce faces, hats, patterns, or other high-contrast detail there, and do not flatten it to a uniform color. It is intentional negative space in the composition.`
     : '';
 
-  // Cover text preservation: when the original cover prompt rendered title /
-  // dedication / branding into the image, list those exact strings here so
-  // Grok keeps them intact while fixing the requested issues. Without this
-  // the title disappears on every cover inpaint.
-  let coverTextSuffix = '';
-  if (coverText && (coverText.title || coverText.dedication || coverText.branding)) {
-    const lines = [];
-    if (coverText.title) lines.push(`- Title text "${coverText.title}" rendered in the upper third of the image — keep its exact spelling, position, lettering style, and three-dimensional rendering.`);
-    if (coverText.dedication) lines.push(`- Dedication text "${coverText.dedication}" — keep its exact spelling, position, and lettering style.`);
-    if (coverText.branding) lines.push(`- Branding text "${coverText.branding}" inset from the bottom-left corner — keep its exact spelling, position, and lettering style.`);
-    coverTextSuffix = `\n\nPRESERVE EXISTING TEXT — CRITICAL: this image is a book cover. Do NOT modify, remove, distort, or re-letter the following pre-existing text:\n${lines.join('\n')}\nWhile fixing the issues listed above, leave every letter of these texts pixel-perfect. If a fix would overlap the text area, work around it.`;
-  }
+  // (Cover text is no longer preserved via a prompt hint. Covers render textless
+  // and the title/dedication/branding is composited app-side by composeCover;
+  // cover inpaint repaints the textless art layer and re-composites the text
+  // afterward — see executeInpaintAction / restampCover.)
 
   // Strip entity-grid vocabulary ("cells A, D, F", "the reference (R)")
   // before the instruction reaches the image model — image models DRAW what
@@ -7230,7 +7215,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     const { sanitizeVbIdsInPrompt } = require('./storyHelpers');
     editInstruction = sanitizeVbIdsInPrompt(editInstruction, visualBible, pageNumber);
   }
-  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${quietZoneSuffix}${coverTextSuffix}`;
+  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${quietZoneSuffix}`;
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {
@@ -8026,7 +8011,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const executeInpaintAction = async (img, latestEval, roundNum = null) => {
     const versions = pageVersions.get(img.pageNumber) || [];
     const bestSoFar = selectBestVersion(versions);
-    const inputImage = bestSoFar?.imageData || img.imageData;
+    let inputImage = bestSoFar?.imageData || img.imageData;
     // Parse per-character clothing for this page so the avatar lookup picks the
     // styled+costumed variant matching what's actually drawn on this page.
     // Without this, inpaint attaches unstyled base photos and Grok has no visual
@@ -8045,23 +8030,32 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // server.js — see docs/calm-zone-pipeline.md), so a non-null value here
     // means the story uses overlay and the suffix is correct.
     const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === img.pageNumber)?.textPosition || null;
-    // Cover text preservation: when inpainting a cover (pageNumber<=0), tell
-    // Grok to keep the title / dedication / "magicalstory.ch" branding that
-    // the original cover prompt rendered into the image. Without this, every
-    // cover inpaint regenerates the modified area and the text disappears.
-    //   page -1 = frontCover  → title text in upper third
-    //   page -2 = initialPage → dedication (when set)
-    //   page -3 = backCover   → "magicalstory.ch" in bottom-left
-    let coverText = null;
-    if (img.pageNumber === -1) {
-      coverText = { title: storyData?.title || null };
-    } else if (img.pageNumber === -2) {
-      const dedication = storyData?.dedication
-        || storyData?.coverImages?.initialPage?.dedication
-        || null;
-      if (dedication) coverText = { dedication };
-    } else if (img.pageNumber === -3) {
-      coverText = { branding: 'magicalstory.ch' };
+    // Cover text preservation. Covers render TEXTLESS; the title / dedication /
+    // "magicalstory.ch" branding is composited app-side (composeCover). If the
+    // post-persist bake has already run (${key}Art row exists → post-generation
+    // repair), inpaint the TEXTLESS art layer and re-composite the text after,
+    // so Grok can't mangle it. During INITIAL generation (${key}Art absent) the
+    // cover is already textless and bakeCoverTypographyPostPersist stamps it
+    // later — inpaint the served (textless) image as-is, no restamp.
+    const coverKey = img.pageNumber === -1 ? 'frontCover'
+      : img.pageNumber === -2 ? 'initialPage'
+      : img.pageNumber === -3 ? 'backCover' : null;
+    let restampCoverAfter = false;
+    if (coverKey) {
+      try {
+        const { dbQuery } = require('../services/database');
+        const sid = storyData?.id || jobId || null;
+        const rows = sid ? await dbQuery(
+          "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test ORDER BY version_index DESC LIMIT 1",
+          [sid, `${coverKey}Art`]) : [];
+        if (rows.length) {
+          const r2mod = require('./r2');
+          const artRow = rows[0];
+          const artSrc = artRow.image_url || (artRow.image_data ? 'data:image/jpeg;base64,' + artRow.image_data.toString('base64') : null);
+          const artBytes = artSrc ? await r2mod.bytesFromAnyImage(artSrc) : null;
+          if (artBytes) { inputImage = 'data:image/jpeg;base64,' + artBytes.toString('base64'); restampCoverAfter = true; }
+        }
+      } catch (e) { /* fall back: inpaint the served image, no restamp */ }
     }
     const result = await inpaintPage(inputImage, latestEval || {}, {
       visualBible: storyData?.visualBible || null,
@@ -8072,13 +8066,26 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       artStyle: storyData?.artStyle || artStyle || null,
       characterClothing: pageCharacterClothing,
       clothingRequirements: storyData?.clothingRequirements || null,
-      coverText,
       // Thread storyId + round so consolidator calls get persisted
       storyId: storyData?.id || jobId || null,
       round: roundNum,
       aspectRatio: sceneAspect,
       textPosition: pageTextPosition,
     });
+    // Re-composite the cover text onto the repainted textless art (reuses
+    // composeCover). The served image keeps its title; artImageData is the new
+    // textless source for future no-AI title edits.
+    if (restampCoverAfter && result?.imageData) {
+      try {
+        const { restampCover } = require('./coverTypography');
+        const figures = storyData?.coverImages?.[coverKey]?.bboxDetection?.figures || [];
+        const stamped = await restampCover(storyData, coverKey, result.imageData, { seed: storyData?.title, figures });
+        result.artImageData = stamped.textlessData;
+        result.imageData = stamped.titledData;
+      } catch (e) {
+        require('../utils/logger').log.warn(`⚠️ [COVER INPAINT] ${coverKey}: restamp failed (${e.message}) — serving repainted image`);
+      }
+    }
     if (result.usage && usageTracker) {
       // Detect actual provider from the model used
       const inpaintModel = result.usage?.model || '';

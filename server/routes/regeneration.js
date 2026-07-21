@@ -2363,6 +2363,11 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         generatedAt: timestamp,
         versionIndex: newVersionIndex
       });
+      // Persist the textless art in lockstep (${coverKey}Art vN) so a later
+      // title-only edit re-composites from THIS version's own art (no AI call).
+      if (imageResult.artImageData) {
+        await saveStoryImage(id, `${coverKey}Art`, null, imageResult.artImageData, { versionIndex: newVersionIndex });
+      }
       // Mark as already saved so saveStoryData doesn't re-save it
       newVersion.dbVersionIndex = newVersionIndex;
       newVersion._alreadySaved = true;
@@ -3131,6 +3136,12 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       generatedAt: new Date().toISOString(),
       versionIndex: newVersionIndex
     });
+    // Persist the textless art in lockstep (${coverKey}Art vN) so a later
+    // title-only edit re-composites from THIS version's own art with no AI call.
+    // iterateCover returns artImageData when app-side typography is on.
+    if (iterResult.artImageData) {
+      await saveStoryImage(id, `${coverKey}Art`, null, iterResult.artImageData, { versionIndex: newVersionIndex });
+    }
     // Mark the new version's imageData as already saved so saveStoryData doesn't re-save it
     newVersion.dbVersionIndex = newVersionIndex;
     newVersion._alreadySaved = true;
@@ -6022,8 +6033,28 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     const previousReasoning = prevVersionEntry?.qualityReasoning ?? (typeof existingCover === 'object' ? existingCover.qualityReasoning || null : null);
     log.debug(`✏️ [COVER EDIT] Capturing previous image (score: ${previousScore})`);
 
+    // Edit the TEXTLESS art layer, not the titled served image — Grok re-renders
+    // the raster and mangles/drops the baked title/dedication/branding. Load the
+    // ${coverKey}Art for the active version; fall back to the titled image only
+    // for legacy covers with no Art row. The text is re-composited after editing.
+    const { dbQuery } = require('../services/database');
+    let editBaseSrc = currentImageData;   // fallback: titled served image
+    let editedTextless = false;
+    try {
+      const meta = (await dbQuery('SELECT image_version_meta FROM stories WHERE id=$1', [id]))[0]?.image_version_meta || {};
+      const activeIdx = meta[coverKey]?.activeVersion ?? 0;
+      const artRows = await dbQuery(
+        "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND version_index=$3 AND NOT is_test LIMIT 1",
+        [id, `${coverKey}Art`, activeIdx]);
+      const artRow = artRows[0];
+      const artSrc = artRow ? (artRow.image_url || (artRow.image_data ? 'data:image/jpeg;base64,' + artRow.image_data.toString('base64') : null)) : null;
+      if (artSrc) { editBaseSrc = artSrc; editedTextless = true; }
+    } catch (e) {
+      log.warn(`✏️ [COVER EDIT] could not load ${coverKey}Art (${e.message}) — editing the titled image`);
+    }
+
     // Edit the cover image (pure text/instruction based - no character photos to avoid regeneration artifacts)
-    const editResult = await editImageWithPrompt(currentImageData, editPrompt);
+    const editResult = await editImageWithPrompt(editBaseSrc, editPrompt);
 
     // Log token usage for cover editing
     if (editResult?.usage) {
@@ -6032,6 +6063,23 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
 
     if (!editResult || !editResult.imageData) {
       return res.status(500).json({ error: 'Failed to edit cover - no result returned' });
+    }
+
+    // Re-composite the cover text onto the edited art (reuses composeCover). When
+    // we edited the textless layer, editResult.imageData becomes the titled served
+    // image again and editedArt holds the new textless source. Mutating
+    // editResult.imageData keeps every downstream use (eval / version / save /
+    // response) on the titled bytes with no further changes.
+    let editedArt = null;
+    if (editedTextless) {
+      try {
+        const { restampCover } = require('../lib/coverTypography');
+        const stamped = await restampCover(storyData, coverKey, editResult.imageData, { seed: storyData.title, figures: existingCover.bboxDetection?.figures || [] });
+        editedArt = stamped.textlessData;
+        editResult.imageData = stamped.titledData;
+      } catch (e) {
+        log.warn(`✏️ [COVER EDIT] restamp failed (${e.message}) — serving edited image as-is`);
+      }
     }
 
     // Evaluate the edited cover quality
@@ -6101,6 +6149,11 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       generatedAt: timestamp,
       versionIndex: newVersionIndex
     });
+    // Persist the edited textless art in lockstep so a later title-only edit
+    // re-composites from THIS version's own art with no AI call.
+    if (editedArt) {
+      await saveStoryImage(id, `${coverKey}Art`, null, editedArt, { versionIndex: newVersionIndex });
+    }
     await saveStoryData(id, storyData);
     // User-triggered cover edit — make the new push canonical (no pickBest).
     // pinned: any later save's recompute would otherwise revert to pickBest.

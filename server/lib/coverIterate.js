@@ -556,8 +556,46 @@ async function iterateCover(coverKey, storyData, options = {}) {
 
   log.info(`🔄 [COVER-ITERATE] ${coverKey}: Generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
 
+  // App-side typography: the render above is TEXTLESS (frontCoverTextless etc.).
+  // Re-composite the title / dedication / branding so the served cover keeps its
+  // text after this repaint — reuses composeCover via restampCover. Expose the
+  // textless bytes as artImageData so callers persist ${key}Art for future
+  // no-AI title edits.
+  //
+  // ONLY restamp once the post-persist bake has already run — signalled by the
+  // ${key}Art row existing. During INITIAL generation the cover is intentionally
+  // textless and bakeCoverTypographyPostPersist stamps it later; restamping here
+  // would double-bake. Post-generation repaints (regenerate/edit/repair) run
+  // after the bake, so ${key}Art exists and they DO need the restamp.
+  let servedImageData = imageResult.imageData;
+  let artImageData = null;
+  let typographySpec = null;
+  if (textlessCovers) {
+    let bakeAlreadyRan = false;
+    try {
+      const { dbQuery } = require('../services/database');
+      const rows = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 LIMIT 1", [storyData.id, `${coverKey}Art`]);
+      bakeAlreadyRan = rows.length > 0;
+    } catch (e) { /* check failed → skip restamp (safe: textless served, initial bake handles it) */ }
+    if (bakeAlreadyRan) {
+      try {
+        const { restampCover } = require('./coverTypography');
+        const figures = existingCover.bboxDetection?.figures || [];
+        const stamped = await restampCover(storyData, coverKey, imageResult.imageData, { seed: storyData.title, figures });
+        servedImageData = stamped.titledData;
+        artImageData = stamped.textlessData;
+        typographySpec = stamped.spec;
+        log.info(`🅰️ [COVER-ITERATE] ${coverKey}: re-composited text (${typographySpec?.fontId || '?'}/${typographySpec?.layout || '?'})`);
+      } catch (e) {
+        log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: restamp failed (${e.message}) — serving textless render`);
+      }
+    }
+  }
+
   return {
-    imageData: imageResult.imageData,
+    imageData: servedImageData,
+    artImageData,
+    typography: typographySpec,
     score: imageResult.score,
     reasoning: imageResult.reasoning,
     modelId: imageResult.modelId,

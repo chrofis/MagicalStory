@@ -492,8 +492,39 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
   }
 }
 
+// ---------------------------------------------------------------------------
+// restampCover — re-apply cover text after a REPAINT. Covers render textless and
+// the title / dedication / branding is composited app-side (composeCover); every
+// repair · redo · edit path that repaints a cover MUST call this so the served
+// image keeps its text. The invariant that prevents double-baking: the input is
+// ALWAYS textless art (a ${key}Art layer or a fresh textless render), never an
+// already-titled image. Pure — returns bytes; the caller owns persistence.
+//   coverKey    : 'frontCover' | 'initialPage' | 'backCover'
+//   textlessSrc : data-URI | raw base64 | https URL (resolved via bytesFromAnyImage)
+//   figures     : optional detected figures for text placement; [] falls back to
+//                 composeCover's default bands (safe when none available).
+// ---------------------------------------------------------------------------
+async function restampCover(storyData, coverKey, textlessSrc, { seed, figures } = {}) {
+  const r2 = require('./r2');
+  const KIND = { frontCover: 'front', initialPage: 'initial', backCover: 'back' }[coverKey];
+  if (!KIND) throw new Error(`restampCover: unknown coverKey ${coverKey}`);
+  const bytes = await r2.bytesFromAnyImage(textlessSrc);
+  if (!bytes) throw new Error('restampCover: could not resolve cover art bytes');
+  const title = storyData?.title || '';
+  const dedication = storyData?.dedication || '';   // trials store no dedication → empty
+  const { buffer, spec } = await composeCover({
+    artBuffer: bytes, kind: KIND, title, dedication, seed: seed || title, figures: figures || [],
+  });
+  return {
+    titledData: 'data:image/jpeg;base64,' + buffer.toString('base64'),
+    textlessData: 'data:image/jpeg;base64,' + bytes.toString('base64'),
+    spec,
+  };
+}
+
 module.exports = {
   composeCover, composeFrontTitle, composeDedication, composeBrand, applyCoverTypography, bakeCoverTypographyPostPersist,
+  restampCover,
   // exported for the standalone verify CLI / tests
   _internals: { occupancyFromFigures, bestRect, colorCandidates, finalizeColor, palette, garmentColors, FONTS, DEAL, FONT_FILES, renderSvg, buildTitleGroup, fitRender },
 };
