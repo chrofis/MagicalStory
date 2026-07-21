@@ -2009,3 +2009,17 @@ where it is genuinely unreachable.
 `extractCropFromImage` cutout), `server/lib/images.js` (`resolveCharBbox`
 `bodyMask`, `executeCharFixAction` thread, silhouette-gate reuse in
 `repairCharacterMismatchWithGrok`), `server/lib/testlab.js` (bbox verdict fields).
+
+## AI-image failure-mode catalogue documented, mitigations deferred (2026-07-21)
+
+**Context:** recurring physically implausible renders (slack ropes under
+tension, cage bars in front of one limb and behind another, ascending stairs
+substituted for descending). Internet research found no single canonical
+taxonomy; PhyBench + forensic checklists + practitioner lists were synthesized
+into `docs/image-failure-modes.md` (10 failure classes + mitigation playbook).
+
+**Decision:** documentation only for now — NO hazard-list prompt rules and NO
+new eval checks yet. When picked up: hazard list in scene expansion + matching
+eval checks + Test Lab scene_variant validation, per the playbook in the doc.
+
+**Touched:** `docs/image-failure-modes.md` (new), this entry.
