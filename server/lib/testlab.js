@@ -18,7 +18,7 @@
 'use strict';
 
 const { log } = require('../utils/logger');
-const { samUnionBlend, maskBlurThreshold, fetchMaskWithRetry } = require('./samBlend');
+const { samUnionBlend, maskBlurThreshold, fetchMaskWithRetry, BLEND_RULE_VERSION } = require('./samBlend');
 
 // ─────────────────────────────────────────────────────────────────────
 // Context loading
