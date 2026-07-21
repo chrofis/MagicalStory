@@ -11125,6 +11125,172 @@ async function measureRegionSharpness(imageBuffer, rect) {
 const REPAIR_SHARPNESS_REJECT_RATIO = 0.5;
 const REPAIR_SHARPNESS_MIN_ORIG = 25; // orig region too flat → ratio meaningless, skip gate
 
+// Production FACE repair via the shared SAM-union insert blend (samBlend.samUnionBlend)
+// — the Test-Lab "insert path" ported to prod: square face crop → SAM head whiteout →
+// Grok redraw → SAM round-1∪round-2 union → erode-then-feather composite. NO crosshatch,
+// NO rectangular blend. Feather-only first (colorCorrect:false; garment/border colour is
+// a later follow-up). The blended FACE branch calls this inside a try/catch → falls back
+// to the legacy blur+rectangular blend on ANY failure (SAM down, gate reject, style
+// drift), so a repair always returns an image. Everything stays in CROP space; the
+// feathered crop is composited back at the crop origin. Mirrors runQwenInsertStage.
+async function grokFaceInsertRepair(sceneBuffer, avatarDataUri, faceBbox, bodyBbox, charName, options = {}) {
+  const sharp = require('sharp');
+  const { samUnionBlend, fetchMaskWithRetry } = require('./samBlend');
+  const meta = await sharp(sceneBuffer).metadata();
+  const W = meta.width, H = meta.height;
+  const fb = faceBbox; // [ymin,xmin,ymax,xmax] 0-1
+  if (!Array.isArray(fb) || fb.length !== 4) throw new Error('face-insert needs a 4-value faceBbox');
+
+  // Padded box → SQUARE crop centred on the head (side ≈ 3× head, floor 384, capped).
+  // Square by construction so aspectRatio:'1:1' needs no mid-pipeline reshape (a past
+  // aspect-snap desynced the paste — faces landed in the sky).
+  const pad = 0.35;
+  const padX = (fb[3] - fb[1]) * pad, padY = (fb[2] - fb[0]) * pad * 0.6;
+  let crop = {
+    x: Math.round(Math.max(0, fb[1] - padX) * W),
+    y: Math.round(Math.max(0, fb[0] - padY) * H),
+    w: Math.round(Math.min(1, fb[3] - fb[1] + 2 * padX) * W),
+    h: Math.round(Math.min(1, fb[2] - fb[0] + 2 * padY) * H),
+  };
+  const fwPx = Math.round((fb[3] - fb[1]) * W), fhPx = Math.round((fb[2] - fb[0]) * H);
+  const cx0 = crop.x + crop.w / 2, cy0 = crop.y + crop.h / 2;
+  const side = Math.min(W, H, Math.max(3 * fwPx, 3 * fhPx, 384));
+  crop = {
+    x: Math.max(0, Math.min(W - side, Math.round(cx0 - side / 2))),
+    y: Math.max(0, Math.min(H - side, Math.round(cy0 - side / 2))),
+    w: side, h: side,
+  };
+  const cropBuf = await sharp(sceneBuffer).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer();
+
+  // Boxes in crop coords: face box, body box (SAM segments the whole figure), hair box.
+  const boxInCrop = [
+    Math.max(0, Math.round(fb[1] * W) - crop.x),
+    Math.max(0, Math.round(fb[0] * H) - crop.y),
+    Math.min(crop.w, Math.round(fb[3] * W) - crop.x),
+    Math.min(crop.h, Math.round(fb[2] * H) - crop.y),
+  ];
+  const bb = (Array.isArray(bodyBbox) && bodyBbox.length === 4) ? bodyBbox : fb;
+  const bodyBoxInCrop = [
+    Math.max(0, Math.round(bb[1] * W) - crop.x),
+    Math.max(0, Math.round(bb[0] * H) - crop.y),
+    Math.min(crop.w, Math.round(bb[3] * W) - crop.x),
+    Math.min(crop.h, Math.round(bb[2] * H) - crop.y),
+  ];
+  const fbw = boxInCrop[2] - boxInCrop[0], fbh = boxInCrop[3] - boxInCrop[1];
+  const hairBox = [
+    Math.max(0, Math.round(boxInCrop[0] - fbw * 0.5)),
+    Math.max(0, Math.round(boxInCrop[1] - fbh * 0.35)),
+    Math.min(crop.w, Math.round(boxInCrop[2] + fbw * 0.5)),
+    boxInCrop[3],
+  ];
+  // Bottom-only clip: full width/top, cut at the face-box bottom (side/top hair survives).
+  const clipBottom = Math.min(crop.h, Math.round(fb[2] * H) - crop.y);
+  const faceClip = [0, 0, crop.w, clipBottom];
+
+  // Retry-aware SAM fetcher (survives post-deploy MobileSAM cold starts); requireMobilesam
+  // so rembg's whole-figure fallback can't produce a garbage box-shaped head whiteout.
+  const maskFetch = (b, box, o) => fetchMaskWithRetry(b, box, 4, { ...(o || {}), requireMobilesam: true });
+
+  // Head silhouette (whole-figure SAM ∩ face box, bottom-clipped) → binarized whiteout.
+  const rawMask = await fetchFigureHeadMaskPng(cropBuf, bodyBoxInCrop, boxInCrop, crop.w, crop.h, maskFetch, { clipMode: 'bottom', hairBox });
+  if (!rawMask) throw new Error('SAM head mask unavailable for face-insert (MobileSAM down?)');
+  const a = await sharp(rawMask).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+  const stride = Math.max(1, Math.round(a.length / (crop.w * crop.h)));
+  const hard = Buffer.alloc(crop.w * crop.h);
+  for (let y = 0; y < crop.h; y++) for (let x = 0; x < crop.w; x++) {
+    const i = y * crop.w + x;
+    const inClip = x >= faceClip[0] && x < faceClip[2] && y >= faceClip[1] && y < faceClip[3];
+    hard[i] = inClip && a[i * stride] > 128 ? 255 : 0;
+  }
+  let cov = 0; for (let i = 0; i < hard.length; i++) if (hard[i]) cov++;
+  if (cov < 40) throw new Error('SAM head mask empty for face-insert');
+  const oldMaskPng = await sharp(Buffer.alloc(crop.w * crop.h * 3, 255), { raw: { width: crop.w, height: crop.h, channels: 3 } })
+    .ensureAlpha().joinChannel(Buffer.from(hard), { raw: { width: crop.w, height: crop.h, channels: 1 } }).png().toBuffer();
+  const sentBuf = await sharp(cropBuf).composite([{ input: oldMaskPng, left: 0, top: 0 }]).png().toBuffer();
+
+  // Head-pose facts (best-effort) → keep the original head direction/expression.
+  let poseText = null;
+  try {
+    const fp = 0.3;
+    const fhn = fb[2] - fb[0], fwn = fb[3] - fb[1];
+    const fx = Math.max(0, Math.round((fb[1] - fwn * fp) * W));
+    const fy = Math.max(0, Math.round((fb[0] - fhn * fp) * H));
+    const fww = Math.min(W - fx, Math.round(fwn * (1 + 2 * fp) * W));
+    const fhh2 = Math.min(H - fy, Math.round(fhn * (1 + 2 * fp) * H));
+    const faceCrop = await sharp(sceneBuffer).extract({ left: fx, top: fy, width: fww, height: fhh2 }).jpeg({ quality: 92 }).toBuffer();
+    const p = await describeHeadPose(`data:image/jpeg;base64,${faceCrop.toString('base64')}`);
+    poseText = [p.facing ? `facing ${p.facing}` : null, p.headTilt ? `head ${p.headTilt}` : null, p.gaze ? `gaze ${p.gaze}` : null, p.expression ? `expression: ${p.expression}` : null, p.mouth ? `mouth ${p.mouth}` : null].filter(Boolean).join('; ');
+  } catch (e) { log.warn(`[CHAR REPAIR GROK] face-insert head-pose failed (${e.message}) — omitting pose facts`); }
+
+  // Prompt (ported from the lab's validated face-repair whiteout prompt).
+  let styleLine = ' Match the visual style and lighting of the first image.';
+  try {
+    const { ART_STYLES } = require('./storyHelpers');
+    const raw = ART_STYLES[options.artStyle];
+    const txt = typeof raw === 'string' ? raw : (raw && raw.default) || '';
+    if (txt) styleLine = ` Match the exact visual style, medium and rendering of the first image: ${txt}`;
+  } catch { /* generic */ }
+  const rich = (typeof options.characterDescription === 'string' ? options.characterDescription : options.richDescription) || '';
+  const faceFacts = rich ? ` The person: ${rich.split(/Wearing:/i)[0].replace(/\s+/g, ' ').trim().slice(0, 380)}` : '';
+  const hasGlasses = /\bglasses\b|\bbrille\b/i.test(rich);
+  const glassesClause = rich ? (hasGlasses ? ', including the same glasses' : '. The person does NOT wear glasses — do not add any') : '';
+  const poseClause = poseText
+    ? ` HEAD POSE AND EXPRESSION (from the original scene; directions are from the viewer's perspective): ${poseText}. Paint the head in exactly this pose — never turn it toward the camera unless stated.`
+    : '';
+  const prompt = `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. IDENTITY comes from the second image: exact same facial features, age, hair style and hair color${glassesClause}.${faceFacts}${poseClause} Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people.${styleLine}`;
+
+  // Grok redraw on the SQUARE crop (aspectRatio 1:1 — Grok coerces output to slot-0 aspect).
+  const grokResult = await require('./grok').editWithGrok(prompt, [`data:image/jpeg;base64,${sentBuf.toString('base64')}`, avatarDataUri], { aspectRatio: '1:1', resolution: '1k' });
+  if (!grokResult?.imageData) throw new Error('Grok returned no image for face-insert');
+  const outBuf = Buffer.from(grokResult.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+  const back = await sharp(outBuf).resize(crop.w, crop.h, { fit: 'fill' }).png().toBuffer();
+
+  // Round-2 full-page re-detect of the repainted figure → body box for SAM round 2.
+  let r2BodyBox = null;
+  try {
+    const candFull = await sharp(sceneBuffer).composite([{ input: back, left: crop.x, top: crop.y }]).jpeg({ quality: 92 }).toBuffer();
+    const facePagePx = [Math.round(fb[1] * W), Math.round(fb[0] * H), Math.round(fb[3] * W), Math.round(fb[2] * H)];
+    const pageBox = await detectPersonBoxInCrop(candFull, facePagePx, `prod-face-insert ${charName}: `);
+    if (pageBox) r2BodyBox = [Math.max(0, pageBox[0] - crop.x), Math.max(0, pageBox[1] - crop.y), Math.min(crop.w, pageBox[2] - crop.x), Math.min(crop.h, pageBox[3] - crop.y)];
+  } catch (e) { log.warn(`[CHAR REPAIR GROK] face-insert round-2 re-detect failed (${e.message}) — using copied box`); }
+
+  // Shared SAM-union feather blend. FEATHER-ONLY: colorCorrect false (first prod cut).
+  const blend = await samUnionBlend({
+    originalCropBuf: cropBuf,
+    candidateCropBuf: back,
+    boxInCrop,
+    cropW: crop.w,
+    cropH: crop.h,
+    oldMaskPng,
+    failCtx: {},
+    maskFetcher: async (buf) => {
+      const r2Body = r2BodyBox || bodyBoxInCrop;
+      return fetchFigureHeadMaskPng(buf, r2Body, boxInCrop, crop.w, crop.h, maskFetch, { clipMode: 'bottom', hairBox });
+    },
+    clipRect: faceClip,
+    colorCorrect: false,
+    bodyColorMode: false,
+  });
+
+  const composited = await sharp(sceneBuffer).composite([{ input: blend.feathered, left: crop.x, top: crop.y }]).jpeg({ quality: 95 }).toBuffer();
+  const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
+  const originalSceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
+  const whiteoutDataUri = `data:image/jpeg;base64,${sentBuf.toString('base64')}`;
+  log.info(`✅ [CHAR REPAIR GROK] Face-insert (SAM-union feather) repair for ${charName} completed. Crop ${crop.w}x${crop.h}@(${crop.x},${crop.y}). Cost: $${grokResult.usage?.cost || 0.02}`);
+  return {
+    imageData: finalImageData,
+    comparison: { before: originalSceneDataUri, after: finalImageData },
+    blackoutImage: whiteoutDataUri,
+    grokRawResult: grokResult.imageData,
+    croppedAvatar: avatarDataUri,
+    character: charName,
+    usage: grokResult.usage,
+    method: 'grok_face_insert',
+    promptSent: prompt,
+    debug: options.includeDebug ? { prompt, sceneSent: whiteoutDataUri, avatarSent: avatarDataUri, grokRawResult: grokResult.imageData, bbox: bodyBbox, faceBbox: fb, crop } : null,
+  };
+}
+
 async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options = {}) {
   if (!isGrokConfigured()) {
     throw new Error('XAI_API_KEY not configured for Grok repair');
@@ -11269,6 +11435,22 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   } else {
     const currentBase64 = r2Lib.stripDataUriPrefix(imageData);
     sceneBuffer = Buffer.from(currentBase64, 'base64');
+  }
+
+  // FACE repair → the shared SAM-union INSERT blend (the good Test-Lab blend: whiteout
+  // head → Grok → union feather, NO crosshatch/rectangle). Fires for EVERY face repair
+  // that has a face box — BEFORE the blended/fullScene split, so a large-face-box repair
+  // (which the 60%-guard downgrades to fullScene CROSSHATCH for the legacy blur path)
+  // still gets the insert blend. The insert path whiteouts only the SAM head silhouette,
+  // so the "whole-figure blurs to mush" reason behind that downgrade doesn't apply here.
+  // On ANY failure (SAM down, gate reject, style drift) fall through to the legacy
+  // mode-based paths below so the repair always returns an image.
+  if (whiteoutTargetOpt === 'face' && Array.isArray(options.faceBbox) && options.faceBbox.length === 4) {
+    try {
+      return await grokFaceInsertRepair(sceneBuffer, croppedAvatarDataUri, options.faceBbox, [ymin, xmin, ymax, xmax], charName, options);
+    } catch (e) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] face-insert blend failed (${e.message}) — falling back to legacy ${method} path`);
+    }
   }
 
   const issueDescription = options.issueDescription || '';
