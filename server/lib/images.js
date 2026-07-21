@@ -10604,7 +10604,7 @@ function _ccBorderRings(mask, W, H, ringPx) {
  * a face mask getting a skin-tuned shift. K=1 == the plain mean-shift.
  */
 async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, width, height, opts = {}) {
-  const { strength = 0.9, minDeltaE = 4, bins = 128, refMask = null, borderMatch = true, borderIters = 500, meanShift = false, colorAware = false, clusters = 3, sigmaScale = 0.6, maxOffsetDeltaE = 30, borderRefine = true } = opts;
+  const { strength = 0.9, minDeltaE = 4, bins = 128, refMask = null, borderMatch = true, borderIters = 500, meanShift = false, colorAware = false, clusters = 3, sigmaScale = 0.6, maxOffsetDeltaE = 30, borderRefine = true, garmentOnly = true } = opts;
   const n = width * height;
   const toRaw = async (buf) => (Buffer.isBuffer(buf) && buf.length === n * 3) ? buf : sharp(buf).resize(width, height, { fit: 'fill' }).removeAlpha().raw().toBuffer();
   const O = await toRaw(originalCropBuf);
@@ -10698,7 +10698,12 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
     const offK = cent.map((c, k) => {
       if (!keep[k]) return [0, 0, 0];
       const m = meanOffK[k];
-      if (!hasBorder[k]) return m;
+      // garmentOnly (default): only materials that CONTINUE OUTSIDE the paste (a
+      // same-material border — the shirt/coat below the neck clip) are colour-matched.
+      // Skin/hair have no same-material neighbour outside, so they get ZERO shift and
+      // keep Grok's rendering (a skin/hair colour shift is fine, even intentional). The
+      // old behaviour region-mean-matched them too, which tinted skin — switch off.
+      if (!hasBorder[k]) return garmentOnly ? [0, 0, 0] : m;
       const r = [bOut[k][0] / bOut[k][3] - (bIn[k][0] / bIn[k][3] + m[0]), bOut[k][1] / bOut[k][3] - (bIn[k][1] / bIn[k][3] + m[1]), bOut[k][2] / bOut[k][3] - (bIn[k][2] / bIn[k][3] + m[2])];
       const cap = Math.max(0.5, 0.2 * Math.hypot(m[0], m[1], m[2])); // ≤20% of the mean move
       const rm = Math.hypot(r[0], r[1], r[2]); if (rm > cap) { const s = cap / rm; r[0] *= s; r[1] *= s; r[2] *= s; }
