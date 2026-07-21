@@ -702,7 +702,8 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       const excludedNames = allNames.filter(n => !selectedNames.includes(n));
 
       if (excludedNames.length > 0) {
-        imagePrompt += `\n\n**CRITICAL CHARACTER RESTRICTION:**\nONLY show these characters: ${selectedNames.join(', ')}\nDo NOT include: ${excludedNames.join(', ')}\nIf the scene description mentions excluded characters, IGNORE those mentions and show ONLY the specified characters.`;
+        const { buildCharacterRestriction } = require('../lib/storyHelpers');
+        imagePrompt += buildCharacterRestriction(selectedNames, excludedNames);
         log.debug(`📸 [REGEN] Added character restriction: show ${selectedNames.join(', ')}, exclude ${excludedNames.join(', ')}`);
       }
     }

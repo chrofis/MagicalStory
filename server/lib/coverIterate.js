@@ -108,6 +108,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     parseClothingCategory,
     buildCharacterReferenceList,
     convertClothingToCurrentFormat,
+    buildCharacterRestriction,
   } = getStoryHelpers();
 
   const {
@@ -319,6 +320,21 @@ async function iterateCover(coverKey, storyData, options = {}) {
       CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),
       VISUAL_BIBLE: visualBiblePrompt
     });
+  }
+
+  // Explicit character restriction. The reference-photo filter above drops an
+  // excluded character's photo, but the cover prose still names them and the
+  // image model draws anyone it's told about (a supporting character reappeared
+  // on a back cover the user regenerated without them). Same restriction the
+  // scene-page regen uses — exclude anyone not in the final cover cast.
+  {
+    const selectedNames = selectedCoverCharacters.map(c => c.name).filter(Boolean);
+    const excludedNames = mergedCharacters.map(c => c.name).filter(n => n && !selectedNames.includes(n));
+    const restriction = buildCharacterRestriction(selectedNames, excludedNames);
+    if (restriction) {
+      coverPrompt += restriction;
+      log.info(`🔄 [COVER-ITERATE] ${coverKey}: character restriction — show [${selectedNames.join(', ')}], exclude [${excludedNames.join(', ')}]`);
+    }
   }
 
   // Append evaluation feedback

@@ -3524,6 +3524,20 @@ function buildRelativeHeightDescription(characters) {
  * @param {Array} characters - Original character data with physical descriptions
  * @returns {string} Formatted character reference list
  */
+/**
+ * Explicit character-restriction block appended to an image / cover prompt when
+ * the user regenerates with a subset of characters. Filtering the reference
+ * photos is NOT enough — the scene prose still names excluded characters and the
+ * image model draws anyone it is told about (observed: a supporting character
+ * reappearing on a cover the user regenerated without them). Single source of
+ * truth for scene-page regen (routes/regeneration.js) and cover regen
+ * (lib/coverIterate.js). Returns '' when nothing is excluded.
+ */
+function buildCharacterRestriction(selectedNames, excludedNames) {
+  if (!Array.isArray(excludedNames) || excludedNames.length === 0) return '';
+  return `\n\n**CRITICAL CHARACTER RESTRICTION:**\nONLY show these characters: ${(selectedNames || []).join(', ')}\nDo NOT include: ${excludedNames.join(', ')}\nIf the scene description mentions excluded characters, IGNORE those mentions and show ONLY the specified characters.`;
+}
+
 function buildCharacterReferenceList(photos, characters = null, { includeClothing = false } = {}) {
   if (!photos || photos.length === 0) return '';
 
@@ -5984,6 +5998,7 @@ module.exports = {
   buildCharacterPromptBlock,
   buildRelativeHeightDescription,
   buildCharacterReferenceList,
+  buildCharacterRestriction,
   buildHairDescription,
   getHeadBodyRatio,
 
