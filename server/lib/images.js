@@ -12604,7 +12604,18 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
           const occCrop = await sharp(paddedScene)
             .extract({ left: occLeft, top: occTop, width: occWidth, height: occHeight })
             .jpeg({ quality: 90 }).toBuffer();
-          const occSilhouette = await fetchSilhouettePng(occCrop);
+          // Occluder silhouette via SAM (box-prompted) instead of rembg — accurate
+          // figure masks, no whole-image guess. Box = the occluder's UNPADDED bbox
+          // mapped into the 20%-padded occ-crop. fetchFigureMaskPng falls back to
+          // fetchSilhouettePng (rembg) internally if SAM is unavailable, so the old
+          // path stays only as a last resort.
+          const occBoxInCrop = [
+            Math.max(0, Math.round(pxMin * sceneMeta.width) - occLeft),
+            Math.max(0, Math.round(pyMin * sceneMeta.height) - occTop),
+            Math.min(occWidth, Math.round(pxMax * sceneMeta.width) - occLeft),
+            Math.min(occHeight, Math.round(pyMax * sceneMeta.height) - occTop),
+          ];
+          const occSilhouette = await fetchFigureMaskPng(occCrop, occBoxInCrop);
           if (!occSilhouette) continue;
           // Clip the occluder silhouette to the intersection with the target's
           // hatch region. Sharp's composite rejects negative offsets and inputs
