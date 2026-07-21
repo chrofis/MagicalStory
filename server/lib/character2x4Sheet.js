@@ -34,7 +34,7 @@ const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
 // as editWithGrok (prompt + reference images → { imageData, usage, modelId }).
 // Gemini stylises far better than Grok on this BIG transform (all-5 A/B,
 // project_image_model_tests.md 2026-07-19); Grok stays on Round 1 (identity).
-async function editWithGeminiImage(prompt, refImages, { aspectRatio = '16:9', model = 'gemini-3-pro-image-preview' } = {}) {
+async function editWithGeminiImage(prompt, refImages, { aspectRatio = '16:9', model = 'gemini-2.5-flash-image' } = {}) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY missing for avatar style transfer');
   const parts = [{ text: prompt }, ...refImages.map(img => ({
@@ -749,7 +749,18 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   for (let attempt = 1; attempt <= totalAttempts; attempt++) {
     log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}, backend=${MODEL_DEFAULTS.avatarStyleTransferBackend}) attempt ${attempt}/${totalAttempts}`);
     const result = await styleTransferGenerate(prompt, pass1ImageData);
-    if (usageTracker && result.usage) usageTracker(result.provider || 'grok', result.usage, 'character_2x4_style_transfer', result.modelId);
+    if (usageTracker && result.usage) {
+      // Image models are priced per image, not per token — without an explicit
+      // cost the tracker falls into token-rate lookup, finds none for image
+      // models, and poisons the run total with NaN (observed: $NaN TOTAL on
+      // the 2026-07-21 run via gemini-3-pro style transfer).
+      const { MODEL_PRICING } = require('../config/models');
+      const usage = {
+        ...result.usage,
+        cost: result.usage.cost ?? MODEL_PRICING[result.modelId]?.perImage ?? 0.04,
+      };
+      usageTracker(result.provider || 'grok', usage, 'character_2x4_style_transfer', result.modelId);
+    }
 
     if (!process.env.GEMINI_API_KEY) {
       log.warn('[CHARACTER 2×4] GEMINI_API_KEY missing — accepting Pass 2 after first attempt');

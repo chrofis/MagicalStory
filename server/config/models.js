@@ -300,10 +300,13 @@ const MODEL_DEFAULTS = {
   // Round 1 (realistic identity anchor) stays on Grok — it preserves hair
   // length + outfit better than Gemini (which drifts identity). Round 2
   // (art/style transfer, a BIG transform) goes to Gemini — Grok barely
-  // stylises while gemini-3-pro produces a true styled render. Verdict from
-  // the all-5 Grok-vs-Gemini A/B (project_image_model_tests.md, 2026-07-19).
+  // stylises (all-5 Grok-vs-Gemini A/B, project_image_model_tests.md,
+  // 2026-07-19; that A/B ran on gemini-3-pro). Model switched pro → flash
+  // 2026-07-21 (user decision: $0.15/image vs $0.04; flash-vs-pro quality
+  // not separately A/B'd — revert via AVATAR_STYLE_MODEL if flash under-
+  // stylises).
   avatarStyleTransferBackend: process.env.AVATAR_STYLE_BACKEND || 'gemini', // 'gemini' | 'grok'
-  avatarStyleTransferModel: process.env.AVATAR_STYLE_MODEL || 'gemini-3-pro-image-preview',
+  avatarStyleTransferModel: process.env.AVATAR_STYLE_MODEL || 'gemini-2.5-flash-image',
 
   // ─── Composite Cover mode ────────────────────────────────────────────
   // When true, cover pages (frontCover, initialPage, backCover) skip the
