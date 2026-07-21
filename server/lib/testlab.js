@@ -1978,7 +1978,7 @@ async function _interiorSeedPoints(maskPng, w, h) {
   } catch { return []; }
 }
 
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep, failCtx, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -2203,7 +2203,15 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const origRaw = await sharp(origResized).removeAlpha().raw().toBuffer();
   let pasteRaw = await sharp(candResized).removeAlpha().raw().toBuffer();
   let colorInfo = null;
-  if (colorCorrect) {
+  // FIGURE colour policy differs by repair mode:
+  //  - FACE mode (bodyColorMode=false): the pasted head/coat butts against the
+  //    ORIGINAL figure, so protect the figure colour (mean+border match below).
+  //  - FIGURE/BODY mode (bodyColorMode=true): the WHOLE figure is redrawn, so a
+  //    slight coat drift is fine (no adjacent original figure to clash with) — we
+  //    SKIP the figure colour-match and instead protect the BACKGROUND at the
+  //    silhouette border (the snow-in-cutout must match the surrounding original;
+  //    that's what the eye catches). Handled by the generalized bg-match below.
+  if (colorCorrect && !bodyColorMode) {
     try {
       // FACE correction on the FIGURE (+ its 3px edge ring), referenced to the
       // original figure — histogram built from figure pixels only, so the white
@@ -2242,7 +2250,18 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // the whole red zone (the old behaviour) smeared over the good chin.
   // figExclude = both heads → the diffusion sources only real background, never
   // the old skin (which would ghost a "2nd nose").
-  if (redZonePx > 0) {
+  // BACKGROUND protection — BOTH modes. The dilated union edge always catches some
+  // background that Grok redrew: sky/wall ABOVE the head (face mode), or ground/wall/
+  // sky all around a full figure (body mode). Wherever that redrawn background abuts
+  // the ORIGINAL background just outside the silhouette, a colour step reads as a
+  // cut-out. So we build a ring just inside the silhouette edge and, per BACKGROUND
+  // material (clustered — snow, grass, wall, sky are separated by colour), shift the
+  // model's pixels back to the surrounding original. Multiple materials around one
+  // silhouette are matched independently. Texture is kept (shift, not replace).
+  const eroded = await maskBlurThreshold(Buffer.from(alpha1), cropW, cropH, 12, 200); // shrink union ~12px inward
+  const borderRing = Buffer.alloc(n);
+  for (let i = 0; i < n; i++) borderRing[i] = (alpha1[i] > 128 && eroded[i] <= 128) ? 255 : 0; // union edge margin
+  if (redZonePx > 0 || borderRing) {
     const { _rgbToLab, _labToRgb, _deltaE, _ccKMeans } = require('./images');
     const figExclude = Buffer.alloc(n);
     for (let i = 0; i < n; i++) figExclude[i] = (newDil[i] > 128 || oldA[i * s1r] > 128) ? 255 : 0;
@@ -2252,10 +2271,12 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     const figCent = (figPts.length ? _ccKMeans(Float32Array.from(figPts), 3, 6).cent : []);
     // BACKGROUND palette = K-cluster the ORIGINAL just OUTSIDE the union — the real
     // scene materials (snow, grass, …), EACH with its true target colour.
-    const ring = await maskBlurThreshold(Buffer.from(alpha1), cropW, cropH, 4, 16); // union dilated → outer ring
+    const ring = await maskBlurThreshold(Buffer.from(alpha1), cropW, cropH, 8, 16); // union → ~8px outer ring
     const bgPts = [];
     for (let i = 0; i < n; i++) if (ring[i] > 128 && alpha1[i] <= 128) { const l = _rgbToLab(origRaw[i * 3], origRaw[i * 3 + 1], origRaw[i * 3 + 2]); bgPts.push(l[0], l[1], l[2]); }
-    const bgCent = (bgPts.length ? _ccKMeans(Float32Array.from(bgPts), 3, 6).cent : []);
+    // K=5: separate sky, wall, ground, snow, grass — a full figure can abut 3+ bg
+    // materials at once, each needing its own target colour.
+    const bgCent = (bgPts.length ? _ccKMeans(Float32Array.from(bgPts), 5, 8).cent : []);
     // Classify each red-zone pixel: FIGURE (chin → keep model) vs BACKGROUND (the
     // halo margin). For each BACKGROUND material, shift the model's pixels by
     // (original material colour − model material colour) so the model's snow is
@@ -2267,7 +2288,11 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     const srcSum = bgCent.map(() => [0, 0, 0, 0]); // model mean per bg material
     let garbagePx = 0, bgPx = 0;
     for (let i = 0; i < n; i++) {
-      if (!redZone[i]) continue;
+      // Candidate pixels: the red zone + the silhouette border margin (both modes).
+      // A pixel here is corrected ONLY if it classifies as background below — figure
+      // pixels (hair/coat at the edge) are left to the figure policy.
+      const inZone = redZone[i] || borderRing[i] > 128;
+      if (!inZone) continue;
       const r = pasteRaw[i * 3], g = pasteRaw[i * 3 + 1], b = pasteRaw[i * 3 + 2];
       if ((r > 235 && g > 235 && b > 235) || (r < 22 && g < 22 && b < 22)) { garbage[i] = 255; garbagePx++; continue; }
       if (!bgCent.length) continue;
@@ -2289,7 +2314,8 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
       const bgFill = harmonicBackgroundFill(origRaw, garbage, figExclude, cropW, cropH);
       for (let i = 0; i < n; i++) { if (garbage[i]) { pasteRaw[i * 3] = bgFill[i * 3]; pasteRaw[i * 3 + 1] = bgFill[i * 3 + 1]; pasteRaw[i * 3 + 2] = bgFill[i * 3 + 2]; } }
     }
-    if (bgPx > 0) log.info(`[TESTLAB] red-zone: colour-matched ${bgPx}px background (${bgCent.length} materials) to the scene, ${garbagePx}px garbage bg-filled`);
+    if (bgPx > 0) log.info(`[TESTLAB] ${bodyColorMode ? 'figure-mode border' : 'red-zone'}: colour-matched ${bgPx}px background (${bgCent.length} materials) to the scene, ${garbagePx}px garbage bg-filled`);
+    if (!colorInfo && bodyColorMode) colorInfo = { deltaEBefore: null, seamBefore: null, seamAfter: null, figureColorKept: true };
     if (colorInfo) { colorInfo.redZonePx = redZonePx; colorInfo.garbagePx = garbagePx; colorInfo.bgMatchedPx = bgPx; }
   }
   const pasteBuf = await sharp(pasteRaw, { raw: { width: cropW, height: cropH, channels: 3 } }).png().toBuffer(); // PNG: lossless corrected paste
@@ -2854,6 +2880,9 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       featherPx: params.featherPx,
       erodeFeather: params.erodeFeather,
       colorBorderRefine: params.colorBorderRefine,
+      // FIGURE/BODY repair (not face mode) → protect background at the border, let
+      // the redrawn figure colour drift. Override with params.bodyColorMode to A/B.
+      bodyColorMode: params.bodyColorMode != null ? params.bodyColorMode : !params._faceMode,
     });
     feathered = blend.feathered;
     colorInfo = blend.colorInfo || null;
