@@ -5387,16 +5387,37 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const { groupPagesByVantage, enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
         const groups = groupPagesByVantage(pageDataArray, visualBible);
         const realGroups = Array.from(groups.entries()).filter(([key]) => key !== '__unassigned__');
-        if (realGroups.length > 0) {
-          log.info(`🏛️ [UNIFIED] Phase 5a-pre-vantage: ${realGroups.length} location vantage(s) for ${pageDataArray.length} page(s)`);
+        // One VB vantage can be used from genuinely different viewpoints (a
+        // cellar seen from the exterior threshold on one page and from inside on
+        // the next). Those pages carry different per-page emptyScenePrompts and
+        // need SEPARATE plates — sharing one canvas across them composited page 4
+        // onto page 3's exterior plate (staging job_…km769btua). Partition each
+        // vantage group by its per-page brief; a split unit renders from the
+        // page's own brief instead of the generic vantage description.
+        const briefSig = (pd) => ((pd?.emptyScenePrompt || pd?.sceneMetadata?.emptyScenePrompt || '')
+          .replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 200));
+        const renderUnits = [];
+        for (const [vantageId, group] of realGroups) {
+          const byBrief = new Map();
+          for (const pn of group.pageNumbers) {
+            const pd = pageDataArray.find(x => x.pageNumber === pn);
+            const key = briefSig(pd);
+            if (!byBrief.has(key)) byBrief.set(key, []);
+            byBrief.get(key).push(pn);
+          }
+          const split = byBrief.size > 1;
+          for (const pns of byBrief.values()) renderUnits.push({ vantageId, vantage: group.vantage, pageNumbers: pns, usePageBrief: split });
+        }
+        if (renderUnits.length > 0) {
+          log.info(`🏛️ [UNIFIED] Phase 5a-pre-vantage: ${realGroups.length} location vantage(s) → ${renderUnits.length} canvas(es) for ${pageDataArray.length} page(s)`);
           const vStart = Date.now();
           const vLimit = pLimit(20);
           const { getTextAreaMask } = require('./server/lib/textMasks');
-          await Promise.all(realGroups.map(([vantageId, group]) => vLimit(async () => {
+          await Promise.all(renderUnits.map((unit) => vLimit(async () => {
             await checkCancellation();
-            const v = group.vantage;
+            const { vantageId, vantage: v } = unit;
             // Pull a representative page so we can inherit aspect / model / landmark refs.
-            const repPageNum = group.pageNumbers[0];
+            const repPageNum = unit.pageNumbers[0];
             const repPageData = pageDataArray.find(pd => pd.pageNumber === repPageNum);
             if (!repPageData) return;
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', repPageData.pageImageBackend) || '';
@@ -5407,7 +5428,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // image render handles those.
             const eraGuard = buildEraGuard(repPageData.sceneMetadata?.era || null);
             const shotPrefix = v.shot ? `**SHOT:** ${v.shot}\n\n` : '';
-            const emptySceneDesc = `${shotPrefix}**LOCATION:** ${v.locationName || ''}\n**VANTAGE:** ${v.name || ''}\n\n${v.description || ''}`;
+            // A split unit (same vantage, different per-page viewpoint) renders
+            // from the representative page's own brief so the plate matches what
+            // that page composites onto; otherwise the generic vantage prose.
+            const repBrief = repPageData.emptyScenePrompt || repPageData.sceneMetadata?.emptyScenePrompt || '';
+            const descBody = (unit.usePageBrief && repBrief) ? repBrief : (v.description || '');
+            const emptySceneDesc = `${shotPrefix}**LOCATION:** ${v.locationName || ''}\n**VANTAGE:** ${v.name || ''}\n\n${descBody}`;
             const characterSpace = `Render this as an empty location backdrop. Foreground, midground and background bands all show the scene's natural ground/floor/water surface continuing unbroken — characters will be composited into them later. No figures, no animals.`;
             // Pull landmark photos for the LOC if real — used as a strict
             // visual reference for the Wikimedia-photo case.
@@ -5450,8 +5476,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 log.warn(`⚠️ [VANTAGE] ${vantageId} (${v.locationName} – ${v.name}) produced no image`);
                 return;
               }
-              // Fan out the same canvas to every page in the group.
-              for (const pn of group.pageNumbers) {
+              // Fan out the same canvas to every page in this render unit.
+              for (const pn of unit.pageNumbers) {
                 if (sceneBackgrounds[pn]) continue; // pre-populated (e.g. trial mode)
                 sceneBackgrounds[pn] = {
                   imageData: result.imageData,
@@ -5463,14 +5489,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   locationName: v.locationName,
                 };
               }
-              log.info(`🏛️ [VANTAGE] ${vantageId} ${v.locationName} – ${v.name}: 1 canvas → pages [${group.pageNumbers.join(',')}]`);
+              log.info(`🏛️ [VANTAGE] ${vantageId} ${v.locationName} – ${v.name}: 1 canvas → pages [${unit.pageNumbers.join(',')}]`);
             } catch (err) {
               log.warn(`⚠️ [VANTAGE] ${vantageId} failed: ${err.message}`);
             }
           })));
           const vElapsed = ((Date.now() - vStart) / 1000).toFixed(1);
           const covered = Object.keys(sceneBackgrounds).length;
-          log.info(`🏛️ [UNIFIED] Phase 5a-pre-vantage: ${realGroups.length} canvases → ${covered} pages covered in ${vElapsed}s (saved ${Math.max(0, covered - realGroups.length)} redundant generations)`);
+          log.info(`🏛️ [UNIFIED] Phase 5a-pre-vantage: ${renderUnits.length} canvases → ${covered} pages covered in ${vElapsed}s (saved ${Math.max(0, covered - renderUnits.length)} redundant generations)`);
         }
       }
 

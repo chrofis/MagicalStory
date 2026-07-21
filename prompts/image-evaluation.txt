@@ -78,6 +78,7 @@ Apply CATASTROPHIC when ONE OR MORE of these holds:
 - A large unrequested geometric shape — white triangle, white wedge, diagonal slash, monochrome panel, blank rectangle — covers a significant portion of the image, breaking the scene composition.
 - Two or more characters are merged into each other (single body with two heads, faces fused, limbs of one extending out of the other).
 - Prominent or large unrequested text — wrong or garbled words, captions, watermarks, or story text painted into the image. Small incidental in-world signage is fine (see RENDERED TEXT in STEP 3).
+- A decorative panel border, inked keyline, or coloured band frames the whole artwork around its edges (a comic-book panel frame) — a full-perimeter frame cannot be removed by repainting one region.
 
 Don't apply CATASTROPHIC when the issue is recoverable by repainting one region:
 - A character is present but in the wrong **position**, **depth**, or **scale** (e.g. should be far background but rendered in foreground; should be small but rendered large; should be on the left but appears on the right). CRITICAL position/scale issue, not catastrophic — flag as `position_and_scale` or `composition` in STEP 4.
