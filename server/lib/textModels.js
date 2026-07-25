@@ -564,21 +564,27 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
       if (options && options.system) reqBody.systemInstruction = { parts: [{ text: options.system }] };
       // Prefill: seed a model turn so the model continues from it (e.g. '{' for JSON).
       if (prefill) reqBody.contents.push({ role: 'model', parts: [{ text: prefill }] });
-      return fetch(url, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: AbortSignal.timeout(120000),
         body: JSON.stringify(reqBody)
       });
+      // fetch resolves (not rejects) on HTTP 429/5xx, so the old !response.ok
+      // check OUTSIDE withRetry never retried rate limits. Throw here with
+      // .status so withRetry backs off on 429/5xx.
+      if (!res.ok) {
+        const bodyText = await res.text().catch(() => '');
+        const err = new Error(`Gemini API error (${res.status}): ${bodyText.slice(0, 200)}`);
+        err.status = res.status;
+        throw err;
+      }
+      return res;
     }, { maxRetries: 2, baseDelay: 2000 }));
   };
 
+  // callAPI throws on non-ok (after retries), so `response` is always ok here.
   let response = await callAPI(modelId);
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Gemini API error (${response.status}): ${error}`);
-  }
 
   let data = await response.json();
 
@@ -596,8 +602,11 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
   if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
     const blockReason = data.promptFeedback?.blockReason || 'empty response';
 
-    // Try fallback to Grok (no PROHIBITED_CONTENT issues), then gemini-2.0-flash as last resort
-    if (modelId !== 'gemini-2.0-flash') {
+    // Try fallback to Grok (no PROHIBITED_CONTENT issues), then a second Gemini
+    // tier as last resort. NOTE: gemini-2.0-flash was RETIRED by Google (404),
+    // so the last resort is gemini-2.5-flash-lite.
+    const LAST_RESORT_GEMINI = 'gemini-2.5-flash-lite';
+    if (modelId !== LAST_RESORT_GEMINI) {
       const grokFallbackModel = TEXT_MODELS['grok-4-fast'];
       if (grokFallbackModel && process.env.XAI_API_KEY) {
         log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with grok-4-fast...`);
@@ -605,17 +614,13 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
           const grokResult = await callXaiAPI(prompt, maxTokens, grokFallbackModel.modelId, prefill ? { prefill } : {});
           return { ...grokResult, modelId: grokFallbackModel.modelId };
         } catch (grokErr) {
-          log.warn(`⚠️  [GEMINI] Grok fallback also failed: ${grokErr.message}, trying gemini-2.0-flash...`);
+          log.warn(`⚠️  [GEMINI] Grok fallback also failed: ${grokErr.message}, trying ${LAST_RESORT_GEMINI}...`);
         }
       } else {
-        log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with gemini-2.0-flash...`);
+        log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with ${LAST_RESORT_GEMINI}...`);
       }
 
-      response = await callAPI('gemini-2.0-flash');
-
-      if (!response.ok) {
-        throw new Error('No text in Gemini response (fallback also failed)');
-      }
+      response = await callAPI(LAST_RESORT_GEMINI);
 
       data = await response.json();
 

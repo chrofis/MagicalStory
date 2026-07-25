@@ -3857,7 +3857,12 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
   // recurring elements — only pass elements referenced by THIS scene, not the entire VB.
   let hintObjectIds = new Set();
   try {
-    const hintJson = draftSceneDescription || rawOutlineContext?.currentPage || '';
+    // Read the objects list straight from the raw scene hint. (Previously this
+    // referenced `draftSceneDescription`, declared with `let` ~80 lines below —
+    // a temporal-dead-zone ReferenceError that the catch swallowed, leaving
+    // hintObjectIds empty and disabling the relevance filter entirely, so every
+    // page shipped the whole Visual Bible.)
+    const hintJson = rawOutlineContext?.currentPage || '';
     const objMatch = hintJson.match(/"objects"\s*:\s*\[(.*?)\]/s);
     if (objMatch) {
       const ids = objMatch[1].match(/"([^"]+)"/g);

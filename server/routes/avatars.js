@@ -2974,8 +2974,10 @@ These corrections OVERRIDE what is visible in the reference photo.
           const outfitDescription = category === 'winter' ? 'a winter coat'
             : category === 'summer' ? 'a casual T-shirt and shorts'
               : 'casual clothes';
+          // Bare key — fillTemplate adds the braces. '{OUTFIT_DESCRIPTION}'
+          // never matched, so the safety-retry shipped "wearing ." with no outfit.
           const retryPrompt = fillTemplate(PROMPT_TEMPLATES.avatarRetryPrompt, {
-            '{OUTFIT_DESCRIPTION}': outfitDescription
+            OUTFIT_DESCRIPTION: outfitDescription
           });
           geminiResult = await callGeminiAvatarApi({ ...callOpts, prompt: retryPrompt, logTag: `[CLOTHING AVATARS] ${category} retry` });
           trackTokens(selectedModel, geminiResult.inputTokens, geminiResult.outputTokens);

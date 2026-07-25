@@ -893,7 +893,20 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             );
 
             gridResults.push({ gridResult, evalResult, batchCrops });
-            if (evalResult.issues) allIssues.push(...evalResult.issues);
+            if (evalResult.issues) {
+              // Stamp each issue with THIS grid's letter→page map, taken from the
+              // manifest the model actually saw. Multi-grid batches each restart
+              // lettering at 'A', so a single cross-grid map (or one rebuilt from
+              // collection order) mis-attributes issues to the wrong page.
+              const gridCellToPage = {};
+              for (const cell of (gridResult.manifest?.cells || [])) {
+                if (cell && cell.letter && cell.metadata && cell.metadata.pageNumber != null) {
+                  gridCellToPage[cell.letter] = cell.metadata.pageNumber;
+                }
+              }
+              for (const iss of evalResult.issues) iss._gridCellToPage = gridCellToPage;
+              allIssues.push(...evalResult.issues);
+            }
             if (evalResult.score < worstScore) worstScore = evalResult.score;
             if (!evalResult.consistent) overallConsistent = false;
           }
@@ -1001,24 +1014,34 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
         // If the eval text names a specific cell ("Cell B"), narrow to that
         // single page; otherwise attribute to all pages in the group.
         const groupPages = groupAppearances.map(a => a.pageNumber).filter(n => n != null);
-        const cellToPage = new Map();
-        for (let i = 0; i < groupAppearances.length; i++) {
-          const letter = String.fromCharCode(65 + i); // A, B, C...
-          cellToPage.set(letter, groupAppearances[i].pageNumber);
+        // Cell→page comes from the grid MANIFEST the model saw (stamped per grid
+        // at eval time), NOT from groupAppearances collection order — the latter
+        // diverged whenever covers (appended last but sorted first in the grid)
+        // or dropped crops shifted the lettering, routing repair feedback to the
+        // wrong page. Fall back to the primary grid's manifest if an issue lacks
+        // its stamp.
+        const primaryCellToPage = new Map();
+        for (const cell of (gridResult.manifest?.cells || [])) {
+          if (cell && cell.letter && cell.metadata && cell.metadata.pageNumber != null) {
+            primaryCellToPage.set(cell.letter, cell.metadata.pageNumber);
+          }
         }
         // Translate "Cell X" → "Cell X (page N)" in human-facing strings so
         // log output and dev panels surface page numbers directly. The Gemini
         // API call already happened on the grid image where the model saw
         // bare cell letters — we're only rewriting the stored display strings.
-        const annotateCells = (text) => {
+        const annotateCells = (text, cellMap) => {
           if (!text || typeof text !== 'string') return text;
           return text.replace(/\bCell\s+([A-Z])\b(?!\s*\(page)/g, (match, letter) => {
-            const page = cellToPage.get(letter);
+            const page = cellMap.get(letter);
             return page != null ? `${match} (page ${page})` : match;
           });
         };
 
         for (const issue of (evalResult.issues || [])) {
+          const cellToPage = issue._gridCellToPage
+            ? new Map(Object.entries(issue._gridCellToPage))
+            : primaryCellToPage;
           let pageNumbers = groupPages;
           const desc = String(issue.description || issue.issue || '');
           // Use ONLY the FIRST cell mentioned as the target page. Earlier code
@@ -1049,10 +1072,11 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             clothingCategory,
             pageNumbers,
             cellsToPages,
-            description: annotateCells(issue.description),
-            issue: annotateCells(issue.issue),
-            fixInstruction: annotateCells(issue.fixInstruction),
+            description: annotateCells(issue.description, cellToPage),
+            issue: annotateCells(issue.issue, cellToPage),
+            fixInstruction: annotateCells(issue.fixInstruction, cellToPage),
           };
+          delete annotated._gridCellToPage; // internal-only; don't persist
           report.characters[charName].issues.push(annotated);
         }
 

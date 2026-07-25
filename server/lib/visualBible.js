@@ -788,8 +788,11 @@ async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
   try {
     // Build the analysis prompt from template
     const elementsList = elementsToAnalyze.map(e => `- ${e.name} (${e.type})`).join('\n');
+    // fillTemplate wraps the key in braces itself, so pass the bare name —
+    // passing '{ELEMENTS_LIST}' built a regex for {{ELEMENTS_LIST}} that never
+    // matched, and the element list was silently dropped from every call.
     const analysisPrompt = fillTemplate(PROMPT_TEMPLATES.visualBibleAnalysis, {
-      '{ELEMENTS_LIST}': elementsList
+      ELEMENTS_LIST: elementsList
     });
 
     // Extract base64 and mime type
