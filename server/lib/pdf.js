@@ -555,6 +555,11 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
   // Classic mode dimensions (text below image)
   const textAreaHeight = pageHeight * textRatio;
   const imageHeight = textOverlay ? pageHeight : (pageHeight - textAreaHeight);
+  // Geometry for the classic "text strip below the image" layout. Used by the
+  // fallback paths even in overlay mode: overlay's imageHeight is the FULL page,
+  // so placing text at `bleed + imageHeight` would push it past the trim edge
+  // and PDFKit would auto-paginate, corrupting the Gelato page count + parity.
+  const classicImageHeight = pageHeight - textAreaHeight;
   const textWidth = pageWidth - (textMargin * 2);
   const availableTextHeight = textAreaHeight - textMargin;
   // Effective vertical budget for text after carving out top/bottom breathing room.
@@ -610,21 +615,23 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
       }
 
       if (!overlayDrawn) {
-        // Fallback: draw image without overlay + text below
+        // Fallback: draw image in the classic image band + text strip below it.
+        // Must use classicImageHeight (NOT the overlay full-page imageHeight) so
+        // the text lands in the reserved strip, not off the trim edge.
         try {
           const imageBuffer = await resolveImageBuffer(image.imageData);
         if (!imageBuffer) throw new Error('image source unresolvable');
-          await drawImageCovering(doc, imageBuffer, 0, 0, interiorW, bleed + imageHeight, { valign: 'top' });
+          await drawImageCovering(doc, imageBuffer, 0, 0, interiorW, bleed + classicImageHeight, { valign: 'top' });
         } catch (imgErr) {
           log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
         }
         doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
         const textHeight = doc.heightOfString(flowText, { width: textWidth, align: 'center', lineGap, paragraphGap });
-        // Center within effective height (after carving top/bottom padding) so
-        // there is always at least textPadTop above and textPadBottom below.
         const centerOffset = Math.max(0, (effectiveTextHeight - textHeight) / 2);
-        const textY = bleed + imageHeight + textPadTop + centerOffset;
-        doc.text(flowText, bleed + textMargin, textY, { width: textWidth, align: 'center', lineGap, paragraphGap });
+        const textY = bleed + classicImageHeight + textPadTop + centerOffset;
+        // height + ellipsis: never let overflow spill onto an auto-created page.
+        const textBudget = Math.max(0, bleed + pageHeight - textY - textPadBottom);
+        doc.text(flowText, bleed + textMargin, textY, { width: textWidth, align: 'center', lineGap, paragraphGap, height: textBudget, ellipsis: true });
       }
     } else if (image && image.imageData) {
       // Draw image (no text overlay)
@@ -639,12 +646,15 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
 
     if (!textOverlay || !image?.imageData || !cleanText) {
       // Classic mode: text in white area below image, with one-line breathing
-      // room top (below image) and bottom (above page edge).
+      // room top (below image) and bottom (above page edge). Use
+      // classicImageHeight so a missing image in overlay mode doesn't place the
+      // text off-page (it equals imageHeight in true classic mode).
       doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
       const textHeight = doc.heightOfString(flowText, { width: textWidth, align: 'center', lineGap, paragraphGap });
       const centerOffset = Math.max(0, (effectiveTextHeight - textHeight) / 2);
-      const textY = bleed + imageHeight + textPadTop + centerOffset;
-      doc.text(flowText, bleed + textMargin, textY, { width: textWidth, align: 'center', lineGap, paragraphGap });
+      const textY = bleed + classicImageHeight + textPadTop + centerOffset;
+      const textBudget = Math.max(0, bleed + pageHeight - textY - textPadBottom);
+      doc.text(flowText, bleed + textMargin, textY, { width: textWidth, align: 'center', lineGap, paragraphGap, height: textBudget, ellipsis: true });
     }
   }
 }
