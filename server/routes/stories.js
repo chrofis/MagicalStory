@@ -3086,11 +3086,11 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 router.patch('/:id/page/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { text, sceneDescription } = req.body;
+    const { text, sceneDescription, imageData } = req.body;
     const pageNumber = parseInt(pageNum);
 
-    if (!text && !sceneDescription) {
-      return res.status(400).json({ error: 'Provide text or sceneDescription to update' });
+    if (text === undefined && sceneDescription === undefined && imageData === undefined) {
+      return res.status(400).json({ error: 'Provide text, sceneDescription, or imageData to update' });
     }
 
     console.log(`📝 Editing page ${pageNumber} for story ${id}`);
@@ -3110,7 +3110,13 @@ router.patch('/:id/page/:pageNum', authenticateToken, async (req, res) => {
     }
 
     const story = storyResult.rows[0];
-    const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+    let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+    // For an image revert the bytes may be stripped from the blob (they live in
+    // story_images/R2), so rehydrate before mutating sceneImages.
+    if (imageData !== undefined) {
+      storyData = await rehydrateStoryImages(id, storyData);
+    }
 
     // Update page text if provided. Readers prefer data->'story' (COALESCE), and
     // unified stories carry both 'story' (canonical) and 'storyText' (compat), so
@@ -3128,13 +3134,39 @@ router.patch('/:id/page/:pageNum', authenticateToken, async (req, res) => {
       let sceneDescriptions = storyData.sceneDescriptions || [];
       const existingIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
 
+      // Re-extract the translated/image summaries so downstream consumers stay in
+      // sync with the edited description.
+      const { extractSceneMetadata } = require('../lib/storyHelpers');
+      const metadata = extractSceneMetadata(sceneDescription);
+      const sceneEntry = {
+        pageNumber,
+        description: sceneDescription,
+        translatedSummary: metadata?.translatedSummary ?? null,
+        imageSummary: metadata?.imageSummary ?? null,
+      };
       if (existingIndex >= 0) {
-        sceneDescriptions[existingIndex].description = sceneDescription;
+        sceneDescriptions[existingIndex] = { ...sceneDescriptions[existingIndex], ...sceneEntry };
       } else {
-        sceneDescriptions.push({ pageNumber, description: sceneDescription });
+        sceneDescriptions.push(sceneEntry);
         sceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
       }
       storyData.sceneDescriptions = sceneDescriptions;
+    }
+
+    // Update image if provided (admin only — used to revert an auto-repair).
+    if (imageData !== undefined) {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can update images directly' });
+      }
+      const sceneImages = storyData.sceneImages || [];
+      const imageIndex = sceneImages.findIndex(s => s.pageNumber === pageNumber);
+      if (imageIndex < 0) {
+        return res.status(404).json({ error: `No image found for page ${pageNumber}` });
+      }
+      sceneImages[imageIndex].imageData = imageData;
+      sceneImages[imageIndex].wasAutoRepaired = false; // mark as reverted
+      storyData.sceneImages = sceneImages;
+      console.log(`🔄 [REVERT] Image reverted for page ${pageNumber} of story ${id}`);
     }
 
     // Save updated story with metadata (extracts images to story_images table)
