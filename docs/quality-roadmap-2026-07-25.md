@@ -122,10 +122,19 @@ outline + character arcs + plot structure + visual bible + per-page text +
 per-page scene hints + cover hints + title candidates + clothing requirements +
 a self-critique/patch loop — a very dense prompt.
 
+**Findings:** the single unified Sonnet call performs **~26 distinct tasks** (full
+enumerated checklist in the audit — dialect, character declaration + inventing
+secondaries, category guidelines, scene plan, plot structure, per-character arcs,
+supporting arcs, per-page text, do-not-write enforcement, per-page scene prose +
+metadata JSON, full draft, 5-axis self-critique, revise, Visual Bible JSON,
+landmark handling, vantages, 4 cover specs, marker formatting). Cost is
+~$0.40–0.60/story and it is the single most expensive call — but judgment-locked
+(Haiku already rejected for the adjacent scene-description task).
+
 **Experiment (📐 spec):** compare **A = current single dense call** vs **B = split**
-(e.g. story text + arcs in one call; visual bible + scene hints in a second
-grounded on the finished text). Measure with the story-quality criteria below.
-This depends on the Test Lab text-only rerun (§7).
+— narrative draft + critique + revise in call 1; Visual Bible + covers + arcs
+metadata in call 2 (grounded on the finished text). Measure with the §6 criteria.
+Depends on §7 (text-only rerun). The lever here is task-density, NOT the model.
 
 **Status:** 🧪 experiment defined; blocked on §7 (text-only rerun) + §6 (criteria).
 
@@ -165,16 +174,31 @@ number to compare against, not a perfect taxonomy.
 **Concern:** "in the Test Lab it should be possible to rerun the same story
 inputs but only generate story text."
 
-**Findings:** ❓ (the model-cost agent is checking whether a text-only path
-already exists — there is a `skipImages` developer flag in the pipeline, so the
-plumbing may be most of the way there). Minimal implementation sketch pending
-that finding.
+**Findings — feasible with a small hook; the plumbing already exists:**
+- The text-only pipeline already exists via the dev `skipImages` flag: threaded
+  into `processUnifiedStoryJob` with a clean early-return seam AFTER text + scene
+  expansion, BEFORE covers/page images (`server.js:4929-4953` returns
+  `{title, pages(image:null), visualBible, tokenUsage}`). Today only the wizard
+  triggers it (`StoryWizard.tsx:5785`).
+- Test Lab today is per-stage regression tooling on *existing* stories
+  (`testlab.js:2608-2654`) — no full-story-text regenerate stage exists.
+- **Original inputs live in `story_jobs.input_data`** (authoritative, not
+  `stories.data`).
 
-**Action:** add a Test Lab control that re-runs a saved story's exact inputs
-through story generation with images/covers/repair skipped, emitting the story
-text + the §6 rubric scores. This is the harness for §5 and §9 experiments.
+**Minimal implementation (Option A, ~1 route, no `server.js` changes):** new
+admin route in `server/routes/admin/testlab.js` that (1) loads the source story's
+`input_data` from `story_jobs`, (2) sets `input_data.skipImages = true`,
+(3) inserts a new `story_jobs` row + calls `deps.processStoryJob(jobId)` — the
+exact pattern already at `jobs.js:358,397`. Then run the §6 rubric on the output.
+**One thing to confirm first:** whether `stories` carries a `job_id` back to its
+originating job row (raw inputs are definitely in `story_jobs.input_data`; only
+the story→job linkage needs verifying).
 
-**Status:** 📐 spec; feasibility ❓ pending.
+**Action:** build Option A + wire the §6 rubric scoring. This is the harness for
+§5 and §9 experiments.
+
+**Status:** 📐 spec — feasible, minimal; autonomous-buildable once story→job
+linkage is confirmed (candidate for a follow-up once the owner confirms §6 rubric).
 
 ---
 
@@ -227,29 +251,81 @@ model."
 **Concern:** "review all prompts and which models we use — can we use cheaper
 models? Can we merge or split prompts to improve quality?"
 
-**Findings:** ❓ (prompt×model×cost table + ranked downgrade candidates from the
-model-cost agent). Guardrails from memory: `gemini-2.5-flash` is required for
-quality eval/bbox (lite misses small targets — already a logged verdict); don't
-re-litigate rejected tech.
+**Findings — audit complete.**
 
-**Action:** ❓ downgrade the low-risk utility/formatting stages; keep judgment
-stages premium; run merge/split as measured experiments (§5/§6/§7).
+**Must STAY premium (verdicts already logged — do NOT re-litigate):** unified
+story (Sonnet, narrative quality); quality-eval + bbox + entity checks
+(gemini-2.5-flash — lite tried & rejected for missing small targets, 2.0-flash
+can't bbox); Stage-2 compliance (qwen3-max — qwen-plus/haiku/deepseek/kimi all
+flooded false CRITICALs). **Already cheap:** all page/cover/repair/avatar images
+on Grok $0.02; scene-iterate + consolidation on qwen-plus; avatar style-transfer
+on flash ($0.04, down from pro $0.15); face-crop validate on flash-lite.
 
-**Status:** 🧪 audit pending.
+**Top downgrade candidates (new, low-risk):**
+1. **`text_check` (Sonnet, up to 16K out, 1×/story)** — mechanical proofreading,
+   ~5× cheaper on flash/haiku. BUT ⚠️ see §10: the style-check agent found
+   `evaluateTextConsistency` is **imported-but-never-called** (dead), while the
+   cost agent assumed it runs — **reconcile whether it fires at all** before
+   spending effort; if dead, delete it (it duplicates the unified self-critique).
+2. **`story_ideas` (Sonnet, 2×/story)** — short creative blurbs; grok-4-fast is
+   15–30× cheaper. A/B for conversion (idea text drives which story users pick).
+3. **`scene_validation` + `scene_rewrite`** — pass `null` override so they
+   silently ride the Sonnet default (`sceneValidator.js:644`, `images.js:4673`);
+   parse/rewrite utilities → set an explicit cheap override (qwen-plus/haiku).
+   **Lowest-risk, autonomous-safe candidate.**
+
+**Merge/eliminate:** `text-consistency-check` largely duplicates the unified
+prompt's own ANALYSIS→REVISE self-critique (`story-unified.txt:447-552`) — drop
+or downgrade (ties to #1). Scene expansion is ALREADY merged into the unified
+call (`unifiedSceneProse:true`). Keep the 3-stage image eval split (deliberate,
+logged in decisions.md).
+
+**Action:** #3 is autonomous-safe (explicit cheap override on two utility calls);
+#1 needs the dead-code reconciliation first; #2 needs a conversion A/B.
+
+**Status:** 🟢 audit done; #3 shippable, #1/#2 need a decision/A-B.
 
 ---
 
-## 10. Final style/consistency check "not working" ❓
+## 10. Final style/consistency check "not working" 🔴
 
 **Concern:** "the style consistency check at the end is not working, in my eyes."
 
-**Findings:** ❓ (verification agent: is `runFinalConsistencyChecks` even called
-in production, and if so is its score gated/acted-upon or just displayed?). Review
-hint: the production face-insert path has NO style gate while testlab does.
+**Findings — BROKEN, three distinct problems (owner is right):**
+- **1A — dead code.** `runFinalConsistencyChecks` (`images.js:15672`) and
+  `evaluateTextConsistency` (`textModels.js:1039`) are **imported** (`server.js:105,152`)
+  but **never called** — grep finds only the definitions. The character/text
+  final-consistency prompts (`final-consistency-check.txt`, `text-consistency-check.txt`)
+  never run in production. Classic "wired-but-never-fires."
+- **1B — the style audit that DOES run is detection-only.**
+  `checkStoryStyleConsistency` (`styleConsistency.js:108`) runs as Step 5 of the
+  repair pipeline (`images.js:8971`), clusters pages by style, returns a
+  **categorical** `verdict` (`consistent`/`mixed`/`fragmented`) + `outliers[]` —
+  **no numeric score**, so there's nothing to threshold. The result is attached
+  to `finalChecksReport.styleConsistency` (`server.js:6692`) and **nothing reads
+  it** — the code comment says it's surfaced "for **manual repair**"
+  (`images.js:8965`; `regeneration.js:1535` "Detection only — no auto-repair").
+  A page that flips art style is correctly flagged `outliers=[4]` and then
+  shipped anyway.
+- **1C — production has no style GATE on repairs.** `checkStyleMatch`
+  (`images.js:16964`) is a hard gate ONLY in Test Lab (`testlab.js:2295-2318`,
+  "Style drift → Redo"). The production char-fix / inpaint / iterate paths
+  (`images.js:8115`, round loop `8480-8579`) never call it — a Grok/Qwen repair
+  that repaints a face in flat-vector inside a watercolor scene ships.
 
-**Action:** ❓ wire it / gate it / fix the threshold depending on the finding.
+**Action (concrete, owner to pick scope):**
+1. Wire Step-5 `styleConsistency.outliers` into the repair loop — feed those
+   pages back through `iterate` before finalizing (or block "done" + enqueue an
+   auto-redo). This is the smallest change that makes the existing check *do*
+   something.
+2. Add `checkStyleMatch` as a production gate on char-fix/inpaint/iterate outputs
+   (reuse the Test Lab gate) so a style-flipped repair is rejected.
+3. Decide: delete the dead `runFinalConsistencyChecks`/`evaluateTextConsistency`
+   or actually invoke them (they overlap Step 5 + text-consistency — likely
+   delete text-consistency-in-pipeline unless you want a text pass).
 
-**Status:** ❓ under investigation.
+**Status:** 🔴 confirmed broken. All three fixes change generation/repair behavior
+→ owner decision on scope before shipping (no blind pipeline-behavior changes).
 
 ---
 
@@ -273,25 +349,50 @@ just prioritizes starting it.
 
 ---
 
-## 12. Scene-first, then per-figure correction; no facing-away (owner) ❓📐
+## 12. Scene-first, then per-figure correction; no facing-away (owner) 🔴📐
 
 **Concern:** "with image evaluation — we now have a good way of changing
 individual characters. So we must FIRST perfect entire scenes and THEN get
 individual figures correct. And not have them facing away."
 
-**Findings:** ❓ (orientation + repair-ordering agent: current pass order, whether
-scene-quality is fixed before per-character repair, and whether facing-away is
-detectable/repairable — face-swap repair is useless on a turned-away head).
+**Findings — owner is right on all three sub-points:**
+- **Facing-away is actively ENCOURAGED by the prompts, not just tolerated.**
+  `image-generation.txt:12` ("faces that action target — NOT the camera … faces
+  away from camera with back or side visible"); `scene-expansion.txt:34` (rule
+  11b forces `back view`); `storyHelpers.js:5019-5022` explicitly aims "to break
+  the model's default look-at-camera pose." There is **no rule that a named lead's
+  face must be visible.**
+- **Eval only penalizes facing RELATIVE to the declared pose**, never absolute
+  face-visibility (`image-evaluation.txt:267`); mirror/gaze-toward-viewer are
+  explicitly never deducted (`:55`, `image-semantic.txt:44`); entity-consistency
+  **exempts** back-turned figures (`entityConsistency.js:220`,
+  `entity-consistency-check.txt:54`). So if scene-expansion declared `back view`
+  (which the prompts push), a faceless hero passes every evaluator.
+- **Repair is per-page interleaved, NOT global scene-first-then-figures.** One
+  round loop (`maxPasses:3`, `images.js:8354`); each round every bad page picks a
+  method (`repairLogic.js:179-283`). Scene-vs-figure ordering exists only *within
+  a page*, and even there char-fix (step 3) outranks inpaint (step 4). Across the
+  story, page 2 gets char-fix while page 5 gets iterate in the same round — no
+  phase boundary.
+- **char-fix cannot fix an away-facing figure.** It inpaints a front-facing
+  avatar into a face bbox (`images.js:8161-8235`); a turned head has no face to
+  swap and the front avatar is geometrically incoherent. A back-turned hero is
+  neither detected (above) nor fixable by the per-figure tool.
 
-**Design (📐, pending the finding):** enforce an explicit ordering in
-`runUnifiedRepairPipeline`: **(1)** whole-scene composition/quality gate (right
-cast count, right location, one clear moment, all focal faces visible / not
-facing away) → regenerate the whole scene if it fails; **(2)** only once the
-scene is structurally right, run per-character face/figure repair. A facing-away
-focal character is a **scene-level** failure (redo the scene), not a per-figure
-fix. Add a "focal faces visible" check to the scene gate.
+**Design / action (📐, concrete):**
+1. Add an **absolute face-visibility check for named leads** (quality or semantic
+   eval, or a dedicated pass): a designated protagonist on a page with no visible
+   face — where the beat didn't require concealment — is flagged, independent of
+   declared pose.
+2. **Rebalance the away-facing generation bias** (`image-generation.txt:12`,
+   `buildExactPosesBlock`): "face visible unless the beat demands otherwise."
+   (Prompt change → validate + owner input; it's currently a deliberate choice.)
+3. **Phase boundary in `runUnifiedRepairPipeline`:** run whole-scene passes
+   (iterate/inpaint) to convergence FIRST, then enter char-fix passes — and route
+   a "facing-away lead" to `iterate` (scene re-stage), never `char-fix`.
 
-**Status:** ❓ current ordering under investigation; 📐 target ordering drafted.
+**Status:** 🔴 confirmed. Fixes change generation/repair behavior → owner scope
+decision; all three are exactly what the owner asked for, so likely go-ahead.
 
 ---
 
