@@ -7256,13 +7256,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     dropInlineBase64(resultDataForStorage);
     const resultJson = JSON.stringify(resultDataForStorage);
     log.debug(`📊 [UNIFIED] result_data size: ${(resultJson.length / 1024).toFixed(1)}KB (images stripped)`);
-    await dbPool.query(
+    // Guard the completion write with `status = 'processing'`: if the stale-job
+    // watchdog or a cancel already flipped this job to 'failed'/'cancelled' (and
+    // refunded credits_reserved), an unconditional UPDATE would resurrect it to
+    // 'completed' — handing the user a refund AND a finished story. If no row
+    // matches, the job was terminated out from under us; leave it as-is.
+    const completionRes = await dbPool.query(
       `UPDATE story_jobs
        SET status = $1, progress = $2, progress_message = $3, result_data = $4,
            credits_reserved = 0, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5`,
+       WHERE id = $5 AND status = 'processing'
+       RETURNING id`,
       ['completed', 100, 'Story generation complete!', resultJson, jobId]
     );
+    if (completionRes.rowCount === 0) {
+      log.warn(`⚠️ [UNIFIED] Job ${jobId} was no longer 'processing' at completion (cancelled/failed by watchdog?) — not marking completed. Story is saved; job status left unchanged.`);
+    }
 
     // Clean up checkpoints immediately - story is saved, no longer needed
     await deleteJobCheckpoints(jobId);
@@ -8230,14 +8239,51 @@ initialize().then(() => {
     // dead job server-side within 5 min.
     const sweepStaleJobs = async () => {
       try {
+        // Fail + atomically claim credits_reserved in ONE statement: zeroing
+        // credits_reserved in the same UPDATE that fails the job means a
+        // concurrent cancel (WHERE credits_reserved > 0) can't also refund it.
+        // Without this, the sweep marked jobs failed but never refunded, and
+        // cleanupOldCompletedJobs then deleted the row (+ the reserved amount)
+        // after 1h — the user silently lost the full story price.
         const r = await dbPool.query(
-          `UPDATE story_jobs SET status='failed',
+          `UPDATE story_jobs s SET status='failed',
              error_message='Job stalled — no progress for 15 min (worker died: OOM/crash/restart)',
-             updated_at=NOW()
-           WHERE status IN ('pending','processing')
-             AND updated_at < NOW() - INTERVAL '15 minutes'
-           RETURNING id`);
-        if (r.rowCount > 0) log.warn(`[STALE-JOB-SWEEP] failed ${r.rowCount} stalled job(s): ${r.rows.map(x => x.id).join(', ')}`);
+             credits_reserved=0, updated_at=NOW()
+           FROM (SELECT id, credits_reserved AS prev, user_id, progress
+                   FROM story_jobs
+                  WHERE status IN ('pending','processing')
+                    AND updated_at < NOW() - INTERVAL '15 minutes') old
+           WHERE s.id = old.id
+           RETURNING s.id, old.prev AS refund_amount, old.user_id, old.progress`);
+        if (r.rowCount > 0) {
+          log.warn(`[STALE-JOB-SWEEP] failed ${r.rowCount} stalled job(s): ${r.rows.map(x => x.id).join(', ')}`);
+          for (const job of r.rows) {
+            // Refund reserved credits (credits != -1 guards unlimited/admin accounts)
+            if (job.refund_amount && job.refund_amount > 0 && job.user_id) {
+              try {
+                const refundRes = await dbPool.query(
+                  `UPDATE users SET credits = credits + $1 WHERE id = $2 AND credits != -1 RETURNING credits`,
+                  [job.refund_amount, job.user_id]);
+                if (refundRes.rows.length > 0) {
+                  await dbPool.query(
+                    `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+                     VALUES ($1, $2, $3, 'story_refund', $4, $5)`,
+                    [job.user_id, job.refund_amount, refundRes.rows[0].credits, job.id,
+                     `Auto-refund: stale job swept (progress ${job.progress || 0}%)`]);
+                  log.info(`💳 [STALE-JOB-SWEEP] refunded ${job.refund_amount} credits for ${job.id}`);
+                }
+              } catch (refundErr) {
+                log.error(`[STALE-JOB-SWEEP] refund failed for ${job.id}: ${refundErr.message}`);
+              }
+            }
+            // Salvage any completed pages from checkpoints (same as boot cleanup)
+            try {
+              await savePartialStoryFromCheckpoints(job.id, 'Job stalled — recovered partial story');
+            } catch (saveErr) {
+              log.warn(`[STALE-JOB-SWEEP] partial-save failed for ${job.id}: ${saveErr.message}`);
+            }
+          }
+        }
       } catch (err) {
         log.warn(`[STALE-JOB-SWEEP] sweep failed: ${err.message}`);
       }

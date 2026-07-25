@@ -7,7 +7,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, uploadCharacterPhotosToR2 } = require('../services/database');
+const { dbQuery, withTransaction, isDatabaseMode, logActivity, uploadCharacterPhotosToR2 } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { normalizePhotos, stripLegacyPhotoFields, normalizeAvatarsForResponse, normalizeCharacterAvatars } = require('../lib/characterPhotos');
 const { normalizePhysical, stripLegacyPhysicalFields, expandUserHairOverrideForDisplay } = require('../lib/characterPhysical');
@@ -451,13 +451,15 @@ router.post('/', authenticateToken, async (req, res) => {
       const characterId = `characters_${req.user.id}`;
       console.log(`[Characters] POST - Using characterId: ${characterId}`);
 
-      // Use transaction with row lock to prevent race conditions with avatar job
-      await dbQuery('BEGIN');
-
+      // Real transaction on a pinned client (see withTransaction). Issuing
+      // BEGIN/FOR UPDATE/COMMIT through dbQuery ran each statement on a
+      // possibly-different pooled connection, so the row lock never held and
+      // the open transaction leaked back into the pool.
+      await withTransaction(async (txClient) => {
       // Lock the row and read FULL data in one query (DB-first approach)
       // This ensures we always start with the latest DB state including full avatars
       const lockAndReadQuery = `SELECT data FROM characters WHERE id = $1 FOR UPDATE`;
-      const dbResult = await dbQuery(lockAndReadQuery, [characterId]);
+      const dbResult = (await txClient.query(lockAndReadQuery, [characterId])).rows;
       const currentDbData = dbResult[0]?.data || { characters: [] };
       const dbCharacters = currentDbData.characters || [];
 
@@ -757,19 +759,9 @@ router.post('/', authenticateToken, async (req, res) => {
           created_at = CURRENT_TIMESTAMP
       `;
 
-      try {
-        await dbQuery(upsertQuery, [characterId, req.user.id, jsonData, metadataJson]);
-        console.log(`[Characters] POST - Database upsert successful`);
-
-        // Commit the transaction (releases the row lock)
-        await dbQuery('COMMIT');
-        console.log(`[Characters] POST - Transaction committed`);
-      } catch (dbErr) {
-        // Rollback on any error
-        await dbQuery('ROLLBACK');
-        console.error(`[Characters] POST - Database upsert FAILED, rolled back:`, dbErr.message);
-        throw dbErr;
-      }
+      await txClient.query(upsertQuery, [characterId, req.user.id, jsonData, metadataJson]);
+      console.log(`[Characters] POST - Database upsert successful`);
+      }); // withTransaction: COMMIT on success, ROLLBACK + rethrow on any throw
 
       // Clean up orphaned rows from photo uploads (numeric IDs from Date.now())
       // Only delete rows with numeric IDs or old format IDs - preserve the main characters_X row
@@ -790,12 +782,8 @@ router.post('/', authenticateToken, async (req, res) => {
     await logActivity(req.user.id, req.user.username, 'CHARACTERS_SAVED', { count: charactersWithoutAvatars.length }, req.user);
     res.json({ message: 'Characters saved successfully', count: charactersWithoutAvatars.length });
   } catch (err) {
-    // Attempt ROLLBACK in case transaction was started but not committed
-    try {
-      await dbQuery('ROLLBACK');
-    } catch (rollbackErr) {
-      // Ignore rollback errors - transaction may not have been started
-    }
+    // withTransaction already rolled back its own transaction on throw; nothing
+    // to unwind here.
     console.error('Error saving characters:', err);
     res.status(500).json({ error: 'Failed to save characters' });
   }

@@ -60,6 +60,35 @@ function getPool() {
   return dbPool;
 }
 
+// Run `fn` inside a real transaction on a single dedicated client. This is the
+// ONLY safe way to issue BEGIN/FOR UPDATE/COMMIT — doing them through dbQuery()
+// (i.e. pool.query) runs each statement on a possibly-different pooled
+// connection, so row locks never hold, an open transaction leaks back into the
+// pool, and a stray ROLLBACK can abort an unrelated request. `fn` receives the
+// pinned client; it is committed on success and rolled back on any throw.
+async function withTransaction(fn) {
+  if (!dbPool) {
+    throw new Error('Database pool not initialized');
+  }
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackErr) {
+      // eslint-disable-next-line no-console
+      console.error('[withTransaction] ROLLBACK failed:', rollbackErr.message);
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 // Initialize database tables
 async function initializeDatabase() {
   if (!dbPool) {
@@ -3182,6 +3211,7 @@ module.exports = {
   initializeDatabase,
   dbQuery,
   getPool,
+  withTransaction,
   closePool,
   isDatabaseMode,
   logActivity,

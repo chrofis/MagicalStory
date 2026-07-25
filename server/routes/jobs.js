@@ -19,7 +19,7 @@ const { CREDIT_CONFIG } = require('../config/credits');
 // Services
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
-const { getPool } = require('../services/database');
+const { getPool, withTransaction } = require('../services/database');
 const email = require('../../email');
 
 function getDbPool() { return getPool(); }
@@ -325,39 +325,55 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
           });
         }
 
-        // Reserve credits atomically - this prevents race conditions
-        // The UPDATE only succeeds if credits >= creditsNeeded, preventing overdraw
-        const updateResult = await getDbPool().query(
-          'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
-          [creditsNeeded, userId]
-        );
+        // (credit reservation happens inside the transaction below)
+      }
 
-        if (updateResult.rows.length === 0) {
-          // Race condition occurred - another request already used the credits
+      // Reserve credits (if applicable) + create the job row atomically. If the
+      // job INSERT fails — e.g. a concurrent double-submit hits the idempotency
+      // unique index — the whole transaction rolls back, so a debit can never
+      // stick without a story_jobs row to refund it from later.
+      let insufficientRace = false;
+      try {
+        await withTransaction(async (txClient) => {
+          if (userCredits !== -1 && req.user.role !== 'admin') {
+            // The UPDATE only succeeds if credits >= creditsNeeded (no overdraw)
+            const updateResult = await txClient.query(
+              'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
+              [creditsNeeded, userId]
+            );
+            if (updateResult.rows.length === 0) {
+              insufficientRace = true;
+              throw new Error('INSUFFICIENT_CREDITS_RACE');
+            }
+            const newBalance = updateResult.rows[0].credits;
+            await txClient.query(
+              `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+              [userId, -creditsNeeded, newBalance, 'story_reserve', jobId, `Reserved ${creditsNeeded} credits for ${pages}-page story`]
+            );
+            log.debug(`💳 Reserved ${creditsNeeded} credits for job ${jobId} (user balance: ${userCredits} -> ${newBalance})`);
+          }
+
+          await txClient.query(
+            `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved, idempotency_key)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', (userCredits === -1 || req.user.role === 'admin') ? 0 : creditsNeeded, idempotencyKey]
+          );
+        });
+      } catch (txErr) {
+        if (insufficientRace) {
           return res.status(402).json({
             error: 'Insufficient credits',
             creditsNeeded: creditsNeeded,
             message: 'Credits were used by another request. Please try again.'
           });
         }
-
-        const newBalance = updateResult.rows[0].credits;
-
-        // Create transaction record for credit reservation
-        await getDbPool().query(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [userId, -creditsNeeded, newBalance, 'story_reserve', jobId, `Reserved ${creditsNeeded} credits for ${pages}-page story`]
-        );
-
-        log.debug(`💳 Reserved ${creditsNeeded} credits for job ${jobId} (user balance: ${userCredits} -> ${newBalance})`);
+        // Job INSERT failed (rolled back with the debit). The most likely cause
+        // is a concurrent submit with the same idempotency key → a job already
+        // exists, so report it as a duplicate rather than a lost charge.
+        log.error(`Failed to reserve credits / create job ${jobId} (rolled back): ${txErr.message}`);
+        return res.status(409).json({ error: 'A story is already being generated for this request', code: 'DUPLICATE_JOB' });
       }
-
-      await getDbPool().query(
-        `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved, idempotency_key)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', (userCredits === -1 || req.user.role === 'admin') ? 0 : creditsNeeded, idempotencyKey]
-      );
 
       // Clean up old completed/failed jobs in background (don't await)
       cleanupOldCompletedJobs().catch(err => log.error('Cleanup error:', err.message));

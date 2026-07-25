@@ -11,7 +11,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
-const { logActivity, dbQuery, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2 } = require('../services/database');
+const { logActivity, dbQuery, withTransaction, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2 } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
@@ -1271,14 +1271,15 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         // keeps its bytes — the documented inline fallback.
         await uploadCharacterPhotosToR2(req.user.id, characterId, photosObj);
 
-        // Use transaction with FOR UPDATE to prevent race with avatar job writes
-        await dbQuery('BEGIN');
-
+        // Real transaction on a pinned client (see withTransaction) — the old
+        // pool-level BEGIN/FOR UPDATE ran each statement on a different pooled
+        // connection, so the row lock never actually held.
+        await withTransaction(async (txClient) => {
         // Get existing characters for this user (locked)
-        const existingResult = await dbQuery(
+        const existingResult = (await txClient.query(
           'SELECT data FROM characters WHERE id = $1 FOR UPDATE',
           [rowId]
-        );
+        )).rows;
 
         let charData = existingResult.length > 0 ? (existingResult[0].data || {}) : {};
         let characters = charData.characters || [];
@@ -1366,17 +1367,15 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         const metadataObj = Array.isArray(charData) ? lightCharacters : { ...charData, characters: lightCharacters };
 
         // Upsert the characters row
-        await dbQuery(`
+        await txClient.query(`
           INSERT INTO characters (id, user_id, data, metadata)
           VALUES ($1, $2, $3, $4)
           ON CONFLICT (id) DO UPDATE SET data = $3, metadata = $4
         `, [rowId, req.user.id, JSON.stringify(charData), JSON.stringify(metadataObj)]);
-
-        await dbQuery('COMMIT');
+        }); // withTransaction: COMMIT on success, ROLLBACK on throw
       } catch (dbErr) {
-        // Rollback on any error
-        try { await dbQuery('ROLLBACK'); } catch (_) { /* ignore */ }
-        // Log but don't fail - character creation is a nice-to-have
+        // withTransaction already rolled back; character creation is a
+        // nice-to-have, so log and continue (the avatar job will retry).
         log.warn(`📸 [PHOTO] Failed to create character in DB (avatar job will retry): ${dbErr.message}`);
       }
 
@@ -2242,17 +2241,17 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
           // Use transaction with row lock to prevent race condition with character save
           // The charIndex from retry loop may be stale if user modified characters during avatar generation
-          await dbQuery('BEGIN');
-
-          try {
+          // Real transaction on a pinned client (see withTransaction) — the old
+          // pool-level BEGIN/FOR UPDATE never actually held the row lock, so this
+          // avatar write could race a concurrent character save.
+          await withTransaction(async (txClient) => {
             // Lock row and get fresh data
-            const freshRows = await dbQuery(
+            const freshRows = (await txClient.query(
               `SELECT id, data FROM characters WHERE user_id = $1 FOR UPDATE`,
               [user.id]
-            );
+            )).rows;
 
             if (freshRows.length === 0) {
-              await dbQuery('ROLLBACK');
               throw new Error('Character row disappeared during transaction');
             }
 
@@ -2273,7 +2272,6 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             }
 
             if (freshCharIndex < 0) {
-              await dbQuery('ROLLBACK');
               const availableChars = freshCharacters.map(c => `${c.name}(${c.id})`).join(', ');
               throw new Error(`Character ${characterId} (${name}) not found in fresh lookup - may have been deleted. Available: [${availableChars}]`);
             }
@@ -2481,22 +2479,14 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
             // Execute atomic update
             const updateQuery = `UPDATE characters SET data = ${dataUpdate}, metadata = ${metaUpdate} WHERE id = $1`;
-            await dbQuery(updateQuery, params);
-
-            // Commit transaction
-            await dbQuery('COMMIT');
+            await txClient.query(updateQuery, params);
 
             log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${name || characterId} at index ${freshCharIndex} in row ${freshRowId} (data + metadata)`);
             results.dbSaveSuccessful = true;
           } else {
-            await dbQuery('ROLLBACK');
             throw new Error(`Character at fresh index ${freshCharIndex} is undefined`);
           }
-          } catch (txErr) {
-            // Ensure rollback on any error
-            try { await dbQuery('ROLLBACK'); } catch (rollbackErr) { /* ignore rollback errors */ }
-            throw txErr;
-          }
+          }); // withTransaction: COMMIT on success, ROLLBACK + rethrow on any throw
         } else {
           // Character still not found after all retries - fail the job
           throw new Error(`Character not found by ID ${characterId} or name "${name}" after 30 retries - cannot save avatars`);
