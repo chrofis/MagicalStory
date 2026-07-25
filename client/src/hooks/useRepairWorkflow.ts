@@ -1277,7 +1277,11 @@ export function useRepairWorkflow({
               if (result?.repaired && result.imageData) {
                 allChangedPages.add(pageNumber);
                 if (!signal.aborted && onImageUpdate) {
-                  onImageUpdate(pageNumber, result.imageData, 0, { type: 'inpaint-repair' });
+                  // Use the server's activeVersion (the newly-pushed version),
+                  // not a hardcoded 0 — hardcoding overwrote v0 in the version
+                  // selector and hid the repair from history (matches the
+                  // standalone repairInpaint path).
+                  onImageUpdate(pageNumber, result.imageData, typeof result.activeVersion === 'number' ? result.activeVersion : 0, { type: 'inpaint-repair' });
                 }
                 roundResults[pageNumber] = { success: true, previousScore: previousScore ?? undefined };
               } else {

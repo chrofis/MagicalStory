@@ -32,7 +32,7 @@ import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UI
 import { characterService, storyService, authService } from '@/services';
 import { reportError } from '@/services/errorReporter';
 import type { ExtractedTraits, ExtractedClothing } from '@/services/characterService';
-import { storyTypes } from '@/constants/storyTypes';
+import { storyTypes, lifeChallenges, educationalTopics, historicalEvents } from '@/constants/storyTypes';
 import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship, type CustomRelationshipPair } from '@/constants/relationships';
 import { createLogger } from '@/services/logger';
 import { useDeveloperMode } from '@/hooks/useDeveloperMode';
@@ -5652,10 +5652,11 @@ export default function StoryWizard() {
 
       {/* Pre-selected topic banner (from theme page URL params) */}
       {storyCategory && storyTopic && step < 4 && step !== 6 && searchParams.get('topic') && (() => {
-        // Look up the topic name for display
-        const { lifeChallenges, storyTypes: adventureTypes, educationalTopics, historicalEvents } = require('@/constants/storyTypes');
-        const allThemes = [...(lifeChallenges || []), ...(adventureTypes || []), ...(educationalTopics || []), ...(historicalEvents || [])];
-        const found = allThemes.find((t: { id: string; name: Record<string, string> }) => t.id === storyTopic);
+        // Look up the topic name for display. NOTE: use the static ESM imports —
+        // a `require()` here is a ReferenceError in the browser bundle (Vite ships
+        // pure ESM) and, with no ErrorBoundary, white-screens the whole app.
+        const allThemes = [...(lifeChallenges || []), ...(storyTypes || []), ...(educationalTopics || []), ...(historicalEvents || [])];
+        const found = allThemes.find((t) => t.id === storyTopic) as { id: string; name: Record<string, string>; emoji?: string } | undefined;
         const topicName = found?.name?.[language] || found?.name?.en || storyTopic;
         return (
           <div className="mx-3 md:mx-8 mt-2 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2 flex items-center gap-2 text-sm">
