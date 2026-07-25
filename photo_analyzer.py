@@ -865,7 +865,11 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
 
     Returns dict with face_thumbnail, body_no_bg, and bounding boxes
     """
-    temp_input = os.path.join(TEMP_DIR, f'input_{os.getpid()}.jpg')
+    # No shared temp file. The old code wrote input_<pid>.jpg — shared by every
+    # waitress worker thread in the single process — so concurrent /analyze
+    # requests overwrote each other's photo (a cross-user leak), and the JPEG
+    # save also crashed on RGBA PNGs. Decode base64 straight from memory.
+    temp_input = None
 
     try:
         # 1. DECODE IMAGE
@@ -874,15 +878,14 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
             if ',' in image_data:
                 image_data = image_data.split(',')[1]
 
-            # Decode base64
+            # Decode base64 in memory (handles RGBA/PNG, no disk round-trip)
             image_bytes = base64.b64decode(image_data)
-            img_pil = Image.open(BytesIO(image_bytes))
-            img_pil.save(temp_input)
+            img = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
         else:
             temp_input = image_data
+            # Load image with OpenCV from the provided path
+            img = cv2.imread(temp_input)
 
-        # Load image with OpenCV
-        img = cv2.imread(temp_input)
         if img is None:
             raise ValueError("Failed to load image")
 
@@ -951,7 +954,7 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
         if len(all_faces) == 0:
             print("[ERROR] No face detected in photo")
             # Clean up temp files
-            if os.path.exists(temp_input) and is_base64:
+            if temp_input and os.path.exists(temp_input) and is_base64:
                 os.remove(temp_input)
             return {
                 "success": False,
@@ -982,7 +985,7 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
                     })
 
             # Clean up temp files
-            if os.path.exists(temp_input) and is_base64:
+            if temp_input and os.path.exists(temp_input) and is_base64:
                 os.remove(temp_input)
 
             return {
@@ -1138,7 +1141,7 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
                 body_crop = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
 
         # Clean up temp files
-        if os.path.exists(temp_input) and is_base64:
+        if temp_input and os.path.exists(temp_input) and is_base64:
             os.remove(temp_input)
 
         print("[OK] Photo processing complete")
@@ -1168,7 +1171,7 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
 
     except Exception as e:
         # Clean up on error
-        if os.path.exists(temp_input) and is_base64:
+        if temp_input and os.path.exists(temp_input) and is_base64:
             os.remove(temp_input)
 
         return {

@@ -2083,7 +2083,7 @@ async function _stratifiedBody(ctx) {
   // to match preset.name instead of cover-cropping. Both refs here have
   // white backgrounds (silhouette crop's surround is white; identity
   // pack's background is white) so the pad bars are invisible.
-  const frontPlate = await editWithGrok(fillPrompt, fillRefs, { aspectRatio: preset.name, model: GROK_MODELS.STANDARD, padInput: true });
+  const frontPlate = await editWithGrok(fillPrompt, fillRefs, { aspectRatio: presetName, model: GROK_MODELS.STANDARD, padInput: true });
   if (usageTracker) usageTracker('grok', frontPlate.usage, 'scene_composite_strat_back_fill', frontPlate.modelId);
   totalCost += frontPlate.usage?.cost || 0;
   debug.frontPlate = frontPlate.imageData; // panel reads "frontPlate"; semantically this is the bg-fill plate

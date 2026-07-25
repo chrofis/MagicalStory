@@ -3778,6 +3778,14 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     if (!pageNumbers.every(n => Number.isInteger(n))) {
       return res.status(400).json({ error: 'All pageNumbers must be integers' });
     }
+    // Validate qualityModelOverride against a bbox-capable eval allowlist. It is
+    // interpolated raw into the Gemini API URL, so an unvalidated value on this
+    // non-admin endpoint allowed arbitrary (expensive) model spend + path
+    // injection, and bbox-incapable models break fix-target detection.
+    const ALLOWED_EVAL_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+    if (qualityModelOverride && !ALLOWED_EVAL_MODELS.includes(qualityModelOverride)) {
+      return res.status(400).json({ error: `Invalid qualityModelOverride: ${qualityModelOverride}` });
+    }
 
     log.info(`📊 [REPAIR-WORKFLOW] Re-evaluating pages ${pageNumbers.join(', ')} in story ${id}`);
 
