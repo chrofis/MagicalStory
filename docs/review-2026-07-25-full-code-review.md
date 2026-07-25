@@ -11,10 +11,79 @@
 
 ## Status
 
-- [ ] Wave 1 — backend core (security, payments, pipeline, images, entity, text/PDF, regeneration, avatars/trial)
-- [ ] Wave 2 — client, DB layer, prompts↔parsers, providers, python analyzer, composites, email/sharing
-- [ ] Wave 3 — adversarial verification of P0/P1 findings + synthesis
-- [ ] Final summary + ranked fix list
+- [x] Wave 1 — backend core (security, payments, pipeline, images, entity, text/PDF, regeneration, avatars/trial)
+- [x] Wave 2 — client, DB layer, prompts↔parsers, providers, python analyzer, composites, email/sharing
+- [x] Wave 3 — adversarial verification of P0/P1 findings (6 skeptic agents, refute-by-default)
+- [x] Final summary + ranked fix list (below)
+
+---
+
+## VERIFIED & RANKED — start here
+
+16 review agents (Waves 1–2) → 6 adversarial verifiers (Wave 3) that tried to
+*refute* every P0/P1 by re-reading the code. Verdicts below are post-verification.
+**Every fix listed is a port of a pattern already correct elsewhere in this repo,
+not an invention.** None deployed — all on branch `claude/last-commit-timestamp-vwarki`.
+
+### P0 — CONFIRMED (4) · money / crash / data-integrity, fix before next deploy
+
+| # | Finding | Evidence | Fix |
+|---|---------|----------|-----|
+| P0-1 | **Free printed books** — `POST /api/print-provider/order` places a real (non-draft) Gelato order with no payment/credit/Stripe check; only `authenticateToken`. The gate is *backwards*: `isUserTestMode` gives admins the safe `'draft'`, non-admins the real `'order'`. | print.js:77,191,238-245; mounted server.js:1616; sibling admin endpoint at :1212 proves the intended pattern | Add `if (req.user.role!=='admin' && !req.user.impersonating) return 403` at handler top |
+| P0-2 | **Stripe webhook swallows all money errors** — inner `catch` (server.js:1156) logs but doesn't rethrow, so the outer `stripe_webhook_retry` buffer is unreachable for every order/credit throw. DB blip during order INSERT → 200 ack → charged, no order, no credits, no retry, no alert. | try opens 727, catch 1156 (log-only), outer catch 1191 never sees it | `throw retrieveError` in the inner catch → outer catch buffers + acks deferred |
+| P0-3 | **Fake pool-level transactions** — `dbQuery('BEGIN')`/`FOR UPDATE`/`COMMIT` run through the pool (each stmt a different connection): locks never hold, a connection returns to the pool *inside* a transaction where unrelated requests join it, and a stray `ROLLBACK` can discard another request's writes. | characters.js:455-795; avatars.js:1275,2245-2497; dbQuery=pool.query at database.js:47-56; no `.connect()` in those files | `withTransaction(client=>…)` helper (pattern already at jobs.js:209) |
+| P0-4 | **Client white-screen** — `require('@/constants/storyTypes')` in a render IIFE ships to the ESM bundle → `ReferenceError`; no ErrorBoundary anywhere → whole app blanks. Reachable via theme-page → `/try` → (logged-in) → `/create?category=…&topic=…`. `@types/node` in client tsconfig is why `tsc` doesn't catch it. | StoryWizard.tsx:5656; static import already at :35 | Move the 4 names onto the line-35 static import; delete the `require` |
+
+### P1 — CONFIRMED (18)
+
+**Credits / job lifecycle (the highest-leverage cluster — refunds silently fail):**
+- **Watchdog marks jobs failed without refunding** `credits_reserved`, and `cleanupOldCompletedJobs` deletes the row (+evidence) after 1h. Once flipped to `failed`, *every* refund path stops matching. (server.js:8214; jobs.js:684; verifier found jobs.js:460 `/status` flip is a *third* leak, not a bypassed refund.) → reuse the atomic claim-refund SQL (jobs.js:216) in the sweep.
+- **Reserve+INSERT non-atomic** — debit, ledger, job INSERT are 3 pool stmts; a failed INSERT (concurrent double-submit hits the idempotency unique index) leaves credits debited with no row → unrecoverable. (jobs.js:330-360) → one transaction.
+- **Unconditional completion UPDATE resurrects killed jobs** — `UPDATE … SET status='completed' WHERE id=$5` (no status guard); `checkCancellation` ignores `'failed'` and isn't called after server.js:5794. A swept/cancelled job overwrites itself to completed → refund + free story. → `WHERE status='processing' RETURNING id`.
+- **Unconfigured 2nd pool** (server.js:521) — no `pool.on('error')` (idle-client error crashes the process, killing all in-flight jobs), no statement_timeout, connectionTimeout 0. → add error handler + limits.
+- **Non-atomic version-index MAX+1** + `ON CONFLICT DO UPDATE` — concurrent same-page mutations overwrite each other's image bytes (+ same R2 key). (database.js:2388,2444) → allocate in-INSERT or advisory lock.
+
+**Money (non-P0):**
+- **`payment_status='paid'` is transient** (flips to processing/completed in ms) → `hasPaidOrder` false for real customers (first-time-buyer referral gate leaks CHF ~20/redemption) and `getRefundableAmount`=0 (cashout broken for everyone). (orders.js:25; referralBalance.js:421; gelato.js:192,436) → query `IN ('paid','processing','completed')`.
+- **Referral balance discount baked into Stripe session before `holdPending`** → N concurrent checkouts each get the full discount; losers never decrement balance. User-triggerable. (print.js:1817-1902) → `session.expire()` on failed hold before returning.
+
+**Pipeline / parser:**
+- **Mid-stream retry mixes generations** — `withRetry` wraps stream reading; attempt-1 emitted pages already launched scene-expansion + image-gen while attempt-2 text gets stored → page text ≠ its image; title/cover can be from the aborted attempt. (textModels.js:257-385; server.js:4023,4529) → mark post-first-chunk errors non-retryable.
+- **Entity cell→page mislabeling** — `cellToPage` built in collection order; the grid the evaluator saw sorted crops by pageNumber (covers −1/−2/−3 sort first, failed crops shift letters, multi-grid restarts A) → repair feedback routed to the wrong page. (entityConsistency.js:1003 vs 1928) → build from `gridResult.manifest.cells`.
+- **`fillTemplate` brace-key bug ×2** — call sites pass `'{ELEMENTS_LIST}'`/`'{OUTFIT_DESCRIPTION}'` as keys; fillTemplate re-wraps → regex `{{…}}` never matches → VB analysis ships with no element list; avatar safety-retry ships "wearing ." (visualBible.js:791; avatars.js:2987) → drop the braces.
+- **`callGeminiTextAPI` never retries 429/5xx** — `!response.ok` throw sits outside `withRetry` (fetch resolves on HTTP errors). (textModels.js:554-581) → move the check inside the closure with `err.status`.
+
+**PDF / print (two compound into blank, misprinted books):**
+- **`print-provider/order` builds the PDF without `rehydrateStoryImages`** — post-R2 blob has no imageData → blank cover + every page missing. (print.js:82-103; siblings rehydrate) → add the rehydrate call.
+- **Overlay-failure fallback places text below the trim edge** → PDFKit auto-paginates → Gelato pageCount mismatch + spread-parity flip. One transient R2 hiccup = misprinted book. (pdf.js:557,626,646) → classic geometry + `{height, ellipsis}`.
+- **Unbaked (title-less) cover can become active** — post-persist bake stamps only the active version; the picker + score-recompute can activate an unstamped one. (`pinned` does protect manual picks — so scope is the picker itself + untouched covers.) (coverTypography.js:462; stories.js:3445) → restamp on activation.
+
+**Client / UI:**
+- **Dev-mode model overrides not server-gated** — `req.body` spread into job input; `modelOverrides`/`skipImages`/`skipCovers`/`enableFullRepair`/`layoutOverride` honored for any user (bounded to registry model IDs, so cost/quality shift not arbitrary injection). (jobs.js:101; server.js:7774-7805) → gate on `isAdmin`.
+- **Automated inpaint reports version index 0** (standalone path fixed this w/ a comment; sibling didn't) → repair shown as "Original", hidden from history. (useRepairWorkflow.ts:1280) → use `result.activeVersion`.
+- **Shadowed inline PATCH route** — server.js:2659 dead behind stories.js:3086; breaks TestModelsPanel "apply image" (`{imageData}` → 400). → port imageData branch into stories.js, delete inline.
+
+**Security / data-retention:**
+- **GDPR: anon 48h sweep orphans stories + story_images + R2** — deletes users/characters/jobs only; `stories.user_id` has no cascading FK → child's story/photos/illustrations survive account deletion forever. (trial.js:1571; server.js:1830) → delete stories (+R2) in the sweep.
+- **Rate-limiter bypass via `jwt.decode`** (not verify) — forged `{"role":"admin"}` skips the global 100/min cap; unlocks the expensive unauthenticated `/api/landmarks/discover` (2 Gemini calls/req, cache-bustable). (rateLimit.js:34) → `jwt.verify`.
+
+### Downgraded / refined by verification
+- **`qualityModelOverride` → Gemini URL unvalidated** (regeneration.js:3773): CONFIRMED but scope = authenticated-non-admin, fixed host → model-spend + path-injection, **P2** not SSRF. Allowlist + `encodeURIComponent`.
+- **`/api/files/:fileId` no ownership check**: CONFIRMED, but IDs are ~46.5 bits → brute force infeasible (~950k yrs at the cap). It's **IDOR-via-leaked-URL** (P3), not guessing. Still: child photos served unauth; add ownership check + `crypto.randomUUID`.
+- **AI proxy `/api/claude`,`/api/gemini` uncharged**: `/claude` confirmed (no credits, no `max_tokens` clamp); `/gemini` *has* a model allowlist; **both are dead client code** → admin-gate or delete, zero app impact.
+- **CORS `*.railway.app` + credentials**: predicate real but **low impact** — auth is header-only JWT, no auth cookie to ride.
+- **VB relevance filter disabled by a TDZ bug** (storyHelpers.js:3860 uses a `let` from :3938, swallowed by a bare catch): CONFIRMED but effect is "whole VB included" = **token cost, P2**, not a correctness break.
+- **`sceneComposite.js:2086` `preset.name` ReferenceError**: certain crash, but `enableSceneComposite:false` gates it to the **admin test-lab** → **not a production P1** (means that branch hasn't been smoke-tested since it was written). One-char fix.
+
+### REFUTED by verification
+- **"Trial covers generate from empty hints"** — the `onCoverScene` callback IS fully wired (progressive.js:336-365 → server.js:4219-4396); trial covers come from rich structured JSON. Only a dead fallback branch (server.js:4844) survives as a minor cleanup.
+
+### Cross-cutting patterns (worth a systemic pass, not just point-fixes)
+1. **Full-blob read-modify-write on `stories.data`** across ~15 handlers with an AI call in the read→write window — last-writer-wins data loss. `saveScenePageData` (jsonb_set) exists and is the model; covers/finalChecksReport/sceneDescriptions still full-blob. → optimistic-concurrency `data_version` column.
+2. **Prompt↔parser contract drift** — dozens of fields requested-but-unread or read-but-not-requested; the deduction tables in 3 prompts disagree with `SEVERITY_POINTS`. The canonical redo gate (60, single-sourced) is coherent; the *prompts teach a different rubric than the code charges*.
+3. **testlab ↔ production divergence** — 7 near-copy blend blocks; production lacks the style gate + erode-then-feather + lossless-PNG that testlab has. The `fixing-sibling-paths` skill exists because this recurs; several findings here are new instances.
+4. **Cost accounting** — ≥5 no-op `usageTracker` calls + a still-reachable `$NaN` on the default Gemini avatar path; per-story cost reports undercount repair/bbox/eval spend.
+5. **Dead code as a hazard** — the 630-line dead `initializeDatabase` already caused a prod incident (a column added only there); `docs/text-overlay.html` (which CLAUDE.md tells you to read) describes a pipeline that no longer exists.
 
 ## Scope inventory
 
