@@ -30,8 +30,11 @@ function _peekAdminFromToken(req) {
     const jwt = require('jsonwebtoken');
     const h = req.headers['authorization'] || '';
     const t = h.startsWith('Bearer ') ? h.slice(7) : null;
-    if (!t) return false;
-    const decoded = jwt.decode(t);
+    if (!t || !process.env.JWT_SECRET) return false;
+    // MUST verify the signature, not just decode: this limiter also fronts
+    // unauthenticated routes, so a decode-only check let anyone forge an
+    // unsigned {"role":"admin"} token and remove the global 100/min cap.
+    const decoded = jwt.verify(t, process.env.JWT_SECRET);
     // Admin or admin-acting-as-someone-else (impersonation token) both
     // carry role=admin OR an explicit `impersonating` flag with original
     // admin id; either should skip the cap.

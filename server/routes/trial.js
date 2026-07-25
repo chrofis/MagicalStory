@@ -1568,25 +1568,22 @@ setInterval(async () => {
     try {
       await client.query('BEGIN');
 
-      // Delete story_jobs for abandoned anonymous users
-      const jobsResult = await client.query(`
-        DELETE FROM story_jobs
+      // Same anon-and-older-than-48h filter for every table.
+      const anonFilter = `
         WHERE user_id IN (
           SELECT id FROM users
           WHERE anonymous = true
             AND created_at < NOW() - INTERVAL '48 hours'
-        )
-      `);
+        )`;
 
-      // Delete characters for abandoned anonymous users
-      const charsResult = await client.query(`
-        DELETE FROM characters
-        WHERE user_id IN (
-          SELECT id FROM users
-          WHERE anonymous = true
-            AND created_at < NOW() - INTERVAL '48 hours'
-        )
-      `);
+      const jobsResult = await client.query(`DELETE FROM story_jobs ${anonFilter}`);
+      const charsResult = await client.query(`DELETE FROM characters ${anonFilter}`);
+      const filesResult = await client.query(`DELETE FROM files ${anonFilter}`);
+      // Delete stories too — previously orphaned. stories.user_id has no
+      // cascading FK, so a purged anonymous child's story (title, dedication,
+      // likeness-derived illustrations) + its story_images survived forever.
+      // story_images DOES cascade from stories, so deleting stories cleans it.
+      const storiesResult = await client.query(`DELETE FROM stories ${anonFilter} RETURNING id`);
 
       // Delete the anonymous users themselves
       const usersResult = await client.query(`
@@ -1599,7 +1596,24 @@ setInterval(async () => {
       await client.query('COMMIT');
 
       if (usersResult.rowCount > 0) {
-        log.info(`[TRIAL CLEANUP] Deleted ${usersResult.rowCount} abandoned anonymous accounts (${charsResult.rowCount} characters, ${jobsResult.rowCount} jobs)`);
+        log.info(`[TRIAL CLEANUP] Deleted ${usersResult.rowCount} abandoned anonymous accounts (${charsResult.rowCount} characters, ${jobsResult.rowCount} jobs, ${storiesResult.rowCount} stories, ${filesResult.rowCount} files)`);
+      }
+
+      // Prune R2 artefacts (external storage — after commit, best-effort).
+      if (storiesResult.rowCount > 0 || usersResult.rowCount > 0) {
+        try {
+          const r2 = require('../lib/r2');
+          let totalR2 = 0;
+          for (const row of storiesResult.rows) {
+            totalR2 += await r2.deleteStoryArtefacts(row.id);
+          }
+          for (const row of usersResult.rows) {
+            totalR2 += await r2.deleteByPrefix(`characters/${row.id}/`);
+          }
+          if (totalR2 > 0) log.info(`[TRIAL CLEANUP] Pruned ${totalR2} R2 objects for abandoned anon accounts`);
+        } catch (r2Err) {
+          log.warn(`[TRIAL CLEANUP] R2 prune failed (rows already deleted): ${r2Err.message}`);
+        }
       }
     } catch (txErr) {
       await client.query('ROLLBACK');

@@ -7797,18 +7797,32 @@ async function _processStoryJobImpl(jobId) {
       log.debug(`[LANDMARK] Skipping local landmarks for historical story (uses historical locations instead)`);
     }
 
+    // Check if user is admin (developer-mode fields below are admin-only)
+    const userResult = await dbPool.query('SELECT role FROM users WHERE id = $1', [job.user_id]);
+    const isAdmin = userResult.rows.length > 0 && userResult.rows[0].role === 'admin';
+
+    // SECURITY: developer-mode fields (model overrides, skip flags, layout
+    // override) are honored for admins only. The client gate is cosmetic and
+    // req.body was spread verbatim into input_data, so strip these for
+    // non-admins here — before any reader (this function OR the pipeline's
+    // resolveLayout) can pick them up — so a normal user can't pick expensive
+    // models or silently degrade their own paid story.
+    if (!isAdmin) {
+      delete inputData.modelOverrides;
+      delete inputData.skipImages;
+      delete inputData.skipCovers;
+      delete inputData.layoutOverride;
+      delete inputData.enableFullRepair; // fall back to default (ON)
+    }
+
     const skipImages = inputData.skipImages === true; // Developer mode: text only
     const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
     const enableFullRepair = inputData.enableFullRepair !== false; // Full repair after generation (default: ON)
 
     log.info(`🔧 [PIPELINE] Settings: enableFullRepair=${enableFullRepair}, skipImages=${skipImages}, skipCovers=${skipCovers}`);
 
-    // Check if user is admin (for including debug images in repair history)
-    const userResult = await dbPool.query('SELECT role FROM users WHERE id = $1', [job.user_id]);
-    const isAdmin = userResult.rows.length > 0 && userResult.rows[0].role === 'admin';
-
-    // Developer mode: model overrides (admin only)
-    // Use centralized MODEL_DEFAULTS from textModels.js
+    // Developer mode: model overrides (admin only — non-admin overrides were
+    // stripped above). Use centralized MODEL_DEFAULTS from textModels.js.
     // Filter out null/undefined user overrides so they don't overwrite defaults
     const userOverrides = inputData.modelOverrides || {};
     const filteredUserOverrides = Object.fromEntries(
