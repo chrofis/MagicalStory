@@ -178,21 +178,47 @@ text + the §6 rubric scores. This is the harness for §5 and §9 experiments.
 
 ---
 
-## 8. Secondary characters with no avatar look like the primary (owner) ❓🔴
+## 8. Secondary characters with no avatar look like the primary (owner) 🔴
 
 **Concern:** "sometimes secondary characters have no avatar. If only described by
 text they end up looking the same as [the primary] avatar sent to the image
 model."
 
-**Findings:** ❓ (dedicated bug-trace agent running: how text-only secondary
-characters flow into reference packing, and why they inherit the primary's face).
+**Findings — REPRODUCED, mechanism fully explained:**
+- Two disjoint pools: primaries (`inputData.characters`, get avatars) vs
+  `visualBible.secondaryCharacters` (get an image only if a *reference* is
+  generated). Reference generation is gated by `minAppearances` **default 2**
+  (`visualBible.js:1712-1722`) — that's the "sometimes": a secondary on **one
+  page** (or dropped by the trial `maxElements` cap) never gets a reference.
+- Per-page reference selection resolves `sceneCharacters` against
+  `inputData.characters` **only** (`server.js:5100`), so a secondary never
+  produces a colour-framed identity card. The VB-grid path drops ref-less
+  secondaries via `hasRef` (`visualBible.js:1876,1882`). Net: the secondary
+  contributes **zero image slots**.
+- The collision: `packReferences` then sends Grok only the **primary's**
+  face/body as the sole human reference, and the "REFERENCE CARD COLOURS" block
+  is built strictly from primaries (`storyHelpers.js:4625-4636`). Grok's edit
+  endpoint is heavily anchored to its input images → it paints the secondary
+  borrowing the primary's face. The secondary's real identity survives only as
+  prose, which loses to the image reference.
+- Clothing fallback (`getStyledAvatarForClothing`) is NOT the culprit — identity
+  is lost before any avatar-resolution runs. Affects BOTH providers (Gemini
+  consumes the same `characterPhotos`), so the fix belongs at the
+  reference-selection layer, not a provider branch.
 
-**Action:** ❓ then fix at the identified point — likely either (a) always give
-every named character at least a lightweight avatar/reference, or (b) ensure a
-text-only character's distinct physical description reaches the model AND that no
-other character's reference is (mis)associated with them.
+**Action / fix options (agent-ranked):**
+1. **Root cause:** lower/remove `minAppearances` for `secondaryCharacters`
+   specifically so any named secondary gets a generated reference → flows into a
+   VB cell → Grok gets an independent face. *Cost:* extra reference generation
+   per story (owner cost/latency call — flagged, not auto-shipped).
+2. On-demand secondary avatar + own framed card (most correct, higher effort).
+3. **Backstop (cheap, no new images):** when a named secondary has no reference
+   card, append its full physical description to the prompt tail + an explicit
+   line that the primary's card applies to the primary ONLY and the secondary
+   must be rendered with a distinct face/build (`storyHelpers.js:4625-4649`).
 
-**Status:** ❓ under investigation; expected 🔴 confirmed.
+**Status:** 🔴 confirmed. #1 needs an owner cost decision; #3 is autonomous-safe
+(prompt-builder, no cost change) — candidate for this pass, pending prompt validation.
 
 ---
 
