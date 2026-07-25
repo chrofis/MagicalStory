@@ -414,11 +414,16 @@ async function getPayoutHistory(userId, limit = 20) {
  * @returns {Promise<{totalRefundableCents: number, orders: Array<{orderId, sessionId, paymentIntentId, refundableCents, currency, stripeMode}>}>}
  */
 async function getRefundableAmount(userId, pickStripeForOrder) {
+  // `payment_status` flips 'paid' → 'processing' → 'completed' (or 'failed')
+  // within seconds of insert, so filtering on 'paid' alone found nothing and
+  // silently broke cashout for every user with a fulfilled order. Every row
+  // here was paid via Stripe; the real over-refund guard is the per-order
+  // paymentIntent refundable check below.
   const ordersResult = await getPool().query(
     `SELECT id, stripe_session_id, stripe_payment_intent_id, amount_total, currency, stripe_mode, created_at
        FROM orders
       WHERE user_id = $1
-        AND payment_status = 'paid'
+        AND payment_status IN ('paid','processing','completed','failed')
         AND stripe_payment_intent_id IS NOT NULL
         AND (currency = 'CHF' OR currency IS NULL)
       ORDER BY created_at DESC`,

@@ -76,6 +76,13 @@ const STORAGE_MODE = (process.env.STORAGE_MODE === 'database' && process.env.DAT
 // Accepts bookFormat: 'A4' (default — 21×28cm portrait) or 'square' (legacy 20×20cm)
 router.post('/print-provider/order', authenticateToken, async (req, res) => {
   try {
+    // SECURITY: this endpoint places a real (non-draft) Gelato order with no
+    // payment/credit/Stripe check — it is the developer "direct print bypasses
+    // payment" path (see storyService.ts), so it must be admin-only. Without
+    // this gate any authenticated user could order a printed book for free.
+    if (req.user.role !== 'admin' && req.user.impersonating !== true) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
     let { storyId, pdfUrl, shippingAddress, orderReference, productUid, pageCount, bookFormat = 'A4' } = req.body;
 
     // If storyId provided, look up story to get pdfUrl and pageCount
@@ -96,6 +103,11 @@ router.post('/print-provider/order', authenticateToken, async (req, res) => {
       if (!storyData) {
         return res.status(404).json({ error: 'Story not found' });
       }
+
+      // Post-R2 migration the stored blob has no inline imageData (bytes live
+      // in story_images/R2). Rehydrate before PDF generation or the print
+      // would ship blank covers + missing page images. Matches the paid flow.
+      storyData = await rehydrateStoryImages(storyId, storyData);
 
       // Generate fresh PDF using the shared print function (same as Buy Book)
       log.debug(`🖨️ [PRINT] Generating fresh print PDF for story: ${storyId}, format: ${bookFormat}`);
@@ -1881,11 +1893,14 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
     console.log(`✅ Checkout session created: ${session.id}`);
     log.debug(`   Stories: ${stories.length}, Pages: ${totalPages}, Price: CHF ${price / 100}`);
 
-    // Hold the referral balance now that we have a sessionId. If hold fails,
-    // the discount is already baked into Stripe — log and continue (the worst
-    // case is the user gets a discount they didn't draw from balance, which
-    // self-corrects to "free money" for them, small loss).
+    // Hold the referral balance now that we have a sessionId. The discount is
+    // already baked into the Stripe session; if the hold fails (balance drawn
+    // by a concurrent checkout) we must NOT hand out a session carrying a
+    // discount we never charged against balance — otherwise N parallel
+    // checkouts each spend the same balance N times. The session URL has not
+    // been sent to the client yet, so expiring here is race-free.
     if (useBalanceCents > 0) {
+      let held = false;
       try {
         const holdResult = await referralBalance.holdPending({
           userId,
@@ -1893,11 +1908,20 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
           sessionId: session.id,
           description: `Hold for checkout ${session.id} (${stories.length} stories)`,
         });
+        held = !!holdResult.ok;
         if (!holdResult.ok) {
-          log.error(`❌ [CHECKOUT] holdPending failed for user ${userId} session ${session.id}: ${holdResult.reason} — discount granted but balance not held`);
+          log.error(`❌ [CHECKOUT] holdPending failed for user ${userId} session ${session.id}: ${holdResult.reason}`);
         }
       } catch (holdErr) {
         log.error(`❌ [CHECKOUT] holdPending threw for user ${userId} session ${session.id}: ${holdErr.message}`);
+      }
+      if (!held) {
+        try {
+          await userStripe.checkout.sessions.expire(session.id);
+        } catch (expireErr) {
+          log.error(`❌ [CHECKOUT] failed to expire un-held session ${session.id}: ${expireErr.message}`);
+        }
+        return res.status(409).json({ error: 'Referral balance is no longer available — please retry checkout.' });
       }
     }
 

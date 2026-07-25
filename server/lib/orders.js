@@ -22,8 +22,14 @@ const { getPool } = require('../services/database');
 async function hasPaidOrder(userId, dbClient = null) {
   if (!userId) return false;
   const conn = dbClient || getPool();
+  // `payment_status` starts at 'paid' but processBookOrder flips it to
+  // 'processing' → 'completed' within seconds (and 'failed' on fulfillment
+  // error). All of these represent a genuinely-paid order (rows are only
+  // inserted after a successful Stripe payment), so the first-time-buyer
+  // gate must treat the whole set as "has paid" — querying 'paid' alone
+  // matched almost nothing and let repeat buyers redeem first-time discounts.
   const result = await conn.query(
-    `SELECT 1 FROM orders WHERE user_id = $1 AND payment_status = 'paid' LIMIT 1`,
+    `SELECT 1 FROM orders WHERE user_id = $1 AND payment_status IN ('paid','processing','completed','failed') LIMIT 1`,
     [userId]
   );
   return result.rows.length > 0;

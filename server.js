@@ -524,7 +524,17 @@ if (STORAGE_MODE === 'database') {
     connectionString: DATABASE_URL,
     ssl: {
       rejectUnauthorized: false
-    }
+    },
+    statement_timeout: 120000,
+    connectionTimeoutMillis: 10000
+  });
+
+  // An error emitted by an IDLE client (e.g. Railway Postgres restart, network
+  // reset) surfaces as 'error' on the Pool. With no listener, Node treats it as
+  // an unhandled 'error' event and crashes the process — killing every in-flight
+  // story generation. Log and let the pool evict the dead client instead.
+  dbPool.on('error', (err) => {
+    log.error('❌ [PG POOL] Idle client error (evicted, not fatal):', err.message);
   });
 
   // Initialize the modular database service pool as well
@@ -1158,6 +1168,13 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         log.error('   Error stack:', retrieveError.stack);
         log.error('   Session ID:', session.id);
         log.error('   This payment succeeded but order processing failed!');
+        // Rethrow so the outer handler buffers this event into
+        // stripe_webhook_retry for out-of-band replay. Swallowing it here
+        // acks 200 to Stripe → the event is never retried and never buffered,
+        // leaving the customer charged with no order/credits. The duplicate
+        // guards above already `return` before reaching this point, so a
+        // rethrow only fires on genuine processing failures.
+        throw retrieveError;
       }
     }
 
