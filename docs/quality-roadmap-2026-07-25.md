@@ -34,11 +34,28 @@ Sections marked ❓ are filled in as those land.
 - Non-atomic version allocation (`getNextVersionIndex` MAX+1 + `ON CONFLICT DO
   UPDATE`) can overwrite an image on concurrent same-page mutation.
 
-**Action:** ❓ full consolidated inventory from the completeness sweep, then a
-prioritized fix pass. The version-index↔array-index normalization deserves a
-single shared resolver used everywhere (`findIndex(v => v.versionIndex === active)`).
+**Findings — the SCORING side is actually well-consolidated now (good news):**
+- `applyScore`/`stampScores` is the **single canonical writer** of
+  `finalScore`/`deductions` per version (`images.js:9062-9090`); un-evaluated
+  versions correctly get `finalScore=null`; scene-level score mirrors the picked
+  version via `computeFinalScore(best)` and uses `best.evalScore` not the
+  generation-time `best.score` (an old bug, now fixed). Eval is **fail-CLOSED**
+  (returns null, treated as `evalWasBlocked`, re-evaluated) — not fail-open.
+- Residual scoring↔version bugs still live at HEAD: **(a)** scene-level
+  `bboxDetection` can lag the picked version's pixels when `freshBboxMap` misses
+  the page (`images.js:9235`) — per-version bbox is fine, only the flattened
+  mirror; **(b)** the early-Grok branch returns a proportion-blind score (tied to
+  §3's STEP-2C gate — now FIXED); **(c)** the client version-index↔array-index
+  confusion (sparse `versionIndex` vs raw array index in `ImageHistoryModal.tsx` /
+  `StoryDisplay.tsx`) — this is the biggest remaining one, needs a single shared
+  resolver `findIndex(v => v.versionIndex === active)`.
 
-**Status:** 🟡 several fixed on staging; systemic version-index normalization pending.
+**Action:** the server scoring is solid; the remaining work is (1) the client
+version-index normalization (shared resolver), (2) drop-or-recompute the
+scene-level bbox mirror. Both contained; version normalization touches UI display
+so wants a visual check.
+
+**Status:** 🟢 server scoring consolidated; 🟡 client version-index + bbox mirror pending.
 
 ---
 
@@ -46,18 +63,27 @@ single shared resolver used everywhere (`findIndex(v => v.versionIndex === activ
 
 **Concern:** a recent colour-shift regression.
 
-**Findings:** ❓ (colour-path map from the completeness sweep). Known from review:
-`samBlend` bg-material offset has no minimum-sample guard (a 3-pixel "material"
-gets a full LAB shift → speckled fringe); `bgBorderMatch` defaults ON in
-production while the face-insert path is documented "FEATHER-ONLY, colorCorrect
-false" — so production runs a colour knob it doesn't think it runs. Multiple
-colour ops (`correctColorShift`, `samBlend`, `colorAware`, `harmonicBackgroundFill`)
-with different guard levels.
+**Findings — colour correction is SINGLE-SOURCE (good), no duplicate impl:**
+`correctColorShift` (`images.js:10618`) is the one canonical function, run in
+production from `samBlend.js:374` (`colorAware:true, borderMatch:false,
+garmentOnly:true`). Guards mostly present: empty-mask return, per-material offset
+cap (`maxOffsetDeltaE=30`), border-refine ≤20%-of-mean cap, background-palette
+rejection. No second colour implementation exists. So a *recent regression* is
+most likely one of these residual gaps, NOT a rogue second path:
+- **colorAware bypasses the overall-mean `minDeltaE` floor** (deliberate,
+  `images.js:10645-10649`) — so on the production blend a tiny real shift still
+  runs a full k-means recolor with no floor protecting it.
+- **`bgCent` needs ≥90 background points** (`images.js:10697`); on small crops
+  the background-rejection arm drops out and the tight `SAME2=36` gate is the
+  only protection → over-correction risk on small figures.
+- Seam-close (`_closeSeamHarmonic`) is OFF in prod blend (`borderMatch:false`).
 
-**Action:** ❓ identify the most likely recent-regression culprit, add the
-missing min-sample guard, reconcile which colour ops run in production vs testlab.
+**Action:** add a minimum-sample floor to the colorAware per-material shift (skip
+a "material" matched by too few pixels — the earlier review's speckled-fringe
+concern) and a small-crop guard when `bgCent` is empty. **Behavior-affecting on
+image output → wants a visual before/after, so proposed not auto-shipped.**
 
-**Status:** ❓ under investigation.
+**Status:** 🟢 single-source confirmed; 🟡 two residual guard gaps to add (need visual check).
 
 ---
 
@@ -67,20 +93,53 @@ missing min-sample guard, reconcile which colour ops run in production vs testla
 implemented, but we then only improve ONE path. Or introduce gates that are not
 complete. And instead of fixing properly, fallbacks are created."
 
-**Did the review cover this?** Partially — it surfaced many instances (testlab↔
-production blend has 7 near-copy blocks; production face-repair lacks the style
-gate + erode-then-feather + lossless-PNG that testlab has; Runware branches
-diverge) but was not *organized* around this theme. The completeness sweep (in
-flight) produces three dedicated inventories: **duplicated paths**, **incomplete
-gates**, **fallback-instead-of-fix**.
+**Findings — three consolidated inventories (full detail in the review report):**
 
-**Action:** ❓ then a consolidation strategy — the recurring root cause is that
-testlab and production reimplement the same blend/repair steps. The durable fix
-is to make production CALL the same functions testlab does (single source), not
-maintain parallel copies. The `fixing-sibling-paths` skill exists precisely
-because this recurs.
+**Duplicated feature paths (still drifting at HEAD):**
+- Two image-generation entry functions (`callGeminiAPIForImage`@4704 vs
+  `generateImageOnly`@5523) each re-implement the whole provider dispatch ladder
+  — eval-gate improvements to one don't reach the other.
+- `padToGeminiRatio`/`removePadding` implemented TWICE with different math
+  (`repairGrid.js` pads solid white/black vs `entityConsistency.js` pads mirror).
+- Face-repair: 5 coexisting modes + `grokFaceInsertRepair` (SAM-union) with a
+  legacy fall-through; a SECOND inline union blend in
+  `repairCharacterMismatchWithGrok`@11822 that does NOT use the shared
+  `samUnionBlend`.
+- Cover logic scattered: **VB-id sanitization in 4 places with OPPOSITE fail
+  semantics** (composite fails OPEN → can paint a literal `ART###`); title/text
+  rule in 3 incompatible formulations; aspect hardcoded `3:4` in composite vs
+  `MODEL_DEFAULTS.coverAspect`.
 
-**Status:** ❓ inventories pending; consolidation is the highest-leverage structural work.
+**Incomplete gates (one path enforces, sibling skips):** style-match
+(`checkStyleMatch` — testlab only, absent in prod face repair); IoU<0.55 +
+white-card (samBlend path only; legacy inline union uses a weak area-ratio);
+whiteout over-coverage (testlab only); `requireMobilesam` (round-1 only, round-2
+silently allows rembg); **composite covers bypass ALL eval and return
+`score:null`** so auto-repair can't confirm improvement; cascade depth Signal A
+(prod detection only). ✅ **STEP-2C proportion check — FIXED this pass** (was OFF
+on the production `grok` default while siblings ran it).
+
+**Fallbacks masking root bugs:** ⚠️ **`evaluateEntityConsistency` fails OPEN in 3
+places** (`entityConsistency.js:2025/2117/2158`) — missing template / parse error
+/ any Gemini error returns `consistent:true`, **silently disabling repair for the
+whole story** (highest-impact fail-open). Face-insert → legacy blur+rect blend on
+ANY failure (masks SAM-down / gate-reject / style-drift). `styleHint` defaults to
+hardcoded **watercolor** (an `oil` story missing `styleHint` renders watercolor).
+Composite → direct silent fallback; composite repaints ship **titleless**. A full
+repair-verification trio (`verifyRepairImprovement`) exists but is **dead** — live
+repairs hardcode `verification:{improved:true}`. Also: `regeneration.js:5904`
+artifact-repair calls `gridBasedRepair` with the wrong signature → **always
+throws** (that endpoint's grid path is dead).
+
+**Action / strategy:** the durable fix is to make production CALL the shared
+functions (samBlend, `sanitizeVbIdsInPrompt`, `coverTextFor`, one dispatcher, one
+pad helper) instead of parallel copies — then every fix lands everywhere. The
+highest-value *correctness* fix is the entity fail-open (flip to fail-closed /
+surface "unresolved"), but it changes repair-trigger behavior on flaky evals →
+owner sign-off, not a blind flip.
+
+**Status:** 🟡 inventoried; consolidation is the highest-leverage structural work.
+STEP-2C fixed; the rest are behavior-changing → prioritized proposal below.
 
 ---
 
@@ -403,4 +462,51 @@ Points 1, 2, 3, 10, 12 share one root cause the owner named directly:
 most valuable structural investment is collapsing the testlab/production
 duplication so there is ONE blend path, ONE colour path, ONE scoring/version
 resolver, ONE scene-then-figure repair order — then every fix lands everywhere.
-The completeness sweep (in flight) turns this into a concrete work-list.
+
+---
+
+## Prioritized action list
+
+### ✅ Shipped this pass (autonomous, low-risk, verified by syntax)
+- **STEP-2C proportion gate completion** (`images.js:4891`) — was OFF on the
+  production `grok` default; added the missing `sceneCharacters` arg so the
+  head-to-body check runs like its siblings. Pure gate-completion.
+
+### 🔴 Correctness bugs — recommend fixing next (need owner OK; they change behavior)
+1. **Entity check fail-open ×3** (`entityConsistency.js:2025/2117/2158`) — flip to
+   fail-closed / surface "unresolved" so a broken evaluator can't silently
+   disable repair for a whole story. *(risk: repair-trigger behavior on flaky
+   evals — mitigate by only failing closed on parse/template errors, not
+   transient timeouts.)*
+2. **Wire the final style check** (§10) — feed Step-5 `styleConsistency.outliers`
+   back through iterate before finalize; add `checkStyleMatch` as a production
+   gate on char-fix/inpaint/iterate. *(this is "the style check isn't working".)*
+3. **Titleless composite covers + composite covers return `score:null`** —
+   restamp on composite repaint; run eval on the composite path.
+4. **Secondary-character identity** (§8) — the cheap prompt-tail backstop (#3) is
+   autonomous-safe pending prompt validation; the root-cause reference generation
+   (#1) is a cost decision.
+5. **`styleHint` watercolor default** (`coverComposite.js:515`) — derive from
+   `artStyle` instead of defaulting an `oil` story to watercolor.
+
+### 🧪 Experiments (need §6 rubric + §7 harness first)
+- Outline single-vs-split A/B (§5); model downgrades for `story_ideas` / util
+  calls (§9); image-first prototype (§4); AI-image-limitation mitigations one at
+  a time (§11).
+
+### 📐 Design/behavior changes (need owner direction)
+- Scene-first-then-figure repair ordering + facing-away → scene redo (§12);
+  rebalance the away-facing generation bias (§12 #2); colour min-sample guard
+  (§2, wants a visual before/after).
+
+### 🏗 Structural (largest leverage, largest effort)
+- Collapse duplicated paths to single sources: one image-gen dispatcher, one
+  `padToGeminiRatio`, one blend (`samUnionBlend` everywhere), one cover
+  text/VB-id/aspect source. This is what makes "we only improved one path" stop
+  happening.
+
+**Autonomous fixes are deliberately conservative** — the owner's core frustration
+is half-done gates and unvalidated changes, so everything that alters image
+output or repair-trigger behavior is proposed (with exact file:line + fix) rather
+than shipped blind, since this environment can't runtime- or visually-test the
+pipeline.

@@ -4887,7 +4887,11 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         qualityModelOverride,
         pageContext,
         storyText,
-        sceneHint
+        sceneHint,
+        sceneCharacters   // 9th arg enables STEP-2C head-to-body proportion check;
+                          // was omitted here so the check was silently OFF on the
+                          // production default (imageBackend:'grok'), while the
+                          // Runware (5187) and model-routed Grok (5263) siblings ran it.
       );
       if (!qualityResult) {
         log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Grok backend) — returning image with score=null so pipeline can re-evaluate next round`);
