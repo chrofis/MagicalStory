@@ -117,7 +117,7 @@ async function _interiorSeedPoints(maskPng, w, h) {
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -249,7 +249,11 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     if (dropped > 0) log.info(`[TESTLAB] dropped ${dropped}px disconnected mask islands (kept the face component)`);
   }
   const iou = unionPx > 0 ? interPx / unionPx : 0;
-  if (iou < 0.55) {
+  // Gate tunable via opts (default 0.55 = today's hardcoded value, byte-identical
+  // behaviour). The unified faceRepair.js exposes it as opts.gates.iou so a Test
+  // Lab A/B can calibrate before the legacy box-blur/crosshatch paths (which
+  // never faced this gate) route through here in production.
+  if (gateIou && iou < iouThreshold) {
     throw fail(`Painted figure barely overlaps the original (mask IoU ${(iou * 100).toFixed(0)}%) — the figure moved or changed pose. Redo instead of blending a misaligned figure.`);
   }
 
@@ -312,7 +316,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
       if (candRaw0[i * 3] >= 243 && candRaw0[i * 3 + 1] >= 243 && candRaw0[i * 3 + 2] >= 243) whiteCnt++;
     }
     const whiteFrac = unionCnt ? whiteCnt / unionCnt : 0;
-    if (whiteFrac > 0.22) {
+    if (gateWhiteCard && whiteFrac > whiteCardMaxFrac) {
       throw fail(`Blended region is ${(whiteFrac * 100).toFixed(0)}% near-white — the model painted the face on a white card. Redo.`);
     }
   }

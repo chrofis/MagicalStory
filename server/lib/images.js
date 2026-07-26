@@ -17178,6 +17178,16 @@ module.exports = {
   _deltaE,
   _ccKMeans,
   fetchFigureHeadMaskPng,
+  fetchSilhouettePng,
+  // Region/geometry + treatment helpers consumed by the unified faceRepair.js.
+  // Exported (minimal) rather than duplicated so the merge stays single-source.
+  computePresetAlignedExtract,
+  grokEditSceneExact,
+  detectAddedBorder,
+  buildCharActionContextFromInteractions,
+  REPAIR_SHARPNESS_MIN_ORIG,
+  REPAIR_SHARPNESS_REJECT_RATIO,
+  closestGrokAspect,
   buildEvalClothingHeader,
   buildPageCompositeRefs,
   detectSubRegion,  // Sub-region detection for targeted repairs (shoes, shirt, hands, etc.)
