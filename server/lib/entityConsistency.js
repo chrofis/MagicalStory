@@ -944,7 +944,9 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
         if (error) {
           if (!report.characters[charName]) {
-            report.characters[charName] = { byClothing: {}, issues: [], overallConsistent: true, overallScore: 0, totalIssues: 0, error };
+            // Fail CLOSED: a character whose check errored is NOT verified —
+            // overallConsistent:false + evalFailed so it isn't a silent pass.
+            report.characters[charName] = { byClothing: {}, issues: [], overallConsistent: false, evalFailed: true, overallScore: 0, totalIssues: 0, error };
           }
           continue;
         }
@@ -1180,8 +1182,9 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           log.error(`❌ [ENTITY-CHECK] Error checking object ${objName}: ${err.message}`);
           report.objects[objName] = {
             error: err.message,
-            consistent: true,  // Assume consistent on error
-            score: 0,
+            consistent: false,  // Fail closed — an errored check is NOT a pass
+            evalFailed: true,
+            score: 10,
             issues: []
           };
         }
@@ -2023,10 +2026,13 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
   // Build prompt from template
   const promptTemplate = PROMPT_TEMPLATES.entityConsistencyCheck;
   if (!promptTemplate) {
-    log.error('❌ [ENTITY-CHECK] Missing prompt template: entity-consistency-check.txt');
+    // Missing template is a deploy/code bug (never transient) — fail CLOSED and
+    // loud, never silently mark the story entity-consistent.
+    log.error('❌ [ENTITY-CHECK] Missing prompt template: entity-consistency-check.txt — failing entity check closed');
     return {
-      consistent: true,
-      score: 0,
+      consistent: false,
+      evalFailed: true,
+      score: 10,
       issues: [],
       summary: 'Prompt template not available',
       error: 'Missing prompt template'
@@ -2088,83 +2094,89 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
     CELL_COUNT: cellCount.toString(),
   });
 
-  try {
-    const model = genAI.getGenerativeModel({
-      model: ENTITY_CHECK_MODEL,
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 8192  // Increased from 2048 to handle complex responses with many issues
-      }
-    });
-
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: gridBuffer.toString('base64')
-        }
-      }
-    ]);
-
-    const response = result.response;
-    const text = response.text();
-
-    // Parse JSON response — extractJsonFromText handles fenced blocks, raw JSON,
-    // and balanced-brace extraction (covers the unclosed-fence cases that the
-    // older inline parser tried to handle separately).
-    const parsed = extractJsonFromText(text);
-    if (!parsed) {
-      log.warn(`⚠️  [ENTITY-CHECK] Failed to parse response for ${entityName}`);
-      log.debug(`[ENTITY-CHECK] Raw response: ${text.substring(0, 200)}...`);
-      return {
-        consistent: true,
-        score: 5,
-        issues: [],
-        summary: 'Could not parse evaluation response',
-        rawResponse: text,
-        parseError: true
-      };
+  const model = genAI.getGenerativeModel({
+    model: ENTITY_CHECK_MODEL,
+    generationConfig: {
+      temperature: 0.2,
+      maxOutputTokens: 8192  // Increased from 2048 to handle complex responses with many issues
     }
+  });
 
-    // Convert issues to unified format
-    const issues = (parsed.issues || []).map(issue => ({
-      id: `entity_${entityName.toLowerCase().replace(/\s+/g, '_')}_${issue.pagesToFix?.[0] || 'unknown'}`,
-      source: 'entity',
-      pageNumber: issue.pagesToFix?.[0] || null,
-      region: null,  // Will be enriched later if needed
-      type: 'consistency',
-      subType: issue.type,
-      severity: issue.severity || 'major',
-      description: issue.description,
-      fixInstruction: issue.fixInstruction,
-      affectedCharacter: entityName,
-      cells: issue.cells,
-      pagesToFix: issue.pagesToFix,
-      canonicalVersion: issue.canonicalVersion
-    }));
+  // Retry transient Gemini/parse failures instead of failing OPEN. Previously a
+  // single error returned consistent:true — silently marking the story entity-
+  // verified and disabling repair for the WHOLE story. Now we retry, and on a
+  // genuine failure fail CLOSED (evalFailed:true, consistent:false, no issues)
+  // so it's visible and never counts as a clean pass. issues stays empty, so no
+  // phantom repair is triggered.
+  const MAX_ATTEMPTS = 3;
+  let lastErr = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await model.generateContent([
+        prompt,
+        { inlineData: { mimeType: 'image/jpeg', data: gridBuffer.toString('base64') } }
+      ]);
+      const response = result.response;
+      const text = response.text();
 
-    return {
-      consistent: parsed.consistent ?? true,
-      score: parsed.score ?? 10,
-      issues,
-      summary: parsed.summary || 'Evaluation complete',
-      // O7: verbatim model output — was kept only on parse failure, so a
-      // successful eval's raw judgment was unreconstructable afterwards.
-      rawResponse: text,
-      usage: response.usageMetadata
-    };
+      // Parse JSON response — extractJsonFromText handles fenced blocks, raw
+      // JSON, and balanced-brace extraction.
+      const parsed = extractJsonFromText(text);
+      if (!parsed) {
+        log.warn(`⚠️  [ENTITY-CHECK] Failed to parse response for ${entityName} (attempt ${attempt}/${MAX_ATTEMPTS})`);
+        log.debug(`[ENTITY-CHECK] Raw response: ${text.substring(0, 200)}...`);
+        lastErr = new Error('unparseable evaluation response');
+        if (attempt < MAX_ATTEMPTS) { await new Promise(r => setTimeout(r, 1000 * attempt)); continue; }
+        break;
+      }
 
-  } catch (err) {
-    log.error(`❌ [ENTITY-CHECK] Gemini evaluation failed for ${entityName}: ${err.message}`);
-    return {
-      consistent: true,
-      score: 0,
-      issues: [],
-      summary: `Evaluation failed: ${err.message}`,
-      error: err.message
-    };
+      // Convert issues to unified format
+      const issues = (parsed.issues || []).map(issue => ({
+        id: `entity_${entityName.toLowerCase().replace(/\s+/g, '_')}_${issue.pagesToFix?.[0] || 'unknown'}`,
+        source: 'entity',
+        pageNumber: issue.pagesToFix?.[0] || null,
+        region: null,  // Will be enriched later if needed
+        type: 'consistency',
+        subType: issue.type,
+        severity: issue.severity || 'major',
+        description: issue.description,
+        fixInstruction: issue.fixInstruction,
+        affectedCharacter: entityName,
+        cells: issue.cells,
+        pagesToFix: issue.pagesToFix,
+        canonicalVersion: issue.canonicalVersion
+      }));
+
+      return {
+        consistent: parsed.consistent ?? true,
+        score: parsed.score ?? 10,
+        issues,
+        summary: parsed.summary || 'Evaluation complete',
+        // O7: verbatim model output — was kept only on parse failure, so a
+        // successful eval's raw judgment was unreconstructable afterwards.
+        rawResponse: text,
+        usage: response.usageMetadata
+      };
+    } catch (err) {
+      lastErr = err;
+      log.warn(`⚠️  [ENTITY-CHECK] Gemini eval error for ${entityName} (attempt ${attempt}/${MAX_ATTEMPTS}): ${err.message}`);
+      if (attempt < MAX_ATTEMPTS) { await new Promise(r => setTimeout(r, 1000 * attempt)); continue; }
+    }
   }
+
+  // All attempts failed → fail CLOSED. score:10 so a failed check doesn't drag
+  // worstScore down (we didn't FIND issues — we couldn't look); consistent:false
+  // + evalFailed:true so it never reads as verified-good and the report shows
+  // the story wasn't entity-checked.
+  log.error(`❌ [ENTITY-CHECK] Entity eval failed for ${entityName} after ${MAX_ATTEMPTS} attempts: ${lastErr?.message}`);
+  return {
+    consistent: false,
+    evalFailed: true,
+    score: 10,
+    issues: [],
+    summary: `Evaluation failed: ${lastErr?.message || 'unknown error'}`,
+    error: lastErr?.message || 'unknown'
+  };
 }
 
 // Repair model (same as repairGrid.js)
