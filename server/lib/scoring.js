@@ -203,10 +203,11 @@ function composeDeductions({ evalResult = null, entityResult = null, consolidate
 }
 
 /**
- * Sum severity points across every category and clamp 100−sum to [0, 100].
+ * Sum severity points across every category (entity capped). This is the
+ * total deduction; `100 − total` is the raw (un-clamped) score.
  */
-function computeMathFinalScore(deductions) {
-  if (!deductions || typeof deductions !== 'object') return 100;
+function sumDeductionPoints(deductions) {
+  if (!deductions || typeof deductions !== 'object') return 0;
   let total = 0;
   // `consolidated` is the deduped cross-evaluator list (one entry per unique
   // defect) — mutually exclusive with the raw buckets by construction in
@@ -221,7 +222,15 @@ function computeMathFinalScore(deductions) {
   // apply at every entity-penalty site.
   const entityRaw = (deductions.entity || []).reduce((s, d) => s + (SEVERITY_POINTS[d.severity] || 0), 0);
   total += capEntityPenalty(entityRaw);
-  return Math.max(0, Math.min(100, 100 - total));
+  return total;
+}
+
+/**
+ * Sum severity points across every category and clamp 100−sum to [0, 100].
+ */
+function computeMathFinalScore(deductions) {
+  if (!deductions || typeof deductions !== 'object') return 100;
+  return Math.max(0, Math.min(100, 100 - sumDeductionPoints(deductions)));
 }
 
 /**
@@ -272,6 +281,11 @@ function applyScore(version, { evalResult = null, entityResult = null, promptFin
   version.mathFinalScore = mathFinalScore;
   version.promptFinalScore = (typeof promptFinalScore === 'number') ? promptFinalScore : null;
   version.finalScore = finalScore;
+  // Un-clamped score (can go below 0). finalScore pins to 0 once deductions pass
+  // 100, so several failing versions all read 0 and become indistinguishable in
+  // the UI; rawScore preserves how-far-below-zero so they can be told apart
+  // (e.g. −30 vs −140) and is a hint that the eval may be over-penalizing.
+  version.rawScore = 100 - sumDeductionPoints(deductions);
   version.scoreModel = 'math';
   // Which issue set fed the math: 'consolidated' (deduped) or 'raw'.
   version.scoreSource = dedupedIssues ? 'consolidated' : 'raw';

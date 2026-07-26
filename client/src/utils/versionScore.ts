@@ -14,6 +14,7 @@
  */
 export interface ScoredVersionLike {
   finalScore?: number | null;
+  rawScore?: number | null;
   evalScore?: number | null;
   qualityScore?: number | null;
   entityPenalty?: number | null;
@@ -26,4 +27,16 @@ export function versionScore(v: ScoredVersionLike | null | undefined): number | 
   if (typeof v.evalScore === 'number') return Math.max(0, v.evalScore - penalty);
   if (typeof v.qualityScore === 'number') return Math.max(0, v.qualityScore - penalty);
   return null;
+}
+
+/**
+ * Un-clamped score (`100 − Σ deductions`, can go below 0), written server-side
+ * by applyScore. Only meaningful to surface when the clamped `versionScore` has
+ * floored at 0 — it distinguishes several 0-scored versions (e.g. −30 vs −140)
+ * and hints at eval over-penalization. Returns null for legacy versions that
+ * predate the field.
+ */
+export function versionRawScore(v: ScoredVersionLike | null | undefined): number | null {
+  if (!v || typeof v !== 'object') return null;
+  return typeof v.rawScore === 'number' ? v.rawScore : null;
 }

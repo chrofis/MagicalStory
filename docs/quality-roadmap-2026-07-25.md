@@ -57,6 +57,30 @@ so wants a visual check.
 
 **Status:** 🟢 server scoring consolidated; 🟡 client version-index + bbox mirror pending.
 
+### 1a. Scores floor at 0 — "often 3 images have 0"
+- **Answer:** the score CANNOT go negative — clamped to `[0,100]` server-side
+  (`scoring.js:224`) and client-side (`versionScore.ts`). A version scores
+  `100 − Σ deductions`; once deductions pass 100 it pins to 0, so several failing
+  versions all read 0 and become indistinguishable. Selection is NOT broken
+  (`pickBestVersionIndex` tiebreaks on the un-clamped deduction total), only the
+  displayed number is uninformative.
+- **✅ A (shipped):** `applyScore` now stores an un-clamped `version.rawScore`
+  (`100 − Σ deductions`, can go negative); the dev-mode version badges + detail
+  panel show it in parentheses when the score floors at 0 (e.g. `0% (−140)`), so
+  three 0-scored versions are distinguishable. Legacy versions (pre-deploy) lack
+  the field and just show `0%`.
+- **🧪 B (documented — needs decision):** if pages *routinely* exceed 100
+  deductions, the likelier cause is the eval **over-penalizing** — flooding false
+  CRITICALs (25 pts each; the model-cost audit flagged that some eval models do
+  exactly this). With critical 25 / major 15 + entity cap 40, ~3–4 false
+  criticals floor an otherwise-fine image. **Investigation:** measure the
+  false-CRITICAL rate per eval stage on a sample of stories (the rawScore
+  distribution now makes this visible — how far below 0 do "bad" pages land?),
+  then either tighten the eval prompts (fewer spurious criticals) or re-weight
+  `SEVERITY_POINTS`. Behavior-changing (shifts scores + repair frequency) → run
+  as a Test Lab experiment with the §6 rubric, not a blind change. Ties to the
+  §1 rubric-calibration item (prompts teach a harsher table than intended).
+
 ---
 
 ## 2. Colour shifting (owner: "recently had issues")
