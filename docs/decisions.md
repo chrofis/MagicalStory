@@ -72,13 +72,65 @@ asking for the appearance description, append the result to the VB as a
 new `CHRxxx` entry.
 **Rationale:** ~$0.004 per phantom call (Sonnet 4.6) vs the alternative
 of asking the main prompt to be perfect. Cheap insurance.
-**Caveat:** The phantom is added to the Visual Bible (so prompts pick her
+**Caveat:** ~~The phantom is added to the Visual Bible (so prompts pick her
 up), but the reference-sheet generator may skip generating a dedicated
-reference image for single-page side characters — see the ✗ marker in
-`[REF-SHEET]` log lines.
+reference image for single-page side characters~~ — RESOLVED, see "Every named
+secondary character gets its own reference image (Pt 8)" below: named
+secondaries now qualify for a reference on a single page in full mode.
 **Touched:**
 - `server/lib/phantomCharacters.js` — detection + Sonnet patch call
 - `server.js` (unified pipeline, after parsing) — invokes the recovery
+**Status:** ✅ active.
+
+---
+
+### Every named secondary character gets its own reference image (Pt 8, 2026-07-26)
+**Context:** Two disjoint character pools exist: **primaries**
+(`inputData.characters` — get avatars + face/body reference photos) and
+**secondaries** (`visualBible.secondaryCharacters` — get an image ONLY if a VB
+reference is generated). Reference generation was gated by `minAppearances`
+(default 2), so a secondary appearing on a single page never got a reference.
+With no reference, the secondary contributed zero image slots; `packReferences`
+then sent Grok/Gemini only the **primary's** face as the sole human reference,
+and the model — anchored to its input images — painted the secondary borrowing
+the primary's face. The secondary's identity survived only as prose, which loses
+to the image reference. Owner decision (2026-07-25): "Every character must be in
+the visual bible" with its own identity, and the cost of generating secondary
+references IS accepted.
+**Decision:** Lower the appearance gate for **characters only** to 1 page while
+locations / artifacts / animals / vehicles keep the 2-page recurring-element
+gate. `getElementsNeedingReferenceImages(visualBible, minAppearances=2,
+characterMinAppearances=1)` now takes a per-type gate; the character branch also
+runs a named-individual guard so generic crowds don't get a wasted reference.
+Once a named secondary has a reference, the existing per-page path
+(`getElementReferenceImagesForPage` → `buildVisualBibleGrid` → `visualBibleGrid`
+→ `packReferences`) already carries its own face to both providers — no
+provider-branch change needed.
+**Named-vs-generic rule** (`isNamedIndividualCharacter`): a character qualifies
+for its own reference iff its name is present (≥2 chars), is NOT article-prefixed
+("a guard", "the innkeeper" → generic role reference), and is NOT a single-word
+plural/collective crowd noun (villagers, soldiers, guards, crowd, townsfolk, …).
+Proper names, singular named roles ("Innkeeper"), and placeholder individuals
+("Soldier1") all qualify — a distinct invented face always beats borrowing the
+primary's identity. Generic crowds belong in the scene `background` field
+(story-unified.txt:249), not the VB; this guard is the safety net for the rare
+story-text-extraction leak. The guard applies to characters at ALL page counts,
+so a "villagers" entry that recurs is now excluded (previously it got one
+misleading face at 2+ pages).
+**Trial mode:** unchanged — the trial `generateReferenceSheet` call passes
+`characterMinAppearances: 2`, so trial keeps the old 2-page gate. Trial is
+speed-optimised and its `maxElements: 6` cap already bounds element count; the
+Pt 8 single-page widening is full-(non-trial-)mode only, per "unified mode is
+primary".
+**Cost/latency:** one extra reference-gen call per newly-qualifying single-page
+named secondary (batched up to 4 per grid). A story with K such secondaries adds
+⌈K/4⌉ grid generations. Logged at `[REF-SHEET] 🧑 N secondary CHARACTER
+reference(s)…` for observability.
+**Touched:**
+- `server/lib/visualBible.js` — `isNamedIndividualCharacter()` + `GENERIC_CROWD_TERMS`; `getElementsNeedingReferenceImages()` per-type gate + named guard; export
+- `server/lib/images.js` — `generateReferenceSheet` accepts `characterMinAppearances`, threads it, logs secondary-character ref count
+- `server.js` — full-mode call passes `characterMinAppearances: 1`; trial call passes `2`
+- `tests/manual/test-pt8-secondary-references.js` — unit test
 **Status:** ✅ active.
 
 ---
