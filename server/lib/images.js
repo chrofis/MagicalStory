@@ -4717,6 +4717,25 @@ function truncatePromptForModel(prompt, maxPromptLength, logLabel, modelName = n
 }
 
 /**
+ * Collect the data:image reference URLs from a characterPhotos array (each
+ * entry is either a raw data-URI string or an object with a `photoUrl`).
+ * Shared by the Runware dispatch of both image-gen entry functions and the
+ * Grok avatar branch, so the extraction rule lives in one place.
+ */
+function extractDataImageUrls(characterPhotos) {
+  const referenceImages = [];
+  if (characterPhotos && characterPhotos.length > 0) {
+    for (const photoData of characterPhotos) {
+      const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+      if (photoUrl && photoUrl.startsWith('data:image')) {
+        referenceImages.push(photoUrl);
+      }
+    }
+  }
+  return referenceImages;
+}
+
+/**
  * Call Gemini API for image generation
  * @param {string} prompt - The image generation prompt
  * @param {string[]} characterPhotos - Character reference photos
@@ -4764,15 +4783,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
     try {
       // Extract photo URLs for reference images
-      const referenceImages = [];
-      if (characterPhotos && characterPhotos.length > 0) {
-        for (const photoData of characterPhotos) {
-          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-          if (photoUrl && photoUrl.startsWith('data:image')) {
-            referenceImages.push(photoUrl);
-          }
-        }
-      }
+      const referenceImages = extractDataImageUrls(characterPhotos);
 
       // Pass all reference images (prompt already limits character count)
       const result = await generateWithRunware(prompt, {
@@ -5172,15 +5183,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       const runwareModel = modelId === 'flux-dev' ? RUNWARE_MODELS.FLUX_DEV : RUNWARE_MODELS.FLUX_SCHNELL;
 
       // Extract photo URLs for reference images
-      const referenceImages = [];
-      if (characterPhotos && characterPhotos.length > 0) {
-        for (const photoData of characterPhotos) {
-          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-          if (photoUrl && photoUrl.startsWith('data:image')) {
-            referenceImages.push(photoUrl);
-          }
-        }
-      }
+      const referenceImages = extractDataImageUrls(characterPhotos);
 
       const result = await generateWithRunware(effectivePrompt, {
         model: runwareModel,
@@ -5254,13 +5257,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       // For scenes: use normal packing (VB grid + landmarks + characters + scene background)
       let refImages;
       if (evaluationType === 'avatar' && characterPhotos?.length > 0) {
-        refImages = [];
-        for (const photoData of characterPhotos.slice(0, 3)) {
-          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-          if (photoUrl && photoUrl.startsWith('data:image')) {
-            refImages.push(photoUrl);
-          }
-        }
+        refImages = extractDataImageUrls(characterPhotos.slice(0, 3));
         log.info(`🎨 [GROK] Avatar mode: ${refImages.length} reference images as separate slots`);
       } else {
         refImages = await packReferences(
@@ -5591,15 +5588,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     log.info(`🎨 [IMAGE GEN-ONLY] Using Runware FLUX Schnell backend`);
 
     try {
-      const referenceImages = [];
-      if (characterPhotos && characterPhotos.length > 0) {
-        for (const photoData of characterPhotos) {
-          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-          if (photoUrl && photoUrl.startsWith('data:image')) {
-            referenceImages.push(photoUrl);
-          }
-        }
-      }
+      const referenceImages = extractDataImageUrls(characterPhotos);
 
       const result = await generateWithRunware(prompt, {
         model: RUNWARE_MODELS.FLUX_SCHNELL,
@@ -5840,15 +5829,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
     try {
       const runwareModel = modelId === 'flux-dev' ? RUNWARE_MODELS.FLUX_DEV : RUNWARE_MODELS.FLUX_SCHNELL;
-      const referenceImages = [];
-      if (characterPhotos && characterPhotos.length > 0) {
-        for (const photoData of characterPhotos) {
-          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-          if (photoUrl && photoUrl.startsWith('data:image')) {
-            referenceImages.push(photoUrl);
-          }
-        }
-      }
+      const referenceImages = extractDataImageUrls(characterPhotos);
 
       const result = await generateWithRunware(effectivePrompt, {
         model: runwareModel,
@@ -14827,5 +14808,6 @@ module.exports = {
 
   // Pure dispatch helpers (exported for unit tests / reuse)
   resolveOutputAspect,
-  truncatePromptForModel
+  truncatePromptForModel,
+  extractDataImageUrls
 };
