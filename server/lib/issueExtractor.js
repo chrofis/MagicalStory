@@ -386,7 +386,9 @@ function calculateIoU(bbox1, bbox2) {
  * @param {Object} evalResults - All evaluation results
  * @param {Object} evalResults.quality - Result from evaluateImageQuality (has fixTargets, identity_sync)
  * @param {Object} evalResults.incremental - Result from evaluateIncrementalConsistency (has issues[])
- * @param {Object} evalResults.final - Result from runFinalConsistencyChecks (has pagesToFix[])
+ * @param {Object} [evalResults.final] - LEGACY/optional final-consistency result (has pagesToFix[]).
+ *   No production caller populates this anymore (runFinalConsistencyChecks was removed 2026-07-26);
+ *   the pagesToFix branch below stays as a defensive no-op for any external caller that still passes it.
  * @param {number} pageNumber - Page number
  * @param {{width: number, height: number}} imgDimensions - Image dimensions
  * @param {Object} options - Additional options

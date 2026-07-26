@@ -159,7 +159,7 @@ const DEFAULT_OPTIONS = {
  * @param {Object} evalResults - Results from all evaluation paths
  * @param {Object} evalResults.quality - From evaluateImageQuality
  * @param {Object} evalResults.incremental - From evaluateIncrementalConsistency
- * @param {Object} evalResults.final - From runFinalConsistencyChecks
+ * @param {Object} [evalResults.final] - LEGACY/optional (runFinalConsistencyChecks was removed 2026-07-26; no longer produced)
  * @param {Object} options - Configuration options
  * @returns {Promise<{imageData: Buffer, repaired: boolean, history: Object}>}
  */

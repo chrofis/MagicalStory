@@ -88,8 +88,6 @@ async function loadPromptTemplates() {
     ['storyUnified', 'story-unified.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
-    ['finalConsistencyCheck', 'final-consistency-check.txt'],
-    ['textConsistencyCheck', 'text-consistency-check.txt'],
     ['incrementalConsistencyCheck', 'incremental-consistency-check.txt'],
     ['boundingBoxDetection', 'bounding-box-detection.txt'],
     ['repairVerification', 'repair-verification.txt'],

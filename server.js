@@ -102,7 +102,6 @@ const {
   clearImageCache,
   deleteFromImageCache,
   compressImageToJPEG,
-  runFinalConsistencyChecks,
   generateReferenceSheet,
   buildVisualBibleGrid,
   buildEmptySceneVbGrid,
@@ -148,8 +147,7 @@ const {
   callAnthropicAPI,
   callAnthropicAPIStreaming,
   callGeminiTextAPI,
-  callClaudeAPI,
-  evaluateTextConsistency
+  callClaudeAPI
 } = require('./server/lib/textModels');
 const {
   MODEL_PRICING,
