@@ -272,8 +272,9 @@ per-story so the outline A/B (§5), model-downgrade experiments (§9) and the
 §1a-B calibration are measurable.
 
 **Status:** ✅ CONFIRMED by owner 2026-07-25 — these 5 text-only criteria
-(picturability dropped; it's an image-pipeline concern, scored separately). Ready
-to wire the judge once the harness (§7) is built.
+(picturability dropped; it's an image-pipeline concern, scored separately).
+**Judge WIRED + SHIPPED (2026-07-26)** in `server/lib/textQualityJudge.js` +
+`prompts/story-text-quality-judge.txt` (see §7).
 
 ---
 
@@ -305,8 +306,17 @@ the story→job linkage needs verifying).
 **Action:** build Option A + wire the §6 rubric scoring. This is the harness for
 §5 and §9 experiments.
 
-**Status:** 📐 spec — feasible, minimal; autonomous-buildable once story→job
-linkage is confirmed (candidate for a follow-up once the owner confirms §6 rubric).
+**Status:** ✅ **SHIPPED to staging (2026-07-26, `8507d3d9`).** Two admin
+endpoints on `server/routes/admin/jobs.js`: `POST /:jobId/rerun-text` (clone a
+job's input_data, force `skipImages=true`, start N runs, with an `inputOverrides`
+shallow-merge seam for the §5 outline A/B — no new endpoint needed) and `POST
+/:jobId/judge-text` (score a completed text-only job on the §6 rubric via
+`server/lib/textQualityJudge.js`, cross-model default gemini-2.5-flash, persisted
+to `result_data.textQualityScore`). Fixed a real bug en route: text-only
+(`skipImages`) jobs never marked `completed` or wrote `result_data` (hung at
+'processing') — now first-class. 11 unit assertions pass. **Pending staging
+verification:** a live rerun→judge round-trip (couldn't exercise the model call /
+real pipeline locally).
 
 ---
 
