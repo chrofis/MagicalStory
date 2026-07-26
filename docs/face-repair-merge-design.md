@@ -4,8 +4,12 @@
 > CROSSHATCH, or WHITEOUT. Can call DIFFERENT MODELS. This should be 3
 > PARAMETERS not 5 METHODS. All such paths must be merged."
 >
-> Status: **design approved-pending**. Do not implement until the owner signs
-> off on the shape + accepts the IoU-gate behavior change (see Risk).
+> Status: **IMPLEMENTED (2026-07-26)** — owner green-lit the shape and accepted
+> the IoU-gate tradeoff. All 5 stages landed on `server/lib/faceRepair.js`. The
+> deterministic pieces are unit-tested (`tests/manual/faceRepair-geometry.test.js`,
+> 29 assertions). **Still pending: a staging Test Lab A/B on 8-10 stored repair
+> cases to confirm pixel-level equivalence and calibrate the IoU/white-card gate
+> thresholds before these gates reach prod defaults** (see Risk + `docs/decisions.md`).
 
 ## The 3 axes (+ 2 orthogonal extras)
 

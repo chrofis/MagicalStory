@@ -2023,3 +2023,48 @@ new eval checks yet. When picked up: hazard list in scene expansion + matching
 eval checks + Test Lab scene_variant validation, per the playbook in the doc.
 
 **Touched:** `docs/image-failure-modes.md` (new), this entry.
+
+## Character-repair merge — 5 methods → 3 axes, one gated spine (2026-07-26)
+
+**Context:** character repair had five divergent paths — `grok_face_insert`,
+`grok_blended` (face/body), `grok_cutout`, `grok_inpaint` (fullScene) and
+`grok_blackout`, plus an ungated Gemini full-scene repaint. Only two
+(face-insert + Test Lab's qwen insert) routed through the shared blend engine
+`samUnionBlend` and its strong gates; the others each carried a private inline
+blend and a partial gate set (sharpness on 2, leak-ratio on 1, none on the
+blackout/Gemini verbatim paths). "Gate on one path, not the sibling" bugs
+recurred, and the Test Lab re-blended prod output post-hoc so the lab never saw
+what prod shipped.
+
+**Decision:** collapse all paths into ONE unified spine
+`server/lib/faceRepair.js` → `repairCharacterFace(scene, avatar, opts)` with
+three axes — `regionSource` (box|cutout) · `treatment` (blur|crosshatch|whiteout)
+· `model` (grok|qwen|gemini) — plus `faceOnly` and `requireMobilesam`. EVERY
+combination now routes through `samUnionBlend` and faces the SAME gates
+(style-match, IoU, white-card, coverage, requireMobilesam, sharpness), all
+default ON and Test-Lab-tunable via `opts.gates.*`. The old `method` strings
+are replaced by a stable descriptor `grok:cutout:whiteout:face`.
+
+**Rationale / accepted tradeoff:** routing the legacy body blur/crosshatch
+paths through `samUnionBlend` subjects them to the IoU (0.55) + white-card
+(0.22) gates they never faced. Body repaints that legitimately shift the figure
+may now be REJECTED (return null → "kept original") instead of shipping a
+possibly-misaligned blend. This is more correct but a visible change; the gate
+thresholds are `opts.gates`-tunable and must be calibrated on a staging Test Lab
+A/B before this reaches prod defaults. `grok_blackout` and the ungated Gemini
+repaint (the two no-gate verbatim paths) are deprecated — both now flow through
+the gated crosshatch/spine.
+
+**Known non-critical difference for the A/B:** the body path no longer reuses
+the detection-time SAM `bodyMask` (`detectionBodyMask`) — the spine re-segments,
+costing one extra `/figure-mask` call per body repair. Correctness unchanged.
+
+**Touched:** `server/lib/faceRepair.js` (new spine + resolveRepairAxes /
+legacyFlagsToAxes / applyGeometryGuards), `server/lib/samBlend.js` (tunable gate
+params), `server/lib/images.js` (repairCharacterMismatchWithGrok → ~55-line
+adapter, grokFaceInsertRepair + 4 inline branches + Gemini branch deleted,
+executeCharFixAction axes), `server/lib/testlab.js` (runCharRepairStage → spine,
+post-hoc re-blend deleted), `server/lib/repairLogic.js` (decideRepairMethod
+emits repairParams), `server/routes/regeneration.js` (manual route axes),
+`tests/manual/faceRepair-geometry.test.js` (new, 29 assertions),
+`docs/face-repair-merge-design.md` (status).
