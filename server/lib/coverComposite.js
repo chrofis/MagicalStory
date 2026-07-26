@@ -403,7 +403,7 @@ function visualIdentifier(idx, n, age) {
 // passed, the request uses `images[]` instead of `image` so all slots reach
 // the model. The Grok API treats the first image as the primary edit target
 // and subsequent images as visual references.
-async function callGrokEdit(promptOrImgs, imgBuf, { aspectRatio = '3:4', model = 'grok-imagine-image' } = {}) {
+async function callGrokEdit(promptOrImgs, imgBuf, { aspectRatio = MODEL_DEFAULTS.coverAspect, model = 'grok-imagine-image' } = {}) {
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) throw new Error('XAI_API_KEY not set');
   const prompt = promptOrImgs;
@@ -536,8 +536,12 @@ async function generateCoverViaComposite({
 }) {
   const turnSource = orient === 'turned-source' || orient === 'both';
   const turnPrompt = orient === 'turned-prompt' || orient === 'both';
+  // Canvas dims derive from the centralized cover aspect (MODEL_DEFAULTS.coverAspect,
+  // '3:4' today → 1024×1365, unchanged). Keeps the composite canvas in lockstep
+  // with the aspect the rest of the cover pipeline renders at.
   const W = 1024;
-  const H = 1365;
+  const [aspectW, aspectH] = String(MODEL_DEFAULTS.coverAspect).split(':').map(Number);
+  const H = Math.round(W * aspectH / aspectW);
   const label = coverLabel(coverKey);
   log.info(`🎨 [COVER-COMPOSITE] ${label}: starting composite-cover generation`);
 
@@ -830,6 +834,14 @@ async function generateCoverViaComposite({
   // (in pass-2 prompt). Computed once here so both branches stay in sync.
   // App-side cover typography → bake NO text; the title / dedication / branding
   // are composited afterwards by server/lib/coverTypography.js.
+  // DIVERGENCE: this textLine is a natural-language instruction BAKED INTO the
+  // Grok prompt (model paints the text) or "NO TEXT" under
+  // MODEL_DEFAULTS.appSideCoverType. It intentionally does NOT go through
+  // regeneration.js's coverTextFor() (which returns an app-side overlay spec) —
+  // different mechanism (model-painted vs app-stamped), so merging them would
+  // change behavior. Kept separate pending an owner decision on unifying cover
+  // text onto one mechanism. Keep the title/dedication/branding wording aligned
+  // by hand if coverTextFor changes.
   let textLine = '';
   if (MODEL_DEFAULTS.appSideCoverType) {
     textLine = `\nNO TEXT: do not render any title, dedication, footer, letters, numbers, signs, banners, or captions anywhere in the image. Keep the illustration purely visual with calm, uncluttered space.`;
@@ -889,15 +901,14 @@ Keep the same characters — no additions, no removals. The background stays a p
   // drops the line + WARNs on orphans. Same chokepoint semantics as
   // coverIterate.js and the streaming cover path in server.js.
   const coverPageNumber = COVER_PAGE_NUMBERS[coverKey] ?? -1;
-  const sanitizePrompt = (p) => {
-    try {
-      const { sanitizeVbIdsInPrompt } = require('./storyHelpers');
-      return sanitizeVbIdsInPrompt(p, visualBible, coverPageNumber);
-    } catch (err) {
-      log.warn(`🎨 [COVER-COMPOSITE] ${label}: prompt sanitize failed (${err.message}) — sending unsanitized`);
-      return p;
-    }
-  };
+  // Fail-CLOSED: call the canonical helper directly (no try/catch that shipped
+  // the raw-id prompt on error). sanitizeVbIdsInPrompt is itself defensive
+  // (returns the prompt unchanged only for non-string/non-object inputs, never
+  // throws), so a bare call can never leak a literal ART###/LOC### onto the
+  // cover. Same chokepoint pattern as coverIterate.js and the server.js
+  // streaming cover paths.
+  const { sanitizeVbIdsInPrompt } = require('./storyHelpers');
+  const sanitizePrompt = (p) => sanitizeVbIdsInPrompt(p, visualBible, coverPageNumber);
   pass1Prompt = sanitizePrompt(pass1Prompt);
 
   // 6. Call Grok pass 1 — figures-on-white as primary edit target, VB grid as

@@ -1381,43 +1381,21 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       try {
         if (useSceneComposite) {
           // ── Scene-composite-for-covers path (Method 2/3) ──────────────
-          const { buildCoverReferences } = require('../lib/coverIterate');
+          const { buildCoverReferences, enrichCoverHintWithArtifacts, filterBackCoverToMainCharacters } = require('../lib/coverIterate');
           const { buildCoverCompositeCast } = require('../lib/compositeCastBuilder');
           const { generateSceneComposite } = require('../lib/sceneComposite');
           const { coverKeyToHintKey, coverLabel } = require('../lib/coverKeys');
           const hintKey = coverKeyToHintKey(coverType);
           const coverHint = storyData.coverHints?.[hintKey] || {};
-          // Pull artifact images so the cast's prop references resolve to
-          // actual bytes (same enrichment iterateCover does at line 351).
-          const enrichedHint = { ...coverHint };
-          enrichedHint._artifactImages = enrichedHint._artifactImages || {};
-          enrichedHint._artifactNames = enrichedHint._artifactNames || {};
-          // Names resolve from the FULL Visual Bible — `holds` can reference
-          // an id outside coverHint.objects and the raw id would otherwise
-          // leak into the cast action phrases (same widening as
-          // coverIterate's composite enrichment).
-          for (const pool of ['artifacts', 'animals', 'locations', 'vehicles']) {
-            for (const entry of (visualBible?.[pool] || [])) {
-              if (entry?.id && entry?.name && !enrichedHint._artifactNames[entry.id]) {
-                enrichedHint._artifactNames[entry.id] = entry.name;
-              }
-            }
-          }
-          for (const oid of (coverHint.objects || [])) {
-            if (!/^ART\d+/.test(String(oid))) continue;
-            const art = (visualBible?.artifacts || []).find(a => a?.id === oid);
-            if (!art) continue;
-            const src = art.referenceImageUrl || art.referenceImageData;
-            if (src) enrichedHint._artifactImages[oid] = src;
-          }
-          // Filter back-cover characters to main-only (same rule iterateCover
-          // applies at line 196-207). Front/initial pass through all.
+          // Pull artifact prop bytes + full-VB id→name map so the cast's prop
+          // references resolve (shared producer helper — same enrichment the
+          // coverIterate composite path uses).
+          const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible);
+          // Filter back-cover characters to main-only (shared helper — same
+          // rule the iterate path applies). Front/initial pass through all.
           let coverCharacters = storyData.characters || [];
           if (coverType === 'backCover') {
-            const mainIds = Array.isArray(storyData.mainCharacters) ? storyData.mainCharacters : [];
-            const isMain = (c) => c.isMainCharacter === true || (mainIds.length > 0 && mainIds.includes(c.id));
-            const mainOnly = coverCharacters.filter(isMain);
-            if (mainOnly.length > 0) coverCharacters = mainOnly;
+            coverCharacters = filterBackCoverToMainCharacters(coverCharacters, storyData.mainCharacters).characters;
           }
           // Build cover cast — delegates to buildCompositeCast for avatar
           // resolution + lazy 2×4 sheet generation.
@@ -1441,8 +1419,17 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
             // test-models doesn't bill — pass no usageTracker so empty-scene
             // generation either uses cached or skips depending on defaults.
           });
-          // Cover-text helper — single source of truth for title / dedication
-          // / branding so both this path and cover composite stay aligned.
+          // Cover-text helper — returns the APP-SIDE typography overlay spec
+          // ({type,text,artStyle}) consumed by generateSceneComposite's
+          // post-render stamp.
+          // DIVERGENCE: this is NOT shared with coverComposite.js's textLine
+          // (~L830). That path builds a natural-language instruction BAKED into
+          // the Grok prompt (or "NO TEXT" under MODEL_DEFAULTS.appSideCoverType),
+          // a fundamentally different mechanism (model-painted vs app-stamped).
+          // Consolidating the two would force one path to switch mechanisms — a
+          // behavior change, so left separate pending owner decision on whether
+          // covers should stamp text app-side everywhere. Keep the field names
+          // (title/dedication/branding + 'magicalstory.ch') in sync by hand.
           const coverTextFor = (ckey, sdata) => {
             const style = sdata.artStyle || 'watercolor';
             if (ckey === 'frontCover' && sdata.title) {

@@ -18,6 +18,69 @@ function getStoryHelpers() {
 }
 
 /**
+ * Enrich a cover hint with artifact reference bytes + a full-VB id→name map.
+ * Single source of truth for the producer-side enrichment that the composite
+ * path (here) and the regeneration test-models path built identically.
+ *
+ * Returns a NEW hint (shallow clone, never mutates the input):
+ *   _artifactNames — every artifact/animal/location/vehicle id→name across the
+ *                    FULL Visual Bible (a character's `holds` can reference an
+ *                    id outside coverHint.objects — holds ⊄ objects — and the
+ *                    raw id would otherwise leak into pose/action prose as
+ *                    paintable text). First-writer-wins per id.
+ *   _artifactImages — reference bytes, limited to the ART ids actually declared
+ *                     in coverHint.objects (only pasted props need bytes).
+ *
+ * Pre-existing _artifactNames/_artifactImages on the hint are preserved (the
+ * safer of the two prior formulations — regeneration used `|| {}`, coverIterate
+ * reset to `{}`; identical in the normal unenriched path).
+ */
+function enrichCoverHintWithArtifacts(coverHint, visualBible) {
+  const enriched = { ...(coverHint || {}) };
+  enriched._artifactImages = enriched._artifactImages || {};
+  enriched._artifactNames = enriched._artifactNames || {};
+  for (const pool of ['artifacts', 'animals', 'locations', 'vehicles']) {
+    for (const entry of (visualBible?.[pool] || [])) {
+      if (entry?.id && entry?.name && !enriched._artifactNames[entry.id]) {
+        enriched._artifactNames[entry.id] = entry.name;
+      }
+    }
+  }
+  for (const id of (coverHint?.objects || [])) {
+    if (!/^ART\d+/.test(String(id))) continue;
+    const art = (visualBible?.artifacts || []).find(a => a?.id === id);
+    if (!art) continue;
+    const src = art.referenceImageUrl || art.referenceImageData;
+    if (src) enriched._artifactImages[id] = src;
+  }
+  return enriched;
+}
+
+/**
+ * Back cover is a main-characters-only group portrait — drop supporting
+ * characters that slipped in via the hint or scene description. Single source
+ * of truth for the filter used by both the iterate path and the regeneration
+ * test-models path.
+ *
+ * Keeps the length-check safety: only narrows the cast when at least one main
+ * character remains (never returns an empty cast). Returns
+ *   { characters, dropped }
+ * where `dropped` is the removed names (empty when nothing changed), so callers
+ * can log and decide whether to recompute derived state.
+ */
+function filterBackCoverToMainCharacters(characters, mainIds) {
+  const list = Array.isArray(characters) ? characters : [];
+  const ids = Array.isArray(mainIds) ? mainIds : [];
+  const isMain = (c) => c.isMainCharacter === true || (ids.length > 0 && ids.includes(c.id));
+  const mainOnly = list.filter(isMain);
+  if (mainOnly.length > 0 && mainOnly.length !== list.length) {
+    const dropped = list.filter(c => !isMain(c)).map(c => c.name);
+    return { characters: mainOnly, dropped };
+  }
+  return { characters: list, dropped: [] };
+}
+
+/**
  * Drop sentences that mention a character by name. Used on the cover
  * empty-scene plate description: covers fall back to the full group-portrait
  * prose, and any character sentence left in makes the "empty" plate render
@@ -251,13 +314,9 @@ async function iterateCover(coverKey, storyData, options = {}) {
   // Back cover is a main-characters-only group portrait (same rule as front cover).
   // Drop any supporting characters that slipped in through the hint or scene description.
   if (normalizedCoverType === 'back' && selectedCoverCharacters.length > 0) {
-    const mainIds = Array.isArray(storyData.mainCharacters) ? storyData.mainCharacters : [];
-    const isMainChar = (c) =>
-      c.isMainCharacter === true || (mainIds.length > 0 && mainIds.includes(c.id));
-    const mainOnly = selectedCoverCharacters.filter(isMainChar);
-    if (mainOnly.length > 0 && mainOnly.length !== selectedCoverCharacters.length) {
-      const dropped = selectedCoverCharacters.filter(c => !isMainChar(c)).map(c => c.name).join(', ');
-      log.info(`🔄 [COVER-ITERATE] backCover: Dropping non-main characters: ${dropped}`);
+    const { characters: mainOnly, dropped } = filterBackCoverToMainCharacters(selectedCoverCharacters, storyData.mainCharacters);
+    if (dropped.length > 0) {
+      log.info(`🔄 [COVER-ITERATE] backCover: Dropping non-main characters: ${dropped.join(', ')}`);
       selectedCoverCharacters = mainOnly;
       coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
     }
@@ -455,29 +514,10 @@ async function iterateCover(coverKey, storyData, options = {}) {
   if (compositeOn) {
     try {
       const { generateCoverViaComposite } = require('./coverComposite');
-      // Pull artifact images from the visual bible so the composite layer
-      // has the prop bytes ready.
-      const enrichedHint = { ...(coverHint || {}) };
-      enrichedHint._artifactImages = {};
-      enrichedHint._artifactNames = {};
-      // Names resolve from the FULL Visual Bible, not just coverHint.objects —
-      // a character's `holds` can reference an id outside the objects list
-      // (holds ⊄ objects, documented) and the raw id would otherwise leak
-      // into the pose prompt as paintable text.
-      for (const pool of ['artifacts', 'animals', 'locations', 'vehicles']) {
-        for (const entry of (visualBible?.[pool] || [])) {
-          if (entry?.id && entry?.name) enrichedHint._artifactNames[entry.id] = entry.name;
-        }
-      }
-      // Image bytes stay limited to the declared cover objects (only pasted
-      // props need their reference bytes).
-      for (const id of (coverHint?.objects || [])) {
-        if (!/^ART\d+/.test(String(id))) continue;
-        const art = (visualBible?.artifacts || []).find(a => a?.id === id);
-        if (!art) continue;
-        const src = art.referenceImageUrl || art.referenceImageData;
-        if (src) enrichedHint._artifactImages[id] = src;
-      }
+      // Pull artifact prop bytes + a full-VB id→name map so the composite layer
+      // has everything ready (shared producer helper — same enrichment the
+      // regeneration test-models path uses).
+      const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible);
       // First landmark photo for the cover. options.landmarkBufOverride lets a
       // caller (Test Lab) BORROW a background plate from any story so the
       // composite path can be exercised on a landmark-less story — otherwise
@@ -1003,4 +1043,4 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
   return lines.join(' ');
 }
 
-module.exports = { iterateCover, buildCoverReferences, buildCoverSceneFromHint, stripCharacterSentences, buildPlateDescription };
+module.exports = { iterateCover, buildCoverReferences, buildCoverSceneFromHint, stripCharacterSentences, buildPlateDescription, enrichCoverHintWithArtifacts, filterBackCoverToMainCharacters };
