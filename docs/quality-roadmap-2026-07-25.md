@@ -162,8 +162,26 @@ highest-value *correctness* fix is the entity fail-open (flip to fail-closed /
 surface "unresolved"), but it changes repair-trigger behavior on flaky evals →
 owner sign-off, not a blind flip.
 
-**Status:** 🟡 inventoried; consolidation is the highest-leverage structural work.
-STEP-2C fixed; the rest are behavior-changing → prioritized proposal below.
+**Status:** 🟡 inventoried; consolidation UNDERWAY (owner green-lit "all such paths
+must be merged", 2026-07-25).
+
+**Merge queue (8 duplicated-path clusters):**
+- ✅ STEP-2C gate completion (shipped)
+- ✅ Entity fail-open ×5 → fail-closed + retry (shipped)
+- 🔧 Face repair 5→3 params — agent implementing full Stages 1–5 + geometry unit
+  tests (worktree; owner accepted the IoU-gate tradeoff)
+- 🔧 #5 Gemini pad helpers (repairGrid vs entityConsistency) → one `geminiPad.js`
+  (agent, behavior-preserving via padMode param)
+- 🔧 #6 Cover logic (VB-id sanitize ×4 fail-open → fail-closed; cover-text ×3;
+  aspect hardcode → coverAspect) (agent)
+- ⏳ #1 image-gen entry (`callGeminiAPIForImage` vs `generateImageOnly`),
+  #2 Grok truncation, #3 aspect-resolve ×4, #4 aspect-snap ×4, #7 mask-fetcher —
+  all `images.js`; QUEUED behind face-repair (same file), done sequentially on top.
+- ⏳ dead `verifyRepairImprovement` trio — decide wire-or-delete.
+
+All agent work commits to worktrees and is NOT auto-promoted — each diff +
+faithfulness list reviewed before it goes to staging; each needs a Test Lab / staging
+eyeball for pixel-level equivalence.
 
 ---
 
@@ -190,7 +208,8 @@ dictating a scene the model can't draw. Image-first removes that constraint.
 Test Lab experiment on a few stories before committing. Ties into §5 (the outline
 prompt does too much) and the testing-backlog acceptance-gate idea.
 
-**Status:** 📐 spec — needs owner go-ahead + a Test Lab prototype.
+**Status:** ⏭️ SKIPPED by owner 2026-07-25 ("too big to do through mobile").
+Design retained as the north-star for when it's revisited.
 
 ---
 
@@ -219,7 +238,7 @@ landmark handling, vantages, 4 cover specs, marker formatting). Cost is
 metadata in call 2 (grounded on the finished text). Measure with the §6 criteria.
 Depends on §7 (text-only rerun). The lever here is task-density, NOT the model.
 
-**Status:** 🧪 experiment defined; blocked on §7 (text-only rerun) + §6 (criteria).
+**Status:** ⏭️ SKIPPED by owner 2026-07-25. Design retained above if revisited.
 
 ---
 
@@ -244,11 +263,11 @@ testing-backlog cross-model-review item), applied per story:
    translation artifacts; a satisfying, memorable ending.
 
 Each criterion: 1 (fails) – 5 (excellent), with a one-line justification. Store
-per-story so A/B runs (§5) and model-downgrade experiments (§9) are measurable.
-Keep it to these 6 unless the owner wants to add/drop — the point is a stable
-number to compare against, not a perfect taxonomy.
+per-story so model-downgrade experiments (§9) and the §1a-B calibration are
+measurable.
 
-**Status:** 📐 proposed — owner to confirm the criteria before we wire the judge.
+**Status:** ✅ CONFIRMED by owner 2026-07-25 — these 6 as-is. Ready to wire the
+judge whenever the harness (§7) is built.
 
 ---
 
