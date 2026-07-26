@@ -28,6 +28,7 @@ Test Lab: `/admin/test-lab`. Stages run via `server/lib/testlab.js` `STAGE_RUNNE
 | Quality eval (bbox fix_targets) | Gemini `2.5-flash` | Page quality | ✅ required for spatial fix_targets | `quality_eval` | CLAUDE.md |
 | Prompt-compliance eval | qwen `qwen3-max` | Stage-2 compliance | ✅ presence-is-input, never-CRITICAL gate | `quality_eval` | project_unified_call |
 | **Scene composite** (non-cover) | — | — | ❌ **KILLED** 2026-05-16 (style drift, label leak) — don't re-enable without gate | — | scene_composite_killed |
+| **Style-repair** (repaint a style-outlier page toward the dominant cluster) | `repairPageStyle` (styleRepair.js) → `editImageWithPrompt` → **Gemini** `gemini-2.5-flash-image` vs **Grok** `grok-imagine` | A page flips art style (a `checkStoryStyleConsistency` outlier) | 🧪 **A/B UNTESTED** — Test-Lab-first, NOT wired into prod auto-repair (production wiring deferred, decisions.md Pt 10). Reuses detection + shared edit dispatcher + `checkStyleMatch` gate | `style_repair` | decisions.md Pt 10 |
 
 ---
 
@@ -96,7 +97,13 @@ Grok Round-1 sometimes renders ONE figure split across the mid-row divider (top 
 
 ## Test Lab stage map (route BACK here to re-test, don't re-script)
 
-`image`, `empty_scene`, `quality_eval`, `semantic_eval`, `bbox`, `char_repair`, `entity`, `text_zone`, `consolidate`, `inpaint`, `iterate`, `repair_round`, `edit_image`, `artifact_repair`, `scale_repair`, `style_transfer`, `pick_best`, `scene_expansion`, `scene_expansion_ab`, `scene_variant`, `scene_description`, `rewrite_blocked`, `repair_verify`, `qwen_insert`, `avatar_realistic`, `avatar_style`, `avatar_eval`, `cover`, `style_check`.
+`image`, `empty_scene`, `quality_eval`, `semantic_eval`, `bbox`, `char_repair`, `entity`, `text_zone`, `consolidate`, `inpaint`, `iterate`, `repair_round`, `edit_image`, `artifact_repair`, `scale_repair`, `style_transfer`, `pick_best`, `scene_expansion`, `scene_expansion_ab`, `scene_variant`, `scene_description`, `rewrite_blocked`, `repair_verify`, `qwen_insert`, `avatar_realistic`, `avatar_style`, `avatar_eval`, `cover`, `style_check`, `style_repair`.
+
+`style_repair` (story-level, target `{storyId}`): the missing repair half of the detection-only
+`style_check` — finds style-outlier pages via `checkStoryStyleConsistency`, repaints each toward the
+dominant cluster with BOTH Gemini and Grok (`repairPageStyle`, model-parameterized), and surfaces the
+two candidates side-by-side with before/after `checkStyleMatch` scores so a human picks the winning model.
+Test-Lab-first; production wiring deferred (decisions.md Pt 10).
 
 Targets: page stages `{storyId, pageNumber}`; avatar stages `{storyId, character}`; story-level `{storyId}` (+ `coverType` for `cover`).
 

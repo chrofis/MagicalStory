@@ -1158,6 +1158,116 @@ async function runStyleCheckStage(target, { experimentId }) {
   return { elapsedMs, report: safe };
 }
 
+/**
+ * STYLE-REPAIR A/B stage (roadmap Pt 10). The missing repair half of the
+ * detection-only `style_check`: find the style-outlier pages, then repaint each
+ * one toward the dominant style cluster with BOTH Gemini and Grok, and surface
+ * the two candidates side-by-side with their before/after style-match scores so
+ * a human can pick the winning model. Test-Lab-FIRST — nothing in the
+ * production auto-repair pipeline calls repairPageStyle yet (PRODUCTION WIRING:
+ * deferred — see docs/decisions.md Pt 10).
+ *
+ * Reuses production code end-to-end: detection = checkStoryStyleConsistency,
+ * repaint = editImageWithPrompt (via repairPageStyle), gate = checkStyleMatch.
+ *
+ * Target: {storyId}. Params:
+ *   - models     : string[] of {'gemini','grok'} (default both) — the A/B arms.
+ *   - maxTargets : cap on outlier pages repaired this run (default 3, cost bound).
+ *   - pages      : optional explicit page-number list to override detection.
+ *   - detection  : optional pre-computed checkStoryStyleConsistency result
+ *                  (skip re-detecting; e.g. a redo reusing the first run's audit).
+ */
+async function runStyleRepairStage(target, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { checkStoryStyleConsistency } = require('./styleConsistency');
+  const { repairPageStyle, planStyleRepair } = require('./styleRepair');
+
+  const models = Array.isArray(params.models) && params.models.length
+    ? params.models.filter(m => m === 'gemini' || m === 'grok')
+    : ['gemini', 'grok'];
+  if (models.length === 0) throw new Error('style_repair: params.models must contain "gemini" and/or "grok"');
+  const maxTargets = Number.isInteger(params.maxTargets) && params.maxTargets > 0 ? params.maxTargets : 3;
+
+  const { storyData } = await loadStoryDataFull(target.storyId);
+  const artStyle = storyData.artStyle || null;
+
+  const t0 = Date.now();
+
+  // 1) Detection — reuse the existing style audit (or a passed-in result).
+  const detection = params.detection || await checkStoryStyleConsistency(storyData);
+
+  // 2) Plan — deterministic outlier→target selection.
+  const plan = planStyleRepair(detection, storyData);
+
+  // Optional explicit page override (repair specific pages regardless of the
+  // audit). Each still repaints toward the planned dominant-cluster anchor.
+  let targets = plan.targets;
+  if (Array.isArray(params.pages) && params.pages.length) {
+    const wanted = new Set(params.pages.map(Number));
+    const byNum = new Map((storyData.sceneImages || []).filter(s => s?.imageData && typeof s.pageNumber === 'number').map(s => [s.pageNumber, s.imageData]));
+    targets = [...wanted].filter(p => byNum.has(p)).map(p => ({
+      page: p, image: byNum.get(p), targetRefPage: plan.anchorPage,
+      targetRefImage: plan.anchorPage != null ? byNum.get(plan.anchorPage) : null, severity: null, differences: [],
+    })).filter(tg => tg.targetRefImage);
+  }
+  targets = targets.slice(0, maxTargets);
+
+  // 3) A/B — repaint each outlier with every requested model.
+  const results = [];
+  for (const tg of targets) {
+    const perModel = {};
+    for (const model of models) {
+      const m0 = Date.now();
+      try {
+        const rep = await repairPageStyle(tg.image, tg.targetRefImage, { model, artStyle });
+        const versionIndex = await saveTestVersion(target.storyId, 'scene', tg.page, rep.imageData, experimentId);
+        perModel[model] = {
+          versionIndex,
+          passedGate: rep.passedGate,
+          beforeStyleMatch: rep.beforeStyleMatch,
+          afterStyleMatch: rep.afterStyleMatch,
+          modelId: rep.modelId,
+          elapsedMs: Date.now() - m0,
+        };
+      } catch (err) {
+        log.warn(`[TESTLAB] style_repair ${model} failed on page ${tg.page}: ${err.message}`);
+        perModel[model] = { error: err.message, elapsedMs: Date.now() - m0 };
+      }
+    }
+    results.push({
+      page: tg.page,
+      targetRefPage: tg.targetRefPage,
+      severity: tg.severity,
+      differences: tg.differences,
+      models: perModel,
+    });
+  }
+
+  const elapsedMs = Date.now() - t0;
+
+  // Strip image bytes from the surfaced detection (grid JPEG + any inline).
+  const detectionSafe = JSON.parse(JSON.stringify(detection, (key, value) => {
+    if (typeof value === 'string' && value.startsWith('data:image')) return `[image ${Math.round(value.length / 1024)}KB]`;
+    return value;
+  }));
+
+  return {
+    imageType: 'scene',
+    elapsedMs,
+    models,
+    detection: {
+      verdict: detectionSafe.verdict,
+      dominantCluster: detectionSafe.dominantCluster,
+      anchorPage: detectionSafe.anchorPage,
+      outliers: detectionSafe.outliers,
+      reasoning: detectionSafe.reasoning,
+    },
+    plan: { anchorPage: plan.anchorPage, targetPages: targets.map(t => t.page), skipped: plan.skipped },
+    results,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Text-zone + repair-side page stages
 // ─────────────────────────────────────────────────────────────────────
@@ -2601,6 +2711,7 @@ const STAGE_RUNNERS = {
 const STORY_STAGES = {
   cover: runCoverStage,
   style_check: runStyleCheckStage,
+  style_repair: runStyleRepairStage,
 };
 
 // Avatar stages take {storyId, character} targets, not page targets.

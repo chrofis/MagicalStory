@@ -2196,3 +2196,62 @@ prompt), `server/services/prompts.js` (register template key),
 `tests/manual/test-text-quality-judge.js` (unit test), `docs/codebase-guide.md`.
 **Status:** ✅ local (worktree branch `testlab-textonly-harness`) — pending staging validation with a
 live judge call + a real rerun.
+
+---
+
+## Pt 10 — separate STYLE-repair path, Gemini-vs-Grok A/B in the Test Lab (2026-07-26)
+**Context:** The final style-consistency check "isn't working" (roadmap Pt 10). Three findings, verified:
+(1A) `runFinalConsistencyChecks` (images.js) + `evaluateTextConsistency` (textModels.js) were imported
+in server.js but **never called** — dead since import. (1B) The style audit that DOES run,
+`checkStoryStyleConsistency` (styleConsistency.js, repair Step 5), is **detection-only** — it returns a
+categorical verdict + `outliers[]` and nothing repaints them, so a page that flips art style is flagged
+then shipped. (1C) `checkStyleMatch` (images.js) is a hard style gate ONLY in the Test Lab; no production
+repair path calls it.
+**Decision:**
+1. **New dedicated style-repair path** `server/lib/styleRepair.js` — `repairPageStyle(pageImage,
+   targetStyleRef, opts)` repaints a style-outlier page TOWARD the dominant cluster (style transfer,
+   content/composition/characters preserved). It is **model-parameterized** (`opts.model` ∈
+   {`gemini`,`grok`}) for the A/B. Dispatch REUSES the shared production edit dispatcher
+   `editImageWithPrompt` (images.js) — model id `gemini-2.5-flash-image` routes to the Gemini edit path,
+   `grok-imagine` to `editWithGrok`; no hand-rolled provider call, and Grok's input-aspect coercion is
+   handled by editImageWithPrompt as usual. A deterministic `planStyleRepair(detection, storyData)` picks
+   targets from the EXISTING `checkStoryStyleConsistency` output (reused, not re-detected). The path gates
+   its OWN output with `checkStyleMatch` (before/after same-style scores + `passedGate`).
+2. **Test Lab stage `style_repair`** (STORY_STAGES, target `{storyId}`): detect → plan → repaint each
+   outlier with BOTH gemini and grok → surface side-by-side with style-match scores so a human picks the
+   winning model. This is the A/B.
+3. **Test-Lab-FIRST — production wiring DEFERRED.** Nothing in the production auto-repair pipeline
+   (`processUnifiedStoryJob` / repair round loop) calls `repairPageStyle`. The eventual hook point is the
+   post-repair finalize, right after the Step-5 `checkStoryStyleConsistency` audit in
+   `server/lib/images.js` (`runUnifiedRepairPipeline`, the styleConsistency Step-5 block at
+   `checkStoryStyleConsistency(styleInput)`, ~line 8993 — marked with a `// PRODUCTION WIRING: deferred`
+   comment) — where `styleConsistency.outliers` is produced but currently only surfaced for manual
+   repair. A future decision (once the Lab A/B picks a model) turns that into `planStyleRepair(styleConsistency,
+   styleInput)` → `repairPageStyle(model=<winner>)` per outlier → re-pick `finalBestPerPage`. Kept out now
+   for low blast radius.
+4. **Dead-code cleanup (Pt 10 1A).** Exhaustive grep confirmed zero call sites for `runFinalConsistencyChecks`
+   and `evaluateTextConsistency` (+ their private helper chain `evaluateConsistencyAcrossImages` /
+   `evaluateSingleBatch`, reachable only from the dead root). **Removed:** both server.js imports; the whole
+   dead chain in images.js (−534 lines) + its two exports; `evaluateTextConsistency` in textModels.js + its
+   export; the two now-orphaned prompt templates `final-consistency-check.txt` + `text-consistency-check.txt`
+   and their `prompts.js` keys. `checkStoryStyleConsistency` and `checkStyleMatch` are LIVE and were NOT
+   touched. `evaluateIncrementalConsistency` (live, called from the eval pipeline) was preserved.
+**Rationale:** Owner decision 2026-07-25 ("create a separate style-repair path A/B-tested in the Lab with
+Gemini and Grok"). Test-Lab-first keeps a behavior-changing image path out of production until the A/B
+picks a model. Reuses the one shared edit dispatcher (no parallel provider code). Style descriptor is
+generic (no story specifics). Deleting the confirmed-dead final-consistency code removes the "wired but
+never fires" trap the roadmap named.
+**A/B caveat (staging):** `editImageWithPrompt`'s grok arm silently falls back to Gemini on a Grok
+failure/moderation block; a contaminated grok arm would show a Gemini-rendered result. The Test Lab log
+capture surfaces the "falling back to Gemini" line so a reviewer can spot it — the stage does not
+otherwise detect the fallback.
+**Touched:** `server/lib/styleRepair.js` (new), `server/lib/testlab.js` (new `runStyleRepairStage` +
+STORY_STAGES registration), `server/routes/admin/testlab.js` (story-level redo dispatch),
+`server/lib/images.js` (−dead chain + exports), `server/lib/textModels.js` (−evaluateTextConsistency + export),
+`server.js` (−2 dead imports), `server/services/prompts.js` (−2 dead template keys),
+`prompts/final-consistency-check.txt` + `prompts/text-consistency-check.txt` (deleted),
+`server/lib/issueExtractor.js` + `server/lib/gridBasedRepair.js` (stale JSDoc updated),
+`tests/manual/test-style-repair.js` (unit test), `docs/image-routing.md`,
+`docs/image-generation-methods.html`, `docs/prompt-inventory.md`.
+**Status:** ✅ local (branch `pt10-style-repair-lab`) — unit-verified; PENDING staging Test Lab run of the
+`style_repair` stage on a story with a known style outlier (live Gemini+Grok repaint + style-match gate).

@@ -208,6 +208,14 @@
 </tr>
 
 <tr>
+  <td><code>repairPageStyle(pageImage, targetStyleRef, opts)</code></td>
+  <td><code>server/lib/styleRepair.js</code></td>
+  <td><strong>Dispatcher</strong> → <code>editImageWithPrompt</code> → Grok / Gemini (per <code>opts.model</code>)</td>
+  <td>A style-outlier page + a dominant-cluster reference image. <code>opts.model</code> ∈ {<code>gemini</code>,<code>grok</code>} → model id <code>gemini-2.5-flash-image</code> / <code>grok-imagine</code>; + <code>artStyle</code>; injectable <code>editFn</code>/<code>styleMatchFn</code> for tests.</td>
+  <td>Roadmap Pt 10 STYLE-repair path (distinct from character repair): repaints the outlier toward the dominant style, content preserved. Does NOT hand-roll a provider call — dispatches through the shared <code>editImageWithPrompt</code> (so Grok's input-aspect coercion is handled there). Gates its OWN output with <code>checkStyleMatch</code>. <strong>Test-Lab-first</strong> (stage <code>style_repair</code>); NOT wired into prod auto-repair (decisions.md Pt 10). ⚠️ inherits <code>editImageWithPrompt</code>'s grok→Gemini fallback, so a failed grok arm can surface a Gemini render.</td>
+</tr>
+
+<tr>
   <td><strong>Scene composite</strong> (multiple Grok calls) — <strong>🗄 KILLED 2026-05-16</strong></td>
   <td><code>server/lib/sceneComposite.js</code> (in tree, unreachable)</td>
   <td>Grok generate ×1 + edit ×2 (+N for phantom-pose); stratified variant flat 4 calls</td>

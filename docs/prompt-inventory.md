@@ -32,7 +32,7 @@ Three loading mechanisms feed these templates:
 | life-challenge-guides.txt | storyHelpers.js `parseTeachingGuideFile` | Teaching guide (SEL/therapeutic) |
 | historical-guides.txt | storyHelpers.js; historicalEvents.js; trialCostumes.js | Teaching guide + historical locations |
 | swiss-sagen-guides.txt | storyHelpers.js; storyIdeas.js | Teaching guide (Swiss legends) |
-| text-consistency-check.txt | textModels.js `evaluateTextConsistency` | **DEAD in prod** — imported in server.js but never called |
+| ~~text-consistency-check.txt~~ | — | **DELETED 2026-07-26** — `evaluateTextConsistency` was dead (imported, never called); removed in the Pt 10 cleanup (decisions.md) |
 
 ## Scene expansion
 
@@ -87,7 +87,7 @@ Three loading mechanisms feed these templates:
 | entity-consistency-check.txt | entityConsistency.js `evaluateEntityConsistency` | Cross-page entity consistency eval |
 | entity-single-page-repair.txt | entityConsistency.js `repairSinglePage` | Single-page entity repair |
 | incremental-consistency-check.txt | images.js `evaluateIncrementalConsistency` | Incremental consistency |
-| final-consistency-check.txt | images.js `evaluateSingleBatch` | Final consistency batch |
+| ~~final-consistency-check.txt~~ | — | **DELETED 2026-07-26** — `runFinalConsistencyChecks`/`evaluateSingleBatch` chain was dead (imported, never called); removed in the Pt 10 cleanup (decisions.md) |
 | visual-bible-analysis.txt | visualBible.js `analyzeVisualBibleElements` | VB element analysis |
 | reference-sheet.txt | images.js `buildReferenceSheetPrompt` | Element reference sheet generation |
 

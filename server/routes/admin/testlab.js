@@ -502,7 +502,7 @@ async function executeRedo(experimentId, exp, entry, resultIndex, override, extr
             ...(entry.realisticVersionIndex != null ? { realisticVersionIndex: entry.realisticVersionIndex } : {}),
           },
         });
-      } else if (entry.coverType || ['cover', 'style_check'].includes(exp.stage)) {
+      } else if (entry.coverType || ['cover', 'style_check', 'style_repair'].includes(exp.stage)) {
         // Story-level stages: no page context.
         redo = await runStageOnTarget(exp.stage, { storyId: entry.storyId, ...(entry.coverType ? { coverType: entry.coverType } : {}) }, {
           experimentId, promptOverride: override, params: exp.params || {},
