@@ -475,8 +475,26 @@ later decision once the Lab A/B picks the better model/approach. (Also clean up
 the dead `runFinalConsistencyChecks`/`evaluateTextConsistency` imports while
 there.)
 
-**Status:** 🔴 confirmed broken → 🧪 build the separate Lab-A/B style-repair path.
-QUEUED (new module + testlab stage → after the face-repair merge).
+**Status:** ✅ **SHIPPED to staging (2026-07-26, `e94643dd`).** New
+`server/lib/styleRepair.js` — `planStyleRepair(detection, storyData)` (reuses the
+existing `checkStoryStyleConsistency` Step-5 outliers; skips cover page -1) →
+`repairPageStyle(page, ref, {model})` dispatching through the shared production
+`editImageWithPrompt` (grok→`editWithGrok`, gemini→Gemini edit path — no forked
+call), gated by the existing `checkStyleMatch` on its OWN output. New Test Lab
+`runStyleRepairStage` runs BOTH models per outlier and surfaces them side-by-side
+with before/after style-match scores (the Gemini-vs-Grok A/B). **Test-Lab-first —
+NOT wired into production auto-repair**; a `// PRODUCTION WIRING: deferred` marker
+sits at the exact Step-5 hook (`images.js` ~8994) so wiring the winner later is a
+small edit. **Dead-code cleanup (1A):** verified zero call sites, removed
+`runFinalConsistencyChecks` + `evaluateConsistencyAcrossImages` +
+`evaluateSingleBatch` + `evaluateTextConsistency` (−662 lines) + the two orphaned
+prompt templates. LIVE `evaluateIncrementalConsistency`, `checkStoryStyleConsistency`,
+`checkStyleMatch` preserved. 6 unit assertions pass.
+**A/B caveat (documented):** `editImageWithPrompt`'s grok arm silently falls back
+to Gemini on a Grok failure/moderation block — the stage logs the fallback line but
+doesn't otherwise flag a contaminated grok arm; watch for it in the staging A/B.
+**Pending staging Test Lab run:** confirm both arms repaint, gates score, content
+preserved.
 
 ---
 
