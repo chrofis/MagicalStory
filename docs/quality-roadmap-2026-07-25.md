@@ -168,12 +168,16 @@ must be merged", 2026-07-25).
 **Merge queue (8 duplicated-path clusters):**
 - ✅ STEP-2C gate completion (shipped)
 - ✅ Entity fail-open ×5 → fail-closed + retry (shipped)
-- 🔧 Face repair 5→3 params — agent implementing full Stages 1–5 + geometry unit
-  tests (worktree; owner accepted the IoU-gate tradeoff)
-- 🔧 #5 Gemini pad helpers (repairGrid vs entityConsistency) → one `geminiPad.js`
-  (agent, behavior-preserving via padMode param)
-- 🔧 #6 Cover logic (VB-id sanitize ×4 fail-open → fail-closed; cover-text ×3;
-  aspect hardcode → coverAspect) (agent)
+- ✅ Face repair 5→3 params — SHIPPED to staging (`cb51be6b`). New
+  `server/lib/faceRepair.js` 3-axis spine (regionSource/treatment/model +
+  faceOnly/requireMobilesam), all gates in the shared spine, `images.js` −2036
+  lines, 29 geometry assertions pass. **Pending: staging Test Lab A/B on 8–10
+  stored repair cases for pixel equivalence + IoU/white-card calibration
+  (owner accepted this tradeoff).**
+- ✅ #5 Gemini pad helpers → one `geminiPad.js` (padMode param) — SHIPPED to
+  staging (verified 18,172-size sweep, 0 mismatches).
+- ✅ #6 Cover logic (VB-id sanitize ×4 fail-open → fail-closed; cover-text ×3;
+  aspect hardcode → coverAspect) — SHIPPED to staging.
 - ⏳ #1 image-gen entry (`callGeminiAPIForImage` vs `generateImageOnly`),
   #2 Grok truncation, #3 aspect-resolve ×4, #4 aspect-snap ×4, #7 mask-fetcher —
   all `images.js`; QUEUED behind face-repair (same file), done sequentially on top.
