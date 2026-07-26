@@ -41,7 +41,7 @@ Module._load = function (request, parent, isMain) {
 };
 
 const {
-  resolveRegion, repairDescriptor, legacyMethodAlias, resolveRepairAxes, legacyFlagsToAxes,
+  resolveRegion, repairDescriptor, legacyMethodAlias, resolveRepairAxes, legacyFlagsToAxes, applyGeometryGuards,
 } = require('../../server/lib/faceRepair.js');
 
 let passed = 0;
@@ -223,6 +223,47 @@ ok('forceTarget body overrides a face issue', () => {
 });
 ok('model axis threads through (qwen)', () => {
   assert.strictEqual(resolveRepairAxes('face wrong', { hasFaceBbox: true, model: 'qwen' }).model, 'qwen');
+});
+
+// ===========================================================================
+console.log('\ngeometry guards (degenerate-cutout, large-face-box)');
+// ===========================================================================
+ok('degenerate cutout (bbox >50% area) downgrades cutout→box', () => {
+  const axes = { model: 'grok', regionSource: 'cutout', treatment: 'crosshatch', faceOnly: false };
+  const g = applyGeometryGuards(axes, { bodyBbox: [0.05, 0.05, 0.95, 0.95] }); // ~81% area
+  assert.strictEqual(g.regionSource, 'box');
+  assert.strictEqual(g._guard, 'degenerate-cutout→box');
+});
+ok('degenerate cutout (bbox >85% wide) downgrades cutout→box', () => {
+  const g = applyGeometryGuards({ model: 'grok', regionSource: 'cutout', treatment: 'crosshatch', faceOnly: false }, { bodyBbox: [0.4, 0.02, 0.6, 0.90] });
+  assert.strictEqual(g.regionSource, 'box');
+});
+ok('normal cutout bbox is left alone', () => {
+  const g = applyGeometryGuards({ model: 'grok', regionSource: 'cutout', treatment: 'crosshatch', faceOnly: false }, { bodyBbox: [0.3, 0.3, 0.6, 0.5] });
+  assert.strictEqual(g.regionSource, 'cutout');
+  assert.strictEqual(g._guard, undefined);
+});
+ok('large face box (>=60% of body) downgrades blur+face → body crosshatch', () => {
+  const faceBbox = [0.30, 0.30, 0.60, 0.60]; // 0.3*0.3 = 0.09 area
+  const bodyBbox = [0.28, 0.28, 0.64, 0.64]; // 0.36*0.36 = 0.1296 → ratio ~0.69
+  const g = applyGeometryGuards({ model: 'grok', regionSource: 'box', treatment: 'blur', faceOnly: true }, { faceBbox, bodyBbox });
+  assert.strictEqual(g.treatment, 'crosshatch');
+  assert.strictEqual(g.faceOnly, false);
+  assert.strictEqual(g.regionSource, 'box');
+});
+ok('large-face-box guard does NOT touch whiteout (face-insert)', () => {
+  const faceBbox = [0.30, 0.30, 0.60, 0.60];
+  const bodyBbox = [0.28, 0.28, 0.64, 0.64];
+  const g = applyGeometryGuards({ model: 'grok', regionSource: 'cutout', treatment: 'whiteout', faceOnly: true }, { faceBbox, bodyBbox });
+  assert.strictEqual(g.treatment, 'whiteout', 'whiteout face-insert stays');
+  assert.strictEqual(g.faceOnly, true);
+});
+ok('small face box leaves blur+face alone', () => {
+  const faceBbox = [0.30, 0.40, 0.36, 0.46]; // small
+  const bodyBbox = [0.30, 0.35, 0.85, 0.60]; // tall body
+  const g = applyGeometryGuards({ model: 'grok', regionSource: 'box', treatment: 'blur', faceOnly: true }, { faceBbox, bodyBbox });
+  assert.strictEqual(g.treatment, 'blur');
+  assert.strictEqual(g.faceOnly, true);
 });
 
 console.log(`\n${passed} assertions passed${process.exitCode ? ' — WITH FAILURES' : ''}`);
