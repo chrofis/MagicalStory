@@ -345,8 +345,15 @@ model."
    line that the primary's card applies to the primary ONLY and the secondary
    must be rendered with a distinct face/build (`storyHelpers.js:4625-4649`).
 
-**Status:** 🔴 confirmed. #1 needs an owner cost decision; #3 is autonomous-safe
-(prompt-builder, no cost change) — candidate for this pass, pending prompt validation.
+**Status:** 🔴 confirmed. **OWNER DECISION 2026-07-25: "Every character must be in
+the visual bible."** → the structural root fix: unify the two disjoint character
+pools (primaries in `inputData.characters` + secondaries in
+`visualBible.secondaryCharacters`) so EVERY named character is a first-class VB
+entity with its own physical identity, and every VB character gets a reference
+image (remove/lower the `minAppearances` gate for characters) so none inherits
+another's face. Per-page reference packing then pulls each character's own
+reference. Cost of generating secondary references is accepted. QUEUED (touches
+visualBible/storyHelpers/images reference-packing → after the face-repair merge).
 
 ---
 
@@ -387,7 +394,10 @@ logged in decisions.md).
 **Action:** #3 is autonomous-safe (explicit cheap override on two utility calls);
 #1 needs the dead-code reconciliation first; #2 needs a conversion A/B.
 
-**Status:** 🟢 audit done; #3 shippable, #1/#2 need a decision/A-B.
+**Status:** 🟢 audit done. **OWNER DECISION 2026-07-25: DOWNGRADE** the two silent-
+Sonnet utility calls (scene_validation `sceneValidator.js:644`, scene_rewrite
+`images.js:4673`) → explicit cheap-model override. QUEUED (touches images.js →
+after the face-repair merge). #1 (text_check) + #2 (story_ideas) still pending.
 
 ---
 
@@ -417,19 +427,20 @@ logged in decisions.md).
   (`images.js:8115`, round loop `8480-8579`) never call it — a Grok/Qwen repair
   that repaints a face in flat-vector inside a watercolor scene ships.
 
-**Action (concrete, owner to pick scope):**
-1. Wire Step-5 `styleConsistency.outliers` into the repair loop — feed those
-   pages back through `iterate` before finalizing (or block "done" + enqueue an
-   auto-redo). This is the smallest change that makes the existing check *do*
-   something.
-2. Add `checkStyleMatch` as a production gate on char-fix/inpaint/iterate outputs
-   (reuse the Test Lab gate) so a style-flipped repair is rejected.
-3. Decide: delete the dead `runFinalConsistencyChecks`/`evaluateTextConsistency`
-   or actually invoke them (they overlap Step 5 + text-consistency — likely
-   delete text-consistency-in-pipeline unless you want a text pass).
+**Action — OWNER DECISION 2026-07-25:** *"Create a separate repair path for style
+that can be A/B tested in the Lab using Gemini and Grok."*
+→ Build a NEW dedicated **style-consistency repair path** (distinct from
+character/entity repair): identify style-outlier pages (from the existing
+`checkStoryStyleConsistency` Step-5 detection) and repair them toward the
+dominant style cluster. Expose it as a **Test Lab stage** that A/B's **Gemini vs
+Grok** as the style-repair model. **Test-Lab-first** — not wired into the
+production auto-pipeline yet, so it's low-risk to build; production wiring is a
+later decision once the Lab A/B picks the better model/approach. (Also clean up
+the dead `runFinalConsistencyChecks`/`evaluateTextConsistency` imports while
+there.)
 
-**Status:** 🔴 confirmed broken. All three fixes change generation/repair behavior
-→ owner decision on scope before shipping (no blind pipeline-behavior changes).
+**Status:** 🔴 confirmed broken → 🧪 build the separate Lab-A/B style-repair path.
+QUEUED (new module + testlab stage → after the face-repair merge).
 
 ---
 
@@ -495,8 +506,8 @@ individual figures correct. And not have them facing away."
    (iterate/inpaint) to convergence FIRST, then enter char-fix passes — and route
    a "facing-away lead" to `iterate` (scene re-stage), never `char-fix`.
 
-**Status:** 🔴 confirmed. Fixes change generation/repair behavior → owner scope
-decision; all three are exactly what the owner asked for, so likely go-ahead.
+**Status:** 🔴 confirmed → ⏸️ **HELD by owner 2026-07-25.** Design retained above;
+revisit (likely bundled with the image-first direction §4). No implementation now.
 
 ---
 
