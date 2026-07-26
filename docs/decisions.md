@@ -2091,3 +2091,43 @@ storyText/sceneDescription) are untouched — they stay on Sonnet.
 **Touched:** `server/config/models.js` (two new keys), `server/lib/sceneValidator.js`
 (repairScene override), `server/lib/images.js` (rewriteBlockedScene override).
 **Status:** ✅ active
+
+## Test Lab text-only harness — skipImages jobs complete, cross-model judge, 5 text criteria (2026-07-26)
+**Context:** We want to iterate on story TEXT and run an outline single-vs-split A/B without paying
+for image generation. A text-only pipeline already existed (`inputData.skipImages === true`), but
+(a) the `skipImages` early-return in `processUnifiedStoryJob` only updated `progress` — it never
+wrote `result_data` or set `status='completed'` (the normal completion write sits AFTER the
+early-return), so text-only jobs hung at `status='processing'` until the status-poll watchdog killed
+them as "stopped responding". This also broke the wizard's dev "text-only" button, which polls for
+`completed`. And (b) there was no way to score the resulting text.
+**Decision:**
+1. **skipImages jobs now complete.** The branch writes a lightweight `result_data`
+   (`title` + `pages[].text` + `pages[].sceneDescription`, no image bytes — there are none) and sets
+   `status='completed'` via the SAME guarded write the normal path uses
+   (`... WHERE id=$ AND status='processing' RETURNING id`), so a watchdog/cancel that already flipped
+   the job isn't resurrected.
+2. **Cross-model judge, default `gemini-2.5-flash`.** Story text is written by Claude; judging it
+   with Claude would be self-grading (a model favours its own style). The judge defaults to a
+   different provider (Gemini), overridable via `opts.judgeModel` / request body / `TEXT_JUDGE_MODEL`
+   env. Robust JSON parse (regex-extract, validate each criterion ∈ [1,5], recompute `overall`
+   server-side rather than trust the model's arithmetic).
+3. **Five text-only criteria, picturability DELIBERATELY EXCLUDED.** coherence, ageAppropriateness,
+   characterConsistency, emotionalArc, languageQuality. The owner was explicit: evaluate ONLY the
+   text — do not add an "is this illustratable / visual" criterion, since the harness exists to judge
+   writing in isolation from illustration.
+4. **Two separate endpoints** (`/rerun-text` generates, `/judge-text` scores) so a slow judge never
+   blocks generation and text can be re-judged without regenerating. `/rerun-text` accepts an
+   `inputOverrides` shallow-merge object — the seam for the future outline A/B (swap a prompt-variant
+   flag with no new endpoint).
+**Rationale:** Root-cause fix (persist + complete) rather than a special-case status hack; the fix
+also repairs the pre-existing wizard text-only path. Cross-model judging avoids self-grading bias at
+near-zero cost (Gemini flash). Endpoint split keeps each unit cheap and idempotent-ish (re-judge is
+free, reruns are explicit).
+**Touched:** `server.js` (skipImages branch: persist result_data + complete),
+`server/lib/textQualityJudge.js` (new judge lib), `prompts/story-text-quality-judge.txt` (new judge
+prompt), `server/services/prompts.js` (register template key),
+`server/routes/admin/jobs.js` (new `/rerun-text` + `/judge-text` endpoints, `initJobsRoutes` deps),
+`server/routes/admin.js` (thread `processStoryJob` into jobs submodule),
+`tests/manual/test-text-quality-judge.js` (unit test), `docs/codebase-guide.md`.
+**Status:** ✅ local (worktree branch `testlab-textonly-harness`) — pending staging validation with a
+live judge call + a real rerun.

@@ -392,6 +392,64 @@ scene descriptions. Usage: `node scripts/test-models.js <story-id> <page-number>
 
 ---
 
+## Test Lab — text-only story harness
+
+Reruns the SAME story inputs but generates story **TEXT ONLY** (no images), then scores the text
+on five text-only quality criteria via a cross-model LLM judge. Purpose: iterate on the text
+pipeline (and run an outline single-vs-split A/B) without paying for image generation.
+
+**Two admin endpoints** (both `requireAdmin`, both 501 when not in database mode), on the jobs
+submodule `server/routes/admin/jobs.js`:
+
+- `POST /api/admin/jobs/:jobId/rerun-text` — clone a source job's `input_data` (from
+  `story_jobs.input_data`, the authoritative raw inputs), force `skipImages=true`, insert N new
+  `story_jobs` rows (0 credits, status `pending`), and fire `processStoryJob` for each. Works for
+  ANY source job (not just failed ones). Body (all optional): `runs` (1-5, default 1),
+  `inputOverrides` (a **shallow-merge** object applied over `input_data` before insert — the seam
+  for a future outline single-vs-split A/B: pass e.g. `{"outlineMode":"split"}` with NO new
+  endpoint), `judgeModel` (passed through for a UI's bookkeeping; judging is separate). Returns
+  `{ success, runs:[{jobId}], sourceJobId }` immediately — generation is async, caller polls
+  `GET /api/jobs/:id/status`.
+- `POST /api/admin/jobs/:jobId/judge-text` — load a COMPLETED text-only job's `result_data`
+  (`title` + `pages[].text`), score it with `judgeStoryText`, persist the score into
+  `result_data.textQualityScore`, and return it. Body: `judgeModel` (override). Kept separate from
+  the rerun so a slow judge never blocks generation and you can re-judge without regenerating.
+
+**The five text-only criteria** (each 1-5 + one-line justification; NO picturability/image criterion
+by design — this harness judges writing in isolation): `coherence` (structure / no dropped threads),
+`ageAppropriateness` (vocabulary + register vs target reading level), `characterConsistency` (voice
++ traits stable, child protagonist central and active), `emotionalArc` (felt journey, emotion
+earned not asserted), `languageQuality` (natural prose, no translation artifacts, satisfying ending).
+Judge output: `{scores, justifications, overall (avg, recomputed server-side), summary}`.
+
+**Judge model** — cross-model by design so the grader is not the writer (story text is written by
+Claude; judging it with Claude would be self-grading). Default `gemini-2.5-flash`, overridable via
+`opts.judgeModel`, the request body `judgeModel`, or the `TEXT_JUDGE_MODEL` env var. Judge lib:
+`server/lib/textQualityJudge.js` (prompt: `prompts/story-text-quality-judge.txt`). Robust JSON
+parse (regex-extract `{...}`, validate every criterion in [1,5], recompute `overall`).
+
+**Underlying fix** — text-only jobs (`inputData.skipImages === true`) now persist `result_data` and
+set `status='completed'` in the `processUnifiedStoryJob` skipImages branch. Previously they hung at
+`status='processing'` (early-return skipped the normal completion write), which also broke the
+wizard's dev "text-only" flow. See `docs/decisions.md`.
+
+**Curl** (staging; `$T` = admin bearer token, `$JOB` = a source job id):
+```bash
+# 1) start a text-only rerun of an existing job's inputs
+curl -sX POST https://staging.magicalstory.ch/api/admin/jobs/$JOB/rerun-text \
+  -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
+  -d '{"runs":1}'
+# → { success, runs:[{jobId:"job_..."}], sourceJobId }   (poll GET /api/jobs/<jobId>/status)
+
+# 2) once that new job is 'completed', judge its text
+curl -sX POST https://staging.magicalstory.ch/api/admin/jobs/<newJobId>/judge-text \
+  -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
+  -d '{}'
+# → { success, scores:{...}, justifications:{...}, overall, summary, judgeModel }
+```
+
+---
+
 ## Image Model Comparison (Grok vs Gemini)
 
 Also tracked in memory `project_image_model_tests.md` — check there before recommending a vendor.
