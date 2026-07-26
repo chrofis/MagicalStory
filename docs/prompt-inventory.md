@@ -69,6 +69,7 @@ Three loading mechanisms feed these templates:
 | generated-image-analysis.txt | sceneValidator.js `analyzeGeneratedImage` | Generated-image analysis |
 | feedback-consolidator.txt | feedbackConsolidator.js `consolidateFeedback` | Consolidates eval + entity issues into per-page fix plan |
 | repair-verification.txt | repairVerification.js `verifyRepairWithGemini` | Verifies a repair changed the target region |
+| story-text-quality-judge.txt | textQualityJudge.js `judgeStoryText` | Test Lab text-only harness: scores story TEXT on 5 criteria (cross-model judge) |
 
 ## Bounding boxes
 

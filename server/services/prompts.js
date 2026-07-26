@@ -102,6 +102,7 @@ async function loadPromptTemplates() {
     ['emptyScene', 'empty-scene.txt'],
     ['textSpaceRepair', 'text-space-repair.txt'],
     ['feedbackConsolidator', 'feedback-consolidator.txt'],
+    ['storyTextQualityJudge', 'story-text-quality-judge.txt'],
   ];
 
   await Promise.all(FILES.map(([k, f]) => load(k, f)));

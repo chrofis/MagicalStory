@@ -1,0 +1,47 @@
+You are an expert editor of children's picture-book stories. Judge the TEXT of the story below. You are evaluating ONLY the writing — there are no illustrations to consider. Do NOT reward or penalise how "illustratable" or visual the text is; judge the prose as prose.
+
+Judge only what is actually written, and judge it in the story's own language. Do not invent facts the text does not state. Be a strict, calibrated grader: reserve 5 for genuinely excellent work and 1 for clear failure.
+
+STORY METADATA
+- Language: {LANGUAGE}
+- Target reading level: {READING_LEVEL}
+- Target age range: {AGE_RANGE}
+
+STORY TITLE
+{TITLE}
+
+STORY TEXT (one block per page, in order)
+{STORY_TEXT}
+
+Rate the story on these FIVE criteria. Each score is an integer from 1 to 5 (1 = fails badly, 2 = weak, 3 = acceptable, 4 = good, 5 = excellent). Give a single-sentence justification for each score, grounded in what the text actually does.
+
+1. coherence — Coherence & structure. Is there a clear beginning, middle and end? Does each page follow logically from the one before it? Are there plot holes, non-sequiturs, or threads that are introduced and then dropped?
+
+2. ageAppropriateness — Age-appropriateness & readability. Do vocabulary, sentence length and concepts match the target reading level and age range? Is the register/dialect consistent throughout (no sudden jumps between very simple and very advanced language)?
+
+3. characterConsistency — Character consistency. Does each character's voice, personality and relationships stay consistent from page to page? Is the child protagonist central and active in the story (driving events rather than being a passive bystander)?
+
+4. emotionalArc — Emotional arc. Is there a felt emotional journey (for example rising tension that then resolves)? Does the emotion on each page follow believably from the previous lines, rather than being flatly asserted ("she was very happy") without being earned?
+
+5. languageQuality — Language quality & delight. Is the prose natural and pleasant to read aloud? Is the humour, warmth or sense of wonder right for the age? Are there translation artifacts, awkward phrasings or repetition? Is the ending satisfying and memorable?
+
+Return STRICT JSON and nothing else — no markdown, no code fences, no commentary before or after. Use exactly this shape:
+
+{
+  "scores": {
+    "coherence": <1-5>,
+    "ageAppropriateness": <1-5>,
+    "characterConsistency": <1-5>,
+    "emotionalArc": <1-5>,
+    "languageQuality": <1-5>
+  },
+  "justifications": {
+    "coherence": "<one sentence>",
+    "ageAppropriateness": "<one sentence>",
+    "characterConsistency": "<one sentence>",
+    "emotionalArc": "<one sentence>",
+    "languageQuality": "<one sentence>"
+  },
+  "overall": <average of the five scores, one decimal place>,
+  "summary": "<1-2 sentence overall assessment>"
+}
