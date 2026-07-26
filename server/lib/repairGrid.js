@@ -12,6 +12,12 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { stripDataUriPrefix } = require('./r2');
+const {
+  GEMINI_RATIOS_EXACT,
+  findClosestGeminiRatio,
+  padToGeminiRatio,
+  removePadding,
+} = require('./geminiPad');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -37,153 +43,13 @@ const LABEL_HEIGHT = 30;    // Height for letter labels
 const TITLE_HEIGHT = 40;    // Height for grid title
 const CELL_INSET = 4;       // Pixels to trim from cell edges when extracting (removes Gemini border artifacts)
 
-// Gemini-supported aspect ratios (width/height)
-const GEMINI_RATIOS = [
-  { name: '1:1', ratio: 1.0 },
-  { name: '4:3', ratio: 4/3 },    // 1.333 - landscape
-  { name: '3:4', ratio: 3/4 },    // 0.75 - portrait
-  { name: '16:9', ratio: 16/9 },  // 1.778 - wide
-  { name: '9:16', ratio: 9/16 }   // 0.5625 - tall
-];
+// Gemini aspect-ratio padding helpers (findClosestGeminiRatio, padToGeminiRatio,
+// removePadding) live in ./geminiPad — imported above. repairGrid uses the
+// pure-math ratio table (GEMINI_RATIOS_EXACT), solid white/black padding, JPEG
+// output, and the 'crop-remainder' unpad strategy.
 
 // Gemini model for image editing (same as page generation)
 const REPAIR_MODEL = 'gemini-2.5-flash-image';
-
-/**
- * Find the closest Gemini-supported aspect ratio
- * @param {number} width - Image width
- * @param {number} height - Image height
- * @returns {{name: string, ratio: number, paddedWidth: number, paddedHeight: number}}
- */
-function findClosestGeminiRatio(width, height) {
-  const currentRatio = width / height;
-
-  let best = null;
-  let bestDiff = Infinity;
-
-  for (const r of GEMINI_RATIOS) {
-    const diff = Math.abs(currentRatio - r.ratio);
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      best = r;
-    }
-  }
-
-  // Calculate padded dimensions to match the target ratio
-  let paddedWidth, paddedHeight;
-  if (currentRatio > best.ratio) {
-    // Image is wider than target - pad height
-    paddedWidth = width;
-    paddedHeight = Math.round(width / best.ratio);
-  } else {
-    // Image is taller than target - pad width
-    paddedHeight = height;
-    paddedWidth = Math.round(height * best.ratio);
-  }
-
-  return {
-    name: best.name,
-    ratio: best.ratio,
-    paddedWidth,
-    paddedHeight
-  };
-}
-
-/**
- * Pad an image to a Gemini-supported aspect ratio
- * @param {Buffer} imageBuffer - Original image buffer
- * @param {number} originalWidth - Original width
- * @param {number} originalHeight - Original height
- * @param {string} padColor - Padding color ('white' or 'black')
- * @returns {Promise<{buffer: Buffer, padding: Object, targetRatio: Object}>}
- */
-async function padToGeminiRatio(imageBuffer, originalWidth, originalHeight, padColor = 'white') {
-  const target = findClosestGeminiRatio(originalWidth, originalHeight);
-
-  // No padding needed if already at target ratio
-  if (target.paddedWidth === originalWidth && target.paddedHeight === originalHeight) {
-    return {
-      buffer: imageBuffer,
-      padding: { top: 0, left: 0, bottom: 0, right: 0 },
-      targetRatio: target
-    };
-  }
-
-  // Calculate padding (center the original image)
-  const padLeft = Math.floor((target.paddedWidth - originalWidth) / 2);
-  const padTop = Math.floor((target.paddedHeight - originalHeight) / 2);
-  const padRight = target.paddedWidth - originalWidth - padLeft;
-  const padBottom = target.paddedHeight - originalHeight - padTop;
-
-  const bgColor = padColor === 'black'
-    ? { r: 0, g: 0, b: 0, alpha: 1 }
-    : { r: 255, g: 255, b: 255, alpha: 1 };
-
-  const paddedBuffer = await sharp(imageBuffer)
-    .extend({
-      top: padTop,
-      bottom: padBottom,
-      left: padLeft,
-      right: padRight,
-      background: bgColor
-    })
-    .jpeg({ quality: 95 })
-    .toBuffer();
-
-  console.log(`  [GRID] Padded ${originalWidth}x${originalHeight} → ${target.paddedWidth}x${target.paddedHeight} (${target.name}, +${padLeft}/${padRight}/${padTop}/${padBottom})`);
-
-  return {
-    buffer: paddedBuffer,
-    padding: { top: padTop, left: padLeft, bottom: padBottom, right: padRight },
-    targetRatio: target
-  };
-}
-
-/**
- * Remove padding from a repaired grid image
- * @param {Buffer} imageBuffer - Padded image buffer
- * @param {Object} padding - Padding info {top, left, bottom, right}
- * @param {number} expectedWidth - Expected width after removing padding
- * @param {number} expectedHeight - Expected height after removing padding
- * @returns {Promise<Buffer>}
- */
-async function removePadding(imageBuffer, padding, expectedWidth, expectedHeight) {
-  const meta = await sharp(imageBuffer).metadata();
-
-  // Calculate scale factor (Gemini may have resized)
-  const scaleX = meta.width / (expectedWidth + padding.left + padding.right);
-  const scaleY = meta.height / (expectedHeight + padding.top + padding.bottom);
-
-  // Scale padding values
-  const scaledPadding = {
-    left: Math.round(padding.left * scaleX),
-    top: Math.round(padding.top * scaleY),
-    right: Math.round(padding.right * scaleX),
-    bottom: Math.round(padding.bottom * scaleY)
-  };
-
-  const cropWidth = meta.width - scaledPadding.left - scaledPadding.right;
-  const cropHeight = meta.height - scaledPadding.top - scaledPadding.bottom;
-
-  if (cropWidth <= 0 || cropHeight <= 0) {
-    console.warn(`  [GRID] Invalid crop dimensions after padding removal: ${cropWidth}x${cropHeight}`);
-    return imageBuffer;
-  }
-
-  const croppedBuffer = await sharp(imageBuffer)
-    .extract({
-      left: scaledPadding.left,
-      top: scaledPadding.top,
-      width: cropWidth,
-      height: cropHeight
-    })
-    .jpeg({ quality: 95 })
-    .toBuffer();
-
-  console.log(`  [GRID] Removed padding: ${meta.width}x${meta.height} → ${cropWidth}x${cropHeight}`);
-
-  return croppedBuffer;
-}
 
 /**
  * Create a labeled grid image from extracted issue thumbnails
@@ -342,9 +208,20 @@ async function createIssueGrid(issues, options = {}) {
     .jpeg({ quality: 95 })
     .toBuffer();
 
-  // Pad to Gemini-supported aspect ratio
+  // Pad to Gemini-supported aspect ratio (solid white fill, JPEG output —
+  // preserves the original repairGrid behavior via geminiPad options).
   const { buffer: gridBuffer, padding, targetRatio } = await padToGeminiRatio(
-    rawGridBuffer, gridWidth, gridHeight, 'white'
+    rawGridBuffer,
+    {
+      width: gridWidth,
+      height: gridHeight,
+      ratios: GEMINI_RATIOS_EXACT,
+      padMode: 'solid',
+      padColor: 'white',
+      encode: 'jpeg',
+      logPrefix: '[GRID]',
+      skipWhenNoPad: true,
+    }
   );
 
   // Build manifest
@@ -535,7 +412,20 @@ async function extractRepairedRegions(repairedGrid, cellPositions, manifest = nu
   // Remove padding from repaired grid if it was padded
   let unpadedGrid = repairedGrid;
   if (padding.top > 0 || padding.left > 0 || padding.bottom > 0 || padding.right > 0) {
-    unpadedGrid = await removePadding(repairedGrid, padding, originalWidth, originalHeight);
+    unpadedGrid = await removePadding(
+      repairedGrid,
+      {
+        padLeft: padding.left,
+        padTop: padding.top,
+        padRight: padding.right,
+        padBottom: padding.bottom,
+        paddedWidth: originalWidth + padding.left + padding.right,
+        paddedHeight: originalHeight + padding.top + padding.bottom,
+        originalWidth,
+        originalHeight,
+      },
+      { strategy: 'crop-remainder', encode: 'jpeg', logPrefix: '[GRID]' }
+    );
   }
 
   // Get actual dimensions of unpadded grid
@@ -981,8 +871,9 @@ module.exports = {
   createCellLabel,        // Cell label creation for reuse
   escapeXml,              // XML escaping for SVG
 
-  // Gemini aspect ratio helpers
-  GEMINI_RATIOS,
+  // Gemini aspect ratio helpers (now shared via ./geminiPad; re-exported for
+  // backward compatibility — GEMINI_RATIOS is repairGrid's pure-math table)
+  GEMINI_RATIOS: GEMINI_RATIOS_EXACT,
   findClosestGeminiRatio,
   padToGeminiRatio,
   removePadding,

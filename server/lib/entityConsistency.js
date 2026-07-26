@@ -21,6 +21,7 @@ const { detectAllBoundingBoxes, sanitizeForGemini } = require('./images');
 const { getCurrentLogger } = require('./generationLogger');
 const { COVER_HINT_KEY } = require('./coverKeys');
 const r2 = require('./r2');
+const geminiPad = require('./geminiPad');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -2245,114 +2246,39 @@ async function saveEntityGrids(grids, outputDir) {
 // Gemini's minimum recommended size for good repair results
 const GEMINI_MIN_SIZE = 512;
 
-// Gemini-supported aspect ratios for image generation
-const GEMINI_ASPECT_RATIOS = [
-  { ratio: '1:1', width: 1024, height: 1024 },
-  { ratio: '3:4', width: 896, height: 1120 },
-  { ratio: '4:3', width: 1120, height: 896 },
-  { ratio: '9:16', width: 768, height: 1360 },
-  { ratio: '16:9', width: 1360, height: 768 }
-];
+// Gemini aspect-ratio padding lives in the shared ./geminiPad module. The two
+// wrappers below bind entityConsistency's specific behavior so callers here (and
+// the exported signatures) stay unchanged: pad against the PIXEL-derived ratio
+// table (from Gemini's actual output dims), fill with MIRROR edge-extension,
+// keep the raw (input-format) buffer, and unpad by extracting the scaled
+// original region ('extract-original'). See ./geminiPad for the ratio-table
+// difference vs repairGrid (pure-math table + solid fill + JPEG).
 
 /**
- * Pad an image to a Gemini-supported aspect ratio
+ * Pad an image to a Gemini-supported aspect ratio (mirror fill, raw output).
  * @param {Buffer} imageBuffer - Image buffer
  * @returns {Promise<{buffer: Buffer, paddingInfo: object}>}
  */
 async function padToGeminiRatio(imageBuffer) {
-  const meta = await sharp(imageBuffer).metadata();
-  const currentRatio = meta.width / meta.height;
-
-  // Find the closest Gemini aspect ratio
-  let bestRatio = GEMINI_ASPECT_RATIOS[0];
-  let bestDiff = Infinity;
-
-  for (const ar of GEMINI_ASPECT_RATIOS) {
-    const targetRatio = ar.width / ar.height;
-    const diff = Math.abs(currentRatio - targetRatio);
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      bestRatio = ar;
-    }
-  }
-
-  const targetRatio = bestRatio.width / bestRatio.height;
-
-  // Calculate new dimensions to fit the target ratio
-  let newWidth, newHeight;
-  if (currentRatio > targetRatio) {
-    // Image is wider, add padding on top/bottom
-    newWidth = meta.width;
-    newHeight = Math.round(meta.width / targetRatio);
-  } else {
-    // Image is taller, add padding on left/right
-    newHeight = meta.height;
-    newWidth = Math.round(meta.height * targetRatio);
-  }
-
-  // Calculate padding
-  const padX = Math.max(0, newWidth - meta.width);
-  const padY = Math.max(0, newHeight - meta.height);
-  const padLeft = Math.floor(padX / 2);
-  const padRight = padX - padLeft;
-  const padTop = Math.floor(padY / 2);
-  const padBottom = padY - padTop;
-
-  // Apply padding with edge extension (more natural than solid color)
-  const paddedBuffer = await sharp(imageBuffer)
-    .extend({
-      top: padTop,
-      bottom: padBottom,
-      left: padLeft,
-      right: padRight,
-      extendWith: 'mirror'  // Mirror edges for more natural blending
-    })
-    .toBuffer();
-
-  return {
-    buffer: paddedBuffer,
-    paddingInfo: {
-      padTop,
-      padBottom,
-      padLeft,
-      padRight,
-      originalWidth: meta.width,
-      originalHeight: meta.height,
-      paddedWidth: newWidth,
-      paddedHeight: newHeight,
-      aspectRatio: bestRatio.ratio
-    }
-  };
+  const { buffer, paddingInfo } = await geminiPad.padToGeminiRatio(imageBuffer, {
+    ratios: geminiPad.GEMINI_RATIOS_PIXELS,
+    padMode: 'mirror',
+    encode: null,
+  });
+  return { buffer, paddingInfo };
 }
 
 /**
- * Remove padding from a repaired image
+ * Remove padding from a repaired image (extract scaled original region).
  * @param {Buffer} imageBuffer - Padded repaired image
  * @param {object} paddingInfo - Padding info from padToGeminiRatio
  * @returns {Promise<Buffer>}
  */
 async function removePadding(imageBuffer, paddingInfo) {
-  const meta = await sharp(imageBuffer).metadata();
-
-  // Calculate scale factors (Gemini might have changed the size)
-  const scaleX = meta.width / paddingInfo.paddedWidth;
-  const scaleY = meta.height / paddingInfo.paddedHeight;
-
-  // Scale padding values
-  const left = Math.round(paddingInfo.padLeft * scaleX);
-  const top = Math.round(paddingInfo.padTop * scaleY);
-  const extractWidth = Math.round(paddingInfo.originalWidth * scaleX);
-  const extractHeight = Math.round(paddingInfo.originalHeight * scaleY);
-
-  // Extract the original region
-  return sharp(imageBuffer)
-    .extract({
-      left: Math.max(0, left),
-      top: Math.max(0, top),
-      width: Math.min(extractWidth, meta.width - left),
-      height: Math.min(extractHeight, meta.height - top)
-    })
-    .toBuffer();
+  return geminiPad.removePadding(imageBuffer, paddingInfo, {
+    strategy: 'extract-original',
+    encode: null,
+  });
 }
 
 /**
