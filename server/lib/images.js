@@ -4701,6 +4701,22 @@ function resolveOutputAspect(evaluationType, aspectRatioOverride) {
 }
 
 /**
+ * Truncate a prompt to a backend's max length, emitting the same "Prompt too
+ * long" warning every dispatch site used to hand-roll. Returns the prompt
+ * unchanged when it already fits. `modelName` is optional — when supplied the
+ * warning appends " for <model>" (three sites logged it, the gen-only Gemini
+ * site did not), so the emitted string stays byte-identical to each original.
+ * The caller keeps any follow-on side effect (e.g. updating parts[0] on the
+ * Gemini path) by testing `result !== prompt`, which is true iff truncated.
+ */
+function truncatePromptForModel(prompt, maxPromptLength, logLabel, modelName = null) {
+  if (prompt.length <= maxPromptLength) return prompt;
+  const forClause = modelName != null ? ` for ${modelName}` : '';
+  log.warn(`✂️ [${logLabel}] Prompt too long (${prompt.length} chars), truncating to ${maxPromptLength}${forClause}`);
+  return prompt.substring(0, maxPromptLength - 3) + '...';
+}
+
+/**
  * Call Gemini API for image generation
  * @param {string} prompt - The image generation prompt
  * @param {string[]} characterPhotos - Character reference photos
@@ -4846,11 +4862,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     // truncates, but only AFTER Grok has already failed.
     const grokModelKey = imageModelOverride || (imageModelOverride === 'grok-imagine-pro' ? 'grok-imagine-pro' : 'grok-imagine');
     const grokMaxPrompt = IMAGE_MODELS[grokModelKey]?.maxPromptLength || 7500;
-    let grokPrompt = prompt;
-    if (prompt.length > grokMaxPrompt) {
-      log.warn(`✂️ [IMAGE GEN] Prompt too long (${prompt.length} chars), truncating to ${grokMaxPrompt} for ${grokModel}`);
-      grokPrompt = prompt.substring(0, grokMaxPrompt - 3) + '...';
-    }
+    const grokPrompt = truncatePromptForModel(prompt, grokMaxPrompt, 'IMAGE GEN', grokModel);
 
     try {
       const refImages = await packReferences(
@@ -5146,10 +5158,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   // Truncate prompt if needed based on model's maxPromptLength
   const maxPromptLength = modelConfig?.maxPromptLength || 30000;
-  let effectivePrompt = prompt;
-  if (prompt.length > maxPromptLength) {
-    log.warn(`✂️ [IMAGE GEN] Prompt too long (${prompt.length} chars), truncating to ${maxPromptLength} for ${modelId}`);
-    effectivePrompt = prompt.substring(0, maxPromptLength - 3) + '...';
+  const effectivePrompt = truncatePromptForModel(prompt, maxPromptLength, 'IMAGE GEN', modelId);
+  if (effectivePrompt !== prompt) {
     // Update parts array with truncated prompt for Gemini path
     parts[0] = { text: effectivePrompt };
   }
@@ -5628,11 +5638,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     // Truncate to Grok's prompt-length cap before the API call (see note at the
     // matching block in callGeminiAPIForImage's Grok branch).
     const grokMaxPrompt = IMAGE_MODELS['grok-imagine']?.maxPromptLength || 7500;
-    let grokPrompt = prompt;
-    if (prompt.length > grokMaxPrompt) {
-      log.warn(`✂️ [IMAGE GEN-ONLY] Prompt too long (${prompt.length} chars), truncating to ${grokMaxPrompt} for ${GROK_MODELS.STANDARD}`);
-      grokPrompt = prompt.substring(0, grokMaxPrompt - 3) + '...';
-    }
+    const grokPrompt = truncatePromptForModel(prompt, grokMaxPrompt, 'IMAGE GEN-ONLY', GROK_MODELS.STANDARD);
 
     try {
       // When slot 0 is a scene plate (empty-scene landmark photo, previous full
@@ -5824,10 +5830,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   // Truncate prompt if needed
   const maxPromptLength = modelConfig?.maxPromptLength || 30000;
-  let effectivePrompt = prompt;
-  if (prompt.length > maxPromptLength) {
-    log.warn(`✂️ [IMAGE GEN-ONLY] Prompt too long (${prompt.length} chars), truncating to ${maxPromptLength}`);
-    effectivePrompt = prompt.substring(0, maxPromptLength - 3) + '...';
+  const effectivePrompt = truncatePromptForModel(prompt, maxPromptLength, 'IMAGE GEN-ONLY');
+  if (effectivePrompt !== prompt) {
     parts[0] = { text: effectivePrompt };
   }
 
@@ -14822,5 +14826,6 @@ module.exports = {
   MAX_MASK_COVERAGE_PERCENT,
 
   // Pure dispatch helpers (exported for unit tests / reuse)
-  resolveOutputAspect
+  resolveOutputAspect,
+  truncatePromptForModel
 };
