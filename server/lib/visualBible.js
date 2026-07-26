@@ -1698,28 +1698,81 @@ function injectHistoricalLocations(visualBible, historicalLocations) {
 // REFERENCE IMAGE FUNCTIONS
 // ============================================================================
 
+// Plural / collective crowd nouns that occasionally leak into
+// `secondaryCharacters` via story-text extraction. A collective has no single
+// face, so it must never get a one-cell reference image (it would waste an
+// image-gen call and stamp one invented face onto a whole crowd). By design
+// these belong in the scene `background` field (story-unified.txt:249), not the
+// VB — this set is the safety net for the leaks.
+const GENERIC_CROWD_TERMS = new Set([
+  'villagers', 'soldiers', 'guards', 'crowd', 'crowds', 'townsfolk', 'onlookers',
+  'passersby', 'people', 'children', 'kids', 'men', 'women', 'adults', 'folk',
+  'others', 'everyone', 'bystanders', 'spectators', 'peasants', 'citizens',
+  'servants', 'sailors', 'knights', 'monks', 'nuns', 'travelers', 'travellers',
+  'pilgrims', 'merchants', 'guests', 'dancers', 'musicians', 'workers', 'students',
+]);
+
+/**
+ * A named secondary character is a specific individual with its own identity,
+ * which is why it must get its own face reference (Pt 8 fix: otherwise the
+ * image model, anchored to the primary's face card, paints the secondary with
+ * the primary's face). A generic crowd/collective entry is NOT such an
+ * individual and must be excluded.
+ *
+ * Rule (documented in docs/decisions.md):
+ *   - name present, >=2 chars after trimming
+ *   - NOT article-prefixed ("a guard", "the innkeeper") -> reads as a generic
+ *     role reference, not a proper name
+ *   - NOT a single-word plural/collective crowd noun (see GENERIC_CROWD_TERMS)
+ * Everything else (proper names, singular named roles like "Innkeeper",
+ * placeholder individuals like "Soldier1") qualifies -- a distinct invented
+ * face is always better than borrowing the primary's identity.
+ */
+function isNamedIndividualCharacter(name) {
+  if (!name || typeof name !== 'string') return false;
+  const trimmed = name.trim();
+  if (trimmed.length < 2) return false;
+  // Leading article => generic role reference, not a proper name.
+  if (/^(a|an|the)\s+/i.test(trimmed)) return false;
+  const words = trimmed.split(/\s+/);
+  if (words.length === 1 && GENERIC_CROWD_TERMS.has(words[0].toLowerCase())) return false;
+  return true;
+}
+
 /**
  * Get Visual Bible elements that need reference images generated
  * Returns elements that:
- * 1. Appear in 2+ pages (recurring elements)
+ * 1. Meet the per-type appearance gate (named characters: 1+ page; others: minAppearances)
  * 2. Don't already have reference images
  * 3. Are secondary characters or important artifacts (not locations which have landmark photos)
  *
+ * Pt 8 fix: every NAMED secondary character gets its OWN reference image even on
+ * a single page, so none inherits the primary's face. Locations/artifacts/
+ * animals/vehicles keep the recurring-element gate (`minAppearances`, default 2)
+ * — a one-page prop/place doesn't justify a reference-gen call.
+ *
  * @param {Object} visualBible - The Visual Bible object
- * @param {number} minAppearances - Minimum page appearances to qualify (default 2)
+ * @param {number} minAppearances - Min page appearances for NON-character elements (default 2)
+ * @param {number} characterMinAppearances - Min page appearances for named secondary characters (default 1)
  * @returns {Array} Elements needing reference images
  */
-function getElementsNeedingReferenceImages(visualBible, minAppearances = 2) {
+function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, characterMinAppearances = 1) {
   if (!visualBible) return [];
 
   const needsReference = [];
 
-  const checkEntries = (entries, type) => {
+  const checkEntries = (entries, type, minPages = minAppearances, namedGuard = false) => {
     for (const entry of entries || []) {
-      // Skip if already has reference image or fewer than minAppearances pages
+      // Skip if already has reference image or fewer than minPages pages
       if (entry.referenceImageGenerated) continue;
       if (entry.referenceImageData) continue;
-      if (!entry.appearsInPages || entry.appearsInPages.length < minAppearances) continue;
+      if (!entry.appearsInPages || entry.appearsInPages.length < minPages) continue;
+      // Characters: only named individuals get a face reference; generic crowds
+      // (which should live in the scene `background`, not the VB) are skipped.
+      if (namedGuard && !isNamedIndividualCharacter(entry.name)) {
+        log.debug(`[VISUAL BIBLE] Skipping reference for generic/crowd secondary "${entry.name}" (no distinct identity)`);
+        continue;
+      }
 
       needsReference.push({
         ...entry,
@@ -1729,9 +1782,10 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2) {
     }
   };
 
-  // Include secondary characters, artifacts, animals, and vehicles
+  // Named secondary characters: single-page gate + named-individual guard (Pt 8).
+  checkEntries(visualBible.secondaryCharacters, 'character', characterMinAppearances, true);
+  // Artifacts, animals, vehicles keep the recurring-element gate.
   // Skip clothing (worn by characters) - they appear on character reference images
-  checkEntries(visualBible.secondaryCharacters, 'character');
   checkEntries(visualBible.artifacts, 'artifact');
   checkEntries(visualBible.animals, 'animal');
   checkEntries(visualBible.vehicles, 'vehicle');
@@ -2118,6 +2172,7 @@ module.exports = {
 
   // Reference image support
   getElementsNeedingReferenceImages,
+  isNamedIndividualCharacter,
   updateElementReferenceImage,
   getElementReferenceImagesForPage,
   getEmptySceneElementReferences,
