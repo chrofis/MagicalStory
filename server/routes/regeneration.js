@@ -5440,14 +5440,16 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const issueDesc = charIssues.length > 0
             ? charIssues.map(i => i.issue || i.description || '').filter(Boolean).join('; ')
             : '';
-          const issueText = issueDesc.toLowerCase();
-          const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
-          const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
-
-          // Pick the right box: user override > auto-detect from issues
-          const useFaceOnly = whiteoutTarget === 'face' ? !!storedAppearance.faceBox
-            : whiteoutTarget === 'body' ? false
-            : (hasFaceIssue && !hasClothingIssue && !!storedAppearance.faceBox);
+          // Pick the right box via the ONE central rule (resolveRepairAxes).
+          // The manual route lets the user force the target (whiteoutTarget
+          // face|body) — passed as forceTarget, which beats the keyword
+          // heuristic; anything else falls back to the issue-text derivation.
+          const { resolveRepairAxes } = require('../lib/faceRepair');
+          const manualAxes = resolveRepairAxes(issueDesc, {
+            hasFaceBbox: !!storedAppearance.faceBox,
+            forceTarget: (whiteoutTarget === 'face' || whiteoutTarget === 'body') ? whiteoutTarget : null,
+          });
+          const useFaceOnly = manualAxes.faceOnly;
           const repairBox = useFaceOnly ? storedAppearance.faceBox : (storedAppearance.bodyBox || storedAppearance.faceBox);
           // Bbox can be either [ymin, xmin, ymax, xmax] (array from detectAllBoundingBoxes)
           // or {x, y, width, height} (object from some legacy paths)

@@ -8171,10 +8171,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return { pageNumber, imageData: null, error: `no avatar photo for ${charName}` };
     }
 
-    const issueText = (decision.issueDescription || '').toLowerCase();
-    const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
-    const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
-    const useFaceOnly = hasFaceIssue && !hasClothingIssue && !!faceBbox;
+    // Repair axes resolved by the ONE central rule (resolveRepairAxes) against
+    // the ACTUAL detected face box — replaces the old inline useFaceOnly
+    // derivation. Prefer the intent the decision already emitted (repairParams),
+    // but finalise faceOnly here since only now do we know a face box exists.
+    const { resolveRepairAxes } = require('./faceRepair');
+    const repairAxes = resolveRepairAxes(decision.issueDescription, { hasFaceBbox: !!faceBbox });
+    const useFaceOnly = repairAxes.faceOnly;
     const repairBbox = useFaceOnly ? faceBbox : (bodyBbox || faceBbox);
 
     // Protection list: same helper, iterated over sceneCharacters so

@@ -251,12 +251,21 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
       }
     }
     if (worst) {
+      const issueDescription = worst.issue.description || worst.issue.fixInstruction || '';
+      // repairParams: the 3-axis repair plan for this char-fix, resolved from the
+      // issue text by the ONE central rule (resolveRepairAxes). Emitted here so the
+      // decision — not a scattered per-caller `useFaceOnly` derivation — owns which
+      // axes a char-fix uses. faceOnly here is the INTENT (assumes a face box is
+      // available); executeCharFixAction finalises it against the actual bbox.
+      const { resolveRepairAxes } = require('./faceRepair');
+      const repairParams = resolveRepairAxes(issueDescription, { hasFaceBbox: true });
       return {
         method: 'char-fix',
         reason: `entity ${worst.severity} on ${worst.charName}`,
         charName: worst.charName,
         severity: worst.severity,
-        issueDescription: worst.issue.description || worst.issue.fixInstruction || '',
+        issueDescription,
+        repairParams,
       };
     }
   }
