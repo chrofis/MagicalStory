@@ -409,12 +409,14 @@ logged in decisions.md).
 #1 needs the dead-code reconciliation first; #2 needs a conversion A/B.
 
 **Status:** ✅ **#3 SHIPPED to staging (2026-07-26).** scene_validation +
-scene_rewrite now take explicit `MODEL_DEFAULTS.sceneValidationRepair` /
-`MODEL_DEFAULTS.sceneRewrite` overrides, both defaulting to `gemini-2.5-flash`
-(env-overridable via `SCENE_VALIDATION_MODEL` / `SCENE_REWRITE_MODEL`). Prefill-
-compatible, always-available, ~10× cheaper than Sonnet. Logged in decisions.md.
-#1 (text_check — needs dead-code reconciliation) + #2 (story_ideas — needs a
-conversion A/B) still pending.
+scene_rewrite now resolve via `resolveSceneValidationModel()` /
+`resolveSceneRewriteModel()`, defaulting to **`qwen3-max`** (env-overridable via
+`SCENE_VALIDATION_MODEL` / `SCENE_REWRITE_MODEL`; guardModel falls back to
+claude-sonnet if OPENROUTER_API_KEY unset). **Owner correction 2026-07-26:** first
+shipped on gemini-2.5-flash, but scene_validation is spatial/compositional
+reasoning → moved to qwen3-max (the codebase's trusted spatial reasoner, still
+~4× cheaper than Sonnet). Logged in decisions.md. #1 (text_check — needs dead-code
+reconciliation) + #2 (story_ideas — needs a conversion A/B) still pending.
 
 ---
 

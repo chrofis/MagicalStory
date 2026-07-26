@@ -2078,18 +2078,31 @@ patch, the other paraphrases one scene sentence to dodge a safety filter. Sonnet
 was overkill for both, and they sit on rescue paths that can fire several times
 per story.
 **Decision:** Route both through named, env-overridable config keys
-(`MODEL_DEFAULTS.sceneValidationRepair`, `MODEL_DEFAULTS.sceneRewrite`) that
-default to `gemini-2.5-flash` — the always-available utility tier. Passed as the
-explicit `modelOverride` arg so the downgrade is visible at the call site, not a
-global default flip. (Owner Pt 9, "Downgrade them.")
-**Rationale:** gemini-2.5-flash is ~an order of magnitude cheaper than Sonnet,
-always available (GEMINI_API_KEY), and supports the JSON `prefill: '{'` seed both
-callers rely on (Gemini seeds a `model`-role turn — see callGeminiTextAPI). Env
-overrides (`SCENE_VALIDATION_MODEL`, `SCENE_REWRITE_MODEL`) allow a no-deploy flip
-back to Sonnet on staging if quality regresses. story prose stages (idea/outline/
-storyText/sceneDescription) are untouched — they stay on Sonnet.
-**Touched:** `server/config/models.js` (two new keys), `server/lib/sceneValidator.js`
-(repairScene override), `server/lib/images.js` (rewriteBlockedScene override).
+(`MODEL_DEFAULTS.sceneValidationRepair`, `MODEL_DEFAULTS.sceneRewrite`) resolved
+via `resolveSceneValidationModel()` / `resolveSceneRewriteModel()` (guardModel),
+defaulting to **`qwen3-max`**. Passed as the explicit `modelOverride` arg so the
+choice is visible at the call site, not a global default flip.
+**Correction (same day):** first shipped these on `gemini-2.5-flash`; owner
+corrected — "those have spatial reasoning, they probably need qwen max."
+`scene_validation` repairs a scene DESCRIPTION from composition issues (left/right,
+counts, who's where) — genuine spatial/compositional TEXT reasoning that
+gemini-flash handles poorly. Moved to `qwen3-max`, the codebase's already-trusted
+spatial reasoner (also `complianceModel`), newer AND cheaper than `qwen-max`
+($0.78/$3.9 vs $1.6/$6.4) and still ~4× cheaper than Sonnet. `scene_rewrite` is
+the lighter of the two (a safety paraphrase) but kept on the same model for
+consistency; it's still cheap.
+**Rationale:** qwen3-max reasons about spatial corrections far better than
+gemini-flash while remaining well under Sonnet's cost — satisfying Pt 9's cost
+intent without sacrificing the reasoning these rescue paths need. `guardModel`
+falls back to `claude-sonnet` (NOT a weak model) when `OPENROUTER_API_KEY` is
+unset, so a missing key degrades UP to the strong original, never down. All three
+providers (anthropic/google/openrouter) handle the JSON `prefill: '{'` both
+callers use — OpenRouter seeds an assistant turn + prepends. Env overrides
+(`SCENE_VALIDATION_MODEL`, `SCENE_REWRITE_MODEL`) allow a no-deploy flip. Story
+prose stages (idea/outline/storyText/sceneDescription) untouched — stay on Sonnet.
+**Touched:** `server/config/models.js` (two keys + two resolvers),
+`server/lib/sceneValidator.js` (resolveSceneValidationModel),
+`server/lib/images.js` (resolveSceneRewriteModel).
 **Status:** ✅ active
 
 ## Test Lab text-only harness — skipImages jobs complete, cross-model judge, 5 text criteria (2026-07-26)

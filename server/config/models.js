@@ -172,13 +172,17 @@ const MODEL_DEFAULTS = {
                                        // compareImageStyles/analyzeImageStyle/VB-utility call
                                        // was failing with it.
 
-  // Two rescue-path utility calls DOWNGRADED off Sonnet (owner decision 2026-07-26,
-  // Pt 9 "Downgrade them"). Both are cheap structured tasks (JSON scene repair /
-  // safety rewrite of a blocked scene), not story prose — Sonnet was overkill.
-  // gemini-2.5-flash is the always-available utility tier and supports the JSON
-  // prefill both callers use. Env-overridable for a no-deploy flip on staging.
-  sceneValidationRepair: process.env.SCENE_VALIDATION_MODEL || 'gemini-2.5-flash', // sceneValidator.repairScene JSON fix
-  sceneRewrite: process.env.SCENE_REWRITE_MODEL || 'gemini-2.5-flash',             // rewriteBlockedScene safety rewrite
+  // Two rescue-path calls moved OFF Sonnet for cost (owner Pt 9 "Downgrade them",
+  // 2026-07-26) — but to qwen3-max, NOT gemini-flash (owner correction same day:
+  // "those have spatial reasoning, they probably need qwen max"). scene_validation
+  // repairs a scene DESCRIPTION from composition issues (left/right, counts, who's
+  // where) — real spatial/compositional text reasoning that flash reasons poorly
+  // about; scene_rewrite paraphrases a blocked scene. qwen3-max is the codebase's
+  // already-trusted spatial reasoner (see complianceModel) and still ~4× cheaper
+  // than Sonnet. Resolved via guardModel() → falls back to claude-sonnet (NOT a
+  // weak model) when OPENROUTER_API_KEY is unset. Env-overridable for staging.
+  sceneValidationRepair: process.env.SCENE_VALIDATION_MODEL || 'qwen3-max', // sceneValidator.repairScene JSON fix (spatial)
+  sceneRewrite: process.env.SCENE_REWRITE_MODEL || 'qwen3-max',             // rewriteBlockedScene safety rewrite
 
   // DEAD CONFIG (audit 2026-07-09): only read by the never-wired mask-inpaint
   // dispatcher (inpaintWithMask etc. in images.js — see DEAD CODE banners).
@@ -640,6 +644,8 @@ function guardModel(modelKey, label = 'model') {
 function resolveEvalModel() { return guardModel(MODEL_DEFAULTS.evalModel, 'EVAL MODEL'); }
 function resolveComplianceModel() { return guardModel(MODEL_DEFAULTS.complianceModel, 'COMPLIANCE MODEL'); }
 function resolveSceneIterationModel() { return guardModel(MODEL_DEFAULTS.sceneIteration, 'SCENE ITERATE MODEL'); }
+function resolveSceneValidationModel() { return guardModel(MODEL_DEFAULTS.sceneValidationRepair, 'SCENE VALIDATION MODEL'); }
+function resolveSceneRewriteModel() { return guardModel(MODEL_DEFAULTS.sceneRewrite, 'SCENE REWRITE MODEL'); }
 
 module.exports = {
   TEXT_MODELS,
@@ -647,6 +653,8 @@ module.exports = {
   resolveEvalModel,
   resolveComplianceModel,
   resolveSceneIterationModel,
+  resolveSceneValidationModel,
+  resolveSceneRewriteModel,
   IMAGE_MODELS,
   IMAGE_BACKENDS,
   IMAGE_ASPECTS,

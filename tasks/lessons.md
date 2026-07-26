@@ -415,3 +415,16 @@ parse + load and only fails at runtime. And per smoke-testing-before-push:
 actually execute the changed call path (stub the endpoint if needed), don't stop
 at `node --check`. If a request suddenly "returns nothing / empty body", suspect
 the CLIENT is sending nothing before blaming the server.
+
+## Model downgrades: match the model to the REASONING type, not just cost tier (2026-07-26)
+When downgrading a call off Sonnet for cost, don't reflexively pick gemini-flash
+as "the cheap utility tier." First ask what the task actually REQUIRES:
+- **Spatial / compositional reasoning** (repair a scene description from left/right
+  + count + who's-where composition issues) → gemini-flash reasons about this
+  poorly. Use a strong cheap REASONER (qwen3-max — already the codebase's trusted
+  spatial model for complianceModel), still ~4× cheaper than Sonnet.
+- gemini-2.5-flash's spatial strength in this codebase is VISION (bounding boxes
+  for quality eval), NOT text reasoning. Don't conflate the two.
+Owner corrected a gemini-flash downgrade with "those have spatial reasoning, they
+probably need qwen max." Route qwen/openrouter models through guardModel() so a
+missing OPENROUTER_API_KEY degrades to claude-sonnet (strong), never to a weak model.
