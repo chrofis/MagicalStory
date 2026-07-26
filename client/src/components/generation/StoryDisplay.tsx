@@ -216,6 +216,25 @@ interface StoryDisplayProps {
   onRefreshStory?: () => Promise<void>;
 }
 
+// Resolve the ARRAY position of the active version. `activeVersion` is a DB
+// version_index, NOT an array index — and imageVersions can be sparse (a deleted
+// version leaves the array shorter than the highest version_index), so indexing
+// the array directly by activeVersion selects the WRONG version: the green
+// "Aktiv" badge marks the wrong card, "Use this image" switches to a different
+// version, and dev panels show the wrong bbox/score. Match the versionIndex
+// carried on each entry; fall back to a clamped array index only for legacy rows
+// that don't carry versionIndex (contiguous, so index == versionIndex there).
+function resolveActiveArrayIdx(image: any): number {
+  const versions = image?.imageVersions;
+  if (!Array.isArray(versions) || versions.length === 0) return -1;
+  const lastIdx = versions.length - 1;
+  const active = image?.activeVersion;
+  if (active == null) return lastIdx;
+  const byVi = versions.findIndex((v: any) => v && v.versionIndex === active);
+  if (byVi >= 0) return byVi;
+  return Math.min(Math.max(0, active), lastIdx);
+}
+
 // Pull bbox + overlay from the active version of an image record. Falls back
 // to the latest version if activeVersion is missing, then to the page-level
 // fields. Without this the dev-mode Object Detection panel shows v0's bbox
@@ -223,10 +242,9 @@ interface StoryDisplayProps {
 function pickActiveVersion<T extends { imageVersions?: Array<unknown> | null; activeVersion?: number | null }>(
   image: T | null | undefined
 ): unknown | null {
-  if (!image?.imageVersions || image.imageVersions.length === 0) return null;
-  const lastIdx = image.imageVersions.length - 1;
-  const idx = image.activeVersion ?? lastIdx;
-  return image.imageVersions[Math.min(Math.max(0, idx), lastIdx)] || null;
+  const idx = resolveActiveArrayIdx(image);
+  if (idx < 0) return null;
+  return (image!.imageVersions as Array<unknown>)[idx] || null;
 }
 
 function activeBboxDetection(image: any): BboxSceneDetection | null {
@@ -244,10 +262,7 @@ function activeBboxOverlay(image: any): string | null {
 // the Object Detection panel stayed pinned to that stale detection no matter
 // which version the user activated.
 function bboxKey(base: string, image: any): string {
-  const versions = image?.imageVersions;
-  const idx = Array.isArray(versions) && versions.length > 0
-    ? Math.min(Math.max(0, image?.activeVersion ?? versions.length - 1), versions.length - 1)
-    : 0;
+  const idx = Math.max(0, resolveActiveArrayIdx(image));
   return `${base}:v${idx}`;
 }
 
@@ -255,11 +270,8 @@ function bboxKey(base: string, image: any): string {
 // overlay is drawn on the same version's image the user is viewing. Without
 // it, server fell back to scene-level detection and produced stale overlays.
 function activeVersionIndex(image: any): number | undefined {
-  const versions = image?.imageVersions;
-  if (!Array.isArray(versions) || versions.length === 0) return undefined;
-  const lastIdx = versions.length - 1;
-  const idx = image?.activeVersion ?? lastIdx;
-  return Math.min(Math.max(0, idx), lastIdx);
+  const idx = resolveActiveArrayIdx(image);
+  return idx < 0 ? undefined : idx;
 }
 
 // Cover quality panels read score/reasoning from the active version's row,
@@ -1010,8 +1022,12 @@ export function StoryDisplay({
 
   // Get active version index for a page
   const getActiveVersionIndex = (pageNumber: number): number | undefined => {
+    // Return the ARRAY position (what the modal compares against), resolved from
+    // the DB activeVersion — returning the raw versionIndex marked the wrong
+    // card active on sparse version arrays.
     const image = sceneImages.find(img => img.pageNumber === pageNumber);
-    return image?.activeVersion;
+    const idx = resolveActiveArrayIdx(image);
+    return idx < 0 ? undefined : idx;
   };
 
   // Handle selecting a different image version
@@ -1045,8 +1061,10 @@ export function StoryDisplay({
 
   // Get active version index for a cover
   const getCoverActiveVersionIndex = (coverType: 'frontCover' | 'initialPage' | 'backCover'): number | undefined => {
+    // ARRAY position for the cover history modal (same sparse-array fix as pages).
     const cover = coverImages?.[coverType];
-    return cover?.activeVersion;
+    const idx = resolveActiveArrayIdx(cover);
+    return idx < 0 ? undefined : idx;
   };
 
   // Extract just the Image Summary from a full scene description
@@ -4467,7 +4485,7 @@ export function StoryDisplay({
                   // Prefer the active version's grokRefImages over the root
                   // cover object — iterated covers store the new refs inside
                   // imageVersions[activeVersion], and the root stays stale.
-                  const activeIdx = frontCoverObj.activeVersion ?? (frontCoverObj.imageVersions?.length ? frontCoverObj.imageVersions.length - 1 : 0);
+                  const activeIdx = Math.max(0, resolveActiveArrayIdx(frontCoverObj));
                   const frontCoverGrokRefs = (frontCoverObj.imageVersions?.[activeIdx] as any)?.grokRefImages ?? frontCoverObj.grokRefImages;
                   const frontCoverComposite = (frontCoverObj.imageVersions?.[activeIdx] as any)?.compositeAttempts ?? null;
                   const show = (frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0 || frontCoverObj.visualBibleGrid || (frontCoverGrokRefs?.length ?? 0) > 0 || (frontCoverComposite?.length ?? 0) > 0;
@@ -4738,7 +4756,7 @@ export function StoryDisplay({
 
                 {/* Reference Photos */}
                 {(() => {
-                  const activeIdx = initialPageObj.activeVersion ?? (initialPageObj.imageVersions?.length ? initialPageObj.imageVersions.length - 1 : 0);
+                  const activeIdx = Math.max(0, resolveActiveArrayIdx(initialPageObj));
                   const initialPageGrokRefs = (initialPageObj.imageVersions?.[activeIdx] as any)?.grokRefImages ?? initialPageObj.grokRefImages;
                   const initialPageComposite = (initialPageObj.imageVersions?.[activeIdx] as any)?.compositeAttempts ?? null;
                   const show = (initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0 || initialPageObj.visualBibleGrid || (initialPageGrokRefs?.length ?? 0) > 0 || (initialPageComposite?.length ?? 0) > 0;
@@ -5353,8 +5371,8 @@ export function StoryDisplay({
                                 textAreaMask={image.textAreaMask}
                                 emptySceneVbGrid={(image as any).emptySceneVbGrid}
                                 textCoverageReport={image.textCoverageReport}
-                                grokRefImages={image?.imageVersions?.[image.activeVersion ?? (image.imageVersions.length - 1)]?.grokRefImages ?? (image as any)?.grokRefImages}
-                                compositeAttempts={(image?.imageVersions?.[image.activeVersion ?? (image.imageVersions.length - 1)] as any)?.compositeAttempts ?? null}
+                                grokRefImages={(image?.imageVersions?.[Math.max(0, resolveActiveArrayIdx(image))] as any)?.grokRefImages ?? (image as any)?.grokRefImages}
+                                compositeAttempts={(image?.imageVersions?.[Math.max(0, resolveActiveArrayIdx(image))] as any)?.compositeAttempts ?? null}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}
@@ -6042,8 +6060,8 @@ export function StoryDisplay({
                                 textAreaMask={image.textAreaMask}
                                 emptySceneVbGrid={(image as any).emptySceneVbGrid}
                                 textCoverageReport={image.textCoverageReport}
-                                grokRefImages={image?.imageVersions?.[image.activeVersion ?? (image.imageVersions?.length ? image.imageVersions.length - 1 : 0)]?.grokRefImages ?? (image as any)?.grokRefImages}
-                                compositeAttempts={(image?.imageVersions?.[image.activeVersion ?? (image.imageVersions?.length ? image.imageVersions.length - 1 : 0)] as any)?.compositeAttempts ?? null}
+                                grokRefImages={(image?.imageVersions?.[Math.max(0, resolveActiveArrayIdx(image))] as any)?.grokRefImages ?? (image as any)?.grokRefImages}
+                                compositeAttempts={(image?.imageVersions?.[Math.max(0, resolveActiveArrayIdx(image))] as any)?.compositeAttempts ?? null}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}
@@ -6452,7 +6470,7 @@ export function StoryDisplay({
 
                 {/* Reference Photos */}
                 {(() => {
-                  const activeIdx = backCoverObj.activeVersion ?? (backCoverObj.imageVersions?.length ? backCoverObj.imageVersions.length - 1 : 0);
+                  const activeIdx = Math.max(0, resolveActiveArrayIdx(backCoverObj));
                   const backCoverGrokRefs = (backCoverObj.imageVersions?.[activeIdx] as any)?.grokRefImages ?? backCoverObj.grokRefImages;
                   const backCoverComposite = (backCoverObj.imageVersions?.[activeIdx] as any)?.compositeAttempts ?? null;
                   const show = (backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0 || backCoverObj.visualBibleGrid || (backCoverGrokRefs?.length ?? 0) > 0 || (backCoverComposite?.length ?? 0) > 0;

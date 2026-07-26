@@ -35,8 +35,13 @@ const PADDING_BY_TYPE = {
   default: 0.3
 };
 
-// Severity ordering for deduplication preference
-const SEVERITY_ORDER = { critical: 0, major: 1, minor: 2 };
+// Severity ordering for deduplication preference (most-severe first = lowest).
+// Complete + case-insensitive: quality fixTargets carry UPPERCASE severities,
+// and `moderate`/`catastrophic` were previously absent — all of which fell
+// through the `|| 2` default and were mis-ranked as `minor`, so an overlapping
+// major issue could dominate-drop a genuine CRITICAL during dedup.
+const SEVERITY_ORDER = { catastrophic: 0, critical: 1, major: 2, moderate: 3, minor: 4 };
+const sevRank = (s) => SEVERITY_ORDER[String(s || '').toLowerCase()] ?? 5;
 
 // Target element keywords for sub-region detection
 // Maps common keywords in fix instructions to canonical element names
@@ -501,9 +506,10 @@ function deduplicateIssues(issues, iouThreshold = 0.5) {
   // Sort by severity (critical first) then by source preference
   const sourceOrder = { quality: 0, incremental: 1, final: 2 };
   const sorted = [...issues].sort((a, b) => {
-    const sevDiff = (SEVERITY_ORDER[a.severity] || 2) - (SEVERITY_ORDER[b.severity] || 2);
+    const sevDiff = sevRank(a.severity) - sevRank(b.severity);
     if (sevDiff !== 0) return sevDiff;
-    return (sourceOrder[a.source] || 2) - (sourceOrder[b.source] || 2);
+    // `?? 3` not `|| 3`: source 'quality' is 0 and would otherwise fall through.
+    return (sourceOrder[a.source] ?? 3) - (sourceOrder[b.source] ?? 3);
   });
 
   const keep = [];

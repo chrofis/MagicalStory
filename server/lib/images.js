@@ -16077,15 +16077,15 @@ function mergeEvaluationIssues(qualityResult, consistencyResult, options = {}) {
   // Merge all issues
   report.allIssues = [...report.qualityIssues, ...report.consistencyIssues];
 
-  // Determine severity threshold
-  const severityOrder = { critical: 0, major: 1, minor: 2 };
-  const minSeverityLevel = severityOrder[config.minSeverityToFix] || 1;
+  // Determine severity threshold. Complete + case-insensitive: 'critical' is 0,
+  // so the old `|| 1` silently turned a "fix critical only" config into "fix
+  // major too"; uppercase/moderate/catastrophic severities also fell through.
+  const severityOrder = { catastrophic: 0, critical: 1, major: 2, moderate: 3, minor: 4 };
+  const sevRankLocal = (s) => severityOrder[String(s || '').toLowerCase()] ?? 2; // unknown → major (prior effective default)
+  const minSeverityLevel = sevRankLocal(config.minSeverityToFix);
 
-  // Filter issues that meet severity threshold
-  const fixableIssues = report.allIssues.filter(issue => {
-    const issueSeverity = severityOrder[issue.severity] ?? 1;
-    return issueSeverity <= minSeverityLevel;
-  });
+  // Filter issues that meet severity threshold (lower rank = more severe)
+  const fixableIssues = report.allIssues.filter(issue => sevRankLocal(issue.severity) <= minSeverityLevel);
 
   // Build fix plan
   if (fixableIssues.length > 0) {
