@@ -238,15 +238,19 @@ landmark handling, vantages, 4 cover specs, marker formatting). Cost is
 metadata in call 2 (grounded on the finished text). Measure with the §6 criteria.
 Depends on §7 (text-only rerun). The lever here is task-density, NOT the model.
 
-**Status:** ⏭️ SKIPPED by owner 2026-07-25. Design retained above if revisited.
+**Status:** 🧪 LIVE — experiment defined; blocked on §7 (text-only rerun harness).
+(Not skipped — earlier "skip 5" referred to rubric criterion 5, not this point.)
 
 ---
 
 ## 6. Story-quality criteria (owner: "define 3-8 criteria so we can rate") 📐
 
-**Proposed rubric (6 criteria, each rated 1-5 by an LLM judge + optionally a
-human).** Cross-model: written by Sonnet, judged by a different model (per the
-testing-backlog cross-model-review item), applied per story:
+**Rubric — 5 criteria, TEXT-ONLY.** The judge evaluates the story *text* only —
+NO picturability / image concerns (owner, 2026-07-25: "I want to evaluate only
+the text"). Picturability belongs to the image pipeline (scene-expansion +
+acceptance gate), NOT the text score. Each rated 1-5 by an LLM judge; cross-model
+(written by Sonnet, judged by a different model per the testing-backlog
+cross-model-review item), applied per story:
 
 1. **Coherence & structure** — clear beginning/middle/end; each page follows from
    the last; no plot holes or dropped threads.
@@ -256,18 +260,16 @@ testing-backlog cross-model-review item), applied per story:
    stay consistent; the child protagonist is central and active.
 4. **Emotional arc** — a felt emotional journey (tension → resolution); the
    emotion on each page follows from the prior line, not asserted.
-5. **Picturability** — every page contains exactly one clear, renderable "picture
-   moment" (one frozen instant, ≤3 focal characters, no un-drawable action). This
-   criterion doubles as the bridge to the image pipeline.
-6. **Language quality & delight** — natural prose, age-right humour/wonder, no
+5. **Language quality & delight** — natural prose, age-right humour/wonder, no
    translation artifacts; a satisfying, memorable ending.
 
 Each criterion: 1 (fails) – 5 (excellent), with a one-line justification. Store
-per-story so model-downgrade experiments (§9) and the §1a-B calibration are
-measurable.
+per-story so the outline A/B (§5), model-downgrade experiments (§9) and the
+§1a-B calibration are measurable.
 
-**Status:** ✅ CONFIRMED by owner 2026-07-25 — these 6 as-is. Ready to wire the
-judge whenever the harness (§7) is built.
+**Status:** ✅ CONFIRMED by owner 2026-07-25 — these 5 text-only criteria
+(picturability dropped; it's an image-pipeline concern, scored separately). Ready
+to wire the judge once the harness (§7) is built.
 
 ---
 
