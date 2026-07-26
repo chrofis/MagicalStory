@@ -4930,24 +4930,53 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (skipImages) {
       log.debug(`📖 [UNIFIED] Skipping image generation (text-only mode)`);
 
+      const textPages = expandedScenes.map(scene => ({
+        pageNumber: scene.pageNumber,
+        text: scene.text,
+        sceneDescription: scene.sceneDescription,
+        image: null
+      }));
+
       const result = {
         title,
-        pages: expandedScenes.map(scene => ({
-          pageNumber: scene.pageNumber,
-          text: scene.text,
-          sceneDescription: scene.sceneDescription,
-          image: null
-        })),
+        pages: textPages,
         coverImages: {},
         visualBible,
         tokenUsage,
         generationMode: 'unified'
       };
 
-      await dbPool.query(
-        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-        [100, 'Story generation complete (text only)', jobId]
+      // Text-only jobs return HERE — they never reach the normal completion
+      // UPDATE (~line 7160) that sets status='completed' + writes result_data.
+      // Persist a LIGHTWEIGHT result_data (title + per-page text + sceneDescription,
+      // no image bytes — there are none) and mark the job completed so the wizard
+      // dev "text-only" flow and the Test Lab text harness both finish cleanly and
+      // are pollable. Guard with `status = 'processing'` (mirroring the normal
+      // completion write) so a watchdog/cancel that already flipped this job to
+      // failed/cancelled isn't resurrected to 'completed'.
+      const textResultData = {
+        title,
+        pages: textPages.map(p => ({
+          pageNumber: p.pageNumber,
+          text: p.text,
+          sceneDescription: p.sceneDescription,
+        })),
+        generationMode: 'unified',
+        textOnly: true,
+      };
+      const textResultJson = JSON.stringify(textResultData);
+
+      const textOnlyCompletion = await dbPool.query(
+        `UPDATE story_jobs
+         SET status = $1, progress = $2, progress_message = $3, result_data = $4,
+             credits_reserved = 0, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $5 AND status = 'processing'
+         RETURNING id`,
+        ['completed', 100, 'Story generation complete (text only)', textResultJson, jobId]
       );
+      if (textOnlyCompletion.rowCount === 0) {
+        log.warn(`⚠️ [UNIFIED] Text-only job ${jobId} was no longer 'processing' at completion (cancelled/failed by watchdog?) — not marking completed.`);
+      }
 
       return result;
     }
