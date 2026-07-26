@@ -1,7 +1,8 @@
 /**
  * Admin Job Management Routes
  *
- * View and retry failed story generation jobs
+ * View and retry failed story generation jobs, plus the Test Lab text-only
+ * harness (rerun a job's inputs as TEXT ONLY, then LLM-judge the resulting text).
  */
 
 const express = require('express');
@@ -10,6 +11,15 @@ const router = express.Router();
 const { dbQuery, getPool, isDatabaseMode } = require('../../services/database');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
+const { judgeStoryText } = require('../../lib/textQualityJudge');
+
+// Server.js-local dependencies received via initJobsRoutes() — same init pattern
+// as trial.js / auth.js. `processStoryJob` is the fire-and-forget job runner;
+// the rerun-text endpoint below needs it to kick off text-only generation.
+let deps = {};
+function initJobsRoutes(serverDeps) {
+  deps = serverDeps;
+}
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {
@@ -168,4 +178,159 @@ router.get('/:jobId', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────
+// Test Lab — text-only harness
+//
+// Rerun the SAME story inputs as TEXT ONLY (no image generation), then score
+// the resulting text on 5 text-only quality criteria via a cross-model LLM
+// judge. Generation and judging are SEPARATE endpoints on purpose:
+//   - a slow judge never blocks the rerun,
+//   - you can re-judge a run (or re-judge with a different model) without
+//     regenerating the text.
+// Full doc: docs/codebase-guide.md → "Test Lab — text-only story harness".
+// ─────────────────────────────────────────────────────────────────────
+
+// POST /api/admin/jobs/:jobId/rerun-text
+// Clone a source job's input_data, force skipImages=true, and start N text-only
+// runs. Works for ANY source job (not just failed ones, unlike /retry).
+// Body (all optional):
+//   runs           — number of text variants to generate (default 1, cap 5)
+//   judgeModel     — reserved for the caller's bookkeeping; judging happens in
+//                    the separate /judge-text endpoint (kept here so a UI can
+//                    pass one object through). Not persisted.
+//   inputOverrides — shallow-merge object applied over input_data BEFORE insert.
+//                    This is the seam for a future outline single-vs-split A/B:
+//                    swap a prompt-variant flag (e.g. { outlineMode: 'split' })
+//                    WITHOUT needing a new endpoint. Shallow merge only.
+router.post('/:jobId/rerun-text', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'Database mode required' });
+    }
+    if (typeof deps.processStoryJob !== 'function') {
+      return res.status(500).json({ error: 'Job runner not wired (initJobsRoutes not called)' });
+    }
+
+    const { jobId } = req.params;
+    const pool = getPool();
+
+    const jobResult = await pool.query('SELECT * FROM story_jobs WHERE id = $1', [jobId]);
+    if (jobResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    const sourceJob = jobResult.rows[0];
+
+    // Clone input_data (input_data is JSONB → already a JS object from pg).
+    const baseInput = { ...(sourceJob.input_data || {}) };
+
+    // Shallow-merge caller overrides (the outline-A/B seam). Applied over the
+    // clone so a future experiment can flip a prompt-variant flag with no new
+    // endpoint. Shallow by design — nested objects are replaced wholesale.
+    const overrides = (req.body && typeof req.body.inputOverrides === 'object' && req.body.inputOverrides)
+      ? req.body.inputOverrides : {};
+    const inputData = { ...baseInput, ...overrides };
+
+    // Text-only: never generate images/covers.
+    inputData.skipImages = true;
+    // Strip idempotency so repeated reruns each create a distinct job.
+    delete inputData.idempotencyKey;
+
+    const userId = sourceJob.user_id; // reuse original user (matches /retry)
+
+    const runs = Math.min(5, Math.max(1, parseInt(req.body?.runs, 10) || 1));
+
+    const created = [];
+    for (let i = 0; i < runs; i++) {
+      const newJobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      await pool.query(
+        `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved)
+         VALUES ($1, $2, 'pending', $3, 0, 'Test Lab text-only rerun', 0)`,
+        [newJobId, userId, JSON.stringify(inputData)]
+      );
+      created.push({ jobId: newJobId });
+
+      // Fire-and-forget (same pattern as admin.js /jobs/:jobId/start).
+      deps.processStoryJob(newJobId).catch(err => {
+        log.error(`❌ [TESTLAB] Text-only rerun job ${newJobId} failed:`, err);
+      });
+    }
+
+    log.info(`[TESTLAB] Started ${runs} text-only rerun(s) from job ${jobId} (user: ${userId})`);
+    res.json({ success: true, runs: created, sourceJobId: jobId });
+  } catch (err) {
+    log.error('Error starting text-only rerun:', err);
+    res.status(500).json({ error: 'Failed to start text-only rerun', details: err.message });
+  }
+});
+
+// POST /api/admin/jobs/:jobId/judge-text
+// Load a COMPLETED text-only job's result_data (title + pages[].text), score the
+// text via the cross-model judge, persist the score back into result_data, and
+// return it. Body: { judgeModel? } to override the judge model for this call.
+router.post('/:jobId/judge-text', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'Database mode required' });
+    }
+
+    const { jobId } = req.params;
+    const pool = getPool();
+
+    const jobResult = await pool.query(
+      'SELECT id, status, input_data, result_data FROM story_jobs WHERE id = $1',
+      [jobId]
+    );
+    if (jobResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    const job = jobResult.rows[0];
+
+    if (job.status !== 'completed') {
+      return res.status(400).json({ error: 'Job is not completed', currentStatus: job.status });
+    }
+
+    const resultData = job.result_data || {};
+    const pages = Array.isArray(resultData.pages) ? resultData.pages : [];
+    if (pages.length === 0) {
+      return res.status(400).json({ error: 'Job result_data has no pages to judge' });
+    }
+
+    // Pull target reading level / age hints from the original inputs when present.
+    const input = job.input_data || {};
+    const language = resultData.language || input.language || null;
+    const readingLevel = input.languageLevel || input.readingLevel || null;
+    const ageRange = input.ageRange || null;
+
+    const score = await judgeStoryText(
+      { title: resultData.title, pages, language, readingLevel, ageRange },
+      { judgeModel: req.body?.judgeModel }
+    );
+
+    if (!score.success) {
+      return res.status(502).json({ error: 'Text judge failed', details: score.error, judgeModel: score.judgeModel });
+    }
+
+    // Persist the score back into result_data so it survives (re-judging just
+    // overwrites it). jsonb_set on the whole textQualityScore key.
+    try {
+      await pool.query(
+        `UPDATE story_jobs
+         SET result_data = jsonb_set(COALESCE(result_data, '{}'::jsonb), '{textQualityScore}', $2::jsonb, true),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [jobId, JSON.stringify(score)]
+      );
+    } catch (persistErr) {
+      // Non-fatal — return the score even if persistence fails.
+      log.warn(`[TESTLAB] Could not persist textQualityScore for job ${jobId}: ${persistErr.message}`);
+    }
+
+    res.json({ success: true, jobId, ...score });
+  } catch (err) {
+    log.error('Error judging text:', err);
+    res.status(500).json({ error: 'Failed to judge text', details: err.message });
+  }
+});
+
 module.exports = router;
+module.exports.initJobsRoutes = initJobsRoutes;

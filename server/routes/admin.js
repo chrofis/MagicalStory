@@ -22,6 +22,14 @@ let deps = {};
 
 function initAdminRoutes(serverDeps) {
   deps = serverDeps;
+  // Thread server deps into submodules that need them. The jobs submodule's
+  // Test Lab text-only rerun endpoint needs processStoryJob to start jobs.
+  // (require() here returns the same cached instance admin/index.js mounted.)
+  try {
+    require('./admin/jobs').initJobsRoutes(serverDeps);
+  } catch (e) {
+    log.error('Failed to init admin/jobs routes with deps:', e.message);
+  }
 }
 
 // Legacy file-based storage helpers
