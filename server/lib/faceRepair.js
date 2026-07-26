@@ -218,7 +218,7 @@ async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop,
 // CROSSHATCH — magenta SVG crosshatch clipped to the figure silhouette (dest-in).
 // FAITHFULNESS-CHECK: images.js:12163-12172 (grok_cutout hatch SVG) +
 //                     images.js:12483-12496 / 12689-12695 (grok_inpaint hatch + silhouette clip).
-async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage }) {
+async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage, sceneBuffer, sceneWidth, sceneHeight, protectedBodies, bodyBbox }) {
   const sharp = require('sharp');
   const { fetchFigureMaskPng } = require('./images');
   const figureLeft = boxInCrop[0], figureTop = boxInCrop[1];
@@ -257,8 +257,66 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
     // Silhouette over the hatch region for the dest-in clip AND the blend union.
     const boxInHatch = [figureLeft - hatchLeft, figureTop - hatchTop, figureLeft - hatchLeft + figureWidth, figureTop - hatchTop + figureHeight];
     const hatchCrop = await sharp(cropBuf).extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight }).jpeg({ quality: 90 }).toBuffer();
-    const sil = await fetchFigureMaskPng(hatchCrop, boxInHatch, {});
+    let sil = await fetchFigureMaskPng(hatchCrop, boxInHatch, {});
     if (sil) {
+      // Occluder-subtract: rembg/SAM in the target crop returns ALL foreground
+      // figures — a neighbour standing in front lands inside the hatch too. For
+      // each protected body overlapping the hatch region, dest-out its silhouette
+      // so the crosshatch only covers the target. Pathological-revert guard: if a
+      // subtract removes >70% of the target silhouette it was a label mismatch —
+      // revert. FAITHFULNESS-CHECK: images.js:12560-12675.
+      if (sceneBuffer && Array.isArray(protectedBodies) && protectedBodies.length && sceneWidth && sceneHeight) {
+        const W = sceneWidth, H = sceneHeight;
+        const opaqueFrac = async (buf) => { try { const s = await sharp(buf).stats(); const ch = s?.channels?.[3]; return ch ? ch.mean / 255 : null; } catch { return null; } };
+        const silBefore = sil;
+        const fracBefore = await opaqueFrac(sil);
+        // hatch region origin in PAGE pixels.
+        const hatchPageLeft = crop.x + hatchLeft, hatchPageTop = crop.y + hatchTop;
+        for (const pb of protectedBodies) {
+          if (!Array.isArray(pb) || pb.length !== 4) continue;
+          const [pyMin, pxMin, pyMax, pxMax] = pb;
+          if ([pyMin, pxMin, pyMax, pxMax].some(v => v == null || isNaN(v))) continue;
+          // Skip the self bbox (within tolerance).
+          if (Array.isArray(bodyBbox) && bodyBbox.length === 4) {
+            const eps = 0.005;
+            if (Math.abs(pxMin - bodyBbox[1]) < eps && Math.abs(pyMin - bodyBbox[0]) < eps && Math.abs(pxMax - bodyBbox[3]) < eps && Math.abs(pyMax - bodyBbox[2]) < eps) continue;
+          }
+          const OCC_PAD = 0.20;
+          const pbW = pxMax - pxMin, pbH = pyMax - pyMin;
+          const occLeft = Math.max(0, Math.floor((pxMin - pbW * OCC_PAD) * W));
+          const occTop = Math.max(0, Math.floor((pyMin - pbH * OCC_PAD) * H));
+          const occRight = Math.min(W, Math.ceil((pxMax + pbW * OCC_PAD) * W));
+          const occBottom = Math.min(H, Math.ceil((pyMax + pbH * OCC_PAD) * H));
+          const occW = occRight - occLeft, occH = occBottom - occTop;
+          if (occW <= 1 || occH <= 1) continue;
+          // Intersection with the hatch region (page coords).
+          const ixmin = Math.max(occLeft, hatchPageLeft), iymin = Math.max(occTop, hatchPageTop);
+          const ixmax = Math.min(occRight, hatchPageLeft + hatchWidth), iymax = Math.min(occBottom, hatchPageTop + hatchHeight);
+          if (ixmax - ixmin <= 0 || iymax - iymin <= 0) continue;
+          try {
+            const occCrop = await sharp(sceneBuffer).extract({ left: occLeft, top: occTop, width: occW, height: occH }).jpeg({ quality: 90 }).toBuffer();
+            const occBoxInCrop = [
+              Math.max(0, Math.round(pxMin * W) - occLeft), Math.max(0, Math.round(pyMin * H) - occTop),
+              Math.min(occW, Math.round(pxMax * W) - occLeft), Math.min(occH, Math.round(pyMax * H) - occTop),
+            ];
+            const occSil = await fetchFigureMaskPng(occCrop, occBoxInCrop, {});
+            if (!occSil) continue;
+            const occClipped = await sharp(occSil)
+              .extract({ left: ixmin - occLeft, top: iymin - occTop, width: ixmax - ixmin, height: iymax - iymin })
+              .png().toBuffer();
+            sil = await sharp(sil)
+              .composite([{ input: occClipped, left: ixmin - hatchPageLeft, top: iymin - hatchPageTop, blend: 'dest-out' }])
+              .png().toBuffer();
+          } catch (occErr) {
+            log.warn(`[FACE REPAIR] occluder subtract failed (${occErr.message})`);
+          }
+        }
+        const fracAfter = await opaqueFrac(sil);
+        if (fracBefore != null && fracBefore > 0 && fracAfter != null && fracAfter < fracBefore * 0.30) {
+          log.warn(`[FACE REPAIR] occluder subtract removed ${Math.round((1 - fracAfter / fracBefore) * 100)}% of the target silhouette — reverting (likely label mismatch)`);
+          sil = silBefore;
+        }
+      }
       // FAITHFULNESS-CHECK: images.js:12689-12695 (dest-in clip of hatch to silhouette).
       hatchRegion = await sharp(hatchOnly).extract({ left: 0, top: 0, width: hatchWidth, height: hatchHeight })
         .composite([{ input: sil, blend: 'dest-in' }]).png().toBuffer();
@@ -350,12 +408,62 @@ async function callModel({ model, prompt, treatedUri, avatarUri, aspect, cropW, 
 // source; the adapter passes context via opts.
 // FAITHFULNESS-CHECK: images.js:11236-11251 (whiteout face-insert prompt).
 // ---------------------------------------------------------------------------
+// Action context (expression / pose / gaze / holding) from scene metadata,
+// falling back to interaction text. FAITHFULNESS-CHECK: images.js:11639-11667.
+function buildActionContext(sceneDescription, charName) {
+  if (!sceneDescription) return '';
+  try {
+    const { extractSceneMetadata } = require('./storyHelpers');
+    const md = extractSceneMetadata(sceneDescription);
+    const charData = md?.fullData?.characters?.find(c => c.name?.toLowerCase() === charName.toLowerCase());
+    if (charData) {
+      const parts = [];
+      if (charData.expression) parts.push(`Expression: ${charData.expression}`);
+      if (charData.pose) parts.push(`Pose: ${charData.pose}`);
+      if (charData.action) parts.push(`Action: ${charData.action}`);
+      if (charData.gaze) parts.push(`Gaze: ${charData.gaze}`);
+      if (charData.holding && typeof charData.holding === 'object') {
+        const holding = [];
+        if (charData.holding.leftHand && charData.holding.leftHand !== 'empty') holding.push(`left hand: ${charData.holding.leftHand}`);
+        if (charData.holding.rightHand && charData.holding.rightHand !== 'empty') holding.push(`right hand: ${charData.holding.rightHand}`);
+        if (holding.length) parts.push(`Holding: ${holding.join(', ')}`);
+      }
+      if (parts.length) return `\n\n${charName}'s state in this scene (MUST be preserved in the redrawn face):\n- ${parts.join('\n- ')}`;
+    }
+  } catch { /* fall through */ }
+  try {
+    const { buildCharActionContextFromInteractions } = require('./images');
+    return buildCharActionContextFromInteractions(sceneDescription, charName) || '';
+  } catch { return ''; }
+}
+
+// Quiet-zone instruction for the text overlay position.
+// FAITHFULNESS-CHECK: images.js:11476-11498.
+function buildTextPositionContext(textPosition, sceneDescription) {
+  if (!textPosition) return '';
+  const TEXT_POSITION_DESC = {
+    'top-left': 'upper left corner', 'top-right': 'upper right corner',
+    'bottom-left': 'lower left corner', 'bottom-right': 'lower right corner',
+    'top-full': 'upper third (full width)', 'bottom-full': 'lower third (full width)',
+  };
+  const desc = TEXT_POSITION_DESC[textPosition];
+  if (!desc) return '';
+  let zoneDesc = null;
+  if (sceneDescription) {
+    try {
+      const { extractSceneMetadata } = require('./storyHelpers');
+      zoneDesc = extractSceneMetadata(sceneDescription)?.textZoneDescription || null;
+    } catch { /* null */ }
+  }
+  return `\n\nQuiet zone: keep the ${desc} as ${zoneDesc ? `the established ${zoneDesc} — preserve its existing atmospheric character (clouds, gradient, texture)` : 'soft and visually calm'}. Do not place the character's face or any high-contrast detail there, and do not flatten it to a uniform color. It is intentional negative space in the composition.`;
+}
+
 async function buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW, sceneH }) {
   const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
   const clothingContext = opts.clothingDescription ? `\nClothing: ${opts.clothingDescription}` : '';
   const issueContext = opts.issueContext || (opts.issueDescription ? `\nIssues to fix: ${opts.issueDescription}` : '');
-  const textPositionContext = opts.textPositionContext || '';
-  const actionContext = opts.actionContext || '';
+  const textPositionContext = opts.textPositionContext || buildTextPositionContext(opts.textPosition, opts.sceneDescription);
+  const actionContext = opts.actionContext || buildActionContext(opts.sceneDescription, charName);
 
   if (treatment === 'whiteout' && faceOnly) {
     const sharp = require('sharp');
@@ -416,10 +524,18 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   } = require('./images');
 
   // --- Axis normalisation + defaults (reproduce today's dominant path) -------
-  const model = opts.model || 'grok';
-  const faceOnly = opts.faceOnly !== undefined ? !!opts.faceOnly : (opts.treatment === 'whiteout');
-  const treatment = opts.treatment || 'whiteout';
-  const regionSource = opts.regionSource || (treatment === 'whiteout' ? 'cutout' : (treatment === 'crosshatch' && !faceOnly ? 'box' : 'cutout'));
+  const model0 = opts.model || 'grok';
+  const faceOnly0 = opts.faceOnly !== undefined ? !!opts.faceOnly : (opts.treatment === 'whiteout');
+  const treatment0 = opts.treatment || 'whiteout';
+  const regionSource0 = opts.regionSource || (treatment0 === 'whiteout' ? 'cutout' : (treatment0 === 'crosshatch' && !faceOnly0 ? 'box' : 'cutout'));
+  // Bespoke bbox-shape guards (degenerate-cutout, large-face-box) — same
+  // downgrades the legacy branches applied before picking a method.
+  const guarded = applyGeometryGuards(
+    { model: model0, faceOnly: faceOnly0, treatment: treatment0, regionSource: regionSource0 },
+    { faceBbox: opts.faceBbox, bodyBbox: opts.bodyBbox || opts.bbox }
+  );
+  if (guarded._guard) log.info(`👤 [FACE REPAIR] geometry guard applied: ${guarded._guard}`);
+  const model = guarded.model, faceOnly = guarded.faceOnly, treatment = guarded.treatment, regionSource = guarded.regionSource;
   const requireMobilesam = opts.requireMobilesam !== undefined ? !!opts.requireMobilesam : true;
   const gates = {
     styleMatch: true, iou: true, whiteCard: true, coverage: true, requireMobilesam: true, sharpness: true,
@@ -453,7 +569,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   if (treatment === 'whiteout') {
     treated = await buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, requireMobilesam, gateCoverage: gates.coverage });
   } else if (treatment === 'crosshatch') {
-    treated = await buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage: gates.coverage });
+    treated = await buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage: gates.coverage, sceneBuffer, sceneWidth: W, sceneHeight: H, protectedBodies: opts.protectedBodies, bodyBbox });
   } else if (treatment === 'blur') {
     treated = await buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCoverage: gates.coverage });
   } else {
@@ -602,6 +718,46 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// applyGeometryGuards — the bespoke bbox-shape downgrades the legacy branches
+// applied BEFORE picking a method, ported into axis space. Deterministic;
+// exposed for unit tests.
+//
+//  degenerate-cutout : a body cutout whose bbox covers >50% of the page (or is
+//                      >85% wide/tall) would repaint nearly the whole page →
+//                      downgrade cutout→box (mask-hatch only the figure region).
+//                      FAITHFULNESS-CHECK: images.js:11372-11381.
+//  large-face-box    : a "face" box covering >=60% of the body box is not a real
+//                      face box (faceBox==bodyBox) — a face BLUR would blur the
+//                      whole figure to mush → downgrade to body crosshatch.
+//                      Does NOT apply to whiteout (the face-insert whiteout marks
+//                      only the SAM head silhouette). FAITHFULNESS-CHECK:
+//                      images.js:11390-11399 + 11453-11456.
+// ---------------------------------------------------------------------------
+function applyGeometryGuards(axes, { faceBbox, bodyBbox } = {}) {
+  const out = { ...axes };
+  const bb = Array.isArray(bodyBbox) && bodyBbox.length === 4 ? bodyBbox : null;
+  if (out.regionSource === 'cutout' && !out.faceOnly && bb) {
+    const bboxW = Math.max(0, bb[3] - bb[1]);
+    const bboxH = Math.max(0, bb[2] - bb[0]);
+    if (bboxW * bboxH > 0.5 || bboxW > 0.85 || bboxH > 0.85) {
+      out.regionSource = 'box';
+      out._guard = 'degenerate-cutout→box';
+    }
+  }
+  if (out.treatment === 'blur' && out.faceOnly && Array.isArray(faceBbox) && faceBbox.length === 4 && bb) {
+    const faceArea = Math.max(0, faceBbox[2] - faceBbox[0]) * Math.max(0, faceBbox[3] - faceBbox[1]);
+    const bodyArea = Math.max(1e-6, (bb[2] - bb[0]) * (bb[3] - bb[1]));
+    if (faceArea / bodyArea >= 0.6) {
+      out.treatment = 'crosshatch';
+      out.faceOnly = false;
+      out.regionSource = 'box';
+      out._guard = 'large-face-box→body-crosshatch';
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // resolveRepairAxes — THE single place the "which axes for this issue" decision
 // lives. Replaces the scattered `useFaceOnly` derivations (images.js:8174 +
 // regeneration.js:5444). Face issue → whiteout + cutout + face; body issue →
@@ -656,4 +812,5 @@ module.exports = {
   legacyMethodAlias,
   resolveRepairAxes,
   legacyFlagsToAxes,
+  applyGeometryGuards,
 };
