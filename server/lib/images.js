@@ -4687,6 +4687,20 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
 }
 
 /**
+ * Resolve the output aspect ratio for an image-gen call: an explicit override
+ * always wins, otherwise fall back to the configured default for the target
+ * (avatar / cover / page) — all three live in one place (MODEL_DEFAULTS).
+ * Single source of truth for the block that was copy-pasted across every
+ * Grok/Gemini dispatch inside callGeminiAPIForImage.
+ */
+function resolveOutputAspect(evaluationType, aspectRatioOverride) {
+  return aspectRatioOverride
+    || (evaluationType === 'avatar' ? MODEL_DEFAULTS.avatarAspect
+        : evaluationType === 'cover' ? MODEL_DEFAULTS.coverAspect
+        : MODEL_DEFAULTS.pageAspect);
+}
+
+/**
  * Call Gemini API for image generation
  * @param {string} prompt - The image generation prompt
  * @param {string[]} characterPhotos - Character reference photos
@@ -4822,10 +4836,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     const grokModel = imageModelOverride === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
     // Aspect ratio: explicit override wins, otherwise read from MODEL_DEFAULTS
     // (pageAspect / coverAspect / avatarAspect — all configured in one place).
-    const grokAspect = aspectRatioOverride
-      || (evaluationType === 'avatar' ? MODEL_DEFAULTS.avatarAspect
-          : evaluationType === 'cover' ? MODEL_DEFAULTS.coverAspect
-          : MODEL_DEFAULTS.pageAspect);
+    const grokAspect = resolveOutputAspect(evaluationType, aspectRatioOverride);
     log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend (model: ${grokModel}, type: ${evaluationType}, aspect: ${grokAspect})`);
 
     // Truncate to Grok's prompt-length cap BEFORE the API call. Without this,
@@ -5227,10 +5238,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
       // Aspect ratio: explicit override wins, otherwise read from MODEL_DEFAULTS.
       // editWithGrok pads input refs to this aspect so the output matches.
-      const grokAspect = aspectRatioOverride
-        || (evaluationType === 'avatar' ? MODEL_DEFAULTS.avatarAspect
-            : evaluationType === 'cover' ? MODEL_DEFAULTS.coverAspect
-            : MODEL_DEFAULTS.pageAspect);
+      const grokAspect = resolveOutputAspect(evaluationType, aspectRatioOverride);
 
       // For avatars: each reference image (face, body, style sample) gets its own slot
       // For scenes: use normal packing (VB grid + landmarks + characters + scene background)
@@ -5316,10 +5324,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   const modelTemp = IMAGE_MODELS[modelId]?.temperature ?? 0.8;
   // Aspect ratio: explicit override wins, otherwise read from MODEL_DEFAULTS
   // (pageAspect / coverAspect / avatarAspect — one source of truth).
-  const geminiAspect = aspectRatioOverride
-    || (evaluationType === 'avatar' ? MODEL_DEFAULTS.avatarAspect
-        : evaluationType === 'cover' ? MODEL_DEFAULTS.coverAspect
-        : MODEL_DEFAULTS.pageAspect);
+  const geminiAspect = resolveOutputAspect(evaluationType, aspectRatioOverride);
   const requestBody = {
     ...(systemInstruction && { systemInstruction }),
     contents: [{
@@ -14814,5 +14819,8 @@ module.exports = {
 
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD,
-  MAX_MASK_COVERAGE_PERCENT
+  MAX_MASK_COVERAGE_PERCENT,
+
+  // Pure dispatch helpers (exported for unit tests / reuse)
+  resolveOutputAspect
 };
