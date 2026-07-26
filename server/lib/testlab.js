@@ -702,7 +702,6 @@ async function runCharRepairStage(ctx, opts) {
   if (opts.params?.samBlend || opts.params?.backend === 'qwen' || opts.params?.backend === 'grok') warmupFigureMask();
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
-  const { repairCharacterMismatch } = require('./images');
 
   const charName = params.characterName;
   if (!charName) throw new Error('char_repair requires params.characterName');
@@ -824,29 +823,25 @@ async function runCharRepairStage(ctx, opts) {
     if (fb?.length === 4 || bb?.length === 4) protectedNames.push(n);
   }
 
-  const t0 = Date.now();
-  const result = await repairCharacterMismatch(imageData, avatarPhoto, bbox, charName, {
-    imageBackend: backend,
-    ...(params.issueDescription ? { issueDescription: params.issueDescription } : {}),
-    clothingDescription,
-    photoType: avatarPhotoType,
-    sceneDescription: ctx.scene.sceneDescription || ctx.scene.text || '',
-    textPosition: ctx.textPosition,
-    ...(backend === 'grok' ? {
-      ...modeFlags,
-      faceBbox,
-      protectedFaces,
-      protectedBodies,
-      whiteoutTarget,
-    } : {}),
+  // Route through the unified spine (server/lib/faceRepair.js). Legacy
+  // repairMode flags + whiteoutTarget + backend → axes via legacyFlagsToAxes;
+  // the spine blends INTERNALLY through samUnionBlend, so the old post-hoc
+  // re-blend is gone. That re-blend was the testlab↔prod divergence — it stacked
+  // a SECOND samUnionBlend on TOP of the production repair's own composite, so
+  // the lab never saw what prod actually ships. Now both use the one spine.
+  const { repairCharacterFace, legacyFlagsToAxes } = require('./faceRepair');
+  const axes = legacyFlagsToAxes({
+    useBlended: modeFlags.useBlended || null,
+    useCutout: modeFlags.useCutout || null,
+    useFullScene: modeFlags.useFullScene || null,
+    whiteoutTarget,
+    hasFaceBbox: faceBbox?.length === 4,
+    model: backend,
   });
-  const elapsedMs = Date.now() - t0;
-  const repairedImage = result?.imageData || result?.repairedImage || null;
-  if (!repairedImage) throw new Error('Character repair returned no image');
 
-  // Every intermediate the repair produced, saved as tl_step test versions so
-  // the UI can show the full chain, not just the final composite. SAM round
-  // 1/2 views (region-whited + cutout) come from the shared blend below.
+  // Intermediates saved as tl_step versions so the UI shows the full chain. The
+  // spine emits its SAM round-1/2 views through this addStep (threaded into
+  // samUnionBlend), plus the treated input + model raw output below.
   const steps = [];
   const addStep = async (label, dataUri) => {
     if (typeof dataUri !== 'string' || !dataUri.startsWith('data:image')) return;
@@ -854,60 +849,29 @@ async function runCharRepairStage(ctx, opts) {
     steps.push({ label, imageType: 'tl_step', versionIndex: v });
   };
   await addStep(`input: character reference (${avatarPhotoType})`, avatarPhoto);
-  await addStep('sent to model (whiteout/crosshatch)', result?.blackoutImage || result?.comparison?.blackoutImage || result?.debug?.sceneSent);
-  await addStep('model raw output', result?.grokRawResult || result?.comparison?.grokRawResult);
 
-  // EVERY engine's output goes through the shared SAM-union blend — the
-  // production paste is never the final. Identical blending across engines;
-  // the background outside the figure union is mechanically guaranteed.
-  let finalImage = repairedImage;
-  let samBlendApplied = false;
-  {
-    const sharp = require('sharp');
-    const origBuf = Buffer.from(imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-    const candBufFull = Buffer.from(repairedImage.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-    const om = await sharp(origBuf).metadata();
-    const pad = 0.15;
-    const bw = bbox[3] - bbox[1], bh = bbox[2] - bbox[0];
-    const cx = Math.max(0, Math.round((bbox[1] - bw * pad) * om.width));
-    const cy = Math.max(0, Math.round((bbox[0] - bh * pad * 0.6) * om.height));
-    const cw = Math.min(om.width - cx, Math.round(bw * (1 + 2 * pad) * om.width));
-    const chh = Math.min(om.height - cy, Math.round(bh * (1 + 2 * pad * 0.6) * om.height));
-    const origCrop = await sharp(origBuf).extract({ left: cx, top: cy, width: cw, height: chh }).jpeg({ quality: 95 }).toBuffer();
-    // Candidate page may differ in dims (Grok preset coercion) — normalize
-    // to the original page size before cropping the same region.
-    const candCrop = await sharp(candBufFull).resize(om.width, om.height, { fit: 'fill' })
-      .extract({ left: cx, top: cy, width: cw, height: chh }).jpeg({ quality: 95 }).toBuffer();
-    const boxInCrop = [
-      Math.max(0, Math.round(bbox[1] * om.width) - cx),
-      Math.max(0, Math.round(bbox[0] * om.height) - cy),
-      Math.min(cw, Math.round(bbox[3] * om.width) - cx),
-      Math.min(chh, Math.round(bbox[2] * om.height) - cy),
-    ];
-    const failCtx = { steps, characterName: charName, bbox, boxSource, backend };
-    // Face repairs: clip the blend to the faceBox — the union must never
-    // include body pixels regardless of what SAM returns.
-    const faceClip = whiteoutTarget === 'face' && faceBbox?.length === 4 ? [
-      Math.max(0, Math.round(faceBbox[1] * om.width) - cx),
-      Math.max(0, Math.round(faceBbox[0] * om.height) - cy),
-      Math.min(cw, Math.round(faceBbox[3] * om.width) - cx),
-      Math.min(chh, Math.round(faceBbox[2] * om.height) - cy),
-    ] : null;
-    const blend = await samUnionBlend({
-      originalCropBuf: origCrop,
-      candidateCropBuf: candCrop,
-      boxInCrop,
-      cropW: cw,
-      cropH: chh,
-      addStep,
-      failCtx,
-      clipRect: faceClip,
-      maskFetcher: faceClip ? (buf) => fetchFaceHeadMask(buf, faceClip, cw, chh) : null,
-    });
-    const composed = await sharp(origBuf).composite([{ input: blend.feathered, left: cx, top: cy }]).png().toBuffer(); // PNG: lossless final
-    finalImage = `data:image/png;base64,${composed.toString('base64')}`;
-    samBlendApplied = true;
-  }
+  const t0 = Date.now();
+  const result = await repairCharacterFace(imageData, avatarPhoto, {
+    ...axes,
+    charName,
+    faceBbox: faceBbox || undefined,
+    bodyBbox: bbox,
+    ...(params.issueDescription ? { issueDescription: params.issueDescription } : {}),
+    clothingDescription,
+    photoType: avatarPhotoType,
+    sceneDescription: ctx.scene.sceneDescription || ctx.scene.text || '',
+    textPosition: ctx.textPosition,
+    protectedFaces,
+    protectedBodies,
+    addStep,
+    includeDebug: true,
+  });
+  const elapsedMs = Date.now() - t0;
+  const finalImage = result?.imageData;
+  if (!finalImage) throw new Error(`Character repair returned no image (${result?.rejectedReason || 'unknown'})`);
+
+  await addStep('sent to model (whiteout/crosshatch)', result.blackoutImage);
+  await addStep('model raw output', result.grokRawResult);
 
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, finalImage, experimentId);
   return {
@@ -915,8 +879,9 @@ async function runCharRepairStage(ctx, opts) {
     repairMode: backend === 'grok' ? repairMode : null,
     clothingCategory, avatarPhotoType,
     protectedCharacters: protectedNames.length ? protectedNames : undefined,
-    samBlend: samBlendApplied || undefined,
-    blendRule: samBlendApplied ? BLEND_RULE_VERSION : undefined,
+    samBlend: true,
+    blendRule: BLEND_RULE_VERSION,
+    descriptor: result.descriptor,
     method: result?.method || null, steps, elapsedMs,
   };
 }

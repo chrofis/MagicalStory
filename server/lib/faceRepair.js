@@ -533,6 +533,9 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       cropW: crop.w,
       cropH: crop.h,
       oldMaskPng: oldMaskPng || null,
+      // Test Lab threads an addStep so the shared blend emits its SAM round-1/2
+      // views into the run timeline; production omits it (no-op default).
+      ...(typeof opts.addStep === 'function' ? { addStep: opts.addStep } : {}),
       failCtx: {},
       maskFetcher: (faceOnly && oldMaskPng) ? async (buf) => {
         const r2Body = r2BodyBox || bodyBoxInCrop;
