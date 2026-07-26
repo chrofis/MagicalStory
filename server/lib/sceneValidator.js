@@ -641,7 +641,7 @@ async function repairScene(sceneJson, imageDescription, compositionIssues) {
   });
 
   // Call Claude to generate the repair
-  const result = await callTextModel(repairPrompt, 4000, null, { prefill: '{', usageLabel: 'scene_validation' });
+  const result = await callTextModel(repairPrompt, 4000, MODEL_DEFAULTS.sceneValidationRepair || null, { prefill: '{', usageLabel: 'scene_validation' });
 
   const elapsed = Date.now() - startTime;
   const text = result.text;

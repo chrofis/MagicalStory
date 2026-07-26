@@ -398,10 +398,13 @@ logged in decisions.md).
 **Action:** #3 is autonomous-safe (explicit cheap override on two utility calls);
 #1 needs the dead-code reconciliation first; #2 needs a conversion A/B.
 
-**Status:** 🟢 audit done. **OWNER DECISION 2026-07-25: DOWNGRADE** the two silent-
-Sonnet utility calls (scene_validation `sceneValidator.js:644`, scene_rewrite
-`images.js:4673`) → explicit cheap-model override. QUEUED (touches images.js →
-after the face-repair merge). #1 (text_check) + #2 (story_ideas) still pending.
+**Status:** ✅ **#3 SHIPPED to staging (2026-07-26).** scene_validation +
+scene_rewrite now take explicit `MODEL_DEFAULTS.sceneValidationRepair` /
+`MODEL_DEFAULTS.sceneRewrite` overrides, both defaulting to `gemini-2.5-flash`
+(env-overridable via `SCENE_VALIDATION_MODEL` / `SCENE_REWRITE_MODEL`). Prefill-
+compatible, always-available, ~10× cheaper than Sonnet. Logged in decisions.md.
+#1 (text_check — needs dead-code reconciliation) + #2 (story_ideas — needs a
+conversion A/B) still pending.
 
 ---
 

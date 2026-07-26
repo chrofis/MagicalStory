@@ -172,6 +172,14 @@ const MODEL_DEFAULTS = {
                                        // compareImageStyles/analyzeImageStyle/VB-utility call
                                        // was failing with it.
 
+  // Two rescue-path utility calls DOWNGRADED off Sonnet (owner decision 2026-07-26,
+  // Pt 9 "Downgrade them"). Both are cheap structured tasks (JSON scene repair /
+  // safety rewrite of a blocked scene), not story prose — Sonnet was overkill.
+  // gemini-2.5-flash is the always-available utility tier and supports the JSON
+  // prefill both callers use. Env-overridable for a no-deploy flip on staging.
+  sceneValidationRepair: process.env.SCENE_VALIDATION_MODEL || 'gemini-2.5-flash', // sceneValidator.repairScene JSON fix
+  sceneRewrite: process.env.SCENE_REWRITE_MODEL || 'gemini-2.5-flash',             // rewriteBlockedScene safety rewrite
+
   // DEAD CONFIG (audit 2026-07-09): only read by the never-wired mask-inpaint
   // dispatcher (inpaintWithMask etc. in images.js — see DEAD CODE banners).
   // Live inpaint dispatches via IMAGE_MODELS[pageImage].backend instead.

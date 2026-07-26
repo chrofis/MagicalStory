@@ -4670,7 +4670,7 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
       SCENE_DESCRIPTION: sceneDescription
     });
 
-    const rewriteResult = await callTextModel(rewritePrompt, 1000, null, { usageLabel: 'scene_rewrite' });
+    const rewriteResult = await callTextModel(rewritePrompt, 1000, MODEL_DEFAULTS.sceneRewrite || null, { usageLabel: 'scene_rewrite' });
     const rewrittenScene = rewriteResult.text;
 
     // Log token usage

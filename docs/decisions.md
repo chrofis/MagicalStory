@@ -2068,3 +2068,26 @@ post-hoc re-blend deleted), `server/lib/repairLogic.js` (decideRepairMethod
 emits repairParams), `server/routes/regeneration.js` (manual route axes),
 `tests/manual/faceRepair-geometry.test.js` (new, 29 assertions),
 `docs/face-repair-merge-design.md` (status).
+
+## Two rescue-path utility calls downgraded off Sonnet (2026-07-26)
+**Context:** `sceneValidator.repairScene` (JSON scene-repair after a composition
+check) and `rewriteBlockedScene` (safety rewrite of a scene the image model
+refused) both called `callTextModel(..., null, ...)`, defaulting to the global
+`claude-sonnet`. Neither writes story prose — one emits a small structured JSON
+patch, the other paraphrases one scene sentence to dodge a safety filter. Sonnet
+was overkill for both, and they sit on rescue paths that can fire several times
+per story.
+**Decision:** Route both through named, env-overridable config keys
+(`MODEL_DEFAULTS.sceneValidationRepair`, `MODEL_DEFAULTS.sceneRewrite`) that
+default to `gemini-2.5-flash` — the always-available utility tier. Passed as the
+explicit `modelOverride` arg so the downgrade is visible at the call site, not a
+global default flip. (Owner Pt 9, "Downgrade them.")
+**Rationale:** gemini-2.5-flash is ~an order of magnitude cheaper than Sonnet,
+always available (GEMINI_API_KEY), and supports the JSON `prefill: '{'` seed both
+callers rely on (Gemini seeds a `model`-role turn — see callGeminiTextAPI). Env
+overrides (`SCENE_VALIDATION_MODEL`, `SCENE_REWRITE_MODEL`) allow a no-deploy flip
+back to Sonnet on staging if quality regresses. story prose stages (idea/outline/
+storyText/sceneDescription) are untouched — they stay on Sonnet.
+**Touched:** `server/config/models.js` (two new keys), `server/lib/sceneValidator.js`
+(repairScene override), `server/lib/images.js` (rewriteBlockedScene override).
+**Status:** ✅ active
