@@ -2295,3 +2295,27 @@ test (69 assertions, full truth tables + boundary lengths + exact log strings).
 `tests/manual/test-images-dispatch-helpers.js` (new).
 **Status:** ✅ local (branch `images-cluster-dedup`) — parse-checked + unit-verified; PENDING
 staging smoke test (real Grok/Gemini/Runware page + cover + avatar generation, since no live API here).
+
+## Dead post-repair verifier `verifyRepairImprovement` deleted, not wired (2026-07-26)
+**Context:** `entityConsistency.js` carried a self-contained ~230-line cluster —
+`verifyRepairImprovement` (a post-repair gate: border/background-stability check
++ a Gemini "is the AFTER crop actually closer to the reference than BEFORE, any
+artifacts?" comparison) plus its private helpers `extractBorderRegions`,
+`computeImageDifference` and the constants `VERIFICATION_MODEL` /
+`MAX_BACKGROUND_DIFF`. It was exported but had ZERO call sites anywhere (verified
+by exhaustive grep across server/ + client/) — wired-but-never-fires legacy from
+an older repair architecture.
+**Decision:** deleted the whole cluster (function + 4 self-contained helpers +
+3 exports), rather than wiring it into the production repair path.
+**Rationale:** (1) The face-repair merge (see the 5→3 spine entry above) already
+enforces strong gates on every repair — IoU, white-card, style-match, coverage,
+sharpness — in one shared spine; a second, separate, UNCALIBRATED gate
+(`MAX_BACKGROUND_DIFF=30` was never tuned against real repairs) is exactly the
+"incomplete gate bolted on the side" pattern we're trying to eliminate. (2)
+Keeping dead, exported, uncalibrated gate code around invites a future caller to
+wire it blind. (3) It's fully recoverable from git history. If a semantic
+"did-the-repair-actually-improve" check is wanted, the correct shape is a
+Test-Lab-first A/B stage (like the Pt 10 style-repair path), rebuilt with
+calibrated thresholds — not this resurrected as-is.
+**Touched:** `server/lib/entityConsistency.js` (−~233 lines: cluster + exports).
+**Status:** ✅ active

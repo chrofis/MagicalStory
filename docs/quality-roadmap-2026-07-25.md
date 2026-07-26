@@ -181,7 +181,11 @@ must be merged", 2026-07-25).
 - ⏳ #1 image-gen entry (`callGeminiAPIForImage` vs `generateImageOnly`),
   #2 Grok truncation, #3 aspect-resolve ×4, #4 aspect-snap ×4, #7 mask-fetcher —
   all `images.js`; QUEUED behind face-repair (same file), done sequentially on top.
-- ⏳ dead `verifyRepairImprovement` trio — decide wire-or-delete.
+- ✅ dead `verifyRepairImprovement` trio — DELETED (2026-07-26). Zero call sites,
+  uncalibrated `MAX_BACKGROUND_DIFF`, superseded by the face-repair spine's gates.
+  Removed function + 4 self-contained helpers + 3 exports (−233 lines). Recoverable
+  from git; rebuild as a Test-Lab A/B if semantic repair-verification is wanted.
+  Logged in decisions.md.
 
 All agent work commits to worktrees and is NOT auto-promoted — each diff +
 faithfulness list reviewed before it goes to staging; each needs a Test Lab / staging
