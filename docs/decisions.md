@@ -2255,3 +2255,43 @@ STORY_STAGES registration), `server/routes/admin/testlab.js` (story-level redo d
 `docs/image-generation-methods.html`, `docs/prompt-inventory.md`.
 **Status:** ✅ local (branch `pt10-style-repair-lab`) — unit-verified; PENDING staging Test Lab run of the
 `style_repair` stage on a story with a known style outlier (live Gemini+Grok repaint + style-match gate).
+
+## images.js dispatch de-dup — 3 shared helpers, entry functions left separate (2026-07-26)
+**Context:** `server/lib/images.js` is the hottest path in the codebase (every page/cover/avatar
+image flows through it) and has TWO large image-gen entry functions — `callGeminiAPIForImage`
+(gen + eval, 17 positional params) and `generateImageOnly` (gen-only, options object, separate
+`genonly_` cache namespace) — that dispatch to Grok/Gemini/Runware with duplicated inner logic.
+Roadmap "images.js cluster" flagged 4 duplications (#1 gen-entry, #2 truncation, #3/#4 aspect,
+#7 mask-fetcher). Cannot be runtime-tested here (no live API; native `sharp` absent), so the bar
+was byte-faithful behavior-preserving extraction, not a rewrite.
+**Decision:** Extract the DUPLICATED INNER LOGIC into pure shared helpers both entry functions
+call; do NOT force-merge the two public entry functions (genuinely different responsibilities +
+signatures). Three helpers added, all exported for unit testing:
+- **`resolveOutputAspect(evaluationType, aspectRatioOverride)`** (#3/#4) — replaced 3 identical
+  copies inside `callGeminiAPIForImage`. Returns the same string for every input combo.
+- **`truncatePromptForModel(prompt, max, logLabel, modelName?)`** (#2) — unified 4 hand-rolled
+  prompt-cap blocks (Grok + Gemini paths × both entry functions). Optional `modelName` reproduces
+  the `for <model>` suffix that 3 sites logged and the gen-only Gemini site omitted; the
+  Gemini-path `parts[0]` side effect stays at the call site via `result !== prompt`.
+- **`extractDataImageUrls(characterPhotos)`** (#1) — unified 5 copies of the
+  characterPhotos→data:image filter (4 Runware branches + the Grok avatar branch).
+**Deliberately left separate (documented, not merged):**
+- The two entry functions' bodies past the shared filters — eval vs gen-only, `genonly_` cache
+  namespace, `padInputWithExtension`/`textAreaMask` packing, and return shapes genuinely differ.
+- `generateImageOnly`'s aspect default (`CONFIG_DEFAULTS.pageAspect`, no evaluationType branch) and
+  `editImageWithPrompt`'s (`measuredAspect || override || pageAspect`) — different expressions, not
+  the resolveOutputAspect shape.
+- The per-site truncation `max` (Grok 7500 vs Gemini/Runware 30000) — computed by each caller.
+- **#7 mask-fetcher:** already centralized — the repair path routes through one injected
+  `fetchFigureMaskPng`; the only other `/figure-mask` POST (`_mobilesamMaskFull`) is the detection
+  path with a different contract (returns a binarized mask object, body `{image, box}` only, no
+  rembg fallback). No merge; only the truly-identical plumbing (the base64 data-URI decode) is
+  shared in spirit, not worth an indirection across the two differently-shaped callers.
+**Rationale:** One implementation to fix instead of 2-5 copies (owner's actual concern), while
+keeping blast radius controlled on an untestable hot path. No entry-function signature changed
+(all callers align unchanged); helpers are pure and proven equivalent by a source-extraction unit
+test (69 assertions, full truth tables + boundary lengths + exact log strings).
+**Touched:** `server/lib/images.js` (3 helpers + call-site swaps + exports),
+`tests/manual/test-images-dispatch-helpers.js` (new).
+**Status:** ✅ local (branch `images-cluster-dedup`) — parse-checked + unit-verified; PENDING
+staging smoke test (real Grok/Gemini/Runware page + cover + avatar generation, since no live API here).
