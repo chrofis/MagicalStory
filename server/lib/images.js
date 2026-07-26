@@ -10030,113 +10030,25 @@ async function repairCharacterMismatch(imageData, characterPhoto, bbox, charName
     return repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options);
   }
 
-  // Default: Gemini repair
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('Gemini API key not configured');
-  }
-
-  const [ymin, xmin, ymax, xmax] = bbox;
-  log.info(`👤 [CHAR REPAIR] Starting character replacement for ${charName} at bbox [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}]`);
-
-  // Extract base64 from both images
-  const currentBase64 = r2Lib.stripDataUriPrefix(imageData);
-  const avatarBase64 = r2Lib.stripDataUriPrefix(characterPhoto);
-
-  // Build issue context if provided
-  const issueDescription = options.issueDescription || '';
-  const issueContext = issueDescription
-    ? `\nSPECIFIC ISSUE: ${issueDescription}\n`
-    : '';
-
-  // Calculate region description for spatial awareness
-  const regionWidth = Math.round((xmax - xmin) * 100);
-  const regionHeight = Math.round((ymax - ymin) * 100);
-  const centerX = Math.round(((xmin + xmax) / 2) * 100);
-  const centerY = Math.round(((ymin + ymax) / 2) * 100);
-  const horizontalPos = centerX < 33 ? 'left side' : centerX > 66 ? 'right side' : 'center';
-  const verticalPos = centerY < 33 ? 'upper' : centerY > 66 ? 'lower' : 'middle';
-  const regionDesc = `${verticalPos} ${horizontalPos}`;
-
-  const prompt = fillTemplate(LOCAL_PROMPTS.characterRepairGemini, {
-    REGION_DESC: regionDesc,
-    CHAR_NAME: charName,
-    ISSUE_CONTEXT: issueContext,
-    REGION_WIDTH: regionWidth,
-    REGION_HEIGHT: regionHeight,
-    CENTER_X: centerX,
-    CENTER_Y: centerY,
+  // Default: Gemini repair — folded into the unified spine as model:'gemini'
+  // (Stage 5). This was the last no-gate verbatim path: an ungated full-scene
+  // Gemini repaint with no mask and no blend. It now flows through the SAME
+  // treatment + samUnionBlend + gate battery (style-match / IoU / white-card /
+  // coverage / sharpness) as grok and qwen. Axes come from the ONE central rule.
+  const { repairCharacterFace, resolveRepairAxes } = require('./faceRepair');
+  const geminiAxes = resolveRepairAxes(options.issueDescription, {
+    hasFaceBbox: Array.isArray(options.faceBbox) && options.faceBbox.length === 4,
+    forceTarget: (options.whiteoutTarget === 'face' || options.whiteoutTarget === 'body') ? options.whiteoutTarget : null,
+    model: 'gemini',
   });
-
-  // Build parts: prompt, reference image (IMAGE 1), scene to fix (IMAGE 2)
-  const parts = [
-    { text: prompt },
-    { text: `IMAGE 1 — ${charName} reference (CORRECT appearance):` },
-    { inline_data: { mime_type: 'image/jpeg', data: avatarBase64 } },
-    { text: `IMAGE 2 — Scene to fix (character at ${regionDesc} has WRONG face):` },
-    { inline_data: { mime_type: 'image/jpeg', data: currentBase64 } }
-  ];
-
-  // Character repair always uses a Gemini image model (pageImage may be Grok)
-  const defaultPageImage = MODEL_DEFAULTS.pageImage || '';
-  const modelId = defaultPageImage.startsWith('gemini') ? defaultPageImage : 'gemini-2.5-flash-image';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-
-  const systemInstruction = getImageSystemInstruction();
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(120000),
-    body: JSON.stringify({
-      ...(systemInstruction && { systemInstruction }),
-      contents: [{ parts }],
-      generationConfig: {
-        responseModalities: ["TEXT", "IMAGE"],
-        temperature: 0.7,  // Moderate temperature to encourage actual changes while staying faithful
-        ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } })
-      }
-    })
+  return repairCharacterFace(imageData, characterPhoto, {
+    ...options,
+    ...geminiAxes,
+    charName,
+    bbox,
+    bodyBbox: bbox,
+    faceBbox: options.faceBbox,
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    log.error('❌ [CHAR REPAIR] Gemini API error:', error);
-    throw new Error(`Character replacement failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-
-  // Extract usage
-  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-  const thinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
-  log.debug(`📊 [CHAR REPAIR] Token usage - input: ${inputTokens}, output: ${outputTokens}${thinkingTokens ? `, thinking: ${thinkingTokens}` : ''}`);
-
-  // Extract thinking text
-  const thinkingText = extractThinkingFromParts(data.candidates?.[0]?.content?.parts, 'CHAR REPAIR');
-
-  // Extract the generated image
-  if (data.candidates && data.candidates[0]?.content?.parts) {
-    for (const part of data.candidates[0].content.parts) {
-      const inlineData = part.inlineData || part.inline_data;
-      if (inlineData && inlineData.data) {
-        const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
-        const repairedImageData = `data:${respMimeType};base64,${inlineData.data}`;
-        log.info(`✅ [CHAR REPAIR] Character replacement for ${charName} completed successfully`);
-        return {
-          imageData: repairedImageData,
-          comparison: { before: imageData, after: repairedImageData },
-          character: charName,
-          usage: { inputTokens, outputTokens, thinkingTokens, model: modelId },
-          thinkingText,
-          method: 'character_replacement'
-        };
-      }
-    }
-  }
-
-  log.warn('⚠️ [CHAR REPAIR] No image in response');
-  return { imageData: null, character: charName, method: 'character_replacement' };
 }
 
 /**
