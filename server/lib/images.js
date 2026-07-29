@@ -11067,6 +11067,82 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
 }
 
 /**
+ * Composite routing for the shared image path.
+ *
+ * `composite` is a first-class OPTION on generateImageWithQualityRetry, not a
+ * cover-only fork. When `options.composite === true` AND the landmark-buffer
+ * prerequisite is met, the image is produced by the manual-composite + 2-pass
+ * Grok pipeline (`generateCoverViaComposite`) instead of the normal direct
+ * generate+eval path, and returned in an imageResult-shaped object marked
+ * `composite:true`. The composite result skips quality eval (score null) —
+ * identical to the behaviour before this became a shared-path option.
+ *
+ * Returns null to signal "run the normal direct generate+eval path". That
+ * happens in three cases, each byte-identical to the previous cover fork:
+ *   1. composite not requested (the DEFAULT — every page image; pages never set
+ *      the option, so they skip this entirely and are unaffected),
+ *   2. composite requested but the landmark-buffer prerequisite is missing
+ *      (invented-location fallback → direct render with location prose),
+ *   3. the composite generator threw (fall back to direct).
+ *
+ * Gated on the OPTION VALUE, never on evaluationType — a page COULD opt in
+ * (owner principle: covers and images share one code path, composite is just an
+ * option that is ON for covers and OFF for pages). Defaults differ, code does not.
+ *
+ * @param {Object} options - the generateImageWithQualityRetry options bag
+ * @param {Function|null} usageTracker - forwarded to the composite generator
+ * @param {string} pageLabel - log prefix
+ * @returns {Promise<Object|null>} composite imageResult, or null → run direct path
+ */
+async function _maybeGenerateComposite(options, usageTracker = null, pageLabel = '') {
+  if (!options || options.composite !== true) return null;
+  const ci = options.compositeInputs || {};
+  // Composite requires a real background plate (the landmark buffer). Without
+  // one, pass 2 (the photo-protection edit) is skipped and the path degrades to
+  // figures-on-white — so covers for invented/landmark-less locations fall back
+  // to the direct render, whose location prose drives the backdrop directly.
+  if (!ci.landmarkBuf) {
+    log.info(`🎨 [QUALITY RETRY] ${pageLabel}composite requested but no landmark buffer — using normal generation`);
+    return null;
+  }
+  try {
+    const { generateCoverViaComposite } = require('./coverComposite');
+    const compositeResult = await generateCoverViaComposite({
+      coverKey: ci.coverKey,
+      characters: ci.characters,
+      coverHint: ci.coverHint,
+      sceneDescription: ci.sceneDescription,
+      vbGrid: ci.vbGrid,
+      landmarkBuf: ci.landmarkBuf,
+      sceneBackground: ci.sceneBackground,
+      artStyle: ci.artStyle,
+      title: ci.title,
+      dedication: ci.dedication,
+      styleHint: ci.styleHint,
+      usageTracker,
+      visualBible: ci.visualBible,
+      orient: ci.orient || 'frontal',
+    });
+    log.info(`🎨 [QUALITY RETRY] ${pageLabel}composite-cover generated (modelId=${compositeResult.modelId})`);
+    return {
+      composite: true,
+      imageData: compositeResult.imageData,
+      score: null, // composite path skips quality eval — returns immediately
+      reasoning: 'composite-cover (no quality eval)',
+      modelId: compositeResult.modelId,
+      totalAttempts: compositeResult.totalAttempts || 1,
+      prompt: compositeResult.prompt,
+      usage: { cost: 0.04, direct_cost: 0.04 }, // 2 Grok edits
+      grokRefImages: null,
+      compositeDebug: compositeResult.debug,
+    };
+  } catch (err) {
+    log.warn(`⚠️ [QUALITY RETRY] ${pageLabel}composite path failed: ${err.message} — falling back to normal path`);
+    return null;
+  }
+}
+
+/**
  * Generate image with automatic retry if quality score is below threshold
  * Stores all attempts for dev mode viewing
  * @param {string} prompt - The image generation prompt
@@ -11159,6 +11235,16 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     log.debug(`🔍 [QUALITY RETRY] Check-only mode: MAX_ATTEMPTS=1, autoRepair=OFF, incrementalDryRun=ON`);
   }
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
+
+  // Composite is an OPTION on this shared path. When set (covers pass it via
+  // iterateCover; pages never do → default off) and the landmark prerequisite
+  // is met, route to the composite generator and return immediately — no eval,
+  // no retry, exactly as the previous cover-only fork did. Absent/false → null,
+  // and the normal direct generate+eval path below runs byte-unchanged.
+  {
+    const compositeResult = await _maybeGenerateComposite(options, usageTracker, pageLabel);
+    if (compositeResult) return compositeResult;
+  }
 
   // Extract page number from pageContext for cache key uniqueness
   const pageMatch = pageContext.match(/PAGE\s*(\d+)/i);
@@ -14435,6 +14521,7 @@ module.exports = {
   callGeminiAPIForImage,
   editImageWithPrompt,
   generateImageWithQualityRetry,
+  _maybeGenerateComposite,
   rewriteBlockedScene,
   buildVisualBibleGrid,
   buildEmptySceneVbGrid,
