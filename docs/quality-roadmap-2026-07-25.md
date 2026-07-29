@@ -616,11 +616,21 @@ resolver, ONE scene-then-figure repair order — then every fix lands everywhere
    story never rendered watercolor; the in-function default (never reached) now
    derives from `artStyle` anyway.
 
-**Structural (the marquee item, IN PROGRESS 2026-07-26):** merge the two image-gen
-entry functions `callGeminiAPIForImage` (eval path) + `generateImageOnly` (no-eval,
-`genonly_` cache) — they re-implement the same Grok/Gemini/Runware dispatch ladder.
-Extracting a shared `_dispatchImageGeneration` core (both become thin wrappers;
-eval + cache namespaces preserved). Owner: "this must be fixed."
+**Structural (marquee item — ✅ SHIPPED to staging 2026-07-29, `6597fc4a`):** the two
+image-gen entry functions `callGeminiAPIForImage` (eval path) + `generateImageOnly`
+(no-eval, `genonly_` cache) now share ONE `_dispatchImageGeneration` core (the full
+Grok/Gemini/Runware ladder); both are thin wrappers. Signatures, both cache
+namespaces, and per-branch return shapes preserved byte-for-byte → 17 callers
+unchanged. Differences parameterized via opts (`verbose`, `usePadExtension`,
+`avatarMode`, `outputAspect`, `defaultModel`, `includeSceneBackgroundPart`, …).
+The terminal Gemini fetch stays per-wrapper (eval = single-shot+recordUsage;
+gen-only = 3-level sanitization retry). images.js −267 lines; 53 new + 69 existing
+assertions pass. **Pending staging smoke test:** real Grok/Gemini/Runware/avatar/
+empty-scene gens (dispatch args unit-proven identical; image bytes need live check).
+**5 latent divergences found + preserved (not fixed):** routed branches don't cache;
+mislabeled "in generateImageOnly" log strings; avatar-eval-skip inconsistent per
+branch; routed vs primary eval-shape differ; missing GEMINI_API_KEY throws even for
+non-Gemini models. Each is a separate follow-up if wanted.
 
 **Structural — covers = normal images, one code path (QUEUED behind the entry-fn
 merge; owner 2026-07-26):** now that cover TEXT is app-side (`composeCover`, not
