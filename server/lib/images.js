@@ -4736,6 +4736,376 @@ function extractDataImageUrls(characterPhotos) {
 }
 
 /**
+ * Shared provider-dispatch core for the two image-gen entry functions
+ * (`callGeminiAPIForImage` — eval path — and `generateImageOnly` — gen-only).
+ *
+ * Owns the ENTIRE Grok→Gemini→Runware selection ladder that both used to
+ * re-implement in parallel: backend resolution, primary Runware, primary Grok,
+ * Gemini `parts` construction, model-id resolution + prompt truncation,
+ * model-routed Runware, model-routed Grok, and the non-Gemini→Gemini model swap.
+ * It performs the actual provider API call for the Runware/Grok branches and
+ * invokes `onImageReady`, but does NO quality eval and NO caching — those stay
+ * in the wrappers so each keeps its own cache namespace and result shape.
+ *
+ * Returns one of:
+ *   - a RAW generation result for a Runware/Grok branch:
+ *       { provider, imageData, modelId, usage, packedRefs, promptSent }
+ *     provider ∈ 'runware-primary' | 'grok-primary' | 'runware-routed' | 'grok-routed'
+ *   - a Gemini fallback SENTINEL when no upstream provider produced an image:
+ *       { provider: 'gemini', parts, modelId, effectivePrompt }
+ *     The wrapper runs its own terminal Gemini fetch — the two differ (gen-only
+ *     runs a 3-level sanitization retry loop; the eval path is a single-shot
+ *     fallback that also calls recordImageApiUsage), so that one branch is not
+ *     shared. Everything up to it (parts already built, model id resolved +
+ *     swapped, prompt truncated) is done here.
+ *
+ * Every place the two original ladders differed is a documented `opts` field
+ * each wrapper passes its own value for, so behavior is byte-preserved.
+ */
+async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {}) {
+  const {
+    logLabel,                            // 'IMAGE GEN' | 'IMAGE GEN-ONLY'
+    verbose = false,                     // eval path: verbose logs + per-photo hash log + model name in truncate warning
+    previousImage = null,
+    imageModelOverride = null,
+    imageBackendOverride = null,
+    landmarkPhotos = [],
+    visualBibleGrid = null,
+    sceneBackground = null,
+    textAreaMask = null,                 // gen-only threads this into primary-Grok packReferences
+    onImageReady = null,
+    outputAspect,                        // pre-resolved aspect (eval: resolveOutputAspect(evalType, override); gen-only: aspectRatio option)
+    evaluationType = null,               // used only for the primary-Grok log line (eval path)
+    grokPrimaryModel,                    // eval path honors pro override; gen-only forces STANDARD
+    grokPrimaryModelKey,                 // key for maxPromptLength lookup ('grok-imagine' | override)
+    usePadExtension = false,             // gen-only pads scene-plate slot 0 (both Grok branches)
+    avatarMode = false,                  // eval path avatar-slices refs in model-routed Grok
+    pageLabel = '',                      // Grok packReferences pageLabel
+    defaultModel,                        // eval path cover-aware; gen-only pageImage
+    includeSceneBackgroundPart = false,  // gen-only adds a [Background] Gemini part
+  } = opts;
+
+  // Whether slot-0 scene plates get magenta-extension padding (gen-only only).
+  const slot0IsScenePlate = usePadExtension && !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
+
+  // Priority: override param > CONFIG_DEFAULTS > 'gemini'
+  const imageBackend = imageBackendOverride || CONFIG_DEFAULTS?.imageBackend || 'gemini';
+  if (verbose) {
+    log.info(`🎨 [${logLabel}] Backend: ${imageBackend} (override=${imageBackendOverride || 'none'}, default=${CONFIG_DEFAULTS?.imageBackend || 'gemini'})`);
+  } else {
+    log.info(`🎨 [${logLabel}] Backend: ${imageBackend}`);
+  }
+
+  // ── Primary Runware (cheap FLUX Schnell) ──────────────────────────────────
+  if (imageBackend === 'runware' && isRunwareConfigured()) {
+    log.info(`🎨 [${logLabel}] Using Runware FLUX Schnell backend${verbose ? ' (cheap testing mode)' : ''}`);
+    try {
+      const referenceImages = extractDataImageUrls(characterPhotos);
+      const result = await generateWithRunware(prompt, {
+        model: RUNWARE_MODELS.FLUX_SCHNELL,
+        width: 1024,
+        height: 1024,
+        steps: 4,
+        referenceImages: referenceImages
+      });
+      if (onImageReady && result.imageData) {
+        try { await onImageReady(result.imageData, result.modelId); }
+        catch (callbackError) { log.error(`⚠️ [${logLabel}] onImageReady callback error:`, callbackError.message); }
+      }
+      return { provider: 'runware-primary', imageData: result.imageData, modelId: result.modelId, usage: result.usage, packedRefs: referenceImages, promptSent: prompt };
+    } catch (runwareError) {
+      log.error(verbose
+        ? `❌ [RUNWARE] Generation failed, falling back to Gemini: ${runwareError.message}`
+        : `❌ [${logLabel}] Runware failed, falling back to Gemini: ${runwareError.message}`);
+      // Fall through to Gemini
+    }
+  }
+
+  // ── Primary Grok Imagine ──────────────────────────────────────────────────
+  if (imageBackend === 'grok' && isGrokConfigured()) {
+    const grokModel = grokPrimaryModel;
+    const grokAspect = outputAspect;
+    log.info(`🎨 [${logLabel}] Using Grok Imagine backend (model: ${grokModel}${verbose ? `, type: ${evaluationType}, aspect: ${grokAspect}` : ''})`);
+
+    // Truncate to Grok's prompt-length cap BEFORE the API call.
+    const grokMaxPrompt = IMAGE_MODELS[grokPrimaryModelKey]?.maxPromptLength || 7500;
+    const grokPrompt = truncatePromptForModel(prompt, grokMaxPrompt, logLabel, grokModel);
+
+    try {
+      const refImages = await packReferences(
+        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask },
+        { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate }
+      );
+
+      let result;
+      if (refImages.length > 0) {
+        result = await editWithGrok(grokPrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate });
+      } else {
+        result = await generateWithGrok(grokPrompt, { model: grokModel, aspectRatio: grokAspect });
+      }
+
+      if (onImageReady && result.imageData) {
+        try { await onImageReady(result.imageData, result.modelId); }
+        catch (callbackError) { log.error(`⚠️ [${logLabel}] onImageReady callback error:`, callbackError.message); }
+      }
+
+      return { provider: 'grok-primary', imageData: result.imageData, modelId: result.modelId, usage: result.usage, packedRefs: refImages, promptSent: grokPrompt };
+    } catch (grokError) {
+      log.error(verbose
+        ? `❌ [GROK] Generation failed, falling back to Gemini: ${grokError.message}`
+        : `❌ [${logLabel}] Grok failed, falling back to Gemini: ${grokError.message}`);
+      // Fall through to Gemini
+    }
+  }
+
+  // ── Build Gemini parts array (PROMPT FIRST, then images in order) ──────────
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Gemini API key not configured');
+  }
+
+  const hasSequentialImage = previousImage && previousImage.startsWith('data:image');
+  const parts = [{ text: prompt }];
+  let currentImageIndex = 1;
+
+  // Sequential mode: cropped PREVIOUS scene image first (continuity anchor).
+  if (hasSequentialImage) {
+    const croppedImage = await cropImageForSequential(previousImage);
+    const base64Data = r2Lib.stripDataUriPrefix(croppedImage);
+    const mimeType = croppedImage.match(/^data:(image\/\w+);base64,/) ?
+      croppedImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+    parts.push({ text: `[Previous scene]:` });
+    parts.push({ inline_data: { mime_type: mimeType, data: base64Data } });
+    currentImageIndex++;
+    log.debug(verbose
+      ? `🖼️  [${logLabel}] Added cropped previous scene image for visual continuity (SEQUENTIAL MODE)`
+      : `🖼️  [${logLabel}] Added cropped previous scene image (SEQUENTIAL MODE)`);
+  }
+
+  // Scene background reference (empty scene for style anchoring) — gen-only.
+  if (includeSceneBackgroundPart && sceneBackground && sceneBackground.startsWith('data:image')) {
+    const bgBase64 = r2Lib.stripDataUriPrefix(sceneBackground);
+    const bgMime = sceneBackground.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+    parts.push({ text: `[Background]:` });
+    parts.push({ inline_data: { mime_type: bgMime, data: bgBase64 } });
+    currentImageIndex++;
+    log.debug(`🖼️ [${logLabel}] Added scene background reference`);
+  }
+
+  // Character photos as reference images (compressed + cached for token efficiency).
+  if (characterPhotos && characterPhotos.length > 0) {
+    let addedCount = 0;
+    let skippedCount = 0;
+    let cacheHits = 0;
+    const characterNames = [];
+    const apiImageHashes = [];  // verbose-only debug artifact
+
+    for (const photoData of characterPhotos) {
+      let photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+      if (photoUrl && typeof photoUrl === 'object') {
+        if (Array.isArray(photoUrl)) {
+          photoUrl = photoUrl[0];
+        } else if (photoUrl.data) {
+          photoUrl = photoUrl.data;
+        } else if (photoUrl.imageData) {
+          photoUrl = photoUrl.imageData;
+        }
+      }
+      const characterName = typeof photoData === 'object' ? photoData?.name : null;
+      const providedHash = typeof photoData === 'object' ? photoData?.photoHash : null;
+
+      if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
+        const imageHash = hashImageData(photoUrl);
+        let compressedBase64 = compressedRefCache.get(imageHash);
+        if (compressedBase64) {
+          cacheHits++;
+        } else {
+          const compressed = await compressImageToJPEG(photoUrl, 85, 768);
+          compressedBase64 = r2Lib.stripDataUriPrefix(compressed);
+          compressedRefCache.set(imageHash, compressedBase64);
+        }
+
+        if (verbose) {
+          apiImageHashes.push({
+            name: characterName || `photo_${addedCount + 1}`,
+            hash: imageHash,
+            matchesProvided: providedHash ? imageHash === providedHash : null
+          });
+        }
+
+        // IMPORTANT: Do NOT use numbered format like [Image 1 - Name] as it triggers "character sheet" generation
+        const labelName = characterName || `Character ${addedCount + 1}`;
+        parts.push({ text: `[${labelName}]:` });
+        if (characterName) {
+          characterNames.push(characterName);
+        }
+        parts.push({ inline_data: { mime_type: 'image/jpeg', data: compressedBase64 } });
+        currentImageIndex++;
+        addedCount++;
+      } else {
+        skippedCount++;
+        if (verbose) {
+          const charLabel = characterName ? `"${characterName}"` : `#${addedCount + skippedCount}`;
+          const preview = photoUrl
+            ? (typeof photoUrl === 'string' ? photoUrl.substring(0, 30) : `[object: ${Object.keys(photoUrl).join(',')}]`)
+            : 'null/undefined';
+          log.warn(`[${logLabel}] Skipping character ${charLabel}: invalid photoUrl (${preview}...)`);
+        }
+      }
+    }
+
+    if (verbose && apiImageHashes.length > 0) {
+      log.debug(`🔐 [${logLabel}] API image hashes:`, apiImageHashes.map(h => `${h.name}:${h.hash}`).join(', '));
+    }
+    if (characterNames.length > 0) {
+      log.debug(`🖼️  [${logLabel}] Added ${addedCount} LABELED reference images: ${characterNames.join(', ')} (${cacheHits} cached)`);
+    } else if (verbose) {
+      log.debug(`🖼️  [${logLabel}] Added ${addedCount}/${characterPhotos.length} character reference images (${cacheHits} cached)`);
+    }
+    if (verbose && skippedCount > 0) {
+      log.warn(`[${logLabel}] WARNING: ${skippedCount} photos were SKIPPED (not base64 data URLs)`);
+    }
+  }
+
+  // Primary landmark reference photo only (1st landmark as separate image).
+  if (landmarkPhotos && landmarkPhotos.length > 0) {
+    const primaryLandmark = landmarkPhotos[0];
+    const candidates = [primaryLandmark.photoUrl, primaryLandmark.photoData].filter(s => typeof s === 'string' && s.length > 0);
+    if (candidates.length > 0) {
+      let buf = null;
+      for (const source of candidates) {
+        try { buf = await r2Lib.bytesFromAnyImage(source); if (buf) break; } catch { /* try next */ }
+      }
+      if (buf) {
+        parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
+        parts.push({ inline_data: { mime_type: 'image/jpeg', data: buf.toString('base64') } });
+        currentImageIndex++;
+        log.info(`🌍 [${logLabel}] Added primary landmark reference: ${primaryLandmark.name}`);
+        if (verbose && landmarkPhotos.length > 1) {
+          log.debug(`🌍 [${logLabel}] ${landmarkPhotos.length - 1} secondary landmark(s) excluded (should be in VB grid)`);
+        }
+      } else {
+        log.warn(verbose
+          ? `⚠️ [${logLabel}] Landmark "${primaryLandmark.name}": failed to load bytes — skipping`
+          : `⚠️ [${logLabel}] Landmark "${primaryLandmark.name}": failed to load bytes from any source — skipping`);
+      }
+    } else {
+      log.warn(verbose
+        ? `⚠️ [${logLabel}] Landmark "${primaryLandmark.name}" has no photoData — skipping`
+        : `⚠️ [${logLabel}] Landmark "${primaryLandmark.name}" has no source — skipping`);
+    }
+  }
+
+  // Visual Bible reference grid (secondary chars, animals, artifacts, vehicles, 2nd+ landmarks).
+  if (visualBibleGrid) {
+    parts.push({ text: `[Reference Grid (objects, secondary characters, locations)]:` });
+    parts.push({ inline_data: { mime_type: 'image/jpeg', data: visualBibleGrid.toString('base64') } });
+    currentImageIndex++;
+    log.info(verbose
+      ? `🔲 [${logLabel}] Added Visual Bible reference grid (${Math.round(visualBibleGrid.length / 1024)}KB)`
+      : `🔲 [${logLabel}] Added Visual Bible reference grid`);
+  }
+
+  if (verbose) {
+    log.debug(`🔍 [${logLabel}] Parts array structure: ${parts.map((p, i) =>
+      p.text ? `[${i}] text(${p.text.length}ch)` :
+      p.inline_data ? `[${i}] image(${p.inline_data.mime_type})` : `[${i}] unknown`
+    ).join(', ')}`);
+  }
+
+  // ── Resolve model id + truncate to its cap ────────────────────────────────
+  let modelId = imageModelOverride || defaultModel;
+  if (verbose && imageModelOverride) {
+    log.debug(`🔧 [${logLabel}] Using model override: ${modelId}`);
+  }
+
+  const modelConfig = IMAGE_MODELS[modelId];
+  const maxPromptLength = modelConfig?.maxPromptLength || 30000;
+  const effectivePrompt = truncatePromptForModel(prompt, maxPromptLength, logLabel, verbose ? modelId : null);
+  if (effectivePrompt !== prompt) {
+    parts[0] = { text: effectivePrompt };
+  }
+
+  // ── Model-routed Runware (model config says backend='runware') ────────────
+  if (modelConfig?.backend === 'runware' && isRunwareConfigured()) {
+    log.info(verbose
+      ? `🎨 [${logLabel}] Model ${modelId} uses Runware backend - routing to Runware`
+      : `🎨 [${logLabel}] Model ${modelId} uses Runware backend`);
+    try {
+      const runwareModel = modelId === 'flux-dev' ? RUNWARE_MODELS.FLUX_DEV : RUNWARE_MODELS.FLUX_SCHNELL;
+      const referenceImages = extractDataImageUrls(characterPhotos);
+      const result = await generateWithRunware(effectivePrompt, {
+        model: runwareModel,
+        width: 1024,
+        height: 1024,
+        steps: modelId === 'flux-dev' ? 30 : 4,
+        referenceImages: referenceImages
+      });
+      if (onImageReady && result.imageData) {
+        try { await onImageReady(result.imageData, result.modelId); }
+        catch (callbackError) { log.error(`⚠️ [${logLabel}] onImageReady callback error:`, callbackError.message); }
+      }
+      return { provider: 'runware-routed', imageData: result.imageData, modelId: result.modelId, usage: result.usage, packedRefs: referenceImages, promptSent: effectivePrompt };
+    } catch (runwareError) {
+      log.error(`❌ [${logLabel}] Runware generation failed:`, runwareError.message);
+      throw runwareError;
+    }
+  }
+
+  // ── Model-routed Grok (model config says backend='grok') ──────────────────
+  if (modelConfig?.backend === 'grok' && isGrokConfigured()) {
+    log.info(verbose
+      ? `🎨 [${logLabel}] Model ${modelId} uses Grok backend - routing to Grok`
+      : `🎨 [${logLabel}] Model ${modelId} uses Grok backend`);
+    try {
+      const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
+      const grokAspect = outputAspect;
+
+      // Avatars: each reference (face, body, style) as its own slot; scenes: normal packing.
+      let refImages;
+      if (avatarMode && characterPhotos?.length > 0) {
+        refImages = extractDataImageUrls(characterPhotos.slice(0, 3));
+        log.info(`🎨 [GROK] Avatar mode: ${refImages.length} reference images as separate slots`);
+      } else {
+        refImages = await packReferences(
+          { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
+          { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate }
+        );
+      }
+
+      let result;
+      if (refImages.length > 0) {
+        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: grokAspect, padInputWithExtension: slot0IsScenePlate });
+      } else {
+        result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio: grokAspect });
+      }
+
+      if (onImageReady && result.imageData) {
+        try { await onImageReady(result.imageData, result.modelId); } catch (e) { /* ignore */ }
+      }
+
+      return { provider: 'grok-routed', imageData: result.imageData, modelId: result.modelId, usage: result.usage, packedRefs: refImages, promptSent: effectivePrompt };
+    } catch (grokError) {
+      log.error(`❌ [${logLabel}] Grok generation failed (model-routed), falling back to Gemini: ${grokError.message}`);
+      // Fall through to Gemini below
+    }
+  }
+
+  // If modelId points at a non-Gemini backend (Grok/Runware) we reached here
+  // via the fallback path — swap to a known-good Gemini image model so the
+  // URL the wrapper builds is valid.
+  if (IMAGE_MODELS[modelId]?.backend && IMAGE_MODELS[modelId].backend !== 'gemini') {
+    const originalModelId = modelId;
+    modelId = 'gemini-2.5-flash-image';
+    log.warn(`🔄 [${logLabel}] Fallback: swapped model ${originalModelId} → ${modelId} for Gemini API call`);
+  }
+
+  // Gemini fallback sentinel — parts built, model resolved + swapped, prompt
+  // truncated. The wrapper runs its own terminal Gemini fetch (they differ).
+  return { provider: 'gemini', parts, modelId, effectivePrompt };
+}
+
+/**
  * Call Gemini API for image generation
  * @param {string} prompt - The image generation prompt
  * @param {string[]} characterPhotos - Character reference photos
@@ -4774,564 +5144,194 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   log.debug(`🆕 [IMAGE CACHE] MISS - key: ${cacheKey.substring(0, 16)}...`);
 
-  // Check if we should use Runware backend (for cheap testing with FLUX Schnell)
-  // Priority: override param > CONFIG_DEFAULTS > 'gemini'
-  const imageBackend = imageBackendOverride || CONFIG_DEFAULTS?.imageBackend || 'gemini';
-  log.info(`🎨 [IMAGE GEN] Backend: ${imageBackend} (override=${imageBackendOverride || 'none'}, default=${CONFIG_DEFAULTS?.imageBackend || 'gemini'})`);
-  if (imageBackend === 'runware' && isRunwareConfigured()) {
-    log.info(`🎨 [IMAGE GEN] Using Runware FLUX Schnell backend (cheap testing mode)`);
+  // Aspect ratio: explicit override wins, otherwise read from MODEL_DEFAULTS
+  // (pageAspect / coverAspect / avatarAspect — all configured in one place).
+  const outputAspect = resolveOutputAspect(evaluationType, aspectRatioOverride);
 
-    try {
-      // Extract photo URLs for reference images
-      const referenceImages = extractDataImageUrls(characterPhotos);
+  // Shared provider-dispatch ladder (Runware/Grok/Gemini selection + reference
+  // packing + truncation + aspect + onImageReady). See _dispatchImageGeneration.
+  const raw = await _dispatchImageGeneration(prompt, characterPhotos, {
+    logLabel: 'IMAGE GEN',
+    verbose: true,
+    previousImage,
+    imageModelOverride,
+    imageBackendOverride,
+    landmarkPhotos,
+    visualBibleGrid,
+    sceneBackground,
+    textAreaMask: null,
+    onImageReady,
+    outputAspect,
+    evaluationType,
+    // Honour the caller's model selection (imageModelOverride) — pro override → PRO.
+    grokPrimaryModel: imageModelOverride === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD,
+    grokPrimaryModelKey: imageModelOverride || 'grok-imagine',
+    usePadExtension: false,
+    avatarMode: evaluationType === 'avatar',
+    pageLabel: pageNumber != null ? String(pageNumber) : pageContext,
+    defaultModel: evaluationType === 'cover' ? MODEL_DEFAULTS.coverImage : MODEL_DEFAULTS.pageImage,
+    includeSceneBackgroundPart: false,
+  });
 
-      // Pass all reference images (prompt already limits character count)
-      const result = await generateWithRunware(prompt, {
-        model: RUNWARE_MODELS.FLUX_SCHNELL,
-        width: 1024,
-        height: 1024,
-        steps: 4,
-        referenceImages: referenceImages
-      });
+  // Same 9-arg quality eval every non-avatar branch ran inline before.
+  const runEval = () => evaluateImageQuality(
+    raw.imageData, prompt, characterPhotos, evaluationType,
+    qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters
+  );
 
-      // Call onImageReady callback for progressive display
-      if (onImageReady && result.imageData) {
-        try {
-          await onImageReady(result.imageData, result.modelId);
-        } catch (callbackError) {
-          log.error('⚠️ [IMAGE GEN] onImageReady callback error:', callbackError.message);
-        }
-      }
-
-      // Evaluate quality using Gemini (still needed for consistency checking)
-      const qualityResult = await evaluateImageQuality(
-        result.imageData,
-        prompt,              // originalPrompt (string)
-        characterPhotos,     // referenceImages (array)
-        evaluationType,
-        qualityModelOverride,
-        pageContext,
-        storyText,
-        sceneHint,
-        sceneCharacters      // Enables STEP 2C head-to-body proportion check
-      );
-      if (!qualityResult) {
-        log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Runware) — returning image with score=null so pipeline can re-evaluate next round`);
-      }
-
-      const finalResult = {
-        imageData: result.imageData,
-        modelId: result.modelId,
-        score: qualityResult?.score ?? null,
-        // Distinguish "no opinion" from "eval failed". Null score + evaluated:false
-        // tells findBadPages to redo the page instead of silently shipping it
-        // because the eval call timed out / blew up.
-        evaluated: !!qualityResult,
-        evalError: qualityResult ? null : 'evaluator returned no result',
-        reasoning: qualityResult?.reasoning ?? null,
-        detectedProblems: qualityResult?.detectedProblems || [],
-        figures: qualityResult?.figures || [],
-        matches: qualityResult?.matches || [],
-        objectMatches: qualityResult?.object_matches || [],
-        fixTargets: qualityResult?.fixTargets || [],
-        fixableIssues: qualityResult?.fixableIssues || [],
-        semanticResult: qualityResult?.semanticResult || null,
-        semanticScore: qualityResult?.semanticScore ?? null,
-        issuesSummary: qualityResult?.issuesSummary || null,
-        verdict: qualityResult?.verdict || null,
-        usage: result.usage
-      };
-
-      // Cache the result
-      imageCache.set(cacheKey, finalResult);
-      log.debug(`💾 [IMAGE CACHE] Stored (${imageCache.size}/${IMAGE_CACHE_MAX_SIZE})`);
-
-      return finalResult;
-    } catch (runwareError) {
-      log.error(`❌ [RUNWARE] Generation failed, falling back to Gemini: ${runwareError.message}`);
-      // Fall through to Gemini
+  // ── Primary Runware branch: eval + big shape, cache ───────────────────────
+  if (raw.provider === 'runware-primary') {
+    const qualityResult = await runEval();
+    if (!qualityResult) {
+      log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Runware) — returning image with score=null so pipeline can re-evaluate next round`);
     }
+    const finalResult = {
+      imageData: raw.imageData,
+      modelId: raw.modelId,
+      score: qualityResult?.score ?? null,
+      // Distinguish "no opinion" from "eval failed". Null score + evaluated:false
+      // tells findBadPages to redo the page instead of silently shipping it
+      // because the eval call timed out / blew up.
+      evaluated: !!qualityResult,
+      evalError: qualityResult ? null : 'evaluator returned no result',
+      reasoning: qualityResult?.reasoning ?? null,
+      detectedProblems: qualityResult?.detectedProblems || [],
+      figures: qualityResult?.figures || [],
+      matches: qualityResult?.matches || [],
+      objectMatches: qualityResult?.object_matches || [],
+      fixTargets: qualityResult?.fixTargets || [],
+      fixableIssues: qualityResult?.fixableIssues || [],
+      semanticResult: qualityResult?.semanticResult || null,
+      semanticScore: qualityResult?.semanticScore ?? null,
+      issuesSummary: qualityResult?.issuesSummary || null,
+      verdict: qualityResult?.verdict || null,
+      usage: raw.usage
+    };
+    imageCache.set(cacheKey, finalResult);
+    log.debug(`💾 [IMAGE CACHE] Stored (${imageCache.size}/${IMAGE_CACHE_MAX_SIZE})`);
+    return finalResult;
   }
 
-  // Check if we should use Grok Imagine backend
-  if (imageBackend === 'grok' && isGrokConfigured()) {
-    // Honour the caller's model selection (imageModelOverride / MODEL_DEFAULTS.coverImage / pageImage).
-    // Previously this branch hardcoded Pro for covers regardless of routing — and because
-    // it returned `usage:` instead of `imageUsage:`, the cost tracker at
-    // generateImageWithQualityRetry never saw it, so 3× $0.07 cover gens silently
-    // disappeared from the per-story cost report.
-    const grokModel = imageModelOverride === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-    // Aspect ratio: explicit override wins, otherwise read from MODEL_DEFAULTS
-    // (pageAspect / coverAspect / avatarAspect — all configured in one place).
-    const grokAspect = resolveOutputAspect(evaluationType, aspectRatioOverride);
-    log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend (model: ${grokModel}, type: ${evaluationType}, aspect: ${grokAspect})`);
-
-    // Truncate to Grok's prompt-length cap BEFORE the API call. Without this,
-    // iterate-mode prompts with appended feedback bullets cross 8000 chars
-    // and fail with `Prompt length exceeds the maximum allowed length of 8000`,
-    // forcing a fallback to Gemini. The Gemini-path code at line ~3785 already
-    // truncates, but only AFTER Grok has already failed.
-    const grokModelKey = imageModelOverride || (imageModelOverride === 'grok-imagine-pro' ? 'grok-imagine-pro' : 'grok-imagine');
-    const grokMaxPrompt = IMAGE_MODELS[grokModelKey]?.maxPromptLength || 7500;
-    const grokPrompt = truncatePromptForModel(prompt, grokMaxPrompt, 'IMAGE GEN', grokModel);
-
-    try {
-      const refImages = await packReferences(
-        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
-        { aspectRatio: grokAspect, pageLabel: pageNumber != null ? String(pageNumber) : pageContext }
-      );
-
-      let result;
-      if (refImages.length > 0) {
-        result = await editWithGrok(grokPrompt, refImages, { model: grokModel, aspectRatio: grokAspect });
-      } else {
-        result = await generateWithGrok(grokPrompt, { model: grokModel, aspectRatio: grokAspect });
-      }
-
-      // Call onImageReady callback for progressive display
-      if (onImageReady && result.imageData) {
-        try {
-          await onImageReady(result.imageData, result.modelId);
-        } catch (callbackError) {
-          log.error('⚠️ [IMAGE GEN] onImageReady callback error:', callbackError.message);
-        }
-      }
-
-      // Skip quality evaluation for avatar conversions (just style transfer)
-      if (evaluationType === 'avatar') {
-        log.debug(`⏭️ [QUALITY] Skipping quality evaluation for Grok avatar conversion`);
-        const finalResult = {
-          imageData: result.imageData,
-          modelId: result.modelId,
-          score: null,
-          reasoning: null,
-          imageUsage: result.usage,
-          usage: result.usage
-        };
-        imageCache.set(cacheKey, finalResult);
-        return finalResult;
-      }
-
-      // Evaluate quality using Gemini
-      const qualityResult = await evaluateImageQuality(
-        result.imageData,
-        prompt,
-        characterPhotos,
-        evaluationType,
-        qualityModelOverride,
-        pageContext,
-        storyText,
-        sceneHint,
-        sceneCharacters   // 9th arg enables STEP-2C head-to-body proportion check;
-                          // was omitted here so the check was silently OFF on the
-                          // production default (imageBackend:'grok'), while the
-                          // Runware (5187) and model-routed Grok (5263) siblings ran it.
-      );
-      if (!qualityResult) {
-        log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Grok backend) — returning image with score=null so pipeline can re-evaluate next round`);
-      }
-
+  // ── Primary Grok branch: avatar skip OR eval + big shape, cache ───────────
+  if (raw.provider === 'grok-primary') {
+    // Skip quality evaluation for avatar conversions (just style transfer)
+    if (evaluationType === 'avatar') {
+      log.debug(`⏭️ [QUALITY] Skipping quality evaluation for Grok avatar conversion`);
       const finalResult = {
-        imageData: result.imageData,
-        modelId: result.modelId,
-        score: qualityResult?.score ?? null,
-        // Distinguish "no opinion" from "eval failed". Null score + evaluated:false
-        // tells findBadPages to redo the page instead of silently shipping it
-        // because the eval call timed out / blew up.
-        evaluated: !!qualityResult,
-        evalError: qualityResult ? null : 'evaluator returned no result',
-        reasoning: qualityResult?.reasoning ?? null,
-        detectedProblems: qualityResult?.detectedProblems || [],
-        figures: qualityResult?.figures || [],
-        matches: qualityResult?.matches || [],
-        objectMatches: qualityResult?.object_matches || [],
-        fixTargets: qualityResult?.fixTargets || [],
-        fixableIssues: qualityResult?.fixableIssues || [],
-        semanticResult: qualityResult?.semanticResult || null,
-        semanticScore: qualityResult?.semanticScore ?? null,
-        issuesSummary: qualityResult?.issuesSummary || null,
-        verdict: qualityResult?.verdict || null,
-        // `imageUsage` is the field generateImageWithQualityRetry's tracker reads.
-        // The legacy `usage:` field stays for any direct callers of this function.
-        imageUsage: result.usage,
-        qualityUsage: qualityResult?.usage ?? null,
-        qualityModelId: qualityResult?.qualityModelId ?? null,
-        usage: result.usage,
-        grokRefImages: refImages.length > 0 ? refImages : undefined,
-        // Prompt actually sent (may be truncated to Grok's max) — completes
-        // the reconstruction record next to the refs.
-        prompt: grokPrompt,
+        imageData: raw.imageData,
+        modelId: raw.modelId,
+        score: null,
+        reasoning: null,
+        imageUsage: raw.usage,
+        usage: raw.usage
       };
-
       imageCache.set(cacheKey, finalResult);
-      log.debug(`💾 [IMAGE CACHE] Stored (${imageCache.size}/${IMAGE_CACHE_MAX_SIZE})`);
-
       return finalResult;
-    } catch (grokError) {
-      log.error(`❌ [GROK] Generation failed, falling back to Gemini: ${grokError.message}`);
-      // Fall through to Gemini
     }
+
+    const qualityResult = await runEval();
+    if (!qualityResult) {
+      log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Grok backend) — returning image with score=null so pipeline can re-evaluate next round`);
+    }
+    const finalResult = {
+      imageData: raw.imageData,
+      modelId: raw.modelId,
+      score: qualityResult?.score ?? null,
+      evaluated: !!qualityResult,
+      evalError: qualityResult ? null : 'evaluator returned no result',
+      reasoning: qualityResult?.reasoning ?? null,
+      detectedProblems: qualityResult?.detectedProblems || [],
+      figures: qualityResult?.figures || [],
+      matches: qualityResult?.matches || [],
+      objectMatches: qualityResult?.object_matches || [],
+      fixTargets: qualityResult?.fixTargets || [],
+      fixableIssues: qualityResult?.fixableIssues || [],
+      semanticResult: qualityResult?.semanticResult || null,
+      semanticScore: qualityResult?.semanticScore ?? null,
+      issuesSummary: qualityResult?.issuesSummary || null,
+      verdict: qualityResult?.verdict || null,
+      // `imageUsage` is the field generateImageWithQualityRetry's tracker reads.
+      // The legacy `usage:` field stays for any direct callers of this function.
+      imageUsage: raw.usage,
+      qualityUsage: qualityResult?.usage ?? null,
+      qualityModelId: qualityResult?.qualityModelId ?? null,
+      usage: raw.usage,
+      grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined,
+      // Prompt actually sent (may be truncated to Grok's max).
+      prompt: raw.promptSent,
+    };
+    imageCache.set(cacheKey, finalResult);
+    log.debug(`💾 [IMAGE CACHE] Stored (${imageCache.size}/${IMAGE_CACHE_MAX_SIZE})`);
+    return finalResult;
   }
 
-  // Call Gemini API for image generation with optional character reference images
+  // ── Model-routed Runware branch: eval + shape (no cache, matches original) ─
+  if (raw.provider === 'runware-routed') {
+    const qualityResult = await runEval();
+    if (!qualityResult) {
+      log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Runware in generateImageOnly) — returning image with score=null so pipeline can re-evaluate next round`);
+    }
+    return {
+      imageData: raw.imageData,
+      modelId: raw.modelId,
+      score: qualityResult?.score ?? null,
+      numericScore: qualityResult?.numericScore ?? null,
+      reasoning: qualityResult?.reasoning ?? null,
+      verdict: qualityResult?.verdict ?? null,
+      fixTargets: qualityResult?.fixTargets ?? [],
+      fixableIssues: qualityResult?.fixableIssues || [],
+      semanticResult: qualityResult?.semanticResult || null,
+      semanticScore: qualityResult?.semanticScore ?? null,
+      issuesSummary: qualityResult?.issuesSummary || null,
+      qualityModelId: qualityResult?.qualityModelId ?? null,
+      imageUsage: raw.usage,
+      qualityUsage: qualityResult?.usage ?? null,
+      // Reconstruction record (see Gemini/Grok branches).
+      prompt: raw.promptSent,
+      grokRefImages: raw.packedRefs?.length > 0 ? raw.packedRefs : undefined
+    };
+  }
+
+  // ── Model-routed Grok branch: eval + shape (no cache, matches original) ────
+  if (raw.provider === 'grok-routed') {
+    const qualityResult = await runEval();
+    if (!qualityResult) {
+      log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Grok in generateImageOnly) — returning image with score=null so pipeline can re-evaluate next round`);
+    }
+    return {
+      imageData: raw.imageData,
+      modelId: raw.modelId,
+      score: qualityResult?.score ?? null,
+      numericScore: qualityResult?.numericScore ?? null,
+      reasoning: qualityResult?.reasoning ?? null,
+      verdict: qualityResult?.verdict ?? null,
+      fixTargets: qualityResult?.fixTargets ?? [],
+      fixableIssues: qualityResult?.fixableIssues || [],
+      semanticResult: qualityResult?.semanticResult || null,
+      semanticScore: qualityResult?.semanticScore ?? null,
+      issuesSummary: qualityResult?.issuesSummary || null,
+      qualityModelId: qualityResult?.qualityModelId ?? null,
+      imageUsage: raw.usage,
+      qualityUsage: qualityResult?.usage ?? null,
+      // Exact packed references sent to Grok (for dev-mode "Sent to Grok" display).
+      grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined,
+      // Prompt actually sent (may be truncated to the model's max).
+      prompt: raw.promptSent,
+    };
+  }
+
+  // ── Gemini fallback: terminal single-shot fetch + eval (eval-path only) ────
+  // The core already built `parts`, resolved + swapped `modelId`, and truncated
+  // the prompt. This block reproduces the eval path's ORIGINAL Gemini generator:
+  // one withRetry fetch, recordImageApiUsage, rich refusal-error extraction, and
+  // the avatar-skip early return — deliberately NOT shared with generateImageOnly's
+  // sanitization-retry-loop Gemini generator (they are different generators).
+  const { parts, modelId, effectivePrompt } = raw;
   const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('Gemini API key not configured');
-  }
-
-  // Determine if we have a previous scene image (for sequential mode)
-  const hasSequentialImage = previousImage && previousImage.startsWith('data:image');
-
-  // Build parts array: PROMPT FIRST, then images in order
-  const parts = [{ text: prompt }];
-
-  // Track image index for numbered labels (matches the reference map in the prompt)
-  let currentImageIndex = 1;
-
-  // For sequential mode: Add PREVIOUS scene image FIRST (most important for continuity)
-  // Crop the image slightly to change aspect ratio - this forces AI to regenerate
-  // rather than copying too much from the reference image
-  if (hasSequentialImage) {
-    // Crop 15% from top and bottom to change aspect ratio
-    const croppedImage = await cropImageForSequential(previousImage);
-
-    const base64Data = r2Lib.stripDataUriPrefix(croppedImage);
-    const mimeType = croppedImage.match(/^data:(image\/\w+);base64,/) ?
-      croppedImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
-
-    // Add label for sequential mode (avoid numbered format)
-    parts.push({ text: `[Previous scene]:` });
-    parts.push({
-      inline_data: {
-        mime_type: mimeType,
-        data: base64Data
-      }
-    });
-    currentImageIndex++;
-    log.debug(`🖼️  [IMAGE GEN] Added cropped previous scene image for visual continuity (SEQUENTIAL MODE)`);
-  }
-
-  // Add character photos as reference images (compressed and cached for token efficiency)
-  // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
-  if (characterPhotos && characterPhotos.length > 0) {
-    let addedCount = 0;
-    let skippedCount = 0;
-    let cacheHits = 0;
-    const characterNames = [];
-    const apiImageHashes = [];  // Track hashes of images actually sent to API
-
-    for (const photoData of characterPhotos) {
-      // Handle both formats: string URL or {name, photoUrl} object
-      let photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-      // Handle various legacy formats
-      if (photoUrl && typeof photoUrl === 'object') {
-        if (Array.isArray(photoUrl)) {
-          photoUrl = photoUrl[0];
-        } else if (photoUrl.data) {
-          photoUrl = photoUrl.data;
-        } else if (photoUrl.imageData) {
-          photoUrl = photoUrl.imageData;
-        }
-      }
-      const characterName = typeof photoData === 'object' ? photoData?.name : null;
-      const providedHash = typeof photoData === 'object' ? photoData?.photoHash : null;
-
-      if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
-        // Check cache first using hash of original image
-        const imageHash = hashImageData(photoUrl);
-        let compressedBase64 = compressedRefCache.get(imageHash);
-
-        if (compressedBase64) {
-          cacheHits++;
-        } else {
-          // Compress and cache (768px for image gen - slightly larger than quality eval)
-          const compressed = await compressImageToJPEG(photoUrl, 85, 768);
-          compressedBase64 = r2Lib.stripDataUriPrefix(compressed);
-          compressedRefCache.set(imageHash, compressedBase64);
-        }
-
-        // Calculate hash of the compressed data being sent to API
-        apiImageHashes.push({
-          name: characterName || `photo_${addedCount + 1}`,
-          hash: imageHash,
-          matchesProvided: providedHash ? imageHash === providedHash : null
-        });
-
-        // Add name label BEFORE the image (matches reference map in prompt)
-        // IMPORTANT: Do NOT use numbered format like [Image 1 - Name] as it triggers "character sheet" generation
-        const labelName = characterName || `Character ${addedCount + 1}`;
-        parts.push({ text: `[${labelName}]:` });
-        if (characterName) {
-          characterNames.push(characterName);
-        }
-
-        parts.push({
-          inline_data: {
-            mime_type: 'image/jpeg',
-            data: compressedBase64
-          }
-        });
-        currentImageIndex++;
-        addedCount++;
-      } else {
-        skippedCount++;
-        // Bug #10 fix: Log character name for skipped photos to help diagnose issues
-        const charLabel = characterName ? `"${characterName}"` : `#${addedCount + skippedCount}`;
-        const preview = photoUrl
-          ? (typeof photoUrl === 'string' ? photoUrl.substring(0, 30) : `[object: ${Object.keys(photoUrl).join(',')}]`)
-          : 'null/undefined';
-        log.warn(`[IMAGE GEN] Skipping character ${charLabel}: invalid photoUrl (${preview}...)`);
-      }
-    }
-
-    // Log hashes of images being sent to API
-    if (apiImageHashes.length > 0) {
-      log.debug(`🔐 [IMAGE GEN] API image hashes:`, apiImageHashes.map(h => `${h.name}:${h.hash}`).join(', '));
-    }
-
-    if (characterNames.length > 0) {
-      log.debug(`🖼️  [IMAGE GEN] Added ${addedCount} LABELED reference images: ${characterNames.join(', ')} (${cacheHits} cached)`);
-    } else {
-      log.debug(`🖼️  [IMAGE GEN] Added ${addedCount}/${characterPhotos.length} character reference images (${cacheHits} cached)`);
-    }
-    if (skippedCount > 0) {
-      log.warn(`[IMAGE GEN] WARNING: ${skippedCount} photos were SKIPPED (not base64 data URLs)`);
-    }
-  }
-
-  // Add PRIMARY landmark reference photo only (1st landmark as separate image)
-  // Secondary landmarks (2nd+) go into the Visual Bible grid instead.
-  // Accepts photoUrl (R2 URL post-Phase-2) OR photoData (legacy / curated
-  // upload). Try URL first; fall back to inline data when the URL can't be
-  // loaded (e.g. synthetic magicalstory:// schemes from tell-curated upload).
-  if (landmarkPhotos && landmarkPhotos.length > 0) {
-    const primaryLandmark = landmarkPhotos[0];
-    const candidates = [primaryLandmark.photoUrl, primaryLandmark.photoData].filter(s => typeof s === 'string' && s.length > 0);
-    if (candidates.length > 0) {
-      let buf = null;
-      for (const source of candidates) {
-        try { buf = await r2Lib.bytesFromAnyImage(source); if (buf) break; } catch { /* try next */ }
-      }
-      if (buf) {
-        parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
-        parts.push({
-          inline_data: {
-            mime_type: 'image/jpeg',
-            data: buf.toString('base64')
-          }
-        });
-        currentImageIndex++;
-        log.info(`🌍 [IMAGE GEN] Added primary landmark reference: ${primaryLandmark.name}`);
-        if (landmarkPhotos.length > 1) {
-          log.debug(`🌍 [IMAGE GEN] ${landmarkPhotos.length - 1} secondary landmark(s) excluded (should be in VB grid)`);
-        }
-      } else {
-        log.warn(`⚠️ [IMAGE GEN] Landmark "${primaryLandmark.name}": failed to load bytes — skipping`);
-      }
-    } else {
-      log.warn(`⚠️ [IMAGE GEN] Landmark "${primaryLandmark.name}" has no photoData — skipping`);
-    }
-  }
-
-  // Add Visual Bible reference grid (combines secondary chars, animals, artifacts, vehicles, 2nd+ landmarks)
-  if (visualBibleGrid) {
-    parts.push({ text: `[Reference Grid (objects, secondary characters, locations)]:` });
-    parts.push({
-      inline_data: {
-        mime_type: 'image/jpeg',
-        data: visualBibleGrid.toString('base64')
-      }
-    });
-    currentImageIndex++;
-    log.info(`🔲 [IMAGE GEN] Added Visual Bible reference grid (${Math.round(visualBibleGrid.length / 1024)}KB)`);
-  }
-
-  // Log parts array structure for verification (text first, then images)
-  log.debug(`🔍 [IMAGE GEN] Parts array structure: ${parts.map((p, i) =>
-    p.text ? `[${i}] text(${p.text.length}ch)` :
-    p.inline_data ? `[${i}] image(${p.inline_data.mime_type})` : `[${i}] unknown`
-  ).join(', ')}`);
-
-  // Use model override if provided, otherwise default based on type:
-  // - Covers: Gemini 3 Pro Image (higher quality)
-  // - Scenes: Gemini 2.5 Flash Image (faster)
-  const defaultModel = evaluationType === 'cover' ? MODEL_DEFAULTS.coverImage : MODEL_DEFAULTS.pageImage;
-  // let — may be swapped to a Gemini model below if we reach the Gemini
-  // branch via a Grok/Runware fallback.
-  let modelId = imageModelOverride || defaultModel;
-  if (imageModelOverride) {
-    log.debug(`🔧 [IMAGE GEN] Using model override: ${modelId}`);
-  }
-
-  // Check if the selected model is a Runware model (flux-schnell, flux-dev)
-  const modelConfig = IMAGE_MODELS[modelId];
-
-  // Truncate prompt if needed based on model's maxPromptLength
-  const maxPromptLength = modelConfig?.maxPromptLength || 30000;
-  const effectivePrompt = truncatePromptForModel(prompt, maxPromptLength, 'IMAGE GEN', modelId);
-  if (effectivePrompt !== prompt) {
-    // Update parts array with truncated prompt for Gemini path
-    parts[0] = { text: effectivePrompt };
-  }
-
-  if (modelConfig?.backend === 'runware' && isRunwareConfigured()) {
-    log.info(`🎨 [IMAGE GEN] Model ${modelId} uses Runware backend - routing to Runware`);
-
-    try {
-      // Determine which Runware model to use
-      const runwareModel = modelId === 'flux-dev' ? RUNWARE_MODELS.FLUX_DEV : RUNWARE_MODELS.FLUX_SCHNELL;
-
-      // Extract photo URLs for reference images
-      const referenceImages = extractDataImageUrls(characterPhotos);
-
-      const result = await generateWithRunware(effectivePrompt, {
-        model: runwareModel,
-        width: 1024,
-        height: 1024,
-        steps: modelId === 'flux-dev' ? 30 : 4,
-        referenceImages: referenceImages  // No limit - prompt controls character count
-      });
-
-      // Call onImageReady callback for progressive display
-      if (onImageReady && result.imageData) {
-        try {
-          await onImageReady(result.imageData, result.modelId);
-        } catch (callbackError) {
-          log.error('⚠️ [IMAGE GEN] onImageReady callback error:', callbackError.message);
-        }
-      }
-
-      // Evaluate quality using Gemini
-      const qualityResult = await evaluateImageQuality(
-        result.imageData,
-        prompt,              // originalPrompt (string)
-        characterPhotos,     // referenceImages (array)
-        evaluationType,
-        qualityModelOverride,
-        pageContext,
-        storyText,
-        sceneHint,
-        sceneCharacters      // Enables STEP 2C head-to-body proportion check
-      );
-      if (!qualityResult) {
-        log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Runware in generateImageOnly) — returning image with score=null so pipeline can re-evaluate next round`);
-      }
-
-      return {
-        imageData: result.imageData,
-        modelId: result.modelId,
-        score: qualityResult?.score ?? null,
-        numericScore: qualityResult?.numericScore ?? null,
-        reasoning: qualityResult?.reasoning ?? null,
-        verdict: qualityResult?.verdict ?? null,
-        fixTargets: qualityResult?.fixTargets ?? [],
-        fixableIssues: qualityResult?.fixableIssues || [],
-        semanticResult: qualityResult?.semanticResult || null,
-        semanticScore: qualityResult?.semanticScore ?? null,
-        issuesSummary: qualityResult?.issuesSummary || null,
-        qualityModelId: qualityResult?.qualityModelId ?? null,
-        imageUsage: result.usage,
-        qualityUsage: qualityResult?.usage ?? null,
-        // Reconstruction record (see Gemini/Grok branches).
-        prompt: effectivePrompt,
-        grokRefImages: referenceImages?.length > 0 ? referenceImages : undefined
-      };
-    } catch (runwareError) {
-      log.error('❌ [IMAGE GEN] Runware generation failed:', runwareError.message);
-      throw runwareError;
-    }
-  }
-
-  // Route to Grok if model config says so
-  if (modelConfig?.backend === 'grok' && isGrokConfigured()) {
-    log.info(`🎨 [IMAGE GEN] Model ${modelId} uses Grok backend - routing to Grok`);
-
-    try {
-      const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-      // Aspect ratio: explicit override wins, otherwise read from MODEL_DEFAULTS.
-      // editWithGrok pads input refs to this aspect so the output matches.
-      const grokAspect = resolveOutputAspect(evaluationType, aspectRatioOverride);
-
-      // For avatars: each reference image (face, body, style sample) gets its own slot
-      // For scenes: use normal packing (VB grid + landmarks + characters + scene background)
-      let refImages;
-      if (evaluationType === 'avatar' && characterPhotos?.length > 0) {
-        refImages = extractDataImageUrls(characterPhotos.slice(0, 3));
-        log.info(`🎨 [GROK] Avatar mode: ${refImages.length} reference images as separate slots`);
-      } else {
-        refImages = await packReferences(
-          { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
-          { aspectRatio: grokAspect, pageLabel: pageNumber != null ? String(pageNumber) : pageContext }
-        );
-      }
-
-      let result;
-      if (refImages.length > 0) {
-        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: grokAspect });
-      } else {
-        result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio: grokAspect });
-      }
-
-      if (onImageReady && result.imageData) {
-        try { await onImageReady(result.imageData, result.modelId); } catch (e) { /* ignore */ }
-      }
-
-      const qualityResult = await evaluateImageQuality(
-        result.imageData, prompt, characterPhotos, evaluationType,
-        qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters
-      );
-      if (!qualityResult) {
-        log.warn(`⚠️  [IMAGE GEN] Quality eval unavailable for ${pageContext || 'image'} (Grok in generateImageOnly) — returning image with score=null so pipeline can re-evaluate next round`);
-      }
-
-      return {
-        imageData: result.imageData,
-        modelId: result.modelId,
-        score: qualityResult?.score ?? null,
-        numericScore: qualityResult?.numericScore ?? null,
-        reasoning: qualityResult?.reasoning ?? null,
-        verdict: qualityResult?.verdict ?? null,
-        fixTargets: qualityResult?.fixTargets ?? [],
-        fixableIssues: qualityResult?.fixableIssues || [],
-        semanticResult: qualityResult?.semanticResult || null,
-        semanticScore: qualityResult?.semanticScore ?? null,
-        issuesSummary: qualityResult?.issuesSummary || null,
-        qualityModelId: qualityResult?.qualityModelId ?? null,
-        imageUsage: result.usage,
-        qualityUsage: qualityResult?.usage ?? null,
-        // Exact packed references sent to Grok (for dev-mode "Sent to Grok" display).
-        // The primary Grok branch at the top of this function already returns
-        // this field — the secondary "route to Grok if model config says so"
-        // branch used to forget it, so covers (which hit this path because
-        // CONFIG_DEFAULTS.imageBackend='gemini' but grok-imagine's modelConfig
-        // says backend='grok') always had grokRefImages=null in the DB.
-        grokRefImages: refImages.length > 0 ? refImages : undefined,
-        // Prompt actually sent (may be truncated to the model's max) —
-        // completes the reconstruction record next to the refs.
-        prompt: effectivePrompt,
-      };
-    } catch (grokError) {
-      log.error(`❌ [IMAGE GEN] Grok generation failed (model-routed), falling back to Gemini: ${grokError.message}`);
-      // Fall through to Gemini below
-    }
-  }
-
-  // If modelId points at a non-Gemini backend (Grok/Runware) we reached here
-  // via the fallback path — swap to a known-good Gemini image model so the
-  // URL below is valid. Without this, the URL becomes
-  // `.../models/grok-imagine:generateContent` → Google returns 404.
-  if (IMAGE_MODELS[modelId]?.backend && IMAGE_MODELS[modelId].backend !== 'gemini') {
-    const originalModelId = modelId;
-    modelId = 'gemini-2.5-flash-image';
-    log.warn(`🔄 [IMAGE GEN] Fallback: swapped model ${originalModelId} → ${modelId} for Gemini API call`);
-  }
 
   const systemInstruction = getImageSystemInstruction();
   const modelTemp = IMAGE_MODELS[modelId]?.temperature ?? 0.8;
-  // Aspect ratio: explicit override wins, otherwise read from MODEL_DEFAULTS
-  // (pageAspect / coverAspect / avatarAspect — one source of truth).
-  const geminiAspect = resolveOutputAspect(evaluationType, aspectRatioOverride);
+  const geminiAspect = outputAspect;
   const requestBody = {
     ...(systemInstruction && { systemInstruction }),
     contents: [{
@@ -5384,7 +5384,6 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     log.debug(`📊 [IMAGE GEN] Token usage - input: ${imageUsage.input_tokens.toLocaleString()}, output: ${imageUsage.output_tokens.toLocaleString()}${thinkingInfo}`);
   }
   // Structured cost log so analyze-story-log.js can attribute Nano Banana spend.
-  // models.js: gemini-2.5-flash-image is $0.04/image regardless of token count.
   recordImageApiUsage(modelId, evaluationType, imageUsage);
 
   if (!data.candidates || data.candidates.length === 0) {
@@ -5480,12 +5479,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           imageUsage: imageUsage,  // Token usage for image generation
           qualityUsage: qualityUsage,  // Token usage for quality evaluation
           // Reconstruction record: prompt + reference images actually sent in
-          // this call. This branch (Gemini — the fallback when Grok fails)
-          // recorded neither, so exactly the generations that already had a
-          // failure were unreconstructable. grokRefImages is the historical
-          // field name for "refs sent to the image model" — the save path
-          // R2-extracts it and the dev viewer displays it. parts[0] holds the
-          // exact sent text (post-truncation when a model cap applied).
+          // this call. parts[0] holds the exact sent text (post-truncation when
+          // a model cap applied); grokRefImages is the historical field name for
+          // "refs sent to the image model".
           prompt: parts[0]?.text || prompt,
           grokRefImages: parts
             .filter(p => p.inline_data)
@@ -5580,351 +5576,88 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   log.debug(`🆕 [IMAGE GEN-ONLY] Cache MISS - key: ${genOnlyCacheKey.substring(0, 24)}...`);
 
-  // Check if we should use Runware backend
-  const imageBackend = imageBackendOverride || CONFIG_DEFAULTS?.imageBackend || 'gemini';
-  log.info(`🎨 [IMAGE GEN-ONLY] Backend: ${imageBackend}`);
+  // Shared provider-dispatch ladder (Runware/Grok/Gemini selection + reference
+  // packing + truncation + aspect + onImageReady). See _dispatchImageGeneration.
+  const raw = await _dispatchImageGeneration(prompt, characterPhotos, {
+    logLabel: 'IMAGE GEN-ONLY',
+    verbose: false,
+    previousImage,
+    imageModelOverride,
+    imageBackendOverride,
+    landmarkPhotos,
+    visualBibleGrid,
+    sceneBackground,
+    textAreaMask,
+    onImageReady,
+    outputAspect: aspectRatio,
+    evaluationType: null,
+    // generateImageOnly is only used for page regeneration, so always STANDARD.
+    grokPrimaryModel: GROK_MODELS.STANDARD,
+    grokPrimaryModelKey: 'grok-imagine',
+    usePadExtension: true,
+    avatarMode: false,
+    pageLabel: pageNumber != null ? String(pageNumber) : '',
+    defaultModel: MODEL_DEFAULTS.pageImage,
+    includeSceneBackgroundPart: true,
+  });
 
-  if (imageBackend === 'runware' && isRunwareConfigured()) {
-    log.info(`🎨 [IMAGE GEN-ONLY] Using Runware FLUX Schnell backend`);
-
-    try {
-      const referenceImages = extractDataImageUrls(characterPhotos);
-
-      const result = await generateWithRunware(prompt, {
-        model: RUNWARE_MODELS.FLUX_SCHNELL,
-        width: 1024,
-        height: 1024,
-        steps: 4,
-        referenceImages: referenceImages
-      });
-
-      if (onImageReady && result.imageData) {
-        try {
-          await onImageReady(result.imageData, result.modelId);
-        } catch (callbackError) {
-          log.error('⚠️ [IMAGE GEN-ONLY] onImageReady callback error:', callbackError.message);
-        }
-      }
-
-      const finalResult = {
-        imageData: result.imageData,
-        modelId: result.modelId,
-        usage: result.usage
-      };
-
-      if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
-      return finalResult;
-    } catch (runwareError) {
-      log.error(`❌ [IMAGE GEN-ONLY] Runware failed, falling back to Gemini: ${runwareError.message}`);
-    }
+  // ── Shape raw result per provider (gen-only: no eval, minimal shape) + cache ─
+  if (raw.provider === 'runware-primary') {
+    const finalResult = {
+      imageData: raw.imageData,
+      modelId: raw.modelId,
+      usage: raw.usage
+    };
+    if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
+    return finalResult;
   }
 
-  // Check if we should use Grok Imagine backend
-  if (imageBackend === 'grok' && isGrokConfigured()) {
-    // generateImageOnly is only used for page regeneration, so always STANDARD
-    log.info(`🎨 [IMAGE GEN-ONLY] Using Grok Imagine backend (model: ${GROK_MODELS.STANDARD})`);
-
-    // Truncate to Grok's prompt-length cap before the API call (see note at the
-    // matching block in callGeminiAPIForImage's Grok branch).
-    const grokMaxPrompt = IMAGE_MODELS['grok-imagine']?.maxPromptLength || 7500;
-    const grokPrompt = truncatePromptForModel(prompt, grokMaxPrompt, 'IMAGE GEN-ONLY', GROK_MODELS.STANDARD);
-
-    try {
-      // When slot 0 is a scene plate (empty-scene landmark photo, previous full
-      // scene, or sceneBackground) whose aspect differs from target, packReferences
-      // leaves it native-aspect and editWithGrok magenta-extends it — instead of
-      // pillarboxing it with sampled gray edge bars that bake into the empty scene
-      // and every page built on it. Both calls must share the flag.
-      const slot0IsScenePlate = !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
-      const refImages = await packReferences(
-        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask },
-        { aspectRatio, pageLabel: pageNumber != null ? String(pageNumber) : '', padInputWithExtension: slot0IsScenePlate }
-      );
-
-      let result;
-      if (refImages.length > 0) {
-        result = await editWithGrok(grokPrompt, refImages, { model: GROK_MODELS.STANDARD, aspectRatio, padInputWithExtension: slot0IsScenePlate });
-      } else {
-        result = await generateWithGrok(grokPrompt, { model: GROK_MODELS.STANDARD, aspectRatio });
-      }
-
-      if (onImageReady && result.imageData) {
-        try {
-          await onImageReady(result.imageData, result.modelId);
-        } catch (callbackError) {
-          log.error('⚠️ [IMAGE GEN-ONLY] onImageReady callback error:', callbackError.message);
-        }
-      }
-
-      const finalResult = {
-        imageData: result.imageData,
-        prompt,
-        modelId: result.modelId,
-        usage: result.usage,
-        grokRefImages: refImages.length > 0 ? refImages : undefined,
-      };
-
-      if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
-      return finalResult;
-    } catch (grokError) {
-      log.error(`❌ [IMAGE GEN-ONLY] Grok failed, falling back to Gemini: ${grokError.message}`);
-    }
+  if (raw.provider === 'grok-primary') {
+    const finalResult = {
+      imageData: raw.imageData,
+      prompt,
+      modelId: raw.modelId,
+      usage: raw.usage,
+      grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined,
+    };
+    if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
+    return finalResult;
   }
 
-  // Gemini path
+  if (raw.provider === 'runware-routed') {
+    const finalResult = {
+      imageData: raw.imageData,
+      prompt: raw.promptSent,
+      modelId: raw.modelId,
+      usage: raw.usage,
+      // Reconstruction record — refs were built above but never stamped.
+      grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined
+    };
+    if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
+    return finalResult;
+  }
+
+  if (raw.provider === 'grok-routed') {
+    const finalResult = {
+      imageData: raw.imageData,
+      prompt: raw.promptSent,
+      modelId: raw.modelId,
+      usage: raw.usage,
+      grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined,
+    };
+    if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
+    return finalResult;
+  }
+
+  // ── Gemini fallback: terminal fetch WITH the 3-level safety sanitization loop ─
+  // The core already built `parts`, resolved + swapped `modelId`, and truncated
+  // the prompt into `effectivePrompt`. This block is generateImageOnly's ORIGINAL
+  // Gemini generator — deliberately NOT shared with callGeminiAPIForImage's
+  // single-shot generator (that one records usage + extracts refusal text; this
+  // one runs a sanitization retry loop instead).
+  const { parts, modelId, effectivePrompt } = raw;
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('Gemini API key not configured');
-  }
 
-  // Determine if we have a previous scene image (for sequential mode)
-  const hasSequentialImage = previousImage && previousImage.startsWith('data:image');
-
-  // Build parts array: PROMPT FIRST, then images in order
-  const parts = [{ text: prompt }];
-  let currentImageIndex = 1;
-
-  // For sequential mode: Add PREVIOUS scene image FIRST
-  if (hasSequentialImage) {
-    const croppedImage = await cropImageForSequential(previousImage);
-    const base64Data = r2Lib.stripDataUriPrefix(croppedImage);
-    const mimeType = croppedImage.match(/^data:(image\/\w+);base64,/) ?
-      croppedImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
-
-    parts.push({ text: `[Previous scene]:` });
-    parts.push({
-      inline_data: {
-        mime_type: mimeType,
-        data: base64Data
-      }
-    });
-    currentImageIndex++;
-    log.debug(`🖼️  [IMAGE GEN-ONLY] Added cropped previous scene image (SEQUENTIAL MODE)`);
-  }
-
-  // Scene background reference (empty scene for style anchoring)
-  if (sceneBackground && sceneBackground.startsWith('data:image')) {
-    const bgBase64 = r2Lib.stripDataUriPrefix(sceneBackground);
-    const bgMime = sceneBackground.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
-    parts.push({ text: `[Background]:` });
-    parts.push({ inline_data: { mime_type: bgMime, data: bgBase64 } });
-    currentImageIndex++;
-    log.debug(`🖼️ [IMAGE GEN-ONLY] Added scene background reference`);
-  }
-
-  // Add character photos as reference images
-  if (characterPhotos && characterPhotos.length > 0) {
-    let addedCount = 0;
-    let cacheHits = 0;
-    const characterNames = [];
-
-    for (const photoData of characterPhotos) {
-      let photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-      if (photoUrl && typeof photoUrl === 'object') {
-        if (Array.isArray(photoUrl)) {
-          photoUrl = photoUrl[0];
-        } else if (photoUrl.data) {
-          photoUrl = photoUrl.data;
-        } else if (photoUrl.imageData) {
-          photoUrl = photoUrl.imageData;
-        }
-      }
-      const characterName = typeof photoData === 'object' ? photoData?.name : null;
-
-      if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
-        const imageHash = hashImageData(photoUrl);
-        let compressedBase64 = compressedRefCache.get(imageHash);
-
-        if (compressedBase64) {
-          cacheHits++;
-        } else {
-          const compressed = await compressImageToJPEG(photoUrl, 85, 768);
-          compressedBase64 = r2Lib.stripDataUriPrefix(compressed);
-          compressedRefCache.set(imageHash, compressedBase64);
-        }
-
-        // IMPORTANT: Do NOT use numbered format like [Image 1 - Name] as it triggers "character sheet" generation
-        const labelName = characterName || `Character ${addedCount + 1}`;
-        parts.push({ text: `[${labelName}]:` });
-        if (characterName) {
-          characterNames.push(characterName);
-        }
-
-        parts.push({
-          inline_data: {
-            mime_type: 'image/jpeg',
-            data: compressedBase64
-          }
-        });
-        currentImageIndex++;
-        addedCount++;
-      }
-    }
-
-    if (characterNames.length > 0) {
-      log.debug(`🖼️  [IMAGE GEN-ONLY] Added ${addedCount} LABELED reference images: ${characterNames.join(', ')} (${cacheHits} cached)`);
-    }
-  }
-
-  // Add PRIMARY landmark reference photo only.
-  // Try photoUrl first, fall back to photoData when URL can't be loaded
-  // (e.g. synthetic magicalstory:// schemes from tell-curated upload).
-  if (landmarkPhotos && landmarkPhotos.length > 0) {
-    const primaryLandmark = landmarkPhotos[0];
-    const candidates = [primaryLandmark.photoUrl, primaryLandmark.photoData].filter(s => typeof s === 'string' && s.length > 0);
-    if (candidates.length > 0) {
-      let buf = null;
-      for (const source of candidates) {
-        try { buf = await r2Lib.bytesFromAnyImage(source); if (buf) break; } catch { /* try next */ }
-      }
-      if (buf) {
-        parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
-        parts.push({
-          inline_data: {
-            mime_type: 'image/jpeg',
-            data: buf.toString('base64')
-          }
-        });
-        currentImageIndex++;
-        log.info(`🌍 [IMAGE GEN-ONLY] Added primary landmark reference: ${primaryLandmark.name}`);
-      } else {
-        log.warn(`⚠️ [IMAGE GEN-ONLY] Landmark "${primaryLandmark.name}": failed to load bytes from any source — skipping`);
-      }
-    } else {
-      log.warn(`⚠️ [IMAGE GEN-ONLY] Landmark "${primaryLandmark.name}" has no source — skipping`);
-    }
-  }
-
-  // Add Visual Bible reference grid
-  if (visualBibleGrid) {
-    parts.push({ text: `[Reference Grid (objects, secondary characters, locations)]:` });
-    parts.push({
-      inline_data: {
-        mime_type: 'image/jpeg',
-        data: visualBibleGrid.toString('base64')
-      }
-    });
-    currentImageIndex++;
-    log.info(`🔲 [IMAGE GEN-ONLY] Added Visual Bible reference grid`);
-  }
-
-  // Use model override if provided
-  const defaultModel = MODEL_DEFAULTS.pageImage;
-  // let — may be swapped to a Gemini model below if we reach the Gemini
-  // branch via a Grok/Runware fallback.
-  let modelId = imageModelOverride || defaultModel;
-
-  // Check if the selected model is a Runware model
-  const modelConfig = IMAGE_MODELS[modelId];
-
-  // Truncate prompt if needed
-  const maxPromptLength = modelConfig?.maxPromptLength || 30000;
-  const effectivePrompt = truncatePromptForModel(prompt, maxPromptLength, 'IMAGE GEN-ONLY');
-  if (effectivePrompt !== prompt) {
-    parts[0] = { text: effectivePrompt };
-  }
-
-  if (modelConfig?.backend === 'runware' && isRunwareConfigured()) {
-    log.info(`🎨 [IMAGE GEN-ONLY] Model ${modelId} uses Runware backend`);
-
-    try {
-      const runwareModel = modelId === 'flux-dev' ? RUNWARE_MODELS.FLUX_DEV : RUNWARE_MODELS.FLUX_SCHNELL;
-      const referenceImages = extractDataImageUrls(characterPhotos);
-
-      const result = await generateWithRunware(effectivePrompt, {
-        model: runwareModel,
-        width: 1024,
-        height: 1024,
-        steps: modelId === 'flux-dev' ? 30 : 4,
-        referenceImages: referenceImages
-      });
-
-      if (onImageReady && result.imageData) {
-        try {
-          await onImageReady(result.imageData, result.modelId);
-        } catch (callbackError) {
-          log.error('⚠️ [IMAGE GEN-ONLY] onImageReady callback error:', callbackError.message);
-        }
-      }
-
-      const finalResult = {
-        imageData: result.imageData,
-        prompt: effectivePrompt,
-        modelId: result.modelId,
-        usage: result.usage,
-        // Reconstruction record — refs were built above but never stamped.
-        grokRefImages: referenceImages.length > 0 ? referenceImages : undefined
-      };
-
-      if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
-      return finalResult;
-    } catch (runwareError) {
-      log.error('❌ [IMAGE GEN-ONLY] Runware generation failed:', runwareError.message);
-      throw runwareError;
-    }
-  }
-
-  // Route to Grok if model config says so
-  if (modelConfig?.backend === 'grok' && isGrokConfigured()) {
-    log.info(`🎨 [IMAGE GEN-ONLY] Model ${modelId} uses Grok backend`);
-
-    try {
-      const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-      // Magenta-extension on slot 0 when the primary input is a scene-type plate
-      // (landmark photo, previous full scene, or sceneBackground). These have full
-      // backgrounds whose aspect rarely matches target (Wikipedia landscape → A4
-      // portrait, etc); without extension packReferences pillarboxes it with sampled
-      // gray bars and Grok composes for the wrong aspect. packReferences leaves slot 0
-      // native so editWithGrok extends it. Skip when slot 0 is a character-only ref
-      // (avatars are tall portraits that keep their existing white-letterbox behavior).
-      const slot0IsScenePlate = !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
-      const refImages = await packReferences(
-        { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground },
-        { aspectRatio, pageLabel: pageNumber != null ? String(pageNumber) : '', padInputWithExtension: slot0IsScenePlate }
-      );
-
-      let result;
-      if (refImages.length > 0) {
-        result = await editWithGrok(effectivePrompt, refImages, {
-          model: grokModel,
-          aspectRatio,
-          padInputWithExtension: slot0IsScenePlate,
-        });
-      } else {
-        result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio });
-      }
-
-      if (onImageReady && result.imageData) {
-        try { await onImageReady(result.imageData, result.modelId); } catch (e) { /* ignore */ }
-      }
-
-      const finalResult = {
-        imageData: result.imageData,
-        prompt: effectivePrompt,
-        modelId: result.modelId,
-        usage: result.usage,
-        grokRefImages: refImages.length > 0 ? refImages : undefined,
-      };
-
-      if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
-      return finalResult;
-    } catch (grokError) {
-      log.error(`❌ [IMAGE GEN-ONLY] Grok generation failed (model-routed), falling back to Gemini: ${grokError.message}`);
-      // Fall through to Gemini below
-    }
-  }
-
-  // If modelId points at a non-Gemini backend (Grok/Runware) we reached here
-  // via the fallback path — swap to a known-good Gemini image model so the
-  // URL below is valid. Without this, the URL becomes
-  // `.../models/grok-imagine:generateContent` → Google returns 404.
-  if (IMAGE_MODELS[modelId]?.backend && IMAGE_MODELS[modelId].backend !== 'gemini') {
-    const originalModelId = modelId;
-    modelId = 'gemini-2.5-flash-image';
-    log.warn(`🔄 [IMAGE GEN-ONLY] Fallback: swapped model ${originalModelId} → ${modelId} for Gemini API call`);
-  }
-
-  // Gemini API call
   const systemInstruction = getImageSystemInstruction();
   const modelTemp = IMAGE_MODELS[modelId]?.temperature ?? 0.8;
   const requestBody = {
