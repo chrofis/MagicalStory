@@ -622,6 +622,21 @@ entry functions `callGeminiAPIForImage` (eval path) + `generateImageOnly` (no-ev
 Extracting a shared `_dispatchImageGeneration` core (both become thin wrappers;
 eval + cache namespaces preserved). Owner: "this must be fixed."
 
+**Structural — covers = normal images, one code path (QUEUED behind the entry-fn
+merge; owner 2026-07-26):** now that cover TEXT is app-side (`composeCover`, not
+baked into the image), a cover IS a normal image with cover framing. Already
+unified: direct render (`generateImageWithQualityRetry(evaluationType='cover')`),
+app-side text, full page-style eval, viewer-gaze (prompt default — NO CODE CHANGE,
+owner: "front viewing already there"). **Remaining gap:** `composite` is still a
+SEPARATE path (`generateCoverViaComposite`) that `iterateCover` forks to, not an
+option on the shared image entry. **Task:** make `composite` a flag on the SAME
+image code — default ON for covers (rationale, owner: covers have no action + all
+figures forward, which is exactly what compositing figures onto a plate handles
+well; current gate keeps it to >5-figure covers), default OFF for page images.
+`iterateCover`'s fork collapses into the option; covers/images share code, differ
+only in defaults. Update `image-routing.md` + `decisions.md` after. MUST land after
+the entry-fn merge (same file, `images.js` — no concurrent edits).
+
 ### 🧪 Experiments (need §6 rubric + §7 harness first)
 - Outline single-vs-split A/B (§5); model downgrades for `story_ideas` / util
   calls (§9); image-first prototype (§4); AI-image-limitation mitigations one at
