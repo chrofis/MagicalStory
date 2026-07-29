@@ -2117,6 +2117,44 @@ emits repairParams), `server/routes/regeneration.js` (manual route axes),
 `tests/manual/faceRepair-geometry.test.js` (new, 29 assertions),
 `docs/face-repair-merge-design.md` (status).
 
+## Face repair: colour matching ON by default, keyed by clip continuation (2026-07-29)
+
+**Context:** the spine refactor defaulted `colorCorrect = !faceOnly`, which quietly
+left the FACE path feather-only in BOTH production and the Test Lab. That leaves the
+one colour defect that reads as a seam unfixed: the crop's bottom clip always cuts
+through material that continues into the untouched body (a coat collar, or the neck's
+own skin), and when the model's shade there differs from the body's, a visible colour
+LINE appears at the seam. Feathering fixes geometry, not a tone step.
+
+**Decision:** default `colorCorrect = true` for BOTH paths (face and body). The blend's
+`garmentOnly` (default true) makes this safe and general: it tone-matches ONLY a material
+that has a same-material border just OUTSIDE the paste — i.e. one that continues into the
+body, giving a reference to match to. One rule, all three clip contents:
+- **only clothing** → coat matched to the body coat;
+- **clothing + skin** → both matched;
+- **only skin** (clip cuts the neck) → neck skin matched to the body's neck; the face
+  shifts with it as one uniform tone (correct — face and neck are the same skin; a benign
+  mean shift, not a per-pixel distortion).
+Materials with no continuation outside the patch (hair; the face when the clip is all
+clothing) get ZERO shift and keep the model's rendering — identity is never repainted.
+`bgBorderMatch` (default true) colour-matches the background pixels the paste introduces
+— the red zone (old face wider than the new) and the 6px safety pad around the cut — to
+the surrounding scene, so no halo. Body path is unchanged in effect (bodyColorMode still
+true → figure histogram correction stays off, bg protection stays on).
+
+`opts.colorCorrect` / `opts.garmentOnly` / `opts.bgBorderMatch` still override (Test Lab
+A/B); only the default moved.
+
+**Rejected:** correcting figure tone unconditionally (would repaint the face for no reason
+in the only-clothing / clothing+skin cases).
+
+**Known residual to eyeball on staging:** the only-skin clip case — K-means can split
+lit/shadowed skin into separate clusters and shift only the one that meets the neck; the
+soft colour-weighted blend smooths it, but check that case visually.
+
+**Touched:** `server/lib/faceRepair.js` (colorCorrect default + garmentOnly/bgBorderMatch
+passthrough + colorInfo in log/return).
+
 ## Two rescue-path utility calls downgraded off Sonnet (2026-07-26)
 **Context:** `sceneValidator.repairScene` (JSON scene-repair after a composition
 check) and `rewriteBlockedScene` (safety rewrite of a scene the image model

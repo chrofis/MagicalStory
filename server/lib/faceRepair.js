@@ -636,9 +636,17 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   } catch (e) { log.warn(`[FACE REPAIR] round-2 re-detect failed (${e.message}) — using copied box`); }
 
   // --- The ONE shared blend --------------------------------------------------
-  // colorCorrect / bodyColorMode default to today's per-path values: face-insert
-  // = colorCorrect:false; body = colorCorrect on + bodyColorMode on (protect bg).
-  const colorCorrect = opts.colorCorrect !== undefined ? opts.colorCorrect : !faceOnly;
+  // Colour matching ON for BOTH paths by default.
+  //  - FACE (bodyColorMode=false): garmentOnly correction runs — it tone-matches
+  //    only material that CONTINUES past the bottom clip into the untouched body
+  //    (a coat collar, or the neck's own skin), so the seam has no colour line.
+  //    Covers all three clip contents: only-clothing, clothing+skin, only-skin
+  //    (neck skin → matched to the body's neck; the face shifts with it as one
+  //    tone). Hair / the face with no continuation get zero shift (identity kept).
+  //  - BODY (bodyColorMode=true): figure correction is skipped inside the blend;
+  //    only the background at the silhouette border is protected.
+  // Either path can be overridden (Test Lab A/B) via explicit opts.
+  const colorCorrect = opts.colorCorrect !== undefined ? opts.colorCorrect : true;
   const bodyColorMode = opts.bodyColorMode !== undefined ? opts.bodyColorMode : !faceOnly;
   let blend;
   try {
@@ -660,6 +668,10 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       clipRect: faceClip,
       colorCorrect,
       bodyColorMode,
+      // garmentOnly / bgBorderMatch default to true inside samUnionBlend; thread
+      // them only when a caller (Test Lab A/B) overrides, so prod keeps the defaults.
+      ...(opts.garmentOnly !== undefined ? { garmentOnly: opts.garmentOnly } : {}),
+      ...(opts.bgBorderMatch !== undefined ? { bgBorderMatch: opts.bgBorderMatch } : {}),
       featherPx: opts.featherPx,
       erodeFeather: opts.erodeFeather,
       // Uniform gates — tunable for the Test Lab A/B, default ON in production.
@@ -699,7 +711,11 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
   const originalSceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
   const treatedDataUri = `data:image/png;base64,${treatedBuf.toString('base64')}`;
-  log.info(`✅ [FACE REPAIR] ${descriptor} for ${charName} completed. Crop ${crop.w}x${crop.h}@(${crop.x},${crop.y}). Cost: $${usage?.cost || 0.02}`);
+  const ci = blend.colorInfo;
+  const ccLog = ci
+    ? ` Colour-match: figure ΔE ${ci.deltaEBefore ?? 'n/a'}, seam ${ci.seamBefore ?? 'n/a'}→${ci.seamAfter ?? 'n/a'}${ci.bgMatchedPx ? `, bg ${ci.bgMatchedPx}px` : ''}${Array.isArray(ci.clusters) ? `, ${ci.clusters.filter(c => c.src === 'mean+border').length} bordered material(s) matched` : ''}.`
+    : ' Colour-match: nothing continued past the clip (no seam material to match).';
+  log.info(`✅ [FACE REPAIR] ${descriptor} for ${charName} completed. Crop ${crop.w}x${crop.h}@(${crop.x},${crop.y}).${ccLog} Cost: $${usage?.cost || 0.02}`);
   return {
     imageData: finalImageData,
     comparison: { before: originalSceneDataUri, after: finalImageData },
@@ -712,6 +728,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
     descriptor,
     promptSent: prompt,
     iou: blend.iou,
+    colorInfo: blend.colorInfo || null,
     blendRule: blend.blendRule,
     debug: opts.includeDebug ? { prompt, sceneSent: treatedDataUri, avatarSent: avatarUri, grokRawResult, bbox: bodyBbox, faceBbox, crop, descriptor } : null,
   };
