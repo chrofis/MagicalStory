@@ -632,20 +632,27 @@ mislabeled "in generateImageOnly" log strings; avatar-eval-skip inconsistent per
 branch; routed vs primary eval-shape differ; missing GEMINI_API_KEY throws even for
 non-Gemini models. Each is a separate follow-up if wanted.
 
-**Structural — covers = normal images, one code path (QUEUED behind the entry-fn
-merge; owner 2026-07-26):** now that cover TEXT is app-side (`composeCover`, not
-baked into the image), a cover IS a normal image with cover framing. Already
-unified: direct render (`generateImageWithQualityRetry(evaluationType='cover')`),
-app-side text, full page-style eval, viewer-gaze (prompt default — NO CODE CHANGE,
-owner: "front viewing already there"). **Remaining gap:** `composite` is still a
-SEPARATE path (`generateCoverViaComposite`) that `iterateCover` forks to, not an
-option on the shared image entry. **Task:** make `composite` a flag on the SAME
-image code — default ON for covers (rationale, owner: covers have no action + all
-figures forward, which is exactly what compositing figures onto a plate handles
-well; current gate keeps it to >5-figure covers), default OFF for page images.
-`iterateCover`'s fork collapses into the option; covers/images share code, differ
-only in defaults. Update `image-routing.md` + `decisions.md` after. MUST land after
-the entry-fn merge (same file, `images.js` — no concurrent edits).
+**Structural — covers = normal images, one code path (✅ SHIPPED to staging
+2026-07-29, `43cce409`):** `composite` is now an OPTION on the shared image entry
+`generateImageWithQualityRetry` (new `_maybeGenerateComposite` router), default
+**OFF for pages** (images.js diff is PURELY additive — 0 deletions in the direct
+path, so the page path is byte-unchanged), default **ON for covers** (existing
+>5-figure gate). `iterateCover`'s composite-vs-direct fork collapsed into one
+shared call passing `composite: compositeOn` + `compositeInputs`; it only branches
+afterward on `imageResult.composite` to skip the restamp (composite bakes its own
+title). Gated on the OPTION value, not `evaluationType` — a page could opt in
+(owner's "same code" point). `generateCoverViaComposite` internals unchanged. All
+gating preserved (figure-count, explicit flag, no-landmark→direct, throw→direct).
+34 new + 53 + 69 assertions pass. Viewer-gaze/facing-forward untouched (owner: no
+action). `image-routing.md` + `image-generation-methods.html` + `decisions.md`
+updated.
+**Latent divergence flagged (NOT fixed):** `server.js:3884` streaming initial-cover
+gen calls `generateImageWithQualityRetry` with NO composite option → initial-gen
+covers always render direct regardless of the figure-count gate; only `iterateCover`
+(auto-repair/dev-iterate/user-regen) applies composite. Pre-existing; wiring it is a
+follow-up decision (owner's "everything must be implemented this way" may want it).
+**Pending staging smoke test:** direct ≤5-fig cover, >5-fig composite cover w/
+landmark, >5-fig cover w/o landmark (→ direct), normal page (byte-unchanged).
 
 ### 🧪 Experiments (need §6 rubric + §7 harness first)
 - Outline single-vs-split A/B (§5); model downgrades for `story_ideas` / util
