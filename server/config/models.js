@@ -300,6 +300,20 @@ const MODEL_DEFAULTS = {
   // path is validated on a test story.
   unifiedSceneProse: true,
 
+  // Lighting-aware garment HUE normalization — a cheap, deterministic pre-eval
+  // pass that rotates a figure's drifted garment hue toward its styled avatar's
+  // garment colour WITHOUT touching L* (lighting) or chroma, so eval never
+  // triggers a full redraw for a mere hue shift. Estimates + discounts the
+  // page's global illumination cast before measuring drift (a red jacket that
+  // reads warm only because the whole scene is a warm sunset is left alone).
+  // Runs on every figure with a resolvable avatar; corrects only outliers;
+  // defers very large drifts (likely garment-TYPE errors) to eval+repair. See
+  // server/lib/garmentHueNormalize.js + docs/decisions.md. Env override:
+  // GARMENT_HUE_NORMALIZE=false to disable on staging without a deploy.
+  garmentHueNormalize: process.env.GARMENT_HUE_NORMALIZE
+    ? process.env.GARMENT_HUE_NORMALIZE !== 'false'
+    : true,
+
   // Output aspect ratios — one config per image type, read by every
   // generation / iterate / repair path. Defaults: A4 portrait for pages
   // and covers; 9:16 for avatars. Change the default here to reshape
