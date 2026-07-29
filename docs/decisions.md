@@ -207,6 +207,55 @@ the p8 landmark: before = 17%/17% bars, after = 1%/1% full-bleed.
 - `server/lib/images.js` — both Grok branches in `generateImageOnly` pass the flag
 **Status:** ✅ active.
 
+### One shared provider-dispatch core: `_dispatchImageGeneration` (2026-07-29)
+**Context:** The two image-gen entry functions `callGeminiAPIForImage` (eval
+path, 17 positional params) and `generateImageOnly` (gen-only, options object)
+each re-implemented the SAME Grok→Gemini→Runware dispatch ladder — primary
+Runware, primary Grok, Gemini parts-building, model-routed Runware, model-routed
+Grok, Gemini fallback — in parallel. Improvements to reference packing, aspect
+resolution, prompt truncation, or the Grok pad-extension flag only ever landed
+in one path (owner: "we only improve one path").
+**Decision:** Extract a single private core
+`_dispatchImageGeneration(prompt, characterPhotos, opts)` that owns the WHOLE
+provider-selection ladder up to (and including) building the Gemini `parts`
+array, model-id resolution, prompt truncation, aspect, reference packing (both
+Grok branches, both Runware branches), and the `onImageReady` callback. It does
+NO quality eval and NO caching. It returns a provider-tagged RAW result
+(`{ provider, imageData, modelId, usage, packedRefs, promptSent }`) for the
+Runware/Grok branches, or a Gemini-fallback sentinel
+(`{ provider: 'gemini', parts, modelId, effectivePrompt }`) when no upstream
+provider produced an image. Each entry function is now a thin wrapper: it keeps
+its own cache namespace + lookup/store, its own per-branch result shaping, and —
+for the Gemini fallback — its own terminal Gemini fetch (the two Gemini
+generators are genuinely different: `generateImageOnly` runs a 3-level safety
+sanitization retry loop and no usage recording; `callGeminiAPIForImage` is a
+single-shot fallback with `recordImageApiUsage` and rich refusal-error
+extraction). Every divergence between the two ladders is a documented `opts`
+field each wrapper supplies its own value for, so behavior is byte-preserved:
+`verbose` (log detail + per-photo hash logging + model-name in truncate warning),
+`usePadExtension` (gen-only pads scene-plate slot 0; eval path does not),
+`avatarMode` (eval path avatar-slices refs in model-routed Grok),
+`grokPrimaryModel`/`grokPrimaryModelKey` (gen-only forces STANDARD; eval path
+honors the pro override), `includeSceneBackgroundPart` (gen-only adds a
+`[Background]` Gemini part), `defaultModel` (eval path is cover-aware),
+`pageLabel`, `outputAspect`, `textAreaMask`, `evaluationType` (Grok log only).
+**Rationale:** Collapses ~500 lines of duplicated dispatch into one core; a
+Grok/Runware/packing/aspect improvement now reaches both entry points. The
+terminal Gemini fetch and the per-branch RESULT SHAPING stay in the wrappers
+because they are genuinely function-specific (eval vs no-eval), not duplication —
+forcing them into the core would need ~10 more flags and two co-located Gemini
+execution modes, net-negative for simplicity. Byte-faithful extraction only: no
+behavior change, no provider-call change. Verified with a stubbed-provider unit
+test (`tests/manual/test-images-dispatch-core.js`) asserting each branch calls
+the same provider fn with the same key args as the pre-refactor inline ladder.
+**Touched:**
+- `server/lib/images.js` — new `_dispatchImageGeneration`; `callGeminiAPIForImage`
+  and `generateImageOnly` rewritten as thin wrappers (signatures, cache
+  namespaces, return shapes unchanged)
+- `docs/image-generation-methods.html` — both entries flagged as sharing the core
+- `tests/manual/test-images-dispatch-core.js` — faithfulness unit test
+**Status:** ✅ active.
+
 ### Text-overlay font size never shrinks
 **Context:** Page text gets overlaid on the rendered illustration. Longer
 paragraphs are tempting to shrink so they always fit a fixed box.

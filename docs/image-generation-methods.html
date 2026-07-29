@@ -105,10 +105,10 @@
 
 <tr>
   <td><code>callGeminiAPIForImage(prompt, charPhotos, prev, evalType, …)</code></td>
-  <td><code>server/lib/images.js:3582</code></td>
-  <td>Gemini 2.5 Flash Image / Gemini 3 Pro Image Preview</td>
-  <td>Long parameter list — prompt, character photos, previous image (iteration), landmarks, VB grid, scene background, characters, story text, aspect override.</td>
-  <td><code>{ imageData, usage, modelId, prompt }</code>. Direct provider call — not a dispatcher.</td>
+  <td><code>server/lib/images.js</code></td>
+  <td><strong>Dispatcher + quality eval</strong> → Grok / Gemini / Runware</td>
+  <td>Long positional parameter list — prompt, character photos, previous image (iteration), landmarks, VB grid, scene background, characters, story text, aspect override. The eval path.</td>
+  <td>Thin wrapper over the shared <code>_dispatchImageGeneration</code> core (below): keeps its own <code>cacheKey</code> namespace, runs <code>evaluateImageQuality</code> per branch, and — on the Gemini fallback — does a single-shot fetch + <code>recordImageApiUsage</code> + refusal-text extraction. Returns an eval-augmented shape (<code>score</code>, <code>fixTargets</code>, <code>semanticResult</code>, …).</td>
 </tr>
 
 <tr>
@@ -137,10 +137,18 @@
 
 <tr>
   <td><code>generateImageOnly(prompt, charPhotos, options)</code></td>
-  <td><code>server/lib/images.js:4401</code></td>
+  <td><code>server/lib/images.js</code></td>
   <td><strong>Dispatcher</strong> → Grok / Gemini / Runware</td>
-  <td>Prompt + character photos + options (<code>imageBackendOverride</code>, <code>imageModelOverride</code>, scene metadata).</td>
-  <td><code>{ imageData, prompt, modelId, usage }</code>. Single-shot generation, no quality retry.</td>
+  <td>Prompt + character photos + options (<code>imageBackendOverride</code>, <code>imageModelOverride</code>, scene metadata, <code>textAreaMask</code>).</td>
+  <td>Thin wrapper over the shared <code>_dispatchImageGeneration</code> core (below): keeps its own <code>genonly_</code> cache namespace + <code>skipCache</code>, and — on the Gemini fallback — runs the 3-level safety sanitization retry loop. <code>{ imageData, prompt, modelId, usage }</code>. Single-shot generation, no quality eval.</td>
+</tr>
+
+<tr>
+  <td><code>_dispatchImageGeneration(prompt, charPhotos, opts)</code> <strong>SHARED CORE</strong></td>
+  <td><code>server/lib/images.js</code></td>
+  <td><strong>Provider-dispatch ladder</strong> → Grok / Gemini / Runware</td>
+  <td>The single Grok→Gemini→Runware selection ladder both entry functions above delegate to: backend resolution, primary Runware, primary Grok, Gemini <code>parts</code> build, model-id resolution + prompt truncation, model-routed Runware, model-routed Grok, non-Gemini→Gemini swap, reference packing (both Grok branches), aspect, <code>onImageReady</code>. Every place the two callers differed is a documented <code>opts</code> field.</td>
+  <td>No quality eval, no caching (those stay in the wrappers). Returns a provider-tagged RAW result <code>{ provider, imageData, modelId, usage, packedRefs, promptSent }</code>, or a Gemini-fallback sentinel <code>{ provider:'gemini', parts, modelId, effectivePrompt }</code> the wrapper finishes. See <code>docs/decisions.md</code> "One shared provider-dispatch core".</td>
 </tr>
 
 <tr>
