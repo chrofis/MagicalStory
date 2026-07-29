@@ -489,19 +489,22 @@ async function iterateCover(coverKey, storyData, options = {}) {
     sceneMetadata: coverSceneMetadata,
   } = refs;
 
-  // --- Composite Cover branch (flag-gated) ──────────────────────────────
-  // When MODEL_DEFAULTS.compositeCovers is true (or modelOverrides override),
-  // skip the normal generation path and use the manual-composite + 2-pass
-  // Grok edit method. Same return shape so all callers stay agnostic.
-  // options.compositeCovers === false is an explicit opt-out: the
-  // user-facing "Überarbeiten" (regenerate-from-scratch) endpoint passes it
-  // so a from-scratch render never routes through composite — composite
-  // stays for iterate (repair panel, auto-pipeline) and initial generation.
-  // Direct render handles up to 5 figures fine (Pixar @5 verified, user decision
-  // 2026-07-19), so composite — which is slower, needs the analyzer, and looks
-  // more "assembled" — is only worth it for CROWDED covers (>5 figures). The
-  // default flag now gates on figure count; an explicit options.compositeCovers
-  // === true (Test Lab) still forces composite for testing.
+  // --- Composite-vs-direct decision (unchanged gate) ────────────────────
+  // `composite` is now an OPTION on the shared generateImageWithQualityRetry
+  // path — NOT a cover-only fork. We decide compositeOn exactly as before and
+  // hand it + the composite inputs to the single image call below; the shared
+  // function routes to the composite generator internally when composite is on
+  // AND a landmark buffer is present, and renders direct otherwise (the
+  // no-landmark fallback and the composite-throws fallback both live inside the
+  // shared function now — see _maybeGenerateComposite in images.js).
+  //
+  // options.compositeCovers === false is an explicit opt-out: the user-facing
+  // "Überarbeiten" (regenerate-from-scratch) endpoint passes it so a from-scratch
+  // render never routes through composite. Direct render handles up to 5 figures
+  // fine (Pixar @5 verified, user decision 2026-07-19), so composite — slower,
+  // needs the analyzer, looks more "assembled" — is only worth it for CROWDED
+  // covers (>5 figures). The default flag gates on figure count; an explicit
+  // options.compositeCovers === true (Test Lab) still forces composite.
   const coverFigureCount = coverCharacterPhotos?.length || 0;
   const compositeOn = options.compositeCovers === false
     ? false
@@ -511,104 +514,81 @@ async function iterateCover(coverKey, storyData, options = {}) {
   if (!compositeOn && MODEL_DEFAULTS.compositeCovers === true && options.compositeCovers == null) {
     log.info(`🔄 [COVER-ITERATE] ${coverKey}: ${coverFigureCount} figure(s) ≤ 5 — direct render (composite reserved for >5)`);
   }
+
+  // When composite is on, assemble the inputs the composite generator needs
+  // (artifact-enriched hint + resolved landmark bytes). These stay HERE because
+  // they are cover-domain producer helpers; the shared image path only consumes
+  // the ready-made bundle. landmarkBuf may be null → the shared path detects the
+  // missing prerequisite and renders direct (the location prose drives the
+  // backdrop). options.landmarkBufOverride lets a caller (Test Lab) BORROW a
+  // background plate so composite can be exercised on a landmark-less story.
+  let compositeInputs = null;
   if (compositeOn) {
-    try {
-      const { generateCoverViaComposite } = require('./coverComposite');
-      // Pull artifact prop bytes + a full-VB id→name map so the composite layer
-      // has everything ready (shared producer helper — same enrichment the
-      // regeneration test-models path uses).
-      const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible);
-      // First landmark photo for the cover. options.landmarkBufOverride lets a
-      // caller (Test Lab) BORROW a background plate from any story so the
-      // composite path can be exercised on a landmark-less story — otherwise
-      // no landmark → composite silently falls back to direct.
-      const landmarkBuf = options.landmarkBufOverride
-        || (coverLandmarkPhotos?.[0] ? await loadLandmarkBytes(coverLandmarkPhotos[0]) : null);
-      // Composite path requires a real landmark photo for pass 2 (the
-      // photo-protection edit). Without one, pass 2 is skipped and pass 1
-      // returns figures-on-white — which then gets padded with gray bars
-      // to fit the page aspect. For invented locations (no photo) we want
-      // a full backdrop, not a white plate, so route those through the
-      // normal generation path below where the LOC's prose description
-      // drives the backdrop directly.
-      if (!landmarkBuf) {
-        log.info(`🎨 [COVER-ITERATE] ${coverKey}: no landmark photo for composite path — using normal generation with location prose`);
-        // Fall through to the normal path. No throw, just skip the
-        // composite branch entirely so generateImageWithQualityRetry runs.
-      } else {
-      const compositeResult = await generateCoverViaComposite({
-        coverKey,
-        // Use mergedCharacters (with fresh avatars merged) so the composite
-        // pulls the same costumed avatars the rest of the pipeline uses.
-        characters: mergedCharacters,
-        coverHint: enrichedHint,
-        // Pass the full scene prose so pass-1 / pass-2 prompts can include
-        // the story-specific action (Emma holds the Schatztruhe with eyes on
-        // contents, Noah gazes at the Schatzkarte). Without this the
-        // composite fell back to generic positional pose templates and the
-        // model invented arbitrary poses that contradicted the story.
-        sceneDescription,
-        // VB grid as a second image slot for pass 1. The grid carries
-        // reference cells for every artifact / animal / secondary character
-        // referenced by the cover hint. Pass 1 was previously blind to these
-        // — only the first artifact was pasted into the input image as a
-        // single "prop" buffer; multiple artifacts (Schatztruhe + Schatzkarte
-        // in one scene), animals, and secondary characters had no visual
-        // reference at all and Grok rendered them generically. Sending the
-        // VB grid as a labeled second image gives Grok the actual look of
-        // each element it should depict in the figures' hands.
-        vbGrid: coverVbGrid,
-        landmarkBuf,
-        // sceneBackground = already-styled manga/watercolor empty scene of
-        // the landmark, generated earlier by packReferences-equivalent code
-        // around line 600 of this file. When present, the composite path
-        // uses it as the figure backdrop and runs ONE Grok refinement edit
-        // (no style transfer, no landmark protection needed — both are
-        // already baked into the empty scene). Without this V2/V3/V4 of
-        // job_1780564110486_g4gn4vzvu all dropped the landmark on pass 2.
-        sceneBackground: coverSceneBackground,
-        artStyle: storyData.artStyle || 'watercolor',
-        title: storyData.title || '',
-        dedication: storyData.dedication || '',
-        styleHint: styleDescription,
-        usageTracker,
-        // Full VB — id→name resolution + final sanitizeVbIdsInPrompt scrub
-        // on both pass prompts (post-VEH001 rule).
-        visualBible,
-        // Figure orientation strategy (Test Lab / docs/image-routing.md).
-        // Default 'frontal' when unset — production behaviour unchanged.
-        orient: options.orient || 'frontal',
-      });
-      log.info(`🎨 [COVER-ITERATE] ${coverKey}: composite-cover generated (modelId=${compositeResult.modelId})`);
-      return {
-        imageData: compositeResult.imageData,
-        score: null, // composite path skips quality eval — returns immediately
-        reasoning: 'composite-cover (no quality eval)',
-        modelId: compositeResult.modelId,
-        totalAttempts: compositeResult.totalAttempts || 1,
-        prompt: compositeResult.prompt,
-        referencePhotos: coverCharacterPhotos,
-        landmarkPhotos: coverLandmarkPhotos,
-        visualBibleGrid: null,
-        grokRefImages: null,
-        usage: { cost: 0.04, direct_cost: 0.04 }, // 2 Grok edits
-        previousImage: rehydratedCoverBytes,
-        previousScore: existingCover.qualityScore || null,
-        compositeDebug: compositeResult.debug,
-      };
-      } // close else (landmarkBuf present)
-    } catch (err) {
-      log.warn(`⚠️ [COVER-ITERATE] composite path failed: ${err.message} — falling back to normal path`);
-    }
+    // Pull artifact prop bytes + a full-VB id→name map so the composite layer
+    // has everything ready (shared producer helper — same enrichment the
+    // regeneration test-models path uses).
+    const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible);
+    const landmarkBuf = options.landmarkBufOverride
+      || (coverLandmarkPhotos?.[0] ? await loadLandmarkBytes(coverLandmarkPhotos[0]) : null);
+    compositeInputs = {
+      coverKey,
+      // mergedCharacters (fresh avatars merged) so the composite pulls the same
+      // costumed avatars the rest of the pipeline uses.
+      characters: mergedCharacters,
+      coverHint: enrichedHint,
+      // Full scene prose so the composite passes carry the story-specific action
+      // (who holds what, eyes on which contents) instead of generic pose templates.
+      sceneDescription,
+      // VB grid as a labeled reference slot for every artifact / animal /
+      // secondary character the cover hint references.
+      vbGrid: coverVbGrid,
+      landmarkBuf,
+      // Already-styled empty scene of the landmark → composite single-pass branch
+      // (uses it as the figure backdrop, one Grok refinement edit, no re-style /
+      // re-protect of the landmark).
+      sceneBackground: coverSceneBackground,
+      artStyle: storyData.artStyle || 'watercolor',
+      title: storyData.title || '',
+      dedication: storyData.dedication || '',
+      styleHint: styleDescription,
+      // Full VB — id→name resolution + final sanitize scrub on both pass prompts.
+      visualBible,
+      // Figure orientation strategy (Test Lab / docs/image-routing.md). Default
+      // 'frontal' when unset — production behaviour unchanged.
+      orient: options.orient || 'frontal',
+    };
   }
 
-  // --- Generate image ---
+  // --- Generate image (single shared path; composite is just an option) ──
   const imageResult = await generateImageWithQualityRetry(
     coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, usageTracker, null,
     { imageModel: imageModel || null },
     `${coverLabelStr} ITERATE`,
-    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground, clothingRequirements: storyData.clothingRequirements || null, artStyle: artStyleId }
+    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground, clothingRequirements: storyData.clothingRequirements || null, artStyle: artStyleId, composite: compositeOn, compositeInputs }
   );
+
+  // Composite path skips quality eval AND the app-side restamp (title/dedication
+  // are baked in by the composite passes) — return its result directly, exactly
+  // as before composite became a shared-path option. Same return shape so all
+  // callers stay agnostic.
+  if (imageResult.composite) {
+    return {
+      imageData: imageResult.imageData,
+      score: null, // composite path skips quality eval — returns immediately
+      reasoning: 'composite-cover (no quality eval)',
+      modelId: imageResult.modelId,
+      totalAttempts: imageResult.totalAttempts || 1,
+      prompt: imageResult.prompt,
+      referencePhotos: coverCharacterPhotos,
+      landmarkPhotos: coverLandmarkPhotos,
+      visualBibleGrid: null,
+      grokRefImages: null,
+      usage: imageResult.usage,
+      previousImage: rehydratedCoverBytes,
+      previousScore: existingCover.qualityScore || null,
+      compositeDebug: imageResult.compositeDebug,
+    };
+  }
 
   log.info(`🔄 [COVER-ITERATE] ${coverKey}: Generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
 
