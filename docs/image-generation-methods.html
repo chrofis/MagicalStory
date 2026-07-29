@@ -236,7 +236,7 @@
   <td><code>server/lib/coverComposite.js</code></td>
   <td>Grok edit ×1 (single-pass) or ×2 (legacy)</td>
   <td>Manually composited canvas (costumed avatars + styled empty scene OR landmark photo) + cover hint.</td>
-  <td>Single-pass (default when styled empty scene exists, since commit <code>b8e72eb9</code> 2026-06-07): sharp-composite figures onto styled scene → 1 Grok edit (blend + ground + title). Legacy two-pass (fallback when no styled scene): pass 1 pose-redraw on white BG → pass 2 composite onto landmark + watercolor finish. Active when <code>MODEL_DEFAULTS.compositeCovers</code> is true. <strong>Auto-pipeline default for V2+ covers.</strong></td>
+  <td>Single-pass (default when styled empty scene exists, since commit <code>b8e72eb9</code> 2026-06-07): sharp-composite figures onto styled scene → 1 Grok edit (blend + ground + title). Legacy two-pass (fallback when no styled scene): pass 1 pose-redraw on white BG → pass 2 composite onto landmark + watercolor finish. <strong>No longer called directly by <code>coverIterate</code></strong> — it is the implementation the shared-path <code>composite</code> option dispatches to (<code>images.js _maybeGenerateComposite</code>). Engaged when <code>composite===true</code> (covers set this via <code>MODEL_DEFAULTS.compositeCovers</code> + the &gt;5-figure gate) AND a landmark buffer is present. <strong>Auto-pipeline default for V2+ covers.</strong></td>
 </tr>
 
 <tr>
@@ -274,9 +274,9 @@
 
 <tr>
   <td>Generate front cover / initial page / back cover</td>
-  <td><code>server/lib/coverIterate.js</code> → <code>coverComposite</code> (if <code>compositeCovers</code>) or <code>generateImageWithQualityRetry</code></td>
+  <td><code>server/lib/coverIterate.js</code> → <code>generateImageWithQualityRetry(..., { composite, compositeInputs })</code></td>
   <td>Grok edit</td>
-  <td>Composite mode is the current default. Direct path is the fallback / older behaviour.</td>
+  <td><strong>Composite is now an OPTION on the shared image path, not a fork.</strong> <code>iterateCover</code> computes <code>compositeOn</code> (figure-count gate, explicit-flag override) and passes <code>composite: compositeOn</code> + <code>compositeInputs</code> into the SAME <code>generateImageWithQualityRetry</code> call every page uses. Inside, <code>_maybeGenerateComposite</code> routes to <code>generateCoverViaComposite</code> when <code>composite===true</code> AND a landmark buffer is present, else runs the direct generate+eval path (also the no-landmark / composite-throws fallback). Pages pass no option → default off → direct. Different DEFAULTS (covers on for &gt;5 figures, pages off), one CODE path.</td>
 </tr>
 
 <tr>

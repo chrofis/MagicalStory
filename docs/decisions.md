@@ -256,6 +256,67 @@ the same provider fn with the same key args as the pre-refactor inline ladder.
 - `tests/manual/test-images-dispatch-core.js` — faithfulness unit test
 **Status:** ✅ active.
 
+### Covers = images; `composite` is a shared-path OPTION, not a cover-only fork (2026-07-29)
+**Context:** Owner directive: "Covers should now be identical to all other
+images — we add the text separately app-side. The only thing is they have the
+COMPOSITE option (figures composited onto a background = simpler image)…
+composite should just be an OPTION that is ON for covers and OFF for images.
+Everything must be implemented this way between cover and normal images. They
+can have different DEFAULTS but the CODE should be the same." Previously
+`iterateCover` FORKED: `if (compositeOn && landmarkBuf) → generateCoverViaComposite`
+(a cover-only path that returned its own result shape) `else → generateImageWithQualityRetry`.
+Pages and direct covers already shared `generateImageWithQualityRetry`; only the
+composite branch lived outside it.
+**Decision:** `composite` is now a first-class option on the shared
+`generateImageWithQualityRetry` path (default **false**). A new private router
+`_maybeGenerateComposite(options, usageTracker, pageLabel)` runs at the top of
+the function: when `options.composite === true` AND `options.compositeInputs.landmarkBuf`
+is present, it calls `generateCoverViaComposite` (the composite internals are
+UNCHANGED — it's still the implementation, just called through the option) and
+returns an imageResult-shaped object marked `composite:true`, `score:null`
+(composite skips eval, as before). It returns `null` — meaning "run the normal
+direct generate+eval path" — when composite is off (the default; every page),
+when the landmark prerequisite is missing (invented-location fallback), or when
+the composite generator throws. `iterateCover` STOPS calling
+`generateCoverViaComposite` directly: it computes `compositeOn` with the exact
+same gate (figure-count `>5` default, explicit `options.compositeCovers` true/false
+override) and passes `composite: compositeOn` + `compositeInputs` (artifact-enriched
+hint + resolved landmark bytes — cover-domain producer prep stays in coverIterate)
+into the SINGLE shared call. Its two-branch generation fork collapses into that
+one call. After it, `iterateCover` still branches on `imageResult.composite` to
+skip the app-side restamp for composite covers (their title is baked in by the
+composite passes) — that is a return-assembly difference, not a second generator
+call, and it preserves today's behaviour exactly.
+**Rationale:** The owner's "covers = images, composite as an option" principle,
+made literal — one code path, gated on the OPTION VALUE (never on
+`evaluationType==='cover'`, so a page COULD opt in), with different defaults
+(covers on for >5 figures, pages off). Composite-default-on-for-covers is right
+because covers are STATIC group portraits — no action, every figure faces
+forward — which is exactly what compositing pre-rendered figure cutouts onto a
+background plate handles well; page scenes have action/interaction/depth that
+the direct render captures better, so they stay direct. This is a REFACTOR, not
+a redesign: the composite result, the direct result, eval, versioning, the
+`restampCover` restamp, and the no-landmark → direct fallback all behave
+byte-identically — only WHERE the composite-vs-direct decision is made moved
+(into the shared function as an option). The PAGE PATH is provably untouched:
+with no `composite` option, `_maybeGenerateComposite` returns null on its first
+line and the direct generate+eval loop runs exactly as before.
+**Rejected:** hardcoding composite to `evaluationType==='cover'` inside the
+shared function (violates "same code, page could opt in"); moving the full
+cover-return assembly (referencePhotos, previousImage, previousScore) into the
+shared function (those are cover-domain values not available there — keeps the
+shared fn generic).
+**Touched:**
+- `server/lib/images.js` — new `_maybeGenerateComposite` router + early-return
+  in `generateImageWithQualityRetry`; exported for testing
+- `server/lib/coverIterate.js` — fork removed; computes `compositeOn`, builds
+  `compositeInputs`, one shared call, `imageResult.composite` return branch
+- `server/lib/coverComposite.js` — UNCHANGED (composite internals preserved)
+- `docs/image-routing.md`, `docs/image-generation-methods.html` — composite
+  documented as a shared-path option
+- `tests/manual/test-composite-option-dispatch.js` — dispatch faithfulness test
+**Status:** ✅ active.
+
 ### Text-overlay font size never shrinks
 **Context:** Page text gets overlaid on the rendered illustration. Longer
 paragraphs are tempting to shrink so they always fit a fixed box.
