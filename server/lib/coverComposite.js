@@ -512,7 +512,11 @@ async function generateCoverViaComposite({
   artStyle = 'watercolor',
   title = '',
   dedication = '',
-  styleHint = "watercolor children's storybook illustration, soft brushwork, gentle storybook colors",
+  // Defensive default only — the sole caller (coverIterate) always passes a
+  // resolveArtStyle-derived styleHint. Derive from artStyle (not a hardcoded
+  // "watercolor") so a future caller that omits it can't silently render an
+  // oil/manga story in watercolour.
+  styleHint = `${artStyle} children's storybook illustration, soft brushwork, gentle storybook colors`,
   sceneDescription = '',
   vbGrid = null,
   usageTracker = null,
