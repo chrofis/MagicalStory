@@ -646,11 +646,12 @@ gating preserved (figure-count, explicit flag, no-landmark→direct, throw→dir
 34 new + 53 + 69 assertions pass. Viewer-gaze/facing-forward untouched (owner: no
 action). `image-routing.md` + `image-generation-methods.html` + `decisions.md`
 updated.
-**Latent divergence flagged (NOT fixed):** `server.js:3884` streaming initial-cover
-gen calls `generateImageWithQualityRetry` with NO composite option → initial-gen
-covers always render direct regardless of the figure-count gate; only `iterateCover`
-(auto-repair/dev-iterate/user-regen) applies composite. Pre-existing; wiring it is a
-follow-up decision (owner's "everything must be implemented this way" may want it).
+**Initial-cover-gen stays direct — BY DESIGN (owner 2026-07-29):** "Direct is still
+better, so composite stays as fallback. That is ok." `server.js:3884` streaming
+initial-cover gen deliberately renders DIRECT (no composite option); composite is
+the fallback for crowded (>5-figure) covers, applied only via `iterateCover`
+(auto-repair / dev-iterate / user-regen). NOT a gap — do not wire composite into
+initial-gen.
 **Pending staging smoke test:** direct ≤5-fig cover, >5-fig composite cover w/
 landmark, >5-fig cover w/o landmark (→ direct), normal page (byte-unchanged).
 
