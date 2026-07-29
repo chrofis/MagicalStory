@@ -55,7 +55,13 @@ version-index normalization (shared resolver), (2) drop-or-recompute the
 scene-level bbox mirror. Both contained; version normalization touches UI display
 so wants a visual check.
 
-**Status:** 🟢 server scoring consolidated; 🟡 client version-index + bbox mirror pending.
+**Status:** 🟢 server scoring consolidated; client version-index resolver
+(`resolveActiveArrayIdx`) SHIPPED. **Bbox mirror residual REVIEWED 2026-07-26 →
+NON-ISSUE:** `bboxDetection: freshBboxMap.get(page) || finalEval.bboxDetection`
+is NOT stale — `finalEval = best.evaluation` (the picked version's own eval), and
+the freshBboxMap loop only re-detects when `bboxPairsWith(bestBbox, best.imageData)`
+fails (the `sourceImageFp` byte-pairing invariant). So the mirror always reflects
+the picked version's pixels. No change needed.
 
 ### 1a. Scores floor at 0 — "often 3 images have 0"
 - **Answer:** the score CANNOT go negative — clamped to `[0,100]` server-side
@@ -597,13 +603,24 @@ resolver, ONE scene-then-figure repair order — then every fix lands everywhere
 2. **Wire the final style check** (§10) — feed Step-5 `styleConsistency.outliers`
    back through iterate before finalize; add `checkStyleMatch` as a production
    gate on char-fix/inpaint/iterate. *(this is "the style check isn't working".)*
-3. **Titleless composite covers + composite covers return `score:null`** —
-   restamp on composite repaint; run eval on the composite path.
-4. **Secondary-character identity** (§8) — the cheap prompt-tail backstop (#3) is
-   autonomous-safe pending prompt validation; the root-cause reference generation
-   (#1) is a cost decision.
-5. **`styleHint` watercolor default** (`coverComposite.js:515`) — derive from
-   `artStyle` instead of defaulting an `oil` story to watercolor.
+3. ~~**Titleless composite covers + composite covers return `score:null`**~~ —
+   REVIEWED 2026-07-26 → **DELIBERATE, no change.** decisions.md ("Covers get full
+   page-style evaluation" + "score:null — eval only runs on the promoted image"):
+   cover eval runs in the unified repair pipeline on the promoted image, and
+   `restampCover` already re-stamps titles on composite repaints. Not a bug.
+4. **Secondary-character identity** (§8) — ✅ SHIPPED (every secondary in the VB on
+   a single scene).
+5. ~~**`styleHint` watercolor default**~~ — REVIEWED 2026-07-26 → **NON-ISSUE + tiny
+   hygiene fix shipped (`49fd645e`).** The sole caller (`coverIterate`) always passes
+   `styleHint = resolveArtStyle(artStyle) || resolveArtStyle('pixar')`, so an oil
+   story never rendered watercolor; the in-function default (never reached) now
+   derives from `artStyle` anyway.
+
+**Structural (the marquee item, IN PROGRESS 2026-07-26):** merge the two image-gen
+entry functions `callGeminiAPIForImage` (eval path) + `generateImageOnly` (no-eval,
+`genonly_` cache) — they re-implement the same Grok/Gemini/Runware dispatch ladder.
+Extracting a shared `_dispatchImageGeneration` core (both become thin wrappers;
+eval + cache namespaces preserved). Owner: "this must be fixed."
 
 ### 🧪 Experiments (need §6 rubric + §7 harness first)
 - Outline single-vs-split A/B (§5); model downgrades for `story_ideas` / util
