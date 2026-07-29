@@ -1,13 +1,22 @@
 /**
- * Pt 8 — Secondary-character identity fix.
+ * Secondary-character identity fix.
  *
- * Verifies getElementsNeedingReferenceImages now returns a NAMED secondary
- * character that appears on only ONE page (so it gets its own face reference
- * and can't inherit the primary's identity), while still:
- *   - excluding a generic / crowd secondary ("villagers", "a guard"),
- *   - excluding a 1-page LOCATION (non-character elements keep the 2-page gate),
- *   - excluding a secondary that already has a reference,
- *   - keeping the old behaviour for a 2-page location.
+ * Owner rule (2026-07-26): EVERY secondary character must be in the visual bible
+ * with its own reference image even when it appears in a SINGLE scene — the old
+ * "2+ scenes" gate is what left single-scene secondaries with no reference, so
+ * they inherited the primary's face. There is NO name/identity filter: any entry
+ * the story put in `secondaryCharacters` gets its own face.
+ *
+ * Verifies getElementsNeedingReferenceImages:
+ *   - INCLUDES a secondary that appears on only ONE page (Sofia),
+ *   - INCLUDES a secondary described with an article ("a guard") — a single
+ *     individual that previously (and wrongly) got filtered out,
+ *   - INCLUDES a group entry ("villagers") — the story chose to put it in the VB,
+ *     so it gets its own reference and doesn't borrow the primary's face,
+ *   - EXCLUDES a secondary that already has a reference,
+ *   - EXCLUDES a secondary with no pages (can't be placed),
+ *   - keeps the 2-page gate for LOCATIONS (a one-page place needs no reference),
+ *   - applies the SAME single-page rule in trial mode.
  *
  * Deterministic, no network / DB.
  * Run: node tests/manual/test-pt8-secondary-references.js
@@ -35,10 +44,7 @@ Module._load = function (request, parent, isMain) {
   }
 };
 
-const {
-  getElementsNeedingReferenceImages,
-  isNamedIndividualCharacter,
-} = require('../../server/lib/visualBible');
+const { getElementsNeedingReferenceImages } = require('../../server/lib/visualBible');
 Module._load = origLoad;
 
 let passed = 0;
@@ -48,35 +54,22 @@ const check = (label, cond) => {
   console.log(`  ✓ ${label}`);
 };
 
-// ── isNamedIndividualCharacter unit checks ──────────────────────────────────
-console.log('isNamedIndividualCharacter:');
-check('proper name "Sofia" is a named individual', isNamedIndividualCharacter('Sofia') === true);
-check('two-word name "Frau Müller" is a named individual', isNamedIndividualCharacter('Frau Müller') === true);
-check('singular role "Innkeeper" is a named individual', isNamedIndividualCharacter('Innkeeper') === true);
-check('placeholder "Soldier1" is a named individual', isNamedIndividualCharacter('Soldier1') === true);
-check('article-prefixed "a guard" is NOT a named individual', isNamedIndividualCharacter('a guard') === false);
-check('article-prefixed "The Innkeeper" is NOT a named individual', isNamedIndividualCharacter('The Innkeeper') === false);
-check('collective "villagers" is NOT a named individual', isNamedIndividualCharacter('villagers') === false);
-check('collective "Soldiers" is NOT a named individual', isNamedIndividualCharacter('Soldiers') === false);
-check('empty name is NOT a named individual', isNamedIndividualCharacter('') === false);
-check('null name is NOT a named individual', isNamedIndividualCharacter(null) === false);
-
 // ── getElementsNeedingReferenceImages integration ───────────────────────────
-console.log('getElementsNeedingReferenceImages:');
+console.log('getElementsNeedingReferenceImages (every secondary, single scene):');
 const vb = {
   secondaryCharacters: [
-    { id: 'CHR001', name: 'Sofia', appearsInPages: [4], referenceImageGenerated: false }, // 1-page NAMED → include
-    { id: 'CHR002', name: 'villagers', appearsInPages: [2, 5], referenceImageGenerated: false }, // generic crowd → exclude even at 2 pages
-    { id: 'CHR003', name: 'a guard', appearsInPages: [3], referenceImageGenerated: false }, // article generic → exclude
-    { id: 'CHR004', name: 'Otto', appearsInPages: [1], referenceImageGenerated: true }, // already has ref → exclude
-    { id: 'CHR005', name: 'Grandpa Max', appearsInPages: [], referenceImageGenerated: false }, // no page → exclude (can't place)
+    { id: 'CHR001', name: 'Sofia', appearsInPages: [4], referenceImageGenerated: false },      // 1-page → include
+    { id: 'CHR002', name: 'a guard', appearsInPages: [3], referenceImageGenerated: false },     // 1-page article-role → include (was wrongly filtered before)
+    { id: 'CHR003', name: 'villagers', appearsInPages: [2], referenceImageGenerated: false },   // group entry the story put in VB → include (own ref, not primary's face)
+    { id: 'CHR004', name: 'Otto', appearsInPages: [1], referenceImageGenerated: true },         // already has ref → exclude
+    { id: 'CHR005', name: 'Grandpa Max', appearsInPages: [], referenceImageGenerated: false },  // no page → exclude (can't place)
   ],
   artifacts: [],
   animals: [],
   vehicles: [],
   locations: [
-    { id: 'LOC001', name: 'Cave', appearsInPages: [7], isRealLandmark: false, referenceImageGenerated: false }, // 1-page location → exclude (2-page gate)
-    { id: 'LOC002', name: 'Castle', appearsInPages: [1, 8], isRealLandmark: false, referenceImageGenerated: false }, // 2-page location → include
+    { id: 'LOC001', name: 'Cave', appearsInPages: [7], isRealLandmark: false, referenceImageGenerated: false },       // 1-page location → exclude (2-page gate)
+    { id: 'LOC002', name: 'Castle', appearsInPages: [1, 8], isRealLandmark: false, referenceImageGenerated: false },   // 2-page location → include
   ],
 };
 
@@ -84,18 +77,19 @@ const result = getElementsNeedingReferenceImages(vb); // defaults: minAppearance
 const names = result.map(e => `${e.name}:${e.type}`);
 console.log('  returned:', JSON.stringify(names));
 
-check('1-page NAMED secondary "Sofia" IS included', names.includes('Sofia:character'));
-check('generic 2-page "villagers" is EXCLUDED', !names.some(n => n.startsWith('villagers')));
-check('article-generic "a guard" is EXCLUDED', !names.some(n => n.startsWith('a guard')));
+check('1-page secondary "Sofia" IS included', names.includes('Sofia:character'));
+check('1-page article-role "a guard" IS included (no name filter)', names.includes('a guard:character'));
+check('group entry "villagers" IS included (gets its own reference)', names.includes('villagers:character'));
 check('already-referenced "Otto" is EXCLUDED', !names.some(n => n.startsWith('Otto')));
 check('no-page "Grandpa Max" is EXCLUDED', !names.some(n => n.startsWith('Grandpa Max')));
-check('1-page LOCATION "Cave" is EXCLUDED', !names.some(n => n.startsWith('Cave')));
+check('1-page LOCATION "Cave" is EXCLUDED (locations keep 2-page gate)', !names.some(n => n.startsWith('Cave')));
 check('2-page LOCATION "Castle" IS included', names.includes('Castle:location'));
 
-// ── trial-mode gate (characterMinAppearances=2) preserves old behaviour ──────
-console.log('trial gate (characterMinAppearances=2):');
-const trialResult = getElementsNeedingReferenceImages(vb, 2, 2).map(e => e.name);
-check('trial gate EXCLUDES 1-page "Sofia"', !trialResult.includes('Sofia'));
-check('trial gate still includes 2-page "Castle"', trialResult.includes('Castle'));
+// ── trial mode uses the SAME single-page rule ───────────────────────────────
+console.log('trial mode (characterMinAppearances=1, same as full):');
+const trialResult = getElementsNeedingReferenceImages(vb, 2, 1).map(e => e.name);
+check('trial INCLUDES 1-page "Sofia"', trialResult.includes('Sofia'));
+check('trial INCLUDES 1-page "a guard"', trialResult.includes('a guard'));
+check('trial still EXCLUDES 1-page location "Cave"', !trialResult.includes('Cave'));
 
 console.log(`\nALL ${passed} CHECKS PASSED`);

@@ -84,7 +84,7 @@ secondaries now qualify for a reference on a single page in full mode.
 
 ---
 
-### Every named secondary character gets its own reference image (Pt 8, 2026-07-26)
+### Every secondary character gets its own reference image, even in a single scene (2026-07-26)
 **Context:** Two disjoint character pools exist: **primaries**
 (`inputData.characters` — get avatars + face/body reference photos) and
 **secondaries** (`visualBible.secondaryCharacters` — get an image ONLY if a VB
@@ -94,42 +94,38 @@ With no reference, the secondary contributed zero image slots; `packReferences`
 then sent Grok/Gemini only the **primary's** face as the sole human reference,
 and the model — anchored to its input images — painted the secondary borrowing
 the primary's face. The secondary's identity survived only as prose, which loses
-to the image reference. Owner decision (2026-07-25): "Every character must be in
-the visual bible" with its own identity, and the cost of generating secondary
-references IS accepted.
+to the image reference. Owner rule: "They should be in the visual bible. We had
+if they appear in more than 2 scenes. We just need to change that even in a
+single scene." The cost of generating secondary references IS accepted.
 **Decision:** Lower the appearance gate for **characters only** to 1 page while
-locations / artifacts / animals / vehicles keep the 2-page recurring-element
-gate. `getElementsNeedingReferenceImages(visualBible, minAppearances=2,
-characterMinAppearances=1)` now takes a per-type gate; the character branch also
-runs a named-individual guard so generic crowds don't get a wasted reference.
-Once a named secondary has a reference, the existing per-page path
+locations / artifacts / animals / vehicles keep the 2-page recurring-element gate
+(a one-page prop/place doesn't justify a reference-gen call).
+`getElementsNeedingReferenceImages(visualBible, minAppearances=2,
+characterMinAppearances=1)` takes a per-type gate. **No name/identity filter** —
+any entry the story placed in `secondaryCharacters` gets its own face. Once a
+secondary has a reference, the existing per-page path
 (`getElementReferenceImagesForPage` → `buildVisualBibleGrid` → `visualBibleGrid`
 → `packReferences`) already carries its own face to both providers — no
-provider-branch change needed.
-**Named-vs-generic rule** (`isNamedIndividualCharacter`): a character qualifies
-for its own reference iff its name is present (≥2 chars), is NOT article-prefixed
-("a guard", "the innkeeper" → generic role reference), and is NOT a single-word
-plural/collective crowd noun (villagers, soldiers, guards, crowd, townsfolk, …).
-Proper names, singular named roles ("Innkeeper"), and placeholder individuals
-("Soldier1") all qualify — a distinct invented face always beats borrowing the
-primary's identity. Generic crowds belong in the scene `background` field
-(story-unified.txt:249), not the VB; this guard is the safety net for the rare
-story-text-extraction leak. The guard applies to characters at ALL page counts,
-so a "villagers" entry that recurs is now excluded (previously it got one
-misleading face at 2+ pages).
-**Trial mode:** unchanged — the trial `generateReferenceSheet` call passes
-`characterMinAppearances: 2`, so trial keeps the old 2-page gate. Trial is
-speed-optimised and its `maxElements: 6` cap already bounds element count; the
-Pt 8 single-page widening is full-(non-trial-)mode only, per "unified mode is
-primary".
+provider-branch change needed. Applies **the same in trial mode** (its
+`maxElements: 6` cap still bounds total refs).
+**Correction (same day):** an earlier version of this fix added an
+`isNamedIndividualCharacter` guard + `GENERIC_CROWD_TERMS` blocklist that skipped
+article-prefixed names ("a guard", "the innkeeper") and plural collectives, and
+kept trial at gate 2. That was over-engineered and wrong for the common case:
+"a guard" / "the innkeeper" are single individuals, and excluding them left them
+inheriting the primary's face — the exact bug. Removed the guard entirely: every
+`secondaryCharacters` entry qualifies. (True crowds are a story-text data-quality
+issue that belongs in the scene `background` field, not a reference-gen blocklist;
+giving a group entry its own reference is not a regression toward the primary-face
+bug — it just gets its own face — and matches the pre-existing behaviour that
+generated references for whatever the story put in the pool at ≥2 pages.)
 **Cost/latency:** one extra reference-gen call per newly-qualifying single-page
-named secondary (batched up to 4 per grid). A story with K such secondaries adds
-⌈K/4⌉ grid generations. Logged at `[REF-SHEET] 🧑 N secondary CHARACTER
-reference(s)…` for observability.
+secondary (batched up to 4 per grid). A story with K such secondaries adds ⌈K/4⌉
+grid generations. Logged at `[REF-SHEET] 🧑 N secondary CHARACTER reference(s)…`.
 **Touched:**
-- `server/lib/visualBible.js` — `isNamedIndividualCharacter()` + `GENERIC_CROWD_TERMS`; `getElementsNeedingReferenceImages()` per-type gate + named guard; export
+- `server/lib/visualBible.js` — `getElementsNeedingReferenceImages()` per-type gate (character=1, others=2); removed the name guard + crowd blocklist + export
 - `server/lib/images.js` — `generateReferenceSheet` accepts `characterMinAppearances`, threads it, logs secondary-character ref count
-- `server.js` — full-mode call passes `characterMinAppearances: 1`; trial call passes `2`
+- `server.js` — full-mode AND trial call both pass `characterMinAppearances: 1`
 - `tests/manual/test-pt8-secondary-references.js` — unit test
 **Status:** ✅ active.
 

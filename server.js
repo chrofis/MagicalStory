@@ -4040,10 +4040,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const styleDescriptionForRefs = resolveArtStyle(artStyle, refSheetBackend) || resolveArtStyle('pixar');
           trialReferenceSheetPromise = generateReferenceSheet(streamingVisualBible, styleDescriptionForRefs, {
             minAppearances: 2,
-            // Trial keeps the 2-page gate for secondaries too (Pt 8 single-page
-            // widening is full-mode only) — trial is speed-optimised and the
-            // maxElements cap already bounds it. See docs/decisions.md.
-            characterMinAppearances: 2,
+            // Every secondary character is in the visual bible with its own
+            // reference even on a single page (owner 2026-07-26) — same rule in
+            // trial as full mode; the maxElements cap below still bounds total refs.
+            characterMinAppearances: 1,
             maxPerBatch: 4,
             maxElements: 6,  // trial cap — story-trial.txt limits to max 2 secondaries + 2 artifacts + 2 locations
             storyId: jobId,
@@ -4579,7 +4579,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const styleDescription = resolveArtStyle(artStyle, refSheetBackend) || resolveArtStyle('pixar');
       referenceSheetPromise = generateReferenceSheet(visualBible, styleDescription, {
         minAppearances: 2, // Non-character elements (locations/artifacts/…) appearing on 2+ pages
-        characterMinAppearances: 1, // Pt 8: every named secondary gets its own face reference, even on a single page
+        characterMinAppearances: 1, // Every secondary character gets its own face reference, even on a single page (owner)
         maxPerBatch: 4,    // Max 4 elements per grid for quality
         maxElements: null, // Generate reference sheets for all qualifying elements
         storyId: jobId,    // Phase 1d R2 dual-write: refs upload to stories/{jobId}/vb/{entryId}.jpg

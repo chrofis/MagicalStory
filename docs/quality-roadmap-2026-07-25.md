@@ -372,23 +372,25 @@ image (remove/lower the `minAppearances` gate for characters) so none inherits
 another's face. Per-page reference packing then pulls each character's own
 reference. Cost of generating secondary references is accepted.
 
-**✅ SHIPPED to staging (2026-07-26, `9b51af9b`).** Targeted root fix (not a full
-pool-merge — deliberately bounded blast radius): `getElementsNeedingReferenceImages`
-now takes a per-type gate — named secondary **characters** qualify on a SINGLE page
-(`characterMinAppearances=1`), locations/artifacts/etc keep the 2-page gate. A
-`isNamedIndividualCharacter` guard (article-prefix + `GENERIC_CROWD_TERMS` set)
-excludes crowds ("villagers", "a guard") so only real individuals get a face.
-Every qualifying secondary now flows into a VB-grid cell → per-page packing sends
-its OWN face to Grok/Gemini → no more primary-face bleed. Fix is provider-agnostic
-(VB/reference layer, not a provider branch). 19 unit assertions pass; observability
-log at `images.js` `[REF-SHEET] 🧑`. **Trial mode intentionally kept at gate=2**
-(speed + `maxElements:6` cap) — single-page trial secondaries can still bleed; flip
-`characterMinAppearances:1` at `server.js` trial caller to cover it.
-**Residual gap (not a regression):** secondaries ride a VB-grid cell, not the
-primary colour-frame face-card path, and don't get clothing-avatar resolution — a
-FULL pool-merge would close those. Enough to stop face-borrowing; parity would need
-the merge. **Pending staging eyeball:** a live run's `[REF-SHEET] 🧑` line + a
-single-page secondary rendering with a distinct face.
+**✅ SHIPPED to staging (2026-07-26; corrected same day).** Simple threshold change
+per the owner: `getElementsNeedingReferenceImages` takes a per-type gate — secondary
+**characters** qualify on a SINGLE page (`characterMinAppearances=1`, was 2),
+locations/artifacts/etc keep the 2-page gate. **No name/identity filter** — every
+entry the story put in `secondaryCharacters` gets its own reference and flows into a
+VB-grid cell → per-page packing sends its OWN face to Grok/Gemini → no primary-face
+bleed. Same rule in **full AND trial mode** (trial's `maxElements:6` cap still bounds
+refs). Provider-agnostic (VB/reference layer). 10 unit assertions pass; observability
+log `[REF-SHEET] 🧑`.
+**Correction:** the first cut added an `isNamedIndividualCharacter` guard +
+`GENERIC_CROWD_TERMS` blocklist that excluded article-prefixed names ("a guard",
+"the innkeeper") — which are the *common* secondary-character form, so they kept
+inheriting the primary's face. Owner: "not what I wanted… just change [the >2-scene
+gate] even in a single scene." Guard removed entirely.
+**Residual gap (not a regression):** secondaries ride a VB-grid cell, not the primary
+colour-frame face-card path, and don't get clothing-avatar resolution — a FULL
+pool-merge would close those. Enough to stop face-borrowing. **Pending staging
+eyeball:** a live run's `[REF-SHEET] 🧑` line + a single-page secondary rendering with
+a distinct face.
 
 ---
 

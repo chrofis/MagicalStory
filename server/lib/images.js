@@ -13896,9 +13896,9 @@ function buildReferenceSheetPrompt(elements, styleDescription) {
 async function generateReferenceSheet(visualBible, styleDescription, options = {}) {
   const {
     minAppearances = 2,
-    // Pt 8: named secondary characters qualify for a reference on a single page
+    // Every secondary character qualifies for a reference on a single page
     // (default 1) so none inherits the primary's face. Non-character elements
-    // keep `minAppearances`. Trial passes 2 to preserve its speed profile.
+    // keep `minAppearances`. Same rule in trial (bounded by maxElements).
     characterMinAppearances = 1,
     maxPerBatch = 4,
     imageModel = null,
@@ -13939,12 +13939,12 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   // Get elements that need reference images
   let needsReference = getElementsNeedingReferenceImages(visualBible, minAppearances, characterMinAppearances);
 
-  // Pt 8 observability: how many secondary CHARACTER references we're generating.
-  // These are the extra image-gen calls the "every named secondary gets its own
+  // Observability: how many secondary CHARACTER references we're generating.
+  // These are the extra image-gen calls the "every secondary gets its own
   // face" fix introduces — log them so cost/latency is traceable in Railway.
   const secondaryCharRefs = needsReference.filter(e => e.type === 'character');
   if (secondaryCharRefs.length > 0) {
-    log.info(`[REF-SHEET] 🧑 ${secondaryCharRefs.length} secondary CHARACTER reference(s) — each named secondary gets its own face so none inherits the primary's identity (Pt 8): ${secondaryCharRefs.map(e => `${e.name} (${e.pageCount}p)`).join(', ')}`);
+    log.info(`[REF-SHEET] 🧑 ${secondaryCharRefs.length} secondary CHARACTER reference(s) — each secondary gets its own face so none inherits the primary's identity: ${secondaryCharRefs.map(e => `${e.name} (${e.pageCount}p)`).join(', ')}`);
   }
 
   // Limit elements if maxElements specified (trial mode)
