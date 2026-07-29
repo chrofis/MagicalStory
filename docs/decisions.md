@@ -2265,6 +2265,23 @@ soft colour-weighted blend smooths it, but check that case visually.
 **Touched:** `server/lib/faceRepair.js` (colorCorrect default + garmentOnly/bgBorderMatch
 passthrough + colorInfo in log/return).
 
+**Follow-up cleanup (same day):** with colour matching now the single live path, the
+dead branches were removed and the giant blend split (net −80 lines):
+- `correctColorShift` is now unconditionally material-aware. Deleted the never-reached
+  `meanShift` and per-channel histogram-LUT branches, the `_ccMatchLUT` /
+  `_ccQuant` / `_ccBinCenter` / `_CC_RANGES` helpers, the `srcHist`/`refHist`
+  accumulation, the `below threshold` early-return, and the `borderMatch` harmonic
+  seam-close (`_closeSeamHarmonic`) — the sole caller always passed
+  `colorAware:true, borderMatch:false`, so all of it was unreachable. Provably
+  behaviour-preserving.
+- The inline ~55-line background-matching block in `samUnionBlend` was extracted verbatim
+  into a named `matchIntroducedBackground` helper (same file). NOT merged with the figure
+  correction — they're distinct: the figure path clusters background only to EXCLUDE it
+  (protect the garment match), this path clusters background to CORRECT introduced pixels.
+  Pure extraction, behaviour identical.
+**Cleanup touched:** `server/lib/images.js` (correctColorShift + dead helpers),
+`server/lib/samBlend.js` (matchIntroducedBackground extraction).
+
 ## Two rescue-path utility calls downgraded off Sonnet (2026-07-26)
 **Context:** `sceneValidator.repairScene` (JSON scene-repair after a composition
 check) and `rewriteBlockedScene` (safety rewrite of a scene the image model

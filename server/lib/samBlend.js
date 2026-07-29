@@ -103,6 +103,71 @@ async function _interiorSeedPoints(maskPng, w, h) {
 }
 
 /**
+ * Colour-match the BACKGROUND pixels the paste INTRODUCES back to the surrounding
+ * scene, so the silhouette edge doesn't read as a cut-out. Two sources of
+ * introduced background: the RED ZONE (old head wider than the new — the paste
+ * reveals scene there) and, when bgBorderMatch is on, a ring just inside the
+ * dilated union edge (the model redrew sky/wall/ground there). Per BACKGROUND
+ * material (clustered — snow, grass, wall, sky separated by colour) shift the
+ * model's pixels back toward the surrounding original (texture kept, not replaced);
+ * snow and grass corrected INDEPENDENTLY, figure pixels (hair/coat at the edge)
+ * left to the figure policy. GARBAGE (unfilled white / black fill) is instead
+ * diffusion-filled from the real scene, excluding both heads as a source so it can't
+ * ghost a "2nd nose". Mutates pasteRaw in place. Returns { bgPx, garbagePx, materials }.
+ */
+async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, oldA, s1r, bgBorderMatch }) {
+  const n = cropW * cropH;
+  const { _rgbToLab, _labToRgb, _deltaE, _ccKMeans, harmonicBackgroundFill } = require('./images');
+  const borderRing = Buffer.alloc(n);
+  if (bgBorderMatch) {
+    const eroded = await maskBlurThreshold(Buffer.from(alpha1), cropW, cropH, 12, 200); // shrink union ~12px inward
+    for (let i = 0; i < n; i++) borderRing[i] = (alpha1[i] > 128 && eroded[i] <= 128) ? 255 : 0; // union edge margin
+  }
+  const figExclude = Buffer.alloc(n);
+  for (let i = 0; i < n; i++) figExclude[i] = (newDil[i] > 128 || oldA[i * s1r] > 128) ? 255 : 0;
+  // FIGURE palette = K-cluster the model over the figure (newDil) → skin/hair/cloth.
+  const figPts = [];
+  for (let i = 0; i < n; i++) if (newDil[i] > 128) { const l = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]); figPts.push(l[0], l[1], l[2]); }
+  const figCent = (figPts.length ? _ccKMeans(Float32Array.from(figPts), 3, 6).cent : []);
+  // BACKGROUND palette = K-cluster the ORIGINAL just OUTSIDE the union — the real
+  // scene materials (snow, grass, …), EACH with its true target colour. K=5: a full
+  // figure can abut 3+ bg materials (sky, wall, ground, snow, grass) at once.
+  const ring = await maskBlurThreshold(Buffer.from(alpha1), cropW, cropH, 8, 16); // union → ~8px outer ring
+  const bgPts = [];
+  for (let i = 0; i < n; i++) if (ring[i] > 128 && alpha1[i] <= 128) { const l = _rgbToLab(origRaw[i * 3], origRaw[i * 3 + 1], origRaw[i * 3 + 2]); bgPts.push(l[0], l[1], l[2]); }
+  const bgCent = (bgPts.length ? _ccKMeans(Float32Array.from(bgPts), 5, 8).cent : []);
+  // Classify each candidate pixel: FIGURE (keep model) vs BACKGROUND (shift toward
+  // the real material). Per bg material, offset = original mean − model mean.
+  const garbage = Buffer.alloc(n);
+  const bgAssign = new Int32Array(n).fill(-1); // per-pixel background cluster (or -1)
+  const srcSum = bgCent.map(() => [0, 0, 0, 0]); // model mean per bg material
+  let garbagePx = 0, bgPx = 0;
+  for (let i = 0; i < n; i++) {
+    const inZone = redZone[i] || borderRing[i] > 128;
+    if (!inZone) continue;
+    const r = pasteRaw[i * 3], g = pasteRaw[i * 3 + 1], b = pasteRaw[i * 3 + 2];
+    if ((r > 235 && g > 235 && b > 235) || (r < 22 && g < 22 && b < 22)) { garbage[i] = 255; garbagePx++; continue; }
+    if (!bgCent.length) continue;
+    const lab = _rgbToLab(r, g, b);
+    let dFig = Infinity; for (const c of figCent) { const d = _deltaE(lab, c); if (d < dFig) dFig = d; }
+    let bk = -1, dBg = Infinity; for (let k = 0; k < bgCent.length; k++) { const d = _deltaE(lab, bgCent[k]); if (d < dBg) { dBg = d; bk = k; } }
+    if (bk >= 0 && dBg < dFig) { bgAssign[i] = bk; srcSum[bk][0] += lab[0]; srcSum[bk][1] += lab[1]; srcSum[bk][2] += lab[2]; srcSum[bk][3]++; bgPx++; }
+  }
+  const bgOff = bgCent.map((c, k) => srcSum[k][3] ? [c[0] - srcSum[k][0] / srcSum[k][3], c[1] - srcSum[k][1] / srcSum[k][3], c[2] - srcSum[k][2] / srcSum[k][3]] : [0, 0, 0]);
+  for (let i = 0; i < n; i++) {
+    const bk = bgAssign[i]; if (bk < 0) continue;
+    const lab = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
+    const rgb = _labToRgb(lab[0] + bgOff[bk][0], lab[1] + bgOff[bk][1], lab[2] + bgOff[bk][2]);
+    pasteRaw[i * 3] = rgb[0]; pasteRaw[i * 3 + 1] = rgb[1]; pasteRaw[i * 3 + 2] = rgb[2];
+  }
+  if (garbagePx > 0) {
+    const bgFill = harmonicBackgroundFill(origRaw, garbage, figExclude, cropW, cropH);
+    for (let i = 0; i < n; i++) { if (garbage[i]) { pasteRaw[i * 3] = bgFill[i * 3]; pasteRaw[i * 3 + 1] = bgFill[i * 3 + 1]; pasteRaw[i * 3 + 2] = bgFill[i * 3 + 2]; } }
+  }
+  return { bgPx, garbagePx, materials: bgCent.length };
+}
+
+/**
  * THE shared repair blend — engine-agnostic. Given the original crop and a
  * candidate crop (any model's output for the same region), put ONLY the
  * repainted figure back:
@@ -342,7 +407,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // union being pasted (alpha1).
   // Build the paste as RAW RGB: start from the candidate, colour-correct the
   // figure, then replace the red zone with the harmonic background fill.
-  const { correctColorShift, harmonicBackgroundFill } = require('./images');
+  const { correctColorShift } = require('./images');
   const origRaw = await sharp(origResized).removeAlpha().raw().toBuffer();
   let pasteRaw = await sharp(candResized).removeAlpha().raw().toBuffer();
   let colorInfo = null;
@@ -356,26 +421,18 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   //    that's what the eye catches). Handled by the generalized bg-match below.
   if (colorCorrect && !bodyColorMode) {
     try {
-      // FACE correction on the FIGURE (+ its 3px edge ring), referenced to the
-      // original figure — histogram built from figure pixels only, so the white
-      // glow/red zone can't skew it.
+      // FIGURE correction (material-aware), referenced to the ORIGINAL figure
+      // (refMask = oldA) so the white glow / red zone can't skew the palette.
       const refMaskBin = Buffer.alloc(n);
       for (let i = 0; i < n; i++) refMaskBin[i] = oldA[i * s1r] > 128 ? 255 : 0;
-      // borderMatch:false — do NOT diffuse the seam offset into the face. The
-      // edge transition is handled separately by the background-fill on the red
-      // zone + margin, which never touches the figure. Pass-2 diffusion ran the
-      // offset into the face interior (altering it) — that's wrong.
-      // colorAware — learn the scene palette (skin / hair / cloth) and shift
-      // each pasted pixel by its OWN material's mean offset, so the orange cloth
-      // band inside the head mask matches the original dress instead of getting
-      // the face's skin-tuned shift.
       // Correct the NEW figure AND the red zone (old-only pixels kept from the
-      // model, e.g. the chin the round-2 mask missed) as ONE region — the
-      // border-match then makes the red-zone outer edge match the surroundings
-      // exactly, instead of leaving raw (uncorrected) model pixels there.
+      // model, e.g. the chin the round-2 mask missed) as ONE region. The material-
+      // aware shift matches each pasted pixel to its own original material; the
+      // background halo at the edge is handled separately by the background-match
+      // below, which never touches the figure.
       const ccMask = Buffer.alloc(n);
       for (let i = 0; i < n; i++) ccMask[i] = (newDil[i] > 128 || redZone[i] > 128) ? 255 : 0;
-      const cc = await correctColorShift(origRaw, pasteRaw, ccMask, cropW, cropH, { refMask: refMaskBin, borderMatch: false, colorAware: true, borderRefine: colorBorderRefine, garmentOnly });
+      const cc = await correctColorShift(origRaw, pasteRaw, ccMask, cropW, cropH, { refMask: refMaskBin, borderRefine: colorBorderRefine, garmentOnly });
       if (cc.applied) {
         pasteRaw = Buffer.from(cc.correctedRaw);
         colorInfo = { deltaEBefore: cc.deltaEBefore, seamBefore: cc.seamDeltaEBefore, seamAfter: cc.seamDeltaEAfter, clusters: cc.clusterInfo };
@@ -384,84 +441,14 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
       log.warn(`[TESTLAB] colour correction skipped (${err.message})`);
     }
   }
-  // Red zone = where the OLD head mask was but the NEW one isn't. The model
-  // repainted this area (usually coherent face/scene — e.g. the crisp chin the
-  // round-2 mask missed by a few px), so KEEP the model's pixels here — there is
-  // no better source. ONLY where the model left GARBAGE (unfilled whiteout white
-  // or a black fill) do we diffuse the TRUE scene background in, so garbage gets
-  // a surrounding-matched colour instead of a white/black halo. Blanket-filling
-  // the whole red zone (the old behaviour) smeared over the good chin.
-  // figExclude = both heads → the diffusion sources only real background, never
-  // the old skin (which would ghost a "2nd nose").
-  // BACKGROUND protection — BOTH modes. The dilated union edge always catches some
-  // background that Grok redrew: sky/wall ABOVE the head (face mode), or ground/wall/
-  // sky all around a full figure (body mode). Wherever that redrawn background abuts
-  // the ORIGINAL background just outside the silhouette, a colour step reads as a
-  // cut-out. So we build a ring just inside the silhouette edge and, per BACKGROUND
-  // material (clustered — snow, grass, wall, sky are separated by colour), shift the
-  // model's pixels back to the surrounding original. Multiple materials around one
-  // silhouette are matched independently. Texture is kept (shift, not replace).
-  // bgBorderMatch toggle: the NEW silhouette-border extension (on by default). Turn
-  // OFF to A/B against the old red-zone-only behaviour. The red zone always runs.
-  const borderRing = Buffer.alloc(n);
-  if (bgBorderMatch) {
-    const eroded = await maskBlurThreshold(Buffer.from(alpha1), cropW, cropH, 12, 200); // shrink union ~12px inward
-    for (let i = 0; i < n; i++) borderRing[i] = (alpha1[i] > 128 && eroded[i] <= 128) ? 255 : 0; // union edge margin
-  }
+  // Colour-match the BACKGROUND the paste INTRODUCES (red zone + silhouette-border
+  // margin) back to the surrounding scene, so the edge doesn't read as a cut-out.
+  // See matchIntroducedBackground. Runs whenever there's a red zone or bgBorderMatch.
   if (redZonePx > 0 || bgBorderMatch) {
-    const { _rgbToLab, _labToRgb, _deltaE, _ccKMeans } = require('./images');
-    const figExclude = Buffer.alloc(n);
-    for (let i = 0; i < n; i++) figExclude[i] = (newDil[i] > 128 || oldA[i * s1r] > 128) ? 255 : 0;
-    // FIGURE palette = K-cluster the model over the figure (newDil) → skin/hair/cloth.
-    const figPts = [];
-    for (let i = 0; i < n; i++) if (newDil[i] > 128) { const l = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]); figPts.push(l[0], l[1], l[2]); }
-    const figCent = (figPts.length ? _ccKMeans(Float32Array.from(figPts), 3, 6).cent : []);
-    // BACKGROUND palette = K-cluster the ORIGINAL just OUTSIDE the union — the real
-    // scene materials (snow, grass, …), EACH with its true target colour.
-    const ring = await maskBlurThreshold(Buffer.from(alpha1), cropW, cropH, 8, 16); // union → ~8px outer ring
-    const bgPts = [];
-    for (let i = 0; i < n; i++) if (ring[i] > 128 && alpha1[i] <= 128) { const l = _rgbToLab(origRaw[i * 3], origRaw[i * 3 + 1], origRaw[i * 3 + 2]); bgPts.push(l[0], l[1], l[2]); }
-    // K=5: separate sky, wall, ground, snow, grass — a full figure can abut 3+ bg
-    // materials at once, each needing its own target colour.
-    const bgCent = (bgPts.length ? _ccKMeans(Float32Array.from(bgPts), 5, 8).cent : []);
-    // Classify each red-zone pixel: FIGURE (chin → keep model) vs BACKGROUND (the
-    // halo margin). For each BACKGROUND material, shift the model's pixels by
-    // (original material colour − model material colour) so the model's snow is
-    // pushed back to the real snow — snow and grass corrected INDEPENDENTLY, and
-    // the figure/other materials untouched. This keeps the model's texture and
-    // kills the halo (vs replacing the pixels).
-    const garbage = Buffer.alloc(n);
-    const bgAssign = new Int32Array(n).fill(-1); // per-pixel background cluster (or -1)
-    const srcSum = bgCent.map(() => [0, 0, 0, 0]); // model mean per bg material
-    let garbagePx = 0, bgPx = 0;
-    for (let i = 0; i < n; i++) {
-      // Candidate pixels: the red zone + the silhouette border margin (both modes).
-      // A pixel here is corrected ONLY if it classifies as background below — figure
-      // pixels (hair/coat at the edge) are left to the figure policy.
-      const inZone = redZone[i] || borderRing[i] > 128;
-      if (!inZone) continue;
-      const r = pasteRaw[i * 3], g = pasteRaw[i * 3 + 1], b = pasteRaw[i * 3 + 2];
-      if ((r > 235 && g > 235 && b > 235) || (r < 22 && g < 22 && b < 22)) { garbage[i] = 255; garbagePx++; continue; }
-      if (!bgCent.length) continue;
-      const lab = _rgbToLab(r, g, b);
-      let dFig = Infinity; for (const c of figCent) { const d = _deltaE(lab, c); if (d < dFig) dFig = d; }
-      let bk = -1, dBg = Infinity; for (let k = 0; k < bgCent.length; k++) { const d = _deltaE(lab, bgCent[k]); if (d < dBg) { dBg = d; bk = k; } }
-      if (bk >= 0 && dBg < dFig) { bgAssign[i] = bk; srcSum[bk][0] += lab[0]; srcSum[bk][1] += lab[1]; srcSum[bk][2] += lab[2]; srcSum[bk][3]++; bgPx++; }
-    }
-    // Per-material offset = original target (bgCent) − model source mean.
-    const bgOff = bgCent.map((c, k) => srcSum[k][3] ? [c[0] - srcSum[k][0] / srcSum[k][3], c[1] - srcSum[k][1] / srcSum[k][3], c[2] - srcSum[k][2] / srcSum[k][3]] : [0, 0, 0]);
-    for (let i = 0; i < n; i++) {
-      const bk = bgAssign[i]; if (bk < 0) continue;
-      const lab = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
-      const rgb = _labToRgb(lab[0] + bgOff[bk][0], lab[1] + bgOff[bk][1], lab[2] + bgOff[bk][2]);
-      pasteRaw[i * 3] = rgb[0]; pasteRaw[i * 3 + 1] = rgb[1]; pasteRaw[i * 3 + 2] = rgb[2];
-    }
-    // Garbage (unfilled white/black) still gets diffused scene background.
-    if (garbagePx > 0) {
-      const bgFill = harmonicBackgroundFill(origRaw, garbage, figExclude, cropW, cropH);
-      for (let i = 0; i < n; i++) { if (garbage[i]) { pasteRaw[i * 3] = bgFill[i * 3]; pasteRaw[i * 3 + 1] = bgFill[i * 3 + 1]; pasteRaw[i * 3 + 2] = bgFill[i * 3 + 2]; } }
-    }
-    if (bgPx > 0) log.info(`[TESTLAB] ${bodyColorMode ? 'figure-mode border' : 'red-zone'}: colour-matched ${bgPx}px background (${bgCent.length} materials) to the scene, ${garbagePx}px garbage bg-filled`);
+    const { bgPx, garbagePx, materials } = await matchIntroducedBackground({
+      origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, oldA, s1r, bgBorderMatch,
+    });
+    if (bgPx > 0) log.info(`[TESTLAB] ${bodyColorMode ? 'figure-mode border' : 'red-zone'}: colour-matched ${bgPx}px background (${materials} materials) to the scene, ${garbagePx}px garbage bg-filled`);
     if (!colorInfo && bodyColorMode) colorInfo = { deltaEBefore: null, seamBefore: null, seamAfter: null, figureColorKept: true };
     if (colorInfo) { colorInfo.redZonePx = redZonePx; colorInfo.garbagePx = garbagePx; colorInfo.bgMatchedPx = bgPx; }
   }

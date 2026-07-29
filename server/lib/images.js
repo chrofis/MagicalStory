@@ -10092,20 +10092,15 @@ async function fetchFigureHeadMaskPng(cropJpegBuffer, bodyBoxInCrop, faceBoxInCr
     .ensureAlpha().joinChannel(out, { raw: { width: outW, height: outH, channels: 1 } }).png().toBuffer();
 }
 
-// ── Qwen colour-shift correction for the repair blend ───────────────────────
-// Qwen-Image-Edit repaints the masked figure but shifts its colour distribution
-// (measured on staging: skin ΔL +14..+22, Δb +7..+16 — a lighten + warm/yellow
-// push; ΔE 16-28). Because only the masked figure is pasted onto the untouched
-// page, that shift shows as a colour discontinuity at the paste boundary. Two
-// passes, restricted to the mask, applied to the candidate BEFORE compositing:
-//   1. LAB histogram-match the masked pixels toward the ORIGINAL figure's
-//      distribution — corrects the overall skin/clothing tone. Monotone
-//      per-channel remap → spatial detail (texture, glasses, edges) preserved.
-//   2. Harmonic seam-close — diffuse the residual (outside-original − inside)
-//      gap across the mask so the BORDER matches the neighbouring page exactly
-//      (seam ΔE → ~0), interior gets only a vanishing nudge. Kills the seam,
-//      worst on clothing at the neck/collar.
-// No pixel outside the mask is touched; no-op below minDeltaE.
+// ── Colour-shift correction for the repair blend ────────────────────────────
+// The edit model repaints the masked figure but shifts its colour distribution
+// (measured: skin ΔL +14..+22, Δb +7..+16 — a lighten + warm push; ΔE 16-28).
+// Because only the masked figure is pasted onto the untouched page, that shift
+// shows as a colour discontinuity at the paste boundary. `correctColorShift`
+// (below) fixes it MATERIAL-AWARE: cluster the region into materials (skin/hair/
+// cloth), and shift each pasted pixel by its own material's offset, but ONLY for
+// materials that continue outside the paste (a same-material border to match to).
+// No pixel outside the mask is touched.
 const _LAB_Xn = 0.95047, _LAB_Yn = 1.0, _LAB_Zn = 1.08883;
 function _srgbToLinear(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
 function _linearToSrgb(c) { const v = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; return Math.max(0, Math.min(255, Math.round(v * 255))); }
@@ -10125,45 +10120,7 @@ function _labToRgb(L, a, b) {
   return [_linearToSrgb(3.2406 * X - 1.5372 * Y - 0.4986 * Z), _linearToSrgb(-0.9689 * X + 1.8758 * Y + 0.0415 * Z), _linearToSrgb(0.0557 * X - 0.2040 * Y + 1.0570 * Z)];
 }
 function _deltaE(l1, l2) { return Math.sqrt((l1[0] - l2[0]) ** 2 + (l1[1] - l2[1]) ** 2 + (l1[2] - l2[2]) ** 2); }
-const _CC_RANGES = [[0, 100], [-110, 110], [-110, 110]];
-function _ccQuant(val, ch, bins) { const [lo, hi] = _CC_RANGES[ch]; const q = Math.floor(((val - lo) / (hi - lo)) * bins); return q < 0 ? 0 : q >= bins ? bins - 1 : q; }
-function _ccBinCenter(q, ch, bins) { const [lo, hi] = _CC_RANGES[ch]; return lo + ((q + 0.5) / bins) * (hi - lo); }
-function _ccMatchLUT(srcHist, refHist, ch, bins) {
-  const cdf = (hh) => { const c = new Float64Array(bins); let acc = 0, tot = 0; for (let i = 0; i < bins; i++) tot += hh[i]; for (let i = 0; i < bins; i++) { acc += hh[i]; c[i] = tot ? acc / tot : 0; } return c; };
-  const sc = cdf(srcHist), rc = cdf(refHist); const lut = new Float64Array(bins); let j = 0;
-  for (let i = 0; i < bins; i++) { while (j < bins - 1 && rc[j] < sc[i]) j++; lut[i] = _ccBinCenter(j, ch, bins); }
-  return lut;
-}
 function _ccStripMask(buf, n) { const s = Math.max(1, Math.round(buf.length / n)); if (s === 1) return buf; const out = Buffer.alloc(n); for (let i = 0; i < n; i++) out[i] = buf[i * s]; return out; }
-function _closeSeamHarmonic(correctedRaw, originalRaw, maskBin, w, h, iters) {
-  const n = w * h; const isMask = new Uint8Array(n);
-  for (let i = 0; i < n; i++) isMask[i] = maskBin[i] > 128 ? 1 : 0;
-  const cL = new Float32Array(n), ca = new Float32Array(n), cb = new Float32Array(n);
-  const oL = new Float32Array(n), oa = new Float32Array(n), ob = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    let l = _rgbToLab(correctedRaw[i * 3], correctedRaw[i * 3 + 1], correctedRaw[i * 3 + 2]); cL[i] = l[0]; ca[i] = l[1]; cb[i] = l[2];
-    l = _rgbToLab(originalRaw[i * 3], originalRaw[i * 3 + 1], originalRaw[i * 3 + 2]); oL[i] = l[0]; oa[i] = l[1]; ob[i] = l[2];
-  }
-  const fL = new Float32Array(n), fa = new Float32Array(n), fb = new Float32Array(n); const fixed = new Uint8Array(n);
-  const nb = (x, y) => [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = y * w + x; if (!isMask[i]) continue;
-    let oCnt = 0, sL = 0, sa = 0, sb = 0;
-    for (const [nx, ny] of nb(x, y)) { if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const j = ny * w + nx; if (!isMask[j]) { oCnt++; sL += oL[j]; sa += oa[j]; sb += ob[j]; } }
-    if (oCnt) { fL[i] = sL / oCnt - cL[i]; fa[i] = sa / oCnt - ca[i]; fb[i] = sb / oCnt - cb[i]; fixed[i] = 1; }
-  }
-  for (let it = 0; it < iters; it++) {
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const i = y * w + x; if (!isMask[i] || fixed[i]) continue;
-      let c = 0, aL = 0, aa = 0, ab = 0;
-      for (const [nx, ny] of nb(x, y)) { if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const j = ny * w + nx; if (isMask[j]) { c++; aL += fL[j]; aa += fa[j]; ab += fb[j]; } }
-      if (c) { fL[i] = aL / c; fa[i] = aa / c; fb[i] = ab / c; }
-    }
-  }
-  const out = Buffer.from(correctedRaw);
-  for (let i = 0; i < n; i++) { if (!isMask[i]) continue; const rgb = _labToRgb(cL[i] + fL[i], ca[i] + fa[i], cb[i] + fb[i]); out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2]; }
-  return out;
-}
 function _seamDeltaE(resultRaw, originalRaw, maskBin, w, h) {
   const n = w * h; const isMask = (i) => maskBin[i] > 128;
   const nb = (x, y) => [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]; let sum = 0, cnt = 0;
@@ -10251,56 +10208,43 @@ function _ccBorderRings(mask, W, H, ringPx) {
 }
 
 /**
- * Correct Qwen's colour shift on the masked repair figure. Inputs may be
- * encoded images OR raw RGB (width*height*3). maskAlpha = the union pixels
- * pasted back; opts.refMask = original-side mask to sample the reference tone
- * from (default maskAlpha). Returns { applied, correctedRaw (RGB), deltaEBefore/
- * After, seamDeltaEBefore/After, histogramRaw }.
- *
- * opts.colorAware: instead of ONE global mean-shift, learn K material colours
- * from the original reference region and shift each candidate pixel by its own
- * material's mean offset (soft colour-weighted blend). Fixes cloth bands inside
- * a face mask getting a skin-tuned shift. K=1 == the plain mean-shift.
+ * Correct the edit model's colour shift on the masked repair figure, MATERIAL-
+ * AWARE. Inputs may be encoded images OR raw RGB (width*height*3). maskAlpha =
+ * the union pixels pasted back; opts.refMask = original-side mask to sample the
+ * reference tone from (default maskAlpha). Learns K material colours from the
+ * original reference region and shifts each candidate pixel by its own material's
+ * offset (soft colour-weighted blend), so a cloth band inside a face mask matches
+ * the original dress instead of getting the face's skin-tuned shift. With
+ * garmentOnly (default) only materials that continue OUTSIDE the paste (a
+ * same-material border to match to) are shifted; skin/hair with no continuation
+ * keep the model's rendering. Returns { applied, correctedRaw (RGB), deltaEBefore,
+ * seamDeltaEBefore/After, clusterInfo }.
  */
 async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, width, height, opts = {}) {
-  const { strength = 0.9, minDeltaE = 4, bins = 128, refMask = null, borderMatch = true, borderIters = 500, meanShift = false, colorAware = false, clusters = 3, sigmaScale = 0.6, maxOffsetDeltaE = 30, borderRefine = true, garmentOnly = true } = opts;
+  const { strength = 0.9, refMask = null, clusters = 3, sigmaScale = 0.6, maxOffsetDeltaE = 30, borderRefine = true, garmentOnly = true } = opts;
   const n = width * height;
   const toRaw = async (buf) => (Buffer.isBuffer(buf) && buf.length === n * 3) ? buf : sharp(buf).resize(width, height, { fit: 'fill' }).removeAlpha().raw().toBuffer();
   const O = await toRaw(originalCropBuf);
   const C = await toRaw(candidateCropBuf);
   const mCand = _ccStripMask(maskAlpha, n);
   const mRef = refMask ? _ccStripMask(refMask, n) : mCand;
-  const srcHist = [new Float64Array(bins), new Float64Array(bins), new Float64Array(bins)];
-  const refHist = [new Float64Array(bins), new Float64Array(bins), new Float64Array(bins)];
   const mo = [0, 0, 0], mc = [0, 0, 0]; let cnt = 0;
   const candLab = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
     if (mCand[i] > 128) {
       const lab = _rgbToLab(C[i * 3], C[i * 3 + 1], C[i * 3 + 2]);
       candLab[i * 3] = lab[0]; candLab[i * 3 + 1] = lab[1]; candLab[i * 3 + 2] = lab[2];
-      for (let ch = 0; ch < 3; ch++) srcHist[ch][_ccQuant(lab[ch], ch, bins)]++;
       const olab = _rgbToLab(O[i * 3], O[i * 3 + 1], O[i * 3 + 2]);
       for (let ch = 0; ch < 3; ch++) { mo[ch] += olab[ch]; mc[ch] += lab[ch]; }
       cnt++;
     }
-    if (mRef[i] > 128) { const olab = _rgbToLab(O[i * 3], O[i * 3 + 1], O[i * 3 + 2]); for (let ch = 0; ch < 3; ch++) refHist[ch][_ccQuant(olab[ch], ch, bins)]++; }
   }
   if (!cnt) return { applied: false, reason: 'empty mask', correctedRaw: Buffer.from(C) };
   for (let ch = 0; ch < 3; ch++) { mo[ch] /= cnt; mc[ch] /= cnt; }
   const deltaEBefore = _deltaE(mo, mc);
   const out = Buffer.from(C);
-  // The overall-mean gate applies only to the global mean-shift / histogram path.
-  // colorAware corrects PER MATERIAL, so a small overall mean can still hide an
-  // off material (e.g. the jacket at the bottom clip while skin/hair match) — run
-  // it regardless; each material self-gates via its own offset.
-  if (!colorAware && deltaEBefore < minDeltaE) return { applied: false, deltaEBefore: +deltaEBefore.toFixed(2), reason: 'below threshold', correctedRaw: out };
-  // meanShift: move the whole face in ONE direction — a single uniform LAB
-  // offset (mean original − mean candidate), no per-pixel distribution
-  // reshaping. This shifts the tone to match the scene without distorting the
-  // face. Default (histogram) reshapes each channel's distribution — heavier.
-  const off = [mo[0] - mc[0], mo[1] - mc[1], mo[2] - mc[2]];
   let clusterInfo = null;
-  if (colorAware) {
+  {
     // 1. Learn the scene palette from the ORIGINAL reference region.
     const refPts = [];
     for (let i = 0; i < n; i++) if (mRef[i] > 128) { const l = _rgbToLab(O[i * 3], O[i * 3 + 1], O[i * 3 + 2]); refPts.push(l[0], l[1], l[2]); }
@@ -10387,25 +10331,14 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
       out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2];
     }
     clusterInfo = cent.map((c, k) => keep[k] ? { lab: c.map(v => +v.toFixed(1)), count: counts[k], off: offK[k].map(v => +v.toFixed(1)), mean: meanOffK[k].map(v => +v.toFixed(1)), src: hasBorder[k] ? 'mean+border' : 'mean' } : null).filter(Boolean);
-  } else {
-    const lut = meanShift ? null : [0, 1, 2].map(ch => _ccMatchLUT(srcHist[ch], refHist[ch], ch, bins));
-    for (let i = 0; i < n; i++) {
-      if (mCand[i] <= 128) continue;
-      const lab = [candLab[i * 3], candLab[i * 3 + 1], candLab[i * 3 + 2]];
-      const nl = [0, 0, 0];
-      for (let ch = 0; ch < 3; ch++) {
-        nl[ch] = meanShift ? lab[ch] + strength * off[ch] : lab[ch] + strength * (lut[ch][_ccQuant(lab[ch], ch, bins)] - lab[ch]);
-      }
-      const rgb = _labToRgb(nl[0], nl[1], nl[2]);
-      out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2];
-    }
   }
+  // seamDeltaE is a diagnostic on the corrected paste's border vs the neighbouring
+  // page (before === after: the figure seam is closed by the paste itself, not a
+  // separate harmonic diffusion — that pass was removed as it altered the face).
   const maskBin = Buffer.alloc(n);
   for (let i = 0; i < n; i++) maskBin[i] = mCand[i] > 128 ? 255 : 0;
   const seamBefore = _seamDeltaE(out, O, maskBin, width, height);
-  let finalRaw = out, seamAfter = seamBefore;
-  if (borderMatch) { finalRaw = _closeSeamHarmonic(out, O, maskBin, width, height, borderIters); seamAfter = _seamDeltaE(finalRaw, O, maskBin, width, height); }
-  return { applied: true, deltaEBefore: +deltaEBefore.toFixed(2), seamDeltaEBefore: +seamBefore.toFixed(2), seamDeltaEAfter: +seamAfter.toFixed(2), histogramRaw: out, correctedRaw: finalRaw, clusterInfo };
+  return { applied: true, deltaEBefore: +deltaEBefore.toFixed(2), seamDeltaEBefore: +seamBefore.toFixed(2), seamDeltaEAfter: +seamBefore.toFixed(2), correctedRaw: out, clusterInfo };
 }
 
 /**
