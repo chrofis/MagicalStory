@@ -5315,8 +5315,20 @@ ${adventureGuide}` : ''}`;
   const imageModelConfig = IMAGE_MODELS[imageModelKey];
   const maxCharsPerScene = imageModelConfig?.maxCharactersPerScene || 3;
 
-  if (PROMPT_TEMPLATES.storyUnified) {
-    let prompt = fillTemplate(PROMPT_TEMPLATES.storyUnified, {
+  // Prompt-variant seam (Test-Lab A/B, roadmap §4 image-first): inputData.
+  // storyPromptVariant === 'imageFirst' selects the reordered scenes-first
+  // template. Absent/any other value → the production template, unchanged.
+  // Injected per-run via POST /api/admin/jobs/:jobId/rerun-text inputOverrides.
+  const useImageFirst = inputData.storyPromptVariant === 'imageFirst';
+  if (useImageFirst && !PROMPT_TEMPLATES.storyUnifiedImageFirst) {
+    log.warn('[PROMPT] storyPromptVariant=imageFirst requested but storyUnifiedImageFirst template not loaded — falling back to storyUnified');
+  }
+  const unifiedTemplate = (useImageFirst && PROMPT_TEMPLATES.storyUnifiedImageFirst)
+    ? PROMPT_TEMPLATES.storyUnifiedImageFirst
+    : PROMPT_TEMPLATES.storyUnified;
+
+  if (unifiedTemplate) {
+    let prompt = fillTemplate(unifiedTemplate, {
       LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
       PAGES: pageCount,
       LANGUAGE: getLanguageNameEnglish(language),
@@ -5350,7 +5362,7 @@ ${adventureGuide}` : ''}`;
     } else {
       prompt = prompt.replace(/<!-- TEXT_OVERLAY_BEGIN -->[\s\S]*?<!-- TEXT_OVERLAY_END -->\n?/g, '');
     }
-    log.debug(`[PROMPT] Unified story prompt length: ${prompt.length} chars (textInImage=${textInImage})`);
+    log.debug(`[PROMPT] Unified story prompt length: ${prompt.length} chars (textInImage=${textInImage}, variant=${useImageFirst ? 'imageFirst' : 'default'})`);
     return prompt;
   }
 

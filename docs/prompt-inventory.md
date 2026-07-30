@@ -21,6 +21,7 @@ Three loading mechanisms feed these templates:
 | Template | Consumer | Stage |
 |---|---|---|
 | story-unified.txt | storyHelpers.js `buildUnifiedStoryPrompt` | Unified story call (outline + VB + text + hints) |
+| story-unified-imagefirst.txt | storyHelpers.js `buildUnifiedStoryPrompt` (when `inputData.storyPromptVariant === 'imageFirst'`) | Image-first variant of the unified call — same output markers, authoring order arc → scenes → text (Test-Lab A/B, roadmap §4) |
 | story-trial.txt | storyHelpers.js `buildTrialStoryPrompt` | Trial story call |
 | trial-idea.txt | trial.js `POST /generate-ideas-stream` | Trial idea generation |
 | generate-story-ideas.txt | storyIdeas.js `buildIdeasPromptContext` | Wizard story ideas (multi) |

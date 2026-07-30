@@ -86,6 +86,7 @@ async function loadPromptTemplates() {
     ['characterRepairInpaint', 'character-repair-inpaint.txt'],
     ['bboxRefine', 'bbox-refine.txt'],
     ['storyUnified', 'story-unified.txt'],
+    ['storyUnifiedImageFirst', 'story-unified-imagefirst.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
     ['incrementalConsistencyCheck', 'incremental-consistency-check.txt'],

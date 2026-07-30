@@ -222,8 +222,18 @@ dictating a scene the model can't draw. Image-first removes that constraint.
 Test Lab experiment on a few stories before committing. Ties into §5 (the outline
 prompt does too much) and the testing-backlog acceptance-gate idea.
 
-**Status:** ⏭️ SKIPPED by owner 2026-07-25 ("too big to do through mobile").
-Design retained as the north-star for when it's revisited.
+**Status:** 🧪 first increment BUILT 2026-07-30 (owner-directed) — prompt-level
+image-first, not the full pipeline restructure: ONE call, internal authoring
+reordered to arc → all scene designs (critiqued as a set) → full text last
+serving the locked scenes. Variant template
+`prompts/story-unified-imagefirst.txt`, flag
+`inputData.storyPromptVariant === 'imageFirst'`, production default untouched,
+output format byte-compatible with all parsers
+(tests/manual/test-imagefirst-parser-compat.js). A/B pending via the §7
+text-only harness on ≥3 diverse stored stories; image-side benefit needs a
+later full-pipeline run. Full record: docs/decisions.md
+"Image-first story prompt variant" (2026-07-30). The original full-pipeline
+design below stays the north-star.
 
 ---
 
@@ -254,6 +264,9 @@ Depends on §7 (text-only rerun). The lever here is task-density, NOT the model.
 
 **Status:** 🧪 LIVE — experiment defined; blocked on §7 (text-only rerun harness).
 (Not skipped — earlier "skip 5" referred to rubric criterion 5, not this point.)
+The `inputOverrides` seam this experiment reserved now has its first user: the
+§4 image-first prompt variant (`{"storyPromptVariant":"imageFirst"}`, built
+2026-07-30) — both A/Bs run through the same rerun-text + judge-text flow.
 
 ---
 

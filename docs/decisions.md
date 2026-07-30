@@ -2605,3 +2605,57 @@ skip-when-no-detection, resolver wiring, re-stamp-only-on-change, flag, count
 aggregation).
 **Status:** ✅ active — pending a staging Test Lab smoke of a story that goes through
 repair rounds (confirm repaired pages are colour-normalized; flag-off = unchanged).
+
+## Image-first story prompt variant — one call, scenes authored before text (2026-07-30)
+
+**Context:** roadmap §4 (image-first, owner strategic direction) + §5 (outline
+prompt A/B). Most image failures originate in text dictating un-picturable
+scenes. Owner decided the first experiment: keep ONE unified call, but reorder
+its internal authoring so ALL scene designs are authored before any story
+prose — three stages: story arc/outline first (plot structure + one beat per
+page), then the full scene sequence designed for renderability and critiqued
+as a set, then the full story text written last in one pass over the locked
+scenes. Blocks, not interleaved (interleaving scene1/text1/scene2 reintroduces
+text-driving-scenes).
+
+**Decision:** variant template `prompts/story-unified-imagefirst.txt`, selected
+only when `inputData.storyPromptVariant === 'imageFirst'` (seam in
+`buildUnifiedStoryPrompt`, storyHelpers.js). Production default and trial flow
+are untouched. The variant's OUTPUT format is byte-compatible with
+story-unified.txt — same `---MARKER---` set, same relative order, same
+per-page draft/patch syntax — because the parsers hard-bound sections
+(draft = STORY DRAFT→ANALYSIS; FIXES REQUIRED→TITLE; patches after STORY
+PAGES; cover hints→STORY PAGES). Only three NEW work sections are added,
+all BEFORE `---STORY DRAFT---`: `---SCENE SEQUENCE---` (per-page designs,
+`**Scene N**` headers — deliberately NOT `Draft N`/`--- Page N ---` shapes,
+which draft/page regexes would swallow), `---SCENE SEQUENCE CRITIQUE---`
+(scene-set critique: picturability, variety, cast rotation, visual arc;
+labelled REVISIONS, never "FIXES REQUIRED" — the streaming parser locks onto
+the FIRST occurrence of that phrase), and `---PAGE TEXTS---` (`**Text N**`
+headers; the draft copies these texts verbatim so the parsed draft stays
+canonical). The ANALYSIS gains the hard rule: text-vs-scene mismatch is
+always a TEXT fix, never a SCENE/METADATA fix (checks 18 and 24c inverted;
+mechanical metadata corrections still allowed).
+
+**Rationale:** parsers win over elegance — reordering the emitted sections
+would have required touching 4 parser files with regression risk across every
+stored story; reordering only the authoring WORK sections gets the
+image-first discipline with zero parser changes. Text duplication
+(PAGE TEXTS → draft) costs ~1k words per 10 pages; duplicating the 250–350
+word SCENE prose instead would have risked output-token limits on 30-page
+stories, so scene designs are compact in SCENE SEQUENCE and expanded to full
+prose once, in the draft, after all texts exist.
+
+**Touched:** `prompts/story-unified-imagefirst.txt` (new),
+`server/services/prompts.js` (template key `storyUnifiedImageFirst`),
+`server/lib/storyHelpers.js` `buildUnifiedStoryPrompt` (variant seam),
+`tests/manual/test-imagefirst-parser-compat.js` (37 checks: parser
+equivalence original vs variant, streaming parser, marker diff, seam
+default-untouched proof), `docs/prompt-inventory.md`, roadmap §4 status.
+
+**Status:** 🧪 built, A/B pending — validate via the §7 text-only harness on
+≥3 diverse stored stories (`POST /api/admin/jobs/:jobId/rerun-text` with
+`{"inputOverrides":{"storyPromptVariant":"imageFirst"}}` vs without, judged
+by `/judge-text`). The text harness measures TEXT quality only; the expected
+image-side benefit needs a later full-pipeline run. Whether the model truly
+obeys the authoring order cannot be verified without live calls.
