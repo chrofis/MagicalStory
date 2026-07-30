@@ -19,6 +19,7 @@ const swissLandmarksRouter = require('./swiss-landmarks');
 const stripeWebhookRetryRouter = require('./stripe-webhook-retry');
 const activityRouter = require('./activity');
 const testlabRouter = require('./testlab');
+const diagnosticsRouter = require('./diagnostics');
 
 // Mount submodule routers
 router.use('/users', usersRouter);
@@ -28,7 +29,8 @@ router.use('/jobs', jobsRouter);   // failed jobs view and retry
 router.use('/swiss-landmarks', swissLandmarksRouter);  // Swiss pre-indexed landmarks
 router.use('/stripe-webhook-retry', stripeWebhookRetryRouter);  // Buffered Stripe events that need triage
 router.use('/activity', activityRouter);  // Chronological activity feed (Aktivitaet tab + daily email)
-router.use('/testlab', testlabRouter);    // Test Lab: prompt A/B experiments, benchmark scenes, test versions
+router.use('/testlab', testlabRouter);
+router.use('/diagnostics', diagnosticsRouter);  // one-page health answer (DB, templates, keys, Anthropic ping, running commit)    // Test Lab: prompt A/B experiments, benchmark scenes, test versions
 router.use('/', analyticsRouter);  // stats, database-size, user-storage, config, token-usage
 router.use('/', databaseRouter);   // cleanup endpoints
 
