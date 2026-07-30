@@ -132,6 +132,32 @@ regression from batching.
 
 ---
 
+## 7. Competitive-analysis follow-ups (2026-07-30 — see docs/competitive-analysis-2026-07.md)
+
+Ranked upgrade experiments from the 10-feature SOTA benchmark (8 best-in-class, 2 competitive).
+Full evidence + sources in the analysis doc; each is a Test Lab experiment, not a blind change.
+
+1. **Avatar identity engine A/B: Gemini 3.x image ("Nano Banana 2") vs Grok** — closes the
+   Pt-1 competitive gap. 2026 head-to-heads show Gemini leading face fidelity + reference
+   adherence. Re-test the IMAGE_OTHER adult-face refusals (they predate the 3.x line);
+   keep Grok as refusal fallback. Log verdict in image-routing.md.
+2. **Layflat hardcover tier (~CHF 59-69)** — closes the Pt-9 gap (Oscar proves $59.99
+   layflat demand; our book-spread layout showcases it). Gelato catalog first, else Peecho.
+3. **Trial story as persistent watermarked share link** (recoverable via deferred email) —
+   category's strongest conversion lever + viral loop.
+4. **On-demand landmark acquisition** (Places/Wikimedia fetch for unindexed locations) —
+   "your actual neighborhood, in art"; pre-empts Nano Banana landmark commoditization.
+5. **SAM 3.1 concept/exemplar prompting** for repair masks (vs box-prompted MobileSAM) —
+   cleaner occlusion/multi-instance masks → higher IoU-gate pass rate.
+6. **Local illuminant estimation for garment-hue normalizer** — cast from an annulus around
+   each figure instead of whole-frame gray-world (mixed-light scenes).
+7. **Judge-ensemble disagreement gate** — second-opinion VLM before spending a repair round.
+   NOTE: staging already has default-off multi-judge jury commits (b90a3761/d5e43080) — align.
+8. **Embedding identity score** (CLIP/ArcFace cosine vs VB reference) as deterministic
+   pre-filter + per-entity consistency KPI.
+9. **Typographic art direction** (auto font pairing, drop caps, palette-tinted panels).
+10. **Production text-quality judge gate** (currently Test Lab only) + market the machinery.
+
 ## Rejected as written (do NOT implement literally)
 
 **"Explicit per-scene exclusion list in the prompt"** (readable text, fine hand
