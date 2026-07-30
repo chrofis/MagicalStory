@@ -690,6 +690,31 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_historical_locations_event ON historical_locations(event_id)`);
 
+    // eval_findings — one row per merged eval BUCKET-hit per page, flattened for
+    // per-style / per-genre stats (a plain GROUP BY). Written best-effort by the
+    // eval path; never blocks generation. No FK on story_id (eval can run for
+    // trials / before the story row is persisted). See server/lib/evalBuckets.js.
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS eval_findings (
+        id SERIAL PRIMARY KEY,
+        story_id VARCHAR(255),
+        page_number INT,
+        bucket VARCHAR(50) NOT NULL,
+        severity VARCHAR(20) NOT NULL,
+        owner VARCHAR(20),
+        agreement VARCHAR(10),
+        eval_type VARCHAR(20),
+        art_style VARCHAR(60),
+        genre VARCHAR(60),
+        language VARCHAR(10),
+        char_count INT,
+        judges VARCHAR(120),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_eval_findings_style_bucket ON eval_findings(art_style, bucket)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_eval_findings_story ON eval_findings(story_id)`);
+
     console.log('✓ Database tables initialized');
 
   } catch (err) {
@@ -710,6 +735,46 @@ async function closePool() {
 // Helper to check if using database mode
 function isDatabaseMode() {
   return process.env.STORAGE_MODE === 'database' && getPool();
+}
+
+// Record merged eval bucket-hits for stats. Best-effort: never throws, never
+// blocks generation. `findings` = [{ story_id, page_number, bucket, severity,
+// owner, agreement, eval_type, art_style, genre, language, char_count, judges }].
+async function recordEvalFindings(findings) {
+  if (!Array.isArray(findings) || !findings.length) return;
+  try {
+    for (const f of findings) {
+      if (!f || !f.bucket || !f.severity) continue;
+      await dbQuery(
+        `INSERT INTO eval_findings
+           (story_id, page_number, bucket, severity, owner, agreement, eval_type, art_style, genre, language, char_count, judges)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [f.story_id || null, f.page_number ?? null, f.bucket, f.severity, f.owner || null,
+         f.agreement || null, f.eval_type || null, f.art_style || null, f.genre || null,
+         f.language || null, f.char_count ?? null, f.judges || null]
+      );
+    }
+  } catch (e) {
+    console.warn('[eval_findings] record failed (non-blocking):', e.message);
+  }
+}
+
+// Aggregate eval findings for reporting: counts per (groupBy, bucket). groupBy is
+// validated against an allowlist (no injection). Optional `since` (ISO date).
+async function getEvalFindingsStats({ groupBy = 'art_style', since = null } = {}) {
+  const ALLOWED = ['art_style', 'genre', 'language', 'bucket', 'severity', 'char_count', 'judges'];
+  const col = ALLOWED.includes(groupBy) ? groupBy : 'art_style';
+  const params = [];
+  let where = '';
+  if (since) { params.push(since); where = 'WHERE created_at >= $1'; }
+  const res = await dbQuery(
+    `SELECT ${col} AS group_key, bucket, severity, COUNT(*)::int AS n
+       FROM eval_findings ${where}
+      GROUP BY ${col}, bucket, severity
+      ORDER BY ${col} NULLS LAST, n DESC`,
+    params
+  );
+  return res.rows;
 }
 
 // Pick the best src value for an image row: bytes if present, otherwise R2 URL.
@@ -3215,6 +3280,8 @@ module.exports = {
   closePool,
   isDatabaseMode,
   logActivity,
+  recordEvalFindings,
+  getEvalFindingsStats,
   buildStoryMetadata,
   saveStoryData,
   saveScenePageData,

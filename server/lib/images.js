@@ -1758,6 +1758,61 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
+      // MULTI-JUDGE JURY (EVAL_JUDGES): run the extra judges (Grok, Qwen) on the
+      // SAME parts, then merge ALL judges by PURE MEDIAN per bucket (evalBuckets)
+      // and replace fixableIssues with the deduplicated merged set before scoring.
+      // Default EVAL_JUDGES=gemini → runExtraJudges returns [] → single-judge path
+      // unchanged (zero prod behaviour change). NOTE: the merge de-duplicates issues
+      // into one severity per bucket, which changes score magnitude — the redo
+      // threshold must be A/B-calibrated in the Test Lab before the jury drives prod.
+      try {
+        const { getEvalJudges, runExtraJudges } = require('./evalJudges');
+        const judges = getEvalJudges();
+        if (judges.length > 1) {
+          const extra = await runExtraJudges({ parts, judges });
+          if (extra.length) {
+            const { mapIssuesToBuckets, mergeJudges, bucketsToIssues } = require('./evalBuckets');
+            const vectors = [mapIssuesToBuckets(fixableIssues), ...extra.map(e => mapIssuesToBuckets(e.fixableIssues))];
+            const merged = mergeJudges(vectors);
+            const mergedIssues = bucketsToIssues(merged);
+            const lowConf = Object.values(merged).filter(m => m.lowConfidence).length;
+            log.info(`🧑‍⚖️ [EVAL] Jury ${vectors.length} judges (gemini,${extra.map(e => e.judge).join(',')}) → ${mergedIssues.length} merged buckets (${lowConf} low-confidence)`);
+            fixableIssues = mergedIssues.map(m => ({
+              description: m.description,
+              severity: String(m.severity).toUpperCase(),
+              type: m.type,
+              character: null,
+              fix: `Fix: ${m.description}`,
+              agreement: m.agreement,
+            }));
+          }
+        }
+      } catch (juryErr) {
+        log.warn(`[EVAL] multi-judge merge skipped (${juryErr.message}) — using primary judge only`);
+      }
+
+      // STATS: record the (merged) buckets to eval_findings for per-style/genre
+      // reporting. Best-effort, fire-and-forget; only records when the caller
+      // passes evalOptions.storyMeta (else skipped). Works in single- and
+      // multi-judge mode so stats populate even before the jury is enabled.
+      try {
+        const sm = evalOptions && evalOptions.storyMeta;
+        if (sm && sm.storyId) {
+          const { mapIssuesToBuckets } = require('./evalBuckets');
+          const db = require('../services/database');
+          const vec = mapIssuesToBuckets(fixableIssues);
+          const rows = Object.entries(vec).map(([bucket, m]) => ({
+            story_id: sm.storyId, page_number: sm.pageNumber ?? null, bucket,
+            severity: String(m.severity).toLowerCase(), eval_type: evaluationType,
+            art_style: sm.artStyle || null, genre: sm.genre || null, language: sm.language || null,
+            char_count: sm.charCount ?? null, judges: process.env.EVAL_JUDGES || 'gemini',
+          }));
+          if (rows.length && typeof db.recordEvalFindings === 'function') db.recordEvalFindings(rows).catch(() => {});
+        }
+      } catch (recErr) {
+        log.warn(`[EVAL] eval_findings record skipped (${recErr.message})`);
+      }
+
       // DETERMINISTIC SCORING: compute from fixable_issues[] severities using the
       // §2 rubric (the eval prompt's single source of truth). The model's own
       // `score` field is unreliable — the same image rerendered through eval
@@ -6042,7 +6097,12 @@ async function evaluateImageBatch(images, options = {}) {
     qualityModelOverride = null,
     visualBible = null,
     clothingRequirements = null,
-    artStyle = null
+    artStyle = null,
+    // Story-level context for eval_findings stats (best-effort; per-style works
+    // from artStyle alone, the rest populate once the batch caller threads them).
+    storyId = null,
+    genre = null,
+    language = null
   } = options;
 
   if (!images || images.length === 0) {
@@ -6080,7 +6140,13 @@ async function evaluateImageBatch(images, options = {}) {
         pageLabel,
         img.pageText || null,  // Story text for semantic fidelity check
         img.sceneHint || null, // Scene hint for semantic evaluation
-        img.sceneCharacters || null  // Enables STEP 2C head-to-body proportion check
+        img.sceneCharacters || null,  // Enables STEP 2C head-to-body proportion check
+        // evalOptions: story-level context so the eval records per-style/genre
+        // stats to eval_findings (best-effort; no behaviour change).
+        { storyMeta: {
+          storyId, pageNumber: img.pageNumber, artStyle, genre, language,
+          charCount: Array.isArray(img.sceneCharacters) ? img.sceneCharacters.length : null,
+        } }
       );
 
       // Use pre-extracted scene metadata if available, otherwise extract from scene description

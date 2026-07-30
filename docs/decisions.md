@@ -2282,6 +2282,50 @@ dead branches were removed and the giant blend split (net −80 lines):
 **Cleanup touched:** `server/lib/images.js` (correctColorShift + dead helpers),
 `server/lib/samBlend.js` (matchIntroducedBackground extraction).
 
+## Multi-judge eval: bucket taxonomy + median jury + per-style stats (2026-07-30)
+
+**Context:** the same image scored differently on repeated evals (a repair decision
+could flip on noise). Root cause is not config — even at temperature 0 a hosted
+API is non-deterministic (dynamic-batch reduction order), and a holistic 0-100
+pointwise score is the noisiest judge design. Also, a single free-form `type` per
+issue couldn't be aggregated, so "what goes wrong per style/genre" was unanswerable.
+
+**Decision (all behind config, default-off — zero prod change until enabled):**
+1. **Closed bucket taxonomy** (`server/lib/evalBuckets.js`): every issue maps to a
+   fixed bucket (owner eval + repair route). Adds the missing `action_interaction`
+   bucket (rope slack under tension, aim at wrong target, travel/facing away from a
+   NAMED target) — added to `image-semantic.txt`. Unknown `type` → `other` (tracked).
+2. **3-judge jury** (`server/lib/evalJudges.js`): Gemini (primary) + Grok
+   (`grok-4-fast`) + Qwen (`qwen-vl` via OpenRouter), run on the SAME parts, gated by
+   `EVAL_JUDGES` (default `gemini`). Merge = **pure median severity per bucket**;
+   critical treated like any severity ([crit,major,major]→major, [crit,none,none]→
+   dropped); median over {present,0} = 2-of-3 majority for binary buckets for free.
+   Per-bucket agreement is kept as a confidence signal (low agreement = route to an
+   extra pass). Judges that error / lack a key are skipped, never throw.
+3. Merged buckets → `bucketsToIssues` → existing `scoring.js` (score math stays
+   single-source). Wired into `evaluateImageQuality` before scoring.
+4. **`eval_findings` table** + `recordEvalFindings`/`getEvalFindingsStats` +
+   `scripts/admin/eval-findings-stats.js` — best-effort per-page bucket rows for
+   `GROUP BY art_style|genre|…`. Records in single- AND multi-judge mode (needs
+   `evalOptions.storyMeta`; `evaluateImageBatch` threads it — art_style flows now,
+   storyId/genre/language populate once the batch caller passes them).
+
+**Rejected:** the earlier plan's "lone CATASTROPHIC escalation" — owner chose pure
+median for all severities (accepts a rare 1-of-3 real miss for far fewer false
+alarms). Item "retire Gemini eval-bbox": already satisfied — detection is
+DINO-first with Gemini as the cold-start fallback; the eval prompt emits typed
+issues, not boxes.
+
+**CALIBRATION CAVEAT:** bucketing de-duplicates (one severity per bucket vs summing
+many issues) → changes score magnitude when the jury is on. The redo threshold MUST
+be A/B-calibrated in the Test Lab before `EVAL_JUDGES` >1 drives prod decisions.
+
+**Touched:** `server/lib/evalBuckets.js` (new), `server/lib/evalJudges.js` (new),
+`server/lib/images.js` (jury merge + stats record in evaluateImageQuality;
+evaluateImageBatch storyMeta), `prompts/image-semantic.txt` (action_interaction),
+`server/services/database.js` (eval_findings table + funcs),
+`scripts/admin/eval-findings-stats.js` (new), `tests/manual/evalBuckets.test.js` (new).
+
 ## Two rescue-path utility calls downgraded off Sonnet (2026-07-26)
 **Context:** `sceneValidator.repairScene` (JSON scene-repair after a composition
 check) and `rewriteBlockedScene` (safety rewrite of a scene the image model
