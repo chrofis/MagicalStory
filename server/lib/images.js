@@ -8820,6 +8820,53 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
   }));
 
+  // Full chain (final catch): normalize the garment hue of every REPAIRED page's
+  // picked-best one last time, before the flatten. The per-round pass only covers
+  // iterate redraws (they return a fresh output detection); inpaint / char-fix do
+  // not, so a page whose final version came from one of those could still ship a
+  // colour-drifted garment. This pass reuses the detection just computed above
+  // (freshBboxMap or the best's own paired eval detection — no extra detect) and
+  // corrects it. Originals were already normalized in Phase 5b-hue (pre-eval), so
+  // they're skipped. Runs after scoring, like the other post-repair recovery steps
+  // (calm-zone / text overlay), so the shipped bytes carry the corrected colour.
+  if (CONFIG_DEFAULTS.garmentHueNormalize) {
+    try {
+      const { normalizeGarmentHueBatch } = require('./garmentHueNormalize');
+      const { normalizeClothingCategory, resolvePageClothingCategory } = require('./clothingCategories');
+      const finalResolveAvatar = async (pageNumber, fig) => {
+        const character = characters.find(c => (c.name || '').toLowerCase() === String(fig?.name || '').toLowerCase());
+        if (!character) return null;
+        const orig = rawImages.find(i => i.pageNumber === pageNumber);
+        const pageClothing = orig?.perCharClothing || orig?.characterClothing || orig?.sceneMetadata?.characterClothing || {};
+        const cat = normalizeClothingCategory(
+          pageClothing[character.name] || resolvePageClothingCategory(storyData, pageNumber, character.name) || 'standard'
+        );
+        return getStyledAvatarForClothing(character, artStyle, cat);
+      };
+      const finalEntries = rawImages.map(img => {
+        const pageNumber = img.pageNumber;
+        const versions = pageVersions.get(pageNumber) || [];
+        const best = finalBestPerPage.get(pageNumber) || versions[0];
+        const detection = freshBboxMap.get(pageNumber) || best?.evaluation?.bboxDetection || null;
+        return { pageNumber, best, detection };
+      }).filter(e => e.best && e.best.source !== 'original'); // originals already normalized pre-eval
+      const finalHue = await normalizeGarmentHueBatch(finalEntries, {
+        resolveAvatarForPage: finalResolveAvatar,
+        getPageNumber: (e) => e.pageNumber,
+        getImageData: (e) => e.best?.imageData,
+        setImageData: (e, v) => { if (e.best) e.best.imageData = v; },
+        getDetection: (e) => e.detection,
+        imageFingerprint,
+        logLabel: 'Final ',
+      });
+      if (finalHue.pagesChanged > 0) {
+        log.info(`🎨 [UNIFIED PIPELINE] Final: garment-hue normalized ${finalHue.figuresApplied} figure(s) across ${finalHue.pagesChanged} repaired page(s)`);
+      }
+    } catch (err) {
+      log.warn(`⚠️ [UNIFIED PIPELINE] Final garment-hue normalization skipped: ${err.message}`);
+    }
+  }
+
   const results = rawImages.map(img => {
     const pageNumber = img.pageNumber;
     const versions = pageVersions.get(pageNumber) || [];

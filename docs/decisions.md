@@ -2543,9 +2543,16 @@ version row read the corrected bytes.
 **Detection is reused, never forced:** the per-round pass normalizes only repaired
 pages that already carry a fresh full-image detection. `iterate` returns one
 (`result.bboxDetection`, plumbed onto the roundResult); `inpaint`/`char-fix` do NOT
-produce a full-image detection, so those redraws are skipped (no-op) rather than
-paying for an extra detect. Same `garmentHueNormalize` flag → flipping it off restores
-today's exact behaviour (the per-round pass is additive and guarded).
+produce a full-image detection, so those redraws are skipped in the per-round pass.
+**Final-catch pass (closes that gap):** after the round loop, at the finalize stage
+where `freshBboxMap` has already (re-)detected each picked-best (no extra detect),
+a FINAL `normalizeGarmentHueBatch` runs on every REPAIRED page's best version
+(`source !== 'original'`) using that detection — so a page whose final version came
+from inpaint/char-fix is also corrected. It runs after scoring, like the other
+post-repair recovery steps (calm-zone / text overlay), so the shipped bytes carry the
+corrected colour. Net: EVERY shipped page's garment hue is normalized regardless of
+which method produced it. Same `garmentHueNormalize` flag → flipping it off restores
+today's exact behaviour (both the per-round and final passes are additive and guarded).
 **Touched:** `server/lib/garmentHueNormalize.js` (`normalizeGarmentHueBatch` shared
 driver), `server.js` (Phase 5b-hue refactored to call it), `server/lib/images.js`
 (per-round call in `runUnifiedRepairPipeline`; iterate roundResult carries
