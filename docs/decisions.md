@@ -2525,3 +2525,32 @@ skip defers to it).
 lightness-preserved + global-cast-not-corrected).
 **Status:** ✅ active — pending a staging Test Lab eyeball that day/night lighting
 survives on real pages.
+
+### Full-chain wiring: normalize before EVERY eval, not just the first (2026-07-30)
+**Context:** the pass above ran ONCE, in Phase 5b-hue, before the FIRST eval. But
+`runUnifiedRepairPipeline` then REDRAWS pages over up to 3 repair rounds
+(iterate / char-fix / inpaint), and those redrawn pages were never re-normalized —
+so a repaired page could ship with reintroduced garment-colour drift, and a redraw's
+own drift could even waste a repair round (the eval flags a hue shift the redraw just
+introduced). Owner: "Implement full chain."
+**Decision:** extracted a single shared driver `normalizeGarmentHueBatch(images, …)`
+in `garmentHueNormalize.js`. Phase 5b-hue (server.js) now CALLS it (behaviour
+unchanged — same avatar resolution, same re-stamp of `sharedBboxDetection.sourceImageFp`,
+same flag, same logs). The repair loop calls it once per round at the seam AFTER a
+round's repaired pages have image+detection but BEFORE `evaluateImageBatch` scores
+them — mutating `roundSuccess[].imageData` in place so both the eval and the persisted
+version row read the corrected bytes.
+**Detection is reused, never forced:** the per-round pass normalizes only repaired
+pages that already carry a fresh full-image detection. `iterate` returns one
+(`result.bboxDetection`, plumbed onto the roundResult); `inpaint`/`char-fix` do NOT
+produce a full-image detection, so those redraws are skipped (no-op) rather than
+paying for an extra detect. Same `garmentHueNormalize` flag → flipping it off restores
+today's exact behaviour (the per-round pass is additive and guarded).
+**Touched:** `server/lib/garmentHueNormalize.js` (`normalizeGarmentHueBatch` shared
+driver), `server.js` (Phase 5b-hue refactored to call it), `server/lib/images.js`
+(per-round call in `runUnifiedRepairPipeline`; iterate roundResult carries
+`bboxDetection`), `tests/manual/garmentHueNormalizeBatch.test.js` (25 assertions:
+skip-when-no-detection, resolver wiring, re-stamp-only-on-change, flag, count
+aggregation).
+**Status:** ✅ active — pending a staging Test Lab smoke of a story that goes through
+repair rounds (confirm repaired pages are colour-normalized; flag-off = unchanged).
