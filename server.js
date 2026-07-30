@@ -6323,46 +6323,35 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Gated by MODEL_DEFAULTS.garmentHueNormalize (env GARMENT_HUE_NORMALIZE).
         if (MODEL_DEFAULTS.garmentHueNormalize) {
           try {
-            const { normalizeGarmentHue } = require('./server/lib/garmentHueNormalize');
+            // Runs the SHARED full-chain driver (normalizeGarmentHueBatch) — the
+            // ONE implementation the per-round repair passes also call, so the
+            // initial pre-eval pass and every redraw normalize identically.
+            const { normalizeGarmentHueBatch } = require('./server/lib/garmentHueNormalize');
             const { imageFingerprint } = require('./server/lib/images');
             const { getStyledAvatarForClothing } = require('./server/lib/entityConsistency');
             const { normalizeClothingCategory } = require('./server/lib/clothingCategories');
             const chars = inputData.characters || [];
             const findChar = (name) => name && chars.find(c => (c.name || '').toLowerCase() === String(name).toLowerCase());
-            const hueLimit = pLimit(50);
             const hueStart = Date.now();
-            let huePages = 0, hueFigs = 0;
-            await Promise.all(rawImages
-              .filter(img => img.imageData && img.sharedBboxDetection?.figures?.length)
-              .map(img => hueLimit(async () => {
-                try {
-                  // Per-page clothing per character (same priority as the entity
-                  // check): explicit page clothing → scene metadata → 'standard'.
-                  // Resolves the avatar matching THIS page's outfit, so a costume
-                  // -change page corrects toward the right (costumed) avatar.
-                  const pageClothing = img.characterClothing || img.sceneCharacterClothing || img.sceneMetadata?.characterClothing || {};
-                  const resolveAvatar = async (fig) => {
-                    const character = findChar(fig?.name);
-                    if (!character) return null; // unnamed/UNKNOWN figure → skip (no-op)
-                    const cat = normalizeClothingCategory(pageClothing[character.name] || 'standard');
-                    return getStyledAvatarForClothing(character, inputData.artStyle, cat);
-                  };
-                  const out = await normalizeGarmentHue(img.imageData, img.sharedBboxDetection, resolveAvatar, { logLabel: `P${img.pageNumber} ` });
-                  hueFigs += out.perFigure.filter(f => f.applied).length;
-                  if (out.changed) {
-                    img.imageData = out.correctedImageData;
-                    // Boxes + SAM masks are geometry — a hue rotation moves nothing.
-                    // Re-stamp the shared detection to the corrected bytes so eval +
-                    // entity REUSE it (the non-enumerable _gdinoMasks survive on the
-                    // same object) instead of paying for a fresh re-detect.
-                    img.sharedBboxDetection.sourceImageFp = imageFingerprint(img.imageData);
-                    huePages++;
-                  }
-                } catch (err) {
-                  log.warn(`⚠️ [GARMENT-HUE] P${img.pageNumber}: ${err.message} — leaving page unchanged`);
-                }
-              })));
-            log.info(`🎨 [UNIFIED] Phase 5b-hue: corrected ${hueFigs} figure(s) across ${huePages} page(s) in ${((Date.now() - hueStart) / 1000).toFixed(1)}s`);
+            // Per-page clothing per character (same priority as the entity check):
+            // explicit page clothing → scene metadata → 'standard'. Resolves the
+            // avatar matching THIS page's outfit, so a costume-change page
+            // corrects toward the right (costumed) avatar.
+            const resolveAvatarForPage = async (pageNumber, fig) => {
+              const character = findChar(fig?.name);
+              if (!character) return null; // unnamed/UNKNOWN figure → skip (no-op)
+              const img = rawImages.find(i => i.pageNumber === pageNumber);
+              const pageClothing = img?.characterClothing || img?.sceneCharacterClothing || img?.sceneMetadata?.characterClothing || {};
+              const cat = normalizeClothingCategory(pageClothing[character.name] || 'standard');
+              return getStyledAvatarForClothing(character, inputData.artStyle, cat);
+            };
+            const hueOut = await normalizeGarmentHueBatch(rawImages, {
+              resolveAvatarForPage,
+              getDetection: (img) => img.sharedBboxDetection,
+              imageFingerprint,
+              concurrency: 50,
+            });
+            log.info(`🎨 [UNIFIED] Phase 5b-hue: corrected ${hueOut.figuresApplied} figure(s) across ${hueOut.pagesChanged} page(s) in ${((Date.now() - hueStart) / 1000).toFixed(1)}s`);
           } catch (err) {
             log.warn(`⚠️ [UNIFIED] Phase 5b-hue skipped: ${err.message}`);
           }

@@ -456,6 +456,131 @@ async function normalizeGarmentHue(pageImageData, bboxDetection, resolveAvatar, 
   return { changed: true, correctedImageData: `data:image/jpeg;base64,${corrected.toString('base64')}`, perFigure };
 }
 
+// ── Full-chain batch driver (shared by the initial pre-eval pass AND every
+//    repair round) ────────────────────────────────────────────────────────────
+//
+// The garment-hue correction must run BEFORE every quality eval in the
+// generation→repair chain, not just the first. The initial pass (server.js
+// Phase 5b-hue) corrects the freshly-generated pages; but the repair pipeline
+// then REDRAWS pages over up to 3 rounds (iterate / char-fix / inpaint), and a
+// redraw can reintroduce the exact colour drift the first pass fixed — so a
+// repaired page could ship with garment-colour drift, and a redraw's drift
+// could even waste a repair round. This one driver runs the per-page
+// normalizeGarmentHue on a batch and is called at BOTH seams, so there is ONE
+// implementation for the whole chain.
+//
+// Each call site supplies its own avatar/clothing lookup (resolveAvatarForPage)
+// and its own image/detection accessors, so the initial pass (img.imageData +
+// img.sharedBboxDetection) and the per-round pass (roundResult.imageData +
+// roundResult.bboxDetection) reuse this code path without copy-paste.
+//
+// Detection is REUSED, never forced: only images that already carry a detection
+// with ≥1 figure are eligible (the round's own iterate detection, or the shared
+// pre-eval detection). An image without a fresh detection at the seam is skipped
+// (no-op) rather than paying for an extra detect.
+
+/** Minimal concurrency-limited map (no p-limit dependency — keeps this module
+ *  requireable in unit tests that stub the native deps). */
+async function _mapLimit(items, limit, fn) {
+  const lim = Math.max(1, Math.min(limit | 0 || 1, items.length));
+  let idx = 0;
+  const workers = Array.from({ length: lim }, async () => {
+    while (idx < items.length) {
+      const i = idx++;
+      await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+}
+
+/**
+ * Normalize garment hue across a batch of image entries, reusing each entry's
+ * already-computed detection (never forcing a fresh detect). For every changed
+ * image: writes the corrected bytes back onto the entry and re-stamps the
+ * detection's sourceImageFp so a downstream eval that REUSES the detection reads
+ * it against the corrected bytes.
+ *
+ * @param {Array} images  entries to normalize
+ * @param {object} o
+ * @param {(pageNumber:number, figure:object)=>Promise<string|null>|string|null} o.resolveAvatarForPage
+ *        per-(page,figure) styled-avatar resolver — the avatar data-URI matching
+ *        THIS page's clothing for that figure, or null to skip the figure.
+ * @param {(img)=>number}        [o.getPageNumber]  read the entry's page number
+ * @param {(img)=>string}        [o.getImageData]   read the entry's image bytes
+ * @param {(img,data)=>void}     [o.setImageData]   write corrected bytes back
+ * @param {(img)=>object|null}   [o.getDetection]   read the entry's detection
+ * @param {(data:string)=>string|null} [o.imageFingerprint] re-stamp fingerprinter (injected;
+ *        lazily required from ./images when omitted)
+ * @param {boolean} [o.enabled=true]   feature gate (call sites pass the flag / wrap the call)
+ * @param {number}  [o.concurrency=50] parallel pages
+ * @param {string}  [o.logLabel='']    log prefix (e.g. 'Round 2 ')
+ * @param {object}  [o.opts={}]        threshold overrides forwarded to normalizeGarmentHue
+ * @returns {Promise<{pagesChanged:number, figuresApplied:number, perImage:Array}>}
+ */
+async function normalizeGarmentHueBatch(images, o = {}) {
+  const {
+    resolveAvatarForPage,
+    getPageNumber = (img) => img.pageNumber,
+    getImageData = (img) => img.imageData,
+    setImageData = (img, data) => { img.imageData = data; },
+    getDetection = (img) => img.sharedBboxDetection,
+    imageFingerprint = null,
+    enabled = true,
+    concurrency = 50,
+    logLabel = '',
+    opts = {},
+  } = o;
+
+  const result = { pagesChanged: 0, figuresApplied: 0, perImage: [] };
+  if (!enabled) return result;
+  if (!Array.isArray(images) || images.length === 0) return result;
+  if (typeof resolveAvatarForPage !== 'function') return result;
+
+  // Only entries that already carry a detection with ≥1 figure are eligible —
+  // reuse the detection's SAM mask, never force a fresh detect. The rest no-op.
+  const eligible = images.filter((img) => {
+    const det = getDetection(img);
+    return getImageData(img) && det && Array.isArray(det.figures) && det.figures.length > 0;
+  });
+  if (eligible.length === 0) return result;
+
+  // Fingerprinter for the re-stamp: injected (server.js / pipeline both pass the
+  // canonical images.imageFingerprint) or lazily required. Never fatal.
+  let fp = imageFingerprint;
+  if (typeof fp !== 'function') {
+    try { fp = require('./images').imageFingerprint; } catch { fp = null; }
+  }
+
+  await _mapLimit(eligible, concurrency, async (img) => {
+    const page = getPageNumber(img);
+    try {
+      const detection = getDetection(img);
+      const resolveAvatar = (fig) => resolveAvatarForPage(page, fig);
+      // Call through module.exports so the batch is unit-testable by stubbing
+      // normalizeGarmentHue (a same-module reference would not be interceptable).
+      const out = await module.exports.normalizeGarmentHue(
+        getImageData(img), detection, resolveAvatar,
+        { opts, logLabel: `${logLabel}P${page} ` }
+      );
+      const applied = (out.perFigure || []).filter((f) => f.applied).length;
+      result.figuresApplied += applied;
+      result.perImage.push({ pageNumber: page, changed: !!out.changed, figuresApplied: applied, perFigure: out.perFigure || [] });
+      if (out.changed) {
+        setImageData(img, out.correctedImageData);
+        // Boxes + SAM masks are geometry — a hue rotation moves nothing. Re-stamp
+        // the detection to the corrected bytes so a downstream eval that REUSES
+        // it reads it on the corrected pixels instead of paying for a re-detect.
+        if (fp && detection) detection.sourceImageFp = fp(out.correctedImageData);
+        result.pagesChanged += 1;
+      }
+    } catch (err) {
+      result.perImage.push({ pageNumber: page, changed: false, error: err.message });
+      log.warn(`⚠️ [GARMENT-HUE] ${logLabel}P${page}: ${err.message} — leaving page unchanged`);
+    }
+  });
+  return result;
+}
+
 async function cropDataUri(raw, W, H, box) {
   const [ymin, xmin, ymax, xmax] = box;
   const left = Math.max(0, Math.round(xmin * W)), top = Math.max(0, Math.round(ymin * H));
@@ -471,6 +596,8 @@ const log = new Proxy({}, { get: (_t, level) => (...a) => { try { require('../ut
 
 module.exports = {
   normalizeGarmentHue,
+  // full-chain batch driver (initial pre-eval pass + every repair round)
+  normalizeGarmentHueBatch,
   // deterministic core — unit-tested directly on synthetic buffers
   normalizeGarmentRaw,
   estimateCast,
