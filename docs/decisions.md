@@ -2480,3 +2480,48 @@ Test-Lab-first A/B stage (like the Pt 10 style-repair path), rebuilt with
 calibrated thresholds — not this resurrected as-is.
 **Touched:** `server/lib/entityConsistency.js` (−~233 lines: cluster + exports).
 **Status:** ✅ active
+
+## Lighting-aware garment HUE normalization runs BEFORE eval (2026-07-30)
+**Context:** Clothing colour is specified only as TEXT ("red jacket"); each page's
+image model re-interprets it independently, so the same jacket renders red on one
+page and orange on another. Today the eval flags the drift and the pipeline does a
+FULL figure redraw — hugely expensive for a mere hue shift, and the redraw can
+introduce new drift. Owner: "cloth colour across images is not consistent … redraw
+all seems expensive just to turn red to orange." Owner also flagged the trap: a red
+jacket SHOULD look dim/cool at night and bright/warm at noon — a naive recolor that
+forces every page to the avatar's colour would DESTROY legitimate scene lighting.
+**Decision:** A new pre-eval pass `normalizeGarmentHue` (`server/lib/garmentHueNormalize.js`)
+runs in `processUnifiedStoryJob` Phase 5b-hue — AFTER the shared bbox/SAM detection
+(reusing its masks, no re-detect) and BEFORE the quality/semantic/entity SCORING —
+so eval scores the already-corrected image and never triggers a redraw for a hue
+drift. For each figure with a resolvable styled avatar (matched to THIS page's
+clothing category, so a costume-change page uses the right avatar), it corrects the
+garment hue toward the avatar's garment colour.
+**How it preserves lighting (the crux):** illumination is a GLOBAL cast on the whole
+page (sunset warms +a/+b, moonlight cools); intrinsic drift is LOCAL (only the
+garment). We estimate the page's global cast (gray-world mean a*/b*), DISCOUNT it
+before reading the garment hue, and compare to the avatar's discounted hue. We
+correct ONLY the residual hue by ROTATING the (a*,b*) vector of the masked garment
+pixels — a 2D rotation about the origin preserves L* (lightness = the lighting) and
+chroma magnitude (saturation) EXACTLY; L* is never read or written. So a night
+jacket stays night-lit but becomes the right red. A garment that only looks "orange"
+because the whole page has a warm cast (same cast on the background) is NOT corrected
+(that's global lighting, not drift).
+**Gating (always-check, correct-outliers):** run on every figure; NO-OP below a
+min hue drift (already correct); SKIP + defer to eval/repair above a max drift
+(likely a garment-TYPE error, not a tint) or below a chroma floor (grey/neutral has
+no hue); soft Gaussian selection window so only the drifted garment cluster rotates
+(other garments/skin/hair/bg untouched). Zero model calls (pure sharp/CPU). Feature-
+flagged `MODEL_DEFAULTS.garmentHueNormalize` (default on, env `GARMENT_HUE_NORMALIZE`)
+so it flips off on staging without a deploy. Exposed as Test Lab stage `garment_hue`
+(per-figure before/after crops + measured drift/cast).
+**Rationale:** replaces an expensive, drift-prone full redraw with a free,
+deterministic, lighting-preserving hue rotation for the colour-drift case, while
+leaving the redraw path intact for garment-TYPE and non-colour issues (the max-drift
+skip defers to it).
+**Touched:** `server/lib/garmentHueNormalize.js` (new core + orchestration),
+`server.js` (Phase 5b-hue), `server/config/models.js` (flag), `server/lib/testlab.js`
+(`garment_hue` stage), `tests/manual/garmentHueNormalize.test.js` (24 assertions incl.
+lightness-preserved + global-cast-not-corrected).
+**Status:** ✅ active — pending a staging Test Lab eyeball that day/night lighting
+survives on real pages.
