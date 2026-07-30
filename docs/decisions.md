@@ -2659,3 +2659,79 @@ default-untouched proof), `docs/prompt-inventory.md`, roadmap §4 status.
 by `/judge-text`). The text harness measures TEXT quality only; the expected
 image-side benefit needs a later full-pipeline run. Whether the model truly
 obeys the authoring order cannot be verified without live calls.
+
+## Eval reference photos hydrate from any source (R2 URLs included), not data-URIs only (2026-07-30)
+
+**Context:** A staging cover eval flagged both main characters as
+"not identified in QUALITY_FIGURES.matches[]" at CRITICAL (25-30 pts each),
+tanking the cover and looping it through repair forever — every repaired
+version re-evaluated through the same broken input. Traced chain:
+post-save eval entry points (`/repair-workflow/re-evaluate`,
+admin single-page eval, in-pipeline repair rounds via `allCharacterPhotos`)
+pass character reference photos as `{name, photoUrl}` where `photoUrl` is an
+R2 **https URL** — `stripInlineImagesFromStoryData` sweeps every inline byte
+out of `stories.data`, and `avatars.styled` (the first-choice field at those
+call sites) is never written anywhere, so the swept `photoUrl` is all there
+is. `evaluateImageQuality`'s reference loop required
+`photoUrl.startsWith('data:image')` and SILENTLY dropped everything else →
+zero labeled REF_IMAGES reached the quality eval and the P1 visual
+inventory → `matches[]` came back empty → the blind compliance stage
+(presence-is-input) saw prompt-named characters with no matches entry and
+emitted identity CRITICALs. Generation-time evals were unaffected (in-memory
+data URIs), which is why scores looked fine until a post-save re-eval.
+
+**Decision:** the reference loop resolves each photo via
+`r2Lib.bytesFromAnyImage` (data URI fast path unchanged; https URLs fetched;
+unsupported schemes / fetch failures logged and skipped per item), and logs a
+loud warning whenever refs are dropped — including the explicit
+"NO references: matches[] will be empty" case.
+
+**Rationale:** identification is the input the whole downstream severity
+model leans on; a silent ref drop converts a storage-format migration into
+phantom character-absence findings. Fix at the single chokepoint loader so
+every eval entry point (covers AND scenes) is repaired at once.
+
+**Touched:** `server/lib/images.js` (`evaluateImageQuality` reference loop).
+
+**Status:** ✅ active — staging check pending: re-run a cover re-evaluate on a
+stored story and confirm the log shows labeled references added and
+`matches[]` populated.
+
+## Compliance judge can never emit CRITICAL for identity-absence — capped in code (2026-07-30)
+
+**Context:** same incident. `prompts/image-prompt-compliance.txt` documented
+"presence-is-input" but its STEP 4 still listed missing-character as a
+CRITICAL, and the judge emitted CRITICAL "not identified in matches[]" even
+while itself noting the figure was visually present — violating the
+never-CRITICAL contract documented at `models.js` `complianceModel`. Each
+such CRITICAL costs 30 pts in the merged recompute, enough to drive a
+repair loop on its own whenever identification hiccups.
+
+**Decision:** two layers. (1) Prompt: STEP 1 now says `missing_character` is
+at most MAJOR, defines the empty/absent-`matches[]` case as an eval-input
+deficiency ("pair by zone/appearance, never emit missing_character for a
+character with any plausibly-matching figure"), the NEVER-CRITICAL list gains
+an identity-absence entry, and STEP 4 moves missing-character from the
+CRITICAL bucket to MAJOR. (2) Code: `capComplianceIdentitySeverity()`
+(exported from `server/lib/images.js`, applied to every parsed compliance
+result) deterministically downgrades CRITICAL/CATASTROPHIC findings of type
+`missing_character` or with identity-absence wording ("not identified",
+"matches[]", "no entry in matches", "absent from matches") to MAJOR and
+stamps `severityCapped: 'identity-input'`.
+
+**Rationale:** the compliance judge never sees the image — its "missing"
+verdicts are inferences from the identification input, and the image-seeing
+quality eval already owns true missing-character CRITICALs, so capping the
+blind judge loses no real detection power. The code-side cap exists because
+a prompt contract a model can disobey is not a guarantee; with the cap, this
+failure class can degrade a score by at most 20 pts (MAJOR) and can no
+longer sustain a repair loop by itself.
+
+**Touched:** `prompts/image-prompt-compliance.txt`,
+`server/lib/images.js` (`capComplianceIdentitySeverity` + call in
+`evaluateThreeStage`),
+`tests/manual/test-compliance-severity-cap.js` (16 checks: caps by type and
+by wording, CATASTROPHIC included, real CRITICALs untouched, malformed
+inputs tolerated).
+
+**Status:** ✅ active.

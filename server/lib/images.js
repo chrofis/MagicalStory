@@ -945,6 +945,43 @@ Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "on
 }
 
 /**
+ * Never-CRITICAL gate for the compliance stage's identity-absence findings
+ * (docs/decisions.md + models.js "presence-is-input + never-CRITICAL"): the
+ * compliance judge never sees the image — a "missing / not identified"
+ * character finding from it is an INFERENCE from the identification input
+ * (QUALITY_FIGURES.matches[]), not an observed image defect. When the
+ * identification stage produced an empty or incomplete matches[] (e.g. no
+ * usable reference photos), every named character looks "missing" and each
+ * CRITICAL costs 30 pts in the merged recompute → a good cover/page tanks and
+ * loops through repair forever, because the repaired image re-evals through
+ * the same broken input. The image-seeing quality eval still owns true
+ * missing-character CRITICALs, so capping the blind judge at MAJOR loses no
+ * real detection power. Enforced in CODE (not only in the prompt) so a model
+ * that disobeys its own contract cannot re-open the loop.
+ *
+ * Mutates severity in place; stamps `severityCapped` for the dev panel.
+ * @param {Array<{description: string, severity: string, type: string}>} issues
+ * @returns {Array} the same array (for chaining)
+ */
+function capComplianceIdentitySeverity(issues) {
+  if (!Array.isArray(issues)) return issues;
+  // Self-contained (no module-scope deps) so unit tests can vm-extract it.
+  const identityAbsenceRe = /\bnot identified\b|\bunidentified\b|matches\s*\[\s*\]|\bno (?:entry|match(?:es)?) in\b|\babsent from (?:the )?match/i;
+  for (const issue of issues) {
+    if (!issue || typeof issue !== 'object') continue;
+    const sev = String(issue.severity || '').toUpperCase();
+    if (sev !== 'CRITICAL' && sev !== 'CATASTROPHIC') continue;
+    const isIdentityAbsence = issue.type === 'missing_character'
+      || identityAbsenceRe.test(String(issue.description || ''));
+    if (isIdentityAbsence) {
+      issue.severity = 'MAJOR';
+      issue.severityCapped = 'identity-input'; // eval-input deficiency, not an observed defect
+    }
+  }
+  return issues;
+}
+
+/**
  * Three-stage image evaluation: vision inventory (flash-lite) + prompt compliance (Haiku).
  * Stage 1 describes the image without seeing the prompt (unbiased).
  * Stage 2 compares the vision inventory against the original prompt (text-only, no image).
@@ -1144,6 +1181,9 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
         fix: i.fix || `Fix: ${i.description}`,
         source: 'three-stage'
       }));
+    // Never-CRITICAL gate on identity-absence findings (see helper above):
+    // presence is an INPUT to this blind judge, never its judgment.
+    capComplianceIdentitySeverity(fixableIssues);
   }
 
   // Convert 0-10 score to 0-100
@@ -1449,23 +1489,42 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     // Add reference images if provided (compressed and cached for token efficiency)
     // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
+    // Sources are resolved via bytesFromAnyImage: inline data: URIs (generation-time)
+    // AND http(s) R2 URLs (post-save paths — stripInlineImagesFromStoryData sweeps
+    // every inline byte out of stories.data, so re-evaluate / repair rounds hand
+    // this function URL refs). Before this, non-data: refs were silently dropped
+    // → the quality eval and P1 inventory ran with ZERO labeled reference photos
+    // → matches[] came back empty → the compliance stage flagged every named
+    // character as unidentified (identity CRITICALs → repair loop on covers).
     if (referenceImages && referenceImages.length > 0) {
       let addedCount = 0;
       let cacheHits = 0;
+      let skippedCount = 0;
       for (const refImg of referenceImages) {
         // Handle both formats: string URL or {name, photoUrl} object
         const photoUrl = typeof refImg === 'string' ? refImg : refImg?.photoUrl;
         const charName = typeof refImg === 'object' ? refImg?.name : null;
-        if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
-          // Check cache first using hash of original image
+        if (!photoUrl || typeof photoUrl !== 'string') { skippedCount++; continue; }
+        try {
+          // Cache key: hash of the source string (data URI payload or URL) — stable per ref
           const imageHash = hashImageData(photoUrl);
           let compressedBase64 = compressedRefCache.get(imageHash);
 
           if (compressedBase64) {
             cacheHits++;
           } else {
+            let dataUri = photoUrl;
+            if (!photoUrl.startsWith('data:image')) {
+              const buf = await r2Lib.bytesFromAnyImage(photoUrl); // https / raw base64 → Buffer, null on unsupported
+              if (!buf) {
+                skippedCount++;
+                log.warn(`⚠️ [EVAL] Reference photo${charName ? ` "${charName}"` : ''} could not be resolved to bytes (${photoUrl.substring(0, 40)}...) — skipping`);
+                continue;
+              }
+              dataUri = `data:image/jpeg;base64,${buf.toString('base64')}`;
+            }
             // Compress and cache
-            const compressed = await compressImageToJPEG(photoUrl, 85, 768); // 85% quality, max 768px
+            const compressed = await compressImageToJPEG(dataUri, 85, 768); // 85% quality, max 768px
             compressedBase64 = r2Lib.stripDataUriPrefix(compressed);
             compressedRefCache.set(imageHash, compressedBase64);
           }
@@ -1481,9 +1540,15 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             }
           });
           addedCount++;
+        } catch (refErr) {
+          skippedCount++;
+          log.warn(`⚠️ [EVAL] Reference photo${charName ? ` "${charName}"` : ''} failed to load (${refErr.message}) — skipping`);
         }
       }
       log.verbose(`📊 [EVAL] Added ${addedCount} reference images (${cacheHits} cached, ${addedCount - cacheHits} compressed)`);
+      if (skippedCount > 0) {
+        log.warn(`⚠️ [EVAL] ${skippedCount}/${referenceImages.length} reference photos unusable — figure-identity matching will be degraded${addedCount === 0 ? ' (NO references: matches[] will be empty)' : ''}`);
+      }
     }
 
     // === LAUNCH P1 VISUAL INVENTORY IN PARALLEL (age/figure detection) ===
@@ -14619,6 +14684,7 @@ module.exports = {
   evaluateImageQuality,
   blendVisualScore,
   evaluateThreeStage,
+  capComplianceIdentitySeverity,
   callGeminiAPIForImage,
   editImageWithPrompt,
   generateImageWithQualityRetry,
