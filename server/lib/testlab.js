@@ -913,6 +913,93 @@ async function runEntityStage(ctx, { experimentId }) {
   return { elapsedMs, report: safe };
 }
 
+/**
+ * Garment-hue normalization stage — the pre-eval, lighting-aware hue correction
+ * (server/lib/garmentHueNormalize.js). Runs a FRESH detection (so the in-process
+ * SAM masks exist — stored DB detections have none), resolves each figure's
+ * styled avatar for THIS page's clothing, and runs the normalization with
+ * before/after crops. Surfaces per figure: measured hue drift, the estimated
+ * illumination cast, whether a correction was applied + why, and before/after
+ * crops — so the owner can eyeball that lighting is preserved and only true
+ * drift is corrected. Saves the corrected full page as a scene test version.
+ * Target: {storyId, pageNumber}. params.opts = threshold overrides (A/B).
+ */
+async function runGarmentHueStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { normalizeGarmentHue } = require('./garmentHueNormalize');
+  const { detectAllBoundingBoxes } = require('./images');
+  const { getStyledAvatarForClothing, normalizeClothingCategory } = require('./entityConsistency');
+
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  const expectedCharacters = buildExpectedCharacters(ctx);
+  const t0 = Date.now();
+  // Fresh detection on the ACTIVE bytes → in-process _gdinoMasks for the reuse
+  // path (falls back to bodyBox rectangle when the backend returns no mask).
+  const detection = await detectAllBoundingBoxes(imageData, {
+    expectedCharacters,
+    sceneContext: (ctx.scene.sceneDescription || '').slice(0, 2000),
+    artStyle: ctx.artStyle,
+    skipCache: true,
+    pageContext: `testlab-exp${experimentId}-P${ctx.pageNumber}`,
+  });
+  if (!detection?.figures?.length) throw new Error('No figures detected on this page — nothing to normalize');
+
+  const chars = ctx.characters || [];
+  const findChar = (name) => name && chars.find(c => (c.name || '').toLowerCase() === String(name).toLowerCase());
+  const pageClothing = ctx.scene.sceneCharacterClothing || ctx.scene.sceneMetadata?.characterClothing || {};
+  const resolveAvatar = async (fig) => {
+    const character = findChar(fig?.name);
+    if (!character) return null;
+    const cat = normalizeClothingCategory(pageClothing[character.name] || 'standard');
+    return getStyledAvatarForClothing(character, ctx.artStyle, cat);
+  };
+
+  const out = await normalizeGarmentHue(imageData, detection, resolveAvatar, {
+    opts: params.opts || {},
+    logLabel: `exp${experimentId}-P${ctx.pageNumber} `,
+    collectCrops: true,
+  });
+  const elapsedMs = Date.now() - t0;
+
+  // Before/after crops per corrected figure as inspectable step images.
+  const steps = [];
+  for (const f of out.perFigure) {
+    if (f.beforeCrop) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, f.beforeCrop, experimentId);
+      steps.push({ label: `${f.name} BEFORE (garment ${f.garmentHueDeg}°)`, imageType: 'tl_step', versionIndex: v });
+    }
+    if (f.afterCrop) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, f.afterCrop, experimentId);
+      steps.push({ label: `${f.name} AFTER (→ avatar ${f.avatarHueDeg}°, rotated ${f.rotationDeg}°)`, imageType: 'tl_step', versionIndex: v });
+    }
+  }
+  // The corrected full page (only when something actually changed).
+  let correctedVersion = null;
+  if (out.changed) {
+    correctedVersion = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, out.correctedImageData, experimentId);
+  }
+
+  return {
+    elapsedMs,
+    changed: out.changed,
+    detectionBackend: detection.detectionBackend || null,
+    correctedVersion,
+    perFigure: out.perFigure.map(f => ({
+      name: f.name,
+      applied: f.applied,
+      reason: f.reason,
+      hueDriftDeg: f.driftDeg,
+      rotationDeg: f.rotationDeg,
+      garmentHueDeg: f.garmentHueDeg,
+      avatarHueDeg: f.avatarHueDeg,
+      illuminationCast: f.cast,   // {a,b} — the estimated global scene cast (discounted before measuring drift)
+      maskSource: f.maskSource,   // 'sam' (shared silhouette) | 'bodyBox' (rectangle fallback)
+    })),
+    steps: steps.length ? steps : undefined,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Avatar stages — production two-pass sheet flow, split so the realistic
 // anchor (Pass 1) is generated once per character and every style transfer
@@ -2705,6 +2792,7 @@ const STAGE_RUNNERS = {
   rewrite_blocked: runRewriteBlockedStage,
   repair_verify: runRepairVerifyStage,
   qwen_insert: runQwenInsertStage,
+  garment_hue: runGarmentHueStage,
 };
 
 // Story-level stages: target {storyId} (+ coverType for cover). No page context.
