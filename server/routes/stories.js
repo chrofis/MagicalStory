@@ -1564,32 +1564,66 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: `Cover ${cover} not found` });
       }
 
-      // For covers, generate bboxOverlay on-the-fly against the ACTIVE cover image
+      // For covers, generate bboxOverlay on-the-fly against the REQUESTED (or
+      // active) cover version — boxes and bytes must come from the SAME version.
+      // The old code always drew the flattened coverImage.bboxDetection (stamped
+      // at generation time, i.e. an older version's boxes) onto the active image,
+      // so selecting version 2 showed version 1's detection.
       if (field === 'bboxOverlay') {
-        const detection = coverImage.bboxDetection;
-        if (detection) {
-          // Load the active cover image from DB (blob may have imageData stripped)
-          let activeCoverImageData = coverImage.imageData;
-          if (!activeCoverImageData) {
-            try {
-              const activeVersion = await getActiveVersion(id, coverKey);
-              const imgRow = await getStoryImage(id, coverKey, null, activeVersion);
-              activeCoverImageData = imgRow?.imageData || null;
-            } catch (dbErr) {
-              console.warn(`⚠️ [DEV-IMAGE] Failed to load active cover image for ${coverKey}: ${dbErr.message}`);
-            }
-          }
-          if (activeCoverImageData) {
-            try {
-              const { createBboxOverlayImage } = require('../lib/images');
-              const overlayImage = await createBboxOverlayImage(activeCoverImageData, detection);
-              return res.json({ bboxOverlayImage: overlayImage });
-            } catch (overlayErr) {
-              console.warn(`⚠️ [DEV-IMAGE] Failed to generate bbox overlay for ${coverKey}: ${overlayErr.message}`);
-            }
+        // Resolve target version. ?version=N is an imageVersions ARRAY index —
+        // same convention as the page branch below. Without it, the ACTIVE
+        // version (a DB version_index) is used.
+        const requestedIdx = req.query.version != null && String(req.query.version) !== ''
+          ? parseInt(String(req.query.version), 10) : null;
+        let versionEntry = null;
+        let dbVersionForBytes = null;
+        if (Number.isInteger(requestedIdx)) {
+          versionEntry = coverImage.imageVersions?.[requestedIdx] || null;
+          dbVersionForBytes = versionEntry?.versionIndex ?? requestedIdx;
+        } else {
+          try {
+            const activeVersion = await getActiveVersion(id, coverKey);
+            dbVersionForBytes = activeVersion;
+            versionEntry = (coverImage.imageVersions || []).find(v => v?.versionIndex === activeVersion)
+              || (Number.isInteger(activeVersion) ? coverImage.imageVersions?.[activeVersion] : null) || null;
+          } catch { /* fall through to flattened bytes */ }
+        }
+
+        // That version's image bytes (JSONB blobs may have imageData stripped).
+        let coverImageData = versionEntry?.imageData || null;
+        if (!coverImageData && dbVersionForBytes !== null) {
+          try {
+            const imgRow = await getStoryImage(id, coverKey, null, dbVersionForBytes);
+            coverImageData = imgRow?.imageData || null;
+          } catch (dbErr) {
+            console.warn(`⚠️ [DEV-IMAGE] Failed to load cover image v${dbVersionForBytes} for ${coverKey}: ${dbErr.message}`);
           }
         }
-        return res.json({ bboxOverlayImage: coverImage.bboxOverlayImage || null });
+        if (!coverImageData) coverImageData = coverImage.imageData || null;
+
+        // Detection preference: the version's OWN bboxDetection → the flattened
+        // cover-level one only if it byte-pairs with these bytes (sourceImageFp
+        // invariant) → otherwise none (honest null beats wrong-version boxes;
+        // the panel's refresh button re-detects on the current bytes).
+        const { createBboxOverlayImage, bboxPairsWith } = require('../lib/images');
+        let detection = versionEntry?.bboxDetection || null;
+        if (!detection && coverImage.bboxDetection
+            && (!coverImageData || bboxPairsWith(coverImage.bboxDetection, coverImageData))) {
+          detection = coverImage.bboxDetection;
+        }
+
+        if (detection && coverImageData) {
+          try {
+            const overlayImage = await createBboxOverlayImage(coverImageData, detection);
+            return res.json({ bboxOverlayImage: overlayImage });
+          } catch (overlayErr) {
+            console.warn(`⚠️ [DEV-IMAGE] Failed to generate bbox overlay for ${coverKey}: ${overlayErr.message}`);
+          }
+        }
+        return res.json({
+          bboxOverlayImage: null,
+          reason: detection ? 'no image bytes for this version' : 'no detection for this version — use refresh to re-detect on the current image'
+        });
       }
       if (field === 'imageData') {
         return res.json({ imageData: coverImage.imageData || null });

@@ -242,6 +242,10 @@ export function ObjectDetectionDisplay({
 
       if (coverType) {
         params.set('cover', coverType);
+        // Same version pinning as pages — without it the server falls back to
+        // the active version, and the overlay could show a different version's
+        // boxes than the image the user selected.
+        if (typeof versionIndex === 'number') params.set('version', String(versionIndex));
       } else {
         // Server generates overlay against the requested version's image and
         // detection (defaults to active when versionIndex is undefined).

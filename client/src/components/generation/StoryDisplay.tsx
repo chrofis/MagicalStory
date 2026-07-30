@@ -4562,6 +4562,7 @@ export function StoryDisplay({
                   language={language}
                   storyId={storyId}
                   coverType="front"
+                  versionIndex={activeVersionIndex(frontCoverObj)}
                   onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey('cover:front', frontCoverObj)]: bbox }))}
                 />
 
@@ -4831,6 +4832,7 @@ export function StoryDisplay({
                   language={language}
                   storyId={storyId}
                   coverType="initial"
+                  versionIndex={activeVersionIndex(initialPageObj)}
                   onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey('cover:initial', initialPageObj)]: bbox }))}
                 />
 
@@ -6545,6 +6547,7 @@ export function StoryDisplay({
                   language={language}
                   storyId={storyId}
                   coverType="back"
+                  versionIndex={activeVersionIndex(backCoverObj)}
                   onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey('cover:back', backCoverObj)]: bbox }))}
                 />
 
