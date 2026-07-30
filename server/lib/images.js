@@ -8292,6 +8292,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 sceneMetadata: result.newSceneMetadata || null,
                 sceneCharacters: result.newSceneCharacters || null,
                 compositeAttempts,
+                // Fresh detection of THIS redraw (iterate re-detects internally
+                // on its accepted image). Carried so the per-round garment-hue
+                // pass can normalize the redraw BEFORE it is scored, reusing this
+                // detection's mask (no extra detect). inpaint/char-fix don't
+                // produce a full-image detection → those redraws are skipped.
+                bboxDetection: result.bboxDetection || null,
               };
             }
             return { pageNumber, imageData: null, method, error: 'iterate produced no result' };
@@ -8333,6 +8339,55 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         error: f.error || 'no result',
         timestamp: new Date().toISOString(),
       });
+    }
+
+    // Full-chain garment-hue normalization (mirror of the initial pre-eval
+    // Phase 5b-hue in server.js). iterate REDRAWS the whole page, so a redraw
+    // can reintroduce the garment-colour drift the initial pass corrected — and
+    // that drift can waste a repair round. Normalize each repaired page that
+    // carries a fresh output detection (iterate does; inpaint/char-fix don't
+    // produce a full-image detection → skipped, never forcing a detect) BEFORE
+    // it is scored below, reusing the round's own detection + SAM mask. Mutates
+    // roundSuccess[].imageData in place, so both the eval (buildEvalInputs) and
+    // the persisted version row read the corrected bytes. Same feature flag as
+    // the initial pass → flip GARMENT_HUE_NORMALIZE off = today's behaviour.
+    if (CONFIG_DEFAULTS.garmentHueNormalize && roundSuccess.length > 0) {
+      try {
+        const { normalizeGarmentHueBatch } = require('./garmentHueNormalize');
+        const { normalizeClothingCategory, resolvePageClothingCategory } = require('./clothingCategories');
+        const resolveAvatarForPage = async (pageNumber, fig) => {
+          const character = characters.find(c => (c.name || '').toLowerCase() === String(fig?.name || '').toLowerCase());
+          if (!character) return null; // unnamed/UNKNOWN figure → skip (no-op)
+          const orig = rawImages.find(i => i.pageNumber === pageNumber);
+          const re = roundSuccess.find(r => r.pageNumber === pageNumber);
+          // Per-page clothing priority (same sources the char-fix + entity paths
+          // use): the repaired entry's own (iterate-rewritten) scene metadata →
+          // the original page's clothing → the story's page-clothing resolver →
+          // 'standard'. Resolves the avatar matching THIS page's outfit.
+          const pageClothing = re?.sceneMetadata?.characterClothing
+            || orig?.perCharClothing
+            || orig?.characterClothing
+            || orig?.sceneMetadata?.characterClothing
+            || {};
+          const cat = normalizeClothingCategory(
+            pageClothing[character.name]
+            || resolvePageClothingCategory(storyData, pageNumber, character.name)
+            || 'standard'
+          );
+          return getStyledAvatarForClothing(character, artStyle, cat);
+        };
+        const hueOut = await normalizeGarmentHueBatch(roundSuccess, {
+          resolveAvatarForPage,
+          getDetection: (r) => r.bboxDetection,
+          imageFingerprint,
+          logLabel: `Round ${round} `,
+        });
+        if (hueOut.pagesChanged > 0) {
+          log.info(`🎨 [UNIFIED PIPELINE] Round ${round}: garment-hue normalized ${hueOut.figuresApplied} figure(s) across ${hueOut.pagesChanged} page(s) before eval`);
+        }
+      } catch (err) {
+        log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round}: garment-hue normalization skipped: ${err.message}`);
+      }
     }
 
     // Run fresh entity consistency AND quality eval in parallel. They're
