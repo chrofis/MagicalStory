@@ -461,48 +461,17 @@ REVISIONS (one line per change): `Scene N: [problem] → [revised Setting/Cast/A
 After this section the scene sequence is LOCKED. The story text and the SCENE prose below must realize these designs; no later stage may change what a scene depicts.
 
 
----SCENE PLAN---
-Summarize the LOCKED scene sequence (post-critique). One line per page:
-`Page N: [shot] — [character count] character(s) — [brief composition note]`
-
-Example for a 10-page story:
-```
-Page 1: wide — 1 char — Luna alone discovering the forest entrance
-Page 2: medium — 2 chars — Luna meets the fox, over-the-shoulder from Luna
-Page 3: close-up — 1 char — Luna's face reacting to the fox's riddle
-Page 4: ultra-wide — 1 char — tiny Luna crossing the vast frozen lake
-Page 5: medium — 2 chars — Luna and fox at the bridge, both facing it
-Page 6: wide — 1 char — Luna climbing the tower, seen from below
-Page 7: medium — 1 char + crowd — Luna in the market, crowd in background
-Page 8: close-up — 1 char — Luna reading the ancient scroll, concentration
-Page 9: wide — 2 chars — Luna and fox running, chase perspective, both small
-Page 10: medium — 2 chars — Luna and fox at the meadow, back view walking away
-```
-
-Rules: no two consecutive pages with same shot + same character count. At least 30% solo scenes. Emit this section exactly once, here — do not repeat it later in the output.
-
-
----PAGE TEXTS---
-NOW write the full story text — LAST, in ONE continuous pass over the locked scene sequence. One block per page:
-
-**Text N**
-[Story text for page N]
-
-Rules:
+---STORY DRAFT---
+NOW write the full story text — LAST, page by page over the locked scene sequence, each page's text paired with the full illustration brief realizing its locked scene. Text rules:
 - Each page's text narrates the moment its locked **Scene N** depicts. The scene decides what is on the page; the text gives it voice, causality, and feeling.
 - All TEXT LENGTH RULES, reading-level, language, and DO-NOT-WRITE rules apply here in full.
 - Characters or actions the locked scene does not show may appear in the text only as prior or off-page context (something said, remembered, already done) — never as the page's visible main action.
 - Do NOT change any scene while writing. If a text idea does not fit its scene, change the text idea.
 
-... continue for ALL {PAGES} pages ...
-
-
----STORY DRAFT---
-Assemble the full draft — pair each page's text with the full illustration brief realizing its locked scene.
 For EACH of the {PAGES} pages:
 
 **Draft [Page number]**
-[Story text — copy the matching **Text N** block above verbatim]
+[Story text for page N — written here, once]
 *(Word count: X)*
 [SCENE prose paragraph + METADATA JSON — use format from "Scene Output Format" section above. The SCENE prose is the 250-350 word realization of the LOCKED **Scene N** design: same setting, same cast + depths, same single action moment, same shot/framing. Derive each character's `expression` from the page text (affect translation). Expressions and mood follow the text; the depicted moment, cast, and composition follow the locked design.]
 
@@ -565,7 +534,7 @@ Probes (apply to every character):
 **D. SCENE HINTS (mechanical checks)**
 
 15. **Character count** — Any page with more than {MAX_CHARACTERS_PER_SCENE} characters in scene hint? Remove the least important.
-16. **Scene plan compliance** — Does each page match the SCENE PLAN above? Same shot type, same character count?
+16. **Scene sequence compliance** — Does each page match its LOCKED Scene N design in the SCENE SEQUENCE? Same shot type, same character count?
 17. **Clothing** — Are costumed characters using `costumed` in ALL scenes (except scene 1, before the adventure starts)?
 18. **Action match (text serves scene)** — Does each page's text narrate the moment its locked scene depicts? On a mismatch, emit a TEXT fix rewriting the text toward the scene — never a SCENE/METADATA fix bending the scene toward the text.
 19. **Depth vs size consistency** — For each character on each page, confirm `depth` matches how the prose describes their size. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size (e.g. "roughly a sixth of the frame height"), `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is the only named figure, `depth` MUST be `background`. Emit a fix line for each mismatch, e.g. `Page 9: CharacterF described as tiny silhouette but depth=foreground → depth=background`.
@@ -728,11 +697,9 @@ REVISIONS:
 Scene 5: same shot as Scene 4 → over-the-shoulder from behind the main character
 Scene 6: four distinct villagers with tools → one villager (midground, holds a lantern), others as background silhouettes
 
----SCENE PLAN---
 Page 1: close-up — 1 char — the main character at the window, snow falling outside
 ... (one line per page) ...
 
----PAGE TEXTS---
 **Text 1**
 The main character ran to the window. Snow was falling!
 ... (one block per page) ...

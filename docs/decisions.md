@@ -2866,3 +2866,28 @@ three.
 (identical additions; parser-compat test 38/38 green).
 **Status:** ✅ active — pending the next staging story to confirm the model
 follows the new rules.
+
+## Image-first template de-duplicated: PAGE TEXTS + SCENE PLAN removed (2026-07-31)
+**Context:** Owner review of a live image-first run: "the whole structure seems
+shitty — what is redundant?" Audit confirmed: page text was emitted THREE times
+(---PAGE TEXTS--- → verbatim copy into ---STORY DRAFT--- → ---STORY PAGES---
+patches) and scene content in FIVE layers (PAGE BEATS → SCENE SEQUENCE →
+SCENE PLAN → SCENE prose → sceneIntent). Grep-verified: NOTHING consumes
+---PAGE TEXTS--- or ---SCENE PLAN--- — both were unparsed model workspace. The
+verbatim-copy design also carried a drift failure mode (model paraphrases the
+copy → the parsed draft diverges from the "canonical" unparsed text).
+**Decision:** In `story-unified-imagefirst.txt`: (1) PAGE TEXTS deleted — story
+text is written ONCE, per page, directly in the STORY DRAFT, which now carries
+the former PAGE TEXTS rules (text narrates the locked Scene N; text bends, scenes
+never). Arc → scenes → text order is preserved: the SCENE SEQUENCE + critique are
+locked before the draft begins. (2) SCENE PLAN deleted — a vestigial one-line-per-
+page summary of the SCENE SEQUENCE it sat next to; ANALYSIS check 16 now verifies
+pages against the locked Scene N designs directly. Production template untouched
+(its SCENE PLAN is its real planning layer). Parser-compat suite updated to
+declare SCENE PLAN as a deliberate variant absence; 37 checks pass.
+**Rationale:** ~2k fewer output tokens on a 10-pager (more on 30), truncation
+risk down, copy-drift eliminated; the parsed STORY DRAFT is the single canonical
+text.
+**Touched:** `prompts/story-unified-imagefirst.txt`,
+`tests/manual/test-imagefirst-parser-compat.js`.
+**Status:** ✅ active.

@@ -5,7 +5,7 @@
  * model's AUTHORING work (arc → scene designs → text) but must emit a response
  * whose parsed result is IDENTICAL to the original story-unified.txt format.
  * New work sections (---SCENE SEQUENCE---, ---SCENE SEQUENCE CRITIQUE---,
- * ---PAGE TEXTS---, PAGE BEATS inside PLOT STRUCTURE) sit BEFORE
+ * PAGE BEATS inside PLOT STRUCTURE) sit BEFORE
  * ---STORY DRAFT--- and must be invisible to every parser.
  *
  * Verifies, with synthetic model outputs (2-page story, minimal VB):
@@ -196,19 +196,6 @@ Arc note: opens up from interior close-up to exterior wide
 REVISIONS:
 Scene 2: three figures → Cast: Mira (midground, leading), Jonas (midground, following)
 
----SCENE PLAN---
-Page 1: close-up — 1 char — Mira at the window
-Page 2: wide — 2 chars — garden path, Mira leading
-
----PAGE TEXTS---
-**Text 1**
-The main character ran to the window. Snow was falling outside.
-
-"Come and see!" she called down the stairs.
-
-**Text 2**
-Outside, the garden had turned white. The main character pulled her friend onto the path.
-
 `;
 
 const originalResponse = ORIGINAL_FRONT + DRAFT + '\n' + ANALYSIS + '\n' + TAIL;
@@ -303,21 +290,26 @@ const seqOrig = markerSeq(tplOrig);
 const seqVar = markerSeq(tplVar);
 
 const missing = seqOrig.filter(m => !seqVar.includes(m));
-check(`variant contains every original marker (missing: ${missing.join(',') || 'none'})`, missing.length === 0);
+// SCENE PLAN is DELIBERATELY absent from the variant (2026-07-31 de-dup: it was a
+// vestigial summary of SCENE SEQUENCE, consumed by nothing — see decisions.md).
+check(`variant contains every original marker except SCENE PLAN (missing: ${missing.join(',') || 'none'})`,
+  JSON.stringify(missing) === JSON.stringify(['SCENE PLAN']));
 
 const extra = seqVar.filter(m => !seqOrig.includes(m));
-check('only additions are the 3 new work sections',
-  JSON.stringify(extra) === JSON.stringify(['SCENE SEQUENCE', 'SCENE SEQUENCE CRITIQUE', 'PAGE TEXTS']));
+check('only additions are the 2 new work sections',
+  JSON.stringify(extra) === JSON.stringify(['SCENE SEQUENCE', 'SCENE SEQUENCE CRITIQUE']));
 
 // Relative order of the ORIGINAL markers must be preserved in the variant.
+// Compare on the COMMON marker set (SCENE PLAN is deliberately variant-absent).
+const commonOrig = seqOrig.filter(m => seqVar.includes(m));
 const varFiltered = seqVar.filter(m => seqOrig.includes(m));
-check('original markers keep their relative order in the variant',
-  JSON.stringify(varFiltered) === JSON.stringify(seqOrig));
+check('common markers keep their relative order in the variant',
+  JSON.stringify(varFiltered) === JSON.stringify(commonOrig));
 
 // New sections must all sit BEFORE ---STORY DRAFT--- (parsers bound the draft
 // at STORY DRAFT → ANALYSIS and the fixes block at FIXES REQUIRED → TITLE).
 const draftIdx = tplVar.indexOf('---STORY DRAFT---');
-for (const s of ['---SCENE SEQUENCE---', '---SCENE SEQUENCE CRITIQUE---', '---PAGE TEXTS---']) {
+for (const s of ['---SCENE SEQUENCE---', '---SCENE SEQUENCE CRITIQUE---']) {
   check(`${s} sits before ---STORY DRAFT---`, tplVar.indexOf(s) !== -1 && tplVar.indexOf(s) < draftIdx);
 }
 // New sections must never instruct headers that collide with draft/page parsers.
@@ -362,9 +354,9 @@ const promptsSvc = require('../../server/services/prompts');
   const otherPrompt = buildUnifiedStoryPrompt({ ...baseInput, storyPromptVariant: 'somethingElse' }, 2);
 
   check('default (flag absent) uses the IMAGE-FIRST template',
-    defPrompt.includes('---SCENE SEQUENCE---') && defPrompt.includes('---PAGE TEXTS---'));
+    defPrompt.includes('---SCENE SEQUENCE---') && defPrompt.includes('---SCENE SEQUENCE CRITIQUE---'));
   check('imageFirst flag selects the variant template',
-    varPrompt.includes('---SCENE SEQUENCE---') && varPrompt.includes('---PAGE TEXTS---')
+    varPrompt.includes('---SCENE SEQUENCE---') && varPrompt.includes('---SCENE SEQUENCE CRITIQUE---')
     && varPrompt.includes('Image-First Variant'));
   check('textFirst flag opts back into the legacy template',
     !legacyPrompt.includes('---SCENE SEQUENCE---') && legacyPrompt.includes('Draft the story with scene output'));
