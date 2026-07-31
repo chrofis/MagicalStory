@@ -9,7 +9,7 @@ When the FIRST reference photo shows a real location (architecture, landscape, n
 {SCENE_DESCRIPTION}
 
 **Composition:**
-- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that action target — not the camera. When the target is in the background, the character faces away from camera with back or side visible. Companions sharing the same movement or destination all face the same way — never one facing the camera while the others walk away.
+- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that action target — not the camera, UNLESS the scene description explicitly declares a facing for that character (facing the camera, back view, facing left/right) — the scene's declared facing always wins over this default. When the target is in the background and no facing is declared, the character faces away from camera with back or side visible. Companions sharing the same movement or destination all face the same way — never one facing the camera while the others walk away.
 - Depth: `foreground` characters are large and dominate the lower half. `midground` characters occupy the middle band, smaller and further back. `background` characters are small and distant. Foreground > midground > background in size.
 
 {REQUIRED_OBJECTS}

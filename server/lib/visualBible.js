@@ -622,6 +622,63 @@ function getElementsNeedingAnalysis(visualBible, pageNumber) {
 // PROMPT BUILDING FUNCTIONS
 // ============================================================================
 
+// Tokens ignored when matching a VB entry against clothing / scene text.
+// Shared canon for the cover worn≠held dedupe (coverIterate) and the page-side
+// worn-vs-held guards (storyHelpers) — one stopword list, one tokenizer.
+const ENTITY_MATCH_STOPWORDS = new Set([
+  'the', 'and', 'with', 'for', 'its', 'her', 'his', 'their', 'one', 'two',
+  'der', 'die', 'das', 'ein', 'eine', 'einen', 'und', 'mit', 'von', 'aus',
+  'les', 'des', 'une', 'avec', 'small', 'large', 'made', 'over', 'around',
+]);
+
+function significantEntityTokens(text) {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .split(/[^a-zäöüéèêàçñ]+/i)
+      .filter(t => t.length >= 3 && !ENTITY_MATCH_STOPWORDS.has(t))
+  );
+}
+
+/**
+ * Short ENGLISH image-facing reference for a VB entity. The entity NAME
+ * follows the story language (a German "Roter Umhang" must never reach the
+ * English image prompt as the thing to draw), so build the reference from the
+ * entry's description instead: first clause, capped at 12 words, leading
+ * article stripped. Falls back to the pool-generic noun when the entry has no
+ * usable description (same generic-noun approach as sanitizeVbIdsInPrompt).
+ * Canonical implementation — coverIterate re-exports it, storyHelpers'
+ * page-prompt emission sites use it directly.
+ */
+function englishEntityRef(entry, genericNoun = 'object') {
+  const desc = String(entry?.extractedDescription || entry?.description || '').trim();
+  if (desc) {
+    const clause = desc.split(/[.;\n]/)[0].trim();
+    const words = clause.replace(/^(?:a|an|the)\s+/i, '').split(/\s+/).slice(0, 12).join(' ').trim();
+    if (words) return words.replace(/[,\s]+$/, '');
+  }
+  return genericNoun;
+}
+
+/**
+ * Image-facing reference for a VB location. The bare location name is
+ * story-language and — for invented locations — carries zero visual
+ * information, so the name is only emitted WITH the entry's English visual
+ * fields (features / colors / signatureElement) inlined in parentheses
+ * (settled cover-prompt pattern, docs/decisions.md 2026-07-31). Returns null
+ * when the entry has no name — callers keep their own fallbacks.
+ */
+function englishLocationRef(loc) {
+  if (!loc) return null;
+  const name = String(loc.name || '').trim();
+  if (!name) return null;
+  const visuals = [loc.features, loc.colors, loc.signatureElement]
+    .map(v => String(v || '').trim())
+    .filter(Boolean)
+    .join('; ');
+  return visuals ? `${name} (${visuals})` : name;
+}
+
 /**
  * Build Visual Bible prompt section for image generation
  * Includes ALL visual bible elements (not filtered by page) with optional intro text
@@ -659,28 +716,35 @@ function buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames = n
     return '';
   }
 
-  // Build intro text based on language
-  let introText;
-  if (language === 'de') {
-    introText = `**VISUELLE REFERENZELEMENTE (optional):**
-Du kannst Elemente aus der visuellen Bibel unten verwenden, wenn sie fuer diese Szene passend sind.
-Diese Elemente sind NICHT erforderlich - fuege sie nur hinzu, wenn sie natuerlich ins Bild passen.`;
-  } else if (language === 'fr') {
-    introText = `**ELEMENTS DE REFERENCE VISUELS (optionnel):**
-Vous pouvez utiliser les elements de la bible visuelle ci-dessous s'ils sont appropries pour cette scene.
-Ces elements ne sont PAS obligatoires - incluez-les uniquement s'ils s'integrent naturellement dans l'image.`;
-  } else {
-    introText = `**VISUAL REFERENCE ELEMENTS (optional):**
+  // Image-facing prompts are English-only regardless of story language
+  // (settled direction — see docs/decisions.md cover/page prompt entries).
+  // The de/fr intro variants and story-language entity names are gone; the
+  // `language` parameter stays in the signature for call compatibility.
+  const introText = `**VISUAL REFERENCE ELEMENTS (optional):**
 You may use elements from the visual bible below if appropriate for this scene.
 These elements are NOT required - only include them if they naturally fit the image.`;
-  }
 
   let prompt = `\n${introText}\n\n`;
 
-  // Add all recurring elements (no IDs — they confuse image generators)
+  // Add all recurring elements (no IDs — they confuse image generators).
+  // English-only entity refs: a VB entity NAME follows the story language, so
+  // artifacts/vehicles/clothing lead with an English description-derived ref.
+  // Characters and animals keep their given names (identity anchors); real
+  // landmarks keep their real-world names.
+  const GENERIC_NOUN_BY_TYPE = { artifact: 'object', vehicle: 'vehicle', clothing: 'outfit' };
   for (const entry of allEntries) {
     const description = entry.extractedDescription || entry.description;
-    prompt += `**${entry.name}** (${entry.type}): ${description}\n`;
+    let lead;
+    if (entry.type === 'character' || entry.type === 'animal') {
+      lead = `**${entry.name}**`;
+    } else if (entry.type === 'location') {
+      lead = entry.isRealLandmark
+        ? `**${entry.name}**`
+        : `**${englishEntityRef(entry, 'place')}**`;
+    } else {
+      lead = `**${englishEntityRef(entry, GENERIC_NOUN_BY_TYPE[entry.type] || 'object')}**`;
+    }
+    prompt += `${lead} (${entry.type}): ${description}\n`;
   }
 
   return prompt;
@@ -2139,6 +2203,9 @@ module.exports = {
   // Prompt building
   buildVisualBiblePrompt,
   buildFullVisualBiblePrompt,
+  englishEntityRef,
+  englishLocationRef,
+  significantEntityTokens,
 
   // Image analysis
   analyzeVisualBibleElements,

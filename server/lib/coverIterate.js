@@ -70,23 +70,10 @@ function enrichCoverHintWithArtifacts(coverHint, visualBible, opts = {}) {
   return enriched;
 }
 
-/**
- * Short ENGLISH image-facing reference for a VB entity. The entity NAME
- * follows the story language (a German "Roter Umhang" must never reach the
- * English image prompt as the thing to draw), so build the reference from the
- * entry's description instead: first clause, capped at 12 words, leading
- * article stripped. Falls back to the pool-generic noun when the entry has no
- * usable description (same generic-noun approach as sanitizeVbIdsInPrompt).
- */
-function englishEntityRef(entry, genericNoun = 'object') {
-  const desc = String(entry?.extractedDescription || entry?.description || '').trim();
-  if (desc) {
-    const clause = desc.split(/[.;\n]/)[0].trim();
-    const words = clause.replace(/^(?:a|an|the)\s+/i, '').split(/\s+/).slice(0, 12).join(' ').trim();
-    if (words) return words.replace(/[,\s]+$/, '');
-  }
-  return genericNoun;
-}
+// englishEntityRef / englishLocationRef / significantEntityTokens moved to
+// visualBible.js (canonical implementations, shared with the page-prompt
+// builders in storyHelpers.js). Re-exported below for existing consumers.
+const { englishEntityRef, englishLocationRef, significantEntityTokens } = require('./visualBible');
 
 /**
  * VB ids the cover hint actually asks for: `Objects:` list ∪ every character's
@@ -111,21 +98,9 @@ function collectCoverHintElementIds(coverHint) {
   return ids.length > 0 ? [...new Set(ids)] : null;
 }
 
-// Tokens ignored when matching a VB artifact against a clothing description.
-const WORN_HELD_STOPWORDS = new Set([
-  'the', 'and', 'with', 'for', 'its', 'her', 'his', 'their', 'one', 'two',
-  'der', 'die', 'das', 'ein', 'eine', 'einen', 'und', 'mit', 'von', 'aus',
-  'les', 'des', 'une', 'avec', 'small', 'large', 'made', 'over', 'around',
-]);
-
-function significantTokens(text) {
-  return new Set(
-    String(text || '')
-      .toLowerCase()
-      .split(/[^a-zäöüéèêàçñ]+/i)
-      .filter(t => t.length >= 3 && !WORN_HELD_STOPWORDS.has(t))
-  );
-}
+// Tokenizer for matching a VB artifact against a clothing description —
+// shared canon in visualBible.js (significantEntityTokens, imported above).
+const significantTokens = significantEntityTokens;
 
 /**
  * Resolve the "item emitted as BOTH clothing and artifact" contradiction for a
@@ -1179,14 +1154,8 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
   const loc = locId && Array.isArray(visualBible?.locations)
     ? visualBible.locations.find(l => l?.id && l.id.toUpperCase() === locId.toUpperCase())
     : null;
-  let landmarkName = loc?.name || (locId ? 'the landmark' : 'a scenic outdoor setting');
-  if (loc) {
-    const visuals = [loc.features, loc.colors, loc.signatureElement]
-      .map(v => String(v || '').trim())
-      .filter(Boolean)
-      .join('; ');
-    if (visuals) landmarkName = `${landmarkName} (${visuals})`;
-  }
+  const landmarkName = (loc && englishLocationRef(loc))
+    || (locId ? 'the landmark' : 'a scenic outdoor setting');
 
   // Resolve any VB id (ART/ANI/VEH/CLO) to its VB entry across all pools.
   // The outline sometimes declares `holds: ART001` without listing ART001 in

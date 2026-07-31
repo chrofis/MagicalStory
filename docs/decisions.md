@@ -2956,3 +2956,71 @@ text = English, per scene-iteration LANGUAGE RULES + VB-id sanitizer).
 `prompts/initial-page-with-dedication.txt`,
 `tests/manual/test-cover-prompt-builder.js` (new, 40+ assertions).
 **Status:** ✅ active.
+
+## Page prompt builder: worn≠held guard, English-only entity refs, subordinated facing boilerplate, state-aware REQUIRED OBJECTS (2026-07-31)
+**Context:** Owner audit of a real emitted PAGE prompt (German story) found the
+page-side siblings of the cover-prompt defects fixed the same day: (a) the SAME
+cape described as BOTH worn ("tied around his neck" — the CLOTHING wears-line
+backstop pasted the worn CLO entry raw, internal name incl. the wearer
+parenthetical) AND held ("held overhead in his hands" — scene prose): physically
+impossible, the model paints two capes; (b) story-language VB names raw in the
+English prompt (clothing/artifact names in REQUIRED OBJECTS + the wears-line,
+location names in the vantage empty-scene LOCATION line, plus localized de/fr
+REQUIRED OBJECTS headers — which also silently broke `parseVisualBibleObjects`,
+it only matches the English header); (c) the composition boilerplate "faces
+that action target — not the camera" contradicting scenes that explicitly
+declare "facing the camera"; (d) REQUIRED OBJECTS descriptions saying "tied at
+the neck" for items the scene holds/drapes.
+**Decision:**
+- **Worn-vs-held guard on the wears-line backstop**
+  (`filterWornClothingAgainstScene`, storyHelpers): a garment segment the scene
+  places off-body is dropped from the injected `- X wears:` line. Off-body =
+  structured `interactions[]` (id match or token overlap) or a prose sentence
+  (token overlap + non-worn placement wording). Placement lexicon: held/carried/
+  waved/overhead/in hands, lying/crumpled/dropped/on the ground, removed/taken
+  off are always off-body; draped/hangs/slung only when NOT anchored to a body
+  part ("draped over his shoulders" stays worn). Token overlap rule = the cover
+  dedupe's (≥2 shared significant tokens or ≥1 entry-NAME token), tokenizer
+  shared via `significantEntityTokens` (moved to visualBible.js).
+- **English-only entity refs at every page emission site**: REQUIRED OBJECTS
+  header is always English; artifact/vehicle/clothing entries lead with the
+  `englishEntityRef` description-derived ref (moved to visualBible.js, shared
+  with covers), never the story-language VB name; animals keep proper names;
+  internal entry names inside kept wears-line segments are swapped for the
+  English ref and "(WearerName)" parentheticals removed. `sanitizeVbIdsInPrompt`
+  (final chokepoint for pages AND cover composite) now resolves ART/VEH/CLO ids
+  to English refs and LOC ids to name + inlined English visuals
+  (`englishLocationRef`); CHR/ANI still resolve to given names. The
+  `buildVisualBiblePrompt` fallback section and the vantage empty-scene
+  `**LOCATION:**` line follow the same rule.
+- **ROOT fix**: `story-unified.txt` + `story-unified-imagefirst.txt` VB rules
+  now mandate ENGLISH `name` + `description` for artifacts, locations, vehicles,
+  and clothing (characters/animals keep given names) — the code-side refs are
+  the backstop for stories generated before the rule and for model slips.
+- **Facing boilerplate subordinated** (`image-generation.txt`): "...faces that
+  action target — not the camera, UNLESS the scene description explicitly
+  declares a facing ... — the scene's declared facing always wins."
+- **State-aware REQUIRED OBJECTS**: when the scene places an object off-body,
+  the emitted description drops attachment clauses ("tied at the neck" —
+  attachment verb + body part, via `stripWornStateFromDescription`) and the
+  clothing "(worn by X)" suffix; the English lead ref is built from the
+  stripped description so the clause can't re-enter via the lead. Worn pages
+  keep clause + suffix unchanged.
+- Known cross-language limit: token matching cannot bridge a German entry name
+  against English prose — closed at the root by the English-VB rule; the
+  structured-interactions id/overlap path still catches most cases meanwhile.
+**Rationale:** a worn+held contradiction cannot be drawn (model paints the item
+twice); story-language tokens degrade image-model compliance and get painted as
+lettering (settled English-only direction); localized REQUIRED OBJECTS headers
+break the expected-objects parser; unconditional facing boilerplate overrides
+the scene's explicit facing declarations.
+**Touched:** `server/lib/storyHelpers.js` (guards, REQUIRED OBJECTS emission,
+wears-line backstop, sanitizeVbIdsInPrompt), `server/lib/visualBible.js`
+(shared `englishEntityRef`/`englishLocationRef`/`significantEntityTokens`,
+English-only `buildVisualBiblePrompt`), `server/lib/coverIterate.js` (delegates
+to shared helpers), `server.js` (vantage LOCATION line),
+`prompts/image-generation.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`,
+`tests/manual/test-page-prompt-builder.js` (new, 45+ assertions),
+`tests/manual/test-cover-sanitize.js` (updated to English-ref contract).
+**Status:** ✅ active.

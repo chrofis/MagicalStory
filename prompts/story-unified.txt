@@ -723,6 +723,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
 
 **Rules:**
 - Do NOT include main or primary characters ({CHARACTER_NAMES}) - they have reference photos
+- **ENGLISH `name` and `description` for artifacts, locations, vehicles, and clothing — even when the story is written in another language.** These fields are copied verbatim into ENGLISH image prompts; a story-language name leaks into the prompt and can even be painted as lettering. Characters and animals keep their given names.
 - **Every physical item appears in exactly ONE category.** An item WORN by a character (cape, hat, mask, uniform, boots) belongs in `clothing` (and the wearer's `clothingRequirements`) ONLY — never also as an `artifacts` entry. `artifacts` is for props and objects that are not worn garments. Duplicating a worn item as an artifact produces two competing canonical descriptions and a stray standalone reference render of a garment that already appears on the character's avatar.
 - Add at least {PAGES} entries. Even if an element appears only once, add it for visual consistency
 - Use empty arrays `[]` for categories with no elements

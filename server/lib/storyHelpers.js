@@ -10,7 +10,7 @@ const path = require('path');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
-const { buildVisualBiblePrompt } = require('./visualBible');
+const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens } = require('./visualBible');
 const { getPrimaryPhoto, getFacePhoto, getStandardAvatar, getFaceThumb, getBodyThumb } = require('./characterPhotos');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
@@ -4445,6 +4445,181 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 /**
  * Build image generation prompt
  */
+// ============================================================================
+// WORN-VS-HELD / STATE-AWARE GUARDS (page siblings of the cover worn≠held
+// dedupe in coverIterate.applyCoverWornHeldDedupe — docs/decisions.md
+// 2026-07-31). A garment the scene holds/drops must not ALSO be described as
+// worn ("tied around his neck" + "held overhead in his hands" is unpaintable —
+// the model draws the item twice).
+// ============================================================================
+
+// Placement wording that means an item is NOT worn on the body: held/carried/
+// waved, lying/dropped on a surface, or explicitly removed.
+const NON_WORN_STRONG_RE = /\b(?:held|holds?|holding|clutch(?:es|ed|ing)?|grip(?:s|ped|ping)?|carr(?:y|ies|ied|ying)|wav(?:es|ed|ing)|swing(?:s|ing)?|brandish(?:es|ed|ing)?|overhead|in\s+(?:his|her|their|both|one)\s+hands?|l(?:ies|ying)|lays?|laid|crumpled|dropp(?:ed|ing)|drops?|on\s+the\s+(?:ground|floor|grass|sand|bench|chair|bed|rock|table)|tak(?:es|en|ing)\s+off|took\s+off|pull(?:s|ed|ing)\s+off|remov(?:es|ed|ing)|without\s+(?:the|his|her|their))\b/i;
+// draped / hangs / slung are off-body ONLY when not anchored to a body part
+// ("cape draped over his shoulders" is worn; "cape draped over the chair" is not).
+const NON_WORN_WEAK_RE = /\b(?:drap(?:es|ed|ing)|hangs?|hanging|hung|slung)\b/i;
+const BODY_ANCHORED_DRAPE_RE = /\b(?:drap(?:es|ed|ing)|hangs?|hanging|hung|slung)\b[^.;]{0,50}\b(?:shoulders?|neck|waist|head|back|hips?|arms?|torso|chest|body)\b/i;
+
+function textDeclaresNonWornPlacement(text) {
+  const t = String(text || '');
+  if (!t) return false;
+  if (NON_WORN_STRONG_RE.test(t)) return true;
+  return NON_WORN_WEAK_RE.test(t) && !BODY_ANCHORED_DRAPE_RE.test(t);
+}
+
+/**
+ * Does the scene place this VB entry somewhere other than ON a body?
+ * Checks the structured interactions[] first (VB id match or token overlap),
+ * then the prose sentences (token overlap + non-worn placement wording).
+ * Overlap rule = the cover dedupe's: ≥2 shared significant tokens, or ≥1
+ * token from the entry NAME (names are short and specific).
+ *
+ * Cross-language caveat: token matching cannot bridge a story-language entry
+ * ("Roter Umhang") against English prose ("red cape") — that gap is closed at
+ * the ROOT by the story-unified VB language rule (English name + description
+ * for artifacts/locations/vehicles/clothing).
+ */
+function sceneDeclaresNonWornState(entry, proseText, interactions) {
+  const nameTokens = significantEntityTokens(entry?.name);
+  const allTokens = new Set([
+    ...nameTokens,
+    ...significantEntityTokens(entry?.extractedDescription || entry?.description),
+  ]);
+  if (allTokens.size === 0) return false;
+  const entryId = String(entry?.id || '').toUpperCase();
+  const overlaps = (text) => {
+    const tokens = significantEntityTokens(text);
+    let overlap = 0;
+    let nameHit = false;
+    for (const t of tokens) {
+      if (allTokens.has(t)) overlap++;
+      if (nameTokens.has(t)) nameHit = true;
+    }
+    return overlap >= 2 || nameHit;
+  };
+  for (const i of (Array.isArray(interactions) ? interactions : [])) {
+    if (!i || typeof i !== 'object') continue;
+    const combined = `${i.object || ''} ${i.where || ''}`;
+    const idHit = entryId && combined.toUpperCase().includes(entryId);
+    if (!idHit && !overlaps(combined)) continue;
+    if (textDeclaresNonWornPlacement(combined)) return true;
+  }
+  const sentences = String(proseText || '').split(/(?<=[.!?])\s+|\n+/);
+  for (const s of sentences) {
+    if (!overlaps(s)) continue;
+    if (textDeclaresNonWornPlacement(s)) return true;
+  }
+  return false;
+}
+
+// Attachment clauses ("tied at the neck", "fastened around her waist") inside
+// an object description contradict a scene that holds/drops the item. The
+// clause is dropped; the physical features stay. A clause conflicts when it
+// pairs an attachment verb with a body part, or says "worn ...".
+const WORN_ATTACHMENT_CLAUSE_RE = /\b(?:tied|fasten(?:ed|s)?|clasp(?:ed|s)?|button(?:ed|s)?|knott?(?:ed|s)?|secur(?:ed|es)?|wrapp?(?:ed|s)?|worn|wearing)\b[^,;.]*\b(?:neck|shoulders?|waist|head|chin|chest|back|hips?|torso|body)\b|\bworn\s+(?:by|over|under|around|on)\b/i;
+
+/**
+ * Strip worn-state attachment clauses from an object description when the
+ * scene places the object off-body (fix for REQUIRED OBJECTS saying "tied at
+ * the neck" while the scene holds/drapes the item).
+ */
+function stripWornStateFromDescription(description) {
+  const raw = String(description || '').trim();
+  if (!raw) return raw;
+  const segments = raw.split(/\s*[,;]\s*/).filter(Boolean);
+  const kept = segments.filter(s => !WORN_ATTACHMENT_CLAUSE_RE.test(s));
+  if (kept.length > 0 && kept.length < segments.length) return kept.join(', ');
+  if (kept.length === segments.length) return raw;
+  // Every segment matched (single-clause description) — strip the matched
+  // phrases inline rather than deleting the whole description.
+  return raw.replace(new RegExp(WORN_ATTACHMENT_CLAUSE_RE.source, 'gi'), '').replace(/\s{2,}/g, ' ').replace(/[,\s]+$/, '').trim();
+}
+
+/**
+ * Worn-vs-held guard for the injected CLOTHING wears-lines (page sibling of
+ * applyCoverWornHeldDedupe):
+ *   - a garment segment the scene places elsewhere (held, on the ground,
+ *     removed) is DROPPED from the wears-line — the scene prose carries the
+ *     item's real placement, the wears-line must not re-attach it to the body;
+ *   - raw VB entry names inside kept segments (internal, story-language,
+ *     often carrying a "(WearerName)" parenthetical per the VB clothing name
+ *     convention) are replaced by the entry's English description-derived ref;
+ *   - leftover "(CharacterName)" parentheticals are removed.
+ *
+ * @returns {string|null} filtered clothing description, or null when nothing
+ *                        wearable remains (caller skips the wears-line).
+ */
+function filterWornClothingAgainstScene(clothingDescription, proseText, interactions, visualBible, characterNames = []) {
+  const raw = String(clothingDescription || '').trim();
+  if (!raw) return null;
+
+  const vbEntries = [
+    ...(Array.isArray(visualBible?.clothing) ? visualBible.clothing : []),
+    ...(Array.isArray(visualBible?.artifacts) ? visualBible.artifacts : []),
+  ].filter(e => e && (e.name || e.description || e.extractedDescription));
+
+  const entryMeta = vbEntries.map(e => ({
+    entry: e,
+    nameRaw: String(e.name || '').trim(),
+    nameTokens: significantEntityTokens(e.name),
+    allTokens: new Set([
+      ...significantEntityTokens(e.name),
+      ...significantEntityTokens(e.extractedDescription || e.description),
+    ]),
+    placedElsewhere: sceneDeclaresNonWornState(e, proseText, interactions),
+  }));
+
+  const segmentMatchesEntry = (segment, meta) => {
+    const segTokens = significantEntityTokens(segment);
+    let overlap = 0;
+    let nameHit = false;
+    for (const t of segTokens) {
+      if (meta.allTokens.has(t)) overlap++;
+      if (meta.nameTokens.has(t)) nameHit = true;
+    }
+    return overlap >= 2 || nameHit;
+  };
+
+  const segments = raw.split(/\s*[,;]\s*/).filter(Boolean);
+  const kept = [];
+  for (const segment of segments) {
+    // (1) direct: the prose/interactions declare this garment's own tokens
+    //     off-body (works when clothing text and prose share a language)
+    let drop = sceneDeclaresNonWornState({ name: '', description: segment }, proseText, interactions);
+    // (2) VB bridge: the segment matches a VB entry the scene places elsewhere
+    if (!drop) {
+      drop = entryMeta.some(m => m.placedElsewhere && segmentMatchesEntry(segment, m));
+    }
+    if (drop) continue;
+    // Kept segment: never emit an internal VB entry name — swap it for the
+    // English description-derived ref. The ref is built from the description
+    // MINUS its attachment clauses: the surrounding segment usually carries
+    // its own worn-state wording ("<name> tied around his neck"), so a ref
+    // that repeats the entry's "tied at the neck" would double it.
+    let cleaned = segment;
+    for (const m of entryMeta) {
+      if (!m.nameRaw || m.nameRaw.length < 3) continue;
+      const idx = cleaned.toLowerCase().indexOf(m.nameRaw.toLowerCase());
+      if (idx === -1) continue;
+      const genericNoun = m.entry.type === 'clothing' || m.entry.wornBy ? 'outfit' : 'object';
+      const strippedDesc = stripWornStateFromDescription(m.entry.extractedDescription || m.entry.description);
+      const ref = englishEntityRef({ description: strippedDesc }, genericNoun);
+      cleaned = cleaned.slice(0, idx) + ref + cleaned.slice(idx + m.nameRaw.length);
+    }
+    // Drop "(CharacterName)" parentheticals that rode in on internal names.
+    for (const charName of (characterNames || [])) {
+      if (!charName) continue;
+      const esc = String(charName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      cleaned = cleaned.replace(new RegExp(`\\s*\\(\\s*${esc}\\s*\\)`, 'gi'), '');
+    }
+    cleaned = cleaned.replace(/\s{2,}/g, ' ').trim();
+    if (cleaned) kept.push(cleaned);
+  }
+  if (kept.length === 0) return null;
+  return kept.join(', ');
+}
+
 function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, visualBible = null, pageNumber = null, referencePhotos = null, options = {}) {
   // Build image generation prompt. The unified pipeline is the only generation
   // mode; legacy pictureBook / outlineAndText / sequential / language-variant
@@ -4572,14 +4747,33 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         'dusty', 'heather', 'medium', 'bright', 'muted',
       ]);
       const missingClothingLines = [];
+      const guardCharNames = [
+        ...new Set([
+          ...referencePhotos.map(p => p && p.name).filter(Boolean),
+          ...((sceneCharacters || []).map(c => c && c.name).filter(Boolean)),
+        ]),
+      ];
       referencePhotos.forEach(photo => {
         if (!photo.name || !photo.clothingDescription) return;
         log.debug(`[IMAGE PROMPT] ${photo.name} wears: "${photo.clothingDescription}" (${photo.clothingCategory})`);
-        const items = String(photo.clothingDescription).toLowerCase().split(/[^a-zäöüéèà-]+/)
+        // Worn-vs-held guard: a garment the scene places OFF the body (held,
+        // lying on the ground, removed) must not be re-attached by the
+        // wears-line; internal VB entry names are swapped for English refs.
+        const guarded = filterWornClothingAgainstScene(
+          photo.clothingDescription, cleanSceneDescription, metadata?.interactions, visualBible, guardCharNames
+        );
+        if (!guarded) {
+          log.info(`🧥 [IMAGE PROMPT] Page ${pageNumber}: ${photo.name}'s wears-line skipped — scene places the outfit's item(s) off-body`);
+          return;
+        }
+        if (guarded !== photo.clothingDescription) {
+          log.info(`🧥 [IMAGE PROMPT] Page ${pageNumber}: ${photo.name}'s wears-line adjusted for scene placement: "${guarded}"`);
+        }
+        const items = guarded.toLowerCase().split(/[^a-zäöüéèà-]+/)
           .filter(w => w.length >= 4 && !CLOTHING_STOPWORDS.has(w));
         const hits = new Set(items.filter(w => proseLower.includes(w)));
         if (hits.size < 2) {
-          missingClothingLines.push(`- ${photo.name} wears: ${photo.clothingDescription}`);
+          missingClothingLines.push(`- ${photo.name} wears: ${guarded}`);
           log.warn(`[IMAGE PROMPT] Prose omitted ${photo.name}'s outfit (${hits.size} wardrobe terms found) — appending explicit wears-line`);
         }
       });
@@ -4708,7 +4902,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const artifact = (visualBible.artifacts || []).find(a => matchesEntry(a, objName));
       if (artifact) {
         const description = artifact.extractedDescription || artifact.description;
-        requiredObjects.push({ name: artifact.name, id: artifact.id, type: 'object', description });
+        requiredObjects.push({ name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact });
         continue;
       }
 
@@ -4716,7 +4910,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const animal = (visualBible.animals || []).find(a => matchesEntry(a, objName));
       if (animal) {
         const description = animal.extractedDescription || animal.description;
-        requiredObjects.push({ name: animal.name, id: animal.id, type: 'animal', description });
+        requiredObjects.push({ name: animal.name, id: animal.id, type: 'animal', description, entry: animal });
         continue;
       }
 
@@ -4724,7 +4918,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const location = (visualBible.locations || []).find(l => matchesEntry(l, objName));
       if (location) {
         const description = location.extractedDescription || location.description;
-        requiredObjects.push({ name: location.name, id: location.id, type: 'location', description });
+        requiredObjects.push({ name: location.name, id: location.id, type: 'location', description, entry: location });
         continue;
       }
 
@@ -4732,7 +4926,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const vehicle = (visualBible.vehicles || []).find(v => matchesEntry(v, objName));
       if (vehicle) {
         const description = vehicle.extractedDescription || vehicle.description;
-        requiredObjects.push({ name: vehicle.name, id: vehicle.id, type: 'vehicle', description });
+        requiredObjects.push({ name: vehicle.name, id: vehicle.id, type: 'vehicle', description, entry: vehicle });
         continue;
       }
 
@@ -4740,22 +4934,17 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const clothing = (visualBible.clothing || []).find(c => matchesEntry(c, objName));
       if (clothing) {
         const description = clothing.extractedDescription || clothing.description;
-        const wornBy = clothing.wornBy ? ` (worn by ${clothing.wornBy})` : '';
-        requiredObjects.push({ name: clothing.name, id: clothing.id, type: 'clothing', description: description + wornBy });
+        requiredObjects.push({ name: clothing.name, id: clothing.id, type: 'clothing', description, wornBy: clothing.wornBy || null, entry: clothing });
       }
     }
 
     if (requiredObjects.length > 0) {
       hasRequiredObjects = true;
-      // Build the required objects section with language-appropriate header
-      let header;
-      if (language === 'de') {
-        header = '**ERFORDERLICHE OBJEKTE IN DIESER SZENE (MÜSSEN im Bild erscheinen):**';
-      } else if (language === 'fr') {
-        header = '**OBJETS REQUIS DANS CETTE SCÈNE (DOIVENT apparaître dans l\'image):**';
-      } else {
-        header = '**REQUIRED OBJECTS IN THIS SCENE (MUST appear in the image):**';
-      }
+      // Image-facing prompts are English-only — single English header, no
+      // de/fr variants. (The localized headers also broke the downstream
+      // parseVisualBibleObjects, which matches /REQUIRED OBJECTS/ to build
+      // the expected-objects list for eval/bbox.)
+      const header = '**REQUIRED OBJECTS IN THIS SCENE (MUST appear in the image):**';
 
       // Skip location entries — the location is either visually attached
       // as the empty-scene / vantage backdrop reference image OR named in
@@ -4763,10 +4952,32 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // wastes ~200 chars per page with no model benefit.
       const promptObjects = requiredObjects.filter(o => o.type !== 'location');
       requiredObjectsSection = `\n${header}\n`;
+      const GENERIC_NOUN_BY_TYPE = { object: 'object', vehicle: 'vehicle', clothing: 'outfit' };
       for (const obj of promptObjects) {
         // Note: obj.id exists for Visual Bible tracking but is not included in image prompts
-        // as image models don't use these identifiers
-        requiredObjectsSection += `* **${obj.name}** (${obj.type}): ${obj.description}\n`;
+        // as image models don't use these identifiers.
+        // State-aware description: when the scene places the object off-body
+        // (held, draped over furniture, lying on the ground), the emitted
+        // description must not contradict it — attachment clauses like "tied
+        // at the neck" and the clothing "(worn by X)" suffix are dropped.
+        const placedElsewhere = sceneDeclaresNonWornState(obj.entry, cleanSceneDescription, metadata?.interactions);
+        const description = placedElsewhere ? stripWornStateFromDescription(obj.description) : obj.description;
+        const wornSuffix = (obj.type === 'clothing' && obj.wornBy && !placedElsewhere)
+          ? ` (worn by ${obj.wornBy})`
+          : '';
+        if (placedElsewhere) {
+          log.info(`🧥 [IMAGE PROMPT] Page ${pageNumber}: required ${obj.type} ${obj.id || ''} emitted state-aware (scene places it off-body)`);
+        }
+        // English-only entity refs: the VB NAME follows the story language, so
+        // artifacts/vehicles/clothing lead with an English description-derived
+        // ref. Animals keep their proper name (identity anchor). The ref is
+        // built from the STATE-AWARE description so a stripped attachment
+        // clause can't sneak back in via the lead.
+        const refEntry = placedElsewhere ? { description } : obj.entry;
+        const lead = (obj.type === 'animal' && obj.name)
+          ? `**${obj.name}** (animal)`
+          : `**${englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object')}** (${obj.type})`;
+        requiredObjectsSection += `* ${lead}: ${description}${wornSuffix}\n`;
       }
       if (promptObjects.length === 0) {
         // All entries were locations — nothing left to list.
@@ -4867,7 +5078,10 @@ Important:
 /**
  * Final-pass sanitiser for image prompts. Walks the assembled prompt for
  * Visual Bible IDs (CHR### / ANI### / ART### / LOC### / VEH### / CLO###),
- * resolves each to the matching VB entry's `name`. When an id has no
+ * resolves each to an image-facing substitution: character/animal ids to the
+ * entry's given name, artifact/vehicle/clothing ids to an ENGLISH
+ * description-derived ref (VB names follow the story language), location ids
+ * to the name with English visual fields inlined. When an id has no
  * matching entry — orphan — substitutes a generic noun for its pool
  * (ART→object, CHR→person, …) and logs a WARN so the upstream bug surfaces
  * in logs. (Never drops the line: the cover scene description is a single
@@ -4890,16 +5104,34 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   if (!prompt || typeof prompt !== 'string') return prompt;
   if (!visualBible || typeof visualBible !== 'object') return prompt;
 
-  // Build id → name lookup across every VB pool.
+  // Build id → substitution lookup across every VB pool. Image-facing prompts
+  // are English-only: characters and animals resolve to their given names
+  // (identity anchors), but artifact/location/vehicle/clothing NAMES follow
+  // the story language ("Roter Umhang" must not reach the English prompt), so
+  // those resolve to an English description-derived ref instead. Locations
+  // keep their name WITH the English visual fields inlined (real-landmark
+  // names are real-world identifiers the model knows).
+  const NAME_POOLS = ['mainCharacters', 'secondaryCharacters', 'animals'];
+  const REF_POOLS = { artifacts: 'object', vehicles: 'vehicle', clothing: 'outfit' };
   const idToName = new Map();
-  const pools = ['mainCharacters', 'secondaryCharacters', 'animals', 'artifacts', 'locations', 'vehicles', 'clothing'];
-  for (const pool of pools) {
-    const arr = visualBible[pool];
-    if (!Array.isArray(arr)) continue;
-    for (const entry of arr) {
+  for (const pool of NAME_POOLS) {
+    for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
       if (!entry?.id || !entry?.name) continue;
       idToName.set(String(entry.id).toUpperCase(), entry.name);
     }
+  }
+  for (const [pool, genericNoun] of Object.entries(REF_POOLS)) {
+    for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
+      if (!entry?.id) continue;
+      idToName.set(String(entry.id).toUpperCase(), englishEntityRef(entry, genericNoun));
+    }
+  }
+  for (const entry of (Array.isArray(visualBible.locations) ? visualBible.locations : [])) {
+    if (!entry?.id) continue;
+    const ref = entry.isRealLandmark
+      ? (entry.name || englishLocationRef(entry))
+      : (englishLocationRef(entry) || englishEntityRef(entry, 'place'));
+    if (ref) idToName.set(String(entry.id).toUpperCase(), ref);
   }
 
   const ID_PATTERN = /(CHR|ANI|ART|LOC|VEH|CLO)\d+/g;
@@ -6048,6 +6280,11 @@ module.exports = {
   buildSceneDescriptionPrompt,
   buildSceneIterationPrompt: buildSceneDescriptionPrompt,  // Alias: iteration = full description prompt
   buildImagePrompt,
+  // Worn-vs-held / state-aware page-prompt guards (unit-tested)
+  textDeclaresNonWornPlacement,
+  sceneDeclaresNonWornState,
+  stripWornStateFromDescription,
+  filterWornClothingAgainstScene,
   buildUnifiedStoryPrompt,
   buildTrialStoryPrompt,
   buildPreviousScenesContext,

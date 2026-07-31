@@ -17,8 +17,11 @@ const sceneDescription =
 
 const visualBible = {
   artifacts: [
-    { id: 'ART002', name: 'Wasserwerfer-Hebel' },
-    { id: 'ART005', name: 'Feuerwehrhelm' },
+    // Descriptions present as in real parsed VBs — since the English-only
+    // page/cover prompt fix, sanitize resolves ART ids to an ENGLISH
+    // description-derived ref, never the story-language name.
+    { id: 'ART002', name: 'Wasserwerfer-Hebel', description: 'a red metal water-cannon lever with a black rubber grip' },
+    { id: 'ART005', name: 'Feuerwehrhelm', description: 'a yellow firefighter helmet with a silver crest' },
   ],
   mainCharacters: [{ id: 'CHR001', name: 'Matej' }],
   secondaryCharacters: [
@@ -35,8 +38,10 @@ const promptOut = sanitizeVbIdsInPrompt(promptIn, visualBible, -2);
 console.log('--- final prompt after sanitize ---');
 console.log(promptOut);
 console.assert(!/ART\d+/.test(promptOut), 'FAIL: raw ART id survived in final prompt');
-console.assert(promptOut.includes('Wasserwerfer-Hebel'), 'FAIL: ART002 not resolved to name');
-console.assert(promptOut.includes('Feuerwehrhelm'), 'FAIL: ART005 not resolved to name');
+console.assert(!promptOut.includes('Wasserwerfer-Hebel'), 'FAIL: German ART002 name leaked into English prompt');
+console.assert(!promptOut.includes('Feuerwehrhelm'), 'FAIL: German ART005 name leaked into English prompt');
+console.assert(promptOut.includes('red metal water-cannon lever'), 'FAIL: ART002 not resolved to English ref');
+console.assert(promptOut.includes('yellow firefighter helmet'), 'FAIL: ART005 not resolved to English ref');
 
 // 2. Orphan id: line is dropped with a WARN
 const orphanOut = sanitizeVbIdsInPrompt('keep this line\nAndrej holds the ART099.\nkeep this too', visualBible, -2);

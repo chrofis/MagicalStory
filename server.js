@@ -5394,7 +5394,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // image render handles those.
             const eraGuard = buildEraGuard(repPageData.sceneMetadata?.era || null);
             const shotPrefix = v.shot ? `**SHOT:** ${v.shot}\n\n` : '';
-            const emptySceneDesc = `${shotPrefix}**LOCATION:** ${v.locationName || ''}\n**VANTAGE:** ${v.name || ''}\n\n${v.description || ''}`;
+            // English-only empty-scene reference: the bare VB location name is
+            // story-language and carries no visual info — emit it with the
+            // entry's English visual fields inlined (same rule as covers /
+            // sanitizeVbIdsInPrompt; docs/decisions.md 2026-07-31).
+            const { englishLocationRef } = require('./server/lib/visualBible');
+            const locationRef = englishLocationRef(v.location) || v.locationName || '';
+            const emptySceneDesc = `${shotPrefix}**LOCATION:** ${locationRef}\n**VANTAGE:** ${v.name || ''}\n\n${v.description || ''}`;
             const characterSpace = `Render this as an empty location backdrop. Foreground, midground and background bands all show the scene's natural ground/floor/water surface continuing unbroken — characters will be composited into them later. No figures, no animals.`;
             // Pull landmark photos for the LOC if real — used as a strict
             // visual reference for the Wikimedia-photo case.
