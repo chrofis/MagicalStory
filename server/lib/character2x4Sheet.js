@@ -53,8 +53,14 @@ async function editWithGeminiImage(prompt, refImages, { aspectRatio = '16:9', mo
 }
 
 // Dispatch the Round-2 style transfer to the configured backend.
-async function styleTransferGenerate(prompt, pass1ImageData) {
-  if (MODEL_DEFAULTS.avatarStyleTransferBackend === 'gemini') {
+// `backendOverride` ('gemini' | 'grok') bypasses MODEL_DEFAULTS for ONE call —
+// used by the alternate-engine retry in runStyleTransferPass when every
+// attempt on the configured backend failed (e.g. Gemini IMAGE_OTHER safety
+// refusal on an adult-face sheet). Model IDs never cross providers: each
+// branch resolves its own provider's model.
+async function styleTransferGenerate(prompt, pass1ImageData, backendOverride = null) {
+  const backend = backendOverride || MODEL_DEFAULTS.avatarStyleTransferBackend;
+  if (backend === 'gemini') {
     const r = await editWithGeminiImage(prompt, [pass1ImageData], { aspectRatio: '16:9', model: MODEL_DEFAULTS.avatarStyleTransferModel });
     return { ...r, provider: 'gemini_image' };
   }
@@ -589,7 +595,19 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
   for (let attempt = 1; attempt <= totalAttempts; attempt++) {
     log.info(`[CHARACTER 2×4] Generating sheet for ${character?.name} (${clothingCategory}, ${artStyle}, refs=${refs.length}, attempt ${attempt}/${totalAttempts})`);
-    const result = await editWithGrok(prompt, refs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD });
+    // A thrown Grok call must consume ONE attempt, not abort the whole sheet.
+    // Previously this line was unprotected, so a single transient API error
+    // (timeout, 5xx, refusal) escaped the retry loop, propagated out of
+    // generateCharacter2x4Sheet, and the character lost its avatar entirely
+    // even though two retries remained.
+    let result;
+    try {
+      result = await editWithGrok(prompt, refs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD });
+    } catch (err) {
+      log.warn(`[CHARACTER 2×4] ${character?.name} attempt ${attempt}/${totalAttempts} Grok generation threw: ${err.message}${attempt < totalAttempts ? ' — retrying' : ' — no attempts left'}`);
+      attemptHistory.push({ attempt, stage: 'gen-error', score: 0, reason: err.message });
+      continue;
+    }
     if (usageTracker && result.usage) usageTracker('grok', result.usage, 'character_2x4_sheet', result.modelId);
 
     if (skipQualityEval) {
@@ -696,13 +714,23 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   const wantStyleTransfer = !skipQualityEval && artStyle && artStyle !== 'realistic';
   let pass2 = null;
   if (wantStyleTransfer) {
-    pass2 = await runStyleTransferPass({
-      pass1ImageData: pass1.imageData,
-      facePhoto,
-      artStyle,
-      characterName: character?.name,
-      usageTracker,
-    });
+    // Pass-2 failure must NEVER destroy the avatar: the Pass-1 realistic
+    // sheet is a complete identity anchor on its own, so any throw here is
+    // downgraded to "ship Pass 1 unstyled". runStyleTransferPass already
+    // catches per-attempt backend errors + does an alternate-engine retry;
+    // this outer catch is defence in depth for anything unexpected.
+    try {
+      pass2 = await runStyleTransferPass({
+        pass1ImageData: pass1.imageData,
+        facePhoto,
+        artStyle,
+        characterName: character?.name,
+        usageTracker,
+      });
+    } catch (err) {
+      log.error(`[CHARACTER 2×4] ${character?.name} Pass 2 threw unexpectedly: ${err.message} — shipping realistic Pass 1 sheet unstyled`);
+      pass2 = null;
+    }
   }
 
   // The function's primary return value (`imageData`) is the styled sheet
@@ -746,9 +774,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   const attempts = [];
   let best = null;
 
-  for (let attempt = 1; attempt <= totalAttempts; attempt++) {
-    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}, backend=${MODEL_DEFAULTS.avatarStyleTransferBackend}) attempt ${attempt}/${totalAttempts}`);
-    const result = await styleTransferGenerate(prompt, pass1ImageData);
+  const trackUsage = (result) => {
     if (usageTracker && result.usage) {
       // Image models are priced per image, not per token — without an explicit
       // cost the tracker falls into token-rate lookup, finds none for image
@@ -761,6 +787,27 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       };
       usageTracker(result.provider || 'grok', usage, 'character_2x4_style_transfer', result.modelId);
     }
+  };
+
+  for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}, backend=${MODEL_DEFAULTS.avatarStyleTransferBackend}) attempt ${attempt}/${totalAttempts}`);
+    // A thrown backend call consumes ONE attempt — it must never escape this
+    // loop. Previously this line was unprotected: one Gemini IMAGE_OTHER
+    // safety refusal (photorealistic ADULT face on the Pass-1 sheet) threw
+    // out of runStyleTransferPass AND out of generateCharacter2x4Sheet,
+    // destroying the perfectly good Pass-1 identity anchor. That is how an
+    // adult primary character ended up with ZERO styled avatars on staging
+    // (costumed sheet died here, then the standard-fallback sheet died on the
+    // same refusal). See docs/decisions.md "Styled-avatar MUST guarantee".
+    let result;
+    try {
+      result = await styleTransferGenerate(prompt, pass1ImageData);
+    } catch (err) {
+      log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt}/${totalAttempts} (${MODEL_DEFAULTS.avatarStyleTransferBackend}) threw: ${err.message}${attempt < totalAttempts ? ' — retrying' : ''}`);
+      attempts.push({ attempt, stage: 'gen-error', score: 0, reason: err.message });
+      continue;
+    }
+    trackUsage(result);
 
     if (!process.env.GEMINI_API_KEY) {
       log.warn('[CHARACTER 2×4] GEMINI_API_KEY missing — accepting Pass 2 after first attempt');
@@ -806,7 +853,28 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   }
 
   if (!best) {
-    log.error(`[CHARACTER 2×4] ${characterName} Pass 2 produced no image after ${totalAttempts} attempts — returning Pass 1 unchanged`);
+    // Every attempt on the configured backend failed (thrown, not just
+    // low-scored). Retry ONCE via the alternate engine before giving up on
+    // style transfer: Gemini refuses photorealistic adult faces
+    // (IMAGE_OTHER), Grok doesn't — and a weakly-stylised Grok sheet still
+    // beats shipping no styled avatar at all. No eval on this last-resort
+    // attempt (score neutral 5); the identity content is Pass 1's, unchanged.
+    const primaryBackend = MODEL_DEFAULTS.avatarStyleTransferBackend === 'gemini' ? 'gemini' : 'grok';
+    const altBackend = primaryBackend === 'gemini' ? 'grok' : 'gemini';
+    log.warn(`[CHARACTER 2×4] ${characterName} Pass 2: all ${totalAttempts} ${primaryBackend} attempts failed — retrying once via alternate backend (${altBackend})`);
+    try {
+      const result = await styleTransferGenerate(prompt, pass1ImageData, altBackend);
+      trackUsage(result);
+      best = { result, attempt: totalAttempts + 1, score: 5, verdict: null };
+      attempts.push({ attempt: totalAttempts + 1, stage: 'alt-backend', score: 5, backend: altBackend, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
+      log.info(`[CHARACTER 2×4] ${characterName} Pass 2 alternate backend (${altBackend}) succeeded`);
+    } catch (err) {
+      log.error(`[CHARACTER 2×4] ${characterName} Pass 2 alternate backend (${altBackend}) also failed: ${err.message} — returning Pass 1 unchanged`);
+      attempts.push({ attempt: totalAttempts + 1, stage: 'alt-backend-error', score: 0, backend: altBackend, reason: err.message });
+    }
+  }
+  if (!best) {
+    log.error(`[CHARACTER 2×4] ${characterName} Pass 2 produced no image after ${totalAttempts} attempts + alternate backend — returning Pass 1 unchanged`);
     return { imageData: null, attempts, selectedAttempt: null, finalScore: 0, finalVerdict: null, prompt };
   }
   if (attempts.length > 1) {

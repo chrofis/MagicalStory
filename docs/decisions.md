@@ -2770,3 +2770,58 @@ order only.
 **Touched:** `server/lib/storyHelpers.js` (variant seam default).
 **Status:** ✅ active on staging; watch the first live runs for order-obedience +
 output-length headroom on 20+ page stories.
+
+## Styled-avatar MUST guarantee: Pass-2 failure is never fatal + coverage backstop (2026-07-31)
+**Context:** A live staging story (both primaries costumed on every page,
+`standard.used=false`) shipped with the ADULT primary having NO styled avatar —
+every page and eval silently fell back to the raw photo. Root cause chain: the
+story pipeline's only costumed/styled generator is the 2×4 sheet
+(`generateCharacter2x4Sheet` — Pass 1 identity anchor on **Grok**, Pass 2 style
+transfer on **Gemini** by default, `avatarStyleTransferBackend='gemini'`). The
+Pass-2 backend call was unprotected: one thrown Gemini call (e.g. IMAGE_OTHER
+safety refusal on the photorealistic ADULT face in the Pass-1 sheet — the same
+refusal class that forced clothing avatars to Grok) escaped the retry loop,
+escaped `generateCharacter2x4Sheet`, and destroyed the perfectly good Pass-1
+sheet. The costumed→standard emergency fallback in `prepareStyledAvatars` then
+re-ran the SAME pipeline and died on the same refusal → zero avatars, no
+surfaced warning. (The CLAUDE.md provider-table note "costumed avatars still
+hit Gemini directly" is stale: `generateDynamicAvatar`'s direct-Gemini path is
+only the `/generate-avatar-options` picker route, not the story pipeline.)
+**Decision:** Three layers, root cause first:
+(1) Per-attempt error containment — Pass-1 Grok call and Pass-2 backend call
+each catch throws as a consumed attempt (`stage: 'gen-error'`) instead of
+aborting the sheet.
+(2) Alternate-engine retry — when EVERY Pass-2 attempt on the configured
+backend throws, retry ONCE via the other backend (gemini↔grok,
+`styleTransferGenerate(prompt, img, backendOverride)`); a weakly-stylised Grok
+sheet beats no avatar. If that fails too, Pass 2 returns `imageData: null` and
+the realistic Pass-1 sheet ships unstyled (existing seam). The **default**
+Pass-2 backend stays Gemini — the 2026-07-19 all-5 A/B verdict ("Grok barely
+stylises") is NOT re-litigated; Grok is the failure path, not the default.
+(3) Hard coverage backstop — `ensureStyledAvatarCoverage` (styledAvatars.js)
+runs at the end of `prepareStyledAvatars`: any required character with zero
+styled avatars in any bucket is an ERROR state. The best available raw
+reference (standard clothing avatar → bg-removed body photo → face photo, via
+the pure `resolveGuaranteedReference` chain in `server/lib/avatarGuarantee.js`)
+is seeded into the styled-avatar cache at 'standard' (same seam as
+`_seedStandardFromPreview`; cache-only — `char.avatars.styledAvatars` is NOT
+written so composite-cover cell extraction never mistakes a raw photo for a
+2×4 sheet). Seeded keys are registered in `guaranteeSeededKeys`: they serve
+reads but do NOT satisfy "already cached → skip" checks, so a later
+`prepareStyledAvatars` call (coverage top-up) still retries the real
+conversion; a successful conversion overwrites the seed. Failures are logged
+as `[AVATAR] ❌ …` and surfaced in BOTH dev-panel logs
+(generationLog `avatar_guarantee_fallback`/`avatar_guarantee_exhausted` +
+styled-avatar audit entry). Realistic style only fires the backstop when a
+costume was required (standard/winter/summer cache misses are normal there).
+**Rationale:** the Pass-1 sheet is a complete identity anchor; losing it to a
+style-transfer failure inverted the value order (style > identity). A primary
+character without any identity reference must be impossible, and when only a
+degraded reference is available that fact must be loud, not buried in debug
+logs.
+**Touched:** `server/lib/character2x4Sheet.js`, `server/lib/styledAvatars.js`,
+`server/lib/avatarGuarantee.js` (new), `tests/manual/test-avatar-guarantee.js`
+(28 checks: chain resolver + vm-sliced `runStyleTransferPass` alternate-backend
+behaviour), `docs/image-generation-methods.html`, `docs/image-routing.md`.
+**Status:** ✅ active; needs one live staging avatar run (adult + costumed
+story) to confirm end-to-end.

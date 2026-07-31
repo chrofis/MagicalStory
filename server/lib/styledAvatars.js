@@ -151,6 +151,15 @@ function getCacheScope() {
 // Value: Promise that resolves to the styled avatar
 const conversionInProgress = new Map();
 
+// Cache keys seeded by the ensureStyledAvatarCoverage backstop (raw reference,
+// NOT a real styled sheet). These entries serve reads (getStyledAvatar /
+// applyStyledAvatars always have something) but must NOT satisfy the
+// "already cached → skip generation" checks: a later prepareStyledAvatars
+// call (e.g. the coverage top-up after early streaming styling) must still
+// retry the real conversion. A successful conversion overwrites the entry
+// and removes the key from this set.
+const guaranteeSeededKeys = new Set();
+
 // Generation log for developer mode auditing, scoped per cache scope (= per
 // story job, via AsyncLocalStorage). Was previously a single module-level
 // array, which caused cross-story bleed on trial pipelines (the global never
@@ -399,8 +408,10 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
 async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false } = {}) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
 
-  // Check cache first
-  if (styledAvatarCache.has(cacheKey)) {
+  // Check cache first. A guarantee-seeded raw reference does NOT count — the
+  // whole point of the seed is to cover reads while a real conversion can
+  // still be retried.
+  if (styledAvatarCache.has(cacheKey) && !guaranteeSeededKeys.has(cacheKey)) {
     log.debug(`💾 [STYLED AVATAR] Cache HIT: ${cacheKey}`);
     return styledAvatarCache.get(cacheKey);
   }
@@ -418,6 +429,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
     try {
       const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageModelOverride, { skipQualityEval, redress });
       styledAvatarCache.set(cacheKey, styledAvatar);
+      guaranteeSeededKeys.delete(cacheKey); // real sheet replaces any seeded raw reference
       return styledAvatar;
     } finally {
       // Clean up in-progress tracker
@@ -472,8 +484,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 
       const cacheKey = getAvatarCacheKey(charName, clothingCategory, artStyle);
 
-      // Skip if already cached
-      if (styledAvatarCache.has(cacheKey)) continue;
+      // Skip if already cached (a guarantee-seeded raw reference doesn't
+      // count — the real conversion must still be retried)
+      if (styledAvatarCache.has(cacheKey) && !guaranteeSeededKeys.has(cacheKey)) continue;
 
       // Skip if already in our list to convert
       if (neededAvatars.has(cacheKey)) continue;
@@ -665,6 +678,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
     log.debug(`🔄 [STYLED AVATARS] Converting ${neededAvatars.size} avatars in parallel...`);
   } else {
     log.debug(`✅ [STYLED AVATARS] All needed avatars already cached`);
+    // Even with nothing to generate, a required character can still have zero
+    // avatars (e.g. every conversion was skipped as "cannot convert").
+    await ensureStyledAvatarCoverage(characters, artStyle, pageRequirements);
     return styledAvatarCache;
   }
 
@@ -784,7 +800,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
     for (const { charName, char } of failedCostumed) {
       if (!char) continue;
       const fallbackKey = getAvatarCacheKey(charName, 'standard', artStyle);
-      if (styledAvatarCache.has(fallbackKey)) continue;
+      if (styledAvatarCache.has(fallbackKey) && !guaranteeSeededKeys.has(fallbackKey)) continue;
       const avatars = char.avatars || char.clothingAvatars;
       // Same resolveAvatarBytes pattern — handles inline + R2 URL. Without it,
       // post-Phase-4 character rows silently fall back to getPrimaryPhoto (raw
@@ -829,7 +845,138 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   const totalCount = costumeTotal + standardTotal;
   log.debug(`💾 [STYLED AVATARS] Stored ${totalSuccess}/${totalCount} styled avatars in ${duration}ms (${costumeSuccess} costumed, ${standardSuccess} standard) for ${artStyle}`);
 
+  // HARD GUARANTEE — a required character with zero styled avatars after all
+  // generation + fallback attempts gets the best available raw reference
+  // seeded (loudly). See ensureStyledAvatarCoverage.
+  await ensureStyledAvatarCoverage(characters, artStyle, pageRequirements);
+
   return styledAvatarCache;
+}
+
+// Canonical buckets a styled avatar can live under in the cache.
+const STYLED_AVATAR_BUCKETS = ['costumed', 'standard', 'winter', 'summer'];
+
+/**
+ * HARD GUARANTEE: after styled-avatar generation, every character the story
+ * requires must have SOME identity reference — a character ending up with
+ * zero styled avatars is an ERROR state, never a silent shrug.
+ *
+ * Why this exists: on a staging story where both primaries were costumed on
+ * every page (standard.used=false), one failed costumed sheet + one failed
+ * standard-fallback sheet left the adult primary with NOTHING — every page
+ * and every eval silently fell back to the raw photo with only scattered
+ * log lines. This backstop makes that state loud and bounded:
+ *   1. Engine-level retries already happened upstream (Grok Pass-1 best-of-3,
+ *      Pass-2 configured backend best-of-3 + alternate-engine retry — see
+ *      character2x4Sheet.js).
+ *   2. Here, any required character with no styled avatar in ANY bucket gets
+ *      the best available raw reference seeded into the cache at 'standard'
+ *      (same seam as _seedStandardFromPreview): standard clothing avatar
+ *      (realistic anchor) → bg-removed body photo → face photo.
+ *   3. The failure is surfaced: log.error + a generationLogger entry (dev
+ *      panel generationLog) + a styled-avatar log entry (dev panel avatar
+ *      audit).
+ *
+ * Cache-only seeding is deliberate: char.avatars.styledAvatars is NOT
+ * written, so sheet-shaped consumers (composite cover cell extraction) never
+ * mistake a raw photo for a 2×4 sheet; only whole-image reference consumers
+ * (applyStyledAvatars / getStyledAvatar) see the fallback.
+ *
+ * Realistic style: a cache miss is NORMAL for standard/winter/summer with
+ * unchanged outfits (no conversion needed — base avatar is already correct),
+ * so the guarantee only fires for realistic when the character required a
+ * costume (a costume sheet is expected to exist in every style).
+ *
+ * @param {Array} characters
+ * @param {string} artStyle
+ * @param {Array<{clothingCategory, characterNames}>} pageRequirements
+ */
+async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements) {
+  if (!Array.isArray(characters) || characters.length === 0) return;
+  // name(lower) → Set of canonical categories the story requires
+  const requiredCategories = new Map();
+  for (const req of pageRequirements || []) {
+    const cat = normalizeClothingCategory(req?.clothingCategory || 'standard');
+    for (const n of req?.characterNames || []) {
+      const key = String(n || '').trim().toLowerCase();
+      if (!key) continue;
+      if (!requiredCategories.has(key)) requiredCategories.set(key, new Set());
+      requiredCategories.get(key).add(cat);
+    }
+  }
+  if (requiredCategories.size === 0) return;
+
+  const isRealistic = artStyle === 'realistic';
+  const { resolveGuaranteedReference } = require('./avatarGuarantee');
+  const { getCurrentLogger } = require('./generationLogger');
+  const r2mod = require('./r2');
+  const toDataUri = async (candidate) => {
+    if (!candidate) return null;
+    if (typeof candidate === 'string' && candidate.startsWith('data:image')) return candidate;
+    const bytes = await r2mod.bytesFromAnyImage(candidate);
+    return bytes ? `data:image/jpeg;base64,${bytes.toString('base64')}` : null;
+  };
+
+  for (const char of characters) {
+    const nameKey = String(char?.name || '').trim().toLowerCase();
+    const required = requiredCategories.get(nameKey);
+    if (!required) continue;
+    // Realistic: only a required costume implies a sheet must exist.
+    if (isRealistic && !required.has('costumed')) continue;
+    const hasAny = STYLED_AVATAR_BUCKETS.some(b => styledAvatarCache.has(getAvatarCacheKey(char.name, b, artStyle)));
+    if (hasAny) continue;
+
+    const avatars = char.avatars || char.clothingAvatars;
+    const { imageData, source, warnings } = await resolveGuaranteedReference({
+      characterName: char.name,
+      steps: [
+        { source: 'standard clothing avatar (realistic anchor)', fn: () => resolveAvatarBytes(avatars, 'standard') },
+        { source: 'bg-removed body photo', fn: () => toDataUri(getPrimaryPhoto(char)) },
+        { source: 'face photo', fn: () => toDataUri(getFacePhoto(char)) },
+      ],
+    });
+
+    const genLog = getCurrentLogger();
+    if (imageData) {
+      // Seed at 'standard' — getStyledAvatar's bucket substitution serves it
+      // for costumed/winter/summer requests too. Registered as seeded so a
+      // later prepareStyledAvatars call still retries the real conversion.
+      const seedKey = getAvatarCacheKey(char.name, 'standard', artStyle);
+      styledAvatarCache.set(seedKey, imageData);
+      guaranteeSeededKeys.add(seedKey);
+      log.error(`[AVATAR] ❌ ${char.name} has no styled avatar after retries — using ${source} as identity reference for all pages/covers (required: ${[...required].join(', ')}; chain: ${warnings.join('; ') || 'none'})`);
+      genLog?.error('avatar_guarantee_fallback',
+        `No styled avatar after all retries — using ${source} as identity reference`,
+        char.name, { artStyle, source, required: [...required], warnings });
+    } else {
+      log.error(`[AVATAR] ❌ ${char.name} has no styled avatar AND no usable fallback reference — pages will render this character from text only (chain: ${warnings.join('; ')})`);
+      genLog?.error('avatar_guarantee_exhausted',
+        `No styled avatar and no fallback reference — character renders from text only`,
+        char.name, { artStyle, required: [...required], warnings });
+    }
+
+    // Also surface in the styled-avatar audit log (dev panel).
+    {
+      const scope = cacheContext.getStore() || _STYLED_LOG_UNSCOPED;
+      let bucket = styledAvatarGenerationLogs.get(scope);
+      if (!bucket) { bucket = []; styledAvatarGenerationLogs.set(scope, bucket); }
+      bucket.push({
+        timestamp: new Date().toISOString(),
+        characterName: char.name,
+        artStyle,
+        clothingCategory: 'standard',
+        success: false,
+        guaranteeFallback: source,
+        warning: imageData
+          ? `no styled avatar generated — raw "${source}" seeded as identity reference`
+          : `no styled avatar generated and NO fallback reference found`,
+        output: imageData ? { sizeKB: getImageSizeKB(imageData), imageData } : null,
+      });
+      if (bucket.length > MAX_GENERATION_LOG_ENTRIES) {
+        bucket.splice(0, bucket.length - MAX_GENERATION_LOG_ENTRIES);
+      }
+    }
+  }
 }
 
 /**
@@ -949,12 +1096,16 @@ function clearStyledAvatarCache() {
         conversionInProgress.delete(key);
       }
     }
+    for (const key of [...guaranteeSeededKeys]) {
+      if (key.startsWith(scope)) guaranteeSeededKeys.delete(key);
+    }
     log.debug(`🗑️ [STYLED AVATARS] Cleared ${cleared} entries for scope ${scope} (${styledAvatarCache.size} remain)`);
   } else {
     // No scope set — clear everything (backward compat)
     const size = styledAvatarCache.size;
     styledAvatarCache.clear();
     conversionInProgress.clear();
+    guaranteeSeededKeys.clear();
     log.debug(`🗑️ [STYLED AVATARS] Cache cleared (${size} entries)`);
   }
 }
