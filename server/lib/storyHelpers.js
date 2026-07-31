@@ -5315,13 +5315,15 @@ ${adventureGuide}` : ''}`;
   const imageModelConfig = IMAGE_MODELS[imageModelKey];
   const maxCharsPerScene = imageModelConfig?.maxCharactersPerScene || 3;
 
-  // Prompt-variant seam (Test-Lab A/B, roadmap §4 image-first): inputData.
-  // storyPromptVariant === 'imageFirst' selects the reordered scenes-first
-  // template. Absent/any other value → the production template, unchanged.
-  // Injected per-run via POST /api/admin/jobs/:jobId/rerun-text inputOverrides.
-  const useImageFirst = inputData.storyPromptVariant === 'imageFirst';
+  // Prompt-variant seam (roadmap §4 image-first). DEFAULT = the image-first
+  // template (owner 2026-07-31: arc → scenes → text is the production order).
+  // storyPromptVariant === 'textFirst' opts back into the legacy text-then-scene
+  // template (kept for the harness A/B via rerun-text inputOverrides; also set
+  // STORY_PROMPT_VARIANT=textFirst to flip the fleet without a deploy).
+  const variant = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
+  const useImageFirst = variant !== 'textFirst';
   if (useImageFirst && !PROMPT_TEMPLATES.storyUnifiedImageFirst) {
-    log.warn('[PROMPT] storyPromptVariant=imageFirst requested but storyUnifiedImageFirst template not loaded — falling back to storyUnified');
+    log.warn('[PROMPT] image-first template not loaded — falling back to storyUnified (text-first)');
   }
   const unifiedTemplate = (useImageFirst && PROMPT_TEMPLATES.storyUnifiedImageFirst)
     ? PROMPT_TEMPLATES.storyUnifiedImageFirst

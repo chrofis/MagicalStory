@@ -2735,3 +2735,38 @@ by wording, CATASTROPHIC included, real CRITICALs untouched, malformed
 inputs tolerated).
 
 **Status:** ✅ active.
+
+## Back view: kept for its two cases; shared-action facing must be consistent (2026-07-31)
+**Context:** A scene put two companions on the same path to the same destination —
+one facing the camera studying a held object, the other back-view walking ahead.
+Owner: back view stays for its two legitimate reasons — (1) crowded multi-character
+compositions (a variety option) and (2) figures walking toward a background object
+(recommended). "What is terrible is both go to the same place but one gets back
+view." Also in that scene: camera-facing combined with a look-down task (reading),
+and front-only helmet detail (visor) declared visible on a back-view figure — both
+unrenderable by specification.
+**Decision:** New shared rule at the four sibling sites (identical archetypal
+wording, per validating-prompt-changes): characters sharing a destination/activity
+get the SAME facing treatment (all back view toward a background target — never one
+companion camera-facing while the rest walk away); a look-down task cannot combine
+with `facing the camera`; front-only details are never described on back-view
+figures. Sites: `prompts/story-unified.txt` + `prompts/story-unified-imagefirst.txt`
+(scene-design rules), `prompts/scene-expansion.txt` (rule 8c), `prompts/
+image-generation.txt` (companion clause). The deliberate back-view push itself
+(Pt 12) is NOT reversed — the two legitimate cases stand.
+**Touched:** the four prompt files above.
+**Status:** ✅ active.
+
+## Image-first prompt is the DEFAULT on staging (2026-07-31)
+**Context:** The arc → scenes → text variant shipped flag-gated (default text-first)
+for a harness A/B. Owner: "we have still not changed the outline prompt — I thought
+you changed this" → wants the new order live for staging testing.
+**Decision:** `buildUnifiedStoryPrompt` now DEFAULTS to `storyUnifiedImageFirst`;
+`storyPromptVariant: 'textFirst'` (or env `STORY_PROMPT_VARIANT=textFirst`) selects
+the legacy template — the A/B still runs both ways via rerun-text inputOverrides.
+Master/prod inherits only when staging is promoted (normal approval flow). Output
+format is parser-identical (37-check compat test), so the flip changes authoring
+order only.
+**Touched:** `server/lib/storyHelpers.js` (variant seam default).
+**Status:** ✅ active on staging; watch the first live runs for order-obedience +
+output-length headroom on 20+ page stories.
