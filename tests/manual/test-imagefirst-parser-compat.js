@@ -354,16 +354,21 @@ const promptsSvc = require('../../server/services/prompts');
     layout: { textInImage: true },
   };
 
+  // Default flipped 2026-07-31 (owner): image-first IS the default; 'textFirst'
+  // opts back into the legacy template. Anything else → image-first.
   const defPrompt = buildUnifiedStoryPrompt({ ...baseInput }, 2);
   const varPrompt = buildUnifiedStoryPrompt({ ...baseInput, storyPromptVariant: 'imageFirst' }, 2);
+  const legacyPrompt = buildUnifiedStoryPrompt({ ...baseInput, storyPromptVariant: 'textFirst' }, 2);
   const otherPrompt = buildUnifiedStoryPrompt({ ...baseInput, storyPromptVariant: 'somethingElse' }, 2);
 
-  check('default (flag absent) uses production template (no SCENE SEQUENCE section)',
-    !defPrompt.includes('---SCENE SEQUENCE---') && defPrompt.includes('Draft the story with scene output'));
+  check('default (flag absent) uses the IMAGE-FIRST template',
+    defPrompt.includes('---SCENE SEQUENCE---') && defPrompt.includes('---PAGE TEXTS---'));
   check('imageFirst flag selects the variant template',
     varPrompt.includes('---SCENE SEQUENCE---') && varPrompt.includes('---PAGE TEXTS---')
     && varPrompt.includes('Image-First Variant'));
-  check('unknown flag value falls through to production template',
+  check('textFirst flag opts back into the legacy template',
+    !legacyPrompt.includes('---SCENE SEQUENCE---') && legacyPrompt.includes('Draft the story with scene output'));
+  check('unknown flag value falls through to the default (image-first)',
     otherPrompt === defPrompt);
   check('variant keeps all output markers the pipeline parses',
     ['---STORY DRAFT---', '---ANALYSIS---', '---TITLE---', '---CLOTHING REQUIREMENTS---',
