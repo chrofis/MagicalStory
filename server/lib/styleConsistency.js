@@ -112,12 +112,22 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
     throw new Error('GEMINI_API_KEY missing');
   }
 
-  // Collect all renderable images: front cover (-1 for label) + every page.
+  // Collect all renderable images: covers (negative page convention:
+  // frontCover -1, initialPage -2, backCover -3 — same numbers the repair
+  // pipeline uses) + every page. Covers are treated the same as normal
+  // pages (owner directive 2026-07-31): a style outlier on any of the three
+  // covers must be detected exactly like a page outlier.
   const cells = [];
-  const front = storyData.coverImages?.frontCover?.imageData;
-  if (front) {
-    cells.push({ label: 'Front cover', imageData: front, page: -1 });
+  const COVER_CELLS = [
+    ['frontCover', -1, 'Front cover'],
+    ['initialPage', -2, 'Initial page'],
+    ['backCover', -3, 'Back cover'],
+  ];
+  for (const [coverKey, page, label] of COVER_CELLS) {
+    const img = storyData.coverImages?.[coverKey]?.imageData;
+    if (img) cells.push({ label, imageData: img, page });
   }
+  const coverCount = cells.length;
   const pages = (storyData.sceneImages || [])
     .filter(s => s.imageData)
     .sort((a, b) => a.pageNumber - b.pageNumber);
@@ -129,13 +139,13 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
     throw new Error(`style-check needs ≥2 images, got ${cells.length}`);
   }
 
-  log.info(`🎨 [STYLE-CHECK] Building grid for ${cells.length} images (${cells.length - (front ? 1 : 0)} pages + ${front ? 'cover' : 'no cover'})`);
+  log.info(`🎨 [STYLE-CHECK] Building grid for ${cells.length} images (${cells.length - coverCount} pages + ${coverCount} cover(s))`);
   const gridBuffer = await buildStyleGrid(cells);
   log.info(`🎨 [STYLE-CHECK] Grid built: ${(gridBuffer.length / 1024).toFixed(0)}KB, sending to ${modelId}...`);
 
   // Prompt: cluster by style, return strict JSON.
-  // pageNumber values: -1 for front cover, 1+ for pages. The model returns
-  // the same numbers so we can act on them.
+  // pageNumber values: -1 front cover, -2 initial page, -3 back cover,
+  // 1+ for pages. The model returns the same numbers so we can act on them.
   const prompt = `You are a visual-style auditor for a children's storybook.
 
 The image you see is a labelled grid of every illustrated page from one storybook (and its front cover, if shown). Each cell has a label like "Page 3" or "Front cover".
@@ -165,7 +175,7 @@ Return ONLY this JSON, no prose:
   "reasoning": "<2-3 sentences explaining what unifies the dominant cluster and how the outliers diverge>"
 }
 
-Use -1 for "Front cover" if it appears. Use the page numbers from the labels for everything else.
+Use -1 for "Front cover", -2 for "Initial page", -3 for "Back cover" if they appear. Use the page numbers from the labels for everything else.
 
 Verdict rule:
 - "consistent" if ≥90% of cells are in the dominant cluster and outliers are all "minor"

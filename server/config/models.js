@@ -333,6 +333,20 @@ const MODEL_DEFAULTS = {
     ? process.env.GARMENT_HUE_NORMALIZE !== 'false'
     : true,
 
+  // ─── Style-repair production wiring (Pt 10, owner directive 2026-07-31) ──
+  // When true (default), the Step-5 style-consistency audit's outliers —
+  // pages AND covers — are repainted toward the dominant style cluster via
+  // server/lib/styleRepair.js (planStyleRepair → repairPageStyle), one
+  // repaint attempt per outlier, gated by checkStyleMatch. The repainted
+  // image is stored as a new version through the normal version plumbing.
+  // Env override: STYLE_REPAIR_PRODUCTION=false to fall back to
+  // detection-only. Model per styleRepairModel ('gemini' | 'grok') — the
+  // Test Lab `style_repair` stage remains the A/B harness for this choice.
+  styleRepairProduction: process.env.STYLE_REPAIR_PRODUCTION
+    ? process.env.STYLE_REPAIR_PRODUCTION !== 'false'
+    : true,
+  styleRepairModel: process.env.STYLE_REPAIR_MODEL || 'gemini',
+
   // Output aspect ratios — one config per image type, read by every
   // generation / iterate / repair path. Defaults: A4 portrait for pages
   // and covers; 9:16 for avatars. Change the default here to reshape

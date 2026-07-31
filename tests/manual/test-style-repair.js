@@ -49,18 +49,47 @@ const detection = {
   ok('planStyleRepair selects outlier page 4 with anchor-page-2 reference');
 }
 
-// Front-cover outlier (-1) is skipped; anchor falls back over a missing-image page.
+// Covers are repair TARGETS (owner directive 2026-07-31 — covers = pages).
+// The anchor still falls back to a real story page (covers never anchor).
 {
+  const storyWithCovers = {
+    ...storyData,
+    coverImages: {
+      frontCover: { imageData: 'data:image/jpeg;base64,FRONT' },
+      initialPage: { imageData: 'data:image/jpeg;base64,INITIAL' },
+      backCover: { imageData: 'data:image/jpeg;base64,BACK' },
+    },
+  };
   const det2 = {
     dominantCluster: [1, 2, 3],
     anchorPage: -1, // cover as anchor → not a usable page ref, must fall back
-    outliers: [{ page: -1, severity: 'moderate' }, { page: 3, severity: 'major' }],
+    outliers: [
+      { page: -1, severity: 'moderate', differences: ['palette shift'] },
+      { page: -3, severity: 'major' },
+      { page: 3, severity: 'major' },
+    ],
   };
-  const plan = planStyleRepair(det2, storyData);
-  assert.strictEqual(plan.anchorPage, 1, 'anchor falls back to first dominant-cluster page with an image');
-  assert.deepStrictEqual(plan.targets.map(t => t.page), [3], 'cover outlier -1 skipped, page 3 kept');
-  assert.ok(plan.skipped.some(s => s.page === -1), 'cover outlier recorded as skipped');
-  ok('planStyleRepair skips the front-cover outlier and falls back the anchor');
+  const plan = planStyleRepair(det2, storyWithCovers);
+  assert.strictEqual(plan.anchorPage, 1, 'anchor falls back to first dominant-cluster PAGE with an image (covers never anchor)');
+  assert.deepStrictEqual(plan.targets.map(t => t.page), [-1, -3, 3], 'front cover, back cover AND page 3 are all repair targets');
+  const front = plan.targets.find(t => t.page === -1);
+  assert.strictEqual(front.image, 'data:image/jpeg;base64,FRONT', 'front-cover target uses the cover pixels');
+  assert.strictEqual(front.targetRefPage, 1, 'cover repaints toward the page anchor');
+  assert.strictEqual(plan.skipped.length, 0, 'nothing skipped when all outliers have images');
+  ok('planStyleRepair repairs cover outliers like pages (owner: covers = pages)');
+}
+
+// A cover outlier with NO stored cover image is skipped (not a crash).
+{
+  const det2b = {
+    dominantCluster: [1, 2],
+    anchorPage: 1,
+    outliers: [{ page: -2, severity: 'minor' }],
+  };
+  const plan = planStyleRepair(det2b, storyData); // storyData has no coverImages
+  assert.strictEqual(plan.targets.length, 0, 'no target for an image-less cover');
+  assert.ok(plan.skipped.some(s => s.page === -2 && /cover/.test(s.reason)), 'image-less cover outlier recorded as skipped');
+  ok('planStyleRepair skips cover outliers with no stored image');
 }
 
 // Outlier with no stored image is skipped.

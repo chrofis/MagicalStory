@@ -830,6 +830,11 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         name: p.name, photoType: p.photoType,
         clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
       })),
+      // Detection is part of every image version (owner decision): the
+      // eval-time detection computed by generateImageWithQualityRetry rides
+      // on the version so the viewer never shows another version's boxes.
+      bboxDetection: imageResult.bboxDetection || null,
+      hasBboxOverlay: !!imageResult.bboxDetection,
     };
     await stampCanonicalScore(newVersion, imageResult, {
       consolidation: {
@@ -1381,7 +1386,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       try {
         if (useSceneComposite) {
           // ── Scene-composite-for-covers path (Method 2/3) ──────────────
-          const { buildCoverReferences, enrichCoverHintWithArtifacts, filterBackCoverToMainCharacters } = require('../lib/coverIterate');
+          const { buildCoverReferences, enrichCoverHintWithArtifacts, narrowCoverCastToMains } = require('../lib/coverIterate');
           const { buildCoverCompositeCast } = require('../lib/compositeCastBuilder');
           const { generateSceneComposite } = require('../lib/sceneComposite');
           const { coverKeyToHintKey, coverLabel } = require('../lib/coverKeys');
@@ -1391,11 +1396,19 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           // references resolve (shared producer helper — same enrichment the
           // coverIterate composite path uses).
           const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible, { language: storyData.language });
-          // Filter back-cover characters to main-only (shared helper — same
-          // rule the iterate path applies). Front/initial pass through all.
+          // Back-cover main-only narrowing — FALLBACK only. When the hint
+          // lists characters, the cast builder below intersects with the
+          // hint's characterDetails, and every hint-listed character must
+          // stay resolvable (owner rule 2026-07-31 — narrowCoverCastToMains).
+          const hintListsCharacters =
+            Object.keys(enrichedHint?.characterDetails || {}).length > 0 ||
+            Object.keys(enrichedHint?.characterClothing || {}).length > 0;
           let coverCharacters = storyData.characters || [];
           if (coverType === 'backCover') {
-            coverCharacters = filterBackCoverToMainCharacters(coverCharacters, storyData.mainCharacters).characters;
+            coverCharacters = narrowCoverCastToMains(coverCharacters, {
+              castFromHint: hintListsCharacters,
+              mainIds: storyData.mainCharacters,
+            }).characters;
           }
           // Build cover cast — delegates to buildCompositeCast for avatar
           // resolution + lazy 2×4 sheet generation.
@@ -3067,6 +3080,10 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       method: compositeAttempts ? 'composite' : undefined,
       source: compositeAttempts ? 'composite-regenerate' : 'regenerate',
       compositeAttempts,
+      // Detection is part of every image version (owner decision): covers
+      // stamp the eval-time detection per version exactly like pages.
+      bboxDetection: coverResult.bboxDetection || null,
+      hasBboxOverlay: !!coverResult.bboxDetection,
     };
     await stampCanonicalScore(newVersion, coverResult, {
       consolidation: {

@@ -774,6 +774,25 @@ export function ImageHistoryModal({
                     </DetailBlock>
                   )}
 
+                  {/* 6a2. DETECTION — this version's OWN bbox detection (owner
+                       decision: detection is part of every image version, covers
+                       and pages alike). Compact summary; the Object Detection
+                       panel renders the full overlay for the active version. */}
+                  {(() => {
+                    const det = detailVersion.bboxDetection as { figures?: Array<{ name?: string }>; objects?: Array<{ name?: string; found?: boolean }> } | null | undefined;
+                    if (!det || (!(det.figures?.length) && !(det.objects?.length))) return null;
+                    const figNames = (det.figures || []).map(f => f.name || 'UNKNOWN');
+                    const objNames = (det.objects || []).filter(o => o.found !== false).map(o => o.name || '?');
+                    return (
+                      <DetailBlock label={language === 'de' ? 'Objekterkennung (diese Version)' : 'Object detection (this version)'} color="purple">
+                        {[
+                          `Figures (${figNames.length}): ${figNames.join(', ') || '—'}`,
+                          objNames.length > 0 ? `Objects (${objNames.length}): ${objNames.join(', ')}` : null,
+                        ].filter(Boolean).join('\n')}
+                      </DetailBlock>
+                    );
+                  })()}
+
                   {/* 6b. THREE-STAGE — Stage 1 vision inventory + Stage 2 compliance.
                        Stage 1 is the raw "what I see" text Gemini wrote BEFORE any
                        comparison to the prompt; useful for debugging eval misses

@@ -2425,7 +2425,7 @@ repair path calls it.
 2. **Test Lab stage `style_repair`** (STORY_STAGES, target `{storyId}`): detect → plan → repaint each
    outlier with BOTH gemini and grok → surface side-by-side with style-match scores so a human picks the
    winning model. This is the A/B.
-3. **Test-Lab-FIRST — production wiring DEFERRED.** Nothing in the production auto-repair pipeline
+3. **[SUPERSEDED 2026-07-31 — see "Style-repair wired into production" entry below: the deferred hook is now LIVE, flag-gated, pages AND covers.]** **Test-Lab-FIRST — production wiring DEFERRED.** Nothing in the production auto-repair pipeline
    (`processUnifiedStoryJob` / repair round loop) calls `repairPageStyle`. The eventual hook point is the
    post-repair finalize, right after the Step-5 `checkStoryStyleConsistency` audit in
    `server/lib/images.js` (`runUnifiedRepairPipeline`, the styleConsistency Step-5 block at
@@ -3131,3 +3131,151 @@ exact issue types, clean page → none, mechanical-only whitelist).
 
 **Status:** ✅ active (report-only — findings inform the review and the dev
 panel; no automatic regeneration is driven off them yet).
+
+## Cover-parity batch — six owner-directed fixes after the 2026-07-31 staging run
+
+Overarching owner directive: **covers must be treated the same as normal pages.**
+Six entries below (one per fix); branch `cover-parity-batch`.
+
+### Opus outline review is persisted and visible (2026-07-31)
+**Context:** the split outline review appended the reviewer output to the local
+`unifiedResponse` for parsing, but the stored story blob wrote
+`outline: unifiedResult.text` (writer-only) — so the dev outline view never
+showed the Opus ANALYSIS, and nothing recorded who reviewed or how long it took.
+**Decision:** `data.outline` (and the job resultData `outline`) now store the
+full writer+reviewer CONCATENATION (`unifiedResponse`); a new
+`storyData.outlineReview` field carries `{ model, modelId, durationMs,
+fixCount, reviewChars, hintCount, reviewedAt }`; the generationLog
+`outline_review` event now includes the reviewer's fix-line count (counted with
+the same `Pages N,M:` line shape the progressive parser reads) + duration.
+Verified the split executes in the NORMAL job path: the review block sits
+inline in `processUnifiedStoryJob` (server.js), which `processStoryJob` calls
+for every unified job — not only the rerun-text harness.
+**Touched:** `server.js` (review block meta capture; storyData/resultData
+outline + outlineReview).
+
+### Image-first prompt authors ALL scene work scene-first — ---SCENE PAGES--- section (2026-07-31)
+**Context:** owner: "would it not be more logical to do all scene stuff first."
+The image-first template designed scenes before text but still AUTHORED the
+full SCENE prose + METADATA JSON inside the STORY DRAFT blocks (i.e. during
+the text pass). A verbatim-copy design (scenes authored early, then copied
+into the draft) was explicitly banned by the owner.
+**Decision:** `prompts/story-unified-imagefirst.txt` restructured: after the
+SCENE SEQUENCE CRITIQUE locks the designs, a new `---SCENE PAGES---` section
+authors the COMPLETE per-page illustration brief (`**Scene N**` + SCENE prose
++ METADATA JSON — expressions derived from the PAGE BEATS since no text exists
+yet); `---STORY DRAFT---` then carries page TEXT only (no SCENE/METADATA
+blocks, no duplication). PARSERS extended, guarded by response-format
+detection: `extractDraftPagesFromText` (shared.js — used by BOTH
+UnifiedStoryParser and ProgressiveUnifiedParser) merges
+`extractScenePagesFromText` blocks into the draft map ONLY when the
+`---SCENE PAGES---` marker is present; the original format parses
+byte-identically (marker absent → zero-op). Draft-inline scene sections (model
+duplicates despite instructions) win over the scene-section blocks (later-wins
+patch philosophy); ---STORY PAGES--- patches still override both. Affect
+translation (text ↔ authored expression) moved to the ANALYSIS
+(outline-analysis-imagefirst.txt § 18b) as a mechanical SCENE,METADATA fix;
+outline-review.txt told never to re-emit ---SCENE PAGES---.
+**Touched:** `prompts/story-unified-imagefirst.txt`,
+`prompts/outline-analysis-imagefirst.txt`, `prompts/outline-review.txt`,
+`server/lib/outlineParser/shared.js` (`extractScenePagesFromText` + merge),
+`tests/manual/test-imagefirst-parser-compat.js` (59 checks: original format
+byte-identical, scene-first format parses to IDENTICAL pages/streaming
+output, template marker diff).
+**Status:** 🧪 built + unit-verified; needs a live staging story to confirm the
+model follows the new emission shape.
+
+### Detection is part of every image version (2026-07-31)
+**Context:** owner decision — `bboxDetection` (+ overlay availability) must be
+stamped onto EVERY stored image version at eval time, covers AND pages,
+exactly like grokRefImages are stored per version. The cover dev-image path
+already supported per-version detection (5d43e4c7) but never had data:
+`iterateCover` dropped `imageResult.bboxDetection` from its return, so the
+cover regen route's `iterResult.bboxDetection` read was always undefined; the
+final-assembly fresh-bbox refresh landed only on the scene root, not on the
+picked version; the manual page-regen version entry never stamped it.
+**Decision:** one resolution rule, `detectionForVersion(v)` (images.js,
+exported): version-stamped detection (computed on the version's own bytes)
+wins → eval-time `evaluation.bboxDetection` → null. Used by the pipeline's
+`buildVersionEntry` (+ `hasBboxOverlay` availability flag; overlay itself is
+drawn on demand by the dev endpoint) and retryHistory. Stamp sites fixed:
+fresh-bbox refresh now also stamps `best.bboxDetection`; `iterateCover`
+forwards `bboxDetection`/`bboxOverlayImage` (composite path: honest null — no
+eval ran); page-regen + cover-regen version entries stamp
+`imageResult.bboxDetection`. Display backfill: ImageHistoryModal (version
+viewer) shows a per-version detection summary; ObjectDetectionDisplay already
+read the active version's own detection (5d43e4c7). Versions created without
+any eval (scale-repair, style-transfer) stay honest-null — the refresh button
+re-detects on demand.
+**Touched:** `server/lib/images.js`, `server/lib/coverIterate.js`,
+`server/routes/regeneration.js`,
+`client/src/components/generation/story/ImageHistoryModal.tsx`,
+`tests/manual/test-version-detection-and-cover-cast.js`.
+
+### Cover reference packing: hint-listed characters are authoritative (2026-07-31)
+**Context:** owner report — the title page sent only the main character's
+avatar; the hint-listed second protagonist's avatar never went along, so the
+model invented that face. Root cause: server.js's streaming title-page filter
+dropped every non-"main" character even when the outline's cover hint
+explicitly listed them (`hint.characterClothing`). Sibling paths had the same
+bug shape: `iterateCover`'s back-cover drop and the test-models
+cover-composite dispatch filtered hint-listed primaries too.
+**Decision:** new single decision point `narrowCoverCastToMains(cast,
+{castFromHint, mainIds})` (coverIterate.js): a HINT-derived cast passes
+through untouched — every hint-listed character's styled avatar is packed;
+the main-only narrowing applies ONLY to fallback-derived casts (scene-text
+matching / all-characters distribution), where it still guards against
+feeding the whole cast. Used by the streaming cover path (server.js), the
+iterate back-cover drop, and the regeneration cover-composite dispatch.
+`filterBackCoverToMainCharacters` unchanged for direct behavior, now called
+through the gate.
+**Touched:** `server/lib/coverIterate.js`, `server.js`,
+`server/routes/regeneration.js`,
+`tests/manual/test-version-detection-and-cover-cast.js`.
+
+### Style audit covers all three covers (2026-07-31)
+**Context:** `checkStoryStyleConsistency` graded only the front cover (+
+pages); a style outlier on the initial page or back cover was invisible.
+**Decision:** the audit input includes ALL THREE covers under the pipeline's
+negative page convention (frontCover −1, initialPage −2, backCover −3);
+the grid labels them "Front cover" / "Initial page" / "Back cover" and the
+clustering prompt returns the same numbers. The Step-5 pipeline call feeds
+the covers' PICKED-BEST pixels from `finalBestPerPage` (covers run through
+the repair rounds as pages −1/−2/−3), falling back to the input storyData
+covers. The ad-hoc `/style-check` endpoint passes full storyData and picks
+the covers up automatically.
+**Touched:** `server/lib/styleConsistency.js`, `server/lib/images.js` (Step 5
+styleInput).
+
+### Style-repair wired into production, flag-gated (2026-07-31 — supersedes Pt 10 "wiring deferred")
+**Context:** owner expects criticized covers (and pages) to actually be
+redone — the Pt 10 path was Test-Lab-only and the Step-5 audit was
+detection-only.
+**Decision:** the `// PRODUCTION WIRING` marker in `runUnifiedRepairPipeline`
+Step 5 is live: when `MODEL_DEFAULTS.styleRepairProduction` (env
+`STYLE_REPAIR_PRODUCTION`, default **true**) and the audit reports outliers,
+`planStyleRepair(styleConsistency, styleInput)` →
+`repairPageStyle(model per MODEL_DEFAULTS.styleRepairModel, env
+STYLE_REPAIR_MODEL, default 'gemini')` runs ONE repaint per outlier — pages
+AND covers. `planStyleRepair` now maps covers at −1/−2/−3 from
+`storyData.coverImages` (supersedes its front-cover skip: covers are TEXTLESS
+under appSideCoverType, typography is composited after the art, so a repaint
+never touches title lettering); the anchor reference stays a real story page.
+Each repaint is gated by `checkStyleMatch` inside `repairPageStyle` —
+gate-fail discards the repaint (never stored: an inherited-score version
+could win recompute later); gate-pass/gate-unavailable is pushed as a new
+version through the normal plumbing (source `style-repair-{model}`, inherits
+the picked best's evaluation + entity record, canonical applyScore stamp,
+`styleRepair` debug bundle with before/after style-match) and re-points
+`finalBestPerPage`, so the final-assembly fresh-bbox refresh re-detects on
+the repainted bytes and covers flow back into `coverImages` via the existing
+extraction. Usage tracked as `style_repair`. The Test Lab `style_repair`
+stage remains the Gemini-vs-Grok A/B; flip the winner in via
+`STYLE_REPAIR_MODEL`.
+**Touched:** `server/config/models.js` (`styleRepairProduction`,
+`styleRepairModel`), `server/lib/images.js` (Step 5 wiring),
+`server/lib/styleRepair.js` (cover targets + wiring note),
+`tests/manual/test-style-repair.js` (cover-target checks),
+`docs/image-routing.md`, `docs/image-generation-methods.html`.
+**Status:** 🧪 wired + unit-verified; needs a live staging run with a real
+style outlier to validate the repaint→gate→version flow end to end.

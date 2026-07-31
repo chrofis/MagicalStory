@@ -25,8 +25,12 @@
  *     path's OWN output so a repaint that did not actually land in the target
  *     style class is flagged/rejected.
  *
- * PRODUCTION WIRING: deferred — see docs/decisions.md Pt 10. This is
- * Test-Lab-first; nothing in the production auto-repair pipeline calls it yet.
+ * PRODUCTION WIRING: live since 2026-07-31 (owner directive) — the Step-5
+ * style audit in runUnifiedRepairPipeline (images.js) calls
+ * planStyleRepair → repairPageStyle for pages AND covers, gated by
+ * MODEL_DEFAULTS.styleRepairProduction (env STYLE_REPAIR_PRODUCTION,
+ * default true) with model per MODEL_DEFAULTS.styleRepairModel. The Test
+ * Lab `style_repair` stage remains the Gemini-vs-Grok A/B harness.
  */
 
 const { log } = require('../utils/logger');
@@ -75,20 +79,28 @@ function resolveStyleRepairModelId(model) {
  * `checkStoryStyleConsistency`-shaped detection result + the story data,
  * decide which pages to repair and what the target-style reference is.
  *
- * - Repair targets = detected outliers that are real story pages (page ≥ 1)
- *   with a stored image. Front-cover outliers (page -1) are SKIPPED: a cover
- *   carries burned-in title typography, so repainting it is out of scope for
- *   this style path (see docs/decisions.md Pt 10).
+ * - Repair targets = detected outliers with a stored image — story pages
+ *   (page ≥ 1) AND covers (negative page convention: frontCover -1,
+ *   initialPage -2, backCover -3, read from storyData.coverImages). Covers
+ *   are treated the same as normal pages (owner directive 2026-07-31,
+ *   supersedes the earlier front-cover skip: covers are TEXTLESS under
+ *   appSideCoverType — typography is composited after the art — so a style
+ *   repaint never touches title lettering).
  * - Target reference = the anchor page's image (the cleanest representative of
  *   the dominant cluster). Falls back to the first dominant-cluster page with
- *   an image if the reported anchor has none.
+ *   an image if the reported anchor has none. The anchor is always a real
+ *   story page (≥ 1) — covers are repainted TOWARD the pages' dominant style,
+ *   never used as the style reference.
  *
  * @param {Object} detection - { dominantCluster[], anchorPage, outliers[] }
- * @param {Object} storyData - { sceneImages: [{pageNumber, imageData}] }
+ * @param {Object} storyData - { sceneImages: [{pageNumber, imageData}],
+ *   coverImages?: { frontCover|initialPage|backCover: { imageData } } }
  * @returns {{ anchorPage: number|null, dominantCluster: number[],
  *   targets: Array<{page,image,targetRefPage,targetRefImage,severity,differences}>,
  *   skipped: Array<{page,reason}> }}
  */
+const COVER_PAGE_BY_KEY = Object.freeze({ frontCover: -1, initialPage: -2, backCover: -3 });
+
 function planStyleRepair(detection, storyData) {
   const det = detection || {};
   const pagesByNum = new Map();
@@ -96,6 +108,11 @@ function planStyleRepair(detection, storyData) {
     if (s && s.imageData && typeof s.pageNumber === 'number') {
       pagesByNum.set(s.pageNumber, s.imageData);
     }
+  }
+  // Covers join the repairable set at their negative page numbers.
+  for (const [coverKey, coverPage] of Object.entries(COVER_PAGE_BY_KEY)) {
+    const img = storyData?.coverImages?.[coverKey]?.imageData;
+    if (img) pagesByNum.set(coverPage, img);
   }
 
   const dominantCluster = Array.isArray(det.dominantCluster) ? det.dominantCluster : [];
@@ -121,8 +138,7 @@ function planStyleRepair(detection, storyData) {
     if (typeof page !== 'number') { skipped.push({ page: page ?? null, reason: 'outlier has no page number' }); continue; }
     if (seen.has(page)) continue;
     seen.add(page);
-    if (page < 1) { skipped.push({ page, reason: 'front-cover / non-page outlier — cover style repaint out of scope' }); continue; }
-    if (!pagesByNum.has(page)) { skipped.push({ page, reason: 'no stored image for page' }); continue; }
+    if (!pagesByNum.has(page)) { skipped.push({ page, reason: page < 0 ? 'no stored image for cover' : 'no stored image for page' }); continue; }
     if (!anchorImage) { skipped.push({ page, reason: 'no dominant-cluster reference image available' }); continue; }
     targets.push({
       page,
@@ -228,4 +244,5 @@ module.exports = {
   resolveStyleRepairModelId,
   STYLE_REPAIR_MODEL_IDS,
   STYLE_REPAIR_INSTRUCTION,
+  COVER_PAGE_BY_KEY,
 };

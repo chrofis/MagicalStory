@@ -353,6 +353,62 @@ function parseDraftSections(content) {
 // causing pages with no patch to vanish from the final story.
 const DRAFT_HEADER_RE = /^\s*(?:#{1,3}\s*)?\*{0,2}\s*Draft\s*(?:Page|Seite|Página|Pagina)?\s*\[?\s*(\d+)\s*\]?\s*[:\-—]?\s*\*{0,2}\s*$/gim;
 
+// ── Scene-first variant (image-first prompt, 2026-07-31) ────────────────────
+// The image-first template authors ALL scene work — full SCENE prose +
+// METADATA JSON per page — in a dedicated `---SCENE PAGES---` section (after
+// the SCENE SEQUENCE critique locks the designs), and the STORY DRAFT then
+// carries page TEXT only. The response-format DETECTION is the presence of
+// the `---SCENE PAGES---` marker: when absent, parsing is byte-identical to
+// the original format (verbatim-duplication of scene blocks into the draft is
+// banned — owner decision).
+const SCENE_PAGES_MARKER_RE = /---\s*SCENE\s+PAGES\s*---/i;
+// Per-page headers inside the SCENE PAGES section: `**Scene 1**`, `Scene 1`,
+// `### Scene Page 1`, DE variants — same tolerance as DRAFT_HEADER_RE.
+const SCENE_PAGE_HEADER_RE = /^\s*(?:#{1,3}\s*)?\*{0,2}\s*Scene\s*(?:Page|Seite|Página|Pagina)?\s*\[?\s*(\d+)\s*\]?\s*[:\-—]?\s*\*{0,2}\s*$/gim;
+
+/**
+ * Extract per-page scene blocks (SCENE prose + METADATA JSON) from the
+ * `---SCENE PAGES---` section of a scene-first variant response. Returns an
+ * empty Map when the marker is absent (original format — no behavior change).
+ * Pure function — returns a fresh Map each call.
+ *
+ * @param {string} response - Full unified-story response text
+ * @returns {Map<number, {sceneProse: string, sceneHint: string, content: string}>}
+ */
+function extractScenePagesFromText(response) {
+  const map = new Map();
+  if (!response) return map;
+
+  const markerMatch = response.match(SCENE_PAGES_MARKER_RE);
+  if (!markerMatch) return map;
+
+  const sectionStart = markerMatch.index + markerMatch[0].length;
+  const tail = response.substring(sectionStart);
+  // Section ends at the next top-level section marker (---STORY DRAFT---
+  // normally; be tolerant of a skipped draft section).
+  const endMatch = tail.match(/---\s*(?:STORY\s+DRAFT|ANALYSIS|TITLE|CLOTHING\s+REQUIREMENTS|VISUAL\s+BIBLE|COVER\s+SCENE\s+HINTS|STORY\s+PAGES)\s*---/i);
+  const section = endMatch ? tail.substring(0, endMatch.index) : tail;
+
+  SCENE_PAGE_HEADER_RE.lastIndex = 0;
+  const headers = [];
+  let m;
+  while ((m = SCENE_PAGE_HEADER_RE.exec(section)) !== null) {
+    headers.push({ pageNumber: parseInt(m[1], 10), index: m.index, headerEnd: m.index + m[0].length });
+  }
+
+  for (let i = 0; i < headers.length; i++) {
+    const cur = headers[i];
+    const nextIndex = i + 1 < headers.length ? headers[i + 1].index : section.length;
+    const content = section.substring(cur.headerEnd, nextIndex);
+    // parsePatchSections extracts SCENE: prose + METADATA: JSON; there is no
+    // TEXT: label in a scene block, so text comes back empty (as intended).
+    const { sceneProse, sceneHint } = parsePatchSections(content);
+    map.set(cur.pageNumber, { sceneProse, sceneHint, content });
+  }
+
+  return map;
+}
+
 /**
  * Extract draft-section pages from a full unified-story response.
  * Pure function — returns a fresh Map each call. Callers should cache.
@@ -407,6 +463,33 @@ function extractDraftPagesFromText(response, options = {}) {
     const content = draftSection.substring(cur.headerEnd, nextIndex);
     const { text, sceneProse, sceneHint } = parseDraftSections(content);
     map.set(cur.pageNumber, { text, sceneProse, sceneHint, content });
+  }
+
+  // Scene-first variant merge (format-detected by the ---SCENE PAGES---
+  // marker; a no-op for the original format). The scene section supplies
+  // sceneProse + sceneHint for pages whose draft carries text only; the
+  // scene block's content is appended so the METADATA `"characters":[...]`
+  // clothing parse keeps working on the merged content. A draft's own scene
+  // sections (model duplicated despite instructions) win — they sit closer
+  // to the final text, matching the later-wins patch philosophy.
+  const scenePages = extractScenePagesFromText(response);
+  if (scenePages.size > 0) {
+    for (const [pageNumber, scene] of scenePages.entries()) {
+      const draft = map.get(pageNumber);
+      if (draft) {
+        map.set(pageNumber, {
+          text: draft.text,
+          sceneProse: draft.sceneProse || scene.sceneProse,
+          sceneHint: draft.sceneHint || scene.sceneHint,
+          content: `${draft.content || ''}\n${scene.content || ''}`,
+        });
+      } else {
+        // Scene authored but the draft block is missing (truncated/omitted):
+        // keep the scene so the page still renders; text may come from a patch.
+        map.set(pageNumber, { text: '', sceneProse: scene.sceneProse, sceneHint: scene.sceneHint, content: scene.content || '' });
+      }
+    }
+    log.debug(`[UNIFIED-PARSER] Scene-first format: merged ${scenePages.size} SCENE PAGES blocks into ${map.size} pages`);
   }
 
   return map;
@@ -615,6 +698,7 @@ module.exports = {
   parsePatchSections,
   parseDraftSections,
   extractDraftPagesFromText,
+  extractScenePagesFromText,
   stableCandidateIndex,
   keywordPattern,
   createPageHeaderPattern,

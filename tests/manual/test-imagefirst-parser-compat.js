@@ -201,6 +201,40 @@ Scene 2: three figures → Cast: Mira (midground, leading), Jonas (midground, fo
 const originalResponse = ORIGINAL_FRONT + DRAFT + '\n' + ANALYSIS + '\n' + TAIL;
 const variantResponse = VARIANT_FRONT + DRAFT + '\n' + ANALYSIS + '\n' + TAIL;
 
+// ─── Scene-first variant (2026-07-31): ALL scene work (SCENE prose + METADATA
+// JSON per page) authored in a dedicated ---SCENE PAGES--- section after the
+// critique; the STORY DRAFT carries page TEXT only (verbatim duplication of
+// the scene blocks is banned — owner decision). Payload content is identical
+// to DRAFT, just split across the two sections.
+const SCENE_PAGES_SECTION = `---SCENE PAGES---
+**Scene 1**
+SCENE:
+The main character — a slim grade-school girl with shoulder-length brown hair — stands in the foreground at a tall frosted bedroom window, both hands pressed flat against the cold glass, facing the window. Beyond the pane, large snowflakes drift past a pale grey dawn sky. Close-up shot, warm soft morning light, quiet wondering atmosphere.
+METADATA:
+{"sceneIntent":"The main character presses both hands on the bedroom window and watches falling snow. She leans close to the glass. Dawn light, quiet mood.","characters":[{"name":"Mira","position":"at the window","clothing":"standard","depth":"foreground","expression":"delighted, mouth open, eyes wide"}],"objects":["LOC001"],"interactions":[{"character":"Mira","object":"window","where":"presses both hands on the window","storyRelevant":true,"priority":"essential"}],"background":"empty bedroom, falling snow through window","setting":"indoor","time":"morning","weather":"snowy","shot":"close-up","textPosition":"top-left","textZoneDescription":"shadowed deep blue wall tone in the upper left","emptyScenePrompt":"Simple bedroom interior at dawn, a tall frosted window on the right, shadowed wall in the upper left, soft warm morning light."}
+
+**Scene 2**
+SCENE:
+Mira — the same slim grade-school girl — walks a few paces ahead of Jonas along a snow-covered garden path in the midground, glancing back toward him, facing Jonas. Jonas — a short kindergartner with curly black hair — follows behind her, arms out for balance. Wide shot, pale midday light, fresh snow blanketing hedges.
+METADATA:
+{"sceneIntent":"Mira leads Jonas along the snowy garden path. She glances back at him while he balances. Pale midday light, playful mood.","characters":[{"name":"Mira","position":"a few paces ahead of Jonas on the path","clothing":"winter","depth":"midground","expression":"playful, broad smile"},{"name":"Jonas","position":"behind Mira on the path","clothing":"winter","depth":"midground","expression":"concentrating, tongue out"}],"objects":["LOC002"],"interactions":[{"character":"Mira","object":"Jonas","where":"reaches back toward Jonas a few paces apart","storyRelevant":true,"priority":"essential"}],"background":"snow-covered hedges","setting":"outdoor","time":"midday","weather":"snowy","shot":"wide","textPosition":"bottom-full","textZoneDescription":"unbroken fresh snow band across the lower frame","emptyScenePrompt":"Snow-covered garden path curving from lower-left foreground to upper-right background, hedges under fresh snow, unbroken snow band across the lower frame."}
+
+`;
+
+const TEXT_ONLY_DRAFT = `---STORY DRAFT---
+**Draft 1**
+The main character ran to the window. Snow was falling outside.
+
+"Come and see!" she called down the stairs.
+*(Word count: 18)*
+
+**Draft 2**
+Outside, the garden had turned white. The main character pulled her friend onto the path.
+*(Word count: 15)*
+`;
+
+const sceneFirstResponse = VARIANT_FRONT + SCENE_PAGES_SECTION + TEXT_ONLY_DRAFT + '\n' + ANALYSIS + '\n' + TAIL;
+
 // ─── 1. UnifiedStoryParser equivalence ──────────────────────────────────────
 
 console.log('UnifiedStoryParser: original vs variant format');
@@ -238,6 +272,59 @@ check('coverHints identical (3 covers, chars parsed)',
   JSON.stringify(pOrig.extractCoverHints()) === JSON.stringify(pVar.extractCoverHints())
   && pVar.extractCoverHints().titlePage.characters.length === 1
   && pVar.extractCoverHints().backCover.characters.length === 2);
+
+// ─── 1b. Scene-first format: scenes from SCENE PAGES, text from STORY DRAFT ──
+
+console.log('UnifiedStoryParser: scene-first format (SCENE PAGES + text-only draft)');
+const { extractScenePagesFromText } = require('../../server/lib/outlineParser/shared');
+check('format detection: original response has NO scene-pages section',
+  extractScenePagesFromText(originalResponse).size === 0);
+check('format detection: scene-first response yields 2 scene blocks',
+  extractScenePagesFromText(sceneFirstResponse).size === 2);
+
+const pSf = new UnifiedStoryParser(sceneFirstResponse);
+const pagesSf = pSf.extractPages();
+check('scene-first parses 2 pages', pagesSf.length === 2);
+for (let i = 0; i < 2; i++) {
+  const a = pagesOrig[i], b = pagesSf[i];
+  check(`scene-first page ${a.pageNumber}: text identical to original format`, a.text === b.text && b.text.length > 0);
+  check(`scene-first page ${a.pageNumber}: sceneProse identical to original format`, a.sceneProse === b.sceneProse && b.sceneProse.length > 0);
+  check(`scene-first page ${a.pageNumber}: sceneHint (METADATA JSON) identical`, a.sceneHint === b.sceneHint && b.sceneHint.length > 0);
+  check(`scene-first page ${a.pageNumber}: characterClothing identical`,
+    JSON.stringify(a.characterClothing) === JSON.stringify(b.characterClothing));
+}
+check('scene-first page 2 patch applied (TEXT fix wins over draft)',
+  pagesSf[1].text.includes('Race you to the arch'));
+check('scene-first page 2 sceneHint valid JSON with textPosition',
+  JSON.parse(pagesSf[1].sceneHint).textPosition === 'bottom-full');
+check('scene-first tail sections identical (title/clothing/VB/coverHints)',
+  pSf.extractTitle() === pOrig.extractTitle()
+  && JSON.stringify(pSf.extractClothingRequirements()) === JSON.stringify(pOrig.extractClothingRequirements())
+  && JSON.stringify(pSf.extractVisualBible()) === JSON.stringify(pOrig.extractVisualBible())
+  && JSON.stringify(pSf.extractCoverHints()) === JSON.stringify(pOrig.extractCoverHints()));
+
+// Streaming: the progressive parser must emit the same pages from the
+// scene-first response, and patched-page detection must be unaffected.
+const sfEmitted = { pages: [] };
+const progSf = new ProgressiveUnifiedParser({
+  onPageComplete: (p) => sfEmitted.pages.push(p),
+});
+let sfBuf = '';
+for (let i = 0; i < sceneFirstResponse.length; i += 700) {
+  sfBuf += sceneFirstResponse.substring(i, i + 700);
+  progSf.processChunk(sceneFirstResponse.substring(i, i + 700), sfBuf);
+}
+const sfFinal = progSf.finalize();
+check('scene-first streaming emits 2 pages', sfFinal.pageCount === 2 && sfEmitted.pages.length === 2);
+const sfP1 = sfEmitted.pages.find(p => p.pageNumber === 1);
+const sfP2 = sfEmitted.pages.find(p => p.pageNumber === 2);
+check('scene-first streaming page 1 text + sceneProse match final parser',
+  sfP1.text === pagesSf[0].text && sfP1.sceneProse === pagesSf[0].sceneProse);
+check('scene-first streaming page 2 patched text matches final parser', sfP2.text === pagesSf[1].text);
+check('scene-first streaming page 1 clothing parsed from scene METADATA',
+  sfP1.characterClothing && sfP1.characterClothing.Mira === 'standard');
+check('scene-first streaming FIXES REQUIRED detected only page 2 as patched',
+  progSf._ensurePatchedPageNumbers().size === 1 && progSf._ensurePatchedPageNumbers().has(2));
 
 // ─── 2. ProgressiveUnifiedParser on the variant format ──────────────────────
 
@@ -296,8 +383,8 @@ check(`variant contains every original marker except SCENE PLAN (missing: ${miss
   JSON.stringify(missing) === JSON.stringify(['SCENE PLAN']));
 
 const extra = seqVar.filter(m => !seqOrig.includes(m));
-check('only additions are the 2 new work sections',
-  JSON.stringify(extra) === JSON.stringify(['SCENE SEQUENCE', 'SCENE SEQUENCE CRITIQUE']));
+check('only additions are the 3 new work sections (incl. SCENE PAGES scene-first authoring)',
+  JSON.stringify(extra) === JSON.stringify(['SCENE SEQUENCE', 'SCENE SEQUENCE CRITIQUE', 'SCENE PAGES']));
 
 // Relative order of the ORIGINAL markers must be preserved in the variant.
 // Compare on the COMMON marker set (SCENE PLAN is deliberately variant-absent).
@@ -309,9 +396,23 @@ check('common markers keep their relative order in the variant',
 // New sections must all sit BEFORE ---STORY DRAFT--- (parsers bound the draft
 // at STORY DRAFT → ANALYSIS and the fixes block at FIXES REQUIRED → TITLE).
 const draftIdx = tplVar.indexOf('---STORY DRAFT---');
-for (const s of ['---SCENE SEQUENCE---', '---SCENE SEQUENCE CRITIQUE---']) {
+for (const s of ['---SCENE SEQUENCE---', '---SCENE SEQUENCE CRITIQUE---', '---SCENE PAGES---']) {
   check(`${s} sits before ---STORY DRAFT---`, tplVar.indexOf(s) !== -1 && tplVar.indexOf(s) < draftIdx);
 }
+// Scene-first authoring split: the OUTPUT-FORMAT STORY DRAFT section must be
+// TEXT-ONLY — no SCENE:/METADATA: labels between ---STORY DRAFT--- and
+// ---ANALYSIS--- (scene blocks live exclusively in ---SCENE PAGES---; the
+// banned alternative was verbatim duplication into the draft).
+check('OUTPUT-FORMAT STORY DRAFT section is text-only (no SCENE:/METADATA: labels)', (() => {
+  const analysisIdx = tplVar.indexOf('---ANALYSIS---');
+  const draftSection = tplVar.substring(draftIdx, analysisIdx);
+  return !/^\s*(?:SCENE|METADATA)\s*:/m.test(draftSection);
+})());
+check('SCENE PAGES section instructs SCENE: + METADATA: blocks', (() => {
+  const spIdx = tplVar.indexOf('---SCENE PAGES---');
+  const section = tplVar.substring(spIdx, draftIdx);
+  return /^SCENE:/m.test(section) && /^METADATA:/m.test(section) && /\*\*Scene \[Page number\]\*\*/.test(section);
+})());
 // New sections must never instruct headers that collide with draft/page parsers.
 check('variant instructs **Scene N** / **Text N** headers, never Draft/Page headers, in new sections', (() => {
   const seq = tplVar.substring(tplVar.indexOf('---SCENE SEQUENCE---'), draftIdx);

@@ -3246,6 +3246,23 @@ function bboxPairsWith(detection, imageData) {
   return !fp || detection.sourceImageFp === fp;
 }
 
+/**
+ * Detection stored on an image VERSION (owner decision 2026-07-31:
+ * "detection is part of every image version" — covers AND pages, exactly
+ * like grokRefImages are stored per version). Single resolution rule used
+ * by every version-entry writer:
+ *   1. v.bboxDetection — a detection stamped directly on the version
+ *      (e.g. the final-assembly fresh-bbox refresh, regen/iterate results)
+ *      always wins: it was computed on this version's own bytes.
+ *   2. v.evaluation.bboxDetection — the eval-time detection attached when
+ *      the version was scored.
+ *   3. null — version never had a detection (the dev endpoint's refresh
+ *      button re-detects on demand).
+ */
+function detectionForVersion(v) {
+  return v?.bboxDetection || v?.evaluation?.bboxDetection || null;
+}
+
 // Public entry — stamps every result with the fingerprint of the bytes it was
 // computed on (see imageFingerprint above). Cache hits keep the stamp from
 // when they were computed; the cache key already includes the image hash, so
@@ -8887,25 +8904,107 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   let styleConsistency = null;
   try {
     const { checkStoryStyleConsistency } = require('./styleConsistency');
+    const { COVER_PAGE_BY_KEY } = require('./styleRepair');
     // Build a minimal storyData-shaped object from finalBestPerPage so we
     // never accidentally feed pre-repair pixels to the audit.
     const stylePages = [...finalBestPerPage.entries()]
       .filter(([pn]) => pn > 0)
       .sort((a, b) => a[0] - b[0])
       .map(([pageNumber, best]) => ({ pageNumber, imageData: best?.imageData }));
-    const frontCoverFromInputs = (storyData?.coverImages?.frontCover?.imageData) || null;
+    // Covers = pages (owner directive): all three covers join the audit at
+    // their negative page numbers. Prefer the pipeline's picked-best pixels
+    // (covers run through the repair rounds as pages -1/-2/-3); fall back to
+    // the input storyData covers for any cover not in this pipeline run.
+    const styleCovers = {};
+    for (const [coverKey, coverPage] of Object.entries(COVER_PAGE_BY_KEY)) {
+      const pipelineBest = finalBestPerPage.get(coverPage);
+      const imageData = pipelineBest?.imageData
+        || storyData?.coverImages?.[coverKey]?.imageData
+        || null;
+      if (imageData) styleCovers[coverKey] = { imageData };
+    }
     const styleInput = {
       sceneImages: stylePages,
-      coverImages: frontCoverFromInputs ? { frontCover: { imageData: frontCoverFromInputs } } : {},
+      coverImages: styleCovers,
     };
     if (stylePages.filter(p => p.imageData).length >= 2) {
       styleConsistency = await checkStoryStyleConsistency(styleInput, { usageTracker });
       log.info(`🎨 [UNIFIED PIPELINE] Step 5: style verdict=${styleConsistency.verdict} (cluster=${styleConsistency.dominantCluster?.length || 0}, outliers=${styleConsistency.outliers?.length || 0})`);
-      // PRODUCTION WIRING: deferred — see docs/decisions.md Pt 10. This is the
-      // hook point for the new style-repair path. Once the Test Lab `style_repair`
-      // A/B picks a model, wire it here: planStyleRepair(styleConsistency, styleInput)
-      // → repairPageStyle(model=<winner>) per outlier → re-pick finalBestPerPage.
-      // Detection-only for now: outliers are surfaced (finalChecksReport) but not repaired.
+
+      // PRODUCTION WIRING (live 2026-07-31, owner directive — supersedes the
+      // deferred Pt 10 note): repaint each style outlier — pages AND covers —
+      // toward the dominant cluster, one attempt per outlier, gated by
+      // checkStyleMatch inside repairPageStyle. Flag-gated by
+      // MODEL_DEFAULTS.styleRepairProduction (env STYLE_REPAIR_PRODUCTION,
+      // default true); model per MODEL_DEFAULTS.styleRepairModel.
+      if (MODEL_DEFAULTS.styleRepairProduction && (styleConsistency.outliers?.length || 0) > 0) {
+        const { planStyleRepair, repairPageStyle } = require('./styleRepair');
+        const styleRepairModel = MODEL_DEFAULTS.styleRepairModel === 'grok' ? 'grok' : 'gemini';
+        const plan = planStyleRepair(styleConsistency, styleInput);
+        for (const s of plan.skipped) {
+          log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair skip ${s.page}: ${s.reason}`);
+        }
+        for (const target of plan.targets) {
+          const pageLabel = target.page < 0 ? `cover ${target.page}` : `page ${target.page}`;
+          try {
+            const rep = await repairPageStyle(target.image, target.targetRefImage, {
+              model: styleRepairModel,
+              artStyle,
+            });
+            if (rep.usage && usageTracker) {
+              const provider = rep.modelId?.startsWith('grok') ? 'grok' : 'gemini_image';
+              usageTracker(provider, rep.usage, 'style_repair', rep.modelId);
+            }
+            if (rep.passedGate === false) {
+              log.warn(`🎨 [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} failed the style gate — repaint discarded, original kept`);
+              continue;
+            }
+            const versions = pageVersions.get(target.page);
+            const prevBest = finalBestPerPage.get(target.page);
+            if (!versions || !prevBest) {
+              log.warn(`🎨 [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} has no version array — repaint discarded`);
+              continue;
+            }
+            // New version through the normal plumbing — inherits the picked
+            // best's evaluation/entity record (a style transfer preserves
+            // content; no re-eval here), canonical applyScore stamp, then
+            // re-point finalBestPerPage so the final assembly ships it.
+            const { applyScore: stampStyleRepair } = require('./scoring');
+            const newVersion = {
+              imageData: rep.imageData,
+              score: prevBest.score ?? null,
+              source: `style-repair-${styleRepairModel}`,
+              evaluation: prevBest.evaluation || null,
+              modelId: rep.modelId,
+              entityIssues: prevBest.entityIssues || [],
+              evaluatedAt: new Date().toISOString(),
+              prompt: null,
+              description: prevBest.description || null,
+              styleRepair: {
+                targetRefPage: target.targetRefPage,
+                severity: target.severity,
+                differences: target.differences,
+                beforeStyleMatch: rep.beforeStyleMatch || null,
+                afterStyleMatch: rep.afterStyleMatch || null,
+                passedGate: rep.passedGate,
+              },
+              pageNumber: target.page,
+            };
+            stampStyleRepair(newVersion, {
+              evalResult: newVersion.evaluation,
+              entityResult: { issues: newVersion.entityIssues, penalty: prevBest.entityPenaltyRaw ?? prevBest.entityPenalty ?? 0 },
+              promptFinalScore: prevBest.score ?? null,
+            });
+            versions.push(newVersion);
+            finalBestPerPage.set(target.page, newVersion);
+            log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair applied on ${pageLabel} (${styleRepairModel}, gate=${rep.passedGate === null ? 'unavailable' : 'pass'}, ref=Page ${target.targetRefPage})`);
+          } catch (repErr) {
+            log.warn(`⚠️ [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} failed: ${repErr.message} — original kept`);
+          }
+        }
+      } else if ((styleConsistency.outliers?.length || 0) > 0) {
+        log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair disabled (STYLE_REPAIR_PRODUCTION=false) — ${styleConsistency.outliers.length} outlier(s) surfaced only`);
+      }
     } else {
       log.info(`🎨 [UNIFIED PIPELINE] Step 5: skipped (need ≥2 images, got ${stylePages.length})`);
     }
@@ -8943,6 +9042,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         });
         if (fresh && Array.isArray(fresh.figures) && fresh.figures.length > 0) {
           freshBboxMap.set(pageNumber, fresh);
+          // Detection is part of every image version (owner decision): stamp
+          // the refreshed detection onto the picked version itself, so the
+          // per-version record (buildVersionEntry reads v.bboxDetection
+          // first) matches the bytes it describes — previously the refresh
+          // landed only on the scene root and the active version's own
+          // detection stayed stale/empty.
+          best.bboxDetection = fresh;
           log.info(`📦 [UNIFIED PIPELINE] P${pageNumber}: refreshed bbox (${fresh.figures.length} figures, ${fresh.objects?.length || 0} objects) for ${best.source}`);
         }
       } catch (err) {
@@ -9089,7 +9195,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       generatedAt: new Date().toISOString(),
       qualityReasoning: v.evaluation?.reasoning || null,
       fixTargets: v.evaluation?.enrichedFixTargets || v.evaluation?.fixTargets || [],
-      bboxDetection: v.evaluation?.bboxDetection || null,
+      // Detection is part of every image version (owner decision): the
+      // version's own stamped detection wins over its eval-time detection
+      // (see detectionForVersion). hasBboxOverlay tells the viewer an
+      // overlay can be rendered for this version (the dev endpoint draws it
+      // on the fly from the version's detection + bytes).
+      bboxDetection: detectionForVersion(v),
+      hasBboxOverlay: !!detectionForVersion(v),
       // Prefer per-version prompt/description (iterate stores its own
       // feedback-augmented prompt + new scene). Original generations and
       // inpaints fall back to the page's prompt/description. sceneMetadata /
@@ -9137,7 +9249,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       type: 'unified_pipeline',
       source: v.source,
       score: v.score,
-      bboxDetection: v.evaluation?.bboxDetection,
+      bboxDetection: detectionForVersion(v),
       bboxOverlayImage: v.evaluation?.bboxOverlayImage,
       charName: v.charName || null,
       targetBbox: v.targetBbox || null,
@@ -14737,6 +14849,7 @@ module.exports = {
   detectAllBoundingBoxes,
   imageFingerprint,
   bboxPairsWith,
+  detectionForVersion,
   fetchFigureMaskPng,
   fetchFaceHeadMaskPng,
   recoverFaceBox,

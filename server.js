@@ -3606,32 +3606,34 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
 
+        // A cast that came from the hint's character list is AUTHORITATIVE —
+        // every hint-listed character's avatar must be packed with the cover
+        // render (owner rule 2026-07-31: the title page previously dropped a
+        // hint-listed second protagonist because they weren't flagged "main",
+        // so their styled avatar never went along as a reference).
+        const castFromHint = coverCharacters.length > 0;
+
         // Fallback: if characterClothing didn't yield results, try scene text matching
         if (coverCharacters.length === 0) {
           coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
         }
 
         // The FRONT cover (coverType 'titlePage' → stored as frontCover) is a
-        // main-characters-only portrait; drop any supporting characters Claude
-        // listed in the hint, so the front cover matches the single-main-character
-        // description instead of feeding the whole cast to the generator (which the
-        // evaluator flagged "N vs a single character" and round-3 inpaint then
-        // bluntly deleted all-but-one figure, often the WRONG one).
+        // main-characters-only portrait — but ONLY for FALLBACK casts (scene-
+        // text matching). Hint-derived casts pass through untouched; the
+        // narrowing exists to stop the whole cast flooding a fallback cover,
+        // not to veto characters the outline explicitly placed on the cover.
         // The BACK cover is deliberately a full-cast group portrait (see
         // story-unified.txt Back Cover spec) — do NOT drop non-mains there.
-        if (coverType === 'titlePage' && coverCharacters.length > 0) {
-          const isMainChar = (c) =>
-            c.isMainCharacter === true ||
-            (inputData.mainCharacters?.length > 0 && inputData.mainCharacters.includes(c.id));
-          const mainOnly = coverCharacters.filter(isMainChar);
-          // If NO character qualifies as main, keep the original list rather than
-          // emptying the cover — better a full-cast cover than an empty one.
-          if (mainOnly.length > 0) {
-            if (mainOnly.length !== coverCharacters.length) {
-              const dropped = coverCharacters.filter(c => !isMainChar(c)).map(c => c.name).join(', ');
-              log.info(`📕 [COVER] ${coverType}: Dropping non-main characters: ${dropped}`);
-            }
-            coverCharacters = mainOnly;
+        if (coverType === 'titlePage' && coverCharacters.length > 0 && !castFromHint) {
+          const { narrowCoverCastToMains } = require('./server/lib/coverIterate');
+          const narrowed = narrowCoverCastToMains(coverCharacters, {
+            castFromHint: false,
+            mainIds: inputData.mainCharacters,
+          });
+          if (narrowed.applied) {
+            log.info(`📕 [COVER] ${coverType}: Dropping non-main characters (fallback cast): ${narrowed.dropped.join(', ')}`);
+            coverCharacters = narrowed.characters;
           }
         }
 
@@ -4440,6 +4442,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const splitOutlineReviewEnabled = inputData.splitOutlineReview !== undefined
       ? !!inputData.splitOutlineReview
       : !!MODEL_DEFAULTS.splitOutlineReview;
+    // Review metadata persisted onto storyData/resultData so the dev outline
+    // view can show WHO reviewed, how long it took, and how many fixes the
+    // reviewer demanded. The reviewer's full text itself is appended to
+    // unifiedResponse — which is what data.outline stores (see the storyData
+    // assembly), so the Opus ANALYSIS is visible in the dev outline view.
+    let outlineReviewMeta = null;
     if (!inputData.trialMode && splitOutlineReviewEnabled) {
       await checkCancellation();
       const reviewModel = modelOverrides.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel;
@@ -4465,6 +4473,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       } else {
         log.info(`🧐 [OUTLINE-REVIEW] model=${reviewModel} split=true promptChars=${reviewPrompt.length} hints=${draftConsistencyIssues.reduce((n, e) => n + e.issues.length, 0)}`);
         let reviewText = null;
+        let reviewModelId = null;
         for (let attempt = 1; attempt <= 2 && !reviewText; attempt++) {
           try {
             const reviewResult = await callTextModelStreaming(reviewPrompt, 32000, () => {
@@ -4475,6 +4484,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // confuse the parsers — treat as a failed attempt.
             if (/---\s*ANALYSIS\s*---/i.test(t) && /FIXES\s+REQUIRED/i.test(t)) {
               reviewText = t;
+              reviewModelId = reviewResult.modelId || reviewModel;
               log.info(`✅ [OUTLINE-REVIEW] model=${reviewResult.modelId} reviewed the draft (attempt ${attempt}, ${t.length} chars, ${((Date.now() - timing.outlineReviewStart) / 1000).toFixed(1)}s)`);
             } else {
               log.warn(`⚠️ [OUTLINE-REVIEW] attempt ${attempt}: reviewer output missing ANALYSIS/FIXES REQUIRED markers (${t.length} chars) — ${attempt < 2 ? 'retrying' : 'giving up'}`);
@@ -4485,9 +4495,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
         if (reviewText) {
           unifiedResponse = unifiedResponse + '\n\n' + reviewText;
-          genLog.info('outline_review', `External review by ${reviewModel} applied (${reviewText.length} chars)`, null, {
+          // Fix-count: the reviewer's FIXES REQUIRED lines (same "Pages N,M:"
+          // line shape the progressive parser's patched-page detection reads).
+          const reviewFixCount = (reviewText.match(/^[\s\-*•]*Pages?\s+[\d,\s\-–]+?\s*:/gim) || []).length;
+          const reviewDurationMs = Date.now() - timing.outlineReviewStart;
+          outlineReviewMeta = {
+            model: reviewModel,
+            modelId: reviewModelId,
+            durationMs: reviewDurationMs,
+            fixCount: reviewFixCount,
+            reviewChars: reviewText.length,
+            hintCount: draftConsistencyIssues.reduce((n, e) => n + e.issues.length, 0),
+            reviewedAt: new Date().toISOString(),
+          };
+          genLog.info('outline_review', `External review by ${reviewModelId} applied: ${reviewFixCount} fix line(s) in ${(reviewDurationMs / 1000).toFixed(1)}s (${reviewText.length} chars)`, null, {
             reviewModel,
-            hintCount: draftConsistencyIssues.reduce((n, e) => n + e.issues.length, 0)
+            reviewModelId,
+            fixCount: reviewFixCount,
+            durationMs: reviewDurationMs,
+            hintCount: outlineReviewMeta.hintCount
           });
           // Hand the reviewer output to the progressive parser in one chunk so
           // its patched-page detection sees the COMPLETE FIXES REQUIRED list.
@@ -7020,10 +7046,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       mainCharacters: inputData.mainCharacters || [],
       relationships: inputData.relationships || {},
       relationshipTexts: inputData.relationshipTexts || {},
-      outline: unifiedResult.text, // Full unified response
+      // Full unified response INCLUDING the appended reviewer output (split
+      // outline review). unifiedResult.text is writer-only — storing it here
+      // made the Opus ANALYSIS invisible in the dev outline view.
+      outline: unifiedResponse,
       outlinePrompt: unifiedPrompt, // Prompt sent to API (dev mode)
       outlineModelId: unifiedModelId, // Model used (dev mode)
       outlineUsage: unifiedUsage, // Token usage (dev mode)
+      outlineReview: outlineReviewMeta, // { model, modelId, durationMs, fixCount, reviewChars, hintCount } | null
       storyTextPrompts: [], // Not used in unified mode (single prompt generates all)
       visualBible: (() => {
         // Phase 2: project per-character costume descriptions onto the visual
@@ -7270,10 +7300,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       storyId,
       shareToken,
       title,
-      outline: unifiedResult.text,
+      outline: unifiedResponse, // writer + reviewer concatenation (matches data.outline)
       outlinePrompt: unifiedPrompt,
       outlineModelId: unifiedModelId,
       outlineUsage: unifiedUsage,
+      outlineReview: outlineReviewMeta,
       storyTextPrompts: [], // Not used in unified mode
       story: fullStoryText,  // Frontend expects 'story' not 'storyText'
       visualBible,

@@ -255,6 +255,35 @@ function filterBackCoverToMainCharacters(characters, mainIds) {
 }
 
 /**
+ * Owner rule (2026-07-31): characters explicitly listed in a cover HINT are
+ * authoritative — EVERY hint-listed character's avatar must be packed with
+ * the cover render. (The title page previously dropped a hint-listed second
+ * protagonist because they weren't flagged "main", so their styled avatar
+ * never went along as a reference and the model invented the face.)
+ *
+ * The main-only narrowing filters therefore apply ONLY to casts derived by
+ * FALLBACK (scene-text matching / all-characters distribution) — never to a
+ * cast that came from the cover hint's character list.
+ *
+ * Single decision point used by the streaming cover path (server.js), the
+ * iterate path (iterateCover), and the test-models cover-composite dispatch
+ * (routes/regeneration.js).
+ *
+ * @param {Array} cast - selected cover characters (full character objects)
+ * @param {Object} opts
+ * @param {boolean} opts.castFromHint - true when the cast came from the cover
+ *   hint's character list (characterClothing / characterDetails)
+ * @param {Array} [opts.mainIds] - storyData.mainCharacters ids
+ * @returns {{ characters: Array, dropped: string[], applied: boolean }}
+ */
+function narrowCoverCastToMains(cast, { castFromHint = false, mainIds = null } = {}) {
+  const list = Array.isArray(cast) ? cast : [];
+  if (castFromHint) return { characters: list, dropped: [], applied: false };
+  const { characters, dropped } = filterBackCoverToMainCharacters(list, mainIds);
+  return { characters, dropped, applied: dropped.length > 0 };
+}
+
+/**
  * Drop sentences that mention a character by name. Used on the cover
  * empty-scene plate description: covers fall back to the full group-portrait
  * prose, and any character sentence left in makes the "empty" plate render
@@ -426,8 +455,12 @@ async function iterateCover(coverKey, storyData, options = {}) {
 
   let coverCharacterPhotos;
   let selectedCoverCharacters;
+  // Hint-derived casts are authoritative (owner rule — see narrowCoverCastToMains):
+  // the main-only narrowing below must never drop a hint-listed character.
+  let castFromHint = false;
 
   if (hintCharClothing && Object.keys(hintCharClothing).length > 0) {
+    castFromHint = true;
     // Primary: use outline's character list (matches initial generation logic)
     const hintCharNames = Object.keys(hintCharClothing);
     selectedCoverCharacters = mergedCharacters.filter(c =>
@@ -485,12 +518,16 @@ async function iterateCover(coverKey, storyData, options = {}) {
     }
   }
 
-  // Back cover is a main-characters-only group portrait (same rule as front cover).
-  // Drop any supporting characters that slipped in through the hint or scene description.
+  // Back cover main-only narrowing — FALLBACK casts only. A hint-derived cast
+  // is authoritative: every hint-listed character's avatar must be packed
+  // (owner rule 2026-07-31 — see narrowCoverCastToMains).
   if (normalizedCoverType === 'back' && selectedCoverCharacters.length > 0) {
-    const { characters: mainOnly, dropped } = filterBackCoverToMainCharacters(selectedCoverCharacters, storyData.mainCharacters);
-    if (dropped.length > 0) {
-      log.info(`🔄 [COVER-ITERATE] backCover: Dropping non-main characters: ${dropped.join(', ')}`);
+    const { characters: mainOnly, dropped, applied } = narrowCoverCastToMains(selectedCoverCharacters, {
+      castFromHint,
+      mainIds: storyData.mainCharacters,
+    });
+    if (applied) {
+      log.info(`🔄 [COVER-ITERATE] backCover: Dropping non-main characters (fallback cast): ${dropped.join(', ')}`);
       selectedCoverCharacters = mainOnly;
       coverCharacterPhotos = getCharacterPhotoDetails(selectedCoverCharacters, coverClothing, artStyleId, clothingRequirements);
     }
@@ -779,6 +816,10 @@ async function iterateCover(coverKey, storyData, options = {}) {
       previousImage: rehydratedCoverBytes,
       previousScore: existingCover.qualityScore || null,
       compositeDebug: imageResult.compositeDebug,
+      // Composite path skips quality eval, so no detection was computed —
+      // honest null (the dev endpoint's refresh re-detects on demand).
+      bboxDetection: null,
+      bboxOverlayImage: null,
     };
   }
 
@@ -836,6 +877,13 @@ async function iterateCover(coverKey, storyData, options = {}) {
     usage: imageResult.usage,
     previousImage: rehydratedCoverBytes,
     previousScore: existingCover.qualityScore || null,
+    // Detection is part of every image version (owner decision 2026-07-31):
+    // generateImageWithQualityRetry computed these at eval time, but this
+    // return previously dropped them — so the cover regen route's
+    // `iterResult.bboxDetection` read was ALWAYS undefined and cover
+    // versions never carried per-version detection data.
+    bboxDetection: imageResult.bboxDetection || null,
+    bboxOverlayImage: imageResult.bboxOverlayImage || null,
   };
 }
 
@@ -1256,6 +1304,7 @@ module.exports = {
   buildPlateDescription,
   enrichCoverHintWithArtifacts,
   filterBackCoverToMainCharacters,
+  narrowCoverCastToMains,
   // Cover-prompt hygiene helpers (shared with the streaming initial-gen path)
   collectCoverHintElementIds,
   applyCoverWornHeldDedupe,
