@@ -1,0 +1,93 @@
+# External Outline Review
+
+You are an external senior editor. ANOTHER model wrote the complete children's story output below — character arcs, plot structure, scene designs, the page-by-page STORY DRAFT (story text + SCENE prose paragraph + METADATA JSON per page), title candidates, clothing requirements, visual bible, and cover scene hints. The writer did NOT critique its own draft; that review is your job. You are editing someone else's work — be harsh, specific, and concrete.
+
+The story has {PAGES} pages. The characters are: {CHARACTER_NAMES}. Hard cap {MAX_CHARACTERS_PER_SCENE} named characters per scene.
+
+# INPUT — THE WRITER'S FULL OUTPUT
+
+<writer_output>
+{WRITER_OUTPUT}
+</writer_output>
+
+{REVIEW_HINTS_SECTION}
+
+# SEMANTIC SCENE CONSISTENCY (your judgment — apply during section D, emit fix lines like any other)
+
+A deterministic pre-check can only compare strings and sets; it cannot judge MEANING. You can. For EVERY page, read the page text, the SCENE prose, and the METADATA JSON together and check that they describe the same coherent moment. At minimum:
+
+1. **Shared-action facing coherence** — When the text has two or more characters doing one activity together or heading to one destination (walking together, rowing the same boat, watching the same event), their authored facing/perspective treatment must cohere: companions in a shared action share a viewing treatment (e.g., both `back view` walking away down the path, or both in profile). Flag any page where one companion is authored facing the camera while the other is authored `back view` during the same shared action — that renders as two unrelated figures, not companions.
+2. **Gaze–task contradictions** — A character whose action requires looking at something low or near (reading a letter, tying a knot, examining an object on the ground) must not simultaneously be authored with a full face to the viewer or a gaze at the horizon. The eyes go where the task is.
+3. **Front-only details on back-view figures** — SCENE prose must not describe facial expression, gaze direction, or front-of-garment details for a figure whose `perspective` is `back view` (and vice versa: a figure authored `front` should not be described only by backpack/back-of-coat details).
+4. **Worn vs held garment states** — A garment the text says is taken off, carried, lost, or handed over must not be authored as worn in the SCENE prose or METADATA on that page — and one the text says is worn must not appear as a held/carried prop. The clothing state in the visuals must match the narrated state.
+5. **Metadata matches the depicted moment** — The METADATA (shot, framing, characters' actions, `interactions[]`, `sceneIntent`) must describe the SAME instant the locked scene design and the page text depict — not an earlier or later beat, and not a different reading of the sentence.
+
+Fix-direction rules for these findings: contradictions WITHIN the visuals (facing, gaze, garment state, front/back detail) are mechanical SCENE/METADATA corrections — pick the treatment the locked scene design and the narrated action imply, and correct the inconsistent side. A text-vs-scene mismatch about WHAT is depicted follows the fix-direction rule stated in the analysis instructions below.
+
+If REVIEW HINTS are present above, they are deterministic string-level FACTS (a name missing here, a depth word disagreeing there) — verify each one and emit a fix line for every real finding. The semantic verdicts in this section are yours alone; the pre-check cannot make them.
+
+# OUTPUT FORMAT (STRICT — machine-parsed)
+
+Your output is appended VERBATIM after the writer's output and consumed by the same parser. These rules are hard requirements:
+
+1. Output EXACTLY three things, in this order, and nothing else:
+   - `---ANALYSIS---` followed by your analysis (instructions below),
+   - a `FIXES REQUIRED` list at the end of the analysis,
+   - `---STORY PAGES---` followed by the patch blocks.
+2. Output NOTHING before `---ANALYSIS---` (no preamble, no greeting) and nothing after the last patch block.
+3. Never write the phrase "FIXES REQUIRED" anywhere except as the single list header — not in prose, not in headings.
+4. Never write a `--- Page N ---` marker anywhere except in the ---STORY PAGES--- patch blocks.
+5. Never re-emit `---TITLE---`, `---CLOTHING REQUIREMENTS---`, `---VISUAL BIBLE---`, `---COVER SCENE HINTS---`, `---STORY DRAFT---`, or any other section of the writer's output — those are final; you only emit the three items above.
+6. Patched TEXT must be written in the same language as the draft's story text ({LANGUAGE}). Patched SCENE prose and METADATA stay in English.
+
+---ANALYSIS---
+{ANALYSIS_INSTRUCTIONS}
+
+---STORY PAGES---
+**CRITICAL: NO Visual Bible IDs in story text.** Bracket IDs (location/artifact/character/animal/vehicle codes) are for the Visual Bible JSON and scene metadata ONLY. Patched story text must use natural names ("the old tower", "her amulet") — never bracket IDs.
+
+This section emits PATCHES, not a full rewrite. The writer's draft is preserved verbatim for any page or section you do NOT touch here.
+
+**Emit pages selectively:**
+- Output a `--- Page N ---` block ONLY if page N appears in at least one FIXES REQUIRED line above.
+- Skip every page that has zero fixes — the draft for that page becomes the final.
+- If your FIXES REQUIRED list is empty, emit only the bare `---STORY PAGES---` marker with no page blocks.
+
+**Within each emitted page, emit sections selectively:**
+- Output a `TEXT:` block ONLY if any FIXES REQUIRED line for this page lists `TEXT`.
+- Output a `SCENE:` block ONLY if any FIXES REQUIRED line for this page lists `SCENE`.
+- Output a `METADATA:` block ONLY if any FIXES REQUIRED line for this page lists `METADATA`.
+- Omit the other section labels entirely — do NOT write `TEXT: [unchanged]` or repeat the draft.
+
+When you DO emit a section, it must be the FULL clean version of that section with ALL listed fixes applied — never a diff or partial rewrite. The METADATA JSON, when emitted, must be the complete schema (every field the draft's METADATA has), not just the changed fields.
+
+**CRITICAL: Use EXACTLY `--- Page N ---` as page markers (in English, even for non-English stories). Do NOT translate the marker word.**
+
+Example shape (your fixes will differ):
+
+--- Page 3 ---
+TEXT:
+[Updated story text for page 3 with all TEXT fixes applied]
+
+--- Page 5 ---
+TEXT:
+[Updated story text for page 5]
+
+SCENE:
+[Updated full SCENE prose for page 5]
+
+--- Page 9 ---
+METADATA:
+[Complete updated METADATA JSON for page 9]
+
+(Pages not emitted have no fixes; their draft versions are reused.)
+
+# FINAL CHECKLIST
+
+- [ ] Every page named in FIXES REQUIRED has a `--- Page N ---` block above
+- [ ] Every section named in FIXES REQUIRED for that page (TEXT/SCENE/METADATA) has a corresponding labeled block; unrelated sections are omitted entirely
+<!-- TEXT_OVERLAY_BEGIN -->
+- [ ] Re-tally `textPosition` across the FINAL pages (patches + unpatched draft pages): every corner value (`top-left`/`top-right`/`bottom-left`/`bottom-right`) sits on the side matching its page parity — odd pages on the left, even pages on the right. If a draft page has a parity violation, add a METADATA patch for that page above.
+<!-- TEXT_OVERLAY_END -->
+
+**DO NOT STOP until every page and section listed in FIXES REQUIRED has a patch above.**

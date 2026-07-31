@@ -5289,6 +5289,98 @@ function buildExactPosesBlock(interactions, sceneCharacters = []) {
 // UNIFIED STORY GENERATION
 // ============================================================================
 
+// Injected into {ANALYSIS_INSTRUCTIONS} when the split outline review is ON
+// (MODEL_DEFAULTS.splitOutlineReview): the writer skips its self-critique and a
+// separate reviewer model (see buildOutlineReviewPrompt) emits the ANALYSIS +
+// FIXES REQUIRED + patches instead. The stub keeps the writer's output shape
+// byte-compatible with the parsers: the ---ANALYSIS--- marker still appears
+// (draft extraction ends there) and the bare ---STORY PAGES--- marker still
+// closes the output (cover-hint extraction ends there), but no FIXES REQUIRED
+// phrase and no patch blocks are emitted — those come from the reviewer, whose
+// output is appended after this one.
+const SPLIT_REVIEW_ANALYSIS_STUB = `The critique of this draft is performed by a SEPARATE external reviewer AFTER this response — not by you. In this section, write exactly one line and nothing else:
+
+Reviewed externally.
+
+Then continue directly with the ---TITLE--- section. Hard rules for this response:
+- Do NOT write any analysis and do NOT emit a "FIXES REQUIRED" list — never write that phrase anywhere in your output.
+- Do NOT emit any \`--- Page N ---\` patch blocks anywhere. Your draft is final as written; the external reviewer emits all patches.
+- At the very end, still output the bare \`---STORY PAGES---\` marker on its own line, followed by NOTHING. Any patch-related instructions in the ---STORY PAGES--- section or the FINAL CHECKLIST do not apply to this response.`;
+
+/**
+ * Build the external outline-review prompt (split outline review, Call 2).
+ *
+ * The reviewer receives the writer's FULL output verbatim plus the SAME
+ * analysis instructions the single-call mode would have used (variant-matched
+ * body, one shared source file), and emits ---ANALYSIS--- + FIXES REQUIRED +
+ * ---STORY PAGES--- patch blocks in the exact single-call format — so the
+ * concatenation (writer output + reviewer output) parses through the unchanged
+ * UnifiedStoryParser / ProgressiveUnifiedParser.
+ *
+ * @param {Object} inputData - Same story parameters given to buildUnifiedStoryPrompt
+ * @param {string} writerOutput - Call 1's complete response text
+ * @param {Array}  [sceneConsistencyIssues] - deterministic validator findings
+ *   ([{page, issues:[{type, detail}]}]) surfaced to the reviewer as REVIEW HINTS
+ * @returns {string|null} Filled reviewer prompt, or null when the template is missing
+ */
+function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssues = []) {
+  const template = PROMPT_TEMPLATES.outlineReview;
+  if (!template) {
+    log.error('[PROMPT] outlineReview template not loaded — split outline review unavailable');
+    return null;
+  }
+
+  const variant = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
+  const useImageFirst = variant !== 'textFirst';
+  const analysisBody = (useImageFirst
+    ? PROMPT_TEMPLATES.outlineAnalysisImageFirst
+    : PROMPT_TEMPLATES.outlineAnalysisTextFirst) || '';
+  if (!analysisBody) {
+    log.error('[PROMPT] outline analysis instruction template missing — reviewer prompt will lack the check list');
+  }
+
+  // REVIEW HINTS block from the deterministic scene-consistency pre-check.
+  // Facts only (string/set findings) — the semantic verdicts stay with the
+  // reviewer (see the SEMANTIC SCENE CONSISTENCY section of the template).
+  let reviewHintsSection = '';
+  const flat = [];
+  for (const entry of sceneConsistencyIssues || []) {
+    for (const issue of entry.issues || []) {
+      flat.push(`- Page ${entry.page}: [${issue.type}] ${issue.detail}`);
+    }
+  }
+  if (flat.length > 0) {
+    reviewHintsSection = `# REVIEW HINTS — deterministic pre-check findings\n\nAn automated string-level check compared each page's METADATA against its SCENE prose, its interactions, and the locked scene designs. These are mechanical facts, not judgments — verify each one against the draft and emit a fix line for every real finding (mechanical METADATA/SCENE corrections):\n\n${flat.join('\n')}`;
+  }
+
+  const characterNames = (inputData.characters || []).map(c => c.name).join(', ');
+  const imageModelKey = inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage;
+  const maxCharsPerScene = IMAGE_MODELS[imageModelKey]?.maxCharactersPerScene || 3;
+
+  // Inject the analysis body BEFORE fillTemplate so its own placeholders
+  // ({CHARACTER_NAMES}, {MAX_CHARACTERS_PER_SCENE}) get filled too.
+  const templateWithAnalysis = template.replace('{ANALYSIS_INSTRUCTIONS}', () => analysisBody);
+
+  let prompt = fillTemplate(templateWithAnalysis, {
+    PAGES: inputData.pages || '',
+    LANGUAGE: getLanguageNameEnglish(inputData.language || 'en'),
+    CHARACTER_NAMES: characterNames,
+    MAX_CHARACTERS_PER_SCENE: maxCharsPerScene,
+    WRITER_OUTPUT: writerOutput,
+    REVIEW_HINTS_SECTION: reviewHintsSection
+  });
+
+  // Same text-overlay gating as the writer prompt: layouts that render text
+  // below the image drop every overlay-only analysis check.
+  const textInImage = inputData.layout?.textInImage === true;
+  if (textInImage) {
+    prompt = prompt.replace(/<!-- TEXT_OVERLAY_(BEGIN|END) -->\n?/g, '');
+  } else {
+    prompt = prompt.replace(/<!-- TEXT_OVERLAY_BEGIN -->[\s\S]*?<!-- TEXT_OVERLAY_END -->\n?/g, '');
+  }
+  return prompt;
+}
+
 /**
  * Build unified story generation prompt
  * Generates complete story with character arcs, plot structure, visual bible, and all pages
@@ -5562,7 +5654,37 @@ ${adventureGuide}` : ''}`;
     : PROMPT_TEMPLATES.storyUnified;
 
   if (unifiedTemplate) {
-    let prompt = fillTemplate(unifiedTemplate, {
+    // ── ANALYSIS placeholder (split outline review seam) ──
+    // Both templates carry {ANALYSIS_INSTRUCTIONS} in their ---ANALYSIS---
+    // section. Single-call mode injects the full self-critique instructions
+    // (variant-matched body, one source shared with the external reviewer);
+    // split mode injects a stub telling the writer the review happens
+    // externally — no FIXES REQUIRED, no patch blocks, bare ---STORY PAGES---
+    // marker so every parser boundary stays where it is today.
+    // Per-job override first (the rerun-text harness A/B seam:
+    // inputOverrides: { splitOutlineReview: false }), then the global default.
+    const splitReview = inputData.splitOutlineReview !== undefined
+      ? !!inputData.splitOutlineReview
+      : !!MODEL_DEFAULTS.splitOutlineReview;
+    const analysisBody = useImageFirst
+      ? PROMPT_TEMPLATES.outlineAnalysisImageFirst
+      : PROMPT_TEMPLATES.outlineAnalysisTextFirst;
+    let analysisBlock;
+    if (splitReview) {
+      analysisBlock = SPLIT_REVIEW_ANALYSIS_STUB;
+    } else if (analysisBody) {
+      analysisBlock = analysisBody;
+    } else {
+      // Analysis body failed to load — ship the stub rather than an empty
+      // critique section (the model would otherwise invent its own format).
+      log.error('[PROMPT] outline analysis instruction template missing — falling back to reviewed-externally stub');
+      analysisBlock = SPLIT_REVIEW_ANALYSIS_STUB;
+    }
+    // Inject BEFORE fillTemplate so placeholders inside the analysis body
+    // ({CHARACTER_NAMES}, {MAX_CHARACTERS_PER_SCENE}) get filled below.
+    const templateWithAnalysis = unifiedTemplate.replace('{ANALYSIS_INSTRUCTIONS}', () => analysisBlock);
+
+    let prompt = fillTemplate(templateWithAnalysis, {
       LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
       PAGES: pageCount,
       LANGUAGE: getLanguageNameEnglish(language),
@@ -6286,6 +6408,7 @@ module.exports = {
   stripWornStateFromDescription,
   filterWornClothingAgainstScene,
   buildUnifiedStoryPrompt,
+  buildOutlineReviewPrompt,
   buildTrialStoryPrompt,
   buildPreviousScenesContext,
   buildAvailableAvatarsForPrompt,

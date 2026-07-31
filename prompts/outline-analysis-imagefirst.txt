@@ -1,0 +1,117 @@
+Analyze the draft above. Be harsh and critical — pretend you are editing someone else's work. A green checklist is not an analysis; if your section verdict is "all fine", you didn't probe hard enough. Every probe below must name a specific page, line, or beat — never a blanket "✓".
+
+**IMAGE-FIRST HARD RULE:** the scene sequence is locked. If any page's text mentions or implies something its scene does not show — an agent, an object, an action, a location detail — FIX THE TEXT, never the scene. SCENE/METADATA fix lines are allowed only for mechanical corrections (trait-lock wording, depth/position/parity/format, expression affect); no fix may change what a scene depicts.
+
+**PRIORITY ORDER**: Fix story-breaking issues first, formatting issues last:
+1. **HIGH** — Sections A (narrative/plot) and B (character): plot holes, out-of-character behaviour, missing arcs, flat dialogue. Spend most analysis here.
+2. **MEDIUM** — Sections C (prose) and E (clichés): repetition, passive voice, banned gestures.
+3. **LOW** — Section D (scene hints mechanics): formatting and metadata. Fix them, but don't over-analyse if the story itself has bigger problems.
+
+---
+
+**A. NARRATIVE & PLOT**
+
+1. **Plot holes** — Name the weakest causal link in the draft. What event happens because the plot needs it to, not because the prior events forced it? If genuinely none, name the closest candidate and explain why it survives scrutiny.
+2. **Cause and effect** — For each page, does the event follow from the previous page? Name the transition that feels most arbitrary.
+3. **Pacing** — Name the slowest page and the most rushed page. Justify with word counts or beat density. Suggest what to cut from the slow one and what to expand in the rushed one.
+4. **Stakes** — Name the beat where the stakes feel weakest. What would raise it? If stakes are stated but not felt, mark it a SHOW-VS-TELL failure and fix in Section B.
+5. **Resolution** — Is the ending earned by the arc that preceded it, or does it feel pasted on? Name one element of the ending that could be strengthened.
+6. **Antagonist on the page** — On every page where a coerced action plays out (punishment, forced choice, arrest, sentence executed), the page's TEXT must name the character forcing it or carry their command. Visual metadata does not count. Flag any such page where the antagonist isn't on the page in words.
+
+---
+
+**B. CHARACTER & DIALOGUE (per-character, by name)**
+
+For EACH character in {CHARACTER_NAMES} output one line — no character may be skipped. If all 5 axes pass, write `none found` instead of inventing a weakness.
+
+Format A (clean character — all 5 axes ✓):
+- **[Name]**: consistency ✓, voice ✓, show-not-tell ✓, motivation ✓, growth ✓ — none found.
+
+Format B (at least one axis ✗):
+- **[Name]**: consistency [✓/✗], voice [✓/✗], show-not-tell [✓/✗], motivation [✓/✗], growth [✓/✗ or N/A]. Weakest moment: Page X, "[quote a specific line or beat]" — [one-sentence why]. Fix: [concrete change].
+
+Mark an axis ✗ only when you can name the specific page/line that fails it — never as a placeholder to justify a fix you wanted to suggest anyway.
+
+Probes (apply to every character):
+6. **Consistency** — Any out-of-character moment? Any trait established on page 1 that is contradicted later? Any location/ability violation (fear of heights on a cliff, shy character leading a crowd without prior setup)?
+7. **Voice** — Does [Name] sound different from the other characters in dialogue? If two characters could swap lines without the reader noticing, that's a voice fail — name the two and the page.
+8. **Show vs tell** — Find one emotion in the draft stated as a label ("she was scared", "he felt proud") for this character. Rewrite it as a shown action. If none exist, note "none found" and move on.
+9. **Motivation** — Is it clear WHY [Name] does what they do on their busiest page? Any unmotivated action? If motivation is assumed from the character brief but not shown in the draft, mark it a fail.
+10. **Growth** (main characters only) — Does [Name] end the story in a different emotional or knowledge state than they started? Name the page where the shift becomes visible. If the shift is told not shown, mark a growth-told fail.
+
+---
+
+**C. PROSE QUALITY**
+
+11. **Reading level** — Is the vocabulary appropriate for the target level? Name one word or sentence that feels off-register (too simple, too complex, jargon) and propose a replacement.
+12. **Repetition** — List any word (excluding names, articles, pronouns) used 4+ times across the draft. List any sentence structure (e.g. "Subject verbed, and subject verbed") used on 3+ pages in a row. Name replacements.
+13. **Flow** — Name the most awkward sentence in the draft and rewrite it.
+14. **Passive voice** — List any passive construction in narration ("was given", "was seen", "was felt"). Rewrite to active. Dialogue exempt.
+
+---
+
+**D. SCENE HINTS (mechanical checks)**
+
+15. **Character count** — Any page with more than {MAX_CHARACTERS_PER_SCENE} characters in scene hint? Remove the least important.
+16. **Scene sequence compliance** — Does each page match its LOCKED Scene N design in the SCENE SEQUENCE? Same shot type, same character count?
+17. **Clothing** — Are costumed characters using `costumed` in ALL scenes (except scene 1, before the adventure starts)?
+18. **Action match (text serves scene)** — Does each page's text narrate the moment its locked scene depicts? On a mismatch, emit a TEXT fix rewriting the text toward the scene — never a SCENE/METADATA fix bending the scene toward the text.
+19. **Depth vs size consistency** — For each character on each page, confirm `depth` matches how the prose describes their size. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size (e.g. "roughly a sixth of the frame height"), `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is the only named figure, `depth` MUST be `background`. Emit a fix line for each mismatch, e.g. `Page 9: CharacterF described as tiny silhouette but depth=foreground → depth=background`.
+19a. **Position phrase matches depth** — The depth word inside `position` (`foreground` / `midground` / `background`) MUST equal the separate `depth` field. Flag any character where they disagree, e.g. `Page 4: CharacterD position='far left foreground' but depth='background' → position='far left background'`.
+19b. **Physical-trait fidelity (CHARACTER DETAILS lock)** — For every character mentioned in any SCENE prose, scan the prose for that character's appearance words and compare to the `CHARACTER DETAILS` block. The prose MUST use the `Hair:`, `Facial hair:`, `Glasses:`, `Looks:`/`Age cues:`, `Distinctive marks:` values from that block character-for-character — paraphrase counts as a violation. Common drift to watch for:
+    - Hair colour swapped (e.g. CHARACTER DETAILS says `Hair: brown, ...` but the prose says "dark hair greying at the temples", "salt-and-pepper", "silvered", "snow-white").
+    - Hair length / styling dropped or altered (e.g. `Hair: ..., shoulder-length, ponytail, ...` rendered as just "shoulder-length brown hair" — the ponytail/braids/buzz/parting MUST stay).
+    - Facial-hair lock violated (e.g. `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face` rendered as "weathered face", "stubbled jaw", "grizzled beard", "bearded man").
+    - Glasses dropped or substituted (e.g. `Glasses: schwarze Brille` rendered as bare-eyed, or translated to "dark spectacles").
+    - Age word drift (e.g. `Looks: adult` rendered as "middle-aged", "elderly", "ageing").
+    Emit ONE fix line per violation, naming the page, the character, the offending phrase, and the verbatim replacement. Example: `Page 1: SCENE: CharacterD described as "dark hair greying at the temples" but CHARACTER DETAILS says "Hair: brown, wavy, shoulder-length, ponytail, side part left" → replace with "brown wavy shoulder-length hair tied in a ponytail with a side part on the left".`
+19c. **Camera-action consistency.** When a character moves INTO, descends INTO, climbs INTO, or steps THROUGH a space whose interior or far-side is named in `emptyScenePrompt` (descending stairs, doorway into another room, tunnel, cave, threshold), `framingPattern` must be `over-the-shoulder` or `side`, and that character's `perspective` must be `back view`, `over-the-shoulder`, or `side` — never `front`. With `framingPattern: solo-*` or `perspective: front`, the character's body occludes the interior the action is about, and the rendered geometry contradicts the action. Emit a fix line for each mismatch, e.g. `Page 3: CharacterA descends cellar stairs (interior named in emptyScenePrompt as 'steep stairs descending into darkness') but framingPattern=solo-before, CharacterA.perspective=front → framingPattern=over-the-shoulder, CharacterA.perspective=back view; also update emptyScenePrompt to name the camera POV ('camera positioned outside the cellar door looking past the threshold').`
+<!-- TEXT_OVERLAY_BEGIN -->
+20. **Text position distribution** — Tally the `textPosition` values across all pages and report each violation:
+    - **Parity:** every corner value (`top-left`/`top-right`/`bottom-left`/`bottom-right`) must match page parity (odd=left, even=right). `top-full`/`bottom-full` are valid on any page. List any page where a corner value sits on the wrong side.
+    - **Full-width floor:** count how many pages use `top-full` or `bottom-full`. This must be between 30% and 50% of all pages. If it's below 30%, identify the pages whose scene most naturally takes a full-width dark band (wide/ultra-wide shots, landscape-heavy scenes, aerial shots, clean horizon bands) and flip them to `top-full` or `bottom-full`.
+    - **Top/bottom balance:** at least 30% of pages must be `top-*` and at least 30% `bottom-*`.
+    - **Streak:** never more than 3 consecutive pages in the same half.
+    - Emit a fix line for each violation, e.g. `Page 3: textPosition bottom-right on odd page → bottom-left` or `Only 0% full-width — flip Page 9 (ultra-wide storm) to bottom-full`.
+21. **Text zone description** — For each page, `textZoneDescription` must be 5–15 words and name a physical surface (sky / wall / foliage / ground / water / fabric). Reject any that contain `rectangle`, `negative space`, `text box`, `blank`, `reserved`, `for text`, or describe what the area is *for* instead of what it *is*. The chosen surface must NATURALLY OCCUPY the chosen corner: `top-*` → sky / cliff / upper foliage / ceiling; `bottom-*` → ground / floor / water / cobblestones / shadow. Walls or facades for `top-*` are only valid when the camera angle truly puts a vertical surface across the top of the frame (narrow alley, interior, against-the-wall). Otherwise emit a fix line replacing the surface with one that fits the corner.
+22. **Forbidden-side intrusion** — Derive the forbidden side from `textPosition` (corner → that half; `*-full` → that row). Scan `background`, every `objects[].where` and object prose, and every `characters[].position` / `depth`. Flag any mention of the forbidden side (e.g. `right flank`, `center-right midground`, `bottom-right`, `far right`) and emit a fix line moving that content to the allowed side.
+23. **Empty scene alignment** — `emptyScenePrompt` must name the same reserved surface as `textZoneDescription`. If they disagree, emit a fix line updating `emptyScenePrompt`.
+<!-- TEXT_OVERLAY_END -->
+24. **Character coverage** — List the pages each primary character appears in. Any character with fewer than 2 appearances gets added to a relevant scene.
+<!-- TEXT_OVERLAY_BEGIN -->
+24a. **TextPosition vs character vertical collision** — The text overlay sits in the half/strip named by `textPosition`. A `foreground` character fills the bottom of the frame; a `background` character sits higher up. Flag pages where the textPosition zone collides with a character's natural vertical band on the same lateral side:
+    - `bottom-left` / `bottom-right` / `bottom-full` colliding with any character whose `position` contains `foreground`. `bottom-full` overlaps every side; `bottom-left` overlaps `left foreground` and `center foreground`; `bottom-right` overlaps `right foreground` and `center foreground`.
+    - `top-left` / `top-right` / `top-full` colliding with a character whose `depth` is `background` (their head sits in the upper band) on the same lateral side.
+    For each collision, emit ONE fix line. Pick the cheapest of: (a) move `textPosition` to a non-colliding corner that still respects parity + the full-width quota; (b) demote the colliding character from `foreground` to `midground` and adjust their interactions; (c) move them to the opposite lateral side. Example: `Page 9: textPosition=bottom-full collides with CharacterD (center foreground) and CharacterE (left foreground) → textPosition=top-full`.
+<!-- TEXT_OVERLAY_END -->
+24b. **Character vs interaction-target depth** — When a character's `interactions[]` entry has an `object` that is a fixed scene element also named in `emptyScenePrompt` (door, doorway, window, threshold, throne, balcony, staircase, fireplace, sofa, table, bed, signpost, coat rack, counter, shelf, desk, archway, balustrade, fountain, well, altar), the character's `position` depth MUST match the depth at which that element appears in `emptyScenePrompt`. A character cannot be at `left foreground` and "stand in the doorway" while `emptyScenePrompt` puts the door at `far left background` — that is geometrically impossible. For each mismatch emit a fix line picking ONE of: move the character's `position` to match the element's depth; move the element in `emptyScenePrompt` to match the character's depth; or reorient the camera (rewrite both prose blocks) so the element naturally appears in the character's depth band. Example: `Page 3: CharacterA position='left foreground' interacts with doorway frame, but emptyScenePrompt puts the front door at 'far left background' → reframe camera looking out toward the door so the doorway IS in the left foreground (CharacterA about to step out).`
+
+24c. **Agents in TEXT vs the locked scene.** For each page, scan the page TEXT for action verbs aimed AT the main character — chasing, capturing, restraining, freeing, guarding, surrounding, threatening, mocking, accusing, blocking, rescuing. If such a verb has a named or implied agent that the locked scene does not show (not in `characters[]`, not in `background`), the scene stays as designed — emit a TEXT fix that moves the agent's action off-page (already done, heard, remembered) or renarrates the moment to what the scene shows. Putting story-present antagonists INTO the design was the SCENE SEQUENCE's job (and the CRITIQUE's to catch); at this stage the text bends. Decorative mentions ("the crowd murmured", "villagers passed by") need no fix.
+
+---
+
+**E. DO-NOT-WRITE LIST VERIFICATION**
+
+25. **Verification** — Confirm the draft honors the DO-NOT-WRITE LIST (banned gestures, banned phrases, banned trait labels, banned aesthetic buzzwords, gesture re-use cap, banned plot formulas, banned page-1 openings). If anything slipped in, name the page + the violating line and emit a fix in FIXES REQUIRED. If everything is clean, write `clean — verified DO-NOT-WRITE LIST honored.`
+
+---
+
+**FIXES REQUIRED**
+
+For EACH issue found above, emit a fix line. Each line names EVERY page the fix touches and EVERY section it modifies (TEXT, SCENE, and/or METADATA):
+- Pages [N1,N2,...]: [section(s)]: [specific issue] → [specific fix]
+
+Rules for the page list:
+- Single-page fixes: `Pages 5: TEXT: ...`
+- Multi-page fixes: enumerate each page explicitly, never use ranges. A "schaute used 5×" repetition fix that touches pages 2,3,5,6 must be written `Pages 2,3,5,6: TEXT: ...` — not `Pages 2-6:`.
+- Cross-cutting metadata fixes (<!-- TEXT_OVERLAY_BEGIN -->textPosition flips that re-balance parity, <!-- TEXT_OVERLAY_END -->depth corrections that touch multiple characters): list every page whose METADATA changes.
+
+Rules for the section list:
+- `TEXT` — only the story text on that page changes
+- `SCENE` — only the SCENE prose paragraph changes
+- `METADATA` — only the METADATA JSON changes
+- Combine when needed: `TEXT,SCENE` or `SCENE,METADATA` or `TEXT,SCENE,METADATA`
+
+If sections A/B/C genuinely produce zero fix lines, that almost certainly means you didn't probe hard enough — go back and name the weakest beat/line/gesture in each section even if the story is otherwise strong. A 10-page first-draft story should realistically produce at least 5-8 fix lines across A/B/C/E combined.
+
+The ---STORY PAGES--- section below emits PATCHES for the pages and sections you named here. Pages and sections you did NOT name here are reused verbatim from the draft.

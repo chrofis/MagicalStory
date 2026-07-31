@@ -87,6 +87,13 @@ async function loadPromptTemplates() {
     ['bboxRefine', 'bbox-refine.txt'],
     ['storyUnified', 'story-unified.txt'],
     ['storyUnifiedImageFirst', 'story-unified-imagefirst.txt'],
+    // Shared ANALYSIS instruction bodies — injected into the {ANALYSIS_INSTRUCTIONS}
+    // placeholder of the matching unified template (single-call mode) AND into the
+    // external reviewer prompt (split outline review). One source per variant so the
+    // self-critique and the external review can never drift apart.
+    ['outlineAnalysisTextFirst', 'outline-analysis-textfirst.txt'],
+    ['outlineAnalysisImageFirst', 'outline-analysis-imagefirst.txt'],
+    ['outlineReview', 'outline-review.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
     ['incrementalConsistencyCheck', 'incremental-consistency-check.txt'],

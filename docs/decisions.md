@@ -3024,3 +3024,110 @@ to shared helpers), `server.js` (vantage LOCATION line),
 `tests/manual/test-page-prompt-builder.js` (new, 45+ assertions),
 `tests/manual/test-cover-sanitize.js` (updated to English-ref contract).
 **Status:** ✅ active.
+
+## Split outline review — Sonnet writes, Opus reviews (2026-07-31)
+
+**Context:** testing-backlog #2 (cross-model review A/B) + owner: "the review of
+the outline should be a different model. Let's first try opus." The unified
+call previously wrote the draft AND critiqued itself (---ANALYSIS--- + FIXES
+REQUIRED + ---STORY PAGES--- patches) in one Sonnet response; same-model
+self-critique mostly produces agreement.
+
+**Decision:** the self-critique is split out of the writer call. Both unified
+templates now carry an `{ANALYSIS_INSTRUCTIONS}` placeholder in their
+---ANALYSIS--- section; the analysis instruction bodies were extracted to
+`prompts/outline-analysis-textfirst.txt` / `outline-analysis-imagefirst.txt`
+(one source per variant, shared by both modes so self-critique and external
+review can never drift). Modes, gated by `MODEL_DEFAULTS.splitOutlineReview`
+(env `SPLIT_OUTLINE_REVIEW`, default **true**):
+- **Single-call (OFF):** builder injects the full analysis body — byte-identical
+  behavior to before.
+- **Split (ON, default):** the writer (Sonnet, unchanged) gets a stub — emit
+  `---ANALYSIS---` as "Reviewed externally.", no FIXES REQUIRED phrase, no patch
+  blocks, but still the bare `---STORY PAGES---` marker so every parser boundary
+  (draft ends at ANALYSIS, cover hints end at STORY PAGES) stays put. A second
+  call by `MODEL_DEFAULTS.outlineReviewModel` (env `OUTLINE_REVIEW_MODEL`,
+  default `claude-opus` → `claude-opus-5`, 32k out, $5/$25 pricing entries
+  added) receives the writer's full output + the same analysis instructions via
+  `prompts/outline-review.txt` and emits ---ANALYSIS--- + FIXES REQUIRED +
+  ---STORY PAGES--- patches in the exact existing format. server.js appends the
+  reviewer output to the writer output and the CONCATENATION flows through the
+  unchanged UnifiedStoryParser/ProgressiveUnifiedParser. usageLabel
+  `outline_review`; log line `[OUTLINE-REVIEW] model=…`.
+
+**Streaming in split mode:** call 1 streams as today — title/clothing/VB/cover
+hints (and thus early avatar styling + covers) still fire progressively. Page
+emission WAITS for the reviewer: the FIXES REQUIRED list decides draft-final vs
+patched, so the reviewer output is handed to the progressive parser in ONE
+chunk after the review call completes (incremental feeding would let
+`_ensurePatchedPageNumbers` lock onto a half-streamed FIXES list and ship
+pages whose patch hadn't arrived). Cost: scene expansion starts one review-call
+later than the old single-call STORY PAGES streaming.
+
+**Failure containment:** reviewer output missing the ANALYSIS/FIXES REQUIRED
+markers or call failure → 1 retry → proceed with the UNPATCHED draft + loud
+`🚨 [OUTLINE-REVIEW]` warning + generationLog `outline_review_failed` event.
+Review never blocks generation. Trial mode never reviews (its prompt has no
+critique by design).
+
+**Touched:** `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`
+(ANALYSIS body → placeholder), `prompts/outline-analysis-textfirst.txt`,
+`prompts/outline-analysis-imagefirst.txt`, `prompts/outline-review.txt` (new),
+`server/services/prompts.js` (3 new template keys), `server/config/models.js`
+(TEXT_MODELS `claude-opus`, MODEL_DEFAULTS `outlineReviewModel` +
+`splitOutlineReview`, MODEL_PRICING `claude-opus-5`), `server/lib/storyHelpers.js`
+(`SPLIT_REVIEW_ANALYSIS_STUB`, injection seam, `buildOutlineReviewPrompt`),
+`server.js` (review call between call-1 completion and final parse),
+`tests/manual/test-split-outline-review.js` (42 checks: concatenation ≡
+single-call parse, progressive flow, zero-fix tolerance, failure path, builder
+seam).
+
+**Status:** 🧪 built, live A/B pending — measure via §7 text harness +
+regeneration rate per testing-backlog #2 ("If Opus doesn't catch more, keep
+Sonnet on both"). Flip back fleet-wide with `SPLIT_OUTLINE_REVIEW=false`.
+
+## Scene consistency: mechanical validator in code, semantic judgment in the Opus review (2026-07-31)
+
+**Context:** owner: "do we have enough focus on ensuring scenes are consistent?
+that scene metadata matches the scene outline and that this is simple to
+visualize." Metadata↔scene consistency was only prompt-checked (ANALYSIS
+section D). Owner scope ruling on the split: semantic consistency is NOT
+deterministic-checkable — e.g. text says two characters walk together but one
+is authored facing the camera and one back view; inferring "these two share an
+action" from prose is semantic judgment a string checker must not pretend to
+make. Owner: "this is for Opus to review."
+
+**Decision:** two layers with an explicit division of labor.
+- **Code = MECHANICAL PARITY ONLY.** `server/lib/sceneConsistencyCheck.js`
+  (pure string/set logic, no model calls) checks per page: (a) locked SCENE
+  SEQUENCE `Cast:` lines vs METADATA `characters[]` (known-name matching),
+  (b) METADATA characters[] vs SCENE-prose name mentions (both directions),
+  (c) `interactions[]` character/object refs exist in characters[]/objects[]
+  (objects may anchor in background/emptyScenePrompt/prose), (d) depth word in
+  the `position` phrase vs the `depth` field, (e) sceneIntent names ⊆
+  characters[]. NO facing logic, NO shared-action detection, NO pose
+  plausibility — a closed mechanical issue-type whitelist is asserted in the
+  unit test.
+- **Opus review owns ALL semantic scene consistency.** `prompts/outline-review.txt`
+  § SEMANTIC SCENE CONSISTENCY instructs the reviewer per page: shared-action
+  facing coherence (companions in one activity/destination share a facing
+  treatment), gaze–task contradictions, front-only details on back-view
+  figures, worn-vs-held garment states matching the narrated state, and
+  metadata semantically matching the locked scene design + page text. The
+  validator's findings feed the reviewer as a REVIEW HINTS block (facts only);
+  the semantic verdicts are the reviewer's.
+
+**Visualization:** validator runs twice in server.js — pre-review on the draft
+(hints) and post-parse on the final merged pages; the final run logs compact
+`[SCENE-CONSISTENCY] P3: …` lines, writes a generationLog `scene_consistency`
+event, and lands on `finalChecksReport.sceneConsistency`
+({checkedAt, issueCount, pages:[{page, issues:[{type, detail}]}]}) so the dev
+panel surfaces it alongside entity/style consistency.
+
+**Touched:** `server/lib/sceneConsistencyCheck.js` (new), `server.js` (pre-review
+hints + post-parse report), `prompts/outline-review.txt` (semantic section),
+`tests/manual/test-scene-consistency-check.js` (22 checks: seeded mismatches →
+exact issue types, clean page → none, mechanical-only whitelist).
+
+**Status:** ✅ active (report-only — findings inform the review and the dev
+panel; no automatic regeneration is driven off them yet).

@@ -23,6 +23,12 @@ const TEXT_MODELS = {
     maxOutputTokens: 64000,
     description: 'Claude Sonnet 4.6 - Best narrative quality'
   },
+  'claude-opus': {
+    provider: 'anthropic',
+    modelId: 'claude-opus-5',
+    maxOutputTokens: 32000,
+    description: 'Claude Opus 5 - Strongest reviewer/critic ($5/$25 per 1M). Used for the split outline review (cross-model: Sonnet writes, Opus reviews).'
+  },
   'claude-haiku': {
     provider: 'anthropic',
     modelId: 'claude-haiku-4-5-20251001',
@@ -118,6 +124,19 @@ const MODEL_DEFAULTS = {
   // Text generation models
   idea: 'claude-sonnet',               // Story idea generation
   outline: 'claude-sonnet',            // Story outline generation
+
+  // ── Split outline review (testing-backlog #2: cross-model review) ──
+  // When splitOutlineReview is true (default), the unified story call (writer,
+  // Sonnet) SKIPS its self-critique; a second call by outlineReviewModel (Opus)
+  // receives the full writer output + the same analysis instructions and emits
+  // ---ANALYSIS--- + FIXES REQUIRED + ---STORY PAGES--- patches. The two
+  // outputs are concatenated and parsed by the unchanged parsers. Reviewer
+  // failure never blocks generation (unpatched draft ships with a loud
+  // warning). Env overrides let staging flip either knob without a deploy.
+  outlineReviewModel: process.env.OUTLINE_REVIEW_MODEL || 'claude-opus',
+  splitOutlineReview: process.env.SPLIT_OUTLINE_REVIEW
+    ? process.env.SPLIT_OUTLINE_REVIEW !== 'false'
+    : true,
   storyText: 'claude-sonnet',          // Story narrative text
   sceneDescription: 'claude-sonnet',    // Initial scene expansion — Sonnet only. Haiku produced
                                         // unstable clothing labels (e.g. "costumed:medieval swiss
@@ -496,6 +515,8 @@ const REPAIR_DEFAULTS = {
 // Source: https://platform.claude.com/docs/en/about-claude/pricing
 const MODEL_PRICING = {
   // Anthropic Claude models (Feb 2026)
+  'claude-opus-5': { input: 5.00, output: 25.00, thinking: 25.00 },
+  'claude-opus': { input: 5.00, output: 25.00, thinking: 25.00 },
   'claude-sonnet-4-6': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet-4-5': { input: 3.00, output: 15.00, thinking: 15.00 },

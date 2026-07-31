@@ -237,6 +237,7 @@ const {
   buildSceneDescriptionPrompt,
   buildImagePrompt,
   buildUnifiedStoryPrompt,
+  buildOutlineReviewPrompt,
   buildTrialStoryPrompt,
   buildPreviousScenesContext,
   buildAvailableAvatarsForPrompt,
@@ -256,6 +257,7 @@ const {
   buildSceneClothingRequirements,
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
+const { checkSceneConsistency, formatSceneConsistencySummary } = require('./server/lib/sceneConsistencyCheck');
 const { createJobHeartbeat } = require('./server/lib/jobHeartbeat');
 const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
@@ -4407,7 +4409,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       unifiedHeartbeat();  // throttled — fires at most every 30s
     }, modelOverrides.outlineModel, { usageLabel: 'unified_story' });
     timing.storyGenEnd = Date.now();
-    const unifiedResponse = unifiedResult.text;
+    let unifiedResponse = unifiedResult.text;
     const unifiedModelId = unifiedResult.modelId;
     const unifiedUsage = unifiedResult.usage || { input_tokens: 0, output_tokens: 0 };
     // Determine provider from model ID since streaming doesn't return provider
@@ -4416,6 +4418,87 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`📊 [UNIFIED] Story usage - model: ${unifiedModelId}, provider: ${unifiedProvider}, input: ${unifiedUsage.input_tokens}, output: ${unifiedUsage.output_tokens}`);
     // Usage recorded by the callTextModelStreaming chokepoint (usageLabel above).
     log.debug(`⏱️ [UNIFIED] Story generation: ${((timing.storyGenEnd - timing.storyGenStart) / 1000).toFixed(1)}s`);
+
+    // ── Split outline review (cross-model: writer drafted, reviewer critiques) ──
+    // With MODEL_DEFAULTS.splitOutlineReview ON, call 1 (writer) skipped its
+    // self-critique (ANALYSIS stub, no FIXES REQUIRED, bare ---STORY PAGES---
+    // marker). A second model now receives the writer's full output + the same
+    // analysis instructions and emits ---ANALYSIS--- + FIXES REQUIRED +
+    // ---STORY PAGES--- patches. The CONCATENATION (writer + reviewer output)
+    // is what the unchanged parsers consume. Streaming note: the progressive
+    // parser consumed call 1's stream as usual (title/clothing/VB/cover hints
+    // fired live); page emission waits for the review because the FIXES
+    // REQUIRED list decides which pages are draft-final vs patched — the
+    // reviewer output is handed to the progressive parser in ONE final chunk
+    // (feeding it incrementally would let the parser lock onto a half-streamed
+    // FIXES REQUIRED list and mis-classify still-unpatched pages as final).
+    // Failure containment: reviewer failure after 1 retry → proceed with the
+    // UNPATCHED draft + loud warning + generationLog event. Never blocks.
+    // Per-job override first (rerun-text harness A/B seam via inputOverrides:
+    // { splitOutlineReview: false }) — MUST mirror the buildUnifiedStoryPrompt
+    // resolution so the writer's stub and the review call always agree.
+    const splitOutlineReviewEnabled = inputData.splitOutlineReview !== undefined
+      ? !!inputData.splitOutlineReview
+      : !!MODEL_DEFAULTS.splitOutlineReview;
+    if (!inputData.trialMode && splitOutlineReviewEnabled) {
+      await checkCancellation();
+      const reviewModel = modelOverrides.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel;
+      timing.outlineReviewStart = Date.now();
+
+      // Deterministic scene-consistency pre-check on the draft → REVIEW HINTS
+      // (mechanical string/set facts only; semantic verdicts are the reviewer's).
+      let draftConsistencyIssues = [];
+      try {
+        const draftPages = new UnifiedStoryParser(unifiedResponse).extractPages();
+        draftConsistencyIssues = checkSceneConsistency(draftPages, unifiedResponse, {
+          knownCharacterNames: (inputData.characters || []).map(c => c.name)
+        });
+        for (const line of formatSceneConsistencySummary(draftConsistencyIssues)) log.info(`${line} (pre-review draft)`);
+      } catch (preErr) {
+        log.warn(`⚠️ [OUTLINE-REVIEW] draft consistency pre-check failed (non-fatal): ${preErr.message}`);
+      }
+
+      const reviewPrompt = buildOutlineReviewPrompt(inputData, unifiedResponse, draftConsistencyIssues);
+      if (!reviewPrompt) {
+        log.warn('⚠️ [OUTLINE-REVIEW] review template unavailable — proceeding with UNPATCHED draft (no external critique ran)');
+        genLog.warn('outline_review_failed', 'Review template unavailable — story shipped as unpatched draft');
+      } else {
+        log.info(`🧐 [OUTLINE-REVIEW] model=${reviewModel} split=true promptChars=${reviewPrompt.length} hints=${draftConsistencyIssues.reduce((n, e) => n + e.issues.length, 0)}`);
+        let reviewText = null;
+        for (let attempt = 1; attempt <= 2 && !reviewText; attempt++) {
+          try {
+            const reviewResult = await callTextModelStreaming(reviewPrompt, 32000, () => {
+              unifiedHeartbeat(); // keep story_jobs.updated_at fresh during the review
+            }, reviewModel, { usageLabel: 'outline_review' });
+            const t = reviewResult.text || '';
+            // Minimal shape gate: without these markers the concatenation would
+            // confuse the parsers — treat as a failed attempt.
+            if (/---\s*ANALYSIS\s*---/i.test(t) && /FIXES\s+REQUIRED/i.test(t)) {
+              reviewText = t;
+              log.info(`✅ [OUTLINE-REVIEW] model=${reviewResult.modelId} reviewed the draft (attempt ${attempt}, ${t.length} chars, ${((Date.now() - timing.outlineReviewStart) / 1000).toFixed(1)}s)`);
+            } else {
+              log.warn(`⚠️ [OUTLINE-REVIEW] attempt ${attempt}: reviewer output missing ANALYSIS/FIXES REQUIRED markers (${t.length} chars) — ${attempt < 2 ? 'retrying' : 'giving up'}`);
+            }
+          } catch (reviewErr) {
+            log.warn(`⚠️ [OUTLINE-REVIEW] attempt ${attempt} failed: ${reviewErr.message} — ${attempt < 2 ? 'retrying' : 'giving up'}`);
+          }
+        }
+        if (reviewText) {
+          unifiedResponse = unifiedResponse + '\n\n' + reviewText;
+          genLog.info('outline_review', `External review by ${reviewModel} applied (${reviewText.length} chars)`, null, {
+            reviewModel,
+            hintCount: draftConsistencyIssues.reduce((n, e) => n + e.issues.length, 0)
+          });
+          // Hand the reviewer output to the progressive parser in one chunk so
+          // its patched-page detection sees the COMPLETE FIXES REQUIRED list.
+          progressiveParser.processChunk('', unifiedResponse);
+        } else {
+          log.warn('🚨 [OUTLINE-REVIEW] reviewer failed after 1 retry — proceeding with UNPATCHED draft (no critique applied to this story)');
+          genLog.warn('outline_review_failed', `Reviewer ${reviewModel} failed after retry — story shipped as unpatched draft`);
+        }
+      }
+      timing.outlineReviewEnd = Date.now();
+    }
 
     // Finalize streaming parser
     progressiveParser.finalize();
@@ -4471,6 +4554,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
     }
     const storyPages = parser.extractPages();
+
+    // Deterministic scene metadata ↔ scene design consistency check on the
+    // FINAL pages (draft + reviewer patches merged). Mechanical string/set
+    // parity only — semantic scene consistency is the outline reviewer's job
+    // (see docs/decisions.md). Surfaced three ways: compact log lines, a
+    // generationLog event, and finalChecksReport.sceneConsistency (dev panel).
+    let sceneConsistencyResult = null;
+    try {
+      sceneConsistencyResult = checkSceneConsistency(storyPages, unifiedResponse, {
+        knownCharacterNames: (inputData.characters || []).map(c => c.name)
+      });
+      const issueCount = sceneConsistencyResult.reduce((n, e) => n + e.issues.length, 0);
+      for (const line of formatSceneConsistencySummary(sceneConsistencyResult)) log.warn(line);
+      genLog.info('scene_consistency', `Scene consistency check: ${issueCount} issue(s) across ${sceneConsistencyResult.length} page(s)`, null, {
+        issueCount,
+        pages: sceneConsistencyResult
+      });
+    } catch (scErr) {
+      log.warn(`⚠️ [SCENE-CONSISTENCY] check failed (non-fatal): ${scErr.message}`);
+    }
 
     // Construct fullStoryText from parsed pages (for storage compatibility)
     // Use let so it can be modified by text consistency corrections
@@ -6803,6 +6906,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (pipelineStyleConsistency) {
       finalChecksReport = finalChecksReport || {};
       finalChecksReport.styleConsistency = pipelineStyleConsistency;
+    }
+
+    // Deterministic scene metadata ↔ scene design consistency findings (see
+    // check right after the final parse). Attached even when empty so the dev
+    // panel can show "checked, clean" vs "not run".
+    if (sceneConsistencyResult) {
+      finalChecksReport = finalChecksReport || {};
+      finalChecksReport.sceneConsistency = {
+        checkedAt: new Date().toISOString(),
+        issueCount: sceneConsistencyResult.reduce((n, e) => n + e.issues.length, 0),
+        pages: sceneConsistencyResult
+      };
     }
 
     let originalStoryText = null;
