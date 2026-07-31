@@ -4418,7 +4418,7 @@ export function StoryDisplay({
                 </div>
               </div>
             )}
-            {getCoverVersions('frontCover').length > 1 && (
+            {getCoverVersions('frontCover').length > 0 && (
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover'), activeVersionIndex: getCoverActiveVersionIndex('frontCover') })}
@@ -4480,23 +4480,17 @@ export function StoryDisplay({
                   </details>
                 )}
 
-                {/* Reference Photos */}
+                {/* Reference Photos — page-level inputs only. Per-version data
+                    (grokRefImages sent to the model, composite passes) lives
+                    ONLY in the version viewer ("Bild wählen"). */}
                 {(() => {
-                  // Prefer the active version's grokRefImages over the root
-                  // cover object — iterated covers store the new refs inside
-                  // imageVersions[activeVersion], and the root stays stale.
-                  const activeIdx = Math.max(0, resolveActiveArrayIdx(frontCoverObj));
-                  const frontCoverGrokRefs = (frontCoverObj.imageVersions?.[activeIdx] as any)?.grokRefImages ?? frontCoverObj.grokRefImages;
-                  const frontCoverComposite = (frontCoverObj.imageVersions?.[activeIdx] as any)?.compositeAttempts ?? null;
-                  const show = (frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0 || frontCoverObj.visualBibleGrid || (frontCoverGrokRefs?.length ?? 0) > 0 || (frontCoverComposite?.length ?? 0) > 0;
+                  const show = (frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0 || frontCoverObj.visualBibleGrid;
                   if (!show) return null;
                   return (
                     <ReferencePhotosDisplay
                       referencePhotos={frontCoverObj.referencePhotos || []}
                       landmarkPhotos={frontCoverObj.landmarkPhotos}
                       visualBibleGrid={frontCoverObj.visualBibleGrid}
-                      grokRefImages={frontCoverGrokRefs}
-                      compositeAttempts={frontCoverComposite}
                       language={language}
                     />
                   );
@@ -4693,7 +4687,7 @@ export function StoryDisplay({
                 </div>
               </div>
             )}
-            {getCoverVersions('initialPage').length > 1 && (
+            {getCoverVersions('initialPage').length > 0 && (
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage'), activeVersionIndex: getCoverActiveVersionIndex('initialPage') })}
@@ -4755,20 +4749,16 @@ export function StoryDisplay({
                   </details>
                 )}
 
-                {/* Reference Photos */}
+                {/* Reference Photos — page-level inputs only; per-version data
+                    lives in the version viewer ("Bild wählen"). */}
                 {(() => {
-                  const activeIdx = Math.max(0, resolveActiveArrayIdx(initialPageObj));
-                  const initialPageGrokRefs = (initialPageObj.imageVersions?.[activeIdx] as any)?.grokRefImages ?? initialPageObj.grokRefImages;
-                  const initialPageComposite = (initialPageObj.imageVersions?.[activeIdx] as any)?.compositeAttempts ?? null;
-                  const show = (initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0 || initialPageObj.visualBibleGrid || (initialPageGrokRefs?.length ?? 0) > 0 || (initialPageComposite?.length ?? 0) > 0;
+                  const show = (initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0 || initialPageObj.visualBibleGrid;
                   if (!show) return null;
                   return (
                     <ReferencePhotosDisplay
                       referencePhotos={initialPageObj.referencePhotos || []}
                       landmarkPhotos={initialPageObj.landmarkPhotos}
                       visualBibleGrid={initialPageObj.visualBibleGrid}
-                      grokRefImages={initialPageGrokRefs}
-                      compositeAttempts={initialPageComposite}
                       language={language}
                     />
                   );
@@ -5038,7 +5028,7 @@ export function StoryDisplay({
                               {renderCharRepairButton(pageNumber, bboxOverrides[bboxKey(`page:${pageNumber}`, image)] ?? image?.bboxDetection ?? (image?.retryHistory?.find((r: any) => r.bboxDetection?.figures)?.bboxDetection as any), bboxKey(`page:${pageNumber}`, image))}
                             </div>
                             {/* Row 2: Text edit + version history — 2 cols on PC, full width each on mobile */}
-                            {(onSaveStoryText || getImageVersions(pageNumber).length > 1) && (
+                            {(onSaveStoryText || getImageVersions(pageNumber).length > 0) && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {onSaveStoryText && (
                                   <button
@@ -5052,7 +5042,7 @@ export function StoryDisplay({
                                     {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
                                   </button>
                                 )}
-                                {getImageVersions(pageNumber).length > 1 && (
+                                {getImageVersions(pageNumber).length > 0 && (
                                   <button
                                     onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber), activeVersionIndex: getActiveVersionIndex(pageNumber) })}
                                     className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
@@ -5357,8 +5347,10 @@ export function StoryDisplay({
                               </details>
                             )}
 
-                            {/* Reference Photos */}
-                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0 || image?.visualBibleGrid || image?.hasVisualBibleGrid || image?.emptySceneImage || image?.hasEmptySceneImage || (image as any)?.hasCompositeStages || (image as any)?.grokRefImages) && image && (
+                            {/* Reference Photos — page-level inputs only. Per-version
+                                data (refs sent to the model, composite passes) lives
+                                ONLY in the version viewer ("Bild wählen"). */}
+                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0 || image?.visualBibleGrid || image?.hasVisualBibleGrid || image?.emptySceneImage || image?.hasEmptySceneImage || (image as any)?.hasCompositeStages) && image && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
@@ -5373,8 +5365,6 @@ export function StoryDisplay({
                                 textAreaMask={image.textAreaMask}
                                 emptySceneVbGrid={(image as any).emptySceneVbGrid}
                                 textCoverageReport={image.textCoverageReport}
-                                grokRefImages={(image?.imageVersions?.[Math.max(0, resolveActiveArrayIdx(image))] as any)?.grokRefImages ?? (image as any)?.grokRefImages}
-                                compositeAttempts={(image?.imageVersions?.[Math.max(0, resolveActiveArrayIdx(image))] as any)?.compositeAttempts ?? null}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}
@@ -5727,7 +5717,7 @@ export function StoryDisplay({
                               {renderCharRepairButton(pageNumber, bboxOverrides[bboxKey(`page:${pageNumber}`, image)] ?? image?.bboxDetection ?? (image?.retryHistory?.find((r: any) => r.bboxDetection?.figures)?.bboxDetection as any), bboxKey(`page:${pageNumber}`, image))}
                             </div>
                             {/* Row 2: Text edit + version history — 2 cols on PC, full width each on mobile */}
-                            {(onSaveStoryText || getImageVersions(pageNumber).length > 1) && (
+                            {(onSaveStoryText || getImageVersions(pageNumber).length > 0) && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {onSaveStoryText && (
                                   <button
@@ -5741,7 +5731,7 @@ export function StoryDisplay({
                                     {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
                                   </button>
                                 )}
-                                {getImageVersions(pageNumber).length > 1 && (
+                                {getImageVersions(pageNumber).length > 0 && (
                                   <button
                                     onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber), activeVersionIndex: getActiveVersionIndex(pageNumber) })}
                                     className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
@@ -6046,7 +6036,9 @@ export function StoryDisplay({
                               </details>
                             )}
 
-                            {/* Reference Photos */}
+                            {/* Reference Photos — page-level inputs only. Per-version
+                                data (refs sent to the model, composite passes) lives
+                                ONLY in the version viewer ("Bild wählen"). */}
                             {((image.referencePhotos?.length ?? 0) > 0 || (image.landmarkPhotos?.length ?? 0) > 0 || image.visualBibleGrid || image.hasVisualBibleGrid || image.emptySceneImage || image.hasEmptySceneImage || (image as any).hasCompositeStages) && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
@@ -6062,8 +6054,6 @@ export function StoryDisplay({
                                 textAreaMask={image.textAreaMask}
                                 emptySceneVbGrid={(image as any).emptySceneVbGrid}
                                 textCoverageReport={image.textCoverageReport}
-                                grokRefImages={(image?.imageVersions?.[Math.max(0, resolveActiveArrayIdx(image))] as any)?.grokRefImages ?? (image as any)?.grokRefImages}
-                                compositeAttempts={(image?.imageVersions?.[Math.max(0, resolveActiveArrayIdx(image))] as any)?.compositeAttempts ?? null}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}
@@ -6408,7 +6398,7 @@ export function StoryDisplay({
                 </div>
               </div>
             )}
-            {getCoverVersions('backCover').length > 1 && (
+            {getCoverVersions('backCover').length > 0 && (
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover'), activeVersionIndex: getCoverActiveVersionIndex('backCover') })}
@@ -6470,20 +6460,16 @@ export function StoryDisplay({
                   </details>
                 )}
 
-                {/* Reference Photos */}
+                {/* Reference Photos — page-level inputs only; per-version data
+                    lives in the version viewer ("Bild wählen"). */}
                 {(() => {
-                  const activeIdx = Math.max(0, resolveActiveArrayIdx(backCoverObj));
-                  const backCoverGrokRefs = (backCoverObj.imageVersions?.[activeIdx] as any)?.grokRefImages ?? backCoverObj.grokRefImages;
-                  const backCoverComposite = (backCoverObj.imageVersions?.[activeIdx] as any)?.compositeAttempts ?? null;
-                  const show = (backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0 || backCoverObj.visualBibleGrid || (backCoverGrokRefs?.length ?? 0) > 0 || (backCoverComposite?.length ?? 0) > 0;
+                  const show = (backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0 || backCoverObj.visualBibleGrid;
                   if (!show) return null;
                   return (
                     <ReferencePhotosDisplay
                       referencePhotos={backCoverObj.referencePhotos || []}
                       landmarkPhotos={backCoverObj.landmarkPhotos}
                       visualBibleGrid={backCoverObj.visualBibleGrid}
-                      grokRefImages={backCoverGrokRefs}
-                      compositeAttempts={backCoverComposite}
                       language={language}
                     />
                   );
@@ -6981,6 +6967,7 @@ export function StoryDisplay({
             onClose={() => setCoverHistoryModal(null)}
             onSelectVersion={(coverType, versionIndex) => handleSelectCoverVersion(coverType as 'frontCover' | 'initialPage' | 'backCover', versionIndex)}
             developerMode={developerMode}
+            grokRefImages={(coverImages?.[coverHistoryModal.coverType] as any)?.grokRefImages}
             entityIssues={getEntityIssuesForPage(coverPageNum)}
           />
         );

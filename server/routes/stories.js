@@ -483,6 +483,10 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
         for (const row of versionMetaQuery) {
           if (row.page_number && row.image_versions) {
             versionMetaByPage.set(parseInt(row.page_number), row.image_versions.map(v => ({
+              // Preserve the explicit DB stamp so arrayIndexForDb() can locate
+              // entries on sparse/lazy-migrated arrays. Without it the lookup
+              // below always fell back to identity mapping.
+              dbVersionIndex: Number.isInteger(v.dbVersionIndex) ? v.dbVersionIndex : undefined,
               description: v.description,
               prompt: v.prompt,
               userInput: v.userInput,
@@ -589,9 +593,19 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           // Stamped dbVersionIndex wins over identity mapping — the two
           // diverge on lazy-migrated stories whose blob array is shorter
           // than the DB row set.
+          // v0 reads the blob entry too: the unified pipeline writes FULL
+          // original metadata (source, prompt, grokRefImages, …) into
+          // imageVersions[0], same as the /images endpoint's v0 priority
+          // path. Previously v0 got ONLY { bboxDetection }, so with the
+          // original active the dev panel showed grokRefImages=[] (empty
+          // array defeats the client's ??-fallback to scene root) while
+          // switching to v1+ showed refs — the "VB grid missing until you
+          // switch versions" bug. Scene-level bbox stays the v0 fallback
+          // for legacy stories that stored bbox outside the version entry.
+          const rawVersionMeta = pageMeta[arrayIndexForDb(pageMeta, row.version_index, 'scene')] || {};
           const versionMeta = row.version_index > 0
-            ? (pageMeta[arrayIndexForDb(pageMeta, row.version_index, 'scene')] || {})
-            : { bboxDetection: sceneBboxByPage.get(row.page_number) || null };
+            ? rawVersionMeta
+            : { ...rawVersionMeta, bboxDetection: rawVersionMeta.bboxDetection || sceneBboxByPage.get(row.page_number) || null };
           const versionDate = row.generated_at || versionMeta.createdAt;
           const isActiveVersion = row.version_index === activeVersion;
           scene.imageVersions.push({
@@ -2480,10 +2494,11 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               }
             }
           }
-          // Strip imageVersions if only one version (original, no regenerations)
-          if (covers[coverType]?.imageVersions?.length <= 1) {
-            delete covers[coverType].imageVersions;
-          }
+          // NOTE: single-version covers KEEP their one-entry imageVersions.
+          // The version viewer ("Bild wählen") is the canonical home for
+          // per-version dev data and must open for single-version covers too;
+          // stripping the array here left getCoverVersions() empty and hid
+          // the button entirely for never-regenerated covers.
         }
       }
 

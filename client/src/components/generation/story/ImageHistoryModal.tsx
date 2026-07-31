@@ -20,7 +20,7 @@ interface ImageHistoryModalProps {
   onClose: () => void;
   onSelectVersion: (pageNumberOrCoverType: number | string, versionIndex: number) => void;
   developerMode?: boolean;
-  grokRefImages?: string[] | null;  // Scene-level fallback for active version
+  grokRefImages?: string[] | null;  // Scene/cover-level fallback for active version
   // Entity-consistency issues for this page (from finalChecksReport.entity).
   // These are page-scoped and apply to every version of the page — they're
   // not stored per-version, but they explain the entityPenalty deduction.
@@ -472,18 +472,38 @@ export function ImageHistoryModal({
                   )}
                   {(() => {
                     const isActiveVersion = activeVersionIndex != null ? detailIndex === activeVersionIndex : detailIndex === versions.length - 1;
-                    const refs = detailVersion.grokRefImages || (isActiveVersion ? sceneLevelGrokRefImages : null);
-                    if (!refs || refs.length === 0) return null;
+                    // Length-aware fallback: server endpoints stamp empty arrays
+                    // (never undefined) for versions whose refs weren't captured
+                    // — a bare `||` kept the truthy `[]` and never fell back to
+                    // the scene/cover-level refs for the active version.
+                    const versionRefs = detailVersion.grokRefImages;
+                    const refs = (versionRefs && versionRefs.length > 0)
+                      ? versionRefs
+                      : (isActiveVersion && sceneLevelGrokRefImages && sceneLevelGrokRefImages.length > 0 ? sceneLevelGrokRefImages : null);
+                    // Always render the section (even with zero refs) so a
+                    // missing capture is VISIBLE — hiding it made "capture not
+                    // wired up" indistinguishable from "no refs sent".
                     return (
                       <div>
                         <div className="text-xs font-medium text-orange-600 mb-1">
-                          {language === 'de' ? 'An Grok API gesendet' : 'Sent to Grok API'} ({refs.length}/3 slots)
+                          {language === 'de' ? 'An Bildmodell gesendet' : 'Sent to image model'}
+                          {refs && refs.length > 0 && (
+                            <span className="ml-1 font-normal text-orange-500">({refs.length} {language === 'de' ? 'Bild' + (refs.length === 1 ? '' : 'er') : 'image' + (refs.length === 1 ? '' : 's')})</span>
+                          )}
                         </div>
-                        <div className="flex gap-1.5">
-                          {refs.map((img, idx) => (
-                            <img key={idx} src={img} alt={`Slot ${idx + 1}`} className="h-24 rounded border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity" title="Click to enlarge" onClick={() => setLightboxRef(img)} />
-                          ))}
-                        </div>
+                        {refs && refs.length > 0 ? (
+                          <div className="flex gap-1.5">
+                            {refs.map((img, idx) => (
+                              <img key={idx} src={img} alt={`Slot ${idx + 1}`} className="h-24 rounded border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity" title="Click to enlarge" onClick={() => setLightboxRef(img)} />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-500 italic py-2 px-3 bg-gray-100 rounded">
+                            {language === 'de'
+                              ? 'Keine Bilder erfasst (kein API-Aufruf für diese Version oder Erfassung nicht aktiviert)'
+                              : 'No images captured (no API call for this version, or capture not wired up)'}
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
