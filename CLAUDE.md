@@ -213,7 +213,7 @@ Tests check: homepage images, character photos, API health, auth, no JS errors, 
 ### Story Generation Pipeline (Unified Mode)
 ```
 POST /api/jobs/create-story → Background Job:
-  1. Generate full story in ONE Claude call (outline + visual bible + text + scene hints)
+  1. Generate full story: writer call (outline + visual bible + text + scene hints; arc→scenes→text order) + separate OPUS review call (analysis + fixes; SPLIT_OUTLINE_REVIEW gate)
   2. Parse scenes, expand each into Art Director prose (scene-expansion.txt)
      → Each scene gets: character descriptions, interactions, textPosition, emptyScenePrompt
   3. Generate empty scene backgrounds (style anchors for iterative placement)
