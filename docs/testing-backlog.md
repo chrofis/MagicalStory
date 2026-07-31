@@ -158,6 +158,17 @@ Full evidence + sources in the analysis doc; each is a Test Lab experiment, not 
 9. **Typographic art direction** (auto font pairing, drop caps, palette-tinted panels).
 10. **Production text-quality judge gate** (currently Test Lab only) + market the machinery.
 
+## 8. Scene-prose length A/B: 250-350 words vs ~150-word cap (owner: "the scene still seems super complicated")
+
+Every METADATA field is pipeline-consumed (verified 2026-07-31: sceneIntent/interactions/
+emptyScenePrompt/framingPattern/textPosition/characterClothing each feed 2-3 files), and the
+SCENE prose IS the image prompt — so the LAYERS stay. The one debatable knob is prose LENGTH:
+the 250-350-word requirement predates the logged "concise prompts render better" verdict
+(watercolour finding, decisions.md 2026-07-15). A/B via Test Lab on 3+ stored stories:
+current length vs a ~150-word cap (traits stay verbatim; trim setting/atmosphere elaboration),
+scored on image quality evals + repair rounds. If concise wins, cut the requirement in both
+unified templates.
+
 ## Rejected as written (do NOT implement literally)
 
 **"Explicit per-scene exclusion list in the prompt"** (readable text, fine hand
