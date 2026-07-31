@@ -2825,3 +2825,44 @@ logs.
 behaviour), `docs/image-generation-methods.html`, `docs/image-routing.md`.
 **Status:** ✅ active; needs one live staging avatar run (adult + costumed
 story) to confirm end-to-end.
+
+### VB authoring: worn items live in one category; garments sized on-body; doffed pieces stated explicitly (2026-07-31)
+**Context:** a staging story surfaced four Visual-Bible/metadata authoring
+defects from the unified outline call: (1) the same worn garment emitted BOTH
+as an `artifacts` (ART) entry and a `clothing` (CLO) entry — two competing
+canonical descriptions, plus a stray standalone reference render (CLO entries
+deliberately get no reference image, `visualBible.js` skips them because worn
+items appear on the character avatars; the duplicate ART copy re-opened that
+path); (2) the object size-calibration vocabulary ("fist-sized",
+"forearm-length" — meant to stop prop over-scaling) applied to a worn garment,
+contradicting the clothing spec's on-body length; (3) a scene depicting a
+normally-worn costume piece removed and lying on the ground while the
+character's `clothing` tag still implied the full outfit — the avatar
+reference wears the piece, the scene doesn't, guaranteed mismatch; (4) CHR ids
+in scene-metadata `objects[]` (checked, see below).
+**Decision:** three rules added with identical wording to BOTH sibling
+templates (`story-unified.txt` + `story-unified-imagefirst.txt`):
+(1) VB Rules list: every physical item appears in exactly ONE category — worn
+items go in `clothing` (+ wearer's `clothingRequirements`) only, `artifacts`
+is for non-worn props;
+(2) SCENE-prose size-anchor bullet: calibration terms are for props only;
+garments are sized by where they fall on the body ("waist-length",
+"knee-length", "falls to mid-back"), never by object calibration terms;
+(3) SCENE-prose clothing block: a removed normally-worn item requires the
+prose AND `sceneIntent` to state the character is WITHOUT it and where it
+lies, plus an `interactions[]` entry for the item's location.
+(4) NO rule for CHR ids in `objects[]`: verified intentionally consumed —
+`server.js` (unified Phase 5a + trial stream) extracts CHR ids from
+`objects[]` into `getElementReferenceImagesByIds` for VB-grid packing
+(Set-deduplicated, no double-packing), and `storyHelpers.js` filters them out
+of REQUIRED OBJECTS by design (see "Antagonists: outline declares them in
+prose + objects[]" entry above). Template line "Every `objects[]` entry with a
+CHR* ID must appear by name in the prose" stays authoritative.
+**Rationale:** each duplicate/contradictory authoring artifact costs a wasted
+reference render and puts eval+repair in double jeopardy chasing two specs of
+the same item; the outline call is the single cheapest place to prevent all
+three.
+**Touched:** `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`
+(identical additions; parser-compat test 38/38 green).
+**Status:** ✅ active — pending the next staging story to confirm the model
+follows the new rules.
