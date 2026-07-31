@@ -2891,3 +2891,68 @@ text.
 **Touched:** `prompts/story-unified-imagefirst.txt`,
 `tests/manual/test-imagefirst-parser-compat.js`.
 **Status:** ✅ active.
+
+## Cover prompt builder: hint-filtered elements, worn≠held, conditional group block, single full-bleed/no-text, age buckets, English-only (2026-07-31)
+**Context:** Owner audit of a real emitted initial-page cover prompt found six
+defects: (1) KEY STORY ELEMENTS dumped EVERY VB artifact (a prop the hint never
+asked for got hallucinated into the render); (2) an item held per the hint's
+`holds:` was ALSO described as worn in the CLOTHING block — the model got
+"worn tied at the neck" and "held in the hand" for the same item; (3) the
+initial-page "GROUP scene / MAIN CHARACTER in the CENTER / others arranged
+AROUND" boilerplate rendered even for 1-2 characters, contradicting the hint's
+explicit positions and inviting invented extra figures; (4) full-bleed/no-text
+rules were stated 2-3× per prompt (opening paragraph + FRAMING section +
+Notes); (5) character intros used numeric ages ("8-year-old male") though the
+avatar + eval anchor to apparent-age buckets and scene prose forbids numerals;
+(6) German leaked into the English image prompt — VB entity names ("holds the
+<story-language artifact name>"), the invented location's bare German name, and
+the hint's story-language `Mood:` phrase pasted verbatim.
+**Decision:**
+- `buildFullVisualBiblePrompt` takes `allowedElementIds` (cover hint `objects`
+  ∪ every `holds:` id — holds ⊄ objects) and `excludeElementIds`; covers pass
+  them at all three emission sites (coverIterate, server.js streaming, trial).
+  No hint → legacy unfiltered dump. Artifact/vehicle lines lead with a generic
+  English label + description, never the story-language VB name; animals keep
+  their proper name (identity anchor, like characters).
+- `applyCoverWornHeldDedupe` (coverIterate) resolves worn-vs-held
+  deterministically: HELD per hint → the overlapping garment segment is
+  dropped from that character's CLOTHING line (item appears once, in the holds
+  prose); WORN by nobody-holds → artifact id is excluded from KEY STORY
+  ELEMENTS (it lives in the CLOTHING block). Overlap = ≥2 shared significant
+  tokens, or ≥1 token from the artifact NAME. Operates on clones — reference
+  photo objects are never mutated.
+- Initial-page templates now carry `{GROUP_COMPOSITION}`;
+  `buildInitialPageComposition(count)` emits the group boilerplate only for
+  3+ characters, and an exact-count "no invented figures" block for 1-2.
+  Solid-ground / 2-hands / warm-atmosphere lines stay unconditional.
+- All four cover templates state full-bleed ONCE: FRAMING section merged into
+  the opening paragraph; initial-page-no-dedication's Notes merged into a
+  single absolute no-text statement. `makeTextless` lookahead extended
+  (`\n**` | `\n{` | end) since TITLE/TEXT is now the last **section**.
+- `buildCoverSceneFromHint` uses apparent-age buckets via
+  `extractCharacterVisualProfile` (same source as the scene path): "a young
+  school age boy", never "8-year-old male".
+- **Image-facing cover prompts are English-only regardless of story
+  language.** Holds ids resolve to a short English descriptor built from the
+  VB entry's description (fallback: sanitizer-style generic noun) — never the
+  story-language name. The cover location's name is emitted only WITH its
+  English features/colors/signatureElement inlined in parentheses. The hint's
+  free-text `Mood:` is model-authored in the story language, so it is pasted
+  verbatim ONLY when the story language is English and dropped otherwise
+  (deterministic; templates carry their own atmosphere lines). Same gate in
+  the composite pass-2 prose via `coverHint._language` +
+  `_artifactDescsEn` stamped by `enrichCoverHintWithArtifacts`.
+**Rationale:** stray objects cause "unrequested item" hallucinations; a
+worn+held contradiction cannot be drawn; group boilerplate at 1-2 chars
+invents strangers; duplicated rules dilute prompt weight; numeric ages fight
+the bucket-anchored avatar/eval; foreign-language tokens degrade image-model
+compliance and can be painted as lettering (settled direction: image-facing
+text = English, per scene-iteration LANGUAGE RULES + VB-id sanitizer).
+**Touched:** `server/lib/coverIterate.js`, `server/lib/visualBible.js`,
+`server/lib/coverComposite.js`, `server/lib/storyHelpers.js` (export),
+`server/services/prompts.js`, `server.js`, `server/routes/regeneration.js`,
+`prompts/front-cover.txt`, `prompts/back-cover.txt`,
+`prompts/initial-page-no-dedication.txt`,
+`prompts/initial-page-with-dedication.txt`,
+`tests/manual/test-cover-prompt-builder.js` (new, 40+ assertions).
+**Status:** ✅ active.

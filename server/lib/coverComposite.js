@@ -985,13 +985,23 @@ Keep the same characters — no additions, no removals. The background stays a p
   // Cover gaze is code-owned (decision 2026-07-11): always the viewer —
   // any parsed `gazes at:` value is ignored.
   if (!proseForPass2 && (coverHint?.mood || detailEntries.length > 0)) {
-    const moodLine = coverHint?.mood ? `Mood: ${coverHint.mood}.` : '';
+    // Image-facing prompts are English-only: the hint's free-text mood is
+    // model-authored in the STORY language — only paste it when the story
+    // language (stamped by enrichCoverHintWithArtifacts) is English.
+    const hintLang = String(coverHint?._language || '').trim().toLowerCase();
+    const moodIsEnglish = hintLang === 'en' || hintLang.startsWith('en-') || hintLang === 'english';
+    const moodLine = (coverHint?.mood && moodIsEnglish) ? `Mood: ${coverHint.mood}.` : '';
     const actionPhrases = detailEntries.map(d => {
       const holds = String(d.holds || '').trim();
       let phrase = d.name;
       if (holds && holds.toLowerCase() !== 'nothing') {
         const m = holds.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
-        const name = m && artNames[m[1].toUpperCase()] ? artNames[m[1].toUpperCase()] : holds;
+        // ART/VEH: prefer the ENGLISH descriptor map (VB names follow the
+        // story language). Animals/locations keep their proper name.
+        const id = m ? m[1].toUpperCase() : null;
+        const name = id
+          ? (coverHint?._artifactDescsEn?.[id] || artNames[id] || holds)
+          : holds;
         phrase += ` holds the ${name}`;
       }
       phrase += ', eyes on the viewer';

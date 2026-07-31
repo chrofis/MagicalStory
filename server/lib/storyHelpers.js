@@ -6011,6 +6011,7 @@ module.exports = {
   getCharacterPhotoDetails,
   prefetchAvatarBytesForCharacters,
   buildCharacterPhysicalDescription,
+  extractCharacterVisualProfile,
   buildGroundingPrompt,
   resolveClothingForPage,
   buildSceneClothingRequirements,

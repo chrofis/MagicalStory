@@ -34,15 +34,29 @@ function getStoryHelpers() {
  * Pre-existing _artifactNames/_artifactImages on the hint are preserved (the
  * safer of the two prior formulations — regeneration used `|| {}`, coverIterate
  * reset to `{}`; identical in the normal unenriched path).
+ *
+ * Also stamps:
+ *   _artifactDescsEn — ART/VEH id → short ENGLISH descriptor (from the entry's
+ *                      description). Image-facing prompts are English-only;
+ *                      VB names follow the story language, so consumers that
+ *                      write "holds the <X>" prose use this map, not the name.
+ *   _language — story language (opts.language), so downstream prompt builders
+ *               (composite pass 2) can drop story-language mood text.
  */
-function enrichCoverHintWithArtifacts(coverHint, visualBible) {
+function enrichCoverHintWithArtifacts(coverHint, visualBible, opts = {}) {
   const enriched = { ...(coverHint || {}) };
   enriched._artifactImages = enriched._artifactImages || {};
   enriched._artifactNames = enriched._artifactNames || {};
+  enriched._artifactDescsEn = enriched._artifactDescsEn || {};
+  if (opts.language && !enriched._language) enriched._language = opts.language;
   for (const pool of ['artifacts', 'animals', 'locations', 'vehicles']) {
     for (const entry of (visualBible?.[pool] || [])) {
       if (entry?.id && entry?.name && !enriched._artifactNames[entry.id]) {
         enriched._artifactNames[entry.id] = entry.name;
+      }
+      if (entry?.id && (pool === 'artifacts' || pool === 'vehicles') && !enriched._artifactDescsEn[entry.id]) {
+        const ref = englishEntityRef(entry, pool === 'vehicles' ? 'vehicle' : 'object');
+        if (ref) enriched._artifactDescsEn[entry.id] = ref;
       }
     }
   }
@@ -54,6 +68,191 @@ function enrichCoverHintWithArtifacts(coverHint, visualBible) {
     if (src) enriched._artifactImages[id] = src;
   }
   return enriched;
+}
+
+/**
+ * Short ENGLISH image-facing reference for a VB entity. The entity NAME
+ * follows the story language (a German "Roter Umhang" must never reach the
+ * English image prompt as the thing to draw), so build the reference from the
+ * entry's description instead: first clause, capped at 12 words, leading
+ * article stripped. Falls back to the pool-generic noun when the entry has no
+ * usable description (same generic-noun approach as sanitizeVbIdsInPrompt).
+ */
+function englishEntityRef(entry, genericNoun = 'object') {
+  const desc = String(entry?.extractedDescription || entry?.description || '').trim();
+  if (desc) {
+    const clause = desc.split(/[.;\n]/)[0].trim();
+    const words = clause.replace(/^(?:a|an|the)\s+/i, '').split(/\s+/).slice(0, 12).join(' ').trim();
+    if (words) return words.replace(/[,\s]+$/, '');
+  }
+  return genericNoun;
+}
+
+/**
+ * VB ids the cover hint actually asks for: `Objects:` list ∪ every character's
+ * `holds:` id (holds ⊄ objects — the outline sometimes holds an id it forgot
+ * to list). Returns null when the hint declares no objects and no holds, so
+ * callers keep the legacy unfiltered KEY STORY ELEMENTS for hint-less stories.
+ */
+function collectCoverHintElementIds(coverHint) {
+  const ids = [];
+  for (const id of (coverHint?.objects || [])) {
+    if (typeof id === 'string' && /^(?:LOC|ART|ANI|VEH|CHR|CLO)\d+/i.test(id.trim())) {
+      ids.push(id.trim().toUpperCase());
+    }
+  }
+  const details = (coverHint?.characterDetails && typeof coverHint.characterDetails === 'object')
+    ? Object.values(coverHint.characterDetails)
+    : [];
+  for (const d of details) {
+    const m = String(d?.holds || '').trim().match(/^((?:ART|ANI|VEH|CLO)\d+)/i);
+    if (m) ids.push(m[1].toUpperCase());
+  }
+  return ids.length > 0 ? [...new Set(ids)] : null;
+}
+
+// Tokens ignored when matching a VB artifact against a clothing description.
+const WORN_HELD_STOPWORDS = new Set([
+  'the', 'and', 'with', 'for', 'its', 'her', 'his', 'their', 'one', 'two',
+  'der', 'die', 'das', 'ein', 'eine', 'einen', 'und', 'mit', 'von', 'aus',
+  'les', 'des', 'une', 'avec', 'small', 'large', 'made', 'over', 'around',
+]);
+
+function significantTokens(text) {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .split(/[^a-zäöüéèêàçñ]+/i)
+      .filter(t => t.length >= 3 && !WORN_HELD_STOPWORDS.has(t))
+  );
+}
+
+/**
+ * Resolve the "item emitted as BOTH clothing and artifact" contradiction for a
+ * cover, deterministically:
+ *   - HELD wins: when the hint says a character `holds:` an artifact and that
+ *     artifact's name/description overlaps the character's clothing line, the
+ *     overlapping garment segment is REMOVED from the clothing line (the item
+ *     appears once, in the scene's holds prose). Otherwise the prompt says
+ *     "worn tied at the neck" AND "held in the hand" about the same item.
+ *   - WORN wins: when an artifact overlaps a cover character's clothing line
+ *     but nobody holds it, it is part of the worn outfit — its id goes to
+ *     `excludeElementIds` so KEY STORY ELEMENTS doesn't emit it a second time.
+ *
+ * Overlap rule (deterministic): an artifact matches a comma/semicolon segment
+ * of a clothing description when they share ≥2 significant tokens, or ≥1
+ * token that comes from the artifact's NAME (names are short and specific).
+ *
+ * Never mutates the input photos — returns cloned photos for the CLOTHING
+ * text block only (the originals keep full avatar metadata for image parts).
+ *
+ * @returns {{ photos: Array, excludeElementIds: Array<string> }}
+ */
+function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
+  const list = Array.isArray(photos) ? photos : [];
+  const artifacts = Array.isArray(visualBible?.artifacts) ? visualBible.artifacts : [];
+  const details = (coverHint?.characterDetails && typeof coverHint.characterDetails === 'object')
+    ? Object.values(coverHint.characterDetails)
+    : [];
+  if (list.length === 0 || artifacts.length === 0) {
+    return { photos: list, excludeElementIds: [] };
+  }
+
+  // Who holds which artifact id (per the hint — the authoritative spec).
+  const heldByChar = new Map(); // charNameLower -> Set<id>
+  const heldIds = new Set();
+  for (const d of details) {
+    const m = String(d?.holds || '').trim().match(/^((?:ART|ANI|VEH|CLO)\d+)/i);
+    if (!m || !d?.name) continue;
+    const id = m[1].toUpperCase();
+    heldIds.add(id);
+    const key = String(d.name).trim().toLowerCase();
+    if (!heldByChar.has(key)) heldByChar.set(key, new Set());
+    heldByChar.get(key).add(id);
+  }
+
+  const artifactMeta = artifacts
+    .filter(a => a?.id)
+    .map(a => ({
+      id: String(a.id).toUpperCase(),
+      nameTokens: significantTokens(a.name),
+      allTokens: new Set([...significantTokens(a.name), ...significantTokens(a.extractedDescription || a.description)]),
+    }));
+
+  const segmentMatches = (segment, meta) => {
+    const segTokens = significantTokens(segment);
+    let overlap = 0;
+    let nameHit = false;
+    for (const t of segTokens) {
+      if (meta.allTokens.has(t)) overlap++;
+      if (meta.nameTokens.has(t)) nameHit = true;
+    }
+    return overlap >= 2 || nameHit;
+  };
+
+  const excludeElementIds = new Set();
+  const outPhotos = list.map(photo => {
+    const clothing = photo?.clothingDescription;
+    if (!clothing) return photo;
+    const charKey = String(photo.name || '').trim().toLowerCase();
+    const heldHere = heldByChar.get(charKey) || new Set();
+    const segments = String(clothing).split(/\s*[,;]\s*/).filter(Boolean);
+    const kept = [];
+    let changed = false;
+    for (const segment of segments) {
+      let drop = false;
+      for (const meta of artifactMeta) {
+        if (!segmentMatches(segment, meta)) continue;
+        if (heldHere.has(meta.id)) {
+          // Held per hint → not ALSO worn. Drop the worn phrasing.
+          drop = true;
+          log.info(`🧥 [COVER-CLOTHING] ${photo.name}: dropped worn segment "${segment}" — ${meta.id} is held per cover hint`);
+        } else if (!heldIds.has(meta.id)) {
+          // Worn (overlaps an outfit) and held by nobody → clothing keeps it,
+          // KEY STORY ELEMENTS must not emit it again.
+          excludeElementIds.add(meta.id);
+        }
+      }
+      if (drop) changed = true;
+      else kept.push(segment);
+    }
+    if (!changed) return photo;
+    return { ...photo, clothingDescription: kept.join(', ') || null };
+  });
+
+  return { photos: outPhotos, excludeElementIds: [...excludeElementIds] };
+}
+
+/**
+ * COMPOSITION lines for the initial-page templates ({GROUP_COMPOSITION}).
+ * The "GROUP scene / MAIN CHARACTER in the CENTER / others arranged AROUND"
+ * boilerplate only makes sense for 3+ characters — with 1-2 it contradicts
+ * the hint's explicit per-character positions and makes the model invent
+ * extra figures to fill out the "group".
+ */
+function buildInitialPageComposition(characterCount) {
+  const n = Number(characterCount) || 0;
+  if (n === 1) {
+    return [
+      '- Draw EXACTLY the single character described in the SCENE — no more, no fewer. Do not invent extra figures.',
+      '- Place the character at the position given in the SCENE',
+      '- The character should be clearly visible and recognizable',
+    ].join('\n');
+  }
+  if (n === 2) {
+    return [
+      '- Draw EXACTLY the two characters described in the SCENE — no more, no fewer. Do not invent extra figures.',
+      '- Place each character at the position given in the SCENE',
+      '- Both characters should be clearly visible and recognizable',
+    ].join('\n');
+  }
+  // 3+ (and unknown/0 → legacy group behaviour)
+  return [
+    "- This is a GROUP scene introducing all the story's characters",
+    '- The MAIN CHARACTER should be positioned in the CENTER',
+    '- Other characters should be arranged AROUND the main character',
+    '- Everyone should be clearly visible and recognizable',
+  ].join('\n');
 }
 
 /**
@@ -340,7 +539,20 @@ async function iterateCover(coverKey, storyData, options = {}) {
   log.debug(`🔄 [COVER-ITERATE] ${coverKey}: ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
 
   // --- Build cover prompt ---
-  const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible, { skipMainCharacters: true }) : '';
+  // KEY STORY ELEMENTS filtered to what the cover hint actually asks for
+  // (objects ∪ holds); worn-vs-held dedupe resolves the "same item as both
+  // clothing and artifact" contradiction before any text block is built.
+  const hintElementIds = collectCoverHintElementIds(coverHint);
+  const { photos: clothingDedupedPhotos, excludeElementIds } =
+    applyCoverWornHeldDedupe(coverCharacterPhotos, coverHint, visualBible);
+  const visualBiblePrompt = visualBible
+    ? buildFullVisualBiblePrompt(visualBible, {
+        skipMainCharacters: true,
+        allowedElementIds: hintElementIds,
+        excludeElementIds,
+      })
+    : '';
+  const characterRefList = buildCharacterReferenceList(clothingDedupedPhotos, storyData.characters, { includeClothing: true });
   const storyTitle = storyData.title || 'My Story';
   const coverDedication = storyData.dedication;
 
@@ -352,16 +564,20 @@ async function iterateCover(coverKey, storyData, options = {}) {
       TITLE_PAGE_SCENE: sceneDescription,
       STYLE_DESCRIPTION: styleDescription,
       STORY_TITLE: storyTitle,
-      CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),
+      CHARACTER_REFERENCE_LIST: characterRefList,
       VISUAL_BIBLE: visualBiblePrompt
     });
   } else if (normalizedCoverType === 'initialPage') {
+    // Group-composition boilerplate is conditional on the actual cast size —
+    // for 1-2 characters it would contradict the hint's explicit positions.
+    const groupComposition = buildInitialPageComposition(coverCharacterPhotos.length);
     coverPrompt = (!textlessCovers && coverDedication)
       ? fillTemplate(promptTemplateOverride || PROMPT_TEMPLATES.initialPageWithDedication, {
           INITIAL_PAGE_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
           DEDICATION: coverDedication,
-          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),
+          CHARACTER_REFERENCE_LIST: characterRefList,
+          GROUP_COMPOSITION: groupComposition,
           VISUAL_BIBLE: visualBiblePrompt
         })
       : fillTemplate(promptTemplateOverride || PROMPT_TEMPLATES.initialPageNoDedication, {
@@ -369,14 +585,15 @@ async function iterateCover(coverKey, storyData, options = {}) {
           STYLE_DESCRIPTION: styleDescription,
           // No STORY_TITLE — initial-page-no-dedication has no title
           // placeholder (the page is deliberately text-free).
-          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),
+          CHARACTER_REFERENCE_LIST: characterRefList,
+          GROUP_COMPOSITION: groupComposition,
           VISUAL_BIBLE: visualBiblePrompt
         });
   } else {
     coverPrompt = fillTemplate(promptTemplateOverride || (textlessCovers ? PROMPT_TEMPLATES.backCoverTextless : PROMPT_TEMPLATES.backCover), {
       BACK_COVER_SCENE: sceneDescription,
       STYLE_DESCRIPTION: styleDescription,
-      CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters, { includeClothing: true }),
+      CHARACTER_REFERENCE_LIST: characterRefList,
       VISUAL_BIBLE: visualBiblePrompt
     });
   }
@@ -527,7 +744,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // Pull artifact prop bytes + a full-VB id→name map so the composite layer
     // has everything ready (shared producer helper — same enrichment the
     // regeneration test-models path uses).
-    const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible);
+    const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible, { language: storyData.language });
     const landmarkBuf = options.landmarkBufOverride
       || (coverLandmarkPhotos?.[0] ? await loadLandmarkBytes(coverLandmarkPhotos[0]) : null);
     compositeInputs = {
@@ -939,32 +1156,62 @@ async function buildCoverReferences({
  *                          characterClothing, hint? }
  * @param {Object} visualBible - story.visualBible (for landmark + artifact name lookup)
  * @param {Array<Object>} characters - scene characters with physical traits
+ * @param {Object} [opts]
+ * @param {string} [opts.language] - STORY language. Image-facing cover prompts
+ *   are English-only: the hint's free-text `Mood:` is model-authored in the
+ *   story language, so it is only emitted verbatim when the story language is
+ *   English — for any other language it is dropped (the cover templates carry
+ *   their own atmosphere lines). Deterministic; see docs/decisions.md.
  * @returns {string} SCENE prose ready to drop into the cover prompt template
  */
-function buildCoverSceneFromHint(hint, visualBible, characters) {
+function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
   if (!hint) return '';
 
-  // Resolve landmark name from the first LOC### in objects
+  const language = String(opts.language || 'en').trim().toLowerCase();
+  const isEnglish = language === 'en' || language.startsWith('en-') || language === 'english';
+
+  // Resolve the backdrop from the first LOC### in objects. The bare location
+  // name is story-language and — for invented locations — carries zero visual
+  // information, so inline the VB entry's visual fields (features/colors/
+  // signatureElement) right after it.
   const objects = Array.isArray(hint.objects) ? hint.objects : [];
   const locId = objects.find(o => typeof o === 'string' && /^LOC\d+/i.test(o));
   const loc = locId && Array.isArray(visualBible?.locations)
     ? visualBible.locations.find(l => l?.id && l.id.toUpperCase() === locId.toUpperCase())
     : null;
-  const landmarkName = loc?.name || (locId ? 'the landmark' : 'a scenic outdoor setting');
+  let landmarkName = loc?.name || (locId ? 'the landmark' : 'a scenic outdoor setting');
+  if (loc) {
+    const visuals = [loc.features, loc.colors, loc.signatureElement]
+      .map(v => String(v || '').trim())
+      .filter(Boolean)
+      .join('; ');
+    if (visuals) landmarkName = `${landmarkName} (${visuals})`;
+  }
 
-  // Resolve any VB id (ART/ANI/VEH/CLO) to its VB name across all pools.
+  // Resolve any VB id (ART/ANI/VEH/CLO) to its VB entry across all pools.
   // The outline sometimes declares `holds: ART001` without listing ART001 in
   // hint.objects (spec gap: holds ⊆ objects is not enforced), so resolution
   // must NOT depend on the objects list — an unresolved id here propagates
   // into the scene description, where the final sanitizer used to drop the
   // entire single-line description (empty SCENE section, lost layout).
-  const holdablePools = ['artifacts', 'animals', 'vehicles', 'clothing'];
-  const resolveHoldableId = (id) => {
+  const holdablePools = [
+    ['artifacts', 'object'],
+    ['animals', 'animal'],
+    ['vehicles', 'vehicle'],
+    ['clothing', 'outfit'],
+  ];
+  const resolveHoldable = (id) => {
     const upper = String(id || '').toUpperCase();
-    for (const pool of holdablePools) {
+    for (const [pool, genericNoun] of holdablePools) {
       const arr = Array.isArray(visualBible?.[pool]) ? visualBible[pool] : [];
       const hit = arr.find(e => e?.id && String(e.id).toUpperCase() === upper);
-      if (hit?.name) return hit.name;
+      // English-only prompt: never emit the story-language VB NAME as the
+      // thing to hold — use the English descriptor built from the entry's
+      // description (animals keep their proper name, like characters do).
+      if (hit) {
+        if (pool === 'animals' && hit.name) return hit.name;
+        return englishEntityRef(hit, genericNoun);
+      }
     }
     return null;
   };
@@ -986,10 +1233,17 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
       : null;
     // Brief physical descriptor — the cover prompt template's CHARACTER_REFERENCE_LIST
     // also provides per-character details, but mentioning the name in prose ties
-    // pose to identity.
-    const physTraits = physChar
-      ? [physChar.age && `${physChar.age}-year-old`, physChar.gender].filter(Boolean).join(' ')
-      : '';
+    // pose to identity. APPARENT-AGE bucket, never the numeric age: avatar and
+    // eval anchor to the bucket ("school-age boy", not "8-year-old male") and
+    // scene prose forbids numeric ages — same source the scene path uses.
+    let physTraits = '';
+    if (physChar) {
+      const { extractCharacterVisualProfile } = getStoryHelpers();
+      const prof = extractCharacterVisualProfile(physChar);
+      const bucket = prof.ageCategory ? prof.ageCategory.replace(/-/g, ' ') : null;
+      const term = prof.genderTerm || null;
+      physTraits = bucket && term ? `a ${bucket} ${term}` : (term ? `a ${term}` : '');
+    }
     const intro = physTraits ? `${d.name}, ${physTraits},` : `${d.name}`;
 
     // Action: holds resolved; gaze is code-owned (decision 2026-07-11):
@@ -1000,7 +1254,7 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
     if (pos) parts.push(`stands ${pos}`);
     if (holds && holds.toLowerCase() !== 'nothing') {
       const m = holds.match(/^((?:ART|ANI|VEH|CLO)\d+)/i);
-      const name = m ? (resolveHoldableId(m[1]) || holds) : holds;
+      const name = m ? (resolveHoldable(m[1]) || holds) : holds;
       parts.push(`holds the ${name}`);
     }
     parts.push('eyes on the viewer');
@@ -1008,7 +1262,9 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
   });
 
   // Mood at the front; landmark behind everything; per-character sentences.
-  const moodPhrase = hint.mood ? `${hint.mood[0].toUpperCase()}${hint.mood.slice(1)}.` : '';
+  // English-only guard: the hint's mood is model-authored in the STORY
+  // language — only paste it when the story language is English.
+  const moodPhrase = (hint.mood && isEnglish) ? `${hint.mood[0].toUpperCase()}${hint.mood.slice(1)}.` : '';
   // Scale the composition phrase to the actual cast. "Group portrait" with only
   // one or two named characters makes the model invent extra strangers to fill
   // out the "group" — so only say "group" for 3+; otherwise state the exact
@@ -1023,4 +1279,17 @@ function buildCoverSceneFromHint(hint, visualBible, characters) {
   return lines.join(' ');
 }
 
-module.exports = { iterateCover, buildCoverReferences, buildCoverSceneFromHint, stripCharacterSentences, buildPlateDescription, enrichCoverHintWithArtifacts, filterBackCoverToMainCharacters };
+module.exports = {
+  iterateCover,
+  buildCoverReferences,
+  buildCoverSceneFromHint,
+  stripCharacterSentences,
+  buildPlateDescription,
+  enrichCoverHintWithArtifacts,
+  filterBackCoverToMainCharacters,
+  // Cover-prompt hygiene helpers (shared with the streaming initial-gen path)
+  collectCoverHintElementIds,
+  applyCoverWornHeldDedupe,
+  buildInitialPageComposition,
+  englishEntityRef,
+};

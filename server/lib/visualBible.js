@@ -691,9 +691,29 @@ These elements are NOT required - only include them if they naturally fit the im
  * @param {object} visualBible - Visual bible data
  * @param {object} options - Options
  * @param {boolean} options.skipMainCharacters - Skip main characters section (use when CHARACTER_REFERENCE_LIST already includes them)
+ * @param {Array<string>|null} options.allowedElementIds - When provided (cover
+ *   hint objects ∪ held ids), KEY STORY ELEMENTS is FILTERED to these VB ids.
+ *   Without the filter the builder dumped every VB artifact into the cover
+ *   prompt, and stray objects the hint never asked for got hallucinated into
+ *   the render. null/undefined = no filter (legacy stories without a hint).
+ * @param {Array<string>|null} options.excludeElementIds - VB ids to always
+ *   drop (e.g. artifacts that are part of a character's WORN outfit — those
+ *   are emitted once in the CLOTHING block, not again as an artifact).
  */
 function buildFullVisualBiblePrompt(visualBible, options = {}) {
   if (!visualBible) return '';
+
+  const normIds = (arr) => Array.isArray(arr)
+    ? new Set(arr.map(id => String(id || '').toUpperCase()).filter(Boolean))
+    : null;
+  const allowedIds = normIds(options.allowedElementIds);
+  const excludeIds = normIds(options.excludeElementIds) || new Set();
+  const elementAllowed = (entry) => {
+    const id = String(entry?.id || '').toUpperCase();
+    if (id && excludeIds.has(id)) return false;
+    if (!allowedIds) return true;           // no hint → legacy unfiltered
+    return id ? allowedIds.has(id) : false; // hint present → only named elements
+  };
 
   let prompt = '';
 
@@ -743,14 +763,14 @@ function buildFullVisualBiblePrompt(visualBible, options = {}) {
 
   // First add animals (pets, companions - usually most important)
   for (const entry of visualBible.animals || []) {
-    if (keyElements.length < 3) {
+    if (keyElements.length < 3 && elementAllowed(entry)) {
       keyElements.push({ ...entry, type: 'animal' });
     }
   }
 
   // Then add artifacts if we have room
   for (const entry of visualBible.artifacts || []) {
-    if (keyElements.length < 3) {
+    if (keyElements.length < 3 && elementAllowed(entry)) {
       keyElements.push({ ...entry, type: 'artifact' });
     }
   }
@@ -759,7 +779,15 @@ function buildFullVisualBiblePrompt(visualBible, options = {}) {
     prompt += '\n**KEY STORY ELEMENTS:**\n';
     for (const entry of keyElements) {
       const description = entry.extractedDescription || entry.description;
-      prompt += `**${entry.name}** (${entry.type}): ${description}\n`;
+      // Image-facing text is English-only. A VB entity NAME follows the story
+      // language (a German artifact name would leak into the English prompt
+      // and can even get painted as lettering), so artifacts/vehicles lead
+      // with a generic English label + their description. Animals keep their
+      // proper name (a pet's name is an identity anchor, like a character's).
+      const lead = entry.type === 'animal' && entry.name
+        ? `**${entry.name}** (animal)`
+        : `**${entry.type.charAt(0).toUpperCase()}${entry.type.slice(1)}**`;
+      prompt += `${lead}: ${description}\n`;
     }
   }
 

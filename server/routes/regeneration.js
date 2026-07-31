@@ -1390,7 +1390,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
           // Pull artifact prop bytes + full-VB id→name map so the cast's prop
           // references resolve (shared producer helper — same enrichment the
           // coverIterate composite path uses).
-          const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible);
+          const enrichedHint = enrichCoverHintWithArtifacts(coverHint, visualBible, { language: storyData.language });
           // Filter back-cover characters to main-only (shared helper — same
           // rule the iterate path applies). Front/initial pass through all.
           let coverCharacters = storyData.characters || [];

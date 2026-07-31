@@ -3731,8 +3731,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
 
         // Cover prompt setup — routed model/backend determined after scene expansion.
-        const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true }) : '';
-        let characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters, { includeClothing: true });
+        // KEY STORY ELEMENTS filtered to the hint's objects ∪ holds, and the
+        // worn-vs-held contradiction resolved before the CLOTHING block is
+        // built (same helpers the iterate path uses — single source of truth).
+        const { collectCoverHintElementIds, applyCoverWornHeldDedupe } = require('./server/lib/coverIterate');
+        const hintElementIds = collectCoverHintElementIds(hint);
+        const { photos: clothingDedupedPhotos, excludeElementIds } =
+          applyCoverWornHeldDedupe(coverPhotos, hint, streamingVisualBible);
+        const visualBibleText = streamingVisualBible
+          ? buildFullVisualBiblePrompt(streamingVisualBible, {
+              skipMainCharacters: true,
+              allowedElementIds: hintElementIds,
+              excludeElementIds,
+            })
+          : '';
+        let characterRefList = buildCharacterReferenceList(clothingDedupedPhotos, inputData.characters, { includeClothing: true });
 
         // Run the cover hint through scene expansion (same as pages) so covers get
         // a structured description with emptyScenePrompt and objects metadata.
@@ -3753,7 +3766,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const initialCoverModel = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
         const initialCoverBackend = IMAGE_MODELS[initialCoverModel]?.backend || null;
         const { buildCoverSceneFromHint } = require('./server/lib/coverIterate');
-        sceneDescription = buildCoverSceneFromHint(hint, streamingVisualBible, charactersForCover);
+        sceneDescription = buildCoverSceneFromHint(hint, streamingVisualBible, charactersForCover, { language: inputData.language || 'en' });
         const coverExpandedMetadata = null; // No metadata block — structured hint IS the metadata.
 
         const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
@@ -3805,19 +3818,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             VISUAL_BIBLE: visualBibleText
           });
         } else if (coverType === 'initialPage') {
-          // Initial page: with or without dedication (textless → always the no-text scene)
+          // Initial page: with or without dedication (textless → always the no-text scene).
+          // Group-composition boilerplate is conditional on the actual cast size —
+          // for 1-2 characters it would contradict the hint's explicit positions.
+          const { buildInitialPageComposition } = require('./server/lib/coverIterate');
+          const groupComposition = buildInitialPageComposition(coverPhotos.length);
           coverPrompt = (!textlessCovers && inputData.dedication && inputData.dedication.trim())
             ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
                 INITIAL_PAGE_SCENE: sceneDescription,
                 STYLE_DESCRIPTION: styleDescription,
                 DEDICATION: inputData.dedication,
                 CHARACTER_REFERENCE_LIST: characterRefList,
+                GROUP_COMPOSITION: groupComposition,
                 VISUAL_BIBLE: visualBibleText
               })
             : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
                 INITIAL_PAGE_SCENE: sceneDescription,
                 STYLE_DESCRIPTION: styleDescription,
                 CHARACTER_REFERENCE_LIST: characterRefList,
+                GROUP_COMPOSITION: groupComposition,
                 VISUAL_BIBLE: visualBibleText
               });
         } else {
@@ -4209,7 +4228,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const pageImageBackend = IMAGE_MODELS[pageImageModel]?.backend || 'grok';
             const styleDescription = resolveArtStyle(artStyle, pageImageBackend) || resolveArtStyle('pixar');
             const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters, { includeClothing: true });
-            const visualBibleText = buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true });
+            // KEY STORY ELEMENTS filtered to the cover hint's declared ids
+            // (same fix as the full-account cover paths — without it every VB
+            // artifact got dumped into the prompt and strays got painted).
+            const trialCoverIds = (coverScene.objects || [])
+              .map(obj => typeof obj === 'string' ? obj.match(/((?:ART|ANI|VEH|CHR|LOC)\d+)/i)?.[1]?.toUpperCase() : (obj?.id ? String(obj.id).toUpperCase() : null))
+              .filter(Boolean);
+            const visualBibleText = buildFullVisualBiblePrompt(streamingVisualBible, {
+              skipMainCharacters: true,
+              allowedElementIds: trialCoverIds.length > 0 ? trialCoverIds : null,
+            });
 
             let coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
               TITLE_PAGE_SCENE: sceneDescription,

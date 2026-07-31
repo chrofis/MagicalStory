@@ -1,4 +1,4 @@
-Generate a SINGLE illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. All surfaces in the scene — walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts — render free of written characters, letters, numbers, or symbols, unless the scene description explicitly names the text to show. Object names in the prompt say what to draw — never paint an object's name as lettering on the object or anywhere in the scene.
+Generate a SINGLE borderless full-bleed illustration filling the ENTIRE canvas edge-to-edge. No borders, no frames, no margins, no white edges; no torn-paper border, polaroid frame, scrapbook page, deckle edges, or matte around the artwork. No split screen, no panels, no grid, no collage. The artwork must extend to all four edges. This page is purely visual: NO text of any kind — no title, no dedication, no caption, and no written characters, letters, numbers, or symbols on any surface in the scene (walls, shutters, vehicles, garments, paper, screens, pole-mounted boards, shopfronts). Object names in the prompt say what to draw — never paint an object's name as lettering on the object or anywhere in the scene.
 
 Create an introduction page illustration for a children's book.
 
@@ -10,19 +10,9 @@ Create an introduction page illustration for a children's book.
 **ART STYLE:** {STYLE_DESCRIPTION}
 
 **COMPOSITION GUIDELINES:**
-- This is a GROUP scene introducing all the story's characters
-- The MAIN CHARACTER should be positioned in the CENTER
-- Other characters should be arranged AROUND the main character
-- Everyone should be clearly visible and recognizable
+{GROUP_COMPOSITION}
 - All characters stand firmly on solid ground — feet flat on a stable surface (floor, pavement, cobblestones, grass, path). Never standing in or on water, never floating, never mid-air; feet visible on the ground and level with each other.
-- Create a warm, inviting atmosphere that draws readers in
+- Create a warm, inviting atmosphere that draws readers in and sets the mood for the story
 - Each character has 2 hands. Show at most 2 items held per character — if more are mentioned, drop the rest.
-
-**Notes:**
-- No title, dedication, or any other rendered text — keep the image purely visual
-- Create a warm, atmospheric illustration that sets the mood for the story
-
-**FRAMING:**
-Borderless full-bleed illustration. No torn-paper border, polaroid frame, scrapbook page, deckle edges, or matte around the artwork.
 
 {VISUAL_BIBLE}

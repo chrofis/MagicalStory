@@ -114,7 +114,11 @@ async function loadPromptTemplates() {
   // (**TITLE:** / **TEXT:**) is replaced with an explicit no-text directive. The initial page just
   // uses the existing initialPageNoDedication when the flag is on. Kept off the two paint paths.
   const NO_TEXT = '**NO TEXT:**\nLeave the illustration completely free of any title, caption, letters, numbers, or written text — the text is added afterwards. Keep the composition clean with calm, uncluttered space.\n';
-  const makeTextless = (tpl, label) => tpl ? tpl.replace(new RegExp(`\\*\\*${label}:\\*\\*[\\s\\S]*?(?=\\n\\*\\*)`), NO_TEXT) : tpl;
+  // Lookahead stops at the next **SECTION**, the next {PLACEHOLDER} line, or
+  // end-of-template — the text-baking block is the LAST section in the cover
+  // templates (followed only by {VISUAL_BIBLE}) since the duplicate FRAMING
+  // section was merged into the opening paragraph.
+  const makeTextless = (tpl, label) => tpl ? tpl.replace(new RegExp(`\\*\\*${label}:\\*\\*[\\s\\S]*?(?=\\n\\*\\*|\\n\\{|$)`), NO_TEXT) : tpl;
   PROMPT_TEMPLATES.frontCoverTextless = makeTextless(PROMPT_TEMPLATES.frontCover, 'TITLE');
   PROMPT_TEMPLATES.backCoverTextless = makeTextless(PROMPT_TEMPLATES.backCover, 'TEXT');
 
