@@ -1020,6 +1020,13 @@ export function StoryDisplay({
     return image?.imageVersions || [];
   };
 
+  // "Bild wählen" visibility: for normal users a picker with a single option
+  // is noise — require ≥2 versions. Dev mode keeps ≥1 because the version
+  // viewer is the canonical home for per-version debug data (refs, prompts,
+  // detection) even when only the original exists.
+  const showVersionPicker = (versionCount: number): boolean =>
+    versionCount > (developerMode ? 0 : 1);
+
   // Get active version index for a page
   const getActiveVersionIndex = (pageNumber: number): number | undefined => {
     // Return the ARRAY position (what the modal compares against), resolved from
@@ -2407,7 +2414,7 @@ export function StoryDisplay({
                     <h4 className="text-sm font-bold text-indigo-700 mb-2">
                       {language === 'de' ? '📤 Prompt (Eingabe)' : language === 'fr' ? '📤 Prompt (Entrée)' : '📤 Prompt (Input)'}
                     </h4>
-                    <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-indigo-200 overflow-x-auto max-h-[400px] overflow-y-auto">
+                    <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-4 rounded-lg border border-indigo-200 overflow-x-auto max-h-[400px] overflow-y-auto">
                       {outlinePrompt}
                     </pre>
                   </div>
@@ -2419,7 +2426,7 @@ export function StoryDisplay({
                       ? (language === 'de' ? '📥 API-Antwort (Kombiniert)' : language === 'fr' ? '📥 Réponse API (Combinée)' : '📥 API Response (Combined)')
                       : (language === 'de' ? '📥 API-Antwort (Outline)' : language === 'fr' ? '📥 Réponse API (Plan)' : '📥 API Response (Outline)')}
                   </h4>
-                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-indigo-200 overflow-x-auto max-h-[400px] overflow-y-auto">
+                  <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-4 rounded-lg border border-indigo-200 overflow-x-auto max-h-[400px] overflow-y-auto">
                     {outline}
                   </pre>
                 </div>
@@ -2505,7 +2512,7 @@ export function StoryDisplay({
                   <h4 className="text-sm font-bold text-amber-700 mb-2">
                     {language === 'de' ? '📤 Prompt (Eingabe)' : language === 'fr' ? '📤 Prompt (Entrée)' : '📤 Prompt (Input)'}
                   </h4>
-                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-[400px] overflow-y-auto">
+                  <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-[400px] overflow-y-auto">
                     {storyTextPrompts[0]?.prompt || 'No prompt available'}
                   </pre>
                 </div>
@@ -2514,7 +2521,7 @@ export function StoryDisplay({
                   <h4 className="text-sm font-bold text-amber-700 mb-2">
                     {language === 'de' ? '📥 Rohe API-Antwort (ungefiltert)' : language === 'fr' ? '📥 Réponse API brute (non filtrée)' : '📥 Raw API Response (unfiltered)'}
                   </h4>
-                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-[400px] overflow-y-auto">
+                  <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-[400px] overflow-y-auto">
                     {storyTextPrompts[0]?.rawResponse || story}
                   </pre>
                 </div>
@@ -3193,7 +3200,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer font-semibold text-indigo-700 hover:text-indigo-800">
                             Prompt ({entry.prompt.length} chars)
                           </summary>
-                          <pre className="mt-2 text-gray-700 whitespace-pre-wrap text-[10px] max-h-[500px] overflow-y-auto">
+                          <pre className="mt-2 text-gray-700 whitespace-pre-wrap break-words text-[10px] max-h-[500px] overflow-y-auto">
                             {entry.prompt}
                           </pre>
                         </details>
@@ -3443,7 +3450,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer font-semibold text-indigo-700 hover:text-indigo-800">
                             Prompt ({entry.prompt.length} chars)
                           </summary>
-                          <pre className="mt-2 text-gray-700 whitespace-pre-wrap text-[10px] max-h-[500px] overflow-y-auto">
+                          <pre className="mt-2 text-gray-700 whitespace-pre-wrap break-words text-[10px] max-h-[500px] overflow-y-auto">
                             {entry.prompt}
                           </pre>
                         </details>
@@ -3840,7 +3847,7 @@ export function StoryDisplay({
                                       {pageData.promptUsed && (
                                         <details className="text-[10px]">
                                           <summary className="cursor-pointer text-blue-600 hover:text-blue-800">Show Prompt</summary>
-                                          <pre className="mt-1 p-2 bg-gray-100 rounded text-gray-700 whitespace-pre-wrap overflow-x-auto max-h-48 text-[9px]">{pageData.promptUsed}</pre>
+                                          <pre className="mt-1 p-2 bg-gray-100 rounded text-gray-700 whitespace-pre-wrap break-words overflow-x-auto max-h-48 text-[9px]">{pageData.promptUsed}</pre>
                                         </details>
                                       )}
                                     </div>
@@ -4054,7 +4061,7 @@ export function StoryDisplay({
                                   {(check.evaluationPrompts?.length ?? 0) > 1 && (
                                     <div className="text-xs font-semibold text-blue-700 mb-1">Batch {promptIdx + 1}:</div>
                                   )}
-                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto bg-white p-2 rounded border">
+                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-sans max-h-[500px] overflow-y-auto bg-white p-2 rounded border">
                                     {prompt}
                                   </pre>
                                 </div>
@@ -4067,7 +4074,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-xs font-medium text-indigo-800">
                             🔧 View Parsed Result (Full JSON)
                           </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-96 overflow-y-auto bg-white p-2 rounded border">
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans max-h-96 overflow-y-auto bg-white p-2 rounded border">
                             {JSON.stringify({
                               type: check.type,
                               characterName: check.characterName,
@@ -4090,7 +4097,7 @@ export function StoryDisplay({
                                   {(check.rawResponses?.length ?? 0) > 1 && (
                                     <div className="text-xs font-semibold text-indigo-700 mb-1">Batch {respIdx + 1}:</div>
                                   )}
-                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto bg-white p-2 rounded border">
+                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-sans max-h-[500px] overflow-y-auto bg-white p-2 rounded border">
                                     {response}
                                   </pre>
                                 </div>
@@ -4182,7 +4189,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-xs font-medium text-gray-700">
                             📄 View Original Text
                           </summary>
-                          <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto">
+                          <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap break-words font-sans max-h-[500px] overflow-y-auto">
                             {finalChecksReport.textCheck.fullOriginalText}
                           </pre>
                         </details>
@@ -4193,7 +4200,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-xs font-medium text-green-800">
                             📋 View Full Corrected Text
                           </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto">
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans max-h-[500px] overflow-y-auto">
                             {finalChecksReport.textCheck.fullCorrectedText}
                           </pre>
                         </details>
@@ -4204,7 +4211,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-xs font-medium text-indigo-800">
                             📝 View Raw Response
                           </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto">
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans max-h-[500px] overflow-y-auto">
                             {finalChecksReport.textCheck.rawResponse}
                           </pre>
                         </details>
@@ -4215,7 +4222,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-xs font-medium text-indigo-800">
                             🔧 View Parsed Result
                           </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto">
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans max-h-[500px] overflow-y-auto">
                             {JSON.stringify({
                               quality: finalChecksReport.textCheck.quality,
                               overallScore: finalChecksReport.textCheck.overallScore,
@@ -4232,7 +4239,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-xs font-medium text-blue-800">
                             🔍 View Evaluation Prompt
                           </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto">
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans max-h-[500px] overflow-y-auto">
                             {finalChecksReport.textCheck.evaluationPrompt}
                           </pre>
                         </details>
@@ -4269,21 +4276,21 @@ export function StoryDisplay({
                       {scene.outlineExtract && (
                         <div className="bg-amber-50 p-2 rounded text-xs">
                           <span className="font-semibold text-amber-700">Outline Extract:</span>
-                          <p className="text-gray-700 mt-1 whitespace-pre-wrap">{scene.outlineExtract}</p>
+                          <p className="text-gray-700 mt-1 whitespace-pre-wrap break-words">{scene.outlineExtract}</p>
                         </div>
                       )}
                       {/* Scene Prompt (Art Director) */}
                       {scene.scenePrompt && (
                         <div className="bg-indigo-50 p-2 rounded text-xs">
                           <span className="font-semibold text-indigo-700">Scene Prompt:</span>
-                          <p className="text-gray-700 mt-1 whitespace-pre-wrap">{scene.scenePrompt}</p>
+                          <p className="text-gray-700 mt-1 whitespace-pre-wrap break-words">{scene.scenePrompt}</p>
                         </div>
                       )}
                       {/* Scene Description */}
                       <div className="bg-green-50 p-2 rounded text-xs">
                         <span className="font-semibold text-green-700">Scene Description:</span>
                         {scene.textModelId && <span className="ml-2 text-green-600">({scene.textModelId})</span>}
-                        <pre className="text-gray-700 mt-1 whitespace-pre-wrap font-mono text-xs overflow-x-auto">
+                        <pre className="text-gray-700 mt-1 whitespace-pre-wrap break-words font-mono text-xs overflow-x-auto">
                           {(() => {
                             // Helper to recursively parse JSON strings that might be double-escaped
                             const parseDeep = (value: unknown): unknown => {
@@ -4418,7 +4425,7 @@ export function StoryDisplay({
                 </div>
               </div>
             )}
-            {getCoverVersions('frontCover').length > 0 && (
+            {showVersionPicker(getCoverVersions('frontCover').length) && (
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover'), activeVersionIndex: getCoverActiveVersionIndex('frontCover') })}
@@ -4441,7 +4448,7 @@ export function StoryDisplay({
                     <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
                       {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
                     </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                       {(() => {
                         // Helper to recursively parse JSON strings that might be double-escaped
                         const parseDeep = (value: unknown): unknown => {
@@ -4474,7 +4481,7 @@ export function StoryDisplay({
                       {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
                       {frontCoverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({frontCoverObj.modelId})</span>}
                     </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                       {frontCoverObj.prompt}
                     </pre>
                   </details>
@@ -4541,7 +4548,7 @@ export function StoryDisplay({
                       {q.reasoning && (
                         <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
                           <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
-                          <p className="whitespace-pre-wrap">{q.reasoning}</p>
+                          <p className="whitespace-pre-wrap break-words">{q.reasoning}</p>
                         </div>
                       )}
                     </details>
@@ -4687,7 +4694,7 @@ export function StoryDisplay({
                 </div>
               </div>
             )}
-            {getCoverVersions('initialPage').length > 0 && (
+            {showVersionPicker(getCoverVersions('initialPage').length) && (
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage'), activeVersionIndex: getCoverActiveVersionIndex('initialPage') })}
@@ -4710,7 +4717,7 @@ export function StoryDisplay({
                     <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
                       {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
                     </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                       {(() => {
                         // Helper to recursively parse JSON strings that might be double-escaped
                         const parseDeep = (value: unknown): unknown => {
@@ -4743,7 +4750,7 @@ export function StoryDisplay({
                       {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
                       {initialPageObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({initialPageObj.modelId})</span>}
                     </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                       {initialPageObj.prompt}
                     </pre>
                   </details>
@@ -4807,7 +4814,7 @@ export function StoryDisplay({
                       {q.reasoning && (
                         <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
                           <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
-                          <p className="whitespace-pre-wrap">{q.reasoning}</p>
+                          <p className="whitespace-pre-wrap break-words">{q.reasoning}</p>
                         </div>
                       )}
                     </details>
@@ -5028,7 +5035,7 @@ export function StoryDisplay({
                               {renderCharRepairButton(pageNumber, bboxOverrides[bboxKey(`page:${pageNumber}`, image)] ?? image?.bboxDetection ?? (image?.retryHistory?.find((r: any) => r.bboxDetection?.figures)?.bboxDetection as any), bboxKey(`page:${pageNumber}`, image))}
                             </div>
                             {/* Row 2: Text edit + version history — 2 cols on PC, full width each on mobile */}
-                            {(onSaveStoryText || getImageVersions(pageNumber).length > 0) && (
+                            {(onSaveStoryText || showVersionPicker(getImageVersions(pageNumber).length)) && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {onSaveStoryText && (
                                   <button
@@ -5042,7 +5049,7 @@ export function StoryDisplay({
                                     {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
                                   </button>
                                 )}
-                                {getImageVersions(pageNumber).length > 0 && (
+                                {showVersionPicker(getImageVersions(pageNumber).length) && (
                                   <button
                                     onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber), activeVersionIndex: getActiveVersionIndex(pageNumber) })}
                                     className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
@@ -5303,7 +5310,7 @@ export function StoryDisplay({
                                 <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
                                   {language === 'de' ? 'Auszug aus Gliederung' : language === 'fr' ? 'Extrait du plan' : 'Outline Extract'}
                                 </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                                   {getOutlineExtract(pageNumber)}
                                 </pre>
                               </details>
@@ -5315,7 +5322,7 @@ export function StoryDisplay({
                                 <summary className="cursor-pointer text-sm font-semibold text-indigo-800 hover:text-indigo-900">
                                   {language === 'de' ? 'Szenen-Prompt' : language === 'fr' ? 'Prompt de scène' : 'Scene Prompt'}
                                 </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                                   {getScenePrompt(pageNumber)}
                                 </pre>
                               </details>
@@ -5328,7 +5335,7 @@ export function StoryDisplay({
                                   {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
                                   {getSceneTextModelId(pageNumber) && <span className="ml-2 text-xs font-normal text-green-600">({getSceneTextModelId(pageNumber)})</span>}
                                 </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                                   {getSceneDescription(pageNumber)}
                                 </pre>
                               </details>
@@ -5341,7 +5348,7 @@ export function StoryDisplay({
                                   {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
                                   {image?.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({image.modelId})</span>}
                                 </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                                   {image?.prompt}
                                 </pre>
                               </details>
@@ -5405,7 +5412,7 @@ export function StoryDisplay({
                                             ? (language === 'de' ? 'Vollständiges Feedback anzeigen' : language === 'fr' ? 'Afficher le retour complet' : 'Show full feedback')
                                             : (language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:')}
                                         </summary>
-                                        <p className="whitespace-pre-wrap mt-1">{image.qualityReasoning}</p>
+                                        <p className="whitespace-pre-wrap break-words mt-1">{image.qualityReasoning}</p>
                                       </details>
                                     )}
                                   </div>
@@ -5569,7 +5576,7 @@ export function StoryDisplay({
                                       {image?.originalReasoning && (
                                         <div className="mt-2 text-xs text-gray-600 bg-white p-2 rounded border">
                                           <div className="font-semibold mb-1">{language === 'de' ? 'Original Feedback:' : language === 'fr' ? 'Retour original:' : 'Original Feedback:'}</div>
-                                          <p className="whitespace-pre-wrap">{image.originalReasoning}</p>
+                                          <p className="whitespace-pre-wrap break-words">{image.originalReasoning}</p>
                                         </div>
                                       )}
                                     </div>
@@ -5611,7 +5618,7 @@ export function StoryDisplay({
                           placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : 'Enter text...'}
                         />
                       ) : (
-                        <p className="text-gray-800 leading-snug whitespace-pre-wrap font-serif text-xl text-center">
+                        <p className="text-gray-800 leading-snug whitespace-pre-wrap break-words font-serif text-xl text-center">
                           {pageText.trim()}
                         </p>
                       )}
@@ -5717,7 +5724,7 @@ export function StoryDisplay({
                               {renderCharRepairButton(pageNumber, bboxOverrides[bboxKey(`page:${pageNumber}`, image)] ?? image?.bboxDetection ?? (image?.retryHistory?.find((r: any) => r.bboxDetection?.figures)?.bboxDetection as any), bboxKey(`page:${pageNumber}`, image))}
                             </div>
                             {/* Row 2: Text edit + version history — 2 cols on PC, full width each on mobile */}
-                            {(onSaveStoryText || getImageVersions(pageNumber).length > 0) && (
+                            {(onSaveStoryText || showVersionPicker(getImageVersions(pageNumber).length)) && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {onSaveStoryText && (
                                   <button
@@ -5731,7 +5738,7 @@ export function StoryDisplay({
                                     {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
                                   </button>
                                 )}
-                                {getImageVersions(pageNumber).length > 0 && (
+                                {showVersionPicker(getImageVersions(pageNumber).length) && (
                                   <button
                                     onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber), activeVersionIndex: getActiveVersionIndex(pageNumber) })}
                                     className="bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-indigo-600"
@@ -5992,7 +5999,7 @@ export function StoryDisplay({
                                 <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
                                   {language === 'de' ? 'Auszug aus Gliederung' : language === 'fr' ? 'Extrait du plan' : 'Outline Extract'}
                                 </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                                   {getOutlineExtract(pageNumber)}
                                 </pre>
                               </details>
@@ -6004,7 +6011,7 @@ export function StoryDisplay({
                                 <summary className="cursor-pointer text-sm font-semibold text-indigo-800 hover:text-indigo-900">
                                   {language === 'de' ? 'Szenen-Prompt' : language === 'fr' ? 'Prompt de scène' : 'Scene Prompt'}
                                 </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                                   {getScenePrompt(pageNumber)}
                                 </pre>
                               </details>
@@ -6017,7 +6024,7 @@ export function StoryDisplay({
                                   {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
                                   {getSceneTextModelId(pageNumber) && <span className="ml-2 text-xs font-normal text-green-600">({getSceneTextModelId(pageNumber)})</span>}
                                 </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                                   {getSceneDescription(pageNumber)}
                                 </pre>
                               </details>
@@ -6030,7 +6037,7 @@ export function StoryDisplay({
                                   {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
                                   {image.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({image.modelId})</span>}
                                 </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                                   {image.prompt}
                                 </pre>
                               </details>
@@ -6093,7 +6100,7 @@ export function StoryDisplay({
                                             ? (language === 'de' ? 'Vollständiges Feedback anzeigen' : language === 'fr' ? 'Afficher le retour complet' : 'Show full feedback')
                                             : (language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:')}
                                         </summary>
-                                        <p className="whitespace-pre-wrap mt-1">{image.qualityReasoning}</p>
+                                        <p className="whitespace-pre-wrap break-words mt-1">{image.qualityReasoning}</p>
                                       </details>
                                     )}
                                   </div>
@@ -6255,7 +6262,7 @@ export function StoryDisplay({
                                       {image.originalReasoning && (
                                         <div className="mt-2 text-xs text-gray-600 bg-white p-2 rounded border">
                                           <div className="font-semibold mb-1">{language === 'de' ? 'Original Feedback:' : language === 'fr' ? 'Retour original:' : 'Original Feedback:'}</div>
-                                          <p className="whitespace-pre-wrap">{image.originalReasoning}</p>
+                                          <p className="whitespace-pre-wrap break-words">{image.originalReasoning}</p>
                                         </div>
                                       )}
                                     </div>
@@ -6294,7 +6301,7 @@ export function StoryDisplay({
                         />
                       ) : (
                         <div className="prose max-w-none">
-                          <p className="text-gray-800 leading-snug whitespace-pre-wrap font-serif text-xl">
+                          <p className="text-gray-800 leading-snug whitespace-pre-wrap break-words font-serif text-xl">
                             {pageText.trim()}
                           </p>
                         </div>
@@ -6398,7 +6405,7 @@ export function StoryDisplay({
                 </div>
               </div>
             )}
-            {getCoverVersions('backCover').length > 0 && (
+            {showVersionPicker(getCoverVersions('backCover').length) && (
               <div className="mt-2">
                 <button
                   onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover'), activeVersionIndex: getCoverActiveVersionIndex('backCover') })}
@@ -6421,7 +6428,7 @@ export function StoryDisplay({
                     <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
                       {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
                     </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                       {(() => {
                         // Helper to recursively parse JSON strings that might be double-escaped
                         const parseDeep = (value: unknown): unknown => {
@@ -6454,7 +6461,7 @@ export function StoryDisplay({
                       {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
                       {backCoverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({backCoverObj.modelId})</span>}
                     </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                       {backCoverObj.prompt}
                     </pre>
                   </details>
@@ -6518,7 +6525,7 @@ export function StoryDisplay({
                       {q.reasoning && (
                         <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
                           <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
-                          <p className="whitespace-pre-wrap">{q.reasoning}</p>
+                          <p className="whitespace-pre-wrap break-words">{q.reasoning}</p>
                         </div>
                       )}
                     </details>

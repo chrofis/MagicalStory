@@ -178,8 +178,12 @@ export function ImageHistoryModal({
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          {/* Top bar */}
-          <div className="flex items-center justify-between px-4 py-2 bg-black/80 shrink-0">
+          {/* Top bar — padded below the iOS status bar so the close X stays
+              on screen and tappable in Safari's full-bleed state. */}
+          <div
+            className="flex items-center justify-between px-4 py-2 bg-black/80 shrink-0"
+            style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
+          >
             <span className="text-white text-sm font-medium">
               {versionLabel(fullscreenIndex)} ({fullscreenIndex + 1}/{versions.length})
               {(() => {
@@ -222,7 +226,10 @@ export function ImageHistoryModal({
           </div>
 
           {/* Bottom bar with select/active button */}
-          <div className="px-4 py-3 bg-black/80 flex items-center justify-between shrink-0">
+          <div
+            className="px-4 py-3 bg-black/80 flex items-center justify-between shrink-0"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
             {/* Dots indicator */}
             <div className="flex gap-1.5">
               {versions.map((_, i) => (
@@ -410,7 +417,7 @@ export function ImageHistoryModal({
                       <div className="text-xs font-medium text-amber-700 mb-1">
                         {language === 'de' ? 'Reparatur-Anweisung (an Grok)' : language === 'fr' ? 'Instruction de réparation (à Grok)' : 'Repair instruction (to Grok)'}
                       </div>
-                      <p className="text-xs text-gray-700 bg-amber-50 rounded p-2 border border-amber-200 whitespace-pre-wrap">
+                      <p className="text-xs text-gray-700 bg-amber-50 rounded p-2 border border-amber-200 whitespace-pre-wrap break-words">
                         {detailVersion.inpaintInstruction}
                       </p>
                     </div>
@@ -419,7 +426,7 @@ export function ImageHistoryModal({
                       <div className="text-xs font-medium text-amber-700 mb-1">
                         {language === 'de' ? 'Iterations-Prompt (an Grok)' : language === 'fr' ? 'Prompt d\'itération (à Grok)' : 'Iterate prompt (to Grok)'}
                       </div>
-                      <pre className="text-xs text-gray-700 bg-amber-50 rounded p-2 border border-amber-200 whitespace-pre-wrap max-h-64 overflow-y-auto">
+                      <pre className="text-xs text-gray-700 bg-amber-50 rounded p-2 border border-amber-200 whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
                         {detailVersion.prompt}
                       </pre>
                     </div>
@@ -492,7 +499,7 @@ export function ImageHistoryModal({
                           )}
                         </div>
                         {refs && refs.length > 0 ? (
-                          <div className="flex gap-1.5">
+                          <div className="flex gap-1.5 flex-wrap">
                             {refs.map((img, idx) => (
                               <img key={idx} src={img} alt={`Slot ${idx + 1}`} className="h-24 rounded border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity" title="Click to enlarge" onClick={() => setLightboxRef(img)} />
                             ))}
@@ -866,7 +873,7 @@ export function ImageHistoryModal({
                           {next.modelId && <code className="text-xs bg-gray-100 px-1 rounded text-gray-600">{next.modelId}</code>}
                         </div>
                         {next.inpaintInstruction ? (
-                          <p className="text-xs text-gray-700 bg-amber-50 rounded p-2 border border-amber-200 whitespace-pre-wrap">
+                          <p className="text-xs text-gray-700 bg-amber-50 rounded p-2 border border-amber-200 whitespace-pre-wrap break-words">
                             {next.inpaintInstruction}
                           </p>
                         ) : (
@@ -911,7 +918,7 @@ function DetailBlock({ label, color, children }: { label: string; color: string;
         {label}
       </button>
       {expanded && (
-        <pre className={`mt-1 text-sm text-gray-700 whitespace-pre-wrap ${c.bg} p-3 rounded border ${c.border} max-h-64 overflow-y-auto`}>
+        <pre className={`mt-1 text-sm text-gray-700 whitespace-pre-wrap break-words ${c.bg} p-3 rounded border ${c.border} max-h-64 overflow-y-auto`}>
           {children}
         </pre>
       )}

@@ -672,7 +672,7 @@ export function ObjectDetectionDisplay({
               <summary className="cursor-pointer font-medium text-gray-700">
                 📝 {language === 'de' ? 'Bbox-Prompt' : 'Bbox Prompt'}
               </summary>
-              <pre className="mt-2 text-xs bg-white p-2 rounded border overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
+              <pre className="mt-2 text-xs bg-white p-2 rounded border overflow-x-auto whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
                 {bboxDetection.rawPrompt}
               </pre>
             </details>
@@ -684,7 +684,7 @@ export function ObjectDetectionDisplay({
               <summary className="cursor-pointer font-medium text-gray-700">
                 📤 {language === 'de' ? 'Bbox-Antwort' : 'Bbox Response'}
               </summary>
-              <pre className="mt-2 text-xs bg-white p-2 rounded border overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto">
+              <pre className="mt-2 text-xs bg-white p-2 rounded border overflow-x-auto whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
                 {bboxDetection.rawResponse}
               </pre>
             </details>

@@ -124,6 +124,19 @@ const BookViewer = React.forwardRef<BookViewerHandle, BookViewerProps>(
       setShimReady(true);
       return () => { restore(); };
     }, []);
+
+    // react-pageflip's wrapper NEVER calls PageFlip.destroy(), so the lib's
+    // window-level mousemove/touchmove/touchend/resize listeners leak past
+    // unmount. Combined with the passive-force shim above, the leaked
+    // touchmove handler's preventDefault() actually works — which froze
+    // touch scrolling on every page visited after the reader (only a reload
+    // recovered). destroy() runs UI.removeHandlers() and detaches them.
+    useEffect(() => {
+      return () => {
+        try { bookRef.current?.pageFlip()?.destroy(); }
+        catch { /* listener cleanup is best-effort; DOM teardown continues */ }
+      };
+    }, []);
     // Mobile breakpoint 1024: iPads in portrait (820), large phones in
     // landscape, and narrow desktops all need the single-page layout. The
     // old 768 threshold let iPads and rotated phones through to the

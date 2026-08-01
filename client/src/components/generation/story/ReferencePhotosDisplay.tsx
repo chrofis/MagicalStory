@@ -307,7 +307,7 @@ export function ReferencePhotosDisplay({
           {displayEmptyScenePrompt && (
             <div>
               <div className="text-[10px] text-emerald-600 font-medium mb-1">{language === 'de' ? 'Prompt ↓' : 'Prompt ↓'}</div>
-              <pre className="text-[10px] bg-emerald-100 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap text-emerald-800 border border-emerald-200">{displayEmptyScenePrompt}</pre>
+              <pre className="text-[10px] bg-emerald-100 p-2 rounded max-h-40 overflow-auto whitespace-pre-wrap break-words text-emerald-800 border border-emerald-200">{displayEmptyScenePrompt}</pre>
             </div>
           )}
 
@@ -361,7 +361,7 @@ export function ReferencePhotosDisplay({
                 {emptySceneQc.retryPrompt && (
                   <details className="bg-white rounded border border-gray-200 p-2">
                     <summary className="text-sm text-gray-600 cursor-pointer">{language === 'de' ? 'Retry-Prompt anzeigen' : 'Show retry prompt'}</summary>
-                    <pre className="mt-2 text-xs whitespace-pre-wrap font-mono max-h-64 overflow-y-auto text-gray-700 bg-gray-50 p-2 rounded">{emptySceneQc.retryPrompt}</pre>
+                    <pre className="mt-2 text-xs whitespace-pre-wrap break-words font-mono max-h-64 overflow-y-auto text-gray-700 bg-gray-50 p-2 rounded">{emptySceneQc.retryPrompt}</pre>
                   </details>
                 )}
                 {/* V2 image (current, in use) */}
@@ -526,19 +526,19 @@ export function ReferencePhotosDisplay({
                   <span className="ml-2 px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[9px]">{language === 'de' ? 'neu generiert' : 'regenerated'}</span>
                 )}
               </summary>
-              <pre className="mt-1 text-[10px] bg-white p-2 rounded border border-purple-200 max-h-40 overflow-auto whitespace-pre-wrap text-purple-800">{compositeStages.cleanBgPrompt}</pre>
+              <pre className="mt-1 text-[10px] bg-white p-2 rounded border border-purple-200 max-h-40 overflow-auto whitespace-pre-wrap break-words text-purple-800">{compositeStages.cleanBgPrompt}</pre>
             </details>
           )}
           {compositeStages?.blockingPrompt && (
             <details className="mt-2">
               <summary className="text-[10px] text-purple-600 cursor-pointer">{language === 'de' ? 'Blocking-Prompt anzeigen' : 'Show blocking prompt'}</summary>
-              <pre className="mt-1 text-[10px] bg-white p-2 rounded border border-purple-200 max-h-40 overflow-auto whitespace-pre-wrap text-purple-800">{compositeStages.blockingPrompt}</pre>
+              <pre className="mt-1 text-[10px] bg-white p-2 rounded border border-purple-200 max-h-40 overflow-auto whitespace-pre-wrap break-words text-purple-800">{compositeStages.blockingPrompt}</pre>
             </details>
           )}
           {compositeStages?.blendPrompt && (
             <details className="mt-2">
               <summary className="text-[10px] text-purple-600 cursor-pointer">{language === 'de' ? 'Blend-Prompt anzeigen (Schritt 4)' : 'Show blend prompt (step 4)'}</summary>
-              <pre className="mt-1 text-[10px] bg-white p-2 rounded border border-purple-200 max-h-40 overflow-auto whitespace-pre-wrap text-purple-800">{compositeStages.blendPrompt}</pre>
+              <pre className="mt-1 text-[10px] bg-white p-2 rounded border border-purple-200 max-h-40 overflow-auto whitespace-pre-wrap break-words text-purple-800">{compositeStages.blendPrompt}</pre>
             </details>
           )}
 
@@ -602,7 +602,7 @@ export function ReferencePhotosDisplay({
                     {pr.prompt && (
                       <details className="mt-1.5">
                         <summary className="text-[9px] text-purple-500 cursor-pointer">{language === 'de' ? 'Prompt anzeigen' : 'Show prompt'}</summary>
-                        <pre className="mt-1 text-[9px] bg-purple-50 p-1.5 rounded border border-purple-100 max-h-32 overflow-auto whitespace-pre-wrap text-purple-700">{pr.prompt}</pre>
+                        <pre className="mt-1 text-[9px] bg-purple-50 p-1.5 rounded border border-purple-100 max-h-32 overflow-auto whitespace-pre-wrap break-words text-purple-700">{pr.prompt}</pre>
                       </details>
                     )}
                   </div>

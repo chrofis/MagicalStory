@@ -30,27 +30,30 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
     setPosition({ x: 0, y: 0 });
   }, []);
 
-  const handleEscape = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    },
-    [onClose]
-  );
+  // Keep the latest onClose in a ref so the lock effect below depends ONLY on
+  // `src`. With onClose (usually an inline arrow) in the deps, the effect
+  // re-ran every parent render — and its cleanup stomped body overflow to
+  // 'unset' even while CLOSED, silently unlocking hosts (SharedStoryViewer)
+  // that rely on a body scroll lock.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
-  // Reset zoom when image changes
+  // Reset zoom + lock body scroll while an image is open. Restores the
+  // PREVIOUS overflow value (not 'unset') so a host page's own lock survives.
   useEffect(() => {
-    if (src) {
-      resetZoom();
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
-    }
+    if (!src) return;
+    resetZoom();
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCloseRef.current();
+    };
+    document.addEventListener('keydown', handleEscape);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = prevOverflow;
     };
-  }, [src, handleEscape, resetZoom]);
+  }, [src, resetZoom]);
 
   // Handle mouse wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -115,10 +118,13 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* Close button — always visible, large touch target */}
+      {/* Close button — always visible, large touch target. Top offset
+          respects the iOS status-bar safe area so the X never renders under
+          the notch / Dynamic Island when Safari is in full-bleed mode. */}
       <button
         onClick={onClose}
-        className="absolute top-3 right-3 p-3 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors z-10"
+        className="absolute right-3 p-3 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors z-10"
+        style={{ top: 'max(0.75rem, env(safe-area-inset-top))' }}
         aria-label="Close"
       >
         <X size={28} />
