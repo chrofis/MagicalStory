@@ -2397,18 +2397,31 @@ export const storyService = {
     return response;
   },
 
-  // Save story title
+  // Save story title. coverImage carries the re-stamped front cover (title is
+  // composited onto the image app-side) — null when the story predates
+  // editable cover text.
   async saveStoryTitle(storyId: string, title: string): Promise<{
     success: boolean;
     message: string;
     title: string;
+    coverImage?: string | null;
   }> {
     const response = await api.put<{
       success: boolean;
       message: string;
       title: string;
+      coverImage?: string | null;
     }>(`/api/stories/${storyId}/title`, { title });
     return response;
+  },
+
+  // User typography for cover text (front title / dedication). style=null resets to automatic.
+  async setCoverTypography(
+    storyId: string,
+    coverKey: 'frontCover' | 'initialPage',
+    style: { fontId?: string; layout?: string; color?: string; font?: string } | null,
+  ): Promise<{ success: boolean; coverKey: string; style: object | null; imageData: string; spec: object }> {
+    return api.put(`/api/stories/${storyId}/cover-typography`, { coverKey, style });
   },
 
   // Select which image version is active (for scene images)

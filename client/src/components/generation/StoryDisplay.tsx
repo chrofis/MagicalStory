@@ -6,6 +6,7 @@ import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVe
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
 import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
+import { CoverTextStylePanel } from './story/CoverTextStylePanel';
 import { ImageLightbox } from '../common/ImageLightbox';
 import type { GenerationSettings } from './story';
 import storyService from '@/services/storyService';
@@ -208,6 +209,8 @@ interface StoryDisplayProps {
   onSaveStoryText?: (text: string) => Promise<void>;
   // Title editing
   onSaveTitleChange?: (title: string) => Promise<void>;
+  /** User typography for cover text — front title / dedication. null resets to automatic. */
+  onSetCoverTypography?: (coverKey: 'frontCover' | 'initialPage', style: { fontId?: string; layout?: string; color?: string; font?: string } | null) => Promise<void>;
   // Image regeneration with credits
   userCredits?: number;
   isImpersonating?: boolean;
@@ -331,6 +334,7 @@ export function StoryDisplay({
   onSaveStoryText,
   // Title editing
   onSaveTitleChange,
+  onSetCoverTypography,
   // Image regeneration with credits
   userCredits = 0,
   isImpersonating = false,
@@ -4433,6 +4437,16 @@ export function StoryDisplay({
                 </button>
               </div>
             )}
+            {/* Title typography — user-facing: font / effect / colour of the
+                composited cover title. Server restamps from the textless art. */}
+            {onSetCoverTypography && frontCoverObj && !isGenerating && (
+              <CoverTextStylePanel
+                kind="front"
+                language={language}
+                currentStyle={(frontCoverObj as any).typographyStyle || null}
+                onApply={(style) => onSetCoverTypography('frontCover', style)}
+              />
+            )}
             {/* Developer Mode Features for Front Cover */}
             {developerMode && frontCoverObj && (
               <div className="mt-3 space-y-2">
@@ -4599,6 +4613,16 @@ export function StoryDisplay({
                   {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('initialPage').length})
                 </button>
               </div>
+            )}
+            {/* Dedication typography — only when the story HAS a dedication
+                (composeDedication no-ops otherwise). */}
+            {onSetCoverTypography && initialPageObj && !isGenerating && !!dedication?.trim() && (
+              <CoverTextStylePanel
+                kind="dedication"
+                language={language}
+                currentStyle={(initialPageObj as any).typographyStyle || null}
+                onApply={(style) => onSetCoverTypography('initialPage', style)}
+              />
             )}
             {/* Developer Mode Features for Initial Page */}
             {developerMode && initialPageObj && (

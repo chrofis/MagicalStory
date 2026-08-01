@@ -69,6 +69,41 @@ const BFONT = 'Poppins'; // branding
 const BRAND_TEXT = 'magicalstory.ch';
 
 // ---------------------------------------------------------------------------
+// user style overrides — the auto pipeline stays the default; a stored
+// typographyStyle on the cover object (or an explicit style param) pins any
+// subset of { font, layout, colour }. Unknown/invalid fields are dropped.
+// ---------------------------------------------------------------------------
+const TITLE_LAYOUTS = ['arch', 'archdown', 'tilt', 'straight'];
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+function sanitizeTitleStyle(style) {
+  if (!style || typeof style !== 'object') return null;
+  const out = {};
+  if (style.fontId && FONTS[style.fontId]) out.fontId = style.fontId;
+  if (style.layout && TITLE_LAYOUTS.includes(style.layout)) out.layout = style.layout;
+  if (typeof style.color === 'string' && HEX_RE.test(style.color)) out.color = style.color.toLowerCase();
+  return Object.keys(out).length ? out : null;
+}
+function sanitizeDedicationStyle(style) {
+  if (!style || typeof style !== 'object') return null;
+  const out = {};
+  if (style.font && WFONTS.some(f => f.family === style.font)) out.font = style.font;
+  if (typeof style.color === 'string' && HEX_RE.test(style.color)) out.color = style.color.toLowerCase();
+  return Object.keys(out).length ? out : null;
+}
+// Fixed user face colour → derive the 3D side + outline the same way
+// finalizeColor does, but WITHOUT moving the face colour itself.
+function colorsFromFace(faceHex, bg) {
+  const { r, g, b } = hex2rgb(faceHex);
+  const [h, s, l] = rgb2hsl(r, g, b);
+  const sideL = l > 0.5 ? Math.max(0.14, l - 0.36) : Math.min(0.80, l + 0.36);
+  const side = hsl(h, Math.min(0.78, s), sideL);
+  const bgLum = relLumRGB(bg.r, bg.g, bg.b), faceLum = relLumHex(faceHex);
+  const outline = bgLum > 0.42 ? '#14110d' : '#f7efdc';
+  const needOutline = wcag(faceLum, bgLum) < 4.0;
+  return { face: faceHex, side, outline, needOutline, lightFace: l > 0.5, hue: h, src: 'user', dE: +deltaE(hex2rgb(faceHex), bg).toFixed(0) };
+}
+
+// ---------------------------------------------------------------------------
 // image sampling (sharp) — accept a Buffer
 // ---------------------------------------------------------------------------
 async function palette(input) {
@@ -318,36 +353,47 @@ async function fitRender(innerGroup, W, H, box, anchor) {
 // ---------------------------------------------------------------------------
 // public API
 // ---------------------------------------------------------------------------
-async function composeFrontTitle(artBuffer, title, figures, seed) {
+async function composeFrontTitle(artBuffer, title, figures, seed, style) {
   const meta = await sharp(artBuffer).metadata(); const W = meta.width, H = meta.height;
   const occ = occupancyFromFigures(figures);
   const hero = (figures || []).slice().sort((a, b) => boxArea(b.bodyBox) - boxArea(a.bodyBox))[0];
   const chars = hero ? await garmentColors(artBuffer, hero.bodyBox) : [];
-  const [fontId, layout] = DEAL[hash(seed || title, 7) % DEAL.length]; const font = FONTS[fontId];
+  const styleOv = sanitizeTitleStyle(style);
+  const [autoFontId, autoLayout] = DEAL[hash(seed || title, 7) % DEAL.length];
+  const fontId = styleOv?.fontId || autoFontId;
+  const layout = styleOv?.layout || autoLayout;
+  const font = FONTS[fontId];
   const C = String(title).length;
   const rect = bestRect(occ.grid, occ.gw, occ.gh, W, H, C, font.adv) || { x0: 0.06, x1: 0.94, y0: 0.05, y1: 0.26, N: C <= 22 ? 1 : 2 };
   const lines = splitLinesN(title, rect.N);
   const place = { align: 'center', x0: rect.x0, x1: rect.x1, yt: rect.y0, yb: rect.y1, hFrac: rect.y1 - rect.y0 };
   const bg = await boxDominant(artBuffer, place.x0, place.yt, place.x1, Math.min(0.95, place.yb));
   const pal = await palette(artBuffer);
-  const cands = colorCandidates(chars, bg, pal);
-  const [bhh, bss, bll] = rgb2hsl(bg.r, bg.g, bg.b);
-  const lightWarm = bll > 0.5 && bss > 0.08 && (bhh < 70 || bhh >= 340);
-  let col = { h: cands[0].h, s: cands[0].s };
-  if (lightWarm) { const a = accentColor(pal, bg); if (a) col = { h: a.h, s: a.s }; }
-  const colors = finalizeColor(col.h, col.s, 'title', bg);
+  let colors;
+  if (styleOv?.color) {
+    colors = colorsFromFace(styleOv.color, bg);
+  } else {
+    const cands = colorCandidates(chars, bg, pal);
+    const [bhh, bss, bll] = rgb2hsl(bg.r, bg.g, bg.b);
+    const lightWarm = bll > 0.5 && bss > 0.08 && (bhh < 70 || bhh >= 340);
+    let col = { h: cands[0].h, s: cands[0].s };
+    if (lightWarm) { const a = accentColor(pal, bg); if (a) col = { h: a.h, s: a.s }; }
+    colors = finalizeColor(col.h, col.s, 'title', bg);
+  }
   const group = buildTitleGroup(lines, font, layout, colors, place, W, H);
   const overlay = await fitRender(group, W, H, { x0: place.x0, x1: place.x1, y0: place.yt, y1: place.yb }, 'top');
   if (!overlay) return { buffer: artBuffer, spec: { skipped: 'no-ink' } };
   const buffer = await sharp(artBuffer).composite([{ input: overlay }]).jpeg({ quality: 92 }).toBuffer();
-  return { buffer, spec: { kind: 'front', fontId, layout, face: colors.face, lines, rect } };
+  return { buffer, spec: { kind: 'front', fontId, layout, face: colors.face, lines, rect, ...(styleOv ? { style: styleOv } : {}) } };
 }
 
-async function composeDedication(artBuffer, dedication, figures, seed) {
+async function composeDedication(artBuffer, dedication, figures, seed, style) {
   if (!dedication || !String(dedication).trim()) return { buffer: artBuffer, spec: { kind: 'initial', skipped: 'no-dedication' } };
   const meta = await sharp(artBuffer).metadata(); const W = meta.width, H = meta.height;
   const occ = occupancyFromFigures(figures);
-  const wf = WFONTS[hash(seed || dedication, 33) % WFONTS.length];
+  const styleOv = sanitizeDedicationStyle(style);
+  const wf = (styleOv?.font && WFONTS.find(f => f.family === styleOv.font))
+    || WFONTS[hash(seed || dedication, 33) % WFONTS.length];
   const text = String(dedication).trim();
   const words = text.split(/\s+/).length;
   let place, colors, lines;
@@ -362,12 +408,17 @@ async function composeDedication(artBuffer, dedication, figures, seed) {
     lines = splitLinesN(text, Math.min(6, Math.max(2, Math.round(words / 6))));
   }
   const bg = await boxDominant(artBuffer, place.x0, place.y0, place.x1, Math.min(0.97, place.y1));
-  colors = bottomColor(bg);
+  if (styleOv?.color) {
+    // user face colour; the halo goes to whichever of black/white contrasts it
+    colors = { face: styleOv.color, outline: relLumHex(styleOv.color) > 0.42 ? '#000000' : '#ffffff' };
+  } else {
+    colors = bottomColor(bg);
+  }
   const group = buildBottomGroup(lines, colors, place, W, H, wf.family, wf.weight, wf.style);
   const overlay = await fitRender(group, W, H, place, 'bottom');
   if (!overlay) return { buffer: artBuffer, spec: { kind: 'initial', skipped: 'no-ink' } };
   const buffer = await sharp(artBuffer).composite([{ input: overlay }]).jpeg({ quality: 92 }).toBuffer();
-  return { buffer, spec: { kind: 'initial', font: wf.family, lines } };
+  return { buffer, spec: { kind: 'initial', font: wf.family, face: colors.face, lines, ...(styleOv ? { style: styleOv } : {}) } };
 }
 
 async function composeBrand(artBuffer, figures) {
@@ -384,10 +435,12 @@ async function composeBrand(artBuffer, figures) {
 }
 
 // dispatch: kind = 'front' | 'initial' | 'back'
-async function composeCover({ artBuffer, kind, title, dedication, seed, figures }) {
+// style (optional): user typography overrides — front: { fontId, layout, color },
+// initial: { font, color }. Invalid fields are dropped; back ignores style.
+async function composeCover({ artBuffer, kind, title, dedication, seed, figures, style }) {
   const figs = (figures || []).filter(f => f && (f.bodyBox || f.faceBox));
-  if (kind === 'front') return composeFrontTitle(artBuffer, title || '', figs, seed);
-  if (kind === 'initial') return composeDedication(artBuffer, dedication || '', figs, seed);
+  if (kind === 'front') return composeFrontTitle(artBuffer, title || '', figs, seed, style);
+  if (kind === 'initial') return composeDedication(artBuffer, dedication || '', figs, seed, style);
   if (kind === 'back') return composeBrand(artBuffer, figs);
   throw new Error(`composeCover: unknown kind ${kind}`);
 }
@@ -504,7 +557,7 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
 //   figures     : optional detected figures for text placement; [] falls back to
 //                 composeCover's default bands (safe when none available).
 // ---------------------------------------------------------------------------
-async function restampCover(storyData, coverKey, textlessSrc, { seed, figures } = {}) {
+async function restampCover(storyData, coverKey, textlessSrc, { seed, figures, style } = {}) {
   const r2 = require('./r2');
   const KIND = { frontCover: 'front', initialPage: 'initial', backCover: 'back' }[coverKey];
   if (!KIND) throw new Error(`restampCover: unknown coverKey ${coverKey}`);
@@ -512,8 +565,12 @@ async function restampCover(storyData, coverKey, textlessSrc, { seed, figures } 
   if (!bytes) throw new Error('restampCover: could not resolve cover art bytes');
   const title = storyData?.title || '';
   const dedication = storyData?.dedication || '';   // trials store no dedication → empty
+  // User typography choice persists on the cover object — every repaint /
+  // repair / title-edit restamp respects it unless the caller overrides.
+  const effStyle = style !== undefined ? style
+    : (storyData?.coverImages?.[coverKey]?.typographyStyle || null);
   const { buffer, spec } = await composeCover({
-    artBuffer: bytes, kind: KIND, title, dedication, seed: seed || title, figures: figures || [],
+    artBuffer: bytes, kind: KIND, title, dedication, seed: seed || title, figures: figures || [], style: effStyle,
   });
   return {
     titledData: 'data:image/jpeg;base64,' + buffer.toString('base64'),
@@ -522,9 +579,44 @@ async function restampCover(storyData, coverKey, textlessSrc, { seed, figures } 
   };
 }
 
+// ---------------------------------------------------------------------------
+// restampServedCover — recomposite the SERVED (active) version of a cover from
+// its persisted textless art, with the story's current title/dedication and
+// the given (or stored) typography style. This is the no-AI edit path behind
+// title changes and the user typography picker. Reads the ${coverKey}Art row
+// matching the active version (falls back to the nearest available art row),
+// overwrites the served story_images row, and stamps spec onto storyData.
+// Throws { code: 'NO_ART_LAYER' } for stories that predate app-side cover
+// typography (their served image has the text baked in — restamping would
+// double-print it).
+// ---------------------------------------------------------------------------
+async function restampServedCover(storyId, storyData, coverKey, { style } = {}) {
+  const { dbQuery, saveStoryImage } = require('../services/database');
+  const KIND = { frontCover: 'front', initialPage: 'initial', backCover: 'back' }[coverKey];
+  if (!KIND) throw new Error(`restampServedCover: unknown coverKey ${coverKey}`);
+  const meta = ((await dbQuery('SELECT image_version_meta FROM stories WHERE id=$1', [storyId]))[0]?.image_version_meta) || {};
+  const activeIdx = meta[coverKey]?.activeVersion ?? 0;
+  const artRows = await dbQuery(
+    "SELECT image_url, image_data, version_index FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test ORDER BY (version_index = $3) DESC, version_index DESC",
+    [storyId, `${coverKey}Art`, activeIdx]);
+  const artRow = artRows[0];
+  if (!artRow) {
+    const e = new Error(`no textless art layer for ${coverKey} — story predates app-side cover typography`);
+    e.code = 'NO_ART_LAYER';
+    throw e;
+  }
+  const src = artRow.image_url || (artRow.image_data ? 'data:image/jpeg;base64,' + artRow.image_data.toString('base64') : null);
+  const figures = storyData?.coverImages?.[coverKey]?.bboxDetection?.figures || [];
+  const stamped = await restampCover(storyData, coverKey, src, { seed: storyData?.title, figures, ...(style !== undefined ? { style } : {}) });
+  await saveStoryImage(storyId, coverKey, null, stamped.titledData, { versionIndex: activeIdx });
+  if (storyData?.coverImages?.[coverKey]) storyData.coverImages[coverKey].typography = stamped.spec;
+  return { imageData: stamped.titledData, spec: stamped.spec, versionIndex: activeIdx };
+}
+
 module.exports = {
   composeCover, composeFrontTitle, composeDedication, composeBrand, applyCoverTypography, bakeCoverTypographyPostPersist,
-  restampCover,
+  restampCover, restampServedCover, sanitizeTitleStyle, sanitizeDedicationStyle,
+  TITLE_LAYOUTS, TITLE_FONT_IDS: Object.keys(FONTS), DEDICATION_FONTS: WFONTS.map(f => f.family),
   // exported for the standalone verify CLI / tests
   _internals: { occupancyFromFigures, bestRect, colorCandidates, finalizeColor, palette, garmentColors, FONTS, DEAL, FONT_FILES, renderSvg, buildTitleGroup, fitRender },
 };

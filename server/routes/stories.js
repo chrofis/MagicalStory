@@ -3398,6 +3398,20 @@ router.put('/:id/title', authenticateToken, async (req, res) => {
     storyData.title = title.trim();
     storyData.updatedAt = new Date().toISOString();
 
+    // Re-composite the front cover from its textless art layer so the baked
+    // title on the image matches the new text. No AI call — pure sharp/resvg.
+    // Non-fatal: stories predating app-side cover typography have no art
+    // layer (their title is painted into the image) and just keep it.
+    let coverImage = null;
+    try {
+      const { restampServedCover } = require('../lib/coverTypography');
+      const restamped = await restampServedCover(id, storyData, 'frontCover');
+      coverImage = restamped.imageData;
+      console.log(`🅰️ Front cover re-stamped with new title (v${restamped.versionIndex})`);
+    } catch (e) {
+      console.warn(`⚠️ Front cover restamp skipped: ${e.message}`);
+    }
+
     // Title is in metadata, so we need to update it
     await saveStoryData(id, storyData);
 
@@ -3407,12 +3421,81 @@ router.put('/:id/title', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       message: 'Story title saved successfully',
-      title: title.trim()
+      title: title.trim(),
+      // New titled front-cover render (null when restamp not possible)
+      coverImage
     });
 
   } catch (err) {
     console.error('Error saving story title:', err);
     res.status(500).json({ error: 'Failed to save story title: ' + err.message });
+  }
+});
+
+// PUT /api/stories/:id/cover-typography — user-selected cover text styling.
+// Body: { coverKey: 'frontCover' | 'initialPage', style: {...} | null }
+//   frontCover style: { fontId?, layout?, color? }   (title typography)
+//   initialPage style: { font?, color? }             (dedication typography)
+//   style: null resets to the automatic choice.
+// Persists the choice on the cover object (typographyStyle) so every later
+// repaint/restamp keeps it, then re-composites the served version from the
+// textless art layer (no AI call) and returns the new render.
+router.put('/:id/cover-typography', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { coverKey, style } = req.body || {};
+    if (!['frontCover', 'initialPage'].includes(coverKey)) {
+      return res.status(400).json({ error: "coverKey must be 'frontCover' or 'initialPage'" });
+    }
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+    if (rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+
+    const storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    const { restampServedCover, sanitizeTitleStyle, sanitizeDedicationStyle } = require('../lib/coverTypography');
+
+    const clean = style === null ? null
+      : (coverKey === 'frontCover' ? sanitizeTitleStyle(style) : sanitizeDedicationStyle(style));
+    if (style !== null && !clean) {
+      return res.status(400).json({ error: 'style contains no valid fields' });
+    }
+    if (coverKey === 'initialPage' && !(storyData.dedication || '').trim()) {
+      return res.status(400).json({ error: 'story has no dedication text to style' });
+    }
+
+    if (!storyData.coverImages?.[coverKey]) {
+      return res.status(404).json({ error: `story has no ${coverKey}` });
+    }
+    if (clean) storyData.coverImages[coverKey].typographyStyle = clean;
+    else delete storyData.coverImages[coverKey].typographyStyle;
+
+    let restamped;
+    try {
+      restamped = await restampServedCover(id, storyData, coverKey, { style: clean });
+    } catch (e) {
+      if (e.code === 'NO_ART_LAYER') {
+        return res.status(409).json({ error: 'This story predates editable cover text — the text is part of the image and cannot be restyled without regenerating the cover.' });
+      }
+      throw e;
+    }
+
+    storyData.updatedAt = new Date().toISOString();
+    await saveStoryData(id, storyData);
+    await logActivity(req.user.id, req.user.username, 'COVER_TYPOGRAPHY_EDITED', { storyId: id, coverKey, style: clean }, req.user);
+
+    res.json({ success: true, coverKey, style: clean, imageData: restamped.imageData, spec: restamped.spec });
+  } catch (err) {
+    console.error('Error updating cover typography:', err);
+    res.status(500).json({ error: 'Failed to update cover typography: ' + err.message });
   }
 });
 

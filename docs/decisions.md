@@ -3347,3 +3347,35 @@ even at one version because it is the canonical debug home).
 
 **Touched:** `client/src/components/generation/StoryDisplay.tsx`,
 `client/src/components/generation/story/ImageHistoryModal.tsx`.
+
+---
+
+## 2026-08-01 — User-editable cover typography (title & dedication): font, effect, colour
+
+**Context:** Editing the story title only updated `storyData.title` — the
+title baked onto the cover image stayed stale. Owner also wants users to
+choose colour, typography and effects for the title and the dedication text.
+
+**Decision:** Built on the existing app-side typography system (covers are
+textless art + composited text; `${key}Art` rows in story_images hold the
+textless source per version). (1) `PUT /:id/title` now calls the new
+`restampServedCover` — re-composites the active version from its art row
+with the new title, no AI call; response carries the new render. (2) User
+styling: optional `typographyStyle` stored on the cover object —
+front `{ fontId, layout, color }`, dedication `{ font, color }` — honored by
+`composeFrontTitle`/`composeDedication` (user colour keeps the 3D side +
+outline derivation via `colorsFromFace`; auto palette logic untouched when
+unset). `restampCover` reads the stored style, so ALL repaint/repair paths
+keep the user's choice. (3) `PUT /:id/cover-typography` endpoint (sanitized
+whitelists, `style:null` resets to auto, 409 for pre-typography stories with
+no art layer). (4) Client: `CoverTextStylePanel` under the front cover and
+the dedication page (user-facing, not dev-gated) — font select (9 title / 5
+dedication fonts), effect select (arch/archdown/tilt/straight), colour
+swatches + custom picker; each Apply restamps server-side (<1s) and the
+updated cover is the preview. Back cover has no user styling (brand only).
+
+**Touched:** `server/lib/coverTypography.js`, `server/routes/stories.js`,
+`client/src/components/generation/story/CoverTextStylePanel.tsx` (new),
+`client/src/components/generation/StoryDisplay.tsx`,
+`client/src/pages/StoryWizard.tsx`, `client/src/services/storyService.ts`,
+`tests/manual/test-cover-typography-style.js` (24 checks).

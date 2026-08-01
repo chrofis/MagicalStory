@@ -5397,13 +5397,32 @@ export default function StoryWizard() {
               onSaveTitleChange={storyId ? async (newTitle: string) => {
                 try {
                   log.info('Saving title for story:', storyId, newTitle);
-                  await storyService.saveStoryTitle(storyId, newTitle);
+                  const result = await storyService.saveStoryTitle(storyId, newTitle);
                   setStoryTitle(newTitle);
+                  // The title is composited onto the cover image — the server
+                  // re-stamps it and returns the new render. Swap it in so the
+                  // displayed cover matches the new title immediately.
+                  if (result.coverImage) {
+                    setCoverImages(prev => prev?.frontCover
+                      ? { ...prev, frontCover: { ...prev.frontCover, imageData: result.coverImage! } }
+                      : prev);
+                  }
                   log.info('Title saved successfully');
                 } catch (error) {
                   log.error('Failed to save title:', error);
                   throw error;
                 }
+              } : undefined}
+              onSetCoverTypography={storyId ? async (coverKey: 'frontCover' | 'initialPage', style) => {
+                const result = await storyService.setCoverTypography(storyId, coverKey, style);
+                setCoverImages(prev => {
+                  const cover = prev?.[coverKey];
+                  if (!cover) return prev;
+                  return {
+                    ...prev,
+                    [coverKey]: { ...cover, imageData: result.imageData, typographyStyle: result.style },
+                  };
+                });
               } : undefined}
               // Image regeneration with credits
               userCredits={isImpersonating ? -1 : (user?.credits || 0)}
