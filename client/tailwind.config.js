@@ -6,6 +6,12 @@ export default {
   ],
   theme: {
     extend: {
+      screens: {
+        // Phone-in-landscape (and any squat window): height is the scarce
+        // dimension, so chrome must shrink. Raw query so it composes with
+        // the width-based breakpoints instead of replacing them.
+        short: { raw: '(orientation: landscape) and (max-height: 520px)' },
+      },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         title: ['Cinzel', 'serif'],

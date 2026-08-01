@@ -3279,3 +3279,41 @@ stage remains the Gemini-vs-Grok A/B; flip the winner in via
 `docs/image-routing.md`, `docs/image-generation-methods.html`.
 **Status:** 🧪 wired + unit-verified; needs a live staging run with a real
 style outlier to validate the repaint→gate→version flow end to end.
+---
+
+## 2026-08-01 — Shared story viewer: iOS full-bleed safe-top fallback + `short:` landscape screen
+
+**Context:** On iPhone, when the wizard auto-navigates (SPA) to the shared
+viewer after generation, Safari can stay in its collapsed-chrome full-bleed
+state: content extends under the status bar / Dynamic Island but
+`env(safe-area-inset-top)` still reports 0 until an orientation change — the
+header sat under the clock and taps didn't land ("rotate to landscape and
+back fixes it"). Separately, phone-landscape stacked chrome (Safari tab bar +
+our header + banner + pagination row) left a sliver for the book, and the
+viewer's `isMobile` breakpoint (768) disagreed with BookViewer's (1024),
+adding phantom `storyText` entries to the page counter on landscape phones
+and iPad portrait.
+
+**Decision:** (1) Viewer root is `fixed inset-x-0 bottom-0` with
+`top: var(--impersonation-banner-h, 0px)` instead of `h-[100dvh]` in flow —
+pinned to the viewport, immune to stale scroll offsets. (2)
+`useIosSafeTopFallback`: on iPhone UA, when portrait and
+`screen.height - innerHeight < 60` (collapsed chrome ≈ full-bleed; expanded
+chrome leaves ~130px), pad the top with `max(env(safe-area-inset-top), 54px)`.
+54px clears notch (47–50) and Dynamic Island (54–59) status bars; when env()
+reports correctly, max() defers to it. Self-disables on rotation/resize.
+(3) New Tailwind raw screen `short:` = `(orientation: landscape) and
+(max-height: 520px)`: compact header, hide private-story banner, float the
+page-counter row over the book, drop main padding. (4) Text-below reading
+mode renders image 58% / text 42% side-by-side under the same media query.
+(5) Viewer `isMobile` aligned to `< 1024` matching BookViewer.
+
+**Rationale:** the env() misreport is a WebKit behavior we can't fix or force
+out of (programmatic scroll doesn't re-expand collapsed chrome); a measured,
+UA-gated fallback that max()es with env() is the only remedy that degrades
+gracefully — worst case is ~30px of extra top padding in an already-degraded
+state. Landscape stays a second-class citizen by design (portrait is the
+product); the `short:` screen makes it usable without a dedicated layout.
+
+**Touched:** `client/src/pages/SharedStoryViewer.tsx`,
+`client/src/components/book/BookStoryPage.tsx`, `client/tailwind.config.js`.

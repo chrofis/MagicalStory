@@ -51,6 +51,37 @@ type PageEntry =
 /** Reading mode for the shared story view. */
 type ReadingMode = 'inline' | 'sidepage';
 
+// iOS Safari can keep its collapsed-chrome (full-bleed) state after SPA
+// navigation from a scrolled page — e.g. the wizard auto-navigating here when
+// generation finishes. In that state the page extends under the status bar /
+// Dynamic Island, but WebKit sometimes still reports env(safe-area-inset-top)
+// as 0 until an orientation change, leaving the header underneath the clock
+// where taps don't land ("rotate to landscape and back fixes it"). Detect the
+// full-bleed state (portrait + viewport height ≈ screen height on an iPhone)
+// and provide a fallback inset that the header padding max()es with env().
+function useIosSafeTopFallback(): number {
+  const [fallback, setFallback] = useState(0);
+  useEffect(() => {
+    if (!/iPhone|iPod/.test(navigator.userAgent)) return;
+    const measure = () => {
+      const portrait = window.innerHeight > window.innerWidth;
+      // Expanded chrome leaves ~130px of Safari UI; collapsed leaves <60px.
+      const fullBleed = portrait && screen.height - window.innerHeight < 60;
+      // 54px clears the status bar on notch and Dynamic Island iPhones; when
+      // env() reports correctly the CSS max() picks whichever is larger.
+      setFallback(fullBleed ? 54 : 0);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+    };
+  }, []);
+  return fallback;
+}
+
 export default function SharedStoryViewer() {
   const { shareToken } = useParams<{ shareToken: string }>();
   const navigate = useNavigate();
@@ -89,7 +120,12 @@ export default function SharedStoryViewer() {
     return 'inline';
   });
   const showTextOverlay = readingMode === 'inline';
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+  // 1024 matches BookViewer's own mobile threshold. With the old 768 the two
+  // disagreed for landscape phones and iPad portrait (768–1023px): this
+  // component added storyText entries to pageList that BookViewer then
+  // silently skipped, inflating the page counter with phantom pages.
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 1024);
+  const safeTopFallback = useIosSafeTopFallback();
   const [bannerDismissed, setBannerDismissed] = useState(() => {
     if (typeof window === 'undefined') return false;
     return sessionStorage.getItem('privateStoryBannerDismissed') === '1';
@@ -102,20 +138,31 @@ export default function SharedStoryViewer() {
   const lastEntryRef = useRef<PageEntry | null>(null);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
+    const onResize = () => setIsMobile(window.innerWidth < 1024);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
   // Lock the document so swipes inside the book don't scroll the whole page
-  // (iOS/Android mobile — `h-[100dvh] overflow-hidden` on the root isn't
-  // enough; the body still rubber-bands).
+  // (iOS/Android mobile — full-viewport root isn't enough; the body still
+  // rubber-bands). Also reset scroll: arriving via SPA navigation from a
+  // scrolled page can leave iOS Safari's visual viewport shifted over our
+  // now-unscrollable document, cutting off the header. The delayed second
+  // reset catches iOS settling the viewport a frame or two after the swap.
   useEffect(() => {
     const prevHtml = document.documentElement.style.overflow;
     const prevBody = document.body.style.overflow;
     document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
+    const resetScroll = () => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+    resetScroll();
+    const t = window.setTimeout(resetScroll, 250);
     return () => {
+      window.clearTimeout(t);
       document.documentElement.style.overflow = prevHtml;
       document.body.style.overflow = prevBody;
     };
@@ -392,7 +439,7 @@ export default function SharedStoryViewer() {
     const coverUrl = header.frontCoverUrl
       || (header.covers.frontCover ? `/api/shared/${shareToken}/cover-image/frontCover${tokenParam}` : null);
     return (
-      <div className="h-[100dvh] overflow-hidden bg-white flex flex-col items-center justify-center p-4">
+      <div className="fixed inset-0 overflow-hidden bg-white flex flex-col items-center justify-center p-4" style={{ paddingTop: 'max(env(safe-area-inset-top), 1rem)', paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)' }}>
         {coverUrl ? (
           <img
             src={coverUrl}
@@ -475,7 +522,7 @@ export default function SharedStoryViewer() {
         }`}
       >
         <Eye size={13} />
-        <span className="hidden sm:inline">Print preview</span>
+        <span className="hidden sm:inline short:hidden">Print preview</span>
       </button>
       <button
         onClick={() => setReadingMode('sidepage')}
@@ -486,22 +533,36 @@ export default function SharedStoryViewer() {
         }`}
       >
         <BookOpen size={13} />
-        <span className="hidden sm:inline">Read mode</span>
+        <span className="hidden sm:inline short:hidden">Read mode</span>
       </button>
     </div>
   );
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div
+      className="fixed inset-x-0 bottom-0 overflow-hidden bg-white flex flex-col"
+      style={{
+        // fixed (not h-[100dvh] in flow): pins the reader to the viewport so a
+        // stale scroll offset or dvh re-evaluation can't shift the header off
+        // screen. The fallback px keeps the header tappable when iOS reports a
+        // zero top inset in the collapsed-chrome state (see useIosSafeTopFallback).
+        // top offsets below the admin impersonation banner (0px when absent).
+        top: 'var(--impersonation-banner-h, 0px)',
+        paddingTop: safeTopFallback
+          ? `max(env(safe-area-inset-top), ${safeTopFallback}px)`
+          : 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
+    >
       {/* Header — single dark surface with a thin gold underline tying it to the
           book-cover accent used throughout the product. Ghost action buttons,
           one white primary (Share). */}
       {isAuthenticated ? (
-        <header className="bg-zinc-900 text-white px-3 py-1.5 md:py-2.5 sticky top-[var(--impersonation-banner-h,0px)] z-10 border-b border-amber-400/60">
+        <header className="bg-zinc-900 text-white px-3 py-1.5 md:py-2.5 short:py-0.5 sticky top-[var(--impersonation-banner-h,0px)] z-10 border-b border-amber-400/60">
           <div className="flex items-center justify-between gap-2">
             {/* Left: Logo + optional title */}
             <button onClick={() => navigate('/')} className="text-sm md:text-base font-semibold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5 flex-shrink-0">
-              <img src="/images/logo-book.webp" alt="" width="88" height="88" className="h-7 md:h-10 -my-1 md:-my-2 w-auto" />
+              <img src="/images/logo-book.webp" alt="" width="88" height="88" className="h-7 md:h-10 short:h-6 -my-1 md:-my-2 short:-my-1 w-auto" />
               <span className="hidden md:inline">{t.title}</span>
             </button>
 
@@ -573,7 +634,7 @@ export default function SharedStoryViewer() {
         </header>
       ) : (
         <header className="bg-gradient-to-b from-amber-50 to-amber-100/60 backdrop-blur-sm border-b-2 border-amber-400 sticky top-[var(--impersonation-banner-h,0px)] z-10">
-          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <div className="max-w-7xl mx-auto px-4 py-3 short:py-1 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 flex-shrink-0">
               <BookOpen className="w-6 h-6 text-amber-700" />
               <span className="font-bold text-amber-900 hidden md:inline">MagicalStory</span>
@@ -592,7 +653,7 @@ export default function SharedStoryViewer() {
 
       {/* Private story banner — shown to owner when story is not shared; dismissable per session */}
       {story.isOwner && !sharingEnabled && !bannerDismissed && (
-        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between gap-3">
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between gap-3 short:hidden">
           <p className="text-sm text-amber-800 min-w-0 flex-1">
             {language === 'de' ? 'Diese Geschichte ist privat — nur du kannst sie sehen.' : language === 'fr' ? 'Cette histoire est privée — vous seul pouvez la voir.' : 'This story is private — only you can see it.'}
           </p>
@@ -619,7 +680,7 @@ export default function SharedStoryViewer() {
       )}
 
       {/* Book with side navigation arrows */}
-      <main className="flex-1 min-h-0 flex items-center justify-center px-2 md:px-4 py-1 md:py-4">
+      <main className="flex-1 min-h-0 flex items-center justify-center px-2 md:px-4 py-1 md:py-4 short:py-0">
         {/* Left arrow - desktop only */}
         <div className="hidden md:flex flex-col items-center gap-2 mr-3 lg:mr-6 flex-shrink-0">
           <button
@@ -691,8 +752,9 @@ export default function SharedStoryViewer() {
         </button>
       </main>
 
-      {/* Text overlay toggle + page counter */}
-      <div className="flex items-center justify-center gap-3 md:gap-4 pb-0.5">
+      {/* Text overlay toggle + page counter. In squat landscape viewports the
+          row floats over the book instead of consuming layout height. */}
+      <div className="flex items-center justify-center gap-3 md:gap-4 pb-0.5 short:absolute short:left-1/2 short:-translate-x-1/2 short:z-20 short:pb-0 short:bottom-[max(4px,env(safe-area-inset-bottom))]">
         {/* Mobile: first page button */}
         <div className="md:hidden">
           {currentPage > 1 && (

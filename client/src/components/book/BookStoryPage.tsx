@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Maximize2 } from 'lucide-react';
 
 interface BookStoryPageProps {
@@ -115,6 +115,20 @@ interface TextBelowPageProps {
 const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedText, pageNumber, onImageClick, forwardedRef }) => {
   const scrollEl = useRef<HTMLDivElement | null>(null);
 
+  // Phone in landscape: stacking image over text leaves the image a sliver.
+  // Put them side by side instead — image left, text right. Matches the
+  // `short` Tailwind screen used by SharedStoryViewer's chrome compaction.
+  const [sideBySide, setSideBySide] = useState(() =>
+    typeof window !== 'undefined' &&
+    window.matchMedia('(orientation: landscape) and (max-height: 520px)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(orientation: landscape) and (max-height: 520px)');
+    const update = () => setSideBySide(mq.matches);
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
   // Touch-driven scroll — bypasses page-flip's window-level preventDefault.
   const bindScroll = useCallback((el: HTMLDivElement | null) => {
     scrollEl.current = el;
@@ -154,7 +168,12 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
     // with percentage heights gives us deterministic image + text zones that
     // don't depend on flex-basis resolution through the flipbook wrapper.
     <div ref={forwardedRef} className="w-full h-full relative bg-white overflow-hidden group">
-      <div className="absolute inset-x-0 top-0" style={{ height: '55%' }}>
+      <div
+        className="absolute"
+        style={sideBySide
+          ? { top: 0, bottom: 0, left: 0, width: '58%' }
+          : { top: 0, left: 0, right: 0, height: '55%' }}
+      >
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -179,7 +198,12 @@ const TextBelowImagePage: React.FC<TextBelowPageProps> = ({ imageUrl, trimmedTex
           </button>
         )}
       </div>
-      <div className="absolute inset-x-0 bottom-0 border-t border-gray-200" style={{ height: '45%' }}>
+      <div
+        className={`absolute ${sideBySide ? 'border-l' : 'border-t'} border-gray-200`}
+        style={sideBySide
+          ? { top: 0, bottom: 0, right: 0, width: '42%' }
+          : { bottom: 0, left: 0, right: 0, height: '45%' }}
+      >
         <div
           ref={bindScroll}
           className="absolute inset-0 overflow-y-auto overscroll-contain bg-white px-4 py-3"
