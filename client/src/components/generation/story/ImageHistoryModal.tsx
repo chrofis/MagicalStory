@@ -300,11 +300,13 @@ export function ImageHistoryModal({
                       : 'border-gray-200 hover:border-indigo-400 hover:shadow-md'
                   }`}
                 >
-                  {/* Image — click opens fullscreen viewer */}
+                  {/* Image — click opens fullscreen viewer. object-contain (not
+                      cover): pages are portrait, a square cover-crop cut faces
+                      at the top/bottom. Letterbox on gray instead. */}
                   <img
                     src={version.imageData}
                     alt={versionLabel(idx)}
-                    className="w-full aspect-square object-cover cursor-pointer"
+                    className="w-full aspect-square object-contain bg-gray-100 cursor-pointer"
                     onClick={() => setFullscreenIndex(idx)}
                   />
 

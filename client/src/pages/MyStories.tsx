@@ -177,7 +177,7 @@ const StoryCard = memo(function StoryCard({
             <img
               src={story.thumbnail}
               alt={story.title}
-              className={`w-full h-48 object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              className={`w-full h-48 object-contain transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onLoad={() => setImageLoaded(true)}
               onError={() => setImageError(true)}
             />
