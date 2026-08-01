@@ -1574,7 +1574,10 @@ export function StoryDisplay({
     };
 
     return (
-      <div className="relative">
+      // h-full: as a grid item next to taller (wrapped-label) siblings the
+      // wrapper stretches, and without it the button stuck to 52px at the top
+      // leaving a dead zone below — one of the "uneven buttons" reports.
+      <div className="relative h-full">
         <button
           onClick={() => {
             if (isOpen) {
@@ -1591,17 +1594,17 @@ export function StoryDisplay({
             }
           }}
           disabled={isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits}
-          className={`w-full min-h-[52px] bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center min-h-[52px] text-sm font-semibold ${
+          className={`w-full h-full min-h-[52px] bg-indigo-500 text-white px-3 py-2 rounded-lg flex flex-col items-center justify-center text-sm font-semibold ${
             isPageBusy(pageNumber) || isDetecting || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
           }`}
           title={language === 'de' ? 'Figur im Bild reparieren (Gesicht oder Körper)' : 'Fix a character in this image (face or body)'}
         >
           {isRepairing ? (
-            <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Repariere...' : language === 'fr' ? 'Réparation...' : 'Repairing...'}</span>
+            <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Repariere...' : language === 'fr' ? 'Réparation...' : 'Repairing...'}</span>
           ) : isDetecting ? (
-            <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : language === 'fr' ? 'Détection...' : 'Detecting...'}</span>
+            <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Erkenne...' : language === 'fr' ? 'Détection...' : 'Detecting...'}</span>
           ) : (
-            <><span className="flex items-center gap-2"><Users size={14} /> {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : 'Fix Character'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+            <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Users size={14} /> {language === 'de' ? 'Figur reparieren' : language === 'fr' ? 'Réparer personnage' : 'Fix Character'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
           )}
         </button>
         {isOpen && !isRepairing && (
@@ -2220,6 +2223,11 @@ export function StoryDisplay({
         <div className="flex items-center gap-2 mt-2">
           <button
             onClick={() => setTextOverlay(!textOverlay)}
+            title={language === 'de'
+              ? 'Vorschau: Geschichte-Text auf den Bildern anzeigen — so sieht das gedruckte Buch aus. Ausschalten zeigt die Illustrationen ohne Text.'
+              : language === 'fr'
+              ? 'Aperçu : afficher le texte sur les images — comme dans le livre imprimé. Désactiver montre les illustrations seules.'
+              : 'Preview: show the story text on the images — how the printed book looks. Turn off to see the clean illustrations.'}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               textOverlay
                 ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
@@ -4387,9 +4395,9 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                   >
                     {editingPages.has(-1) ? (
-                      <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                     ) : (
-                      <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -4403,9 +4411,9 @@ export function StoryDisplay({
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-1) ? (
-                      <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
                     ) : (
-                      <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -4418,7 +4426,7 @@ export function StoryDisplay({
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
-                    <span className="flex items-center gap-2"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
+                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
                     <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
@@ -4564,9 +4572,9 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                   >
                     {editingPages.has(-2) ? (
-                      <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                     ) : (
-                      <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -4580,9 +4588,9 @@ export function StoryDisplay({
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-2) ? (
-                      <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
                     ) : (
-                      <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -4595,7 +4603,7 @@ export function StoryDisplay({
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
-                    <span className="flex items-center gap-2"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
+                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
                     <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
@@ -4815,9 +4823,9 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                                 >
                                   {editingPages.has(pageNumber) ? (
-                                    <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
+                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                                   ) : (
-                                    <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                                    <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
                                 </button>
                               )}
@@ -4831,9 +4839,9 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                                 >
                                   {improvingPages.has(pageNumber) ? (
-                                    <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
+                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
                                   ) : (
-                                    <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                                    <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
                                 </button>
                               )}
@@ -4846,7 +4854,7 @@ export function StoryDisplay({
                                   }`}
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
-                                  <span className="flex items-center gap-2"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
+                                  <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
                                   <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                                 </button>
                               )}
@@ -5399,9 +5407,9 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                                 >
                                   {editingPages.has(pageNumber) ? (
-                                    <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
+                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                                   ) : (
-                                    <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                                    <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
                                 </button>
                               )}
@@ -5415,9 +5423,9 @@ export function StoryDisplay({
                                   title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                                 >
                                   {improvingPages.has(pageNumber) ? (
-                                    <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
+                                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
                                   ) : (
-                                    <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                                    <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                                   )}
                                 </button>
                               )}
@@ -5430,7 +5438,7 @@ export function StoryDisplay({
                                   }`}
                                   title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                                 >
-                                  <span className="flex items-center gap-2"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
+                                  <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
                                   <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                                 </button>
                               )}
@@ -5975,9 +5983,9 @@ export function StoryDisplay({
                     title={language === 'de' ? 'Beschreibe eine Änderung am aktuellen Bild' : 'Describe a change to make to the current image'}
                   >
                     {editingPages.has(-3) ? (
-                      <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Bearbeite...' : language === 'fr' ? 'Modification...' : 'Editing...'}</span>
                     ) : (
-                      <><span className="flex items-center gap-2"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><Pencil size={14} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -5991,9 +5999,9 @@ export function StoryDisplay({
                     title={language === 'de' ? 'KI analysiert und generiert das Bild automatisch neu' : 'AI analyzes and automatically regenerates the image'}
                   >
                     {improvingPages.has(-3) ? (
-                      <span className="flex items-center gap-2"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
+                      <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Nochmal...' : language === 'fr' ? 'Réessai...' : 'Retrying...'}</span>
                     ) : (
-                      <><span className="flex items-center gap-2"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
+                      <><span className="flex flex-wrap items-center justify-center gap-2 text-center"><RotateCcw size={14} /> {language === 'de' ? 'Nochmal' : language === 'fr' ? 'Réessayer' : 'Retry'}</span><span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span></>
                     )}
                   </button>
                 )}
@@ -6006,7 +6014,7 @@ export function StoryDisplay({
                     }`}
                     title={language === 'de' ? 'Szenenbeschreibung bearbeiten und von Grund auf neu generieren' : 'Edit the scene description and regenerate from scratch'}
                   >
-                    <span className="flex items-center gap-2"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
+                    <span className="flex flex-wrap items-center justify-center gap-2 text-center"><Wand2 size={14} /> {language === 'de' ? 'Überarbeiten' : language === 'fr' ? 'Réimaginer' : 'Reimagine'}</span>
                     <span className="text-[10px] opacity-60">({IMAGE_REGENERATION_COST} Credits)</span>
                   </button>
                 )}
