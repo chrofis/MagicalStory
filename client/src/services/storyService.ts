@@ -2415,6 +2415,16 @@ export const storyService = {
     return response;
   },
 
+  // Edit the dedication text — no AI call; the initial page is re-stamped from
+  // its textless art. Empty string removes the dedication.
+  async saveStoryDedication(storyId: string, dedication: string): Promise<{
+    success: boolean;
+    dedication: string;
+    coverImage?: string | null;
+  }> {
+    return api.put(`/api/stories/${storyId}/dedication`, { dedication });
+  },
+
   // User typography for cover text (front title / dedication). style=null resets to automatic.
   async setCoverTypography(
     storyId: string,

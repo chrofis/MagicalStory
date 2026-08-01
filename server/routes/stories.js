@@ -3432,6 +3432,54 @@ router.put('/:id/title', authenticateToken, async (req, res) => {
   }
 });
 
+// PUT /api/stories/:id/dedication — edit the dedication text (no AI call).
+// Mirrors the title route: updates storyData.dedication and re-composites the
+// initial page from its textless art layer so the baked text matches. An empty
+// string removes the dedication (the restamp then serves the clean art).
+router.put('/:id/dedication', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { dedication } = req.body;
+    if (typeof dedication !== 'string') {
+      return res.status(400).json({ error: 'dedication must be a string (empty to remove)' });
+    }
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+    if (rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+
+    const storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    storyData.dedication = dedication.trim();
+    storyData.updatedAt = new Date().toISOString();
+
+    let coverImage = null;
+    try {
+      const { restampServedCover } = require('../lib/coverTypography');
+      const restamped = await restampServedCover(id, storyData, 'initialPage');
+      coverImage = restamped.imageData;
+      console.log(`🅰️ Initial page re-stamped with new dedication (v${restamped.versionIndex})`);
+    } catch (e) {
+      console.warn(`⚠️ Initial page restamp skipped: ${e.message}`);
+    }
+
+    await saveStoryData(id, storyData);
+    await logActivity(req.user.id, req.user.username, 'STORY_DEDICATION_EDITED', { storyId: id }, req.user);
+
+    res.json({ success: true, dedication: storyData.dedication, coverImage });
+  } catch (err) {
+    console.error('Error saving dedication:', err);
+    res.status(500).json({ error: 'Failed to save dedication: ' + err.message });
+  }
+});
+
 // PUT /api/stories/:id/cover-typography — user-selected cover text styling.
 // Body: { coverKey: 'frontCover' | 'initialPage', style: {...} | null }
 //   frontCover style: { fontId?, layout?, color? }   (title typography)

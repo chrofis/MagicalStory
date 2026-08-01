@@ -211,6 +211,8 @@ interface StoryDisplayProps {
   onSaveTitleChange?: (title: string) => Promise<void>;
   /** User typography for cover text — front title / dedication. null resets to automatic. */
   onSetCoverTypography?: (coverKey: 'frontCover' | 'initialPage', style: { fontId?: string; layout?: string; color?: string; font?: string } | null) => Promise<void>;
+  /** Edit the dedication text (no AI — initial page is re-stamped). Empty string removes it. */
+  onSaveDedicationChange?: (dedication: string) => Promise<void>;
   // Image regeneration with credits
   userCredits?: number;
   isImpersonating?: boolean;
@@ -335,6 +337,7 @@ export function StoryDisplay({
   // Title editing
   onSaveTitleChange,
   onSetCoverTypography,
+  onSaveDedicationChange,
   // Image regeneration with credits
   userCredits = 0,
   isImpersonating = false,
@@ -379,6 +382,9 @@ export function StoryDisplay({
   // Title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(title || '');
+  const [isEditingDedication, setIsEditingDedication] = useState(false);
+  const [editedDedication, setEditedDedication] = useState(dedication || '');
+  const [savingDedication, setSavingDedication] = useState(false);
   const [isSavingTitle, setIsSavingTitle] = useState(false);
 
   // Image history modal state
@@ -4620,6 +4626,60 @@ export function StoryDisplay({
                   <Images size={14} />
                   {language === 'de' ? 'Bild wählen' : language === 'fr' ? 'Choisir image' : 'Select Image'} ({getCoverVersions('initialPage').length})
                 </button>
+              </div>
+            )}
+            {/* Dedication text edit — no AI call; the server re-stamps the
+                initial page from its textless art with the new text. */}
+            {onSaveDedicationChange && initialPageObj && !isGenerating && (
+              <div className="mt-2">
+                {!isEditingDedication ? (
+                  <button
+                    onClick={() => { setEditedDedication(dedication || ''); setIsEditingDedication(true); }}
+                    className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2"
+                  >
+                    <Edit3 size={14} />
+                    {dedication?.trim()
+                      ? (language === 'de' ? 'Widmung bearbeiten' : language === 'fr' ? 'Modifier la dédicace' : 'Edit dedication')
+                      : (language === 'de' ? 'Widmung hinzufügen' : language === 'fr' ? 'Ajouter une dédicace' : 'Add dedication')}
+                  </button>
+                ) : (
+                  <div className="bg-white border border-indigo-200 rounded-lg p-3 space-y-2">
+                    <textarea
+                      value={editedDedication}
+                      onChange={e => setEditedDedication(e.target.value)}
+                      rows={3}
+                      className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none"
+                      placeholder={language === 'de' ? 'Für …' : language === 'fr' ? 'Pour …' : 'For …'}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          setSavingDedication(true);
+                          try {
+                            await onSaveDedicationChange(editedDedication.trim());
+                            setIsEditingDedication(false);
+                          } catch (e) {
+                            console.error('Failed to save dedication:', e);
+                          } finally {
+                            setSavingDedication(false);
+                          }
+                        }}
+                        disabled={savingDedication}
+                        className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {savingDedication ? <Loader size={14} className="animate-spin" /> : <Save size={14} />}
+                        {language === 'de' ? 'Speichern' : language === 'fr' ? 'Enregistrer' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => setIsEditingDedication(false)}
+                        disabled={savingDedication}
+                        className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {/* Dedication typography — only when the story HAS a dedication

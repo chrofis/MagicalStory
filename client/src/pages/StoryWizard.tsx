@@ -5413,6 +5413,17 @@ export default function StoryWizard() {
                   throw error;
                 }
               } : undefined}
+              onSaveDedicationChange={storyId ? async (newDedication: string) => {
+                const result = await storyService.saveStoryDedication(storyId, newDedication);
+                setDedication(result.dedication);
+                // Dedication is composited onto the initial page — swap in the
+                // re-stamped render when the server returns one.
+                if (result.coverImage) {
+                  setCoverImages(prev => prev?.initialPage
+                    ? { ...prev, initialPage: { ...prev.initialPage, imageData: result.coverImage! } }
+                    : prev);
+                }
+              } : undefined}
               onSetCoverTypography={storyId ? async (coverKey: 'frontCover' | 'initialPage', style) => {
                 const result = await storyService.setCoverTypography(storyId, coverKey, style);
                 setCoverImages(prev => {
