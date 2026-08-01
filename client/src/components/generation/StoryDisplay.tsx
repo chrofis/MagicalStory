@@ -274,29 +274,6 @@ function activeVersionIndex(image: any): number | undefined {
   return idx < 0 ? undefined : idx;
 }
 
-// Cover quality panels read score/reasoning from the active version's row,
-// not from the cover ROOT. Pre-2026-05-17 the regen routes were writing
-// each new version's eval data to the cover root too, so the root held the
-// LATEST version's score+reasoning regardless of which version was active.
-// That made v0 in the dev panel render v1's reasoning. Root no longer
-// carries eval fields; everything reads per-version, same as scenes.
-function activeQuality(image: any): { score: number | undefined; reasoning: string | null; modelId: string | null } {
-  const v: any = pickActiveVersion(image);
-  // Canonical read: finalScore (chunk-2 scoring migration). Legacy qualityScore
-  // kept as fallback for stories saved before 2026-06-04. Use typeof === 'number'
-  // so legitimate zero scores still surface (?? would also keep 0, but explicit
-  // type check is clearer about intent).
-  const score = typeof v?.finalScore === 'number' ? v.finalScore
-    : (typeof v?.qualityScore === 'number' ? v.qualityScore
-      : (typeof image?.finalScore === 'number' ? image.finalScore
-        : (typeof image?.qualityScore === 'number' ? image.qualityScore : undefined)));
-  return {
-    score,
-    reasoning: (v?.qualityReasoning ?? image?.qualityReasoning) ?? null,
-    modelId: (v?.qualityModelId ?? image?.qualityModelId) ?? null,
-  };
-}
-
 export function StoryDisplay({
   title,
   dedication,
@@ -1485,39 +1462,6 @@ export function StoryDisplay({
     return img?.imageData || null;
   };
 
-  // Helper to get scene description for a page (pretty-printed JSON)
-  const getSceneDescription = (pageNumber: number): string | undefined => {
-    // First check sceneDescriptions array
-    const fromDescriptions = sceneDescriptions.find(s => s.pageNumber === pageNumber)?.description;
-    const rawDesc = fromDescriptions || sceneImages.find(img => img.pageNumber === pageNumber)?.description;
-
-    if (!rawDesc) return undefined;
-
-    // Helper to recursively parse JSON strings that might be double-escaped
-    // e.g., '"{\"key\":\"value\"}"' -> parse to '{"key":"value"}' -> parse to {key: "value"}
-    const parseDeep = (value: unknown): unknown => {
-      if (typeof value !== 'string') return value;
-      try {
-        const parsed = JSON.parse(value);
-        // If we parsed a string that looks like JSON, try parsing again
-        if (typeof parsed === 'string' && (parsed.startsWith('{') || parsed.startsWith('['))) {
-          return parseDeep(parsed);
-        }
-        return parsed;
-      } catch {
-        return value;
-      }
-    };
-
-    // Pretty-print JSON for readability
-    const parsed = parseDeep(rawDesc);
-    if (typeof parsed === 'object' && parsed !== null) {
-      return JSON.stringify(parsed, null, 2);
-    }
-    // If it's still a string after parsing attempts, return as-is
-    return String(parsed);
-  };
-
   // Helper to get outline extract for a page
   const getOutlineExtract = (pageNumber: number): string | undefined => {
     const scene = sceneDescriptions.find(s => s.pageNumber === pageNumber);
@@ -1532,11 +1476,6 @@ export function StoryDisplay({
   // Helper to get scene prompt (Art Director prompt) for a page
   const getScenePrompt = (pageNumber: number): string | undefined => {
     return sceneDescriptions.find(s => s.pageNumber === pageNumber)?.scenePrompt;
-  };
-
-  // Helper to get text model ID used for scene description
-  const getSceneTextModelId = (pageNumber: number): string | undefined => {
-    return sceneDescriptions.find(s => s.pageNumber === pageNumber)?.textModelId;
   };
 
   // Character repair button + inline popover for selecting character and face/body target
@@ -4442,67 +4381,6 @@ export function StoryDisplay({
                 {/* Iterate Button - dev only (uses same iterate endpoint as pages) */}
                 {onIteratePage && renderIteratePanel(-1)}
                 {renderCharRepairResult(-1)}
-                {/* Scene Description */}
-                {frontCoverObj.description && (
-                  <details className="bg-green-50 border border-green-300 rounded-lg p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
-                      {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
-                    </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
-                      {(() => {
-                        // Helper to recursively parse JSON strings that might be double-escaped
-                        const parseDeep = (value: unknown): unknown => {
-                          if (typeof value !== 'string') return value;
-                          try {
-                            const parsed = JSON.parse(value);
-                            if (typeof parsed === 'string' && (parsed.startsWith('{') || parsed.startsWith('['))) {
-                              return parseDeep(parsed);
-                            }
-                            return parsed;
-                          } catch { return value; }
-                        };
-                        const desc = frontCoverObj.description;
-                        const rawDesc = typeof desc === 'object' && (desc as { text?: string })?.text
-                          ? (desc as { text: string }).text : desc;
-                        const parsed = parseDeep(rawDesc);
-                        if (typeof parsed === 'object' && parsed !== null) {
-                          return JSON.stringify(parsed, null, 2);
-                        }
-                        return String(parsed);
-                      })()}
-                    </pre>
-                  </details>
-                )}
-
-                {/* API Prompt */}
-                {frontCoverObj.prompt && (
-                  <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
-                      {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
-                      {frontCoverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({frontCoverObj.modelId})</span>}
-                    </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
-                      {frontCoverObj.prompt}
-                    </pre>
-                  </details>
-                )}
-
-                {/* Reference Photos — page-level inputs only. Per-version data
-                    (grokRefImages sent to the model, composite passes) lives
-                    ONLY in the version viewer ("Bild wählen"). */}
-                {(() => {
-                  const show = (frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0 || frontCoverObj.visualBibleGrid;
-                  if (!show) return null;
-                  return (
-                    <ReferencePhotosDisplay
-                      referencePhotos={frontCoverObj.referencePhotos || []}
-                      landmarkPhotos={frontCoverObj.landmarkPhotos}
-                      visualBibleGrid={frontCoverObj.visualBibleGrid}
-                      language={language}
-                    />
-                  );
-                })()}
-
                 {/* Test Models / composite preview (dev only). pageNumber -1 =
                     frontCover; the test-models endpoint routes negatives through
                     the cover pipeline (composite → generateCoverViaComposite). */}
@@ -4525,47 +4403,6 @@ export function StoryDisplay({
                     )}
                   </div>
                 )}
-
-                {/* Quality Score */}
-                {(() => {
-                  const q = activeQuality(frontCoverObj);
-                  if (q.score === undefined) return null;
-                  return (
-                    <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                      <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                        <span className="flex items-center gap-2">
-                          {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
-                          {q.modelId && <span className="text-xs font-normal text-indigo-500">({q.modelId})</span>}
-                        </span>
-                        <span className={`text-lg font-bold ${
-                          q.score >= 70 ? 'text-green-600' :
-                          q.score >= 50 ? 'text-yellow-600' :
-                          'text-red-600'
-                        }`}>
-                          {Math.round(q.score)}%
-                        </span>
-                      </summary>
-                      {q.reasoning && (
-                        <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
-                          <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
-                          <p className="whitespace-pre-wrap break-words">{q.reasoning}</p>
-                        </div>
-                      )}
-                    </details>
-                  );
-                })()}
-
-                {/* Object Detection for Cover */}
-                <ObjectDetectionDisplay
-                  retryHistory={frontCoverObj.retryHistory}
-                  bboxDetection={bboxOverrides[bboxKey('cover:front', frontCoverObj)] ?? activeBboxDetection(frontCoverObj)}
-                  bboxOverlayImage={bboxOverrides[bboxKey('cover:front', frontCoverObj)] ? null : activeBboxOverlay(frontCoverObj)}
-                  language={language}
-                  storyId={storyId}
-                  coverType="front"
-                  versionIndex={activeVersionIndex(frontCoverObj)}
-                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey('cover:front', frontCoverObj)]: bbox }))}
-                />
 
                 {/* Previous / Original Image */}
                 {frontCoverObj.previousImage && (
@@ -4711,66 +4548,6 @@ export function StoryDisplay({
                 {/* Iterate Button - dev only */}
                 {onIteratePage && renderIteratePanel(-2)}
                 {renderCharRepairResult(-2)}
-                {/* Scene Description */}
-                {initialPageObj.description && (
-                  <details className="bg-green-50 border border-green-300 rounded-lg p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
-                      {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
-                    </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
-                      {(() => {
-                        // Helper to recursively parse JSON strings that might be double-escaped
-                        const parseDeep = (value: unknown): unknown => {
-                          if (typeof value !== 'string') return value;
-                          try {
-                            const parsed = JSON.parse(value);
-                            if (typeof parsed === 'string' && (parsed.startsWith('{') || parsed.startsWith('['))) {
-                              return parseDeep(parsed);
-                            }
-                            return parsed;
-                          } catch { return value; }
-                        };
-                        const desc = initialPageObj.description;
-                        const rawDesc = typeof desc === 'object' && (desc as { text?: string })?.text
-                          ? (desc as { text: string }).text : desc;
-                        const parsed = parseDeep(rawDesc);
-                        if (typeof parsed === 'object' && parsed !== null) {
-                          return JSON.stringify(parsed, null, 2);
-                        }
-                        return String(parsed);
-                      })()}
-                    </pre>
-                  </details>
-                )}
-
-                {/* API Prompt */}
-                {initialPageObj.prompt && (
-                  <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
-                      {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
-                      {initialPageObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({initialPageObj.modelId})</span>}
-                    </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
-                      {initialPageObj.prompt}
-                    </pre>
-                  </details>
-                )}
-
-                {/* Reference Photos — page-level inputs only; per-version data
-                    lives in the version viewer ("Bild wählen"). */}
-                {(() => {
-                  const show = (initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0 || initialPageObj.visualBibleGrid;
-                  if (!show) return null;
-                  return (
-                    <ReferencePhotosDisplay
-                      referencePhotos={initialPageObj.referencePhotos || []}
-                      landmarkPhotos={initialPageObj.landmarkPhotos}
-                      visualBibleGrid={initialPageObj.visualBibleGrid}
-                      language={language}
-                    />
-                  );
-                })()}
-
                 {/* Test Models / composite preview (dev only). pageNumber -2 = initialPage. */}
                 {developerMode && storyId && (
                   <div className="space-y-2">
@@ -4791,47 +4568,6 @@ export function StoryDisplay({
                     )}
                   </div>
                 )}
-
-                {/* Quality Score */}
-                {(() => {
-                  const q = activeQuality(initialPageObj);
-                  if (q.score === undefined) return null;
-                  return (
-                    <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                      <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                        <span className="flex items-center gap-2">
-                          {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
-                          {q.modelId && <span className="text-xs font-normal text-indigo-500">({q.modelId})</span>}
-                        </span>
-                        <span className={`text-lg font-bold ${
-                          q.score >= 70 ? 'text-green-600' :
-                          q.score >= 50 ? 'text-yellow-600' :
-                          'text-red-600'
-                        }`}>
-                          {Math.round(q.score)}%
-                        </span>
-                      </summary>
-                      {q.reasoning && (
-                        <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
-                          <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
-                          <p className="whitespace-pre-wrap break-words">{q.reasoning}</p>
-                        </div>
-                      )}
-                    </details>
-                  );
-                })()}
-
-                {/* Object Detection for Cover */}
-                <ObjectDetectionDisplay
-                  retryHistory={initialPageObj.retryHistory}
-                  bboxDetection={bboxOverrides[bboxKey('cover:initial', initialPageObj)] ?? activeBboxDetection(initialPageObj)}
-                  bboxOverlayImage={bboxOverrides[bboxKey('cover:initial', initialPageObj)] ? null : activeBboxOverlay(initialPageObj)}
-                  language={language}
-                  storyId={storyId}
-                  coverType="initial"
-                  versionIndex={activeVersionIndex(initialPageObj)}
-                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey('cover:initial', initialPageObj)]: bbox }))}
-                />
 
                 {/* Previous / Original Image */}
                 {initialPageObj.previousImage && (
@@ -5328,99 +5064,6 @@ export function StoryDisplay({
                               </details>
                             )}
 
-                            {/* 3. Scene Description */}
-                            {getSceneDescription(pageNumber) && (
-                              <details className="bg-green-50 border border-green-300 rounded-lg p-3">
-                                <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
-                                  {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
-                                  {getSceneTextModelId(pageNumber) && <span className="ml-2 text-xs font-normal text-green-600">({getSceneTextModelId(pageNumber)})</span>}
-                                </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
-                                  {getSceneDescription(pageNumber)}
-                                </pre>
-                              </details>
-                            )}
-
-                            {/* 4. API Prompt (Image Generation) */}
-                            {image?.prompt && (
-                              <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                                <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
-                                  {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
-                                  {image?.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({image.modelId})</span>}
-                                </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
-                                  {image?.prompt}
-                                </pre>
-                              </details>
-                            )}
-
-                            {/* Reference Photos — page-level inputs only. Per-version
-                                data (refs sent to the model, composite passes) lives
-                                ONLY in the version viewer ("Bild wählen"). */}
-                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0 || image?.visualBibleGrid || image?.hasVisualBibleGrid || image?.emptySceneImage || image?.hasEmptySceneImage || (image as any)?.hasCompositeStages) && image && (
-                              <ReferencePhotosDisplay
-                                referencePhotos={image.referencePhotos || []}
-                                landmarkPhotos={image.landmarkPhotos}
-                                visualBibleGrid={image.visualBibleGrid}
-                                hasVisualBibleGrid={image.hasVisualBibleGrid}
-                                emptySceneImage={image.emptySceneImage}
-                                emptyScenePrompt={image.emptyScenePrompt}
-                                hasEmptySceneImage={image.hasEmptySceneImage}
-                                hasCompositeStages={(image as any).hasCompositeStages}
-                                compositeBboxes={(image as any).compositeBboxes}
-                                emptySceneQc={image.emptySceneQc}
-                                textAreaMask={image.textAreaMask}
-                                emptySceneVbGrid={(image as any).emptySceneVbGrid}
-                                textCoverageReport={image.textCoverageReport}
-                                language={language}
-                                storyId={storyId || undefined}
-                                pageNumber={pageNumber}
-                              />
-                            )}
-
-                            {/* Quality Score with Reasoning */}
-                            {(() => {
-                              // Canonical: finalScore. Legacy: qualityScore. Use typeof check
-                              // so a legitimate zero score still renders the badge.
-                              const score = typeof (image as any)?.finalScore === 'number' ? (image as any).finalScore
-                                : (typeof image?.qualityScore === 'number' ? image.qualityScore : undefined);
-                              if (score === undefined) return null;
-                              return (
-                              <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                                <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                                  <span className="flex items-center gap-2">
-                                    {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
-                                    {image?.qualityModelId && <span className="text-xs font-normal text-indigo-500">({image.qualityModelId})</span>}
-                                  </span>
-                                  <span className={`text-lg font-bold ${
-                                    score >= 70 ? 'text-green-600' :
-                                    score >= 50 ? 'text-yellow-600' :
-                                    'text-red-600'
-                                  }`}>
-                                    {Math.round(score)}%
-                                  </span>
-                                </summary>
-                                {(image?.issuesSummary || image?.qualityReasoning) && (
-                                  <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
-                                    {image.issuesSummary && (
-                                      <p className="text-gray-700">{image.issuesSummary}</p>
-                                    )}
-                                    {image.qualityReasoning && (
-                                      <details className={image.issuesSummary ? 'mt-2' : ''}>
-                                        <summary className="cursor-pointer text-indigo-500 hover:text-indigo-800 text-xs">
-                                          {image.issuesSummary
-                                            ? (language === 'de' ? 'Vollständiges Feedback anzeigen' : language === 'fr' ? 'Afficher le retour complet' : 'Show full feedback')
-                                            : (language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:')}
-                                        </summary>
-                                        <p className="whitespace-pre-wrap break-words mt-1">{image.qualityReasoning}</p>
-                                      </details>
-                                    )}
-                                  </div>
-                                )}
-                              </details>
-                              );
-                            })()}
-
                             {/* Semantic Fidelity Score (scene vs story text match) */}
                             {image?.semanticResult && (
                               <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
@@ -5526,18 +5169,6 @@ export function StoryDisplay({
                                 </details>
                               );
                             })()}
-
-                            {/* Object Detection (separate from retry history for visibility) */}
-                            <ObjectDetectionDisplay
-                              retryHistory={image?.retryHistory}
-                              bboxDetection={bboxOverrides[bboxKey(`page:${image?.pageNumber}`, image)] ?? activeBboxDetection(image)}
-                              bboxOverlayImage={bboxOverrides[bboxKey(`page:${image?.pageNumber}`, image)] ? null : activeBboxOverlay(image)}
-                              language={language}
-                              storyId={storyId}
-                              pageNumber={image?.pageNumber}
-                              versionIndex={activeVersionIndex(image)}
-                              onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey(`page:${image?.pageNumber}`, image)]: bbox }))}
-                            />
 
                             {/* Eval Testing (per-page evaluation in dev mode) */}
                             {storyId && (
@@ -6017,98 +5648,6 @@ export function StoryDisplay({
                               </details>
                             )}
 
-                            {/* 3. Scene Description */}
-                            {getSceneDescription(pageNumber) && (
-                              <details className="bg-green-50 border border-green-300 rounded-lg p-3">
-                                <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
-                                  {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
-                                  {getSceneTextModelId(pageNumber) && <span className="ml-2 text-xs font-normal text-green-600">({getSceneTextModelId(pageNumber)})</span>}
-                                </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
-                                  {getSceneDescription(pageNumber)}
-                                </pre>
-                              </details>
-                            )}
-
-                            {/* 4. API Prompt (Image Generation) */}
-                            {image.prompt && (
-                              <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                                <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
-                                  {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
-                                  {image.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({image.modelId})</span>}
-                                </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
-                                  {image.prompt}
-                                </pre>
-                              </details>
-                            )}
-
-                            {/* Reference Photos — page-level inputs only. Per-version
-                                data (refs sent to the model, composite passes) lives
-                                ONLY in the version viewer ("Bild wählen"). */}
-                            {((image.referencePhotos?.length ?? 0) > 0 || (image.landmarkPhotos?.length ?? 0) > 0 || image.visualBibleGrid || image.hasVisualBibleGrid || image.emptySceneImage || image.hasEmptySceneImage || (image as any).hasCompositeStages) && (
-                              <ReferencePhotosDisplay
-                                referencePhotos={image.referencePhotos || []}
-                                landmarkPhotos={image.landmarkPhotos}
-                                visualBibleGrid={image.visualBibleGrid}
-                                hasVisualBibleGrid={image.hasVisualBibleGrid}
-                                emptySceneImage={image.emptySceneImage}
-                                emptyScenePrompt={image.emptyScenePrompt}
-                                hasEmptySceneImage={image.hasEmptySceneImage}
-                                hasCompositeStages={(image as any).hasCompositeStages}
-                                compositeBboxes={(image as any).compositeBboxes}
-                                emptySceneQc={image.emptySceneQc}
-                                textAreaMask={image.textAreaMask}
-                                emptySceneVbGrid={(image as any).emptySceneVbGrid}
-                                textCoverageReport={image.textCoverageReport}
-                                language={language}
-                                storyId={storyId || undefined}
-                                pageNumber={pageNumber}
-                              />
-                            )}
-
-                            {/* Quality Score with Reasoning */}
-                            {(() => {
-                              // Canonical finalScore with legacy qualityScore fallback (chunk-2 migration).
-                              const score = typeof (image as any).finalScore === 'number' ? (image as any).finalScore
-                                : (typeof image.qualityScore === 'number' ? image.qualityScore : undefined);
-                              if (score === undefined) return null;
-                              return (
-                              <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                                <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                                  <span className="flex items-center gap-2">
-                                    {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
-                                    {image.qualityModelId && <span className="text-xs font-normal text-indigo-500">({image.qualityModelId})</span>}
-                                  </span>
-                                  <span className={`text-lg font-bold ${
-                                    score >= 70 ? 'text-green-600' :
-                                    score >= 50 ? 'text-yellow-600' :
-                                    'text-red-600'
-                                  }`}>
-                                    {Math.round(score)}%
-                                  </span>
-                                </summary>
-                                {(image.issuesSummary || image.qualityReasoning) && (
-                                  <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
-                                    {image.issuesSummary && (
-                                      <p className="text-gray-700">{image.issuesSummary}</p>
-                                    )}
-                                    {image.qualityReasoning && (
-                                      <details className={image.issuesSummary ? 'mt-2' : ''}>
-                                        <summary className="cursor-pointer text-indigo-500 hover:text-indigo-800 text-xs">
-                                          {image.issuesSummary
-                                            ? (language === 'de' ? 'Vollständiges Feedback anzeigen' : language === 'fr' ? 'Afficher le retour complet' : 'Show full feedback')
-                                            : (language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:')}
-                                        </summary>
-                                        <p className="whitespace-pre-wrap break-words mt-1">{image.qualityReasoning}</p>
-                                      </details>
-                                    )}
-                                  </div>
-                                )}
-                              </details>
-                              );
-                            })()}
-
                             {/* Semantic Fidelity Score */}
                             {image?.semanticResult && (
                               <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
@@ -6212,18 +5751,6 @@ export function StoryDisplay({
                                 </details>
                               );
                             })()}
-
-                            {/* Object Detection (separate from retry history for visibility) */}
-                            <ObjectDetectionDisplay
-                              retryHistory={image.retryHistory}
-                              bboxDetection={bboxOverrides[bboxKey(`page:${image.pageNumber}`, image)] ?? activeBboxDetection(image)}
-                              bboxOverlayImage={bboxOverrides[bboxKey(`page:${image.pageNumber}`, image)] ? null : activeBboxOverlay(image)}
-                              language={language}
-                              storyId={storyId}
-                              pageNumber={image.pageNumber}
-                              versionIndex={activeVersionIndex(image)}
-                              onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey(`page:${image.pageNumber}`, image)]: bbox }))}
-                            />
 
                             {/* Eval Testing (per-page evaluation in dev mode) */}
                             {storyId && (
@@ -6422,66 +5949,6 @@ export function StoryDisplay({
                 {/* Iterate Button - dev only */}
                 {onIteratePage && renderIteratePanel(-3)}
                 {renderCharRepairResult(-3)}
-                {/* Scene Description */}
-                {backCoverObj.description && (
-                  <details className="bg-green-50 border border-green-300 rounded-lg p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
-                      {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
-                    </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
-                      {(() => {
-                        // Helper to recursively parse JSON strings that might be double-escaped
-                        const parseDeep = (value: unknown): unknown => {
-                          if (typeof value !== 'string') return value;
-                          try {
-                            const parsed = JSON.parse(value);
-                            if (typeof parsed === 'string' && (parsed.startsWith('{') || parsed.startsWith('['))) {
-                              return parseDeep(parsed);
-                            }
-                            return parsed;
-                          } catch { return value; }
-                        };
-                        const desc = backCoverObj.description;
-                        const rawDesc = typeof desc === 'object' && (desc as { text?: string })?.text
-                          ? (desc as { text: string }).text : desc;
-                        const parsed = parseDeep(rawDesc);
-                        if (typeof parsed === 'object' && parsed !== null) {
-                          return JSON.stringify(parsed, null, 2);
-                        }
-                        return String(parsed);
-                      })()}
-                    </pre>
-                  </details>
-                )}
-
-                {/* API Prompt */}
-                {backCoverObj.prompt && (
-                  <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
-                      {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
-                      {backCoverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({backCoverObj.modelId})</span>}
-                    </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
-                      {backCoverObj.prompt}
-                    </pre>
-                  </details>
-                )}
-
-                {/* Reference Photos — page-level inputs only; per-version data
-                    lives in the version viewer ("Bild wählen"). */}
-                {(() => {
-                  const show = (backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0 || backCoverObj.visualBibleGrid;
-                  if (!show) return null;
-                  return (
-                    <ReferencePhotosDisplay
-                      referencePhotos={backCoverObj.referencePhotos || []}
-                      landmarkPhotos={backCoverObj.landmarkPhotos}
-                      visualBibleGrid={backCoverObj.visualBibleGrid}
-                      language={language}
-                    />
-                  );
-                })()}
-
                 {/* Test Models / composite preview (dev only). pageNumber -3 = backCover. */}
                 {developerMode && storyId && (
                   <div className="space-y-2">
@@ -6502,47 +5969,6 @@ export function StoryDisplay({
                     )}
                   </div>
                 )}
-
-                {/* Quality Score */}
-                {(() => {
-                  const q = activeQuality(backCoverObj);
-                  if (q.score === undefined) return null;
-                  return (
-                    <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                      <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                        <span className="flex items-center gap-2">
-                          {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
-                          {q.modelId && <span className="text-xs font-normal text-indigo-500">({q.modelId})</span>}
-                        </span>
-                        <span className={`text-lg font-bold ${
-                          q.score >= 70 ? 'text-green-600' :
-                          q.score >= 50 ? 'text-yellow-600' :
-                          'text-red-600'
-                        }`}>
-                          {Math.round(q.score)}%
-                        </span>
-                      </summary>
-                      {q.reasoning && (
-                        <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
-                          <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
-                          <p className="whitespace-pre-wrap break-words">{q.reasoning}</p>
-                        </div>
-                      )}
-                    </details>
-                  );
-                })()}
-
-                {/* Object Detection for Cover */}
-                <ObjectDetectionDisplay
-                  retryHistory={backCoverObj.retryHistory}
-                  bboxDetection={bboxOverrides[bboxKey('cover:back', backCoverObj)] ?? activeBboxDetection(backCoverObj)}
-                  bboxOverlayImage={bboxOverrides[bboxKey('cover:back', backCoverObj)] ? null : activeBboxOverlay(backCoverObj)}
-                  language={language}
-                  storyId={storyId}
-                  coverType="back"
-                  versionIndex={activeVersionIndex(backCoverObj)}
-                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [bboxKey('cover:back', backCoverObj)]: bbox }))}
-                />
 
                 {/* Previous / Original Image */}
                 {backCoverObj.previousImage && (
@@ -6957,6 +6383,46 @@ export function StoryDisplay({
           developerMode={developerMode}
           grokRefImages={(sceneImages.find(img => img.pageNumber === imageHistoryModal.pageNumber) as any)?.grokRefImages}
           entityIssues={getEntityIssuesForPage(imageHistoryModal.pageNumber)}
+          pageDebug={developerMode ? (() => {
+            // Page-level inputs + full detection moved here from the inline dev
+            // panel (owner decision: the version viewer is the ONE home for
+            // per-image debug data; page cards stay lean).
+            const image = sceneImages.find(img => img.pageNumber === imageHistoryModal.pageNumber) as any;
+            if (!image) return null;
+            const key = bboxKey(`page:${image.pageNumber}`, image);
+            return (
+              <>
+                <ReferencePhotosDisplay
+                  referencePhotos={image.referencePhotos || []}
+                  landmarkPhotos={image.landmarkPhotos}
+                  visualBibleGrid={image.visualBibleGrid}
+                  hasVisualBibleGrid={image.hasVisualBibleGrid}
+                  emptySceneImage={image.emptySceneImage}
+                  emptyScenePrompt={image.emptyScenePrompt}
+                  hasEmptySceneImage={image.hasEmptySceneImage}
+                  hasCompositeStages={image.hasCompositeStages}
+                  compositeBboxes={image.compositeBboxes}
+                  emptySceneQc={image.emptySceneQc}
+                  textAreaMask={image.textAreaMask}
+                  emptySceneVbGrid={image.emptySceneVbGrid}
+                  textCoverageReport={image.textCoverageReport}
+                  language={language}
+                  storyId={storyId || undefined}
+                  pageNumber={imageHistoryModal.pageNumber}
+                />
+                <ObjectDetectionDisplay
+                  retryHistory={image.retryHistory}
+                  bboxDetection={bboxOverrides[key] ?? activeBboxDetection(image)}
+                  bboxOverlayImage={bboxOverrides[key] ? null : activeBboxOverlay(image)}
+                  language={language}
+                  storyId={storyId}
+                  pageNumber={image.pageNumber}
+                  versionIndex={activeVersionIndex(image)}
+                  onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [key]: bbox }))}
+                />
+              </>
+            );
+          })() : null}
         />
       )}
 
@@ -6976,6 +6442,32 @@ export function StoryDisplay({
             developerMode={developerMode}
             grokRefImages={(coverImages?.[coverHistoryModal.coverType] as any)?.grokRefImages}
             entityIssues={getEntityIssuesForPage(coverPageNum)}
+            pageDebug={developerMode ? (() => {
+              const coverObj = coverImages?.[coverHistoryModal.coverType] as any;
+              if (!coverObj) return null;
+              const shortType = ({ frontCover: 'front', initialPage: 'initial', backCover: 'back' } as const)[coverHistoryModal.coverType];
+              const key = bboxKey(`cover:${shortType}`, coverObj);
+              return (
+                <>
+                  <ReferencePhotosDisplay
+                    referencePhotos={coverObj.referencePhotos || []}
+                    landmarkPhotos={coverObj.landmarkPhotos}
+                    visualBibleGrid={coverObj.visualBibleGrid}
+                    language={language}
+                  />
+                  <ObjectDetectionDisplay
+                    retryHistory={coverObj.retryHistory}
+                    bboxDetection={bboxOverrides[key] ?? activeBboxDetection(coverObj)}
+                    bboxOverlayImage={bboxOverrides[key] ? null : activeBboxOverlay(coverObj)}
+                    language={language}
+                    storyId={storyId}
+                    coverType={shortType}
+                    versionIndex={activeVersionIndex(coverObj)}
+                    onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [key]: bbox }))}
+                  />
+                </>
+              );
+            })() : null}
           />
         );
       })()}

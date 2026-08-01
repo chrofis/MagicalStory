@@ -3317,3 +3317,33 @@ product); the `short:` screen makes it usable without a dedicated layout.
 
 **Touched:** `client/src/pages/SharedStoryViewer.tsx`,
 `client/src/components/book/BookStoryPage.tsx`, `client/tailwind.config.js`.
+
+---
+
+## 2026-08-01 — Dev panel consolidation: version viewer is the ONLY per-image debug home
+
+**Context:** Owner: "I thought you moved most things to the version viewer,
+but now they are all back." The 2026-07-31 unification had only moved
+per-version blocks; the page-level dev blocks (Scene Description, API
+Prompt, Reference Photos, Quality Score, Object Detection) still rendered
+inline under every image and cover in dev mode — perceived as regression,
+plus they overflowed on phones.
+
+**Decision (owner-selected via interview, "Everything incl. detection"):**
+inline dev info blocks are REMOVED from page and cover cards (all 5 sites:
+front/initial/back cover + both page render paths). ReferencePhotosDisplay
+(page-level inputs: VB grid, landmarks, empty-scene/composite debug) and the
+full ObjectDetectionDisplay (overlay + re-detect) now render inside the
+version viewer ("Bild wählen") in a collapsed "Seiten-Debug" section via the
+new `pageDebug` prop — they exist nowhere else. Scene Description / API
+Prompt / Quality Score inline blocks were deleted outright (per-version
+equivalents already in the viewer detail panel). Kept inline: action tools
+(Iterate, char repair, Test Models, EvalTestingPanel) and the collapsed
+Outline Extract / Scene Prompt / Semantic / Entity summaries.
+
+**Also:** "Bild wählen" with a single version is dev-gated
+(`showVersionPicker`: ≥2 for normal users, ≥1 in dev — dev needs the viewer
+even at one version because it is the canonical debug home).
+
+**Touched:** `client/src/components/generation/StoryDisplay.tsx`,
+`client/src/components/generation/story/ImageHistoryModal.tsx`.
