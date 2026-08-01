@@ -145,6 +145,9 @@ interface StoryDisplayProps {
   outlinePrompt?: string;
   outlineModelId?: string;
   outlineUsage?: { input_tokens: number; output_tokens: number };
+  /** Split outline review metadata (Sonnet writes, Opus reviews) — null when
+      the review didn't run (trial, disabled, or reviewer failed). */
+  outlineReview?: { model?: string; modelId?: string; durationMs?: number; fixCount?: number; reviewChars?: number; hintCount?: number; reviewedAt?: string } | null;
   storyTextPrompts?: StoryTextPrompt[];
   visualBible?: VisualBible;
   sceneImages: SceneImage[];
@@ -282,6 +285,7 @@ export function StoryDisplay({
   outlinePrompt,
   outlineModelId,
   outlineUsage,
+  outlineReview,
   storyTextPrompts = [],
   visualBible,
   sceneImages,
@@ -2329,6 +2333,60 @@ export function StoryDisplay({
       {/* Developer Mode: Story Overview and Full Text */}
       {developerMode && (
         <div className="space-y-4 mt-6">
+          {/* Outline Review (split review: writer drafts, external reviewer
+              critiques). The writer's own mid-document ANALYSIS section only
+              says "Reviewed externally." (stub) — the real reviewer output is
+              APPENDED at the bottom of the outline blob, so without this
+              dedicated panel it's practically invisible. Extract it here:
+              the reviewer's ---ANALYSIS--- is the LAST one, after the stub. */}
+          {(() => {
+            if (!outline && !outlineReview) return null;
+            const stubIdx = outline ? outline.indexOf('Reviewed externally.') : -1;
+            const lastAnalysisIdx = outline ? outline.lastIndexOf('---ANALYSIS---') : -1;
+            const reviewText = (outline && lastAnalysisIdx >= 0 && stubIdx >= 0 && lastAnalysisIdx > stubIdx)
+              ? outline.slice(lastAnalysisIdx).trim()
+              : null;
+            // Nothing to show for single-call stories (no stub, no meta).
+            if (!reviewText && !outlineReview && stubIdx < 0) return null;
+            return (
+              <details className="bg-violet-50 border-2 border-violet-300 rounded-xl p-4" open>
+                <summary className="cursor-pointer text-lg font-bold text-violet-800 hover:text-violet-900 flex items-center gap-2 flex-wrap">
+                  <FileText size={20} />
+                  {language === 'de' ? 'Outline-Review (externes Modell)' : language === 'fr' ? 'Revue du plan (modèle externe)' : 'Outline Review (external model)'}
+                  {outlineReview?.modelId && (
+                    <span className="text-sm font-normal text-violet-500">({outlineReview.modelId})</span>
+                  )}
+                  {outlineReview && (
+                    <span className="text-xs font-normal text-violet-500">
+                      [{outlineReview.fixCount ?? 0} {language === 'de' ? 'Korrekturen' : 'fixes'}
+                      {typeof outlineReview.durationMs === 'number' && ` · ${(outlineReview.durationMs / 1000).toFixed(0)}s`}
+                      {typeof outlineReview.hintCount === 'number' && outlineReview.hintCount > 0 && ` · ${outlineReview.hintCount} ${language === 'de' ? 'Hinweise' : 'hints'}`}]
+                    </span>
+                  )}
+                </summary>
+                <div className="mt-3">
+                  {reviewText ? (
+                    <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-white p-4 rounded-lg border border-violet-200 overflow-x-auto max-h-[500px] overflow-y-auto">
+                      {reviewText}
+                    </pre>
+                  ) : outlineReview ? (
+                    <p className="text-sm text-violet-700">
+                      {language === 'de'
+                        ? 'Review lief (siehe Metadaten oben), aber der gespeicherte Outline-Text enthält die Reviewer-Ausgabe nicht — Geschichte wurde vor dem Sichtbarkeits-Fix generiert.'
+                        : 'The review ran (see metadata above), but the stored outline predates the visibility fix and does not contain the reviewer output.'}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-red-700 font-medium">
+                      {language === 'de'
+                        ? '⚠️ Der Autor hat die Selbstkritik übersprungen ("Reviewed externally."), aber es wurde keine Reviewer-Ausgabe gefunden — Review fehlgeschlagen oder Geschichte vor dem Deploy generiert. Siehe Generierungsprotokoll (outline_review_failed).'
+                        : '⚠️ The writer skipped self-critique ("Reviewed externally.") but no reviewer output was found — the review failed or the story predates the deploy. Check the generation log for outline_review_failed.'}
+                    </p>
+                  )}
+                </div>
+              </details>
+            );
+          })()}
+
           {/* Full Outline/Combined Generation Output */}
           {outline && (
             <details className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-4">
