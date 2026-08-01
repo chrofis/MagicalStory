@@ -2259,6 +2259,9 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         useOriginalAsReference: !!useOriginalAsReference,
         blackoutIssues: !!blackoutIssues,
         freshCharacters,
+        // User-triggered (post-generation): stamp the title even when the
+        // story predates app-side typography — also upgrades it (art row).
+        forceRestampWhenUnbaked: true,
       });
 
       const previousImageData = imageResult.previousImage;
@@ -3034,6 +3037,9 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       // Always a normal single-pass render — never the composite method
       // (composite stays for iterate + the auto pipeline).
       compositeCovers: false,
+      // User-triggered (post-generation): stamp the title even when the
+      // story predates app-side typography — also upgrades it (art row).
+      forceRestampWhenUnbaked: true,
     });
 
     // Result mapping: keep the variable names the downstream save / response

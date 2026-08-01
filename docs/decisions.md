@@ -3379,3 +3379,24 @@ updated cover is the preview. Back cover has no user styling (brand only).
 `client/src/components/generation/StoryDisplay.tsx`,
 `client/src/pages/StoryWizard.tsx`, `client/src/services/storyService.ts`,
 `tests/manual/test-cover-typography-style.js` (24 checks).
+
+---
+
+## 2026-08-01 — Old-story cover regen was serving TITLE-LESS covers; regen now upgrades them
+
+**Context:** Editable cover text (restamp + typography picker) requires the
+`${coverKey}Art` textless layer, which exists only for stories generated
+after app-side cover typography shipped (2026-07-19). Worse: regenerating a
+cover on an OLDER story rendered textless (current prompts are textless) but
+iterateCover's restamp was gated on the Art row existing — so old stories
+got covers with NO title at all on regen.
+
+**Decision:** new iterateCover option `forceRestampWhenUnbaked`, set by the
+two user-triggered post-generation routes (cover regen + cover iterate).
+Safe because the input there is always a fresh textless render. The gate
+stays off for the in-pipeline repair path (initial generation bakes later)
+and Test Lab. Side effect = the upgrade path: the returned artImageData is
+persisted as `${coverKey}Art` vN, so one cover regeneration converts a
+pre-typography story to fully editable cover text.
+
+**Touched:** `server/lib/coverIterate.js`, `server/routes/regeneration.js`.

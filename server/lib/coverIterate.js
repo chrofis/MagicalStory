@@ -367,6 +367,16 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // cover template would be selected below. Never swap PROMPT_TEMPLATES
     // keys around this async function; pass the override here instead.
     promptTemplateOverride = null,
+    // Post-generation callers (user-triggered regen/iterate routes) set this
+    // so a story WITHOUT a ${coverKey}Art row — generated before app-side
+    // cover typography — still gets its title/dedication stamped onto the
+    // fresh textless render. Without it those stories served a TITLE-LESS
+    // cover on regen (the "initial bake handles it" assumption only holds
+    // during story generation). Stamping here is safe: the input is always a
+    // fresh textless render, never an already-titled image. Side effect: the
+    // returned artImageData gets persisted by the caller, upgrading the old
+    // story to editable cover text from that version on.
+    forceRestampWhenUnbaked = false,
   } = options;
 
   const {
@@ -846,7 +856,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
       const rows = await dbQuery("SELECT 1 FROM story_images WHERE story_id=$1 AND image_type=$2 LIMIT 1", [storyData.id, `${coverKey}Art`]);
       bakeAlreadyRan = rows.length > 0;
     } catch (e) { /* check failed → skip restamp (safe: textless served, initial bake handles it) */ }
-    if (bakeAlreadyRan) {
+    if (bakeAlreadyRan || forceRestampWhenUnbaked) {
       try {
         const { restampCover } = require('./coverTypography');
         const figures = existingCover.bboxDetection?.figures || [];
