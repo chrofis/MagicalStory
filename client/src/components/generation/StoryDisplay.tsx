@@ -2030,7 +2030,11 @@ export function StoryDisplay({
   );
 
   return (
-    <div className="space-y-6">
+    // overflow-x-hidden: the page must NEVER scroll horizontally on phones —
+    // every wide element (prompts, grids, detection tables) scrolls inside its
+    // own overflow-x-auto container. Any child that outgrows the viewport is
+    // clipped here instead of widening the whole document.
+    <div className="space-y-6 max-w-full overflow-x-hidden">
       {/* Story Title */}
       <div className="flex items-center justify-center gap-2">
         {isEditingTitle ? (
