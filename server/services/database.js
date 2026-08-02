@@ -2499,7 +2499,11 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
 
   // isTest/experimentId: Test Lab sandbox versions — excluded from every
   // user-facing read (see is_test filters below); promoted by flipping the flag.
-  const { qualityScore = null, generatedAt = null, versionIndex = 0, isTest = false, experimentId = null } = options;
+  // cacheBust: the write REPLACES an existing version's content (cover restamp
+  // after a title/dedication/typography edit). Versioned R2 keys are cached as
+  // immutable, so overwriting the same key leaves every CDN/browser serving
+  // the OLD image — a fresh revision suffix mints a new URL instead.
+  const { qualityScore = null, generatedAt = null, versionIndex = 0, isTest = false, experimentId = null, cacheBust = false } = options;
 
   // Normalize covers to exact A4 aspect at write time — every cover render
   // is the full bleed page, so a 1% Grok drift would show as a misaligned
@@ -2521,7 +2525,8 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
   try {
     const r2 = require('../lib/r2');
     if (r2.isConfigured() && imageData) {
-      const key = r2.keyForStoryImage(storyId, imageType, pageNumber, versionIndex);
+      let key = r2.keyForStoryImage(storyId, imageType, pageNumber, versionIndex);
+      if (cacheBust) key = key.replace(/\.jpg$/, `-r${Date.now().toString(36)}.jpg`);
       imageUrl = await r2.uploadImage(imageData, key);
     }
   } catch (err) {

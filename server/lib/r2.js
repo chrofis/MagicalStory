@@ -252,7 +252,9 @@ async function uploadImage(input, key, contentType = 'image/jpeg') {
     // new render writes a new URL — so they can be cached forever. Non-versioned
     // keys overwrite in place, so we leave their Cache-Control unset (the CDN
     // default short TTL stays, preserving the avatar staleness fix above).
-    const isVersioned = /(?:\/|-)v\d+\.(?:jpg|jpeg|png|webp)$/i.test(key);
+    // -rXXXX = revision suffix from cache-busting restamps; each revision is a
+    // unique URL, so it keeps the immutable contract.
+    const isVersioned = /(?:\/|-)v\d+(?:-r[0-9a-z]+)?\.(?:jpg|jpeg|png|webp)$/i.test(key);
     await client.send(new PutObjectCommand({
       Bucket: process.env.R2_BUCKET,
       Key: key,

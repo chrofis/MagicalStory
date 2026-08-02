@@ -536,7 +536,7 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
       // Textless original first (for no-AI re-edits), then overwrite the served
       // version row with the titled render.
       await saveStoryImage(storyId, `${key}Art`, null, 'data:image/jpeg;base64,' + bytes.toString('base64'), { versionIndex: 0 });
-      await saveStoryImage(storyId, key, null, 'data:image/jpeg;base64,' + buffer.toString('base64'), { versionIndex: activeIdx });
+      await saveStoryImage(storyId, key, null, 'data:image/jpeg;base64,' + buffer.toString('base64'), { versionIndex: activeIdx, cacheBust: true });
       if (storyData?.coverImages?.[key]) storyData.coverImages[key].typography = spec;
       log.info(`🅰️ [COVER TYPO POST] ${key}: baked title${ded ? '+dedication' : ''} onto served v${activeIdx} (${spec.fontId || '?'}/${spec.layout || '?'})`);
     } catch (err) {
@@ -608,7 +608,9 @@ async function restampServedCover(storyId, storyData, coverKey, { style } = {}) 
   const src = artRow.image_url || (artRow.image_data ? 'data:image/jpeg;base64,' + artRow.image_data.toString('base64') : null);
   const figures = storyData?.coverImages?.[coverKey]?.bboxDetection?.figures || [];
   const stamped = await restampCover(storyData, coverKey, src, { seed: storyData?.title, figures, ...(style !== undefined ? { style } : {}) });
-  await saveStoryImage(storyId, coverKey, null, stamped.titledData, { versionIndex: activeIdx });
+  // cacheBust: this REPLACES the active version's content in place — without a
+  // fresh R2 key the immutable-cached old render survives every reload.
+  await saveStoryImage(storyId, coverKey, null, stamped.titledData, { versionIndex: activeIdx, cacheBust: true });
   if (storyData?.coverImages?.[coverKey]) storyData.coverImages[coverKey].typography = stamped.spec;
   return { imageData: stamped.titledData, spec: stamped.spec, versionIndex: activeIdx };
 }
