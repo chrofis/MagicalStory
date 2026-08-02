@@ -349,6 +349,9 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const [paramsJson, setParamsJson] = useState('');
   const [storyIdInput, setStoryIdInput] = useState('');
   const [coverType, setCoverType] = useState('frontCover');
+  const [stories, setStories] = useState<TestLabStory[]>([]);
+  const [selectedStoryIds, setSelectedStoryIds] = useState<string[]>([]);
+  const [storySearch, setStorySearch] = useState('');
   const [textModels, setTextModels] = useState<TextModelInfo[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [writerModel, setWriterModel] = useState('');
@@ -366,17 +369,26 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
       .filter(b => selectedBench.includes(b.id))
       .flatMap(b => b.snapshot?.characterNames || [])
   )];
-  // How many targets the Run button would fire on.
-  const targetCount = isStoryLevel || isCharacterLevel
-    ? (storyIdInput.trim() ? 1 : [...new Set(benchmarks.filter(b => selectedBench.includes(b.id)).map(b => b.storyId))].length)
-    : selectedBench.length;
+  // Story-level / character-level stages target whole STORIES: the ones ticked
+  // in the story picker plus an optional pasted ID. Page stages target the
+  // selected benchmark pages.
+  const storyTargetIds = [...new Set([
+    ...selectedStoryIds,
+    ...(storyIdInput.trim() ? [storyIdInput.trim()] : []),
+  ])];
+  const targetCount = isStoryLevel || isCharacterLevel ? storyTargetIds.length : selectedBench.length;
   const canStart = targetCount > 0 && (!needsCharacter || !!charName.trim()) && (!isOutlineReview || selectedModels.length > 0);
 
   const load = useCallback(async () => {
     try {
-      const [exps, bench] = await Promise.all([testlabService.getExperiments(), testlabService.getBenchmarks()]);
+      const [exps, bench, storyRes] = await Promise.all([
+        testlabService.getExperiments(),
+        testlabService.getBenchmarks(),
+        testlabService.getStories({ limit: 50 }),
+      ]);
       setExperiments(exps.experiments);
       setBenchmarks(bench.benchmarks);
+      setStories(storyRes.stories);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load');
     }
@@ -397,11 +409,12 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   }, []);
 
   // One-tap "Review" from the Stories tab: land here with the outline_review
-  // stage selected and the story ID filled in, so nothing needs typing.
+  // stage selected and that story ticked as the target, so nothing needs typing.
   useEffect(() => {
     if (!preset) return;
     setStage(preset.stage);
-    setStoryIdInput(preset.storyId);
+    setSelectedStoryIds([preset.storyId]);
+    setStoryIdInput('');
     setError(null);
     onPresetApplied();
   }, [preset, onPresetApplied]);
@@ -435,10 +448,8 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     // input or the selected benchmarks' stories); page stages take pages.
     let storyTargets: { storyId: string; coverType?: string; character?: string }[] = [];
     if (isStoryLevel || isCharacterLevel) {
-      const ids = storyIdInput.trim()
-        ? [storyIdInput.trim()]
-        : [...new Set(benchmarks.filter(b => selectedBench.includes(b.id)).map(b => b.storyId))];
-      if (ids.length === 0) { alert('Enter a story ID or select benchmark pages (their stories are used).'); return; }
+      const ids = storyTargetIds;
+      if (ids.length === 0) { alert('Pick at least one story (tap it in the list) or paste a Story ID.'); return; }
       storyTargets = ids.map(id => {
         if (stage === 'cover') return { storyId: id, coverType };
         if (isCharacterLevel) return { storyId: id, character: charName.trim() };
@@ -587,7 +598,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
           {(isStoryLevel || isCharacterLevel) && (
             <input
               className="border rounded-lg px-3 py-2 text-sm w-full sm:w-72"
-              placeholder="Story ID (empty = selected benchmarks' stories)"
+              placeholder="Or paste a Story ID"
               value={storyIdInput}
               onChange={e => setStoryIdInput(e.target.value)}
             />
@@ -653,31 +664,72 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
           />
         </div>
 
-        <div className="mb-4">
-          <div className="text-sm font-medium text-gray-700 mb-2">Targets (benchmark pages)</div>
-          {benchmarks.length === 0 && <div className="text-sm text-gray-400">No benchmark entries yet — add some in the Benchmark tab.</div>}
-          <div className="flex flex-wrap gap-2">
-            {benchmarks.map(b => (
-              <label key={b.id} className={`text-xs px-3 py-1.5 rounded-full border cursor-pointer ${selectedBench.includes(b.id) ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>
-                <input
-                  type="checkbox"
-                  className="hidden"
-                  checked={selectedBench.includes(b.id)}
-                  onChange={e => setSelectedBench(prev => e.target.checked ? [...prev, b.id] : prev.filter(id => id !== b.id))}
-                />
-                {b.label || `${b.storyTitle || b.storyId} P${b.pageNumber}`} {b.tags.artStyle ? `· ${b.tags.artStyle}` : ''}
-              </label>
-            ))}
+        {(isStoryLevel || isCharacterLevel) ? (
+          <div className="mb-4">
+            <div className="text-sm font-medium text-gray-700 mb-2">
+              Target {isCharacterLevel ? 'stories (whole story)' : 'stories'} ({storyTargetIds.length} selected)
+            </div>
+            <input
+              className="border rounded-lg px-3 py-2 text-sm w-full mb-2"
+              placeholder="Filter stories by title or user…"
+              value={storySearch}
+              onChange={e => setStorySearch(e.target.value)}
+            />
+            {stories.length === 0 && <div className="text-sm text-gray-400">Loading stories…</div>}
+            <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto">
+              {stories
+                .filter(s => {
+                  const q = storySearch.trim().toLowerCase();
+                  if (!q) return true;
+                  return (s.title || '').toLowerCase().includes(q) || (s.userEmail || s.username || '').toLowerCase().includes(q);
+                })
+                .map(s => {
+                  const on = selectedStoryIds.includes(s.id);
+                  return (
+                    <label
+                      key={s.id}
+                      title={`${s.id} · ${s.artStyle || ''} · ${s.pages}p · ${s.language || ''}`}
+                      className={`text-xs px-3 py-1.5 rounded-full border cursor-pointer ${on ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="hidden"
+                        checked={on}
+                        onChange={e => setSelectedStoryIds(prev => e.target.checked ? [...prev, s.id] : prev.filter(id => id !== s.id))}
+                      />
+                      {s.title || <span className="italic">untitled</span>} <span className={on ? 'text-indigo-100' : 'text-gray-400'}>· {s.pages}p · {s.language}</span>
+                    </label>
+                  );
+                })}
+            </div>
           </div>
-          {benchmarks.length > 0 && (
-            <button
-              className="text-xs text-indigo-600 hover:underline mt-2"
-              onClick={() => setSelectedBench(selectedBench.length === benchmarks.length ? [] : benchmarks.map(b => b.id))}
-            >
-              {selectedBench.length === benchmarks.length ? 'Deselect all' : 'Select all'}
-            </button>
-          )}
-        </div>
+        ) : (
+          <div className="mb-4">
+            <div className="text-sm font-medium text-gray-700 mb-2">Targets (benchmark pages)</div>
+            {benchmarks.length === 0 && <div className="text-sm text-gray-400">No benchmark entries yet — add some in the Benchmark tab.</div>}
+            <div className="flex flex-wrap gap-2">
+              {benchmarks.map(b => (
+                <label key={b.id} className={`text-xs px-3 py-1.5 rounded-full border cursor-pointer ${selectedBench.includes(b.id) ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>
+                  <input
+                    type="checkbox"
+                    className="hidden"
+                    checked={selectedBench.includes(b.id)}
+                    onChange={e => setSelectedBench(prev => e.target.checked ? [...prev, b.id] : prev.filter(id => id !== b.id))}
+                  />
+                  {b.label || `${b.storyTitle || b.storyId} P${b.pageNumber}`} {b.tags.artStyle ? `· ${b.tags.artStyle}` : ''}
+                </label>
+              ))}
+            </div>
+            {benchmarks.length > 0 && (
+              <button
+                className="text-xs text-indigo-600 hover:underline mt-2"
+                onClick={() => setSelectedBench(selectedBench.length === benchmarks.length ? [] : benchmarks.map(b => b.id))}
+              >
+                {selectedBench.length === benchmarks.length ? 'Deselect all' : 'Select all'}
+              </button>
+            )}
+          </div>
+        )}
 
         {stageInfo?.overridable && (
           <div className="mb-4">
