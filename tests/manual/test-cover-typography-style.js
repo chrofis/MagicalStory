@@ -32,6 +32,8 @@ async function makeArt() {
   check('title: null → null', sanitizeTitleStyle(null) === null);
   check('dedication: valid style kept', JSON.stringify(sanitizeDedicationStyle({ font: 'Caveat', color: '#112233' })) === JSON.stringify({ font: 'Caveat', color: '#112233' }));
   check('dedication: unknown font dropped', sanitizeDedicationStyle({ font: 'Wingdings', color: '#112233' }).font === undefined);
+  check('dedication: valid align kept', sanitizeDedicationStyle({ align: 'left' }).align === 'left');
+  check('dedication: invalid align dropped', sanitizeDedicationStyle({ align: 'top', font: 'Caveat' }).align === undefined);
   check('exported enums non-empty', TITLE_LAYOUTS.length === 4 && TITLE_FONT_IDS.length === 9 && DEDICATION_FONTS.length === 5);
 
   console.log('— compose with overrides —');
@@ -62,6 +64,13 @@ async function makeArt() {
     // #ffd60a is light → outline should be black for contrast
     return true; // outline not in spec; visual property covered by colorsFromFace test below
   })());
+
+  // Pinned alignment: left vs right must produce different renders, and the
+  // spec echoes the align choice.
+  const dedLeft = await composeCover({ artBuffer: art, kind: 'initial', dedication: 'Für Emma', seed: 'x', figures, style: { align: 'left' } });
+  const dedRight = await composeCover({ artBuffer: art, kind: 'initial', dedication: 'Für Emma', seed: 'x', figures, style: { align: 'right' } });
+  check('dedication align: echoed in spec', dedLeft.spec.style?.align === 'left' && dedRight.spec.style?.align === 'right');
+  check('dedication align: left and right renders differ', !dedLeft.buffer.equals(dedRight.buffer));
 
   console.log('— colorsFromFace contrast derivation —');
   const bgDark = { r: 20, g: 30, b: 40 }, bgLight = { r: 240, g: 240, b: 230 };

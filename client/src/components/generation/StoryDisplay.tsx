@@ -210,7 +210,7 @@ interface StoryDisplayProps {
   // Title editing
   onSaveTitleChange?: (title: string) => Promise<void>;
   /** User typography for cover text — front title / dedication. null resets to automatic. */
-  onSetCoverTypography?: (coverKey: 'frontCover' | 'initialPage', style: { fontId?: string; layout?: string; color?: string; font?: string } | null) => Promise<void>;
+  onSetCoverTypography?: (coverKey: 'frontCover' | 'initialPage', style: { fontId?: string; layout?: string; color?: string; font?: string; align?: string } | null) => Promise<void>;
   /** Edit the dedication text (no AI — initial page is re-stamped). Empty string removes it. */
   onSaveDedicationChange?: (dedication: string) => Promise<void>;
   // Image regeneration with credits
@@ -2043,7 +2043,7 @@ export function StoryDisplay({
               type="text"
               value={editedTitle}
               onChange={(e) => setEditedTitle(e.target.value)}
-              className="flex-1 text-2xl md:text-3xl font-bold text-gray-800 text-center border-2 border-indigo-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+              className="flex-1 min-w-0 text-2xl md:text-3xl font-bold text-gray-800 text-center border-2 border-indigo-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSaveTitle();

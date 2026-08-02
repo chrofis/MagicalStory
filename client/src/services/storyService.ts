@@ -2429,7 +2429,7 @@ export const storyService = {
   async setCoverTypography(
     storyId: string,
     coverKey: 'frontCover' | 'initialPage',
-    style: { fontId?: string; layout?: string; color?: string; font?: string } | null,
+    style: { fontId?: string; layout?: string; color?: string; font?: string; align?: string } | null,
   ): Promise<{ success: boolean; coverKey: string; style: object | null; imageData: string; spec: object }> {
     return api.put(`/api/stories/${storyId}/cover-typography`, { coverKey, style });
   },

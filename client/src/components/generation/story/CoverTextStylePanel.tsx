@@ -7,6 +7,7 @@ export interface CoverTextStyle {
   layout?: string;   // front title effect: arch | archdown | tilt | straight
   color?: string;    // #rrggbb face colour (title or dedication)
   font?: string;     // dedication font family name (server WFONTS)
+  align?: string;    // dedication horizontal position: left | center | right
 }
 
 // Keep in sync with server/lib/coverTypography.js (FONTS / TITLE_LAYOUTS / WFONTS).
@@ -44,6 +45,7 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
   const [fontSel, setFontSel] = useState<string>(currentStyle?.fontId || currentStyle?.font || 'auto');
   const [layoutSel, setLayoutSel] = useState<string>(currentStyle?.layout || 'auto');
   const [colorSel, setColorSel] = useState<string>(currentStyle?.color || 'auto');
+  const [alignSel, setAlignSel] = useState<string>(currentStyle?.align || 'auto');
 
   const t = (de: string, fr: string, en: string) => (language === 'de' ? de : language === 'fr' ? fr : en);
   const LAYOUTS: Array<{ id: string; label: string }> = [
@@ -58,6 +60,7 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
     if (fontSel !== 'auto') { if (kind === 'front') s.fontId = fontSel; else s.font = fontSel; }
     if (kind === 'front' && layoutSel !== 'auto') s.layout = layoutSel;
     if (colorSel !== 'auto') s.color = colorSel;
+    if (kind === 'dedication' && alignSel !== 'auto') s.align = alignSel;
     return Object.keys(s).length ? s : null;
   };
 
@@ -66,7 +69,7 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
     setError(null);
     try {
       await onApply(style);
-      if (style === null) { setFontSel('auto'); setLayoutSel('auto'); setColorSel('auto'); }
+      if (style === null) { setFontSel('auto'); setLayoutSel('auto'); setColorSel('auto'); setAlignSel('auto'); }
     } catch (e: any) {
       setError(e?.message || t('Fehler beim Anwenden', "Échec de l'application", 'Failed to apply'));
     } finally {
@@ -119,6 +122,26 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
               >
                 <option value="auto">{t('Automatisch', 'Automatique', 'Automatic')}</option>
                 {LAYOUTS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Position — dedication only. Auto picks the clearest pocket around
+              the detected figures; pinning it wins over the pocket search. */}
+          {kind === 'dedication' && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                {t('Position', 'Position', 'Position')}
+              </label>
+              <select
+                value={alignSel}
+                onChange={e => setAlignSel(e.target.value)}
+                className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"
+              >
+                <option value="auto">{t('Automatisch', 'Automatique', 'Automatic')}</option>
+                <option value="left">{t('Links', 'À gauche', 'Left')}</option>
+                <option value="center">{t('Mitte', 'Centré', 'Center')}</option>
+                <option value="right">{t('Rechts', 'À droite', 'Right')}</option>
               </select>
             </div>
           )}

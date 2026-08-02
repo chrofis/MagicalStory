@@ -83,11 +83,13 @@ function sanitizeTitleStyle(style) {
   if (typeof style.color === 'string' && HEX_RE.test(style.color)) out.color = style.color.toLowerCase();
   return Object.keys(out).length ? out : null;
 }
+const DEDICATION_ALIGNS = ['left', 'center', 'right'];
 function sanitizeDedicationStyle(style) {
   if (!style || typeof style !== 'object') return null;
   const out = {};
   if (style.font && WFONTS.some(f => f.family === style.font)) out.font = style.font;
   if (typeof style.color === 'string' && HEX_RE.test(style.color)) out.color = style.color.toLowerCase();
+  if (style.align && DEDICATION_ALIGNS.includes(style.align)) out.align = style.align;
   return Object.keys(out).length ? out : null;
 }
 // Fixed user face colour → derive the 3D side + outline the same way
@@ -397,7 +399,15 @@ async function composeDedication(artBuffer, dedication, figures, seed, style) {
   const text = String(dedication).trim();
   const words = text.split(/\s+/).length;
   let place, colors, lines;
-  if (words <= 8) {
+  if (styleOv?.align) {
+    // User pinned the horizontal position — fixed lower band instead of the
+    // occupancy-driven pocket (which drifts wherever the figures aren't).
+    // Band height tracks the line count so fitRender can't balloon the text.
+    lines = words <= 8 ? [text] : splitLinesN(text, Math.min(6, Math.max(2, Math.round(words / 6))));
+    const X = { left: [0.06, 0.58], center: [0.16, 0.84], right: [0.42, 0.94] }[styleOv.align];
+    const y1 = 0.94, y0 = Math.max(0.55, y1 - lines.length * 0.065 - 0.02);
+    place = { x0: X[0], x1: X[1], y0, y1 };
+  } else if (words <= 8) {
     // short dedication → clearest bottom pocket
     const br = bottomRect(occ.grid, occ.gw, occ.gh, W, H, text.length, 0.5, 1, 0.12);
     place = { x0: br.x0, x1: br.x1, y0: br.y0, y1: br.y1 };
