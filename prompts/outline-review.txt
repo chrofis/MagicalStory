@@ -12,6 +12,18 @@ The story has {PAGES} pages. The characters are: {CHARACTER_NAMES}. Hard cap {MA
 
 {REVIEW_HINTS_SECTION}
 
+# CHARACTER DETAILS (source of truth for physical description)
+
+These are the locked physical traits each character was authored with — the SAME block the writer worked from. Use them as the reference for the physical-trait fidelity check (19b) below: every character's SCENE prose must use these `Hair:` / `Facial hair:` / `Glasses:` / `Looks:` / `Distinctive marks:` values verbatim; paraphrase or drift is a violation. The writer output does NOT restate this block (main/primary characters are excluded from the Visual Bible), so this is your only trait reference.
+
+{CHARACTER_DETAILS}
+
+# DO-NOT-WRITE LIST (canonical)
+
+These must appear nowhere in the story text or SCENE prose. Use this list for the DO-NOT-WRITE verification (check 25) below — cite the page and the offending line for any that slipped into the draft.
+
+{DO_NOT_WRITE_LIST}
+
 # SEMANTIC SCENE CONSISTENCY (your judgment — apply during section D, emit fix lines like any other)
 
 A deterministic pre-check can only compare strings and sets; it cannot judge MEANING. You can. For EVERY page, read the page text, the SCENE prose, and the METADATA JSON together and check that they describe the same coherent moment. At minimum:

@@ -344,6 +344,16 @@ const promptsSvc = require('../../server/services/prompts');
     const reviewPromptNoOverlay = buildOutlineReviewPrompt({ ...baseInput, layout: { textInImage: false } }, writerOnlyResponse, []);
     check('review prompt: overlay checks stripped when textInImage=false', !reviewPromptNoOverlay.includes('Text position distribution'));
     check('review prompt without hints omits the REVIEW HINTS block', !reviewPromptNoOverlay.includes('# REVIEW HINTS'));
+
+    // Source-of-truth blocks the reviewer needs (writer PROMPT only, not in the
+    // writer OUTPUT): CHARACTER DETAILS (check 19b) + DO-NOT-WRITE LIST (check 25).
+    check('review prompt carries the CHARACTER DETAILS reference section', reviewPrompt.includes('# CHARACTER DETAILS'));
+    check('review prompt has no unfilled {CHARACTER_DETAILS} placeholder', !reviewPrompt.includes('{CHARACTER_DETAILS}'));
+    check('review prompt carries the DO-NOT-WRITE LIST reference section', reviewPrompt.includes('# DO-NOT-WRITE LIST'));
+    check('review prompt has no unfilled {DO_NOT_WRITE_LIST} placeholder', !reviewPrompt.includes('{DO_NOT_WRITE_LIST}'));
+    check('review prompt embeds a canonical banned item (hand on shoulder)', reviewPrompt.includes('hand on shoulder'));
+    check('review prompt drops the writer-only "does NOT need to re-check" note',
+      !reviewPrompt.includes('the analysis pass does NOT need to re-check them'));
   } finally {
     MODEL_DEFAULTS.splitOutlineReview = prevSplit;
   }

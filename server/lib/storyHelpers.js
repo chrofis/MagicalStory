@@ -5357,6 +5357,39 @@ function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssue
   const imageModelKey = inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage;
   const maxCharsPerScene = IMAGE_MODELS[imageModelKey]?.maxCharactersPerScene || 3;
 
+  // The reviewer's checks reference two source-of-truth blocks the WRITER OUTPUT
+  // does not carry (they live in the writer PROMPT): the CHARACTER DETAILS trait
+  // lock (needed by physical-trait fidelity, check 19b — main/primary chars are
+  // excluded from the Visual Bible) and the DO-NOT-WRITE LIST (needed by check
+  // 25). In single-call mode the writer had both in-context; the split removed
+  // them from the reviewer's view. Rebuild/inject them here so both checks work.
+  const characterDetails = (inputData.characters || [])
+    .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
+    .join('\n\n') || '(no character details available)';
+
+  // Slice the canonical DO-NOT-WRITE LIST out of the matching writer template so
+  // the two never drift. Drop its header and the writer-only "the analysis pass
+  // does NOT need to re-check them" note (that guidance is for the writer's own
+  // self-critique; in split mode the external reviewer IS the re-check).
+  const writerTpl = (useImageFirst && PROMPT_TEMPLATES.storyUnifiedImageFirst)
+    ? PROMPT_TEMPLATES.storyUnifiedImageFirst
+    : PROMPT_TEMPLATES.storyUnified;
+  let doNotWriteList = '';
+  if (writerTpl) {
+    const start = writerTpl.indexOf('## DO-NOT-WRITE LIST');
+    if (start >= 0) {
+      const rest = writerTpl.slice(start);
+      const stops = ['\n**PACING:**', '\n---', '\n# OUTPUT FORMAT']
+        .map(s => rest.indexOf(s)).filter(i => i > 0);
+      const end = stops.length ? Math.min(...stops) : rest.length;
+      doNotWriteList = rest.slice(0, end)
+        .replace(/^##\s*DO-NOT-WRITE LIST[^\n]*\n+/, '')
+        .replace(/^These appear nowhere[^\n]*\n+/m, '')
+        .trim();
+    }
+  }
+  if (!doNotWriteList) doNotWriteList = '(canonical DO-NOT-WRITE list unavailable — apply the ban categories named in check 25)';
+
   // Inject the analysis body BEFORE fillTemplate so its own placeholders
   // ({CHARACTER_NAMES}, {MAX_CHARACTERS_PER_SCENE}) get filled too.
   const templateWithAnalysis = template.replace('{ANALYSIS_INSTRUCTIONS}', () => analysisBody);
@@ -5367,7 +5400,9 @@ function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssue
     CHARACTER_NAMES: characterNames,
     MAX_CHARACTERS_PER_SCENE: maxCharsPerScene,
     WRITER_OUTPUT: writerOutput,
-    REVIEW_HINTS_SECTION: reviewHintsSection
+    REVIEW_HINTS_SECTION: reviewHintsSection,
+    CHARACTER_DETAILS: characterDetails,
+    DO_NOT_WRITE_LIST: doNotWriteList
   });
 
   // Same text-overlay gating as the writer prompt: layouts that render text
