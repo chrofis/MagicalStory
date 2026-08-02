@@ -372,6 +372,9 @@ function bboxToBin(box, width, height) {
 async function normalizeGarmentHue(pageImageData, bboxDetection, resolveAvatar, options = {}) {
   const { opts = {}, logLabel = '', collectCrops = false } = options;
   const cfg = { ...DEFAULTS, ...opts };
+  // disable: hard no-op that returns the page untouched — used by the Test Lab
+  // "colour on/off" A/B as the OFF baseline (same input, no normalization).
+  if (cfg.disable) return { changed: false, correctedImageData: pageImageData, perFigure: [], disabled: true };
   const figures = bboxDetection?.figures || [];
   const masks = bboxDetection?._gdinoMasks || null;
   const perFigure = [];

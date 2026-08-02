@@ -974,11 +974,11 @@ async function runGarmentHueStage(ctx, { experimentId, params = {} }) {
       steps.push({ label: `${f.name} AFTER (→ avatar ${f.avatarHueDeg}°, rotated ${f.rotationDeg}°)`, imageType: 'tl_step', versionIndex: v });
     }
   }
-  // The corrected full page (only when something actually changed).
-  let correctedVersion = null;
-  if (out.changed) {
-    correctedVersion = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, out.correctedImageData, experimentId);
-  }
+  // Always save the resulting full page as a version so BOTH sides of the
+  // colour on/off A/B are directly comparable: the ON variant yields the
+  // corrected page, the OFF variant (opts.disable) yields the original page =
+  // the "without" side. (out.correctedImageData === the original when unchanged.)
+  const correctedVersion = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, out.correctedImageData, experimentId);
 
   return {
     elapsedMs,

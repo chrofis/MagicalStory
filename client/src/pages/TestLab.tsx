@@ -344,6 +344,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const [charName, setCharName] = useState('');
   const [repairBackend, setRepairBackend] = useState('grok');
   const [compareAll, setCompareAll] = useState(false);
+  const [compareColor, setCompareColor] = useState(false);
   const [whiteoutTarget, setWhiteoutTarget] = useState('face');
   const [freshDetection, setFreshDetection] = useState(false);
   const [paramsJson, setParamsJson] = useState('');
@@ -478,11 +479,27 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
             { label: 'E: Gemini repaint', params: { backend: 'gemini', repairMode: 'auto' } },
             { label: 'F: Qwen whiteout', params: { backend: 'qwen' } },
           ];
+        } else if (compareColor) {
+          // ONE experiment: same fresh boxes, insert-path face repair run with
+          // colour correction ON vs OFF → side-by-side to see the seam colour fix.
+          params.rerunDetection = true;
+          params.variants = [
+            { label: 'colour ON', params: { backend: 'grok', colorCorrect: true } },
+            { label: 'colour OFF', params: { backend: 'grok', colorCorrect: false } },
+          ];
         } else {
           params.backend = repairBackend;
           if (repairBackend === 'grok' || repairBackend === 'qwen') params.whiteoutTarget = whiteoutTarget;
           if (freshDetection) params.freshDetection = true;
         }
+      }
+      if (stage === 'garment_hue' && compareColor) {
+        // ONE experiment: garment-hue normalization ON vs OFF (OFF = original page)
+        // → full-page with vs without the per-story colour repair.
+        params.variants = [
+          { label: 'hue ON', params: {} },
+          { label: 'hue OFF', params: { opts: { disable: true } } },
+        ];
       }
       if (stage === 'qwen_insert' && freshDetection) params.freshDetection = true;
       if (stage === 'cover') params.coverType = coverType;
@@ -563,6 +580,10 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
                 <input type="checkbox" checked={compareAll} onChange={e => setCompareAll(e.target.checked)} />
                 Compare ALL engines (fresh detection + Options A–F, one experiment)
               </label>
+              <label className="text-sm flex items-center gap-1.5 font-medium text-indigo-700">
+                <input type="checkbox" checked={compareColor} onChange={e => setCompareColor(e.target.checked)} />
+                Compare colour ON vs OFF (insert repair, one experiment)
+              </label>
               <label className="text-sm flex items-center gap-1.5">
                 Engine
                 <select className="border rounded-lg px-3 py-2 text-sm" value={repairBackend} onChange={e => setRepairBackend(e.target.value)}>
@@ -586,6 +607,12 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
             <label className="text-sm flex items-center gap-1.5">
               <input type="checkbox" checked={freshDetection} onChange={e => setFreshDetection(e.target.checked)} />
               Re-detect character (ignore stored box)
+            </label>
+          )}
+          {stage === 'garment_hue' && (
+            <label className="text-sm flex items-center gap-1.5 font-medium text-indigo-700">
+              <input type="checkbox" checked={compareColor} onChange={e => setCompareColor(e.target.checked)} />
+              Compare colour ON vs OFF (garment-hue on vs original page, one experiment)
             </label>
           )}
           {stage === 'cover' && (
