@@ -61,28 +61,38 @@ function NewVersionBanner() {
 export default function TestLab() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('stories');
+  // One-tap "Review" from the Stories tab hands a story to the Experiments tab
+  // (prefills the outline_review stage + story ID) — no window.prompt / no
+  // benchmark detour / no typing IDs on mobile. {} bumps to force a re-apply
+  // even when the same story is tapped twice.
+  const [preset, setPreset] = useState<{ storyId: string; stage: string } | null>(null);
+
+  const useStoryForReview = (storyId: string) => {
+    setPreset({ storyId, stage: 'outline_review' });
+    setTab('experiments');
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-100 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         <NewVersionBanner />
         <LightboxHost />
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <FlaskConical className="text-indigo-500" size={28} /> Test Lab
+        <div className="flex items-center justify-between mb-4 sm:mb-6 gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <FlaskConical className="text-indigo-500 shrink-0" size={24} /> Test Lab
           </h1>
-          <Button variant="secondary" size="sm" onClick={() => navigate('/admin')}>Admin Dashboard</Button>
+          <Button variant="secondary" size="sm" onClick={() => navigate('/admin')}>Admin</Button>
         </div>
 
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-4 sm:mb-6">
           <button className={tabBtn(tab === 'stories')} onClick={() => setTab('stories')}>Stories</button>
           <button className={tabBtn(tab === 'benchmark')} onClick={() => setTab('benchmark')}>Benchmark</button>
           <button className={tabBtn(tab === 'experiments')} onClick={() => setTab('experiments')}>Experiments</button>
         </div>
 
-        {tab === 'stories' && <StoriesTab />}
+        {tab === 'stories' && <StoriesTab onReviewStory={useStoryForReview} />}
         {tab === 'benchmark' && <BenchmarkTab />}
-        {tab === 'experiments' && <ExperimentsTab />}
+        {tab === 'experiments' && <ExperimentsTab preset={preset} onPresetApplied={() => setPreset(null)} />}
       </div>
     </div>
   );
@@ -92,7 +102,7 @@ export default function TestLab() {
 // Stories tab
 // ─────────────────────────────────────────────────────────────────────
 
-function StoriesTab() {
+function StoriesTab({ onReviewStory }: { onReviewStory: (storyId: string) => void }) {
   const [stories, setStories] = useState<TestLabStory[]>([]);
   const [pagination, setPagination] = useState<TestLabPagination | null>(null);
   const [page, setPage] = useState(1);
@@ -125,10 +135,13 @@ function StoriesTab() {
   useEffect(() => { load(); }, [load]);
 
   const addToBenchmark = async (story: TestLabStory) => {
-    const pageStr = window.prompt(`Add which page of "${story.title || story.id}" to the benchmark? (1-${story.pages})`);
-    if (!pageStr) return;
+    const pageStr = window.prompt(`Benchmark a PAGE of "${story.title || story.id}" for image experiments.\n\nEnter a page NUMBER (1-${story.pages}). To test the whole story's review instead, cancel this and tap "Review".`);
+    if (pageStr === null || pageStr.trim() === '') return;
     const pageNum = parseInt(pageStr, 10);
-    if (!Number.isFinite(pageNum) || pageNum < 1) return;
+    if (!Number.isFinite(pageNum) || pageNum < 1 || pageNum > story.pages) {
+      alert(`"${pageStr}" is not a valid page number (need 1-${story.pages}). Nothing added.`);
+      return;
+    }
     const label = window.prompt('Optional label for this benchmark entry:') || undefined;
     try {
       await testlabService.addBenchmark(story.id, pageNum, label);
@@ -169,31 +182,35 @@ function StoriesTab() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Title</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">User</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Style</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Type</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Lang</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Pages</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Created</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
+              <th className="px-3 sm:px-4 py-3 text-left text-sm font-semibold text-gray-700">Title</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 hidden md:table-cell">User</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 hidden sm:table-cell">Style</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 hidden lg:table-cell">Type</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 hidden lg:table-cell">Lang</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 hidden sm:table-cell">Pages</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 hidden md:table-cell">Created</th>
+              <th className="px-3 sm:px-4 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {stories.map(s => (
               <tr key={s.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-medium">
+                <td className="px-3 sm:px-4 py-3 text-sm font-medium">
                   {s.title || <span className="text-gray-400 italic">untitled</span>}
                   {s.hasBenchmark && <span className="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">benchmark</span>}
+                  <div className="text-xs text-gray-400 font-normal sm:hidden mt-0.5">{s.artStyle} · {s.pages}p · {s.language}</div>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600">{s.userEmail || s.username}</td>
-                <td className="px-4 py-3 text-sm">{s.artStyle}</td>
-                <td className="px-4 py-3 text-sm">{s.storyType}</td>
-                <td className="px-4 py-3 text-sm">{s.language}</td>
-                <td className="px-4 py-3 text-sm">{s.pages}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{new Date(s.createdAt).toLocaleDateString()}</td>
-                <td className="px-4 py-3 text-sm">
-                  <div className="flex gap-2">
+                <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{s.userEmail || s.username}</td>
+                <td className="px-4 py-3 text-sm hidden sm:table-cell">{s.artStyle}</td>
+                <td className="px-4 py-3 text-sm hidden lg:table-cell">{s.storyType}</td>
+                <td className="px-4 py-3 text-sm hidden lg:table-cell">{s.language}</td>
+                <td className="px-4 py-3 text-sm hidden sm:table-cell">{s.pages}</td>
+                <td className="px-4 py-3 text-sm text-gray-500 hidden md:table-cell">{new Date(s.createdAt).toLocaleDateString()}</td>
+                <td className="px-3 sm:px-4 py-3 text-sm">
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button size="sm" onClick={() => onReviewStory(s.id)}>
+                      <FlaskConical size={14} /> Review
+                    </Button>
                     <Button variant="secondary" size="sm" onClick={() => window.open(`/create?storyId=${s.id}`, '_blank')}>
                       <ExternalLink size={14} /> Open
                     </Button>
@@ -313,7 +330,7 @@ function BenchmarkTab() {
 // Experiments tab
 // ─────────────────────────────────────────────────────────────────────
 
-function ExperimentsTab() {
+function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string; stage: string } | null; onPresetApplied: () => void }) {
   const [experiments, setExperiments] = useState<ExperimentSummary[]>([]);
   const [benchmarks, setBenchmarks] = useState<BenchmarkScene[]>([]);
   const [selected, setSelected] = useState<ExperimentDetail | null>(null);
@@ -378,6 +395,16 @@ function ExperimentsTab() {
       })
       .catch(() => { /* picker stays empty; non-fatal */ });
   }, []);
+
+  // One-tap "Review" from the Stories tab: land here with the outline_review
+  // stage selected and the story ID filled in, so nothing needs typing.
+  useEffect(() => {
+    if (!preset) return;
+    setStage(preset.stage);
+    setStoryIdInput(preset.storyId);
+    setError(null);
+    onPresetApplied();
+  }, [preset, onPresetApplied]);
 
   // Poll while any experiment is running (or the detail view shows a running one).
   useEffect(() => {
@@ -483,7 +510,7 @@ function ExperimentsTab() {
   return (
     <div className="space-y-6">
       {/* New experiment */}
-      <div className="bg-white rounded-2xl shadow-lg p-6">
+      <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
         <h2 className="font-semibold text-gray-900 mb-4">New experiment</h2>
         {error && <div className="text-red-600 text-sm mb-3">{error}</div>}
         <div className="flex flex-wrap gap-3 items-center mb-4">
@@ -559,7 +586,7 @@ function ExperimentsTab() {
           )}
           {(isStoryLevel || isCharacterLevel) && (
             <input
-              className="border rounded-lg px-3 py-2 text-sm w-72"
+              className="border rounded-lg px-3 py-2 text-sm w-full sm:w-72"
               placeholder="Story ID (empty = selected benchmarks' stories)"
               value={storyIdInput}
               onChange={e => setStoryIdInput(e.target.value)}
@@ -805,7 +832,7 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl shadow-lg p-6">
+      <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-semibold text-gray-900">
@@ -857,7 +884,7 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
           isRedo={isRedo} superseded={superseded} />
       ))}
       {detail.status === 'running' && (
-        <div className="bg-white rounded-2xl shadow-lg p-6 text-center text-sm text-gray-500">
+        <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 text-center text-sm text-gray-500">
           Running… next target in progress (auto-refreshes every 5s)
         </div>
       )}
