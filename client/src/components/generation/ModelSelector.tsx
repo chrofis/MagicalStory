@@ -50,6 +50,18 @@ export const TEXT_MODELS = {
     description: 'Grok 4 Fast (xAI) - Very cheap, 2M context ($0.20/$0.50 per 1M)',
     descriptionDe: 'Grok 4 Fast (xAI) - Sehr günstig, 2M Kontext ($0.20/$0.50 pro 1M)',
     descriptionFr: 'Grok 4 Fast (xAI) - Très économique, 2M contexte ($0.20/$0.50 par 1M)'
+  },
+  'deepseek-v4-pro': {
+    provider: 'openrouter',
+    description: 'DeepSeek V4 Pro (OpenRouter) - top reasoning, 1M context ($0.44/$0.87 per 1M)',
+    descriptionDe: 'DeepSeek V4 Pro (OpenRouter) - starkes Reasoning, 1M Kontext ($0.44/$0.87 pro 1M)',
+    descriptionFr: 'DeepSeek V4 Pro (OpenRouter) - raisonnement de pointe, 1M contexte ($0.44/$0.87 par 1M)'
+  },
+  'deepseek-v4-flash': {
+    provider: 'openrouter',
+    description: 'DeepSeek V4 Flash (OpenRouter) - fast & very cheap, 1M context ($0.09/$0.18 per 1M)',
+    descriptionDe: 'DeepSeek V4 Flash (OpenRouter) - schnell & sehr günstig, 1M Kontext ($0.09/$0.18 pro 1M)',
+    descriptionFr: 'DeepSeek V4 Flash (OpenRouter) - rapide & très économique, 1M contexte ($0.09/$0.18 par 1M)'
   }
 } as const;
 

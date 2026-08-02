@@ -3400,3 +3400,34 @@ persisted as `${coverKey}Art` vN, so one cover regeneration converts a
 pre-typography story to fully editable cover text.
 
 **Touched:** `server/lib/coverIterate.js`, `server/routes/regeneration.js`.
+
+---
+
+## 2026-08-02 — DeepSeek V4 as a cheap reviewer candidate + Test Lab outline-review model comparison
+
+**Context:** The split outline review (2026-07-31) runs a separate Call-2
+reviewer, defaulting to Opus 5 ($5/$25 per 1M) — the most expensive text call
+in the pipeline. We want to test whether a much cheaper model can review well
+enough to replace Opus, but the lab had no way to run the review across models.
+
+**Decision:** (a) Add DeepSeek V4 (`deepseek-v4-pro`, `deepseek-v4-flash`) to
+`TEXT_MODELS` + `MODEL_PRICING` via the existing OpenRouter provider (no new
+credentials; OpenRouter streaming already exists). 64K `maxOutputTokens` so the
+32K review (and the 64K writer draft) aren't truncated. (b) New Test Lab
+story-level stage `outline_review`: generates ONE critique-free writer draft
+(split mode) from the story's reconstructed creation input, runs the
+deterministic scene-consistency pre-check, then runs `buildOutlineReviewPrompt`
+through every selected model on that SAME draft — one entry with per-model
+review text, cost, tokens, timing, fix-line count, side by side. (c) New
+`GET /api/admin/testlab/text-models` serves the model catalogue so the picker
+is never a hardcoded frontend list. Production default reviewer stays
+`claude-opus` — DeepSeek is testable/selectable, not the default, until an A/B
+proves quality. Input is rebuilt from the permanent `stories.data` fields
+(story_jobs is pruned ~1h after completion), so the stage works on any story.
+
+**Touched:** `server/config/models.js` (V4 entries + pricing),
+`server/lib/testlab.js` (`runOutlineReviewStage`, STORY_STAGES),
+`server/routes/admin/testlab.js` (`/text-models`),
+`client/src/services/testlabService.ts`, `client/src/pages/TestLab.tsx`,
+`client/src/components/generation/ModelSelector.tsx` (V4 selectable for real runs),
+`docs/ARCHITECTURE.html` (text row corrected to writer + separate review call).

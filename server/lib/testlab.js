@@ -1246,6 +1246,136 @@ async function runStyleCheckStage(target, { experimentId }) {
 }
 
 /**
+ * Outline-review model comparison (split outline review, Call 2). Target:
+ * {storyId}. Compares how DIFFERENT models perform AS THE REVIEWER.
+ *
+ * One critique-free writer draft (Call 1, split mode) is generated ONCE from
+ * the story's reconstructed creation input, then every model in params.models
+ * runs buildOutlineReviewPrompt on that SAME draft (Call 2) — so the only
+ * variable is the reviewer. Faithful to production: same split writer, same
+ * deterministic REVIEW HINTS pre-check, same buildOutlineReviewPrompt. Report
+ * only — nothing is written back to the story.
+ *
+ * params.models    : string[] of TEXT_MODELS keys to compare (default: the
+ *                    configured outlineReviewModel).
+ * params.writerModel : model for the shared Call-1 draft (default: MODEL_DEFAULTS.outline).
+ */
+async function runOutlineReviewStage(target, { params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildUnifiedStoryPrompt, buildOutlineReviewPrompt } = require('./storyHelpers');
+  const { callTextModel } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const { UnifiedStoryParser } = require('./outlineParser');
+  const { checkSceneConsistency } = require('./sceneConsistencyCheck');
+
+  const models = Array.isArray(params.models) && params.models.length
+    ? params.models
+    : [MODEL_DEFAULTS.outlineReviewModel];
+  const bad = models.filter(m => !TEXT_MODELS[m]);
+  if (bad.length) throw new Error(`Unknown reviewer model(s): ${bad.join(', ')}. Valid: ${Object.keys(TEXT_MODELS).join(', ')}`);
+
+  // Reconstruct the creation input from the PERMANENT story record (story_jobs
+  // is pruned ~1h after completion — routes/jobs.js). stories.data carries every
+  // field the prompt builders read, copied verbatim at save time (server.js).
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const inputData = {
+    pages: storyData.pages,
+    languageLevel: storyData.languageLevel,
+    language: storyData.language,
+    mainCharacters: storyData.mainCharacters || [],
+    characters: storyData.characters || [],
+    relationships: storyData.relationships || {},
+    relationshipTexts: storyData.relationshipTexts || {},
+    storyCategory: storyData.storyCategory,
+    storyTopic: storyData.storyTopic,
+    storyTheme: storyData.storyTheme,
+    storyType: storyData.storyType,
+    storyTypeName: storyData.storyTypeName,
+    storyDetails: storyData.storyDetails,
+    artStyle: storyData.artStyle,
+    season: storyData.season,
+    userLocation: storyData.userLocation,
+    dedication: storyData.dedication,
+    layout: storyData.layout,
+    storyPromptVariant: storyData.storyPromptVariant,
+    availableLandmarks: storyData.availableLandmarks,
+    customThemeText: storyData.customThemeText,
+    modelOverrides: storyData.modelOverrides,
+    splitOutlineReview: true, // force the critique-free Call-1 writer draft
+  };
+  if (!(inputData.characters || []).length) {
+    throw new Error(`Story ${target.storyId} has no persisted characters/input to rebuild the review.`);
+  }
+
+  // Call 1 — one shared critique-free writer draft.
+  const writerModel = params.writerModel || MODEL_DEFAULTS.outline;
+  if (!TEXT_MODELS[writerModel]) throw new Error(`Unknown writer model "${writerModel}"`);
+  const writerPrompt = buildUnifiedStoryPrompt(inputData, inputData.pages || null);
+  const wt0 = Date.now();
+  const writer = await callTextModel(writerPrompt, 64000, writerModel, { usageLabel: 'testlab_review_writer' });
+  const writerElapsedMs = Date.now() - wt0;
+  const writerOutput = writer.text || '';
+  if (!writerOutput) throw new Error('Writer draft (Call 1) came back empty');
+
+  // Deterministic scene-consistency pre-check → REVIEW HINTS (same as prod).
+  let hints = [];
+  try {
+    const draftPages = new UnifiedStoryParser(writerOutput).extractPages();
+    hints = checkSceneConsistency(draftPages, writerOutput, {
+      knownCharacterNames: (inputData.characters || []).map(c => c.name),
+    });
+  } catch (e) {
+    log.warn(`[TESTLAB] outline_review hint pre-check failed (non-fatal): ${e.message}`);
+  }
+  const hintCount = hints.reduce((n, e) => n + (e.issues?.length || 0), 0);
+
+  const reviewPrompt = buildOutlineReviewPrompt(inputData, writerOutput, hints);
+  if (!reviewPrompt) throw new Error('outline-review template unavailable (buildOutlineReviewPrompt returned null)');
+
+  // Call 2 — every selected reviewer on the SAME draft, concurrently.
+  const CAP = 120000; // per-text storage cap; full reviews are large
+  const reviewRuns = await Promise.all(models.map(async (modelKey) => {
+    const t0 = Date.now();
+    try {
+      const r = await callTextModel(reviewPrompt, 32000, modelKey, { usageLabel: 'testlab_outline_review' });
+      const elapsedMs = Date.now() - t0;
+      const usage = r.usage || {};
+      const modelId = r.modelId || TEXT_MODELS[modelKey].modelId;
+      let reviewText = r.text || '';
+      const reviewTruncated = reviewText.length > CAP;
+      if (reviewTruncated) reviewText = reviewText.slice(0, CAP) + '\n…[output truncated for storage]';
+      // Same "Pages N,M:" fix-line shape the progressive parser counts.
+      const fixCount = (reviewText.match(/^[\s\-*•]*Pages?\s+[\d,\s\-–]+?\s*:/gim) || []).length;
+      return {
+        modelKey, modelId, ok: true, elapsedMs,
+        usage: { input_tokens: usage.input_tokens || 0, output_tokens: usage.output_tokens || 0 },
+        cost: calculateTextCost(modelId, usage), fixCount, reviewText, reviewTruncated,
+      };
+    } catch (err) {
+      return { modelKey, ok: false, elapsedMs: Date.now() - t0, error: err.message };
+    }
+  }));
+
+  let writerDraft = writerOutput;
+  const writerTruncated = writerDraft.length > CAP;
+  if (writerTruncated) writerDraft = writerDraft.slice(0, CAP) + '\n…[draft truncated for storage]';
+
+  return {
+    stageKind: 'outline_review',
+    writerModel,
+    writerModelId: writer.modelId || TEXT_MODELS[writerModel].modelId,
+    writerElapsedMs,
+    writerChars: writerOutput.length,
+    writerTruncated,
+    writerDraft,
+    hintCount,
+    reviewPromptChars: reviewPrompt.length,
+    reviewRuns,
+  };
+}
+
+/**
  * STYLE-REPAIR A/B stage (roadmap Pt 10). The missing repair half of the
  * detection-only `style_check`: find the style-outlier pages, then repaint each
  * one toward the dominant style cluster with BOTH Gemini and Grok, and surface
@@ -2800,6 +2930,7 @@ const STORY_STAGES = {
   cover: runCoverStage,
   style_check: runStyleCheckStage,
   style_repair: runStyleRepairStage,
+  outline_review: runOutlineReviewStage,
 };
 
 // Avatar stages take {storyId, character} targets, not page targets.

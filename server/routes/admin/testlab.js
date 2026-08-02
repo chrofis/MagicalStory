@@ -134,6 +134,29 @@ router.get('/templates', async (req, res) => {
   }
 });
 
+// GET /api/admin/testlab/text-models — full text-model catalogue (single source
+// of truth = server/config/models.js TEXT_MODELS) so the outline_review
+// comparison UI can offer every model with pricing instead of a hardcoded list.
+router.get('/text-models', async (req, res) => {
+  try {
+    const { TEXT_MODELS, MODEL_PRICING, MODEL_DEFAULTS } = require('../../config/models');
+    const models = Object.entries(TEXT_MODELS).map(([id, m]) => {
+      const price = MODEL_PRICING[m.modelId] || null;
+      return {
+        id,
+        modelId: m.modelId,
+        provider: m.provider,
+        maxOutputTokens: m.maxOutputTokens,
+        description: m.description || '',
+        pricing: price ? { input: price.input, output: price.output } : null,
+      };
+    });
+    res.json({ models, defaultReviewModel: MODEL_DEFAULTS.outlineReviewModel, defaultWriterModel: MODEL_DEFAULTS.outline });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load text models', details: err.message });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────
 // Benchmark scenes
 // ─────────────────────────────────────────────────────────────────────

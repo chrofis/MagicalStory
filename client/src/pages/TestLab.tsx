@@ -23,6 +23,7 @@ import {
   type ExperimentSummary,
   type ExperimentDetail,
   type ExperimentResult,
+  type TextModelInfo,
 } from '@/services/testlabService';
 
 type Tab = 'stories' | 'benchmark' | 'experiments';
@@ -331,12 +332,16 @@ function ExperimentsTab() {
   const [paramsJson, setParamsJson] = useState('');
   const [storyIdInput, setStoryIdInput] = useState('');
   const [coverType, setCoverType] = useState('frontCover');
+  const [textModels, setTextModels] = useState<TextModelInfo[]>([]);
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [writerModel, setWriterModel] = useState('');
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const stageInfo = TESTLAB_STAGES.find(s => s.id === stage);
   const isStoryLevel = !!(stageInfo as { storyLevel?: boolean } | undefined)?.storyLevel;
   const isCharacterLevel = !!(stageInfo as { characterLevel?: boolean } | undefined)?.characterLevel;
+  const isOutlineReview = stage === 'outline_review';
   const needsCharacter = stage === 'char_repair' || stage === 'qwen_insert' || isCharacterLevel;
   // Characters on the selected benchmark pages (from their snapshots).
   const charOptions = [...new Set(
@@ -348,7 +353,7 @@ function ExperimentsTab() {
   const targetCount = isStoryLevel || isCharacterLevel
     ? (storyIdInput.trim() ? 1 : [...new Set(benchmarks.filter(b => selectedBench.includes(b.id)).map(b => b.storyId))].length)
     : selectedBench.length;
-  const canStart = targetCount > 0 && (!needsCharacter || !!charName.trim());
+  const canStart = targetCount > 0 && (!needsCharacter || !!charName.trim()) && (!isOutlineReview || selectedModels.length > 0);
 
   const load = useCallback(async () => {
     try {
@@ -361,6 +366,18 @@ function ExperimentsTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Text-model catalogue for the outline_review reviewer picker (single source
+  // of truth = server TEXT_MODELS). Default-selects the configured reviewer.
+  useEffect(() => {
+    testlabService.getTextModels()
+      .then(res => {
+        setTextModels(res.models);
+        setSelectedModels(prev => prev.length ? prev : (res.defaultReviewModel ? [res.defaultReviewModel] : []));
+        setWriterModel(prev => prev || res.defaultWriterModel || '');
+      })
+      .catch(() => { /* picker stays empty; non-fatal */ });
+  }, []);
 
   // Poll while any experiment is running (or the detail view shows a running one).
   useEffect(() => {
@@ -431,6 +448,13 @@ function ExperimentsTab() {
       }
       if (stage === 'qwen_insert' && freshDetection) params.freshDetection = true;
       if (stage === 'cover') params.coverType = coverType;
+      if (isOutlineReview) {
+        if (selectedModels.length === 0) { alert('Pick at least one reviewer model to compare.'); setStarting(false); return; }
+        // One entry per experiment: the runner makes ONE shared writer draft,
+        // then reviews it with every selected model (params.models).
+        params.models = selectedModels;
+        if (writerModel) params.writerModel = writerModel;
+      }
       if (paramsJson.trim()) {
         try { params = { ...params, ...JSON.parse(paramsJson) }; }
         catch { alert('Params JSON is not valid JSON.'); setStarting(false); return; }
@@ -542,6 +566,55 @@ function ExperimentsTab() {
             />
           )}
         </div>
+        {isOutlineReview && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium text-gray-700">
+                Reviewer models to compare ({selectedModels.length} selected)
+              </div>
+              {textModels.length > 0 && (
+                <button
+                  className="text-xs text-indigo-600 hover:underline"
+                  onClick={() => setSelectedModels(selectedModels.length === textModels.length ? [] : textModels.map(m => m.id))}
+                >
+                  {selectedModels.length === textModels.length ? 'Deselect all' : 'Select all'}
+                </button>
+              )}
+            </div>
+            <div className="text-xs text-gray-500 mb-2">
+              Generates ONE critique-free writer draft (below), then runs the split outline-review (buildOutlineReviewPrompt) through each selected model on that same draft. Report only — nothing saved to the story.
+            </div>
+            {textModels.length === 0 && <div className="text-sm text-gray-400">Loading models…</div>}
+            <div className="flex flex-wrap gap-2">
+              {textModels.map(m => {
+                const on = selectedModels.includes(m.id);
+                const price = m.pricing ? `$${m.pricing.input}/$${m.pricing.output} per 1M` : 'price n/a';
+                return (
+                  <label
+                    key={m.id}
+                    title={`${m.description}\n${m.modelId} · ${price} · max out ${m.maxOutputTokens.toLocaleString()}`}
+                    className={`text-xs px-3 py-1.5 rounded-full border cursor-pointer ${on ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="hidden"
+                      checked={on}
+                      onChange={e => setSelectedModels(prev => e.target.checked ? [...prev, m.id] : prev.filter(id => id !== m.id))}
+                    />
+                    {m.id} <span className={on ? 'text-indigo-100' : 'text-gray-400'}>· {price}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <label className="text-xs text-gray-600 flex items-center gap-1.5 mt-3">
+              Writer (draft) model:
+              <select className="border rounded-lg px-2 py-1 text-xs" value={writerModel} onChange={e => setWriterModel(e.target.value)}>
+                {textModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
+
         <div className="mb-4">
           <input
             className="border rounded-lg px-3 py-2 text-sm w-full font-mono"
@@ -603,9 +676,11 @@ function ExperimentsTab() {
             {starting ? 'Starting…' : `Run on ${targetCount} target(s)`}
           </Button>
           <span className="text-xs text-gray-500">
-            {stageInfo?.producesImage
-              ? `~$${(targetCount * 0.05).toFixed(2)} est. (${targetCount} × image gen + eval) — stored as test versions, invisible to users.`
-              : `~$${(targetCount * 0.01).toFixed(2)} est. (LLM/eval only, no images saved to the story).`}
+            {isOutlineReview
+              ? `Per story: 1 writer draft + ${selectedModels.length} reviewer call(s). Cost varies by model (Opus ≈ 30–80¢/review, DeepSeek V4 Flash ≈ 1–2¢). No images saved.`
+              : stageInfo?.producesImage
+                ? `~$${(targetCount * 0.05).toFixed(2)} est. (${targetCount} × image gen + eval) — stored as test versions, invisible to users.`
+                : `~$${(targetCount * 0.01).toFixed(2)} est. (LLM/eval only, no images saved to the story).`}
           </span>
         </div>
       </div>
@@ -971,10 +1046,13 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
   const isPass1 = isAvatar && (result as { pass?: number }).pass === 1;
   const isCover = ['frontCover', 'initialPage', 'backCover'].includes(result.imageType || '');
   const hasPage = typeof result.pageNumber === 'number';
+  // outline_review entries carry no image — one shared writer draft + N reviews.
+  const isOutlineReview = result.stageKind === 'outline_review' || Array.isArray(result.reviewRuns);
 
   // Auto-load — the final image is the whole point of a run; a manual
   // "Load" click hid it while the steps strip showed automatically.
-  useEffect(() => { if (result.ok && !loaded) loadImages(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  // outline_review has no images — skip the baseline/variant fetches.
+  useEffect(() => { if (result.ok && !loaded && !isOutlineReview) loadImages(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   // Step images load here (not in StepsStrip) so ORIGINAL → steps → FINAL is
   // one lightbox sequence.
@@ -1120,7 +1198,44 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
         <StepsStrip steps={result.steps} images={stepImgs} onOpen={vi => { const g = gallery(); const s = (result.steps || []).find(x => x.versionIndex === vi); const idx = s ? g.findIndex(x => x.label === s.label) : 0; openLightbox(g, idx >= 0 ? idx : 0); }} />
       )}
 
-      {result.ok && (
+      {result.ok && isOutlineReview && (
+        <div className="mt-3 space-y-3">
+          <details className="text-xs">
+            <summary className="cursor-pointer text-indigo-600">
+              Shared writer draft — {result.writerModel} ({(result.writerChars || 0).toLocaleString()} chars
+              {result.writerElapsedMs != null ? `, ${(result.writerElapsedMs / 1000).toFixed(1)}s` : ''}
+              {result.hintCount != null ? `, ${result.hintCount} consistency hint(s)` : ''})
+              {result.writerTruncated && <span className="text-amber-600"> · truncated</span>}
+            </summary>
+            <pre className="mt-1 bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-600">{result.writerDraft}</pre>
+          </details>
+          <div className={`grid gap-3 ${(result.reviewRuns?.length || 0) > 1 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+            {(result.reviewRuns || []).map((run, i) => (
+              <div key={run.modelKey + i} className="border border-gray-200 rounded-lg p-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs mb-2">
+                  <span className="font-semibold text-indigo-700">{run.modelKey}</span>
+                  {run.ok ? (
+                    <>
+                      {run.cost != null && <span className="text-gray-600">≈ ${run.cost.toFixed(4)}</span>}
+                      {run.usage && <span className="text-gray-500">{(run.usage.input_tokens || 0).toLocaleString()} in / {(run.usage.output_tokens || 0).toLocaleString()} out</span>}
+                      {run.elapsedMs != null && <span className="text-gray-500">{(run.elapsedMs / 1000).toFixed(1)}s</span>}
+                      {run.fixCount != null && <span className="text-gray-500">{run.fixCount} fix line(s)</span>}
+                      {run.reviewTruncated && <span className="text-amber-600">truncated</span>}
+                    </>
+                  ) : (
+                    <span className="text-red-600">failed: {run.error}</span>
+                  )}
+                </div>
+                {run.ok && (
+                  <pre className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-[32rem] overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-700">{run.reviewText || '(empty)'}</pre>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {result.ok && !isOutlineReview && (
         <>
           {result.storedBaseline && (
             <div className="text-xs text-gray-500 mt-1">

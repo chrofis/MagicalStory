@@ -107,7 +107,7 @@ photo_analyzer.py   Standalone Python Flask service (port 5000)</code></pre>
 <table>
 <thead><tr><th>Service</th><th>Provider</th><th>Used for</th></tr></thead>
 <tbody>
-<tr><td>Text</td><td>Anthropic Claude</td><td>Outline → text → scene-hint generation in one unified call; consolidator and prompt builders.</td></tr>
+<tr><td>Text</td><td>Anthropic Claude</td><td>Story generation — a writer call (Sonnet: outline → text → scene hints, critique-free) plus a separate outline-review call (Opus by default: analysis + fixes), gated by <code>splitOutlineReview</code> / <code>SPLIT_OUTLINE_REVIEW</code>; consolidator and prompt builders.</td></tr>
 <tr><td>Page images</td><td>Gemini (primary), Grok Imagine (secondary)</td><td>Story illustrations, covers. Default per <code>server/config/models.js</code>.</td></tr>
 <tr><td>Character repair</td><td>Grok Imagine</td><td>Cutout / blended / blackout repair. ~$0.02/img.</td></tr>
 <tr><td>Cheap iterations</td><td>Runware (FLUX SDXL)</td><td>Dev mode, inpaint, ACE++ avatar faces.</td></tr>

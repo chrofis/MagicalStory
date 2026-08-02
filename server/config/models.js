@@ -116,6 +116,22 @@ const TEXT_MODELS = {
     modelId: 'deepseek/deepseek-chat',
     maxOutputTokens: 8192,
     description: 'DeepSeek V3 via OpenRouter - cheapest strong reasoner, ~$0.27/$1.10 per 1M'
+  },
+  // DeepSeek V4 (GA 2026-07-20) via OpenRouter. 1M context, up to 384K output —
+  // high maxOutputTokens so the split outline-review call (asks 32K) and even
+  // the full writer draft (64K) aren't truncated. Cheap reviewer candidate vs
+  // Opus 5 ($5/$25): Flash is ~85× cheaper output, Pro ~29×.
+  'deepseek-v4-pro': {
+    provider: 'openrouter',
+    modelId: 'deepseek/deepseek-v4-pro',
+    maxOutputTokens: 64000,
+    description: 'DeepSeek V4 Pro via OpenRouter - top reasoning, 1M context (~$0.44/$0.87 per 1M)'
+  },
+  'deepseek-v4-flash': {
+    provider: 'openrouter',
+    modelId: 'deepseek/deepseek-v4-flash',
+    maxOutputTokens: 64000,
+    description: 'DeepSeek V4 Flash via OpenRouter - fast & very cheap, 1M context (~$0.09/$0.18 per 1M)'
   }
 };
 
@@ -564,6 +580,8 @@ const MODEL_PRICING = {
   'moonshotai/kimi-k2': { input: 0.57, output: 2.3 },
   'qwen/qwen2.5-vl-72b-instruct': { input: 0.70, output: 0.70 },
   'deepseek/deepseek-chat': { input: 0.27, output: 1.10 },
+  'deepseek/deepseek-v4-pro': { input: 0.435, output: 0.87 },
+  'deepseek/deepseek-v4-flash': { input: 0.0882, output: 0.1764 },
 
   // Grok Imagine models (fixed cost per image)
   'grok-imagine-image': { perImage: 0.02 },

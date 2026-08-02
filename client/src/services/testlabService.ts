@@ -142,6 +142,39 @@ export interface ExperimentResult {
   redoOf?: number | string;
   redoneAt?: string;
   promptOverridden?: boolean;
+  // outline_review: one shared writer draft + one review run per compared model.
+  stageKind?: string;
+  writerModel?: string;
+  writerModelId?: string;
+  writerElapsedMs?: number;
+  writerChars?: number;
+  writerTruncated?: boolean;
+  writerDraft?: string;
+  hintCount?: number;
+  reviewPromptChars?: number;
+  reviewRuns?: ReviewRun[];
+}
+
+export interface ReviewRun {
+  modelKey: string;
+  modelId?: string;
+  ok: boolean;
+  elapsedMs?: number;
+  usage?: { input_tokens?: number; output_tokens?: number };
+  cost?: number;
+  fixCount?: number;
+  reviewText?: string;
+  reviewTruncated?: boolean;
+  error?: string;
+}
+
+export interface TextModelInfo {
+  id: string;
+  modelId: string;
+  provider: string;
+  maxOutputTokens: number;
+  description: string;
+  pricing: { input: number; output: number } | null;
 }
 
 export interface ExperimentDetail {
@@ -186,6 +219,7 @@ export const TESTLAB_STAGES = [
   { id: 'qwen_insert', label: 'Qwen insert (crop-bounded)', producesImage: true, overridable: true, noTemplate: true },
   { id: 'cover', label: 'Cover render', producesImage: true, overridable: true, storyLevel: true },
   { id: 'style_check', label: 'Style consistency check', producesImage: false, overridable: false, storyLevel: true },
+  { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
   { id: 'avatar_realistic', label: 'Avatar pass 1 (realistic anchor)', producesImage: true, overridable: false, characterLevel: true },
   { id: 'avatar_style', label: 'Avatar pass 2 (style transfer)', producesImage: true, overridable: true, characterLevel: true },
   { id: 'avatar_eval', label: 'Avatar sheet eval', producesImage: false, overridable: false, characterLevel: true },
@@ -202,6 +236,10 @@ export const testlabService = {
 
   getTemplates() {
     return api.get<{ templates: Record<string, string | null> }>('/api/admin/testlab/templates');
+  },
+
+  getTextModels() {
+    return api.get<{ models: TextModelInfo[]; defaultReviewModel: string; defaultWriterModel: string }>('/api/admin/testlab/text-models');
   },
 
   getBenchmarks() {
