@@ -428,3 +428,16 @@ as "the cheap utility tier." First ask what the task actually REQUIRES:
 Owner corrected a gemini-flash downgrade with "those have spatial reasoning, they
 probably need qwen max." Route qwen/openrouter models through guardModel() so a
 missing OPENROUTER_API_KEY degrades to claude-sonnet (strong), never to a weak model.
+
+## Image prompts: state reserved-area rules WITHOUT the purpose (2026-08-01)
+Never write "reserve this area for the title / text / overlay" in an image
+prompt — explaining WHY an area must stay clear makes the model treat it as a
+special strip (blank white band, or worse, it paints text there). State only
+the constraint + what the area SHOULD contain:
+- "The top third contains no character or prop — only calm scene background
+  in the scene's own colors and lighting (sky outdoors, upper wall/ceiling
+  indoors). Never plain white."
+Owner rule ("Explaining why area must be free is stupid"). Reserved zones:
+front cover = top third; initial page = bottom 20%; back cover = bottom 10%.
+Keep the wording SIMPLE — one bullet, no outdoor/indoor sub-lists beyond the
+parenthetical, no design essays.
