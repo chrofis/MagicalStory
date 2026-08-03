@@ -6496,6 +6496,23 @@ function classifyIssues(evaluation) {
   // Check for clothing/artifact issues (inpaintable)
   // From fixable_issues array
   for (const issue of fixableIssues) {
+    // Age-stage mismatch → character repair (whole-figure repaint against the
+    // avatar). Face-only repair can't change body proportions, and a full-page
+    // redo gambles a usable image on the same prompt — so route it like an
+    // identity mismatch, matched to its detected figure for the bbox.
+    if (issue.type === 'age') {
+      const m = matches.find(mm => mm.reference && issue.description &&
+        issue.description.toLowerCase().includes(String(mm.reference).toLowerCase()));
+      characterMismatches.push({
+        reference: m?.reference || issue.character || 'unknown',
+        figure: m?.figure,
+        face_bbox: m?.face_bbox,
+        issues: ['age mismatch'],
+        confidence: m?.confidence,
+        reason: issue.description || 'figure reads the wrong age stage',
+      });
+      continue;
+    }
     if (issue.type === 'clothing' || issue.type === 'object' ||
         issue.severity === 'MODERATE' || issue.severity === 'MINOR') {
       clothingIssues.push({

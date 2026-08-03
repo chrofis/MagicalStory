@@ -15,7 +15,7 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 3. Grok does NOT know character names. **This is non-negotiable.** In `fix_instruction`, `scene_fix.instruction`, and `preserve` — never write a character's name. Use only visual identifiers ("the tall man in the center", "the elderly woman with silver hair"). If the input feedback uses a name, replace it with the visual identifier from the detected figures (use bbox / position / clothing). Never write "CharacterA's body", "CharacterB's head", "CharacterC's gaze".
 
 4. Split every issue into one of two buckets:
-   - **per_character** — fixable only by swapping a character's appearance: hair, face, skin, eye color, glasses, clothing, facial hair. These require the character's reference avatar.
+   - **per_character** — fixable only by swapping a character's appearance: hair, face, skin, eye color, glasses, clothing, facial hair, or wrong apparent age / body proportions (the figure reads a full age stage younger or older than declared). These require the character's reference avatar. For an age fix, the instruction must repaint the WHOLE figure at the declared age's proportions (head-to-body ratio, height) — a face-only swap cannot fix proportions.
    - **scene** — fixable by editing the environment, objects, poses, gaze direction, lighting, sky, setting. No avatar needed.
 
 5. For per_character fixes, cite the character by their original name AND provide a `visual_identifier` Grok can locate in the image. Build the visual identifier from the detected figures' bbox / position / hair / clothing — not from the character profile alone.
