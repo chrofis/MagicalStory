@@ -72,6 +72,17 @@ async function makeArt() {
   check('dedication align: echoed in spec', dedLeft.spec.style?.align === 'left' && dedRight.spec.style?.align === 'right');
   check('dedication align: left and right renders differ', !dedLeft.buffer.equals(dedRight.buffer));
 
+  console.log('— title stays in the top band —');
+  // Figures encroaching on the top half used to chase the title to the bottom
+  // pocket. The band mask must keep it in the top ~42% no matter what.
+  const topBlockers = [{ bodyBox: [0.05, 0.10, 0.55, 0.90] }];
+  const topBlocked = await composeCover({ artBuffer: art, kind: 'front', title: 'Emma und der Drache', seed: 'Emma und der Drache', figures: topBlockers });
+  check('title band: placed in top even when top is crowded', !topBlocked.spec.skipped && topBlocked.spec.rect.y1 <= 0.5);
+  const bottomFigs = await composeCover({ artBuffer: art, kind: 'front', title: 'Emma und der Drache', seed: 'Emma und der Drache', figures });
+  check('title band: normal case stays top', bottomFigs.spec.rect.y1 <= 0.5);
+  const noFigs = await composeCover({ artBuffer: art, kind: 'front', title: 'Emma und der Drache', seed: 'Emma und der Drache', figures: [] });
+  check('title band: no-detection case stays top', noFigs.spec.rect.y1 <= 0.5);
+
   console.log('— colorsFromFace contrast derivation —');
   const bgDark = { r: 20, g: 30, b: 40 }, bgLight = { r: 240, g: 240, b: 230 };
   const { _internals: intl } = require('../../server/lib/coverTypography');

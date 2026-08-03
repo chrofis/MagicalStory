@@ -366,7 +366,15 @@ async function composeFrontTitle(artBuffer, title, figures, seed, style) {
   const layout = styleOv?.layout || autoLayout;
   const font = FONTS[fontId];
   const C = String(title).length;
-  const rect = bestRect(occ.grid, occ.gw, occ.gh, W, H, C, font.adv) || { x0: 0.06, x1: 0.94, y0: 0.05, y1: 0.26, N: C <= 22 ? 1 : 2 };
+  // The title lives in the TOP band, by contract — the cover prompt reserves
+  // the top third for it. The free-pocket search previously roamed the whole
+  // canvas and fled to the BOTTOM whenever detection boxes touched the top
+  // (bad detection, or a render that ignored the top-third rule). Mask
+  // everything below the band as occupied so the search can only place the
+  // title up top; if even the band is blocked, the fixed top rect wins anyway.
+  const TITLE_BAND = 0.42;
+  const bandGrid = occ.grid.map((row, gy) => ((gy + 0.5) / occ.gh > TITLE_BAND ? row.map(() => 1) : row.slice()));
+  const rect = bestRect(bandGrid, occ.gw, occ.gh, W, H, C, font.adv) || { x0: 0.06, x1: 0.94, y0: 0.05, y1: 0.26, N: C <= 22 ? 1 : 2 };
   const lines = splitLinesN(title, rect.N);
   const place = { align: 'center', x0: rect.x0, x1: rect.x1, yt: rect.y0, yb: rect.y1, hFrac: rect.y1 - rect.y0 };
   const bg = await boxDominant(artBuffer, place.x0, place.yt, place.x1, Math.min(0.95, place.yb));
