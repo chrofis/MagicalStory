@@ -486,12 +486,16 @@ Only the surface treatment changes from photographic to ${styleLine}.`;
  * Pass 2 styled sheet. Returns parsed JSON verdict from
  * prompts/sheet-2x4-style-eval.txt.
  */
-async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styledSheet, artStyle, geminiApiKey, usageTracker = null) {
+async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styledSheet, artStyle, geminiApiKey, usageTracker = null, declaredAge = null) {
   const styleLabel = resolveStyleLineForSheet(artStyle);
 
   let prompt = PROMPT_TEMPLATES.sheet2x4StyleEval;
   if (!prompt) throw new Error('sheet2x4StyleEval prompt template not loaded');
   prompt = prompt.replace(/REQUESTED_STYLE/g, `REQUESTED_STYLE: ${styleLabel}`);
+  // TASK 7 age gate — style transfer is where kids drift younger (the art
+  // style's cute prior). Unknown age disables the task (prompt scores it 10).
+  const ageNum = parseInt(declaredAge, 10);
+  prompt = prompt.replace(/CHARACTER_AGE/g, Number.isFinite(ageNum) ? `${ageNum} years old` : 'unknown');
 
   const toInlinePart = (dataUri) => {
     const b64 = r2.stripDataUriPrefix(dataUri);
@@ -725,6 +729,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
         facePhoto,
         artStyle,
         characterName: character?.name,
+        characterAge: character?.age,
         usageTracker,
       });
     } catch (err) {
@@ -766,7 +771,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
  * style match + costume preserved. Returns the same shape as Pass 1's
  * collected fields so the dev panel can render both passes uniformly.
  */
-async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, usageTracker, promptOverride = null }) {
+async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, usageTracker, promptOverride = null }) {
   // promptOverride: Test Lab A/B — full replacement for the style-transfer
   // prompt (buildStyleTransferPrompt output), this call only.
   const prompt = promptOverride || buildStyleTransferPrompt(artStyle);
@@ -818,8 +823,8 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
 
     let verdict = null;
     try {
-      verdict = await evaluateStyledSheetWithGemini(facePhoto, pass1ImageData, result.imageData, artStyle, process.env.GEMINI_API_KEY, usageTracker);
-      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} final=${verdict.finalScore} valid=${verdict.valid}`);
+      verdict = await evaluateStyledSheetWithGemini(facePhoto, pass1ImageData, result.imageData, artStyle, process.env.GEMINI_API_KEY, usageTracker, characterAge);
+      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       // Mirror Pass-1 behaviour (line 414): a Gemini eval failure should NOT
       // lock in this attempt at the maximum score and break the retry loop.
