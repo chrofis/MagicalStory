@@ -120,7 +120,9 @@ async function loadPromptTemplates() {
   // Derived from the base templates so composition edits auto-sync: the labelled text-baking block
   // (**TITLE:** / **TEXT:**) is replaced with an explicit no-text directive. The initial page just
   // uses the existing initialPageNoDedication when the flag is on. Kept off the two paint paths.
-  const NO_TEXT = '**NO TEXT:**\nLeave the illustration completely free of any title, caption, letters, numbers, or written text — the text is added afterwards. Keep the composition clean with calm, uncluttered space.\n';
+  // Owner rule (tasks/lessons.md): state the constraint ONLY — never why ("text added afterwards")
+  // and never "empty/uncluttered space"; both invited painted titles and blank white bands.
+  const NO_TEXT = '**NO TEXT:**\nThe illustration contains no written text of any kind — no title, no lettering, no caption, no letters, numbers, or symbols anywhere in the image.\n';
   // Lookahead stops at the next **SECTION**, the next {PLACEHOLDER} line, or
   // end-of-template — the text-baking block is the LAST section in the cover
   // templates (followed only by {VISUAL_BIBLE}) since the duplicate FRAMING
