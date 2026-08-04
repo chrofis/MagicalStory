@@ -3484,3 +3484,53 @@ labels), `server/lib/images.js` (harmonicBackgroundFill deleted + unexported),
 replay crop gate), `client/src/pages/TestLab.tsx` (BLEND_REPLAY_VARIANTS, replayBlend,
 ResultCard "Replay blend").
 **Status:** ✅ active (staging).
+
+## 2026-08-04 — Railway memory: heap cap in start.sh, arena cap, staging self-shutdown
+**Context:** The Railway bill was dominated by a single line — memory, billed per
+resident MB per MINUTE, 24/7. This project's memory cost went $32.92 (May) →
+$58.29 (June) → $91.08 (July). Measured over 2 weeks, production sat at
+**p50 4.44 GB / p90 4.57 GB** while consuming only ~234 vCPU-min for the whole
+month. Median ≈ 90th percentile means the memory was *retained, not used*: a
+high-water-mark ratchet, not workload. Staging showed a healthy p50 1.23 GB with
+spikes to 9.84 GB — healthy only because it redeploys constantly and each deploy
+resets the heap.
+**Decision:**
+1. Set `--max-old-space-size=3072` **in `start.sh`**, not `package.json`. The
+   Dockerfile `CMD` is `bash start.sh`, which runs `node server.js` directly —
+   `npm start` is never invoked in the container, so the `--max-old-space-size=8192`
+   that lived in `package.json` had **never** applied in production. Node was
+   sizing its old-space from the container's large memory allowance instead.
+2. `export MALLOC_ARENA_MAX=2` in `start.sh` for both processes.
+3. The GroundingDINO idle reaper now calls `_release_memory()` (gc + `malloc_trim(0)`)
+   instead of a bare `gc.collect()`.
+4. Staging stops itself when provably idle, and only then.
+**Rationale:** V8 only collects under heap pressure and never returns grown pages
+to the OS, so an uncapped heap ratchets to the ceiling and we pay for the peak
+around the clock. glibc compounds it: each malloc arena keeps its own free-list
+and never releases it, and both processes here are heavy multi-threaded
+allocators (libuv threadpool; torch/opencv). 3072 MB is ~2.5x the observed ~1.2 GB
+idle working set — ample headroom for a story run while removing the runway the
+ratchet was filling. **Do not lower it without re-measuring: an OOM here kills
+in-flight story generation.**
+
+For staging idle cost we deliberately did **not** use Railway's built-in app
+sleeping. That decides on inbound HTTP alone and would sleep the container
+mid-generation — story jobs run for many minutes in the background, and closing
+the polling browser tab would kill a paid run. Instead the app shuts *itself*
+down, because it is the only thing that knows whether work is in flight: it
+requires no recent HTTP **and** no `story_jobs` in `('pending','processing')`
+**and** no registered busy probe, after a 20-min boot grace. Triple-gated
+(`STAGING_IDLE_SHUTDOWN=true` + `RAILWAY_ENVIRONMENT_NAME==='staging'` +
+credentials present) so it can never fire in production. A probe that throws
+counts as BUSY, never as idle.
+**Touched:**
+- `start.sh` (heap cap + `MALLOC_ARENA_MAX`; the real entrypoint)
+- `package.json` (aligned `start` script; `staging:up|down|status`)
+- `photo_analyzer.py` (`_gdino_idle_reaper` → `_release_memory()`)
+- `server/lib/idleShutdown.js` (new — gates, busy probes, self-stop)
+- `server.js` (activity middleware; `startIdleShutdown()` after listen)
+- `scripts/admin/staging-power.js` (new — up/down/status, refuses to stop mid-job)
+**Status:** ✅ active on staging (heap cap + arenas verified in the boot log:
+`Node heap cap: 3072MB | MALLOC_ARENA_MAX=2`). Idle-shutdown ships inert until
+`STAGING_IDLE_SHUTDOWN=true` and `RAILWAY_API_TOKEN` are set on the staging
+service. Not yet on production — awaiting approval.

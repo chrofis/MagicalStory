@@ -441,3 +441,55 @@ Owner rule ("Explaining why area must be free is stupid"). Reserved zones:
 front cover = top third; initial page = bottom 20%; back cover = bottom 10%.
 Keep the wording SIMPLE — one bullet, no outdoor/indoor sub-lists beyond the
 parenthetical, no design essays.
+
+## 2026-07-17 — Test Lab: contract bugs from grep-level integration (user: "how can you have so many bugs")
+
+Pattern behind ALL the bugs (repairMode silently ignored; fig.bbox vs stored
+bodyBox/faceBox; free-text character name the system already knew; template
+not loaded for avatar evals; unparsed Response body in editWithQwen):
+I integrated ~20 stage runners against GREPPED SIGNATURES without opening the
+callee body or a real stored record. Signature grep tells you the arg list —
+not which options are consumed, what the return object contains, or what the
+JSONB actually stores.
+
+RULES going forward:
+1. Before calling any existing function from new code: read the callee's
+   DESTRUCTURING + RETURN statements, not just its signature line.
+2. Before reading any stored-JSON field: dump ONE real record (staging DB)
+   and diff the field names against the code. Never trust a field name from
+   another code path's variable naming.
+3. Any param my code accepts must be provably consumed downstream — trace it
+   to the callee's destructure or delete it.
+4. UI never asks for data the system already has (names, boxes, versions):
+   derive choices from snapshots/detections; free-text only as fallback.
+5. After wiring N similar units, run the CHEAPEST real invocation of each
+   class (report-only stages are free) before declaring done — the pick_best/
+   consolidate micro-runs caught nothing precisely because I only ran the
+   units I'd already debugged.
+
+## Test Lab must reuse production code (2026-07-18)
+User correction: "Test Lab must reuse production code. That is the whole purpose. Only if we
+explicitly test something can it be in test lab." The lab's hand-rolled buildExpectedCharacters
+drifted from production's builder (no costume resolution) and silently broke character identity on
+every costumed story. Rule for any lab stage: import the production function and vary ONLY the input
+under test; if I find myself re-implementing >10 lines of pipeline logic in testlab.js, stop — either
+export the production piece or the reimplementation is the bug. Silent fallbacks (stale stored box,
+face→body downgrade) are the same defect class: fail loudly instead.
+
+## The container entrypoint is start.sh, NOT `npm start` (2026-08-04)
+Chasing a Railway memory bill I "found" `--max-old-space-size=8192` in
+`package.json` and reported it as the root cause. Wrong: the Dockerfile `CMD` is
+`bash start.sh`, and start.sh runs `node server.js` directly — that flag had
+never executed in production. The real defect was the *absence* of any cap.
+RULE: before attributing runtime behaviour to a flag, trace the ACTUAL exec
+chain (Dockerfile CMD → shell script → binary). A flag in `package.json`
+`scripts` proves nothing about a container that never runs npm. Same class of
+error as trusting a field name from another code path — verify the path that
+actually runs.
+
+## Stored rows are not RAM (2026-08-04)
+I proposed pruning staging Postgres to cut its memory line. User: "the issue is
+not the accumulated stories, they do not need RAM." Correct — Postgres RSS is
+`shared_buffers` + per-backend memory + page cache, not table size. Checked
+after: 12 connections, `shared_buffers=160MB`. Disk growth and the memory line
+are separate problems; don't conflate "the DB is big" with "the DB needs RAM".

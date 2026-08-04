@@ -8,6 +8,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node --max-old-space-size=3072 server.js",
+    "staging:up": "node scripts/admin/staging-power.js up",
+    "staging:down": "node scripts/admin/staging-power.js down",
+    "staging:status": "node scripts/admin/staging-power.js status",
     "dev": "nodemon server.js",
     "dev:log": "node server.js 2>&1 | tee logs/server.log",
     "dev:client": "cd client && npm run dev",

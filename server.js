@@ -589,6 +589,11 @@ const corsOptions = {
 app.use(require('cookie-parser')());
 app.use(cors(corsOptions));
 
+// Stamps every request as activity for the staging idle-shutdown watcher.
+// Mounted before the routes (and before the static handlers) so any traffic at
+// all keeps the container awake. Inert unless STAGING_IDLE_SHUTDOWN=true.
+app.use(require('./server/lib/idleShutdown').activityMiddleware);
+
 // HTTP Basic Auth gate for staging / preview environments. Activated only
 // when STAGING_AUTH_PASSWORD is set in the environment — prod leaves it
 // unset and gets no gating. Mounted before everything else so unauthenticated
@@ -8378,6 +8383,11 @@ initialize().then(() => {
     log.info(`🚀 MagicalStory Server Running`);
     log.info(`📍 URL: http://localhost:${PORT}`);
   });
+
+  // Staging-only: stop the container once it's provably idle so we stop paying
+  // for ~1.2 GB of resident RAM per minute between test runs. Triple-gated and
+  // a no-op in production — see server/lib/idleShutdown.js.
+  require('./server/lib/idleShutdown').startIdleShutdown();
 
   // Trial reminder sweep — emails unclaimed trial accounts at day-5 and day-25.
   // Hourly cadence: the cohorts move slowly (trials are created sporadically,
