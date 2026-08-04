@@ -39,10 +39,14 @@ const BLEND_REPLAY_VARIANTS = [
   // with the ORIGINAL (the model cannot paint outside the region → no halo), ramp
   // outward (never touches the figure → it stays crisp). It is the figure-repair
   // default; these variants compare it against the legacy padded-union shapes.
-  { label: 'A: legacy — padded-union, f6 erode', params: { blendShape: 'padded-union' } },
-  { label: 'B: legacy — padded-union, f6 outward', params: { blendShape: 'padded-union', featherPx: 6, featherMode: 'outward' } },
-  { label: 'C: figure-exact, f6 (new default)', params: { blendShape: 'figure-exact', featherPx: 6 } },
-  { label: 'D: figure-exact, f12', params: { blendShape: 'figure-exact', featherPx: 12 } },
+  // Every knob is set EXPLICITLY: a replay inherits the source result's params as
+  // its base, so an unset knob silently takes the replayed variant's value (#271:
+  // "A: erode" inherited featherMode 'outward' from the replayed B result and ran
+  // outward — its step label exposed it).
+  { label: 'A: legacy — padded-union, f6 erode', params: { blendShape: 'padded-union', featherPx: 6, featherMode: 'erode', colorCorrect: true, bgBorderMatch: true } },
+  { label: 'B: legacy — padded-union, f6 outward', params: { blendShape: 'padded-union', featherPx: 6, featherMode: 'outward', colorCorrect: true, bgBorderMatch: true } },
+  { label: 'C: figure-exact, f6 (new default)', params: { blendShape: 'figure-exact', featherPx: 6, colorCorrect: true, bgBorderMatch: true } },
+  { label: 'D: figure-exact, f12', params: { blendShape: 'figure-exact', featherPx: 12, colorCorrect: true, bgBorderMatch: true } },
   { label: 'E: figure-exact f6, colour match OFF', params: { blendShape: 'figure-exact', featherPx: 6, bgBorderMatch: false, colorCorrect: false } },
 ];
 
