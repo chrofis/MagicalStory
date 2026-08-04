@@ -3137,11 +3137,17 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     splitPromptUsed = `— HEADS PROMPT —\n${headsR.promptUsed}\n\n— BODIES PROMPT —\n${bodiesR.promptUsed}`;
     const finalScore = Math.min(heads?.finalScore ?? 10, bodies?.finalScore ?? 10);
     evalResult = { split: true, splitY, model, heads, bodies, finalScore, valid: finalScore >= 6 };
-    const [vTop, vBottom] = await Promise.all([
+    // Save the anchors AND the two crops as steps so the lab shows exactly what
+    // the judge saw: face photo + avatar faces (identity anchors) + the two rows.
+    const [vTop, vBottom, vPhoto, vAvatar] = await Promise.all([
       saveTestVersion(target.storyId, 'tl_step', null, topHeads, experimentId, heads?.finalScore ?? null),
       saveTestVersion(target.storyId, 'tl_step', null, bottomBody, experimentId, bodies?.finalScore ?? null),
+      facePhoto ? saveTestVersion(target.storyId, 'tl_step', null, facePhoto, experimentId) : Promise.resolve(null),
+      avatarFaces ? saveTestVersion(target.storyId, 'tl_step', null, avatarFaces, experimentId) : Promise.resolve(null),
     ]);
     splitSteps = [
+      ...(vPhoto != null ? [{ label: 'Anchor · face photo', imageType: 'tl_step', versionIndex: vPhoto }] : []),
+      ...(vAvatar != null ? [{ label: 'Anchor · avatar faces (top of 2×2)', imageType: 'tl_step', versionIndex: vAvatar }] : []),
       { label: `Top row · heads (final ${heads?.finalScore ?? '?'})`, imageType: 'tl_step', versionIndex: vTop },
       { label: `Bottom row · bodies (final ${bodies?.finalScore ?? '?'})`, imageType: 'tl_step', versionIndex: vBottom },
     ];
