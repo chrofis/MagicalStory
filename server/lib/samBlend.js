@@ -112,8 +112,21 @@ async function _interiorSeedPoints(maskPng, w, h) {
  * model's pixels back toward the surrounding original (texture kept, not replaced);
  * snow and grass corrected INDEPENDENTLY, figure pixels (hair/coat at the edge)
  * left to the figure policy. Mutates pasteRaw in place. Returns { bgPx, materials }.
+ *
+ * localField (figure-exact): the cluster MEAN shift cannot fix the model's
+ * whiteout glow — a flat near-white pixel moved by its cluster's average offset
+ * stays bright (measured 255→234, needed ~130: a mean cannot collapse a bimodal
+ * cluster). Standard compositing answer is a TWO-BAND blend (multi-band/Poisson
+ * family): take the LOW frequency from the real scene and keep only the model's
+ * HIGH frequency (texture). Per bg pixel:
+ *     out = H + clamp(model − blur(model), ±30)
+ * where H is the original background diffused across the fill region (sources =
+ * original pixels that are valid background: outside the OLD silhouette and off
+ * the figure — the old figure can never bleed into H). Flat glow has no high
+ * band, so it becomes exactly the local scene colour; textured model fill keeps
+ * its texture on the corrected base. No brightness special-casing anywhere.
  */
-async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch }) {
+async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch, localField = false, oldBin = null, newBin = null }) {
   const n = cropW * cropH;
   const { _rgbToLab, _labToRgb, _deltaE, _ccKMeans } = require('./images');
   const borderRing = Buffer.alloc(n);
@@ -143,18 +156,116 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     const r = pasteRaw[i * 3], g = pasteRaw[i * 3 + 1], b = pasteRaw[i * 3 + 2];
     if (!bgCent.length) continue;
     const lab = _rgbToLab(r, g, b);
-    let dFig = Infinity; for (const c of figCent) { const d = _deltaE(lab, c); if (d < dFig) dFig = d; }
     let bk = -1, dBg = Infinity; for (let k = 0; k < bgCent.length; k++) { const d = _deltaE(lab, bgCent[k]); if (d < dBg) { dBg = d; bk = k; } }
+    if (localField) {
+      // figure-exact: the zone is background BY CONSTRUCTION — SAM says the
+      // figure ends at newBin, and the 3px newDil buffer already protects its
+      // edge. A colour test cannot tell white GLOW from a white SHIRT (the
+      // figure palette sampled the glow ring and classified every glow pixel
+      // "figure", which is why the white outline survived) — so no colour-based
+      // figure rescue here: every zone pixel gets the local background field.
+      if (bk >= 0) { bgAssign[i] = bk; bgPx++; }
+      continue;
+    }
+    let dFig = Infinity; for (const c of figCent) { const d = _deltaE(lab, c); if (d < dFig) dFig = d; }
     if (bk >= 0 && dBg < dFig) { bgAssign[i] = bk; srcSum[bk][0] += lab[0]; srcSum[bk][1] += lab[1]; srcSum[bk][2] += lab[2]; srcSum[bk][3]++; bgPx++; }
   }
-  const bgOff = bgCent.map((c, k) => srcSum[k][3] ? [c[0] - srcSum[k][0] / srcSum[k][3], c[1] - srcSum[k][1] / srcSum[k][3], c[2] - srcSum[k][2] / srcSum[k][3]] : [0, 0, 0]);
-  for (let i = 0; i < n; i++) {
-    const bk = bgAssign[i]; if (bk < 0) continue;
-    const lab = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
-    const rgb = _labToRgb(lab[0] + bgOff[bk][0], lab[1] + bgOff[bk][1], lab[2] + bgOff[bk][2]);
-    pasteRaw[i * 3] = rgb[0]; pasteRaw[i * 3 + 1] = rgb[1]; pasteRaw[i * 3 + 2] = rgb[2];
+  if (!localField) {
+    // Legacy: per-material MEAN shift (padded-union path, byte-identical).
+    const bgOff = bgCent.map((c, k) => srcSum[k][3] ? [c[0] - srcSum[k][0] / srcSum[k][3], c[1] - srcSum[k][1] / srcSum[k][3], c[2] - srcSum[k][2] / srcSum[k][3]] : [0, 0, 0]);
+    for (let i = 0; i < n; i++) {
+      const bk = bgAssign[i]; if (bk < 0) continue;
+      const lab = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
+      const rgb = _labToRgb(lab[0] + bgOff[bk][0], lab[1] + bgOff[bk][1], lab[2] + bgOff[bk][2]);
+      pasteRaw[i * 3] = rgb[0]; pasteRaw[i * 3 + 1] = rgb[1]; pasteRaw[i * 3 + 2] = rgb[2];
+    }
+    return { bgPx, materials: bgCent.length };
   }
-  return { bgPx, materials: bgCent.length };
+
+  // localField: two-band correction, out = H + clamp(model − blur(model), ±30).
+  // High band first — blur of the UNMODIFIED model.
+  const sharp = require('sharp');
+  const modelBlurRaw = await sharp(Buffer.from(pasteRaw), { raw: { width: cropW, height: cropH, channels: 3 } })
+    .blur(4).raw().toBuffer();
+  // The newDil edge buffer (newBin..newDil) is the matting UNKNOWN BAND: it holds
+  // real anti-aliased figure pixels (keep) AND the model's glow hugging the
+  // silhouette (kill) — this band is exactly the white outline that survived every
+  // global correction. Split it per pixel LOCALLY: figure palette from the ERODED
+  // figure interior (glow can never be sampled into it), background reference =
+  // the local H field. Keep what looks like the figure, correct what looks like
+  // the local background. Glow beside a white shirt stays — and is invisible, the
+  // one case colour genuinely cannot split.
+  const newEro = await maskBlurThreshold(Buffer.from(newBin || newDil), cropW, cropH, 2, 200); // erode ~2px inward
+  const eroPts = [];
+  for (let i = 0; i < n; i++) if (newEro[i] > 128) { const l = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]); eroPts.push(l[0], l[1], l[2]); }
+  const figCentE = (eroPts.length ? _ccKMeans(Float32Array.from(eroPts), 3, 6).cent : figCent);
+  const band = new Uint8Array(n);
+  for (let i = 0; i < n; i++) band[i] = (alpha1[i] > 128 && newDil[i] > 128 && newEro[i] <= 128) ? 1 : 0;
+  // Low band H: original where the original IS valid background; diffused inward
+  // where it isn't (inside the old silhouette the original = old figure — it is
+  // excluded both as value and as diffusion source, so it cannot ghost through).
+  const isOld = (i) => oldBin ? oldBin[i] > 128 : false;
+  const fill = new Uint8Array(n);      // pixels needing diffusion
+  const isSource = new Uint8Array(n);  // valid original background
+  let fillCnt = 0;
+  for (let i = 0; i < n; i++) {
+    if ((bgAssign[i] >= 0 || band[i]) && isOld(i)) { fill[i] = 1; fillCnt++; }
+    else if (!isOld(i) && newDil[i] <= 128) isSource[i] = 1;
+  }
+  const H = Buffer.from(origRaw);
+  if (fillCnt > 0) {
+    // Seed the fill with its material's true colour (fast convergence), then
+    // Jacobi-relax toward the local sources. Band pixels (no cluster assigned)
+    // seed with their nearest background material.
+    for (let i = 0; i < n; i++) {
+      if (!fill[i]) continue;
+      let bk = bgAssign[i];
+      if (bk < 0 && bgCent.length) {
+        const lab = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
+        let dBest = Infinity; for (let k = 0; k < bgCent.length; k++) { const d = _deltaE(lab, bgCent[k]); if (d < dBest) { dBest = d; bk = k; } }
+      }
+      if (bk < 0) continue;
+      const rgb = _labToRgb(bgCent[bk][0], bgCent[bk][1], bgCent[bk][2]);
+      H[i * 3] = rgb[0]; H[i * 3 + 1] = rgb[1]; H[i * 3 + 2] = rgb[2];
+    }
+    for (let it = 0; it < 200; it++) {
+      for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
+        const i = y * cropW + x;
+        if (!fill[i]) continue;
+        let c = 0, rs = 0, gs = 0, bs = 0;
+        const nb = [i - 1, i + 1, i - cropW, i + cropW];
+        const ok = [x > 0, x < cropW - 1, y > 0, y < cropH - 1];
+        for (let k = 0; k < 4; k++) {
+          if (!ok[k]) continue;
+          const j = nb[k];
+          if (!fill[j] && !isSource[j]) continue; // figure / old-figure never a source
+          c++; rs += H[j * 3]; gs += H[j * 3 + 1]; bs += H[j * 3 + 2];
+        }
+        if (c) { H[i * 3] = Math.round(rs / c); H[i * 3 + 1] = Math.round(gs / c); H[i * 3 + 2] = Math.round(bs / c); }
+      }
+    }
+  }
+  const clampTex = (v) => Math.max(-30, Math.min(30, v));
+  let bandPx = 0;
+  for (let i = 0; i < n; i++) {
+    let correct = bgAssign[i] >= 0;
+    if (!correct && band[i]) {
+      // Unknown band: keep the pixel if it reads as the figure's interior
+      // palette, correct it if it reads as the LOCAL background (H). Glow next
+      // to a same-coloured garment stays — invisible by definition.
+      const lab = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
+      let dFig = Infinity; for (const c of figCentE) { const d = _deltaE(lab, c); if (d < dFig) dFig = d; }
+      const hLab = _rgbToLab(H[i * 3], H[i * 3 + 1], H[i * 3 + 2]);
+      if (_deltaE(lab, hLab) < dFig) { correct = true; bandPx++; }
+    }
+    if (!correct) continue;
+    for (let c = 0; c < 3; c++) {
+      const tex = clampTex(pasteRaw[i * 3 + c] - modelBlurRaw[i * 3 + c]);
+      pasteRaw[i * 3 + c] = Math.max(0, Math.min(255, H[i * 3 + c] + tex));
+    }
+  }
+  if (bandPx > 0) log.info(`[TESTLAB] unknown band: ${bandPx}px glow corrected to the local background field (figure-edge pixels kept)`);
+  return { bgPx: bgPx + bandPx, materials: bgCent.length, localField: true };
 }
 
 /**
@@ -463,10 +574,16 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // margin) back to the surrounding scene, so the edge doesn't read as a cut-out.
   // See matchIntroducedBackground. Runs whenever there's a red zone or bgBorderMatch.
   if (redZonePx > 0 || bgBorderMatch) {
+    const oldBinBuf = Buffer.alloc(n);
+    for (let i = 0; i < n; i++) oldBinBuf[i] = oldA[i * s1r] > 128 ? 255 : 0;
     const { bgPx, materials } = await matchIntroducedBackground({
       origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch,
+      // figure-exact: two-band local correction (H field + model texture) — the
+      // mean shift cannot collapse the whiteout glow. Legacy shape keeps the
+      // per-material mean shift byte-identical.
+      localField: blendShape === 'figure-exact', oldBin: oldBinBuf, newBin,
     });
-    if (bgPx > 0) log.info(`[TESTLAB] ${bodyColorMode ? 'figure-mode border' : 'red-zone'}: colour-matched ${bgPx}px background (${materials} materials) to the scene`);
+    if (bgPx > 0) log.info(`[TESTLAB] ${bodyColorMode ? 'figure-mode border' : 'red-zone'}: colour-matched ${bgPx}px background (${materials} materials${blendShape === 'figure-exact' ? ', local two-band field' : ''}) to the scene`);
     if (!colorInfo && bodyColorMode) colorInfo = { deltaEBefore: null, seamBefore: null, seamAfter: null, figureColorKept: true };
     if (colorInfo) { colorInfo.redZonePx = redZonePx; colorInfo.bgMatchedPx = bgPx; }
   }

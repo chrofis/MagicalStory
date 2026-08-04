@@ -3660,3 +3660,44 @@ clamp, dynamic blendRule, viz labels), `server/lib/testlab.js` (body-mode defaul
 `server/lib/faceRepair.js` (passthrough), `client/src/pages/TestLab.tsx` (replay variants
 A-E vs legacy).
 **Status:** ✅ active on the figure-repair insert path (staging); face default pending A/B.
+
+---
+
+## 2026-08-04 — figure-exact: local two-band background field + unknown-band matting (kills the white glow ring)
+
+**Context:** Exp #267 (first figure-exact run on the #259 image): the ghost haze was gone
+but a white outline ring hugged the figure, and the head appeared sliced at the eyes.
+Diagnosis from intermediates: (a) the sliced head is NOT a blend bug — #259 result #1's raw
+model output has no head above the eyes (Grok drew the figure taller than the crop; the head
+is clipped by the canvas edge; result #2's roll has a complete head — replay that one). The
+run passed the IoU gate at ~0.57 vs threshold 0.55 — the gate is the upstream lever.
+(b) The white ring had TWO mechanisms: the figure k-means palette was sampled from
+dilate(new,3), whose ring IS the glow — so "near-white" became a figure colour and every
+glow pixel classified FIGURE → kept (bgPx was 0; the mean-shift never even ran on them).
+And the mean shift itself cannot collapse flat glow (255→234, needed ~130).
+
+**Decision (figure-exact only; legacy path byte-identical):**
+1. **Positional classification** — zone pixels (red zone + pad ring beyond the 3px edge
+   buffer) are background BY CONSTRUCTION (SAM says where the figure ends); no colour-based
+   figure rescue there.
+2. **Local two-band correction** — out = H + clamp(model − blur(model), ±30), where H is the
+   original background diffused across the fill (sources = original outside the old
+   silhouette and off the figure; the old figure is excluded as value AND source). Flat glow
+   has no high band → becomes exactly the local scene colour; textured model fill keeps its
+   texture. Replaces the per-material mean shift, uniformly — no white/black special-casing
+   (this is NOT the deleted garbage rescue: no thresholds, one rule for all introduced bg).
+3. **Unknown-band matting** — the newBin..newDil edge buffer holds both real anti-aliased
+   figure pixels and glow hugging the silhouette. Split per pixel: figure palette from the
+   ERODED figure interior (glow cannot be sampled into it), background reference = local H.
+   Keep what reads figure, correct what reads local background. Glow beside a same-coloured
+   garment stays — invisible by definition, the one case colour cannot split.
+
+**Measured (synthetic harness, real samUnionBlend):** figure-exact f6/f12 now pass all four
+properties — old-silhouette alpha 255, byte-exact original outside the old edge, figure
+interior deviation 0, red-zone glow 171 → 30 (the texture clamp). Unknown band: 880px glow
+corrected, figure edges kept. Legacy padded-union unchanged on every measurement.
+
+**Touched:** `server/lib/samBlend.js` (matchIntroducedBackground localField/oldBin/newBin,
+unknown band, H field; samUnionBlend threading).
+**Status:** ✅ active on the figure-repair insert path (staging pending push — NOT pushed,
+experiments in flight).
