@@ -11,19 +11,22 @@ The story has {PAGES} pages. The characters are: {CHARACTER_NAMES}. Hard cap {MA
 </writer_output>
 
 {REVIEW_HINTS_SECTION}
-
+{PRIOR_REVIEWS_SECTION}
+<!-- SCENE_REVIEW_BEGIN -->
 # CHARACTER DETAILS (source of truth for physical description)
 
 These are the locked physical traits each character was authored with — the SAME block the writer worked from. Use them as the reference for the physical-trait fidelity check (19b) below: every character's SCENE prose must use these `Hair:` / `Facial hair:` / `Glasses:` / `Looks:` / `Distinctive marks:` values verbatim; paraphrase or drift is a violation. The writer output does NOT restate this block (main/primary characters are excluded from the Visual Bible), so this is your only trait reference.
 
 {CHARACTER_DETAILS}
-
+<!-- SCENE_REVIEW_END -->
+<!-- TEXT_REVIEW_BEGIN -->
 # DO-NOT-WRITE LIST (canonical)
 
 These must appear nowhere in the story text or SCENE prose. Use this list for the DO-NOT-WRITE verification (check 25) below — cite the page and the offending line for any that slipped into the draft.
 
 {DO_NOT_WRITE_LIST}
-
+<!-- TEXT_REVIEW_END -->
+<!-- SCENE_REVIEW_BEGIN -->
 # SEMANTIC SCENE CONSISTENCY (your judgment — apply during section D, emit fix lines like any other)
 
 A deterministic pre-check can only compare strings and sets; it cannot judge MEANING. You can. For EVERY page, read the page text, the SCENE prose, and the METADATA JSON together and check that they describe the same coherent moment. At minimum:
@@ -37,6 +40,7 @@ A deterministic pre-check can only compare strings and sets; it cannot judge MEA
 Fix-direction rules for these findings: contradictions WITHIN the visuals (facing, gaze, garment state, front/back detail) are mechanical SCENE/METADATA corrections — pick the treatment the locked scene design and the narrated action imply, and correct the inconsistent side. A text-vs-scene mismatch about WHAT is depicted follows the fix-direction rule stated in the analysis instructions below.
 
 If REVIEW HINTS are present above, they are deterministic string-level FACTS (a name missing here, a depth word disagreeing there) — verify each one and emit a fix line for every real finding. The semantic verdicts in this section are yours alone; the pre-check cannot make them.
+<!-- SCENE_REVIEW_END -->
 
 # OUTPUT FORMAT (STRICT — machine-parsed)
 
@@ -53,6 +57,7 @@ Your output is appended VERBATIM after the writer's output and consumed by the s
 6. Patched TEXT must be written in the same language as the draft's story text ({LANGUAGE}). Patched SCENE prose and METADATA stay in English.
 
 ---ANALYSIS---
+{ASPECT_NOTE}
 {ANALYSIS_INSTRUCTIONS}
 
 ---STORY PAGES---

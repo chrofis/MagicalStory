@@ -3431,3 +3431,13 @@ proves quality. Input is rebuilt from the permanent `stories.data` fields
 `client/src/services/testlabService.ts`, `client/src/pages/TestLab.tsx`,
 `client/src/components/generation/ModelSelector.tsx` (V4 selectable for real runs),
 `docs/ARCHITECTURE.html` (text row corrected to writer + separate review call).
+
+---
+
+## 2026-08-03 — Test Lab: split, repeated, and cross-model outline review + Qwen3-VL candidate
+
+**Context:** Owner wants to (a) test cheaper/spatial models for image eval, (b) explore whether the outline review improves when run repeatedly (each pass fed the prior critique) and when successive passes use different models, and (c) split the single review into a text pass and a scene pass. All Lab-only for now.
+
+**Decision:** `buildOutlineReviewPrompt(inputData, writerOutput, hints, opts)` gains `opts.aspect` ('both'|'text'|'scene') and `opts.priorReviews`. Aspect slices the analysis body (text = A/B/C/E, scene = D) and gates the reference blocks via `<!-- TEXT_REVIEW -->` / `<!-- SCENE_REVIEW -->` markers in outline-review.txt; `both` + no priors is byte-equivalent to before (production path untouched). The Test Lab `outline_review` stage gains `mode: compare|iterate`: compare = N models on one shared draft; iterate = rounds where each round's critique is fed forward (told to only add what's new), per-round model(s), optional per-round split, reporting fixes-per-round + a converged flag. Qwen3-VL (32B/235B) added to TEXT_MODELS as an image-eval candidate; the eval-stage vision swap is DEFERRED (evaluateImageQuality is Gemini-specific — prompt sanitization, response schema, and Qwen's bbox order [x0,y0,x1,y1] differs from Gemini's [y0,x0,y1,x1]; needs an adapter before it can score correctly).
+
+**Touched:** `prompts/outline-review.txt`, `server/lib/storyHelpers.js` (buildOutlineReviewPrompt aspect/priorReviews + slicers), `server/lib/testlab.js` (runOutlineReviewStage compare/iterate), `server/config/models.js` (qwen3-vl entries + pricing), `client/src/pages/TestLab.tsx`, `client/src/services/testlabService.ts`, `tests/manual/test-split-outline-review.js` (+16 checks, 58 total).

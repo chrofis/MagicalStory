@@ -354,6 +354,35 @@ const promptsSvc = require('../../server/services/prompts');
     check('review prompt embeds a canonical banned item (hand on shoulder)', reviewPrompt.includes('hand on shoulder'));
     check('review prompt drops the writer-only "does NOT need to re-check" note',
       !reviewPrompt.includes('the analysis pass does NOT need to re-check them'));
+
+    // Split review (Test Lab): aspect scoping. 'both' (default) keeps everything;
+    // 'text' drops scene section D + SEMANTIC + CHARACTER DETAILS; 'scene' drops
+    // A/B/C/E text checks + DO-NOT-WRITE, keeps D + SEMANTIC + CHARACTER DETAILS.
+    const A_PROBE = ANALYSIS_PROBE;                     // section A (narrative)
+    const D_PROBE = 'Scene sequence compliance';        // section D (scene mechanics)
+    const SEMANTIC_PROBE = 'Shared-action facing coherence';
+    check("aspect 'both' keeps text + scene + semantic + both reference blocks",
+      reviewPrompt.includes(A_PROBE) && reviewPrompt.includes(D_PROBE) && reviewPrompt.includes(SEMANTIC_PROBE)
+      && reviewPrompt.includes('# CHARACTER DETAILS') && reviewPrompt.includes('# DO-NOT-WRITE LIST')
+      && !reviewPrompt.includes('SCENE_REVIEW_BEGIN') && !reviewPrompt.includes('TEXT_REVIEW_BEGIN'));
+
+    const textReview = buildOutlineReviewPrompt({ ...baseInput }, writerOnlyResponse, [], { aspect: 'text' });
+    check("aspect 'text' keeps narrative (A) + DO-NOT-WRITE, drops D/SEMANTIC/CHARACTER DETAILS",
+      textReview.includes(A_PROBE) && textReview.includes('# DO-NOT-WRITE LIST')
+      && !textReview.includes(D_PROBE) && !textReview.includes(SEMANTIC_PROBE) && !textReview.includes('# CHARACTER DETAILS'));
+    check("aspect 'text' carries the TEXT-ONLY scope note", textReview.includes('SCOPE — TEXT REVIEW ONLY'));
+    check("aspect 'text' leaves no stray review markers", !textReview.includes('_REVIEW_BEGIN') && !textReview.includes('_REVIEW_END'));
+
+    const sceneReview = buildOutlineReviewPrompt({ ...baseInput }, writerOnlyResponse, [], { aspect: 'scene' });
+    check("aspect 'scene' keeps D + SEMANTIC + CHARACTER DETAILS, drops narrative (A) + DO-NOT-WRITE",
+      sceneReview.includes(D_PROBE) && sceneReview.includes(SEMANTIC_PROBE) && sceneReview.includes('# CHARACTER DETAILS')
+      && !sceneReview.includes(A_PROBE) && !sceneReview.includes('# DO-NOT-WRITE LIST'));
+    check("aspect 'scene' carries the SCENE-ONLY scope note", sceneReview.includes('SCOPE — SCENE REVIEW ONLY'));
+
+    // Repeated review (Test Lab): prior passes fed in as context.
+    const iterated = buildOutlineReviewPrompt({ ...baseInput }, writerOnlyResponse, [], { priorReviews: ['---ANALYSIS---\nPrior pass found: Page 2 pacing weak.\nFIXES REQUIRED\nPages 2: TEXT: ...'] });
+    check('repeated review injects the PRIOR REVIEW PASS context', iterated.includes('# PRIOR REVIEW PASS') && iterated.includes('Page 2 pacing weak'));
+    check('no prior reviews → no PRIOR REVIEW PASS section', !reviewPrompt.includes('# PRIOR REVIEW PASS'));
   } finally {
     MODEL_DEFAULTS.splitOutlineReview = prevSplit;
   }

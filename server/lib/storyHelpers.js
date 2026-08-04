@@ -5326,18 +5326,64 @@ Then continue directly with the ---TITLE--- section. Hard rules for this respons
  *   ([{page, issues:[{type, detail}]}]) surfaced to the reviewer as REVIEW HINTS
  * @returns {string|null} Filled reviewer prompt, or null when the template is missing
  */
-function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssues = []) {
+// Slice the analysis instruction body to a single review aspect (Test Lab
+// split-review experiment). TEXT keeps sections A/B/C (narrative, character,
+// prose) + E (do-not-write); SCENE keeps section D (scene-hint mechanics).
+// 'both' returns the body unchanged (production behaviour). If the section
+// headers can't be located the body is returned intact (never silently blank).
+function sliceAnalysisAspect(body, aspect) {
+  if (aspect === 'both' || !body) return body;
+  const idxA = body.indexOf('**A. ');
+  const idxD = body.indexOf('**D. ');
+  const idxE = body.indexOf('**E. ');
+  const idxFixes = body.indexOf('**FIXES REQUIRED**');
+  if (idxA < 0 || idxD < 0 || idxE < 0 || idxFixes < 0 || !(idxA < idxD && idxD < idxE && idxE < idxFixes)) {
+    return body;
+  }
+  const preamble = body.slice(0, idxA);
+  const secABC = body.slice(idxA, idxD); // A + B + C
+  const secD = body.slice(idxD, idxE);   // D
+  const secE = body.slice(idxE, idxFixes); // E (do-not-write verification)
+  const tail = body.slice(idxFixes);     // FIXES REQUIRED + formatting rules
+  return aspect === 'text'
+    ? preamble + secABC + secE + tail   // drop D (scene mechanics)
+    : preamble + secD + tail;           // drop A/B/C/E (all text checks)
+}
+
+// Strip the aspect-gated reference blocks in outline-review.txt. TEXT review
+// drops SCENE_REVIEW blocks (CHARACTER DETAILS, SEMANTIC SCENE CONSISTENCY);
+// SCENE review drops TEXT_REVIEW blocks (DO-NOT-WRITE LIST). 'both' keeps both
+// (strips only the markers) — byte-equivalent to pre-split behaviour.
+function stripReviewAspectMarkers(prompt, aspect) {
+  const block = (name) => new RegExp(`<!-- ${name}_BEGIN -->[\\s\\S]*?<!-- ${name}_END -->\\n?`, 'g');
+  const marks = (name) => new RegExp(`[ \\t]*<!-- ${name}_(BEGIN|END) -->\\n?`, 'g');
+  if (aspect === 'text') return prompt.replace(block('SCENE_REVIEW'), '').replace(marks('TEXT_REVIEW'), '');
+  if (aspect === 'scene') return prompt.replace(block('TEXT_REVIEW'), '').replace(marks('SCENE_REVIEW'), '');
+  return prompt.replace(marks('TEXT_REVIEW'), '').replace(marks('SCENE_REVIEW'), '');
+}
+
+/**
+ * @param {Object} [opts]
+ * @param {'both'|'text'|'scene'} [opts.aspect] - split-review scope (Test Lab). Default 'both'.
+ * @param {string[]} [opts.priorReviews] - earlier review passes to feed in as context
+ *   (Test Lab repeated-review experiment): the reviewer is told to go deeper and
+ *   only add genuinely new fixes, so we can measure convergence across rounds.
+ */
+function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssues = [], opts = {}) {
   const template = PROMPT_TEMPLATES.outlineReview;
   if (!template) {
     log.error('[PROMPT] outlineReview template not loaded — split outline review unavailable');
     return null;
   }
 
+  const aspect = (opts.aspect === 'text' || opts.aspect === 'scene') ? opts.aspect : 'both';
+  const priorReviews = Array.isArray(opts.priorReviews) ? opts.priorReviews.filter(Boolean) : [];
+
   const variant = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
   const useImageFirst = variant !== 'textFirst';
-  const analysisBody = (useImageFirst
+  const analysisBody = sliceAnalysisAspect((useImageFirst
     ? PROMPT_TEMPLATES.outlineAnalysisImageFirst
-    : PROMPT_TEMPLATES.outlineAnalysisTextFirst) || '';
+    : PROMPT_TEMPLATES.outlineAnalysisTextFirst) || '', aspect);
   if (!analysisBody) {
     log.error('[PROMPT] outline analysis instruction template missing — reviewer prompt will lack the check list');
   }
@@ -5393,6 +5439,22 @@ function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssue
   }
   if (!doNotWriteList) doNotWriteList = '(canonical DO-NOT-WRITE list unavailable — apply the ban categories named in check 25)';
 
+  // Aspect scope note (split review) + prior-review context (repeated review).
+  const aspectNote = aspect === 'text'
+    ? '**SCOPE — TEXT REVIEW ONLY.** Review only narrative, character, prose and the DO-NOT-WRITE list (sections A, B, C, E). Do NOT review scene descriptions or metadata. In FIXES REQUIRED and STORY PAGES emit ONLY `TEXT` fixes — never SCENE or METADATA.'
+    : aspect === 'scene'
+      ? '**SCOPE — SCENE REVIEW ONLY.** Review only the scene designs, METADATA and spatial/semantic scene consistency (section D + SEMANTIC SCENE CONSISTENCY). Do NOT review the story prose/narrative. In FIXES REQUIRED and STORY PAGES emit ONLY `SCENE` and/or `METADATA` fixes — never TEXT.'
+      : '';
+  let priorReviewsSection = '';
+  if (priorReviews.length > 0) {
+    const CAP = 15000;
+    const blocks = priorReviews.map((r, i) => {
+      const t = String(r || '');
+      return `## Prior review ${i + 1}\n${t.length > CAP ? t.slice(0, CAP) + '\n…[truncated]' : t}`;
+    }).join('\n\n');
+    priorReviewsSection = `# PRIOR REVIEW PASS(ES)\n\nEarlier reviewer(s) already critiqued this SAME draft — their output is below. Do a FRESH pass: catch real issues they MISSED and flag any of their fixes you judge wrong. Do NOT repeat fixes that are already correct above — emit a fix line ONLY for something genuinely new or a correction to theirs. If you find nothing to add, say so and emit an empty FIXES REQUIRED list.\n\n${blocks}`;
+  }
+
   // Inject the analysis body BEFORE fillTemplate so its own placeholders
   // ({CHARACTER_NAMES}, {MAX_CHARACTERS_PER_SCENE}) get filled too.
   const templateWithAnalysis = template.replace('{ANALYSIS_INSTRUCTIONS}', () => analysisBody);
@@ -5405,8 +5467,13 @@ function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssue
     WRITER_OUTPUT: writerOutput,
     REVIEW_HINTS_SECTION: reviewHintsSection,
     CHARACTER_DETAILS: characterDetails,
-    DO_NOT_WRITE_LIST: doNotWriteList
+    DO_NOT_WRITE_LIST: doNotWriteList,
+    ASPECT_NOTE: aspectNote,
+    PRIOR_REVIEWS_SECTION: priorReviewsSection
   });
+
+  // Drop the aspect-gated reference blocks (text-only / scene-only reviews).
+  prompt = stripReviewAspectMarkers(prompt, aspect);
 
   // Same text-overlay gating as the writer prompt: layouts that render text
   // below the image drop every overlay-only analysis check.

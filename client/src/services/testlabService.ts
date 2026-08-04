@@ -142,8 +142,11 @@ export interface ExperimentResult {
   redoOf?: number | string;
   redoneAt?: string;
   promptOverridden?: boolean;
-  // outline_review: one shared writer draft + one review run per compared model.
+  // outline_review: one shared writer draft, then either compare mode
+  // (reviewRuns, one per model) or iterate mode (rounds, each feeding the next).
   stageKind?: string;
+  mode?: 'compare' | 'iterate';
+  aspect?: 'both' | 'text' | 'scene';
   writerModel?: string;
   writerModelId?: string;
   writerElapsedMs?: number;
@@ -153,11 +156,13 @@ export interface ExperimentResult {
   hintCount?: number;
   reviewPromptChars?: number;
   reviewRuns?: ReviewRun[];
+  rounds?: ReviewRound[];
 }
 
 export interface ReviewRun {
   modelKey: string;
   modelId?: string;
+  aspect?: 'both' | 'text' | 'scene';
   ok: boolean;
   elapsedMs?: number;
   usage?: { input_tokens?: number; output_tokens?: number };
@@ -166,6 +171,19 @@ export interface ReviewRun {
   reviewText?: string;
   reviewTruncated?: boolean;
   error?: string;
+}
+
+export interface ReviewRound {
+  round: number;
+  split?: boolean;
+  ok?: boolean;
+  error?: string;
+  totalFixCount?: number;
+  converged?: boolean;
+  elapsedMs?: number;
+  review?: ReviewRun;   // non-split rounds
+  text?: ReviewRun;     // split rounds
+  scene?: ReviewRun;    // split rounds
 }
 
 export interface TextModelInfo {

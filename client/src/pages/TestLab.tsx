@@ -23,8 +23,36 @@ import {
   type ExperimentSummary,
   type ExperimentDetail,
   type ExperimentResult,
+  type ReviewRun,
   type TextModelInfo,
 } from '@/services/testlabService';
+
+/** One reviewer-model run (outline_review): header stats + the review text. */
+function ReviewRunView({ run, title }: { run: ReviewRun; title?: string }) {
+  return (
+    <div className="border border-gray-200 rounded-lg p-3">
+      <div className="flex flex-wrap items-center gap-2 text-xs mb-2">
+        {title && <span className="font-semibold text-gray-500">{title}</span>}
+        <span className="font-semibold text-indigo-700">{run.modelKey}</span>
+        {run.aspect && run.aspect !== 'both' && <span className="text-gray-400">[{run.aspect}]</span>}
+        {run.ok ? (
+          <>
+            {run.cost != null && <span className="text-gray-600">≈ ${run.cost.toFixed(4)}</span>}
+            {run.usage && <span className="text-gray-500">{(run.usage.input_tokens || 0).toLocaleString()} in / {(run.usage.output_tokens || 0).toLocaleString()} out</span>}
+            {run.elapsedMs != null && <span className="text-gray-500">{(run.elapsedMs / 1000).toFixed(1)}s</span>}
+            {run.fixCount != null && <span className="text-gray-500">{run.fixCount} fix line(s)</span>}
+            {run.reviewTruncated && <span className="text-amber-600">truncated</span>}
+          </>
+        ) : (
+          <span className="text-red-600">failed: {run.error}</span>
+        )}
+      </div>
+      {run.ok && (
+        <pre className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-[32rem] overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-700">{run.reviewText || '(empty)'}</pre>
+      )}
+    </div>
+  );
+}
 
 type Tab = 'stories' | 'benchmark' | 'experiments';
 
@@ -356,6 +384,9 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const [textModels, setTextModels] = useState<TextModelInfo[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [writerModel, setWriterModel] = useState('');
+  const [reviewMode, setReviewMode] = useState<'compare' | 'iterate'>('compare');
+  const [reviewAspect, setReviewAspect] = useState<'both' | 'text' | 'scene'>('both');
+  const [iterRounds, setIterRounds] = useState<{ model: string; split: boolean; textModel: string; sceneModel: string }[]>([]);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -378,7 +409,8 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     ...(storyIdInput.trim() ? [storyIdInput.trim()] : []),
   ])];
   const targetCount = isStoryLevel || isCharacterLevel ? storyTargetIds.length : selectedBench.length;
-  const canStart = targetCount > 0 && (!needsCharacter || !!charName.trim()) && (!isOutlineReview || selectedModels.length > 0);
+  const canStart = targetCount > 0 && (!needsCharacter || !!charName.trim())
+    && (!isOutlineReview || (reviewMode === 'compare' ? selectedModels.length > 0 : iterRounds.length > 0));
 
   const load = useCallback(async () => {
     try {
@@ -403,8 +435,10 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     testlabService.getTextModels()
       .then(res => {
         setTextModels(res.models);
-        setSelectedModels(prev => prev.length ? prev : (res.defaultReviewModel ? [res.defaultReviewModel] : []));
+        const dflt = res.defaultReviewModel || res.models[0]?.id || '';
+        setSelectedModels(prev => prev.length ? prev : (dflt ? [dflt] : []));
         setWriterModel(prev => prev || res.defaultWriterModel || '');
+        setIterRounds(prev => prev.length ? prev : [{ model: dflt, split: false, textModel: dflt, sceneModel: dflt }]);
       })
       .catch(() => { /* picker stays empty; non-fatal */ });
   }, []);
@@ -504,11 +538,19 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
       if (stage === 'qwen_insert' && freshDetection) params.freshDetection = true;
       if (stage === 'cover') params.coverType = coverType;
       if (isOutlineReview) {
-        if (selectedModels.length === 0) { alert('Pick at least one reviewer model to compare.'); setStarting(false); return; }
-        // One entry per experiment: the runner makes ONE shared writer draft,
-        // then reviews it with every selected model (params.models).
-        params.models = selectedModels;
         if (writerModel) params.writerModel = writerModel;
+        params.aspect = reviewAspect;
+        if (reviewMode === 'iterate') {
+          // Repeated rounds — each round's critique feeds the next; per-round models.
+          params.mode = 'iterate';
+          params.rounds = iterRounds.map(r => r.split
+            ? { split: true, textModel: r.textModel, sceneModel: r.sceneModel }
+            : { model: r.model });
+        } else {
+          if (selectedModels.length === 0) { alert('Pick at least one reviewer model to compare.'); setStarting(false); return; }
+          params.mode = 'compare';
+          params.models = selectedModels; // one shared draft, reviewed by each model
+        }
       }
       if (paramsJson.trim()) {
         try { params = { ...params, ...JSON.parse(paramsJson) }; }
@@ -632,51 +674,79 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
           )}
         </div>
         {isOutlineReview && (
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-medium text-gray-700">
-                Reviewer models to compare ({selectedModels.length} selected)
+          <div className="mb-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="inline-flex rounded-lg border overflow-hidden text-xs">
+                <button className={`px-3 py-1.5 ${reviewMode === 'compare' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700'}`} onClick={() => setReviewMode('compare')}>Compare models</button>
+                <button className={`px-3 py-1.5 ${reviewMode === 'iterate' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700'}`} onClick={() => setReviewMode('iterate')}>Repeated rounds</button>
               </div>
-              {textModels.length > 0 && (
-                <button
-                  className="text-xs text-indigo-600 hover:underline"
-                  onClick={() => setSelectedModels(selectedModels.length === textModels.length ? [] : textModels.map(m => m.id))}
-                >
-                  {selectedModels.length === textModels.length ? 'Deselect all' : 'Select all'}
-                </button>
-              )}
+              <label className="text-xs text-gray-600 flex items-center gap-1.5">
+                Aspect:
+                <select className="border rounded-lg px-2 py-1 text-xs" value={reviewAspect} onChange={e => setReviewAspect(e.target.value as 'both' | 'text' | 'scene')}>
+                  <option value="both">Text + Scene</option>
+                  <option value="text">Text only</option>
+                  <option value="scene">Scene only</option>
+                </select>
+              </label>
+              <label className="text-xs text-gray-600 flex items-center gap-1.5">
+                Writer draft:
+                <select className="border rounded-lg px-2 py-1 text-xs" value={writerModel} onChange={e => setWriterModel(e.target.value)}>
+                  {textModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
+                </select>
+              </label>
             </div>
-            <div className="text-xs text-gray-500 mb-2">
-              Generates ONE critique-free writer draft (below), then runs the split outline-review (buildOutlineReviewPrompt) through each selected model on that same draft. Report only — nothing saved to the story.
-            </div>
-            {textModels.length === 0 && <div className="text-sm text-gray-400">Loading models…</div>}
-            <div className="flex flex-wrap gap-2">
-              {textModels.map(m => {
-                const on = selectedModels.includes(m.id);
-                const price = m.pricing ? `$${m.pricing.input}/$${m.pricing.output} per 1M` : 'price n/a';
-                return (
-                  <label
-                    key={m.id}
-                    title={`${m.description}\n${m.modelId} · ${price} · max out ${m.maxOutputTokens.toLocaleString()}`}
-                    className={`text-xs px-3 py-1.5 rounded-full border cursor-pointer ${on ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="hidden"
-                      checked={on}
-                      onChange={e => setSelectedModels(prev => e.target.checked ? [...prev, m.id] : prev.filter(id => id !== m.id))}
-                    />
-                    {m.id} <span className={on ? 'text-indigo-100' : 'text-gray-400'}>· {price}</span>
-                  </label>
-                );
-              })}
-            </div>
-            <label className="text-xs text-gray-600 flex items-center gap-1.5 mt-3">
-              Writer (draft) model:
-              <select className="border rounded-lg px-2 py-1 text-xs" value={writerModel} onChange={e => setWriterModel(e.target.value)}>
-                {textModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
-              </select>
-            </label>
+
+            {reviewMode === 'compare' ? (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-medium text-gray-700">Reviewer models to compare ({selectedModels.length})</div>
+                  {textModels.length > 0 && <button className="text-xs text-indigo-600 hover:underline" onClick={() => setSelectedModels(selectedModels.length === textModels.length ? [] : textModels.map(m => m.id))}>{selectedModels.length === textModels.length ? 'Deselect all' : 'Select all'}</button>}
+                </div>
+                <div className="text-xs text-gray-500 mb-2">One writer draft, then the review runs through each selected model independently — which model reviews best. {reviewAspect !== 'both' && <b>{reviewAspect} pass only.</b>}</div>
+                {textModels.length === 0 && <div className="text-sm text-gray-400">Loading models…</div>}
+                <div className="flex flex-wrap gap-2">
+                  {textModels.map(m => {
+                    const on = selectedModels.includes(m.id);
+                    const price = m.pricing ? `$${m.pricing.input}/$${m.pricing.output} per 1M` : 'price n/a';
+                    return (
+                      <label key={m.id} title={`${m.description}\n${m.modelId} · ${price}`} className={`text-xs px-3 py-1.5 rounded-full border cursor-pointer ${on ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>
+                        <input type="checkbox" className="hidden" checked={on} onChange={e => setSelectedModels(prev => e.target.checked ? [...prev, m.id] : prev.filter(id => id !== m.id))} />
+                        {m.id} <span className={on ? 'text-indigo-100' : 'text-gray-400'}>· {price}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-1">Review rounds (each round's critique feeds the next)</div>
+                <div className="text-xs text-gray-500 mb-2">Round N reviews the same draft with the prior rounds' critique as context, told to only add what's new — watch the fixes-per-round trend to see if it converges. Pick different models per round to test whether mixing helps. {reviewAspect !== 'both' && <b>{reviewAspect} pass only for non-split rounds.</b>}</div>
+                <div className="space-y-2">
+                  {iterRounds.map((r, i) => (
+                    <div key={i} className="flex flex-wrap items-center gap-2 text-xs border rounded-lg p-2">
+                      <span className="font-semibold text-gray-600">Round {i + 1}</span>
+                      <label className="flex items-center gap-1"><input type="checkbox" checked={r.split} onChange={e => setIterRounds(prev => prev.map((x, j) => j === i ? { ...x, split: e.target.checked } : x))} /> split text/scene</label>
+                      {r.split ? (
+                        <>
+                          <label className="flex items-center gap-1">text:
+                            <select className="border rounded px-1 py-0.5" value={r.textModel} onChange={e => setIterRounds(prev => prev.map((x, j) => j === i ? { ...x, textModel: e.target.value } : x))}>{textModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}</select>
+                          </label>
+                          <label className="flex items-center gap-1">scene:
+                            <select className="border rounded px-1 py-0.5" value={r.sceneModel} onChange={e => setIterRounds(prev => prev.map((x, j) => j === i ? { ...x, sceneModel: e.target.value } : x))}>{textModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}</select>
+                          </label>
+                        </>
+                      ) : (
+                        <label className="flex items-center gap-1">model:
+                          <select className="border rounded px-1 py-0.5" value={r.model} onChange={e => setIterRounds(prev => prev.map((x, j) => j === i ? { ...x, model: e.target.value } : x))}>{textModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}</select>
+                        </label>
+                      )}
+                      {iterRounds.length > 1 && <button className="text-red-500 hover:underline ml-auto" onClick={() => setIterRounds(prev => prev.filter((_, j) => j !== i))}>remove</button>}
+                    </div>
+                  ))}
+                </div>
+                <button className="text-xs text-indigo-600 hover:underline mt-2" onClick={() => setIterRounds(prev => { const last = prev[prev.length - 1] || { model: writerModel, split: false, textModel: writerModel, sceneModel: writerModel }; return [...prev, { ...last }]; })}>+ Add round</button>
+              </div>
+            )}
           </div>
         )}
 
@@ -783,7 +853,9 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
           </Button>
           <span className="text-xs text-gray-500">
             {isOutlineReview
-              ? `Per story: 1 writer draft + ${selectedModels.length} reviewer call(s). Cost varies by model (Opus ≈ 30–80¢/review, DeepSeek V4 Flash ≈ 1–2¢). No images saved.`
+              ? (reviewMode === 'iterate'
+                  ? `Per story: 1 writer draft + ${iterRounds.reduce((n, r) => n + (r.split ? 2 : 1), 0)} review call(s) across ${iterRounds.length} round(s). Cost varies by model. No images saved.`
+                  : `Per story: 1 writer draft + ${selectedModels.length} reviewer call(s). Cost varies by model (Opus ≈ 30–80¢/review, DeepSeek V4 Flash ≈ 1–2¢). No images saved.`)
               : stageInfo?.producesImage
                 ? `~$${(targetCount * 0.05).toFixed(2)} est. (${targetCount} × image gen + eval) — stored as test versions, invisible to users.`
                 : `~$${(targetCount * 0.01).toFixed(2)} est. (LLM/eval only, no images saved to the story).`}
@@ -1315,29 +1387,38 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
             </summary>
             <pre className="mt-1 bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-600">{result.writerDraft}</pre>
           </details>
-          <div className={`grid gap-3 ${(result.reviewRuns?.length || 0) > 1 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
-            {(result.reviewRuns || []).map((run, i) => (
-              <div key={run.modelKey + i} className="border border-gray-200 rounded-lg p-3">
-                <div className="flex flex-wrap items-center gap-2 text-xs mb-2">
-                  <span className="font-semibold text-indigo-700">{run.modelKey}</span>
-                  {run.ok ? (
-                    <>
-                      {run.cost != null && <span className="text-gray-600">≈ ${run.cost.toFixed(4)}</span>}
-                      {run.usage && <span className="text-gray-500">{(run.usage.input_tokens || 0).toLocaleString()} in / {(run.usage.output_tokens || 0).toLocaleString()} out</span>}
-                      {run.elapsedMs != null && <span className="text-gray-500">{(run.elapsedMs / 1000).toFixed(1)}s</span>}
-                      {run.fixCount != null && <span className="text-gray-500">{run.fixCount} fix line(s)</span>}
-                      {run.reviewTruncated && <span className="text-amber-600">truncated</span>}
-                    </>
-                  ) : (
-                    <span className="text-red-600">failed: {run.error}</span>
-                  )}
-                </div>
-                {run.ok && (
-                  <pre className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-[32rem] overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-700">{run.reviewText || '(empty)'}</pre>
-                )}
+          {result.mode === 'iterate' && result.rounds ? (
+            <div className="space-y-3">
+              <div className="text-xs text-gray-600">
+                <span className="font-medium">Fixes per round:</span>{' '}
+                {result.rounds.map((rd, i) => (
+                  <span key={i} className={`inline-block px-2 py-0.5 rounded-full mr-1 ${rd.converged ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>
+                    R{rd.round}: {rd.ok === false ? 'failed' : (rd.totalFixCount ?? '—')}{rd.converged ? ' ✓' : ''}
+                  </span>
+                ))}
+                <span className="text-gray-400 ml-1">(trend toward 0 = converged)</span>
               </div>
-            ))}
-          </div>
+              {result.rounds.map((rd, i) => (
+                <div key={i} className="border-l-2 border-indigo-200 pl-3 space-y-2">
+                  <div className="text-xs font-semibold text-gray-600">
+                    Round {rd.round}{rd.split ? ' — split text + scene' : ''}{rd.converged ? ' — converged (0 new fixes)' : ''}
+                  </div>
+                  {rd.ok === false ? (
+                    <div className="text-xs text-red-600">failed: {rd.error}</div>
+                  ) : rd.split ? (
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      {rd.text && <ReviewRunView run={rd.text} title="TEXT" />}
+                      {rd.scene && <ReviewRunView run={rd.scene} title="SCENE" />}
+                    </div>
+                  ) : rd.review ? <ReviewRunView run={rd.review} /> : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={`grid gap-3 ${(result.reviewRuns?.length || 0) > 1 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+              {(result.reviewRuns || []).map((run, i) => <ReviewRunView key={run.modelKey + i} run={run} />)}
+            </div>
+          )}
         </div>
       )}
 

@@ -111,6 +111,21 @@ const TEXT_MODELS = {
     maxOutputTokens: 8192,
     description: 'Qwen2.5-VL 72B (vision) via OpenRouter - for image-eval A/B vs Gemini'
   },
+  // Qwen3-VL (2026): strong bbox/spatial grounding, cheap. Candidate to A/B
+  // against Gemini for image quality/semantic eval + bbox (Lab). NOTE: Qwen bbox
+  // format is [x0,y0,x1,y1] 0-1000 vs Gemini [y0,x0,y1,x1] — parsing must adapt.
+  'qwen3-vl': {
+    provider: 'openrouter',
+    modelId: 'qwen/qwen3-vl-32b-instruct',
+    maxOutputTokens: 8192,
+    description: 'Qwen3-VL 32B (vision) via OpenRouter - spatial/bbox leader, ~$0.10/$0.42 per 1M'
+  },
+  'qwen3-vl-235b': {
+    provider: 'openrouter',
+    modelId: 'qwen/qwen3-vl-235b-a22b-instruct',
+    maxOutputTokens: 8192,
+    description: 'Qwen3-VL 235B (vision) via OpenRouter - larger, ~$0.20/$0.88 per 1M'
+  },
   'deepseek-v3': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-chat',
@@ -579,6 +594,8 @@ const MODEL_PRICING = {
   'z-ai/glm-4.6': { input: 0.5, output: 2.0 },
   'moonshotai/kimi-k2': { input: 0.57, output: 2.3 },
   'qwen/qwen2.5-vl-72b-instruct': { input: 0.70, output: 0.70 },
+  'qwen/qwen3-vl-32b-instruct': { input: 0.104, output: 0.416 },
+  'qwen/qwen3-vl-235b-a22b-instruct': { input: 0.20, output: 0.88 },
   'deepseek/deepseek-chat': { input: 0.27, output: 1.10 },
   'deepseek/deepseek-v4-pro': { input: 0.435, output: 0.87 },
   'deepseek/deepseek-v4-flash': { input: 0.0882, output: 0.1764 },

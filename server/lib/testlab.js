@@ -1330,39 +1330,40 @@ async function runOutlineReviewStage(target, { params = {} }) {
   }
   const hintCount = hints.reduce((n, e) => n + (e.issues?.length || 0), 0);
 
-  const reviewPrompt = buildOutlineReviewPrompt(inputData, writerOutput, hints);
-  if (!reviewPrompt) throw new Error('outline-review template unavailable (buildOutlineReviewPrompt returned null)');
-
-  // Call 2 — every selected reviewer on the SAME draft, concurrently.
+  // ── Call 2 ──────────────────────────────────────────────────────────
   const CAP = 120000; // per-text storage cap; full reviews are large
-  const reviewRuns = await Promise.all(models.map(async (modelKey) => {
+  const validAspect = a => (a === 'text' || a === 'scene') ? a : 'both';
+  const fixCountOf = t => (String(t).match(/^[\s\-*•]*Pages?\s+[\d,\s\-–]+?\s*:/gim) || []).length;
+
+  // Run one review call: build the aspect-scoped prompt (optionally with prior
+  // passes fed in for the repeated-review convergence test), score its fixes.
+  const runOneReview = async (modelKey, aspect, priorReviews) => {
+    if (!TEXT_MODELS[modelKey]) throw new Error(`Unknown reviewer model "${modelKey}"`);
+    const prompt = buildOutlineReviewPrompt(inputData, writerOutput, hints, { aspect, priorReviews });
+    if (!prompt) throw new Error('outline-review template unavailable');
     const t0 = Date.now();
-    try {
-      const r = await callTextModel(reviewPrompt, 32000, modelKey, { usageLabel: 'testlab_outline_review' });
-      const elapsedMs = Date.now() - t0;
-      const usage = r.usage || {};
-      const modelId = r.modelId || TEXT_MODELS[modelKey].modelId;
-      let reviewText = r.text || '';
-      const reviewTruncated = reviewText.length > CAP;
-      if (reviewTruncated) reviewText = reviewText.slice(0, CAP) + '\n…[output truncated for storage]';
-      // Same "Pages N,M:" fix-line shape the progressive parser counts.
-      const fixCount = (reviewText.match(/^[\s\-*•]*Pages?\s+[\d,\s\-–]+?\s*:/gim) || []).length;
-      return {
-        modelKey, modelId, ok: true, elapsedMs,
-        usage: { input_tokens: usage.input_tokens || 0, output_tokens: usage.output_tokens || 0 },
-        cost: calculateTextCost(modelId, usage), fixCount, reviewText, reviewTruncated,
-      };
-    } catch (err) {
-      return { modelKey, ok: false, elapsedMs: Date.now() - t0, error: err.message };
-    }
-  }));
+    const r = await callTextModel(prompt, 32000, modelKey, { usageLabel: 'testlab_outline_review' });
+    const elapsedMs = Date.now() - t0;
+    const usage = r.usage || {};
+    const modelId = r.modelId || TEXT_MODELS[modelKey].modelId;
+    let reviewText = r.text || '';
+    const reviewTruncated = reviewText.length > CAP;
+    if (reviewTruncated) reviewText = reviewText.slice(0, CAP) + '\n…[output truncated for storage]';
+    return {
+      modelKey, modelId, aspect, ok: true, elapsedMs,
+      usage: { input_tokens: usage.input_tokens || 0, output_tokens: usage.output_tokens || 0 },
+      cost: calculateTextCost(modelId, usage), fixCount: fixCountOf(reviewText), reviewText, reviewTruncated,
+    };
+  };
 
   let writerDraft = writerOutput;
   const writerTruncated = writerDraft.length > CAP;
   if (writerTruncated) writerDraft = writerDraft.slice(0, CAP) + '\n…[draft truncated for storage]';
 
-  return {
+  const mode = params.mode === 'iterate' ? 'iterate' : 'compare';
+  const base = {
     stageKind: 'outline_review',
+    mode,
     writerModel,
     writerModelId: writer.modelId || TEXT_MODELS[writerModel].modelId,
     writerElapsedMs,
@@ -1370,9 +1371,50 @@ async function runOutlineReviewStage(target, { params = {} }) {
     writerTruncated,
     writerDraft,
     hintCount,
-    reviewPromptChars: reviewPrompt.length,
-    reviewRuns,
   };
+
+  if (mode === 'iterate') {
+    // Repeated reviews: each round's critique feeds the next ("go deeper, only
+    // add what's new"). Per-round model(s) — same or different — test whether
+    // mixing models helps; per-round fix counts show whether it converges.
+    const roundsCfg = Array.isArray(params.rounds) && params.rounds.length ? params.rounds : [{}];
+    const priorCombined = [], priorText = [], priorScene = [];
+    const rounds = [];
+    for (let i = 0; i < roundsCfg.length; i++) {
+      const rc = roundsCfg[i] || {};
+      const startedAt = Date.now();
+      try {
+        if (rc.split) {
+          const textModel = rc.textModel || MODEL_DEFAULTS.outlineReviewModel;
+          const sceneModel = rc.sceneModel || MODEL_DEFAULTS.outlineReviewModel;
+          const [tr, sr] = await Promise.all([
+            runOneReview(textModel, 'text', priorText),
+            runOneReview(sceneModel, 'scene', priorScene),
+          ]);
+          priorText.push(tr.reviewText); priorScene.push(sr.reviewText);
+          const totalFixCount = tr.fixCount + sr.fixCount;
+          rounds.push({ round: i + 1, split: true, text: tr, scene: sr, totalFixCount, converged: totalFixCount === 0, elapsedMs: Date.now() - startedAt });
+        } else {
+          const modelKey = rc.model || MODEL_DEFAULTS.outlineReviewModel;
+          const rev = await runOneReview(modelKey, validAspect(params.aspect), priorCombined);
+          priorCombined.push(rev.reviewText);
+          rounds.push({ round: i + 1, split: false, review: rev, totalFixCount: rev.fixCount, converged: rev.fixCount === 0, elapsedMs: Date.now() - startedAt });
+        }
+      } catch (err) {
+        rounds.push({ round: i + 1, ok: false, error: err.message, elapsedMs: Date.now() - startedAt });
+        break; // later rounds depend on this one's output
+      }
+    }
+    return { ...base, rounds };
+  }
+
+  // Compare mode (default): N models each do ONE review of the same draft, same
+  // aspect, independently — which model reviews best.
+  const aspect = validAspect(params.aspect);
+  const reviewRuns = await Promise.all(models.map(m =>
+    runOneReview(m, aspect, []).catch(err => ({ modelKey: m, ok: false, elapsedMs: 0, error: err.message }))
+  ));
+  return { ...base, aspect, reviewRuns };
 }
 
 /**
