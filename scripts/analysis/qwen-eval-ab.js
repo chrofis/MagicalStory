@@ -82,13 +82,14 @@ function costOf(model, inTok, outTok) {
         const inTok = u.input_tokens || 0, outTok = u.output_tokens || 0;
         const c = costOf(model, inTok, outTok);
         const T = totals[model]; T.cost += c; T.inTok += inTok; T.outTok += outTok; T.runs++; T.ms += ms;
-        const nFixes = Array.isArray(res.plan?.fixes) ? res.plan.fixes.length : (Array.isArray(res.plan) ? res.plan.length : '?');
-        console.log(`  ${model.padEnd(14)} ${String(inTok).padStart(6)}in/${String(outTok).padStart(5)}out  $${c.toFixed(4)}  ${(ms/1000).toFixed(1)}s  ${nFixes} fixes${res.error ? '  ERR:' + res.error : ''}`);
-        // Show the actual fix instructions so quality can be judged by eye.
-        const fixes = res.plan?.fixes || (Array.isArray(res.plan) ? res.plan : []);
-        for (const f of (fixes || []).slice(0, 6)) {
-          console.log(`      • ${(f.instruction || f.description || JSON.stringify(f)).slice(0, 140)}`);
+        const pcf = res.plan?.per_character_fixes || [];
+        const scene = res.plan?.scene_fix || {};
+        const score = res.plan?.final_score;
+        console.log(`  ${model.padEnd(14)} ${String(inTok).padStart(6)}in/${String(outTok).padStart(5)}out  $${c.toFixed(4)}  ${(ms/1000).toFixed(1)}s  score=${score ?? '?'}  ${pcf.length} char-fix, scene=${scene.severity || '?'}${res.error ? '  ERR:' + res.error : ''}`);
+        for (const f of pcf.slice(0, 6)) {
+          console.log(`      • [${f.character || f.name || '?'}] ${String(f.instruction || f.fix || JSON.stringify(f)).slice(0, 150)}`);
         }
+        if (scene.instruction) console.log(`      • [SCENE ${scene.severity}] ${String(scene.instruction).slice(0, 150)}`);
       }
     }
   }

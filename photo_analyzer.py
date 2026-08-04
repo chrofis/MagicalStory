@@ -1537,7 +1537,12 @@ def _gdino_idle_reaper():
             print(f"[GDINO] idle {int(time.time() - _gdino_last_used)}s — unloading model to free RAM")
             _gdino_model = None
             _gdino_processor = None
-            gc.collect()
+            # gc.collect() alone only frees the Python objects — glibc keeps the
+            # ~1.9GB of arenas, so RSS never drops and Railway keeps billing for
+            # it. _release_memory() adds the malloc_trim(0) that actually hands
+            # the pages back, which is the whole point of unloading.
+            _release_memory()
+            print(f"[GDINO] unloaded — RSS now {_rss_mb()} MB")
 
 
 # Daemon reaper — stamps started once; the model itself is still lazy-loaded.

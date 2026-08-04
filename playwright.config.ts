@@ -71,7 +71,7 @@ export default defineConfig({
     {
       name: 'chromium-noauth',
       use: { ...devices['Desktop Chrome'] },
-      testMatch: [/auth\.spec\.ts/, /analysis\.spec\.ts/],
+      testMatch: [/auth\.spec\.ts/, /analysis\.spec\.ts/, /verify-conversion-fire\.spec\.ts/],
     },
 
     // One-time family setup (run manually with --project=family-setup)

@@ -1038,11 +1038,19 @@ async function sendAdminDailySummary(feed, dateLabel) {
       <div style="font-size:11px; color:#6b7280;">${label}</div>
     </td>`;
 
+  const health = feed.health || [];
+  const limitHits = health.reduce((n, x) => n + x.count, 0);
+  const healthBanner = health.length ? `
+          <div style="margin-top:14px; padding:12px 14px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px;">
+            <div style="font-weight:bold; color:#b91c1c;">⚠️ AI-API Limits (24h): ${limitHits} Treffer</div>
+            <div style="font-size:13px; color:#7f1d1d; margin-top:4px;">${health.map(x => `${esc(x.provider)} ${x.status || ''} × ${x.count} (zuletzt ${fmtTime(x.last)})`).join(' · ')}</div>
+          </div>` : '';
+
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
-      subject: `[MagicalStory] Tagesbericht ${dateLabel} — ${s.stories + (s.trialStories || 0) || 0} Stories, ${s.newUsers || 0} Signups${s.failedJobs ? `, ${s.failedJobs} FAILED` : ''}`,
+      subject: `[MagicalStory] Tagesbericht ${dateLabel} — ${s.stories + (s.trialStories || 0) || 0} Stories, ${s.newUsers || 0} Signups${s.failedJobs ? `, ${s.failedJobs} FAILED` : ''}${limitHits ? `, ⚠️${limitHits} API-Limits` : ''}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 720px; margin: 0 auto;">
           <h2 style="color:#4f46e5;">MagicalStory Tagesbericht — ${dateLabel}</h2>
@@ -1054,6 +1062,7 @@ async function sendAdminDailySummary(feed, dateLabel) {
             ${stat('Failed', s.failedJobs || 0, true)}
             ${stat('Orders', s.orders || 0)}
           </tr></table>
+          ${healthBanner}
           ${rows ? `
           <table style="border-collapse:collapse; width:100%; margin-top:16px; font-size:13px;">
             <tr style="background:#f1f5f9; text-align:left;">
