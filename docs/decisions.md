@@ -3795,3 +3795,33 @@ through the streaming entry point was recording its tokens unattributed.
 **Touched:** `server/lib/testlab.js` (both calls in `runOutlineReviewStage`),
 `server/lib/textModels.js` (fallback passes `options`).
 **Status:** ✅ kept for the streaming providers, 🟡 OpenRouter still uncovered.
+
+---
+
+## 2026-08-04 — figure-exact red zone: SEAMLESS-CLONE OFFSET (owner spec) — plate fill REVERTED
+
+**Context:** The empty-scene plate fill (earlier today) was built without being asked and
+the owner rejected it: the footprint must keep the MODEL's pixels ("it needs the pixels of
+the new image — but colour adjusted; the one thing that should be adjusted is the border").
+The diffusion wash was equally wrong (#268: old silhouette readable as a flat cream shape —
+a wash cannot produce tiles/sunlight, and its boundary IS the old mask).
+
+**Decision:** figure-exact correction = Poisson-style seamless clone, 0th order:
+out = model + O. O = (original − model), known exactly at every valid-background pixel
+(outside the old silhouette, off the figure), diffused across the zone with a SCREENED
+solver (λ=0.012): O relaxes toward the robust per-material tone offset (median over the
+sampling ring — glow cannot skew a median). Border: paste equals the original exactly, seam
+impossible. Interior: model content and texture pass through with only the small tone
+shift. Boundary anomalies (glow just outside the old edge, O≈−120) act locally (~10px)
+instead of corrupting the interior (pure harmonic measured −50 on correct content).
+Plate fill and H-field replacement DELETED (samBlend + testlab loader + step).
+
+**Measured (synthetic):** border byte-exact; interior checker kept at tone (116-128 vs 92-97
+corrupted under pure harmonic); glow rim fades 150→213 over 8px instead of a hard 250 band.
+**Known limit (by construction):** a wide flat glow rim cannot be fully erased by a
+border-only colour correction — it fades, it doesn't vanish. If the fade still reads as a
+defect on real images, the lever is upstream (whiteout prompt / IoU gate), not the blend.
+
+**Touched:** `server/lib/samBlend.js` (localField → screened offset field; plate/H deleted),
+`server/lib/testlab.js` (plate loader deleted).
+**Status:** ✅ active (staging pending push). Supersedes today's plate-fill entry.

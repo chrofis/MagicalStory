@@ -113,20 +113,14 @@ async function _interiorSeedPoints(maskPng, w, h) {
  * snow and grass corrected INDEPENDENTLY, figure pixels (hair/coat at the edge)
  * left to the figure policy. Mutates pasteRaw in place. Returns { bgPx, materials }.
  *
- * localField (figure-exact): the cluster MEAN shift cannot fix the model's
- * whiteout glow — a flat near-white pixel moved by its cluster's average offset
- * stays bright (measured 255→234, needed ~130: a mean cannot collapse a bimodal
- * cluster). Standard compositing answer is a TWO-BAND blend (multi-band/Poisson
- * family): take the LOW frequency from the real scene and keep only the model's
- * HIGH frequency (texture). Per bg pixel:
- *     out = H + clamp(model − blur(model), ±30)
- * where H is the original background diffused across the fill region (sources =
- * original pixels that are valid background: outside the OLD silhouette and off
- * the figure — the old figure can never bleed into H). Flat glow has no high
- * band, so it becomes exactly the local scene colour; textured model fill keeps
- * its texture on the corrected base. No brightness special-casing anywhere.
+ * localField (figure-exact): seamless-clone offset field. The zone keeps the
+ * MODEL's pixels and texture untouched; the only correction is out = model + O,
+ * where O = original − model is known exactly wherever the original is valid
+ * background and diffuses smoothly across the zone interior. Border seam is
+ * impossible by construction (the paste equals the original there); the deep
+ * interior passes the model through essentially as-is.
  */
-async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch, localField = false, oldBin = null, newBin = null, plateRaw = null }) {
+async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch, localField = false, oldBin = null }) {
   const n = cropW * cropH;
   const { _rgbToLab, _labToRgb, _deltaE, _ccKMeans } = require('./images');
   const borderRing = Buffer.alloc(n);
@@ -182,140 +176,81 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     return { bgPx, materials: bgCent.length };
   }
 
-  // localField: two-band correction, out = H + clamp(model − blur(model), ±30).
-  // High band first — blur of the UNMODIFIED model.
-  const sharp = require('sharp');
-  const modelBlurRaw = await sharp(Buffer.from(pasteRaw), { raw: { width: cropW, height: cropH, channels: 3 } })
-    .blur(4).raw().toBuffer();
-  // The newDil edge buffer (newBin..newDil) is the matting UNKNOWN BAND: it holds
-  // real anti-aliased figure pixels (keep) AND the model's glow hugging the
-  // silhouette (kill) — this band is exactly the white outline that survived every
-  // global correction. Split it per pixel LOCALLY: figure palette from the ERODED
-  // figure interior (glow can never be sampled into it), background reference =
-  // the local H field. Keep what looks like the figure, correct what looks like
-  // the local background. Glow beside a white shirt stays — and is invisible, the
-  // one case colour genuinely cannot split.
-  const newEro = await maskBlurThreshold(Buffer.from(newBin || newDil), cropW, cropH, 2, 200); // erode ~2px inward
-  const eroPts = [];
-  for (let i = 0; i < n; i++) if (newEro[i] > 128) { const l = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]); eroPts.push(l[0], l[1], l[2]); }
-  const figCentE = (eroPts.length ? _ccKMeans(Float32Array.from(eroPts), 3, 6).cent : figCent);
-  const band = new Uint8Array(n);
-  for (let i = 0; i < n; i++) band[i] = (alpha1[i] > 128 && newDil[i] > 128 && newEro[i] <= 128) ? 1 : 0;
-  // Low band H: original where the original IS valid background; diffused inward
-  // where it isn't (inside the old silhouette the original = old figure — it is
-  // excluded both as value and as diffusion source, so it cannot ghost through).
+  // localField (figure-exact): SEAMLESS-CLONE OFFSET FIELD — the owner contract:
+  // the footprint keeps the MODEL'S pixels and texture UNTOUCHED; the ONLY
+  // correction is colour at the border. out = model + O, where the offset
+  // O = (original − model) is KNOWN exactly at every pixel where the original is
+  // valid background (outside the old silhouette, off the figure) and diffuses
+  // smoothly inward across the zone. At the border the paste therefore equals
+  // the original EXACTLY — no seam by construction; deep inside, O flattens to a
+  // gentle average and the model's content passes through as-is. This is Poisson
+  // seamless cloning (0th order): gradients (texture) from the source, colour
+  // pinned to the target at the boundary.
   const isOld = (i) => oldBin ? oldBin[i] > 128 : false;
-  const fill = new Uint8Array(n);      // pixels needing diffusion
-  const isSource = new Uint8Array(n);  // valid original background
-  let fillCnt = 0;
+  const O = new Float32Array(n * 3);
+  const known = new Uint8Array(n);   // O known exactly: original is valid background
+  const domain = new Uint8Array(n);  // O diffused: correction pixels inside the old silhouette
+  let domainCnt = 0;
   for (let i = 0; i < n; i++) {
-    if ((bgAssign[i] >= 0 || band[i]) && isOld(i)) { fill[i] = 1; fillCnt++; }
-    else if (!isOld(i) && newDil[i] <= 128) isSource[i] = 1;
+    if (!isOld(i) && newDil[i] <= 128) {
+      known[i] = 1;
+      O[i * 3] = origRaw[i * 3] - pasteRaw[i * 3];
+      O[i * 3 + 1] = origRaw[i * 3 + 1] - pasteRaw[i * 3 + 1];
+      O[i * 3 + 2] = origRaw[i * 3 + 2] - pasteRaw[i * 3 + 2];
+    } else if (bgAssign[i] >= 0) { domain[i] = 1; domainCnt++; }
   }
-  const H = Buffer.from(origRaw);
-  const plateFilled = new Uint8Array(n);
-  if (fillCnt > 0 && plateRaw) {
-    // CLEAN-PLATE FILL — the proper source for the old figure's footprint. The
-    // page's EMPTY SCENE is the same room painted without figures (the style
-    // anchor the page was generated from): real tiles, real sunlight, real
-    // texture — everything a colour diffusion can only fake as a flat wash.
-    // The plate isn't tone-identical to the final page (regeneration drift,
-    // measured ~13-22 mean |diff| in background), so diffuse the DIFFERENCE
-    // (original − plate, known at every valid background pixel around the
-    // region) inward and add it: H = plate + smooth tone-alignment field.
-    const D = new Float32Array(n * 3); // original − plate at sources, diffused inward
+  if (domainCnt > 0) {
+    // Screened diffusion: pure harmonic O carries BOUNDARY ANOMALIES (a glow
+    // pixel just outside the old edge has O ≈ −120) arbitrarily deep and
+    // corrupts good interior content (measured −50 on a correct checker). The
+    // screen term pulls O toward the ROBUST per-material tone offset (median
+    // over the sampling ring — glow cannot skew a median), so border anomalies
+    // act locally (~6px) and the deep interior gets exactly the small tone
+    // shift and nothing else.
+    const medOf = (arr) => { if (!arr.length) return 0; const s = [...arr].sort((a, b) => a - b); return s[s.length >> 1]; };
+    const matO = bgCent.map(() => [[], [], []]);
+    const globO = [[], [], []];
     for (let i = 0; i < n; i++) {
-      if (!isSource[i]) continue;
-      D[i * 3] = origRaw[i * 3] - plateRaw[i * 3];
-      D[i * 3 + 1] = origRaw[i * 3 + 1] - plateRaw[i * 3 + 1];
-      D[i * 3 + 2] = origRaw[i * 3 + 2] - plateRaw[i * 3 + 2];
+      if (!(ring[i] > 128 && known[i])) continue;
+      const lab = _rgbToLab(origRaw[i * 3], origRaw[i * 3 + 1], origRaw[i * 3 + 2]);
+      let bk = -1, dB = Infinity; for (let k = 0; k < bgCent.length; k++) { const d = _deltaE(lab, bgCent[k]); if (d < dB) { dB = d; bk = k; } }
+      for (let c = 0; c < 3; c++) { globO[c].push(O[i * 3 + c]); if (bk >= 0) matO[bk][c].push(O[i * 3 + c]); }
     }
-    for (let it = 0; it < 120; it++) {
+    const globMed = [medOf(globO[0]), medOf(globO[1]), medOf(globO[2])];
+    const matMed = matO.map((m) => (m[0].length >= 8 ? [medOf(m[0]), medOf(m[1]), medOf(m[2])] : globMed));
+    const lam = 0.012;
+    for (let it = 0; it < 160; it++) {
       for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
         const i = y * cropW + x;
-        if (!fill[i]) continue;
+        if (!domain[i]) continue;
         let c = 0, rs = 0, gs = 0, bs = 0;
         const nb = [i - 1, i + 1, i - cropW, i + cropW];
         const ok = [x > 0, x < cropW - 1, y > 0, y < cropH - 1];
         for (let k = 0; k < 4; k++) {
           if (!ok[k]) continue;
           const j = nb[k];
-          if (!fill[j] && !isSource[j]) continue;
-          c++; rs += D[j * 3]; gs += D[j * 3 + 1]; bs += D[j * 3 + 2];
+          if (!domain[j] && !known[j]) continue; // the figure and the old figure are never offset sources
+          c++; rs += O[j * 3]; gs += O[j * 3 + 1]; bs += O[j * 3 + 2];
         }
-        if (c) { D[i * 3] = rs / c; D[i * 3 + 1] = gs / c; D[i * 3 + 2] = bs / c; }
-      }
-    }
-    const cl = (v) => Math.max(0, Math.min(255, Math.round(v)));
-    for (let i = 0; i < n; i++) {
-      if (!fill[i]) continue;
-      H[i * 3] = cl(plateRaw[i * 3] + D[i * 3]);
-      H[i * 3 + 1] = cl(plateRaw[i * 3 + 1] + D[i * 3 + 1]);
-      H[i * 3 + 2] = cl(plateRaw[i * 3 + 2] + D[i * 3 + 2]);
-      plateFilled[i] = 1;
-    }
-  } else if (fillCnt > 0) {
-    // No plate stored → colour-diffusion fallback (flat wash, last resort).
-    // Seed the fill with its material's true colour (fast convergence), then
-    // Jacobi-relax toward the local sources. Band pixels (no cluster assigned)
-    // seed with their nearest background material.
-    for (let i = 0; i < n; i++) {
-      if (!fill[i]) continue;
-      let bk = bgAssign[i];
-      if (bk < 0 && bgCent.length) {
-        const lab = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
-        let dBest = Infinity; for (let k = 0; k < bgCent.length; k++) { const d = _deltaE(lab, bgCent[k]); if (d < dBest) { dBest = d; bk = k; } }
-      }
-      if (bk < 0) continue;
-      const rgb = _labToRgb(bgCent[bk][0], bgCent[bk][1], bgCent[bk][2]);
-      H[i * 3] = rgb[0]; H[i * 3 + 1] = rgb[1]; H[i * 3 + 2] = rgb[2];
-    }
-    for (let it = 0; it < 200; it++) {
-      for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
-        const i = y * cropW + x;
-        if (!fill[i]) continue;
-        let c = 0, rs = 0, gs = 0, bs = 0;
-        const nb = [i - 1, i + 1, i - cropW, i + cropW];
-        const ok = [x > 0, x < cropW - 1, y > 0, y < cropH - 1];
-        for (let k = 0; k < 4; k++) {
-          if (!ok[k]) continue;
-          const j = nb[k];
-          if (!fill[j] && !isSource[j]) continue; // figure / old-figure never a source
-          c++; rs += H[j * 3]; gs += H[j * 3 + 1]; bs += H[j * 3 + 2];
-        }
-        if (c) { H[i * 3] = Math.round(rs / c); H[i * 3 + 1] = Math.round(gs / c); H[i * 3 + 2] = Math.round(bs / c); }
+        if (!c) continue;
+        const tgt = bgAssign[i] >= 0 ? matMed[bgAssign[i]] : globMed;
+        O[i * 3] = (1 - lam) * (rs / c) + lam * tgt[0];
+        O[i * 3 + 1] = (1 - lam) * (gs / c) + lam * tgt[1];
+        O[i * 3 + 2] = (1 - lam) * (bs / c) + lam * tgt[2];
       }
     }
   }
-  const clampTex = (v) => Math.max(-30, Math.min(30, v));
-  let bandPx = 0;
+  const cl = (v) => Math.max(0, Math.min(255, Math.round(v)));
+  let corrected = 0;
   for (let i = 0; i < n; i++) {
-    let correct = bgAssign[i] >= 0;
-    if (!correct && band[i]) {
-      // Unknown band: keep the pixel if it reads as the figure's interior
-      // palette, correct it if it reads as the LOCAL background (H). Glow next
-      // to a same-coloured garment stays — invisible by definition.
-      const lab = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
-      let dFig = Infinity; for (const c of figCentE) { const d = _deltaE(lab, c); if (d < dFig) dFig = d; }
-      const hLab = _rgbToLab(H[i * 3], H[i * 3 + 1], H[i * 3 + 2]);
-      if (_deltaE(lab, hLab) < dFig) { correct = true; bandPx++; }
-    }
-    if (!correct) continue;
-    if (plateFilled[i]) {
-      // Plate content is REAL scene (tiles, sunlight) — use it as-is; adding
-      // the model's texture on top would double-texture it.
-      pasteRaw[i * 3] = H[i * 3]; pasteRaw[i * 3 + 1] = H[i * 3 + 1]; pasteRaw[i * 3 + 2] = H[i * 3 + 2];
-      continue;
-    }
-    for (let c = 0; c < 3; c++) {
-      const tex = clampTex(pasteRaw[i * 3 + c] - modelBlurRaw[i * 3 + c]);
-      pasteRaw[i * 3 + c] = Math.max(0, Math.min(255, H[i * 3 + c] + tex));
-    }
+    if (bgAssign[i] < 0) continue;
+    pasteRaw[i * 3] = cl(pasteRaw[i * 3] + O[i * 3]);
+    pasteRaw[i * 3 + 1] = cl(pasteRaw[i * 3 + 1] + O[i * 3 + 1]);
+    pasteRaw[i * 3 + 2] = cl(pasteRaw[i * 3 + 2] + O[i * 3 + 2]);
+    corrected++;
   }
-  if (bandPx > 0) log.info(`[TESTLAB] unknown band: ${bandPx}px glow corrected to the local background field (figure-edge pixels kept)`);
-  if (plateRaw && fillCnt > 0) log.info(`[TESTLAB] red-zone fill source: EMPTY SCENE plate (${fillCnt}px, tone-aligned)`);
-  else if (fillCnt > 0) log.info(`[TESTLAB] red-zone fill source: colour diffusion (no empty scene stored — flat wash fallback)`);
-  return { bgPx: bgPx + bandPx, materials: bgCent.length, localField: true };
+  if (corrected > 0) log.info(`[TESTLAB] seamless-clone offset: ${corrected}px model content kept, border pinned to the original (${domainCnt}px interior-diffused)`);
+  return { bgPx: corrected, materials: bgCent.length, localField: true };
 }
 
 /**
@@ -333,7 +268,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', cleanPlateBuf = null, iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -626,18 +561,11 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   if (redZonePx > 0 || bgBorderMatch) {
     const oldBinBuf = Buffer.alloc(n);
     for (let i = 0; i < n; i++) oldBinBuf[i] = oldA[i * s1r] > 128 ? 255 : 0;
-    let plateRaw = null;
-    if (cleanPlateBuf && blendShape === 'figure-exact') {
-      try {
-        plateRaw = await sharp(cleanPlateBuf).resize(cropW, cropH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
-      } catch (err) { log.warn(`[TESTLAB] clean plate unusable (${err.message}) — diffusion fallback`); }
-    }
     const { bgPx, materials } = await matchIntroducedBackground({
       origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch,
-      // figure-exact: two-band local correction (H field + model texture) — the
-      // mean shift cannot collapse the whiteout glow. Legacy shape keeps the
-      // per-material mean shift byte-identical.
-      localField: blendShape === 'figure-exact', oldBin: oldBinBuf, newBin, plateRaw,
+      // figure-exact: seamless-clone offset — model content kept, border pinned
+      // to the original. Legacy shape keeps the per-material mean shift.
+      localField: blendShape === 'figure-exact', oldBin: oldBinBuf,
     });
     if (bgPx > 0) log.info(`[TESTLAB] ${bodyColorMode ? 'figure-mode border' : 'red-zone'}: colour-matched ${bgPx}px background (${materials} materials${blendShape === 'figure-exact' ? ', local two-band field' : ''}) to the scene`);
     if (!colorInfo && bodyColorMode) colorInfo = { deltaEBefore: null, seamBefore: null, seamAfter: null, figureColorKept: true };
