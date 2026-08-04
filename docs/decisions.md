@@ -3935,3 +3935,42 @@ mid-restart. Closed with two changes:
 **Touched:** `start.sh` (supervisor loop), `photo_analyzer.py`
 (`_track_request_start/end`, `_recycle_watchdog`, `/release-memory?recycle=true`).
 **Status:** ✅ staging.
+
+---
+
+## 2026-08-05 — figure-exact FINAL: two-band footprint (owner-verified goal: old outline invisible)
+
+**Context:** Owner goal: "the outline where the old figure was must not be seen after a
+successful repair — run experiments yourself and look." Root cause of every previous
+residual: the model's own output CARRIES the old outline (Grok under-paints the whiteout
+silhouette), so any keep-model-content rule reproduces the ghost (#274: A and C differed by
+mean 2.0/channel — the blob is in the content, not the blend). The two-band idea from #268
+was correct; its implementation failed twice (unconverged fine-grid Jacobi + cluster
+seeding → flat wash blob).
+
+**Decision — the footprint rule (localField):** out = LB + w·clamp(model − blur(model), ±40).
+LB = original's low band with the old figure masked OUT of the blur (normalized masked
+convolution — it cannot ghost), solved coarse-to-fine (8px grid, 400 iters, bilinear
+upsample, 60 fine iters — CONVERGES across 100px+ regions). w fades model texture from 0 at
+the old edge to 1 over ~8px (no texture step at the seam). Pad ring outside the old
+silhouette takes the original exactly. Plus three mask fixes found by LOOKING at local
+runs with real SAM masks:
+1. Old mask dilated ~1.6σ into the footprint AND into alpha1 — the original's painted INK
+   OUTLINE sits just outside SAM's fill mask and survived as a thin dark line tracing the
+   old silhouette.
+2. Figure buffer tightened to ~1.5px (newTight) — the 3px buffer preserved a pale strip of
+   whiteout glow hugging the trouser edge.
+3. Island filter keeps ALL union components intersecting the padded detection box in
+   figure-exact — the old kneeling foot (severed by the wand in mask space) was dropped and
+   survived as an orphan sandal on the floor.
+
+**Verified:** 4 local experiments on the real page with real MobileSAM masks (local
+photo_analyzer): head-clipped roll → clean footprint, no outline; full-head roll → complete
+boy, no outline, no orphans. Synthetics: ghost blob erased (dev 3), texture survives, seam
+step 8, outside untouched, figure byte-crisp; P1-P3 pass; legacy path byte-identical.
+Superseded on the way: seamless-clone offset field + symmetric collar (removed — content
+preservation preserves the ghost), plate fill (removed earlier).
+
+**Touched:** `server/lib/samBlend.js` (localField rewrite, alpha1 old-dilation, island
+keep-in-box).
+**Status:** ✅ shipped as the figure-repair default.

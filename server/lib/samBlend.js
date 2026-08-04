@@ -113,16 +113,147 @@ async function _interiorSeedPoints(maskPng, w, h) {
  * snow and grass corrected INDEPENDENTLY, figure pixels (hair/coat at the edge)
  * left to the figure policy. Mutates pasteRaw in place. Returns { bgPx, materials }.
  *
- * localField (figure-exact): seamless-clone offset field. The zone keeps the
- * MODEL's pixels and texture untouched; the only correction is out = model + O,
- * where O = original − model is known exactly wherever the original is valid
- * background and diffuses smoothly across the zone interior. Border seam is
- * impossible by construction (the paste equals the original there); the deep
- * interior passes the model through essentially as-is.
+ * localField (figure-exact): TWO-BAND footprint reconstruction. The model's
+ * output in the old-figure footprint carries the old outline itself — Grok
+ * under-paints the whiteout silhouette, so "keep model content" reproduces the
+ * ghost no matter how good the colour correction is (exp #274: A and C differed
+ * by mean 2.0/channel — the blob is IN the content). Per footprint pixel:
+ *     out = LB + w·clamp(model − blur(model), ±40)
+ * LB = the ORIGINAL's low band (old figure masked out of the blur so it cannot
+ * ghost), solved as a Laplace field over the footprint on a COARSE grid first
+ * (converges across a 100px+ region — the naive fine-grid Jacobi never did,
+ * which is what produced the flat-wash blob of exp #268), then refined at full
+ * resolution. w fades the model's texture in from 0 at the old edge to 1 over
+ * ~8px, so there is no texture step at the seam. The ghost is low-frequency —
+ * it lives in the band LB replaces; real painted texture is high-frequency and
+ * survives. The pad ring outside the old silhouette takes the original exactly.
  */
-async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch, localField = false, oldBin = null, seamCollar = null }) {
+async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch, localField = false, oldBin = null, newBin = null }) {
   const n = cropW * cropH;
   const { _rgbToLab, _labToRgb, _deltaE, _ccKMeans } = require('./images');
+  const sharpL = require('sharp');
+  if (localField) {
+    // The old mask is DILATED ~2px before defining the footprint: the original's
+    // painted INK OUTLINE of the old figure sits just outside SAM's fill mask,
+    // and left as "valid background" it survives as a thin dark line tracing the
+    // old silhouette (seen in the first local run). The dilation pulls it into
+    // the reconstruction. The figure buffer is TIGHT (~1.5px, the true AA edge):
+    // the old 3px buffer preserved a strip of the model's whiteout glow hugging
+    // the figure — a pale line down the trouser edge.
+    const oldX = await maskBlurThreshold(Buffer.from(oldBin), cropW, cropH, 1.6, 16);
+    const newTight = newBin ? await maskBlurThreshold(Buffer.from(newBin), cropW, cropH, 1.0, 16) : newDil;
+    const isOld = (i) => oldX[i] > 128;
+    // Footprint = dilated old silhouette beyond the figure's tight edge buffer.
+    // Pad ring = paste pixels outside it — the original is valid there, take it.
+    const F = new Uint8Array(n);
+    let fCnt = 0, ringPx = 0;
+    for (let i = 0; i < n; i++) {
+      if (newTight[i] > 128) continue;
+      if (isOld(i)) { F[i] = 1; fCnt++; }
+      else if (alpha1[i] > 128) {
+        pasteRaw[i * 3] = origRaw[i * 3]; pasteRaw[i * 3 + 1] = origRaw[i * 3 + 1]; pasteRaw[i * 3 + 2] = origRaw[i * 3 + 2];
+        ringPx++;
+      }
+    }
+    if (fCnt === 0) { log.info(`[TESTLAB] two-band footprint: none (ring ${ringPx}px → original)`); return { bgPx: ringPx, materials: 0, localField: true }; }
+    // Masked low band of the ORIGINAL — the old figure is excluded from the blur
+    // (normalized masked convolution), so its colour cannot leak into LB.
+    const sigma = 8;
+    const w1 = Buffer.alloc(n);
+    const rgbMasked = Buffer.alloc(n * 3);
+    for (let i = 0; i < n; i++) {
+      const keep = (!isOld(i) && newTight[i] <= 128) ? 1 : 0;
+      w1[i] = keep ? 255 : 0;
+      if (keep) { rgbMasked[i * 3] = origRaw[i * 3]; rgbMasked[i * 3 + 1] = origRaw[i * 3 + 1]; rgbMasked[i * 3 + 2] = origRaw[i * 3 + 2]; }
+    }
+    const blurRgb = await sharpL(rgbMasked, { raw: { width: cropW, height: cropH, channels: 3 } }).blur(sigma).raw().toBuffer();
+    const blurW = await sharpL(w1, { raw: { width: cropW, height: cropH, channels: 1 } }).blur(sigma).raw().toBuffer();
+    const wStride = Math.max(1, Math.round(blurW.length / n));
+    const lowOrig = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const wgt = blurW[i * wStride] / 255;
+      for (let c = 0; c < 3; c++) lowOrig[i * 3 + c] = wgt > 0.02 ? blurRgb[i * 3 + c] / wgt : 0;
+    }
+    const lowModel = await sharpL(Buffer.from(pasteRaw), { raw: { width: cropW, height: cropH, channels: 3 } }).blur(sigma).raw().toBuffer();
+    // LB Laplace solve, COARSE-TO-FINE. Coarse cell = 8px: boundary cells carry
+    // the mean masked-original low band; footprint cells relax 400 iterations
+    // (the region is ~15 cells wide — converges); bilinear upsample; 60 fine
+    // iterations polish the boundary transition.
+    const S = 8, Wc = Math.ceil(cropW / S), Hc = Math.ceil(cropH / S), nc = Wc * Hc;
+    const cVal = new Float32Array(nc * 3), cW = new Float32Array(nc), cF = new Uint8Array(nc), cB = new Uint8Array(nc);
+    for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
+      const i = y * cropW + x, ci = ((y / S) | 0) * Wc + ((x / S) | 0);
+      if (F[i]) cF[ci] = 1;
+      else if (newTight[i] <= 128 && !isOld(i) && blurW[i * wStride] > 5) {
+        cB[ci] = 1; cW[ci]++;
+        for (let c = 0; c < 3; c++) cVal[ci * 3 + c] += lowOrig[i * 3 + c];
+      }
+    }
+    for (let ci = 0; ci < nc; ci++) if (cW[ci] > 0) for (let c = 0; c < 3; c++) cVal[ci * 3 + c] /= cW[ci];
+    for (let it = 0; it < 400; it++) {
+      for (let cy = 0; cy < Hc; cy++) for (let cx = 0; cx < Wc; cx++) {
+        const ci = cy * Wc + cx;
+        if (!cF[ci] || cB[ci]) continue;
+        let c0 = 0; const acc = [0, 0, 0];
+        for (const d of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          const nx = cx + d[0], ny = cy + d[1];
+          if (nx < 0 || ny < 0 || nx >= Wc || ny >= Hc) continue;
+          const cj = ny * Wc + nx;
+          if (!cF[cj] && !cB[cj]) continue;
+          c0++; for (let c = 0; c < 3; c++) acc[c] += cVal[cj * 3 + c];
+        }
+        if (c0) for (let c = 0; c < 3; c++) cVal[ci * 3 + c] = acc[c] / c0;
+      }
+    }
+    const LB = new Float32Array(n * 3);
+    for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
+      const i = y * cropW + x;
+      if (!F[i]) { for (let c = 0; c < 3; c++) LB[i * 3 + c] = lowOrig[i * 3 + c]; continue; }
+      const gx = Math.min(Wc - 1.001, Math.max(0, x / S - 0.5)), gy = Math.min(Hc - 1.001, Math.max(0, y / S - 0.5));
+      const x0 = gx | 0, y0 = gy | 0, fx = gx - x0, fy = gy - y0;
+      for (let c = 0; c < 3; c++) {
+        const v00 = cVal[(y0 * Wc + x0) * 3 + c], v10 = cVal[(y0 * Wc + x0 + 1) * 3 + c];
+        const v01 = cVal[((y0 + 1) * Wc + x0) * 3 + c], v11 = cVal[((y0 + 1) * Wc + x0 + 1) * 3 + c];
+        LB[i * 3 + c] = (v00 * (1 - fx) + v10 * fx) * (1 - fy) + (v01 * (1 - fx) + v11 * fx) * fy;
+      }
+    }
+    for (let it = 0; it < 60; it++) {
+      for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
+        const i = y * cropW + x;
+        if (!F[i]) continue;
+        let c0 = 0; const acc = [0, 0, 0];
+        const nb = [i - 1, i + 1, i - cropW, i + cropW];
+        const ok = [x > 0, x < cropW - 1, y > 0, y < cropH - 1];
+        for (let k = 0; k < 4; k++) {
+          if (!ok[k]) continue;
+          const j = nb[k];
+          const jBoundary = !F[j] && newTight[j] <= 128 && !isOld(j);
+          if (!F[j] && !jBoundary) continue; // figure / covered-old never a source
+          c0++; for (let c = 0; c < 3; c++) acc[c] += F[j] ? LB[j * 3 + c] : lowOrig[j * 3 + c];
+        }
+        if (c0) for (let c = 0; c < 3; c++) LB[i * 3 + c] = acc[c] / c0;
+      }
+    }
+    // Distance-based texture fade: 0 at the old edge (no texture step at the
+    // seam) → 1 at ~8px inside. Eight 1px erosions of F.
+    const wTex = new Float32Array(n);
+    let er = Buffer.alloc(n);
+    for (let i = 0; i < n; i++) er[i] = F[i] ? 255 : 0;
+    for (let k = 0; k < 8; k++) {
+      er = await maskBlurThreshold(er, cropW, cropH, 0.8, 200);
+      for (let i = 0; i < n; i++) if (er[i] > 128) wTex[i] += 1 / 8;
+    }
+    const cl = (v) => Math.max(0, Math.min(255, Math.round(v)));
+    for (let i = 0; i < n; i++) {
+      if (!F[i]) continue;
+      for (let c = 0; c < 3; c++) {
+        const tex = Math.max(-40, Math.min(40, pasteRaw[i * 3 + c] - lowModel[i * 3 + c]));
+        pasteRaw[i * 3 + c] = cl(LB[i * 3 + c] + wTex[i] * tex);
+      }
+    }
+    log.info(`[TESTLAB] two-band footprint: ${fCnt}px = original low band (coarse-to-fine) + model texture faded in; pad ring ${ringPx}px → original`);
+    return { bgPx: fCnt + ringPx, materials: 0, localField: true };
+  }
   const borderRing = Buffer.alloc(n);
   if (bgBorderMatch) {
     const eroded = await maskBlurThreshold(Buffer.from(alpha1), cropW, cropH, 12, 200); // shrink union ~12px inward
@@ -151,20 +282,10 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     if (!bgCent.length) continue;
     const lab = _rgbToLab(r, g, b);
     let bk = -1, dBg = Infinity; for (let k = 0; k < bgCent.length; k++) { const d = _deltaE(lab, bgCent[k]); if (d < dBg) { dBg = d; bk = k; } }
-    if (localField) {
-      // figure-exact: the zone is background BY CONSTRUCTION — SAM says the
-      // figure ends at newBin, and the 3px newDil buffer already protects its
-      // edge. A colour test cannot tell white GLOW from a white SHIRT (the
-      // figure palette sampled the glow ring and classified every glow pixel
-      // "figure", which is why the white outline survived) — so no colour-based
-      // figure rescue here: every zone pixel gets the local background field.
-      if (bk >= 0) { bgAssign[i] = bk; bgPx++; }
-      continue;
-    }
     let dFig = Infinity; for (const c of figCent) { const d = _deltaE(lab, c); if (d < dFig) dFig = d; }
     if (bk >= 0 && dBg < dFig) { bgAssign[i] = bk; srcSum[bk][0] += lab[0]; srcSum[bk][1] += lab[1]; srcSum[bk][2] += lab[2]; srcSum[bk][3]++; bgPx++; }
   }
-  if (!localField) {
+  {
     // Legacy: per-material MEAN shift (padded-union path, byte-identical).
     const bgOff = bgCent.map((c, k) => srcSum[k][3] ? [c[0] - srcSum[k][0] / srcSum[k][3], c[1] - srcSum[k][1] / srcSum[k][3], c[2] - srcSum[k][2] / srcSum[k][3]] : [0, 0, 0]);
     for (let i = 0; i < n; i++) {
@@ -175,100 +296,6 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     }
     return { bgPx, materials: bgCent.length };
   }
-
-  // localField (figure-exact): SEAMLESS-CLONE OFFSET FIELD — the owner contract:
-  // the footprint keeps the MODEL'S pixels and texture UNTOUCHED; the ONLY
-  // correction is colour at the border. out = model + O, where the offset
-  // O = (original − model) is KNOWN exactly at every pixel where the original is
-  // valid background (outside the old silhouette, off the figure) and diffuses
-  // smoothly inward across the zone. At the border the paste therefore equals
-  // the original EXACTLY — no seam by construction; deep inside, O flattens to a
-  // gentle average and the model's content passes through as-is. This is Poisson
-  // seamless cloning (0th order): gradients (texture) from the source, colour
-  // pinned to the target at the boundary.
-  const isOld = (i) => oldBin ? oldBin[i] > 128 : false;
-  const O = new Float32Array(n * 3);
-  const known = new Uint8Array(n);   // O known exactly: original is valid background
-  const domain = new Uint8Array(n);  // O diffused: correction pixels inside the old silhouette
-  let domainCnt = 0;
-  for (let i = 0; i < n; i++) {
-    if (!isOld(i) && newDil[i] <= 128) {
-      O[i * 3] = origRaw[i * 3] - pasteRaw[i * 3];
-      O[i * 3 + 1] = origRaw[i * 3 + 1] - pasteRaw[i * 3 + 1];
-      O[i * 3 + 2] = origRaw[i * 3 + 2] - pasteRaw[i * 3 + 2];
-      // Seam collar: both sides of the border are the same painter, so the
-      // transition is SYMMETRIC — the collar starts at its exact offset but
-      // RELAXES with the interior, taking half the residual ramp outside.
-      if (seamCollar && seamCollar[i]) { domain[i] = 1; domainCnt++; }
-      else known[i] = 1;
-    } else if (bgAssign[i] >= 0) { domain[i] = 1; domainCnt++; }
-  }
-  if (domainCnt > 0) {
-    // Screened diffusion: pure harmonic O carries BOUNDARY ANOMALIES (a glow
-    // pixel just outside the old edge has O ≈ −120) arbitrarily deep and
-    // corrupts good interior content (measured −50 on a correct checker). The
-    // screen term pulls O toward the ROBUST per-material tone offset (median
-    // over the sampling ring — glow cannot skew a median), so border anomalies
-    // act locally (~6px) and the deep interior gets exactly the small tone
-    // shift and nothing else.
-    const medOf = (arr) => { if (!arr.length) return 0; const s = [...arr].sort((a, b) => a - b); return s[s.length >> 1]; };
-    const globO = [[], [], []];
-    for (let i = 0; i < n; i++) {
-      if (!(ring[i] > 128 && known[i])) continue;
-      for (let c = 0; c < 3; c++) globO[c].push(O[i * 3 + c]);
-    }
-    // ONE global median tone offset — the resting target MUST be smooth. A
-    // per-material target with hard nearest-cluster assignment QUANTIZED the
-    // field: deep in the footprint each pixel snapped to its material's median,
-    // and where the model's soft gradient crossed the cluster decision boundary
-    // the offset stepped — painting a crisp contour + contrast expansion into
-    // content that was smooth in BOTH sources (exp #271 C: the cream blob with
-    // the hard outline that exists in neither the model nor the original).
-    // Local variation is already carried by diffusion from the exact border
-    // offsets; the screen only needs the overall tone.
-    const globMed = [medOf(globO[0]), medOf(globO[1]), medOf(globO[2])];
-    // Two leashes: interior pixels relax toward the global tone offset (weak —
-    // border anomalies act locally, deep content keeps only the tone shift).
-    // Collar pixels relax toward their OWN exact offset (strong — the collar
-    // may bend a little to share the seam residual with the outside, but a
-    // large correction like glow is never abandoned; relaxing it fully was
-    // measured to re-expose the glow at 235+).
-    const exactO = seamCollar ? Float32Array.from(O) : null;
-    const lam = 0.012, lamCollar = 0.25;
-    for (let it = 0; it < 160; it++) {
-      for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
-        const i = y * cropW + x;
-        if (!domain[i]) continue;
-        let c = 0, rs = 0, gs = 0, bs = 0;
-        const nb = [i - 1, i + 1, i - cropW, i + cropW];
-        const ok = [x > 0, x < cropW - 1, y > 0, y < cropH - 1];
-        for (let k = 0; k < 4; k++) {
-          if (!ok[k]) continue;
-          const j = nb[k];
-          if (!domain[j] && !known[j]) continue; // the figure and the old figure are never offset sources
-          c++; rs += O[j * 3]; gs += O[j * 3 + 1]; bs += O[j * 3 + 2];
-        }
-        if (!c) continue;
-        const inCollar = seamCollar && seamCollar[i];
-        const lm = inCollar ? lamCollar : lam;
-        const tgt = inCollar ? [exactO[i * 3], exactO[i * 3 + 1], exactO[i * 3 + 2]] : globMed;
-        O[i * 3] = (1 - lm) * (rs / c) + lm * tgt[0];
-        O[i * 3 + 1] = (1 - lm) * (gs / c) + lm * tgt[1];
-        O[i * 3 + 2] = (1 - lm) * (bs / c) + lm * tgt[2];
-      }
-    }
-  }
-  const cl = (v) => Math.max(0, Math.min(255, Math.round(v)));
-  let corrected = 0;
-  for (let i = 0; i < n; i++) {
-    if (bgAssign[i] < 0 && !(seamCollar && seamCollar[i])) continue;
-    pasteRaw[i * 3] = cl(pasteRaw[i * 3] + O[i * 3]);
-    pasteRaw[i * 3 + 1] = cl(pasteRaw[i * 3 + 1] + O[i * 3 + 1]);
-    pasteRaw[i * 3 + 2] = cl(pasteRaw[i * 3 + 2] + O[i * 3 + 2]);
-    corrected++;
-  }
-  if (corrected > 0) log.info(`[TESTLAB] seamless-clone offset: ${corrected}px model content kept, border pinned to the original (${domainCnt}px interior-diffused)`);
-  return { bgPx: corrected, materials: bgCent.length, localField: true };
 }
 
 /**
@@ -405,7 +432,40 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   {
     const cxF = boxInCrop?.length === 4 ? Math.round((boxInCrop[0] + boxInCrop[2]) / 2) : (cropW >> 1);
     const cyF = boxInCrop?.length === 4 ? Math.round((boxInCrop[1] + boxInCrop[3]) / 2) : (cropH >> 1);
-    const keep = _faceConnectedComponent(union, cropW, cropH, cxF, cyF);
+    let keep = _faceConnectedComponent(union, cropW, cropH, cxF, cyF);
+    if (blendShape === 'figure-exact' && boxInCrop?.length === 4) {
+      // FIGURE mode: every OLD-mask island is a ghost by definition — the old
+      // kneeling foot cut off by a foreground object (the wand) is a separate
+      // component, and dropping it left an orphan sandal on the floor (local
+      // iter 2). Keep every union component that intersects the padded
+      // detection box; only fragments clearly outside the figure's area (a
+      // neighbour caught by the crop) are still dropped.
+      const bw = boxInCrop[2] - boxInCrop[0], bh = boxInCrop[3] - boxInCrop[1];
+      const pb = [
+        Math.max(0, boxInCrop[0] - bw * 0.08), Math.max(0, boxInCrop[1] - bh * 0.08),
+        Math.min(cropW, boxInCrop[2] + bw * 0.08), Math.min(cropH, boxInCrop[3] + bh * 0.08),
+      ];
+      const visited = new Uint8Array(n);
+      const keep2 = Buffer.from(keep);
+      for (let s = 0; s < n; s++) {
+        if (union[s] <= 128 || visited[s] || keep[s]) continue;
+        // flood this unseen component, test box overlap
+        const comp = [s]; const stack = [s]; visited[s] = 1;
+        let hits = false;
+        while (stack.length) {
+          const k = stack.pop(); const x = k % cropW, y = (k / cropW) | 0;
+          if (x >= pb[0] && x < pb[2] && y >= pb[1] && y < pb[3]) hits = true;
+          for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= cropW || ny >= cropH) continue;
+            const j = ny * cropW + nx;
+            if (union[j] > 128 && !visited[j]) { visited[j] = 1; stack.push(j); comp.push(j); }
+          }
+        }
+        if (hits) for (const j of comp) keep2[j] = 255;
+      }
+      keep = keep2;
+    }
     let dropped = 0;
     for (let i = 0; i < n; i++) {
       if (!keep[i]) { if (union[i]) dropped++; union[i] = 0; newBin[i] = 0; oldA[i] = 0; newA[i] = 0; }
@@ -475,27 +535,15 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const unionPadded = await maskBlurThreshold(union, cropW, cropH, padPx / 1.5, 16);
   const alpha1 = Buffer.from(unionPadded);
   const sOld = Math.max(1, Math.round(oldA.length / n));
-  // SYMMETRIC SEAM COLLAR (figure-exact): both sides of the old-silhouette border
-  // are the same painter — the page itself is model-generated art, so the seam is
-  // a panorama stitch between equal renders, not truth-vs-guess. The colour
-  // transition therefore splits across BOTH sides: a ~5px collar OUTSIDE the old
-  // edge joins the offset-diffusion domain (initialized with its exact per-pixel
-  // offset, then relaxed), so half the residual ramp lives outside, half inside,
-  // and the seam has no kink. Content in the collar stays effectively the
-  // original — model + exact offset is byte-identical to the original there, so
-  // only the smooth relaxed residual rides on top; structure cannot ghost.
-  let seamCollar = null;
   if (blendShape === 'figure-exact') {
     const newPad = await maskBlurThreshold(Buffer.from(newBin), cropW, cropH, padPx / 1.5, 16);
-    const oldBinB = Buffer.alloc(n);
-    for (let i = 0; i < n; i++) oldBinB[i] = oldA[i * sOld] > 128 ? 255 : 0;
-    const oldDil = await maskBlurThreshold(oldBinB, cropW, cropH, 3.5, 16); // ~5px outward
-    seamCollar = new Uint8Array(n);
-    for (let i = 0; i < n; i++) {
-      const collar = oldDil[i] > 128 && oldBinB[i] <= 128 && newPad[i] <= 128;
-      if (collar) seamCollar[i] = 1;
-      alpha1[i] = (oldBinB[i] > 128 || newPad[i] > 128 || collar) ? 255 : 0;
-    }
+    // Old mask dilated ~2px: the original's painted ink outline of the old figure
+    // sits just OUTSIDE SAM's fill mask — it must be inside the paste region or
+    // it survives as a thin dark line tracing the old silhouette.
+    const oldBinT = Buffer.alloc(n);
+    for (let i = 0; i < n; i++) oldBinT[i] = oldA[i * sOld] > 128 ? 255 : 0;
+    const oldPad = await maskBlurThreshold(oldBinT, cropW, cropH, 1.6, 16);
+    for (let i = 0; i < n; i++) alpha1[i] = (oldPad[i] > 128 || newPad[i] > 128) ? 255 : 0;
   } else if (padMode === 'newFigure') {
     const newPad = await maskBlurThreshold(Buffer.from(newBin), cropW, cropH, padPx / 1.5, 16);
     for (let i = 0; i < n; i++) alpha1[i] = (union[i] > 128 || newPad[i] > 128) ? 255 : 0;
@@ -599,9 +647,9 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     for (let i = 0; i < n; i++) oldBinBuf[i] = oldA[i * s1r] > 128 ? 255 : 0;
     const { bgPx, materials } = await matchIntroducedBackground({
       origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch,
-      // figure-exact: seamless-clone offset — model content kept, transition
-      // split across the seam collar. Legacy shape keeps the per-material mean shift.
-      localField: blendShape === 'figure-exact', oldBin: oldBinBuf, seamCollar,
+      // figure-exact: two-band footprint (original low band + model texture).
+      // Legacy shape keeps the per-material mean shift.
+      localField: blendShape === 'figure-exact', oldBin: oldBinBuf, newBin,
     });
     if (bgPx > 0) log.info(`[TESTLAB] ${bodyColorMode ? 'figure-mode border' : 'red-zone'}: colour-matched ${bgPx}px background (${materials} materials${blendShape === 'figure-exact' ? ', local two-band field' : ''}) to the scene`);
     if (!colorInfo && bodyColorMode) colorInfo = { deltaEBefore: null, seamBefore: null, seamAfter: null, figureColorKept: true };
