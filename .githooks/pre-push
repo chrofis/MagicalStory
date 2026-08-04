@@ -1,0 +1,8 @@
+#!/bin/sh
+# Refuse to push while the target environment has work in flight — a redeploy
+# restarts the container and kills in-process story generations and Test Lab
+# experiments. See scripts/admin/check-push-idle.js for the reasoning.
+#
+# Enabled per-clone with:  git config core.hooksPath .githooks
+# Bypass a single push with:  git push --no-verify
+exec node "$(git rev-parse --show-toplevel)/scripts/admin/check-push-idle.js" "$@"

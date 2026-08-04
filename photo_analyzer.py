@@ -9,6 +9,45 @@ import os
 os.environ["MEDIAPIPE_DISABLE_GPU"] = "1"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # Suppress TF/MediaPipe C++ logs
 
+
+# ── Boot memory instrumentation ─────────────────────────────────────────────
+# Railway bills resident memory per MB per MINUTE, so whatever this process
+# holds at boot is charged 24/7 whether or not a single photo is ever uploaded.
+# This service idled at 1035 MB with NO heavy model loaded, and we had no way to
+# say which import owned it. These marks attribute the floor to a specific
+# import block; the totals are also served from /health so they can be read
+# without log access. Defined before the heavy imports so it can measure them.
+def _rss_mb():
+    """Current resident set size in MB (Linux /proc), or None."""
+    try:
+        with open('/proc/self/status') as f:
+            for line in f:
+                if line.startswith('VmRSS:'):
+                    return round(int(line.split()[1]) / 1024, 1)
+    except Exception:
+        return None
+    return None
+
+
+BOOT_RSS_LOG = []
+_boot_last_rss = None
+
+
+def _boot_mark(label):
+    """Record RSS at this point in module load, plus the delta since the last mark."""
+    global _boot_last_rss
+    rss = _rss_mb()
+    if rss is None:
+        return  # non-Linux (local dev) — instrumentation is a no-op
+    delta = None if _boot_last_rss is None else round(rss - _boot_last_rss, 1)
+    _boot_last_rss = rss
+    BOOT_RSS_LOG.append({"stage": label, "rss_mb": rss, "delta_mb": delta})
+    suffix = "" if delta is None else f"   (+{delta} MB)"
+    print(f"[BOOT-RSS] {label:<26} rss={rss:8.1f} MB{suffix}")
+
+
+_boot_mark("python interpreter")
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import cv2
@@ -22,6 +61,8 @@ import sys
 import time
 import threading
 import gc
+
+_boot_mark("flask+cv2+numpy+PIL")
 
 # Fix Windows encoding issues - force UTF-8 for stdout/stderr
 if sys.platform == 'win32':
@@ -84,6 +125,8 @@ try:
 except ImportError:
     print("[WARN] MediaPipe not installed - face detection disabled")
 
+_boot_mark("mediapipe")
+
 # Try to initialize MTCNN (best accuracy)
 # Try mtcnn-opencv first (lightweight, no TensorFlow), then fall back to mtcnn (TensorFlow)
 MTCNN_AVAILABLE = False
@@ -102,19 +145,66 @@ except ImportError:
     except ImportError:
         print("[INFO] MTCNN not available - will use MediaPipe fallback")
 
-# Try to initialize rembg (better background removal than MediaPipe)
-REMBG_AVAILABLE = False
-rembg_session = None
+# rembg / U2-Net background removal — LAZY.
+#
+# This used to build the U2-Net ONNX session at import, so every container held
+# the model 24/7 even if no photo was ever uploaded. Railway bills resident
+# memory per minute, which made that a permanent charge for an idle capability
+# (~$10/month per GB held). MobileSAM and GroundingDINO below were already lazy
+# with an idle reaper — the two BIGGEST models were on demand while this smaller
+# one was eager, which was backwards.
+#
+# Now: the session is built on first use and reaped after idle, same as the
+# others. REMBG_AVAILABLE only reports whether the module is importable, which
+# is checked via find_spec so it costs nothing at boot.
+import importlib.util
+
 try:
-    from rembg import remove as rembg_remove, new_session
-    # Use u2net model (good balance of speed and quality)
-    rembg_session = new_session("u2net")
-    REMBG_AVAILABLE = True
-    print("[OK] rembg background removal available (U2-Net)")
-except ImportError as e:
-    print(f"[INFO] rembg not available: {e}")
-except Exception as e:
-    print(f"[WARN] rembg initialization failed: {e}")
+    # find_spec only LOCATES the module — it does not import rembg or build the
+    # ONNX session, so this costs nothing at boot. It can still raise on a
+    # broken/partial install, which must not take the whole service down.
+    REMBG_AVAILABLE = importlib.util.find_spec("rembg") is not None
+except Exception as _e:
+    print(f"[WARN] rembg availability check failed: {_e}")
+    REMBG_AVAILABLE = False
+rembg_remove = None
+_rembg_session = None
+_rembg_last_used = 0.0
+# Serialize the import + session build. Photo analysis runs concurrently, so two
+# threads racing `from rembg import ...` would otherwise double-load the model.
+_rembg_lock = threading.Lock()
+_REMBG_IDLE_UNLOAD_S = int(os.environ.get('REMBG_IDLE_UNLOAD_S', '900'))
+
+if REMBG_AVAILABLE:
+    print("[OK] rembg background removal available (U2-Net, lazy)")
+else:
+    print("[INFO] rembg not installed - MediaPipe fallback will be used")
+
+
+def get_rembg_session():
+    """Build (or reuse) the U2-Net session. Returns None if rembg is unusable."""
+    global rembg_remove, _rembg_session, _rembg_last_used
+    _rembg_last_used = time.time()
+    if _rembg_session is not None:
+        return _rembg_session
+    if not REMBG_AVAILABLE:
+        return None
+    with _rembg_lock:
+        if _rembg_session is None:  # re-check under the lock
+            try:
+                from rembg import remove as _remove, new_session
+                print("[REMBG] Loading U2-Net session...")
+                _rembg_session = new_session("u2net")
+                rembg_remove = _remove
+                _rembg_last_used = time.time()
+                print(f"[REMBG] U2-Net loaded — RSS now {_rss_mb()} MB")
+            except Exception as e:
+                # Stay None so the caller falls back to MediaPipe rather than 500ing.
+                print(f"[WARN] rembg initialization failed: {e}")
+                return None
+    return _rembg_session
+
+_boot_mark("rembg (lazy — not loaded)")
 
 # Create temp directory for processing
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp_photos')
@@ -150,6 +240,8 @@ try:
         print("[INFO] Anime face cascade not found at:", cascade_path)
 except Exception as e:
     print(f"[WARN] Anime face cascade error: {e}")
+
+_boot_mark("haar cascades (ready)")
 
 
 def detect_all_faces_anime(image, min_size=30, scale_factor=1.1, min_neighbors=2):
@@ -687,15 +779,18 @@ def remove_background(image):
     Remove background from image using rembg (U2-Net) or MediaPipe fallback.
     Returns tuple: (image with transparent background (RGBA), binary mask)
     """
-    # Try rembg first (better quality, includes heads properly)
-    if REMBG_AVAILABLE:
+    # Try rembg first (better quality, includes heads properly).
+    # get_rembg_session() builds U2-Net on first use and returns None if rembg
+    # is missing or fails to load, in which case we fall through to MediaPipe.
+    session = get_rembg_session()
+    if session is not None:
         try:
             # Convert BGR to RGB for PIL
             rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             pil_image = Image.fromarray(rgb_image)
 
             # Remove background using rembg
-            result_pil = rembg_remove(pil_image, session=rembg_session)
+            result_pil = rembg_remove(pil_image, session=session)
 
             # Convert back to numpy RGBA
             result_rgba = np.array(result_pil)
@@ -1345,16 +1440,8 @@ def _release_memory():
         pass
 
 
-def _rss_mb():
-    """Current resident set size in MB (Linux /proc), or None."""
-    try:
-        with open('/proc/self/status') as f:
-            for line in f:
-                if line.startswith('VmRSS:'):
-                    return round(int(line.split()[1]) / 1024, 1)
-    except Exception:
-        return None
-    return None
+# _rss_mb() is defined at the top of this file, above the heavy imports, so the
+# boot instrumentation can measure them. Do not redefine it here.
 
 
 # MobileSAM for box-prompted figure masks (lazy loaded, ~570MB peak RSS)
@@ -1527,26 +1614,39 @@ def get_groundingdino():
     return _gdino_model, _gdino_processor
 
 
-def _gdino_idle_reaper():
-    """Unload GroundingDINO after _GDINO_IDLE_UNLOAD_S of no use, freeing ~1.9GB.
-    Reloading from the local weights cache on the next call is fast (~3s)."""
-    global _gdino_model, _gdino_processor
+def _idle_model_reaper():
+    """Unload idle models so we stop paying for RAM we aren't using.
+
+    Railway bills resident memory per minute, so a model nobody has touched for
+    fifteen minutes is pure cost. Each unload is followed by _release_memory():
+    gc.collect() alone frees only the Python objects while glibc keeps the
+    arenas, so RSS would never actually drop and the billing would not change —
+    the malloc_trim(0) is what hands the pages back, which is the entire point.
+    Reloading from the local weights cache on the next call is a few seconds.
+    """
+    global _gdino_model, _gdino_processor, _rembg_session, rembg_remove
     while True:
         time.sleep(60)
-        if _gdino_model is not None and (time.time() - _gdino_last_used) > _GDINO_IDLE_UNLOAD_S:
-            print(f"[GDINO] idle {int(time.time() - _gdino_last_used)}s — unloading model to free RAM")
+        now = time.time()
+
+        if _gdino_model is not None and (now - _gdino_last_used) > _GDINO_IDLE_UNLOAD_S:
+            print(f"[GDINO] idle {int(now - _gdino_last_used)}s — unloading model to free RAM")
             _gdino_model = None
             _gdino_processor = None
-            # gc.collect() alone only frees the Python objects — glibc keeps the
-            # ~1.9GB of arenas, so RSS never drops and Railway keeps billing for
-            # it. _release_memory() adds the malloc_trim(0) that actually hands
-            # the pages back, which is the whole point of unloading.
             _release_memory()
             print(f"[GDINO] unloaded — RSS now {_rss_mb()} MB")
 
+        if _rembg_session is not None and (now - _rembg_last_used) > _REMBG_IDLE_UNLOAD_S:
+            print(f"[REMBG] idle {int(now - _rembg_last_used)}s — unloading U2-Net to free RAM")
+            with _rembg_lock:
+                _rembg_session = None
+                rembg_remove = None
+            _release_memory()
+            print(f"[REMBG] unloaded — RSS now {_rss_mb()} MB")
 
-# Daemon reaper — stamps started once; the model itself is still lazy-loaded.
-threading.Thread(target=_gdino_idle_reaper, daemon=True).start()
+
+# Daemon reaper — started once; every model it watches is still lazy-loaded.
+threading.Thread(target=_idle_model_reaper, daemon=True).start()
 
 
 @app.route('/detect-figures-text', methods=['POST'])
@@ -1672,6 +1772,10 @@ def health_check():
         "service": "photo-analyzer",
         "mediapipe_available": MEDIAPIPE_AVAILABLE,
         "rembg_available": REMBG_AVAILABLE,
+        "rembg_loaded": _rembg_session is not None,
+        # Per-import-block RSS at boot. This is how we attribute the idle floor
+        # to a specific import instead of guessing — readable without log access.
+        "boot_rss": BOOT_RSS_LOG,
         "lpips_available": lpips_available,
         "rss_mb": _rss_mb(),
         "mobilesam_loaded": _mobilesam_model is not None,
