@@ -605,7 +605,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   // re-run can never silently drop part of the original configuration.
   const WIDGET_PARAM_KEYS = new Set([
     'autoEval', 'characterName', 'coverType', 'backend', 'whiteoutTarget', 'freshDetection',
-    'rerunDetection', 'variants', 'pass', 'model', 'writerModel', 'aspect', 'mode', 'rounds',
+    'rerunDetection', 'variants', 'pass', 'model', 'splitRows', 'writerModel', 'aspect', 'mode', 'rounds',
     'models', 'genericityWarnings',
   ]);
 
@@ -651,6 +651,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
 
     setAvatarPass(String(p.pass ?? '1'));
     if (p.model) setAvatarEvalModel(String(p.model));
+    setAvatarSplitRows(p.splitRows !== false);
 
     // outline_review: the whole point of re-running — same draft setup, swapped models.
     if (p.writerModel) setWriterModel(String(p.writerModel));
