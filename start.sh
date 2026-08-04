@@ -18,8 +18,29 @@ echo ""
 echo "[1/2] Starting Python photo analyzer service on port 5000..."
 echo "Python version: $(python3 --version)"
 
-# Start Python with unbuffered output so logs appear immediately
-python3 -u photo_analyzer.py 2>&1 | tee /tmp/python-service.log &
+# Supervised: the analyzer deliberately EXITS itself once it is idle and bloated,
+# and this loop brings it straight back.
+#
+# Why exiting is the only option: after heavy SAM/GDINO/rembg inference the
+# process holds ~1GB that a forced malloc_trim(0) reclaims *nothing* of
+# (measured on staging: 1192.2MB -> 1192.9MB with every model already unloaded).
+# It is fragmentation and torch's own pools — freed blocks interleaved with live
+# ones, which glibc can only return when a whole page is free. Unloading models
+# gets their weights back; it cannot defragment what remains. Ending the process
+# is what returns 100% to the OS, and Railway bills that RSS every minute.
+#
+# The exit is idle-gated inside photo_analyzer.py (no in-flight inference, no
+# recent requests) so it can never land mid-story. Node tolerates the few
+# seconds of downtime: analyzer calls have timeouts and fall back.
+run_analyzer() {
+  while true; do
+    python3 -u photo_analyzer.py 2>&1 | tee /tmp/python-service.log
+    code=$?
+    echo "[SUPERVISOR] photo_analyzer exited (code $code) — restarting in 1s"
+    sleep 1
+  done
+}
+run_analyzer &
 PYTHON_PID=$!
 
 echo "Python service PID: $PYTHON_PID"

@@ -3894,3 +3894,33 @@ model content, not adjacent to any original; smoothness beats per-region tone ac
 
 **Touched:** `server/lib/samBlend.js` (globMed-only screen target).
 **Status:** ✅ committed, pending deploy + replay verification on the real page.
+
+## 2026-08-04 — Analyzer self-recycles: only process exit reclaims fragmentation
+**Context:** After the reapers unload every model, the analyzer still held
+1192 MB (fresh boot is 137 MB). A FORCED `malloc_trim(0)` with all models
+unloaded moved it 1192.2 → 1192.9 MB — it reclaimed nothing. The residue is
+fragmentation plus torch's own pools: glibc can only return a page when the
+whole page is free, and after thousands of interleaved tensor allocations most
+pages hold something live. Unloading models returns their weights (measured:
+1037 MB rembg, 740 MB GroundingDINO); nothing in-process defragments the rest.
+**Decision:** The analyzer exits itself when idle AND above `RECYCLE_RSS_MB`
+(700), and `start.sh` supervises it back up. Gated on zero in-flight requests
+and `RECYCLE_IDLE_S` (180s) of quiet, so it cannot land mid-story. A trim is
+attempted first and the restart is skipped if that alone gets under the
+threshold. `POST /release-memory?recycle=true` forces it, and refuses while
+other requests are in flight.
+**Rationale:** A story is NOT a subprocess — the job runs inside the long-lived
+Node process and every analyzer call is HTTP to one Flask process that has been
+up since boot. So story #1's fragmentation is still resident for story #500, and
+no story boundary reclaims anything. Ending the process returns 100% to the OS,
+and Railway bills that RSS every minute. A literal fork-per-inference would also
+work and was rejected: each call would reload MobileSAM/GDINO (~570 MB, seconds)
+inside the repair loop. Idle-gating puts the restart at the story boundary in
+practice without cross-process coordination or any risk to a concurrent story.
+**Known gap:** a request arriving during the ~10s restart gets a connection
+error. Analyzer calls have timeouts and fall back (figure-mask → Gemini), and
+the window only opens after 180s of quiet, but `/remove-bg` during photo upload
+has no fallback — a Node-side retry-on-ECONNREFUSED would close it.
+**Touched:** `start.sh` (supervisor loop), `photo_analyzer.py`
+(`_track_request_start/end`, `_recycle_watchdog`, `/release-memory?recycle=true`).
+**Status:** ✅ staging.

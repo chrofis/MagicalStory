@@ -89,6 +89,30 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 # pipelines. Anything larger is downscaled proportionally.
 MAX_IMAGE_DIM = 2048
 
+# ── Self-recycle ────────────────────────────────────────────────────────────
+# Heavy inference leaves ~1GB of memory that CANNOT be reclaimed in-process.
+# Measured on staging with every model already unloaded: a forced
+# malloc_trim(0) moved RSS from 1192.2MB to 1192.9MB — i.e. nothing. It is
+# fragmentation plus torch's own pools; glibc can only hand back a page when the
+# whole page is free, and after thousands of interleaved tensor allocations most
+# pages hold something live. Unloading models returns their weights (measured:
+# 1037MB for rembg, 740MB for GroundingDINO) but cannot defragment the rest.
+#
+# Ending the process returns 100% of it, and start.sh supervises us back up.
+# Nothing else does, which is why this exists.
+#
+# Strictly idle-gated so it can never interrupt work: zero requests in flight
+# AND nothing for RECYCLE_IDLE_S. A story keeps this process continuously busy,
+# so in practice the gate opens only once a story is finished — which is the
+# boundary where the memory should have been reclaimed all along.
+_request_lock = threading.Lock()
+_inflight_requests = 0
+_last_request_ts = time.time()
+# Below this there is nothing worth a restart — a fresh process is ~137MB.
+RECYCLE_RSS_MB = int(os.environ.get('RECYCLE_RSS_MB', '700'))
+RECYCLE_IDLE_S = int(os.environ.get('RECYCLE_IDLE_S', '180'))
+RECYCLE_ENABLED = os.environ.get('RECYCLE_ENABLED', 'true').lower() == 'true'
+
 # Try to initialize MediaPipe (may fail on newer Python versions)
 mp_face_detection = None
 mp_selfie_segmentation = None
@@ -242,6 +266,66 @@ except Exception as e:
     print(f"[WARN] Anime face cascade error: {e}")
 
 _boot_mark("haar cascades (ready)")
+
+
+@app.before_request
+def _track_request_start():
+    """Count in-flight work so the recycler can prove the process is idle."""
+    global _inflight_requests, _last_request_ts
+    with _request_lock:
+        _inflight_requests += 1
+        _last_request_ts = time.time()
+
+
+@app.teardown_request
+def _track_request_end(exc=None):
+    global _inflight_requests, _last_request_ts
+    with _request_lock:
+        _inflight_requests = max(0, _inflight_requests - 1)
+        # Stamp on the way OUT too: a 90s mask call must count as activity at
+        # the moment it FINISHES, not when it started, or a long inference could
+        # age past the idle window while it is still running.
+        _last_request_ts = time.time()
+
+
+def _recycle_watchdog():
+    """Exit once idle and bloated; start.sh brings the process straight back.
+
+    Deliberately os._exit: we want the OS to reclaim everything, and there is
+    nothing worth flushing — models reload lazily and no state is held here.
+    """
+    while True:
+        time.sleep(30)
+        try:
+            if not RECYCLE_ENABLED:
+                continue
+            rss = _rss_mb()
+            if rss is None or rss < RECYCLE_RSS_MB:
+                continue
+            with _request_lock:
+                inflight = _inflight_requests
+                idle_for = time.time() - _last_request_ts
+            if inflight > 0 or idle_for < RECYCLE_IDLE_S:
+                continue
+            # Last chance for the cheap option: if a trim can get us back under
+            # the threshold, take it and skip the restart entirely.
+            _release_memory()
+            rss_after = _rss_mb()
+            if rss_after is not None and rss_after < RECYCLE_RSS_MB:
+                print(f"[RECYCLE] trim was enough ({rss} -> {rss_after} MB) — no restart needed")
+                continue
+            print(
+                f"[RECYCLE] idle {int(idle_for)}s, 0 in flight, rss {rss_after} MB "
+                f"> {RECYCLE_RSS_MB} MB and trim cannot reclaim it — exiting so the "
+                f"OS can. Supervisor will restart (~10s, models reload lazily)."
+            )
+            sys.stdout.flush()
+            os._exit(0)
+        except Exception as e:
+            print(f"[RECYCLE] watchdog error (non-fatal): {e}")
+
+
+threading.Thread(target=_recycle_watchdog, daemon=True).start()
 
 
 def detect_all_faces_anime(image, min_size=30, scale_factor=1.1, min_neighbors=2):
@@ -1866,8 +1950,37 @@ def release_memory_endpoint():
     after = _rss_mb()
     freed = None if (before is None or after is None) else round(before - after, 1)
     print(f"[RELEASE-MEMORY] {before} MB -> {after} MB (freed {freed} MB), unloaded={unloaded or 'none'}")
+
+    # ?recycle=true — the only thing that reclaims fragmentation. Exits AFTER
+    # responding so the caller still gets its numbers; the supervisor in
+    # start.sh restarts us. Refused while other work is in flight.
+    if request.args.get('recycle') == 'true':
+        with _request_lock:
+            others = max(0, _inflight_requests - 1)  # exclude this request
+        if others > 0:
+            print(f"[RELEASE-MEMORY] recycle refused — {others} request(s) still in flight")
+            return jsonify({
+                "success": True, "recycled": False,
+                "reason": f"{others} request(s) in flight",
+                "rss_before_mb": before, "rss_after_mb": after, "freed_mb": freed, "unloaded": unloaded,
+            })
+
+        def _exit_soon():
+            time.sleep(1.0)  # let the response flush
+            print("[RELEASE-MEMORY] recycling now — supervisor will restart")
+            sys.stdout.flush()
+            os._exit(0)
+
+        threading.Thread(target=_exit_soon, daemon=True).start()
+        return jsonify({
+            "success": True, "recycled": True,
+            "rss_before_mb": before, "rss_after_mb": after, "freed_mb": freed, "unloaded": unloaded,
+            "note": "process exiting; supervisor restarts it in ~10s, models reload lazily",
+        })
+
     return jsonify({
         "success": True,
+        "recycled": False,
         "rss_before_mb": before,
         "rss_after_mb": after,
         "freed_mb": freed,
