@@ -3121,29 +3121,25 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   let splitSteps;
   let splitPromptUsed;
   if (params.splitRows) {
-    // Crop the sheet at the row gutter and judge each half on its own — the
-    // whole-sheet judge conflates rows (bottom-row "full body: 10" on a crop
-    // that isn't). Heads-only + bodies-only prompts see exactly 4 cells each.
-    // Identity anchors: the face photo + the TOP row of the 2×2 standard avatar
-    // (faces only — its bottom row is costume/body which changes per story).
-    const stdAvatar = await resolveAvatarSlotBytes(entry.inputs?.standardAvatar);
-    const avatarFaces = stdAvatar ? (await _internal.splitSheetRows(stdAvatar)).topHeads : null;
-    const { topHeads, bottomBody, splitY } = await _internal.splitSheetRows(sheetForDisplay);
-    const [headsR, bodiesR] = await Promise.all([
-      _internal.evaluateSheetRow(topHeads, 'heads', { sourcePhoto: facePhoto, avatarFaces, model, promptOverride }),
-      _internal.evaluateSheetRow(bottomBody, 'bodies', { sourcePhoto: facePhoto, avatarFaces, costumeDescription: costume.description || 'standard outfit', model }),
-    ]);
-    const heads = headsR.report, bodies = bodiesR.report;
-    splitPromptUsed = `— HEADS PROMPT —\n${headsR.promptUsed}\n\n— BODIES PROMPT —\n${bodiesR.promptUsed}`;
-    const finalScore = Math.min(heads?.finalScore ?? 10, bodies?.finalScore ?? 10);
-    evalResult = { split: true, splitY, model, heads, bodies, finalScore, valid: finalScore >= 6 };
+    // Run the SAME shared split evaluator production uses — parity by
+    // construction. It crops the sheet + the 2×2 avatar's face row and judges
+    // heads and bodies separately (anchored on face photo + avatar faces).
+    const standardAvatar = await resolveAvatarSlotBytes(entry.inputs?.standardAvatar);
+    const split = await _internal.evaluateSheetSplit(sheetForDisplay, {
+      facePhoto, standardAvatar,
+      costumeDescription: costume.description || 'standard outfit',
+      model, promptOverride,
+    });
+    const { heads, bodies } = split;
+    splitPromptUsed = `— HEADS PROMPT —\n${split.headsPrompt}\n\n— BODIES PROMPT —\n${split.bodiesPrompt}`;
+    evalResult = { split: true, splitY: split.splitY, model, heads, bodies, finalScore: split.verdict.finalScore, valid: split.verdict.valid };
     // Save the anchors AND the two crops as steps so the lab shows exactly what
     // the judge saw: face photo + avatar faces (identity anchors) + the two rows.
     const [vTop, vBottom, vPhoto, vAvatar] = await Promise.all([
-      saveTestVersion(target.storyId, 'tl_step', null, topHeads, experimentId, heads?.finalScore ?? null),
-      saveTestVersion(target.storyId, 'tl_step', null, bottomBody, experimentId, bodies?.finalScore ?? null),
+      saveTestVersion(target.storyId, 'tl_step', null, split.topHeads, experimentId, heads?.finalScore ?? null),
+      saveTestVersion(target.storyId, 'tl_step', null, split.bottomBody, experimentId, bodies?.finalScore ?? null),
       facePhoto ? saveTestVersion(target.storyId, 'tl_step', null, facePhoto, experimentId) : Promise.resolve(null),
-      avatarFaces ? saveTestVersion(target.storyId, 'tl_step', null, avatarFaces, experimentId) : Promise.resolve(null),
+      split.avatarFaces ? saveTestVersion(target.storyId, 'tl_step', null, split.avatarFaces, experimentId) : Promise.resolve(null),
     ]);
     splitSteps = [
       ...(vPhoto != null ? [{ label: 'Anchor · face photo', imageType: 'tl_step', versionIndex: vPhoto }] : []),

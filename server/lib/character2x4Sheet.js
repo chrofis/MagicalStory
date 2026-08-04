@@ -602,7 +602,7 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
   // avatarFaces = the TOP row of the 2×2 standard avatar (faces only). The
   // bottom row of that avatar is costume/body which changes per story, so only
   // the face is a stable identity anchor.
-  const { sourcePhoto = null, avatarFaces = null, costumeDescription = '', model = 'gemini-2.5-flash', promptOverride = null } = opts;
+  const { sourcePhoto = null, avatarFaces = null, costumeDescription = '', model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null } = opts;
   const tplKey = which === 'heads' ? 'sheetRowHeadsEval' : 'sheetRowBodiesEval';
   let prompt = promptOverride || PROMPT_TEMPLATES[tplKey];
   if (!prompt) throw new Error(`${tplKey} template not loaded`);
@@ -615,10 +615,46 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
   if (avatarFaces) parts.push(inlineOf(avatarFaces));
   parts.push(inlineOf(rowImageData));
   parts.push({ text: prompt });
-  const { text } = await callSheetJudge(model, parts, 4000, process.env.GEMINI_API_KEY);
+  const { text, usageMetadata } = await callSheetJudge(model, parts, 4000, process.env.GEMINI_API_KEY);
   if (!text) throw new Error(`row eval (${which}, ${model}) returned no text`);
+  if (usageTracker && usageMetadata) {
+    usageTracker('gemini_quality', {
+      input_tokens: usageMetadata.promptTokenCount || 0,
+      output_tokens: usageMetadata.candidatesTokenCount || 0,
+    }, `character_2x4_${which}_eval`, model);
+  }
   const report = parseJudgeJson(text);
   return { report, promptUsed: prompt };
+}
+
+// Shared split evaluator — the SINGLE implementation used by BOTH production
+// (generateCharacter2x4Sheet) and the Test Lab, so they judge identically.
+// Crops the sheet at the row divider and judges the 4 heads and 4 bodies
+// separately, each anchored on the face photo + the 2×2 avatar's face row (its
+// body row is costume that changes per story, so it's excluded). Returns the
+// two sub-reports, the crops/anchor for display, and a merged `verdict` whose
+// flat fields are a drop-in for the whole-sheet verdict the retry gate reads.
+async function evaluateSheetSplit(sheetImageData, opts = {}) {
+  const { facePhoto = null, standardAvatar = null, costumeDescription = 'standard outfit', model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null } = opts;
+  const avatarFaces = standardAvatar ? (await splitSheetRows(standardAvatar)).topHeads : null;
+  const { topHeads, bottomBody, splitY } = await splitSheetRows(sheetImageData);
+  const [headsR, bodiesR] = await Promise.all([
+    evaluateSheetRow(topHeads, 'heads', { sourcePhoto: facePhoto, avatarFaces, model, promptOverride, usageTracker }),
+    evaluateSheetRow(bottomBody, 'bodies', { sourcePhoto: facePhoto, avatarFaces, costumeDescription, model, usageTracker }),
+  ]);
+  const heads = headsR.report, bodies = bodiesR.report;
+  const finalScore = Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0);
+  const verdict = {
+    split: true, splitY, finalScore, valid: finalScore >= 6,
+    failureReasons: [...(heads?.failureReasons || []), ...(bodies?.failureReasons || [])],
+    layout: { layoutScore: Math.min(heads?.headsOnly?.headsScore ?? 10, bodies?.fullBody?.fullBodyScore ?? 10) },
+    identity: { identityScore: Math.min(heads?.identity?.identityScore ?? 10, bodies?.identity?.identityScore ?? 10) },
+    outfit: { outfitScore: bodies?.outfit?.outfitScore ?? 10 },
+    sourceMatch: { sourceMatchScore: heads?.identity?.identityScore ?? 10 },
+    cleanRender: { cleanScore: heads?.cleanRender?.cleanScore ?? 10 },
+    heads, bodies,
+  };
+  return { verdict, heads, bodies, topHeads, bottomBody, avatarFaces, splitY, headsPrompt: headsR.promptUsed, bodiesPrompt: bodiesR.promptUsed };
 }
 
 /**
@@ -724,23 +760,18 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     }
     let verdict = null;
     try {
-      // Pass the source face photo (Image 1) + the standard avatar (Image 2)
-      // + the declared character profile (text). Task 2 now uses Image 2 as
-      // the identity anchor instead of cell 1 — catches drift across the
-      // whole sheet, not just within it. Task 4 cross-checks apparent age
-      // against the profile — catches sheets that look like the source photo
-      // but render the character as the wrong age bucket (e.g. 14-yr-old
-      // profile, sheet renders ~10).
-      const characterProfile = buildCharacterDescription(character);
-      verdict = await evaluateSheetWithGemini(
-        result.imageData,
-        costumeDescription,
-        process.env.GEMINI_API_KEY,
-        facePhoto,
-        usageTracker,
-        { standardAvatar, characterDescription: characterProfile }
-      );
-      log.info(`[CHARACTER 2×4]   eval: layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} sourceMatch=${verdict.sourceMatch?.sourceMatchScore} clean=${verdict.cleanRender?.cleanScore} final=${verdict.finalScore} valid=${verdict.valid}`);
+      // SPLIT eval — the SAME shared evaluator the Test Lab uses. Crops the
+      // sheet at the row divider and judges the 4 heads and 4 bodies
+      // separately (each anchored on the face photo + the 2×2 avatar's face
+      // row), so the judge can't rubber-stamp "bottom row full body" on a crop
+      // that isn't, and a cut/missing head is caught. `verdict` is a drop-in
+      // for the old whole-sheet shape (finalScore/valid/layout/identity/
+      // outfit/sourceMatch/cleanRender/failureReasons).
+      const split = await evaluateSheetSplit(result.imageData, {
+        facePhoto, standardAvatar, costumeDescription, usageTracker,
+      });
+      verdict = split.verdict;
+      log.info(`[CHARACTER 2×4]   split eval: heads=${split.heads?.finalScore} bodies=${split.bodies?.finalScore} layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} sourceMatch=${verdict.sourceMatch?.sourceMatchScore} clean=${verdict.cleanRender?.cleanScore} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       // Eval errors no longer get a free score=10. Treat them as score=5
       // (neutral) so a later successful eval can win the best-of-N selection,
@@ -987,5 +1018,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow },
+  _internal: { buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateSheetSplit },
 };
