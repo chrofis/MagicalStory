@@ -120,7 +120,7 @@ async function _interiorSeedPoints(maskPng, w, h) {
  * impossible by construction (the paste equals the original there); the deep
  * interior passes the model through essentially as-is.
  */
-async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch, localField = false, oldBin = null }) {
+async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch, localField = false, oldBin = null, seamCollar = null }) {
   const n = cropW * cropH;
   const { _rgbToLab, _labToRgb, _deltaE, _ccKMeans } = require('./images');
   const borderRing = Buffer.alloc(n);
@@ -193,10 +193,14 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
   let domainCnt = 0;
   for (let i = 0; i < n; i++) {
     if (!isOld(i) && newDil[i] <= 128) {
-      known[i] = 1;
       O[i * 3] = origRaw[i * 3] - pasteRaw[i * 3];
       O[i * 3 + 1] = origRaw[i * 3 + 1] - pasteRaw[i * 3 + 1];
       O[i * 3 + 2] = origRaw[i * 3 + 2] - pasteRaw[i * 3 + 2];
+      // Seam collar: both sides of the border are the same painter, so the
+      // transition is SYMMETRIC — the collar starts at its exact offset but
+      // RELAXES with the interior, taking half the residual ramp outside.
+      if (seamCollar && seamCollar[i]) { domain[i] = 1; domainCnt++; }
+      else known[i] = 1;
     } else if (bgAssign[i] >= 0) { domain[i] = 1; domainCnt++; }
   }
   if (domainCnt > 0) {
@@ -218,7 +222,14 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     }
     const globMed = [medOf(globO[0]), medOf(globO[1]), medOf(globO[2])];
     const matMed = matO.map((m) => (m[0].length >= 8 ? [medOf(m[0]), medOf(m[1]), medOf(m[2])] : globMed));
-    const lam = 0.012;
+    // Two leashes: interior pixels relax toward the robust material tone offset
+    // (weak — border anomalies act locally, deep content keeps only the tone
+    // shift). Collar pixels relax toward their OWN exact offset (strong — the
+    // collar may bend a little to share the seam residual with the outside, but
+    // a large correction like glow is never abandoned; relaxing it fully was
+    // measured to re-expose the glow at 235+).
+    const exactO = seamCollar ? Float32Array.from(O) : null;
+    const lam = 0.012, lamCollar = 0.25;
     for (let it = 0; it < 160; it++) {
       for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
         const i = y * cropW + x;
@@ -233,17 +244,20 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
           c++; rs += O[j * 3]; gs += O[j * 3 + 1]; bs += O[j * 3 + 2];
         }
         if (!c) continue;
-        const tgt = bgAssign[i] >= 0 ? matMed[bgAssign[i]] : globMed;
-        O[i * 3] = (1 - lam) * (rs / c) + lam * tgt[0];
-        O[i * 3 + 1] = (1 - lam) * (gs / c) + lam * tgt[1];
-        O[i * 3 + 2] = (1 - lam) * (bs / c) + lam * tgt[2];
+        const inCollar = seamCollar && seamCollar[i];
+        const lm = inCollar ? lamCollar : lam;
+        const tgt = inCollar ? [exactO[i * 3], exactO[i * 3 + 1], exactO[i * 3 + 2]]
+          : (bgAssign[i] >= 0 ? matMed[bgAssign[i]] : globMed);
+        O[i * 3] = (1 - lm) * (rs / c) + lm * tgt[0];
+        O[i * 3 + 1] = (1 - lm) * (gs / c) + lm * tgt[1];
+        O[i * 3 + 2] = (1 - lm) * (bs / c) + lm * tgt[2];
       }
     }
   }
   const cl = (v) => Math.max(0, Math.min(255, Math.round(v)));
   let corrected = 0;
   for (let i = 0; i < n; i++) {
-    if (bgAssign[i] < 0) continue;
+    if (bgAssign[i] < 0 && !(seamCollar && seamCollar[i])) continue;
     pasteRaw[i * 3] = cl(pasteRaw[i * 3] + O[i * 3]);
     pasteRaw[i * 3 + 1] = cl(pasteRaw[i * 3 + 1] + O[i * 3 + 1]);
     pasteRaw[i * 3 + 2] = cl(pasteRaw[i * 3 + 2] + O[i * 3 + 2]);
@@ -457,9 +471,27 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const unionPadded = await maskBlurThreshold(union, cropW, cropH, padPx / 1.5, 16);
   const alpha1 = Buffer.from(unionPadded);
   const sOld = Math.max(1, Math.round(oldA.length / n));
+  // SYMMETRIC SEAM COLLAR (figure-exact): both sides of the old-silhouette border
+  // are the same painter — the page itself is model-generated art, so the seam is
+  // a panorama stitch between equal renders, not truth-vs-guess. The colour
+  // transition therefore splits across BOTH sides: a ~5px collar OUTSIDE the old
+  // edge joins the offset-diffusion domain (initialized with its exact per-pixel
+  // offset, then relaxed), so half the residual ramp lives outside, half inside,
+  // and the seam has no kink. Content in the collar stays effectively the
+  // original — model + exact offset is byte-identical to the original there, so
+  // only the smooth relaxed residual rides on top; structure cannot ghost.
+  let seamCollar = null;
   if (blendShape === 'figure-exact') {
     const newPad = await maskBlurThreshold(Buffer.from(newBin), cropW, cropH, padPx / 1.5, 16);
-    for (let i = 0; i < n; i++) alpha1[i] = (oldA[i * sOld] > 128 || newPad[i] > 128) ? 255 : 0;
+    const oldBinB = Buffer.alloc(n);
+    for (let i = 0; i < n; i++) oldBinB[i] = oldA[i * sOld] > 128 ? 255 : 0;
+    const oldDil = await maskBlurThreshold(oldBinB, cropW, cropH, 3.5, 16); // ~5px outward
+    seamCollar = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      const collar = oldDil[i] > 128 && oldBinB[i] <= 128 && newPad[i] <= 128;
+      if (collar) seamCollar[i] = 1;
+      alpha1[i] = (oldBinB[i] > 128 || newPad[i] > 128 || collar) ? 255 : 0;
+    }
   } else if (padMode === 'newFigure') {
     const newPad = await maskBlurThreshold(Buffer.from(newBin), cropW, cropH, padPx / 1.5, 16);
     for (let i = 0; i < n; i++) alpha1[i] = (union[i] > 128 || newPad[i] > 128) ? 255 : 0;
@@ -563,9 +595,9 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     for (let i = 0; i < n; i++) oldBinBuf[i] = oldA[i * s1r] > 128 ? 255 : 0;
     const { bgPx, materials } = await matchIntroducedBackground({
       origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch,
-      // figure-exact: seamless-clone offset — model content kept, border pinned
-      // to the original. Legacy shape keeps the per-material mean shift.
-      localField: blendShape === 'figure-exact', oldBin: oldBinBuf,
+      // figure-exact: seamless-clone offset — model content kept, transition
+      // split across the seam collar. Legacy shape keeps the per-material mean shift.
+      localField: blendShape === 'figure-exact', oldBin: oldBinBuf, seamCollar,
     });
     if (bgPx > 0) log.info(`[TESTLAB] ${bodyColorMode ? 'figure-mode border' : 'red-zone'}: colour-matched ${bgPx}px background (${materials} materials${blendShape === 'figure-exact' ? ', local two-band field' : ''}) to the scene`);
     if (!colorInfo && bodyColorMode) colorInfo = { deltaEBefore: null, seamBefore: null, seamAfter: null, figureColorKept: true };

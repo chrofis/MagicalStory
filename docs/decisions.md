@@ -3825,3 +3825,31 @@ defect on real images, the lever is upstream (whiteout prompt / IoU gate), not t
 **Touched:** `server/lib/samBlend.js` (localField → screened offset field; plate/H deleted),
 `server/lib/testlab.js` (plate loader deleted).
 **Status:** ✅ active (staging pending push). Supersedes today's plate-fill entry.
+
+---
+
+## 2026-08-04 — Symmetric seam collar: the transition splits across BOTH sides of the old edge
+
+**Context:** Owner correction: "both sides are Grok" — the page itself is model-generated
+art, so the old-silhouette seam is a panorama stitch between EQUAL renders, not
+truth-vs-guess. A one-sided inward fade concentrates the whole residual ramp inside and
+leaves a derivative kink at the border.
+
+**Decision:** figure-exact adds a ~5px SEAM COLLAR outside the old edge, inside the paste
+region. Collar pixels join the offset diffusion as domain (not hard-pinned), INITIALIZED at
+their exact per-pixel offset and leashed to it (λ_collar 0.25 vs interior λ 0.012): small
+seam residuals split symmetrically across both sides (measured: no-glow seam = 127-137
+across the whole transition, kink-free), while large corrections are never abandoned —
+relaxing the collar freely was measured to re-expose glow at 235+. Content in the collar
+cannot ghost: model + exact offset is byte-identical to the original, only the smooth
+relaxed residual rides on top. Alpha-fade in both directions is impossible by geometry:
+under the paste inside the old edge sits the OLD FIGURE (inward alpha mixes it back), and
+outward alpha with raw model = the halo.
+
+**Measured:** no-glow seam symmetric and kink-free; glow case: collar holds ≈130, rim fades
+inside, interior keeps model content at tone; P1/P2/P3 all pass (P2 max 140); legacy path
+byte-identical.
+
+**Touched:** `server/lib/samBlend.js` (seamCollar construction, alpha1 extension, two-leash
+screened diffusion).
+**Status:** ✅ active (staging pending push).
