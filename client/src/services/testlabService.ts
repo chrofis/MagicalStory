@@ -240,7 +240,7 @@ export const TESTLAB_STAGES = [
   { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
   { id: 'avatar_realistic', label: 'Avatar pass 1 (realistic anchor)', producesImage: true, overridable: false, characterLevel: true },
   { id: 'avatar_style', label: 'Avatar pass 2 (style transfer)', producesImage: true, overridable: true, characterLevel: true },
-  { id: 'avatar_eval', label: 'Avatar sheet eval', producesImage: false, overridable: false, characterLevel: true },
+  { id: 'avatar_eval', label: 'Avatar sheet eval', producesImage: false, overridable: true, characterLevel: true },
 ] as const;
 
 export const testlabService = {

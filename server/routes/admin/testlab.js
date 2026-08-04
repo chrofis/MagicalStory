@@ -117,6 +117,10 @@ const STAGE_TEMPLATE_KEYS = {
   // Cover prefill shows the front-cover template; the override replaces
   // whichever cover template the target's coverType selects.
   cover: 'frontCover',
+  // Avatar sheet eval prefill shows the pass-1 realistic evaluator; pass-2
+  // (styled) uses sheet-2x4-style-eval.txt — paste that manually when A/B-ing
+  // the styled eval prompt.
+  avatar_eval: 'sheet2x4Evaluation',
 };
 
 // GET /api/admin/testlab/templates — current template text per overridable stage

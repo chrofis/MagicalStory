@@ -377,11 +377,13 @@ function buildCharacterDescription(character) {
 }
 
 async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiKey, sourcePhoto = null, usageTracker = null, opts = {}) {
-  const { standardAvatar = null, characterDescription = '' } = opts;
+  // model / promptOverride let the Test Lab A/B eval models and prompt text
+  // without touching production (which passes neither → defaults below).
+  const { standardAvatar = null, characterDescription = '', model = 'gemini-2.5-flash', promptOverride = null } = opts;
   const sheetB64 = r2.stripDataUriPrefix(imageData);
   const sheetMime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
-  let prompt = PROMPT_TEMPLATES.sheet2x4Evaluation;
+  let prompt = promptOverride || PROMPT_TEMPLATES.sheet2x4Evaluation;
   if (!prompt) throw new Error('sheet2x4Evaluation prompt template not loaded');
   // Braced placeholders via fillTemplate ($-safe, global, strips unfilled).
   // The old bare-word .replace(/REQUESTED_OUTFIT/g, ...) also rewrote the
@@ -427,7 +429,7 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
   };
 
   const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) }
   );
   if (!resp.ok) throw new Error(`Gemini eval HTTP ${resp.status}`);
@@ -438,7 +440,7 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
     usageTracker('gemini_quality', {
       input_tokens: j.usageMetadata.promptTokenCount || 0,
       output_tokens: j.usageMetadata.candidatesTokenCount || 0,
-    }, 'character_2x4_eval', 'gemini-2.5-flash');
+    }, 'character_2x4_eval', model);
   }
   return JSON.parse(text);
 }
@@ -486,10 +488,12 @@ Only the surface treatment changes from photographic to ${styleLine}.`;
  * Pass 2 styled sheet. Returns parsed JSON verdict from
  * prompts/sheet-2x4-style-eval.txt.
  */
-async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styledSheet, artStyle, geminiApiKey, usageTracker = null, declaredAge = null) {
+async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styledSheet, artStyle, geminiApiKey, usageTracker = null, declaredAge = null, opts = {}) {
+  // model / promptOverride: Test Lab A/B only; production passes neither.
+  const { model = 'gemini-2.5-flash', promptOverride = null } = opts;
   const styleLabel = resolveStyleLineForSheet(artStyle);
 
-  let prompt = PROMPT_TEMPLATES.sheet2x4StyleEval;
+  let prompt = promptOverride || PROMPT_TEMPLATES.sheet2x4StyleEval;
   if (!prompt) throw new Error('sheet2x4StyleEval prompt template not loaded');
   prompt = prompt.replace(/REQUESTED_STYLE/g, `REQUESTED_STYLE: ${styleLabel}`);
   // TASK 7 age gate — style transfer is where kids drift younger (the art
@@ -524,7 +528,7 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
     ],
   };
   const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) }
   );
   if (!resp.ok) throw new Error(`Gemini style-eval HTTP ${resp.status}`);
@@ -535,7 +539,7 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
     usageTracker('gemini_quality', {
       input_tokens: j.usageMetadata.promptTokenCount || 0,
       output_tokens: j.usageMetadata.candidatesTokenCount || 0,
-    }, 'character_2x4_style_eval', 'gemini-2.5-flash');
+    }, 'character_2x4_style_eval', model);
   }
   return JSON.parse(text);
 }
