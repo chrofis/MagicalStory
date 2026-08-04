@@ -172,7 +172,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -345,10 +345,26 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   //              exists for) and take the old-only boundary EXACTLY. Outside the old
   //              silhouette the original background is correct and available, so
   //              there is nothing to gain by pasting over it.
+  // blendShape — the SHAPE of the full-opacity paste region:
+  //  'padded-union'  (historical): dilate(old ∪ new, 6). Around the old-only
+  //                  boundary the pad lands in REAL background and carries the
+  //                  model's pixels (incl. whiteout glow) 6px out → white halo.
+  //  'figure-exact'  (the correct construction): old ∪ dilate(new, 6). Full
+  //                  opacity over the ENTIRE old silhouette (nothing old can ever
+  //                  show through) and over the new figure + its anti-aliased
+  //                  edge (the only place the pad has a purpose). The paste
+  //                  never extends beyond the old edge into background the
+  //                  original already renders correctly. Combined with content
+  //                  substitution below, model pixels are STRUCTURALLY unable
+  //                  to appear outside this region — the halo has no source.
   const padPx = 6;
   const unionPadded = await maskBlurThreshold(union, cropW, cropH, padPx / 1.5, 16);
   const alpha1 = Buffer.from(unionPadded);
-  if (padMode === 'newFigure') {
+  const sOld = Math.max(1, Math.round(oldA.length / n));
+  if (blendShape === 'figure-exact') {
+    const newPad = await maskBlurThreshold(Buffer.from(newBin), cropW, cropH, padPx / 1.5, 16);
+    for (let i = 0; i < n; i++) alpha1[i] = (oldA[i * sOld] > 128 || newPad[i] > 128) ? 255 : 0;
+  } else if (padMode === 'newFigure') {
     const newPad = await maskBlurThreshold(Buffer.from(newBin), cropW, cropH, padPx / 1.5, 16);
     for (let i = 0; i < n; i++) alpha1[i] = (union[i] > 128 || newPad[i] > 128) ? 255 : 0;
   }
@@ -394,10 +410,10 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   const candResized = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).png().toBuffer(); // PNG: lossless paste source
   const origResized = await sharp(originalCropBuf).resize(cropW, cropH, { fit: 'fill' }).png().toBuffer(); // PNG: lossless colour reference
   const unionAlphaPng = await sharp(Buffer.alloc(n * 3, 255), { raw: { width: cropW, height: cropH, channels: 3 } })
-    .ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer();
+    .ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
   const whiteVis = await sharp(origResized).composite([{ input: unionAlphaPng }]).jpeg().toBuffer();
-  await addStep('original with SAM union whited out (padded 6px)', `data:image/jpeg;base64,${whiteVis.toString('base64')}`);
-  const cutoutPng = await sharp(candResized).ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer();
+  await addStep(blendShape === 'figure-exact' ? 'original with paste region whited out (old ∪ new+6px pad)' : 'original with SAM union whited out (padded 6px)', `data:image/jpeg;base64,${whiteVis.toString('base64')}`);
+  const cutoutPng = await sharp(candResized).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
   const cutVis = await sharp({ create: { width: cropW, height: cropH, channels: 3, background: { r: 30, g: 30, b: 30 } } })
     .composite([{ input: cutoutPng }]).jpeg().toBuffer();
   await addStep('SAM-identified region — pixels taken from the new image', `data:image/jpeg;base64,${cutVis.toString('base64')}`);
@@ -454,9 +470,25 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     if (!colorInfo && bodyColorMode) colorInfo = { deltaEBefore: null, seamBefore: null, seamAfter: null, figureColorKept: true };
     if (colorInfo) { colorInfo.redZonePx = redZonePx; colorInfo.bgMatchedPx = bgPx; }
   }
+  // figure-exact: CONTENT SUBSTITUTION outside the paste region. The feather
+  // ramp extends beyond alpha1, and whatever pixels sit there get partially
+  // composited — under 'padded-union' that is the model's redrawn background
+  // (glow included), the halo's source. Substituting the ORIGINAL there means
+  // the ramp blends original-with-original: geometrically soft, visually
+  // invisible, and the model cannot contribute a single pixel beyond the
+  // paste region no matter how wide the feather is.
+  if (blendShape === 'figure-exact') {
+    for (let i = 0; i < n; i++) {
+      if (alpha1[i] <= 128) {
+        pasteRaw[i * 3] = origRaw[i * 3];
+        pasteRaw[i * 3 + 1] = origRaw[i * 3 + 1];
+        pasteRaw[i * 3 + 2] = origRaw[i * 3 + 2];
+      }
+    }
+  }
   const pasteBuf = await sharp(pasteRaw, { raw: { width: cropW, height: cropH, channels: 3 } }).png().toBuffer(); // PNG: lossless corrected paste
   // Applied view: exactly what gets pasted (colour-corrected figure + filled bg).
-  const ccCut = await sharp(pasteBuf).ensureAlpha().joinChannel(Buffer.from(unionPadded), raw1).png().toBuffer();
+  const ccCut = await sharp(pasteBuf).ensureAlpha().joinChannel(Buffer.from(alpha1), raw1).png().toBuffer();
   const ccVis = await sharp({ create: { width: cropW, height: cropH, channels: 3, background: { r: 30, g: 30, b: 30 } } })
     .composite([{ input: ccCut }]).jpeg().toBuffer();
   await addStep(`pasted region (colour${colorInfo ? ` ΔE ${colorInfo.deltaEBefore}, seam ${colorInfo.seamBefore}→${colorInfo.seamAfter}` : ' n/a'}${redZonePx ? `, red-zone ${redZonePx}px kept from model` : ''})`, `data:image/jpeg;base64,${ccVis.toString('base64')}`);
@@ -482,16 +514,28 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   //             the falloff beyond it where both sides are background. Coverage
   //             never shrinks, so the feather can be widened freely.
   // Default is unchanged ('erode', or 'centered' when erodeFeather === false).
-  const mode = featherMode || (erodeFeather === false ? 'centered' : 'erode');
+  // figure-exact FORCES 'outward': erode would re-expose the old figure (the
+  // measured 8-27px uncovered ring), and with content substitution the outward
+  // band costs nothing — it blends original into original.
+  const mode = blendShape === 'figure-exact' ? 'outward' : (featherMode || (erodeFeather === false ? 'centered' : 'erode'));
   let alphaSrc = Buffer.from(alpha1);
   if (fpx >= 1 && mode === 'erode') alphaSrc = await maskBlurThreshold(alphaSrc, cropW, cropH, fpx, 200); // blur+high-thr shrinks ~fpx inward
   else if (fpx >= 1 && mode === 'outward') alphaSrc = await maskBlurThreshold(alphaSrc, cropW, cropH, fpx / 1.5, 16); // grows ~fpx outward
   const alphaBlur = await sharp(alphaSrc, raw1).blur(Math.max(0.3, fpx || 1.2)).raw().toBuffer();
   const abStride = Math.max(1, Math.round(alphaBlur.length / n));
   const alphaSoft = abStride === 1 ? alphaBlur : (() => { const o = Buffer.alloc(n); for (let i = 0; i < n; i++) o[i] = alphaBlur[i * abStride]; return o; })();
-  await addStep(`composite alpha (feather ${fpx}px, ramp ${mode}${padMode === 'newFigure' ? ', pad new-figure only' : ''} → net coverage ${mode === 'erode' ? padPx - fpx : mode === 'outward' ? padPx + fpx : padPx}px)`, `data:image/png;base64,${(await sharp(alphaSoft, raw1).png().toBuffer()).toString('base64')}`);
+  // Outward ramp is ONE-SIDED: the Gaussian tail also bleeds ~10% inward past
+  // the region edge, and inside the old silhouette "10% of original" is 10% of
+  // the OLD FIGURE (measured min alpha 223-228 → a faint ghost edge). Clamp the
+  // paste region itself back to full opacity; the ramp lives strictly outside.
+  if (mode === 'outward') {
+    for (let i = 0; i < n; i++) if (alpha1[i] > 128) alphaSoft[i] = 255;
+  }
+  await addStep(blendShape === 'figure-exact'
+    ? `composite alpha (figure-exact: full opacity over old ∪ new+pad, feather ${fpx}px outward into substituted-original band)`
+    : `composite alpha (feather ${fpx}px, ramp ${mode}${padMode === 'newFigure' ? ', pad new-figure only' : ''} → net coverage ${mode === 'erode' ? padPx - fpx : mode === 'outward' ? padPx + fpx : padPx}px)`, `data:image/png;base64,${(await sharp(alphaSoft, raw1).png().toBuffer()).toString('base64')}`);
   const feathered = await sharp(pasteBuf).ensureAlpha().joinChannel(alphaSoft, raw1).png().toBuffer();
-  return { feathered, iou, redPx, colorInfo, blendRule: BLEND_RULE_VERSION };
+  return { feathered, iou, redPx, colorInfo, blendRule: blendShape === 'figure-exact' ? 'figure-exact-pad6' : BLEND_RULE_VERSION };
 }
 
 module.exports = { samUnionBlend, maskBlurThreshold, _faceConnectedComponent, _interiorSeedPoints, fetchMaskWithRetry, BLEND_RULE_VERSION };

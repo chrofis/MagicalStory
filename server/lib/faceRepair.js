@@ -678,6 +678,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       // caller overrides, so production keeps samUnionBlend's defaults.
       ...(opts.featherMode !== undefined ? { featherMode: opts.featherMode } : {}),
       ...(opts.padMode !== undefined ? { padMode: opts.padMode } : {}),
+      ...(opts.blendShape !== undefined ? { blendShape: opts.blendShape } : {}),
       // Uniform gates — tunable for the Test Lab A/B, default ON in production.
       gateIou: gates.iou,
       gateWhiteCard: gates.whiteCard,

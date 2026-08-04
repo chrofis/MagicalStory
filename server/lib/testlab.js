@@ -2819,6 +2819,12 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       erodeFeather: params.erodeFeather,
       featherMode: params.featherMode,
       padMode: params.padMode,
+      // FIGURE/BODY repair defaults to the correct construction: full opacity over
+      // old ∪ new+pad, content-substituted feather band, outward ramp — the old
+      // figure cannot show through and the model cannot paint outside the region.
+      // Face mode keeps 'padded-union' (masks nearly coincide; its default is
+      // calibrated separately). Override with params.blendShape to A/B.
+      blendShape: params.blendShape != null ? params.blendShape : (params._faceMode ? 'padded-union' : 'figure-exact'),
       colorBorderRefine: params.colorBorderRefine,
       // FIGURE/BODY repair (not face mode) → protect background at the border, let
       // the redrawn figure colour drift. Override with params.bodyColorMode to A/B.

@@ -3615,3 +3615,48 @@ self-shutdown could never actually fire, and the feature was silently saving not
 (`ensureDefaultProbes` + `busyReport` + testlab probe + the rows fix), `server.js`
 (`/api/health/busy`), `CLAUDE.md`.
 **Status:** ✅ kept.
+
+---
+
+## 2026-08-04 — Blend: `blendShape 'figure-exact'` — the correct paste construction (figure-repair default)
+
+**Context:** Follow-up to today's featherMode entry. Web research (Laplacian/multi-band
+blending, trimap matting, Poisson cloning) + the owner's own spec — "pad, colour-match the
+padding, feather without touching the figure, old figure completely overwritten" — against
+which the padded-union construction fails structurally: it dilates old ∪ new, so the pad
+lands in REAL background at the old-only boundary and carries model pixels (whiteout glow)
+outward = the white halo; and any inward ramp exposes the old figure.
+
+**Decision:** `blendShape: 'figure-exact'` in `samUnionBlend`:
+1. Paste region = **old ∪ dilate(new, 6px)** — full opacity across the ENTIRE old
+   silhouette (nothing old can show through), pad only where it has a purpose (the new
+   figure's anti-aliased edge). Nothing pasted beyond the old edge into background the
+   original already renders.
+2. **Content substitution**: outside the paste region the paste buffer := ORIGINAL, so the
+   feather band blends original-with-original — the model is structurally unable to
+   contribute any pixel beyond the region, however wide the feather.
+3. Ramp forced **outward + one-sided**: after the Gaussian, alpha is clamped to 255 across
+   the paste region (the blur tail otherwise bleeds ~10% inward → measured min alpha
+   223-228 = faint old-figure ghost). The ramp exists only in the substituted band.
+
+Verified on the real samUnionBlend (synthetic harness, glow band spilling past the old
+edge): figure-exact f6/f12 = min alpha 255 over the old silhouette, byte-exact original
+outside the old edge, figure interior deviation 0. Legacy padded-union: f6-erode fails
+coverage (172) AND halo (194); f6-outward fixes coverage but leaks the glow (252).
+
+**Default:** figure/body repairs in the insert pipeline (testlab runQwenInsertStage,
+`!_faceMode`) now default to figure-exact — per "default to the proper fix". FACE mode and
+production faceRepair.js keep 'padded-union' (masks nearly coincide; separately calibrated;
+flip only after its own A/B). Blend rule stamp: `figure-exact-pad6`.
+
+**Still open:** the red-zone INTERIOR (inside the old silhouette, beyond the new figure)
+necessarily keeps model fill — if the model painted blur there, colour-matching preserves
+it (texture-keeping is by design). That is an inpainting/IoU-rejection problem, not a
+blending one. Multi-band blending remains unimplemented — likely unnecessary now that the
+transition band is original-vs-original.
+
+**Touched:** `server/lib/samBlend.js` (blendShape, content substitution, one-sided outward
+clamp, dynamic blendRule, viz labels), `server/lib/testlab.js` (body-mode default),
+`server/lib/faceRepair.js` (passthrough), `client/src/pages/TestLab.tsx` (replay variants
+A-E vs legacy).
+**Status:** ✅ active on the figure-repair insert path (staging); face default pending A/B.

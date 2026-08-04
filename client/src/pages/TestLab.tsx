@@ -34,15 +34,16 @@ import {
  * nothing else. Edit here to change what "Replay blend" compares.
  */
 const BLEND_REPLAY_VARIANTS = [
-  // Net opacity coverage = pad(6) − erosion. 'erode' shrinks it (fpx 14 → −8px,
-  // so the paste stops INSIDE the union and the old figure shows through);
-  // 'outward' keeps it complete at any width. 'newFigure' padding stops the
-  // model's whiteout glow being pushed into real background (the white halo).
-  { label: 'A: shipped — f6, ramp inside (net 0)', params: {} },
-  { label: 'B: f6, ramp outward (net +12)', params: { featherPx: 6, featherMode: 'outward' } },
-  { label: 'C: f12, ramp outward', params: { featherPx: 12, featherMode: 'outward' } },
-  { label: 'D: f12 outward + pad new-figure only', params: { featherPx: 12, featherMode: 'outward', padMode: 'newFigure' } },
-  { label: 'E: f2, ramp centered (net +6)', params: { featherPx: 2, featherMode: 'centered' } },
+  // 'figure-exact' is the correct construction: full opacity over old ∪ new+pad
+  // (the old figure can never show through), the feather band content-substituted
+  // with the ORIGINAL (the model cannot paint outside the region → no halo), ramp
+  // outward (never touches the figure → it stays crisp). It is the figure-repair
+  // default; these variants compare it against the legacy padded-union shapes.
+  { label: 'A: legacy — padded-union, f6 erode', params: { blendShape: 'padded-union' } },
+  { label: 'B: legacy — padded-union, f6 outward', params: { blendShape: 'padded-union', featherPx: 6, featherMode: 'outward' } },
+  { label: 'C: figure-exact, f6 (new default)', params: { blendShape: 'figure-exact', featherPx: 6 } },
+  { label: 'D: figure-exact, f12', params: { blendShape: 'figure-exact', featherPx: 12 } },
+  { label: 'E: figure-exact f6, colour match OFF', params: { blendShape: 'figure-exact', featherPx: 6, bgBorderMatch: false, colorCorrect: false } },
 ];
 
 /** One reviewer-model run (outline_review): header stats + the review text. */
