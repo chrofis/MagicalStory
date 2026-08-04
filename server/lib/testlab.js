@@ -2972,16 +2972,22 @@ async function runRepairVerifyStage(ctx, { experimentId, params = {} }) {
 }
 
 /** Standalone avatar-sheet evaluation on a stored tl_avatar test version. */
-// Materialize a styledAvatarGeneration image slot ({imageData}|{imageUrl}) to a
-// data URI. Post-R2 the sheet bytes live behind imageUrl; older entries kept
-// imageData inline.
+// Materialize a styledAvatarGeneration image slot to a data URI. Slots come in
+// three shapes: a bare string (data URI or R2 URL — e.g. passes.pass1.imageData),
+// {imageData} (older inline entries), or {imageUrl} (post-R2 input slots).
 async function resolveAvatarSlotBytes(slot) {
   if (!slot) return null;
-  if (slot.imageData) return slot.imageData;
-  if (slot.imageUrl) {
+  const fetchUrl = (url) => {
     const { imgBytesAsync } = require('../services/database');
-    return imgBytesAsync({ image_url: slot.imageUrl });
+    return imgBytesAsync({ image_url: url });
+  };
+  if (typeof slot === 'string') {
+    if (slot.startsWith('data:')) return slot;
+    if (/^https?:\/\//.test(slot)) return fetchUrl(slot);
+    return null;
   }
+  if (slot.imageData) return slot.imageData;
+  if (slot.imageUrl) return fetchUrl(slot.imageUrl);
   return null;
 }
 
@@ -3055,31 +3061,48 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   const entry = chosen.e;
   const artStyle = params.artStyle || entry.artStyle || 'watercolor';
   const facePhoto = (await resolveAvatarSlotBytes(entry.inputs?.facePhoto)) || (await resolveFacePhoto(character));
-  const realistic = await resolveAvatarSlotBytes(entry.inputs?.standardAvatar);
+  // The evaluators score the 2×4 SHEETS, not the 2×2 standard-avatar body ref.
+  // pass 1 = the realistic 2×4 anchor (passes.pass1.imageData / realisticImageData);
+  // pass 2 = the styled 2×4 sheet (passes.pass2.imageData, falling back to output).
+  const realistic = (await resolveAvatarSlotBytes(entry.passes?.pass1?.imageData))
+    || (await resolveAvatarSlotBytes(entry.realisticImageData));
 
   let evalResult;
   let slot;
+  let sheetForDisplay;      // the sheet that was scored (shown in the lab)
+  let realisticVersionIndex; // pass-2 also shows the realistic anchor as baseline
   if (pass === 1) {
-    if (!realistic) throw new Error('pass-1 realistic sheet (inputs.standardAvatar) not stored on this entry');
-    slot = 'standardAvatar';
+    if (!realistic) throw new Error('pass-1 realistic 2×4 sheet (passes.pass1.imageData) not stored on this entry');
+    slot = 'passes.pass1.imageData';
+    sheetForDisplay = realistic;
     evalResult = await _internal.evaluateSheetWithGemini(
       realistic, costume.description || 'standard outfit',
       process.env.GEMINI_API_KEY, facePhoto, null,
       { characterDescription: character.description || '', model, promptOverride }
     );
   } else {
-    const styled = await resolveAvatarSlotBytes(entry.output);
-    if (!styled) throw new Error('pass-2 styled sheet (output) not stored on this entry');
-    if (!realistic) throw new Error('pass-2 eval needs the realistic anchor (inputs.standardAvatar) — not stored on this entry');
-    slot = 'output';
+    const styled = (await resolveAvatarSlotBytes(entry.passes?.pass2?.imageData))
+      || (await resolveAvatarSlotBytes(entry.output));
+    if (!styled) throw new Error('pass-2 styled 2×4 sheet (passes.pass2.imageData / output) not stored on this entry');
+    if (!realistic) throw new Error('pass-2 eval needs the realistic anchor (passes.pass1.imageData) — not stored on this entry');
+    slot = 'passes.pass2.imageData';
+    sheetForDisplay = styled;
     evalResult = await _internal.evaluateStyledSheetWithGemini(
       facePhoto, realistic, styled, artStyle, process.env.GEMINI_API_KEY,
       null /* usageTracker */, params.declaredAge ?? null,
       { model, promptOverride }
     );
+    // Save the realistic anchor too so the pass-2 card shows both side by side.
+    realisticVersionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, realistic, experimentId);
   }
+  // Persist the scored sheet as a test version so the lab renders it next to the
+  // eval report (ResultCard shows any result with imageType + versionIndex).
+  const scoreForBadge = evalResult?.finalScore != null ? Math.round(evalResult.finalScore) : null;
+  const evalVersionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, sheetForDisplay, experimentId, scoreForBadge);
   return {
     character: character.name, source: 'storedSheet', pass, styled: pass === 2, model, artStyle,
+    imageType: 'tl_avatar', versionIndex: evalVersionIndex,
+    ...(realisticVersionIndex != null ? { realisticVersionIndex } : {}),
     sheetSource: { array: 'styledAvatarGeneration', entryIndex: chosen.i, slot },
     elapsedMs: Date.now() - t0, report: evalResult,
   };

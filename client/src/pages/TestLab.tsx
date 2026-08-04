@@ -388,6 +388,8 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const [compareColor, setCompareColor] = useState(false);
   const [whiteoutTarget, setWhiteoutTarget] = useState('face');
   const [freshDetection, setFreshDetection] = useState(false);
+  const [avatarPass, setAvatarPass] = useState('1');        // avatar_eval: 1=realistic anchor, 2=styled sheet
+  const [avatarEvalModel, setAvatarEvalModel] = useState('gemini-2.5-flash'); // avatar_eval: which Gemini scores the sheet
   const [paramsJson, setParamsJson] = useState('');
   const [storyIdInput, setStoryIdInput] = useState('');
   const [coverType, setCoverType] = useState('frontCover');
@@ -549,6 +551,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
         ];
       }
       if (stage === 'qwen_insert' && freshDetection) params.freshDetection = true;
+      if (stage === 'avatar_eval') { params.pass = Number(avatarPass); params.model = avatarEvalModel; }
       if (stage === 'cover') params.coverType = coverType;
       if (isOutlineReview) {
         if (writerModel) params.writerModel = writerModel;
@@ -663,6 +666,25 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
               <input type="checkbox" checked={freshDetection} onChange={e => setFreshDetection(e.target.checked)} />
               Re-detect character (ignore stored box)
             </label>
+          )}
+          {stage === 'avatar_eval' && (
+            <>
+              <label className="text-sm flex items-center gap-1.5">
+                Sheet
+                <select className="border rounded-lg px-3 py-2 text-sm" value={avatarPass} onChange={e => setAvatarPass(e.target.value)}>
+                  <option value="1">Pass 1 — realistic anchor</option>
+                  <option value="2">Pass 2 — styled sheet</option>
+                </select>
+              </label>
+              <label className="text-sm flex items-center gap-1.5">
+                Eval model
+                <select className="border rounded-lg px-3 py-2 text-sm" value={avatarEvalModel} onChange={e => setAvatarEvalModel(e.target.value)}>
+                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                  <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                </select>
+              </label>
+            </>
           )}
           {stage === 'garment_hue' && (
             <label className="text-sm flex items-center gap-1.5 font-medium text-indigo-700">
