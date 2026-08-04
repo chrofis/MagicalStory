@@ -3119,15 +3119,22 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
 
   let evalResult;
   let splitSteps;
+  let splitPromptUsed;
   if (params.splitRows) {
     // Crop the sheet at the row gutter and judge each half on its own — the
     // whole-sheet judge conflates rows (bottom-row "full body: 10" on a crop
     // that isn't). Heads-only + bodies-only prompts see exactly 4 cells each.
+    // Identity anchors: the face photo + the TOP row of the 2×2 standard avatar
+    // (faces only — its bottom row is costume/body which changes per story).
+    const stdAvatar = await resolveAvatarSlotBytes(entry.inputs?.standardAvatar);
+    const avatarFaces = stdAvatar ? (await _internal.splitSheetRows(stdAvatar)).topHeads : null;
     const { topHeads, bottomBody, splitY } = await _internal.splitSheetRows(sheetForDisplay);
-    const [heads, bodies] = await Promise.all([
-      _internal.evaluateSheetRow(topHeads, 'heads', { sourcePhoto: facePhoto, model, promptOverride }),
-      _internal.evaluateSheetRow(bottomBody, 'bodies', { sourcePhoto: facePhoto, costumeDescription: costume.description || 'standard outfit', model }),
+    const [headsR, bodiesR] = await Promise.all([
+      _internal.evaluateSheetRow(topHeads, 'heads', { sourcePhoto: facePhoto, avatarFaces, model, promptOverride }),
+      _internal.evaluateSheetRow(bottomBody, 'bodies', { sourcePhoto: facePhoto, avatarFaces, costumeDescription: costume.description || 'standard outfit', model }),
     ]);
+    const heads = headsR.report, bodies = bodiesR.report;
+    splitPromptUsed = `— HEADS PROMPT —\n${headsR.promptUsed}\n\n— BODIES PROMPT —\n${bodiesR.promptUsed}`;
     const finalScore = Math.min(heads?.finalScore ?? 10, bodies?.finalScore ?? 10);
     evalResult = { split: true, splitY, model, heads, bodies, finalScore, valid: finalScore >= 6 };
     const [vTop, vBottom] = await Promise.all([
@@ -3162,6 +3169,7 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     imageType: 'tl_avatar', versionIndex: evalVersionIndex,
     ...(realisticVersionIndex != null ? { realisticVersionIndex } : {}),
     ...(splitSteps ? { steps: splitSteps } : {}),
+    ...(splitPromptUsed ? { promptUsed: splitPromptUsed } : {}),
     sheetSource: { array: 'styledAvatarGeneration', entryIndex: chosen.i, slot },
     elapsedMs: Date.now() - t0, report: evalResult,
   };

@@ -599,22 +599,26 @@ async function splitSheetRows(imageData) {
 // stops the judge conflating the two rows (the "bottom row full body: 10" on a
 // head-only crop failure). Returns the parsed JSON verdict.
 async function evaluateSheetRow(rowImageData, which, opts = {}) {
-  const { sourcePhoto = null, costumeDescription = '', model = 'gemini-2.5-flash', promptOverride = null } = opts;
+  // avatarFaces = the TOP row of the 2×2 standard avatar (faces only). The
+  // bottom row of that avatar is costume/body which changes per story, so only
+  // the face is a stable identity anchor.
+  const { sourcePhoto = null, avatarFaces = null, costumeDescription = '', model = 'gemini-2.5-flash', promptOverride = null } = opts;
   const tplKey = which === 'heads' ? 'sheetRowHeadsEval' : 'sheetRowBodiesEval';
   let prompt = promptOverride || PROMPT_TEMPLATES[tplKey];
   if (!prompt) throw new Error(`${tplKey} template not loaded`);
   if (which === 'bodies') {
     prompt = fillTemplate(prompt, { REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '' });
   }
+  const inlineOf = (dataUri) => ({ inline_data: { mime_type: dataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(dataUri) } });
   const parts = [];
-  if (sourcePhoto) {
-    parts.push({ inline_data: { mime_type: sourcePhoto.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(sourcePhoto) } });
-  }
-  parts.push({ inline_data: { mime_type: rowImageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(rowImageData) } });
+  if (sourcePhoto) parts.push(inlineOf(sourcePhoto));
+  if (avatarFaces) parts.push(inlineOf(avatarFaces));
+  parts.push(inlineOf(rowImageData));
   parts.push({ text: prompt });
   const { text } = await callSheetJudge(model, parts, 4000, process.env.GEMINI_API_KEY);
   if (!text) throw new Error(`row eval (${which}, ${model}) returned no text`);
-  return parseJudgeJson(text);
+  const report = parseJudgeJson(text);
+  return { report, promptUsed: prompt };
 }
 
 /**

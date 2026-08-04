@@ -6,8 +6,8 @@ You receive UP TO TWO images:
 
 Judge only what is visible. This image has 4 cells and no bottom row.
 
-TASK 1: HEADS ONLY
-Each cell shows head and neck only — no shoulders, torso, arms, or clothing. A cell showing a full or partial body scores 1-3. Per-cell 1-10; headsScore = lowest.
+TASK 1: HEADS ONLY, FACE FULLY VISIBLE
+Each cell shows head and neck only — no shoulders, torso, arms, or clothing. The whole face must be fully visible: a face cut off by the top, bottom, or side edge of its cell, or a missing/clipped head, scores 1-3. A cell showing a full or partial body scores 1-3. Per-cell 1-10; headsScore = lowest.
 
 TASK 2: FACING ANGLES
 The 4 cells read front, three-quarter, profile, back-of-head, left to right. Score 1-10.

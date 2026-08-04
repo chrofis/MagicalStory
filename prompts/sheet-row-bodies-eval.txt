@@ -6,8 +6,8 @@ You receive UP TO TWO images:
 
 Judge only what is visible. This image has 4 cells and no top row.
 
-TASK 1: FULL BODY, FEET VISIBLE
-Each cell shows the COMPLETE figure from head to feet, both feet and shoes inside the cell with white margin below the shoes. A figure cropped at the thigh, knee, or ankle — feet or shoes not visible — scores 1-3 for that cell. Per-cell 1-10; fullBodyScore = lowest.
+TASK 1: COMPLETE FROM TOP OF HEAD TO BOTTOM OF FEET
+Each cell shows the character complete from the top of the head to the bottom of the feet. The top of the head must be fully visible and not cut by the top edge, and both feet with shoes must be visible at the bottom with white margin below them. If the head is cut or missing at the top, or the figure is cropped at the thigh, knee, or ankle with feet/shoes not visible, score that cell 1-3. Per-cell 1-10; fullBodyScore = lowest.
 
 TASK 2: FACING ANGLES
 The 4 cells read front, three-quarter, profile, back, left to right. Score 1-10.
