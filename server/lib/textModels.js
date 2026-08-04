@@ -954,6 +954,17 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
     messages.push({ role: 'assistant', content: options.prefill });
   }
 
+  // ROUTING: OpenRouter serves one model from many upstream providers, and left
+  // to itself it balances on price, not speed. Measured on the same call, same
+  // day: deepseek-v4-pro returned 6,285 tokens in 1202s (5.2 tok/s) from Railway
+  // while a local run of the same request got 12,687 tokens in 144s (88 tok/s) —
+  // a 17x spread that is purely which upstream answered. Sorting by throughput
+  // makes that the selection criterion instead of a lottery.
+  // Cost note: this can pick a pricier provider for the same model, and
+  // MODEL_PRICING has a single price per modelId — so we ask OpenRouter for the
+  // ACTUAL cost of each call (usage.include) and prefer it over our estimate.
+  const providerPref = process.env.OPENROUTER_PROVIDER_SORT || 'throughput';
+
   return await withRetry(async () => {
     console.log(`🌊 [STREAM] Starting streaming request to OpenRouter (${maxTokens} max tokens)...`);
     const startTime = Date.now();
@@ -982,6 +993,8 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
           max_tokens: maxTokens,
           stream: true,
           stream_options: { include_usage: true },
+          usage: { include: true },                      // real cost, not our estimate
+          ...(providerPref !== 'off' ? { provider: { sort: providerPref } } : {}),
           messages
         }),
         signal: controller.signal
@@ -1001,6 +1014,8 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
       let inputTokens = 0;
       let outputTokens = 0;
       let firstChunkTime = null;
+      let upstream = null;      // which provider actually served this
+      let actualCost = null;    // OpenRouter's real charge, when it reports one
       resetInactivity();
 
       try {
@@ -1039,9 +1054,13 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
                 fullText += chunk;
                 if (onChunk) onChunk(chunk, fullText);
               }
+              // Which upstream served this — the single most useful field when a
+              // model is inexplicably slow, and the one we were missing.
+              if (event.provider && !upstream) upstream = event.provider;
               if (event.usage) {
                 inputTokens = event.usage.prompt_tokens || inputTokens;
                 outputTokens = event.usage.completion_tokens || outputTokens;
+                if (typeof event.usage.cost === 'number') actualCost = event.usage.cost;
               }
             } catch {
               // Skip malformed JSON
@@ -1052,13 +1071,33 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
         reader.releaseLock();
       }
 
-      log.debug(`📊 [OPENROUTER STREAM] ${modelId} - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+      // Throughput is the diagnostic: the same model on a different upstream has
+      // measured 5 tok/s vs 88 tok/s. Without this line a slow route is invisible.
+      const elapsedSec = (Date.now() - startTime) / 1000;
+      const tps = outputTokens > 0 ? (outputTokens / elapsedSec).toFixed(1) : '0';
+      log.info(
+        `📊 [OPENROUTER STREAM] ${modelId} via ${upstream || 'unknown'} — ` +
+        `in ${inputTokens.toLocaleString()}, out ${outputTokens.toLocaleString()}, ` +
+        `${elapsedSec.toFixed(1)}s (${tps} tok/s)` +
+        (actualCost !== null ? `, $${actualCost.toFixed(4)} actual` : '')
+      );
 
       const responseText = options.prefill ? options.prefill + fullText : fullText;
       return {
         text: responseText,
-        usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+        usage: {
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          // direct_cost is the existing channel for providers that report a real
+          // charge (Grok, Runware); addUsage already accumulates it. Populating
+          // it keeps the breakdown honest now that throughput routing can land on
+          // an upstream priced well above the single MODEL_PRICING entry —
+          // measured 4x on deepseek-v4-pro via BaseTen.
+          ...(actualCost !== null ? { direct_cost: actualCost } : {}),
+        },
         modelId,
+        provider: upstream,
+        actualCost,
         ttft: firstChunkTime ? firstChunkTime - startTime : null
       };
     } finally {

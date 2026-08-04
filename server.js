@@ -2759,7 +2759,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     // OpenRouter-hosted Qwen/DeepSeek (A/B) — token-based like Claude/Gemini.
-    openrouter: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    // direct_cost carries OpenRouter's ACTUAL charge (usage.cost) when it reports
+    // one — throughput-sorted routing can pick a pricier upstream than
+    // MODEL_PRICING assumes, so the reported figure beats the estimate.
+    openrouter: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0 },
     // Runware/Grok use direct cost instead of tokens
     runware: { direct_cost: 0, calls: 0 },
     grok: { direct_cost: 0, calls: 0 },
@@ -7703,7 +7706,10 @@ async function _processStoryJobImpl(jobId) {
     gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     // OpenRouter-hosted Qwen/DeepSeek (A/B) — token-based.
-    openrouter: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    // direct_cost carries OpenRouter's ACTUAL charge (usage.cost) when it reports
+    // one — throughput-sorted routing can pick a pricier upstream than
+    // MODEL_PRICING assumes, so the reported figure beats the estimate.
+    openrouter: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0 },
     // Runware/Grok use direct cost instead of tokens
     runware: { direct_cost: 0, calls: 0 },
     grok: { direct_cost: 0, calls: 0 },

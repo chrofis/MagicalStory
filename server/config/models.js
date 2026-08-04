@@ -164,7 +164,16 @@ const MODEL_DEFAULTS = {
   // outputs are concatenated and parsed by the unchanged parsers. Reviewer
   // failure never blocks generation (unpatched draft ships with a loud
   // warning). Env overrides let staging flip either knob without a deploy.
-  outlineReviewModel: process.env.OUTLINE_REVIEW_MODEL || 'claude-opus',
+  //
+  // Reviewer = DeepSeek V4 Pro (was claude-opus). Test Lab compare runs on the
+  // same shared draft: pro raised 58 fixes vs claude-sonnet's 15 locally and 16
+  // vs 14 on staging — more findings per pass, at roughly a tenth of the
+  // Anthropic cost ($0.02 vs $0.22 per review). It is an OpenRouter model, so
+  // its wall-clock depends on which upstream serves it; textModels.js sorts
+  // OpenRouter routing by throughput for exactly that reason. Reviewer failure
+  // is already non-fatal, so a bad route degrades to the unpatched draft rather
+  // than blocking a story.
+  outlineReviewModel: process.env.OUTLINE_REVIEW_MODEL || 'deepseek-v4-pro',
   splitOutlineReview: process.env.SPLIT_OUTLINE_REVIEW
     ? process.env.SPLIT_OUTLINE_REVIEW !== 'false'
     : true,
