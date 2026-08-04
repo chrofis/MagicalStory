@@ -114,6 +114,7 @@ const STAGE_TEMPLATE_KEYS = {
   scene_variant: 'sceneExpansion',
   scene_description: 'sceneIteration',
   rewrite_blocked: 'rewriteBlockedScene',
+  text_refine: 'textRefine',
   // Cover prefill shows the front-cover template; the override replaces
   // whichever cover template the target's coverType selects.
   cover: 'frontCover',

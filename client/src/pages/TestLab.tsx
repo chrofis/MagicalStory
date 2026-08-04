@@ -410,6 +410,8 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const [textModels, setTextModels] = useState<TextModelInfo[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [writerModel, setWriterModel] = useState('');
+  const [refineRounds, setRefineRounds] = useState(2);
+  const [refineModel, setRefineModel] = useState('');
   const [reviewMode, setReviewMode] = useState<'compare' | 'iterate'>('compare');
   const [reviewAspect, setReviewAspect] = useState<'both' | 'text' | 'scene'>('both');
   const [iterRounds, setIterRounds] = useState<{ model: string; split: boolean; textModel: string; sceneModel: string }[]>([]);
@@ -420,6 +422,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const isStoryLevel = !!(stageInfo as { storyLevel?: boolean } | undefined)?.storyLevel;
   const isCharacterLevel = !!(stageInfo as { characterLevel?: boolean } | undefined)?.characterLevel;
   const isOutlineReview = stage === 'outline_review';
+  const isTextRefine = stage === 'text_refine';
   const needsCharacter = stage === 'char_repair' || stage === 'qwen_insert' || isCharacterLevel;
   // Characters on the selected benchmark pages (from their snapshots).
   const charOptions = [...new Set(
@@ -564,6 +567,10 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
       if (stage === 'qwen_insert' && freshDetection) params.freshDetection = true;
       if (stage === 'avatar_eval') { params.pass = Number(avatarPass); params.model = avatarEvalModel; params.splitRows = avatarSplitRows; }
       if (stage === 'cover') params.coverType = coverType;
+      if (isTextRefine) {
+        params.rounds = refineRounds;
+        if (refineModel) params.model = refineModel;
+      }
       if (isOutlineReview) {
         if (writerModel) params.writerModel = writerModel;
         params.aspect = reviewAspect;
@@ -817,6 +824,27 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
             />
           )}
         </div>
+        {isTextRefine && (
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <label className="text-xs text-gray-600 flex items-center gap-1.5">
+              Rounds:
+              <select className="border rounded-lg px-2 py-1 text-xs" value={refineRounds} onChange={e => setRefineRounds(Number(e.target.value))}>
+                {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+            <label className="text-xs text-gray-600 flex items-center gap-1.5">
+              Model:
+              <select className="border rounded-lg px-2 py-1 text-xs" value={refineModel} onChange={e => setRefineModel(e.target.value)}>
+                <option value="">(default reviewer)</option>
+                {textModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
+              </select>
+            </label>
+            <div className="text-xs text-gray-500">
+              Each round gets the story brief, the scene outlines (read-only) and the CURRENT text, and returns the full text.
+              Round N+1's input is round N's output — no critique is carried forward. Stops early once a round changes nothing.
+            </div>
+          </div>
+        )}
         {isOutlineReview && (
           <div className="mb-4 space-y-3">
             <div className="flex flex-wrap items-center gap-3">
@@ -1049,6 +1077,98 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * text_refine — the whole point is watching the text move round by round, so
+ * every intermediate version is shown, not just the final one: per page you get
+ * the original and each round's output side by side, with unchanged rounds
+ * marked rather than hidden.
+ */
+function TextRefineView({ result }: { result: ExperimentResult }) {
+  const rounds = result.refineRounds || [];
+  const [page, setPage] = useState<number | null>(null);
+  const pages = result.finalPages || [];
+  const shown = page ?? pages[0]?.pageNumber ?? 1;
+
+  return (
+    <div className="mt-3 space-y-3">
+      <div className="text-xs text-gray-600">
+        {result.title} · {result.pageCount} pages · {result.language}
+        {' · '}
+        <b>{pages.filter(p => p.changed).length}</b> changed vs original
+      </div>
+
+      {/* Per-round header: what moved, how fast, what it cost. */}
+      <div className="space-y-1">
+        {rounds.map(r => (
+          <div key={r.round} className={`text-xs rounded-lg border px-3 py-2 ${r.ok ? 'bg-gray-50 border-gray-200' : 'bg-red-50 border-red-200 text-red-700'}`}>
+            <b>Round {r.round}</b>
+            {r.ok ? (
+              <>
+                {' '}· {r.modelKey}{r.provider ? ` via ${r.provider}` : ''}
+                {' '}· {((r.elapsedMs || 0) / 1000).toFixed(1)}s
+                {' '}· out {(r.usage?.output_tokens || 0).toLocaleString()}
+                {r.cost != null && ` · $${r.cost.toFixed(4)}`}
+                {' · '}changed pages: {r.changedPages?.length ? r.changedPages.join(', ') : <span className="text-emerald-600">none — converged</span>}
+                {!!r.missingPages?.length && <span className="text-amber-600"> · model omitted pages {r.missingPages.join(', ')} (previous text kept)</span>}
+              </>
+            ) : <> · failed: {r.error}</>}
+          </div>
+        ))}
+      </div>
+
+      {/* Page picker — changed pages flagged so you can go straight to them. */}
+      <div className="flex flex-wrap gap-1">
+        {pages.map(p => (
+          <button
+            key={p.pageNumber}
+            onClick={() => setPage(p.pageNumber)}
+            className={`text-xs px-2 py-1 rounded border ${p.pageNumber === shown ? 'bg-indigo-500 text-white border-indigo-500' : p.changed ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-white border-gray-200 text-gray-500'}`}
+          >
+            P{p.pageNumber}{p.changed ? ' •' : ''}
+          </button>
+        ))}
+      </div>
+
+      {/* Original → each round, for the selected page. */}
+      <div className="grid gap-2 md:grid-cols-2">
+        <div className="border border-gray-200 rounded-lg p-3">
+          <div className="text-[11px] font-semibold text-gray-500 mb-1">ORIGINAL (page {shown})</div>
+          <div className="text-xs whitespace-pre-wrap text-gray-700">
+            {pages.find(p => p.pageNumber === shown)?.original || '(none)'}
+          </div>
+        </div>
+        {rounds.filter(r => r.ok).map(r => {
+          const pg = r.pages?.find(p => p.pageNumber === shown);
+          const moved = pg && pg.after !== pg.before;
+          return (
+            <div key={r.round} className={`border rounded-lg p-3 ${moved ? 'border-indigo-300 bg-indigo-50/40' : 'border-gray-200'}`}>
+              <div className="text-[11px] font-semibold text-gray-500 mb-1">
+                AFTER ROUND {r.round} {moved ? <span className="text-indigo-600">· rewritten</span> : <span className="text-gray-400">· unchanged this round</span>}
+              </div>
+              <div className="text-xs whitespace-pre-wrap text-gray-700">{pg?.after || '(none)'}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Scene outline for this page — the read-only constraint the text had to respect. */}
+      <details className="text-xs">
+        <summary className="cursor-pointer text-indigo-600">Scene outline for page {shown} (read-only input)</summary>
+        <pre className="mt-1 bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-600">
+          {rounds.find(r => r.ok)?.pages?.find(p => p.pageNumber === shown)?.sceneIntent || '(none recorded)'}
+        </pre>
+      </details>
+
+      <details className="text-xs">
+        <summary className="cursor-pointer text-indigo-600">Full final text (all pages)</summary>
+        <pre className="mt-1 bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-700">
+          {pages.map(p => `## Page ${p.pageNumber}\n${p.final}`).join('\n\n')}
+        </pre>
+      </details>
     </div>
   );
 }
@@ -1551,6 +1671,10 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
       )}
       {!result.ok && !!result.steps?.length && (
         <StepsStrip steps={result.steps} images={stepImgs} onOpen={vi => { const g = gallery(); const s = (result.steps || []).find(x => x.versionIndex === vi); const idx = s ? g.findIndex(x => x.label === s.label) : 0; openLightbox(g, idx >= 0 ? idx : 0); }} />
+      )}
+
+      {result.ok && result.stageKind === 'text_refine' && (
+        <TextRefineView result={result} />
       )}
 
       {result.ok && isOutlineReview && (

@@ -5487,6 +5487,117 @@ function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssue
 }
 
 /**
+ * Build the iterative text-refinement prompt (Lab stage `text_refine`).
+ *
+ * Deliberately NOT the outline reviewer: that one reads the whole writer draft
+ * and emits patches, and in repeated mode each round re-reads the SAME draft plus
+ * a growing stack of prior critiques. Here the contract is full text in, full
+ * text out, so round N+1's input is literally round N's output and no commentary
+ * is ever carried forward.
+ *
+ * Scene outlines go in read-only: the illustrations already exist, so the prose
+ * must bend to the pictures and never the reverse.
+ *
+ * @param {Object} inputData - story record fields (language, languageLevel, characters, …)
+ * @param {Array<{pageNumber:number,text:string,sceneIntent:string}>} pages
+ * @returns {string|null} filled prompt, or null when the template is unavailable
+ */
+function buildTextRefinePrompt(inputData, pages = []) {
+  const template = PROMPT_TEMPLATES.textRefine;
+  if (!template) {
+    log.error('[PROMPT] textRefine template not loaded — text refinement unavailable');
+    return null;
+  }
+
+  const sceneOutlines = pages
+    .map(p => `## Page ${p.pageNumber}\n${p.sceneIntent || '(no scene outline recorded)'}`)
+    .join('\n\n');
+  const currentText = pages
+    .map(p => `## Page ${p.pageNumber}\n${p.text || '(empty)'}`)
+    .join('\n\n');
+
+  const characterDetails = (inputData.characters || [])
+    .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: false }))
+    .join('\n\n') || '(no character details available)';
+
+  // Story brief = what the book was asked to be. Only the fields that actually
+  // steer prose; anything absent is omitted rather than sent as "undefined".
+  const brief = [
+    inputData.title ? `Title: ${inputData.title}` : null,
+    inputData.storyTypeName || inputData.storyType ? `Type: ${inputData.storyTypeName || inputData.storyType}` : null,
+    inputData.storyCategory ? `Category: ${inputData.storyCategory}` : null,
+    inputData.storyTheme ? `Theme: ${inputData.storyTheme}` : null,
+    inputData.storyTopic ? `Topic: ${inputData.storyTopic}` : null,
+    inputData.storyDetails ? `Details: ${inputData.storyDetails}` : null,
+  ].filter(Boolean).join('\n') || '(no additional brief recorded)';
+
+  // Reuse the canonical DO-NOT-WRITE list from the writer template so the ban
+  // categories can never drift between writing and refining.
+  const variant = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
+  const writerTpl = (variant !== 'textFirst' && PROMPT_TEMPLATES.storyUnifiedImageFirst)
+    ? PROMPT_TEMPLATES.storyUnifiedImageFirst
+    : PROMPT_TEMPLATES.storyUnified;
+  let doNotWriteSection = '';
+  if (writerTpl) {
+    const start = writerTpl.indexOf('## DO-NOT-WRITE LIST');
+    if (start >= 0) {
+      const rest = writerTpl.slice(start);
+      const stops = ['\n**PACING:**', '\n---', '\n# OUTPUT FORMAT']
+        .map(s => rest.indexOf(s)).filter(i => i > 0);
+      const end = stops.length ? Math.min(...stops) : rest.length;
+      const list = rest.slice(0, end).replace(/^##\s*DO-NOT-WRITE LIST[^\n]*\n+/, '').trim();
+      if (list) doNotWriteSection = `# DO-NOT-WRITE LIST\n\n${list}`;
+    }
+  }
+
+  // The FULL language instruction, not the bare name: getLanguageNameEnglish
+  // returns "Swiss German" for de-ch, which a model reads as Schwyzerdütsch and
+  // duly rewrote the book into dialect ("S'Fescht", "blybt stoh"). The
+  // instruction block carries the actual contract — Swiss STANDARD German, ss
+  // never ß, tight guillemets — the same one the writer prompt uses.
+  const language = inputData.language || 'en';
+  return fillTemplate(template, {
+    LANGUAGE: `${getLanguageNameEnglish(language)}\n\n${getLanguageInstruction(language)}`,
+    READING_LEVEL: getReadingLevel(inputData.languageLevel),
+    PAGE_COUNT: pages.length,
+    CHARACTER_NAMES: (inputData.characters || []).map(c => c.name).join(', '),
+    STORY_BRIEF: brief,
+    CHARACTER_DETAILS: characterDetails,
+    SCENE_OUTLINES: sceneOutlines,
+    CURRENT_TEXT: currentText,
+    DO_NOT_WRITE_SECTION: doNotWriteSection,
+  });
+}
+
+/**
+ * Parse a text-refinement response back into per-page text.
+ * Tolerates the model echoing the ---STORY TEXT--- marker or omitting it.
+ * @returns {{pages: Array<{pageNumber:number,text:string}>, missing: number[]}}
+ */
+function parseRefinedText(raw, expectedPages = []) {
+  const body = (() => {
+    const m = String(raw || '').match(/---\s*STORY TEXT\s*---/i);
+    return m ? String(raw).slice(m.index + m[0].length) : String(raw || '');
+  })();
+
+  const pages = [];
+  // "## Page N" headings, tolerating bold/extra markup around the number.
+  const re = /^\s*#{1,4}\s*(?:Page|Seite|Pagina)\s*\**\s*(\d+)\s*\**\s*:?\s*$/gim;
+  const marks = [];
+  let m;
+  while ((m = re.exec(body)) !== null) marks.push({ page: parseInt(m[1], 10), start: re.lastIndex });
+  for (let i = 0; i < marks.length; i++) {
+    const end = i + 1 < marks.length ? body.lastIndexOf('\n', marks[i + 1].start) : body.length;
+    const text = body.slice(marks[i].start, end).replace(/^\s*\n/, '').trim();
+    if (text) pages.push({ pageNumber: marks[i].page, text });
+  }
+
+  const got = new Set(pages.map(p => p.pageNumber));
+  const missing = expectedPages.filter(n => !got.has(n));
+  return { pages, missing };
+}
+
+/**
  * Build unified story generation prompt
  * Generates complete story with character arcs, plot structure, visual bible, and all pages
  * @param {Object} inputData - Story parameters
@@ -6514,6 +6625,8 @@ module.exports = {
   filterWornClothingAgainstScene,
   buildUnifiedStoryPrompt,
   buildOutlineReviewPrompt,
+  buildTextRefinePrompt,
+  parseRefinedText,
   buildTrialStoryPrompt,
   buildPreviousScenesContext,
   buildAvailableAvatarsForPrompt,

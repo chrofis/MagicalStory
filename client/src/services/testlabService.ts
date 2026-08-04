@@ -157,6 +157,30 @@ export interface ExperimentResult {
   reviewPromptChars?: number;
   reviewRuns?: ReviewRun[];
   rounds?: ReviewRound[];
+  // text_refine: each round rewrites the WHOLE text and feeds it to the next.
+  title?: string;
+  language?: string;
+  pageCount?: number;
+  refineRounds?: RefineRound[];
+  finalPages?: { pageNumber: number; original: string; final: string; changed: boolean }[];
+}
+
+export interface RefineRound {
+  round: number;
+  ok: boolean;
+  error?: string;
+  modelKey?: string;
+  modelId?: string;
+  provider?: string | null;
+  elapsedMs?: number;
+  usage?: { input_tokens?: number; output_tokens?: number };
+  cost?: number;
+  promptChars?: number;
+  missingPages?: number[];
+  changedPages?: number[];
+  changedFromOriginal?: number[];
+  converged?: boolean;
+  pages?: { pageNumber: number; before: string; after: string; original: string; sceneIntent?: string }[];
 }
 
 export interface ReviewRun {
@@ -238,6 +262,7 @@ export const TESTLAB_STAGES = [
   { id: 'cover', label: 'Cover render', producesImage: true, overridable: true, storyLevel: true },
   { id: 'style_check', label: 'Style consistency check', producesImage: false, overridable: false, storyLevel: true },
   { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
+  { id: 'text_refine', label: 'Text refine — full text in, full text out (rounds)', producesImage: false, overridable: true, storyLevel: true },
   { id: 'avatar_realistic', label: 'Avatar pass 1 (realistic anchor)', producesImage: true, overridable: false, characterLevel: true },
   { id: 'avatar_style', label: 'Avatar pass 2 (style transfer)', producesImage: true, overridable: true, characterLevel: true },
   { id: 'avatar_eval', label: 'Avatar sheet eval', producesImage: false, overridable: true, characterLevel: true },

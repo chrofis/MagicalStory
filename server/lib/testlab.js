@@ -1496,6 +1496,128 @@ async function runOutlineReviewStage(target, { params = {} }) {
 }
 
 /**
+ * TEXT REFINEMENT — iterative, full text in / full text out.
+ *
+ * Distinct from outline_review's `iterate` mode on purpose. There, every round
+ * re-reads the SAME writer draft with a growing stack of prior critiques
+ * attached, and answers in patches — so the rounds argue with each other's
+ * comments instead of building on each other's prose. Here each round receives
+ * only (target + scene outlines + the current text) and returns the complete
+ * text; round N+1's input is literally round N's output, and no commentary is
+ * ever carried forward.
+ *
+ * Reads the STORED story rather than generating a fresh draft: refining the text
+ * that actually shipped is the point, and it skips a ~6-minute writer call.
+ * Scene outlines are read-only — the illustrations already exist.
+ *
+ * params.rounds  : number of passes (default 2, capped at 5)
+ * params.model   : model for every round, or params.roundModels[] for per-round
+ */
+async function runTextRefineStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildTextRefinePrompt, parseRefinedText } = require('./storyHelpers');
+  const { callTextModelStreaming } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+
+  // Page text + the compact scene intent (what the illustration shows). The full
+  // sceneDescription is Art Director prose — 10x longer and mostly rendering
+  // instructions the writer must not be steered by.
+  const pages = (storyData.sceneImages || [])
+    .filter(s => s && (s.text || '').trim())
+    .map(s => {
+      let sceneIntent = '';
+      try { sceneIntent = JSON.parse(s.outlineExtract || '{}').sceneIntent || ''; } catch { /* not JSON */ }
+      if (!sceneIntent) sceneIntent = (s.sceneDescription || '').slice(0, 600);
+      return { pageNumber: s.pageNumber, text: s.text.trim(), sceneIntent };
+    })
+    .sort((a, b) => a.pageNumber - b.pageNumber);
+
+  if (pages.length === 0) throw new Error(`Story ${target.storyId} has no page text to refine`);
+  const expected = pages.map(p => p.pageNumber);
+
+  const roundCount = Math.max(1, Math.min(5, parseInt(params.rounds, 10) || 2));
+  const perRound = Array.isArray(params.roundModels) ? params.roundModels : [];
+  const defaultModel = params.model || MODEL_DEFAULTS.outlineReviewModel;
+
+  const original = pages.map(p => ({ ...p }));
+  let current = pages.map(p => ({ ...p }));
+  const rounds = [];
+
+  for (let i = 0; i < roundCount; i++) {
+    const modelKey = perRound[i] || defaultModel;
+    if (!TEXT_MODELS[modelKey]) throw new Error(`Unknown model "${modelKey}"`);
+
+    // Built fresh from CURRENT text each round — that is the whole mechanism.
+    let prompt = buildTextRefinePrompt(storyData, current);
+    if (!prompt) throw new Error('text-refine template unavailable');
+    if (promptOverride && i === 0) prompt = promptOverride; // A/B the template itself
+
+    const t0 = Date.now();
+    try {
+      const r = await callTextModelStreaming(prompt, 16000, null, modelKey, { usageLabel: 'testlab_text_refine' });
+      const elapsedMs = Date.now() - t0;
+      const parsed = parseRefinedText(r.text || '', expected);
+
+      // A page the model dropped keeps its previous text — a refinement pass must
+      // never silently delete a page from the book.
+      const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
+      const next = current.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
+
+      const changed = next.filter((p, idx) => p.text !== current[idx].text).map(p => p.pageNumber);
+      const changedFromOriginal = next.filter((p, idx) => p.text !== original[idx].text).map(p => p.pageNumber);
+
+      rounds.push({
+        round: i + 1,
+        ok: true,
+        modelKey,
+        modelId: r.modelId || TEXT_MODELS[modelKey].modelId,
+        provider: r.provider || null,
+        elapsedMs,
+        usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
+        cost: r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[modelKey].modelId, r.usage || {}),
+        promptChars: prompt.length,
+        missingPages: parsed.missing,
+        changedPages: changed,
+        changedFromOriginal,
+        converged: changed.length === 0,
+        pages: next.map((p, idx) => ({
+          pageNumber: p.pageNumber,
+          before: current[idx].text,
+          after: p.text,
+          original: original[idx].text,
+          sceneIntent: p.sceneIntent,
+        })),
+      });
+      current = next;
+      if (changed.length === 0) break; // nothing moved — further rounds are noise
+    } catch (err) {
+      rounds.push({ round: i + 1, ok: false, modelKey, elapsedMs: Date.now() - t0, error: err.message });
+      break; // later rounds depend on this one's text
+    }
+  }
+
+  return {
+    stageKind: 'text_refine',
+    storyId: target.storyId,
+    title: storyData.title || null,
+    language: storyData.language || null,
+    pageCount: pages.length,
+    // NOT `rounds` — outline_review's iterate mode already returns that key with
+    // a different shape, and both land in the same ExperimentResult.
+    refineRounds: rounds,
+    finalPages: current.map((p, idx) => ({
+      pageNumber: p.pageNumber,
+      original: original[idx].text,
+      final: p.text,
+      changed: p.text !== original[idx].text,
+    })),
+  };
+}
+
+/**
  * STYLE-REPAIR A/B stage (roadmap Pt 10). The missing repair half of the
  * detection-only `style_check`: find the style-outlier pages, then repaint each
  * one toward the dominant style cluster with BOTH Gemini and Grok, and surface
@@ -3211,6 +3333,7 @@ const STORY_STAGES = {
   style_check: runStyleCheckStage,
   style_repair: runStyleRepairStage,
   outline_review: runOutlineReviewStage,
+  text_refine: runTextRefineStage,
 };
 
 // Avatar stages take {storyId, character} targets, not page targets.

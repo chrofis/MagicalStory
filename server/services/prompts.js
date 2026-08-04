@@ -96,6 +96,10 @@ async function loadPromptTemplates() {
     ['outlineAnalysisTextFirst', 'outline-analysis-textfirst.txt'],
     ['outlineAnalysisImageFirst', 'outline-analysis-imagefirst.txt'],
     ['outlineReview', 'outline-review.txt'],
+    // Iterative text refinement (Lab): full text in, full text out, one round
+    // feeding the next. Scene outlines are read-only context so the prose stays
+    // consistent with illustrations that already exist.
+    ['textRefine', 'text-refine.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
     ['incrementalConsistencyCheck', 'incremental-consistency-check.txt'],

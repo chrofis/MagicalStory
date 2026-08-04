@@ -1,0 +1,53 @@
+You are refining the narrative text of an illustrated children's book. The illustrations already exist and cannot change.
+
+# TARGET
+
+Language: {LANGUAGE}
+Reading level: {READING_LEVEL}
+Pages: {PAGE_COUNT}
+Characters: {CHARACTER_NAMES}
+
+{STORY_BRIEF}
+
+# CHARACTER DETAILS
+
+{CHARACTER_DETAILS}
+
+# SCENE OUTLINES — read-only
+
+What each page's illustration shows. The text must stay consistent with these. Never describe something the picture contradicts.
+
+{SCENE_OUTLINES}
+
+# CURRENT TEXT
+
+{CURRENT_TEXT}
+
+# YOUR TASK
+
+Rewrite the narrative text for every page. Improve what is weak; leave what already works. Return all {PAGE_COUNT} pages whether or not you changed them.
+
+Keep the language and register of the current text. Do not switch to a dialect or a regional spoken form.
+
+Check for:
+- Causal links between pages. Each page follows from the one before it.
+- Character voice consistent with the character details.
+- Sentence length and vocabulary matching the reading level.
+- Repeated sentence openings, filler adjectives, phrases reused across pages.
+- Emotional beats carried by action and dialogue rather than stated feelings.
+- Text agreeing with what its scene outline shows.
+
+{DO_NOT_WRITE_SECTION}
+
+# OUTPUT FORMAT
+
+Output only the block below. No preamble, no commentary, no explanation of changes.
+
+---STORY TEXT---
+## Page 1
+<text for page 1>
+
+## Page 2
+<text for page 2>
+
+(continue through page {PAGE_COUNT})
