@@ -126,7 +126,7 @@ async function _interiorSeedPoints(maskPng, w, h) {
  * band, so it becomes exactly the local scene colour; textured model fill keeps
  * its texture on the corrected base. No brightness special-casing anywhere.
  */
-async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch, localField = false, oldBin = null, newBin = null }) {
+async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch, localField = false, oldBin = null, newBin = null, plateRaw = null }) {
   const n = cropW * cropH;
   const { _rgbToLab, _labToRgb, _deltaE, _ccKMeans } = require('./images');
   const borderRing = Buffer.alloc(n);
@@ -213,7 +213,49 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     else if (!isOld(i) && newDil[i] <= 128) isSource[i] = 1;
   }
   const H = Buffer.from(origRaw);
-  if (fillCnt > 0) {
+  const plateFilled = new Uint8Array(n);
+  if (fillCnt > 0 && plateRaw) {
+    // CLEAN-PLATE FILL — the proper source for the old figure's footprint. The
+    // page's EMPTY SCENE is the same room painted without figures (the style
+    // anchor the page was generated from): real tiles, real sunlight, real
+    // texture — everything a colour diffusion can only fake as a flat wash.
+    // The plate isn't tone-identical to the final page (regeneration drift,
+    // measured ~13-22 mean |diff| in background), so diffuse the DIFFERENCE
+    // (original − plate, known at every valid background pixel around the
+    // region) inward and add it: H = plate + smooth tone-alignment field.
+    const D = new Float32Array(n * 3); // original − plate at sources, diffused inward
+    for (let i = 0; i < n; i++) {
+      if (!isSource[i]) continue;
+      D[i * 3] = origRaw[i * 3] - plateRaw[i * 3];
+      D[i * 3 + 1] = origRaw[i * 3 + 1] - plateRaw[i * 3 + 1];
+      D[i * 3 + 2] = origRaw[i * 3 + 2] - plateRaw[i * 3 + 2];
+    }
+    for (let it = 0; it < 120; it++) {
+      for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
+        const i = y * cropW + x;
+        if (!fill[i]) continue;
+        let c = 0, rs = 0, gs = 0, bs = 0;
+        const nb = [i - 1, i + 1, i - cropW, i + cropW];
+        const ok = [x > 0, x < cropW - 1, y > 0, y < cropH - 1];
+        for (let k = 0; k < 4; k++) {
+          if (!ok[k]) continue;
+          const j = nb[k];
+          if (!fill[j] && !isSource[j]) continue;
+          c++; rs += D[j * 3]; gs += D[j * 3 + 1]; bs += D[j * 3 + 2];
+        }
+        if (c) { D[i * 3] = rs / c; D[i * 3 + 1] = gs / c; D[i * 3 + 2] = bs / c; }
+      }
+    }
+    const cl = (v) => Math.max(0, Math.min(255, Math.round(v)));
+    for (let i = 0; i < n; i++) {
+      if (!fill[i]) continue;
+      H[i * 3] = cl(plateRaw[i * 3] + D[i * 3]);
+      H[i * 3 + 1] = cl(plateRaw[i * 3 + 1] + D[i * 3 + 1]);
+      H[i * 3 + 2] = cl(plateRaw[i * 3 + 2] + D[i * 3 + 2]);
+      plateFilled[i] = 1;
+    }
+  } else if (fillCnt > 0) {
+    // No plate stored → colour-diffusion fallback (flat wash, last resort).
     // Seed the fill with its material's true colour (fast convergence), then
     // Jacobi-relax toward the local sources. Band pixels (no cluster assigned)
     // seed with their nearest background material.
@@ -259,12 +301,20 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
       if (_deltaE(lab, hLab) < dFig) { correct = true; bandPx++; }
     }
     if (!correct) continue;
+    if (plateFilled[i]) {
+      // Plate content is REAL scene (tiles, sunlight) — use it as-is; adding
+      // the model's texture on top would double-texture it.
+      pasteRaw[i * 3] = H[i * 3]; pasteRaw[i * 3 + 1] = H[i * 3 + 1]; pasteRaw[i * 3 + 2] = H[i * 3 + 2];
+      continue;
+    }
     for (let c = 0; c < 3; c++) {
       const tex = clampTex(pasteRaw[i * 3 + c] - modelBlurRaw[i * 3 + c]);
       pasteRaw[i * 3 + c] = Math.max(0, Math.min(255, H[i * 3 + c] + tex));
     }
   }
   if (bandPx > 0) log.info(`[TESTLAB] unknown band: ${bandPx}px glow corrected to the local background field (figure-edge pixels kept)`);
+  if (plateRaw && fillCnt > 0) log.info(`[TESTLAB] red-zone fill source: EMPTY SCENE plate (${fillCnt}px, tone-aligned)`);
+  else if (fillCnt > 0) log.info(`[TESTLAB] red-zone fill source: colour diffusion (no empty scene stored — flat wash fallback)`);
   return { bgPx: bgPx + bandPx, materials: bgCent.length, localField: true };
 }
 
@@ -283,7 +333,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', cleanPlateBuf = null, iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -576,12 +626,18 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   if (redZonePx > 0 || bgBorderMatch) {
     const oldBinBuf = Buffer.alloc(n);
     for (let i = 0; i < n; i++) oldBinBuf[i] = oldA[i * s1r] > 128 ? 255 : 0;
+    let plateRaw = null;
+    if (cleanPlateBuf && blendShape === 'figure-exact') {
+      try {
+        plateRaw = await sharp(cleanPlateBuf).resize(cropW, cropH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+      } catch (err) { log.warn(`[TESTLAB] clean plate unusable (${err.message}) — diffusion fallback`); }
+    }
     const { bgPx, materials } = await matchIntroducedBackground({
       origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch,
       // figure-exact: two-band local correction (H field + model texture) — the
       // mean shift cannot collapse the whiteout glow. Legacy shape keeps the
       // per-material mean shift byte-identical.
-      localField: blendShape === 'figure-exact', oldBin: oldBinBuf, newBin,
+      localField: blendShape === 'figure-exact', oldBin: oldBinBuf, newBin, plateRaw,
     });
     if (bgPx > 0) log.info(`[TESTLAB] ${bodyColorMode ? 'figure-mode border' : 'red-zone'}: colour-matched ${bgPx}px background (${materials} materials${blendShape === 'figure-exact' ? ', local two-band field' : ''}) to the scene`);
     if (!colorInfo && bodyColorMode) colorInfo = { deltaEBefore: null, seamBefore: null, seamAfter: null, figureColorKept: true };

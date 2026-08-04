@@ -2774,6 +2774,22 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       err.partialResult = failCtx;
       throw err;
     }
+    // Clean plate for the red-zone fill: the page's stored EMPTY SCENE, cropped
+    // to the same rect. Real scene content for the old figure's footprint —
+    // diffusion wash is the fallback when a story has no empty scene.
+    let plateCropBuf = null;
+    if (!params._faceMode) {
+      try {
+        const plateUri = await loadEmptyScene(ctx.storyId, ctx.pageNumber);
+        if (plateUri) {
+          const plateBuf = Buffer.from(plateUri.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          plateCropBuf = await sharp(plateBuf).resize(W, H, { fit: 'fill' })
+            .extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer();
+          const vis = await sharp(plateCropBuf).jpeg({ quality: 90 }).toBuffer();
+          await addStep('clean plate (empty scene crop — red-zone fill source)', `data:image/jpeg;base64,${vis.toString('base64')}`);
+        }
+      } catch (err) { log.warn(`[TESTLAB] empty-scene plate unavailable (${err.message}) — diffusion fallback`); }
+    }
     const blend = await samUnionBlend({
       originalCropBuf: cropBuf,
       candidateCropBuf: back,
@@ -2783,6 +2799,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       oldMaskPng,
       addStep,
       failCtx,
+      cleanPlateBuf: plateCropBuf,
       maskPoints: params._maskPoints || null,
       // Round 2 (the RESULT) uses the FULL-PAGE re-detected figure box (computed
       // above) — aligned to the actual repainted figure — then SAM ∩ face box.

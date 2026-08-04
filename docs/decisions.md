@@ -3736,3 +3736,30 @@ exist and logs failures instead of 500ing a repair.
 MobileSAM branch, `/release-memory`, `/figure-mask` both paths, `/health?probe=sam`),
 `server/routes/health.js` (`/api/health/memory`, `/api/health/release-memory`).
 **Status:** ✅ on staging. Production still unpatched — awaiting approval.
+
+---
+
+## 2026-08-04 — Red-zone fill source: the page's EMPTY SCENE (clean plate), tone-aligned
+
+**Context:** Exp #268 confirmed the white ring is gone under figure-exact, but the old
+figure's footprint rendered as a pale ghost blob — the colour-diffusion H field can only
+produce smooth washes, never tiles/sunlight/texture. The pipeline already stores the real
+answer: the page's empty scene (the style anchor the page was generated from — same room,
+no figures). Measured alignment vs the final page background: ~13-22 mean |diff| per
+channel (structurally aligned; regeneration tone drift only).
+
+**Decision:** figure-exact red-zone fill uses the EMPTY SCENE crop as content. Tone drift is
+corrected by diffusing the DIFFERENCE (original − plate), known at every valid background
+pixel around the region, inward across the fill: H = plate + smooth alignment field. Plate
+pixels are used as-is (no model texture on top — the plate has real texture). Fallback when
+a story has no empty scene: the colour-diffusion wash. The plate crop is emitted as a step
+("clean plate (empty scene crop)") and the fill source is logged either way.
+
+**Verified (synthetic):** plate checker texture appears in the red zone (16-level swing,
+structure preserved), tone aligned across a deliberate 12-unit drift, figure byte-untouched;
+all four figure-exact properties still pass; legacy path unchanged.
+
+**Touched:** `server/lib/samBlend.js` (cleanPlateBuf, plate fill + difference-field
+alignment), `server/lib/testlab.js` (runQwenInsertStage loads + crops the empty scene,
+plate step).
+**Status:** ✅ active on the figure-repair insert path (staging).
