@@ -172,7 +172,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -337,9 +337,21 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // blur().threshold() erodes instead — it under-covered the figure, so thin
   // protrusions like the nose poked past the union → old feature at the border,
   // the "ghost nose").
+  // padMode — WHERE the 6px safety pad is applied.
+  //  'union'     (default, historical): pad the whole union. Around the old-only
+  //              boundary this pushes the paste 6px into REAL background, carrying
+  //              the model's unfilled whiteout glow with it → white halo.
+  //  'newFigure': pad only the NEW figure's edge (the anti-aliased edge the pad
+  //              exists for) and take the old-only boundary EXACTLY. Outside the old
+  //              silhouette the original background is correct and available, so
+  //              there is nothing to gain by pasting over it.
   const padPx = 6;
   const unionPadded = await maskBlurThreshold(union, cropW, cropH, padPx / 1.5, 16);
   const alpha1 = Buffer.from(unionPadded);
+  if (padMode === 'newFigure') {
+    const newPad = await maskBlurThreshold(Buffer.from(newBin), cropW, cropH, padPx / 1.5, 16);
+    for (let i = 0; i < n; i++) alpha1[i] = (union[i] > 128 || newPad[i] > 128) ? 255 : 0;
+  }
 
   // Split figure vs background by the SAM MASK (newBin), NOT brightness: Qwen
   // lightens BOTH the background and parts of the face, so a luminance threshold
@@ -456,13 +468,28 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // a 1px step. featherPx/erodeFeather are exposed so the Test Lab can A/B each stage
   // on the SAME model output. (sharp's raw blur can come back multi-channel — stride.)
   const fpx = featherPx == null ? 6 : Math.max(0, Number(featherPx));
-  const doErode = erodeFeather !== false && fpx >= 1;
+  // featherMode — WHERE the alpha ramp sits relative to the union edge. Net
+  // opacity coverage is (pad − erosion), so this decides whether a wide feather
+  // dissolves the seam or eats the paste:
+  //  'erode'    ramp INSIDE  (erode fpx, then blur) → net 6 − fpx. Correct ONLY
+  //             when the union edge is a real content boundary and the original
+  //             just outside it is untouched background (a face repair whose
+  //             masks agree). On a figure repair the union edge IS the OLD
+  //             silhouette, so eroding re-exposes the old figure: at fpx 14 the
+  //             paste stops 8px inside the union and the old body shows through.
+  //  'centered' blur only → net 6. Ramp straddles the edge.
+  //  'outward'  dilate fpx, then blur → alpha 255 across the ENTIRE union, with
+  //             the falloff beyond it where both sides are background. Coverage
+  //             never shrinks, so the feather can be widened freely.
+  // Default is unchanged ('erode', or 'centered' when erodeFeather === false).
+  const mode = featherMode || (erodeFeather === false ? 'centered' : 'erode');
   let alphaSrc = Buffer.from(alpha1);
-  if (doErode) alphaSrc = await maskBlurThreshold(alphaSrc, cropW, cropH, fpx, 200); // blur+high-thr shrinks ~fpx inward
+  if (fpx >= 1 && mode === 'erode') alphaSrc = await maskBlurThreshold(alphaSrc, cropW, cropH, fpx, 200); // blur+high-thr shrinks ~fpx inward
+  else if (fpx >= 1 && mode === 'outward') alphaSrc = await maskBlurThreshold(alphaSrc, cropW, cropH, fpx / 1.5, 16); // grows ~fpx outward
   const alphaBlur = await sharp(alphaSrc, raw1).blur(Math.max(0.3, fpx || 1.2)).raw().toBuffer();
   const abStride = Math.max(1, Math.round(alphaBlur.length / n));
   const alphaSoft = abStride === 1 ? alphaBlur : (() => { const o = Buffer.alloc(n); for (let i = 0; i < n; i++) o[i] = alphaBlur[i * abStride]; return o; })();
-  await addStep(`composite alpha (feather ${fpx}px${doErode ? ', eroded-then-feathered' : ', feather only'})`, `data:image/png;base64,${(await sharp(alphaSoft, raw1).png().toBuffer()).toString('base64')}`);
+  await addStep(`composite alpha (feather ${fpx}px, ramp ${mode}${padMode === 'newFigure' ? ', pad new-figure only' : ''} → net coverage ${mode === 'erode' ? padPx - fpx : mode === 'outward' ? padPx + fpx : padPx}px)`, `data:image/png;base64,${(await sharp(alphaSoft, raw1).png().toBuffer()).toString('base64')}`);
   const feathered = await sharp(pasteBuf).ensureAlpha().joinChannel(alphaSoft, raw1).png().toBuffer();
   return { feathered, iou, redPx, colorInfo, blendRule: BLEND_RULE_VERSION };
 }

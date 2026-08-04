@@ -674,6 +674,10 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       ...(opts.bgBorderMatch !== undefined ? { bgBorderMatch: opts.bgBorderMatch } : {}),
       featherPx: opts.featherPx,
       erodeFeather: opts.erodeFeather,
+      // Ramp placement / pad scope — same reason as above: thread only when a
+      // caller overrides, so production keeps samUnionBlend's defaults.
+      ...(opts.featherMode !== undefined ? { featherMode: opts.featherMode } : {}),
+      ...(opts.padMode !== undefined ? { padMode: opts.padMode } : {}),
       // Uniform gates — tunable for the Test Lab A/B, default ON in production.
       gateIou: gates.iou,
       gateWhiteCard: gates.whiteCard,

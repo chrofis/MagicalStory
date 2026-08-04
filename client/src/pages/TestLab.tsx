@@ -34,10 +34,15 @@ import {
  * nothing else. Edit here to change what "Replay blend" compares.
  */
 const BLEND_REPLAY_VARIANTS = [
-  { label: 'as shipped', params: {} },
-  { label: 'no colour match', params: { colorCorrect: false, bgBorderMatch: false } },
-  { label: 'colour, feather 2', params: { featherPx: 2 } },
-  { label: 'colour, feather 14', params: { featherPx: 14 } },
+  // Net opacity coverage = pad(6) − erosion. 'erode' shrinks it (fpx 14 → −8px,
+  // so the paste stops INSIDE the union and the old figure shows through);
+  // 'outward' keeps it complete at any width. 'newFigure' padding stops the
+  // model's whiteout glow being pushed into real background (the white halo).
+  { label: 'A: shipped — f6, ramp inside (net 0)', params: {} },
+  { label: 'B: f6, ramp outward (net +12)', params: { featherPx: 6, featherMode: 'outward' } },
+  { label: 'C: f12, ramp outward', params: { featherPx: 12, featherMode: 'outward' } },
+  { label: 'D: f12 outward + pad new-figure only', params: { featherPx: 12, featherMode: 'outward', padMode: 'newFigure' } },
+  { label: 'E: f2, ramp centered (net +6)', params: { featherPx: 2, featherMode: 'centered' } },
 ];
 
 /** One reviewer-model run (outline_review): header stats + the review text. */

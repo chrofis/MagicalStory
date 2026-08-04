@@ -2817,6 +2817,8 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       colorCorrect: params.colorCorrect !== false,
       featherPx: params.featherPx,
       erodeFeather: params.erodeFeather,
+      featherMode: params.featherMode,
+      padMode: params.padMode,
       colorBorderRefine: params.colorBorderRefine,
       // FIGURE/BODY repair (not face mode) → protect background at the border, let
       // the redrawn figure colour drift. Override with params.bodyColorMode to A/B.

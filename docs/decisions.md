@@ -3534,3 +3534,50 @@ counts as BUSY, never as idle.
 `Node heap cap: 3072MB | MALLOC_ARENA_MAX=2`). Idle-shutdown ships inert until
 `STAGING_IDLE_SHUTDOWN=true` and `RAILWAY_API_TOKEN` are set on the staging
 service. Not yet on production — awaiting approval.
+
+---
+
+## 2026-08-04 — Blend feather: the ramp direction was eating the paste (featherMode / padMode)
+
+**Context:** A figure repair on exp #259/#265 left the OLD figure's outline clearly
+visible, and `featherPx: 14` sliced the top off the new figure's head (the ceiling
+showed through his scalp). Cause is coverage, not blending. The alpha is built as
+union dilated +6px (`padPx`), then eroded by `fpx` and blurred — the ramp is carved
+INWARD. Measured on the real `samUnionBlend`, alpha just inside the old silhouette
+edge: shipped f6 = 172/204/237, first fully-opaque 8px inside the union; f14 =
+100/116/139, first fully-opaque 27px inside. So the paste does not cover the region
+it is meant to replace, and the ORIGINAL — which in the old-only band IS the old
+figure — shows through. The erosion (`blur σ=fpx, thr 200`) bites harder than the pad
+(`σ=6/1.5, thr 16`) grows, so even "net 0" settings under-cover.
+
+Erode-then-feather is correct where the union edge is a real content boundary and the
+original just outside is untouched background — a face repair whose two masks agree.
+It is wrong wherever the union edge is the OLD silhouette.
+
+**Decision:** `featherMode` selects ramp placement — `'erode'` (inward, historical),
+`'centered'` (blur only), `'outward'` (dilate then blur: alpha 255 across the ENTIRE
+union, falloff beyond it where both sides are background). `padMode` selects pad scope
+— `'union'` (historical) or `'newFigure'` (pad only the new figure's anti-aliased edge,
+take the old-only boundary exactly). Defaults unchanged and byte-identical: `featherMode`
+falls back to `'erode'`, or `'centered'` when `erodeFeather === false`. Threaded through
+the Test Lab stage and the production face spine; both A/B-able via Replay blend.
+
+**Measured:** f6 outward = 255 across the union (clean winner). f2 centered = covers.
+f12 outward = 244-253 (the post-dilation blur pulls the interior down ~4px). f6 erode
+(shipped) = 8px uncovered. f14 erode = 27px uncovered.
+
+**Rejected:** `padMode:'newFigure'` as the halo fix. Removing the outward pad at the
+old-only boundary also removes the room the ramp needs — measured 9px uncovered. The
+halo (model's unfilled whiteout glow pasted into real background) and the coverage fix
+are geometrically opposed at that edge; the glow has to be suppressed by COLOUR, not by
+pulling the paste back. Open.
+
+**Affects production face repair:** `faceRepair.js` passes `featherPx`/`erodeFeather`
+undefined → feather 6 + erode → the same 8px uncovered ring. That is the
+*"faint light edge halo … edge-matting limit, minor"* logged in the 2026-07-2x face
+entry — misdiagnosed there. Default NOT changed yet; calibrate via Replay blend first.
+
+**Touched:** `server/lib/samBlend.js` (featherMode/padMode, alpha step label states net
+coverage), `server/lib/faceRepair.js`, `server/lib/testlab.js`,
+`client/src/pages/TestLab.tsx` (BLEND_REPLAY_VARIANTS A-E).
+**Status:** 🟡 conditional — knobs shipped, defaults unchanged pending an A/B.
