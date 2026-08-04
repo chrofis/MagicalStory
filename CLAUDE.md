@@ -75,6 +75,14 @@ Spaces). Before launching any Python script, consider its memory footprint; cap 
 
   Even when the user said "push" earlier in the session for an unrelated commit, that authorization does NOT carry forward. Every prod push is its own approval moment. When in doubt, push staging only and wait.
 
+- **Pushes are gated on the target environment being idle.** `.githooks/pre-push` asks
+  `GET /api/health/busy` (staging for `staging`, production for `master`) and refuses the
+  push while a story generation or Test Lab experiment is running — a deploy restarts the
+  container and kills it. Enable once per clone: `git config core.hooksPath .githooks`.
+  If it blocks you, **wait** — `--no-verify` is only for a run you are willing to destroy,
+  and on `master` that means a real user's paid generation. Never disable the hook to get
+  a push through. Check status any time with `node scripts/admin/check-push-idle.js`
+  (`docs/decisions.md`, 2026-08-04 entry).
 - **Do not automatically deploy.** Always ask before deploying.
 - **Ask if unclear.** If there are different implementation options, ask rather than assuming.
 - **Interview the user with `AskUserQuestion` — never decide direction for them.** When the user surfaces a problem with multiple valid resolutions (different scopes, different trade-offs, different "which file to touch" choices, "revert vs adjust vs leave alone"), STOP and ask via `AskUserQuestion` with 2-4 framed options + their trade-offs. Do NOT pick the option you think makes sense and "just ship it" with a "let me know if you want differently" tail. Do NOT bury the choice in prose ("Want me to do X? Or Y?") — that loses framing, hides trade-offs, and ends up as a slow back-and-forth. Use the actual question tool with explicit options. Exception: the "default to the proper fix" rule above (clean root-cause vs hacky shortcut) — there you don't ask, you ship proper. Every other choice → interview.

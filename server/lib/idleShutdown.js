@@ -53,6 +53,67 @@ function activityMiddleware(req, res, next) {
 }
 
 /**
+ * The probes that define "work in flight", registered once and shared by BOTH
+ * consumers: the shutdown timer below, and the /api/health/busy endpoint the
+ * pre-push hook reads. Registration is deliberately NOT inside
+ * startIdleShutdown() — that arms only on staging, while the push gate has to
+ * answer in production too, where a deploy kills real users' generations.
+ * Idempotent: both entry points call it without coordinating.
+ */
+let defaultProbesRegistered = false;
+function ensureDefaultProbes() {
+  if (defaultProbesRegistered) return;
+  defaultProbesRegistered = true;
+
+  // Story generation — the long-running background work all of this protects.
+  registerBusyProbe('story-jobs', async () => {
+    const { dbQuery } = require('../services/database');
+    // dbQuery resolves to the ROWS ARRAY, not a pg result object — `r.rows[0]`
+    // throws, and a throwing probe counts as busy, which would silently pin the
+    // container up forever (and block every push through /api/health/busy).
+    const r = await dbQuery(
+      "SELECT COUNT(*)::int AS n FROM story_jobs WHERE status IN ('pending', 'processing')"
+    );
+    const n = r[0]?.n || 0;
+    return n > 0 ? `${n} job(s) in flight` : false;
+  });
+
+  // Test Lab experiments run as an in-process loop with no story_jobs row, so
+  // nothing else can see them. The 2h bound mirrors the zombie reaper in
+  // routes/admin/testlab.js — without it one stuck row would block every push
+  // forever. to_regclass keeps a missing table (fresh DB) from reading as busy.
+  registerBusyProbe('testlab', async () => {
+    const { dbQuery } = require('../services/database');
+    const r = await dbQuery(
+      `SELECT COUNT(*)::int AS n FROM testlab_experiments
+        WHERE status = 'running' AND created_at > NOW() - INTERVAL '2 hours'
+          AND to_regclass('public.testlab_experiments') IS NOT NULL`
+    );
+    const n = r[0]?.n || 0;
+    return n > 0 ? `${n} experiment(s) running` : false;
+  });
+}
+
+/**
+ * Full status for the push gate: evaluates EVERY probe (not first-match) so the
+ * refusal can name everything that is holding the deploy off, not just the first
+ * thing found. Same throw-means-busy rule as firstBusyProbe.
+ */
+async function busyReport() {
+  ensureDefaultProbes();
+  const reasons = [];
+  for (const [name, fn] of busyProbes) {
+    try {
+      const v = await fn();
+      if (v) reasons.push(`${name}: ${typeof v === 'string' ? v : 'busy'}`);
+    } catch (err) {
+      reasons.push(`${name}: probe failed (${err.message}) — treated as busy`);
+    }
+  }
+  return { busy: reasons.length > 0, reasons };
+}
+
+/**
  * A probe that throws is treated as BUSY, never as idle. A failing database
  * check must not be the reason we shut down on top of an in-flight story.
  */
@@ -109,14 +170,7 @@ function startIdleShutdown() {
   startedAtMs = Date.now();
   lastActivityMs = Date.now();
 
-  // Story generation is the long-running background work this exists to protect.
-  registerBusyProbe('story-jobs', async () => {
-    const { dbQuery } = require('../services/database');
-    const r = await dbQuery(
-      "SELECT COUNT(*)::int AS n FROM story_jobs WHERE status IN ('pending', 'processing')"
-    );
-    return (r.rows[0]?.n || 0) > 0;
-  });
+  ensureDefaultProbes();
 
   log.info(
     `[IDLE-SHUTDOWN] armed on staging — will stop after ${idleMin} min idle ` +
@@ -154,4 +208,4 @@ function startIdleShutdown() {
   if (timer.unref) timer.unref();
 }
 
-module.exports = { startIdleShutdown, activityMiddleware, markActivity, registerBusyProbe };
+module.exports = { startIdleShutdown, activityMiddleware, markActivity, registerBusyProbe, busyReport };

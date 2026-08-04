@@ -1562,6 +1562,24 @@ app.get('/api/health', (req, res) => {
     commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 8) || null,
   });
 });
+// Is work in flight that a deploy would destroy? Read by the pre-push hook
+// (.githooks/pre-push) so a push can't restart the container on top of a running
+// story generation or Test Lab experiment. Same busy probes the idle-shutdown
+// watcher uses — one definition of "busy", not two that can drift.
+app.get('/api/health/busy', async (req, res) => {
+  try {
+    const { busyReport } = require('./server/lib/idleShutdown');
+    const report = await busyReport();
+    res.json({
+      ...report,
+      env: process.env.RAILWAY_ENVIRONMENT_NAME || 'unknown',
+      commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 8) || null,
+    });
+  } catch (err) {
+    // Unknown is not idle — say so explicitly and let the hook block.
+    res.status(500).json({ busy: true, reasons: [`busy check failed: ${err.message}`] });
+  }
+});
 
 // Serve static files
 // Priority: 1. Built React app (dist/), 2. Images folder, 3. Legacy HTML files

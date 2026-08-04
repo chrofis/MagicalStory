@@ -3581,3 +3581,37 @@ entry — misdiagnosed there. Default NOT changed yet; calibrate via Replay blen
 coverage), `server/lib/faceRepair.js`, `server/lib/testlab.js`,
 `client/src/pages/TestLab.tsx` (BLEND_REPLAY_VARIANTS A-E).
 **Status:** 🟡 conditional — knobs shipped, defaults unchanged pending an A/B.
+
+## 2026-08-04 — Pushes are gated on the target environment being idle
+
+**Context:** every push redeploys and restarts the container, and anything running
+in-process dies with it. Two Test Lab outline-review experiments were destroyed this
+way in one afternoon (#261, #264 — both left with zero results), by sessions that had
+no way to know a run was in flight; five commits landed on `staging` from four
+concurrent sessions that day. The same hazard is far more expensive on `master`, where
+a deploy kills real users' paid story generations. The existing safeguard was a
+CLAUDE.md sentence asking for approval, which nothing enforces.
+
+**Decision:** a versioned `pre-push` hook blocks the push when the target environment
+reports work in flight. `GET /api/health/busy` answers from the SAME busy probes the
+idle-shutdown watcher uses (`server/lib/idleShutdown.js`), so "busy" has one definition
+rather than two that drift. `refs/heads/staging` probes staging, `refs/heads/master`
+probes production; every other ref is ungated (no deploy, no risk). Enabled per clone
+with `git config core.hooksPath .githooks`; a single push escapes with `--no-verify`.
+
+**Rationale for the failure semantics:** a stopped container is genuinely idle —
+nothing can be running inside it — so connection-refused / DNS failure / Railway's
+502-503 allow the push. A timeout, a 500, or an unparseable body is *not* proof of
+idleness and blocks. HTTP 404 means the environment predates the gate; blocking there
+would deadlock (the fix can only ship by pushing), so it warns loudly and allows.
+
+**Also fixed here:** the `story-jobs` busy probe shipped hours earlier read
+`r.rows[0].n`, but `dbQuery()` resolves to the ROWS ARRAY, not a pg result object. It
+threw on every tick, and a throwing probe counts as busy — so staging's new idle
+self-shutdown could never actually fire, and the feature was silently saving nothing.
+
+**Touched:** `.githooks/pre-push` (new), `scripts/admin/check-push-idle.js` (new),
+`tests/manual/test-push-idle-gate.js` (new, 17 checks), `server/lib/idleShutdown.js`
+(`ensureDefaultProbes` + `busyReport` + testlab probe + the rows fix), `server.js`
+(`/api/health/busy`), `CLAUDE.md`.
+**Status:** ✅ kept.
