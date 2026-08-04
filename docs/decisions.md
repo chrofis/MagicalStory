@@ -3861,3 +3861,36 @@ byte-identical.
 **Touched:** `server/lib/samBlend.js` (seamCollar construction, alpha1 extension, two-leash
 screened diffusion).
 **Status:** ✅ active (staging pending push).
+
+---
+
+## 2026-08-04 — Offset field: GLOBAL tone target — per-material screen target warped content (exp #271 C blob)
+
+**Context:** #271 C showed a bright cream blob with a crisp contour + hard navy patch in the
+old footprint — contrast that exists in NEITHER source (the raw model backdrop there is a
+smooth warm floor with a soft shadow; verified against a naive rect-paste). Owner verdict:
+implementation bug, correct method. ALSO found: #271's variant labels lie — the replay of
+#268 result #1 (variant B) inherited featherMode 'outward' into every variant that didn't
+override it, so "A: legacy f6 erode" actually ran padded-union+outward (its own step label
+proves it: "ramp outward → net coverage 12px"). The praised "A" is the padded-union
+OUTWARD construction.
+
+**Mechanism (reproduced pre-fix vs fixed):** the screened diffusion's resting target was the
+per-material median offset with HARD nearest-cluster assignment per pixel. Deep in the
+footprint the screen dominates, so each pixel snaps to its material's median; where the
+model's SMOOTH gradient crosses the cluster decision boundary the offset flips between
+medians → a dip-and-rebound wave stamped into smooth content (synthetic, 2 materials: ±20
+band at the boundary; the real page has 5 materials incl. sunbeam and shadow → plateaus =
+posterized blobs). The fixed field (single GLOBAL median tone target) tracks the model's
+structure exactly — monotonic, parallel to the source — with locality still carried by
+diffusion from the exact border offsets.
+
+**Decision:** localField screen target = ONE global median tone offset. Per-material
+machinery removed from the offset field (stays in the legacy mean-shift path untouched).
+
+**Trade-off accepted:** deep interior colour can sit further from the ORIGINAL's per-region
+tone than the per-material version — irrelevant by the owner's contract: deep interior is
+model content, not adjacent to any original; smoothness beats per-region tone accuracy.
+
+**Touched:** `server/lib/samBlend.js` (globMed-only screen target).
+**Status:** ✅ committed, pending deploy + replay verification on the real page.

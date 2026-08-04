@@ -212,21 +212,26 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     // act locally (~6px) and the deep interior gets exactly the small tone
     // shift and nothing else.
     const medOf = (arr) => { if (!arr.length) return 0; const s = [...arr].sort((a, b) => a - b); return s[s.length >> 1]; };
-    const matO = bgCent.map(() => [[], [], []]);
     const globO = [[], [], []];
     for (let i = 0; i < n; i++) {
       if (!(ring[i] > 128 && known[i])) continue;
-      const lab = _rgbToLab(origRaw[i * 3], origRaw[i * 3 + 1], origRaw[i * 3 + 2]);
-      let bk = -1, dB = Infinity; for (let k = 0; k < bgCent.length; k++) { const d = _deltaE(lab, bgCent[k]); if (d < dB) { dB = d; bk = k; } }
-      for (let c = 0; c < 3; c++) { globO[c].push(O[i * 3 + c]); if (bk >= 0) matO[bk][c].push(O[i * 3 + c]); }
+      for (let c = 0; c < 3; c++) globO[c].push(O[i * 3 + c]);
     }
+    // ONE global median tone offset — the resting target MUST be smooth. A
+    // per-material target with hard nearest-cluster assignment QUANTIZED the
+    // field: deep in the footprint each pixel snapped to its material's median,
+    // and where the model's soft gradient crossed the cluster decision boundary
+    // the offset stepped — painting a crisp contour + contrast expansion into
+    // content that was smooth in BOTH sources (exp #271 C: the cream blob with
+    // the hard outline that exists in neither the model nor the original).
+    // Local variation is already carried by diffusion from the exact border
+    // offsets; the screen only needs the overall tone.
     const globMed = [medOf(globO[0]), medOf(globO[1]), medOf(globO[2])];
-    const matMed = matO.map((m) => (m[0].length >= 8 ? [medOf(m[0]), medOf(m[1]), medOf(m[2])] : globMed));
-    // Two leashes: interior pixels relax toward the robust material tone offset
-    // (weak — border anomalies act locally, deep content keeps only the tone
-    // shift). Collar pixels relax toward their OWN exact offset (strong — the
-    // collar may bend a little to share the seam residual with the outside, but
-    // a large correction like glow is never abandoned; relaxing it fully was
+    // Two leashes: interior pixels relax toward the global tone offset (weak —
+    // border anomalies act locally, deep content keeps only the tone shift).
+    // Collar pixels relax toward their OWN exact offset (strong — the collar
+    // may bend a little to share the seam residual with the outside, but a
+    // large correction like glow is never abandoned; relaxing it fully was
     // measured to re-expose the glow at 235+).
     const exactO = seamCollar ? Float32Array.from(O) : null;
     const lam = 0.012, lamCollar = 0.25;
@@ -246,8 +251,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
         if (!c) continue;
         const inCollar = seamCollar && seamCollar[i];
         const lm = inCollar ? lamCollar : lam;
-        const tgt = inCollar ? [exactO[i * 3], exactO[i * 3 + 1], exactO[i * 3 + 2]]
-          : (bgAssign[i] >= 0 ? matMed[bgAssign[i]] : globMed);
+        const tgt = inCollar ? [exactO[i * 3], exactO[i * 3 + 1], exactO[i * 3 + 2]] : globMed;
         O[i * 3] = (1 - lm) * (rs / c) + lm * tgt[0];
         O[i * 3 + 1] = (1 - lm) * (gs / c) + lm * tgt[1];
         O[i * 3 + 2] = (1 - lm) * (bs / c) + lm * tgt[2];
