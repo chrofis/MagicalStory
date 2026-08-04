@@ -268,13 +268,26 @@ except Exception as e:
 _boot_mark("haar cascades (ready)")
 
 
+# Observing the process must not keep it alive. /health is polled by monitoring
+# and by /api/health/memory, so counting it as activity would reset the idle
+# timer forever and the recycler could never fire — the watcher would silently
+# prevent the thing it was watching. These paths are still counted as in-flight
+# (we must not exit mid-response), just not as *activity*.
+_NON_ACTIVITY_PATHS = frozenset({'/health', '/release-memory'})
+
+
+def _is_activity(path):
+    return path not in _NON_ACTIVITY_PATHS
+
+
 @app.before_request
 def _track_request_start():
     """Count in-flight work so the recycler can prove the process is idle."""
     global _inflight_requests, _last_request_ts
     with _request_lock:
         _inflight_requests += 1
-        _last_request_ts = time.time()
+        if _is_activity(request.path):
+            _last_request_ts = time.time()
 
 
 @app.teardown_request
@@ -285,7 +298,12 @@ def _track_request_end(exc=None):
         # Stamp on the way OUT too: a 90s mask call must count as activity at
         # the moment it FINISHES, not when it started, or a long inference could
         # age past the idle window while it is still running.
-        _last_request_ts = time.time()
+        try:
+            if _is_activity(request.path):
+                _last_request_ts = time.time()
+        except Exception:
+            # teardown can run without a request context in edge cases
+            pass
 
 
 def _recycle_watchdog():
