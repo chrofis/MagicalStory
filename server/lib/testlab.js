@@ -211,13 +211,28 @@ async function resolveReplayParams(replayOf, ctx) {
   if (!rawStep) throw new Error(`replayOf: result #${idx} stored no "model raw output" step — nothing to replay the blend on.`);
   if (!src.crop) throw new Error(`replayOf: result #${idx} stored no crop rect — cannot verify alignment.`);
   // Pinned detection: the experiment's fresh-detection entry (every option in a
-  // compare-all run was blended against these same boxes).
-  const det = results.find(r => Array.isArray(r?.figures) && r.figures.length);
-  if (!det) throw new Error(`replayOf: experiment #${expId} stored no detection entry — re-detecting would move the crop and invalidate the replay.`);
+  // compare-all run was blended against these same boxes). A replay-of-a-replay
+  // stores no detection of its own — follow the params.replayOf chain back to
+  // the root experiment (bounded: a chain is user-created, never deep). The
+  // characterName rides the same chain (replay experiments don't store it).
+  let det = results.find(r => Array.isArray(r?.figures) && r.figures.length);
+  let charName = rows[0].params?.characterName;
+  {
+    let cursor = rows[0].params?.replayOf;
+    let hops = 0;
+    while ((!det || !charName) && cursor && hops++ < 5) {
+      const anc = await dbQuery('SELECT params, results FROM testlab_experiments WHERE id = $1', [Number(cursor.experimentId)]);
+      if (!anc.length) break;
+      if (!det) det = (anc[0].results || []).find(r => Array.isArray(r?.figures) && r.figures.length);
+      if (!charName) charName = anc[0].params?.characterName;
+      cursor = anc[0].params?.replayOf;
+    }
+  }
+  if (!det) throw new Error(`replayOf: experiment #${expId} (and its replay ancestors) stored no detection entry — re-detecting would move the crop and invalidate the replay.`);
   // The source run's own knobs: its variant params when it was one of several.
   const srcVariant = (rows[0].params?.variants || []).find(v => v.label === src.label);
   return {
-    ...(rows[0].params?.characterName ? { characterName: rows[0].params.characterName } : {}),
+    ...(charName ? { characterName: charName } : {}),
     ...(srcVariant?.params || {}),
     ...(src.backend ? { backend: src.backend } : {}),
     detection: { figures: det.figures, objects: det.objects || [] },
