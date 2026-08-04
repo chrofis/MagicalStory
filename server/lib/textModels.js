@@ -919,6 +919,156 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
 }
 
 /**
+ * Call OpenRouter with SSE streaming (OpenAI-compatible, same shape as xAI).
+ *
+ * WHY THIS EXISTS: the non-streaming call above cannot survive a generation
+ * longer than five minutes. undici's default headersTimeout is 300000 ms, and a
+ * non-streaming response sends no headers until the completion is finished, so
+ * the request dies with "fetch failed" — which withRetry treats as retryable and
+ * burns three times over. Reasoning models (DeepSeek V4 Pro) and 32k-token
+ * reviews routinely cross that line. Streaming gets headers immediately, so the
+ * ceiling never applies and an inactivity timer catches a genuinely dead stream.
+ */
+async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error('OpenRouter API key not configured (OPENROUTER_API_KEY)');
+  }
+
+  // Same prompt assembly as the non-streaming path: cachePrefix carries required
+  // content (OpenRouter just can't discount it), and vision goes as image_url parts.
+  const fullPrompt = (options.cachePrefix || '') + prompt;
+  let userContent;
+  if (options.images && options.images.length > 0) {
+    userContent = options.images.map(img => ({
+      type: 'image_url',
+      image_url: { url: img.startsWith('data:') ? img : `data:image/jpeg;base64,${stripDataUriPrefix(img)}` }
+    }));
+    userContent.push({ type: 'text', text: fullPrompt });
+  } else {
+    userContent = fullPrompt;
+  }
+
+  const messages = [{ role: 'user', content: userContent }];
+  if (options.prefill) {
+    messages.push({ role: 'assistant', content: options.prefill });
+  }
+
+  return await withRetry(async () => {
+    console.log(`🌊 [STREAM] Starting streaming request to OpenRouter (${maxTokens} max tokens)...`);
+    const startTime = Date.now();
+
+    const timeoutMs = Math.max(1500000, 900000 + Math.ceil(maxTokens / 1000) * 15000);
+    const INACTIVITY_TIMEOUT_MS = 120000;
+    const controller = new AbortController();
+    const maxTimer = setTimeout(() => controller.abort(new Error(`streaming timeout after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs);
+    let inactivityTimer;
+    const resetInactivity = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => controller.abort(new Error('stream inactivity timeout (120s)')), INACTIVITY_TIMEOUT_MS);
+    };
+
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://magicalstory.ch',
+          'X-Title': 'MagicalStory'
+        },
+        body: JSON.stringify({
+          model: modelId,
+          max_tokens: maxTokens,
+          stream: true,
+          stream_options: { include_usage: true },
+          messages
+        }),
+        signal: controller.signal
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        const error = new Error(`OpenRouter streaming API error (${res.status}): ${errorText}`);
+        error.status = res.status;
+        throw error;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      let buffer = '';
+      let inputTokens = 0;
+      let outputTokens = 0;
+      let firstChunkTime = null;
+      resetInactivity();
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            log.debug('🌊 [OPENROUTER STREAM] Stream complete');
+            break;
+          }
+
+          // OpenRouter emits ": OPENROUTER PROCESSING" SSE comments as keep-alives
+          // while a slow provider spins up. They are not data lines (skipped
+          // below), but they DO prove the connection is alive — so resetting the
+          // inactivity timer on any bytes is what keeps a slow model from being
+          // killed at 120s while it is still queued upstream.
+          resetInactivity();
+
+          if (!firstChunkTime && value) firstChunkTime = Date.now();
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const event = JSON.parse(data);
+              // Only `content` is the answer. Reasoning models also stream
+              // `delta.reasoning`, which the non-streaming path never returned
+              // either — including it here would corrupt every parsed response.
+              if (event.choices?.[0]?.delta?.content) {
+                const chunk = event.choices[0].delta.content;
+                fullText += chunk;
+                if (onChunk) onChunk(chunk, fullText);
+              }
+              if (event.usage) {
+                inputTokens = event.usage.prompt_tokens || inputTokens;
+                outputTokens = event.usage.completion_tokens || outputTokens;
+              }
+            } catch {
+              // Skip malformed JSON
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      log.debug(`📊 [OPENROUTER STREAM] ${modelId} - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+
+      const responseText = options.prefill ? options.prefill + fullText : fullText;
+      return {
+        text: responseText,
+        usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+        modelId,
+        ttft: firstChunkTime ? firstChunkTime - startTime : null
+      };
+    } finally {
+      clearTimeout(maxTimer);
+      clearTimeout(inactivityTimer);
+    }
+  }, { maxRetries: 2, baseDelay: 2000 });
+}
+
+/**
  * Main text model caller - routes to appropriate provider
  * @param {string} prompt - The prompt to send
  * @param {number} maxTokens - Maximum tokens to generate (capped to model limit)
@@ -996,6 +1146,9 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
       break;
     case 'xai':
       result = await callXaiAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, options);
+      break;
+    case 'openrouter':
+      result = await callOpenRouterAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, options);
       break;
     default:
       // Fall back to non-streaming for unknown providers

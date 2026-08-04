@@ -3782,19 +3782,27 @@ and the reviewer calls, matching what production already does for the same two c
 (`server.js` unified writer + review). Streaming receives headers immediately, so the
 headers timeout never applies.
 
-**Known remaining exposure:** `callTextModelStreaming` has no OpenRouter branch — it
-falls back to the plain call for that provider, so OpenRouter reviewers (DeepSeek, Qwen,
-GLM, Kimi) still die at five minutes. Closing that needs either an SSE implementation
-for OpenRouter or the `undici` package (not currently a dependency) to set a dispatcher
-whose `headersTimeout` matches the app's computed timeout. Open.
+**OpenRouter closed the same day:** `callOpenRouterAPIStreaming` implements the SSE path
+(OpenAI-compatible, mirroring the xAI one), so DeepSeek/Qwen/GLM/Kimi stream too — no
+`undici` dependency needed. Two things that path must get right: only `delta.content` is
+accumulated, because reasoning models also stream `delta.reasoning`, which the
+non-streaming path never returned and which would corrupt every parsed response; and the
+`: OPENROUTER PROCESSING` keep-alive comments reset the inactivity timer, so a slow model
+still queued upstream is not killed at 120s.
+
+**Measured** (exp #270's exact config, whole stage end to end, 528.2s): writer
+claude-sonnet 346.2s / 58,895 chars; reviewers deepseek-v4-flash 68.3s (5 fixes,
+$0.0034), deepseek-v4-pro 144.2s (58 fixes, $0.0214), qwen3-vl-235b 108.3s (7 fixes,
+$0.0079), claude-sonnet 181.5s (15 fixes, $0.2197). All four had returned nothing before.
 
 **Also fixed:** the streaming fallback called `callTextModel(prompt, maxTokens,
 modelOverride)` without `options`, dropping `usageLabel` — every OpenRouter call routed
 through the streaming entry point was recording its tokens unattributed.
 
 **Touched:** `server/lib/testlab.js` (both calls in `runOutlineReviewStage`),
-`server/lib/textModels.js` (fallback passes `options`).
-**Status:** ✅ kept for the streaming providers, 🟡 OpenRouter still uncovered.
+`server/lib/textModels.js` (`callOpenRouterAPIStreaming` + dispatcher case; fallback
+passes `options`).
+**Status:** ✅ kept — every provider streams.
 
 ---
 
