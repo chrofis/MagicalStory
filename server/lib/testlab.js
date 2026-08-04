@@ -179,6 +179,54 @@ async function loadActivePageImage(storyId, pageNumber) {
   return data;
 }
 
+/**
+ * BLEND REPLAY — resolve `params.replayOf = {experimentId, resultIndex}` into the
+ * inputs that reproduce a past repair EXACTLY, minus the model call:
+ *   - the source run's own params (backend, whiteoutTarget, cropPad …) as the base,
+ *   - its PINNED detection (the experiment's fresh-detection entry), so the boxes
+ *     and therefore the crop are recomputed identically instead of re-detected,
+ *   - `reuseModelOutput` = the stored "model raw output" step of that result.
+ * The caller's params win over all of it, so an A/B changes ONLY the blend knobs
+ * (featherPx, erodeFeather, colorCorrect, bgBorderMatch, bodyColorMode, garmentOnly).
+ * Cost: zero — no image model is called. `_replayCrop` is carried so the stage can
+ * assert the recomputed crop matches the source; a drift would silently misalign
+ * the reused output and invalidate the comparison.
+ */
+async function resolveReplayParams(replayOf, ctx) {
+  const { dbQuery } = require('../services/database');
+  const expId = Number(replayOf.experimentId);
+  const idx = Number(replayOf.resultIndex);
+  if (!Number.isInteger(expId) || !Number.isInteger(idx)) {
+    throw new Error('replayOf needs {experimentId, resultIndex} as integers');
+  }
+  const rows = await dbQuery('SELECT params, results FROM testlab_experiments WHERE id = $1', [expId]);
+  if (!rows.length) throw new Error(`replayOf: experiment #${expId} not found`);
+  const results = rows[0].results || [];
+  const src = results[idx];
+  if (!src) throw new Error(`replayOf: experiment #${expId} has no result #${idx} (it has ${results.length})`);
+  if (src.storyId !== ctx.storyId || src.pageNumber !== ctx.pageNumber) {
+    throw new Error(`replayOf: result #${idx} is ${src.storyId} P${src.pageNumber}, but this target is ${ctx.storyId} P${ctx.pageNumber} — a replay must run on the same page.`);
+  }
+  const rawStep = (src.steps || []).find(s => /model raw output/i.test(s.label || ''));
+  if (!rawStep) throw new Error(`replayOf: result #${idx} stored no "model raw output" step — nothing to replay the blend on.`);
+  if (!src.crop) throw new Error(`replayOf: result #${idx} stored no crop rect — cannot verify alignment.`);
+  // Pinned detection: the experiment's fresh-detection entry (every option in a
+  // compare-all run was blended against these same boxes).
+  const det = results.find(r => Array.isArray(r?.figures) && r.figures.length);
+  if (!det) throw new Error(`replayOf: experiment #${expId} stored no detection entry — re-detecting would move the crop and invalidate the replay.`);
+  // The source run's own knobs: its variant params when it was one of several.
+  const srcVariant = (rows[0].params?.variants || []).find(v => v.label === src.label);
+  return {
+    ...(rows[0].params?.characterName ? { characterName: rows[0].params.characterName } : {}),
+    ...(srcVariant?.params || {}),
+    ...(src.backend ? { backend: src.backend } : {}),
+    detection: { figures: det.figures, objects: det.objects || [] },
+    reuseModelOutput: rawStep.versionIndex,
+    _replayCrop: src.crop,
+    _replayLabel: `replay of #${expId} result #${idx}${src.label ? ` (${src.label})` : ''}`,
+  };
+}
+
 /** A specific test-version image (Test Lab rows included). */
 async function loadTestImage(storyId, imageType, pageNumber, versionIndex) {
   const { dbQuery } = require('../services/database');
@@ -696,7 +744,13 @@ async function resolveCharacterBox(ctx, imageData, charName, { detection = null 
 }
 
 async function runCharRepairStage(ctx, opts) {
-  const { experimentId, params = {} } = opts;
+  let { experimentId, params = {} } = opts;
+  // Blend replay: reuse a past run's model output + pinned detection, so an A/B
+  // isolates the blend/colour stage on byte-identical images ($0, no model call).
+  if (params.replayOf) {
+    params = { ...(await resolveReplayParams(params.replayOf, ctx)), ...params };
+    opts = { ...opts, params };
+  }
   // Warm the SAM figure-mask service for any insert-pipeline run (qwen OR grok);
   // the legacy Grok blended/cutout path (explicit repairMode) warms it too.
   if (opts.params?.samBlend || opts.params?.backend === 'qwen' || opts.params?.backend === 'grok') warmupFigureMask();
@@ -2239,6 +2293,7 @@ async function fetchFigureHeadMask(buf, bodyBoxInCrop, faceBoxInCrop, cropW, cro
  */
 async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = {} }) {
   const sharp = require('sharp');
+  if (params.replayOf && !params.reuseModelOutput) params = { ...(await resolveReplayParams(params.replayOf, ctx)), ...params };
   if (params.repairMode) warmupFigureMask();
   const { editWithQwen } = require('./runware');
 
@@ -2322,6 +2377,19 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     }
   }
   if (!crop) throw new Error('qwen_insert needs params.crop {x,y,w,h} (normalized 0-1) — the character was not found on the base image either');
+  // Replay alignment gate: the reused model output was rendered for the SOURCE
+  // crop. If the recomputed crop drifted (different detection, different cropPad),
+  // pasting it back would be misaligned and the A/B meaningless — fail loudly.
+  if (params._replayCrop) {
+    const want = params._replayCrop;
+    const off = Math.max(
+      Math.abs(want.x * W - crop.x), Math.abs(want.y * H - crop.y),
+      Math.abs(want.w * W - crop.w), Math.abs(want.h * H - crop.h),
+    );
+    if (off > 1) {
+      throw new Error(`Replay crop drifted ${Math.round(off)}px from the source run (source ${JSON.stringify(want)}) — the reused model output would be misaligned. The source detection did not reproduce the same box.`);
+    }
+  }
   // Face mode: SQUARE crop centered on the head. A 1:1 crop is a valid Grok edit
   // aspect BY CONSTRUCTION, so there is NO mid-pipeline reshape — the earlier
   // aspect-snap mutated crop.w/h/x/y AFTER coordinates were derived from it and
@@ -3173,6 +3241,7 @@ module.exports = {
   loadSceneContext,
   loadCharacterContext,
   loadTestImage,
+  resolveReplayParams,
   loadActivePageImage,
   checkRuleGenericity,
 };

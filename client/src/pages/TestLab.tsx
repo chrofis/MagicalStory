@@ -27,6 +27,19 @@ import {
   type TextModelInfo,
 } from '@/services/testlabService';
 
+/**
+ * Blend-replay A/B set: the blend/colour knobs, run against ONE stored model
+ * output. Everything else (detection, crop, model pixels) is pinned by the
+ * server, so a difference between these images is caused by the knob and
+ * nothing else. Edit here to change what "Replay blend" compares.
+ */
+const BLEND_REPLAY_VARIANTS = [
+  { label: 'as shipped', params: {} },
+  { label: 'no colour match', params: { colorCorrect: false, bgBorderMatch: false } },
+  { label: 'colour, feather 2', params: { featherPx: 2 } },
+  { label: 'colour, feather 14', params: { featherPx: 14 } },
+];
+
 /** One reviewer-model run (outline_review): header stats + the review text. */
 function ReviewRunView({ run, title }: { run: ReviewRun; title?: string }) {
   return (
@@ -942,6 +955,28 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
     }
   };
 
+  // BLEND REPLAY — rerun ONLY the blend + colour stage on this result's stored
+  // model output (no image model call, $0), as an A/B of the blend knobs. The
+  // server pins the source detection and refuses a drifted crop, so both sides
+  // composite byte-identical model pixels and the ONLY difference is the knob.
+  const replayBlend = async (index: number) => {
+    const r = detail.results[index];
+    const variants = BLEND_REPLAY_VARIANTS;
+    if (!window.confirm(`Replay the blend on result #${index}'s stored model output?\n\nNo model call ($0). Runs ${variants.length} variants: ${variants.map(v => v.label).join(', ')}.`)) return;
+    try {
+      const res = await testlabService.createExperiment({
+        stage: detail.stage,
+        label: `blend replay of #${detail.id} · result #${index}`,
+        promptOverride: null,
+        params: { autoEval: false, replayOf: { experimentId: detail.id, resultIndex: index }, variants },
+        targets: [{ storyId: r.storyId, pageNumber: r.pageNumber }],
+      });
+      alert(`Started experiment #${res.id} — open it from "Past experiments".`);
+    } catch (e) {
+      alert(`Replay failed: ${e instanceof Error ? e.message : e}`);
+    }
+  };
+
   // Poll while any redo is in flight; clear pendings once their entry lands.
   useEffect(() => {
     if (Object.keys(pendingRedos).length === 0) return;
@@ -1032,6 +1067,7 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
       {displayList.map(({ r, i, isRedo, superseded }) => (
         <ResultCard key={`${r.storyId}-${r.pageNumber}-${i}`} result={r} stage={detail.stage}
           onRedo={() => redo(i)} redoing={pendingRedos[i] !== undefined}
+          onReplayBlend={(r.steps || []).some(s => /model raw output/i.test(s.label)) ? () => replayBlend(i) : undefined}
           isRedo={isRedo} superseded={superseded} />
       ))}
       {detail.status === 'running' && (
@@ -1208,7 +1244,7 @@ function StepsStrip({ steps, images, onOpen }: {
   );
 }
 
-function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { result: ExperimentResult; stage: string; onRedo?: () => void; redoing?: boolean; isRedo?: boolean; superseded?: boolean }) {
+function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, superseded }: { result: ExperimentResult; stage: string; onRedo?: () => void; redoing?: boolean; onReplayBlend?: () => void; isRedo?: boolean; superseded?: boolean }) {
   const [baseline, setBaseline] = useState<string | null>(null);
   const [variant, setVariant] = useState<string | null>(null);
   const [variantB, setVariantB] = useState<string | null>(null);
@@ -1324,6 +1360,11 @@ function ResultCard({ result, stage, onRedo, redoing, isRedo, superseded }: { re
           {onRedo && (
             <Button variant="secondary" size="sm" onClick={onRedo} disabled={redoing}>
               {redoing ? (<><RefreshCw size={14} className="animate-spin" /> Redoing…</>) : 'Redo'}
+            </Button>
+          )}
+          {onReplayBlend && (
+            <Button variant="secondary" size="sm" onClick={onReplayBlend} title="Rerun blend + colour on this exact model output — no model call, $0">
+              Replay blend
             </Button>
           )}
           {result.elapsedMs !== undefined && <span>{(result.elapsedMs / 1000).toFixed(1)}s</span>}

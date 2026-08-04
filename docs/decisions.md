@@ -1979,7 +1979,7 @@ over-segmented before the clip bounded it (exp #122).
 **Touched:** `server/lib/testlab.js` (samUnionBlend, runQwenInsertStage face path,
 fetchFigureHeadMask), `server/lib/images.js` (fetchFigureHeadMaskPng,
 detectPersonBoxInCrop, correctColorShift {meanShift, borderMatch},
-harmonicBackgroundFill, recoverFaceBox).
+recoverFaceBox).
 **Status:** staging (Test Lab). Production repairCharacterMismatch NOT yet ported.
 **Known residual:** a faint light edge halo where the 3px protected ring keeps a
 sliver of Qwen's glow — edge-matting limit, minor.
@@ -3441,3 +3441,46 @@ proves quality. Input is rebuilt from the permanent `stories.data` fields
 **Decision:** `buildOutlineReviewPrompt(inputData, writerOutput, hints, opts)` gains `opts.aspect` ('both'|'text'|'scene') and `opts.priorReviews`. Aspect slices the analysis body (text = A/B/C/E, scene = D) and gates the reference blocks via `<!-- TEXT_REVIEW -->` / `<!-- SCENE_REVIEW -->` markers in outline-review.txt; `both` + no priors is byte-equivalent to before (production path untouched). The Test Lab `outline_review` stage gains `mode: compare|iterate`: compare = N models on one shared draft; iterate = rounds where each round's critique is fed forward (told to only add what's new), per-round model(s), optional per-round split, reporting fixes-per-round + a converged flag. Qwen3-VL (32B/235B) added to TEXT_MODELS as an image-eval candidate; the eval-stage vision swap is DEFERRED (evaluateImageQuality is Gemini-specific — prompt sanitization, response schema, and Qwen's bbox order [x0,y0,x1,y1] differs from Gemini's [y0,x0,y1,x1]; needs an adapter before it can score correctly).
 
 **Touched:** `prompts/outline-review.txt`, `server/lib/storyHelpers.js` (buildOutlineReviewPrompt aspect/priorReviews + slicers), `server/lib/testlab.js` (runOutlineReviewStage compare/iterate), `server/config/models.js` (qwen3-vl entries + pricing), `client/src/pages/TestLab.tsx`, `client/src/services/testlabService.ts`, `tests/manual/test-split-outline-review.js` (+16 checks, 58 total).
+
+---
+
+## 2026-08-04 — Repair blend: garbage rescue deleted; blend/colour A/B replays a stored model output
+
+**Context:** Exp #259 (char_repair, figure/body mode) left a large soft ghost where the
+kneeling figure used to be: Grok re-posed the character to standing, so ~39k px of the old
+silhouette fell in the RED ZONE (old mask minus new). Red-zone policy keeps the model's
+pixels, and the background matcher only *shifts* their colour (texture preserved by design)
+— so Grok's out-of-focus backdrop survived, tonally matched and still blurry. A second
+finding: the run's "colour ON/OFF" A/B tested nothing. `colorCorrect` is only consulted in
+FACE mode (`if (colorCorrect && !bodyColorMode)`); the variants set no `whiteoutTarget`, so
+both sides ran figure mode with `bodyColorMode=true` and the branch never executed. The two
+results differed only by model nondeterminism.
+
+**Decision:** (1) The "garbage rescue" is DELETED — `harmonicBackgroundFill` and the
+near-white(>235)/near-black(<22) special case in `matchIntroducedBackground` are gone.
+Unfilled remnants are handled by feathering and the per-material background match like any
+other introduced background pixel; there is no diffusion inpaint anywhere in the blend.
+(2) Blend/colour comparisons no longer call an image model: `params.replayOf =
+{experimentId, resultIndex}` resolves to the source run's params, its PINNED detection, and
+its stored "model raw output" step, so variants differ ONLY by the blend knob. A crop-drift
+gate (>1px vs the source crop) fails the run loudly rather than pasting a misaligned reuse.
+Exposed as a "Replay blend" button on any result card that stored a raw output.
+
+**Rationale:** The rescue only ever covered a hard-thresholded sliver (622 px of 39095 in
+exp #259) while carrying a 400-iteration Laplace solve and its own failure mode (diffusing
+scene colour into a region the model had painted correctly). Owner's call: feather it
+properly instead of patching remnants. The replay harness exists because every previous
+blend A/B was confounded — each side re-called Grok, so ~$0.04 bought two different images
+and no isolated variable. Replay is $0 and byte-identical on the model side.
+
+**Known consequence:** a near-white/near-black remnant inside the union interior is no longer
+repainted — feathering only reaches the silhouette edge. Verified on a synthetic case: a
+white bar in the red-zone interior survives (shifted 255→234 by the material match). Watch
+for it if a model starts returning unfilled whiteouts again.
+
+**Touched:** `server/lib/samBlend.js` (matchIntroducedBackground, samUnionBlend doc/log/step
+labels), `server/lib/images.js` (harmonicBackgroundFill deleted + unexported),
+`server/lib/testlab.js` (resolveReplayParams, runCharRepairStage/runQwenInsertStage hooks,
+replay crop gate), `client/src/pages/TestLab.tsx` (BLEND_REPLAY_VARIANTS, replayBlend,
+ResultCard "Replay blend").
+**Status:** ✅ active (staging).
