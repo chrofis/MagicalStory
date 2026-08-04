@@ -3917,10 +3917,21 @@ and Railway bills that RSS every minute. A literal fork-per-inference would also
 work and was rejected: each call would reload MobileSAM/GDINO (~570 MB, seconds)
 inside the repair loop. Idle-gating puts the restart at the story boundary in
 practice without cross-process coordination or any risk to a concurrent story.
-**Known gap:** a request arriving during the ~10s restart gets a connection
-error. Analyzer calls have timeouts and fall back (figure-mask → Gemini), and
-the window only opens after 180s of quiet, but `/remove-bg` during photo upload
-has no fallback — a Node-side retry-on-ECONNREFUSED would close it.
+**Gap, now CLOSED:** a request arriving during the ~10s restart got a connection
+error. figure-mask falls back to Gemini, but `/remove-bg` and the photo-upload
+path have no fallback, so a user would simply see their upload fail. Scheduling
+alone can only shrink that window, never close it — a user can always arrive
+mid-restart. Closed with two changes:
+1. `server/lib/analyzerClient.js` — `analyzerFetch()` retries CONNECTION errors
+   only (ECONNREFUSED/ECONNRESET/…), 3x at 4s, covering ~12s of downtime. HTTP
+   500s are real answers and are deliberately NOT retried.
+2. `ensureWarm()` preloads models when a user is active — on photo upload and at
+   story creation, whose first minutes are Claude calls that never touch the
+   analyzer. Warming also counts as a request, so the idle window cannot open
+   while someone is using the app, and repair never pays the ~570MB MobileSAM
+   load mid-loop.
+**Touched (gap fix):** `server/lib/analyzerClient.js` (new), `server/lib/rembg.js`,
+`server/routes/photos.js`, `server/routes/jobs.js`, `photo_analyzer.py` (`/warmup`).
 **Touched:** `start.sh` (supervisor loop), `photo_analyzer.py`
 (`_track_request_start/end`, `_recycle_watchdog`, `/release-memory?recycle=true`).
 **Status:** ✅ staging.

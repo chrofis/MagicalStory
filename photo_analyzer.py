@@ -1913,6 +1913,53 @@ def detect_figures_text_endpoint():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+_warmup_thread = None
+
+
+@app.route('/warmup', methods=['POST'])
+def warmup_endpoint():
+    """Preload every model this environment will need, ahead of time.
+
+    Called when a user becomes active. The point is that model loading should
+    happen while the user is still filling in the wizard or while the story's
+    opening Claude calls run for minutes — not on the first mask call in the
+    middle of character repair, where it costs ~570MB and several seconds of
+    latency inside the repair loop.
+
+    It also keeps the recycler away: warming counts as a request, so the idle
+    window cannot open while someone is actually using the app.
+
+    Returns immediately; loading happens on a background thread. Poll /health
+    for the *_loaded flags. Idempotent — get_*() are no-ops when already loaded.
+    """
+    global _warmup_thread
+    if _warmup_thread is not None and _warmup_thread.is_alive():
+        return jsonify({"success": True, "status": "already warming"})
+
+    want_dino = os.environ.get('FIGURE_DETECTION_BACKEND', '') == 'grounding-dino'
+
+    def _warm():
+        t0 = time.time()
+        try:
+            get_rembg_session()
+        except Exception as e:
+            print(f"[WARMUP] rembg failed: {e}")
+        try:
+            get_mobilesam()
+        except Exception as e:
+            print(f"[WARMUP] mobilesam failed: {e}")
+        if want_dino:
+            try:
+                get_groundingdino()
+            except Exception as e:
+                print(f"[WARMUP] groundingdino failed: {e}")
+        print(f"[WARMUP] done in {time.time() - t0:.1f}s — rss {_rss_mb()} MB")
+
+    _warmup_thread = threading.Thread(target=_warm, daemon=True)
+    _warmup_thread.start()
+    return jsonify({"success": True, "status": "warming", "groundingdino": want_dino})
+
+
 @app.route('/release-memory', methods=['POST'])
 def release_memory_endpoint():
     """Force a memory release NOW instead of waiting out the idle reapers.

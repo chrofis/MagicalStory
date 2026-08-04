@@ -70,6 +70,14 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
   try {
     const userId = req.user.id;
 
+    // A story is starting. Its first minutes are Claude calls for outline and
+    // text — nothing touches the analyzer until page images exist — so this is
+    // the ideal runway to load the models. Warming here means character repair
+    // never pays the ~570MB MobileSAM load mid-loop, and it keeps the analyzer's
+    // idle-recycle window shut for the whole generation.
+    // Fire-and-forget: never let warming delay or fail story creation.
+    require('../lib/analyzerClient').ensureWarm('story-start');
+
     // Extract and validate idempotency key (optional but recommended)
     const idempotencyKey = req.body.idempotencyKey ? sanitizeString(req.body.idempotencyKey, 100) : null;
 

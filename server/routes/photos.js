@@ -40,6 +40,11 @@ router.get('/status', async (req, res) => {
 // Remove background from a pre-cropped image
 // POST /api/photos/remove-bg
 router.post('/remove-bg', authenticateToken, async (req, res) => {
+  // A user is here and working with photos — make sure the analyzer's models
+  // are loading now rather than on the first mask call inside character repair.
+  // Debounced and fire-and-forget; never blocks this request.
+  require('../lib/analyzerClient').ensureWarm('photo-upload');
+
   const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
   const { image, max_size } = req.body;
 
@@ -50,7 +55,10 @@ router.post('/remove-bg', authenticateToken, async (req, res) => {
   try {
     log.debug(`📸 [REMOVE-BG] Proxying to Python service (${Math.round(image.length / 1024)}KB)`);
 
-    const response = await fetch(`${photoAnalyzerUrl}/remove-bg`, {
+    // Retry-aware: the analyzer restarts itself when idle to reclaim memory,
+    // and this endpoint is the user's photo upload with no fallback.
+    const { analyzerFetch } = require('../lib/analyzerClient');
+    const response = await analyzerFetch('/remove-bg', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image, max_size }),

@@ -22,7 +22,11 @@ async function rembgRemoveBackground(buf, { maxSize } = {}) {
       image: `data:image/png;base64,${buf.toString('base64')}`,
       ...(maxSize ? { max_size: maxSize } : {}),
     };
-    const r = await fetch(`${PHOTO_ANALYZER_URL}/remove-bg`, {
+    // analyzerFetch, not fetch: the analyzer restarts itself when idle to
+    // reclaim fragmentation, and this path has NO fallback — a refused
+    // connection here is a failed photo upload in the user's face.
+    const { analyzerFetch } = require('./analyzerClient');
+    const r = await analyzerFetch('/remove-bg', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
