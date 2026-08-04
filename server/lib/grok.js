@@ -553,6 +553,34 @@ async function frameCharacterImage(buffer, color) {
  * @returns {Promise<{face: Buffer, body: Buffer}|null>} null if the buffer
  *   isn't a 2x2 grid (aspect ratio outside 1.5-2.0).
  */
+// Find a grid divider line by MINIMUM per-line variance — a divider (black or
+// white) is near-uniform, so its row/column has the lowest variance. Scans only
+// within [startFrac, endFrac] of the dimension so figures near the edges don't
+// win. axis 'h' → returns a Y (row split); 'v' → returns an X (column split).
+// The split point is wherever the line actually is, never assumed to be half.
+function detectMinVarianceSeparator(data, width, height, axis, startFrac, endFrac) {
+  if (axis === 'h') {
+    const start = Math.floor(height * startFrac), end = Math.floor(height * endFrac);
+    let minVar = Infinity, sep = Math.floor(height / 2);
+    for (let y = start; y < end; y++) {
+      let sum = 0, sumSq = 0;
+      for (let x = 0; x < width; x++) { const v = data[y * width + x]; sum += v; sumSq += v * v; }
+      const mean = sum / width, variance = sumSq / width - mean * mean;
+      if (variance < minVar) { minVar = variance; sep = y; }
+    }
+    return sep;
+  }
+  const start = Math.floor(width * startFrac), end = Math.floor(width * endFrac);
+  let minVar = Infinity, sep = Math.floor(width / 2);
+  for (let x = start; x < end; x++) {
+    let sum = 0, sumSq = 0;
+    for (let y = 0; y < height; y++) { const v = data[y * width + x]; sum += v; sumSq += v * v; }
+    const mean = sum / height, variance = sumSq / height - mean * mean;
+    if (variance < minVar) { minVar = variance; sep = x; }
+  }
+  return sep;
+}
+
 async function extractFaceAndBody(buffer) {
   const meta = await sharp(buffer).metadata();
   if (!meta.width || !meta.height) return null;
@@ -562,35 +590,11 @@ async function extractFaceAndBody(buffer) {
   const { data, info } = await sharp(buffer).greyscale().raw().toBuffer({ resolveWithObject: true });
   const { width, height } = info;
 
-  // Horizontal separator (face row ↔ body row)
-  const hStart = Math.floor(height * 0.25);
-  const hEnd = Math.floor(height * 0.75);
-  let minHVar = Infinity, separatorY = Math.floor(height / 2);
-  for (let y = hStart; y < hEnd; y++) {
-    let sum = 0, sumSq = 0;
-    for (let x = 0; x < width; x++) {
-      const v = data[y * width + x];
-      sum += v; sumSq += v * v;
-    }
-    const mean = sum / width;
-    const variance = sumSq / width - mean * mean;
-    if (variance < minHVar) { minHVar = variance; separatorY = y; }
-  }
-
-  // Vertical separator (front view ↔ profile view)
-  const vStart = Math.floor(width * 0.3);
-  const vEnd = Math.floor(width * 0.7);
-  let minVVar = Infinity, separatorX = Math.floor(width / 2);
-  for (let x = vStart; x < vEnd; x++) {
-    let sum = 0, sumSq = 0;
-    for (let y = 0; y < height; y++) {
-      const v = data[y * width + x];
-      sum += v; sumSq += v * v;
-    }
-    const mean = sum / height;
-    const variance = sumSq / height - mean * mean;
-    if (variance < minVVar) { minVVar = variance; separatorX = x; }
-  }
+  // Horizontal separator (face row ↔ body row) and vertical separator
+  // (front ↔ profile). Divider lines are near-uniform, so they sit at the
+  // minimum-variance line — NOT necessarily at the geometric half.
+  const separatorY = detectMinVarianceSeparator(data, width, height, 'h', 0.25, 0.75);
+  const separatorX = detectMinVarianceSeparator(data, width, height, 'v', 0.3, 0.7);
 
   let faceFront = await sharp(buffer)
     .extract({ left: 0, top: 0, width: separatorX, height: separatorY })
@@ -1564,6 +1568,7 @@ module.exports = {
   packReferences,
   cropToFrontColumn,
   extractBottomBody3Columns,
+  detectMinVarianceSeparator,
   buildCharacterGroupSlot,
   frameCharacterImage,
   GROK_MODELS,

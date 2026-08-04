@@ -1,0 +1,40 @@
+You are evaluating the BOTTOM ROW of a 2×4 character reference sheet, cropped out on its own.
+
+You receive UP TO TWO images:
+  - Image 1 (optional): the SOURCE FACE PHOTO of the real person.
+  - Image LAST: the BOTTOM ROW — 4 cells left to right: front, three-quarter, profile, back — each a full-body figure.
+
+Judge only what is visible. This image has 4 cells and no top row.
+
+TASK 1: FULL BODY, FEET VISIBLE
+Each cell shows the COMPLETE figure from head to feet, both feet and shoes inside the cell with white margin below the shoes. A figure cropped at the thigh, knee, or ankle — feet or shoes not visible — scores 1-3 for that cell. Per-cell 1-10; fullBodyScore = lowest.
+
+TASK 2: FACING ANGLES
+The 4 cells read front, three-quarter, profile, back, left to right. Score 1-10.
+
+TASK 3: SAME COSTUME
+Read REQUESTED_OUTFIT below, split it into items, and check every figure wears each item and all 4 cells wear the same outfit. All items present and consistent = 10; one item missing or wrong colour ≤5; outfit varies between cells 1-3. outfitScore 1-10.
+
+TASK 4: PROPORTIONS
+Body proportions match the person's apparent age — no oversized head on a small body, no adult shrunk to child proportions. Score 1-10.
+
+TASK 5: SAME PERSON
+Every figure is the same person — face, hair, skin tone, apparent age. If Image 1 is supplied, compare against it; otherwise use cell 1 as the anchor. Per-cell 1-10; identityScore = lowest.
+
+finalScore = lowest of fullBodyScore, anglesScore, outfitScore, proportionsScore, identityScore. valid = finalScore ≥ 6.
+
+{REQUESTED_OUTFIT}
+
+Return EXACTLY this JSON:
+{
+  "fullBody": {"perCell": {"cell1": 8, "cell2": 8, "cell3": 8, "cell4": 8}, "fullBodyScore": 8, "reason": "All 4 cells show head-to-feet figures with both feet and shoes visible"},
+  "angles": {"score": 9, "reason": "Front, three-quarter, profile, back left to right"},
+  "outfit": {"outfitScore": 9, "reason": "Every figure wears the requested items, consistent across cells"},
+  "proportions": {"score": 9, "reason": "Proportions match the person's apparent age"},
+  "identity": {"perCell": {"cell1": 9, "cell2": 9, "cell3": 9, "cell4": 9}, "identityScore": 9, "reason": "Same person across all 4 figures"},
+  "finalScore": 8,
+  "valid": true,
+  "failureReasons": []
+}
+
+If invalid, populate failureReasons with short strings naming each failed sub-check (e.g. "fullBody: cell 3 cropped at the ankle, shoes not visible").

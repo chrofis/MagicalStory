@@ -3067,19 +3067,13 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   const realistic = (await resolveAvatarSlotBytes(entry.passes?.pass1?.imageData))
     || (await resolveAvatarSlotBytes(entry.realisticImageData));
 
-  let evalResult;
-  let slot;
-  let sheetForDisplay;      // the sheet that was scored (shown in the lab)
+  // Resolve which sheet is scored (and shown) for this pass.
+  let slot, sheetForDisplay;
   let realisticVersionIndex; // pass-2 also shows the realistic anchor as baseline
   if (pass === 1) {
     if (!realistic) throw new Error('pass-1 realistic 2×4 sheet (passes.pass1.imageData) not stored on this entry');
     slot = 'passes.pass1.imageData';
     sheetForDisplay = realistic;
-    evalResult = await _internal.evaluateSheetWithGemini(
-      realistic, costume.description || 'standard outfit',
-      process.env.GEMINI_API_KEY, facePhoto, null,
-      { characterDescription: character.description || '', model, promptOverride }
-    );
   } else {
     const styled = (await resolveAvatarSlotBytes(entry.passes?.pass2?.imageData))
       || (await resolveAvatarSlotBytes(entry.output));
@@ -3087,22 +3081,55 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     if (!realistic) throw new Error('pass-2 eval needs the realistic anchor (passes.pass1.imageData) — not stored on this entry');
     slot = 'passes.pass2.imageData';
     sheetForDisplay = styled;
-    evalResult = await _internal.evaluateStyledSheetWithGemini(
-      facePhoto, realistic, styled, artStyle, process.env.GEMINI_API_KEY,
-      null /* usageTracker */, params.declaredAge ?? null,
-      { model, promptOverride }
-    );
     // Save the realistic anchor too so the pass-2 card shows both side by side.
     realisticVersionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, realistic, experimentId);
   }
+
+  let evalResult;
+  let splitSteps;
+  if (params.splitRows) {
+    // Crop the sheet at the row gutter and judge each half on its own — the
+    // whole-sheet judge conflates rows (bottom-row "full body: 10" on a crop
+    // that isn't). Heads-only + bodies-only prompts see exactly 4 cells each.
+    const { topHeads, bottomBody, splitY } = await _internal.splitSheetRows(sheetForDisplay);
+    const [heads, bodies] = await Promise.all([
+      _internal.evaluateSheetRow(topHeads, 'heads', { sourcePhoto: facePhoto, model, promptOverride }),
+      _internal.evaluateSheetRow(bottomBody, 'bodies', { sourcePhoto: facePhoto, costumeDescription: costume.description || 'standard outfit', model }),
+    ]);
+    const finalScore = Math.min(heads?.finalScore ?? 10, bodies?.finalScore ?? 10);
+    evalResult = { split: true, splitY, model, heads, bodies, finalScore, valid: finalScore >= 6 };
+    const [vTop, vBottom] = await Promise.all([
+      saveTestVersion(target.storyId, 'tl_step', null, topHeads, experimentId, heads?.finalScore ?? null),
+      saveTestVersion(target.storyId, 'tl_step', null, bottomBody, experimentId, bodies?.finalScore ?? null),
+    ]);
+    splitSteps = [
+      { label: `Top row · heads (final ${heads?.finalScore ?? '?'})`, imageType: 'tl_step', versionIndex: vTop },
+      { label: `Bottom row · bodies (final ${bodies?.finalScore ?? '?'})`, imageType: 'tl_step', versionIndex: vBottom },
+    ];
+  } else if (pass === 1) {
+    evalResult = await _internal.evaluateSheetWithGemini(
+      sheetForDisplay, costume.description || 'standard outfit',
+      process.env.GEMINI_API_KEY, facePhoto, null,
+      { characterDescription: character.description || '', model, promptOverride }
+    );
+  } else {
+    evalResult = await _internal.evaluateStyledSheetWithGemini(
+      facePhoto, realistic, sheetForDisplay, artStyle, process.env.GEMINI_API_KEY,
+      null /* usageTracker */, params.declaredAge ?? null,
+      { model, promptOverride }
+    );
+  }
+
   // Persist the scored sheet as a test version so the lab renders it next to the
   // eval report (ResultCard shows any result with imageType + versionIndex).
   const scoreForBadge = evalResult?.finalScore != null ? Math.round(evalResult.finalScore) : null;
   const evalVersionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, sheetForDisplay, experimentId, scoreForBadge);
   return {
     character: character.name, source: 'storedSheet', pass, styled: pass === 2, model, artStyle,
+    splitRows: !!params.splitRows,
     imageType: 'tl_avatar', versionIndex: evalVersionIndex,
     ...(realisticVersionIndex != null ? { realisticVersionIndex } : {}),
+    ...(splitSteps ? { steps: splitSteps } : {}),
     sheetSource: { array: 'styledAvatarGeneration', entryIndex: chosen.i, slot },
     elapsedMs: Date.now() - t0, report: evalResult,
   };

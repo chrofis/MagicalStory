@@ -389,7 +389,8 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const [whiteoutTarget, setWhiteoutTarget] = useState('face');
   const [freshDetection, setFreshDetection] = useState(false);
   const [avatarPass, setAvatarPass] = useState('1');        // avatar_eval: 1=realistic anchor, 2=styled sheet
-  const [avatarEvalModel, setAvatarEvalModel] = useState('gemini-2.5-flash'); // avatar_eval: which Gemini scores the sheet
+  const [avatarEvalModel, setAvatarEvalModel] = useState('gemini-2.5-flash'); // avatar_eval: which model scores the sheet
+  const [avatarSplitRows, setAvatarSplitRows] = useState(true); // avatar_eval: crop the sheet at the gutter, judge heads/bodies separately
   const [paramsJson, setParamsJson] = useState('');
   const [storyIdInput, setStoryIdInput] = useState('');
   const [coverType, setCoverType] = useState('frontCover');
@@ -551,7 +552,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
         ];
       }
       if (stage === 'qwen_insert' && freshDetection) params.freshDetection = true;
-      if (stage === 'avatar_eval') { params.pass = Number(avatarPass); params.model = avatarEvalModel; }
+      if (stage === 'avatar_eval') { params.pass = Number(avatarPass); params.model = avatarEvalModel; params.splitRows = avatarSplitRows; }
       if (stage === 'cover') params.coverType = coverType;
       if (isOutlineReview) {
         if (writerModel) params.writerModel = writerModel;
@@ -776,6 +777,10 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
                     <option value="qwen-vl">qwen2.5-vl-72b</option>
                   </optgroup>
                 </select>
+              </label>
+              <label className="text-sm flex items-center gap-1.5">
+                <input type="checkbox" checked={avatarSplitRows} onChange={e => setAvatarSplitRows(e.target.checked)} />
+                Split rows (judge heads &amp; bodies separately)
               </label>
             </>
           )}

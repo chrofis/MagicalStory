@@ -571,6 +571,52 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
   return parseJudgeJson(text);
 }
 
+// Split a 2×4 sheet into its top (4 heads) and bottom (4 bodies) rows. The head
+// row and body row are NOT equal height, so the divider is NOT at H/2. We locate
+// the actual divider line with the SAME production detector used to split avatar
+// grids (grok.detectMinVarianceSeparator): the divider — a thin black/white line
+// — is near-uniform, so it sits at the minimum-variance row within 0.25–0.75 H.
+async function splitSheetRows(imageData) {
+  const { detectMinVarianceSeparator } = require('./grok');
+  const buf = Buffer.from(r2.stripDataUriPrefix(imageData), 'base64');
+  const { data, info } = await sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height;
+  const mid = detectMinVarianceSeparator(data, W, H, 'h', 0.25, 0.75);
+  const [top, bottom] = await Promise.all([
+    sharp(buf).extract({ left: 0, top: 0, width: W, height: mid }).jpeg().toBuffer(),
+    sharp(buf).extract({ left: 0, top: mid, width: W, height: H - mid }).jpeg().toBuffer(),
+  ]);
+  return {
+    topHeads: 'data:image/jpeg;base64,' + top.toString('base64'),
+    bottomBody: 'data:image/jpeg;base64,' + bottom.toString('base64'),
+    splitY: mid, width: W, height: H,
+  };
+}
+
+// Evaluate ONE cropped row on its own. which='heads' → sheet-row-heads-eval,
+// 'bodies' → sheet-row-bodies-eval (costume filled in). Same cross-provider
+// dispatcher as the full-sheet evaluators. Sending only the relevant 4 cells
+// stops the judge conflating the two rows (the "bottom row full body: 10" on a
+// head-only crop failure). Returns the parsed JSON verdict.
+async function evaluateSheetRow(rowImageData, which, opts = {}) {
+  const { sourcePhoto = null, costumeDescription = '', model = 'gemini-2.5-flash', promptOverride = null } = opts;
+  const tplKey = which === 'heads' ? 'sheetRowHeadsEval' : 'sheetRowBodiesEval';
+  let prompt = promptOverride || PROMPT_TEMPLATES[tplKey];
+  if (!prompt) throw new Error(`${tplKey} template not loaded`);
+  if (which === 'bodies') {
+    prompt = fillTemplate(prompt, { REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '' });
+  }
+  const parts = [];
+  if (sourcePhoto) {
+    parts.push({ inline_data: { mime_type: sourcePhoto.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(sourcePhoto) } });
+  }
+  parts.push({ inline_data: { mime_type: rowImageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(rowImageData) } });
+  parts.push({ text: prompt });
+  const { text } = await callSheetJudge(model, parts, 4000, process.env.GEMINI_API_KEY);
+  if (!text) throw new Error(`row eval (${which}, ${model}) returned no text`);
+  return parseJudgeJson(text);
+}
+
 /**
  * Generate a 2×4 reference sheet for one character + costume in one Grok call.
  *
@@ -937,5 +983,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass },
+  _internal: { buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow },
 };

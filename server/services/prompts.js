@@ -75,6 +75,8 @@ async function loadPromptTemplates() {
     ['avatarEvaluation', 'avatar-evaluation.txt'],
     ['sheet2x4Evaluation', 'sheet-2x4-evaluation.txt'],
     ['sheet2x4StyleEval', 'sheet-2x4-style-eval.txt'],
+    ['sheetRowHeadsEval', 'sheet-row-heads-eval.txt'],
+    ['sheetRowBodiesEval', 'sheet-row-bodies-eval.txt'],
     ['styledCostumedAvatar', 'styled-costumed-avatar.txt'],
     ['visualBibleAnalysis', 'visual-bible-analysis.txt'],
     ['illustrationEdit', 'illustration-edit.txt'],
