@@ -1473,6 +1473,24 @@ def _free_sam_cache():
     a ~570 MB reload on the next page mid-story — so it stays warm and is only
     dropped by the idle reaper after MOBILESAM_IDLE_UNLOAD_S of no work.
 
+    ONLY `features` and `results` are cleared, and each is reset to the type the
+    library expects rather than to None:
+
+      - features -> None : SAM's predictor explicitly guards with
+                           `if self.features is None: ...recompute`, so None is
+                           the documented "not cached" state. This is the big
+                           one — the image embeddings.
+      - results  -> []   : the masks we already encoded. A list, not None,
+                           because callers iterate it.
+
+    Do NOT null `batch`, `prompts` or `im`. A first version of this cleared them
+    too and broke inference on the very next call: ultralytics unpacks
+    `p, im0s, s = self.batch` ("'NoneType' object is not subscriptable") and
+    calls `self.prompts.pop(...)` ("'NoneType' object has no attribute 'pop'").
+    Both showed up in staging logs immediately. They are small anyway — the
+    memory is in features/results — so clearing them bought nothing and cost
+    correctness.
+
     Defensive: ultralytics' internals differ across versions, so only existing
     attributes are touched and any failure is logged rather than 500ing a repair.
     """
@@ -1483,9 +1501,10 @@ def _free_sam_cache():
         p = getattr(m, 'predictor', None)
         if p is None:
             return
-        for attr in ('results', 'batch', 'features', 'im', 'prompts', 'vid_writer'):
-            if hasattr(p, attr) and getattr(p, attr) is not None:
-                setattr(p, attr, None)
+        if getattr(p, 'features', None) is not None:
+            p.features = None
+        if getattr(p, 'results', None):
+            p.results = []
     except Exception as e:
         print(f"[FIGURE-MASK] predictor cache clear failed (non-fatal): {e}")
 
