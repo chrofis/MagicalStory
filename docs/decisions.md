@@ -3763,3 +3763,35 @@ all four figure-exact properties still pass; legacy path unchanged.
 alignment), `server/lib/testlab.js` (runQwenInsertStage loads + crops the empty scene,
 plate step).
 **Status:** ✅ active on the figure-repair insert path (staging).
+
+## 2026-08-04 — Test Lab outline_review must stream: non-streaming hits undici's 300s headers timeout
+
+**Context:** experiment #270 (compare, 4 reviewers) ran 15 minutes and returned zero
+reviews. Railway logs give the exact shape: writer call starts 19:31:07, `fetch failed`
+at 19:36:08, again at 19:41:09, again at 19:46:09 — three attempts of ~301s each, then
+the target is recorded as failed. 301s is not the app's own AbortSignal (which computes
+`max(300000, 180000 + 64*3000)` = 372s for a 64k-token call); it is **undici's default
+`headersTimeout` of 300000 ms**. A non-streaming request receives no response headers
+until the entire completion is written, so any draft that generates for more than five
+minutes fails, and `withRetry` classifies `fetch failed` as retryable and burns it three
+times. Experiment #258 only passed because its writer finished in 187s — this is a
+cliff, not a slowdown, and the prompt in #270 was 95,664 chars.
+
+**Decision:** `runOutlineReviewStage` uses `callTextModelStreaming` for both the writer
+and the reviewer calls, matching what production already does for the same two calls
+(`server.js` unified writer + review). Streaming receives headers immediately, so the
+headers timeout never applies.
+
+**Known remaining exposure:** `callTextModelStreaming` has no OpenRouter branch — it
+falls back to the plain call for that provider, so OpenRouter reviewers (DeepSeek, Qwen,
+GLM, Kimi) still die at five minutes. Closing that needs either an SSE implementation
+for OpenRouter or the `undici` package (not currently a dependency) to set a dispatcher
+whose `headersTimeout` matches the app's computed timeout. Open.
+
+**Also fixed:** the streaming fallback called `callTextModel(prompt, maxTokens,
+modelOverride)` without `options`, dropping `usageLabel` — every OpenRouter call routed
+through the streaming entry point was recording its tokens unattributed.
+
+**Touched:** `server/lib/testlab.js` (both calls in `runOutlineReviewStage`),
+`server/lib/textModels.js` (fallback passes `options`).
+**Status:** ✅ kept for the streaming providers, 🟡 OpenRouter still uncovered.

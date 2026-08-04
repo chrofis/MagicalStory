@@ -1000,7 +1000,9 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
     default:
       // Fall back to non-streaming for unknown providers
       log.debug(`🌊 [TEXT STREAM] Provider ${model.provider} doesn't support streaming, falling back to regular call`);
-      result = await callTextModel(prompt, maxTokens, modelOverride);
+      // options must ride along — dropping it loses usageLabel, so the fallback's
+      // tokens land in the daily summary unattributed.
+      result = await callTextModel(prompt, maxTokens, modelOverride, options);
       if (onChunk) {
         onChunk(result.text, result.text);
       }

@@ -1333,7 +1333,7 @@ async function runOutlineReviewStage(target, { params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { buildUnifiedStoryPrompt, buildOutlineReviewPrompt } = require('./storyHelpers');
-  const { callTextModel } = require('./textModels');
+  const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
   const { UnifiedStoryParser } = require('./outlineParser');
   const { checkSceneConsistency } = require('./sceneConsistencyCheck');
@@ -1382,7 +1382,13 @@ async function runOutlineReviewStage(target, { params = {} }) {
   if (!TEXT_MODELS[writerModel]) throw new Error(`Unknown writer model "${writerModel}"`);
   const writerPrompt = buildUnifiedStoryPrompt(inputData, inputData.pages || null);
   const wt0 = Date.now();
-  const writer = await callTextModel(writerPrompt, 64000, writerModel, { usageLabel: 'testlab_review_writer' });
+  // STREAMING, like production (server.js buildUnified call) — not optional. A
+  // non-streaming request gets no response headers until the whole completion is
+  // finished, so any draft that takes over 5 minutes trips undici's default
+  // 300s headersTimeout and surfaces as "fetch failed". withRetry sees that as
+  // retryable, so it burns 3 x 5 min and ends with zero results (exp #270).
+  // Streaming delivers headers immediately, so the ceiling never applies.
+  const writer = await callTextModelStreaming(writerPrompt, 64000, null, writerModel, { usageLabel: 'testlab_review_writer' });
   const writerElapsedMs = Date.now() - wt0;
   const writerOutput = writer.text || '';
   if (!writerOutput) throw new Error('Writer draft (Call 1) came back empty');
@@ -1411,7 +1417,10 @@ async function runOutlineReviewStage(target, { params = {} }) {
     const prompt = buildOutlineReviewPrompt(inputData, writerOutput, hints, { aspect, priorReviews });
     if (!prompt) throw new Error('outline-review template unavailable');
     const t0 = Date.now();
-    const r = await callTextModel(prompt, 32000, modelKey, { usageLabel: 'testlab_outline_review' });
+    // Streaming for the same headersTimeout reason as the writer above. Anthropic
+    // / xAI / Gemini reviewers stream; OpenRouter has no streaming path and falls
+    // back to the plain call, so those stay exposed to the 5-minute ceiling.
+    const r = await callTextModelStreaming(prompt, 32000, null, modelKey, { usageLabel: 'testlab_outline_review' });
     const elapsedMs = Date.now() - t0;
     const usage = r.usage || {};
     const modelId = r.modelId || TEXT_MODELS[modelKey].modelId;
@@ -2774,22 +2783,6 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       err.partialResult = failCtx;
       throw err;
     }
-    // Clean plate for the red-zone fill: the page's stored EMPTY SCENE, cropped
-    // to the same rect. Real scene content for the old figure's footprint —
-    // diffusion wash is the fallback when a story has no empty scene.
-    let plateCropBuf = null;
-    if (!params._faceMode) {
-      try {
-        const plateUri = await loadEmptyScene(ctx.storyId, ctx.pageNumber);
-        if (plateUri) {
-          const plateBuf = Buffer.from(plateUri.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          plateCropBuf = await sharp(plateBuf).resize(W, H, { fit: 'fill' })
-            .extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer();
-          const vis = await sharp(plateCropBuf).jpeg({ quality: 90 }).toBuffer();
-          await addStep('clean plate (empty scene crop — red-zone fill source)', `data:image/jpeg;base64,${vis.toString('base64')}`);
-        }
-      } catch (err) { log.warn(`[TESTLAB] empty-scene plate unavailable (${err.message}) — diffusion fallback`); }
-    }
     const blend = await samUnionBlend({
       originalCropBuf: cropBuf,
       candidateCropBuf: back,
@@ -2799,7 +2792,6 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       oldMaskPng,
       addStep,
       failCtx,
-      cleanPlateBuf: plateCropBuf,
       maskPoints: params._maskPoints || null,
       // Round 2 (the RESULT) uses the FULL-PAGE re-detected figure box (computed
       // above) — aligned to the actual repainted figure — then SAM ∩ face box.
