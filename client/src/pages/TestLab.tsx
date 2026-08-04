@@ -589,8 +589,91 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     }
   };
 
+  // Inverse of start(): load a past experiment's stage, targets and params back
+  // into the form so it can be run again with one setting changed (another
+  // reviewer model, a different aspect, …). Works on any status — a failed or
+  // interrupted run is exactly the one you want to fire again.
+  // KEEP IN SYNC WITH start(): every params key start() writes is read here, and
+  // anything not represented by a widget lands in the Params JSON box so a
+  // re-run can never silently drop part of the original configuration.
+  const WIDGET_PARAM_KEYS = new Set([
+    'autoEval', 'characterName', 'coverType', 'backend', 'whiteoutTarget', 'freshDetection',
+    'rerunDetection', 'variants', 'pass', 'model', 'writerModel', 'aspect', 'mode', 'rounds',
+    'models', 'genericityWarnings',
+  ]);
+
+  const reuseExperiment = (d: ExperimentDetail) => {
+    const p = (d.params || {}) as Record<string, unknown>;
+    const targets = (d.targets || []) as { storyId: string; pageNumber?: number; coverType?: string; character?: string }[];
+    const info = TESTLAB_STAGES.find(s => s.id === d.stage) as { storyLevel?: boolean; characterLevel?: boolean } | undefined;
+
+    setStage(d.stage);
+    setLabel(d.label ? `${d.label} · re-run of #${d.id}` : `Re-run of #${d.id}`);
+    setOverride(d.promptOverride || '');
+    setAutoEval(p.autoEval !== false);
+    setError(null);
+
+    // Targets: story/character stages carry the story id (plus coverType or
+    // character) on each target; page stages map back to their benchmark rows.
+    if (info?.storyLevel || info?.characterLevel) {
+      setSelectedStoryIds([...new Set(targets.map(t => t.storyId))]);
+      setSelectedBench([]);
+    } else {
+      const ids = benchmarks
+        .filter(b => targets.some(t => t.storyId === b.storyId && t.pageNumber === b.pageNumber))
+        .map(b => b.id);
+      setSelectedBench(ids);
+      setSelectedStoryIds([]);
+      if (ids.length < targets.length) {
+        setError(`${targets.length - ids.length} of ${targets.length} original targets are no longer benchmark scenes — re-run covers the rest.`);
+      }
+    }
+    setStoryIdInput('');
+
+    setCharName(String(p.characterName || targets[0]?.character || ''));
+    setCoverType(String(p.coverType || targets[0]?.coverType || 'frontCover'));
+
+    // char_repair / garment_hue: a stored `variants` array means it was one of
+    // the canned comparisons; otherwise it was a single-backend run.
+    const variants = Array.isArray(p.variants) ? p.variants : null;
+    setCompareAll(!!variants && d.stage === 'char_repair' && variants.length > 2);
+    setCompareColor(!!variants && (d.stage === 'garment_hue' || variants.length === 2));
+    setRepairBackend(String(p.backend || 'grok'));
+    setWhiteoutTarget(String(p.whiteoutTarget || 'face'));
+    setFreshDetection(!!p.freshDetection);
+
+    setAvatarPass(String(p.pass ?? '1'));
+    if (p.model) setAvatarEvalModel(String(p.model));
+
+    // outline_review: the whole point of re-running — same draft setup, swapped models.
+    if (p.writerModel) setWriterModel(String(p.writerModel));
+    setReviewAspect((p.aspect === 'text' || p.aspect === 'scene') ? p.aspect : 'both');
+    if (p.mode === 'iterate') {
+      setReviewMode('iterate');
+      const rounds = (Array.isArray(p.rounds) ? p.rounds : []) as { model?: string; split?: boolean; textModel?: string; sceneModel?: string }[];
+      if (rounds.length) {
+        setIterRounds(rounds.map(r => ({
+          model: r.model || r.textModel || '',
+          split: !!r.split,
+          textModel: r.textModel || r.model || '',
+          sceneModel: r.sceneModel || r.model || '',
+        })));
+      }
+    } else if (p.mode === 'compare' || Array.isArray(p.models)) {
+      setReviewMode('compare');
+      if (Array.isArray(p.models)) setSelectedModels(p.models as string[]);
+    }
+
+    // Anything no widget owns (replayOf, extraRule, one-off knobs) survives verbatim.
+    const leftover = Object.fromEntries(Object.entries(p).filter(([k]) => !WIDGET_PARAM_KEYS.has(k)));
+    setParamsJson(Object.keys(leftover).length ? JSON.stringify(leftover, null, 2) : '');
+
+    setSelected(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   if (selected) {
-    return <ExperimentDetailView detail={selected} onBack={() => { setSelected(null); load(); }} onRefresh={async () => setSelected(await testlabService.getExperiment(selected.id))} />;
+    return <ExperimentDetailView detail={selected} onBack={() => { setSelected(null); load(); }} onRefresh={async () => setSelected(await testlabService.getExperiment(selected.id))} onReuse={reuseExperiment} />;
   }
 
   return (
@@ -679,9 +762,19 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
               <label className="text-sm flex items-center gap-1.5">
                 Eval model
                 <select className="border rounded-lg px-3 py-2 text-sm" value={avatarEvalModel} onChange={e => setAvatarEvalModel(e.target.value)}>
-                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-                  <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                  <optgroup label="Gemini (Google)">
+                    <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                    <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                  </optgroup>
+                  <optgroup label="Grok (xAI)">
+                    <option value="grok-4-fast">grok-4-fast</option>
+                  </optgroup>
+                  <optgroup label="Qwen-VL (OpenRouter)">
+                    <option value="qwen3-vl">qwen3-vl-32b (spatial leader)</option>
+                    <option value="qwen3-vl-235b">qwen3-vl-235b</option>
+                    <option value="qwen-vl">qwen2.5-vl-72b</option>
+                  </optgroup>
                 </select>
               </label>
             </>
@@ -948,7 +1041,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
 // Experiment detail — baseline vs variant grid
 // ─────────────────────────────────────────────────────────────────────
 
-function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: ExperimentDetail; onBack: () => void; onRefresh: () => void }) {
+function ExperimentDetailView({ detail, onBack, onRefresh, onReuse }: { detail: ExperimentDetail; onBack: () => void; onRefresh: () => void; onReuse: (d: ExperimentDetail) => void }) {
   const [showPrompt, setShowPrompt] = useState(false);
   const [redoOverride, setRedoOverride] = useState('');
   const [showRedoOverride, setShowRedoOverride] = useState(false);
@@ -1053,6 +1146,11 @@ function ExperimentDetailView({ detail, onBack, onRefresh }: { detail: Experimen
           </div>
           <div className="flex gap-2">
             {detail.status === 'running' && <Button variant="secondary" size="sm" onClick={onRefresh}><RefreshCw size={14} /></Button>}
+            {detail.status !== 'running' && (
+              <Button variant="secondary" size="sm" onClick={() => onReuse(detail)} title="Load this experiment's stage, targets and settings back into the form so you can change a model and run it again">
+                Re-run with changes
+              </Button>
+            )}
             <Button variant="secondary" size="sm" onClick={onBack}>Back</Button>
           </div>
         </div>
