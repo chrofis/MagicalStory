@@ -769,6 +769,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
       // outfit/sourceMatch/cleanRender/failureReasons).
       const split = await evaluateSheetSplit(result.imageData, {
         facePhoto, standardAvatar, costumeDescription, usageTracker,
+        model: MODEL_DEFAULTS.sheetEvalModel,
       });
       verdict = split.verdict;
       log.info(`[CHARACTER 2×4]   split eval: heads=${split.heads?.finalScore} bodies=${split.bodies?.finalScore} layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} sourceMatch=${verdict.sourceMatch?.sourceMatchScore} clean=${verdict.cleanRender?.cleanScore} final=${verdict.finalScore} valid=${verdict.valid}`);

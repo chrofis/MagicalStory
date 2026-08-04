@@ -407,6 +407,12 @@ const MODEL_DEFAULTS = {
   avatarStyleTransferBackend: process.env.AVATAR_STYLE_BACKEND || 'gemini', // 'gemini' | 'grok'
   avatarStyleTransferModel: process.env.AVATAR_STYLE_MODEL || 'gemini-2.5-flash-image',
 
+  // Vision judge for the 2×4 sheet split eval (evaluateSheetSplit). qwen3-vl-32b
+  // is ~6× cheaper on output than gemini-2.5-flash ($0.42 vs $2.50 /1M) and is
+  // the registry's spatial leader. Revert to 'gemini-2.5-flash' via
+  // SHEET_EVAL_MODEL if the JSON verdict shape drifts. Must be a TEXT_MODELS key.
+  sheetEvalModel: process.env.SHEET_EVAL_MODEL || 'qwen3-vl',
+
   // ─── Composite Cover mode ────────────────────────────────────────────
   // When true, cover pages (frontCover, initialPage, backCover) skip the
   // normal generateImageWithQualityRetry path and instead use a manual
