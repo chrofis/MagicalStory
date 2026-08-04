@@ -1092,6 +1092,106 @@ async function sendAdminDailySummary(feed, dateLabel) {
   }
 }
 
+/**
+ * Weekly Railway cost report. `report` is the buildCostReport() result
+ * (server/lib/railwayCost.js).
+ *
+ * Exists because the bill is a function of what the containers HOLD, not what
+ * they do — RSS can ratchet up quietly and the first signal used to be the
+ * monthly invoice. Leads with average resident RAM per service, since memory
+ * dominates the cost and is the number that moves.
+ */
+async function sendAdminWeeklyCostReport(report) {
+  if (!resend) {
+    console.log('📧 Email not configured - skipping weekly cost report');
+    return null;
+  }
+
+  const esc = (t) => String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const usd = (n) => '$' + n.toFixed(2);
+  const { current, previous, days } = report;
+
+  const delta = report.deltaTotal;
+  const deltaPct = previous.totals.total > 0 ? (delta / previous.totals.total) * 100 : 0;
+  const up = delta > 0;
+  // Only shout when the change is big enough to act on; small week-to-week
+  // wobble is normal and a permanently red banner trains you to ignore it.
+  const notable = Math.abs(deltaPct) >= 15;
+
+  const rows = current.items.map((i) => {
+    const prev = i.previous?.cost.total;
+    const pct = prev ? ((i.cost.total - prev) / prev) * 100 : null;
+    const pctTxt = pct === null ? '—'
+      : `${pct > 0 ? '+' : ''}${pct.toFixed(0)}%`;
+    const pctColor = pct === null ? '#6b7280' : pct > 15 ? '#b91c1c' : pct < -15 ? '#15803d' : '#6b7280';
+    return `
+      <tr>
+        <td style="padding:6px 10px; border-bottom:1px solid #e5e7eb;">${esc(i.service)} <span style="color:#6b7280;">/ ${esc(i.environment)}</span></td>
+        <td style="padding:6px 10px; border-bottom:1px solid #e5e7eb; text-align:right; white-space:nowrap;"><b>${i.avgResidentGb.toFixed(2)} GB</b></td>
+        <td style="padding:6px 10px; border-bottom:1px solid #e5e7eb; text-align:right;">${usd(i.cost.memory)}</td>
+        <td style="padding:6px 10px; border-bottom:1px solid #e5e7eb; text-align:right;">${usd(i.cost.total)}</td>
+        <td style="padding:6px 10px; border-bottom:1px solid #e5e7eb; text-align:right; color:${pctColor};">${pctTxt}</td>
+      </tr>`;
+  }).join('');
+
+  const memShare = current.totals.total > 0
+    ? (current.totals.memory / current.totals.total) * 100 : 0;
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: ADMIN_EMAIL,
+      subject: `[MagicalStory] Railway ${days}-Tage-Kosten — ${usd(current.totals.total)} (${up ? '+' : ''}${deltaPct.toFixed(0)}%), Hochrechnung ${usd(report.projectedMonthly)}/Monat`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 720px; margin: 0 auto;">
+          <h2 style="color:#4f46e5;">Railway Kosten — letzte ${days} Tage</h2>
+          <div style="color:#6b7280; font-size:13px;">${current.startISO.slice(0, 10)} → ${current.endISO.slice(0, 10)} · Projekt ${esc(report.projectName)}</div>
+
+          <div style="margin-top:14px; padding:14px; background:${notable && up ? '#fef2f2' : '#f8fafc'}; border:1px solid ${notable && up ? '#fecaca' : '#e5e7eb'}; border-radius:8px;">
+            <div style="font-size:26px; font-weight:bold; color:${notable && up ? '#b91c1c' : '#1f2937'};">${usd(current.totals.total)}</div>
+            <div style="font-size:13px; color:#6b7280; margin-top:2px;">
+              Vorwoche ${usd(previous.totals.total)} · Veränderung ${up ? '+' : ''}${usd(delta)} (${up ? '+' : ''}${deltaPct.toFixed(0)}%)
+            </div>
+            <div style="font-size:13px; color:#6b7280; margin-top:2px;">
+              Hochrechnung: <b>${usd(report.projectedMonthly)}/Monat</b> · Memory = ${memShare.toFixed(0)}% der Kosten
+            </div>
+          </div>
+
+          <table style="border-collapse:collapse; width:100%; margin-top:16px; font-size:14px;">
+            <thead>
+              <tr style="background:#f1f5f9;">
+                <th style="padding:8px 10px; text-align:left;">Service / Umgebung</th>
+                <th style="padding:8px 10px; text-align:right;">Ø RAM</th>
+                <th style="padding:8px 10px; text-align:right;">Memory</th>
+                <th style="padding:8px 10px; text-align:right;">Total</th>
+                <th style="padding:8px 10px; text-align:right;">vs. Vorwoche</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+
+          <p style="font-size:12px; color:#6b7280; margin-top:16px;">
+            Railway verrechnet Memory pro MB und MINUTE, rund um die Uhr — «Ø RAM» ist
+            deshalb die Zahl, die den Preis bestimmt. Steigt sie ohne mehr Traffic, hält
+            ein Container Speicher fest, statt ihn zu brauchen.
+            Details jederzeit mit <code>npm run cost:report</code>.
+          </p>
+        </div>
+      `,
+    });
+    if (error) {
+      console.error('📧 Weekly cost report email error:', error);
+      return null;
+    }
+    console.log('📧 Weekly cost report sent');
+    return data;
+  } catch (err) {
+    console.error('📧 Weekly cost report email error:', err.message);
+    return null;
+  }
+}
+
 module.exports = {
   // Error handling utilities
   EmailErrorCode,
@@ -1114,4 +1214,5 @@ module.exports = {
   sendAdminStoryFailureAlert,
   sendAdminOrderFailureAlert,
   sendAdminDailySummary,
+  sendAdminWeeklyCostReport,
 };

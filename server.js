@@ -8484,6 +8484,18 @@ initialize().then(() => {
       });
     }, 60 * 60 * 1000); // every hour
 
+    // Weekly Railway cost report — same hourly cadence, sends Mondays after
+    // 07:00 Swiss (config row weekly_cost_last_sent dedupes). Railway bills
+    // resident memory per minute, so cost drifts silently between invoices;
+    // this surfaces it while it's still cheap to react to. Inert until
+    // RAILWAY_API_TOKEN + RAILWAY_PROJECT_ID are set.
+    const { runWeeklyCostSweep } = require('./server/lib/costReport');
+    setInterval(() => {
+      runWeeklyCostSweep(dbPool, log).catch(err => {
+        log.error('[weekly-cost] sweep crashed:', err.message);
+      });
+    }, 60 * 60 * 1000); // every hour
+
     // Stripe webhook retry monitor — polls every 5 min for buffered events
     // that landed during a DB blip / processing throw. Emits an ERROR-level
     // alert when unprocessed rows exist. Operators inspect + manually
