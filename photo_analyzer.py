@@ -1444,12 +1444,55 @@ def _release_memory():
 # boot instrumentation can measure them. Do not redefine it here.
 
 
-# MobileSAM for box-prompted figure masks (lazy loaded, ~570MB peak RSS)
+# MobileSAM for box-prompted figure masks (lazy loaded, ~570MB peak RSS).
+# Lazy-loaded but, until now, never unloaded: once a single mask request landed,
+# the model stayed resident for the life of the process. Railway bills resident
+# memory per minute, so that was ~570MB charged 24/7 for a model used only
+# during character repair. It now has the same idle reaper as rembg/GDINO.
 _mobilesam_model = None
+_mobilesam_last_used = 0.0
+_MOBILESAM_IDLE_UNLOAD_S = int(os.environ.get('MOBILESAM_IDLE_UNLOAD_S', '900'))
+
+
+def _free_sam_cache():
+    """Drop the predictor's retained tensors WITHOUT unloading the model.
+
+    Measured on staging: RSS climbed ~300 MB on every /figure-mask call with
+    identical 416x710 input, and stayed up even after gc.collect() +
+    malloc_trim(0). Fragmentation would have been released by the trim, so this
+    is live references, not allocator slack — ultralytics' predictor holds the
+    last run's results/batch and, for SAM, the cached image embeddings.
+
+    Those are all dead once we've encoded the PNG:
+      - results/batch : the masks we already turned into a PNG
+      - features/im   : embeddings for THAT image, and every call is a new image,
+                        so the next call recomputes them regardless
+
+    Clearing them therefore costs nothing to recompute, which is why this runs
+    per call. Unloading the model itself is a different trade — that would force
+    a ~570 MB reload on the next page mid-story — so it stays warm and is only
+    dropped by the idle reaper after MOBILESAM_IDLE_UNLOAD_S of no work.
+
+    Defensive: ultralytics' internals differ across versions, so only existing
+    attributes are touched and any failure is logged rather than 500ing a repair.
+    """
+    m = _mobilesam_model
+    if m is None:
+        return
+    try:
+        p = getattr(m, 'predictor', None)
+        if p is None:
+            return
+        for attr in ('results', 'batch', 'features', 'im', 'prompts', 'vid_writer'):
+            if hasattr(p, attr) and getattr(p, attr) is not None:
+                setattr(p, attr, None)
+    except Exception as e:
+        print(f"[FIGURE-MASK] predictor cache clear failed (non-fatal): {e}")
 
 
 def get_mobilesam():
-    global _mobilesam_model
+    global _mobilesam_model, _mobilesam_last_used
+    _mobilesam_last_used = time.time()
     if _mobilesam_model is None:
         from ultralytics import SAM  # optional dep — endpoint 503s if missing
         weights = os.environ.get('MOBILESAM_WEIGHTS', 'mobile_sam.pt')
@@ -1560,14 +1603,22 @@ def figure_mask_endpoint():
         # Drop the big per-call intermediates, then hand freed RSS back to the OS
         # so this long-running process doesn't creep up into an OOM 500.
         del results, res, m, union, binary, out, buffer, img, img_array
+        # Our own locals are gone, but ultralytics still holds the run's tensors
+        # on the predictor — that retention, not fragmentation, is what made RSS
+        # climb ~300MB per call even with the trim below. Model stays loaded.
+        _free_sam_cache()
         _release_memory()
         print(f"[FIGURE-MASK] {w}x{h} crop, box={box_str}{pts_str}, fill px={fill_pixels}, rss={_rss_mb()}MB")
         return payload
 
     except Exception as e:
+        # The failing path leaked hardest on staging: repair retries the same
+        # crop, so a run of 500s stacked ~300MB each. Clear here too.
         print(f"[FIGURE-MASK] Error: {e} (rss={_rss_mb()}MB)")
         traceback.print_exc()
+        _free_sam_cache()
         _release_memory()
+        print(f"[FIGURE-MASK] after cleanup rss={_rss_mb()}MB")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1624,10 +1675,16 @@ def _idle_model_reaper():
     the malloc_trim(0) is what hands the pages back, which is the entire point.
     Reloading from the local weights cache on the next call is a few seconds.
     """
-    global _gdino_model, _gdino_processor, _rembg_session, rembg_remove
+    global _gdino_model, _gdino_processor, _rembg_session, rembg_remove, _mobilesam_model
     while True:
         time.sleep(60)
         now = time.time()
+
+        if _mobilesam_model is not None and (now - _mobilesam_last_used) > _MOBILESAM_IDLE_UNLOAD_S:
+            print(f"[FIGURE-MASK] idle {int(now - _mobilesam_last_used)}s — unloading MobileSAM to free RAM")
+            _mobilesam_model = None
+            _release_memory()
+            print(f"[FIGURE-MASK] unloaded — RSS now {_rss_mb()} MB")
 
         if _gdino_model is not None and (now - _gdino_last_used) > _GDINO_IDLE_UNLOAD_S:
             print(f"[GDINO] idle {int(now - _gdino_last_used)}s — unloading model to free RAM")
@@ -1753,6 +1810,52 @@ def detect_figures_text_endpoint():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route('/release-memory', methods=['POST'])
+def release_memory_endpoint():
+    """Force a memory release NOW instead of waiting out the idle reapers.
+
+    The reapers only fire after 10-15 minutes of no use, which is right for
+    normal running but useless when you want to reclaim RAM on demand or verify
+    that the release actually works. Railway bills resident memory per minute,
+    so being able to hand pages back without restarting the container is an
+    operational lever, not just a test hook.
+
+    POST /release-memory            gc + malloc_trim, models stay loaded
+    POST /release-memory?unload=true  also drop every lazily-loaded model
+
+    Returns before/after RSS so the caller can see what was actually freed —
+    the whole point is that gc.collect() alone does NOT lower RSS; only the
+    malloc_trim(0) inside _release_memory() hands pages back to the OS.
+    """
+    global _mobilesam_model, _gdino_model, _gdino_processor, _rembg_session, rembg_remove
+    before = _rss_mb()
+    unloaded = []
+    if request.args.get('unload') == 'true':
+        if _mobilesam_model is not None:
+            _mobilesam_model = None
+            unloaded.append('mobilesam')
+        if _gdino_model is not None:
+            _gdino_model = None
+            _gdino_processor = None
+            unloaded.append('groundingdino')
+        if _rembg_session is not None:
+            with _rembg_lock:
+                _rembg_session = None
+                rembg_remove = None
+            unloaded.append('rembg')
+    _release_memory()
+    after = _rss_mb()
+    freed = None if (before is None or after is None) else round(before - after, 1)
+    print(f"[RELEASE-MEMORY] {before} MB -> {after} MB (freed {freed} MB), unloaded={unloaded or 'none'}")
+    return jsonify({
+        "success": True,
+        "rss_before_mb": before,
+        "rss_after_mb": after,
+        "freed_mb": freed,
+        "unloaded": unloaded,
+    })
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint.
@@ -1788,11 +1891,13 @@ def health_check():
             r = model(probe_img, imgsz=1024, verbose=False, bboxes=[[8, 8, 56, 56]])
             ok = r and r[0].masks is not None
             del r
+            _free_sam_cache()
             _release_memory()
             body["sam_probe"] = "ok" if ok else "no_mask"
         except Exception as e:
             body["sam_probe"] = f"fail: {e}"
             body["status"] = "degraded"
+            _free_sam_cache()
             _release_memory()
     return jsonify(body)
 

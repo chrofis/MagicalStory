@@ -3701,3 +3701,38 @@ corrected, figure edges kept. Legacy padded-union unchanged on every measurement
 unknown band, H field; samUnionBlend threading).
 **Status:** ✅ active on the figure-repair insert path (staging pending push — NOT pushed,
 experiments in flight).
+
+## 2026-08-04 — Analyzer memory: per-call cache clear now, model unload only when idle
+**Context:** Staging reproduced the production plateau live: the Python analyzer
+sat at 3813 MB and did not move for six minutes. Railway logs showed `/figure-mask`
+climbing ~300 MB on EVERY call with identical 416x710 input —
+`rss=2661 → 3019 → 3301 → 3633 MB` — and those lines print *after*
+`_release_memory()` (gc.collect + malloc_trim(0)) has already run. Allocator
+fragmentation would have been returned by the trim, so this was live references.
+Separately, when the rembg idle reaper fired it returned **1036.7 MB in one step**
+(3813.3 → 2776.6 MB) and stayed down, proving malloc_trim works at GB scale.
+MobileSAM had no reaper at all, so its ~2.2 GB of retained memory was held until
+the next restart.
+**Decision:** Split the release by what it costs to redo.
+1. **Per call, immediately** — `_free_sam_cache()` drops ultralytics' retained
+   `results` / `batch` / `features` / `im` from the predictor. The model object
+   stays loaded. Runs in both the success and error paths of `/figure-mask`.
+2. **Only when idle** — the model itself is unloaded by `_idle_model_reaper`
+   after `MOBILESAM_IDLE_UNLOAD_S` (900s), matching rembg and GroundingDINO.
+3. `POST /release-memory` (proxied by admin-only `POST /api/health/release-memory`)
+   forces a trim on demand, so reclaiming RAM no longer requires a redeploy —
+   a redeploy restarts the container and destroys whatever you were measuring.
+**Rationale:** The retained tensors are dead the moment the PNG is encoded —
+`results`/`batch` are masks already serialised, and `features`/`im` are embeddings
+for that one image, which the next (different) image recomputes anyway. So
+clearing them per call costs zero recomputation. Unloading the *model* is a
+different trade: mid-story that forces a ~570 MB reload on the very next page, so
+it stays warm while work is flowing and is dropped only after real idleness.
+The error path clears too because repair retries the same crop, so a run of 500s
+stacked ~300 MB each — that was the worst leak observed.
+Ultralytics internals vary by version, so the clear only touches attributes that
+exist and logs failures instead of 500ing a repair.
+**Touched:** `photo_analyzer.py` (`_free_sam_cache`, `_idle_model_reaper`
+MobileSAM branch, `/release-memory`, `/figure-mask` both paths, `/health?probe=sam`),
+`server/routes/health.js` (`/api/health/memory`, `/api/health/release-memory`).
+**Status:** ✅ on staging. Production still unpatched — awaiting approval.

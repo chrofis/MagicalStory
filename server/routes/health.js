@@ -8,10 +8,37 @@ const express = require('express');
 const router = express.Router();
 const { errorLoggingLimiter } = require('../middleware/rateLimit');
 const { validateBody, schemas } = require('../middleware/validation');
+const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
 // GET /api/health - Health check
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// POST /api/health/release-memory - reclaim RAM now, without a restart.
+//
+// The Python idle reapers only fire after 10-15 min of no use. That is correct
+// for normal running but leaves no way to reclaim memory on demand, or to prove
+// that the release works, without redeploying — and a redeploy restarts the
+// container, which resets RSS and destroys whatever you were measuring.
+//
+// ?unload=true also drops the lazily-loaded models (rembg / MobileSAM /
+// GroundingDINO); they reload on next use in a few seconds.
+// Admin-only: this evicts models and briefly slows the next request.
+router.post('/health/release-memory', authenticateToken, requireAdmin, async (req, res) => {
+  const url = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+  const unload = req.query.unload === 'true' ? '?unload=true' : '';
+  const nodeBefore = Math.round(process.memoryUsage().rss / 1024 / 1024 * 10) / 10;
+  try {
+    const r = await fetch(`${url}/release-memory${unload}`, { method: 'POST', signal: AbortSignal.timeout(30000) });
+    const python = await r.json();
+    // Node's own heap too, when the runtime exposes it (--expose-gc).
+    if (typeof global.gc === 'function') global.gc();
+    const nodeAfter = Math.round(process.memoryUsage().rss / 1024 / 1024 * 10) / 10;
+    res.json({ success: true, python, node: { rss_before_mb: nodeBefore, rss_after_mb: nodeAfter, gc_available: typeof global.gc === 'function' } });
+  } catch (err) {
+    res.status(502).json({ success: false, error: err.message });
+  }
 });
 
 // GET /api/health/memory - Live memory breakdown for this container.
