@@ -14,6 +14,56 @@ router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// GET /api/health/memory - Live memory breakdown for this container.
+//
+// Railway bills resident memory per MB per MINUTE, so what this process HOLDS
+// is the bill. Railway's own metrics are container-total at 5-minute
+// resolution, which can't separate Node from the Python analyzer and is too
+// coarse to see whether memory is released after a story generation.
+//
+// The number that matters is `external` vs `rss`: page images move through Node
+// as large Buffers, which live OUTSIDE the V8 heap in malloc'd memory. When
+// those are freed, glibc can keep the pages in per-thread arenas instead of
+// returning them to the OS — that retention is why RSS used to climb to a peak
+// and stay there until a redeploy. If rss stays high while heapUsed and
+// external have fallen back, the allocator is holding freed pages, not the app.
+router.get('/health/memory', async (req, res) => {
+  const m = process.memoryUsage();
+  const mb = (n) => Math.round(n / 1024 / 1024 * 10) / 10;
+
+  // The Python analyzer is a separate process in the same container, so it is
+  // billed with us but invisible to process.memoryUsage(). Fetch it so the two
+  // add up to what Railway charges for. Never fail the endpoint over it.
+  let python = null;
+  try {
+    const url = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+    const r = await fetch(`${url}/health`, { signal: AbortSignal.timeout(4000) });
+    const j = await r.json();
+    python = { rss_mb: j.rss_mb, rembg_loaded: j.rembg_loaded, mobilesam_loaded: j.mobilesam_loaded, groundingdino_loaded: j.groundingdino_loaded, boot_rss: j.boot_rss };
+  } catch (err) {
+    python = { error: err.message };
+  }
+
+  res.json({
+    timestamp: new Date().toISOString(),
+    uptime_s: Math.round(process.uptime()),
+    node: {
+      rss_mb: mb(m.rss),
+      heapUsed_mb: mb(m.heapUsed),
+      heapTotal_mb: mb(m.heapTotal),
+      external_mb: mb(m.external),
+      arrayBuffers_mb: mb(m.arrayBuffers),
+      heapLimit_mb: mb(require('v8').getHeapStatistics().heap_size_limit),
+    },
+    python,
+    env: {
+      mallocArenaMax: process.env.MALLOC_ARENA_MAX || '(unset)',
+      railwayEnv: process.env.RAILWAY_ENVIRONMENT_NAME || '(unset)',
+    },
+    container_total_mb: python && python.rss_mb ? Math.round(mb(m.rss) + python.rss_mb) : null,
+  });
+});
+
 // GET /api/debug-landmarks/:city - Temporary debug endpoint for landmarks
 const { getPool } = require('../services/database');
 router.get('/debug-landmarks/:city', async (req, res) => {
