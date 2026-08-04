@@ -376,6 +376,67 @@ function buildCharacterDescription(character) {
   return parts.join('\n');
 }
 
+const SHEET_JUDGE_SAFETY = [
+  { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+];
+
+// Vision-judge dispatcher for the sheet evaluators. `model` is a TEXT_MODELS
+// key (e.g. 'gemini-2.5-flash', 'grok-4-fast', 'qwen3-vl') or a bare Gemini
+// modelId (defaults to google). Production passes nothing → gemini-2.5-flash,
+// so the google branch stays byte-identical to the old inline fetch. Grok/Qwen
+// reuse the SAME `parts` array (images + prompt) via the existing vision
+// helpers. Returns { text, usageMetadata }.
+async function callSheetJudge(model, parts, maxOutputTokens, geminiApiKey) {
+  const { TEXT_MODELS } = require('../config/models');
+  const cfg = TEXT_MODELS[model];
+  const provider = cfg?.provider || 'google';
+  const modelId = cfg?.modelId || model;
+  if (provider === 'google') {
+    const body = {
+      contents: [{ parts }],
+      generationConfig: { temperature: 0.2, maxOutputTokens, responseMimeType: 'application/json' },
+      safetySettings: SHEET_JUDGE_SAFETY,
+    };
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${geminiApiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(60000) }
+    );
+    if (!resp.ok) throw new Error(`Gemini eval HTTP ${resp.status}`);
+    const j = await resp.json();
+    return { text: j?.candidates?.[0]?.content?.parts?.[0]?.text, usageMetadata: j?.usageMetadata };
+  }
+  if (provider === 'xai') {
+    const { callGrokVisionAPI } = require('./images');
+    const resp = await callGrokVisionAPI(model, modelId, parts, '');
+    if (!resp?.ok) throw new Error(`Grok vision eval failed (${model})`);
+    const j = await resp.json();
+    return { text: j?.candidates?.[0]?.content?.parts?.[0]?.text, usageMetadata: j?.usageMetadata };
+  }
+  if (provider === 'openrouter') {
+    const { callOpenRouterVisionAPI } = require('./evalJudges');
+    const text = await callOpenRouterVisionAPI(modelId, parts);
+    if (!text) throw new Error(`OpenRouter vision eval returned nothing (${model})`);
+    return { text, usageMetadata: null };
+  }
+  throw new Error(`"${model}" (provider ${provider}) is not a supported vision judge`);
+}
+
+// Non-Gemini judges don't honor responseMimeType:json, so their text may be
+// fenced or prose-wrapped. Try strict parse, then ```json``` fence, then the
+// first {…last } span.
+function parseJudgeJson(text) {
+  const s = String(text || '').trim();
+  try { return JSON.parse(s); } catch { /* fall through */ }
+  const fenced = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) { try { return JSON.parse(fenced[1].trim()); } catch { /* fall through */ } }
+  const first = s.indexOf('{'), last = s.lastIndexOf('}');
+  if (first >= 0 && last > first) return JSON.parse(s.slice(first, last + 1));
+  throw new Error(`judge returned non-JSON: ${s.slice(0, 160)}`);
+}
+
 async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiKey, sourcePhoto = null, usageTracker = null, opts = {}) {
   // model / promptOverride let the Test Lab A/B eval models and prompt text
   // without touching production (which passes neither → defaults below).
@@ -417,32 +478,15 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
   parts.push({ inline_data: { mime_type: sheetMime, data: sheetB64 } });
   parts.push({ text: prompt });
 
-  const body = {
-    contents: [{ parts }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 4000, responseMimeType: 'application/json' },
-    safetySettings: [
-      { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-    ],
-  };
-
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) }
-  );
-  if (!resp.ok) throw new Error(`Gemini eval HTTP ${resp.status}`);
-  const j = await resp.json();
-  const text = j?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('Gemini eval returned no text');
-  if (usageTracker && j?.usageMetadata) {
+  const { text, usageMetadata } = await callSheetJudge(model, parts, 4000, geminiApiKey);
+  if (!text) throw new Error(`sheet eval (${model}) returned no text`);
+  if (usageTracker && usageMetadata) {
     usageTracker('gemini_quality', {
-      input_tokens: j.usageMetadata.promptTokenCount || 0,
-      output_tokens: j.usageMetadata.candidatesTokenCount || 0,
+      input_tokens: usageMetadata.promptTokenCount || 0,
+      output_tokens: usageMetadata.candidatesTokenCount || 0,
     }, 'character_2x4_eval', model);
   }
-  return JSON.parse(text);
+  return parseJudgeJson(text);
 }
 
 // Art-style descriptor for the Pass 2 style-transfer prompt.
@@ -507,41 +551,24 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
     return { inline_data: { mime_type: mime, data: b64 } };
   };
 
-  const body = {
-    contents: [{
-      parts: [
-        toInlinePart(sourcePhoto),
-        toInlinePart(realisticSheet),
-        toInlinePart(styledSheet),
-        { text: prompt },
-      ],
-    }],
-    // 8000 not 2500: gemini-2.5 internal thinking counts toward
-    // maxOutputTokens — the TASK-5 colour enumeration makes it think longer,
-    // and a 2500 cap truncated the JSON mid-string (parse failures).
-    generationConfig: { temperature: 0.2, maxOutputTokens: 8000, responseMimeType: 'application/json' },
-    safetySettings: [
-      { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-    ],
-  };
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) }
-  );
-  if (!resp.ok) throw new Error(`Gemini style-eval HTTP ${resp.status}`);
-  const j = await resp.json();
-  const text = j?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('Gemini style-eval returned no text');
-  if (usageTracker && j?.usageMetadata) {
+  // 8000 not 2500: gemini-2.5 internal thinking counts toward maxOutputTokens —
+  // the TASK-5 colour enumeration makes it think longer, and a 2500 cap
+  // truncated the JSON mid-string (parse failures).
+  const parts = [
+    toInlinePart(sourcePhoto),
+    toInlinePart(realisticSheet),
+    toInlinePart(styledSheet),
+    { text: prompt },
+  ];
+  const { text, usageMetadata } = await callSheetJudge(model, parts, 8000, geminiApiKey);
+  if (!text) throw new Error(`style-eval (${model}) returned no text`);
+  if (usageTracker && usageMetadata) {
     usageTracker('gemini_quality', {
-      input_tokens: j.usageMetadata.promptTokenCount || 0,
-      output_tokens: j.usageMetadata.candidatesTokenCount || 0,
+      input_tokens: usageMetadata.promptTokenCount || 0,
+      output_tokens: usageMetadata.candidatesTokenCount || 0,
     }, 'character_2x4_style_eval', model);
   }
-  return JSON.parse(text);
+  return parseJudgeJson(text);
 }
 
 /**
