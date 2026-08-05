@@ -401,6 +401,11 @@ function SetsTab() {
   const [expanded, setExpanded] = useState<Record<number, TestLabSetMember[]>>({});
   const [newName, setNewName] = useState('');
   const [newStage, setNewStage] = useState('avatar_eval');
+  // Run-time overrides applied to whichever set you run — the iteration loop:
+  // same pinned cases, new prompt / params, so only the variable under test moves.
+  const [runPrompt, setRunPrompt] = useState('');
+  const [runParams, setRunParams] = useState('');
+  const [runLabel, setRunLabel] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -422,8 +427,16 @@ function SetsTab() {
   };
   const run = async (id: number) => {
     setBusy(true); setError(null);
+    let params: Record<string, unknown> | undefined;
+    if (runParams.trim()) {
+      try { params = JSON.parse(runParams); }
+      catch { setError('Run params must be valid JSON'); setBusy(false); return; }
+    }
     try {
-      const res = await testlabService.runSet(id);
+      const res = await testlabService.runSet(id, params, {
+        promptOverride: runPrompt.trim() || null,
+        label: runLabel.trim() || undefined,
+      });
       alert(`Started experiment #${res.id} over ${res.members} cases — open it from the Experiments tab.`);
     } catch (e) { setError(e instanceof Error ? e.message : 'Run failed'); }
     finally { setBusy(false); }
@@ -450,6 +463,16 @@ function SetsTab() {
           {stageOptions.map(id => <option key={id} value={id}>{id}</option>)}
         </select>
         <Button size="sm" onClick={create}><Plus size={14} /> Create</Button>
+      </div>
+      <div className="border rounded-lg p-3 mb-4 bg-gray-50">
+        <div className="text-xs font-medium text-gray-700 mb-2">Run overrides — applied to whichever set you run (leave empty for stage defaults)</div>
+        <input className="border rounded-lg px-3 py-2 text-sm w-full mb-2" placeholder="Run label (e.g. 'wide crop + model-chosen colour')"
+          value={runLabel} onChange={e => setRunLabel(e.target.value)} />
+        <input className="border rounded-lg px-3 py-2 text-xs w-full mb-2 font-mono" placeholder='Params JSON (e.g. {"recolor": true, "marginPct": 0.2})'
+          value={runParams} onChange={e => setRunParams(e.target.value)} />
+        <textarea className="border rounded-lg px-3 py-2 text-xs w-full font-mono" rows={4}
+          placeholder="Prompt override — the point of a set: same images, new prompt"
+          value={runPrompt} onChange={e => setRunPrompt(e.target.value)} />
       </div>
       {error && <div className="text-sm text-red-600 mb-3">{error}</div>}
       {sets.length === 0 && <div className="text-sm text-gray-400">No sets yet. Create one for a stage, then pin failing cases from that stage's results.</div>}

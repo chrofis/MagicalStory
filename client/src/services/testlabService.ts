@@ -400,8 +400,9 @@ export const testlabService = {
   unpinFromSet(setId: number, memberId: number) {
     return api.delete<{ success: boolean }>(`/api/admin/testlab/sets/${setId}/members/${memberId}`);
   },
-  runSet(setId: number, params?: Record<string, unknown>) {
-    return api.post<{ id: number; members: number }>(`/api/admin/testlab/sets/${setId}/run`, { params });
+  // opts.promptOverride is the reason sets exist: same cases, new prompt.
+  runSet(setId: number, params?: Record<string, unknown>, opts: { promptOverride?: string | null; label?: string } = {}) {
+    return api.post<{ id: number; members: number }>(`/api/admin/testlab/sets/${setId}/run`, { params, ...opts });
   },
 
 };

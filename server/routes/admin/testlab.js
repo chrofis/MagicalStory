@@ -334,7 +334,10 @@ router.delete('/sets/:id/members/:memberId', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Failed to remove member', details: err.message }); }
 });
 
-// POST /api/admin/testlab/sets/:id/run { params? }
+// POST /api/admin/testlab/sets/:id/run { params?, promptOverride?, label? }
+// promptOverride is the point of a set: the SAME cases re-run with a new prompt,
+// so the prompt is the only variable. Stored on the experiment like any other
+// override, so the run is reproducible from its row.
 router.post('/sets/:id/run', async (req, res) => {
   try {
     if (experimentRunning) return res.status(409).json({ error: 'Another experiment is already running' });
@@ -347,15 +350,17 @@ router.post('/sets/:id/run', async (req, res) => {
     if (!members.length) return res.status(400).json({ error: 'Set is empty' });
     if (members.length > 25) return res.status(400).json({ error: 'Max 25 members per run' });
     const override = req.body?.params || {};
+    const promptOverride = req.body?.promptOverride ? String(req.body.promptOverride) : null;
     const targets = members.map(m => ({ ...(m.target || {}), _params: { ...setParams, ...(m.params || {}), ...override } }));
     experimentRunning = true;
     const rows = await dbQuery(
       `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by)
-       VALUES ($1, $2, null, $3, 'running', $4, $5) RETURNING id`,
-      [stage, `Set: ${name} (${members.length})`, JSON.stringify({ autoEval: true }), JSON.stringify(targets), req.user.username || String(req.user.id)]
+       VALUES ($1, $2, $3, $4, 'running', $5, $6) RETURNING id`,
+      [stage, req.body?.label || `Set: ${name} (${members.length})`, promptOverride,
+       JSON.stringify({ autoEval: true }), JSON.stringify(targets), req.user.username || String(req.user.id)]
     );
     const experimentId = rows[0].id;
-    executeExperiment(experimentId, stage, targets, { promptOverride: null, params: { autoEval: true } });
+    executeExperiment(experimentId, stage, targets, { promptOverride, params: { autoEval: true } });
     log.info(`[TESTLAB] Set ${setId} (${stage}) run as experiment ${experimentId} (${members.length} members)`);
     res.json({ id: experimentId, members: members.length });
   } catch (err) { experimentRunning = false; res.status(500).json({ error: 'Failed to run set', details: err.message }); }
