@@ -4023,3 +4023,26 @@ Lab verification: replay of the #274 r0 chain (next experiment) — per the new 
 real-image experiments run in the Test Lab, never as local scripts.
 
 **Touched:** `server/lib/samBlend.js`.
+
+---
+
+## 2026-08-05 — Leg-gap glow specks: solve domain + band reference (exp #279 residual)
+
+**Context:** Owner: white specks between the legs in #279 C. The gap between the trouser
+legs is inside the OLD silhouette, and the newTight dilation bridges the thin slot. The
+edge band's background reference there was the ORIGINAL — i.e. the old boy's dark torso —
+so white glow read as "not background" and was kept. Additionally the LB field was never
+solved in that slot (the solve domain excluded everything under newTight), so no valid
+reference existed.
+
+**Decision:** the LB solve domain is Fs = old ∧ ¬newBin (everything old that is not actual
+figure — the field is DEFINED in thin gaps), while the paste domain stays F = old ∧
+¬newTight. The edge band's background reference is LB whenever the pixel is inside the old
+silhouette, the original otherwise — the original is never consulted where it depicts the
+old figure.
+
+**Verified (synthetic):** white glow in a 6px between-legs slot collapses (max channel 250 →
+132) with legs byte-untouched; full battery (ghost, curtain crispness, seam, outside,
+figure) all pass.
+
+**Touched:** `server/lib/samBlend.js`.

@@ -146,8 +146,15 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     // Footprint = dilated old silhouette beyond the figure's tight edge buffer.
     // Pad ring = paste pixels outside it — the original is valid there, take it.
     const F = new Uint8Array(n);
+    // Fs = the LB solve domain: every old-silhouette pixel that is not actual
+    // figure (newBin). Wider than the paste domain F so the field is DEFINED in
+    // thin gaps the newTight dilation bridges (between the legs) — the edge
+    // band needs a valid background reference there; the original is the OLD
+    // FIGURE's torso, which made white glow pass as "not background".
+    const Fs = new Uint8Array(n);
     let fCnt = 0, ringPx = 0;
     for (let i = 0; i < n; i++) {
+      if ((newBin ? newBin[i] : newTight[i]) <= 128 && isOld(i)) Fs[i] = 1;
       if (newTight[i] > 128) continue;
       if (isOld(i)) { F[i] = 1; fCnt++; }
       else if (alpha1[i] > 128) {
@@ -183,7 +190,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     const cVal = new Float32Array(nc * 3), cW = new Float32Array(nc), cF = new Uint8Array(nc), cB = new Uint8Array(nc);
     for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
       const i = y * cropW + x, ci = ((y / S) | 0) * Wc + ((x / S) | 0);
-      if (F[i]) cF[ci] = 1;
+      if (Fs[i]) cF[ci] = 1;
       else if (newTight[i] <= 128 && !isOld(i) && blurW[i * wStride] > 5) {
         cB[ci] = 1; cW[ci]++;
         for (let c = 0; c < 3; c++) cVal[ci * 3 + c] += lowOrig[i * 3 + c];
@@ -208,7 +215,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     const LB = new Float32Array(n * 3);
     for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
       const i = y * cropW + x;
-      if (!F[i]) { for (let c = 0; c < 3; c++) LB[i * 3 + c] = lowOrig[i * 3 + c]; continue; }
+      if (!Fs[i]) { for (let c = 0; c < 3; c++) LB[i * 3 + c] = lowOrig[i * 3 + c]; continue; }
       const gx = Math.min(Wc - 1.001, Math.max(0, x / S - 0.5)), gy = Math.min(Hc - 1.001, Math.max(0, y / S - 0.5));
       const x0 = gx | 0, y0 = gy | 0, fx = gx - x0, fy = gy - y0;
       for (let c = 0; c < 3; c++) {
@@ -220,16 +227,16 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     for (let it = 0; it < 60; it++) {
       for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
         const i = y * cropW + x;
-        if (!F[i]) continue;
+        if (!Fs[i]) continue;
         let c0 = 0; const acc = [0, 0, 0];
         const nb = [i - 1, i + 1, i - cropW, i + cropW];
         const ok = [x > 0, x < cropW - 1, y > 0, y < cropH - 1];
         for (let k = 0; k < 4; k++) {
           if (!ok[k]) continue;
           const j = nb[k];
-          const jBoundary = !F[j] && newTight[j] <= 128 && !isOld(j);
-          if (!F[j] && !jBoundary) continue; // figure / covered-old never a source
-          c0++; for (let c = 0; c < 3; c++) acc[c] += F[j] ? LB[j * 3 + c] : lowOrig[j * 3 + c];
+          const jBoundary = !Fs[j] && newTight[j] <= 128 && !isOld(j);
+          if (!Fs[j] && !jBoundary) continue; // figure never a source
+          c0++; for (let c = 0; c < 3; c++) acc[c] += Fs[j] ? LB[j * 3 + c] : lowOrig[j * 3 + c];
         }
         if (c0) for (let c = 0; c < 3; c++) LB[i * 3 + c] = acc[c] / c0;
       }
@@ -305,7 +312,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
         const lab = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
         const figRef = _rgbToLab(figBlurRgb[i * 3] / fw, figBlurRgb[i * 3 + 1] / fw, figBlurRgb[i * 3 + 2] / fw);
         const dFig = _deltaE(lab, figRef);
-        const ref = F[i] ? [LB[i * 3], LB[i * 3 + 1], LB[i * 3 + 2]] : [origRaw[i * 3], origRaw[i * 3 + 1], origRaw[i * 3 + 2]];
+        const ref = isOld(i) ? [LB[i * 3], LB[i * 3 + 1], LB[i * 3 + 2]] : [origRaw[i * 3], origRaw[i * 3 + 1], origRaw[i * 3 + 2]];
         const dBg = _deltaE(lab, _rgbToLab(ref[0], ref[1], ref[2]));
         if (dBg < dFig) {
           pasteRaw[i * 3] = cl(ref[0]); pasteRaw[i * 3 + 1] = cl(ref[1]); pasteRaw[i * 3 + 2] = cl(ref[2]);
