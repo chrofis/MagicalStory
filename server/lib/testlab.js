@@ -937,7 +937,26 @@ async function runCharRepairStage(ctx, opts) {
   });
   const elapsedMs = Date.now() - t0;
   const finalImage = result?.imageData;
-  if (!finalImage) throw new Error(`Character repair returned no image (${result?.rejectedReason || 'unknown'})`);
+  if (!finalImage) {
+    // A GATE rejection is a result, not a void: show WHY and what the model
+    // produced. Previously the card said only "returned no image (blend_gate)"
+    // with zero steps, so a rejected treatment was undiagnosable (exp #306 blur).
+    if (result?.blackoutImage) await addStep('sent to model (treated input)', result.blackoutImage);
+    if (result?.grokRawResult) await addStep('model raw output (REJECTED)', result.grokRawResult);
+    const err = new Error(`Character repair REJECTED by the ${result?.rejectedReason || 'unknown'} gate: ${result?.gateMessage || 'no detail'}`);
+    err.partialResult = {
+      steps,
+      characterName: charName,
+      bbox,
+      faceBbox: faceBbox || undefined,
+      descriptor: result?.descriptor,
+      rejectedReason: result?.rejectedReason || 'unknown',
+      gateMessage: result?.gateMessage || null,
+      promptUsed: result?.promptSent || null,
+      elapsedMs,
+    };
+    throw err;
+  }
 
   await addStep('sent to model (whiteout/crosshatch)', result.blackoutImage);
   await addStep('model raw output', result.grokRawResult);

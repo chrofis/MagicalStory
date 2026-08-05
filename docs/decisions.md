@@ -4378,3 +4378,20 @@ mask every other body path uses; face blur keeps the head mask. `fetchSilhouette
 the fallback for both.
 
 **Touched:** `server/lib/faceRepair.js`.
+
+---
+
+## 2026-08-05 — Gate rejections must show WHY and WHAT (exp #306 blur)
+
+**Context:** After the body-blur mask fix, the blur variant came back
+`ok:false, error:"Character repair returned no image (blend_gate)"` with ZERO steps — no
+treated input, no model output, no gate message. Undiagnosable: the spine HAS the reason
+(`gateMessage`) and the images, `runCharRepairStage` threw them away.
+
+**Decision:** on a null-image result the stage emits the treated input and the model's raw
+output as steps ("model raw output (REJECTED)"), and throws with the gate message plus an
+`err.partialResult` carrying steps / boxes / descriptor / rejectedReason / gateMessage /
+promptUsed. The runner already merges `partialResult` into the stored entry, so a rejected
+run now renders like any other card.
+
+**Touched:** `server/lib/testlab.js`.
