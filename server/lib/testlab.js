@@ -1538,7 +1538,11 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
   if (pages.length === 0) throw new Error(`Story ${target.storyId} has no page text to refine`);
   const expected = pages.map(p => p.pageNumber);
 
-  const roundCount = Math.max(1, Math.min(5, parseInt(params.rounds, 10) || 2));
+  // Rounds is a CEILING, not a target: the loop stops as soon as a pass returns
+  // no rewrites. A converged pass is cheap (it emits the NONE marker, so output
+  // is a handful of tokens) — the remaining cost is the prompt plus whatever the
+  // model reasons, which is why this is bounded rather than unlimited.
+  const roundCount = Math.max(1, Math.min(8, parseInt(params.rounds, 10) || 4));
   const perRound = Array.isArray(params.roundModels) ? params.roundModels : [];
   const defaultModel = params.model || MODEL_DEFAULTS.outlineReviewModel;
 
@@ -1561,9 +1565,12 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
       const elapsedMs = Date.now() - t0;
       const parsed = parseRefinedText(r.text || '', expected);
 
-      // A page the model dropped keeps its previous text — a refinement pass must
-      // never silently delete a page from the book.
+      // Omission is the CONTRACT now, not a fault: the model returns only the
+      // pages it rewrote, and everything else keeps its current text. That is
+      // also the safety property — a page can never be lost by being skipped.
       const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
+      // A page number outside the book is the one thing that IS a fault.
+      const strayPages = parsed.pages.map(p => p.pageNumber).filter(n => !expected.includes(n));
       const next = current.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
 
       const changed = next.filter((p, idx) => p.text !== current[idx].text).map(p => p.pageNumber);
@@ -1579,7 +1586,8 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
         usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
         cost: r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[modelKey].modelId, r.usage || {}),
         promptChars: prompt.length,
-        missingPages: parsed.missing,
+        returnedPages: parsed.pages.map(p => p.pageNumber),
+        strayPages,
         changedPages: changed,
         changedFromOriginal,
         converged: changed.length === 0,
@@ -1592,7 +1600,9 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
         })),
       });
       current = next;
-      if (changed.length === 0) break; // nothing moved — further rounds are noise
+      // Converged: the model found nothing worth rewriting. Every further round
+      // would pay a full prompt to be told the same thing.
+      if (changed.length === 0) break;
     } catch (err) {
       rounds.push({ round: i + 1, ok: false, modelKey, elapsedMs: Date.now() - t0, error: err.message });
       break; // later rounds depend on this one's text

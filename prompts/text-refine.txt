@@ -32,7 +32,11 @@ What each page's illustration shows. The text must stay consistent with these. N
 
 # YOUR TASK
 
-Rewrite the narrative text for every page. Improve what is weak; leave what already works. Return all {PAGE_COUNT} pages whether or not you changed them. The story must still deliver the brief above.
+Find the pages that are weak and rewrite only those. A page that already works stays as it is. The story must still deliver the brief above.
+
+Return only the pages you rewrote. Omit every page you left alone. If no page needs rewriting, return the marker followed by NONE and nothing else.
+
+Do not rewrite a page for small stylistic preference. Rewrite it when it has a real problem from the list below.
 
 Never use an em-dash (—) or an en-dash (–), anywhere, for any purpose. Replace every one you find with a comma, a full stop, a colon, or parentheses, and recast the sentence if none of those fit.
 
@@ -51,11 +55,16 @@ Check for:
 
 Output only the block below. No preamble, no commentary, no explanation of changes.
 
+Include a page only if you rewrote it. Use its real page number.
+
 ---STORY TEXT---
-## Page 1
-<text for page 1>
+## Page <number>
+<rewritten text for that page>
 
-## Page 2
-<text for page 2>
+## Page <number>
+<rewritten text for that page>
 
-(continue through page {PAGE_COUNT})
+When nothing needs rewriting, output exactly:
+
+---STORY TEXT---
+NONE

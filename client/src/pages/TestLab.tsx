@@ -827,9 +827,9 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
         {isTextRefine && (
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <label className="text-xs text-gray-600 flex items-center gap-1.5">
-              Rounds:
+              Max rounds:
               <select className="border rounded-lg px-2 py-1 text-xs" value={refineRounds} onChange={e => setRefineRounds(Number(e.target.value))}>
-                {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+                {[1, 2, 3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
             <label className="text-xs text-gray-600 flex items-center gap-1.5">
@@ -840,8 +840,9 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
               </select>
             </label>
             <div className="text-xs text-gray-500">
-              Each round gets the story brief, the scene outlines (read-only) and the CURRENT text, and returns the full text.
-              Round N+1's input is round N's output — no critique is carried forward. Stops early once a round changes nothing.
+              Each round gets the story brief, the scene outlines (read-only) and the CURRENT text, and rewrites only the pages
+              that are weak. Round N+1's input is round N's output; no critique is carried forward. A ceiling, not a target —
+              it stops as soon as a round rewrites nothing.
             </div>
           </div>
         )}
@@ -1112,8 +1113,8 @@ function TextRefineView({ result }: { result: ExperimentResult }) {
                 {' '}· {((r.elapsedMs || 0) / 1000).toFixed(1)}s
                 {' '}· out {(r.usage?.output_tokens || 0).toLocaleString()}
                 {r.cost != null && ` · $${r.cost.toFixed(4)}`}
-                {' · '}changed pages: {r.changedPages?.length ? r.changedPages.join(', ') : <span className="text-emerald-600">none — converged</span>}
-                {!!r.missingPages?.length && <span className="text-amber-600"> · model omitted pages {r.missingPages.join(', ')} (previous text kept)</span>}
+                {' · '}rewrote: {r.changedPages?.length ? r.changedPages.join(', ') : <span className="text-emerald-600">nothing — converged, stopped here</span>}
+                {!!r.strayPages?.length && <span className="text-amber-600"> · ignored out-of-range page {r.strayPages.join(', ')}</span>}
               </>
             ) : <> · failed: {r.error}</>}
           </div>

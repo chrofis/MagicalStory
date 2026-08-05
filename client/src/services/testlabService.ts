@@ -176,7 +176,8 @@ export interface RefineRound {
   usage?: { input_tokens?: number; output_tokens?: number };
   cost?: number;
   promptChars?: number;
-  missingPages?: number[];
+  returnedPages?: number[];
+  strayPages?: number[];
   changedPages?: number[];
   changedFromOriginal?: number[];
   converged?: boolean;
