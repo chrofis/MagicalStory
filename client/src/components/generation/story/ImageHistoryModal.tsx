@@ -26,11 +26,14 @@ interface ImageHistoryModalProps {
   // These are page-scoped and apply to every version of the page — they're
   // not stored per-version, but they explain the entityPenalty deduction.
   entityIssues?: Array<{ name: string; severity: string; description: string; source: string }>;
-  // Page-level debug content (reference-photo inputs + full object-detection
+  // Per-image debug content (reference-photo inputs + full object-detection
   // panel) — moved here from the inline dev panel under each image so the
-  // version viewer is the single home for per-image debug data. Rendered in
-  // a collapsed section below the grid, dev mode only.
-  pageDebug?: ReactNode;
+  // version viewer is the single home for per-image debug data. Dev mode only.
+  // Called with the ARRAY index of the version whose detail panel is open, so
+  // the detection panel follows the inspected version instead of staying
+  // pinned to the active one (opening another version's info used to leave
+  // stale boxes on screen). null = no detail panel open → active version.
+  pageDebug?: (inspectedVersionIndex: number | null) => ReactNode;
 }
 
 export function ImageHistoryModal({
@@ -897,17 +900,18 @@ export function ImageHistoryModal({
               </div>
             )}
 
-            {/* Page-level debug (dev only) — reference-photo inputs + full
+            {/* Per-image debug (dev only) — reference-photo inputs + full
                 object-detection panel, moved here from the inline dev panel
-                under each image. Collapsed by default; applies to the PAGE
-                (active version), not to the version selected above. */}
+                under each image. Open by default (the owner opens the version
+                viewer to look at exactly this) and rebuilt for whichever
+                version's detail panel is currently open. */}
             {developerMode && pageDebug && (
-              <details className="mt-5 border border-gray-200 rounded-lg bg-gray-50">
+              <details open className="mt-5 border border-gray-200 rounded-lg bg-gray-50">
                 <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-gray-700 hover:text-gray-900">
                   {language === 'de' ? 'Seiten-Debug — Referenzen & Objekterkennung' : language === 'fr' ? 'Débogage de page — références & détection' : 'Page debug — references & object detection'}
                 </summary>
                 <div className="p-3 space-y-2">
-                  {pageDebug}
+                  {pageDebug(detailIndex)}
                 </div>
               </details>
             )}

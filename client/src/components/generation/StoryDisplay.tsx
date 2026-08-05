@@ -265,6 +265,28 @@ function activeBboxOverlay(image: any): string | null {
   return (v?.bboxOverlayImage as string | undefined) ?? (image?.bboxOverlayImage ?? null);
 }
 
+// Same three reads, for an EXPLICIT version array index — used by the version
+// viewer's debug panel, which must follow the version whose detail panel is
+// open rather than the active one. Index 0's detection still lives on the
+// scene-level field (legacy), same fallback as the server's dev-image route.
+function bboxDetectionForIndex(image: any, idx: number | undefined): BboxSceneDetection | null {
+  if (idx == null) return activeBboxDetection(image);
+  const v: any = image?.imageVersions?.[idx];
+  return (v?.bboxDetection as BboxSceneDetection | undefined)
+    ?? (idx === 0 ? (image?.bboxDetection ?? null) : null);
+}
+
+function bboxOverlayForIndex(image: any, idx: number | undefined): string | null {
+  if (idx == null) return activeBboxOverlay(image);
+  const v: any = image?.imageVersions?.[idx];
+  return (v?.bboxOverlayImage as string | undefined)
+    ?? (idx === 0 ? (image?.bboxOverlayImage ?? null) : null);
+}
+
+function bboxKeyForIndex(base: string, idx: number | undefined): string {
+  return `${base}:v${Math.max(0, idx ?? 0)}`;
+}
+
 // bboxOverrides cache key: per page/cover AND per active version. A
 // version-less key survived version switches, so after one manual re-detect
 // the Object Detection panel stayed pinned to that stale detection no matter
@@ -6537,13 +6559,15 @@ export function StoryDisplay({
           developerMode={developerMode}
           grokRefImages={(sceneImages.find(img => img.pageNumber === imageHistoryModal.pageNumber) as any)?.grokRefImages}
           entityIssues={getEntityIssuesForPage(imageHistoryModal.pageNumber)}
-          pageDebug={developerMode ? (() => {
+          pageDebug={developerMode ? ((inspectedIdx) => {
             // Page-level inputs + full detection moved here from the inline dev
             // panel (owner decision: the version viewer is the ONE home for
             // per-image debug data; page cards stay lean).
             const image = sceneImages.find(img => img.pageNumber === imageHistoryModal.pageNumber) as any;
             if (!image) return null;
-            const key = bboxKey(`page:${image.pageNumber}`, image);
+            // Follow the version whose detail panel is open, not the active one.
+            const vIdx = inspectedIdx ?? activeVersionIndex(image);
+            const key = bboxKeyForIndex(`page:${image.pageNumber}`, vIdx);
             return (
               <>
                 <ReferencePhotosDisplay
@@ -6566,17 +6590,17 @@ export function StoryDisplay({
                 />
                 <ObjectDetectionDisplay
                   retryHistory={image.retryHistory}
-                  bboxDetection={bboxOverrides[key] ?? activeBboxDetection(image)}
-                  bboxOverlayImage={bboxOverrides[key] ? null : activeBboxOverlay(image)}
+                  bboxDetection={bboxOverrides[key] ?? bboxDetectionForIndex(image, vIdx)}
+                  bboxOverlayImage={bboxOverrides[key] ? null : bboxOverlayForIndex(image, vIdx)}
                   language={language}
                   storyId={storyId}
                   pageNumber={image.pageNumber}
-                  versionIndex={activeVersionIndex(image)}
+                  versionIndex={vIdx}
                   onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [key]: bbox }))}
                 />
               </>
             );
-          })() : null}
+          }) : undefined}
         />
       )}
 
@@ -6596,11 +6620,12 @@ export function StoryDisplay({
             developerMode={developerMode}
             grokRefImages={(coverImages?.[coverHistoryModal.coverType] as any)?.grokRefImages}
             entityIssues={getEntityIssuesForPage(coverPageNum)}
-            pageDebug={developerMode ? (() => {
+            pageDebug={developerMode ? ((inspectedIdx) => {
               const coverObj = coverImages?.[coverHistoryModal.coverType] as any;
               if (!coverObj) return null;
               const shortType = ({ frontCover: 'front', initialPage: 'initial', backCover: 'back' } as const)[coverHistoryModal.coverType];
-              const key = bboxKey(`cover:${shortType}`, coverObj);
+              const vIdx = inspectedIdx ?? activeVersionIndex(coverObj);
+              const key = bboxKeyForIndex(`cover:${shortType}`, vIdx);
               return (
                 <>
                   <ReferencePhotosDisplay
@@ -6611,17 +6636,17 @@ export function StoryDisplay({
                   />
                   <ObjectDetectionDisplay
                     retryHistory={coverObj.retryHistory}
-                    bboxDetection={bboxOverrides[key] ?? activeBboxDetection(coverObj)}
-                    bboxOverlayImage={bboxOverrides[key] ? null : activeBboxOverlay(coverObj)}
+                    bboxDetection={bboxOverrides[key] ?? bboxDetectionForIndex(coverObj, vIdx)}
+                    bboxOverlayImage={bboxOverrides[key] ? null : bboxOverlayForIndex(coverObj, vIdx)}
                     language={language}
                     storyId={storyId}
                     coverType={shortType}
-                    versionIndex={activeVersionIndex(coverObj)}
+                    versionIndex={vIdx}
                     onBboxRefreshed={(bbox) => setBboxOverrides(prev => ({ ...prev, [key]: bbox }))}
                   />
                 </>
               );
-            })() : null}
+            }) : undefined}
           />
         );
       })()}

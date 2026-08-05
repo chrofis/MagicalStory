@@ -104,10 +104,12 @@ export function ObjectDetectionDisplay({
     }
   }, [bboxKey, directBboxOverlayImage]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Prefer direct props (from latest re-evaluation, matches active version).
-  // Fall back to retryHistory (from initial generation — may not match if version switched,
-  // but better than showing nothing).
-  const fromRetryHistory = extractBboxData(retryHistory);
+  // Prefer direct props (they are already scoped to the version being viewed).
+  // retryHistory holds the FIRST generation's detection, so it may only stand in
+  // for version 0 — using it for a later version showed another version's boxes.
+  const fromRetryHistory = (versionIndex == null || versionIndex === 0)
+    ? extractBboxData(retryHistory)
+    : { bboxDetection: null, bboxOverlayImage: null, hasBboxOverlay: false };
   const bboxDetection = directBboxDetection || fromRetryHistory.bboxDetection;
   const bboxOverlayImage = directBboxOverlayImage || fromRetryHistory.bboxOverlayImage;
   const hasBboxOverlay = !!directBboxOverlayImage || fromRetryHistory.hasBboxOverlay;
@@ -206,30 +208,7 @@ export function ObjectDetectionDisplay({
     }
   };
 
-  // Show refresh button even when no detection data yet
-  if (!bboxDetection) {
-    if (!storyId || (pageNumber === undefined && !coverType)) return null;
-    return (
-      <div className="mt-2">
-        <button
-          onClick={refreshBbox}
-          disabled={isRefreshing}
-          className="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-300 flex items-center gap-1.5 disabled:opacity-50"
-        >
-          {isRefreshing ? (
-            <><Loader2 size={14} className="animate-spin" /> {language === 'de' ? 'Erkennung läuft...' : 'Detecting...'}</>
-          ) : (
-            <><RefreshCw size={14} /> {language === 'de' ? 'Objekterkennung starten' : 'Run Object Detection'}</>
-          )}
-        </button>
-      </div>
-    );
-  }
-
-  const figureCount = bboxDetection.figures?.length || 0;
-  const objectCount = bboxDetection.objects?.length || 0;
-
-  // Fetch overlay image from server
+  // Fetch overlay image from server (against the version being viewed).
   const fetchOverlay = async () => {
     // For covers, use coverType; for pages, use pageNumber
     if (!storyId || isLoading) return;
@@ -269,6 +248,40 @@ export function ObjectDetectionDisplay({
     }
   };
 
+  // Auto-load the overlay as soon as this panel mounts (i.e. the version viewer
+  // is open) or the viewed version changes. Previously the user had to click
+  // through version viewer → page debug → object detection → "load regions";
+  // the overlay is the whole point of opening the panel, so fetch it eagerly.
+  useEffect(() => {
+    if (!bboxDetection) return;
+    if (loadedOverlay || bboxOverlayImage) return;
+    if (isLoading || isRefreshing || isIterating) return;
+    fetchOverlay();
+  }, [storyId, pageNumber, coverType, versionIndex, !!bboxDetection, loadedOverlay, bboxOverlayImage]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Show refresh button even when no detection data yet
+  if (!bboxDetection) {
+    if (!storyId || (pageNumber === undefined && !coverType)) return null;
+    return (
+      <div className="mt-2">
+        <button
+          onClick={refreshBbox}
+          disabled={isRefreshing}
+          className="text-sm px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-300 flex items-center gap-1.5 disabled:opacity-50"
+        >
+          {isRefreshing ? (
+            <><Loader2 size={14} className="animate-spin" /> {language === 'de' ? 'Erkennung läuft...' : 'Detecting...'}</>
+          ) : (
+            <><RefreshCw size={14} /> {language === 'de' ? 'Objekterkennung starten' : 'Run Object Detection'}</>
+          )}
+        </button>
+      </div>
+    );
+  }
+
+  const figureCount = bboxDetection.figures?.length || 0;
+  const objectCount = bboxDetection.objects?.length || 0;
+
   const overlayImage = loadedOverlay || bboxOverlayImage;
 
   return (
@@ -296,7 +309,7 @@ export function ObjectDetectionDisplay({
         </div>
       )}
 
-      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+      <details open className="bg-blue-50 border border-blue-300 rounded-lg p-3">
         <summary className="cursor-pointer text-sm font-semibold text-blue-700 flex items-center justify-between">
           <span className="flex items-center gap-2">
             📦 {language === 'de' ? 'Objekterkennung' : 'Object Detection'}
