@@ -1428,8 +1428,16 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   if (!title) throw new Error('Story has no title to paint in');
 
   // Covers render TEXTLESS and typography is baked app-side, so artImageData is
-  // the clean plate. Pre-bake stories only have imageData.
-  const artBytes = await r2.bytesFromAnyImage(cover.artImageData || cover.imageData);
+  // the clean plate. FAIL LOUDLY when it is missing: falling back to imageData
+  // silently stamps a SECOND title onto a cover that already carries one (exp
+  // #311, "Das Seil fliegt…" came back with the title twice — top from the
+  // baked-in art, bottom from composeCover). A pre-bake story simply has no
+  // textless plate and cannot be painted in.
+  if (!cover.artImageData) {
+    throw new Error('No textless cover plate (artImageData) — this story predates app-side typography, '
+      + 'so compositing a title would double-stamp it. Re-run cover typography first.');
+  }
+  const artBytes = await r2.bytesFromAnyImage(cover.artImageData);
   if (!artBytes) throw new Error('Could not resolve cover art bytes');
 
   const steps = [];
@@ -1477,7 +1485,12 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   await addStep(`glyph mask (dilated ${dilatePx}px — paint-in is clipped to this)`, `data:image/png;base64,${grownMaskPng.toString('base64')}`);
 
   // --- 3. crop-bounded edit --------------------------------------------------
-  const padPx = Math.round(Math.max(W, H) * (params.marginPct ?? 0.12));
+  // Default BACK to 0.05 after exp #311: at 0.12 the crop reached 31-53% of the
+  // cover and swallowed the characters, and Qwen then RE-COMPOSED the crop —
+  // shrunken duplicate figures got stamped into the letter band (the girl inside
+  // the word "tock"; a second crossbow man above the real one). Context has to
+  // come from the context REFERENCE, not from a fatter edit crop.
+  const padPx = Math.round(Math.max(W, H) * (params.marginPct ?? 0.05));
   const crop = {
     left: Math.max(0, minx - padPx),
     top: Math.max(0, miny - padPx),
