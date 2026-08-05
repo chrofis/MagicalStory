@@ -1596,14 +1596,33 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   const refs = [`data:image/jpeg;base64,${cropBuf.toString('base64')}`];
   if (contextBuf) refs.push(`data:image/jpeg;base64,${contextBuf.toString('base64')}`);
 
+  // BACKEND is a lever, not an assumption (owner, 2026-08-05: the
+  // "Gemini for style / Qwen for small edits" rule came from avatars and repair,
+  // NOT from text — do not carry it over, measure it here instead).
+  //   params.backend: 'qwen' (Runware, default) | 'grok' | 'gemini'
+  //   params.model  : exact model id — a Runware id for qwen (lets other
+  //                   Runware edit models be tried with no code change), or an
+  //                   IMAGE_MODELS key for grok/gemini.
+  const backend = params.backend || 'qwen';
   const snap = v => Math.max(512, Math.min(2048, Math.round(v / 64) * 64));
   const t0 = Date.now();
-  const result = await editWithQwen(prompt, refs, {
-    width: snap(crop.width * 2), height: snap(crop.height * 2),
-  });
+  let result;
+  if (backend === 'qwen') {
+    result = await editWithQwen(prompt, refs, {
+      width: snap(crop.width * 2), height: snap(crop.height * 2),
+      ...(params.model ? { model: params.model } : {}),
+    });
+  } else {
+    // Shared dispatcher: routes by IMAGE_MODELS[...].backend and snaps the
+    // output aspect to the nearest preset both Grok and Gemini accept.
+    const { editImageWithPrompt } = require('./images');
+    const modelKey = params.model || (backend === 'grok' ? 'grok-imagine' : 'gemini-2.5-flash-image');
+    result = await editImageWithPrompt(refs[0], prompt, modelKey, refs.slice(1), storyData.artStyle);
+    if (!result?.imageData) throw new Error(`${backend} (${modelKey}) returned no image`);
+  }
   const elapsedMs = Date.now() - t0;
-  if (!result?.imageData) throw new Error('Qwen returned no image');
-  await addStep('raw Qwen output (before mask gating)', result.imageData);
+  if (!result?.imageData) throw new Error(`${backend} returned no image`);
+  await addStep(`raw ${backend} output (before mask gating)`, result.imageData);
 
   // --- 4. mask-gated paste-back (artwork outside the letters is untouched) ---
   const paintedRaw = await sharp(Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
@@ -1658,7 +1677,7 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   const versionIndex = await saveTestVersion(target.storyId, coverKey, null, finalUri, experimentId);
   return {
     imageType: coverKey, coverType: coverKey, versionIndex, steps,
-    promptUsed: prompt, modelId: result.modelId || 'alibaba:qwen-image-edit@2511', elapsedMs,
+    promptUsed: prompt, modelId: result.modelId || params.model || backend, elapsedMs,
     cost: result.cost ?? null,
     alignGate: {
       offMaskMeanDiff, threshold: ALIGN_MAX, pass: alignPass,
@@ -1684,6 +1703,7 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
       dilatePx,
       contextRef: useContextRef,
       recolor,
+      backend,
       refsSent: refs.length,
       deterministicColour: spec?.face || null,
     },
