@@ -34,7 +34,11 @@ const PROVIDER_FALLBACK_MODEL = {
   gemini_text: MODEL_DEFAULTS.utility,
   gemini: MODEL_DEFAULTS.utility,
   anthropic: MODEL_DEFAULTS.storyText,
-  openrouter: MODEL_DEFAULTS.storyText,
+  // NOT storyText: OpenRouter carries the eval/compliance traffic (Qwen,
+  // DeepSeek), which is ~10x cheaper than Claude. Falling back to the story
+  // model here would have inflated OpenRouter spend by roughly an order of
+  // magnitude, in the opposite direction to the $0 bug it usually causes.
+  openrouter: MODEL_DEFAULTS.evalModel,
 };
 
 // Per-image providers report real spend in direct_cost; token-priced providers

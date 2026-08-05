@@ -638,6 +638,24 @@ function calculateTextCost(modelId, usage) {
   let pricing = MODEL_PRICING[modelId];
 
   if (!pricing) {
+    // OpenRouter models are keyed with their vendor prefix ('qwen/qwen-plus'),
+    // but MODEL_DEFAULTS refers to them bare ('qwen-plus'), and neither branch
+    // below matches across the slash: 'qwen/qwen-plus'.startsWith('qwen-plus')
+    // is false, and 'qwen-plus'.includes('qwen/qwen-plus') is false too.
+    // Result: every eval/compliance call through OpenRouter priced at $0 —
+    // silent under-reporting in the pipeline's own cost accounting, not just in
+    // reports built on top of it. Match the part after the slash as well.
+    const lower = modelId.toLowerCase();
+    for (const [key, value] of Object.entries(MODEL_PRICING)) {
+      const bare = key.includes('/') ? key.split('/').pop() : key;
+      if (bare.toLowerCase() === lower) {
+        pricing = value;
+        break;
+      }
+    }
+  }
+
+  if (!pricing) {
     // Try to find a matching key by normalizing the model ID
     const normalizedId = modelId.toLowerCase().replace(/-\d+$/, '');
     for (const [key, value] of Object.entries(MODEL_PRICING)) {
