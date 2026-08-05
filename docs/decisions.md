@@ -4446,3 +4446,47 @@ sharpest available test of a treatment. Exposed as "Reference swap" in the form,
 "Blur face over crosshatch" checkbox for the A/B.
 
 **Touched:** `server/lib/faceRepair.js`, `server/lib/testlab.js`, `client/src/pages/TestLab.tsx`.
+
+## 2026-08-05 — SAM masks must FILL their DINO box (≥25%) and the inside test is per-axis
+**Context:** Staging story `job_1785767208189_x6lyay5fr` (ran 2026-08-03 15:04
+CEST) shipped three broken pages. The GroundingDINO person boxes were correct on
+all of them; the damage came from `_cleanMaskAndCheck`, which replaces the DINO
+box with the bounds of the accepted MobileSAM mask. p2: Roger's `bodyBox`
+collapsed onto a sliver of his vest fringe (1.7% of the box). p4: Lukas's
+collapsed onto the pumpkin standing beside him (1.6%). Both were recorded as
+`mask-ok`. p10's name swap followed from the same cause — the identity step
+marks figures from those boxes. Story-wide, 41 of 69 figures got
+`rejected-all-outside`: a box-prompted mask cannot land outside its own box
+unless SAM is answering about different pixels. The analyzer fault behind it was
+fixed the next day (`ff1ed9aa`, per-call SAM predictor/embedding clear, at a
+3813 MB RSS plateau) — but the acceptance rule that let 1.6% coverage through is
+independent of it, and Test Lab exp #314 confirms the same three pages now
+detect cleanly (19/19 figures `mask-ok`, 62–99% coverage).
+**Decision:** Two guards in `_cleanMaskAndCheck`:
+1. `SAM_MIN_BOX_COVERAGE = 0.25` — the kept extent must fill ≥25% of the DINO
+   box, else the mask is dropped wholesale and the tight DINO box is kept, with
+   a new verdict `rejected-too-small`. Coverage is measured bbox-area-to-bbox-
+   area (not silhouette pixels) so the number reads directly against the boxes
+   in a lab detection entry, and it is persisted per figure as `maskCoverage`.
+2. The inside-the-box tolerance is computed PER AXIS (`0.12 * width`,
+   `0.12 * height`) instead of `0.12 * max(width, height)` for both.
+`rejected-too-small` joins the `sam_mask_leak` story-log warning, so a page of
+them is findable per-story instead of only in container logs.
+**Rationale:** Falling back to the DINO box costs nothing — it is the pre-SAM
+truth, just not silhouette-tight — so the floor can sit far below any real
+silhouette and still never fire on good input (measured separation: 1.6–1.7%
+bad vs 62–99% good). The per-axis fix is what actually admitted the pumpkin: a
+tall narrow person box (253×733 px) got 88 px of horizontal slack from the long
+axis instead of 30, wide enough to swallow a prop standing entirely beside the
+figure. `tests/unit/sam-mask-guard.test.ts` pins both with the real geometry and
+fails on the pre-fix logic.
+**Not changed:** `fetchFigureMaskPng` (the repair-side `/figure-mask` path,
+`images.js:~10750`) still accepts any mask with `fill_pixels > 0` with no
+geometry check against the requested box — same defect class, different
+trade-off (its fallback is rembg, or null for face repairs). Open.
+**Touched:**
+- `server/lib/images.js` (`SAM_MIN_BOX_COVERAGE`, `_cleanMaskAndCheck`, the
+  Stage-2 verdict switch, `maskCoverage` on each figure)
+- `server/lib/testlab.js` (`maskCoverage` in the bbox detection entry)
+- `tests/unit/sam-mask-guard.test.ts`
+**Status:** ✅ active

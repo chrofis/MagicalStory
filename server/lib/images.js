@@ -2482,8 +2482,19 @@ async function _binMaskFromBuffer(buf, W, H) {
 // analyzer returned garbage). Rule (user 2026-07-20): KEEP every component that
 // is mostly inside the DINO box (occlusion included); DROP components mostly
 // outside it. Mutates the mask to the kept (inside) components and returns
-// { keptBox, droppedOutside }. keptBox === null → nothing inside the box, so the
-// caller keeps the tight DINO box as the bodyBox.
+// { keptBox, droppedOutside, coverage }. keptBox === null → nothing usable inside
+// the box, so the caller keeps the tight DINO box as the bodyBox.
+//
+// A kept mask must also FILL a meaningful share of the DINO box. Measured on
+// exp #314 (three pages, 19 figures, healthy analyzer): every real silhouette
+// covers 62-99% of its box. The two known failures — a story run against an
+// analyzer serving stale SAM embeddings (fixed in ff1ed9aa) — produced kept
+// fragments at 1.6% and 1.7%: a sliver of an adult's vest, and the pumpkin
+// standing next to a boy. Both were accepted as `mask-ok` and became the
+// figure's bodyBox. Falling back to the tight DINO box costs nothing (it is
+// the pre-SAM truth), so the floor sits far below any real silhouette.
+const SAM_MIN_BOX_COVERAGE = 0.25;
+
 async function _cleanMaskAndCheck(mask, gdinoBoxPx) {
   const { alpha, width: W, height: H } = mask;
   const lab = new Int32Array(W * H); let n = 0; const comps = [];
@@ -2500,15 +2511,19 @@ async function _cleanMaskAndCheck(mask, gdinoBoxPx) {
     }
     comps.push({ label: n, area, bbox: [minx, miny, maxx + 1, maxy + 1] });
   }
-  if (!comps.length) return { keptBox: null, droppedOutside: 0 };
+  if (!comps.length) return { keptBox: null, droppedOutside: 0, coverage: 0 };
   // Fraction of a component's bbox area that overlaps the DINO box, with a small
   // tolerance so a figure that legitimately overhangs the tight box a little is
-  // still "inside".
+  // still "inside". The tolerance is PER AXIS: deriving one tolerance from
+  // max(width, height) inflated the short axis by a fraction of the long one, so
+  // a tall narrow person box (253x733 px) got 88 px of horizontal slack instead
+  // of 30 — wide enough to swallow a prop standing entirely beside the figure.
   const [bx0, by0, bx1, by1] = gdinoBoxPx;
-  const tol = 0.12 * Math.max(bx1 - bx0, by1 - by0);
+  const tolX = 0.12 * (bx1 - bx0);
+  const tolY = 0.12 * (by1 - by0);
   const fracInside = (b) => {
-    const ix = Math.max(0, Math.min(b[2], bx1 + tol) - Math.max(b[0], bx0 - tol));
-    const iy = Math.max(0, Math.min(b[3], by1 + tol) - Math.max(b[1], by0 - tol));
+    const ix = Math.max(0, Math.min(b[2], bx1 + tolX) - Math.max(b[0], bx0 - tolX));
+    const iy = Math.max(0, Math.min(b[3], by1 + tolY) - Math.max(b[1], by0 - tolY));
     const a = (b[2] - b[0]) * (b[3] - b[1]);
     return a > 0 ? (ix * iy) / a : 0;
   };
@@ -2517,15 +2532,24 @@ async function _cleanMaskAndCheck(mask, gdinoBoxPx) {
     if (fracInside(c.bbox) >= 0.5) kept.push(c);
     else { drop.add(c.label); if (c.area > 50) droppedOutside++; }  // >50px = a real outside piece, not a speck
   }
-  if (!kept.length) return { keptBox: null, droppedOutside };       // all outside → use the DINO box
+  if (!kept.length) return { keptBox: null, droppedOutside, coverage: 0 };  // all outside → use the DINO box
+  let mnx = W, mny = H, mxx = -1, mxy = -1;
+  for (const c of kept) { mnx = Math.min(mnx, c.bbox[0]); mny = Math.min(mny, c.bbox[1]); mxx = Math.max(mxx, c.bbox[2]); mxy = Math.max(mxy, c.bbox[3]); }
+  // Coverage of the DINO box by the kept extent, measured the same way the
+  // boxes themselves are compared (bbox area, not silhouette pixel count) so
+  // the threshold reads directly against the numbers in a lab detection entry.
+  const boxArea = Math.max(1, (bx1 - bx0) * (by1 - by0));
+  const coverage = ((mxx - mnx) * (mxy - mny)) / boxArea;
+  if (coverage < SAM_MIN_BOX_COVERAGE) {
+    // Do NOT mutate the mask — the caller drops it wholesale and keeps the box.
+    return { keptBox: null, droppedOutside, coverage };
+  }
   if (drop.size) {
     for (let i = 0; i < W * H; i++) if (alpha[i] && drop.has(lab[i])) alpha[i] = 0;
   }
-  let mnx = W, mny = H, mxx = -1, mxy = -1;
-  for (const c of kept) { mnx = Math.min(mnx, c.bbox[0]); mny = Math.min(mny, c.bbox[1]); mxx = Math.max(mxx, c.bbox[2]); mxy = Math.max(mxy, c.bbox[3]); }
   mask.bbox = [mnx, mny, mxx, mxy]; mask.area = kept.reduce((s, c) => s + c.area, 0);
   if (drop.size) mask.pngBuf = await _maskToPng(mask);
-  return { keptBox: mask.bbox, droppedOutside };
+  return { keptBox: mask.bbox, droppedOutside, coverage };
 }
 
 // GroundingDINO text→box for a set of prompts.
@@ -2998,29 +3022,39 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     const rawMask = await _mobilesamMaskFull(imageDataUri, p.box, W, H);
     const gdinoNorm = _pxBoxToNorm(p.box, W, H);
     let bodyBox = gdinoNorm, mask = null, samApplied = false, maskVerdict = 'no-mask';
+    let maskCoverage = null;
     if (rawMask) {
       // Keep mask parts INSIDE the DINO box (occlusion is fine); drop parts
       // outside it (neighbour-grab / degraded-analyzer garbage). bodyBox = the
-      // kept parts; if nothing is inside, keep the tight DINO box.
-      const { keptBox, droppedOutside } = await _cleanMaskAndCheck(rawMask, p.box);
+      // kept parts; if nothing usable is inside, keep the tight DINO box.
+      const { keptBox, droppedOutside, coverage } = await _cleanMaskAndCheck(rawMask, p.box);
+      maskCoverage = +coverage.toFixed(3);
       if (keptBox) {
         mask = rawMask; bodyBox = _pxBoxToNorm(keptBox, W, H); samApplied = true;
         maskVerdict = droppedOutside ? 'mask-clipped-outside-box' : 'mask-ok';
         if (droppedOutside) log.debug(`[GDINO-DETECT] ${pageLabel}dropped ${droppedOutside} SAM component(s) outside the DINO box`);
+      } else if (coverage > 0) {
+        // Something survived the inside test but is far too small to be the
+        // figure — a prop beside it, or a fragment of a mask computed against
+        // different pixels. The DINO box is the safer answer.
+        maskVerdict = 'rejected-too-small';
+        log.debug(`[GDINO-DETECT] ${pageLabel}SAM mask fills only ${(coverage * 100).toFixed(1)}% of the DINO box (min ${(SAM_MIN_BOX_COVERAGE * 100).toFixed(0)}%) — keeping DINO box`);
       } else {
         maskVerdict = 'rejected-all-outside';
         log.debug(`[GDINO-DETECT] ${pageLabel}SAM mask entirely outside the DINO box — keeping DINO box`);
       }
     }
-    dets.push({ box: p.box, score: p.score, mask, bodyBox, gdinoBox: gdinoNorm, samApplied, maskVerdict });
+    dets.push({ box: p.box, score: p.score, mask, bodyBox, gdinoBox: gdinoNorm, samApplied, maskVerdict, maskCoverage });
   }
   // Persist any SAM mask leak to the STORY log (not just Railway), so a blow-out
   // is always findable later per-story instead of vanishing into container logs.
-  const leaks = dets.filter(d => d.maskVerdict === 'rejected-all-outside' || d.maskVerdict === 'mask-clipped-outside-box');
+  const leaks = dets.filter(d => d.maskVerdict === 'rejected-all-outside'
+    || d.maskVerdict === 'mask-clipped-outside-box'
+    || d.maskVerdict === 'rejected-too-small');
   if (leaks.length) {
     getCurrentLogger()?.warn?.('sam_mask_leak',
-      `${pageLabel}SAM mask leaked outside the DINO box on ${leaks.length}/${dets.length} figure(s) — kept the DINO box`,
-      null, { pageLabel, verdicts: dets.map(d => d.maskVerdict) });
+      `${pageLabel}SAM mask did not match the DINO box on ${leaks.length}/${dets.length} figure(s) — kept the DINO box`,
+      null, { pageLabel, verdicts: dets.map(d => d.maskVerdict), coverage: dets.map(d => d.maskCoverage) });
   }
   const noMask = dets.filter(d => d.maskVerdict === 'no-mask');
   if (dets.length >= 2 && noMask.length >= Math.ceil(dets.length * 0.6)) {
@@ -3159,7 +3193,12 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       bodyBox: d.bodyBox,
       gdinoBox: d.gdinoBox,
       samApplied: d.samApplied,
-      maskVerdict: d.maskVerdict,   // 'mask-ok' | 'rejected-disconnected' | 'rejected-over-10pct' | 'no-mask' — SAM mask validation vs DINO box
+      // 'mask-ok' | 'mask-clipped-outside-box' | 'rejected-all-outside' |
+      // 'rejected-too-small' | 'no-mask' — SAM mask validation vs the DINO box.
+      maskVerdict: d.maskVerdict,
+      // Share of the DINO box filled by the kept mask extent. Real silhouettes
+      // measure 0.62-0.99; anything under SAM_MIN_BOX_COVERAGE is rejected.
+      maskCoverage: d.maskCoverage,
       _faceSource: d.face ? 'dino' : undefined,
       _faceScore: d.face ? +d.face.score.toFixed(3) : undefined,
       confidence: name === 'UNKNOWN' ? 'low' : d.score >= 0.6 ? 'high' : d.score >= 0.4 ? 'medium' : 'low',
@@ -14777,6 +14816,9 @@ module.exports = {
   compressImageToJPEG,
   buildExpectedCharactersForBbox,
   buildObjectGroundingHints,
+  // Exported for tests/unit/sam-mask-guard.test.ts — the SAM acceptance rule
+  // decides every figure's bodyBox, so its thresholds need direct coverage.
+  _cleanMaskAndCheck,
 
   // Core image functions
   validateEmptyScene,
