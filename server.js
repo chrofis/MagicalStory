@@ -5255,6 +5255,29 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     );
 
     timing.pagesStart = Date.now();
+
+    // ── TEXT REFINEMENT, IN PARALLEL WITH IMAGES ──────────────────────────
+    // Scenes are locked at this point, so image generation and prose polishing
+    // are independent: the refiner receives the scene outlines READ-ONLY and may
+    // only rewrite page prose, never events. Running it here costs no wall-clock
+    // — images take ~25 min on a 10-page story, refinement ~2-4 min — whereas a
+    // pass after images would add its full duration to the total.
+    // Never blocks and never throws: a failed refinement leaves the original
+    // text in place (startBackgroundRefine swallows and logs).
+    const refineEnabled = process.env.TEXT_REFINE !== 'false';
+    let textRefinePromise = null;
+    if (refineEnabled) {
+      const { extractRefinablePages, startBackgroundRefine } = require('./server/lib/textRefine');
+      const refinablePages = extractRefinablePages(expandedScenes);
+      if (refinablePages.length > 0) {
+        genLog.info('text_refine_start', `Refining text for ${refinablePages.length} page(s) in parallel with images`);
+        textRefinePromise = startBackgroundRefine(inputData, refinablePages, {
+          rounds: parseInt(process.env.TEXT_REFINE_ROUNDS || '2', 10),
+          usageLabel: 'text_refine',
+        });
+      }
+    }
+
     let allImages;
     let pipelineEntityReport = null;
     let pipelineEntityHistory = null;
@@ -6754,6 +6777,37 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`📖 [UNIFIED] Generated ${imgSuccess}/${allImages.length} page images`);
     log.debug(`⏱️ [UNIFIED] Page images: ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s`);
     genLog.info('images_complete', `Generated ${imgSuccess}/${allImages.length} page images in ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s`);
+
+    // ── JOIN THE PARALLEL TEXT REFINEMENT ─────────────────────────────────
+    // Started back at pagesStart; on a normal run it finished long ago and this
+    // await returns immediately. Resolves to null on any failure — the original
+    // text simply stays.
+    if (textRefinePromise) {
+      const refined = await textRefinePromise;
+      if (refined?.changed?.length) {
+        // BOTH arrays: allImages[].text is a COPY taken when the page was
+        // prepared, so updating only the scene would leave the saved story on
+        // the pre-refinement prose.
+        const byPage = new Map(refined.pages.map(p => [p.pageNumber, p.text]));
+        for (const scene of expandedScenes) {
+          const t = byPage.get(scene.pageNumber);
+          if (t) scene.text = t;
+        }
+        for (const img of allImages) {
+          const t = byPage.get(img.pageNumber);
+          if (t) img.text = t;
+        }
+        const totalMs = refined.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0);
+        genLog.info(
+          'text_refine_complete',
+          `Text refined in ${refined.rounds.length} round(s), ${(totalMs / 1000).toFixed(1)}s — rewrote page(s) ${refined.changed.join(', ')}`,
+          null,
+          { rounds: refined.rounds.length, changedPages: refined.changed, durationMs: totalMs }
+        );
+      } else if (refined) {
+        genLog.info('text_refine_complete', 'Text refinement found nothing to rewrite');
+      }
+    }
 
     // Wait for cover images if still running (they ran parallel with page images)
     if (coverAwaitPromise) {

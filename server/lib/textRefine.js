@@ -1,0 +1,158 @@
+/**
+ * Iterative text refinement — full text in, rewritten pages out.
+ *
+ * ONE implementation, two callers: the Test Lab stage (`text_refine`) and the
+ * production pipeline, which runs it in parallel with image generation. Keeping
+ * the loop here rather than inside the Lab stage is the point — a second copy in
+ * server.js would drift the moment either side changed.
+ *
+ * The contract each round: the model receives the brief, the scene outlines
+ * (READ-ONLY) and the CURRENT text, writes an analysis, then returns only the
+ * pages it rewrote. Round N+1's input is round N's output; no critique is
+ * carried forward. Pages the model omits keep their text, so a page can never be
+ * lost by being skipped.
+ *
+ * Scene outlines being read-only is what makes the production parallelism safe:
+ * illustrations are already rendering from those scenes, and the refiner may
+ * only change prose, never events.
+ */
+
+const { log } = require('../utils/logger');
+
+/**
+ * @param {Object} storyData - story record fields (language, characters, brief, …)
+ * @param {Array<{pageNumber:number,text:string,sceneIntent:string}>} pages
+ * @param {Object} [opts]
+ * @param {number} [opts.rounds=4]      ceiling, not a target — stops when a round rewrites nothing
+ * @param {string} [opts.model]         model for every round
+ * @param {string[]} [opts.roundModels] per-round model override
+ * @param {string} [opts.promptOverride] replaces the round-1 prompt (Lab A/B only)
+ * @param {string} [opts.usageLabel]
+ * @returns {Promise<{pages, rounds, changed}>}
+ */
+async function refineStoryText(storyData, pages, opts = {}) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildTextRefinePrompt, parseRefinedText } = require('./storyHelpers');
+  const { callTextModelStreaming } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+
+  if (!Array.isArray(pages) || pages.length === 0) {
+    throw new Error('refineStoryText: no page text to refine');
+  }
+  const expected = pages.map(p => p.pageNumber);
+
+  const roundCount = Math.max(1, Math.min(8, parseInt(opts.rounds, 10) || 4));
+  const perRound = Array.isArray(opts.roundModels) ? opts.roundModels : [];
+  const defaultModel = opts.model || MODEL_DEFAULTS.outlineReviewModel;
+  const usageLabel = opts.usageLabel || 'text_refine';
+
+  const original = pages.map(p => ({ ...p }));
+  let current = pages.map(p => ({ ...p }));
+  const rounds = [];
+
+  for (let i = 0; i < roundCount; i++) {
+    const modelKey = perRound[i] || defaultModel;
+    if (!TEXT_MODELS[modelKey]) throw new Error(`Unknown model "${modelKey}"`);
+
+    // Built fresh from CURRENT text each round — that is the whole mechanism.
+    let prompt = buildTextRefinePrompt(storyData, current);
+    if (!prompt) throw new Error('text-refine template unavailable');
+    if (opts.promptOverride && i === 0) prompt = opts.promptOverride;
+
+    const t0 = Date.now();
+    try {
+      const r = await callTextModelStreaming(prompt, 16000, null, modelKey, { usageLabel });
+      const elapsedMs = Date.now() - t0;
+      const parsed = parseRefinedText(r.text || '', expected);
+
+      // Omission is the CONTRACT: only rewritten pages come back, everything else
+      // keeps its current text.
+      const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
+      const strayPages = parsed.pages.map(p => p.pageNumber).filter(n => !expected.includes(n));
+      const next = current.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
+
+      const changed = next.filter((p, idx) => p.text !== current[idx].text).map(p => p.pageNumber);
+      const changedFromOriginal = next.filter((p, idx) => p.text !== original[idx].text).map(p => p.pageNumber);
+
+      rounds.push({
+        round: i + 1,
+        ok: true,
+        modelKey,
+        modelId: r.modelId || TEXT_MODELS[modelKey].modelId,
+        provider: r.provider || null,
+        elapsedMs,
+        usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
+        cost: r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[modelKey].modelId, r.usage || {}),
+        promptChars: prompt.length,
+        prompt,
+        rawResponse: (r.text || '').slice(0, 40000),
+        analysis: (parsed.analysis || '').slice(0, 40000),
+        returnedPages: parsed.pages.map(p => p.pageNumber),
+        strayPages,
+        changedPages: changed,
+        changedFromOriginal,
+        converged: changed.length === 0,
+        pages: next.map((p, idx) => ({
+          pageNumber: p.pageNumber,
+          before: current[idx].text,
+          after: p.text,
+          original: original[idx].text,
+          sceneIntent: p.sceneIntent,
+        })),
+      });
+      current = next;
+      if (changed.length === 0) break;   // converged
+    } catch (err) {
+      rounds.push({ round: i + 1, ok: false, modelKey, elapsedMs: Date.now() - t0, error: err.message });
+      break;   // later rounds depend on this one's text
+    }
+  }
+
+  const changed = current
+    .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
+    .filter(n => n !== null);
+
+  return { pages: current, original, rounds, changed };
+}
+
+/**
+ * Pull the refiner's input out of a story record: page text plus the COMPACT
+ * scene intent. The full sceneDescription is Art Director prose — ~10x longer
+ * and mostly rendering instructions the writer must not be steered by.
+ *
+ * Works on both shapes: a stored story (sceneImages[]) and the in-flight
+ * pipeline's expanded scenes.
+ */
+function extractRefinablePages(sceneLike = []) {
+  return sceneLike
+    .filter(s => s && (s.text || '').trim())
+    .map(s => {
+      let sceneIntent = '';
+      try { sceneIntent = JSON.parse(s.outlineExtract || '{}').sceneIntent || ''; } catch { /* not JSON */ }
+      if (!sceneIntent) sceneIntent = (s.sceneDescription || s.description || '').slice(0, 600);
+      return { pageNumber: s.pageNumber, text: String(s.text).trim(), sceneIntent };
+    })
+    .sort((a, b) => a.pageNumber - b.pageNumber);
+}
+
+/**
+ * Fire-and-forget wrapper for the production pipeline: never throws, never
+ * blocks a story. A refinement failure must leave the original text intact and
+ * the generation unaffected — this is a polish pass, not a gate.
+ */
+function startBackgroundRefine(storyData, pages, opts = {}) {
+  return refineStoryText(storyData, pages, opts)
+    .then(res => {
+      const rounds = res.rounds.filter(r => r.ok).length;
+      const ms = res.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0);
+      log.info(`✍️  [TEXT-REFINE] ${rounds} round(s) in ${(ms / 1000).toFixed(1)}s — rewrote page(s) ${res.changed.join(', ') || 'none'}`);
+      return res;
+    })
+    .catch(err => {
+      log.warn(`⚠️ [TEXT-REFINE] skipped: ${err.message} — original text kept`);
+      return null;
+    });
+}
+
+module.exports = { refineStoryText, extractRefinablePages, startBackgroundRefine };

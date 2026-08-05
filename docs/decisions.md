@@ -4510,3 +4510,35 @@ finds small areas outside the figure". Fix: a size gate — a kept component mus
 the main silhouette (min 150px). Verified: a 100px speck drops, a 560px severed foot stays.
 
 **Touched:** `server/lib/testlab.js`, `server/lib/samBlend.js`.
+
+## 2026-08-05 — Text refinement runs in PARALLEL with image generation
+
+**Context:** measured on a 10-page story — storyGen (writer + review + scene expansion)
+5.5 min, **images 25.0 min**, covers 0.7 min, total 37.9 min. Images are 66% of wall
+clock, and everything text-side is small next to them.
+
+**Decision:** `text_refine` starts at `timing.pagesStart`, the moment scenes are locked,
+and is joined after `images_complete`. On a normal run the await returns immediately
+because refinement (~2-4 min) finished long before images (~25 min). A pass placed
+*after* images would have added its full duration to the total; here it costs nothing.
+
+**Why it is safe to overlap:** the refiner receives scene outlines READ-ONLY and rewrites
+page prose only, never events. The illustrations are rendering from those same scenes, so
+the two cannot contradict each other. This is the property the stage was designed around,
+not one added afterwards.
+
+**Both arrays are updated on join.** `allImages[].text` is a COPY of `scene.text` taken in
+`preparePageData` while images were being prepared; mutating `expandedScenes` alone would
+have persisted the pre-refinement prose. Verified by tracing `allImages[].text = pageData.scene.text`.
+
+**Never blocks a story.** `startBackgroundRefine` resolves to `null` on any failure and
+logs a warning; the original text stays. Verified: an unknown model returns null rather
+than throwing. Disable with `TEXT_REFINE=false`; rounds via `TEXT_REFINE_ROUNDS`
+(default 2).
+
+**One implementation.** The loop lives in `server/lib/textRefine.js`; the Lab stage
+delegates to it (its 123-line duplicate body was deleted). A Lab result is therefore
+evidence about the code production runs, not about a copy.
+
+**Touched:** `server/lib/textRefine.js` (new), `server/lib/testlab.js`, `server.js`.
+**Status:** ✅ kept — staging only until a full generation is observed end to end.

@@ -1932,109 +1932,21 @@ async function runOutlineReviewStage(target, { params = {} }) {
  * params.model   : model for every round, or params.roundModels[] for per-round
  */
 async function runTextRefineStage(target, { params = {}, promptOverride = null }) {
-  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
-  await loadPromptTemplates();
-  const { buildTextRefinePrompt, parseRefinedText } = require('./storyHelpers');
-  const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
-
+  const { refineStoryText, extractRefinablePages } = require('./textRefine');
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
 
-  // Page text + the compact scene intent (what the illustration shows). The full
-  // sceneDescription is Art Director prose — 10x longer and mostly rendering
-  // instructions the writer must not be steered by.
-  const pages = (storyData.sceneImages || [])
-    .filter(s => s && (s.text || '').trim())
-    .map(s => {
-      let sceneIntent = '';
-      try { sceneIntent = JSON.parse(s.outlineExtract || '{}').sceneIntent || ''; } catch { /* not JSON */ }
-      if (!sceneIntent) sceneIntent = (s.sceneDescription || '').slice(0, 600);
-      return { pageNumber: s.pageNumber, text: s.text.trim(), sceneIntent };
-    })
-    .sort((a, b) => a.pageNumber - b.pageNumber);
-
+  // Delegates to the SAME loop production runs (textRefine.js), so a Lab result
+  // is evidence about the real thing rather than about a copy of it.
+  const pages = extractRefinablePages(storyData.sceneImages || []);
   if (pages.length === 0) throw new Error(`Story ${target.storyId} has no page text to refine`);
-  const expected = pages.map(p => p.pageNumber);
 
-  // Rounds is a CEILING, not a target: the loop stops as soon as a pass returns
-  // no rewrites. A converged pass is cheap (it emits the NONE marker, so output
-  // is a handful of tokens) — the remaining cost is the prompt plus whatever the
-  // model reasons, which is why this is bounded rather than unlimited.
-  const roundCount = Math.max(1, Math.min(8, parseInt(params.rounds, 10) || 4));
-  const perRound = Array.isArray(params.roundModels) ? params.roundModels : [];
-  const defaultModel = params.model || MODEL_DEFAULTS.outlineReviewModel;
-
-  const original = pages.map(p => ({ ...p }));
-  let current = pages.map(p => ({ ...p }));
-  const rounds = [];
-
-  for (let i = 0; i < roundCount; i++) {
-    const modelKey = perRound[i] || defaultModel;
-    if (!TEXT_MODELS[modelKey]) throw new Error(`Unknown model "${modelKey}"`);
-
-    // Built fresh from CURRENT text each round — that is the whole mechanism.
-    let prompt = buildTextRefinePrompt(storyData, current);
-    if (!prompt) throw new Error('text-refine template unavailable');
-    if (promptOverride && i === 0) prompt = promptOverride; // A/B the template itself
-
-    const t0 = Date.now();
-    try {
-      const r = await callTextModelStreaming(prompt, 16000, null, modelKey, { usageLabel: 'testlab_text_refine' });
-      const elapsedMs = Date.now() - t0;
-      const parsed = parseRefinedText(r.text || '', expected);
-
-      // Omission is the CONTRACT now, not a fault: the model returns only the
-      // pages it rewrote, and everything else keeps its current text. That is
-      // also the safety property — a page can never be lost by being skipped.
-      const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
-      // A page number outside the book is the one thing that IS a fault.
-      const strayPages = parsed.pages.map(p => p.pageNumber).filter(n => !expected.includes(n));
-      const next = current.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
-
-      const changed = next.filter((p, idx) => p.text !== current[idx].text).map(p => p.pageNumber);
-      const changedFromOriginal = next.filter((p, idx) => p.text !== original[idx].text).map(p => p.pageNumber);
-
-      rounds.push({
-        round: i + 1,
-        ok: true,
-        modelKey,
-        modelId: r.modelId || TEXT_MODELS[modelKey].modelId,
-        provider: r.provider || null,
-        elapsedMs,
-        usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
-        cost: r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[modelKey].modelId, r.usage || {}),
-        promptChars: prompt.length,
-        // The FULL prompt sent, stored verbatim. A char count is not inspectable
-        // — the contract for every Lab card is that the exact prompt is visible.
-        prompt,
-        // And the raw model answer, so a parse problem is distinguishable from a
-        // model problem without going to Railway.
-        rawResponse: (r.text || '').slice(0, 40000),
-        // The findings that justify this round's rewrites — the answer to
-        // "why did it change that page", which a diff alone can't give.
-        analysis: (parsed.analysis || '').slice(0, 40000),
-        returnedPages: parsed.pages.map(p => p.pageNumber),
-        strayPages,
-        changedPages: changed,
-        changedFromOriginal,
-        converged: changed.length === 0,
-        pages: next.map((p, idx) => ({
-          pageNumber: p.pageNumber,
-          before: current[idx].text,
-          after: p.text,
-          original: original[idx].text,
-          sceneIntent: p.sceneIntent,
-        })),
-      });
-      current = next;
-      // Converged: the model found nothing worth rewriting. Every further round
-      // would pay a full prompt to be told the same thing.
-      if (changed.length === 0) break;
-    } catch (err) {
-      rounds.push({ round: i + 1, ok: false, modelKey, elapsedMs: Date.now() - t0, error: err.message });
-      break; // later rounds depend on this one's text
-    }
-  }
+  const res = await refineStoryText(storyData, pages, {
+    rounds: params.rounds,
+    model: params.model,
+    roundModels: params.roundModels,
+    promptOverride,
+    usageLabel: 'testlab_text_refine',
+  });
 
   return {
     stageKind: 'text_refine',
@@ -2044,15 +1956,16 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
     pageCount: pages.length,
     // NOT `rounds` — outline_review's iterate mode already returns that key with
     // a different shape, and both land in the same ExperimentResult.
-    refineRounds: rounds,
-    finalPages: current.map((p, idx) => ({
+    refineRounds: res.rounds,
+    finalPages: res.pages.map((p, idx) => ({
       pageNumber: p.pageNumber,
-      original: original[idx].text,
+      original: res.original[idx].text,
       final: p.text,
-      changed: p.text !== original[idx].text,
+      changed: p.text !== res.original[idx].text,
     })),
   };
 }
+
 
 /**
  * STYLE-REPAIR A/B stage (roadmap Pt 10). The missing repair half of the
