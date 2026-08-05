@@ -4563,3 +4563,27 @@ blur". Separately: "neither changed the clothing" on the identity swap.
    paint Lukas's clothing onto Roger, so clothing could never change.
 
 **Touched:** `server/lib/faceRepair.js`, `server/lib/testlab.js`.
+
+---
+
+## 2026-08-05 — Identity swap needs the PROMPT to name the reference; blur clipped to the figure silhouette
+
+**Context (exp #329):** the swap sent Roger's avatar and Roger's clothing, and nothing
+changed. The prompt was the reason: "REFERENCE PORTRAIT of **Lukas**", "paint one **Lukas**",
+"Match **Lukas's** … clothing" — the target's name appears 6+ times, and the text beat the
+image. Also the head blur still rendered as a grey rectangle: `fetchFaceHeadMaskPng` on the
+face crop returned nearly the whole box.
+
+**Decisions:**
+1. `opts.promptName` — the identity the PROMPT names, separate from `charName` (the character
+   who is in the scene). Every identity line in `buildPrompt` uses promptName; scene-state
+   lookups (`buildActionContext`) stay on charName so pose/expression still come from the
+   target's metadata. `referenceCharacter` now sets it, making a swap a REAL swap:
+   avatar + clothing + name.
+2. The face blur is clipped to the FIGURE silhouette already segmented for the hatch,
+   restricted to the face box — literally "the SAM part". No fresh head-mask call, and no box
+   fallback: without a silhouette the blur is skipped (a box blur destroys background).
+3. `blurStrength`: 'strong' (default, r ≈ 12% of face width — features destroyed) or 'slight'
+   (r ≈ 4.5% — shape and tone survive), for the A/B the owner asked for.
+
+**Touched:** `server/lib/faceRepair.js`, `server/lib/testlab.js`.

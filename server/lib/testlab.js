@@ -982,6 +982,11 @@ async function runCharRepairStage(ctx, opts) {
     protectedBodies,
     addStep,
     includeDebug: true,
+    // FULL identity swap: the prompt must NAME the reference character, or the
+    // text keeps ordering the target back (exp #329: Roger's avatar + 'paint one
+    // Lukas' = no change). Region/pose stay the target's.
+    ...(params.referenceCharacter ? { promptName: refName } : {}),
+    ...(params.blurStrength ? { blurStrength: params.blurStrength } : {}),
     // Crosshatch carries a blurred head by default (body pose from the hatch,
     // identity from the avatar). params.blurFace=false A/Bs the plain hatch.
     ...(params.blurFace !== undefined ? { blurFace: params.blurFace } : {}),

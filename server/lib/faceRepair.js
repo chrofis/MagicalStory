@@ -218,7 +218,7 @@ async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop,
 // CROSSHATCH — magenta SVG crosshatch clipped to the figure silhouette (dest-in).
 // FAITHFULNESS-CHECK: images.js:12163-12172 (grok_cutout hatch SVG) +
 //                     images.js:12483-12496 / 12689-12695 (grok_inpaint hatch + silhouette clip).
-async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage, sceneBuffer, sceneWidth, sceneHeight, protectedBodies, bodyBbox, faceBoxInCrop = null, blurFace = true }) {
+async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage, sceneBuffer, sceneWidth, sceneHeight, protectedBodies, bodyBbox, faceBoxInCrop = null, blurFace = true, blurStrength = 'strong' }) {
   const sharp = require('sharp');
   const { fetchFigureMaskPng } = require('./images');
   const figureLeft = boxInCrop[0], figureTop = boxInCrop[1];
@@ -253,11 +253,12 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
   let hatchRegion = hatchOnly;
   let oldMaskPng = null;
   let cov = 0;
+  let sil = null;   // figure silhouette (hatch coords) — reused to clip the face blur
   try {
     // Silhouette over the hatch region for the dest-in clip AND the blend union.
     const boxInHatch = [figureLeft - hatchLeft, figureTop - hatchTop, figureLeft - hatchLeft + figureWidth, figureTop - hatchTop + figureHeight];
     const hatchCrop = await sharp(cropBuf).extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight }).jpeg({ quality: 90 }).toBuffer();
-    let sil = await fetchFigureMaskPng(hatchCrop, boxInHatch, {});
+    sil = await fetchFigureMaskPng(hatchCrop, boxInHatch, {});
     if (sil) {
       // Occluder-subtract: rembg/SAM in the target crop returns ALL foreground
       // figures — a neighbour standing in front lands inside the hatch too. For
@@ -343,24 +344,34 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
   const blurLayers = [];
   if (blurFace && Array.isArray(faceBoxInCrop) && faceBoxInCrop.length === 4) {
     try {
-      const { fetchFaceHeadMaskPng } = require('./images');
       const fl = Math.max(0, Math.round(faceBoxInCrop[0])), ft = Math.max(0, Math.round(faceBoxInCrop[1]));
       const fw = Math.min(crop.w - fl, Math.round(faceBoxInCrop[2] - faceBoxInCrop[0]));
       const fh = Math.min(crop.h - ft, Math.round(faceBoxInCrop[3] - faceBoxInCrop[1]));
-      if (fw > 8 && fh > 8) {
+      // The clip is the FIGURE silhouette (already segmented for the hatch)
+      // restricted to the face box — literally "the SAM part". A fresh head-mask
+      // call on the face crop returned nearly the whole box, so the blur showed
+      // as a grey rectangle over the wall (exp #329).
+      if (fw > 8 && fh > 8 && sil) {
+        const silHead = await sharp(sil).resize(hatchWidth, hatchHeight, { fit: 'fill' })
+          .extract({
+            left: Math.max(0, Math.min(hatchWidth - 1, fl - hatchLeft)),
+            top: Math.max(0, Math.min(hatchHeight - 1, ft - hatchTop)),
+            width: Math.max(1, Math.min(fw, hatchWidth - Math.max(0, fl - hatchLeft))),
+            height: Math.max(1, Math.min(fh, hatchHeight - Math.max(0, ft - hatchTop))),
+          })
+          .resize(fw, fh, { fit: 'fill' }).png().toBuffer();
         const faceCrop = await sharp(cropBuf).extract({ left: fl, top: ft, width: fw, height: fh }).jpeg({ quality: 90 }).toBuffer();
-        const radius = Math.max(10, Math.round(fw * 0.12)); // features must not survive
+        // blurStrength: 'strong' (default, features destroyed) | 'slight' (shape
+        // and tone survive — the model still sees roughly what was there).
+        const factor = blurStrength === 'slight' ? 0.045 : 0.12;
+        const radius = Math.max(4, Math.round(fw * factor));
         const blurredFull = await sharp(faceCrop).blur(radius).png().toBuffer();
-        const headMask = await fetchFaceHeadMaskPng(faceCrop, [0, 0, fw, fh], fw, fh);
-        if (headMask) {
-          const clipped = await sharp(blurredFull).ensureAlpha()
-            .composite([{ input: await sharp(headMask).resize(fw, fh, { fit: 'fill' }).png().toBuffer(), blend: 'dest-in' }])
-            .png().toBuffer();
-          blurLayers.push({ input: clipped, top: ft, left: fl });
-          log.info(`[FACE REPAIR] crosshatch+faceblur: head silhouette blurred (r=${radius}) inside ${fw}x${fh}, hatch on top`);
-        } else {
-          log.warn('[FACE REPAIR] head mask unavailable — skipping the face blur rather than blurring the box (background must survive)');
-        }
+        const clipped = await sharp(blurredFull).ensureAlpha()
+          .composite([{ input: silHead, blend: 'dest-in' }]).png().toBuffer();
+        blurLayers.push({ input: clipped, top: ft, left: fl });
+        log.info(`[FACE REPAIR] crosshatch+faceblur: figure-silhouette head blurred (${blurStrength}, r=${radius}) inside ${fw}x${fh}, hatch on top`);
+      } else if (fw > 8 && fh > 8) {
+        log.warn('[FACE REPAIR] no figure silhouette — skipping the face blur (a box blur would destroy the background)');
       }
     } catch (err) {
       log.warn(`[FACE REPAIR] face blur over crosshatch failed (${err.message}) — hatch only`);
@@ -504,6 +515,12 @@ function buildTextPositionContext(textPosition, sceneDescription) {
 
 async function buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW, sceneH }) {
   const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+  // IDENTITY vs REGION. Every "paint <name>" / "match <name>'s clothing" line must
+  // name the person we WANT (opts.promptName), while scene-state lookups stay keyed
+  // on the character who is actually IN the scene (charName). Without this an
+  // identity swap sent B's avatar but still ordered "paint one A, match A's
+  // clothing" — the text won and nothing changed (exp #329).
+  const identityName = opts.promptName || charName;
   const clothingContext = opts.clothingDescription ? `\nClothing: ${opts.clothingDescription}` : '';
   const issueContext = opts.issueContext || (opts.issueDescription ? `\nIssues to fix: ${opts.issueDescription}` : '');
   const textPositionContext = opts.textPositionContext || buildTextPositionContext(opts.textPosition, opts.sceneDescription);
@@ -546,13 +563,13 @@ async function buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, f
   const artStyleContext = opts.artStyle ? `\n\nArt style: ${opts.artStyle}` : '';
   if (treatment === 'blur') {
     const tpl = !faceOnly && PROMPT_TEMPLATES.characterRepairBodyBlended ? PROMPT_TEMPLATES.characterRepairBodyBlended : PROMPT_TEMPLATES.characterRepairBlended;
-    if (tpl) return fillTemplate(tpl, { charName, clothingContext, actionContext, issueContext, textPositionContext });
+    if (tpl) return fillTemplate(tpl, { identityName, clothingContext, actionContext, issueContext, textPositionContext });
   }
   if (treatment === 'crosshatch') {
     const tpl = PROMPT_TEMPLATES.characterRepairCutout;
-    if (tpl) return fillTemplate(tpl, { charName, clothingContext, actionContext, issueContext, artStyleContext, textPositionContext });
+    if (tpl) return fillTemplate(tpl, { identityName, clothingContext, actionContext, issueContext, artStyleContext, textPositionContext });
   }
-  return `This is a children's book illustration. Redraw the marked figure to look like ${charName} from the reference photo. Match face, hair, skin tone, build and clothing exactly. Preserve the original pose, expression and gaze. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}${artStyleContext}`;
+  return `This is a children's book illustration. Redraw the marked figure to look like ${identityName} from the reference photo. Match face, hair, skin tone, build and clothing exactly. Preserve the original pose, expression and gaze. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}${artStyleContext}`;
 }
 
 // ===========================================================================
@@ -620,7 +637,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       Math.min(crop.w, Math.round(faceBbox[3] * W) - crop.x),
       Math.min(crop.h, Math.round(faceBbox[2] * H) - crop.y),
     ] : null;
-    treated = await buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage: gates.coverage, sceneBuffer, sceneWidth: W, sceneHeight: H, protectedBodies: opts.protectedBodies, bodyBbox, faceBoxInCrop: fbForBlur, blurFace: opts.blurFace !== false });
+    treated = await buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage: gates.coverage, sceneBuffer, sceneWidth: W, sceneHeight: H, protectedBodies: opts.protectedBodies, bodyBbox, faceBoxInCrop: fbForBlur, blurFace: opts.blurFace !== false, blurStrength: opts.blurStrength || 'strong' });
   } else if (treatment === 'blur') {
     treated = await buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCoverage: gates.coverage });
   } else {
