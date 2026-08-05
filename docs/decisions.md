@@ -4326,3 +4326,33 @@ working tree), whose message does not mention any of this — hence this entry.
 **Touched:** `server/lib/storyHelpers.js` (`getAgeMarkers`).
 **Status:** ✅ kept. Affects production image generation for characters whose bucket was
 previously merged.
+
+## 2026-08-05 — Title paint-in: crop width is a CONTEXT lever; sets stay generic (no title_sets)
+
+**Context:** Two owner interventions on the `cover_title_paintin` stage. (1) "Why such a narrow crop?
+What I am not always happy with is the chosen colour — does sending more of the image allow a better
+matching colour?" (2) A parallel rewrite of migration 010 generalises avatar sheet sets into a
+stage-typed `testlab_sets` table, while a title-specific `title_sets` mechanism was being added.
+
+**Decision:**
+1. Crop width is treated as a **resolution-vs-context** lever, not a safety one. The tight 5% crop was
+   inherited from the Qwen composite recipe (where full-frame edits re-imagine the scene), but the
+   mask-gated paste-back already discards everything outside the glyph mask, so a wider crop cannot
+   damage the artwork. `marginPct` default 0.05 → **0.12**; new `contextRef` (default ON) sends the
+   FULL cover as a second reference for palette/lighting while the model still edits only the crop;
+   new `recolor` (default OFF) lets the model pick a lettering colour that echoes an accent in the art.
+2. **No `title_sets`.** Set plumbing is held entirely until the generic `testlab_sets` lands; title
+   pinning will be a consumer of that, never a parallel mechanism. Migration 011 and the /title-sets
+   routes + Title sets tab were reverted in `bacab129`.
+
+**Rationale:** A crop that shows only the sky behind the title gives the model no way to know the
+cover's accent colour lives in a coat further down — starving exactly the decision the owner is
+unhappy with. Moving the colour choice to something that can see the whole picture is the direct fix;
+keeping it behind a flag preserves the deterministic pick as the default until an A/B says otherwise.
+On sets: two sets systems in one tree is the "parallel paths" failure the codebase rules forbid.
+
+**Touched:** `server/lib/testlab.js` (TITLE_PAINTIN_BASE / _KEEP_COLOUR / _RECOLOUR / _CONTEXT,
+`paintinSetup` result block), `client/src/pages/TestLab.tsx` ("What was sent to the model" card),
+`client/src/services/testlabService.ts`, `docs/cover-text-rendering-research.md`.
+
+**Status:** 🟡 built, still NOT run — no verdict yet on paint-in quality or on recolour.

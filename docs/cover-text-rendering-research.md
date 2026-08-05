@@ -58,10 +58,23 @@ Test Lab stage **`cover_title_paintin`** (`server/lib/testlab.js`), story-level,
    bbox. No new detection, no SAM, no API call.
 3. **Dilate** — grow the mask by ~1.2 % of the short side (`params.dilatePct`), then soften its border.
    The dilation is the room in which the model is *allowed* to add outline, bleed and shadow.
-4. **Crop-bounded edit** — crop the title region + 5 % margin and send only that to
+4. **Crop-bounded edit** — crop the title region + 12 % margin (`params.marginPct`) and send it to
    **Qwen-Image-Edit** at 2× (dims snapped to /64, min 512), with the story's `ART_STYLES` description
-   appended. This is the model's documented strength: editing text already present. The crop bound is
-   the rule established by the Qwen composite experiments — full-frame edits re-imagine the scene.
+   appended. This is the model's documented strength: editing text already present.
+
+   **Crop width is a resolution-vs-context lever, not a safety one** (owner question, 2026-08-05).
+   The tight 5 % crop was inherited from the Qwen *composite* recipe, where a full-frame edit
+   re-imagined the scene — but step 5 already discards everything outside the glyph mask, so a wider
+   crop cannot damage the artwork. What it changes is how many pixels each letter gets, and **how much
+   palette the model can see**: a crop showing only the sky behind the title cannot know the cover's
+   accent colour lives in a character's coat 60 % further down, so it has no basis for a colour that
+   echoes the artwork. Hence two further levers:
+   - `params.contextRef` (default **on**) — the full cover rides along as a **second reference**, so the
+     model sees the whole palette and lighting while still editing only the crop. No repaint risk.
+   - `params.recolor` (default **off**) — swaps the "keep the colour exactly" clause for "pick a colour
+     that already appears in the artwork as an accent, and keep it legible against what is behind it".
+     This is the lever aimed at the standing complaint that the *deterministic* colour pick is
+     sometimes wrong; it moves the colour decision to something that can actually see the picture.
 5. **Mask-gated paste-back** — the painted crop is composited back at exact coordinates using the
    dilated glyph mask as alpha. **Artwork outside the letters is pixel-identical by construction.**
 6. **OCR gate** — the painted title crop is transcribed by the utility vision model (temperature 0,
@@ -85,6 +98,12 @@ The stage exists; **no run has happened**. Open questions for the first experime
   unchanged? (The "Gemini is lazy on tiny tweaks" rule is why the backend is Qwen, not Gemini — but the
   edit magnitude here is small.)
 - Is `dilatePct` 1.2 % the right room? Too tight → no shadow/bleed; too loose → the model repaints art.
+- Does `contextRef` + `recolor` actually produce a better-matched title colour than the deterministic
+  pick, or does the model just drift toward mud? This is the first A/B to run: same covers, colour
+  locked vs model-chosen.
+- **Pinning is deliberately NOT built here.** A generic stage-typed `testlab_sets` mechanism is being
+  built separately (migration 010 rewrite); title pinning will be a consumer of it, not a second sets
+  system. Owner decision 2026-08-05.
 - OCR gate false-negative rate on a *good* paint-in (stylized letters the transcriber misreads). If this
   is non-trivial, the gate needs a second transcription vote before it can gate production.
 - Whether the flat 3D-extrude look should be dropped from the composite when a paint-in is planned
