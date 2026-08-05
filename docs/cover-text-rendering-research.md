@@ -123,3 +123,46 @@ plus a fallback path. If the paint-in disappoints, that is the next thing to A/B
 - <https://qwenlm.github.io/blog/qwen-image-edit/> · <https://arxiv.org/pdf/2508.02324> · <https://oneig-bench.github.io/>
 - Glyph-ByT5 <https://arxiv.org/pdf/2403.09622> · AnyText2 <https://openreview.net/pdf/62e6058c6bce2b28ab8af509d23522643ae6a392.pdf>
 - <https://fal.ai/models/fal-ai/ideogram/v3/edit/api> · <https://runware.ai/collections/sota-models>
+
+---
+
+## Run log — what four experiments actually proved (2026-08-05)
+
+Set `last-4-titles` (Test Lab set 3): Tock tock tock (pixar), Das Seil fliegt… ,
+Der Turm der Lügen bestraft, Lukas unter dem Lindenbaum (all watercolor).
+
+**#311** — crop 0.12 + full-cover context ref. Output unusable: duplicate titles, scene
+fragments inside letters, comb striping. **Three bugs, none of them the model:**
+
+1. **Wrong textless plate.** The plate is a `story_images` row of type `${coverKey}Art`, not
+   `cover.artImageData` (which does not exist on real stories). The code fell back to
+   `cover.imageData` — the SERVED, already-titled cover — so every crop went to Qwen with the
+   title baked in twice and the glyph mask was diffed against an image that already had lettering.
+2. **The context reference caused composition, not context.** Qwen has no "edit image 1, consult
+   image 2" semantics; with two refs it composes. Proof: an output whose input crop was the top 36 %
+   of the cover contained the crossbow man, the houses and the apple. `contextRef` now defaults OFF —
+   palette context must be TEXT, never a second image.
+3. **The glyph mask was 3-channel.** sharp emits sRGB even from a 1-channel raw input; the mask was
+   indexed as 1 channel and passed to `joinChannel` as alpha, so the alpha was the mask **squeezed 3×
+   horizontally and wrapped across rows**. That is the comb/scanline striping — model pixels leaking
+   hundreds of px from any letter (streaks across a character's eyes with a mask provably empty
+   there). Fixed with `toColourspace('b-w')` + hard `length === W*H` assertions.
+
+**#313** — 4/4 loud errors from the new plate guard. Correct: it refused to double-stamp.
+
+**#316** — real plate, single ref, mask bug still live. OCR 4/4, alignment 1/4. Still striped.
+
+**#318** — all three bugs fixed. **OCR 4/4, alignment 3/4** (the 1 failure is discarded and the flat
+composite served, as production would). Zero changed pixels below the letters — measured, not eyeballed.
+
+### Verdicts
+- ✅ The architecture is sound: glyphs from a font are never misspelled (4/4 across every run), and
+  mask-gating + the alignment gate keep the artwork pixel-exact or discard the attempt.
+- 🟡 **What paint-in adds is marginal** — a soft halo and slightly richer letter edges. It is not the
+  "painted into the artwork" transformation that motivated this. Not worth $0.011/cover as it stands.
+- ❌ **The OCR gate alone is not enough** — #311 passed two visually destroyed covers. The
+  **alignment gate** (off-mask pixels must equal the crop sent) is the gate that actually catches it.
+- 🔴 **The real remaining problem is the deterministic colour**, now cleanly isolated: on the pixar
+  cover the picker chose `#678c0d` — a green title on green foliage. It maximises WCAG contrast
+  against a sampled background box but is blind to composition. That is the next thing to fix, and it
+  needs no model at all.
