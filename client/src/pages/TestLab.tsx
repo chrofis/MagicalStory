@@ -26,6 +26,8 @@ import {
   type SentPrompt,
   type ReviewRun,
   type TextModelInfo,
+  type SheetSet,
+  type SheetSetMember,
 } from '@/services/testlabService';
 
 /**
@@ -74,7 +76,7 @@ function ReviewRunView({ run, title }: { run: ReviewRun; title?: string }) {
   );
 }
 
-type Tab = 'stories' | 'benchmark' | 'experiments';
+type Tab = 'stories' | 'benchmark' | 'sheetsets' | 'experiments';
 
 const tabBtn = (active: boolean) =>
   `px-4 py-2 rounded-lg font-medium transition-colors ${active ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`;
@@ -135,11 +137,13 @@ export default function TestLab() {
         <div className="flex gap-2 mb-4 sm:mb-6">
           <button className={tabBtn(tab === 'stories')} onClick={() => setTab('stories')}>Stories</button>
           <button className={tabBtn(tab === 'benchmark')} onClick={() => setTab('benchmark')}>Benchmark</button>
+          <button className={tabBtn(tab === 'sheetsets')} onClick={() => setTab('sheetsets')}>Sheet sets</button>
           <button className={tabBtn(tab === 'experiments')} onClick={() => setTab('experiments')}>Experiments</button>
         </div>
 
         {tab === 'stories' && <StoriesTab onReviewStory={useStoryForReview} />}
         {tab === 'benchmark' && <BenchmarkTab />}
+        {tab === 'sheetsets' && <SheetSetsTab />}
         {tab === 'experiments' && <ExperimentsTab preset={preset} onPresetApplied={() => setPreset(null)} />}
       </div>
     </div>
@@ -366,6 +370,103 @@ function BenchmarkTab() {
             </div>
             {b.snapshot?.sceneText && (
               <p className="text-xs text-gray-500 mt-2 line-clamp-3">{b.snapshot.sceneText}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Sheet sets tab — named reusable collections of 2×4 avatar sheets. Pin
+// failed sheets from an avatar_eval result (button on the result card), then
+// re-run the whole set here as one experiment.
+// ─────────────────────────────────────────────────────────────────────
+
+function SheetSetsTab() {
+  const [sets, setSets] = useState<SheetSet[]>([]);
+  const [expanded, setExpanded] = useState<Record<number, SheetSetMember[]>>({});
+  const [newName, setNewName] = useState('');
+  const [model, setModel] = useState('qwen3-vl');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try { setSets((await testlabService.getSheetSets()).sets); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Failed to load'); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const create = async () => {
+    if (!newName.trim()) return;
+    await testlabService.createSheetSet(newName.trim());
+    setNewName(''); load();
+  };
+  const toggle = async (id: number) => {
+    if (expanded[id]) { setExpanded(e => { const n = { ...e }; delete n[id]; return n; }); return; }
+    const detail = await testlabService.getSheetSet(id);
+    setExpanded(e => ({ ...e, [id]: detail.members }));
+  };
+  const run = async (id: number) => {
+    setBusy(true); setError(null);
+    try {
+      const res = await testlabService.runSheetSet(id, { model, splitRows: true });
+      alert(`Started experiment #${res.id} over ${res.sheets} sheets — open it from the Experiments tab.`);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Run failed'); }
+    finally { setBusy(false); }
+  };
+  const del = async (id: number) => { if (window.confirm('Delete this set?')) { await testlabService.deleteSheetSet(id); load(); } };
+  const unpin = async (setId: number, memberId: number) => {
+    await testlabService.unpinSheet(setId, memberId);
+    const detail = await testlabService.getSheetSet(setId);
+    setExpanded(e => ({ ...e, [setId]: detail.members })); load();
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <h2 className="font-semibold text-gray-900">Avatar sheet sets</h2>
+        <label className="text-xs text-gray-500 ml-auto flex items-center gap-1">Judge
+          <select className="border rounded-lg px-2 py-1 text-xs" value={model} onChange={e => setModel(e.target.value)}>
+            <option value="qwen3-vl">qwen3-vl</option>
+            <option value="qwen3-vl-235b">qwen3-vl-235b</option>
+            <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+            <option value="grok-4-fast">grok-4-fast</option>
+          </select>
+        </label>
+        <Button variant="secondary" size="sm" onClick={load}><RefreshCw size={14} /></Button>
+      </div>
+      <div className="flex gap-2 mb-4">
+        <input className="border rounded-lg px-3 py-2 text-sm flex-1" placeholder="New set name (e.g. failed-heads)" value={newName}
+          onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && create()} />
+        <Button size="sm" onClick={create}><Plus size={14} /> Create</Button>
+      </div>
+      {error && <div className="text-sm text-red-600 mb-3">{error}</div>}
+      {sets.length === 0 && <div className="text-sm text-gray-400">No sets yet. Create one, then pin sheets from an "Avatar sheet eval" result.</div>}
+      <div className="space-y-2">
+        {sets.map(s => (
+          <div key={s.id} className="border rounded-lg p-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button className="font-medium text-indigo-700 hover:underline" onClick={() => toggle(s.id)}>
+                {s.name} <span className="text-gray-400 font-normal">({s.memberCount} sheets)</span>
+              </button>
+              <div className="ml-auto flex gap-2">
+                <Button size="sm" disabled={busy || s.memberCount === 0} onClick={() => run(s.id)}>Run set</Button>
+                <Button variant="secondary" size="sm" onClick={() => del(s.id)}><Trash2 size={14} /></Button>
+              </div>
+            </div>
+            {expanded[s.id] && (
+              <ul className="mt-2 space-y-1">
+                {expanded[s.id].length === 0 && <li className="text-xs text-gray-400">Empty — pin sheets from an avatar_eval result.</li>}
+                {expanded[s.id].map(m => (
+                  <li key={m.id} className="text-xs text-gray-600 flex items-center gap-2">
+                    <span className="font-mono">{m.character}</span> · pass {m.pass}
+                    <span className="text-gray-400">{m.storyTitle || m.storyId}</span>
+                    <button className="ml-auto text-red-400 hover:text-red-600" onClick={() => unpin(s.id, m.id)}><Trash2 size={12} /></button>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         ))}
@@ -2032,6 +2133,19 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
             <StepsStrip steps={result.steps} images={stepImgs} onOpen={vi => { const g = gallery(); const s = (result.steps || []).find(x => x.versionIndex === vi); const idx = s ? g.findIndex(x => x.label === s.label) : 0; openLightbox(g, idx >= 0 ? idx : 0); }} />
           )}
 
+          {result.titleGate && (
+            <div className={`mt-3 rounded-lg p-3 text-xs border ${result.titleGate.pass === true ? 'bg-green-50 border-green-200 text-green-900'
+              : result.titleGate.pass === false ? 'bg-red-50 border-red-200 text-red-900'
+                : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+              <div className="font-semibold mb-1">OCR gate — {result.titleGate.verdict}</div>
+              <div className="font-mono">expected: “{result.titleGate.expected}”</div>
+              <div className="font-mono">read&nbsp;&nbsp;&nbsp;&nbsp;: {result.titleGate.ocr != null ? `“${result.titleGate.ocr}”` : '—'}</div>
+              {result.typography?.fontId && (
+                <div className="mt-1 opacity-80">font {result.typography.fontId} · layout {result.typography.layout} · {result.typography.face}</div>
+              )}
+            </div>
+          )}
+
           {result.decision && (
             <div className="text-xs text-gray-600 mt-2">
               <b>Repair decision:</b> {result.decision.method}{result.decision.charName ? ` [${result.decision.charName}]` : ''} — {result.decision.reason}
@@ -2060,6 +2174,21 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                   )}
                   {(stage === 'bbox' || result.detectionBackend) && (result.figures || result.objects) && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ backend: result.detectionBackend, figures: result.figures, objects: result.objects }, null, 2)}</pre>
+                  )}
+                  {stage === 'avatar_eval' && result.character && (result as { pass?: number }).pass != null && (
+                    <Button variant="secondary" size="sm" onClick={async () => {
+                      const name = window.prompt('Pin this sheet to which set? (existing name or a new one)');
+                      if (!name?.trim()) return;
+                      try {
+                        const set = await testlabService.createSheetSet(name.trim());
+                        await testlabService.pinSheet(set.id, {
+                          storyId: result.storyId, character: result.character!,
+                          pass: (result as { pass?: number }).pass,
+                          label: `final ${(result.report as { finalScore?: number } | undefined)?.finalScore ?? '?'}`,
+                        });
+                        alert(`Pinned ${result.character} (pass ${(result as { pass?: number }).pass}) to "${set.name}".`);
+                      } catch (e) { alert(`Pin failed: ${e instanceof Error ? e.message : e}`); }
+                    }}><Plus size={14} /> Pin to set</Button>
                   )}
                   {(stage === 'entity' || stage === 'style_check' || stage === 'avatar_eval' || stage === 'repair_verify') && result.report != null && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64">{JSON.stringify(result.report, null, 2)}</pre>

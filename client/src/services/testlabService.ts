@@ -125,6 +125,9 @@ export interface ExperimentResult {
   bbox?: number[];
   faceBbox?: number[];
   steps?: { label: string; imageType: string; versionIndex: number }[];
+  // cover_title_paintin: deterministic OCR gate on the painted title
+  titleGate?: { expected: string; ocr: string | null; pass: boolean | null; error?: string | null; verdict: string };
+  typography?: { fontId?: string; layout?: string; face?: string; lines?: string[] };
   variantScores?: ExperimentResult['scores'];
   newSceneDescriptionA?: string | null;
   newSceneDescriptionB?: string | null;
@@ -278,6 +281,7 @@ export const TESTLAB_STAGES = [
   { id: 'repair_verify', label: 'Repair verification (diff)', producesImage: true, overridable: false },
   { id: 'qwen_insert', label: 'Qwen insert (crop-bounded)', producesImage: true, overridable: true, noTemplate: true },
   { id: 'cover', label: 'Cover render', producesImage: true, overridable: true, storyLevel: true },
+  { id: 'cover_title_paintin', label: 'Cover title paint-in (glyph-masked Qwen + OCR gate)', producesImage: true, overridable: true, storyLevel: true, noTemplate: true },
   { id: 'style_check', label: 'Style consistency check', producesImage: false, overridable: false, storyLevel: true },
   { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
   { id: 'text_refine', label: 'Text refine — full text in, full text out (rounds)', producesImage: false, overridable: true, storyLevel: true },
@@ -371,4 +375,46 @@ export const testlabService = {
   promote(storyId: string, pageNumber: number | null, versionIndex: number, setActive = true, imageType?: string) {
     return api.post<{ success: boolean }>('/api/admin/testlab/promote', { storyId, pageNumber, versionIndex, setActive, ...(imageType ? { imageType } : {}) });
   },
+
+  // Avatar sheet sets — named reusable collections of 2×4 sheets to batch-eval.
+  getSheetSets() {
+    return api.get<{ sets: SheetSet[] }>('/api/admin/testlab/sheet-sets');
+  },
+  createSheetSet(name: string) {
+    return api.post<{ id: number; name: string }>('/api/admin/testlab/sheet-sets', { name });
+  },
+  getSheetSet(id: number) {
+    return api.get<{ id: number; name: string; members: SheetSetMember[] }>(`/api/admin/testlab/sheet-sets/${id}`);
+  },
+  deleteSheetSet(id: number) {
+    return api.delete<{ success: boolean }>(`/api/admin/testlab/sheet-sets/${id}`);
+  },
+  pinSheet(setId: number, member: { storyId: string; character: string; pass?: number; entryIndex?: number; label?: string }) {
+    return api.post<{ id: number }>(`/api/admin/testlab/sheet-sets/${setId}/members`, member);
+  },
+  unpinSheet(setId: number, memberId: number) {
+    return api.delete<{ success: boolean }>(`/api/admin/testlab/sheet-sets/${setId}/members/${memberId}`);
+  },
+  runSheetSet(setId: number, opts: { model?: string; splitRows?: boolean } = {}) {
+    return api.post<{ id: number; sheets: number }>(`/api/admin/testlab/sheet-sets/${setId}/run`, opts);
+  },
 };
+
+export interface SheetSet {
+  id: number;
+  name: string;
+  createdBy: string | null;
+  createdAt: string;
+  memberCount: number;
+}
+
+export interface SheetSetMember {
+  id: number;
+  storyId: string;
+  character: string;
+  pass: number;
+  entryIndex: number | null;
+  label: string | null;
+  storyTitle: string | null;
+  addedAt: string;
+}

@@ -1298,6 +1298,213 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
   };
 }
 
+// ---------------------------------------------------------------------------
+// Cover title PAINT-IN (glyph-conditioned text integration) — 2026-08-05
+//
+// WHY this shape: no image model spells reliably. The 2026 SOTA sits at ~90-95%
+// on short copy (Ideogram 4, GPT Image 2, Qwen-Image) and degrades further on
+// the umlauts/accents every German and French title carries — so "let the model
+// write the title" ships a garbled cover roughly 1 in 10 books, and a VLM judge
+// does not reliably catch a single transposed letter. The research direction
+// that DID solve this (GlyphControl, AnyText, TextDiffuser, Glyph-ByT5: <20% →
+// ~90%) never asks the model to spell: it pre-renders the correct glyphs and
+// lets diffusion only STYLE them.
+//
+// This stage is that principle on our own stack:
+//   1. composeCover renders the title from a real font file  → spelling correct
+//      by construction (this is the existing app-side typography, unchanged).
+//   2. Diff composed-vs-textless art → exact GLYPH MASK (no new detection).
+//   3. Crop the title region and hand it to Qwen-Image-Edit ($0.008), whose
+//      single strongest documented capability is editing text ALREADY PRESENT
+//      in an image while preserving font/size/layout. It paints medium,
+//      texture, edge bleed and contact shadow into letters it does not have to
+//      invent.
+//   4. Paste back gated by the dilated glyph mask, so the artwork outside the
+//      letters stays pixel-identical (the crop-bounded-insertion rule from the
+//      Qwen composite experiments — full-frame edits re-imagine the scene).
+//   5. OCR GATE: transcribe the painted title and compare EXACTLY against the
+//      story title (diacritic-sensitive). Deterministic pass/fail — not a
+//      quality judge. Production port fails back to the flat composite, so a
+//      garbled title is structurally unable to ship.
+//
+// Target: {storyId}. params: { coverType (frontCover), title, marginPct,
+// dilatePct, style }. promptOverride replaces the paint-in prompt.
+// ---------------------------------------------------------------------------
+const TITLE_PAINTIN_PROMPT = `The image is a children's book cover whose title lettering has been placed on top of the artwork as a flat graphic. Repaint the lettering so it belongs to the illustration: the letters take on the medium, brush texture, edge quality and lighting of the artwork, pigment sitting in the paper, a soft contact shadow under each letter and slight natural edge bleed.
+Keep the spelling, the letters, the word order, the line breaks, the letterforms, the size, the colour and the exact position identical. Do not add, remove or redraw any letter. Leave the artwork behind and around the lettering unchanged.`;
+
+/** Transcribe visible text in an image. Deterministic OCR gate input — the
+ *  model is asked to copy characters, never to judge quality. */
+async function transcribeTextInImage(imageDataUri) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured');
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const r2 = require('./r2');
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility}:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { inline_data: { mime_type: imageDataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(imageDataUri) } },
+          { text: 'Transcribe the large title lettering in this image character by character. Copy exactly what is drawn, including accents and umlauts, even if a letter looks malformed or misspelled — do not correct it. Return JSON: {"text": "<transcription>"}' },
+        ] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+      }),
+      signal: AbortSignal.timeout(45_000),
+    });
+  if (!response.ok) throw new Error(`OCR call failed: ${(await response.text()).slice(0, 200)}`);
+  const data = await response.json();
+  const raw = (data.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
+  const parsed = require('./storyHelpers').extractJsonFromText(raw);
+  if (!parsed || typeof parsed.text !== 'string') throw new Error(`Invalid OCR response: ${raw.slice(0, 120)}`);
+  return parsed.text;
+}
+
+// Case-insensitive (several title fonts render uppercase-only) but
+// DIACRITIC-sensitive — "Marchen" must fail against "Märchen".
+function normalizeTitleForGate(s) {
+  return String(s).normalize('NFC').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+async function runCoverTitlePaintinStage(target, { experimentId, promptOverride, params = {} }) {
+  const sharp = require('sharp');
+  const r2 = require('./r2');
+  const { composeCover } = require('./coverTypography');
+  const { editWithQwen } = require('./runware');
+
+  const coverKey = params.coverType || target.coverType || 'frontCover';
+  if (coverKey !== 'frontCover') {
+    throw new Error(`cover_title_paintin runs on the frontCover title lockup (got "${coverKey}")`);
+  }
+  const { storyData } = await loadStoryDataFull(target.storyId);
+  const cover = storyData.coverImages?.[coverKey];
+  if (!cover) throw new Error(`Story has no ${coverKey} — pick a story generated with covers`);
+  const title = String(params.title || storyData.title || '').trim();
+  if (!title) throw new Error('Story has no title to paint in');
+
+  // Covers render TEXTLESS and typography is baked app-side, so artImageData is
+  // the clean plate. Pre-bake stories only have imageData.
+  const artBytes = await r2.bytesFromAnyImage(cover.artImageData || cover.imageData);
+  if (!artBytes) throw new Error('Could not resolve cover art bytes');
+
+  const steps = [];
+  const addStep = async (label, dataUri) => {
+    const v = await saveTestVersion(target.storyId, 'tl_step', null, dataUri, experimentId);
+    steps.push({ label, imageType: 'tl_step', versionIndex: v });
+  };
+
+  // --- 1. deterministic lockup (unchanged production typography) -------------
+  const figures = cover.bboxDetection?.figures || [];
+  const { buffer: composedBuf, spec } = await composeCover({
+    artBuffer: artBytes, kind: 'front', title, seed: storyData.title, figures,
+    style: params.style || cover.typographyStyle || undefined,
+  });
+  if (spec?.skipped) throw new Error(`Typography skipped (${spec.skipped}) — nothing to paint in`);
+  await addStep('baseline: deterministic lockup (composeCover)', `data:image/jpeg;base64,${composedBuf.toString('base64')}`);
+
+  // --- 2. glyph mask = composed − art ---------------------------------------
+  const meta = await sharp(composedBuf).metadata();
+  const W = meta.width, H = meta.height;
+  const rawArt = await sharp(artBytes).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const rawComposed = await sharp(composedBuf).removeAlpha().raw().toBuffer();
+  const inkMask = Buffer.alloc(W * H);
+  let minx = W, miny = H, maxx = -1, maxy = -1;
+  for (let p = 0, i = 0; p < W * H; p++, i += 3) {
+    const d = Math.max(
+      Math.abs(rawComposed[i] - rawArt[i]),
+      Math.abs(rawComposed[i + 1] - rawArt[i + 1]),
+      Math.abs(rawComposed[i + 2] - rawArt[i + 2]));
+    if (d > 12) {
+      inkMask[p] = 255;
+      const x = p % W, y = (p / W) | 0;
+      if (x < minx) minx = x; if (x > maxx) maxx = x;
+      if (y < miny) miny = y; if (y > maxy) maxy = y;
+    }
+  }
+  if (maxx < 0) throw new Error('No typography ink found in the composed cover');
+
+  // Dilate so the painted letters may grow an outline / bleed / shadow beyond
+  // the flat glyph edge, then soften the mask border so the paste-back has no
+  // hard cut. The dilation is what lets the model add the effects we want.
+  const dilatePx = Math.max(4, Math.round(Math.min(W, H) * (params.dilatePct ?? 0.012)));
+  const grownMaskPng = await sharp(inkMask, { raw: { width: W, height: H, channels: 1 } })
+    .blur(dilatePx).threshold(28).blur(Math.max(1.5, dilatePx / 6)).png().toBuffer();
+  await addStep(`glyph mask (dilated ${dilatePx}px — paint-in is clipped to this)`, `data:image/png;base64,${grownMaskPng.toString('base64')}`);
+
+  // --- 3. crop-bounded edit --------------------------------------------------
+  const padPx = Math.round(Math.max(W, H) * (params.marginPct ?? 0.05));
+  const crop = {
+    left: Math.max(0, minx - padPx),
+    top: Math.max(0, miny - padPx),
+  };
+  crop.width = Math.min(W, maxx + 1 + padPx) - crop.left;
+  crop.height = Math.min(H, maxy + 1 + padPx) - crop.top;
+
+  const cropBuf = await sharp(composedBuf).extract(crop).jpeg({ quality: 95 }).toBuffer();
+  await addStep('input: title crop sent to Qwen', `data:image/jpeg;base64,${cropBuf.toString('base64')}`);
+
+  const styleLine = (() => {
+    try {
+      const { ART_STYLES } = require('./storyHelpers');
+      const raw = ART_STYLES[storyData.artStyle];
+      const txt = typeof raw === 'string' ? raw : (raw && raw.default) || '';
+      return txt ? `\nThe artwork's style: ${txt}` : '';
+    } catch { return ''; }
+  })();
+  const prompt = (promptOverride || TITLE_PAINTIN_PROMPT) + styleLine;
+
+  const snap = v => Math.max(512, Math.min(2048, Math.round(v / 64) * 64));
+  const t0 = Date.now();
+  const result = await editWithQwen(prompt, [`data:image/jpeg;base64,${cropBuf.toString('base64')}`], {
+    width: snap(crop.width * 2), height: snap(crop.height * 2),
+  });
+  const elapsedMs = Date.now() - t0;
+  if (!result?.imageData) throw new Error('Qwen returned no image');
+  await addStep('raw Qwen output (before mask gating)', result.imageData);
+
+  // --- 4. mask-gated paste-back (artwork outside the letters is untouched) ---
+  const paintedRaw = await sharp(Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
+    .resize(crop.width, crop.height, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const cropMaskRaw = await sharp(grownMaskPng).extract(crop).raw().toBuffer();
+  const paintedRgba = await sharp(paintedRaw, { raw: { width: crop.width, height: crop.height, channels: 3 } })
+    .joinChannel(cropMaskRaw, { raw: { width: crop.width, height: crop.height, channels: 1 } })
+    .png().toBuffer();
+  const finalBuf = await sharp(composedBuf)
+    .composite([{ input: paintedRgba, left: crop.left, top: crop.top }])
+    .jpeg({ quality: 92 }).toBuffer();
+  const finalUri = `data:image/jpeg;base64,${finalBuf.toString('base64')}`;
+
+  // --- 5. OCR gate (deterministic, diacritic-sensitive) ----------------------
+  const paintedCropUri = `data:image/jpeg;base64,${(await sharp(finalBuf).extract(crop).jpeg({ quality: 95 }).toBuffer()).toString('base64')}`;
+  let ocrText = null, gatePass = null, gateError = null;
+  try {
+    ocrText = await transcribeTextInImage(paintedCropUri);
+    gatePass = normalizeTitleForGate(ocrText) === normalizeTitleForGate(title);
+  } catch (e) {
+    gateError = e.message;
+  }
+
+  const versionIndex = await saveTestVersion(target.storyId, coverKey, null, finalUri, experimentId);
+  return {
+    imageType: coverKey, coverType: coverKey, versionIndex, steps,
+    promptUsed: prompt, modelId: result.modelId || 'alibaba:qwen-image-edit@2511', elapsedMs,
+    cost: result.cost ?? null,
+    titleGate: {
+      expected: title,
+      ocr: ocrText,
+      pass: gatePass,
+      error: gateError,
+      verdict: gatePass === true ? 'PASS — letters intact, paint-in shippable'
+        : gatePass === false ? 'FAIL — lettering changed; production would keep the flat composite'
+          : `GATE ERROR — ${gateError}`,
+    },
+    typography: { fontId: spec?.fontId, layout: spec?.layout, face: spec?.face, lines: spec?.lines },
+    maskPx: { dilatePx, crop },
+    issuesSummary: gatePass === false ? `OCR mismatch: drew "${ocrText}" for "${title}"` : null,
+  };
+}
+
 /** Cross-page style consistency check (report only). Target: {storyId}. */
 async function runStyleCheckStage(target, { experimentId }) {
   const { loadPromptTemplates } = require('../services/prompts');
@@ -3214,11 +3421,13 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   }
 
   // Stored production sheet path — pick the sheet by pass from the story's
-  // avatar-generation audit.
-  const pass = Number(params.pass);
+  // avatar-generation audit. pass/entryIndex may be set PER TARGET (sheet-set
+  // runs mix pass-1 and pass-2 members) or globally on params.
+  const pass = Number(target.pass ?? params.pass);
   if (pass !== 1 && pass !== 2) {
-    throw new Error('avatar_eval needs params.pass (1=realistic anchor, 2=styled sheet) or params.versionIndex (a lab tl_avatar)');
+    throw new Error('avatar_eval needs pass (1=realistic anchor, 2=styled sheet) on the target or params, or params.versionIndex (a lab tl_avatar)');
   }
+  const entryIndexParam = target.entryIndex ?? params.entryIndex;
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
   const entries = storyData.styledAvatarGeneration || [];
   const wanted = (target.character || '').toLowerCase();
@@ -3229,8 +3438,8 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     const names = [...new Set(entries.map(e => e.characterName).filter(Boolean))];
     throw new Error(`No styledAvatarGeneration entry for "${target.character}" (have: ${names.join(', ') || 'none'})`);
   }
-  const chosen = params.entryIndex != null
-    ? matches.find(m => m.i === Number(params.entryIndex))
+  const chosen = entryIndexParam != null
+    ? matches.find(m => m.i === Number(entryIndexParam))
     : matches[matches.length - 1];
   if (!chosen) throw new Error(`entryIndex ${params.entryIndex} not found for "${target.character}"`);
   const entry = chosen.e;
@@ -3351,6 +3560,7 @@ const STAGE_RUNNERS = {
 // Story-level stages: target {storyId} (+ coverType for cover). No page context.
 const STORY_STAGES = {
   cover: runCoverStage,
+  cover_title_paintin: runCoverTitlePaintinStage,
   style_check: runStyleCheckStage,
   style_repair: runStyleRepairStage,
   outline_review: runOutlineReviewStage,

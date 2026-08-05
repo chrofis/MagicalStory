@@ -248,6 +248,149 @@ router.delete('/benchmark/:id', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────
+// Avatar sheet sets — named, reusable collections of 2×4 sheets to re-run
+// avatar_eval over as a batch. Members are (story, character, pass).
+// ─────────────────────────────────────────────────────────────────────
+
+// GET /api/admin/testlab/sheet-sets — all sets with member counts
+router.get('/sheet-sets', async (req, res) => {
+  try {
+    const rows = await dbQuery(
+      `SELECT s.id, s.name, s.created_by, s.created_at,
+              COUNT(m.id)::int AS member_count
+       FROM avatar_sheet_sets s
+       LEFT JOIN avatar_sheet_set_members m ON m.set_id = s.id
+       GROUP BY s.id ORDER BY s.created_at DESC`
+    );
+    res.json({ sets: rows.map(r => ({ id: r.id, name: r.name, createdBy: r.created_by, createdAt: r.created_at, memberCount: r.member_count })) });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to list sheet sets', details: err.message });
+  }
+});
+
+// POST /api/admin/testlab/sheet-sets { name }
+router.post('/sheet-sets', async (req, res) => {
+  try {
+    const name = String(req.body?.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'name required' });
+    const rows = await dbQuery(
+      `INSERT INTO avatar_sheet_sets (name, created_by) VALUES ($1, $2)
+       ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id, name`,
+      [name, req.user.username || String(req.user.id)]
+    );
+    res.json({ id: rows[0].id, name: rows[0].name });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create sheet set', details: err.message });
+  }
+});
+
+// GET /api/admin/testlab/sheet-sets/:id — set + members
+router.get('/sheet-sets/:id', async (req, res) => {
+  try {
+    const setId = parseInt(req.params.id, 10);
+    const setRows = await dbQuery('SELECT id, name FROM avatar_sheet_sets WHERE id = $1', [setId]);
+    if (!setRows.length) return res.status(404).json({ error: 'Set not found' });
+    const members = await dbQuery(
+      `SELECT m.id, m.story_id, m.character, m.pass, m.entry_index, m.label, m.added_at,
+              s.data->>'title' AS story_title
+       FROM avatar_sheet_set_members m
+       LEFT JOIN stories s ON s.id = m.story_id
+       WHERE m.set_id = $1 ORDER BY m.added_at`,
+      [setId]
+    );
+    res.json({
+      id: setRows[0].id, name: setRows[0].name,
+      members: members.map(m => ({ id: m.id, storyId: m.story_id, character: m.character, pass: m.pass, entryIndex: m.entry_index, label: m.label, storyTitle: m.story_title, addedAt: m.added_at })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load sheet set', details: err.message });
+  }
+});
+
+// DELETE /api/admin/testlab/sheet-sets/:id
+router.delete('/sheet-sets/:id', async (req, res) => {
+  try {
+    await dbQuery('DELETE FROM avatar_sheet_sets WHERE id = $1', [parseInt(req.params.id, 10)]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete sheet set', details: err.message });
+  }
+});
+
+// POST /api/admin/testlab/sheet-sets/:id/members { storyId, character, pass?, entryIndex?, label? }
+router.post('/sheet-sets/:id/members', async (req, res) => {
+  try {
+    const setId = parseInt(req.params.id, 10);
+    const { storyId, character } = req.body || {};
+    if (!storyId || !character) return res.status(400).json({ error: 'storyId and character required' });
+    const pass = Number(req.body.pass) === 2 ? 2 : 1;
+    const rows = await dbQuery(
+      `INSERT INTO avatar_sheet_set_members (set_id, story_id, character, pass, entry_index, label)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (set_id, story_id, character, pass) DO UPDATE SET label = EXCLUDED.label
+       RETURNING id`,
+      [setId, String(storyId), String(character), pass,
+       req.body.entryIndex != null ? parseInt(req.body.entryIndex, 10) : null, req.body.label || null]
+    );
+    res.json({ id: rows[0].id });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to pin sheet', details: err.message });
+  }
+});
+
+// DELETE /api/admin/testlab/sheet-sets/:id/members/:memberId
+router.delete('/sheet-sets/:id/members/:memberId', async (req, res) => {
+  try {
+    await dbQuery('DELETE FROM avatar_sheet_set_members WHERE id = $1 AND set_id = $2',
+      [parseInt(req.params.memberId, 10), parseInt(req.params.id, 10)]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to remove sheet', details: err.message });
+  }
+});
+
+// POST /api/admin/testlab/sheet-sets/:id/run { model?, splitRows? }
+// Fires ONE avatar_eval experiment over every sheet in the set. Each member
+// carries its own pass on the target, so a set can mix pass-1 and pass-2 sheets.
+router.post('/sheet-sets/:id/run', async (req, res) => {
+  try {
+    if (experimentRunning) return res.status(409).json({ error: 'Another experiment is already running' });
+    const setId = parseInt(req.params.id, 10);
+    const setRows = await dbQuery('SELECT name FROM avatar_sheet_sets WHERE id = $1', [setId]);
+    if (!setRows.length) return res.status(404).json({ error: 'Set not found' });
+    const members = await dbQuery(
+      'SELECT story_id, character, pass, entry_index FROM avatar_sheet_set_members WHERE set_id = $1 ORDER BY added_at',
+      [setId]
+    );
+    if (!members.length) return res.status(400).json({ error: 'Set is empty' });
+    if (members.length > 25) return res.status(400).json({ error: 'Max 25 sheets per run' });
+
+    const targets = members.map(m => ({
+      storyId: m.story_id, character: m.character, pass: m.pass,
+      ...(m.entry_index != null ? { entryIndex: m.entry_index } : {}),
+    }));
+    const params = {
+      model: req.body?.model || undefined,
+      splitRows: req.body?.splitRows !== false,
+      autoEval: true,
+    };
+    experimentRunning = true;
+    const rows = await dbQuery(
+      `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by)
+       VALUES ('avatar_eval', $1, null, $2, 'running', $3, $4) RETURNING id`,
+      [`Sheet set: ${setRows[0].name} (${members.length} sheets)`, JSON.stringify(params), JSON.stringify(targets), req.user.username || String(req.user.id)]
+    );
+    const experimentId = rows[0].id;
+    executeExperiment(experimentId, 'avatar_eval', targets, { promptOverride: null, params });
+    log.info(`[TESTLAB] Sheet-set ${setId} run started as experiment ${experimentId} (${members.length} sheets)`);
+    res.json({ id: experimentId, sheets: members.length });
+  } catch (err) {
+    experimentRunning = false;
+    res.status(500).json({ error: 'Failed to run sheet set', details: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────
 // Experiments
 // ─────────────────────────────────────────────────────────────────────
 
