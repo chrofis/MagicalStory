@@ -333,30 +333,43 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
   } catch (err) {
     log.warn(`[FACE REPAIR] crosshatch silhouette clip failed (${err.message}) — rectangular hatch`);
   }
-  const layers = [{ input: hatchRegion, top: hatchTop, left: hatchLeft }];
-  // FACE BLUR over the crosshatched body (owner decision 2026-08-05): crosshatch
-  // holds the POSE (the model keeps the figure where it is) but through the hatch
-  // the old face stays legible and gets recreated — identity then comes from the
-  // page, not the reference. A blur over the head destroys the features while
-  // keeping head size/tilt, so pose survives and identity must come from the
-  // avatar. Body = crosshatch, face = blur.
+  // FACE BLUR, then CROSSHATCH ON TOP (owner, 2026-08-05). Two rules:
+  //  - the blur is clipped to the SAM HEAD SILHOUETTE, never the face box: a
+  //    rectangle blurs the wall/window behind the head, destroying background
+  //    the model must keep (visible in exp #326's "sent to model").
+  //  - the hatch goes OVER the blurred head, so the whole figure — head
+  //    included — carries the repaint marker; the blur only removes the
+  //    identity underneath it.
+  const blurLayers = [];
   if (blurFace && Array.isArray(faceBoxInCrop) && faceBoxInCrop.length === 4) {
     try {
+      const { fetchFaceHeadMaskPng } = require('./images');
       const fl = Math.max(0, Math.round(faceBoxInCrop[0])), ft = Math.max(0, Math.round(faceBoxInCrop[1]));
       const fw = Math.min(crop.w - fl, Math.round(faceBoxInCrop[2] - faceBoxInCrop[0]));
       const fh = Math.min(crop.h - ft, Math.round(faceBoxInCrop[3] - faceBoxInCrop[1]));
       if (fw > 8 && fh > 8) {
         const faceCrop = await sharp(cropBuf).extract({ left: fl, top: ft, width: fw, height: fh }).jpeg({ quality: 90 }).toBuffer();
-        const radius = Math.max(10, Math.round(fw * 0.12)); // heavier than the face-repair blur: features must not survive
-        const blurred = await sharp(faceCrop).blur(radius).png().toBuffer();
-        layers.push({ input: blurred, top: ft, left: fl });
-        log.info(`[FACE REPAIR] crosshatch+faceblur: head ${fw}x${fh} blurred (r=${radius}) over the hatched body`);
+        const radius = Math.max(10, Math.round(fw * 0.12)); // features must not survive
+        const blurredFull = await sharp(faceCrop).blur(radius).png().toBuffer();
+        const headMask = await fetchFaceHeadMaskPng(faceCrop, [0, 0, fw, fh], fw, fh);
+        if (headMask) {
+          const clipped = await sharp(blurredFull).ensureAlpha()
+            .composite([{ input: await sharp(headMask).resize(fw, fh, { fit: 'fill' }).png().toBuffer(), blend: 'dest-in' }])
+            .png().toBuffer();
+          blurLayers.push({ input: clipped, top: ft, left: fl });
+          log.info(`[FACE REPAIR] crosshatch+faceblur: head silhouette blurred (r=${radius}) inside ${fw}x${fh}, hatch on top`);
+        } else {
+          log.warn('[FACE REPAIR] head mask unavailable — skipping the face blur rather than blurring the box (background must survive)');
+        }
       }
     } catch (err) {
       log.warn(`[FACE REPAIR] face blur over crosshatch failed (${err.message}) — hatch only`);
     }
   }
-  const treatedBuf = await sharp(cropBuf).composite(layers).png().toBuffer();
+  // blur UNDER, hatch OVER.
+  const treatedBuf = await sharp(cropBuf)
+    .composite([...blurLayers, { input: hatchRegion, top: hatchTop, left: hatchLeft }])
+    .png().toBuffer();
   return { treatedBuf, oldMaskPng, coverage: cov, hatchRect: { left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight } };
 }
 

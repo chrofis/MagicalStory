@@ -4542,3 +4542,24 @@ evidence about the code production runs, not about a copy.
 
 **Touched:** `server/lib/textRefine.js` (new), `server/lib/testlab.js`, `server.js`.
 **Status:** ✅ kept — staging only until a full generation is observed end to end.
+
+---
+
+## 2026-08-05 — Face blur: head silhouette only, hatch on top; swap also swaps the clothing
+
+**Context:** Exp #326's "sent to model" step showed the face blur as a RECTANGLE covering the
+head plus the wall and window behind it, painted OVER the crosshatch. Owner: "the blur should
+only be for the SAM part not for the full box, and the crosshatch should be on top of the
+blur". Separately: "neither changed the clothing" on the identity swap.
+
+**Decisions:**
+1. The blur is clipped to the SAM HEAD SILHOUETTE (`fetchFaceHeadMaskPng` on the face crop),
+   never the box — a rectangle destroys background the model is required to preserve. If the
+   head mask is unavailable the blur is SKIPPED rather than falling back to the box.
+2. Composite order is blur UNDER, hatch OVER: the whole figure including the head carries the
+   repaint marker, while the blur removes identity underneath it.
+3. `clothingDescription` follows the REFERENCE character (`refName`), not the target. During a
+   swap the prompt was still demanding the target's outfit — the model was explicitly told to
+   paint Lukas's clothing onto Roger, so clothing could never change.
+
+**Touched:** `server/lib/faceRepair.js`, `server/lib/testlab.js`.

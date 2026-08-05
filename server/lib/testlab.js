@@ -912,7 +912,11 @@ async function runCharRepairStage(ctx, opts) {
     }
   }
   const clothingDescription = (() => {
-    const reqs = resolveCharacterReqs(ctx.clothingRequirements, charName);
+    // Follows the REFERENCE character: during an identity swap the prompt must
+    // not keep demanding the TARGET's outfit, or the model is told to paint the
+    // original clothing onto the swapped person and nothing changes (owner:
+    // "neither changed the clothing", exp #326).
+    const reqs = resolveCharacterReqs(ctx.clothingRequirements, refName);
     if (reqs?.[clothingCategory]) {
       const cat = reqs[clothingCategory];
       if (cat.signature && cat.signature !== 'none') return cat.signature;
@@ -1979,6 +1983,125 @@ async function runOutlineReviewStage(target, { params = {} }) {
  * params.rounds  : number of passes (default 2, capped at 5)
  * params.model   : model for every round, or params.roundModels[] for per-round
  */
+/**
+ * BEATS-FIRST PLANNING — measures time-to-lock.
+ *
+ * The current pipeline produces outline + visual bible + full text + scene hints
+ * in ONE writer call (~345s) before anything can be drawn. Images are 25 of the
+ * 38 minutes a story takes, so the number that matters is how soon scenes are
+ * locked and the image run can start. This stage runs the proposed front half —
+ * beats + one-line scene intents, then a fast structural review — against a real
+ * story's brief, so time-to-lock and plan quality can be judged before the
+ * production pipeline is restructured.
+ *
+ * Nothing here writes prose. The full text and its refinement are the OTHER
+ * branch, which already runs parallel with images in production.
+ *
+ * params.beatsModel  : planner (default MODEL_DEFAULTS.outline)
+ * params.reviewModel : fast reviewer (default MODEL_DEFAULTS.outlineReviewModel)
+ * params.pages       : page count (default: the story's own)
+ * params.skipReview  : plan only, to isolate planner cost
+ */
+async function runBeatsScenesStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildBeatsPrompt, buildBeatsReviewPrompt, parseBeats } = require('./storyHelpers');
+  const { callTextModelStreaming } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const pageCount = parseInt(params.pages, 10) || (storyData.sceneImages || []).length || storyData.pages || 10;
+  const expected = Array.from({ length: pageCount }, (_, i) => i + 1);
+
+  const beatsModel = params.beatsModel || MODEL_DEFAULTS.outline;
+  const reviewModel = params.reviewModel || MODEL_DEFAULTS.outlineReviewModel;
+  for (const m of [beatsModel, reviewModel]) {
+    if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+  }
+
+  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const lockStart = Date.now();
+
+  // ── Step 1: plan ────────────────────────────────────────────────────────
+  let plannerPrompt = buildBeatsPrompt(storyData, pageCount);
+  if (!plannerPrompt) throw new Error('story-beats template unavailable');
+  if (promptOverride) plannerPrompt = promptOverride;
+
+  const t0 = Date.now();
+  const planRes = await callTextModelStreaming(plannerPrompt, 8000, null, beatsModel, { usageLabel: 'testlab_beats' });
+  const planMs = Date.now() - t0;
+  const planParsed = parseBeats(planRes.text || '', expected);
+  if (planParsed.pages.length === 0) throw new Error('Planner returned no parseable beats');
+
+  const plan = {
+    modelKey: beatsModel,
+    modelId: planRes.modelId,
+    provider: planRes.provider || null,
+    elapsedMs: planMs,
+    usage: planRes.usage,
+    cost: costOf(planRes),
+    promptChars: plannerPrompt.length,
+    prompt: plannerPrompt,
+    rawResponse: (planRes.text || '').slice(0, 40000),
+    pages: planParsed.pages,
+    missingPages: planParsed.missing,
+  };
+
+  // ── Step 2: fast structural review ──────────────────────────────────────
+  let review = null;
+  let finalBeats = planParsed.pages;
+  if (!params.skipReview) {
+    const reviewPrompt = buildBeatsReviewPrompt(storyData, planParsed.pages);
+    if (!reviewPrompt) throw new Error('story-beats-review template unavailable');
+    const t1 = Date.now();
+    const revRes = await callTextModelStreaming(reviewPrompt, 12000, null, reviewModel, { usageLabel: 'testlab_beats_review' });
+    const revMs = Date.now() - t1;
+    const revParsed = parseBeats(revRes.text || '', []);
+
+    // Only rewritten pages come back; everything else keeps its planned beat.
+    const byPage = new Map(revParsed.pages.map(p => [p.pageNumber, p]));
+    finalBeats = planParsed.pages.map(p => {
+      const fix = byPage.get(p.pageNumber);
+      return fix ? { ...p, beat: fix.beat || p.beat, scene: fix.scene || p.scene } : p;
+    });
+    const changed = finalBeats
+      .filter((p, i) => p.beat !== planParsed.pages[i].beat || p.scene !== planParsed.pages[i].scene)
+      .map(p => p.pageNumber);
+
+    review = {
+      modelKey: reviewModel,
+      modelId: revRes.modelId,
+      provider: revRes.provider || null,
+      elapsedMs: revMs,
+      usage: revRes.usage,
+      cost: costOf(revRes),
+      promptChars: reviewPrompt.length,
+      prompt: reviewPrompt,
+      rawResponse: (revRes.text || '').slice(0, 40000),
+      analysis: (revParsed.analysis || '').slice(0, 40000),
+      changedPages: changed,
+      strayPages: revParsed.pages.map(p => p.pageNumber).filter(n => !expected.includes(n)),
+    };
+  }
+
+  const timeToLockMs = Date.now() - lockStart;
+
+  return {
+    stageKind: 'beats_scenes',
+    storyId: target.storyId,
+    title: storyData.title || null,
+    language: storyData.language || null,
+    pageCount,
+    // THE headline number: how long until scenes are locked and images could
+    // start. Compare against the current pipeline's storyGen stage (~5.5 min on
+    // a 10-page story) — that is the whole case for restructuring.
+    timeToLockMs,
+    plan,
+    review,
+    finalBeats,
+  };
+}
+
 async function runTextRefineStage(target, { params = {}, promptOverride = null }) {
   const { refineStoryText, extractRefinablePages } = require('./textRefine');
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
@@ -3758,6 +3881,7 @@ const STORY_STAGES = {
   style_repair: runStyleRepairStage,
   outline_review: runOutlineReviewStage,
   text_refine: runTextRefineStage,
+  beats_scenes: runBeatsScenesStage,
 };
 
 // Avatar stages take {storyId, character} targets, not page targets.
