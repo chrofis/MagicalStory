@@ -244,19 +244,34 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
       for (let i = 0; i < n; i++) if (er[i] > 128) wTex[i] += 1 / 8;
     }
     const cl = (v) => Math.max(0, Math.min(255, Math.round(v)));
+    // STRUCTURE CONFIDENCE m — per pixel: is the model's content here REAL
+    // painted structure (curtain folds, wall, window — keep it, ALL frequencies)
+    // or FLAT under-painted whiteout (the ghost — replace with the field)?
+    // Unconditional low-band replacement wiped Grok's crisp curtain into a blur
+    // (exp #276 B vs C, owner catch); flatness is exactly what separates ghost
+    // from content. m = smoothed local high-frequency energy, faded to 0 at the
+    // old edge (seam stays field-anchored).
+    const hpBuf = Buffer.alloc(n);
     for (let i = 0; i < n; i++) {
       if (!F[i]) continue;
-      // TEXTURE CONFIDENCE — where the model's LOW band was overruled (it
-      // disagrees with LB), its HIGH band must not survive either: a soft
-      // shadow whose body LB removed would otherwise leave its EDGE as an
-      // orphaned crisp dark stroke (the "knee shadow line" of exp #275). Fade
-      // texture to zero as low-band disagreement approaches ~35.
-      let dis = 0;
-      for (let c = 0; c < 3; c++) dis = Math.max(dis, Math.abs(lowModel[i * 3 + c] - LB[i * 3 + c]));
-      const conf = Math.max(0, 1 - dis / 35);
+      const e = (Math.abs(pasteRaw[i * 3] - lowModel[i * 3]) + Math.abs(pasteRaw[i * 3 + 1] - lowModel[i * 3 + 1]) + Math.abs(pasteRaw[i * 3 + 2] - lowModel[i * 3 + 2])) / 3;
+      hpBuf[i] = Math.min(255, Math.round(e * 8)); // ×8 so the σ4 blur keeps resolution
+    }
+    const eBlur = await sharpL(hpBuf, { raw: { width: cropW, height: cropH, channels: 1 } }).blur(4).raw().toBuffer();
+    const eStride = Math.max(1, Math.round(eBlur.length / n));
+    // Broad tone alignment for kept model content: the LB−lowModel difference
+    // blurred wide (σ20), so the model's local shapes survive and only the
+    // overall tone is pulled to the scene.
+    const dBuf = Buffer.alloc(n * 3);
+    for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) dBuf[i * 3 + c] = cl(LB[i * 3 + c] - lowModel[i * 3 + c] + 128);
+    const dBlur = await sharpL(dBuf, { raw: { width: cropW, height: cropH, channels: 3 } }).blur(20).raw().toBuffer();
+    for (let i = 0; i < n; i++) {
+      if (!F[i]) continue;
+      const E = eBlur[i * eStride] / 8;               // mean local high-freq energy
+      const m = Math.max(0, Math.min(1, (E - 3) / 7)) * wTex[i];
       for (let c = 0; c < 3; c++) {
-        const tex = Math.max(-40, Math.min(40, pasteRaw[i * 3 + c] - lowModel[i * 3 + c]));
-        pasteRaw[i * 3 + c] = cl(LB[i * 3 + c] + wTex[i] * conf * tex);
+        const toned = pasteRaw[i * 3 + c] + (dBlur[i * 3 + c] - 128);
+        pasteRaw[i * 3 + c] = cl(m * toned + (1 - m) * LB[i * 3 + c]);
       }
     }
     // UNKNOWN BAND at the figure edge (newBin..newTight): Grok's whiteout glow

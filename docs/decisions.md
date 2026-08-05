@@ -4000,3 +4000,26 @@ outputs, or accept.
 
 **Touched:** `server/lib/samBlend.js` (confidence weight, local-reference band).
 **Status:** ✅ shipped.
+
+---
+
+## 2026-08-05 — Footprint: structure-confidence blend (owner catch: crisp curtain wiped to blur)
+
+**Context:** Exp #276 B vs C (owner): left of the figure, legacy-B shows Grok's crisp painted
+curtain continuation; figure-exact C shows one blur. Cause: the two-band rule replaces the
+model's LOW band unconditionally — curtain folds/window shapes ARE low-frequency, so
+legitimate content died with the ghost. Yesterday's low-band-agreement confidence gate made
+it worse (crisp content disagrees with the field by construction).
+
+**Decision:** per-pixel STRUCTURE confidence: m = smoothed local high-frequency energy of
+the model (×edge fade). out = m·(model, broad-tone-aligned via blur σ20 of LB−lowModel) +
+(1−m)·LB. Flatness is what separates under-painted whiteout from real content: flat ghost →
+field; textured content → kept at ALL frequencies, tone-aligned only broadly. Replaces the
+low-band-agreement gate and the ±40 texture clamp.
+
+**Verified (synthetic):** flat ghost erased (dev 9) AND a striped "curtain" deep in the
+footprint keeps full contrast (swing 62); seam 7, outside untouched, figure byte-crisp.
+Lab verification: replay of the #274 r0 chain (next experiment) — per the new rule, all
+real-image experiments run in the Test Lab, never as local scripts.
+
+**Touched:** `server/lib/samBlend.js`.
