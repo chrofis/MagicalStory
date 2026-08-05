@@ -4046,3 +4046,25 @@ old figure.
 figure) all pass.
 
 **Touched:** `server/lib/samBlend.js`.
+
+---
+
+## 2026-08-05 — White specks between the legs: MODEL content, not blend residue (verdict: not blend-fixable)
+
+**Context:** Owner flagged white specks between the trouser legs (#279/#283 C). Traced
+per-pixel: final = model byte-identical at every speck AND across the whole slot — the
+bright strip is Grok's own lit rim along its inner-leg edge, against Grok's own slot
+shading, present in the raw output. SAM's round-2 mask BRIDGES the slot (verified from the
+cutout step), so the strip is deep inside "figure" where the blend keeps pixels by design.
+
+**Measured separability — none:** speck strip local energy 37 (HIGHER than real edges),
+shirt bright areas energy 6 with 1626 bright+flat px — every brightness/flatness rule that
+removes the strip removes shirt/highlight content elsewhere. A deep-rim colour test (4px
+into the mask) was implemented, benchmarked (zero effect on the real image — the strip is
+~20px inside the bridged mask) and reverted.
+
+**Decision:** not fixable in the blend without risking real figure content. Levers are
+upstream: whiteout-prompt hardening ("paint the silhouette fully to its edge, no light rim"),
+QC on the model output, or the IoU gate. Kept from this round: the Fs solve domain and the
+band background-reference fix (correct on principle; synthetic leg-gap glow collapses when
+SAM does NOT bridge the slot).
