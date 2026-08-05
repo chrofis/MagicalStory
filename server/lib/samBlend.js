@@ -337,7 +337,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
         if (!(isOld(i) && newTight[i] > 128 && alpha1[i] > 128)) continue;
         const mnP = Math.min(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
         const mnB = Math.min(allBlur[i * 3], allBlur[i * 3 + 1], allBlur[i * 3 + 2]);
-        if (mnP - mnB > 30) cand2[i] = 1;
+        if (mnP - mnB > 22) cand2[i] = 1;
       }
       const seen2 = new Uint8Array(n);
       for (let s0 = 0; s0 < n; s0++) {
@@ -356,7 +356,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
         }
         const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
         const elong = Math.max(bw, bh) / Math.max(1, Math.min(bw, bh));
-        if (comp.length >= 12 && elong >= 5) {
+        if (comp.length >= 10 && elong >= 4) {
           for (const j of comp) {
             pasteRaw[j * 3] = cl(LB[j * 3]); pasteRaw[j * 3 + 1] = cl(LB[j * 3 + 1]); pasteRaw[j * 3 + 2] = cl(LB[j * 3 + 2]);
             rimPx++;
