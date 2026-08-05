@@ -260,7 +260,7 @@ async function executeExperiment(experimentId, stage, targets, opts) {
       entry.promptUsed = entry.promptUsed.slice(0, 30000) + '\n…[truncated]';
     }
     await dbQuery(
-      `UPDATE testlab_experiments SET results = results || $2::jsonb WHERE id = $1`,
+      `UPDATE testlab_experiments SET results = results || $2::jsonb, results_count = results_count + COALESCE(jsonb_array_length($2::jsonb), 1) WHERE id = $1`,
       [experimentId, JSON.stringify([entry])]
     );
   };
@@ -390,8 +390,11 @@ router.post('/experiments', async (req, res) => {
     const paramsToStore = { ...(params || {}), ...(genericity && !genericity.generic ? { genericityWarnings: genericity.issues } : {}) };
 
     const rows = await dbQuery(
-      `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by)
-       VALUES ($1, $2, $3, $4, 'running', $5, $6) RETURNING id`,
+      // target_count/results_count are maintained here and on every append so
+      // the list never has to call jsonb_array_length(), which detoasts the
+      // whole blob just to count it.
+      `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by, target_count, results_count)
+       VALUES ($1, $2, $3, $4, 'running', $5, $6, COALESCE(jsonb_array_length($5::jsonb), 0), 0) RETURNING id`,
       [stage, label || null, promptOverride || null, JSON.stringify(paramsToStore), JSON.stringify(targets), req.user.username || String(req.user.id)]
     );
     const experimentId = rows[0].id;
@@ -426,13 +429,36 @@ router.get('/experiments', async (req, res) => {
          WHERE status = 'running' AND created_at < NOW() - INTERVAL '2 hours'`
       ).catch(() => {});
     }
+    // Bounded by default. The old query took the newest 100 unconditionally AND
+    // called jsonb_array_length(results) on each, which detoasts the whole blob
+    // just to count it — ~17MB of disk reads per poll, which is what made this
+    // list slow and what filled the page cache Railway bills as memory.
+    // target_count/results_count are now maintained columns, so nothing here
+    // touches the jsonb at all.
+    //
+    //   ?days=N   time window (default 7, 0 = no window)
+    //   ?limit=N  max rows (default 20, capped at 200)
+    //   ?all=1    no window, up to the cap — for digging through history
+    const all = req.query.all === '1' || req.query.all === 'true';
+    const days = all ? 0 : Math.max(0, parseInt(req.query.days ?? '7', 10) || 0);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit ?? '20', 10) || 20));
+
+    const where = days > 0 ? `WHERE created_at > NOW() - ($1 || ' days')::interval` : '';
+    const params = days > 0 ? [String(days), limit] : [limit];
     const rows = await dbQuery(
       `SELECT id, stage, label, status, created_by, created_at, completed_at,
               (prompt_override IS NOT NULL) AS has_override,
-              jsonb_array_length(targets) AS target_count,
-              jsonb_array_length(results) AS done_count
-       FROM testlab_experiments ORDER BY created_at DESC LIMIT 100`
+              target_count,
+              results_count AS done_count
+       FROM testlab_experiments
+       ${where}
+       ORDER BY created_at DESC
+       LIMIT $${params.length}`,
+      params
     );
+
+    // So the UI can tell "nothing this week" from "hit the page limit".
+    const totalRow = await dbQuery('SELECT COUNT(*)::int AS n FROM testlab_experiments');
     res.json({
       experiments: rows.map(r => ({
         id: r.id,
@@ -446,6 +472,7 @@ router.get('/experiments', async (req, res) => {
         createdAt: r.created_at,
         completedAt: r.completed_at,
       })),
+      window: { days, limit, all, returned: rows.length, totalExperiments: totalRow[0]?.n ?? null },
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to list experiments', details: err.message });
@@ -555,13 +582,13 @@ async function executeRedo(experimentId, exp, entry, resultIndex, override, extr
       }
       const newEntry = { ...entry, ...redo, ok: true, error: undefined, redoOf: resultIndex, redoneAt: new Date().toISOString(), promptOverridden: !!override };
       if (newEntry.promptUsed && newEntry.promptUsed.length > 30000) newEntry.promptUsed = newEntry.promptUsed.slice(0, 30000) + '\n…[truncated]';
-      await dbQuery(`UPDATE testlab_experiments SET results = results || $2::jsonb WHERE id = $1`, [experimentId, JSON.stringify([newEntry])]);
+      await dbQuery(`UPDATE testlab_experiments SET results = results || $2::jsonb, results_count = results_count + COALESCE(jsonb_array_length($2::jsonb), 1) WHERE id = $1`, [experimentId, JSON.stringify([newEntry])]);
       log.info(`[TESTLAB] redo done: exp ${experimentId} result ${resultIndex}`);
     }
   } catch (err) {
     log.error(`[TESTLAB] redo failed: ${err.message}`);
     const failedEntry = { ...entry, ok: false, error: err.message, redoOf: resultIndex, redoneAt: new Date().toISOString(), versionIndex: undefined, imageType: entry.imageType, ...(err.partialResult || {}) };
-    await dbQuery(`UPDATE testlab_experiments SET results = results || $2::jsonb WHERE id = $1`,
+    await dbQuery(`UPDATE testlab_experiments SET results = results || $2::jsonb, results_count = results_count + COALESCE(jsonb_array_length($2::jsonb), 1) WHERE id = $1`,
       [experimentId, JSON.stringify([failedEntry])]).catch(() => {});
   } finally {
     redosInFlight--;
