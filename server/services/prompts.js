@@ -101,6 +101,11 @@ async function loadPromptTemplates() {
     // feeding the next. Scene outlines are read-only context so the prose stays
     // consistent with illustrations that already exist.
     ['textRefine', 'text-refine.txt'],
+    // Beats-first planning (Lab): page beats + one-line scene intents, then a
+    // fast structural review — the cheapest point to fix an arc, and the gate
+    // that locks scenes so image generation can start.
+    ['storyBeats', 'story-beats.txt'],
+    ['storyBeatsReview', 'story-beats-review.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
     ['incrementalConsistencyCheck', 'incremental-consistency-check.txt'],

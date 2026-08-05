@@ -5696,6 +5696,122 @@ function parseRefinedText(raw, expectedPages = []) {
 }
 
 /**
+ * Shared context block for the beats prompts — the same brief, language and
+ * PSYCHOLOGICAL character profile the refiner gets. Extracted so beats, the
+ * beats review and text refinement can never describe the same book differently.
+ */
+function buildStoryContextFields(inputData) {
+  const language = inputData.language || 'en';
+  const loc = inputData.userLocation;
+  const rel = inputData.relationshipTexts && Object.keys(inputData.relationshipTexts).length
+    ? Object.entries(inputData.relationshipTexts).map(([k, v]) => `  ${k}: ${v}`).join('\n')
+    : null;
+  const brief = [
+    inputData.title ? `Title: ${inputData.title}` : null,
+    inputData.storyCategory ? `Category: ${inputData.storyCategory}` : null,
+    inputData.storyTypeName || inputData.storyType ? `Type: ${inputData.storyTypeName || inputData.storyType}` : null,
+    inputData.storyTheme ? `Theme: ${inputData.storyTheme}` : null,
+    inputData.storyTopic ? `Topic: ${inputData.storyTopic}` : null,
+    inputData.season ? `Season: ${inputData.season}` : null,
+    loc?.city ? `Setting/location: ${[loc.city, loc.region, loc.country].filter(Boolean).join(', ')}` : null,
+    rel ? `Relationships:\n${rel}` : null,
+    inputData.storyDetails ? `\nStory idea (the user's own words):\n${wrapUserInput(inputData.storyDetails)}` : null,
+  ].filter(Boolean).join('\n') || '(no additional brief recorded)';
+
+  const mainIds = inputData.mainCharacters || [];
+  const characterDetails = (inputData.characters || []).map(char => {
+    const t = getTraits(char);
+    const line = (label, v) => {
+      const s = Array.isArray(v) ? v.filter(Boolean).join(', ') : v;
+      return s ? `- ${label}: ${s}` : null;
+    };
+    return [
+      `**${char.name}**${mainIds.includes(char.id) ? ' (main character)' : ''}:`,
+      line('Age', char.age),
+      line('Gender', char.gender),
+      line('Personality', char.personality),
+      line('Strengths', t.strengths),
+      line('Flaws', t.flaws),
+      line('Challenges', t.challenges),
+      line('Special details', t.specialDetails),
+    ].filter(Boolean).join('\n');
+  }).join('\n\n') || '(no character details available)';
+
+  const imageModelKey = inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage;
+  return {
+    LANGUAGE: getLanguageNameEnglish(language),
+    LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
+    LANGUAGE_NOTE: getLanguageNote(language),
+    READING_LEVEL: getReadingLevel(inputData.languageLevel),
+    CHARACTER_NAMES: (inputData.characters || []).map(c => c.name).join(', '),
+    STORY_BRIEF: brief,
+    CHARACTER_DETAILS: characterDetails,
+    MAX_CHARACTERS_PER_SCENE: IMAGE_MODELS[imageModelKey]?.maxCharactersPerScene || 3,
+  };
+}
+
+/** Beats + one-line scene intents for N pages. Structure only, no prose. */
+function buildBeatsPrompt(inputData, pageCount) {
+  const template = PROMPT_TEMPLATES.storyBeats;
+  if (!template) {
+    log.error('[PROMPT] storyBeats template not loaded — beats planning unavailable');
+    return null;
+  }
+  return fillTemplate(template, { ...buildStoryContextFields(inputData), PAGE_COUNT: pageCount });
+}
+
+/** Fast structural review of a beat plan. Returns analysis + rewritten pages. */
+function buildBeatsReviewPrompt(inputData, beats) {
+  const template = PROMPT_TEMPLATES.storyBeatsReview;
+  if (!template) {
+    log.error('[PROMPT] storyBeatsReview template not loaded — beats review unavailable');
+    return null;
+  }
+  const current = beats
+    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`)
+    .join('\n\n');
+  return fillTemplate(template, {
+    ...buildStoryContextFields(inputData),
+    PAGE_COUNT: beats.length,
+    CURRENT_BEATS: current,
+  });
+}
+
+/**
+ * Parse a ---BEATS--- block into {pageNumber, beat, scene}. Same shape as
+ * parseRefinedText: analysis before the marker, pages after, omission allowed
+ * (the review returns only rewritten pages).
+ */
+function parseBeats(raw, expectedPages = []) {
+  const full = String(raw || '');
+  const marker = full.match(/---\s*BEATS\s*---/i);
+  const body = marker ? full.slice(marker.index + marker[0].length) : full;
+  const analysis = marker
+    ? full.slice(0, marker.index).replace(/^[\s\S]*?---\s*ANALYSIS\s*---/i, '').trim()
+    : '';
+
+  const re = /^\s*#{1,4}\s*\**\s*(?:Page|Seite|Pagina)\s*\**\s*(\d+)\s*\**\s*:?\s*\**\s*$/gim;
+  const marks = [];
+  let m;
+  while ((m = re.exec(body)) !== null) marks.push({ page: parseInt(m[1], 10), headStart: m.index, bodyStart: re.lastIndex });
+
+  const pages = [];
+  for (let i = 0; i < marks.length; i++) {
+    const end = i + 1 < marks.length ? marks[i + 1].headStart : body.length;
+    const chunk = body.slice(marks[i].bodyStart, end);
+    // BEAT runs until SCENE; SCENE until the end of the chunk.
+    const beat = (chunk.match(/BEAT\s*:\s*([\s\S]*?)(?=\n\s*SCENE\s*:|$)/i) || [])[1];
+    const scene = (chunk.match(/SCENE\s*:\s*([\s\S]*)$/i) || [])[1];
+    if (beat || scene) {
+      pages.push({ pageNumber: marks[i].page, beat: (beat || '').trim(), scene: (scene || '').trim() });
+    }
+  }
+
+  const got = new Set(pages.map(p => p.pageNumber));
+  return { pages, missing: expectedPages.filter(n => !got.has(n)), analysis };
+}
+
+/**
  * Build unified story generation prompt
  * Generates complete story with character arcs, plot structure, visual bible, and all pages
  * @param {Object} inputData - Story parameters
@@ -6725,6 +6841,9 @@ module.exports = {
   buildOutlineReviewPrompt,
   buildTextRefinePrompt,
   parseRefinedText,
+  buildBeatsPrompt,
+  buildBeatsReviewPrompt,
+  parseBeats,
   buildTrialStoryPrompt,
   buildPreviousScenesContext,
   buildAvailableAvatarsForPrompt,

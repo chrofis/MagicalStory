@@ -2096,8 +2096,8 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     // start. Compare against the current pipeline's storyGen stage (~5.5 min on
     // a 10-page story) — that is the whole case for restructuring.
     timeToLockMs,
-    plan,
-    review,
+    beatsPlan: plan,
+    beatsReview: review,
     finalBeats,
   };
 }

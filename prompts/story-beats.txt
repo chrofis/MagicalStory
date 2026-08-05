@@ -1,0 +1,51 @@
+You are planning an illustrated children's book. Output the story as page beats only. No prose, no dialogue.
+
+# LANGUAGE
+
+{LANGUAGE_INSTRUCTION}
+
+{LANGUAGE_NOTE}
+
+Write the beats in {LANGUAGE}.
+
+# TARGET
+
+Reading level: {READING_LEVEL}
+Pages: {PAGE_COUNT}
+Characters: {CHARACTER_NAMES}
+
+{STORY_BRIEF}
+
+# CHARACTER DETAILS
+
+{CHARACTER_DETAILS}
+
+# YOUR TASK
+
+Plan {PAGE_COUNT} pages. Each page gets one BEAT and one SCENE.
+
+BEAT is what happens on that page: the event, and what changes because of it. One or two sentences.
+
+SCENE is what the illustration shows: who is present, where they are, what they are doing. One or two sentences. Every scene must be a single moment that can be drawn — no montages, no before-and-after, no passage of time inside one picture.
+
+Requirements:
+- Each page follows causally from the one before it.
+- The main character wants something by page 1 and their situation is different by the last page.
+- Every beat is visible: something happens that a picture can show. A page of pure reflection cannot be illustrated.
+- No more than {MAX_CHARACTERS_PER_SCENE} named characters in any one scene.
+- Any character who forces or blocks something must be present in the scene where it happens.
+
+# OUTPUT FORMAT
+
+Only the block below. No preamble, no commentary.
+
+---BEATS---
+## Page 1
+BEAT: <what happens>
+SCENE: <what the picture shows>
+
+## Page 2
+BEAT: <what happens>
+SCENE: <what the picture shows>
+
+(continue through page {PAGE_COUNT})

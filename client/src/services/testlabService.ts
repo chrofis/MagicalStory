@@ -177,6 +177,11 @@ export interface ExperimentResult {
   pageCount?: number;
   refineRounds?: RefineRound[];
   finalPages?: { pageNumber: number; original: string; final: string; changed: boolean }[];
+  // beats_scenes
+  timeToLockMs?: number;
+  beatsPlan?: BeatsCall;
+  beatsReview?: BeatsReview | null;
+  finalBeats?: { pageNumber: number; beat: string; scene: string }[];
 }
 
 export interface RefineRound {
@@ -199,6 +204,27 @@ export interface RefineRound {
   changedFromOriginal?: number[];
   converged?: boolean;
   pages?: { pageNumber: number; before: string; after: string; original: string; sceneIntent?: string }[];
+}
+
+// beats_scenes: plan + fast review, and the number that matters — time to lock.
+export interface BeatsCall {
+  modelKey: string;
+  modelId?: string;
+  provider?: string | null;
+  elapsedMs?: number;
+  usage?: { input_tokens?: number; output_tokens?: number };
+  cost?: number;
+  promptChars?: number;
+  prompt?: string;
+  rawResponse?: string;
+  pages?: { pageNumber: number; beat: string; scene: string }[];
+  missingPages?: number[];
+}
+
+export interface BeatsReview extends BeatsCall {
+  analysis?: string;
+  changedPages?: number[];
+  strayPages?: number[];
 }
 
 export interface SentPrompt {
@@ -293,6 +319,7 @@ export const TESTLAB_STAGES = [
   { id: 'style_check', label: 'Style consistency check', producesImage: false, overridable: false, storyLevel: true },
   { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
   { id: 'text_refine', label: 'Text refine — full text in, full text out (rounds)', producesImage: false, overridable: true, storyLevel: true },
+  { id: 'beats_scenes', label: 'Beats + scenes → fast review (time-to-lock)', producesImage: false, overridable: true, storyLevel: true },
   // Both runners existed server-side but were absent from this list, so the
   // dropdown could never select them — unreachable except by hand-posting.
   { id: 'garment_hue', label: 'Garment hue normalization (ON/OFF)', producesImage: true, overridable: false },

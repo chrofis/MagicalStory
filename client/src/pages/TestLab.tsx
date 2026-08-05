@@ -1354,6 +1354,80 @@ function SentPromptsPanel({ prompts, onEdit }: { prompts: SentPrompt[]; onEdit?:
 }
 
 /**
+ * beats_scenes — the headline is TIME TO LOCK: how long until scenes are fixed
+ * and image generation could start. Everything else on the card exists to judge
+ * whether the plan reached at that speed is actually good enough to draw from.
+ */
+function BeatsScenesView({ result }: { result: ExperimentResult }) {
+  const plan = result.beatsPlan;
+  const review = result.beatsReview;
+  const beats = (result.finalBeats || []) as { pageNumber: number; beat: string; scene: string }[];
+  const changed = new Set(review?.changedPages || []);
+  const lockSec = (result.timeToLockMs || 0) / 1000;
+  // The stage this replaces: writer + review + scene expansion, measured at 5.5
+  // min on a 10-page story. Shown so the number means something on its own.
+  const BASELINE_SEC = 327;
+
+  return (
+    <div className="mt-3 space-y-3">
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+        <div className="text-sm">
+          <b>Time to lock: {lockSec.toFixed(1)}s</b>{' '}
+          <span className="text-gray-500">
+            ({(lockSec / 60).toFixed(1)} min) — current pipeline reaches the same point in ~{(BASELINE_SEC / 60).toFixed(1)} min
+          </span>
+        </div>
+        <div className="text-xs text-gray-600 mt-1">
+          {lockSec < BASELINE_SEC
+            ? <>Images could start <b>{((BASELINE_SEC - lockSec) / 60).toFixed(1)} min earlier</b>.</>
+            : <>No gain over the current pipeline at this setting.</>}
+          {' '}{result.pageCount} pages · {result.language}
+        </div>
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-2">
+        {[{ k: 'Plan', c: plan }, { k: 'Fast review', c: review }].map(({ k, c }) => c ? (
+          <div key={k} className="text-xs border border-gray-200 rounded-lg p-2">
+            <b>{k}</b> · {c.modelKey}{c.provider ? ` via ${c.provider}` : ''} · {((c.elapsedMs || 0) / 1000).toFixed(1)}s
+            {c.cost != null && ` · $${c.cost.toFixed(4)}`}
+            {' · out '}{(c.usage?.output_tokens || 0).toLocaleString()}
+            {'changedPages' in c && c.changedPages && (
+              <> · rewrote {c.changedPages.length ? c.changedPages.join(', ') : <span className="text-emerald-600">nothing</span>}</>
+            )}
+            {c.prompt && (
+              <details className="mt-1">
+                <summary className="cursor-pointer text-indigo-600">Prompt ({(c.promptChars || 0).toLocaleString()} chars)</summary>
+                <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-2 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-[11px]">{c.prompt}</pre>
+              </details>
+            )}
+          </div>
+        ) : null)}
+      </div>
+
+      {review?.analysis && (
+        <details className="text-xs" open>
+          <summary className="cursor-pointer text-indigo-600">Structural review — why these pages ({review.analysis.length.toLocaleString()} chars)</summary>
+          <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-3 max-h-[32rem] overflow-auto whitespace-pre-wrap text-[11px] text-gray-700">{review.analysis}</pre>
+        </details>
+      )}
+
+      {/* The locked plan. Reviewed pages flagged so you can see what the fast
+          pass actually moved before any prose or artwork exists. */}
+      <div className="space-y-1">
+        {beats.map(b => (
+          <div key={b.pageNumber} className={`text-xs rounded-lg border p-2 ${changed.has(b.pageNumber) ? 'border-indigo-300 bg-indigo-50/40' : 'border-gray-200'}`}>
+            <b>Page {b.pageNumber}</b>
+            {changed.has(b.pageNumber) && <span className="text-indigo-600"> · revised by review</span>}
+            <div className="mt-0.5"><span className="text-gray-500">BEAT</span> {b.beat}</div>
+            <div><span className="text-gray-500">SCENE</span> {b.scene}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * text_refine — the whole point is watching the text move round by round, so
  * every intermediate version is shown, not just the final one: per page you get
  * the original and each round's output side by side, with unchanged rounds
@@ -1984,6 +2058,10 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
 
       {result.ok && result.stageKind === 'text_refine' && (
         <TextRefineView result={result} />
+      )}
+
+      {result.ok && result.stageKind === 'beats_scenes' && (
+        <BeatsScenesView result={result} />
       )}
 
       {result.ok && isOutlineReview && (

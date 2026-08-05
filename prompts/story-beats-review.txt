@@ -1,0 +1,54 @@
+You are reviewing the page plan for an illustrated children's book, before any prose or artwork exists. This is the cheapest moment to fix structure, so be decisive.
+
+# LANGUAGE
+
+{LANGUAGE_INSTRUCTION}
+
+Write corrected beats in {LANGUAGE}. The analysis may be in English.
+
+# TARGET
+
+Reading level: {READING_LEVEL}
+Pages: {PAGE_COUNT}
+Characters: {CHARACTER_NAMES}
+
+{STORY_BRIEF}
+
+# CHARACTER DETAILS
+
+{CHARACTER_DETAILS}
+
+# CURRENT PLAN
+
+{CURRENT_BEATS}
+
+# YOUR TASK
+
+Judge the plan as a reader who sees only these pages. The brief and character details tell you what the book is FOR; they are never evidence that a page works. A motivation that lives only in the character details and never reaches a beat is a fault to fix.
+
+Answer each check, naming pages. Then rewrite only the pages that a check found wrong.
+
+1. Causality — for each page, does its beat follow from the page before? Name the most arbitrary transition.
+2. Arc — does the main character want something by page 1, and is their situation different by the last page? Name the page where the change becomes visible. If there is none, say so.
+3. Stakes — name the page where the least is at risk. Say what would raise it.
+4. Illustratable — name any scene that cannot be one drawn moment: a montage, a passage of time, an internal state with nothing to see, or an empty stage where a beat needs a character present.
+5. Repetition — name any two pages whose scenes would produce near-identical pictures (same place, same grouping, same action).
+6. Cast — name any scene with more than {MAX_CHARACTERS_PER_SCENE} named characters, or any page where someone forces or blocks something without being in the scene.
+7. Pacing — name the page carrying the most beats and the one carrying the least.
+
+# OUTPUT FORMAT
+
+Both blocks, in this order, nothing before or after.
+
+---ANALYSIS---
+<your answers to checks 1-7>
+
+---BEATS---
+## Page <number>
+BEAT: <corrected beat>
+SCENE: <corrected scene>
+
+Include a page only if you rewrote it. Use its real page number. When nothing needs rewriting, still output the analysis, then:
+
+---BEATS---
+NONE
