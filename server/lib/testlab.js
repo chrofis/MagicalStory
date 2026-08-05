@@ -242,6 +242,33 @@ async function resolveReplayParams(replayOf, ctx) {
   };
 }
 
+
+/**
+ * Reference photo for an IDENTITY-SWAP test: page reference photos only cover
+ * characters ON that page, so swapping in someone who is not in the scene
+ * (`params.referenceCharacter`) must fall back to the story's character list and
+ * that character's styled avatar. Returns a ref shaped like a referencePhoto.
+ */
+async function resolveSwapReference(ctx, refName, artStyle) {
+  const onPage = (ctx.referencePhotos || []).find(p => (p.name || '').toLowerCase() === refName.toLowerCase());
+  if (onPage) return onPage;
+  const character = (ctx.characters || []).find(c => (c.name || '').toLowerCase() === refName.toLowerCase());
+  if (!character) {
+    const avail = [...new Set([...(ctx.referencePhotos || []).map(p => p.name), ...(ctx.characters || []).map(c => c.name)])].filter(Boolean).join(', ');
+    throw new Error(`No reference for "${refName}" — not on this page and not a story character (available: ${avail || 'none'})`);
+  }
+  const { getStyledAvatarForClothing } = require('./entityConsistency');
+  let photoUrl = null;
+  try {
+    const styled = await getStyledAvatarForClothing(character, artStyle || ctx.artStyle, 'standard');
+    if (styled) photoUrl = await toDataUri(styled);
+  } catch { /* fall through to raw photo */ }
+  if (!photoUrl) photoUrl = await toDataUri(character.photoUrl || character.photoData || character.avatars?.standard);
+  if (!photoUrl) throw new Error(`Character "${refName}" has no usable avatar or photo for the swap`);
+  log.info(`[TESTLAB] swap reference for ${refName} resolved from the story character list (not on this page)`);
+  return { name: character.name, photoUrl, clothingDescription: null };
+}
+
 /** A specific test-version image (Test Lab rows included). */
 async function loadTestImage(storyId, imageType, pageNumber, versionIndex) {
   const { dbQuery } = require('../services/database');
@@ -799,7 +826,8 @@ async function runCharRepairStage(ctx, opts) {
   // character, identity is being copied from the page instead of the reference —
   // the sharpest test there is for a treatment (owner, 2026-08-05).
   const refName = params.referenceCharacter || charName;
-  const ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === refName.toLowerCase());
+  let ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === refName.toLowerCase());
+  if (!ref && params.referenceCharacter) ref = await resolveSwapReference(ctx, refName, params.artStyleOverride);
   if (!ref) {
     const avail = ctx.referencePhotos.map(p => p.name).filter(Boolean).join(', ');
     throw new Error(`No reference photo for character "${refName}" on this page (available: ${avail || 'none'})`);
@@ -2832,7 +2860,8 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   if (!charName) throw new Error('qwen_insert requires params.characterName');
   // params.referenceCharacter → identity-transfer test (see runCharRepairStage).
   const refName = params.referenceCharacter || charName;
-  const ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === refName.toLowerCase());
+  let ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === refName.toLowerCase());
+  if (!ref && params.referenceCharacter) ref = await resolveSwapReference(ctx, refName, params.artStyleOverride);
   if (!ref) throw new Error(`No reference photo for "${refName}" on this page`);
   if (params.referenceCharacter) {
     log.info(`[TESTLAB] IDENTITY SWAP: inserting ${refName}'s reference into ${charName}'s region`);
