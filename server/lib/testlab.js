@@ -887,7 +887,11 @@ async function runCharRepairStage(ctx, opts) {
   // protection boxes for every OTHER named character on the page.
   const { normalizeClothingCategory, resolveCharacterReqs } = require('./clothingCategories');
   const { getStyledAvatarForClothing } = require('./entityConsistency');
-  const character = (ctx.characters || []).find(c => (c.name || '').toLowerCase() === charName.toLowerCase()) || null;
+  // The styled avatar must follow the REFERENCE, not the target region — looking
+  // it up by charName silently replaced a swapped reference with the original
+  // character's avatar, so the identity-swap test ran with the wrong image and
+  // its result was meaningless (owner caught this on exp #320).
+  const character = (ctx.characters || []).find(c => (c.name || '').toLowerCase() === refName.toLowerCase()) || null;
   const clothingKey = Object.keys(ctx.scene.sceneCharacterClothing || {})
     .find(k => k.toLowerCase() === charName.toLowerCase());
   const clothingCategory = clothingKey

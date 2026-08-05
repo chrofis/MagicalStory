@@ -567,6 +567,9 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
       ];
       const visited = new Uint8Array(n);
       const keep2 = Buffer.from(keep);
+      let mainCompPx = 0;
+      for (let i = 0; i < n; i++) if (keep[i]) mainCompPx++;
+      let strayDropped = 0;
       for (let s = 0; s < n; s++) {
         if (union[s] <= 128 || visited[s] || keep[s]) continue;
         // flood this unseen component, test box overlap
@@ -582,8 +585,18 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
             if (union[j] > 128 && !visited[j]) { visited[j] = 1; stack.push(j); comp.push(j); }
           }
         }
-        if (hits) for (const j of comp) keep2[j] = 255;
+        // Size gate: keeping EVERY component that merely touches the padded box
+        // let stray SAM specks outside the figure into the paste (owner, after
+        // #315: "the SAM mask finds small areas outside the figure"). A severed
+        // body part — the reason this rule exists — is substantial; a speck is
+        // not. Keep only components >= 0.8% of the main silhouette (min 150px).
+        if (hits && comp.length >= Math.max(150, Math.round(mainCompPx * 0.008))) {
+          for (const j of comp) keep2[j] = 255;
+        } else if (hits) {
+          strayDropped += comp.length;
+        }
       }
+      if (strayDropped > 0) log.info(`[TESTLAB] dropped ${strayDropped}px stray fragments near the figure box (below the 0.8% size gate)`);
       keep = keep2;
     }
     let dropped = 0;

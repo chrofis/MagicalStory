@@ -4490,3 +4490,23 @@ trade-off (its fallback is rembg, or null for face repairs). Open.
 - `server/lib/testlab.js` (`maskCoverage` in the bbox detection entry)
 - `tests/unit/sam-mask-guard.test.ts`
 **Status:** ✅ active
+
+---
+
+## 2026-08-05 — Two regressions from my own changes: swap ignored, stray SAM specks pasted
+
+**1. The identity swap never swapped (exp #320 invalid).** `runCharRepairStage` resolves the
+reference photo, then RE-RESOLVES a styled avatar via
+`getStyledAvatarForClothing(character…)` where `character` was looked up by **charName**.
+So `referenceCharacter:'Roger'` set `ref`, logged "IDENTITY SWAP", and was then overwritten
+by Lukas's own styled avatar — the sent reference image (step v889) is Lukas's sheet. The
+conclusion drawn from #320 ("identity comes from the page, not the reference") is
+UNSUPPORTED and withdrawn. Fix: the character lookup follows `refName`.
+
+**2. Stray SAM fragments outside the figure got pasted.** The figure-exact island filter was
+changed (2026-08-05, orphan-sandal fix) to keep EVERY union component intersecting the
+padded detection box. That also keeps small SAM specks near the box — owner: "the SAM mask
+finds small areas outside the figure". Fix: a size gate — a kept component must be ≥0.8% of
+the main silhouette (min 150px). Verified: a 100px speck drops, a 560px severed foot stays.
+
+**Touched:** `server/lib/testlab.js`, `server/lib/samBlend.js`.
