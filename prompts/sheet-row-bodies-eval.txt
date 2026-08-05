@@ -3,10 +3,10 @@ You are evaluating one row of a character reference sheet.
 You receive ONE image: the sheet row — 4 cells left to right (front, three-quarter, profile, back). Each cell SHOULD be one whole figure from the top of the head to the soles of the feet — check whether it actually is. Do not assume it is. Judge only this image.
 
 TASK 1: IS EACH CELL A COMPLETE HEAD-TO-TOE FIGURE?
-Inspect each of the 4 cells on its own. A cell is complete ONLY if BOTH ends of the person are inside it:
-  - HEAD: a head with a visible face sits at the top of that cell (not cut by the top edge, not absent). A cell that begins at the neck, chest, shoulders, or waist — with no head at the top — is NOT complete.
-  - FEET: both feet with shoes are visible at the bottom (not cut at thigh, knee, or ankle).
-Score each cell: 8-10 = head AND feet both fully visible; 1-2 = head missing/cut at the top OR feet missing/cut at the bottom. In the reason, state for EACH cell whether the head is present and whether the feet are present (e.g. "cell1: head yes, feet yes; cell2: head NO (starts at the waist), feet yes"). Per-cell 1-10; fullBodyScore = LOWEST cell.
+First, look ONLY at the very TOP of each of the 4 cells. Decide: does that cell contain a HEAD (face/hair), or does the figure start lower — at the neck, shoulders, chest, or waist — with NO head at the top? Many sheets show only the lower body: torso-and-legs with no head. Report head=yes only if you actually see a head at the top of that cell.
+Then look at the very BOTTOM: are both feet with shoes visible (not cut at thigh, knee, or ankle)?
+A cell is complete ONLY if it has BOTH a head at the top AND feet at the bottom.
+Score each cell: 8-10 = head AND feet both present; 1-2 = head absent/cut OR feet absent/cut. Per-cell 1-10; fullBodyScore = LOWEST cell. In the reason, report per cell like "cellN: head=<yes|no>, feet=<yes|no>".
 
 TASK 2: FACING ANGLES
 The 4 cells read front, three-quarter, profile, back, left to right. Score 1-10.
@@ -23,7 +23,7 @@ finalScore = lowest of fullBodyScore, anglesScore, outfitScore, proportionsScore
 
 Return EXACTLY this JSON:
 {
-  "fullBody": {"perCell": {"cell1": 8, "cell2": 8, "cell3": 8, "cell4": 8}, "fullBodyScore": 8, "reason": "cell1: head yes, feet yes; cell2: head yes, feet yes; cell3: head yes, feet yes; cell4: head yes, feet yes"},
+  "fullBody": {"perCell": {"cell1": 0, "cell2": 0, "cell3": 0, "cell4": 0}, "fullBodyScore": 0, "reason": "cellN: head=<yes|no>, feet=<yes|no> for each of the 4 cells"},
   "angles": {"score": 9, "reason": "Front, three-quarter, profile, back left to right"},
   "outfit": {"outfitScore": 9, "reason": "Every figure wears the requested items, consistent across cells"},
   "proportions": {"score": 9, "reason": "Proportions match the person's apparent age"},
