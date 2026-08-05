@@ -1427,17 +1427,20 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   const title = String(params.title || storyData.title || '').trim();
   if (!title) throw new Error('Story has no title to paint in');
 
-  // Covers render TEXTLESS and typography is baked app-side, so artImageData is
-  // the clean plate. FAIL LOUDLY when it is missing: falling back to imageData
-  // silently stamps a SECOND title onto a cover that already carries one (exp
-  // #311, "Das Seil fliegt…" came back with the title twice — top from the
-  // baked-in art, bottom from composeCover). A pre-bake story simply has no
-  // textless plate and cannot be painted in.
-  if (!cover.artImageData) {
-    throw new Error('No textless cover plate (artImageData) — this story predates app-side typography, '
-      + 'so compositing a title would double-stamp it. Re-run cover typography first.');
+  // The TEXTLESS plate lives in story_images as `${coverKey}Art` — the
+  // "top-level ${key}Art row" the cover-typography contract describes. It is NOT
+  // a field on the cover object: `cover.artImageData` is undefined on real
+  // stories, so reading that and falling back to `cover.imageData` fed the
+  // SERVED, ALREADY-TITLED cover into the pipeline (exp #311 — every crop went
+  // to Qwen with the title baked in twice, and "Das Seil fliegt…" came back
+  // showing two titles). Read the Art row; fail loudly if there is none.
+  const artRow = await loadTestImage(target.storyId, `${coverKey}Art`, null, 0);
+  const artSrc = artRow?.imageData || cover.artImageData;
+  if (!artSrc) {
+    throw new Error(`No textless cover plate (story_images ${coverKey}Art) — this story predates `
+      + 'app-side typography, so compositing a title would double-stamp it.');
   }
-  const artBytes = await r2.bytesFromAnyImage(cover.artImageData);
+  const artBytes = await r2.bytesFromAnyImage(artSrc);
   if (!artBytes) throw new Error('Could not resolve cover art bytes');
 
   const steps = [];
