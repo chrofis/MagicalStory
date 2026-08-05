@@ -1,8 +1,15 @@
 You are refining the narrative text of an illustrated children's book. The illustrations already exist and cannot change.
 
+# LANGUAGE
+
+{LANGUAGE_INSTRUCTION}
+
+{LANGUAGE_NOTE}
+
+Write in {LANGUAGE}. Keep the register of the current text. Never switch to a dialect or a spoken regional form.
+
 # TARGET
 
-Language: {LANGUAGE}
 Reading level: {READING_LEVEL}
 Pages: {PAGE_COUNT}
 Characters: {CHARACTER_NAMES}
@@ -25,9 +32,7 @@ What each page's illustration shows. The text must stay consistent with these. N
 
 # YOUR TASK
 
-Rewrite the narrative text for every page. Improve what is weak; leave what already works. Return all {PAGE_COUNT} pages whether or not you changed them.
-
-Keep the language and register of the current text. Do not switch to a dialect or a regional spoken form.
+Rewrite the narrative text for every page. Improve what is weak; leave what already works. Return all {PAGE_COUNT} pages whether or not you changed them. The story must still deliver the brief above.
 
 Check for:
 - Causal links between pages. Each page follows from the one before it.

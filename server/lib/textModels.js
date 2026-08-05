@@ -964,6 +964,13 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
   // MODEL_PRICING has a single price per modelId — so we ask OpenRouter for the
   // ACTUAL cost of each call (usage.include) and prefer it over our estimate.
   const providerPref = process.env.OPENROUTER_PROVIDER_SORT || 'throughput';
+  // An explicit order is the only lever that actually selects; sort is advisory
+  // and drifts. Built from live throughput stats (openrouterRouting.js) and
+  // cached, so it can't go stale the way a hand-written list would. Null on any
+  // lookup failure → we still send sort:throughput.
+  const fastOrder = providerPref === 'off'
+    ? null
+    : await require('./openrouterRouting').fastProviderOrder(modelId).catch(() => null);
 
   return await withRetry(async () => {
     console.log(`🌊 [STREAM] Starting streaming request to OpenRouter (${maxTokens} max tokens)...`);
@@ -994,7 +1001,11 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
           stream: true,
           stream_options: { include_usage: true },
           usage: { include: true },                      // real cost, not our estimate
-          ...(providerPref !== 'off' ? { provider: { sort: providerPref } } : {}),
+          // allow_fallbacks keeps the call alive if every pinned provider is
+          // down — it drops to OpenRouter's own choice rather than failing.
+          ...(providerPref !== 'off'
+            ? { provider: fastOrder ? { order: fastOrder, allow_fallbacks: true } : { sort: providerPref } }
+            : {}),
           messages
         }),
         signal: controller.signal

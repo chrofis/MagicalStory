@@ -5520,15 +5520,27 @@ function buildTextRefinePrompt(inputData, pages = []) {
     .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: false }))
     .join('\n\n') || '(no character details available)';
 
-  // Story brief = what the book was asked to be. Only the fields that actually
-  // steer prose; anything absent is omitted rather than sent as "undefined".
+  // Story brief = what the book was ASKED to be. This mirrors the field set the
+  // writer prompt receives, because a refiner working from less context than the
+  // writer had will drift away from the commission — storyDetails in particular
+  // is the user's own idea in their own words and is the strongest anchor here.
+  // Absent fields are omitted rather than sent as "undefined".
+  const loc = inputData.userLocation;
+  const rel = inputData.relationshipTexts && Object.keys(inputData.relationshipTexts).length
+    ? Object.entries(inputData.relationshipTexts).map(([k, v]) => `  ${k}: ${v}`).join('\n')
+    : null;
   const brief = [
     inputData.title ? `Title: ${inputData.title}` : null,
-    inputData.storyTypeName || inputData.storyType ? `Type: ${inputData.storyTypeName || inputData.storyType}` : null,
     inputData.storyCategory ? `Category: ${inputData.storyCategory}` : null,
+    inputData.storyTypeName || inputData.storyType ? `Type: ${inputData.storyTypeName || inputData.storyType}` : null,
     inputData.storyTheme ? `Theme: ${inputData.storyTheme}` : null,
     inputData.storyTopic ? `Topic: ${inputData.storyTopic}` : null,
-    inputData.storyDetails ? `Details: ${inputData.storyDetails}` : null,
+    inputData.season ? `Season: ${inputData.season}` : null,
+    loc?.city ? `Setting/location: ${[loc.city, loc.region, loc.country].filter(Boolean).join(', ')}` : null,
+    rel ? `Relationships:\n${rel}` : null,
+    // The commission itself, last so it reads as the payload — wrapped the same
+    // way the writer wraps it, since it is untrusted user text.
+    inputData.storyDetails ? `\nStory idea (the user's own words):\n${wrapUserInput(inputData.storyDetails)}` : null,
   ].filter(Boolean).join('\n') || '(no additional brief recorded)';
 
   // Reuse the canonical DO-NOT-WRITE list from the writer template so the ban
@@ -5550,14 +5562,17 @@ function buildTextRefinePrompt(inputData, pages = []) {
     }
   }
 
-  // The FULL language instruction, not the bare name: getLanguageNameEnglish
-  // returns "Swiss German" for de-ch, which a model reads as Schwyzerdütsch and
-  // duly rewrote the book into dialect ("S'Fescht", "blybt stoh"). The
-  // instruction block carries the actual contract — Swiss STANDARD German, ss
-  // never ß, tight guillemets — the same one the writer prompt uses.
+  // The COMPLETE language definition, not the bare name. getLanguageNameEnglish
+  // returns "Swiss German" for de-ch, which a model reads as Schwyzerdütsch — it
+  // duly rewrote the whole book into dialect ("S'Fescht", "blybt stoh"). The
+  // refiner gets exactly what the writer gets: name + instruction + note, all
+  // three, so the spelling, vocabulary and dialogue-typography rules are present
+  // verbatim rather than implied by a label.
   const language = inputData.language || 'en';
   return fillTemplate(template, {
-    LANGUAGE: `${getLanguageNameEnglish(language)}\n\n${getLanguageInstruction(language)}`,
+    LANGUAGE: getLanguageNameEnglish(language),
+    LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
+    LANGUAGE_NOTE: getLanguageNote(language),
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
     PAGE_COUNT: pages.length,
     CHARACTER_NAMES: (inputData.characters || []).map(c => c.name).join(', '),
