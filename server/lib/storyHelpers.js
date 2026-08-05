@@ -5597,13 +5597,19 @@ function parseRefinedText(raw, expectedPages = []) {
 
   const pages = [];
   // "## Page N" headings, tolerating bold/extra markup around the number.
-  const re = /^\s*#{1,4}\s*(?:Page|Seite|Pagina)\s*\**\s*(\d+)\s*\**\s*:?\s*$/gim;
+  const re = /^\s*#{1,4}\s*\**\s*(?:Page|Seite|Pagina)\s*\**\s*(\d+)\s*\**\s*:?\s*\**\s*$/gim;
   const marks = [];
   let m;
-  while ((m = re.exec(body)) !== null) marks.push({ page: parseInt(m[1], 10), start: re.lastIndex });
+  // headStart = where the "## Page N" line BEGINS, bodyStart = just after it.
+  // A page's text runs from its own bodyStart to the next page's headStart —
+  // using the next mark's END offset instead appended the literal "## Page N+1"
+  // line to the previous page's text, which then shipped inside the book.
+  while ((m = re.exec(body)) !== null) {
+    marks.push({ page: parseInt(m[1], 10), headStart: m.index, bodyStart: re.lastIndex });
+  }
   for (let i = 0; i < marks.length; i++) {
-    const end = i + 1 < marks.length ? body.lastIndexOf('\n', marks[i + 1].start) : body.length;
-    const text = body.slice(marks[i].start, end).replace(/^\s*\n/, '').trim();
+    const end = i + 1 < marks.length ? marks[i + 1].headStart : body.length;
+    const text = body.slice(marks[i].bodyStart, end).trim();
     if (text) pages.push({ pageNumber: marks[i].page, text });
   }
 

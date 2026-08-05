@@ -1129,6 +1129,24 @@ function TextRefineView({ result }: { result: ExperimentResult }) {
                 {!!r.strayPages?.length && <span className="text-amber-600"> · ignored out-of-range page {r.strayPages.join(', ')}</span>}
               </>
             ) : <> · failed: {r.error}</>}
+            {/* The exact prompt sent this round, and the raw answer back. Both
+                verbatim — a char count tells you nothing when a rule misfires. */}
+            {(r.prompt || r.rawResponse) && (
+              <div className="mt-1 flex gap-3">
+                {r.prompt && (
+                  <details className="flex-1">
+                    <summary className="cursor-pointer text-indigo-600">Prompt sent ({(r.promptChars || r.prompt.length).toLocaleString()} chars)</summary>
+                    <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-3 max-h-[32rem] overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-700">{r.prompt}</pre>
+                  </details>
+                )}
+                {r.rawResponse && (
+                  <details className="flex-1">
+                    <summary className="cursor-pointer text-indigo-600">Raw model answer</summary>
+                    <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-3 max-h-[32rem] overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-700">{r.rawResponse}</pre>
+                  </details>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -1586,6 +1586,12 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
         usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
         cost: r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[modelKey].modelId, r.usage || {}),
         promptChars: prompt.length,
+        // The FULL prompt sent, stored verbatim. A char count is not inspectable
+        // — the contract for every Lab card is that the exact prompt is visible.
+        prompt,
+        // And the raw model answer, so a parse problem is distinguishable from a
+        // model problem without going to Railway.
+        rawResponse: (r.text || '').slice(0, 40000),
         returnedPages: parsed.pages.map(p => p.pageNumber),
         strayPages,
         changedPages: changed,
