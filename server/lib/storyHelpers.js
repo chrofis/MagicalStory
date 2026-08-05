@@ -145,9 +145,13 @@ function getAgeMarkers(apparentAge) {
     case 'infant':
     case 'toddler':
       return 'baby proportions about 4 heads tall, large head relative to body, very short, rounded baby features';
+    // Split: one string used to cover preschooler (<=4) AND kindergartner (5-6)
+    // — a 3-to-6 span phrased at the bottom of its own range, which dragged
+    // every kindergartner render toward toddler.
     case 'preschooler':
+      return 'preschool-age proportions about 4.5 heads tall, large head relative to body, soft rounded features, clearly smaller than a kindergarten child';
     case 'kindergartner':
-      return 'very young child proportions about 4.5-5 heads tall, large head relative to body, soft rounded features, clearly shorter than school-age kids';
+      return 'kindergarten-age proportions about 5 heads tall, head still large relative to body but less than a toddler, softly rounded features, clearly older and taller than a preschooler and shorter than a grade-schooler';
     case 'young-school-age':
     case 'school-age':
       return 'grade-school child proportions about 5.5-6 heads tall, rounded child features, clearly shorter and smaller than a teenager — NOT toddler proportions';
@@ -3077,6 +3081,12 @@ function extractCharacterVisualProfile(char, options = {}) {
   const physical = getPhysicalFromChar(char) || {};
   const numericAge = parseInt(char.age);
   const resolvedAge = Number.isFinite(numericAge) ? numericAge : null;
+  // apparentAge (the photo read) is FIRST on purpose: real 8-year-olds range
+  // from looking 6 to looking 10, and the picture is the better guide to how the
+  // child should be drawn than the number typed in. It is safe to trust here
+  // because clampApparentAge() already bounded it to ONE bucket from the stated
+  // age when the photo was analysed (routes/avatars.js) — the same tolerance
+  // image-evaluation.txt applies ("a 7-year-old reading as 6 → NO deduction").
   const ageCategory = physical.apparentAge || char.ageCategory ||
     (resolvedAge != null ? getAgeCategory(resolvedAge) : null);
 
