@@ -97,7 +97,7 @@ const TEXT_MODELS = {
     provider: 'openrouter',
     modelId: 'qwen/qwen-plus',
     maxOutputTokens: 8192,
-    description: 'Qwen-Plus (Alibaba) via OpenRouter - cheap reasoning, ~$0.4/$1.2 per 1M'
+    description: 'Qwen-Plus (Alibaba) via OpenRouter - cheap reasoning, ~$0.26/$0.78 per 1M'
   },
   // Compliance-eval candidates (A/B 2026-07-18). Stronger reasoners than
   // qwen-plus for severity discipline, still far cheaper than Sonnet.
@@ -124,13 +124,13 @@ const TEXT_MODELS = {
     provider: 'openrouter',
     modelId: 'qwen/qwen3-vl-235b-a22b-instruct',
     maxOutputTokens: 8192,
-    description: 'Qwen3-VL 235B (vision) via OpenRouter - larger, ~$0.20/$0.88 per 1M'
+    description: 'Qwen3-VL 235B (vision) via OpenRouter - larger, ~$0.21/$1.90 per 1M'
   },
   'deepseek-v3': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-chat',
     maxOutputTokens: 8192,
-    description: 'DeepSeek V3 via OpenRouter - cheapest strong reasoner, ~$0.27/$1.10 per 1M'
+    description: 'DeepSeek V3 via OpenRouter - cheapest strong reasoner, ~$0.26/$1.03 per 1M'
   },
   // DeepSeek V4 (GA 2026-07-20) via OpenRouter. 1M context, up to 384K output —
   // high maxOutputTokens so the split outline-review call (asks 32K) and even
@@ -146,7 +146,7 @@ const TEXT_MODELS = {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-v4-flash',
     maxOutputTokens: 64000,
-    description: 'DeepSeek V4 Flash via OpenRouter - fast & very cheap, 1M context (~$0.09/$0.18 per 1M)'
+    description: 'DeepSeek V4 Flash via OpenRouter - fast & very cheap, 1M context (~$0.14/$0.28 per 1M)'
   }
 };
 
@@ -603,17 +603,17 @@ const MODEL_PRICING = {
   // OpenRouter-hosted Qwen / DeepSeek (approx list prices — verify at
   // openrouter.ai; they vary by upstream provider and shift often).
   'qwen/qwen-max': { input: 1.60, output: 6.40 },
-  'qwen/qwen-plus': { input: 0.40, output: 1.20 },
+  'qwen/qwen-plus': { input: 0.26, output: 0.78 },
   'qwen/qwen3-max': { input: 0.78, output: 3.9 },
   'deepseek/deepseek-v3.2': { input: 0.27, output: 0.4 },
   'z-ai/glm-4.6': { input: 0.5, output: 2.0 },
   'moonshotai/kimi-k2': { input: 0.57, output: 2.3 },
-  'qwen/qwen2.5-vl-72b-instruct': { input: 0.70, output: 0.70 },
+  'qwen/qwen2.5-vl-72b-instruct': { input: 0.25, output: 0.75 },
   'qwen/qwen3-vl-32b-instruct': { input: 0.104, output: 0.416 },
-  'qwen/qwen3-vl-235b-a22b-instruct': { input: 0.20, output: 0.88 },
-  'deepseek/deepseek-chat': { input: 0.27, output: 1.10 },
+  'qwen/qwen3-vl-235b-a22b-instruct': { input: 0.21, output: 1.90 },
+  'deepseek/deepseek-chat': { input: 0.2574, output: 1.0287 },
   'deepseek/deepseek-v4-pro': { input: 0.435, output: 0.87 },
-  'deepseek/deepseek-v4-flash': { input: 0.0882, output: 0.1764 },
+  'deepseek/deepseek-v4-flash': { input: 0.14, output: 0.28 },
 
   // Grok Imagine models (fixed cost per image)
   'grok-imagine-image': { perImage: 0.02 },
