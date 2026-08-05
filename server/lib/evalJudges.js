@@ -38,10 +38,17 @@ async function callOpenRouterVisionAPI(modelId, geminiParts) {
     if (part.inline_data) content.push({ type: 'image_url', image_url: { url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}` } });
     else if (part.text) content.push({ type: 'text', text: part.text });
   }
+  // Same fastest-provider routing the text path uses: OpenRouter's published p50
+  // throughput spans ~18x across providers for one model, and a judge drawing
+  // the slow tier stalls the whole eval. Null on lookup failure → sort only.
+  const fastOrder = await require('./openrouterRouting').fastProviderOrder(modelId).catch(() => null);
   const res = await withRetry(async () => fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: modelId, max_tokens: 8192, temperature: 0, messages: [{ role: 'user', content }] }),
+    body: JSON.stringify({
+      model: modelId, max_tokens: 8192, temperature: 0, messages: [{ role: 'user', content }],
+      provider: fastOrder ? { order: fastOrder, allow_fallbacks: true } : { sort: 'throughput' },
+    }),
     signal: AbortSignal.timeout(120000),
   }), { maxRetries: 2, baseDelay: 2000 });
   if (!res.ok) { log.warn(`[EVAL JUDGE] OpenRouter ${modelId} HTTP ${res.status} — skipping this judge`); return null; }

@@ -652,73 +652,15 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
  * Never the default for German story prose until an A/B proves quality.
  */
 async function callOpenRouterAPI(prompt, maxTokens, modelId, options = {}) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    throw new Error('OpenRouter API key not configured (OPENROUTER_API_KEY)');
-  }
-
-  const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
-
-  // OpenRouter can't do Anthropic-style prompt caching, but a cachePrefix still
-  // carries required content (template/rules) — prepend it so the model gets the
-  // full prompt, just without the cache discount.
-  const fullPrompt = (options.cachePrefix || '') + prompt;
-
-  // Vision: OpenAI-compatible content array with image_url parts.
-  let userContent;
-  if (options.images && options.images.length > 0) {
-    userContent = options.images.map(img => ({
-      type: 'image_url',
-      image_url: { url: img.startsWith('data:') ? img : `data:image/jpeg;base64,${stripDataUriPrefix(img)}` }
-    }));
-    userContent.push({ type: 'text', text: fullPrompt });
-  } else {
-    userContent = fullPrompt;
-  }
-
-  const messages = [{ role: 'user', content: userContent }];
-  if (options.prefill) {
-    messages.push({ role: 'assistant', content: options.prefill });
-  }
-
-  const data = await withRetry(async () => {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        // Optional attribution headers OpenRouter recommends.
-        'HTTP-Referer': 'https://magicalstory.ch',
-        'X-Title': 'MagicalStory'
-      },
-      body: JSON.stringify({
-        model: modelId,
-        max_tokens: maxTokens,
-        messages
-      }),
-      signal: AbortSignal.timeout(timeoutMs)
-    });
-    if (!res.ok) {
-      const errorText = await res.text();
-      const error = new Error(`OpenRouter API error (${res.status}): ${errorText}`);
-      error.status = res.status;
-      throw error;
-    }
-    return res.json();
-  }, { maxRetries: 2, baseDelay: 2000 });
-
-  const inputTokens = data.usage?.prompt_tokens || 0;
-  const outputTokens = data.usage?.completion_tokens || 0;
-  if (inputTokens > 0 || outputTokens > 0) {
-    log.debug(`📊 [OPENROUTER] ${modelId} - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
-  }
-
-  const responseText = data.choices?.[0]?.message?.content || '';
-  const fullText = options.prefill ? options.prefill + responseText : responseText;
-  return {
-    text: fullText,
-    usage: { input_tokens: inputTokens, output_tokens: outputTokens }
-  };
+  // Delegates to the streaming implementation with no onChunk. Identical result
+  // shape, and it inherits the two things this path could never have on its own:
+  //   - immunity to undici's 300s headersTimeout, which killed any completion
+  //     that took over five minutes (a non-streaming response sends no headers
+  //     until it is finished)
+  //   - live fastest-provider routing + the real cost OpenRouter reports
+  // Keeping a second hand-rolled request here would mean maintaining those in
+  // two places, which is how the streaming path ended up ahead of this one.
+  return callOpenRouterAPIStreaming(prompt, maxTokens, modelId, null, options);
 }
 
 /**
