@@ -638,9 +638,14 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
   const { facePhoto = null, standardAvatar = null, costumeDescription = 'standard outfit', model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null } = opts;
   const avatarFaces = standardAvatar ? (await splitSheetRows(standardAvatar)).topHeads : null;
   const { topHeads, bottomBody, splitY } = await splitSheetRows(sheetImageData);
+  // Bodies check gets NO reference-face images. The face photo + avatar faces
+  // BOTH contain heads, and the judge was reading THEM to answer "is the head
+  // visible" → it said "head yes" on a headless bottom crop. Body completeness
+  // + outfit must be judged on the sheet crop ALONE; identity is covered by the
+  // heads row.
   const [headsR, bodiesR] = await Promise.all([
     evaluateSheetRow(topHeads, 'heads', { sourcePhoto: facePhoto, avatarFaces, model, promptOverride, usageTracker }),
-    evaluateSheetRow(bottomBody, 'bodies', { sourcePhoto: facePhoto, avatarFaces, costumeDescription, model, usageTracker }),
+    evaluateSheetRow(bottomBody, 'bodies', { costumeDescription, model, usageTracker }),
   ]);
   const heads = headsR.report, bodies = bodiesR.report;
   const finalScore = Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0);

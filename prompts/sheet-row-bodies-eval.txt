@@ -2,12 +2,15 @@ You are evaluating the BOTTOM ROW of a 2×4 character reference sheet, cropped o
 
 You receive UP TO TWO images:
   - Image 1 (optional): the SOURCE FACE PHOTO of the real person.
-  - Image LAST: the BOTTOM ROW — 4 cells left to right: front, three-quarter, profile, back — each a full-body figure.
+  - Image LAST: 4 cells left to right (front, three-quarter, profile, back). Each cell SHOULD be one whole figure from the top of the head to the soles of the feet — your job is to check whether it actually is. Do not assume it is.
 
-Judge only what is visible. This image has 4 cells and no top row.
+Judge only what is visible. This image has 4 cells and no other row.
 
-TASK 1: COMPLETE FROM TOP OF HEAD TO BOTTOM OF FEET
-Each cell shows the character complete from the top of the head to the bottom of the feet. The top of the head must be fully visible and not cut by the top edge, and both feet with shoes must be visible at the bottom with white margin below them. If the head is cut or missing at the top, or the figure is cropped at the thigh, knee, or ankle with feet/shoes not visible, score that cell 1-3. Per-cell 1-10; fullBodyScore = lowest.
+TASK 1: IS EACH CELL A COMPLETE HEAD-TO-TOE FIGURE?
+Inspect each of the 4 cells on its own. A cell is complete ONLY if BOTH ends of the person are inside it:
+  - HEAD: the head with a visible face sits at the top of the cell (not cut by the top edge, not absent). A cell that begins at the neck, chest, shoulders, or waist — with no head — is NOT complete.
+  - FEET: both feet with shoes are visible at the bottom (not cut at thigh, knee, or ankle).
+Score each cell: 8-10 = head AND feet both fully visible; 1-2 = head missing/cut at the top OR feet missing/cut at the bottom. In the reason, state for EACH cell whether the head is present and whether the feet are present (e.g. "cell1: head yes, feet yes; cell2: head NO (starts at the waist), feet yes"). Per-cell 1-10; fullBodyScore = LOWEST cell.
 
 TASK 2: FACING ANGLES
 The 4 cells read front, three-quarter, profile, back, left to right. Score 1-10.
@@ -27,7 +30,7 @@ finalScore = lowest of fullBodyScore, anglesScore, outfitScore, proportionsScore
 
 Return EXACTLY this JSON:
 {
-  "fullBody": {"perCell": {"cell1": 8, "cell2": 8, "cell3": 8, "cell4": 8}, "fullBodyScore": 8, "reason": "All 4 cells show head-to-feet figures with both feet and shoes visible"},
+  "fullBody": {"perCell": {"cell1": 8, "cell2": 8, "cell3": 8, "cell4": 8}, "fullBodyScore": 8, "reason": "cell1: head yes, feet yes; cell2: head yes, feet yes; cell3: head yes, feet yes; cell4: head yes, feet yes"},
   "angles": {"score": 9, "reason": "Front, three-quarter, profile, back left to right"},
   "outfit": {"outfitScore": 9, "reason": "Every figure wears the requested items, consistent across cells"},
   "proportions": {"score": 9, "reason": "Proportions match the person's apparent age"},
@@ -37,4 +40,4 @@ Return EXACTLY this JSON:
   "failureReasons": []
 }
 
-If invalid, populate failureReasons with short strings naming each failed sub-check (e.g. "fullBody: cell 3 cropped at the ankle, shoes not visible").
+If invalid, populate failureReasons with short strings naming each failed sub-check (e.g. "fullBody: all 4 cells have no head — figures start at the waist" or "fullBody: cell 3 cropped at the ankle, shoes not visible").
