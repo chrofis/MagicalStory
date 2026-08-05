@@ -1568,7 +1568,9 @@ pass: pass-1 only, no pass-2), so no re-lettering pass exists.
 **Rationale:** Product call (aesthetics vs reliability) — needs owner
 input, not an engineering default.
 **Touched:** (none — question only)
-**Status:** 🟡 open product question.
+**Status:** 🗄 **superseded 2026-08-05** — see "Cover title: glyph-conditioned PAINT-IN, never
+model-spelled" at the bottom of this file. The answer is neither option: app-side glyphs (correct
+by construction) painted into the art by a masked edit pass, behind an OCR exact-match gate.
 
 ## 2026-07-12 — Text-usage accounting: chokepoint is the single source of truth
 **Context:** Token/cost accounting undercounted Anthropic usage by ~3.5x per
@@ -4218,3 +4220,42 @@ the client never sent either.
 `getExperiments()` takes `{limit, days, all}`.
 
 **Touched:** `client/src/pages/TestLab.tsx`, `client/src/services/testlabService.ts`.
+
+## 2026-08-05 — Cover title: glyph-conditioned PAINT-IN, never model-spelled (closes the 2026-07-11 open question)
+
+**Context:** The app-side title lockup (`coverTypography.composeCover`) spells perfectly but
+reads as a flat graphic pasted on the art. The obvious alternative — have the image model draw
+the title — is what garbles letters, and the owner explicitly rejected "retry three times and
+hope an eval catches the wrong letter". Web research (Aug 2026) put the ceiling for free text
+generation at ~90-95% on short copy (Ideogram 4 best, GPT Image 2, Qwen-Image), with the failure
+mode concentrated on umlauts/accents — i.e. ~1 in 10 German/French covers garbled, and single-letter
+errors are exactly what a VLM judge misses.
+
+**Decision:** The letters always come from a font file; the model only styles them.
+Test Lab stage `cover_title_paintin`: composeCover renders the real-font title → pixel-diff vs the
+textless plate yields the exact glyph mask → dilate (~1.2% of the short side) → crop the title region
++5% and send ONLY that crop to Qwen `qwen-image-edit@2511` ($0.008) with the story's ART_STYLES text →
+mask-gated paste-back at exact coordinates → **OCR exact-match gate** (utility vision model,
+temperature 0, "copy exactly, do not correct"; whitespace-collapsed, case-insensitive because several
+title fonts are uppercase-only, DIACRITIC-SENSITIVE). Gate FAIL ⇒ keep the flat composite.
+
+**Rationale:** This is the GlyphControl / AnyText / Glyph-ByT5 principle (pre-rendered glyphs as the
+condition took design-image text rendering from <20% → ~90%) implemented on models we already pay for.
+Qwen's single strongest documented capability is editing text *already present* in an image while
+preserving font/size/style — it never has to invent a letterform. Crop-bounding is the rule already
+established by the Qwen composite experiments (full-frame edits re-imagine the scene). Mask gating
+makes the artwork outside the letters pixel-identical **by construction**, and the OCR gate is
+deterministic rather than a judge, so a garbled title cannot ship — it is structurally excluded, not
+merely made less likely.
+
+**Rejected:** routing the title to Ideogram 4 / GPT Image 2 free generation — best integration when it
+works, but ~90% first try, weakest exactly on our diacritics, and it still needs the same OCR gate plus
+a fallback path. Re-test in this stage if paint-in disappoints.
+
+**Touched:** `server/lib/testlab.js` (`runCoverTitlePaintinStage`, `transcribeTextInImage`,
+`TITLE_PAINTIN_PROMPT`), `client/src/services/testlabService.ts`, `client/src/pages/TestLab.tsx`
+(OCR-gate card block), `docs/cover-text-rendering-research.md`, `docs/image-routing.md`.
+
+**Status:** 🟡 built, NOT yet run — no verdict on whether Qwen adds real medium inside a mask this thin.
+Supersedes the 2026-07-11 "cover text baked vs overlay" open question: the answer is neither, it is
+overlay-then-paint-in.

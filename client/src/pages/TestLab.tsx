@@ -2184,7 +2184,7 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                         await testlabService.pinSheet(set.id, {
                           storyId: result.storyId, character: result.character!,
                           pass: (result as { pass?: number }).pass,
-                          label: `final ${(result.report as { finalScore?: number } | undefined)?.finalScore ?? '?'}`,
+                          label: `final ${(result.report as unknown as { finalScore?: number } | undefined)?.finalScore ?? '?'}`,
                         });
                         alert(`Pinned ${result.character} (pass ${(result as { pass?: number }).pass}) to "${set.name}".`);
                       } catch (e) { alert(`Pin failed: ${e instanceof Error ? e.message : e}`); }
