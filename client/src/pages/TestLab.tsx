@@ -1228,6 +1228,14 @@ function TextRefineView({ result }: { result: ExperimentResult }) {
             ) : <> · failed: {r.error}</>}
             {/* The exact prompt sent this round, and the raw answer back. Both
                 verbatim — a char count tells you nothing when a rule misfires. */}
+            {/* The analysis is the actual work — open by default, since a page
+                changing without a stated finding behind it is the failure mode. */}
+            {r.analysis && (
+              <details className="mt-1" open>
+                <summary className="cursor-pointer text-indigo-600">Analysis — why these pages ({r.analysis.length.toLocaleString()} chars)</summary>
+                <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-3 max-h-[32rem] overflow-auto whitespace-pre-wrap text-[11px] text-gray-700">{r.analysis}</pre>
+              </details>
+            )}
             {(r.prompt || r.rawResponse) && (
               <div className="mt-1 flex gap-3">
                 {r.prompt && (

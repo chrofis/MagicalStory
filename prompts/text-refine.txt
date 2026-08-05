@@ -40,7 +40,13 @@ Do not rewrite a page for small stylistic preference. Rewrite it when it has a r
 
 Never use an em-dash (—) or an en-dash (–), anywhere, for any purpose. Replace every one you find with a comma, a full stop, a colon, or parentheses, and recast the sentence if none of those fit.
 
-Judge each page against the criteria below. Apply them silently: they tell you what counts as a real problem, not what to write in your answer. A page also fails if it contradicts its scene outline, or if any dash from the rule above survives on it.
+Work in two steps.
+
+Step 1 — write the analysis. Answer every check below in full, naming pages and quoting lines. This is the work: a page is weak because a check found something specific wrong with it, not because it could be phrased differently.
+
+Step 2 — rewrite the pages your analysis found problems on. A page no check flagged stays exactly as it is.
+
+Where a check tells you to emit a fix in FIXES REQUIRED, apply that fix directly in the rewritten page instead. A page also counts as flagged if it contradicts its scene outline or still carries a dash from the rule above.
 
 {ANALYSIS_INSTRUCTIONS}
 
@@ -48,9 +54,10 @@ Judge each page against the criteria below. Apply them silently: they tell you w
 
 # OUTPUT FORMAT
 
-Output only the block below. No preamble, no commentary, no explanation of changes.
+Both blocks, in this order, nothing before or after.
 
-Include a page only if you rewrote it. Use its real page number.
+---ANALYSIS---
+<your answers to A, B, C and E, in that order, using the formats each section specifies>
 
 ---STORY TEXT---
 ## Page <number>
@@ -59,7 +66,7 @@ Include a page only if you rewrote it. Use its real page number.
 ## Page <number>
 <rewritten text for that page>
 
-When nothing needs rewriting, output exactly:
+Include a page under STORY TEXT only if you rewrote it. Use its real page number. When the analysis found nothing to rewrite, still output the analysis, then:
 
 ---STORY TEXT---
 NONE

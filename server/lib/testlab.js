@@ -1592,6 +1592,9 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
         // And the raw model answer, so a parse problem is distinguishable from a
         // model problem without going to Railway.
         rawResponse: (r.text || '').slice(0, 40000),
+        // The findings that justify this round's rewrites — the answer to
+        // "why did it change that page", which a diff alone can't give.
+        analysis: (parsed.analysis || '').slice(0, 40000),
         returnedPages: parsed.pages.map(p => p.pageNumber),
         strayPages,
         changedPages: changed,

@@ -181,6 +181,7 @@ export interface RefineRound {
   promptChars?: number;
   prompt?: string;
   rawResponse?: string;
+  analysis?: string;
   returnedPages?: number[];
   strayPages?: number[];
   changedPages?: number[];

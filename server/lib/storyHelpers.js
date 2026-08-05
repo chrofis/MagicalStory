@@ -5541,9 +5541,31 @@ function buildTextRefinePrompt(inputData, pages = []) {
     .map(p => `## Page ${p.pageNumber}\n${p.text || '(empty)'}`)
     .join('\n\n');
 
-  const characterDetails = (inputData.characters || [])
-    .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: false }))
-    .join('\n\n') || '(no character details available)';
+  // PSYCHOLOGICAL profile, not the visual one. buildCharacterPromptBlock emits
+  // hair/eyes/face/head-height — that exists so an image model can draw the
+  // character, and it is useless here: section B judges consistency, voice,
+  // motivation and growth. Feeding cheekbones to a prose reviewer invites it to
+  // "fix" appearance details the illustrations have already locked. This mirrors
+  // the characterSummary the WRITER prompt gets, so refiner and writer reason
+  // about the same person.
+  const mainIds = inputData.mainCharacters || [];
+  const characterDetails = (inputData.characters || []).map(char => {
+    const t = getTraits(char);
+    const line = (label, v) => {
+      const s = Array.isArray(v) ? v.filter(Boolean).join(', ') : v;
+      return s ? `- ${label}: ${s}` : null;
+    };
+    return [
+      `**${char.name}**${mainIds.includes(char.id) ? ' (main character)' : ''}:`,
+      line('Age', char.age),
+      line('Gender', char.gender),
+      line('Personality', char.personality),
+      line('Strengths', t.strengths),
+      line('Flaws', t.flaws),
+      line('Challenges', t.challenges),
+      line('Special details', t.specialDetails),
+    ].filter(Boolean).join('\n');
+  }).join('\n\n') || '(no character details available)';
 
   // Story brief = what the book was ASKED to be. This mirrors the field set the
   // writer prompt receives, because a refiner working from less context than the
@@ -5619,10 +5641,16 @@ function buildTextRefinePrompt(inputData, pages = []) {
  * @returns {{pages: Array<{pageNumber:number,text:string}>, missing: number[]}}
  */
 function parseRefinedText(raw, expectedPages = []) {
-  const body = (() => {
-    const m = String(raw || '').match(/---\s*STORY TEXT\s*---/i);
-    return m ? String(raw).slice(m.index + m[0].length) : String(raw || '');
-  })();
+  const full = String(raw || '');
+  const marker = full.match(/---\s*STORY TEXT\s*---/i);
+  const body = marker ? full.slice(marker.index + marker[0].length) : full;
+
+  // Everything before the STORY TEXT marker is the analysis — the findings that
+  // justify each rewrite. Returned so the Lab can show WHY a page changed, not
+  // just that it did. The ---ANALYSIS--- header itself is stripped if present.
+  const analysis = marker
+    ? full.slice(0, marker.index).replace(/^[\s\S]*?---\s*ANALYSIS\s*---/i, '').trim()
+    : '';
 
   const pages = [];
   // "## Page N" headings, tolerating bold/extra markup around the number.
@@ -5644,7 +5672,7 @@ function parseRefinedText(raw, expectedPages = []) {
 
   const got = new Set(pages.map(p => p.pageNumber));
   const missing = expectedPages.filter(n => !got.has(n));
-  return { pages, missing };
+  return { pages, missing, analysis };
 }
 
 /**
