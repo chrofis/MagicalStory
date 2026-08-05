@@ -341,7 +341,7 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
 // FAITHFULNESS-CHECK: images.js:11535-11582 (blurFace shapeAware branch).
 async function buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCoverage }) {
   const sharp = require('sharp');
-  const { fetchFaceHeadMaskPng, fetchSilhouettePng } = require('./images');
+  const { fetchFaceHeadMaskPng, fetchSilhouettePng, fetchFigureMaskPng } = require('./images');
   const fLeft = boxInCrop[0], fTop = boxInCrop[1];
   const fWidth = boxInCrop[2] - boxInCrop[0], fHeight = boxInCrop[3] - boxInCrop[1];
   // FAITHFULNESS-CHECK: images.js:11524 + 11547 (FACE_BLUR_RADIUS_FACTOR 0.03, min 10).
@@ -353,7 +353,15 @@ async function buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCove
   let oldMaskPng = null, cov = 0;
   // FAITHFULNESS-CHECK: images.js:11558-11576 (head mask ∪ hair → dest-in clip of blur).
   const innerFaceBox = [0, 0, fWidth, fHeight];
-  const silhouettePng = await fetchFaceHeadMaskPng(cropJpeg, innerFaceBox, fWidth, fHeight) || await fetchSilhouettePng(cropJpeg);
+  // FACE blur wants the HEAD mask; a BODY blur must segment the whole FIGURE.
+  // fetchFaceHeadMaskPng places face/hair dots and clips to a head — run on a
+  // full-body box it returns a head-shaped/partial mask, and that mask IS
+  // "SAM round 1" downstream (exp #304: red zone 51864px under blur vs 5032px
+  // under crosshatch on the SAME box, because round 1 covered only part of the
+  // figure). Body blur now uses the plain figure mask, like every other path.
+  const silhouettePng = (faceOnly
+    ? (await fetchFaceHeadMaskPng(cropJpeg, innerFaceBox, fWidth, fHeight) || await fetchSilhouettePng(cropJpeg))
+    : (await fetchFigureMaskPng(cropJpeg, innerFaceBox, {}) || await fetchSilhouettePng(cropJpeg)));
   if (silhouettePng) {
     const blurredWithAlpha = await sharp(blurred).ensureAlpha().composite([{ input: silhouettePng, blend: 'dest-in' }]).png().toBuffer();
     composite = { input: blurredWithAlpha, left: fLeft, top: fTop };

@@ -4356,3 +4356,25 @@ On sets: two sets systems in one tree is the "parallel paths" failure the codeba
 `client/src/services/testlabService.ts`, `docs/cover-text-rendering-research.md`.
 
 **Status:** 🟡 built, still NOT run — no verdict yet on paint-in quality or on recolour.
+
+---
+
+## 2026-08-05 — BODY blur used the FACE/HEAD mask as SAM round 1 (exp #304)
+
+**Context:** Owner on exp #304: "for the blurred version SAM round 1 is wrong — how can that
+be? It is the same image as for the others." Correct: same page, same box, same detection.
+`buildBlurTreatment` called `fetchFaceHeadMaskPng` unconditionally — the fetcher that places
+face+hair dots and clips to a HEAD. On a whole-figure box it returns a head-shaped/partial
+mask, and that mask IS the blend's `oldMaskPng` = SAM round 1. Measured consequence: red zone
+51864px under blur vs 5032px under crosshatch on the SAME box; the blur path also blurred
+only part of the figure, so the model saw a half-blurred body.
+
+`buildBlurTreatment` already accepted `faceOnly` and never used it — the bug was latent from
+the spine merge (the legacy blur path was face-only, so nothing exercised it until whole-figure
+blur became reachable from the Lab's new Treatment dropdown).
+
+**Decision:** body blur (`faceOnly=false`) uses `fetchFigureMaskPng` — the same plain figure
+mask every other body path uses; face blur keeps the head mask. `fetchSilhouettePng` stays
+the fallback for both.
+
+**Touched:** `server/lib/faceRepair.js`.
