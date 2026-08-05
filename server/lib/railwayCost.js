@@ -34,15 +34,54 @@ const RATES = {
 
 const MEASUREMENTS = ['MEMORY_USAGE_GB', 'CPU_USAGE', 'NETWORK_TX_GB', 'DISK_USAGE_GB'];
 
+// Railway has TWO token types and they use DIFFERENT auth headers:
+//   account / CLI token  ->  Authorization: Bearer <token>
+//   project token        ->  Project-Access-Token: <token>
+//
+// Sending the wrong one returns a bare "Not Authorized", which looks exactly
+// like a bad token or a scope problem — so this cost me a debugging round when
+// the production project token failed against Bearer. Project tokens are the
+// right choice for a server (scoped to one project), so both must work.
+//
+// Guess from the shape, verify by trying, then remember which worked so we pay
+// the retry at most once per process.
+let _authMode = null; // 'bearer' | 'project'
+
+const looksLikeProjectToken = (t) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-/i.test(t);
+
+function headersFor(token, mode) {
+  return mode === 'project'
+    ? { 'Content-Type': 'application/json', 'Project-Access-Token': token }
+    : { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
 async function gql(token, query, variables) {
-  const res = await fetch(RAILWAY_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ query, variables }),
-  });
-  const body = await res.json();
-  if (body.errors) throw new Error(JSON.stringify(body.errors).slice(0, 400));
-  return body.data;
+  const modes = _authMode
+    ? [_authMode]
+    : (looksLikeProjectToken(token) ? ['project', 'bearer'] : ['bearer', 'project']);
+
+  let lastErr;
+  for (let i = 0; i < modes.length; i++) {
+    const res = await fetch(RAILWAY_API, {
+      method: 'POST',
+      headers: headersFor(token, modes[i]),
+      body: JSON.stringify({ query, variables }),
+    });
+    const body = await res.json();
+    if (body.errors) {
+      const msg = JSON.stringify(body.errors).slice(0, 400);
+      // Only an AUTH failure is worth retrying with the other header. A real
+      // query error must surface as itself, not be masked by a second attempt.
+      if (/not authorized|unauthorized/i.test(msg) && i < modes.length - 1) {
+        lastErr = new Error(msg);
+        continue;
+      }
+      throw new Error(msg);
+    }
+    _authMode = modes[i];
+    return body.data;
+  }
+  throw lastErr;
 }
 
 /** Resolve service/environment UUIDs to names so the report is readable. */
