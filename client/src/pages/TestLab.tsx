@@ -34,20 +34,16 @@ import {
  * nothing else. Edit here to change what "Replay blend" compares.
  */
 const BLEND_REPLAY_VARIANTS = [
-  // 'figure-exact' is the correct construction: full opacity over old ∪ new+pad
-  // (the old figure can never show through), the feather band content-substituted
-  // with the ORIGINAL (the model cannot paint outside the region → no halo), ramp
-  // outward (never touches the figure → it stays crisp). It is the figure-repair
-  // default; these variants compare it against the legacy padded-union shapes.
-  // Every knob is set EXPLICITLY: a replay inherits the source result's params as
-  // its base, so an unset knob silently takes the replayed variant's value (#271:
-  // "A: erode" inherited featherMode 'outward' from the replayed B result and ran
-  // outward — its step label exposed it).
-  { label: 'A: legacy — padded-union, f6 erode', params: { blendShape: 'padded-union', featherPx: 6, featherMode: 'erode', colorCorrect: true, bgBorderMatch: true } },
-  { label: 'B: legacy — padded-union, f6 outward', params: { blendShape: 'padded-union', featherPx: 6, featherMode: 'outward', colorCorrect: true, bgBorderMatch: true } },
-  { label: 'C: figure-exact, f6 (new default)', params: { blendShape: 'figure-exact', featherPx: 6, colorCorrect: true, bgBorderMatch: true } },
-  { label: 'D: figure-exact, f12', params: { blendShape: 'figure-exact', featherPx: 12, colorCorrect: true, bgBorderMatch: true } },
-  { label: 'E: figure-exact f6, colour match OFF', params: { blendShape: 'figure-exact', featherPx: 6, bgBorderMatch: false, colorCorrect: false } },
+  // Two cards, in reading order:
+  //  1. FINAL — the production blend (figure-exact + two-band footprint +
+  //     structure confidence + rim removal), what a real repair ships.
+  //  2. RAW — the model's content cut to the SAME old∪new region and pasted
+  //     hard: no colour work, no field, no feather. FINAL minus RAW = what the
+  //     blend contributes; defects visible in BOTH come from the model output
+  //     itself. Every knob is set explicitly (a replay inherits the source
+  //     result's params, so unset knobs silently take the replayed values).
+  { label: '1: FINAL — production blend', params: { blendShape: 'figure-exact', featherPx: 6, colorCorrect: true, bgBorderMatch: true, rawPaste: false } },
+  { label: '2: RAW — union paste, no blending', params: { blendShape: 'figure-exact', featherPx: 6, colorCorrect: false, bgBorderMatch: false, rawPaste: true } },
 ];
 
 /** One reviewer-model run (outline_review): header stats + the review text. */
@@ -397,6 +393,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const [compareAll, setCompareAll] = useState(false);
   const [compareColor, setCompareColor] = useState(false);
   const [whiteoutTarget, setWhiteoutTarget] = useState('face');
+  const [grokTreatment, setGrokTreatment] = useState(''); // '' = whiteout insert (default) | fullscene | blended | cutout
   const [freshDetection, setFreshDetection] = useState(false);
   const [avatarPass, setAvatarPass] = useState('1');        // avatar_eval: 1=realistic anchor, 2=styled sheet
   const [avatarEvalModel, setAvatarEvalModel] = useState('gemini-2.5-flash'); // avatar_eval: which model scores the sheet
@@ -553,6 +550,10 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
         } else {
           params.backend = repairBackend;
           if (repairBackend === 'grok' || repairBackend === 'qwen') params.whiteoutTarget = whiteoutTarget;
+          // Treatment: how the figure is prepared for the model. '' = whiteout
+          // silhouette (insert pipeline, the calibrated default); the legacy
+          // treatments stay reachable explicitly.
+          if (repairBackend === 'grok' && grokTreatment) params.repairMode = grokTreatment;
           if (freshDetection) params.freshDetection = true;
         }
       }
@@ -747,11 +748,22 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
               <label className="text-sm flex items-center gap-1.5">
                 Engine
                 <select className="border rounded-lg px-3 py-2 text-sm" value={repairBackend} onChange={e => setRepairBackend(e.target.value)}>
-                  <option value="grok">Grok (blended)</option>
+                  <option value="grok">Grok</option>
                   <option value="gemini">Gemini</option>
                   <option value="qwen">Qwen (crop insert)</option>
                 </select>
               </label>
+              {repairBackend === 'grok' && (
+                <label className="text-sm flex items-center gap-1.5">
+                  Treatment
+                  <select className="border rounded-lg px-3 py-2 text-sm" value={grokTreatment} onChange={e => setGrokTreatment(e.target.value)}>
+                    <option value="">Whiteout (insert, default)</option>
+                    <option value="fullscene">Crosshatch (full scene)</option>
+                    <option value="blended">Blur (blended)</option>
+                    <option value="cutout">Crop (cutout)</option>
+                  </select>
+                </label>
+              )}
               {(repairBackend === 'grok' || repairBackend === 'qwen') && (
                 <label className="text-sm flex items-center gap-1.5">
                   Repair

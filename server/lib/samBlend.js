@@ -426,7 +426,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
   const sharp = require('sharp');
   const fail = (msg) => {
     const err = new Error(msg);
@@ -730,7 +730,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   //    SKIP the figure colour-match and instead protect the BACKGROUND at the
   //    silhouette border (the snow-in-cutout must match the surrounding original;
   //    that's what the eye catches). Handled by the generalized bg-match below.
-  if (colorCorrect && !bodyColorMode) {
+  if (colorCorrect && !bodyColorMode && !rawPaste) {
     try {
       // FIGURE correction (material-aware), referenced to the ORIGINAL figure
       // (refMask = oldA) so the white glow / red zone can't skew the palette.
@@ -755,7 +755,10 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // Colour-match the BACKGROUND the paste INTRODUCES (red zone + silhouette-border
   // margin) back to the surrounding scene, so the edge doesn't read as a cut-out.
   // See matchIntroducedBackground. Runs whenever there's a red zone or bgBorderMatch.
-  if (redZonePx > 0 || bgBorderMatch) {
+  // rawPaste: the DIAGNOSTIC variant — model content across the whole paste
+  // region, hard, untouched. What you see minus the FINAL card = the blend's
+  // contribution; what is ugly in BOTH = the model output's own defects.
+  if (!rawPaste && (redZonePx > 0 || bgBorderMatch)) {
     const oldBinBuf = Buffer.alloc(n);
     for (let i = 0; i < n; i++) oldBinBuf[i] = oldA[i * s1r] > 128 ? 255 : 0;
     const { bgPx, materials } = await matchIntroducedBackground({
@@ -775,7 +778,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // the ramp blends original-with-original: geometrically soft, visually
   // invisible, and the model cannot contribute a single pixel beyond the
   // paste region no matter how wide the feather is.
-  if (blendShape === 'figure-exact') {
+  if (blendShape === 'figure-exact' && !rawPaste) {
     for (let i = 0; i < n; i++) {
       if (alpha1[i] <= 128) {
         pasteRaw[i * 3] = origRaw[i * 3];
@@ -815,11 +818,12 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
   // figure-exact FORCES 'outward': erode would re-expose the old figure (the
   // measured 8-27px uncovered ring), and with content substitution the outward
   // band costs nothing — it blends original into original.
-  const mode = blendShape === 'figure-exact' ? 'outward' : (featherMode || (erodeFeather === false ? 'centered' : 'erode'));
+  const mode = rawPaste ? 'raw' : (blendShape === 'figure-exact' ? 'outward' : (featherMode || (erodeFeather === false ? 'centered' : 'erode')));
   let alphaSrc = Buffer.from(alpha1);
-  if (fpx >= 1 && mode === 'erode') alphaSrc = await maskBlurThreshold(alphaSrc, cropW, cropH, fpx, 200); // blur+high-thr shrinks ~fpx inward
+  if (mode === 'raw') { /* binary union alpha — no ramp at all */ }
+  else if (fpx >= 1 && mode === 'erode') alphaSrc = await maskBlurThreshold(alphaSrc, cropW, cropH, fpx, 200); // blur+high-thr shrinks ~fpx inward
   else if (fpx >= 1 && mode === 'outward') alphaSrc = await maskBlurThreshold(alphaSrc, cropW, cropH, fpx / 1.5, 16); // grows ~fpx outward
-  const alphaBlur = await sharp(alphaSrc, raw1).blur(Math.max(0.3, fpx || 1.2)).raw().toBuffer();
+  const alphaBlur = mode === 'raw' ? Buffer.from(alphaSrc) : await sharp(alphaSrc, raw1).blur(Math.max(0.3, fpx || 1.2)).raw().toBuffer();
   const abStride = Math.max(1, Math.round(alphaBlur.length / n));
   const alphaSoft = abStride === 1 ? alphaBlur : (() => { const o = Buffer.alloc(n); for (let i = 0; i < n; i++) o[i] = alphaBlur[i * abStride]; return o; })();
   // Outward ramp is ONE-SIDED: the Gaussian tail also bleeds ~10% inward past

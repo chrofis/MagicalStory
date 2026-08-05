@@ -4109,3 +4109,24 @@ either.
 **Touched:** `server/lib/faceRepair.js`.
 **Status:** ✅ staging — a staging story run's automatic whole-figure char-repair now uses
 the calibrated blend.
+
+---
+
+## 2026-08-05 — Lab: replay reduced to FINAL + RAW; Treatment dropdown exposed
+
+**Context:** Owner: show the real result FIRST; drop the 5-variant calibration set; add a
+RAW comparison ("the new input for the full union cropped on top, without any blending") so
+the blend's contribution and the model's own defects separate visually. Also: the treatment
+axis (whiteout / crosshatch / blur / cutout) was hidden — the Engine dropdown said "Grok
+(blended)" but backend:'grok' actually routes to the whiteout-insert pipeline.
+
+**Decision:** (1) Replay-blend runs TWO cards: "1: FINAL — production blend" then "2: RAW —
+union paste, no blending" (`rawPaste:true` in samUnionBlend: same old∪new paste region,
+model content hard, no colour work, no field, no feather, binary alpha). FINAL−RAW = the
+blend's contribution; defects in both = model output. (2) char_repair form gains a
+Treatment dropdown for Grok: Whiteout (insert, default) / Crosshatch (fullscene) / Blur
+(blended) / Crop (cutout) — the legacy repairModes made explicit; the misleading "Grok
+(blended)" label fixed.
+
+**Touched:** `server/lib/samBlend.js` (rawPaste), `server/lib/testlab.js` (threading),
+`client/src/pages/TestLab.tsx` (variants, Treatment dropdown).

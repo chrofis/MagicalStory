@@ -2981,6 +2981,8 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       // Face mode keeps 'padded-union' (masks nearly coincide; its default is
       // calibrated separately). Override with params.blendShape to A/B.
       blendShape: params.blendShape != null ? params.blendShape : (params._faceMode ? 'padded-union' : 'figure-exact'),
+      // Diagnostic raw paste: model content over the union, hard, no colour work.
+      rawPaste: params.rawPaste === true,
       colorBorderRefine: params.colorBorderRefine,
       // FIGURE/BODY repair (not face mode) → protect background at the border, let
       // the redrawn figure colour drift. Override with params.bodyColorMode to A/B.
