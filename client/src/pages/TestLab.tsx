@@ -28,8 +28,6 @@ import {
   type TextModelInfo,
   type SheetSet,
   type SheetSetMember,
-  type TitleSet,
-  type TitleSetMember,
 } from '@/services/testlabService';
 
 /**
@@ -78,7 +76,7 @@ function ReviewRunView({ run, title }: { run: ReviewRun; title?: string }) {
   );
 }
 
-type Tab = 'stories' | 'benchmark' | 'sheetsets' | 'titlesets' | 'experiments';
+type Tab = 'stories' | 'benchmark' | 'sheetsets' | 'experiments';
 
 const tabBtn = (active: boolean) =>
   `px-4 py-2 rounded-lg font-medium transition-colors ${active ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`;
@@ -140,14 +138,12 @@ export default function TestLab() {
           <button className={tabBtn(tab === 'stories')} onClick={() => setTab('stories')}>Stories</button>
           <button className={tabBtn(tab === 'benchmark')} onClick={() => setTab('benchmark')}>Benchmark</button>
           <button className={tabBtn(tab === 'sheetsets')} onClick={() => setTab('sheetsets')}>Sheet sets</button>
-          <button className={tabBtn(tab === 'titlesets')} onClick={() => setTab('titlesets')}>Title sets</button>
           <button className={tabBtn(tab === 'experiments')} onClick={() => setTab('experiments')}>Experiments</button>
         </div>
 
         {tab === 'stories' && <StoriesTab onReviewStory={useStoryForReview} />}
         {tab === 'benchmark' && <BenchmarkTab />}
         {tab === 'sheetsets' && <SheetSetsTab />}
-        {tab === 'titlesets' && <TitleSetsTab />}
         {tab === 'experiments' && <ExperimentsTab preset={preset} onPresetApplied={() => setPreset(null)} />}
       </div>
     </div>
@@ -467,139 +463,6 @@ function SheetSetsTab() {
                   <li key={m.id} className="text-xs text-gray-600 flex items-center gap-2">
                     <span className="font-mono">{m.character}</span> · pass {m.pass}
                     <span className="text-gray-400">{m.storyTitle || m.storyId}</span>
-                    <button className="ml-auto text-red-400 hover:text-red-600" onClick={() => unpin(s.id, m.id)}><Trash2 size={12} /></button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// Title sets tab — named reusable collections of COVERS for the title
-// paint-in. The point is prompt iteration: pin a set once, then fire new
-// prompts / crop margins / recolour settings against the SAME images so
-// only the variable under test changes.
-// ─────────────────────────────────────────────────────────────────────
-
-function TitleSetsTab() {
-  const [sets, setSets] = useState<TitleSet[]>([]);
-  const [expanded, setExpanded] = useState<Record<number, TitleSetMember[]>>({});
-  const [newName, setNewName] = useState('');
-  const [promptOverride, setPromptOverride] = useState('');
-  const [runLabel, setRunLabel] = useState('');
-  const [marginPct, setMarginPct] = useState('0.12');
-  const [dilatePct, setDilatePct] = useState('0.012');
-  const [contextRef, setContextRef] = useState(true);
-  const [recolor, setRecolor] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try { setSets((await testlabService.getTitleSets()).sets); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Failed to load'); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
-
-  const create = async () => {
-    if (!newName.trim()) return;
-    await testlabService.createTitleSet(newName.trim());
-    setNewName(''); load();
-  };
-  const toggle = async (id: number) => {
-    if (expanded[id]) { setExpanded(e => { const n = { ...e }; delete n[id]; return n; }); return; }
-    const detail = await testlabService.getTitleSet(id);
-    setExpanded(e => ({ ...e, [id]: detail.members }));
-  };
-  const run = async (id: number) => {
-    setBusy(true); setError(null);
-    try {
-      const res = await testlabService.runTitleSet(id, {
-        promptOverride: promptOverride.trim() || null,
-        label: runLabel.trim() || undefined,
-        params: {
-          marginPct: parseFloat(marginPct) || 0.12,
-          dilatePct: parseFloat(dilatePct) || 0.012,
-          contextRef, recolor,
-        },
-      });
-      alert(`Started experiment #${res.id} over ${res.covers} covers — open it from the Experiments tab.`);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Run failed'); }
-    finally { setBusy(false); }
-  };
-  const del = async (id: number) => { if (window.confirm('Delete this set?')) { await testlabService.deleteTitleSet(id); load(); } };
-  const unpin = async (setId: number, memberId: number) => {
-    await testlabService.unpinTitle(setId, memberId);
-    const detail = await testlabService.getTitleSet(setId);
-    setExpanded(e => ({ ...e, [setId]: detail.members })); load();
-  };
-
-  return (
-    <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <h2 className="font-semibold text-gray-900">Title sets (cover paint-in)</h2>
-        <Button variant="secondary" size="sm" className="ml-auto" onClick={load}><RefreshCw size={14} /></Button>
-      </div>
-      <div className="flex gap-2 mb-4">
-        <input className="border rounded-lg px-3 py-2 text-sm flex-1" placeholder="New set name (e.g. last-4-titles)" value={newName}
-          onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && create()} />
-        <Button size="sm" onClick={create}><Plus size={14} /> Create</Button>
-      </div>
-
-      <div className="border rounded-lg p-3 mb-4 bg-gray-50">
-        <div className="text-xs font-medium text-gray-700 mb-2">Run settings (applied to whichever set you run)</div>
-        <div className="flex gap-3 flex-wrap items-center mb-2">
-          <label className="text-xs text-gray-600 flex items-center gap-1">Crop margin
-            <input className="border rounded px-2 py-1 w-16 text-xs" value={marginPct} onChange={e => setMarginPct(e.target.value)} />
-            <span className="text-gray-400">of the long side — bigger = more palette context, fewer px per letter</span>
-          </label>
-        </div>
-        <div className="flex gap-3 flex-wrap items-center mb-2">
-          <label className="text-xs text-gray-600 flex items-center gap-1">Mask dilate
-            <input className="border rounded px-2 py-1 w-16 text-xs" value={dilatePct} onChange={e => setDilatePct(e.target.value)} />
-            <span className="text-gray-400">room for outline / bleed / shadow</span>
-          </label>
-          <label className="text-xs text-gray-600 flex items-center gap-1">
-            <input type="checkbox" checked={contextRef} onChange={e => setContextRef(e.target.checked)} />
-            Send full cover as context ref
-          </label>
-          <label className="text-xs text-gray-600 flex items-center gap-1">
-            <input type="checkbox" checked={recolor} onChange={e => setRecolor(e.target.checked)} />
-            Let the model choose the colour
-          </label>
-        </div>
-        <input className="border rounded-lg px-3 py-2 text-sm w-full mb-2" placeholder="Run label (e.g. 'wide crop + recolour')"
-          value={runLabel} onChange={e => setRunLabel(e.target.value)} />
-        <textarea className="border rounded-lg px-3 py-2 text-xs w-full font-mono" rows={4}
-          placeholder="Prompt override (leave empty to use the built-in paint-in prompt with the flags above)"
-          value={promptOverride} onChange={e => setPromptOverride(e.target.value)} />
-      </div>
-
-      {error && <div className="text-sm text-red-600 mb-3">{error}</div>}
-      {sets.length === 0 && <div className="text-sm text-gray-400">No sets yet. Create one, then pin covers from a "Cover title paint-in" result.</div>}
-      <div className="space-y-2">
-        {sets.map(s => (
-          <div key={s.id} className="border rounded-lg p-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <button className="font-medium text-indigo-700 hover:underline" onClick={() => toggle(s.id)}>
-                {s.name} <span className="text-gray-400 font-normal">({s.memberCount} covers)</span>
-              </button>
-              <div className="ml-auto flex gap-2">
-                <Button size="sm" disabled={busy || s.memberCount === 0} onClick={() => run(s.id)}>Run set</Button>
-                <Button variant="secondary" size="sm" onClick={() => del(s.id)}><Trash2 size={14} /></Button>
-              </div>
-            </div>
-            {expanded[s.id] && (
-              <ul className="mt-2 space-y-1">
-                {expanded[s.id].length === 0 && <li className="text-xs text-gray-400">Empty — pin covers from a cover_title_paintin result.</li>}
-                {expanded[s.id].map(m => (
-                  <li key={m.id} className="text-xs text-gray-600 flex items-center gap-2">
-                    <span className="font-medium">{m.storyTitle || '(untitled)'}</span>
-                    <span className="text-gray-400">{m.artStyle} · {m.coverType} · {m.storyId}</span>
                     <button className="ml-auto text-red-400 hover:text-red-600" onClick={() => unpin(s.id, m.id)}><Trash2 size={12} /></button>
                   </li>
                 ))}
@@ -1700,15 +1563,7 @@ function ExperimentDetailView({ detail, onBack, onRefresh, onReuse }: { detail: 
           onReplayBlend={(r.steps || []).some(s => /model raw output/i.test(s.label)) ? () => replayBlend(i) : undefined}
           isRedo={isRedo} superseded={superseded}
           onEditPrompt={text => { setRedoOverride(text); setShowRedoOverride(true); }}
-          onPinTitle={r.paintinSetup ? async () => {
-            const name = window.prompt('Pin this cover to which title set? (existing name or a new one)');
-            if (!name?.trim()) return;
-            try {
-              const set = await testlabService.createTitleSet(name.trim());
-              await testlabService.pinTitle(set.id, { storyId: r.storyId, coverType: r.coverType || 'frontCover' });
-              alert(`Pinned to "${set.name}". Run new prompts against it from the Title sets tab.`);
-            } catch (e) { alert(`Pin failed: ${e instanceof Error ? e.message : e}`); }
-          } : undefined} />
+          />
       ))}
       {detail.status === 'running' && (
         <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 text-center text-sm text-gray-500">
@@ -1884,7 +1739,7 @@ function StepsStrip({ steps, images, onOpen }: {
   );
 }
 
-function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, superseded, onEditPrompt, onPinTitle }: { result: ExperimentResult; stage: string; onRedo?: () => void; redoing?: boolean; onReplayBlend?: () => void; isRedo?: boolean; superseded?: boolean; onEditPrompt?: (text: string) => void; onPinTitle?: () => void }) {
+function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, superseded, onEditPrompt }: { result: ExperimentResult; stage: string; onRedo?: () => void; redoing?: boolean; onReplayBlend?: () => void; isRedo?: boolean; superseded?: boolean; onEditPrompt?: (text: string) => void }) {
   const [baseline, setBaseline] = useState<string | null>(null);
   const [variant, setVariant] = useState<string | null>(null);
   const [variantB, setVariantB] = useState<string | null>(null);
@@ -2301,9 +2156,6 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                   <summary className="cursor-pointer text-indigo-600">Full prompt sent</summary>
                   <pre className="mt-1 bg-white border rounded p-2 whitespace-pre-wrap">{result.promptUsed}</pre>
                 </details>
-              )}
-              {onPinTitle && (
-                <Button variant="secondary" size="sm" className="mt-2" onClick={onPinTitle}><Plus size={14} /> Pin to title set</Button>
               )}
             </div>
           )}
