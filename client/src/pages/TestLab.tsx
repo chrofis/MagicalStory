@@ -1411,17 +1411,58 @@ function BeatsScenesView({ result }: { result: ExperimentResult }) {
         </details>
       )}
 
-      {/* The locked plan. Reviewed pages flagged so you can see what the fast
-          pass actually moved before any prose or artwork exists. */}
+      {/* Per page: what the PLANNER wrote next to what the REVIEWER made of it.
+          Showing only the final hides which model actually did the work — the
+          comparison is the reason both calls are here. */}
       <div className="space-y-1">
-        {beats.map(b => (
-          <div key={b.pageNumber} className={`text-xs rounded-lg border p-2 ${changed.has(b.pageNumber) ? 'border-indigo-300 bg-indigo-50/40' : 'border-gray-200'}`}>
-            <b>Page {b.pageNumber}</b>
-            {changed.has(b.pageNumber) && <span className="text-indigo-600"> · revised by review</span>}
-            <div className="mt-0.5"><span className="text-gray-500">BEAT</span> {b.beat}</div>
-            <div><span className="text-gray-500">SCENE</span> {b.scene}</div>
-          </div>
-        ))}
+        {beats.map(b => {
+          const before = (plan?.pages || []).find(p => p.pageNumber === b.pageNumber);
+          const revised = changed.has(b.pageNumber);
+          return (
+            <div key={b.pageNumber} className={`text-xs rounded-lg border p-2 ${revised ? 'border-indigo-300 bg-indigo-50/40' : 'border-gray-200'}`}>
+              <b>Page {b.pageNumber}</b>
+              {revised
+                ? <span className="text-indigo-600"> · revised by review</span>
+                : <span className="text-gray-400"> · planner's version kept</span>}
+              {revised && before ? (
+                <div className="mt-1 grid gap-2 md:grid-cols-2">
+                  <div className="rounded border border-gray-200 bg-white p-2">
+                    <div className="text-[10px] font-semibold text-gray-500 mb-0.5">BEFORE — {plan?.modelKey}</div>
+                    <div><span className="text-gray-400">BEAT</span> {before.beat}</div>
+                    <div><span className="text-gray-400">SCENE</span> {before.scene}</div>
+                  </div>
+                  <div className="rounded border border-indigo-200 bg-white p-2">
+                    <div className="text-[10px] font-semibold text-indigo-600 mb-0.5">AFTER — {review?.modelKey}</div>
+                    <div><span className="text-gray-400">BEAT</span> {b.beat}</div>
+                    <div><span className="text-gray-400">SCENE</span> {b.scene}</div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-0.5"><span className="text-gray-500">BEAT</span> {b.beat}</div>
+                  <div><span className="text-gray-500">SCENE</span> {b.scene}</div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Each model's answer verbatim — the planner's whole plan and the
+          reviewer's whole reply, so neither is only visible through our parse. */}
+      <div className="grid gap-2 md:grid-cols-2">
+        {plan?.rawResponse && (
+          <details className="text-xs">
+            <summary className="cursor-pointer text-indigo-600">Full planner output — {plan.modelKey}</summary>
+            <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-3 max-h-[32rem] overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-700">{plan.rawResponse}</pre>
+          </details>
+        )}
+        {review?.rawResponse && (
+          <details className="text-xs">
+            <summary className="cursor-pointer text-indigo-600">Full reviewer output — {review.modelKey}</summary>
+            <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-3 max-h-[32rem] overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-700">{review.rawResponse}</pre>
+          </details>
+        )}
       </div>
     </div>
   );
