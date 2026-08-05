@@ -4151,3 +4151,25 @@ match lighting/perspective but shrinks the figure's pixel budget; full-page keep
 composition at the lowest figure resolution. Now A/B-able like any other knob.
 
 **Touched:** `client/src/pages/TestLab.tsx`.
+
+---
+
+## 2026-08-05 — Lab: compare checkboxes silently discarded Engine/Treatment/Zoom; replay ignores model-facing knobs
+
+**Context:** Exp #294 (owner): asked for crosshatch treatment + a wider crop, got whiteout at
+the stored crop with colour ON/OFF variants. Two independent bugs, both silent.
+
+**Bug 1 — compare branches discarded the form.** `start()` built variant lists with
+hardcoded params and never merged the widget state, so ticking "Compare colour ON vs OFF"
+(or "Compare ALL engines") threw away Engine / Treatment / Zoom / Repair without a word.
+**Fix:** a `base` object (backend, whiteoutTarget, repairMode, cropPad|crop) is built once
+and spread into EVERY variant; a compare checkbox now varies only its own axis. Compare-ALL
+keeps its per-option treatment/engine but inherits the chosen Zoom.
+
+**Bug 2 — re-running a replay keeps `replayOf`.** A replay reuses a stored model output, so
+Treatment and Zoom (what the model SEES) cannot take effect; #294 inherited `replayOf` from
+#292 via the params-JSON box and silently ignored both. **Fix:** if `replayOf` is set and a
+model-facing knob is chosen, confirm — OK drops the replay and calls the model for real
+(~$0.02/variant), Cancel clears Treatment/Zoom and keeps the free replay.
+
+**Touched:** `client/src/pages/TestLab.tsx`.

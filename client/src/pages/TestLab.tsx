@@ -528,38 +528,39 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
       let params: Record<string, unknown> = { autoEval };
       if (needsCharacter) params.characterName = charName.trim();
       if (stage === 'char_repair') {
+        // BASE knobs — apply to EVERY run, including compare variants. A compare
+        // checkbox varies ONE axis; it must not silently discard Engine /
+        // Treatment / Zoom / Repair (exp #294: "Compare colour ON/OFF" threw away
+        // the chosen crosshatch treatment and full-page zoom without a word).
+        const base: Record<string, unknown> = { backend: repairBackend };
+        if (repairBackend === 'grok' || repairBackend === 'qwen') base.whiteoutTarget = whiteoutTarget;
+        if (repairBackend === 'grok' && grokTreatment) base.repairMode = grokTreatment;
+        if (cropPad === 'full') base.crop = { x: 0, y: 0, w: 1, h: 1 };
+        else if (cropPad) base.cropPad = Number(cropPad);
         if (compareAll) {
           // ONE experiment: fresh detection first, then every engine/mode as
           // Options A–F against the same fresh boxes.
           params.rerunDetection = true;
           // Every option runs through the shared SAM-union blend (mandatory).
+          const zoom = { ...(base.crop ? { crop: base.crop } : {}), ...(base.cropPad ? { cropPad: base.cropPad } : {}) };
           params.variants = [
-            { label: 'A: Grok crosshatch', params: { backend: 'grok', repairMode: 'fullscene' } },
-            { label: 'B: Grok crop-input', params: { backend: 'grok', repairMode: 'cutout' } },
-            { label: 'C: Grok blended face', params: { backend: 'grok', repairMode: 'blended', whiteoutTarget: 'face' } },
-            { label: 'D: Grok blended body', params: { backend: 'grok', repairMode: 'blended', whiteoutTarget: 'body' } },
-            { label: 'E: Gemini repaint', params: { backend: 'gemini', repairMode: 'auto' } },
-            { label: 'F: Qwen whiteout', params: { backend: 'qwen' } },
+            { label: 'A: Grok crosshatch', params: { ...zoom, backend: 'grok', repairMode: 'fullscene' } },
+            { label: 'B: Grok crop-input', params: { ...zoom, backend: 'grok', repairMode: 'cutout' } },
+            { label: 'C: Grok blended face', params: { ...zoom, backend: 'grok', repairMode: 'blended', whiteoutTarget: 'face' } },
+            { label: 'D: Grok blended body', params: { ...zoom, backend: 'grok', repairMode: 'blended', whiteoutTarget: 'body' } },
+            { label: 'E: Gemini repaint', params: { ...zoom, backend: 'gemini', repairMode: 'auto' } },
+            { label: 'F: Qwen whiteout', params: { ...zoom, backend: 'qwen' } },
           ];
         } else if (compareColor) {
           // ONE experiment: same fresh boxes, insert-path face repair run with
           // colour correction ON vs OFF → side-by-side to see the seam colour fix.
           params.rerunDetection = true;
           params.variants = [
-            { label: 'colour ON', params: { backend: 'grok', colorCorrect: true } },
-            { label: 'colour OFF', params: { backend: 'grok', colorCorrect: false } },
+            { label: 'colour ON', params: { ...base, colorCorrect: true } },
+            { label: 'colour OFF', params: { ...base, colorCorrect: false } },
           ];
         } else {
-          params.backend = repairBackend;
-          if (repairBackend === 'grok' || repairBackend === 'qwen') params.whiteoutTarget = whiteoutTarget;
-          // Treatment: how the figure is prepared for the model. '' = whiteout
-          // silhouette (insert pipeline, the calibrated default); the legacy
-          // treatments stay reachable explicitly.
-          if (repairBackend === 'grok' && grokTreatment) params.repairMode = grokTreatment;
-          // Zoom: how much scene context the model gets around the figure box.
-          // 'full' = the whole page (crop {0,0,1,1}); a number = pad fraction.
-          if (cropPad === 'full') params.crop = { x: 0, y: 0, w: 1, h: 1 };
-          else if (cropPad) params.cropPad = Number(cropPad);
+          params = { ...params, ...base };
           if (freshDetection) params.freshDetection = true;
         }
       }
@@ -596,6 +597,21 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
       if (paramsJson.trim()) {
         try { params = { ...params, ...JSON.parse(paramsJson) }; }
         catch { alert('Params JSON is not valid JSON.'); setStarting(false); return; }
+      }
+      // A REPLAY reuses a stored model output: Treatment and Zoom decide what the
+      // model SEES, so they cannot take effect — the image already exists. Re-running
+      // a replay experiment carries replayOf along (exp #294: crosshatch + full page
+      // silently ran as the stored whiteout crop). Ask, then drop the replay and
+      // call the model for real.
+      if (params.replayOf && stage === 'char_repair' && (grokTreatment || cropPad)) {
+        const ok = window.confirm(
+          ['Treatment / Zoom change what the MODEL sees, but this is a replay of a stored model output — they would be ignored.',
+            '',
+            'OK = drop the replay and call the model for real (costs ~$0.02/variant).',
+            'Cancel = keep the replay and clear Treatment/Zoom.'].join('\n')
+        );
+        if (ok) { delete params.replayOf; }
+        else { setGrokTreatment(''); setCropPad(''); setStarting(false); return; }
       }
       const res = await testlabService.createExperiment({
         stage,
