@@ -34,6 +34,8 @@ What each page's illustration shows. The text must stay consistent with these. N
 
 Rewrite the narrative text for every page. Improve what is weak; leave what already works. Return all {PAGE_COUNT} pages whether or not you changed them. The story must still deliver the brief above.
 
+Never use an em-dash (—) or an en-dash (–), anywhere, for any purpose. Replace every one you find with a comma, a full stop, a colon, or parentheses, and recast the sentence if none of those fit.
+
 Check for:
 - Causal links between pages. Each page follows from the one before it.
 - Character voice consistent with the character details.
@@ -41,6 +43,7 @@ Check for:
 - Repeated sentence openings, filler adjectives, phrases reused across pages.
 - Emotional beats carried by action and dialogue rather than stated feelings.
 - Text agreeing with what its scene outline shows.
+- No em-dash or en-dash remaining on any page.
 
 {DO_NOT_WRITE_SECTION}
 
