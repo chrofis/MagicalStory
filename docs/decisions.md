@@ -4285,3 +4285,44 @@ under-paint rim traced in #279–#288.
 
 **Touched:** `server/lib/testlab.js`, `server/lib/faceRepair.js` (export),
 `client/src/pages/TestLab.tsx`.
+
+## 2026-08-05 — Age-marker ladder: 14 distinct buckets, each bounded on both sides
+
+**Context:** an 8-year-old was described to the image model as "very young child
+proportions about 4.5-5 heads tall, clearly shorter than school-age kids".
+
+**Not a routing bug.** `physical.apparentAge` is deliberately primary over the stated
+age — real 8-year-olds range from looking 6 to looking 10, and the photo is the better
+guide to how the child should be drawn. `clampApparentAge()` (called from
+`routes/avatars.js`) already bounds that read to ONE bucket from the stated age, the same
+tolerance `image-evaluation.txt` applies ("a 7-year-old reading as 6 → NO deduction").
+Lukas: stated 8 = `young-school-age`, photo = `kindergartner` = exactly one bucket. Legal.
+An earlier attempt to make the stated age win was REVERTED — it would have discarded the
+whole reason age comes from the picture.
+
+**The defect was merged buckets.** One string served preschooler (≤4) AND kindergartner
+(5-6): a 3-to-6 span phrased at the bottom of its own range. Because drift of one bucket
+is allowed, a bucket phrased at its neighbour's age turns a legal drift into a
+two-bucket error. Audit found three more instances: infant+toddler shared "baby
+proportions" (so a preschooler reading one young became a BABY); young-school-age+
+school-age shared one string (a 10-year-old described identically to a 7-year-old);
+senior+elderly shared one string with NO head-height at all, despite the code's own note
+that head-height is the strongest cue and models ignore adjectives. preteen (6) also
+overlapped school-age (5.5-6), leaving no gap to render.
+
+**Decision:** 14 distinct strings, monotonic, no ties below adult —
+3.5-4 / 4 / 4.5 / 5 / 5.5 / 6 / 6.25 / 6.5 / 7 / 7.5-8 (adults) / 7.5. Every bucket names
+BOTH neighbours ("clearly taller than X, not yet Y") so one step of drift cannot drag a
+render to an extreme. Elderly keeps 7.5 heads rather than dipping: the head-to-body RATIO
+does not shrink with age, so a lower number would ask for a smaller-headed figure —
+reduced stature is expressed as posture instead.
+
+**Verified** through `buildCharacterPromptBlock`: 14/14 unique, monotonic, every bucket
+bounded both sides with a head-height anchor.
+
+**Note:** the code landed inside commit `0258a3cb` (a concurrent session staged the whole
+working tree), whose message does not mention any of this — hence this entry.
+
+**Touched:** `server/lib/storyHelpers.js` (`getAgeMarkers`).
+**Status:** ✅ kept. Affects production image generation for characters whose bucket was
+previously merged.
