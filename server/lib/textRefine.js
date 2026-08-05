@@ -82,6 +82,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
         modelId: r.modelId || TEXT_MODELS[modelKey].modelId,
         provider: r.provider || null,
         elapsedMs,
+        // ttft separates a QUEUE wait from slow streaming — without it a slow
+        // call is unexplainable (same model+provider has measured 60 vs 137 tok/s).
+        ttftMs: r.ttft ?? null,
         usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
         cost: r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[modelKey].modelId, r.usage || {}),
         promptChars: prompt.length,

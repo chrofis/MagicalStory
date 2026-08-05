@@ -1448,6 +1448,54 @@ function BeatsScenesView({ result }: { result: ExperimentResult }) {
         })}
       </div>
 
+      {/* SCENE CREATION FROM BEATS — the load-bearing test. Production expands
+          scenes from finished page TEXT; a beats-first pipeline has none yet, so
+          each result sits next to the scene description the real pipeline made
+          for the same page. */}
+      {!!result.sceneExpansions?.length && (
+        <div className="space-y-1">
+          <div className="text-xs font-semibold text-gray-700">
+            Scene creation from beats — {result.sceneExpansions.filter(s => s.ok).length}/{result.sceneExpansions.length} ok
+            {result.timeToScenesMs != null && (
+              <span className="font-normal text-gray-500">
+                {' '}· beats → scenes ready in {(result.timeToScenesMs / 1000).toFixed(1)}s
+                {' '}(vs ~327s today)
+              </span>
+            )}
+          </div>
+          {result.sceneExpansions.map(s => (
+            <div key={s.pageNumber} className={`text-xs rounded-lg border p-2 ${s.ok ? 'border-gray-200' : 'border-red-200 bg-red-50'}`}>
+              <b>Page {s.pageNumber}</b>
+              {s.ok ? (
+                <>
+                  <span className="text-gray-500">
+                    {' '}· {((s.elapsedMs || 0) / 1000).toFixed(1)}s
+                    {s.ttftMs != null && ` (ttft ${s.ttftMs}ms)`}
+                    {s.cost != null && ` · $${s.cost.toFixed(4)}`}
+                  </span>
+                  <div className="mt-1 grid gap-2 md:grid-cols-2">
+                    <div className="rounded border border-indigo-200 bg-white p-2">
+                      <div className="text-[10px] font-semibold text-indigo-600 mb-0.5">FROM BEATS (no page text)</div>
+                      <div className="whitespace-pre-wrap max-h-64 overflow-auto">{s.fromBeats}</div>
+                    </div>
+                    <div className="rounded border border-gray-200 bg-white p-2">
+                      <div className="text-[10px] font-semibold text-gray-500 mb-0.5">PRODUCTION (from finished text)</div>
+                      <div className="whitespace-pre-wrap max-h-64 overflow-auto text-gray-600">{s.storedProduction || '(none stored)'}</div>
+                    </div>
+                  </div>
+                  {s.prompt && (
+                    <details className="mt-1">
+                      <summary className="cursor-pointer text-indigo-600">Prompt sent ({(s.promptChars || 0).toLocaleString()} chars)</summary>
+                      <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-2 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-[11px]">{s.prompt}</pre>
+                    </details>
+                  )}
+                </>
+              ) : <span className="text-red-600"> · failed: {s.error}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Each model's answer verbatim — the planner's whole plan and the
           reviewer's whole reply, so neither is only visible through our parse. */}
       <div className="grid gap-2 md:grid-cols-2">

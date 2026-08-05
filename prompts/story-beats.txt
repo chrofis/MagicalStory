@@ -1,14 +1,9 @@
 You are planning an illustrated children's book. Output the story as page beats only. No prose, no dialogue.
 
-# LANGUAGE
-
-{LANGUAGE_INSTRUCTION}
-
-{LANGUAGE_NOTE}
-
-Write the beats in {LANGUAGE}.
-
 # TARGET
+
+Write the beats and scenes in ENGLISH. They are working notes for the writer and the illustrator, never shown to a reader. The finished book will be written in {LANGUAGE} — keep names, places and cultural details as they will appear there, but plan in English.
+
 
 Reading level: {READING_LEVEL}
 Pages: {PAGE_COUNT}

@@ -1,12 +1,9 @@
 You are reviewing the page plan for an illustrated children's book, before any prose or artwork exists. This is the cheapest moment to fix structure, so be decisive.
 
-# LANGUAGE
-
-{LANGUAGE_INSTRUCTION}
-
-Write corrected beats in {LANGUAGE}. The analysis may be in English.
-
 # TARGET
+
+Write the analysis and the corrected beats in ENGLISH. Beats and scenes are working notes for the writer and the illustrator, never shown to a reader. The finished book will be written in {LANGUAGE} — keep names, places and cultural details as they will appear there.
+
 
 Reading level: {READING_LEVEL}
 Pages: {PAGE_COUNT}

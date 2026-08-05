@@ -182,6 +182,14 @@ export interface ExperimentResult {
   beatsPlan?: BeatsCall;
   beatsReview?: BeatsReview | null;
   finalBeats?: { pageNumber: number; beat: string; scene: string }[];
+  timeToScenesMs?: number | null;
+  sceneExpansions?: {
+    pageNumber: number; ok: boolean; error?: string; elapsedMs?: number;
+    modelId?: string; provider?: string | null; ttftMs?: number | null;
+    usage?: { input_tokens?: number; output_tokens?: number }; cost?: number;
+    promptChars?: number; prompt?: string;
+    fromBeats?: string; storedProduction?: string;
+  }[] | null;
 }
 
 export interface RefineRound {
@@ -201,6 +209,7 @@ export interface RefineRound {
   returnedPages?: number[];
   strayPages?: number[];
   changedPages?: number[];
+  ttftMs?: number | null;
   changedFromOriginal?: number[];
   converged?: boolean;
   pages?: { pageNumber: number; before: string; after: string; original: string; sceneIntent?: string }[];
@@ -217,6 +226,7 @@ export interface BeatsCall {
   promptChars?: number;
   prompt?: string;
   rawResponse?: string;
+  ttftMs?: number | null;
   pages?: { pageNumber: number; beat: string; scene: string }[];
   missingPages?: number[];
 }

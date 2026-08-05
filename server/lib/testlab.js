@@ -1679,19 +1679,97 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
     .blur(searchPx).threshold(6).toColourspace('b-w').raw().toBuffer();
 
   const artOutRaw = await sharp(artBytes).resize(outW, outH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
-  const foundMask = Buffer.alloc(outW * outH);
-  const INK_DIFF = params.inkDiff ?? 28;
+
+  // ── PAINT-LAYER EXTRACTION ────────────────────────────────────────────────
+  // Copying pixels is wrong in principle: every pixel at a stroke edge is a MIX
+  // of pigment and background, and the model's background has the trees shifted
+  // a few px from ours. Copy it and each soft edge, pooled bleed and shadow
+  // carries misaligned trees — ghosting no mask can fix, because the
+  // contaminated pixels ARE the ones that make the letters look painted.
+  //
+  // So extract the layer instead of a region:  O = α·F + (1−α)·B
+  //   B = OUR empty scene (known exactly — it is the plate)
+  //   F = the pigment colour, sampled from each stroke's OPAQUE interior
+  //       (never from an edge, so no background contamination gets into it)
+  //   α = projection of (O−B) onto (F−B): how far the pixel travelled from our
+  //       background toward the pigment.
+  // The rejection that kills the shifted trees is the PERPENDICULAR RESIDUAL: a
+  // paint/background mix lies ON the B→F line, a repainted tree is a colour
+  // change in some other direction entirely. Large residual ⇒ not paint ⇒ α=0.
+  // Recompositing α·F over OUR B means every partial pixel blends with OUR
+  // trees, so misalignment is impossible by construction.
+
+  // F per pixel: the local pigment colour, from the stroke interior only.
+  // Erode the drawn mask hard so edge pixels can't pollute the sample, then
+  // normalized-convolution (blur the masked colour, blur the mask, divide) to
+  // spread that colour smoothly outward — this keeps per-letter colour variation
+  // instead of collapsing the title to one flat hue.
+  const interior = await sharp(drawnMaskRaw, { raw: { width: outW, height: outH, channels: 1 } })
+    .blur(3).threshold(230).toColourspace('b-w').raw().toBuffer();
+  const maskedPaint = Buffer.alloc(outW * outH * 3);
+  for (let p = 0, i = 0; p < outW * outH; p++, i += 3) {
+    if (interior[p] > 128) {
+      maskedPaint[i] = paintedRaw[i]; maskedPaint[i + 1] = paintedRaw[i + 1]; maskedPaint[i + 2] = paintedRaw[i + 2];
+    }
+  }
+  const SPREAD_R = Math.max(6, Math.round(Math.min(outW, outH) * 0.02));
+  const blurPaint = await sharp(maskedPaint, { raw: { width: outW, height: outH, channels: 3 } })
+    .blur(SPREAD_R).raw().toBuffer();
+  const blurCov = await sharp(interior, { raw: { width: outW, height: outH, channels: 1 } })
+    .blur(SPREAD_R).raw().toBuffer();
+
+  const alphaBuf = Buffer.alloc(outW * outH);
+  const fgBuf = Buffer.alloc(outW * outH * 3);
+  const RESID_MAX = params.residualMax ?? 42;   // colour distance off the B→F line
+  const ALPHA_MIN = params.alphaMin ?? 0.12;
   let foundN = 0, drawnN = 0, overlapN = 0;
   for (let p = 0, i = 0; p < outW * outH; p++, i += 3) {
     if (drawnMaskRaw[p] > 8) drawnN++;
-    if (searchZone[p] <= 8) continue;             // outside the title neighbourhood — never taken
-    const d = Math.max(Math.abs(paintedRaw[i] - artOutRaw[i]),
-      Math.abs(paintedRaw[i + 1] - artOutRaw[i + 1]), Math.abs(paintedRaw[i + 2] - artOutRaw[i + 2]));
-    if (d > INK_DIFF) { foundMask[p] = 255; foundN++; if (drawnMaskRaw[p] > 8) overlapN++; }
+    if (searchZone[p] <= 8) continue;
+    const cov = blurCov[p];
+    if (cov < 4) continue;                       // no pigment sample nearby → cannot solve
+    const fr = blurPaint[i] * 255 / cov, fg = blurPaint[i + 1] * 255 / cov, fb = blurPaint[i + 2] * 255 / cov;
+    const br = artOutRaw[i], bg = artOutRaw[i + 1], bb = artOutRaw[i + 2];
+    const dr = fr - br, dg = fg - bg, db = fb - bb;
+    const den = dr * dr + dg * dg + db * db;
+    if (den < 120) continue;                     // pigment ≈ background here: unsolvable, leave plate
+    const or_ = paintedRaw[i] - br, og = paintedRaw[i + 1] - bg, ob = paintedRaw[i + 2] - bb;
+    let a = (or_ * dr + og * dg + ob * db) / den;
+    if (a <= ALPHA_MIN) continue;
+    if (a > 1) a = 1;
+    // perpendicular residual — the tree test
+    const rr = or_ - a * dr, rg = og - a * dg, rb = ob - a * db;
+    if (Math.sqrt(rr * rr + rg * rg + rb * rb) > RESID_MAX) continue;
+    alphaBuf[p] = Math.round(a * 255);
+    fgBuf[i] = Math.max(0, Math.min(255, Math.round(fr)));
+    fgBuf[i + 1] = Math.max(0, Math.min(255, Math.round(fg)));
+    fgBuf[i + 2] = Math.max(0, Math.min(255, Math.round(fb)));
+    foundN++;
+    if (drawnMaskRaw[p] > 8) overlapN++;
   }
-  // Soften the found edge by a pixel so the paste has no hard stair-step.
-  const foundMaskSmooth = await sharp(foundMask, { raw: { width: outW, height: outH, channels: 1 } })
-    .blur(1.2).toColourspace('b-w').raw().toBuffer();
+  // Anchor: keep alpha only where it is connected to a drawn glyph. Distance
+  // rules are arbitrary; this is shape-driven — a stroke that pooled far past
+  // the glyph stays (same blob), a stray blob with no glyph in it goes.
+  const anchored = Buffer.alloc(outW * outH);
+  {
+    const stack = [];
+    for (let p = 0; p < outW * outH; p++) if (drawnMaskRaw[p] > 8 && alphaBuf[p] > 0) { anchored[p] = 1; stack.push(p); }
+    while (stack.length) {
+      const p = stack.pop(), x = p % outW, y = (p / outW) | 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= outW || ny >= outH) continue;
+        const q = ny * outW + nx;
+        if (!anchored[q] && alphaBuf[q] > 0) { anchored[q] = 1; stack.push(q); }
+      }
+    }
+  }
+  let keptN = 0;
+  for (let p = 0; p < outW * outH; p++) {
+    if (!anchored[p]) { alphaBuf[p] = 0; } else if (alphaBuf[p] > 0) keptN++;
+  }
+  foundN = keptN;
+  const foundMaskSmooth = alphaBuf;              // real alpha now, not a binary mask
 
   // LETTER GATE — replaces pixel-equality, which punished the backend with the
   // BEST lettering (Grok shifts global tone: #323 failed 3/4 with perfect
@@ -1706,11 +1784,14 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   const offMaskMeanDiff = spread;
   const ALIGN_MAX = SPREAD_MAX;
 
-  const paintedRgba = await sharp(paintedRaw, { raw: { width: outW, height: outH, channels: 3 } })
+  // The composited layer is PIGMENT (fgBuf) with the solved alpha — NOT model
+  // pixels. Its partial-alpha edges therefore blend with our own background.
+  const paintedRgba = await sharp(fgBuf, { raw: { width: outW, height: outH, channels: 3 } })
     .joinChannel(foundMaskSmooth, { raw: { width: outW, height: outH, channels: 1 } })
     .png().toBuffer();
-  await addStep(`found letters (${foundN} px, ${Math.round(coverage * 100)}% of the drawn glyphs)`,
+  await addStep(`solved alpha (${foundN} px, ${Math.round(coverage * 100)}% of the drawn glyphs)`,
     `data:image/png;base64,${(await sharp(foundMaskSmooth, { raw: { width: outW, height: outH, channels: 1 } }).png().toBuffer()).toString('base64')}`);
+  await addStep('extracted pigment layer (colour × alpha, over checker = transparent)', `data:image/png;base64,${paintedRgba.toString('base64')}`);
 
   // Base = the EMPTY (textless) scene, so the model's artwork never survives.
   const baseBuf = await sharp(artBytes).resize(W, H, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
@@ -2043,6 +2124,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     modelId: planRes.modelId,
     provider: planRes.provider || null,
     elapsedMs: planMs,
+    ttftMs: planRes.ttft ?? null,
     usage: planRes.usage,
     cost: costOf(planRes),
     promptChars: plannerPrompt.length,
@@ -2078,6 +2160,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       modelId: revRes.modelId,
       provider: revRes.provider || null,
       elapsedMs: revMs,
+      ttftMs: revRes.ttft ?? null,
       usage: revRes.usage,
       cost: costOf(revRes),
       promptChars: reviewPrompt.length,
@@ -2091,8 +2174,73 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
 
   const timeToLockMs = Date.now() - lockStart;
 
+  // ── Step 3: scene creation FROM BEATS ───────────────────────────────────
+  // The load-bearing question for the whole restructure. Production expands
+  // scenes from the finished page TEXT (server.js passes page.text) — but in a
+  // beats-first pipeline the text does not exist yet. So this feeds the Art
+  // Director the BEAT + SCENE line instead and puts the result next to the scene
+  // description the real pipeline produced for the same page, so "good enough to
+  // draw from" is a judgement about two visible artefacts rather than a guess.
+  let sceneExpansions = null;
+  let timeToScenesMs = null;
+  if (params.expandScenes !== false) {
+    const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
+    const { callTextModelStreaming: callStream } = require('./textModels');
+    const { IMAGE_MODELS } = require('../config/models');
+
+    const expandLimit = parseInt(params.expandPages, 10) || finalBeats.length;
+    const toExpand = finalBeats.slice(0, expandLimit);
+    const lang = storyData.language || 'en';
+    const imgModelConfig = IMAGE_MODELS[storyData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage];
+    const availableAvatars = buildAvailableAvatarsForPrompt
+      ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
+      : '';
+    const storedByPage = new Map((storyData.sceneImages || []).map(s => [s.pageNumber, s.sceneDescription || '']));
+
+    const expStart = Date.now();
+    sceneExpansions = await Promise.all(toExpand.map(async b => {
+      // BEAT + SCENE stands in for page.text. No rawOutlineContext: in a
+      // beats-first run there is no outline block yet, so this measures the
+      // Art Director working from the plan alone.
+      const pageContent = `BEAT: ${b.beat}\nSCENE: ${b.scene}`;
+      const prompt = buildSceneExpansionPrompt(
+        b.pageNumber, pageContent, storyData.characters || [], lang,
+        storyData.visualBible || null, availableAvatars, null,
+        {
+          maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
+          artStyleId: storyData.artStyle,
+          imageBackend: imgModelConfig?.backend,
+        }
+      );
+      const t = Date.now();
+      try {
+        const res = await callStream(prompt, 10000, null, params.sceneModel || null, { usageLabel: 'testlab_beats_scene_expansion' });
+        return {
+          pageNumber: b.pageNumber,
+          ok: true,
+          elapsedMs: Date.now() - t,
+          modelId: res.modelId,
+          provider: res.provider || null,
+          ttftMs: res.ttft ?? null,
+          usage: res.usage,
+          cost: costOf(res),
+          promptChars: prompt.length,
+          prompt,
+          fromBeats: (res.text || '').slice(0, 20000),
+          storedProduction: (storedByPage.get(b.pageNumber) || '').slice(0, 20000),
+        };
+      } catch (err) {
+        return { pageNumber: b.pageNumber, ok: false, elapsedMs: Date.now() - t, error: err.message };
+      }
+    }));
+    // Parallel, as production runs them — so this is wall-clock, not the sum.
+    timeToScenesMs = timeToLockMs + (Date.now() - expStart);
+  }
+
   return {
     stageKind: 'beats_scenes',
+    sceneExpansions,
+    timeToScenesMs,
     storyId: target.storyId,
     title: storyData.title || null,
     language: storyData.language || null,
