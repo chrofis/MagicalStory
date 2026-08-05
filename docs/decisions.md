@@ -4173,3 +4173,34 @@ model-facing knob is chosen, confirm — OK drops the replay and calls the model
 (~$0.02/variant), Cancel clears Treatment/Zoom and keeps the free replay.
 
 **Touched:** `client/src/pages/TestLab.tsx`.
+
+## 2026-08-05 — Push gate must be enabled by npm install, with an ABSOLUTE hooksPath
+
+**Context:** the pre-push idle gate shipped needing `git config core.hooksPath .githooks`
+per clone. Test Lab experiment #297 was still killed mid-run by a push from a parallel
+agent session. The endpoint was correct at the time (`/api/health/busy` →
+`{busy:true, reasons:["testlab: 1 experiment(s) running"]}`); the hook simply never ran.
+
+**Root cause:** `core.hooksPath` lives in the shared `.git/config`, so worktrees DO
+inherit it — but the value was the RELATIVE path `.githooks`, and git resolves a relative
+hooksPath per WORKING TREE. The agent worktrees under `.claude/worktrees/` are checked
+out on branches older than the hook commit, so `.githooks/pre-push` does not exist there.
+**Git skips a missing hook silently, exit 0** — no warning, no failure, push proceeds.
+
+**Decision:** `scripts/admin/setup-git-hooks.js` sets `core.hooksPath` to the main
+clone's ABSOLUTE path and is wired to package.json `prepare`, so `npm install` configures
+it and no one has to be told. The hook resolves the gate script relative to ITSELF rather
+than `git rev-parse --show-toplevel`, because an old-branch worktree has no
+`scripts/admin/` either. The idempotency check compares the RAW stored value and rejects
+a relative one — resolving it first would make the broken setting look correct.
+
+**Verified:** from a worktree with no `.githooks` in its checkout, the hook now executes
+and reports `✓ staging is idle`.
+
+**Residual risk:** `--no-verify` still bypasses, and a clone that never runs `npm install`
+is unprotected. Server-side enforcement would need to gate the DEPLOY rather than the
+push; not built.
+
+**Touched:** `scripts/admin/setup-git-hooks.js` (new), `.githooks/pre-push`,
+`package.json`, `CLAUDE.md`.
+**Status:** ✅ kept.

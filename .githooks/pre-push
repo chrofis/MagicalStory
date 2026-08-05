@@ -3,6 +3,14 @@
 # restarts the container and kills in-process story generations and Test Lab
 # experiments. See scripts/admin/check-push-idle.js for the reasoning.
 #
-# Enabled per-clone with:  git config core.hooksPath .githooks
-# Bypass a single push with:  git push --no-verify
-exec node "$(git rev-parse --show-toplevel)/scripts/admin/check-push-idle.js" "$@"
+# Enabled automatically by `npm install` (scripts/admin/setup-git-hooks.js),
+# which sets core.hooksPath to this directory's ABSOLUTE path. That matters:
+# a relative hooksPath is resolved per working tree, so an agent worktree on a
+# branch older than this file has no hook at all — and git skips a missing hook
+# silently. Bypass a single push with: git push --no-verify
+#
+# Resolved relative to THIS FILE, not `git rev-parse --show-toplevel`: when a
+# worktree is on an old branch, the toplevel has no scripts/admin/ yet, but this
+# hook always sits next to the main clone's copy.
+HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec node "$HOOK_DIR/../scripts/admin/check-push-idle.js" "$@"

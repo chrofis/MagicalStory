@@ -42,7 +42,8 @@
     "showcase": "node scripts/admin/showcase.js",
     "showcase:local": "cross-env TEST_BASE_URL=http://localhost:5173 node scripts/admin/showcase.js",
     "build:emails": "tsx scripts/build-emails.ts",
-    "email:preview": "email dev --dir emails-src --port 3030"
+    "email:preview": "email dev --dir emails-src --port 3030",
+    "prepare": "node scripts/admin/setup-git-hooks.js"
   },
   "keywords": [
     "storytelling",

@@ -78,7 +78,12 @@ Spaces). Before launching any Python script, consider its memory footprint; cap 
 - **Pushes are gated on the target environment being idle.** `.githooks/pre-push` asks
   `GET /api/health/busy` (staging for `staging`, production for `master`) and refuses the
   push while a story generation or Test Lab experiment is running — a deploy restarts the
-  container and kills it. Enable once per clone: `git config core.hooksPath .githooks`.
+  container and kills it. **Enabled automatically by `npm install`** (`prepare` →
+  `scripts/admin/setup-git-hooks.js`); run that script directly if you skipped install.
+  It sets `core.hooksPath` to an ABSOLUTE path deliberately — a relative one is resolved
+  per working tree, so an agent worktree on a branch older than the hook has no
+  `.githooks/pre-push`, and **git skips a missing hook silently**. That is exactly how a
+  push killed a running Test Lab experiment on 2026-08-05.
   If it blocks you, **wait** — `--no-verify` is only for a run you are willing to destroy,
   and on `master` that means a real user's paid generation. Never disable the hook to get
   a push through. Check status any time with `node scripts/admin/check-push-idle.js`
