@@ -4068,3 +4068,25 @@ upstream: whiteout-prompt hardening ("paint the silhouette fully to its edge, no
 QC on the model output, or the IoU gate. Kept from this round: the Fs solve domain and the
 band background-reference fix (correct on principle; synthetic leg-gap glow collapses when
 SAM does NOT bridge the slot).
+
+---
+
+## 2026-08-05 — Elongated bright rim removal (owner correction: "the specs are ON the outline")
+
+**Context:** Earlier verdict "not blend-fixable" was wrong in its conclusion. Colour
+statistics genuinely cannot separate the specks (energy 37, brightness ≈ shirt) — but SHAPE
+can, which is what the eye uses: rim residue is a thin ELONGATED strip along the figure's
+content outline; legitimate bright details (buttons, hem highlights) are compact. Colour-vote
+extensions were tried first and failed measurably (a 10px strip dominates its own σ10
+reference — T7c).
+
+**Decision:** inside old-silhouette figure territory, flag bright outliers vs their σ8
+neighbourhood (min-channel +30), connect them, and remove ONLY components with ≥5:1
+elongation and ≥12px — replaced by the reference field (now solved under bridged masks:
+Fs = all old pixels). Compact components are never touched.
+
+**Verified (synthetic):** 4×110 white strip inside a SAM-bridged slot removed (248→128); a
+6×6 bright button 20px away byte-untouched; legs, ghost, curtain crispness, seam, figure
+all pass.
+
+**Touched:** `server/lib/samBlend.js`.

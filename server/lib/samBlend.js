@@ -154,7 +154,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     const Fs = new Uint8Array(n);
     let fCnt = 0, ringPx = 0;
     for (let i = 0; i < n; i++) {
-      if ((newBin ? newBin[i] : newTight[i]) <= 128 && isOld(i)) Fs[i] = 1;
+      if (isOld(i)) Fs[i] = 1; // ALL old pixels — the reference field must exist under SAM-bridged areas too
       if (newTight[i] > 128) continue;
       if (isOld(i)) { F[i] = 1; fCnt++; }
       else if (alpha1[i] > 128) {
@@ -302,8 +302,8 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
         figMaskW[i] = 255;
         figMaskedRgb[i * 3] = pasteRaw[i * 3]; figMaskedRgb[i * 3 + 1] = pasteRaw[i * 3 + 1]; figMaskedRgb[i * 3 + 2] = pasteRaw[i * 3 + 2];
       }
-      const figBlurRgb = await sharpL(figMaskedRgb, { raw: { width: cropW, height: cropH, channels: 3 } }).blur(5).raw().toBuffer();
-      const figBlurW = await sharpL(figMaskW, { raw: { width: cropW, height: cropH, channels: 1 } }).blur(5).raw().toBuffer();
+      const figBlurRgb = await sharpL(figMaskedRgb, { raw: { width: cropW, height: cropH, channels: 3 } }).blur(10).raw().toBuffer();
+      const figBlurW = await sharpL(figMaskW, { raw: { width: cropW, height: cropH, channels: 1 } }).blur(10).raw().toBuffer();
       const fwStride = Math.max(1, Math.round(figBlurW.length / n));
       for (let i = 0; i < n; i++) {
         if (!(newTight[i] > 128 && newEro[i] <= 128 && alpha1[i] > 128)) continue;
@@ -314,13 +314,57 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
         const dFig = _deltaE(lab, figRef);
         const ref = isOld(i) ? [LB[i * 3], LB[i * 3 + 1], LB[i * 3 + 2]] : [origRaw[i * 3], origRaw[i * 3 + 1], origRaw[i * 3 + 2]];
         const dBg = _deltaE(lab, _rgbToLab(ref[0], ref[1], ref[2]));
-        if (dBg < dFig) {
+        if (dBg < dFig - 6) {
           pasteRaw[i * 3] = cl(ref[0]); pasteRaw[i * 3 + 1] = cl(ref[1]); pasteRaw[i * 3 + 2] = cl(ref[2]);
           bandPx++;
         }
       }
     }
-    log.info(`[TESTLAB] two-band footprint: ${fCnt}px = original low band (coarse-to-fine) + confidence-weighted model texture; pad ring ${ringPx}px → original; edge band ${bandPx}px glow replaced`);
+    // ELONGATED BRIGHT RIM inside the figure mask (owner: "the specs are ON the
+    // outline") — SAM bridges thin gaps, so an under-painted light rim along the
+    // figure's TRUE content outline sits deep inside newBin where no edge-derived
+    // band reaches, and its colour is statistically identical to real highlights.
+    // The separator is SHAPE: rim residue is a thin ELONGATED strip; legitimate
+    // bright details (buttons, hem highlights) are compact. Flag old-silhouette
+    // figure pixels that are bright OUTLIERS vs their σ8 neighbourhood, connect
+    // them, and remove only components elongated ≥5:1 (≥12px) — replaced by the
+    // reference field, which is defined under bridged masks.
+    let rimPx = 0;
+    {
+      const allBlur = await sharpL(Buffer.from(pasteRaw), { raw: { width: cropW, height: cropH, channels: 3 } }).blur(8).raw().toBuffer();
+      const cand2 = new Uint8Array(n);
+      for (let i = 0; i < n; i++) {
+        if (!(isOld(i) && newTight[i] > 128 && alpha1[i] > 128)) continue;
+        const mnP = Math.min(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
+        const mnB = Math.min(allBlur[i * 3], allBlur[i * 3 + 1], allBlur[i * 3 + 2]);
+        if (mnP - mnB > 30) cand2[i] = 1;
+      }
+      const seen2 = new Uint8Array(n);
+      for (let s0 = 0; s0 < n; s0++) {
+        if (!cand2[s0] || seen2[s0]) continue;
+        const comp = [s0]; const stack = [s0]; seen2[s0] = 1;
+        let x0 = cropW, x1 = 0, y0 = cropH, y1 = 0;
+        while (stack.length) {
+          const k = stack.pop(); const x = k % cropW, y = (k / cropW) | 0;
+          if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+          for (const d of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            const nx = x + d[0], ny = y + d[1];
+            if (nx < 0 || ny < 0 || nx >= cropW || ny >= cropH) continue;
+            const j = ny * cropW + nx;
+            if (cand2[j] && !seen2[j]) { seen2[j] = 1; stack.push(j); comp.push(j); }
+          }
+        }
+        const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+        const elong = Math.max(bw, bh) / Math.max(1, Math.min(bw, bh));
+        if (comp.length >= 12 && elong >= 5) {
+          for (const j of comp) {
+            pasteRaw[j * 3] = cl(LB[j * 3]); pasteRaw[j * 3 + 1] = cl(LB[j * 3 + 1]); pasteRaw[j * 3 + 2] = cl(LB[j * 3 + 2]);
+            rimPx++;
+          }
+        }
+      }
+    }
+    log.info(`[TESTLAB] two-band footprint: ${fCnt}px = original low band (coarse-to-fine) + confidence-weighted model texture; pad ring ${ringPx}px → original; edge band ${bandPx}px glow replaced; elongated rim ${rimPx}px removed`);
     return { bgPx: fCnt + ringPx, materials: 0, localField: true };
   }
   const borderRing = Buffer.alloc(n);
