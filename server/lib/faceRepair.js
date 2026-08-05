@@ -218,7 +218,7 @@ async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop,
 // CROSSHATCH — magenta SVG crosshatch clipped to the figure silhouette (dest-in).
 // FAITHFULNESS-CHECK: images.js:12163-12172 (grok_cutout hatch SVG) +
 //                     images.js:12483-12496 / 12689-12695 (grok_inpaint hatch + silhouette clip).
-async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage, sceneBuffer, sceneWidth, sceneHeight, protectedBodies, bodyBbox }) {
+async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage, sceneBuffer, sceneWidth, sceneHeight, protectedBodies, bodyBbox, faceBoxInCrop = null, blurFace = true }) {
   const sharp = require('sharp');
   const { fetchFigureMaskPng } = require('./images');
   const figureLeft = boxInCrop[0], figureTop = boxInCrop[1];
@@ -333,7 +333,30 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
   } catch (err) {
     log.warn(`[FACE REPAIR] crosshatch silhouette clip failed (${err.message}) — rectangular hatch`);
   }
-  const treatedBuf = await sharp(cropBuf).composite([{ input: hatchRegion, top: hatchTop, left: hatchLeft }]).png().toBuffer();
+  const layers = [{ input: hatchRegion, top: hatchTop, left: hatchLeft }];
+  // FACE BLUR over the crosshatched body (owner decision 2026-08-05): crosshatch
+  // holds the POSE (the model keeps the figure where it is) but through the hatch
+  // the old face stays legible and gets recreated — identity then comes from the
+  // page, not the reference. A blur over the head destroys the features while
+  // keeping head size/tilt, so pose survives and identity must come from the
+  // avatar. Body = crosshatch, face = blur.
+  if (blurFace && Array.isArray(faceBoxInCrop) && faceBoxInCrop.length === 4) {
+    try {
+      const fl = Math.max(0, Math.round(faceBoxInCrop[0])), ft = Math.max(0, Math.round(faceBoxInCrop[1]));
+      const fw = Math.min(crop.w - fl, Math.round(faceBoxInCrop[2] - faceBoxInCrop[0]));
+      const fh = Math.min(crop.h - ft, Math.round(faceBoxInCrop[3] - faceBoxInCrop[1]));
+      if (fw > 8 && fh > 8) {
+        const faceCrop = await sharp(cropBuf).extract({ left: fl, top: ft, width: fw, height: fh }).jpeg({ quality: 90 }).toBuffer();
+        const radius = Math.max(10, Math.round(fw * 0.12)); // heavier than the face-repair blur: features must not survive
+        const blurred = await sharp(faceCrop).blur(radius).png().toBuffer();
+        layers.push({ input: blurred, top: ft, left: fl });
+        log.info(`[FACE REPAIR] crosshatch+faceblur: head ${fw}x${fh} blurred (r=${radius}) over the hatched body`);
+      }
+    } catch (err) {
+      log.warn(`[FACE REPAIR] face blur over crosshatch failed (${err.message}) — hatch only`);
+    }
+  }
+  const treatedBuf = await sharp(cropBuf).composite(layers).png().toBuffer();
   return { treatedBuf, oldMaskPng, coverage: cov, hatchRect: { left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight } };
 }
 
@@ -577,7 +600,14 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   if (treatment === 'whiteout') {
     treated = await buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, requireMobilesam, gateCoverage: gates.coverage });
   } else if (treatment === 'crosshatch') {
-    treated = await buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage: gates.coverage, sceneBuffer, sceneWidth: W, sceneHeight: H, protectedBodies: opts.protectedBodies, bodyBbox });
+    // Face box mapped into crop pixels so the hatch can carry a blurred head.
+    const fbForBlur = (!faceOnly && Array.isArray(faceBbox) && faceBbox.length === 4) ? [
+      Math.max(0, Math.round(faceBbox[1] * W) - crop.x),
+      Math.max(0, Math.round(faceBbox[0] * H) - crop.y),
+      Math.min(crop.w, Math.round(faceBbox[3] * W) - crop.x),
+      Math.min(crop.h, Math.round(faceBbox[2] * H) - crop.y),
+    ] : null;
+    treated = await buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage: gates.coverage, sceneBuffer, sceneWidth: W, sceneHeight: H, protectedBodies: opts.protectedBodies, bodyBbox, faceBoxInCrop: fbForBlur, blurFace: opts.blurFace !== false });
   } else if (treatment === 'blur') {
     treated = await buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCoverage: gates.coverage });
   } else {

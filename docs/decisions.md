@@ -4419,3 +4419,30 @@ transmitted (treated scene in box mode, treated crop in cutout mode) and that is
 step shows.
 
 **Touched:** `server/lib/samBlend.js`, `server/lib/faceRepair.js`.
+
+---
+
+## 2026-08-05 — Whole-figure treatment: crosshatch body + BLURRED FACE (owner decision)
+
+**Context:** Owner, after the #315 3-way: "the character should be crosshatch … and the face
+should be blurred." Evidence: crosshatch preserves the kneeling pose and yields the smallest
+red zone (5,060px vs blur 16,182 vs whiteout 25,373), while whiteout loses the pose. But
+through the hatch the OLD face stays legible and gets recreated — identity then comes from
+the page instead of the avatar. A blur destroys the features while keeping head size/tilt,
+so pose survives and identity must come from the reference.
+
+**Decision:** `buildCrosshatchTreatment` composites a blurred head (radius ≈ 12% of face
+width — heavier than the face-repair blur; features must not survive) over the hatched body
+whenever a face box exists and `faceOnly=false`. Default ON (`opts.blurFace !== false`).
+Production body repairs already resolve to crosshatch via `resolveRepairAxes`, so they
+inherit this automatically. The Lab's Treatment default now maps whole-figure → crosshatch,
+matching production — a Lab default that silently differed from prod is why #302/#304/#315
+kept comparing the wrong thing; whiteout-insert stays selectable explicitly.
+
+**Also added — identity-transfer test:** `params.referenceCharacter` repairs character A's
+region using character B's avatar (both the insert and spine paths). If the output still
+looks like A, identity is being copied from the page rather than the reference — the
+sharpest available test of a treatment. Exposed as "Reference swap" in the form, with a
+"Blur face over crosshatch" checkbox for the A/B.
+
+**Touched:** `server/lib/faceRepair.js`, `server/lib/testlab.js`, `client/src/pages/TestLab.tsx`.

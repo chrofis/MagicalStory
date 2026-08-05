@@ -529,7 +529,9 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const [compareColor, setCompareColor] = useState(false);
   const [whiteoutTarget, setWhiteoutTarget] = useState('face');
   const [grokTreatment, setGrokTreatment] = useState('');
-  const [cropPad, setCropPad] = useState(''); // '' = stage default | 0.5 | 1 | full (whole page) // '' = whiteout insert (default) | fullscene | blended | cutout
+  const [cropPad, setCropPad] = useState('');
+  const [blurFace, setBlurFace] = useState(true);
+  const [refCharacter, setRefCharacter] = useState(''); // '' = stage default | 0.5 | 1 | full (whole page) // '' = whiteout insert (default) | fullscene | blended | cutout
   const [freshDetection, setFreshDetection] = useState(false);
   const [avatarPass, setAvatarPass] = useState('1');        // avatar_eval: 1=realistic anchor, 2=styled sheet
   const [avatarEvalModel, setAvatarEvalModel] = useState('gemini-2.5-flash'); // avatar_eval: which model scores the sheet
@@ -672,7 +674,17 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
         // the chosen crosshatch treatment and full-page zoom without a word).
         const base: Record<string, unknown> = { backend: repairBackend };
         if (repairBackend === 'grok' || repairBackend === 'qwen') base.whiteoutTarget = whiteoutTarget;
-        if (repairBackend === 'grok' && grokTreatment) base.repairMode = grokTreatment;
+        // PRODUCTION DEFAULT for a whole-figure repair is crosshatch (resolveRepairAxes),
+        // so the Lab's default must be crosshatch too — a Lab default that silently
+        // differs from prod is how #302/#304/#315 kept comparing the wrong thing.
+        if (repairBackend === 'grok') {
+          base.repairMode = grokTreatment === 'whiteout-insert'
+            ? undefined                                   // no repairMode = the whiteout insert pipeline
+            : (grokTreatment || (whiteoutTarget === 'body' ? 'fullscene' : undefined));
+          if (!base.repairMode) delete base.repairMode;
+        }
+        if (!blurFace) base.blurFace = false;
+        if (refCharacter.trim()) base.referenceCharacter = refCharacter.trim();
         if (cropPad === 'full') base.crop = { x: 0, y: 0, w: 1, h: 1 };
         else if (cropPad) base.cropPad = Number(cropPad);
         if (compareAll) {
@@ -778,7 +790,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const WIDGET_PARAM_KEYS = new Set([
     'autoEval', 'characterName', 'coverType', 'backend', 'whiteoutTarget', 'freshDetection',
     'rerunDetection', 'variants', 'pass', 'model', 'splitRows', 'writerModel', 'aspect', 'mode', 'rounds',
-    'models', 'genericityWarnings', 'repairMode', 'cropPad', 'crop',
+    'models', 'genericityWarnings', 'repairMode', 'cropPad', 'crop', 'blurFace', 'referenceCharacter',
   ]);
 
   const reuseExperiment = (d: ExperimentDetail) => {
@@ -820,6 +832,8 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     setRepairBackend(String(p.backend || 'grok'));
     setWhiteoutTarget(String(p.whiteoutTarget || 'face'));
     setGrokTreatment(String(p.repairMode || ''));
+    setBlurFace(p.blurFace !== false);
+    setRefCharacter(String(p.referenceCharacter || ''));
     const pCrop = p.crop as { x?: number; y?: number; w?: number; h?: number } | undefined;
     setCropPad(pCrop && pCrop.w === 1 && pCrop.h === 1 ? 'full' : (p.cropPad != null ? String(p.cropPad) : ''));
     setFreshDetection(!!p.freshDetection);
@@ -920,13 +934,27 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
                 <label className="text-sm flex items-center gap-1.5">
                   Treatment
                   <select className="border rounded-lg px-3 py-2 text-sm" value={grokTreatment} onChange={e => setGrokTreatment(e.target.value)}>
-                    <option value="">Whiteout (insert, default)</option>
+                    <option value="">Production default (body: crosshatch)</option>
                     <option value="fullscene">Crosshatch (full scene)</option>
                     <option value="blended">Blur (blended)</option>
                     <option value="cutout">Crop (cutout)</option>
+                    <option value="whiteout-insert">Whiteout (insert pipeline)</option>
                   </select>
                 </label>
               )}
+              {repairBackend === 'grok' && (
+                <label className="text-sm flex items-center gap-1.5" title="Crosshatch holds the pose; a blurred head stops the old face being recreated so identity comes from the avatar.">
+                  <input type="checkbox" checked={blurFace} onChange={e => setBlurFace(e.target.checked)} />
+                  Blur face over crosshatch
+                </label>
+              )}
+              <input
+                className="border rounded-lg px-3 py-2 text-sm w-52"
+                placeholder="Reference swap: other character"
+                title="Repairs the chosen character's region using ANOTHER character's avatar. If the result still looks like the original, identity is coming from the page, not the reference."
+                value={refCharacter}
+                onChange={e => setRefCharacter(e.target.value)}
+              />
               <label className="text-sm flex items-center gap-1.5">
                 Zoom
                 <select className="border rounded-lg px-3 py-2 text-sm" value={cropPad} onChange={e => setCropPad(e.target.value)}>

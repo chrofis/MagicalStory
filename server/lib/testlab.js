@@ -692,6 +692,10 @@ async function runBboxStage(ctx, { experimentId }) {
       // it was accepted (bodyBox = mask bounds) or the tight DINO box was kept.
       samApplied: f.samApplied ?? null,
       maskVerdict: f.maskVerdict || null,
+      // Share of the DINO box the accepted mask fills — the number the
+      // coverage floor is judged against, so a 'rejected-too-small' verdict
+      // can be checked here instead of re-deriving it from the boxes.
+      maskCoverage: f.maskCoverage ?? null,
     })),
     objects: (result.objects || []).map(o => ({ name: o.name, bbox: o.bodyBox || o.bbox || o.box_2d })),
   };
@@ -790,10 +794,18 @@ async function runCharRepairStage(ctx, opts) {
   }
 
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
-  const ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === charName.toLowerCase());
+  // IDENTITY-TRANSFER TEST: params.referenceCharacter sends a DIFFERENT character's
+  // avatar while still targeting charName's box. If the repair returns the original
+  // character, identity is being copied from the page instead of the reference —
+  // the sharpest test there is for a treatment (owner, 2026-08-05).
+  const refName = params.referenceCharacter || charName;
+  const ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === refName.toLowerCase());
   if (!ref) {
     const avail = ctx.referencePhotos.map(p => p.name).filter(Boolean).join(', ');
-    throw new Error(`No reference photo for character "${charName}" on this page (available: ${avail || 'none'})`);
+    throw new Error(`No reference photo for character "${refName}" on this page (available: ${avail || 'none'})`);
+  }
+  if (params.referenceCharacter) {
+    log.info(`[TESTLAB] IDENTITY SWAP: repairing ${charName}'s region with ${refName}'s reference`);
   }
 
   // Bbox: explicit param → stored detection → fresh detection on the image.
@@ -934,6 +946,9 @@ async function runCharRepairStage(ctx, opts) {
     protectedBodies,
     addStep,
     includeDebug: true,
+    // Crosshatch carries a blurred head by default (body pose from the hatch,
+    // identity from the avatar). params.blurFace=false A/Bs the plain hatch.
+    ...(params.blurFace !== undefined ? { blurFace: params.blurFace } : {}),
   });
   const elapsedMs = Date.now() - t0;
   const finalImage = result?.imageData;
@@ -2800,8 +2815,13 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
 
   const charName = params.characterName;
   if (!charName) throw new Error('qwen_insert requires params.characterName');
-  const ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === charName.toLowerCase());
-  if (!ref) throw new Error(`No reference photo for "${charName}" on this page`);
+  // params.referenceCharacter → identity-transfer test (see runCharRepairStage).
+  const refName = params.referenceCharacter || charName;
+  const ref = ctx.referencePhotos.find(p => (p.name || '').toLowerCase() === refName.toLowerCase());
+  if (!ref) throw new Error(`No reference photo for "${refName}" on this page`);
+  if (params.referenceCharacter) {
+    log.info(`[TESTLAB] IDENTITY SWAP: inserting ${refName}'s reference into ${charName}'s region`);
+  }
 
   // Base canvas
   let baseUri;
