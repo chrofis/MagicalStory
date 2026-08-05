@@ -26,8 +26,8 @@ import {
   type SentPrompt,
   type ReviewRun,
   type TextModelInfo,
-  type SheetSet,
-  type SheetSetMember,
+  type TestLabSet,
+  type TestLabSetMember,
 } from '@/services/testlabService';
 
 /**
@@ -137,13 +137,13 @@ export default function TestLab() {
         <div className="flex gap-2 mb-4 sm:mb-6">
           <button className={tabBtn(tab === 'stories')} onClick={() => setTab('stories')}>Stories</button>
           <button className={tabBtn(tab === 'benchmark')} onClick={() => setTab('benchmark')}>Benchmark</button>
-          <button className={tabBtn(tab === 'sheetsets')} onClick={() => setTab('sheetsets')}>Sheet sets</button>
+          <button className={tabBtn(tab === 'sheetsets')} onClick={() => setTab('sheetsets')}>Sets</button>
           <button className={tabBtn(tab === 'experiments')} onClick={() => setTab('experiments')}>Experiments</button>
         </div>
 
         {tab === 'stories' && <StoriesTab onReviewStory={useStoryForReview} />}
         {tab === 'benchmark' && <BenchmarkTab />}
-        {tab === 'sheetsets' && <SheetSetsTab />}
+        {tab === 'sheetsets' && <SetsTab />}
         {tab === 'experiments' && <ExperimentsTab preset={preset} onPresetApplied={() => setPreset(null)} />}
       </div>
     </div>
@@ -379,77 +379,86 @@ function BenchmarkTab() {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Sheet sets tab — named reusable collections of 2×4 avatar sheets. Pin
-// failed sheets from an avatar_eval result (button on the result card), then
-// re-run the whole set here as one experiment.
+// Sets tab — named, stage-typed collections of failing cases (any stage). Pin
+// a case from a result (button on the result card), then re-run the whole set
+// here as one experiment of that stage.
 // ─────────────────────────────────────────────────────────────────────
 
-function SheetSetsTab() {
-  const [sets, setSets] = useState<SheetSet[]>([]);
-  const [expanded, setExpanded] = useState<Record<number, SheetSetMember[]>>({});
+function memberLabel(m: TestLabSetMember): string {
+  const t = m.target as { character?: string; pageNumber?: number; coverType?: string };
+  const p = m.params as { pass?: number; characterName?: string };
+  const bits: string[] = [];
+  if (t.character) bits.push(t.character);
+  if (t.pageNumber != null) bits.push(`P${t.pageNumber}`);
+  if (t.coverType) bits.push(t.coverType);
+  if (p.characterName) bits.push(p.characterName);
+  if (p.pass != null) bits.push(`pass ${p.pass}`);
+  return bits.join(' · ') || JSON.stringify(m.target);
+}
+
+function SetsTab() {
+  const [sets, setSets] = useState<TestLabSet[]>([]);
+  const [expanded, setExpanded] = useState<Record<number, TestLabSetMember[]>>({});
   const [newName, setNewName] = useState('');
-  const [model, setModel] = useState('qwen3-vl');
+  const [newStage, setNewStage] = useState('avatar_eval');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    try { setSets((await testlabService.getSheetSets()).sets); }
+    try { setSets((await testlabService.getSets()).sets); }
     catch (e) { setError(e instanceof Error ? e.message : 'Failed to load'); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
   const create = async () => {
     if (!newName.trim()) return;
-    await testlabService.createSheetSet(newName.trim());
+    await testlabService.createSet(newName.trim(), newStage);
     setNewName(''); load();
   };
   const toggle = async (id: number) => {
     if (expanded[id]) { setExpanded(e => { const n = { ...e }; delete n[id]; return n; }); return; }
-    const detail = await testlabService.getSheetSet(id);
+    const detail = await testlabService.getSet(id);
     setExpanded(e => ({ ...e, [id]: detail.members }));
   };
   const run = async (id: number) => {
     setBusy(true); setError(null);
     try {
-      const res = await testlabService.runSheetSet(id, { model, splitRows: true });
-      alert(`Started experiment #${res.id} over ${res.sheets} sheets — open it from the Experiments tab.`);
+      const res = await testlabService.runSet(id);
+      alert(`Started experiment #${res.id} over ${res.members} cases — open it from the Experiments tab.`);
     } catch (e) { setError(e instanceof Error ? e.message : 'Run failed'); }
     finally { setBusy(false); }
   };
-  const del = async (id: number) => { if (window.confirm('Delete this set?')) { await testlabService.deleteSheetSet(id); load(); } };
+  const del = async (id: number) => { if (window.confirm('Delete this set?')) { await testlabService.deleteSet(id); load(); } };
   const unpin = async (setId: number, memberId: number) => {
-    await testlabService.unpinSheet(setId, memberId);
-    const detail = await testlabService.getSheetSet(setId);
+    await testlabService.unpinFromSet(setId, memberId);
+    const detail = await testlabService.getSet(setId);
     setExpanded(e => ({ ...e, [setId]: detail.members })); load();
   };
+
+  const stageOptions = TESTLAB_STAGES.map(s => s.id);
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <h2 className="font-semibold text-gray-900">Avatar sheet sets</h2>
-        <label className="text-xs text-gray-500 ml-auto flex items-center gap-1">Judge
-          <select className="border rounded-lg px-2 py-1 text-xs" value={model} onChange={e => setModel(e.target.value)}>
-            <option value="qwen3-vl">qwen3-vl</option>
-            <option value="qwen3-vl-235b">qwen3-vl-235b</option>
-            <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-            <option value="grok-4-fast">grok-4-fast</option>
-          </select>
-        </label>
-        <Button variant="secondary" size="sm" onClick={load}><RefreshCw size={14} /></Button>
+        <h2 className="font-semibold text-gray-900">Test Lab sets</h2>
+        <Button variant="secondary" size="sm" className="ml-auto" onClick={load}><RefreshCw size={14} /></Button>
       </div>
-      <div className="flex gap-2 mb-4">
-        <input className="border rounded-lg px-3 py-2 text-sm flex-1" placeholder="New set name (e.g. failed-heads)" value={newName}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <input className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-40" placeholder="New set name (e.g. failed-heads)" value={newName}
           onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && create()} />
+        <select className="border rounded-lg px-2 py-2 text-sm" value={newStage} onChange={e => setNewStage(e.target.value)}>
+          {stageOptions.map(id => <option key={id} value={id}>{id}</option>)}
+        </select>
         <Button size="sm" onClick={create}><Plus size={14} /> Create</Button>
       </div>
       {error && <div className="text-sm text-red-600 mb-3">{error}</div>}
-      {sets.length === 0 && <div className="text-sm text-gray-400">No sets yet. Create one, then pin sheets from an "Avatar sheet eval" result.</div>}
+      {sets.length === 0 && <div className="text-sm text-gray-400">No sets yet. Create one for a stage, then pin failing cases from that stage's results.</div>}
       <div className="space-y-2">
         {sets.map(s => (
           <div key={s.id} className="border rounded-lg p-3">
             <div className="flex items-center gap-2 flex-wrap">
               <button className="font-medium text-indigo-700 hover:underline" onClick={() => toggle(s.id)}>
-                {s.name} <span className="text-gray-400 font-normal">({s.memberCount} sheets)</span>
+                {s.name} <span className="text-gray-400 font-normal">· {s.stage} · {s.memberCount} cases</span>
               </button>
               <div className="ml-auto flex gap-2">
                 <Button size="sm" disabled={busy || s.memberCount === 0} onClick={() => run(s.id)}>Run set</Button>
@@ -458,11 +467,12 @@ function SheetSetsTab() {
             </div>
             {expanded[s.id] && (
               <ul className="mt-2 space-y-1">
-                {expanded[s.id].length === 0 && <li className="text-xs text-gray-400">Empty — pin sheets from an avatar_eval result.</li>}
+                {expanded[s.id].length === 0 && <li className="text-xs text-gray-400">Empty — pin cases from a {s.stage} result.</li>}
                 {expanded[s.id].map(m => (
                   <li key={m.id} className="text-xs text-gray-600 flex items-center gap-2">
-                    <span className="font-mono">{m.character}</span> · pass {m.pass}
-                    <span className="text-gray-400">{m.storyTitle || m.storyId}</span>
+                    <span className="font-mono">{memberLabel(m)}</span>
+                    <span className="text-gray-400">{m.storyTitle || String((m.target as { storyId?: string }).storyId || '')}</span>
+                    {m.label && <span className="text-gray-400">— {m.label}</span>}
                     <button className="ml-auto text-red-400 hover:text-red-600" onClick={() => unpin(s.id, m.id)}><Trash2 size={12} /></button>
                   </li>
                 ))}
@@ -2211,18 +2221,25 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                   {(stage === 'bbox' || result.detectionBackend) && (result.figures || result.objects) && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ backend: result.detectionBackend, figures: result.figures, objects: result.objects }, null, 2)}</pre>
                   )}
-                  {stage === 'avatar_eval' && result.character && (result as { pass?: number }).pass != null && (
+                  {result.storyId && (
                     <Button variant="secondary" size="sm" onClick={async () => {
-                      const name = window.prompt('Pin this sheet to which set? (existing name or a new one)');
+                      const name = window.prompt(`Pin this ${stage} case to which set? (existing name or a new one)`);
                       if (!name?.trim()) return;
+                      // target = what identifies this case; params = what to re-run it with.
+                      const target: Record<string, unknown> = { storyId: result.storyId };
+                      if (result.pageNumber != null) target.pageNumber = result.pageNumber;
+                      if (result.character) target.character = result.character;
+                      if (result.coverType) target.coverType = result.coverType;
+                      const params: Record<string, unknown> = {};
+                      if (stage === 'avatar_eval') { if ((result as { pass?: number }).pass != null) params.pass = (result as { pass?: number }).pass; params.splitRows = true; }
+                      if (stage === 'char_repair') { params.characterName = result.character || result.characterName; if (result.backend) params.backend = result.backend; if (result.repairMode) params.repairMode = result.repairMode; }
                       try {
-                        const set = await testlabService.createSheetSet(name.trim());
-                        await testlabService.pinSheet(set.id, {
-                          storyId: result.storyId, character: result.character!,
-                          pass: (result as { pass?: number }).pass,
-                          label: `final ${(result.report as unknown as { finalScore?: number } | undefined)?.finalScore ?? '?'}`,
+                        const set = await testlabService.createSet(name.trim(), stage);
+                        await testlabService.pinToSet(set.id, {
+                          target, params,
+                          label: `final ${(result.report as unknown as { finalScore?: number } | undefined)?.finalScore ?? result.finalScore ?? '?'}`,
                         });
-                        alert(`Pinned ${result.character} (pass ${(result as { pass?: number }).pass}) to "${set.name}".`);
+                        alert(`Pinned to "${set.name}" (${stage}).`);
                       } catch (e) { alert(`Pin failed: ${e instanceof Error ? e.message : e}`); }
                     }}><Plus size={14} /> Pin to set</Button>
                   )}

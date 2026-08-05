@@ -381,45 +381,44 @@ export const testlabService = {
     return api.post<{ success: boolean }>('/api/admin/testlab/promote', { storyId, pageNumber, versionIndex, setActive, ...(imageType ? { imageType } : {}) });
   },
 
-  // Avatar sheet sets — named reusable collections of 2×4 sheets to batch-eval.
-  getSheetSets() {
-    return api.get<{ sets: SheetSet[] }>('/api/admin/testlab/sheet-sets');
+  // Test Lab sets — named, stage-typed collections of failing cases (any stage).
+  getSets() {
+    return api.get<{ sets: TestLabSet[] }>('/api/admin/testlab/sets');
   },
-  createSheetSet(name: string) {
-    return api.post<{ id: number; name: string }>('/api/admin/testlab/sheet-sets', { name });
+  createSet(name: string, stage: string, params?: Record<string, unknown>) {
+    return api.post<{ id: number; name: string; stage: string }>('/api/admin/testlab/sets', { name, stage, params });
   },
-  getSheetSet(id: number) {
-    return api.get<{ id: number; name: string; members: SheetSetMember[] }>(`/api/admin/testlab/sheet-sets/${id}`);
+  getSet(id: number) {
+    return api.get<{ id: number; name: string; stage: string; params: Record<string, unknown>; members: TestLabSetMember[] }>(`/api/admin/testlab/sets/${id}`);
   },
-  deleteSheetSet(id: number) {
-    return api.delete<{ success: boolean }>(`/api/admin/testlab/sheet-sets/${id}`);
+  deleteSet(id: number) {
+    return api.delete<{ success: boolean }>(`/api/admin/testlab/sets/${id}`);
   },
-  pinSheet(setId: number, member: { storyId: string; character: string; pass?: number; entryIndex?: number; label?: string }) {
-    return api.post<{ id: number }>(`/api/admin/testlab/sheet-sets/${setId}/members`, member);
+  pinToSet(setId: number, member: { target: Record<string, unknown>; params?: Record<string, unknown>; label?: string }) {
+    return api.post<{ id: number }>(`/api/admin/testlab/sets/${setId}/members`, member);
   },
-  unpinSheet(setId: number, memberId: number) {
-    return api.delete<{ success: boolean }>(`/api/admin/testlab/sheet-sets/${setId}/members/${memberId}`);
+  unpinFromSet(setId: number, memberId: number) {
+    return api.delete<{ success: boolean }>(`/api/admin/testlab/sets/${setId}/members/${memberId}`);
   },
-  runSheetSet(setId: number, opts: { model?: string; splitRows?: boolean } = {}) {
-    return api.post<{ id: number; sheets: number }>(`/api/admin/testlab/sheet-sets/${setId}/run`, opts);
+  runSet(setId: number, params?: Record<string, unknown>) {
+    return api.post<{ id: number; members: number }>(`/api/admin/testlab/sets/${setId}/run`, { params });
   },
 
 };
 
-export interface SheetSet {
+export interface TestLabSet {
   id: number;
   name: string;
+  stage: string;
   createdBy: string | null;
   createdAt: string;
   memberCount: number;
 }
 
-export interface SheetSetMember {
+export interface TestLabSetMember {
   id: number;
-  storyId: string;
-  character: string;
-  pass: number;
-  entryIndex: number | null;
+  target: Record<string, unknown>;
+  params: Record<string, unknown>;
   label: string | null;
   storyTitle: string | null;
   addedAt: string;
