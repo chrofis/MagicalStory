@@ -86,6 +86,36 @@ async function main() {
   const report = await buildCostReport({ token: getToken(), projectId: PROJECT_ID, days });
   print(report);
 
+  // AI API spend — the other half of the bill. Needs the database, so it is
+  // skipped (with a note, never silently) when no connection string is set.
+  const dbUrl = process.env.DATABASE_URL;
+  if (dbUrl) {
+    const { Pool } = require('pg');
+    const pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+    try {
+      const { buildApiCostReport } = require('../../server/lib/apiCost');
+      const api = await buildApiCostReport({ pool, days });
+      report.api = api;
+      console.log(`AI API spend — last ${days} days (${api.stories} stories, ${api.totals.calls} calls)\n`);
+      for (const p of api.providers) {
+        console.log('  ' + p.name.padEnd(16) + String(p.calls).padStart(6) + ' calls' + usd(p.total).padStart(10));
+      }
+      console.log('  ' + 'TOTAL'.padEnd(16) + String(api.totals.calls).padStart(6) + ' calls' + usd(api.totals.total).padStart(10));
+      console.log(`  ${usd(api.perStory)} per story · projected ${usd(api.projectedMonthly)}/month`);
+      if (api.unpricedTokens) console.log(`  WARNING: ${api.unpricedTokens.toLocaleString()} tokens had no model recorded and are NOT priced`);
+      if (api.estimatedTokens) console.log(`  note: ${api.estimatedTokens.toLocaleString()} tokens priced via the configured default model`);
+      console.log(`\n  GRAND TOTAL ${usd(report.current.totals.total + api.totals.total)}` +
+        `  (Railway ${usd(report.current.totals.total)} + API ${usd(api.totals.total)})` +
+        `  -> ${usd(report.projectedMonthly + api.projectedMonthly)}/month\n`);
+    } catch (e) {
+      console.log(`AI API spend: unavailable (${e.message})\n`);
+    } finally {
+      await pool.end();
+    }
+  } else {
+    console.log('AI API spend: skipped — DATABASE_URL not set.\n');
+  }
+
   if (process.argv.includes('--email')) {
     const email = require('../../email');
     if (!email.isEmailConfigured || !email.isEmailConfigured()) {

@@ -56,6 +56,18 @@ async function runWeeklyCostSweep(dbPool, log) {
   }
 
   const report = await buildCostReport({ token, projectId, days: 7 });
+
+  // Railway is only part of the bill — attach AI API spend from what the
+  // pipeline already records on each story. Never let this sink the email: if
+  // the API side fails we still want the infrastructure numbers to arrive.
+  try {
+    const { buildApiCostReport } = require('./apiCost');
+    report.api = await buildApiCostReport({ pool: dbPool, days: 7 });
+  } catch (err) {
+    log.warn(`[weekly-cost] API cost section failed (sending Railway only): ${err.message}`);
+    report.api = null;
+  }
+
   const result = await email.sendAdminWeeklyCostReport(report);
   if (!result) {
     log.warn('[weekly-cost] send returned null — will retry next hour');

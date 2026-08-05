@@ -1138,11 +1138,47 @@ async function sendAdminWeeklyCostReport(report) {
   const memShare = current.totals.total > 0
     ? (current.totals.memory / current.totals.total) * 100 : 0;
 
+  // ── AI API spend (optional second half of the bill) ──────────────────────
+  // Railway alone understates what the week cost. `report.api` comes from
+  // server/lib/apiCost.js and covers spend recorded on story rows.
+  const api = report.api;
+  const grandTotal = current.totals.total + (api ? api.totals.total : 0);
+  const apiRows = api ? api.providers.map((p) => `
+      <tr>
+        <td style="padding:6px 10px; border-bottom:1px solid #e5e7eb;">${esc(p.name)}</td>
+        <td style="padding:6px 10px; border-bottom:1px solid #e5e7eb; text-align:right;">${p.calls}</td>
+        <td style="padding:6px 10px; border-bottom:1px solid #e5e7eb; text-align:right;">${usd(p.total)}</td>
+      </tr>`).join('') : '';
+
+  const apiSection = !api ? '' : `
+          <h3 style="margin-top:26px; color:#4f46e5;">AI-API Kosten (${days} Tage)</h3>
+          <div style="font-size:13px; color:#6b7280;">
+            ${api.stories} Stories · ${api.totals.calls} Calls · ${usd(api.perStory)} pro Story
+          </div>
+          <table style="border-collapse:collapse; width:100%; margin-top:8px; font-size:14px;">
+            <thead><tr style="background:#f1f5f9;">
+              <th style="padding:8px 10px; text-align:left;">Provider</th>
+              <th style="padding:8px 10px; text-align:right;">Calls</th>
+              <th style="padding:8px 10px; text-align:right;">Kosten</th>
+            </tr></thead>
+            <tbody>${apiRows}</tbody>
+            <tfoot><tr>
+              <td style="padding:8px 10px; font-weight:bold;">Total</td>
+              <td style="padding:8px 10px; text-align:right;">${api.totals.calls}</td>
+              <td style="padding:8px 10px; text-align:right; font-weight:bold;">${usd(api.totals.total)}</td>
+            </tr></tfoot>
+          </table>
+          <p style="font-size:12px; color:#6b7280; margin-top:6px;">
+            Erfasst wird, was an einer Story hängt — Test Lab und einzelne Avatar-Jobs sind nicht enthalten.
+            ${api.unpricedTokens ? `<b>${api.unpricedTokens.toLocaleString()} Tokens ohne Preis</b> (Modell nicht erfasst).` : ''}
+            ${api.estimatedTokens ? `${api.estimatedTokens.toLocaleString()} Tokens über Standardmodell geschätzt.` : ''}
+          </p>`;
+
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
-      subject: `[MagicalStory] Railway ${days}-Tage-Kosten — ${usd(current.totals.total)} (${up ? '+' : ''}${deltaPct.toFixed(0)}%), Hochrechnung ${usd(report.projectedMonthly)}/Monat`,
+      subject: `[MagicalStory] ${days}-Tage-Kosten — ${usd(grandTotal)} total (Railway ${usd(current.totals.total)}${api ? ` + API ${usd(api.totals.total)}` : ''}), Hochrechnung ${usd(report.projectedMonthly + (api ? api.projectedMonthly : 0))}/Monat`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 720px; margin: 0 auto;">
           <h2 style="color:#4f46e5;">Railway Kosten — letzte ${days} Tage</h2>
@@ -1170,6 +1206,16 @@ async function sendAdminWeeklyCostReport(report) {
             </thead>
             <tbody>${rows}</tbody>
           </table>
+          ${apiSection}
+
+          <div style="margin-top:22px; padding:14px; background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px;">
+            <div style="font-size:13px; color:#3730a3;">Gesamtkosten ${days} Tage</div>
+            <div style="font-size:26px; font-weight:bold; color:#312e81;">${usd(grandTotal)}</div>
+            <div style="font-size:13px; color:#4338ca; margin-top:2px;">
+              Railway ${usd(current.totals.total)}${api ? ` · AI-APIs ${usd(api.totals.total)}` : ''}
+              · Hochrechnung <b>${usd(report.projectedMonthly + (api ? api.projectedMonthly : 0))}/Monat</b>
+            </div>
+          </div>
 
           <p style="font-size:12px; color:#6b7280; margin-top:16px;">
             Railway verrechnet Memory pro MB und MINUTE, rund um die Uhr — «Ø RAM» ist
