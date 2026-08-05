@@ -4587,3 +4587,25 @@ face crop returned nearly the whole box.
    (r ≈ 4.5% — shape and tone survive), for the A/B the owner asked for.
 
 **Touched:** `server/lib/faceRepair.js`, `server/lib/testlab.js`.
+
+---
+
+## 2026-08-05 — The face blur never reached the model: chained resize().extract() threw, catch swallowed it
+
+**Context:** Owner: "all your sent to model (whiteout/crosshatch) show no blur at all. Why?"
+Correct — every #331 variant shipped an unblurred hatch. The reason was in `logWarnings`, not
+`logLines`: `[FACE REPAIR] face blur over crosshatch failed (extract_area: bad extract area)
+— hatch only`. Chaining `.resize(hatchW,hatchH).extract({...})` in ONE sharp pipeline throws;
+the try/catch degraded to hatch-only and the run looked successful.
+
+**Decision:** paste the silhouette (hatch coords) onto a crop-sized transparent canvas, THEN
+extract the face box from that — no chained resize+extract. Verified on the real geometry
+(crop 385x722, hatch inset, face box 222x276 at 74,57): silhouette alpha 248/255 (a real
+silhouette, not a full box) and the clipped blur survives.
+
+**Process note:** a swallowed exception that leaves a *plausible* output is the worst failure
+mode in this pipeline — the Lab showed a healthy card, correct logs, and a wrong image. The
+warning existed and I read the wrong field. Gate rejections and treatment fallbacks belong in
+`logLines`, not only `logWarnings`.
+
+**Touched:** `server/lib/faceRepair.js`.

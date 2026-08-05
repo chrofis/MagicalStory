@@ -352,14 +352,19 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
       // call on the face crop returned nearly the whole box, so the blur showed
       // as a grey rectangle over the wall (exp #329).
       if (fw > 8 && fh > 8 && sil) {
-        const silHead = await sharp(sil).resize(hatchWidth, hatchHeight, { fit: 'fill' })
-          .extract({
-            left: Math.max(0, Math.min(hatchWidth - 1, fl - hatchLeft)),
-            top: Math.max(0, Math.min(hatchHeight - 1, ft - hatchTop)),
-            width: Math.max(1, Math.min(fw, hatchWidth - Math.max(0, fl - hatchLeft))),
-            height: Math.max(1, Math.min(fh, hatchHeight - Math.max(0, ft - hatchTop))),
-          })
-          .resize(fw, fh, { fit: 'fill' }).png().toBuffer();
+        // The silhouette lives in HATCH coords; the face box is in CROP coords.
+        // Paste the silhouette onto a crop-sized transparent canvas first, THEN
+        // extract the face box from it. Chaining resize().extract() in one sharp
+        // pipeline threw "extract_area: bad extract area" — the catch swallowed
+        // it and every run shipped an unblurred hatch (exp #331).
+        const silCropSized = await sharp({
+          create: { width: crop.w, height: crop.h, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+        })
+          .composite([{ input: await sharp(sil).resize(hatchWidth, hatchHeight, { fit: 'fill' }).png().toBuffer(), left: hatchLeft, top: hatchTop }])
+          .png().toBuffer();
+        const silHead = await sharp(silCropSized)
+          .extract({ left: fl, top: ft, width: fw, height: fh })
+          .png().toBuffer();
         const faceCrop = await sharp(cropBuf).extract({ left: fl, top: ft, width: fw, height: fh }).jpeg({ quality: 90 }).toBuffer();
         // blurStrength: 'strong' (default, features destroyed) | 'slight' (shape
         // and tone survive — the model still sees roughly what was there).
