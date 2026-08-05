@@ -5331,8 +5331,14 @@ Then continue directly with the ---TITLE--- section. Hard rules for this respons
 // prose) + E (do-not-write); SCENE keeps section D (scene-hint mechanics).
 // 'both' returns the body unchanged (production behaviour). If the section
 // headers can't be located the body is returned intact (never silently blank).
-function sliceAnalysisAspect(body, aspect) {
-  if (aspect === 'both' || !body) return body;
+function sliceAnalysisAspect(body, aspect, opts = {}) {
+  // includeTail=false drops the FIXES REQUIRED block and its formatting rules,
+  // keeping only the CRITERIA. The text-refinement stage reuses the same review
+  // criteria but answers with rewritten pages instead of fix lines, so it must
+  // not inherit an output contract that contradicts its own.
+  const includeTail = opts.includeTail !== false;
+  if (!body) return body;
+  if (aspect === 'both' && includeTail) return body;
   const idxA = body.indexOf('**A. ');
   const idxD = body.indexOf('**D. ');
   const idxE = body.indexOf('**E. ');
@@ -5344,7 +5350,8 @@ function sliceAnalysisAspect(body, aspect) {
   const secABC = body.slice(idxA, idxD); // A + B + C
   const secD = body.slice(idxD, idxE);   // D
   const secE = body.slice(idxE, idxFixes); // E (do-not-write verification)
-  const tail = body.slice(idxFixes);     // FIXES REQUIRED + formatting rules
+  const tail = includeTail ? body.slice(idxFixes) : '';  // FIXES REQUIRED + formatting rules
+  if (aspect === 'both') return preamble + secABC + secD + secE + tail;
   return aspect === 'text'
     ? preamble + secABC + secE + tail   // drop D (scene mechanics)
     : preamble + secD + tail;           // drop A/B/C/E (all text checks)
@@ -5509,6 +5516,24 @@ function buildTextRefinePrompt(inputData, pages = []) {
     return null;
   }
 
+  // The review CRITERIA are the outline reviewer's own text sections (A narrative,
+  // B character/dialogue, C prose, E do-not-write) — the exact slice
+  // `aspect: 'text'` uses. Reused rather than restated so the refiner and the
+  // reviewer can never judge text by different standards; the tail is dropped
+  // because that block dictates fix-line output and this stage returns pages.
+  const variant0 = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
+  const analysisBody = sliceAnalysisAspect(
+    (variant0 !== 'textFirst'
+      ? PROMPT_TEMPLATES.outlineAnalysisImageFirst
+      : PROMPT_TEMPLATES.outlineAnalysisTextFirst) || '',
+    'text',
+    { includeTail: false }
+  );
+  if (!analysisBody) {
+    log.error('[PROMPT] outline analysis template missing — text refinement would run without criteria');
+    return null;
+  }
+
   const sceneOutlines = pages
     .map(p => `## Page ${p.pageNumber}\n${p.sceneIntent || '(no scene outline recorded)'}`)
     .join('\n\n');
@@ -5569,7 +5594,11 @@ function buildTextRefinePrompt(inputData, pages = []) {
   // three, so the spelling, vocabulary and dialogue-typography rules are present
   // verbatim rather than implied by a label.
   const language = inputData.language || 'en';
-  return fillTemplate(template, {
+  // Inject the criteria BEFORE fillTemplate so their own placeholders
+  // ({CHARACTER_NAMES}, {MAX_CHARACTERS_PER_SCENE}) get filled too — same order
+  // buildOutlineReviewPrompt uses.
+  const templateWithAnalysis = template.replace('{ANALYSIS_INSTRUCTIONS}', () => analysisBody);
+  return fillTemplate(templateWithAnalysis, {
     LANGUAGE: getLanguageNameEnglish(language),
     LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
     LANGUAGE_NOTE: getLanguageNote(language),
