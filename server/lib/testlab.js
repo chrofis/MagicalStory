@@ -1506,7 +1506,13 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   // INPUT 2 (context only): the whole cover. The model needs the full palette
   // to choose/echo a colour — a crop that only shows sky cannot know the accent
   // colour lives in a coat further down. It edits input 1; input 2 is reference.
-  const useContextRef = params.contextRef !== false;
+  // DEFAULT OFF after exp #311. A second reference does NOT act as "context" for
+  // Qwen — it composes from both, and here it took the FULL COVER as its base:
+  // every output carried whole-cover content (crossbow man, houses, the girl's
+  // shoes) that was not in the crop at all, at the crop's aspect. Pasted back
+  // through the glyph mask that reads as scaled, misaligned scene fragments
+  // inside the letters. Palette context must be given as TEXT, not as an image.
+  const useContextRef = params.contextRef === true;
   const contextBuf = useContextRef
     ? await sharp(composedBuf).resize(1024, 1024, { fit: 'inside' }).jpeg({ quality: 90 }).toBuffer()
     : null;
@@ -1546,12 +1552,36 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   const paintedRaw = await sharp(Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
     .resize(crop.width, crop.height, { fit: 'fill' }).removeAlpha().raw().toBuffer();
   const cropMaskRaw = await sharp(grownMaskPng).extract(crop).raw().toBuffer();
+
+  // ALIGNMENT GATE (exp #311). The OCR gate proves the letters still spell the
+  // title; it cannot tell that the model returned a DIFFERENT PICTURE at the
+  // right aspect. #311 did exactly that — whole-cover content pasted through the
+  // glyph mask as scaled fragments — and two of those covers PASSED the OCR gate.
+  // So: outside the dilated mask the model's output must still be the crop we
+  // sent. Compare those pixels; a model that re-rendered the frame diverges hard.
+  const cropSentRaw = await sharp(cropBuf).removeAlpha().raw().toBuffer();
+  let offMaskDiff = 0, offMaskN = 0;
+  for (let p = 0, i = 0; p < crop.width * crop.height; p++, i += 3) {
+    if (cropMaskRaw[p] > 8) continue;             // inside the paint zone — allowed to differ
+    offMaskDiff += Math.abs(paintedRaw[i] - cropSentRaw[i])
+      + Math.abs(paintedRaw[i + 1] - cropSentRaw[i + 1])
+      + Math.abs(paintedRaw[i + 2] - cropSentRaw[i + 2]);
+    offMaskN += 3;
+  }
+  const offMaskMeanDiff = offMaskN ? +(offMaskDiff / offMaskN).toFixed(1) : 0;
+  const ALIGN_MAX = params.alignMaxDiff ?? 18;    // JPEG + resample noise sits well under this
+  const alignPass = offMaskMeanDiff <= ALIGN_MAX;
   const paintedRgba = await sharp(paintedRaw, { raw: { width: crop.width, height: crop.height, channels: 3 } })
     .joinChannel(cropMaskRaw, { raw: { width: crop.width, height: crop.height, channels: 1 } })
     .png().toBuffer();
-  const finalBuf = await sharp(composedBuf)
-    .composite([{ input: paintedRgba, left: crop.left, top: crop.top }])
-    .jpeg({ quality: 92 }).toBuffer();
+  // A failed alignment gate means the paint-in is DISCARDED — the served image is
+  // the flat composite, exactly as production would fall back. Showing the
+  // pasted mess as "the result" is what made #311 unreadable.
+  const finalBuf = alignPass
+    ? await sharp(composedBuf)
+      .composite([{ input: paintedRgba, left: crop.left, top: crop.top }])
+      .jpeg({ quality: 92 }).toBuffer()
+    : composedBuf;
   const finalUri = `data:image/jpeg;base64,${finalBuf.toString('base64')}`;
 
   // --- 5. OCR gate (deterministic, diacritic-sensitive) ----------------------
@@ -1569,6 +1599,12 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
     imageType: coverKey, coverType: coverKey, versionIndex, steps,
     promptUsed: prompt, modelId: result.modelId || 'alibaba:qwen-image-edit@2511', elapsedMs,
     cost: result.cost ?? null,
+    alignGate: {
+      offMaskMeanDiff, threshold: ALIGN_MAX, pass: alignPass,
+      verdict: alignPass
+        ? `PASS — outside the letters the model returned the crop we sent (mean diff ${offMaskMeanDiff})`
+        : `FAIL — the model returned a DIFFERENT picture (mean diff ${offMaskMeanDiff} > ${ALIGN_MAX}); paint-in discarded, flat composite kept`,
+    },
     titleGate: {
       expected: title,
       ocr: ocrText,
@@ -3574,6 +3610,7 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   let evalResult;
   let splitSteps;
   let splitPromptUsed;
+  let splitPrompts;
   if (params.splitRows) {
     // Run the SAME shared split evaluator production uses — parity by
     // construction. It crops the sheet + the 2×2 avatar's face row and judges
@@ -3586,6 +3623,7 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     });
     const { heads, bodies, identity } = split;
     splitPromptUsed = split.promptUsed;
+    splitPrompts = split.prompts;
     evalResult = { split: true, splitY: split.splitY, model, heads, bodies, identity, finalScore: split.verdict.finalScore, valid: split.verdict.valid };
     // Save the anchors AND the two crops as steps so the lab shows exactly what
     // the judge saw: face photo + avatar faces (identity anchors) + the two rows.
@@ -3626,6 +3664,7 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     ...(realisticVersionIndex != null ? { realisticVersionIndex } : {}),
     ...(splitSteps ? { steps: splitSteps } : {}),
     ...(splitPromptUsed ? { promptUsed: splitPromptUsed } : {}),
+    ...(splitPrompts ? { prompts: splitPrompts } : {}),
     sheetSource: { array: 'styledAvatarGeneration', entryIndex: chosen.i, slot },
     elapsedMs: Date.now() - t0, report: evalResult,
   };

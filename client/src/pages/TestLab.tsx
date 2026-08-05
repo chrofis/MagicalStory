@@ -2193,6 +2193,13 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
             </div>
           )}
 
+          {result.alignGate && (
+            <div className={`mt-3 rounded-lg p-3 text-xs border ${result.alignGate.pass ? 'bg-green-50 border-green-200 text-green-900' : 'bg-red-50 border-red-200 text-red-900'}`}>
+              <div className="font-semibold">Alignment gate — {result.alignGate.verdict}</div>
+              <div className="opacity-80">Outside the glyph mask the model output must still equal the crop that was sent. Catches "returned a different picture at the right aspect", which the OCR gate cannot see.</div>
+            </div>
+          )}
+
           {result.titleGate && (
             <div className={`mt-3 rounded-lg p-3 text-xs border ${result.titleGate.pass === true ? 'bg-green-50 border-green-200 text-green-900'
               : result.titleGate.pass === false ? 'bg-red-50 border-red-200 text-red-900'

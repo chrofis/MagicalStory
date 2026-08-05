@@ -126,6 +126,7 @@ export interface ExperimentResult {
   faceBbox?: number[];
   steps?: { label: string; imageType: string; versionIndex: number }[];
   // cover_title_paintin: deterministic OCR gate on the painted title
+  alignGate?: { offMaskMeanDiff: number; threshold: number; pass: boolean; verdict: string };
   titleGate?: { expected: string; ocr: string | null; pass: boolean | null; error?: string | null; verdict: string };
   typography?: { fontId?: string; layout?: string; face?: string; lines?: string[] };
   paintinSetup?: {
