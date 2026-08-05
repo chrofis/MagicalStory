@@ -4259,3 +4259,29 @@ a fallback path. Re-test in this stage if paint-in disappoints.
 **Status:** 🟡 built, NOT yet run — no verdict on whether Qwen adds real medium inside a mask this thin.
 Supersedes the 2026-07-11 "cover text baked vs overlay" open question: the answer is neither, it is
 overlay-then-paint-in.
+
+---
+
+## 2026-08-05 — Repair prompt: visible in the Lab, and whole-figure gets the scene's expression/pose
+
+**Context:** Owner on exp #302: "you are not showing the prompt — this must be added. Are we
+telling the position and especially the emotion? We should." Both were real gaps:
+- The card showed `promptUsed` only under "Show details", and the LEGACY treatments
+  (crosshatch/blur) showed none at all — `runCharRepairStage` dropped the spine's
+  `promptSent`.
+- The Lab's whole-figure insert prompt carried clothing + style but NOT the scene's
+  expression / pose / action / gaze / holding. `faceRepair.buildActionContext` builds exactly
+  that from scene metadata and was used for FACE repairs only. #302's crosshatch returned a
+  startled, blushing child for a scene whose metadata says smiling — the model had no state
+  to preserve, so it invented one.
+
+**Decision:** (1) prompt rendered at the TOP level of every result card (collapsed
+`<details>`, char count in the summary). (2) `runCharRepairStage` forwards
+`result.promptSent` → `promptUsed`. (3) whole-figure insert prompts append
+`buildActionContext(...)` (exported from faceRepair) — the same state block the face path
+gets. (4) the insert prompt also gained an explicit fill-to-edge clause ("Paint the
+silhouette FULLY to its edge — no light rim, halo or unpainted border") against the
+under-paint rim traced in #279–#288.
+
+**Touched:** `server/lib/testlab.js`, `server/lib/faceRepair.js` (export),
+`client/src/pages/TestLab.tsx`.

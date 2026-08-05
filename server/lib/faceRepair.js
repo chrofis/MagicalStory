@@ -841,4 +841,5 @@ module.exports = {
   resolveRepairAxes,
   legacyFlagsToAxes,
   applyGeometryGuards,
+  buildActionContext,
 };

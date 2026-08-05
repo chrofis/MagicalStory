@@ -951,6 +951,9 @@ async function runCharRepairStage(ctx, opts) {
     samBlend: true,
     blendRule: BLEND_RULE_VERSION,
     descriptor: result.descriptor,
+    // The spine returns promptSent; the card shows promptUsed — without this
+    // the legacy treatments (crosshatch/blur) showed NO prompt at all (#302).
+    promptUsed: result.promptSent || null,
     method: result?.method || null, steps, elapsedMs,
   };
 }
@@ -1327,11 +1330,33 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
 //      quality judge. Production port fails back to the flat composite, so a
 //      garbled title is structurally unable to ship.
 //
+// CROP WIDTH is a resolution-vs-context lever, NOT a safety one (2026-08-05,
+// owner question). The tight crop came from the Qwen composite recipe where a
+// full-frame edit re-imagined the scene — but here the mask-gated paste-back
+// already discards everything outside the glyph mask, so a wider crop cannot
+// damage the artwork. What it changes is (a) how many pixels each letter gets
+// in the 2× render and (b) HOW MUCH PALETTE THE MODEL CAN SEE. A crop that
+// shows only the sky behind the title gives the model no idea that the accent
+// colour of the cover lives in a character's coat 60% further down, so it
+// cannot pick a title colour that echoes the artwork. Levers:
+//   params.marginPct  — crop padding around the glyph bbox (default 0.12)
+//   params.contextRef — also send the FULL cover as a second reference so the
+//                       model sees the whole palette while editing only the
+//                       crop (default true; costs nothing, no repaint risk)
+//   params.recolor    — allow the model to CHOOSE the lettering colour from
+//                       the artwork's palette instead of preserving the
+//                       deterministic one (default false)
+//
 // Target: {storyId}. params: { coverType (frontCover), title, marginPct,
-// dilatePct, style }. promptOverride replaces the paint-in prompt.
+// dilatePct, contextRef, recolor, style }. promptOverride replaces the prompt.
 // ---------------------------------------------------------------------------
-const TITLE_PAINTIN_PROMPT = `The image is a children's book cover whose title lettering has been placed on top of the artwork as a flat graphic. Repaint the lettering so it belongs to the illustration: the letters take on the medium, brush texture, edge quality and lighting of the artwork, pigment sitting in the paper, a soft contact shadow under each letter and slight natural edge bleed.
-Keep the spelling, the letters, the word order, the line breaks, the letterforms, the size, the colour and the exact position identical. Do not add, remove or redraw any letter. Leave the artwork behind and around the lettering unchanged.`;
+const TITLE_PAINTIN_BASE = `The first image is a children's book cover whose title lettering has been placed on top of the artwork as a flat graphic. Repaint the lettering so it belongs to the illustration: the letters take on the medium, brush texture, edge quality and lighting of the artwork, pigment sitting in the paper, a soft contact shadow under each letter and slight natural edge bleed.
+Keep the spelling, the letters, the word order, the line breaks, the letterforms, the size and the exact position identical. Do not add, remove or redraw any letter. Leave the artwork behind and around the lettering unchanged.`;
+// Colour clauses — the ONLY difference between the two modes.
+const TITLE_PAINTIN_KEEP_COLOUR = `\nKeep the lettering colour exactly as it is.`;
+const TITLE_PAINTIN_RECOLOUR = `\nYou may change the lettering colour: pick a colour that already appears in the artwork as an accent (a garment, an object, a highlight) so the title reads as part of the illustration. It must stay clearly legible against what is directly behind it — if no accent gives enough separation, keep the current colour.`;
+// Appended when the full cover rides along as a second reference.
+const TITLE_PAINTIN_CONTEXT = `\nThe second image is the complete cover for context — use it to judge the artwork's palette and lighting. Edit only the first image.`;
 
 /** Transcribe visible text in an image. Deterministic OCR gate input — the
  *  model is asked to copy characters, never to judge quality. */
@@ -1433,7 +1458,7 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   await addStep(`glyph mask (dilated ${dilatePx}px — paint-in is clipped to this)`, `data:image/png;base64,${grownMaskPng.toString('base64')}`);
 
   // --- 3. crop-bounded edit --------------------------------------------------
-  const padPx = Math.round(Math.max(W, H) * (params.marginPct ?? 0.05));
+  const padPx = Math.round(Math.max(W, H) * (params.marginPct ?? 0.12));
   const crop = {
     left: Math.max(0, minx - padPx),
     top: Math.max(0, miny - padPx),
@@ -1442,7 +1467,21 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   crop.height = Math.min(H, maxy + 1 + padPx) - crop.top;
 
   const cropBuf = await sharp(composedBuf).extract(crop).jpeg({ quality: 95 }).toBuffer();
-  await addStep('input: title crop sent to Qwen', `data:image/jpeg;base64,${cropBuf.toString('base64')}`);
+  const cropPctW = Math.round(crop.width / W * 100), cropPctH = Math.round(crop.height / H * 100);
+  await addStep(`INPUT 1 (edited): title crop ${crop.width}×${crop.height}px = ${cropPctW}%×${cropPctH}% of the cover`,
+    `data:image/jpeg;base64,${cropBuf.toString('base64')}`);
+
+  // INPUT 2 (context only): the whole cover. The model needs the full palette
+  // to choose/echo a colour — a crop that only shows sky cannot know the accent
+  // colour lives in a coat further down. It edits input 1; input 2 is reference.
+  const useContextRef = params.contextRef !== false;
+  const contextBuf = useContextRef
+    ? await sharp(composedBuf).resize(1024, 1024, { fit: 'inside' }).jpeg({ quality: 90 }).toBuffer()
+    : null;
+  if (contextBuf) {
+    await addStep('INPUT 2 (context only, not edited): full cover for palette + lighting',
+      `data:image/jpeg;base64,${contextBuf.toString('base64')}`);
+  }
 
   const styleLine = (() => {
     try {
@@ -1452,11 +1491,19 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
       return txt ? `\nThe artwork's style: ${txt}` : '';
     } catch { return ''; }
   })();
-  const prompt = (promptOverride || TITLE_PAINTIN_PROMPT) + styleLine;
+  const recolor = params.recolor === true;
+  const prompt = promptOverride
+    || (TITLE_PAINTIN_BASE
+      + (recolor ? TITLE_PAINTIN_RECOLOUR : TITLE_PAINTIN_KEEP_COLOUR)
+      + (useContextRef ? TITLE_PAINTIN_CONTEXT : '')
+      + styleLine);
+
+  const refs = [`data:image/jpeg;base64,${cropBuf.toString('base64')}`];
+  if (contextBuf) refs.push(`data:image/jpeg;base64,${contextBuf.toString('base64')}`);
 
   const snap = v => Math.max(512, Math.min(2048, Math.round(v / 64) * 64));
   const t0 = Date.now();
-  const result = await editWithQwen(prompt, [`data:image/jpeg;base64,${cropBuf.toString('base64')}`], {
+  const result = await editWithQwen(prompt, refs, {
     width: snap(crop.width * 2), height: snap(crop.height * 2),
   });
   const elapsedMs = Date.now() - t0;
@@ -1500,6 +1547,17 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
           : `GATE ERROR — ${gateError}`,
     },
     typography: { fontId: spec?.fontId, layout: spec?.layout, face: spec?.face, lines: spec?.lines },
+    paintinSetup: {
+      cropPx: `${crop.width}×${crop.height}`,
+      cropPctOfCover: `${cropPctW}%×${cropPctH}%`,
+      renderedAt: `${snap(crop.width * 2)}×${snap(crop.height * 2)}`,
+      marginPct: params.marginPct ?? 0.12,
+      dilatePx,
+      contextRef: useContextRef,
+      recolor,
+      refsSent: refs.length,
+      deterministicColour: spec?.face || null,
+    },
     maskPx: { dilatePx, crop },
     issuesSummary: gatePass === false ? `OCR mismatch: drew "${ocrText}" for "${title}"` : null,
   };
@@ -2929,6 +2987,18 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       return txt ? ` Match the exact visual style, medium and rendering of the first image: ${txt}` : ' Match the visual style and lighting of the first image.';
     } catch { return ' Match the visual style and lighting of the first image.'; }
   })();
+  // WHOLE-FIGURE repairs get the same scene state the production spine feeds a
+  // face repair (expression / pose / action / gaze / holding). Without it the
+  // model invents a mood — exp #302 returned a startled, blushing child for a
+  // scene whose metadata says smiling. FAITHFULNESS: faceRepair.buildActionContext.
+  let bodyActionContext = '';
+  if (params.repairMode && !params._faceMode) {
+    try {
+      const { buildActionContext } = require('./faceRepair');
+      bodyActionContext = buildActionContext(ctx.scene.sceneDescription || ctx.scene.text || '', ref.name) || '';
+    } catch { /* optional enrichment */ }
+  }
+
   const prompt = promptOverride
     || (params.repairMode
       ? (whiteoutApplied
@@ -2946,7 +3016,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
                 : ` HEAD POSE comes from the third image (blurred on purpose): copy only its head direction, gaze direction, tilt and facial expression — if the person was looking left, the painted face looks left; never copy its blurry detail.`;
               return `Paint the FACE and head of the person from the second image into the white area of the first image. The white area shows the head's exact position and scale. IDENTITY comes from the second image: exact same facial features, age, hair style and hair color${glassesClause}.${faceFacts}${poseClause} Keep everything outside the white area exactly unchanged: same body, same clothing, same pose, same background, same other people.${styleLine}`;
             })()
-          : `Paint the person from the second image into the white silhouette area of the first image. The silhouette shows their exact position, pose and scale — fill it with that person in that pose. The painted person must have the EXACT same face, age, hair color and clothing as shown in the second image${ref.clothingDescription ? ` (${ref.clothingDescription})` : ''}. Keep everything outside the white area exactly unchanged: same background, same other people, same objects, same colors, same framing.${styleLine}`)
+          : `Paint the person from the second image into the white silhouette area of the first image. The silhouette shows their exact position, pose and scale — fill it with that person in that pose. Paint the silhouette FULLY to its edge — no light rim, halo or unpainted border may remain inside it. The painted person must have the EXACT same face, age, hair color and clothing as shown in the second image${ref.clothingDescription ? ` (${ref.clothingDescription})` : ''}. Keep everything outside the white area exactly unchanged: same background, same other people, same objects, same colors, same framing.${bodyActionContext}${styleLine}`)
         : `Replace the person in the first image with the person from the second image: SAME position, SAME pose, SAME scale as the existing figure — only the face and appearance change to match the second image. Keep everything else in the first image exactly unchanged: same background, same other people, same objects, same colors, same framing.${styleLine}`)
       : `Insert the person from the second image into the scene from the first image: ${pose}. Keep the background of the scene exactly as it is — same objects, same colors, same framing. Add a soft contact shadow.${styleLine}`);
 

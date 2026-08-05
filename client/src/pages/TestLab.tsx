@@ -2146,6 +2146,15 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
             </div>
           )}
 
+          {/* The prompt the model actually received — top level, not buried
+              under "Show details": for a repair it IS the experiment (owner,
+              exp #302). Collapsed so it never pushes the images down. */}
+          {result.promptUsed && (
+            <details className="mt-3 text-xs">
+              <summary className="cursor-pointer text-indigo-600 select-none">Prompt sent to the model ({result.promptUsed.length} chars)</summary>
+              <pre className="mt-1 bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-72 overflow-auto whitespace-pre-wrap text-[11px] text-gray-700">{result.promptUsed}</pre>
+            </details>
+          )}
           {result.decision && (
             <div className="text-xs text-gray-600 mt-2">
               <b>Repair decision:</b> {result.decision.method}{result.decision.charName ? ` [${result.decision.charName}]` : ''} — {result.decision.reason}
