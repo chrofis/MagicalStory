@@ -3974,3 +3974,29 @@ preservation preserves the ghost), plate fill (removed earlier).
 **Touched:** `server/lib/samBlend.js` (localField rewrite, alpha1 old-dilation, island
 keep-in-box).
 **Status:** ✅ shipped as the figure-repair default.
+
+---
+
+## 2026-08-05 — Footprint texture confidence + local-reference edge band (exp #275 residuals)
+
+**Context:** #275 C (first two-band run on staging) — owner flagged: (1) a CRISP dark line
+where the old knees were, absent from the model output; (2) white glow pixels around the
+head. (1) is a two-band artifact: the model's soft shadow is low-frequency in its body but
+high-frequency at its EDGE — LB removed the body, the edge survived as an orphaned dark
+stroke. (2) the edge band's figure test used a GLOBAL palette containing the white shirt,
+so white glow matched "figure" everywhere on the silhouette.
+
+**Decision:** (1) texture confidence — model high band is weighted by low-band agreement
+(conf = 1 − |lowModel − LB|/35): where the model's low band was overruled, its edges die
+with it. (2) edge band judged against the LOCAL figure colour (normalized masked blur of
+the model over the eroded figure interior): glow beside brown hair is judged against hair,
+not the shirt. Verified on the full-head roll (local, real SAM masks): knee stroke gone,
+head halo 773→1992px corrected and visually near-gone; T1-T5 + legacy identity all pass.
+
+**Known residuals (content ceiling, owner decision pending):** soft haze where the old
+figure was (the field has no tile lines to offer) + the model's own shadow remnants. Options
+on the table: empty-scene plate (rejected once), IoU gate raise (~0.65) to re-roll re-posed
+outputs, or accept.
+
+**Touched:** `server/lib/samBlend.js` (confidence weight, local-reference band).
+**Status:** ✅ shipped.

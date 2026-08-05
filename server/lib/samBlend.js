@@ -246,12 +246,59 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     const cl = (v) => Math.max(0, Math.min(255, Math.round(v)));
     for (let i = 0; i < n; i++) {
       if (!F[i]) continue;
+      // TEXTURE CONFIDENCE — where the model's LOW band was overruled (it
+      // disagrees with LB), its HIGH band must not survive either: a soft
+      // shadow whose body LB removed would otherwise leave its EDGE as an
+      // orphaned crisp dark stroke (the "knee shadow line" of exp #275). Fade
+      // texture to zero as low-band disagreement approaches ~35.
+      let dis = 0;
+      for (let c = 0; c < 3; c++) dis = Math.max(dis, Math.abs(lowModel[i * 3 + c] - LB[i * 3 + c]));
+      const conf = Math.max(0, 1 - dis / 35);
       for (let c = 0; c < 3; c++) {
         const tex = Math.max(-40, Math.min(40, pasteRaw[i * 3 + c] - lowModel[i * 3 + c]));
-        pasteRaw[i * 3 + c] = cl(LB[i * 3 + c] + wTex[i] * tex);
+        pasteRaw[i * 3 + c] = cl(LB[i * 3 + c] + wTex[i] * conf * tex);
       }
     }
-    log.info(`[TESTLAB] two-band footprint: ${fCnt}px = original low band (coarse-to-fine) + model texture faded in; pad ring ${ringPx}px → original`);
+    // UNKNOWN BAND at the figure edge (newBin..newTight): Grok's whiteout glow
+    // hugs the hair/shoulders exactly where the AA edge must be preserved.
+    // Split per pixel: keep what reads as the FIGURE'S INTERIOR (palette from
+    // the eroded figure — glow cannot be sampled into it), replace what reads
+    // as the local background field. Glow beside a white garment stays — and is
+    // invisible by definition.
+    let bandPx = 0;
+    if (newBin) {
+      const newEro = await maskBlurThreshold(Buffer.from(newBin), cropW, cropH, 1.2, 200); // erode ~2px
+      // LOCAL figure reference — a global palette contains the WHITE SHIRT, so
+      // white glow anywhere on the silhouette matched "figure" and survived
+      // (the head halo of iter 5: glow beside brown hair must be judged against
+      // HAIR). Normalized masked blur of the model over the figure interior
+      // gives the local figure colour at every band pixel.
+      const figMaskedRgb = Buffer.alloc(n * 3);
+      const figMaskW = Buffer.alloc(n);
+      for (let i = 0; i < n; i++) {
+        if (newEro[i] <= 128) continue;
+        figMaskW[i] = 255;
+        figMaskedRgb[i * 3] = pasteRaw[i * 3]; figMaskedRgb[i * 3 + 1] = pasteRaw[i * 3 + 1]; figMaskedRgb[i * 3 + 2] = pasteRaw[i * 3 + 2];
+      }
+      const figBlurRgb = await sharpL(figMaskedRgb, { raw: { width: cropW, height: cropH, channels: 3 } }).blur(5).raw().toBuffer();
+      const figBlurW = await sharpL(figMaskW, { raw: { width: cropW, height: cropH, channels: 1 } }).blur(5).raw().toBuffer();
+      const fwStride = Math.max(1, Math.round(figBlurW.length / n));
+      for (let i = 0; i < n; i++) {
+        if (!(newTight[i] > 128 && newEro[i] <= 128 && alpha1[i] > 128)) continue;
+        const fw = figBlurW[i * fwStride] / 255;
+        if (fw < 0.03) continue;
+        const lab = _rgbToLab(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
+        const figRef = _rgbToLab(figBlurRgb[i * 3] / fw, figBlurRgb[i * 3 + 1] / fw, figBlurRgb[i * 3 + 2] / fw);
+        const dFig = _deltaE(lab, figRef);
+        const ref = F[i] ? [LB[i * 3], LB[i * 3 + 1], LB[i * 3 + 2]] : [origRaw[i * 3], origRaw[i * 3 + 1], origRaw[i * 3 + 2]];
+        const dBg = _deltaE(lab, _rgbToLab(ref[0], ref[1], ref[2]));
+        if (dBg < dFig) {
+          pasteRaw[i * 3] = cl(ref[0]); pasteRaw[i * 3 + 1] = cl(ref[1]); pasteRaw[i * 3 + 2] = cl(ref[2]);
+          bandPx++;
+        }
+      }
+    }
+    log.info(`[TESTLAB] two-band footprint: ${fCnt}px = original low band (coarse-to-fine) + confidence-weighted model texture; pad ring ${ringPx}px → original; edge band ${bandPx}px glow replaced`);
     return { bgPx: fCnt + ringPx, materials: 0, localField: true };
   }
   const borderRing = Buffer.alloc(n);
