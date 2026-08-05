@@ -329,8 +329,13 @@ export const testlabService = {
     return api.post<{ id: number }>('/api/admin/testlab/experiments', body);
   },
 
-  getExperiments() {
-    return api.get<{ experiments: ExperimentSummary[] }>('/api/admin/testlab/experiments');
+  getExperiments(opts?: { limit?: number; days?: number; all?: boolean }) {
+    const q = new URLSearchParams();
+    if (opts?.limit) q.set('limit', String(opts.limit));
+    if (opts?.all) q.set('all', '1');
+    else if (opts?.days != null) q.set('days', String(opts.days));
+    const qs = q.toString();
+    return api.get<{ experiments: ExperimentSummary[] }>(`/api/admin/testlab/experiments${qs ? `?${qs}` : ''}`);
   },
 
   getExperiment(id: number) {

@@ -4204,3 +4204,17 @@ push; not built.
 **Touched:** `scripts/admin/setup-git-hooks.js` (new), `.githooks/pre-push`,
 `package.json`, `CLAUDE.md`.
 **Status:** ✅ kept.
+
+---
+
+## 2026-08-05 — Lab: experiment-list size picker (20 / 50 / 100 / 200)
+
+**Context:** The list loads the last 20 of the past 7 days — right default, but older runs
+were unreachable from the UI. The server already accepted `?limit=` (cap 200) and `?all=1`;
+the client never sent either.
+
+**Decision:** "Show" picker in the Past-experiments header: last 20 / 50 (7 days) or last
+100 / 200 (all time). ≥100 sends `all=1` so the 7-day window doesn't hide older runs.
+`getExperiments()` takes `{limit, days, all}`.
+
+**Touched:** `client/src/pages/TestLab.tsx`, `client/src/services/testlabService.ts`.

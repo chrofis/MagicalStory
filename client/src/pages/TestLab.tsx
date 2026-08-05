@@ -440,10 +440,14 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const canStart = targetCount > 0 && (!needsCharacter || !!charName.trim())
     && (!isOutlineReview || (reviewMode === 'compare' ? selectedModels.length > 0 : iterRounds.length > 0));
 
+  const [expLimit, setExpLimit] = useState(20);
+
   const load = useCallback(async () => {
     try {
       const [exps, bench, storyRes] = await Promise.all([
-        testlabService.getExperiments(),
+        // 20 within the last week is the everyday view; the picker widens it when
+        // an older run needs to be found (server caps at 200).
+        testlabService.getExperiments(expLimit >= 100 ? { limit: expLimit, all: true } : { limit: expLimit }),
         testlabService.getBenchmarks(),
         testlabService.getStories({ limit: 50 }),
       ]);
@@ -453,7 +457,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load');
     }
-  }, []);
+  }, [expLimit]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1086,7 +1090,18 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
         <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
           <h2 className="font-semibold text-gray-900">Past experiments</h2>
-          <Button variant="secondary" size="sm" onClick={load}><RefreshCw size={14} /></Button>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-600 flex items-center gap-1.5">
+              Show
+              <select className="border rounded-lg px-2 py-1 text-xs" value={expLimit} onChange={e => setExpLimit(Number(e.target.value))}>
+                <option value={20}>last 20 (7 days)</option>
+                <option value={50}>last 50 (7 days)</option>
+                <option value={100}>last 100 (all time)</option>
+                <option value={200}>last 200 (all time)</option>
+              </select>
+            </label>
+            <Button variant="secondary" size="sm" onClick={load}><RefreshCw size={14} /></Button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
