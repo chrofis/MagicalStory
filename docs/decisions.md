@@ -4130,3 +4130,24 @@ Treatment dropdown for Grok: Whiteout (insert, default) / Crosshatch (fullscene)
 
 **Touched:** `server/lib/samBlend.js` (rawPaste), `server/lib/testlab.js` (threading),
 `client/src/pages/TestLab.tsx` (variants, Treatment dropdown).
+
+---
+
+## 2026-08-05 — Lab: Zoom (crop pad) exposed on the char-repair form
+
+**Context:** Owner: "we also have 2 zooms — full image or the character cut out padded by
+50%/100% — why is that not an option?" The knob existed (`params.cropPad`, default 0.35
+whole-figure / 0.15 insert; `params.crop` for an explicit rect) but only via params JSON, so
+the axis was invisible in the form.
+
+**Decision:** Zoom dropdown — Default (tight, +35%) / Figure +50% / Figure +100% / Full page.
+'full' sets `crop:{x:0,y:0,w:1,h:1}` (whole page to the model), a number sets `cropPad`.
+Added `repairMode`, `cropPad`, `crop` to WIDGET_PARAM_KEYS and the re-run prefill so
+"re-run with changed settings" restores Treatment and Zoom instead of dumping them into the
+JSON box.
+
+**Why it matters:** zoom is a real quality axis, not cosmetics — more context helps the model
+match lighting/perspective but shrinks the figure's pixel budget; full-page keeps global
+composition at the lowest figure resolution. Now A/B-able like any other knob.
+
+**Touched:** `client/src/pages/TestLab.tsx`.

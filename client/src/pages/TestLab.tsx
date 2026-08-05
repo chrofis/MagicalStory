@@ -393,7 +393,8 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const [compareAll, setCompareAll] = useState(false);
   const [compareColor, setCompareColor] = useState(false);
   const [whiteoutTarget, setWhiteoutTarget] = useState('face');
-  const [grokTreatment, setGrokTreatment] = useState(''); // '' = whiteout insert (default) | fullscene | blended | cutout
+  const [grokTreatment, setGrokTreatment] = useState('');
+  const [cropPad, setCropPad] = useState(''); // '' = stage default | 0.5 | 1 | full (whole page) // '' = whiteout insert (default) | fullscene | blended | cutout
   const [freshDetection, setFreshDetection] = useState(false);
   const [avatarPass, setAvatarPass] = useState('1');        // avatar_eval: 1=realistic anchor, 2=styled sheet
   const [avatarEvalModel, setAvatarEvalModel] = useState('gemini-2.5-flash'); // avatar_eval: which model scores the sheet
@@ -554,6 +555,10 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
           // silhouette (insert pipeline, the calibrated default); the legacy
           // treatments stay reachable explicitly.
           if (repairBackend === 'grok' && grokTreatment) params.repairMode = grokTreatment;
+          // Zoom: how much scene context the model gets around the figure box.
+          // 'full' = the whole page (crop {0,0,1,1}); a number = pad fraction.
+          if (cropPad === 'full') params.crop = { x: 0, y: 0, w: 1, h: 1 };
+          else if (cropPad) params.cropPad = Number(cropPad);
           if (freshDetection) params.freshDetection = true;
         }
       }
@@ -618,7 +623,7 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const WIDGET_PARAM_KEYS = new Set([
     'autoEval', 'characterName', 'coverType', 'backend', 'whiteoutTarget', 'freshDetection',
     'rerunDetection', 'variants', 'pass', 'model', 'splitRows', 'writerModel', 'aspect', 'mode', 'rounds',
-    'models', 'genericityWarnings',
+    'models', 'genericityWarnings', 'repairMode', 'cropPad', 'crop',
   ]);
 
   const reuseExperiment = (d: ExperimentDetail) => {
@@ -659,6 +664,9 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     setCompareColor(!!variants && (d.stage === 'garment_hue' || variants.length === 2));
     setRepairBackend(String(p.backend || 'grok'));
     setWhiteoutTarget(String(p.whiteoutTarget || 'face'));
+    setGrokTreatment(String(p.repairMode || ''));
+    const pCrop = p.crop as { x?: number; y?: number; w?: number; h?: number } | undefined;
+    setCropPad(pCrop && pCrop.w === 1 && pCrop.h === 1 ? 'full' : (p.cropPad != null ? String(p.cropPad) : ''));
     setFreshDetection(!!p.freshDetection);
 
     setAvatarPass(String(p.pass ?? '1'));
@@ -764,6 +772,15 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
                   </select>
                 </label>
               )}
+              <label className="text-sm flex items-center gap-1.5">
+                Zoom
+                <select className="border rounded-lg px-3 py-2 text-sm" value={cropPad} onChange={e => setCropPad(e.target.value)}>
+                  <option value="">Default (tight, +35%)</option>
+                  <option value="0.5">Figure +50%</option>
+                  <option value="1">Figure +100%</option>
+                  <option value="full">Full page</option>
+                </select>
+              </label>
               {(repairBackend === 'grok' || repairBackend === 'qwen') && (
                 <label className="text-sm flex items-center gap-1.5">
                   Repair
