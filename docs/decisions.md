@@ -4395,3 +4395,27 @@ promptUsed. The runner already merges `partialResult` into the stored entry, so 
 run now renders like any other card.
 
 **Touched:** `server/lib/testlab.js`.
+
+---
+
+## 2026-08-05 — Rim removal confined to a 3px outline band; "sent to model" shows the real input
+
+**Context:** Owner on exp #307: (a) pixels DEEP inside the new figure were being replaced —
+"the replace white should only run on the very border, say 3px"; (b) the "sent to model"
+step cannot be right because the model raw output is the full page while the step shows only
+the crop.
+
+**(a) Rim removal was scanning the whole figure.** The elongated-bright-rim rule ran over
+every old-silhouette∩figure pixel, so an elongated highlight 20px inside the new figure (a
+fold, a strap edge) could be flagged and overwritten by the field. Now the candidate set
+excludes `erode(newBin, ~3px)` — the safely-interior region is untouchable, and the rule
+only sees the outline band where rim residue actually lives. Verified: a deep elongated
+highlight survives byte-exact (240→240) while the outline strip is still removed.
+
+**(b) The step lied in box mode.** `regionSource:'box'` (crosshatch/blur) sends the model the
+full treated SCENE and gets a full page back, but `blackoutImage` was always the treated
+CROP — so the pair could not be compared. `sentToModelUri` now records exactly what was
+transmitted (treated scene in box mode, treated crop in cutout mode) and that is what the
+step shows.
+
+**Touched:** `server/lib/samBlend.js`, `server/lib/faceRepair.js`.

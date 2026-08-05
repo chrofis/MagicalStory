@@ -591,6 +591,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   let candidateCrop;      // model output resized to crop dims (the paste source)
   let usage;
   let grokRawResult;
+  let sentToModelUri = null;   // EXACTLY what went to the model (scene or crop)
   if (regionSource === 'box') {
     // The model edits the WHOLE scene (treatment already painted on the crop
     // region of the scene). Composite the treated crop back into the scene,
@@ -598,6 +599,10 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
     // same crop from the returned scene as the blend candidate.
     const treatedScene = await sharp(sceneBuffer).composite([{ input: treatedBuf, left: crop.x, top: crop.y }]).png().toBuffer();
     const treatedSceneUri = `data:image/png;base64,${treatedScene.toString('base64')}`;
+    // "sent to model" must BE what the model received. In box mode that is the
+    // full treated SCENE, not the treated crop — showing the crop next to a
+    // full-page raw output made the pair impossible to compare (owner, #307).
+    sentToModelUri = treatedSceneUri;
     if (model === 'grok') {
       const exact = await grokEditSceneExact(prompt, [avatarUri], treatedScene, W, H, { encode: 'png' });
       if (!exact.buffer) throw new Error('Grok returned no image (box mode)');
@@ -729,7 +734,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
 
   const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
   const originalSceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
-  const treatedDataUri = `data:image/png;base64,${treatedBuf.toString('base64')}`;
+  const treatedDataUri = sentToModelUri || `data:image/png;base64,${treatedBuf.toString('base64')}`;
   const ci = blend.colorInfo;
   const ccLog = ci
     ? ` Colour-match: figure ΔE ${ci.deltaEBefore ?? 'n/a'}, seam ${ci.seamBefore ?? 'n/a'}→${ci.seamAfter ?? 'n/a'}${ci.bgMatchedPx ? `, bg ${ci.bgMatchedPx}px` : ''}${Array.isArray(ci.clusters) ? `, ${ci.clusters.filter(c => c.src === 'mean+border').length} bordered material(s) matched` : ''}.`

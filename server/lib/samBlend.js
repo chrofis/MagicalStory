@@ -332,9 +332,16 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
     let rimPx = 0;
     {
       const allBlur = await sharpL(Buffer.from(pasteRaw), { raw: { width: cropW, height: cropH, channels: 3 } }).blur(8).raw().toBuffer();
+      // OUTLINE BAND ONLY (~3px inside the figure edge). The rim residue lives on
+      // the silhouette; scanning the whole figure let the rule reach content deep
+      // inside the new figure, where a legitimate elongated highlight (a fold, a
+      // strap edge) can be flagged and overwritten (owner, exp #307). newBin
+      // eroded ~3px marks "safely interior" — never a candidate.
+      const deepIn = await maskBlurThreshold(Buffer.from(newBin || newTight), cropW, cropH, 1.8, 200);
       const cand2 = new Uint8Array(n);
       for (let i = 0; i < n; i++) {
         if (!(isOld(i) && newTight[i] > 128 && alpha1[i] > 128)) continue;
+        if (deepIn[i] > 128) continue; // deep interior of the new figure — untouchable
         const mnP = Math.min(pasteRaw[i * 3], pasteRaw[i * 3 + 1], pasteRaw[i * 3 + 2]);
         const mnB = Math.min(allBlur[i * 3], allBlur[i * 3 + 1], allBlur[i * 3 + 2]);
         if (mnP - mnB > 30) cand2[i] = 1;
