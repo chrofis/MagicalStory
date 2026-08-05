@@ -1102,6 +1102,10 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, opt
   // Single source of truth for text usage: record EVERY call here so no caller
   // can silently escape accounting (see usageContext.js). No-op outside a job.
   recordTextUsage(USAGE_PROVIDER_KEY[model.provider] || model.provider, result.usage, options.usageLabel, model.modelId);
+  // Same chokepoint, same reason: every Lab stage's prompt is captured here so
+  // no stage has to remember to stash it (see promptCapture.js). No-op outside
+  // a Test Lab experiment.
+  require('./promptCapture').recordPrompt(options.usageLabel || 'text', model.modelId, prompt, { kind: 'text' });
   return { ...result, modelId: model.modelId };
 }
 
@@ -1156,6 +1160,7 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
       return { ...result, modelId: model.modelId };
   }
   recordTextUsage(USAGE_PROVIDER_KEY[model.provider] || model.provider, result.usage, options.usageLabel, model.modelId);
+  require('./promptCapture').recordPrompt(options.usageLabel || 'text', model.modelId, prompt, { kind: 'text' });
   return { ...result, modelId: model.modelId };
 }
 

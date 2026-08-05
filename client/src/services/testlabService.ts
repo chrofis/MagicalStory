@@ -155,6 +155,9 @@ export interface ExperimentResult {
   writerDraft?: string;
   hintCount?: number;
   reviewPromptChars?: number;
+  // Every prompt this stage actually sent, captured at the text/image
+  // chokepoints — present for ALL stages, not only the ones that stash their own.
+  sentPrompts?: SentPrompt[];
   reviewRuns?: ReviewRun[];
   rounds?: ReviewRound[];
   // text_refine: each round rewrites the WHOLE text and feeds it to the next.
@@ -184,6 +187,17 @@ export interface RefineRound {
   changedFromOriginal?: number[];
   converged?: boolean;
   pages?: { pageNumber: number; before: string; after: string; original: string; sceneIntent?: string }[];
+}
+
+export interface SentPrompt {
+  label: string;
+  modelId: string | null;
+  chars: number;
+  truncated?: boolean;
+  text: string;
+  kind?: 'text' | 'image';
+  aspectRatio?: string;
+  referenceImages?: number;
 }
 
 export interface ReviewRun {
@@ -266,6 +280,10 @@ export const TESTLAB_STAGES = [
   { id: 'style_check', label: 'Style consistency check', producesImage: false, overridable: false, storyLevel: true },
   { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
   { id: 'text_refine', label: 'Text refine — full text in, full text out (rounds)', producesImage: false, overridable: true, storyLevel: true },
+  // Both runners existed server-side but were absent from this list, so the
+  // dropdown could never select them — unreachable except by hand-posting.
+  { id: 'garment_hue', label: 'Garment hue normalization (ON/OFF)', producesImage: true, overridable: false },
+  { id: 'style_repair', label: 'Style repair (story-wide)', producesImage: true, overridable: false, storyLevel: true },
   { id: 'avatar_realistic', label: 'Avatar pass 1 (realistic anchor)', producesImage: true, overridable: false, characterLevel: true },
   { id: 'avatar_style', label: 'Avatar pass 2 (style transfer)', producesImage: true, overridable: true, characterLevel: true },
   { id: 'avatar_eval', label: 'Avatar sheet eval', producesImage: false, overridable: true, characterLevel: true },

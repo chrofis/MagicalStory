@@ -23,6 +23,7 @@ import {
   type ExperimentSummary,
   type ExperimentDetail,
   type ExperimentResult,
+  type SentPrompt,
   type ReviewRun,
   type TextModelInfo,
 } from '@/services/testlabService';
@@ -1112,6 +1113,54 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
 }
 
 /**
+ * Every prompt a stage actually sent, for ANY stage — captured at the text and
+ * image chokepoints rather than stashed per-runner, so a stage cannot ship
+ * without its prompt being inspectable. "Edit & rerun" copies the prompt into
+ * the redo override box, which is what the rerun will send.
+ */
+function SentPromptsPanel({ prompts, onEdit }: { prompts: SentPrompt[]; onEdit?: (text: string) => void }) {
+  const [open, setOpen] = useState<number | null>(null);
+  return (
+    <div className="mt-2 border border-indigo-100 bg-indigo-50/30 rounded-lg p-2">
+      <div className="text-[11px] font-semibold text-indigo-700 mb-1">
+        Prompts sent ({prompts.length})
+      </div>
+      <div className="space-y-1">
+        {prompts.map((p, i) => (
+          <div key={i} className="text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="text-indigo-600 hover:underline" onClick={() => setOpen(open === i ? null : i)}>
+                {open === i ? '▾' : '▸'} {p.label}
+              </button>
+              <span className="text-gray-400">
+                {p.kind === 'image' ? 'image' : 'text'}
+                {p.modelId ? ` · ${p.modelId}` : ''}
+                {' · '}{p.chars.toLocaleString()} chars
+                {p.aspectRatio ? ` · ${p.aspectRatio}` : ''}
+                {p.referenceImages ? ` · ${p.referenceImages} ref img` : ''}
+                {p.truncated ? ' · truncated' : ''}
+              </span>
+              {onEdit && (
+                <button
+                  className="text-[11px] px-2 py-0.5 rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+                  onClick={() => onEdit(p.text)}
+                  title="Copy this prompt into the redo box, edit it, then press Redo to rerun with your version"
+                >
+                  Edit &amp; rerun
+                </button>
+              )}
+            </div>
+            {open === i && (
+              <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-3 max-h-[32rem] overflow-auto whitespace-pre-wrap font-mono text-[11px] text-gray-700">{p.text}</pre>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * text_refine — the whole point is watching the text move round by round, so
  * every intermediate version is shown, not just the final one: per page you get
  * the original and each round's output side by side, with unchanged rounds
@@ -1372,7 +1421,8 @@ function ExperimentDetailView({ detail, onBack, onRefresh, onReuse }: { detail: 
         <ResultCard key={`${r.storyId}-${r.pageNumber}-${i}`} result={r} stage={detail.stage}
           onRedo={() => redo(i)} redoing={pendingRedos[i] !== undefined}
           onReplayBlend={(r.steps || []).some(s => /model raw output/i.test(s.label)) ? () => replayBlend(i) : undefined}
-          isRedo={isRedo} superseded={superseded} />
+          isRedo={isRedo} superseded={superseded}
+          onEditPrompt={text => { setRedoOverride(text); setShowRedoOverride(true); }} />
       ))}
       {detail.status === 'running' && (
         <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 text-center text-sm text-gray-500">
@@ -1548,7 +1598,7 @@ function StepsStrip({ steps, images, onOpen }: {
   );
 }
 
-function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, superseded }: { result: ExperimentResult; stage: string; onRedo?: () => void; redoing?: boolean; onReplayBlend?: () => void; isRedo?: boolean; superseded?: boolean }) {
+function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, superseded, onEditPrompt }: { result: ExperimentResult; stage: string; onRedo?: () => void; redoing?: boolean; onReplayBlend?: () => void; isRedo?: boolean; superseded?: boolean; onEditPrompt?: (text: string) => void }) {
   const [baseline, setBaseline] = useState<string | null>(null);
   const [variant, setVariant] = useState<string | null>(null);
   const [variantB, setVariantB] = useState<string | null>(null);
@@ -1710,6 +1760,15 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
           <div className="font-semibold mb-1">⚠ {result.logWarnings.length} warning{result.logWarnings.length > 1 ? 's' : ''} during this run</div>
           {result.logWarnings.map((w, i) => <div key={i} className="font-mono whitespace-pre-wrap">{w}</div>)}
         </div>
+      )}
+      {/* Every prompt this stage sent — captured at the chokepoints, so it is
+          present for every stage rather than only the ones that stash their own.
+          Editable: "Edit & rerun" seeds the redo override with this exact text. */}
+      {!!result.sentPrompts?.length && (
+        <SentPromptsPanel
+          prompts={result.sentPrompts}
+          onEdit={onEditPrompt ? text => onEditPrompt(text) : undefined}
+        />
       )}
       {!!result.logLines?.length && (
         <details className="mt-1 text-xs text-gray-500">

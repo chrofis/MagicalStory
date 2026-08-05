@@ -11419,6 +11419,10 @@ async function _maybeGenerateComposite(options, usageTracker = null, pageLabel =
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}
  */
 async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null, modelOverrides = null, pageContext = '', options = {}) {
+  // Image-prompt chokepoint for Test Lab capture (promptCapture.js). Recorded
+  // here rather than per-provider so every route — Grok, Gemini, Runware — is
+  // covered by one line. No-op outside an experiment.
+  require('./promptCapture').recordPrompt(`image_${evaluationType}`, modelOverrides?.imageModel || null, prompt, { kind: 'image' });
   const {
     isAdmin = false,
     enableAutoRepair: enableAutoRepairInput = false,

@@ -53,6 +53,9 @@ async function generateWithGrok(prompt, options = {}) {
     aspectRatio = '1:1',
     resolution = '1k',
   } = options;
+  // Image-prompt chokepoint for Test Lab capture (promptCapture.js). No-op
+  // outside an experiment.
+  require('./promptCapture').recordPrompt('grok_generate', model, prompt, { kind: 'image', aspectRatio });
 
   if (!XAI_API_KEY) {
     throw new Error('XAI_API_KEY not configured');
@@ -192,6 +195,10 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
                               // Slots 1+ (avatars, VB grids) keep their existing padInput
                               // behavior — only slot 0 gets the magenta treatment.
   } = options;
+
+  require('./promptCapture').recordPrompt('grok_edit', model, prompt, {
+    kind: 'image', aspectRatio, referenceImages: referenceImages.length,
+  });
 
   if (!XAI_API_KEY) {
     throw new Error('XAI_API_KEY not configured');

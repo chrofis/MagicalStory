@@ -122,6 +122,9 @@ const STAGE_TEMPLATE_KEYS = {
   // (styled) uses sheet-2x4-style-eval.txt — paste that manually when A/B-ing
   // the styled eval prompt.
   avatar_eval: 'sheet2x4Evaluation',
+  // Pass-2 style transfer. Marked overridable since it shipped but had no
+  // prefill, so "Load current template" silently did nothing for it.
+  avatar_style: 'styledCostumedAvatar',
 };
 
 // GET /api/admin/testlab/templates — current template text per overridable stage

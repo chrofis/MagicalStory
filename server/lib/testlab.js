@@ -3380,29 +3380,43 @@ async function runStageOnTarget(stage, target, opts) {
     captured.push({ level, line: line.slice(0, 400) });
   };
   addLogListener(listener);
+  // Capture every prompt this stage sends, at the text/image chokepoints, so no
+  // stage has to remember to stash its own (promptCapture.js). The collector
+  // lives outside the try so a THROWN stage still reports what it sent — that is
+  // exactly when the prompt matters most.
+  const { runWithPromptCapture } = require('./promptCapture');
+  let sentPrompts = [];
   let result;
   try {
-    if (AVATAR_STAGES[stage]) {
-      if (!target.character) throw new Error(`${stage} requires target.character`);
-      result = await AVATAR_STAGES[stage](target, opts);
-    } else if (STORY_STAGES[stage]) {
-      if (!target.storyId) throw new Error(`${stage} requires target.storyId`);
-      result = await STORY_STAGES[stage](target, opts);
-    } else {
+    const captureRun = await runWithPromptCapture(async () => {
+      if (AVATAR_STAGES[stage]) {
+        if (!target.character) throw new Error(`${stage} requires target.character`);
+        return await AVATAR_STAGES[stage](target, opts);
+      }
+      if (STORY_STAGES[stage]) {
+        if (!target.storyId) throw new Error(`${stage} requires target.storyId`);
+        return await STORY_STAGES[stage](target, opts);
+      }
       const runner = STAGE_RUNNERS[stage];
       if (!runner) throw new Error(`Unknown stage: ${stage}. Valid: ${[...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES), ...Object.keys(STORY_STAGES)].join(', ')}`);
       const ctx = await loadSceneContext(target.storyId, target.pageNumber);
-      result = await runner(ctx, opts);
-    }
+      return await runner(ctx, opts);
+    });
+    result = captureRun.result;
+    sentPrompts = captureRun.prompts;
   } catch (err) {
     // Failed runs need the log MOST — attach it to the partial result the
     // route stores with the failure entry.
     removeLogListener(listener);
-    err.partialResult = { ...(err.partialResult || {}), ...buildStageLog(captured) };
+    err.partialResult = {
+      ...(err.partialResult || {}),
+      ...buildStageLog(captured),
+      ...(err.capturedPrompts?.length ? { sentPrompts: err.capturedPrompts } : {}),
+    };
     throw err;
   }
   removeLogListener(listener);
-  return { ...result, ...buildStageLog(captured) };
+  return { ...result, ...buildStageLog(captured), ...(sentPrompts.length ? { sentPrompts } : {}) };
 }
 
 function buildStageLog(captured) {
