@@ -4090,3 +4090,22 @@ Fs = all old pixels). Compact components are never touched.
 all pass.
 
 **Touched:** `server/lib/samBlend.js`.
+
+---
+
+## 2026-08-05 — Production BODY repairs default to the figure-exact blend
+
+**Context:** Owner: "this is hooked up to the story as well?" It was not — the calibrated
+blend (figure-exact + two-band footprint + structure confidence + rim removal, Lab
+#278-#288) was Test-Lab-default only; production `faceRepair.js` still defaulted every
+repair to legacy padded-union.
+
+**Decision:** `faceRepair.js` body repairs (faceOnly=false) now default
+`blendShape:'figure-exact'`. Face repairs keep 'padded-union' until their own A/B (head
+masks nearly coincide — the figure-exact benefits target the old-figure footprint, which a
+face repair barely has). `opts.blendShape` overrides both ways, so the Test Lab can A/B
+either.
+
+**Touched:** `server/lib/faceRepair.js`.
+**Status:** ✅ staging — a staging story run's automatic whole-figure char-repair now uses
+the calibrated blend.

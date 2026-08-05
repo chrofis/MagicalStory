@@ -678,7 +678,13 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       // caller overrides, so production keeps samUnionBlend's defaults.
       ...(opts.featherMode !== undefined ? { featherMode: opts.featherMode } : {}),
       ...(opts.padMode !== undefined ? { padMode: opts.padMode } : {}),
-      ...(opts.blendShape !== undefined ? { blendShape: opts.blendShape } : {}),
+      // BODY repairs default to the figure-exact blend (two-band footprint,
+      // structure confidence, elongated-rim removal) — calibrated through Lab
+      // experiments #278-#288 on 2026-08-05: old outline invisible, crisp model
+      // content kept, no halo. FACE repairs keep the legacy padded-union shape
+      // (old/new head masks nearly coincide; separately calibrated) until their
+      // own A/B. opts.blendShape still overrides both ways.
+      blendShape: opts.blendShape !== undefined ? opts.blendShape : (faceOnly ? 'padded-union' : 'figure-exact'),
       // Uniform gates — tunable for the Test Lab A/B, default ON in production.
       gateIou: gates.iou,
       gateWhiteCard: gates.whiteCard,
