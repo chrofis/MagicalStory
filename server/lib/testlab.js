@@ -1498,8 +1498,19 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   // the flat glyph edge, then soften the mask border so the paste-back has no
   // hard cut. The dilation is what lets the model add the effects we want.
   const dilatePx = Math.max(4, Math.round(Math.min(W, H) * (params.dilatePct ?? 0.012)));
-  const grownMaskPng = await sharp(inkMask, { raw: { width: W, height: H, channels: 1 } })
-    .blur(dilatePx).threshold(28).blur(Math.max(1.5, dilatePx / 6)).png().toBuffer();
+  // toColourspace('b-w') + a hard length assertion are LOAD-BEARING. sharp emits
+  // sRGB (3-channel) by default even from a 1-channel raw input, and the mask was
+  // then indexed as 1 channel: joinChannel took the first W*H bytes as alpha, so
+  // the alpha was the mask SQUEEZED 3x horizontally and wrapped across rows —
+  // a comb/scanline pattern that let model pixels through in stripes far outside
+  // the letters (the "lines" and "smaller version" artifacts in exps #311/#316).
+  const grownMaskRaw = await sharp(inkMask, { raw: { width: W, height: H, channels: 1 } })
+    .blur(dilatePx).threshold(28).blur(Math.max(1.5, dilatePx / 6))
+    .toColourspace('b-w').raw().toBuffer();
+  if (grownMaskRaw.length !== W * H) {
+    throw new Error(`glyph mask is not single-channel: ${grownMaskRaw.length} bytes for ${W}x${H}`);
+  }
+  const grownMaskPng = await sharp(grownMaskRaw, { raw: { width: W, height: H, channels: 1 } }).png().toBuffer();
   await addStep(`glyph mask (dilated ${dilatePx}px — paint-in is clipped to this)`, `data:image/png;base64,${grownMaskPng.toString('base64')}`);
 
   // --- 3. crop-bounded edit --------------------------------------------------
@@ -1569,7 +1580,11 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   // --- 4. mask-gated paste-back (artwork outside the letters is untouched) ---
   const paintedRaw = await sharp(Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
     .resize(crop.width, crop.height, { fit: 'fill' }).removeAlpha().raw().toBuffer();
-  const cropMaskRaw = await sharp(grownMaskPng).extract(crop).raw().toBuffer();
+  const cropMaskRaw = await sharp(grownMaskRaw, { raw: { width: W, height: H, channels: 1 } })
+    .extract(crop).toColourspace('b-w').raw().toBuffer();
+  if (cropMaskRaw.length !== crop.width * crop.height) {
+    throw new Error(`crop mask is not single-channel: ${cropMaskRaw.length} bytes for ${crop.width}x${crop.height}`);
+  }
 
   // ALIGNMENT GATE (exp #311). The OCR gate proves the letters still spell the
   // title; it cannot tell that the model returned a DIFFERENT PICTURE at the
