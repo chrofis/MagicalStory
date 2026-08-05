@@ -126,6 +126,12 @@ const TEXT_MODELS = {
     maxOutputTokens: 8192,
     description: 'Qwen3-VL 235B (vision) via OpenRouter - larger, ~$0.21/$1.90 per 1M'
   },
+  'gpt-4o-mini': {
+    provider: 'openrouter',
+    modelId: 'openai/gpt-4o-mini',
+    maxOutputTokens: 8192,
+    description: 'GPT-4o mini (vision) via OpenRouter - cheap image-eval A/B (~$0.15/$0.60 per 1M)'
+  },
   'deepseek-v3': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-chat',
