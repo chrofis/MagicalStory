@@ -1693,8 +1693,23 @@ def figure_mask_endpoint():
             pts = [[max(0, min(w - 1, int(p[0]))), max(0, min(h - 1, int(p[1])))] for p in points]
             raw_labels = data.get('point_labels')
             labels = [int(l) for l in raw_labels] if isinstance(raw_labels, list) and len(raw_labels) == len(pts) else [1] * len(pts)
-            prompt_kwargs['points'] = pts
-            prompt_kwargs['labels'] = labels
+            if 'bboxes' in prompt_kwargs:
+                # A flat point list reads as N SEPARATE prompts (batch N), while
+                # the box is batch 1. SAM's prompt encoder then concatenates
+                # mismatched batches and dies with
+                #   "Sizes of tensors must match except in dimension 1.
+                #    Expected size N but got size 1 for tensor number 1"
+                # — reproduced locally with 1 box + 3 points. Nesting gives the
+                # points the same batch dimension as the box, which is also the
+                # correct meaning here: these points REFINE that one figure, they
+                # are not independent objects.
+                prompt_kwargs['points'] = [pts]
+                prompt_kwargs['labels'] = [labels]
+            else:
+                # Points-only keeps the flat form: each point is its own prompt,
+                # and the caller unions the resulting masks below.
+                prompt_kwargs['points'] = pts
+                prompt_kwargs['labels'] = labels
 
         # imgsz 1024 keeps memory bounded (16GB rule); measured 573MB peak
         results = model(img, imgsz=1024, verbose=False, **prompt_kwargs)
