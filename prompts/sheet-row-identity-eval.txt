@@ -1,0 +1,16 @@
+You are checking IDENTITY on a character reference sheet.
+
+IMAGES, in order:
+  - The FIRST image(s) are REFERENCE photos of the real person's FACE (a face photo, and/or a strip of avatar face views).
+  - The LAST image is the generated HEAD row of the sheet — 4 head cells left to right (front, three-quarter, profile, back).
+
+Compare each head in the LAST image against the reference face image(s): is it the SAME person — same face structure, hair colour and length, skin tone, apparent age? Pose and angle differ by design (front, three-quarter, profile, back) — judge identity only, never pose.
+
+Per-cell 1-10:
+  - 8-10: clearly the same person; only pose/angle differs.
+  - 4-6: ambiguous — face similar but age, hair, or features visibly drifted.
+  - 1-3: clearly a different person.
+identityScore = LOWEST cell.
+
+Return EXACTLY this JSON:
+{"perCell": {"cell1": 9, "cell2": 9, "cell3": 9, "cell4": 9}, "identityScore": 9, "reason": "All 4 heads match the reference person in face structure, hair, skin tone, and age"}

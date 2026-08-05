@@ -593,73 +593,86 @@ async function splitSheetRows(imageData) {
   };
 }
 
-// Evaluate ONE cropped row on its own. which='heads' → sheet-row-heads-eval,
-// 'bodies' → sheet-row-bodies-eval (costume filled in). Same cross-provider
-// dispatcher as the full-sheet evaluators. Sending only the relevant 4 cells
-// stops the judge conflating the two rows (the "bottom row full body: 10" on a
-// head-only crop failure). Returns the parsed JSON verdict.
+const inlinePartOf = (dataUri) => ({ inline_data: { mime_type: dataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(dataUri) } });
+
+// STRUCTURE eval of one cropped row — crop ALONE, no reference images. This is
+// deliberate: the reference faces (photo/avatar) contain heads, and with them
+// in-context the judge answers "is the head visible" from the reference, not the
+// sheet (it scored a headless bottom crop "head yes, 8"). With the crop alone it
+// judges what's actually there. which='heads' → sheet-row-heads-eval (heads-only
+// / angles / clean); 'bodies' → sheet-row-bodies-eval (head-to-toe / angles /
+// outfit / proportions). Identity is a SEPARATE call — see evaluateIdentity.
 async function evaluateSheetRow(rowImageData, which, opts = {}) {
-  // avatarFaces = the TOP row of the 2×2 standard avatar (faces only). The
-  // bottom row of that avatar is costume/body which changes per story, so only
-  // the face is a stable identity anchor.
-  const { sourcePhoto = null, avatarFaces = null, costumeDescription = '', model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null } = opts;
+  const { costumeDescription = '', model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null } = opts;
   const tplKey = which === 'heads' ? 'sheetRowHeadsEval' : 'sheetRowBodiesEval';
   let prompt = promptOverride || PROMPT_TEMPLATES[tplKey];
   if (!prompt) throw new Error(`${tplKey} template not loaded`);
   if (which === 'bodies') {
     prompt = fillTemplate(prompt, { REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '' });
   }
-  const inlineOf = (dataUri) => ({ inline_data: { mime_type: dataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(dataUri) } });
-  const parts = [];
-  if (sourcePhoto) parts.push(inlineOf(sourcePhoto));
-  if (avatarFaces) parts.push(inlineOf(avatarFaces));
-  parts.push(inlineOf(rowImageData));
-  parts.push({ text: prompt });
+  const parts = [inlinePartOf(rowImageData), { text: prompt }];
   const { text, usageMetadata } = await callSheetJudge(model, parts, 4000, process.env.GEMINI_API_KEY);
   if (!text) throw new Error(`row eval (${which}, ${model}) returned no text`);
   if (usageTracker && usageMetadata) {
-    usageTracker('gemini_quality', {
-      input_tokens: usageMetadata.promptTokenCount || 0,
-      output_tokens: usageMetadata.candidatesTokenCount || 0,
-    }, `character_2x4_${which}_eval`, model);
+    usageTracker('gemini_quality', { input_tokens: usageMetadata.promptTokenCount || 0, output_tokens: usageMetadata.candidatesTokenCount || 0 }, `character_2x4_${which}_eval`, model);
   }
-  const report = parseJudgeJson(text);
-  return { report, promptUsed: prompt };
+  return { report: parseJudgeJson(text), promptUsed: prompt };
+}
+
+// IDENTITY eval — reference faces (photo + avatar faces) + the HEADS crop only.
+// Identity is a face question, so it runs on the head row; the body row's
+// identity is not relevant (user direction). Returns {perCell, identityScore}.
+async function evaluateIdentity(headsCrop, opts = {}) {
+  const { sourcePhoto = null, avatarFaces = null, model = 'gemini-2.5-flash', usageTracker = null } = opts;
+  const prompt = PROMPT_TEMPLATES.sheetRowIdentityEval;
+  if (!prompt) throw new Error('sheetRowIdentityEval template not loaded');
+  const parts = [];
+  if (sourcePhoto) parts.push(inlinePartOf(sourcePhoto));
+  if (avatarFaces) parts.push(inlinePartOf(avatarFaces));
+  parts.push(inlinePartOf(headsCrop));
+  parts.push({ text: prompt });
+  const { text, usageMetadata } = await callSheetJudge(model, parts, 2000, process.env.GEMINI_API_KEY);
+  if (!text) throw new Error(`identity eval (${model}) returned no text`);
+  if (usageTracker && usageMetadata) {
+    usageTracker('gemini_quality', { input_tokens: usageMetadata.promptTokenCount || 0, output_tokens: usageMetadata.candidatesTokenCount || 0 }, 'character_2x4_identity_eval', model);
+  }
+  return { report: parseJudgeJson(text), promptUsed: prompt };
 }
 
 // Shared split evaluator — the SINGLE implementation used by BOTH production
 // (generateCharacter2x4Sheet) and the Test Lab, so they judge identically.
-// Crops the sheet at the row divider and judges the 4 heads and 4 bodies
-// separately, each anchored on the face photo + the 2×2 avatar's face row (its
-// body row is costume that changes per story, so it's excluded). Returns the
-// two sub-reports, the crops/anchor for display, and a merged `verdict` whose
-// flat fields are a drop-in for the whole-sheet verdict the retry gate reads.
+// THREE calls: (1) heads structure — crop alone; (2) bodies structure — crop
+// alone; (3) identity — reference faces + the heads crop. Structure never sees
+// the reference faces (so the head-check can't be fooled by them); identity uses
+// them but only against the heads. Returns the sub-reports + a merged `verdict`
+// whose flat fields are a drop-in for the whole-sheet verdict the retry gate reads.
 async function evaluateSheetSplit(sheetImageData, opts = {}) {
   const { facePhoto = null, standardAvatar = null, costumeDescription = 'standard outfit', model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null } = opts;
   const avatarFaces = standardAvatar ? (await splitSheetRows(standardAvatar)).topHeads : null;
   const { topHeads, bottomBody, splitY } = await splitSheetRows(sheetImageData);
-  // Bodies check gets NO reference-face images. The face photo + avatar faces
-  // BOTH contain heads, and the judge was reading THEM to answer "is the head
-  // visible" → it said "head yes" on a headless bottom crop. Body completeness
-  // + outfit must be judged on the sheet crop ALONE; identity is covered by the
-  // heads row.
-  const [headsR, bodiesR] = await Promise.all([
-    evaluateSheetRow(topHeads, 'heads', { sourcePhoto: facePhoto, avatarFaces, model, promptOverride, usageTracker }),
+  const hasRefs = !!(facePhoto || avatarFaces);
+  const [headsR, bodiesR, identityR] = await Promise.all([
+    evaluateSheetRow(topHeads, 'heads', { model, promptOverride, usageTracker }),
     evaluateSheetRow(bottomBody, 'bodies', { costumeDescription, model, usageTracker }),
+    hasRefs ? evaluateIdentity(topHeads, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker }) : Promise.resolve(null),
   ]);
   const heads = headsR.report, bodies = bodiesR.report;
-  const finalScore = Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0);
+  const identity = identityR?.report || null;
+  const idScore = identity?.identityScore ?? 10;
+  // finalScore spans structure of both rows + identity (heads only).
+  const finalScore = Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0, idScore);
   const verdict = {
     split: true, splitY, finalScore, valid: finalScore >= 6,
     failureReasons: [...(heads?.failureReasons || []), ...(bodies?.failureReasons || [])],
     layout: { layoutScore: Math.min(heads?.headsOnly?.headsScore ?? 10, bodies?.fullBody?.fullBodyScore ?? 10) },
-    identity: { identityScore: Math.min(heads?.identity?.identityScore ?? 10, bodies?.identity?.identityScore ?? 10) },
+    identity: { identityScore: idScore, reason: identity?.reason },
     outfit: { outfitScore: bodies?.outfit?.outfitScore ?? 10 },
-    sourceMatch: { sourceMatchScore: heads?.identity?.identityScore ?? 10 },
+    sourceMatch: { sourceMatchScore: idScore },
     cleanRender: { cleanScore: heads?.cleanRender?.cleanScore ?? 10 },
-    heads, bodies,
+    heads, bodies, identityReport: identity,
   };
-  return { verdict, heads, bodies, topHeads, bottomBody, avatarFaces, splitY, headsPrompt: headsR.promptUsed, bodiesPrompt: bodiesR.promptUsed };
+  const promptUsed = `— HEADS (structure) —\n${headsR.promptUsed}\n\n— BODIES (structure) —\n${bodiesR.promptUsed}` + (identityR ? `\n\n— IDENTITY —\n${identityR.promptUsed}` : '');
+  return { verdict, heads, bodies, identity, topHeads, bottomBody, avatarFaces, splitY, promptUsed };
 }
 
 /**
@@ -1024,5 +1037,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateSheetSplit },
+  _internal: { buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit },
 };

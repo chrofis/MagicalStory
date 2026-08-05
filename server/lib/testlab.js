@@ -3270,9 +3270,9 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
       costumeDescription: costume.description || 'standard outfit',
       model, promptOverride,
     });
-    const { heads, bodies } = split;
-    splitPromptUsed = `— HEADS PROMPT —\n${split.headsPrompt}\n\n— BODIES PROMPT —\n${split.bodiesPrompt}`;
-    evalResult = { split: true, splitY: split.splitY, model, heads, bodies, finalScore: split.verdict.finalScore, valid: split.verdict.valid };
+    const { heads, bodies, identity } = split;
+    splitPromptUsed = split.promptUsed;
+    evalResult = { split: true, splitY: split.splitY, model, heads, bodies, identity, finalScore: split.verdict.finalScore, valid: split.verdict.valid };
     // Save the anchors AND the two crops as steps so the lab shows exactly what
     // the judge saw: face photo + avatar faces (identity anchors) + the two rows.
     const [vTop, vBottom, vPhoto, vAvatar] = await Promise.all([
