@@ -1,26 +1,22 @@
 You are evaluating one row (the top row) of a character reference sheet.
 
-You receive ONE image: the sheet row — 4 cells left to right: front, three-quarter, profile, back of head. Judge only this image.
+You receive ONE image: the sheet row — 4 cells left to right: front, three-quarter, profile, back of head. Some shoulder or a bit of torso in a cell is fine — do not penalise it. Judge only this image.
 
-TASK 1: HEADS ONLY, FACE FULLY VISIBLE
-Each cell shows head and neck only — no shoulders, torso, arms, or clothing. The whole face must be fully visible: a face cut off by the top, bottom, or side edge of its cell, or a missing/clipped head, scores 1-3. A cell showing a full or partial body scores 1-3. Per-cell 1-10; headsScore = lowest.
-
-TASK 2: FACING ANGLES
+TASK 1: FACING ANGLES
 The 4 cells read front, three-quarter, profile, back-of-head, left to right. Score 1-10.
 
-TASK 3: CLEAN RENDER
-No stray arrows, symbols, letters, or graphics on face, hair, or skin. Coloured axis arrows on any head score 1. cleanScore 1-10.
+TASK 2: CLEAN RENDER (no arrows or stray marks)
+Check every head for arrows, lines, pointers, symbols, letters, or graphics coming out of or drawn on the head, face, hair, or skin. Coloured axis arrows (red / green / blue) sticking out of a head are a leaked pose-marker and score 1. Any clear stray mark on a head scores 1-3; none = 9-10. cleanScore 1-10.
 
-finalScore = lowest of headsScore, anglesScore, cleanScore. valid = finalScore ≥ 6.
+finalScore = lowest of anglesScore, cleanScore. valid = finalScore ≥ 6.
 
 Return EXACTLY this JSON:
 {
-  "headsOnly": {"perCell": {"cell1": 9, "cell2": 9, "cell3": 9, "cell4": 9}, "headsScore": 9, "reason": "All 4 cells show head and neck only, face fully visible"},
   "angles": {"score": 9, "reason": "Front, three-quarter, profile, back left to right"},
-  "cleanRender": {"cleanScore": 9, "reason": "No stray marks"},
+  "cleanRender": {"cleanScore": 9, "reason": "No arrows or stray marks on any head"},
   "finalScore": 9,
   "valid": true,
   "failureReasons": []
 }
 
-If invalid, populate failureReasons with short strings naming each failed sub-check.
+If invalid, populate failureReasons with short strings naming each failed sub-check (e.g. "cleanRender: cell4 has coloured arrows sticking out of the back of the head").

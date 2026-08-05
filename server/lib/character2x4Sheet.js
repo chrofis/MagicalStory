@@ -664,7 +664,7 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
   const verdict = {
     split: true, splitY, finalScore, valid: finalScore >= 6,
     failureReasons: [...(heads?.failureReasons || []), ...(bodies?.failureReasons || [])],
-    layout: { layoutScore: Math.min(heads?.headsOnly?.headsScore ?? 10, bodies?.fullBody?.fullBodyScore ?? 10) },
+    layout: { layoutScore: bodies?.fullBody?.fullBodyScore ?? 10 },
     identity: { identityScore: idScore, reason: identity?.reason },
     outfit: { outfitScore: bodies?.outfit?.outfitScore ?? 10 },
     sourceMatch: { sourceMatchScore: idScore },
