@@ -128,6 +128,11 @@ export interface ExperimentResult {
   // cover_title_paintin: deterministic OCR gate on the painted title
   titleGate?: { expected: string; ocr: string | null; pass: boolean | null; error?: string | null; verdict: string };
   typography?: { fontId?: string; layout?: string; face?: string; lines?: string[] };
+  paintinSetup?: {
+    cropPx: string; cropPctOfCover: string; renderedAt: string; marginPct: number;
+    dilatePx: number; contextRef: boolean; recolor: boolean; refsSent: number;
+    deterministicColour: string | null;
+  };
   variantScores?: ExperimentResult['scores'];
   newSceneDescriptionA?: string | null;
   newSceneDescriptionB?: string | null;
@@ -398,7 +403,49 @@ export const testlabService = {
   runSheetSet(setId: number, opts: { model?: string; splitRows?: boolean } = {}) {
     return api.post<{ id: number; sheets: number }>(`/api/admin/testlab/sheet-sets/${setId}/run`, opts);
   },
+
+  // Title sets — named reusable collections of covers, so a new paint-in prompt
+  // runs against the SAME images every time.
+  getTitleSets() {
+    return api.get<{ sets: TitleSet[] }>('/api/admin/testlab/title-sets');
+  },
+  createTitleSet(name: string) {
+    return api.post<{ id: number; name: string }>('/api/admin/testlab/title-sets', { name });
+  },
+  getTitleSet(id: number) {
+    return api.get<{ id: number; name: string; members: TitleSetMember[] }>(`/api/admin/testlab/title-sets/${id}`);
+  },
+  deleteTitleSet(id: number) {
+    return api.delete<{ success: boolean }>(`/api/admin/testlab/title-sets/${id}`);
+  },
+  pinTitle(setId: number, member: { storyId: string; coverType?: string; label?: string }) {
+    return api.post<{ id: number }>(`/api/admin/testlab/title-sets/${setId}/members`, member);
+  },
+  unpinTitle(setId: number, memberId: number) {
+    return api.delete<{ success: boolean }>(`/api/admin/testlab/title-sets/${setId}/members/${memberId}`);
+  },
+  runTitleSet(setId: number, opts: { promptOverride?: string | null; label?: string; params?: Record<string, unknown> } = {}) {
+    return api.post<{ id: number; covers: number }>(`/api/admin/testlab/title-sets/${setId}/run`, opts);
+  },
 };
+
+export interface TitleSet {
+  id: number;
+  name: string;
+  createdBy: string | null;
+  createdAt: string;
+  memberCount: number;
+}
+
+export interface TitleSetMember {
+  id: number;
+  storyId: string;
+  coverType: string;
+  label: string | null;
+  storyTitle: string | null;
+  artStyle: string | null;
+  addedAt: string;
+}
 
 export interface SheetSet {
   id: number;

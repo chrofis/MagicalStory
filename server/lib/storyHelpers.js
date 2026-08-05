@@ -142,34 +142,44 @@ function getAgeMarkers(apparentAge) {
   // ignore adjectives but respect proportion numbers (same table the avatar
   // prompt uses: infant≈4, child≈6, teen≈7, adult≈8 head-heights).
   switch (apparentAge) {
+    // Every bucket is bounded on BOTH sides against its neighbours, and the
+    // head-heights rise monotonically with no ties. Merged buckets were the
+    // original defect: apparentAge is allowed to drift one bucket
+    // (clampApparentAge), so a bucket phrased at its neighbour's age turns a
+    // legal drift into a two-bucket error. That is how an 8-year-old was
+    // described as a "very young child" — and how a preschooler reading one
+    // young was described with "baby proportions, rounded baby features".
     case 'infant':
+      return 'infant proportions about 3.5-4 heads tall, very large head relative to body, rounded baby features, not yet walking — clearly smaller than a toddler';
     case 'toddler':
-      return 'baby proportions about 4 heads tall, large head relative to body, very short, rounded baby features';
-    // Split: one string used to cover preschooler (<=4) AND kindergartner (5-6)
-    // — a 3-to-6 span phrased at the bottom of its own range, which dragged
-    // every kindergartner render toward toddler.
+      return 'toddler proportions about 4 heads tall, large head relative to body, soft rounded features and a rounded belly, walking but unsteady — no longer a baby, clearly smaller than a preschooler';
     case 'preschooler':
-      return 'preschool-age proportions about 4.5 heads tall, large head relative to body, soft rounded features, clearly smaller than a kindergarten child';
+      return 'preschool-age proportions about 4.5 heads tall, large head relative to body, soft rounded features, clearly taller than a toddler and smaller than a kindergarten child';
     case 'kindergartner':
       return 'kindergarten-age proportions about 5 heads tall, head still large relative to body but less than a toddler, softly rounded features, clearly older and taller than a preschooler and shorter than a grade-schooler';
     case 'young-school-age':
+      return 'early grade-school proportions about 5.5 heads tall, rounded child features, clearly taller than a kindergarten child and shorter than an older grade-schooler — NOT toddler proportions';
     case 'school-age':
-      return 'grade-school child proportions about 5.5-6 heads tall, rounded child features, clearly shorter and smaller than a teenager — NOT toddler proportions';
+      return 'grade-school proportions about 6 heads tall, child features starting to lengthen, clearly taller than an early grade-schooler and clearly not yet a preteen — NOT toddler proportions';
     case 'preteen':
-      return 'late-child proportions about 6 heads tall, starting to look slightly older than grade-schoolers, clearly not yet a teenager';
+      return 'late-child proportions about 6.25 heads tall, slightly longer limbs than a grade-schooler, visibly older than grade-schoolers and clearly not yet a teenager';
     case 'young-teen':
-      return 'early adolescent body proportions about 6.5 heads tall, longer limbs than a child, clearly taller and leaner than grade-schoolers, face more elongated than a child';
+      return 'early adolescent proportions about 6.5 heads tall, longer limbs than a child, face more elongated than a child, taller than a preteen but not yet at full teenage height';
     case 'teenager':
-      return 'teenage body proportions about 7 heads tall, long limbs, clearly taller and leaner than grade-schoolers — visibly NOT a child, render as a 15-16 year old';
+      return 'teenage proportions about 7 heads tall, long limbs, clearly taller than a young teen and not yet at adult build — visibly NOT a child, render as a 15-16 year old';
     case 'young-adult':
-      return 'young adult proportions about 7.5-8 heads tall, mature face with defined bone structure, full adult height';
+      return 'young adult proportions about 7.5-8 heads tall, full adult height, clearly taller and more developed than a teenager, mature face with defined bone structure and no adolescent softness, no signs of middle age';
     case 'adult':
-      return 'adult proportions about 7.5-8 heads tall, mature bone structure, full adult height';
+      return 'adult proportions about 7.5-8 heads tall, full adult height, mature bone structure, clearly older than a young adult and not yet showing the age signs of middle age';
     case 'middle-aged':
-      return 'adult proportions about 7.5-8 heads tall, mature bone structure with subtle signs of age, full adult height';
+      return 'adult proportions about 7.5-8 heads tall, full adult height, mature bone structure with subtle signs of age (faint lines, slightly softer jawline), clearly older than a young adult and not yet elderly';
     case 'senior':
+      return 'older adult proportions about 7.5 heads tall, full adult height with a slightly softer posture, visible age markers (lines around eyes and mouth, softer musculature), commonly silver or greying hair — clearly older than middle-aged, still upright and not yet stooped';
+    // Head-height stays 7.5: the head-to-body RATIO does not shrink with age, so
+    // dipping the number would tell the model to draw a smaller-headed figure.
+    // Reduced stature belongs to POSTURE, stated separately.
     case 'elderly':
-      return 'older adult proportions, visible age markers (fine lines, softer musculature), often silver or graying hair';
+      return 'elderly proportions about 7.5 heads tall but visibly shorter in silhouette from a stooped, rounded posture, pronounced age markers (deeper lines, thinner frame, looser skin), white or silver hair — clearly older and less upright than a senior';
     default:
       return '';
   }

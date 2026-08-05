@@ -391,6 +391,140 @@ router.post('/sheet-sets/:id/run', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────
+// Title sets — named, reusable collections of COVERS to re-run the title
+// paint-in over as a batch. The point is prompt iteration: the same images
+// every run, so only the prompt / crop margin / recolour flag varies.
+// Members are (story, coverType).
+// ─────────────────────────────────────────────────────────────────────
+
+// GET /api/admin/testlab/title-sets
+router.get('/title-sets', async (req, res) => {
+  try {
+    const rows = await dbQuery(
+      `SELECT s.id, s.name, s.created_by, s.created_at, COUNT(m.id)::int AS member_count
+       FROM title_sets s LEFT JOIN title_set_members m ON m.set_id = s.id
+       GROUP BY s.id ORDER BY s.created_at DESC`
+    );
+    res.json({ sets: rows.map(r => ({ id: r.id, name: r.name, createdBy: r.created_by, createdAt: r.created_at, memberCount: r.member_count })) });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to list title sets', details: err.message });
+  }
+});
+
+// POST /api/admin/testlab/title-sets { name }
+router.post('/title-sets', async (req, res) => {
+  try {
+    const name = String(req.body?.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'name required' });
+    const rows = await dbQuery(
+      `INSERT INTO title_sets (name, created_by) VALUES ($1, $2)
+       ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id, name`,
+      [name, req.user.username || String(req.user.id)]
+    );
+    res.json({ id: rows[0].id, name: rows[0].name });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create title set', details: err.message });
+  }
+});
+
+// GET /api/admin/testlab/title-sets/:id — set + members
+router.get('/title-sets/:id', async (req, res) => {
+  try {
+    const setId = parseInt(req.params.id, 10);
+    const setRows = await dbQuery('SELECT id, name FROM title_sets WHERE id = $1', [setId]);
+    if (!setRows.length) return res.status(404).json({ error: 'Set not found' });
+    const members = await dbQuery(
+      `SELECT m.id, m.story_id, m.cover_type, m.label, m.added_at,
+              s.data->>'title' AS story_title, s.data->>'artStyle' AS art_style
+       FROM title_set_members m LEFT JOIN stories s ON s.id = m.story_id
+       WHERE m.set_id = $1 ORDER BY m.added_at`,
+      [setId]
+    );
+    res.json({
+      id: setRows[0].id, name: setRows[0].name,
+      members: members.map(m => ({ id: m.id, storyId: m.story_id, coverType: m.cover_type, label: m.label, storyTitle: m.story_title, artStyle: m.art_style, addedAt: m.added_at })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load title set', details: err.message });
+  }
+});
+
+// DELETE /api/admin/testlab/title-sets/:id
+router.delete('/title-sets/:id', async (req, res) => {
+  try {
+    await dbQuery('DELETE FROM title_sets WHERE id = $1', [parseInt(req.params.id, 10)]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete title set', details: err.message });
+  }
+});
+
+// POST /api/admin/testlab/title-sets/:id/members { storyId, coverType?, label? }
+router.post('/title-sets/:id/members', async (req, res) => {
+  try {
+    const setId = parseInt(req.params.id, 10);
+    const { storyId } = req.body || {};
+    if (!storyId) return res.status(400).json({ error: 'storyId required' });
+    const coverType = String(req.body.coverType || 'frontCover');
+    const rows = await dbQuery(
+      `INSERT INTO title_set_members (set_id, story_id, cover_type, label)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (set_id, story_id, cover_type) DO UPDATE SET label = EXCLUDED.label
+       RETURNING id`,
+      [setId, String(storyId), coverType, req.body.label || null]
+    );
+    res.json({ id: rows[0].id });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to pin title', details: err.message });
+  }
+});
+
+// DELETE /api/admin/testlab/title-sets/:id/members/:memberId
+router.delete('/title-sets/:id/members/:memberId', async (req, res) => {
+  try {
+    await dbQuery('DELETE FROM title_set_members WHERE id = $1 AND set_id = $2',
+      [parseInt(req.params.memberId, 10), parseInt(req.params.id, 10)]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to remove title', details: err.message });
+  }
+});
+
+// POST /api/admin/testlab/title-sets/:id/run { promptOverride?, label?, params? }
+// Fires ONE cover_title_paintin experiment over every cover in the set — the
+// prompt-iteration entry point: same images, new prompt/params.
+router.post('/title-sets/:id/run', async (req, res) => {
+  try {
+    if (experimentRunning) return res.status(409).json({ error: 'Another experiment is already running' });
+    const setId = parseInt(req.params.id, 10);
+    const setRows = await dbQuery('SELECT name FROM title_sets WHERE id = $1', [setId]);
+    if (!setRows.length) return res.status(404).json({ error: 'Set not found' });
+    const members = await dbQuery(
+      'SELECT story_id, cover_type FROM title_set_members WHERE set_id = $1 ORDER BY added_at', [setId]);
+    if (!members.length) return res.status(400).json({ error: 'Set is empty' });
+    if (members.length > 25) return res.status(400).json({ error: 'Max 25 covers per run' });
+
+    const targets = members.map(m => ({ storyId: m.story_id, coverType: m.cover_type }));
+    const promptOverride = req.body?.promptOverride ? String(req.body.promptOverride) : null;
+    const params = req.body?.params && typeof req.body.params === 'object' ? req.body.params : {};
+    experimentRunning = true;
+    const rows = await dbQuery(
+      `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by)
+       VALUES ('cover_title_paintin', $1, $2, $3, 'running', $4, $5) RETURNING id`,
+      [req.body?.label || `Title set: ${setRows[0].name} (${members.length} covers)`,
+       promptOverride, JSON.stringify(params), JSON.stringify(targets), req.user.username || String(req.user.id)]
+    );
+    const experimentId = rows[0].id;
+    executeExperiment(experimentId, 'cover_title_paintin', targets, { promptOverride, params });
+    log.info(`[TESTLAB] Title-set ${setId} run started as experiment ${experimentId} (${members.length} covers)`);
+    res.json({ id: experimentId, covers: members.length });
+  } catch (err) {
+    experimentRunning = false;
+    res.status(500).json({ error: 'Failed to run title set', details: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────
 // Experiments
 // ─────────────────────────────────────────────────────────────────────
 
