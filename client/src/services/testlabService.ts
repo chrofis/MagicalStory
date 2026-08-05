@@ -126,12 +126,12 @@ export interface ExperimentResult {
   faceBbox?: number[];
   steps?: { label: string; imageType: string; versionIndex: number }[];
   // cover_title_paintin: deterministic OCR gate on the painted title
-  alignGate?: { offMaskMeanDiff: number; threshold: number; pass: boolean; verdict: string };
+  alignGate?: { offMaskMeanDiff: number; threshold: number; pass: boolean; verdict: string; inkCoverage?: number; reworkMean?: number };
   titleGate?: { expected: string; ocr: string | null; pass: boolean | null; error?: string | null; verdict: string };
   typography?: { fontId?: string; layout?: string; face?: string; lines?: string[] };
   paintinSetup?: {
     cropPx: string; cropPctOfCover: string; renderedAt: string; marginPct: number;
-    dilatePx: number; contextRef: boolean; recolor: boolean; refsSent: number; backend?: string;
+    dilatePx: number; contextRef: boolean; recolor: boolean; refsSent: number; backend?: string; mode?: string;
     deterministicColour: string | null;
   };
   variantScores?: ExperimentResult['scores'];
