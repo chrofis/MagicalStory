@@ -142,6 +142,8 @@ export interface ExperimentResult {
   baselinePrompt?: string | null;
   promptUsedA?: string | null;
   promptUsedB?: string | null;
+  // Multi-call stages (avatar_eval split) expose each call's prompt separately.
+  prompts?: { label: string; text: string }[];
   versions?: unknown[];
   winner?: unknown;
   styled?: boolean;

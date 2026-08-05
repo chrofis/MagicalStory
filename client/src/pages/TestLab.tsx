@@ -2334,7 +2334,14 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                       </div>
                     </div>
                   )}
-                  {result.promptUsed && (
+                  {result.prompts && result.prompts.length > 0 ? (
+                    result.prompts.map((p, i) => (
+                      <details key={i} className="text-xs">
+                        <summary className="cursor-pointer text-indigo-600">Prompt {i + 1}/{result.prompts!.length} sent — {p.label}</summary>
+                        <pre className="bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64 mt-1">{p.text}</pre>
+                      </details>
+                    ))
+                  ) : result.promptUsed && (
                     <details className="text-xs">
                       <summary className="cursor-pointer text-indigo-600">Prompt sent</summary>
                       <pre className="bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64 mt-1">{result.promptUsed}</pre>

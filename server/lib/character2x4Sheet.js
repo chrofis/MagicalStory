@@ -671,8 +671,14 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
     cleanRender: { cleanScore: heads?.cleanRender?.cleanScore ?? 10 },
     heads, bodies, identityReport: identity,
   };
-  const promptUsed = `— HEADS (structure) —\n${headsR.promptUsed}\n\n— BODIES (structure) —\n${bodiesR.promptUsed}` + (identityR ? `\n\n— IDENTITY —\n${identityR.promptUsed}` : '');
-  return { verdict, heads, bodies, identity, topHeads, bottomBody, avatarFaces, splitY, promptUsed };
+  // Each call's prompt as its OWN labeled entry (3 separate calls, not one blob).
+  const prompts = [
+    { label: 'Heads — structure (crop only)', text: headsR.promptUsed },
+    { label: 'Bodies — structure (crop only)', text: bodiesR.promptUsed },
+    ...(identityR ? [{ label: 'Identity (reference faces + heads crop)', text: identityR.promptUsed }] : []),
+  ];
+  const promptUsed = prompts.map(p => `— ${p.label} —\n${p.text}`).join('\n\n');
+  return { verdict, heads, bodies, identity, topHeads, bottomBody, avatarFaces, splitY, prompts, promptUsed };
 }
 
 /**
