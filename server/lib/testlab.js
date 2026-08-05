@@ -1559,9 +1559,20 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   crop.width = Math.min(W, maxx + 1 + padPx) - crop.left;
   crop.height = Math.min(H, maxy + 1 + padPx) - crop.top;
 
-  const cropBuf = await sharp(composedBuf).extract(crop).jpeg({ quality: 95 }).toBuffer();
+  // MODE (owner directive 2026-08-05: "we have the scene without text, why not
+  // send the full scene, very simple, and then find the text").
+  //   'full' (DEFAULT) — send the WHOLE composed cover; the model returns the
+  //     whole cover at the same aspect, so nothing is offset or sub-sampled. The
+  //     crop round-trip was the source of EVERY geometry bug this stage had.
+  //   'crop' — the old crop-bounded path, kept only for comparison.
+  const mode = params.mode === 'crop' ? 'crop' : 'full';
   const cropPctW = Math.round(crop.width / W * 100), cropPctH = Math.round(crop.height / H * 100);
-  await addStep(`INPUT 1 (edited): title crop ${crop.width}×${crop.height}px = ${cropPctW}%×${cropPctH}% of the cover`,
+  const cropBuf = mode === 'crop'
+    ? await sharp(composedBuf).extract(crop).jpeg({ quality: 95 }).toBuffer()
+    : composedBuf;
+  await addStep(mode === 'full'
+    ? `INPUT (edited): the FULL composed cover ${W}×${H}px — no crop`
+    : `INPUT 1 (edited): title crop ${crop.width}×${crop.height}px = ${cropPctW}%×${cropPctH}% of the cover`,
     `data:image/jpeg;base64,${cropBuf.toString('base64')}`);
 
   // INPUT 2 (context only): the whole cover. The model needs the full palette
@@ -1609,11 +1620,13 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   //                   IMAGE_MODELS key for grok/gemini.
   const backend = params.backend || 'qwen';
   const snap = v => Math.max(512, Math.min(2048, Math.round(v / 64) * 64));
+  const editW = mode === 'full' ? W : crop.width;
+  const editH = mode === 'full' ? H : crop.height;
   const t0 = Date.now();
   let result;
   if (backend === 'qwen') {
     result = await editWithQwen(prompt, refs, {
-      width: snap(crop.width * 2), height: snap(crop.height * 2),
+      width: snap(editW), height: snap(editH),
       ...(params.model ? { model: params.model } : {}),
     });
   } else {
@@ -1628,42 +1641,73 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   if (!result?.imageData) throw new Error(`${backend} returned no image`);
   await addStep(`raw ${backend} output (before mask gating)`, result.imageData);
 
-  // --- 4. mask-gated paste-back (artwork outside the letters is untouched) ---
+  // --- 4. FIND the new letters in the output, paste them on the EMPTY scene ---
+  // Owner directive: the model may shift the letters slightly AND may degrade
+  // faces, so do not trust the mask we drew and do not keep the model's version
+  // of the artwork. Instead:
+  //   found = (output differs from the TEXTLESS plate)  ∩  (near where we drew)
+  // The first term finds the painted lettering wherever it actually landed —
+  // including strokes that grew outside the original glyph. The second term is a
+  // generous neighbourhood of the drawn mask (searchPct, default 3% of the short
+  // side), which discards everything the model changed elsewhere: degraded
+  // faces, tone shifts, re-rendered background. The result is composited onto
+  // the ORIGINAL textless art, so the only model pixels that survive are letters.
+  const outW = mode === 'full' ? W : crop.width;
+  const outH = mode === 'full' ? H : crop.height;
   const paintedRaw = await sharp(Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
-    .resize(crop.width, crop.height, { fit: 'fill' }).removeAlpha().raw().toBuffer();
-  const cropMaskRaw = await sharp(grownMaskRaw, { raw: { width: W, height: H, channels: 1 } })
-    .extract(crop).toColourspace('b-w').raw().toBuffer();
-  if (cropMaskRaw.length !== crop.width * crop.height) {
-    throw new Error(`crop mask is not single-channel: ${cropMaskRaw.length} bytes for ${crop.width}x${crop.height}`);
+    .resize(outW, outH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const drawnMaskRaw = mode === 'full'
+    ? grownMaskRaw
+    : await sharp(grownMaskRaw, { raw: { width: W, height: H, channels: 1 } })
+      .extract(crop).toColourspace('b-w').raw().toBuffer();
+  if (drawnMaskRaw.length !== outW * outH) {
+    throw new Error(`mask is not single-channel: ${drawnMaskRaw.length} bytes for ${outW}x${outH}`);
   }
+  // Search zone: the drawn glyphs blurred wide, so a letter that moved or grew
+  // is still inside it, but a face 500px away is not.
+  const searchPx = Math.max(8, Math.round(Math.min(outW, outH) * (params.searchPct ?? 0.03)));
+  const searchZone = await sharp(drawnMaskRaw, { raw: { width: outW, height: outH, channels: 1 } })
+    .blur(searchPx).threshold(6).toColourspace('b-w').raw().toBuffer();
 
-  // ALIGNMENT GATE (exp #311). The OCR gate proves the letters still spell the
-  // title; it cannot tell that the model returned a DIFFERENT PICTURE at the
-  // right aspect. #311 did exactly that — whole-cover content pasted through the
-  // glyph mask as scaled fragments — and two of those covers PASSED the OCR gate.
-  // So: outside the dilated mask the model's output must still be the crop we
-  // sent. Compare those pixels; a model that re-rendered the frame diverges hard.
-  const cropSentRaw = await sharp(cropBuf).removeAlpha().raw().toBuffer();
-  let offMaskDiff = 0, offMaskN = 0;
-  for (let p = 0, i = 0; p < crop.width * crop.height; p++, i += 3) {
-    if (cropMaskRaw[p] > 8) continue;             // inside the paint zone — allowed to differ
-    offMaskDiff += Math.abs(paintedRaw[i] - cropSentRaw[i])
-      + Math.abs(paintedRaw[i + 1] - cropSentRaw[i + 1])
-      + Math.abs(paintedRaw[i + 2] - cropSentRaw[i + 2]);
-    offMaskN += 3;
+  const artOutRaw = await sharp(artBytes).resize(outW, outH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const foundMask = Buffer.alloc(outW * outH);
+  const INK_DIFF = params.inkDiff ?? 28;
+  let foundN = 0, drawnN = 0, overlapN = 0;
+  for (let p = 0, i = 0; p < outW * outH; p++, i += 3) {
+    if (drawnMaskRaw[p] > 8) drawnN++;
+    if (searchZone[p] <= 8) continue;             // outside the title neighbourhood — never taken
+    const d = Math.max(Math.abs(paintedRaw[i] - artOutRaw[i]),
+      Math.abs(paintedRaw[i + 1] - artOutRaw[i + 1]), Math.abs(paintedRaw[i + 2] - artOutRaw[i + 2]));
+    if (d > INK_DIFF) { foundMask[p] = 255; foundN++; if (drawnMaskRaw[p] > 8) overlapN++; }
   }
-  const offMaskMeanDiff = offMaskN ? +(offMaskDiff / offMaskN).toFixed(1) : 0;
-  const ALIGN_MAX = params.alignMaxDiff ?? 18;    // JPEG + resample noise sits well under this
-  const alignPass = offMaskMeanDiff <= ALIGN_MAX;
-  const paintedRgba = await sharp(paintedRaw, { raw: { width: crop.width, height: crop.height, channels: 3 } })
-    .joinChannel(cropMaskRaw, { raw: { width: crop.width, height: crop.height, channels: 1 } })
+  // Soften the found edge by a pixel so the paste has no hard stair-step.
+  const foundMaskSmooth = await sharp(foundMask, { raw: { width: outW, height: outH, channels: 1 } })
+    .blur(1.2).toColourspace('b-w').raw().toBuffer();
+
+  // LETTER GATE — replaces pixel-equality, which punished the backend with the
+  // BEST lettering (Grok shifts global tone: #323 failed 3/4 with perfect
+  // letters) and never measured anything we care about, since non-letter pixels
+  // are discarded by construction now. What matters: did we find letter-shaped
+  // ink, and does it sit where the title belongs?
+  const coverage = drawnN ? +(overlapN / drawnN).toFixed(3) : 0;   // drawn glyphs that got repainted
+  const spread = drawnN ? +(foundN / drawnN).toFixed(2) : 0;       // found ink vs drawn ink (≫1 ⇒ smear)
+  const INK_MIN = params.inkMin ?? 0.55;
+  const SPREAD_MAX = params.spreadMax ?? 3.0;
+  const alignPass = coverage >= INK_MIN && spread <= SPREAD_MAX;
+  const offMaskMeanDiff = spread;
+  const ALIGN_MAX = SPREAD_MAX;
+
+  const paintedRgba = await sharp(paintedRaw, { raw: { width: outW, height: outH, channels: 3 } })
+    .joinChannel(foundMaskSmooth, { raw: { width: outW, height: outH, channels: 1 } })
     .png().toBuffer();
-  // A failed alignment gate means the paint-in is DISCARDED — the served image is
-  // the flat composite, exactly as production would fall back. Showing the
-  // pasted mess as "the result" is what made #311 unreadable.
+  await addStep(`found letters (${foundN} px, ${Math.round(coverage * 100)}% of the drawn glyphs)`,
+    `data:image/png;base64,${(await sharp(foundMaskSmooth, { raw: { width: outW, height: outH, channels: 1 } }).png().toBuffer()).toString('base64')}`);
+
+  // Base = the EMPTY (textless) scene, so the model's artwork never survives.
+  const baseBuf = await sharp(artBytes).resize(W, H, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
   const finalBuf = alignPass
-    ? await sharp(composedBuf)
-      .composite([{ input: paintedRgba, left: crop.left, top: crop.top }])
+    ? await sharp(baseBuf)
+      .composite([{ input: paintedRgba, left: mode === 'full' ? 0 : crop.left, top: mode === 'full' ? 0 : crop.top }])
       .jpeg({ quality: 92 }).toBuffer()
     : composedBuf;
   const finalUri = `data:image/jpeg;base64,${finalBuf.toString('base64')}`;
@@ -1684,10 +1728,12 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
     promptUsed: prompt, modelId: result.modelId || params.model || backend, elapsedMs,
     cost: result.cost ?? null,
     alignGate: {
-      offMaskMeanDiff, threshold: ALIGN_MAX, pass: alignPass,
+      offMaskMeanDiff, threshold: ALIGN_MAX, pass: alignPass, coverage, spread, foundPx: foundN,
       verdict: alignPass
-        ? `PASS — outside the letters the model returned the crop we sent (mean diff ${offMaskMeanDiff})`
-        : `FAIL — the model returned a DIFFERENT picture (mean diff ${offMaskMeanDiff} > ${ALIGN_MAX}); paint-in discarded, flat composite kept`,
+        ? `PASS — repainted ${Math.round(coverage * 100)}% of the drawn glyphs, ink spread ${spread}x (letters only, artwork from the empty scene)`
+        : (coverage < INK_MIN
+          ? `FAIL — only ${Math.round(coverage * 100)}% of the drawn glyphs were repainted (need ${Math.round(INK_MIN * 100)}%); discarded, flat composite kept`
+          : `FAIL — found ink spreads ${spread}x the drawn glyphs (max ${SPREAD_MAX}) — the model smeared beyond the letters; discarded`),
     },
     titleGate: {
       expected: title,
@@ -1708,6 +1754,8 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
       contextRef: useContextRef,
       recolor,
       backend,
+      mode,
+      searchPx,
       refsSent: refs.length,
       deterministicColour: spec?.face || null,
     },

@@ -131,7 +131,7 @@ export interface ExperimentResult {
   typography?: { fontId?: string; layout?: string; face?: string; lines?: string[] };
   paintinSetup?: {
     cropPx: string; cropPctOfCover: string; renderedAt: string; marginPct: number;
-    dilatePx: number; contextRef: boolean; recolor: boolean; refsSent: number; backend?: string; mode?: string;
+    dilatePx: number; contextRef: boolean; recolor: boolean; refsSent: number; backend?: string; mode?: string; searchPx?: number;
     deterministicColour: string | null;
   };
   variantScores?: ExperimentResult['scores'];
