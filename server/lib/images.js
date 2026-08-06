@@ -2443,6 +2443,22 @@ function _photoAnalyzerUrl() {
   return process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 }
 
+// Bounded in-flight requests to the Python analyzer.
+//
+// The page loop dispatches every page at once (pLimit(50)), and each page needs
+// several mask/detect calls, so a 14-page story fired 30-80 concurrent requests
+// at one CPU-bound service. It responded by dropping segmentations
+// (sam_no_mask), returning no detections (detection_fallback -> Gemini) and
+// stretching each pass into a ~30-40s staircase. Bounding the queue here is what
+// prevents the contention; the 150s timeout downstream only waits it out.
+//
+// Held around the HTTP request ONLY, so a caller can never hold a slot while
+// awaiting another analyzer call (which would deadlock).
+const analyzerLimit = pLimit(parseInt(process.env.ANALYZER_MAX_INFLIGHT, 10) || 6);
+function withAnalyzerSlot(fn) {
+  return analyzerLimit(fn);
+}
+
 function _pxBoxToNorm(box, W, H) {
   const [x1, y1, x2, y2] = box;
   return [
@@ -2555,7 +2571,7 @@ async function _cleanMaskAndCheck(mask, gdinoBoxPx) {
 // GroundingDINO text→box for a set of prompts.
 async function _gdinoDetect(imageDataUri, prompts) {
   try {
-    const res = await fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
+    const res = await withAnalyzerSlot(() => fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: imageDataUri, prompts }),
       // The first call after a cold start (or post-idle-unload) pays the ~90s
@@ -2564,7 +2580,7 @@ async function _gdinoDetect(imageDataUri, prompts) {
       // a spurious Gemini fallback. 300s covers cold load + passes; warm calls
       // finish in ~60-100s. Genuine hangs still fall back to Gemini after this.
       signal: AbortSignal.timeout(300_000),
-    });
+    }));
     if (!res.ok) { log.warn(`⚠️ [GDINO-DETECT] /detect-figures-text HTTP ${res.status}`); return null; }
     const j = await res.json();
     if (!j?.success) { log.warn(`⚠️ [GDINO-DETECT] endpoint error: ${j?.error}`); return null; }
@@ -10761,7 +10777,7 @@ async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop, opts = {}) {
   if (backend === 'mobilesam' && Array.isArray(boxInCrop) && boxInCrop.length === 4) {
     const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
     try {
-      const res = await fetch(`${photoAnalyzerUrl}/figure-mask`, {
+      const res = await withAnalyzerSlot(() => fetch(`${photoAnalyzerUrl}/figure-mask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -10777,7 +10793,7 @@ async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop, opts = {}) {
         // short timeouts under CPU contention stack zombie work until the
         // service starves (observed SAM outage: 12 consecutive 30s aborts).
         signal: AbortSignal.timeout(150_000),
-      });
+      }));
       if (res.ok) {
         const j = await res.json();
         const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);

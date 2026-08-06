@@ -3839,6 +3839,44 @@ def detect_illustration_faces():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+
+def _container_cpus():
+    """CPUs this CONTAINER may use, not the host's core count.
+
+    os.cpu_count() reports the host: on a shared Railway host that is dozens of
+    cores, so a container capped at ~2 vCPU started dozens of waitress threads.
+    MobileSAM/GroundingDINO are CPU-bound torch inference, so oversubscribing
+    that far past the quota made every request slower and produced dropped
+    segmentations and empty detections under a full multi-page story.
+
+    Reads the cgroup quota (v2 then v1) and falls back to os.cpu_count().
+    """
+    host = os.cpu_count() or 6
+    try:
+        # cgroup v2: "<quota> <period>", or "max <period>" when unlimited.
+        with open('/sys/fs/cgroup/cpu.max') as fh:
+            quota_s, period_s = fh.read().split()
+        if quota_s != 'max':
+            n = int(quota_s) // int(period_s)
+            if n >= 1:
+                return min(host, n)
+    except Exception:
+        pass
+    try:
+        # cgroup v1: quota of -1 means unlimited.
+        with open('/sys/fs/cgroup/cpu/cpu.cfs_quota_us') as fh:
+            quota = int(fh.read().strip())
+        with open('/sys/fs/cgroup/cpu/cpu.cfs_period_us') as fh:
+            period = int(fh.read().strip())
+        if quota > 0 and period > 0:
+            n = quota // period
+            if n >= 1:
+                return min(host, n)
+    except Exception:
+        pass
+    return host
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PHOTO_ANALYZER_PORT', 5000))
     print(f"[START] Photo Analyzer API starting on port {port}")
@@ -3859,9 +3897,9 @@ if __name__ == '__main__':
         # runs in PARALLEL across the cores instead of ≤6 at a time while the rest
         # queue past the 150s client timeout. Tune via ANALYZER_THREADS. Was
         # hard-coded 6 → left most vCPUs idle under a full multi-page story.
-        _cores = os.cpu_count() or 6
+        _cores = _container_cpus()
         _threads = int(os.environ.get('ANALYZER_THREADS') or _cores)
-        print(f"   Serving via waitress ({_threads} threads, {_cores} vCPUs detected) on port {port}")
+        print(f"   Serving via waitress ({_threads} threads, {_cores} vCPUs available) on port {port}")
         serve(app, host='0.0.0.0', port=port, threads=_threads, channel_timeout=600)
     except ImportError:
         print("   waitress unavailable — falling back to Flask dev server")
