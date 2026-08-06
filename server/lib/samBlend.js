@@ -89,7 +89,12 @@ async function _interiorSeedPoints(maskPng, w, h) {
     const R = 4;
     const interior = (x, y) => on(x, y) && on(x - R, y) && on(x + R, y) && on(x, y - R) && on(x, y + R);
     const pts = [];
-    for (const fy of [0.25, 0.5, 0.75]) {
+    // Rows sampled down the mask. 0.25/0.5/0.75 on a FULL-BODY mask are chest,
+    // waist and thighs — NOTHING anchors the head, so on a figure whose head is
+    // low-contrast against the background (grey hair on a dark bridge) SAM grows
+    // the bright garment and stops at the collar: the catastrophic round-2 mask
+    // in exp #381 was cardigan + trousers only. 0.12 puts a point on the head.
+    for (const fy of [0.12, 0.3, 0.55, 0.8]) {
       const y = Math.round(miny + (maxy - miny) * fy);
       let best = null, run = 0, start = 0;
       for (let x = minx; x <= maxx + 1; x++) {
@@ -481,6 +486,19 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
     const r2Opts = { ...(maskPoints || {}) };
     if (seeds.length) r2Opts.points = [...(r2Opts.points || []), ...seeds];
     newMask = await fetchMaskWithRetry(candidateCropBuf, padBox, 5, r2Opts);
+    // WHAT ROUND 2 WAS PROMPTED WITH — box (yellow) + seed points (red). Round 1
+    // has such a view; round 2 never did, so a bad box or a seed landing off the
+    // figure was invisible (owner asked to see the box and points).
+    try {
+      const dots = (r2Opts.points || []).map(([px, py]) =>
+        `<circle cx="${px}" cy="${py}" r="6" fill="#ff2d2d" stroke="#fff" stroke-width="2"/>`).join('');
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cropW}" height="${cropH}">`
+        + `<rect x="${padBox[0]}" y="${padBox[1]}" width="${padBox[2] - padBox[0]}" height="${padBox[3] - padBox[1]}" fill="none" stroke="#ffcc00" stroke-width="3"/>`
+        + dots + `</svg>`;
+      const viz = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' })
+        .composite([{ input: Buffer.from(svg) }]).jpeg({ quality: 92 }).toBuffer();
+      await addStep(`SAM round 2 PROMPT: box (yellow) + ${(r2Opts.points || []).length} seed point(s) (red)`, `data:image/jpeg;base64,${viz.toString('base64')}`);
+    } catch { /* viz only */ }
   }
   // ---- OCCLUDER SUBTRACT on ROUND 2 ---------------------------------------
   // The hatch builder already removes other characters from the TARGET

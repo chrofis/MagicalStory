@@ -5111,3 +5111,30 @@ two earlier leak fixes. Changing it to corner ticks or a swatch needs a Test Lab
 binding first — not a blind edit. This entry makes the detection catch it in the meantime.
 
 **Touched:** `server/lib/images.js`, `prompts/image-evaluation.txt`.
+
+---
+
+## 2026-08-06 — Round-2 SAM catastrophic failure: no seed point ever landed on the HEAD
+
+**Context:** Owner: "SAM round 2 fails catastrophically." Exp #381's round-2 mask is the
+cardigan and trousers only — no head, no arms, ragged holes. Verified NOT a regression from
+the seed-erosion change: the same page before that change (#365) produced an identical mask.
+
+**Root cause:** `_interiorSeedPoints` samples rows at 25% / 50% / 75% of the mask height. On a
+FULL-BODY mask those are chest, waist and thighs — **nothing anchors the head**. Round 1 does
+not depend on seeds (it segments the original via the hatch crop) so it is unaffected; round 2
+does. On this page Margaret's grey hair sits against a dark bridge, so with only garment seeds
+SAM grew the bright cardigan + trousers and stopped at the collar. The model output itself was
+fine (a clean, well-lit render) and the DINO boxes were correct — the failure is entirely in
+how round 2 was prompted.
+
+**Fixes:** (1) seed rows are now 0.12 / 0.3 / 0.55 / 0.8 — 0.12 puts a point on the head
+(verified on a synthetic head+body mask). (2) A new step, "SAM round 2 PROMPT: box (yellow) +
+N seed point(s) (red)", draws exactly what round 2 was told, on the candidate. Round 1 has had
+such a view for months; round 2 never did, which is why a mis-seeded prompt was invisible.
+
+**Knock-on:** this also inflates the IoU gate's false rejections — a mask missing the head
+cannot overlap the round-1 silhouette well. Margaret's 46% → 50% recomputation was done with
+the broken seeds still in place, so the true IoU should be re-measured after this fix.
+
+**Touched:** `server/lib/samBlend.js`.
