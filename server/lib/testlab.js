@@ -1899,8 +1899,16 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
         if (best <= TOL) sel[p2] = 255;             // (a) pigment match
       }
     }
-    // 3. drop specks: keep components of a sane size (letters are big blobs)
-    const MIN_COMP = params.minComp ?? Math.max(40, Math.round(outW * outH * 0.00002));
+    // 3. CONNECTED AREAS ONLY (owner): a letter is a big, connected blob sitting
+    //    where a letter belongs. Two tests, both structural:
+    //      size   — components below minComp are speckle (leaf fragments, grain)
+    //      anchor — the component must touch the title's own footprint
+    //    The anchor uses the drawn glyphs only as a POSITION reference, never as
+    //    shape: the component keeps its full colour-selected form (overshoot and
+    //    all), it just has to belong to a letter rather than float in the canopy.
+    //    That is what removes the birch trunks and leaf clusters, which match the
+    //    pigment but touch no letter.
+    const MIN_COMP = params.minComp ?? Math.max(150, Math.round(outW * outH * 0.00012));
     const seen = Buffer.alloc(outW * outH);
     const cleaned = Buffer.alloc(outW * outH);
     for (let p2 = 0; p2 < outW * outH; p2++) {
@@ -1916,7 +1924,9 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
           if (!seen[r2] && sel[r2] === 255) { seen[r2] = 1; stack.push(r2); }
         }
       }
-      if (comp.length >= MIN_COMP) for (const q of comp) cleaned[q] = 255;
+      let anchored2 = false;
+      for (const q of comp) { if (drawnMaskRaw[q] > 8 || samMaskRaw[q] > 128) { anchored2 = true; break; } }
+      if (comp.length >= MIN_COMP && anchored2) for (const q of comp) cleaned[q] = 255;
     }
     foundMaskSmooth = await sharp(cleaned, { raw: { width: outW, height: outH, channels: 1 } })
       .blur(0.8).toColourspace('b-w').raw().toBuffer();
