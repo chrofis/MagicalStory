@@ -404,14 +404,16 @@ const MODEL_DEFAULTS = {
   // ─── Avatar 2×4 sheet: per-pass backend ──────────────────────────────
   // Round 1 (realistic identity anchor) stays on Grok — it preserves hair
   // length + outfit better than Gemini (which drifts identity). Round 2
-  // (art/style transfer, a BIG transform) goes to Gemini — Grok barely
-  // stylises (all-5 Grok-vs-Gemini A/B, project_image_model_tests.md,
-  // 2026-07-19; that A/B ran on gemini-3-pro). Model switched pro → flash
-  // 2026-07-21 (user decision: $0.15/image vs $0.04; flash-vs-pro quality
-  // not separately A/B'd — revert via AVATAR_STYLE_MODEL if flash under-
-  // stylises).
-  avatarStyleTransferBackend: process.env.AVATAR_STYLE_BACKEND || 'gemini', // 'gemini' | 'grok'
-  avatarStyleTransferModel: process.env.AVATAR_STYLE_MODEL || 'gemini-2.5-flash-image',
+  // (art/style transfer) is now ALSO Grok. Re-tested 2026-08-06 (Test Lab
+  // exps #336/#341/#344): gemini-2.5-flash-image barely stylises — it returns a
+  // near-photographic sheet regardless of prompt strength (prompt A/B #339
+  // moved it almost nothing) — while Grok produces strong, correct watercolour /
+  // pixar / anime AND handled an adult face (Hans) with no content-moderation
+  // refusals. This reverses the 2026-07-19 verdict (that A/B was gemini-3-pro).
+  // Grok's occasional child-avatar moderation false-reject is covered by the
+  // 3-attempt retry in runStyleTransferPass. Revert via AVATAR_STYLE_BACKEND.
+  avatarStyleTransferBackend: process.env.AVATAR_STYLE_BACKEND || 'grok', // 'gemini' | 'grok'
+  avatarStyleTransferModel: process.env.AVATAR_STYLE_MODEL || 'gemini-2.5-flash-image', // only used when backend='gemini'
 
   // Vision judge for the 2×4 sheet split eval (evaluateSheetSplit). gemini-2.5-flash:
   // qwen3-vl is ~6× cheaper but WON'T apply the strict "whole head" rule — it
