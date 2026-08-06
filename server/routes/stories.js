@@ -634,6 +634,11 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             semanticScore: versionMeta.semanticScore ?? null,
             semanticResult: versionMeta.semanticResult || null,
             rawQualityScore: versionMeta.rawQualityScore ?? null,
+            // Un-clamped 100 − Σ deductions. finalScore floors at 0, so without
+            // this every heavily-penalised version reads "0%" and the admin
+            // cannot tell −10 from −140 or see whether a repair helped.
+            // Derived from stored deductions when the field predates persistence.
+            rawScore: require('../lib/scoring').computeRawScore(versionMeta),
             entityPenalty: versionMeta.entityPenalty ?? null,
             entityIssues: versionMeta.entityIssues || null,
             evaluatedAt: versionMeta.evaluatedAt || null,
@@ -959,6 +964,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             qualityScore: v.qualityScore ?? null,
             // Canonical reader — one fallback chain for every legacy shape.
             finalScore: require('../lib/scoring').computeFinalScore(v),
+            // Un-clamped companion to finalScore — see the /images route.
+            rawScore: require('../lib/scoring').computeRawScore(v),
             rawQualityScore: v.rawQualityScore ?? null,
             semanticScore: v.semanticScore ?? null,
             semanticResult: v.semanticResult || null,

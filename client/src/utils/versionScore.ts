@@ -14,6 +14,15 @@
  */
 export interface ScoredVersionLike {
   finalScore?: number | null;
+  /**
+   * Un-clamped `100 − Σ deductions` from applyScore. NOTE: the name is
+   * overloaded in this codebase — the re-eval endpoints
+   * (`/routes/regeneration.js`) return a `rawScore` that is the evaluator's
+   * 0–10 VISUAL score instead. Only ever pass image-VERSION objects to these
+   * helpers, never an eval-result payload. (The helpers below only consult
+   * `rawScore` when it is negative, which a 0–10 score never is, so a
+   * mistaken call degrades to the clamped score rather than printing nonsense.)
+   */
   rawScore?: number | null;
   evalScore?: number | null;
   qualityScore?: number | null;
@@ -39,4 +48,26 @@ export function versionScore(v: ScoredVersionLike | null | undefined): number | 
 export function versionRawScore(v: ScoredVersionLike | null | undefined): number | null {
   if (!v || typeof v !== 'object') return null;
   return typeof v.rawScore === 'number' ? v.rawScore : null;
+}
+
+/**
+ * Score to PRINT. Readers (and the picker) get the clamped `versionScore`;
+ * developer/admin surfaces pass `allowNegative` and get the true un-clamped
+ * value whenever deductions passed 100.
+ *
+ * Clamping is what makes a heavily-penalised page unreadable: a version with
+ * seven nitpicks and one that is genuinely broken both print "0", so there is
+ * no way to see which repairs helped or how far over the line the evaluator
+ * went. −10 and −140 are different facts and admins need both.
+ *
+ * Falls back to the clamped score for legacy versions with no `rawScore`.
+ */
+export function versionDisplayScore(
+  v: ScoredVersionLike | null | undefined,
+  allowNegative = false,
+): number | null {
+  const clamped = versionScore(v);
+  if (!allowNegative) return clamped;
+  const raw = versionRawScore(v);
+  return raw != null && raw < 0 ? raw : clamped;
 }

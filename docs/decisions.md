@@ -5399,3 +5399,43 @@ front of the parts. (A first attempt at a "one garment = one unambiguous noun ph
 written and then removed: it would have banned exactly the pattern `516efb97e` proved necessary.)
 
 **Touched:** `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`.
+
+---
+
+## 2026-08-06 — Admin surfaces show the un-clamped score (−10 vs −140), not 0
+
+**Context:** Owner, after the scoring audit: "change so negative scores are shown to admin. Don't
+cap them all at 0. Show -10 or -140."
+
+**Most of the feature already existed and was dead end-to-end.** `applyScore` has always written
+`version.rawScore = 100 − Σ deductions` un-clamped, with a comment saying it exists so several
+0-scored versions can be told apart. `ImageHistoryModal` already rendered `0% (−140)` in three
+places via a `versionRawScore` helper. It never appeared because the value never survived the trip:
+`rawScore` was missing from the version persist allowlist in `images.js` (fixed earlier today), and
+BOTH story response builders in `routes/stories.js` construct version objects field-by-field and
+never included it. A stamped field, a client helper and three render sites, joined by nothing.
+
+**Decision:**
+1. `scoring.computeRawScore(version)` is the single reader: prefers the stamped `rawScore`, else
+   recomputes from the stored `deductions`. The fallback matters — it makes every EXISTING story
+   display correctly instead of only stories generated from now on. Note it uses the CAPPED entity
+   penalty, so it can differ from a naive sum of raw severity points.
+2. Both `/routes/stories.js` version builders emit it.
+3. `versionDisplayScore(v, allowNegative)` in `client/src/utils/versionScore.ts` is the display
+   reader. Readers keep the clamped score; developer mode passes `allowNegative` and prints the
+   negative as THE score (`−140%`), replacing the old `0% (−140)` form.
+
+**Landmine documented, not fixed:** `rawScore` is overloaded. On the re-eval endpoints
+(`routes/regeneration.js`) it is the evaluator's 0–10 VISUAL score, a different quantity from the
+version's un-clamped total. The display helpers only consult it when negative — which a 0–10 score
+never is — so a mistaken call degrades to the clamped score rather than printing nonsense. Typed
+and commented in `ScoredVersionLike`.
+
+**Verified** against the 14 zero-scored versions of `job_1786024729214_zrjgzqiey`: they resolve to
+−5, −15, −15, −17, −25, −27, −30, −35, −75, −105, −115, −125 and one true 0 — previously all "0%".
+
+**Not changed:** `RepairWorkflowPanel`'s "Final: N%" still prints the clamped server value; showing
+negatives there needs the re-eval endpoints to return an un-clamped total.
+
+**Touched:** `server/lib/scoring.js`, `server/routes/stories.js`,
+`client/src/utils/versionScore.ts`, `client/src/components/generation/story/ImageHistoryModal.tsx`.

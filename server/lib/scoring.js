@@ -226,6 +226,23 @@ function sumDeductionPoints(deductions) {
 }
 
 /**
+ * Un-clamped score for a version: `100 − Σ deductions`, negative when the
+ * evaluators exceeded 100 points. Prefers the value applyScore stamped; falls
+ * back to recomputing from the stored `deductions` so versions written before
+ * rawScore was persisted still resolve. null when neither is available.
+ *
+ * Admin surfaces print this instead of finalScore — clamping every failing
+ * version to 0 hides whether one is barely over the line (−10) or the
+ * evaluator ran away with it (−140), and makes repair progress invisible.
+ */
+function computeRawScore(version) {
+  if (!version || typeof version !== 'object') return null;
+  if (typeof version.rawScore === 'number') return version.rawScore;
+  if (!version.deductions || typeof version.deductions !== 'object') return null;
+  return 100 - sumDeductionPoints(version.deductions);
+}
+
+/**
  * Sum severity points across every category and clamp 100−sum to [0, 100].
  */
 function computeMathFinalScore(deductions) {
@@ -758,6 +775,7 @@ module.exports = {
   SEVERITY_POINTS,
   composeDeductions,
   computeMathFinalScore,
+  computeRawScore,
   applyScore,
   logScoreModelSummary,
   capEntityPenalty,

@@ -4,7 +4,7 @@ import { Images, X, Check, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } f
 import { useLanguage } from '@/context/LanguageContext';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import type { ImageVersion } from '@/types/story';
-import { versionScore, versionRawScore } from '@/utils/versionScore';
+import { versionScore, versionDisplayScore } from '@/utils/versionScore';
 
 // Cover type names for display
 const COVER_LABELS = {
@@ -199,10 +199,10 @@ export function ImageHistoryModal({
               {(() => {
                 const score = versionScore(versions[fullscreenIndex]);
                 if (!developerMode || score == null) return null;
-                const raw = versionRawScore(versions[fullscreenIndex]);
+                const shown = versionDisplayScore(versions[fullscreenIndex], true);
                 return (
                   <span className={`ml-2 text-xs font-bold px-1.5 py-0.5 rounded ${scoreBgColor(score)}`}>
-                    {score}%{score === 0 && raw != null && raw < 0 ? ` (${raw})` : ''}
+                    {shown}%
                   </span>
                 );
               })()}
@@ -330,13 +330,13 @@ export function ImageHistoryModal({
                               </span>
                             );
                           }
-                          // When the clamped score floors at 0, show the raw
-                          // un-clamped value (e.g. "0% (−140)") so several
-                          // 0-scored versions are distinguishable.
-                          const raw = versionRawScore(version);
+                          // Developer surfaces print the un-clamped score, so
+                          // several failing versions stay distinguishable
+                          // (−10 vs −140) instead of all reading 0%.
+                          const shown = versionDisplayScore(version, true);
                           return (
                             <span className={`text-white text-[10px] sm:text-[11px] font-bold px-1 sm:px-1.5 py-0.5 rounded ${scoreBgColor(score)}`}>
-                              {score}%{score === 0 && raw != null && raw < 0 ? ` (${raw})` : ''}
+                              {shown}%
                             </span>
                           );
                         })()}
@@ -632,16 +632,7 @@ export function ImageHistoryModal({
                       <div className="flex flex-wrap items-center gap-3 text-sm">
                         <span className="font-semibold text-gray-700">{language === 'de' ? 'Endwert:' : 'Final:'}</span>
                         <span className={`font-bold text-lg ${scoreColor(score)}`}>
-                          {score}%
-                          {(() => {
-                            const raw = versionRawScore(v);
-                            // Show the un-clamped value only when the score has
-                            // floored at 0, so heavily-penalized versions are
-                            // distinguishable (0/0/0 → e.g. −30 / −140).
-                            return score === 0 && raw != null && raw < 0
-                              ? <span className="ml-1 text-sm font-semibold text-red-400">({raw})</span>
-                              : null;
-                          })()}
+                          {versionDisplayScore(v, true)}%
                         </span>
                         {showVisual && (
                           <span className="text-xs text-gray-500">
