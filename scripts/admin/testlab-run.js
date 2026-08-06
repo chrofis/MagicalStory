@@ -99,6 +99,13 @@ async function main() {
   const params = {};
   if (flags.character) params.characterName = flags.character;
   if (flags['no-eval'] === 'true') params.autoEval = false;
+  // --opts '<json>': per-stage tunables, forwarded verbatim as params.opts.
+  // Stages that take thresholds (garment_hue) read them from here, so a knob can
+  // be A/B'd from the shell without a deploy and the run still lands in the Lab.
+  if (flags.opts) {
+    try { params.opts = JSON.parse(flags.opts); }
+    catch (e) { die(`--opts must be valid JSON: ${e.message}`); }
+  }
 
   // Style-matrix mode: expand targets × styles; each unit = empty_scene + image.
   let styles = null;
