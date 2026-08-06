@@ -3412,6 +3412,12 @@ router.put('/:id/title', authenticateToken, async (req, res) => {
       console.warn(`⚠️ Front cover restamp skipped: ${e.message}`);
     }
 
+    // The restamp above put the FLAT title back, so any previously painted title
+    // is gone — clear the marker so the UI offers "Repaint title" again.
+    if (storyData.coverImages?.frontCover?.titlePainted) {
+      delete storyData.coverImages.frontCover.titlePainted;
+    }
+
     // Title is in metadata, so we need to update it
     await saveStoryData(id, storyData);
 
@@ -3429,6 +3435,66 @@ router.put('/:id/title', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Error saving story title:', err);
     res.status(500).json({ error: 'Failed to save story title: ' + err.message });
+  }
+});
+
+// POST /api/stories/:id/repaint-title — repaint the front-cover title in the
+// artwork's medium (one image-model call). Costs CREDIT_COSTS.TITLE_PAINT.
+//
+// Charged ONLY when a painted title is actually produced: paintServedCoverTitle
+// falls back to the flat lockup on a model failure or an OCR mismatch, and the
+// user must not pay for an unchanged cover.
+router.post('/:id/repaint-title', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { CREDIT_COSTS } = require('../config/credits');
+    const creditCost = CREDIT_COSTS.TITLE_PAINT;
+    const isImpersonating = req.user.impersonating === true;
+
+    const userResult = await dbQuery('SELECT credits FROM users WHERE id = $1', [req.user.id]);
+    if (!userResult.length) return res.status(404).json({ error: 'User not found' });
+    const userCredits = userResult[0].credits || 0;
+    const hasInfiniteCredits = userCredits === -1 || isImpersonating;
+    if (!hasInfiniteCredits && userCredits < creditCost) {
+      return res.status(402).json({ error: 'Insufficient credits', required: creditCost, available: userCredits });
+    }
+
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (!rows.length) rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+    if (!rows.length) return res.status(404).json({ error: 'Story not found' });
+    const storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    if (!storyData.coverImages?.frontCover) return res.status(404).json({ error: 'Story has no front cover' });
+
+    const { paintServedCoverTitle } = require('../lib/coverTypography');
+    const result = await paintServedCoverTitle(id, storyData, { coverKey: 'frontCover' });
+    if (!result.painted) {
+      return res.status(422).json({
+        error: 'Could not repaint the title — the original title was kept.',
+        reason: result.reason, charged: 0,
+      });
+    }
+
+    storyData.updatedAt = new Date().toISOString();
+    await saveStoryData(id, storyData);
+
+    let newCredits = userCredits;
+    if (!hasInfiniteCredits) {
+      const deduct = await dbQuery(
+        'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
+        [creditCost, req.user.id]);
+      newCredits = deduct.length ? deduct[0].credits : userCredits - creditCost;
+    }
+    await logActivity(req.user.id, req.user.username, 'COVER_TITLE_REPAINTED', { storyId: id, cost: creditCost }, req.user);
+
+    res.json({ success: true, imageData: result.imageData, credits: newCredits, charged: hasInfiniteCredits ? 0 : creditCost });
+  } catch (err) {
+    console.error('Error repainting cover title:', err);
+    res.status(500).json({ error: 'Failed to repaint title: ' + err.message });
   }
 });
 

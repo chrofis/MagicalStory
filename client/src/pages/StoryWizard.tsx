@@ -5424,6 +5424,14 @@ export default function StoryWizard() {
                     : prev);
                 }
               } : undefined}
+              onRepaintCoverTitle={storyId ? async () => {
+                const result = await storyService.repaintCoverTitle(storyId);
+                setCoverImages(prev => {
+                  const cover = prev?.frontCover;
+                  if (!cover) return prev;
+                  return { ...prev, frontCover: { ...cover, imageData: result.imageData } };
+                });
+              } : undefined}
               onSetCoverTypography={storyId ? async (coverKey: 'frontCover' | 'initialPage', style) => {
                 const result = await storyService.setCoverTypography(storyId, coverKey, style);
                 setCoverImages(prev => {

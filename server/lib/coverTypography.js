@@ -557,6 +557,12 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
       await saveStoryImage(storyId, key, null, 'data:image/jpeg;base64,' + buffer.toString('base64'), { versionIndex: activeIdx, cacheBust: true });
       if (storyData?.coverImages?.[key]) storyData.coverImages[key].typography = spec;
       log.info(`🅰️ [COVER TYPO POST] ${key}: baked title${ded ? '+dedication' : ''} onto served v${activeIdx} (${spec.fontId || '?'}/${spec.layout || '?'})`);
+      // AUTOMATIC PAINTED TITLE (owner 2026-08-06): every new front cover gets the
+      // painted treatment. Non-fatal by construction — paintServedCoverTitle keeps
+      // the flat title on any failure, so generation cannot break on it.
+      if (key === 'frontCover' && !trial) {
+        await paintServedCoverTitle(storyId, storyData, { coverKey: 'frontCover' });
+      }
     } catch (err) {
       log.warn(`[COVER TYPO POST] ${key}: ${err.message}`);
     }
@@ -633,9 +639,61 @@ async function restampServedCover(storyId, storyData, coverKey, { style } = {}) 
   return { imageData: stamped.titledData, spec: stamped.spec, versionIndex: activeIdx };
 }
 
+
+// ---------------------------------------------------------------------------
+// paintServedCoverTitle — replace the SERVED front cover's flat title with a
+// painted one (server/lib/coverTitlePaint.js). Reads the textless ${key}Art row,
+// repaints, and overwrites the active version in place. Never throws: on any
+// failure (model, OCR mismatch, missing art layer) the flat title simply stays,
+// which is always a correct, legible cover.
+// Returns { painted: boolean, reason?, imageData? }.
+// ---------------------------------------------------------------------------
+async function paintServedCoverTitle(storyId, storyData, { coverKey = 'frontCover', backend } = {}) {
+  const { log } = require('../utils/logger');
+  try {
+    const { dbQuery, saveStoryImage } = require('../services/database');
+    const r2 = require('./r2');
+    const { paintCoverTitle } = require('./coverTitlePaint');
+    const title = (storyData?.title || '').trim();
+    if (!title) return { painted: false, reason: 'no title' };
+
+    const meta = ((await dbQuery('SELECT image_version_meta FROM stories WHERE id=$1', [storyId]))[0]?.image_version_meta) || {};
+    const activeIdx = meta[coverKey]?.activeVersion ?? 0;
+    const artRows = await dbQuery(
+      "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test ORDER BY (version_index = $3) DESC, version_index DESC",
+      [storyId, `${coverKey}Art`, activeIdx]);
+    if (!artRows[0]) return { painted: false, reason: 'no textless art layer' };
+    const src = artRows[0].image_url || (artRows[0].image_data ? 'data:image/jpeg;base64,' + artRows[0].image_data.toString('base64') : null);
+    const bytes = await r2.bytesFromAnyImage(src);
+    if (!bytes) return { painted: false, reason: 'could not resolve art bytes' };
+
+    const cover = storyData?.coverImages?.[coverKey];
+    const res = await paintCoverTitle(bytes, title, {
+      figures: cover?.bboxDetection?.figures || [],
+      seed: storyData?.title,
+      artStyle: storyData?.artStyle,
+      style: cover?.typographyStyle || undefined,
+      backend,
+    });
+    // paintCoverTitle always returns a usable image; only persist when it is the
+    // PAINTED one (ok), otherwise the served flat render already matches.
+    if (!res.ok) {
+      log.info(`🅰️ [TITLE PAINT] ${coverKey}: kept flat title (${res.reason})`);
+      return { painted: false, reason: res.reason };
+    }
+    await saveStoryImage(storyId, coverKey, null, res.imageData, { versionIndex: activeIdx, cacheBust: true });
+    if (cover) { cover.typography = res.spec; cover.titlePainted = true; }
+    log.info(`🅰️ [TITLE PAINT] ${coverKey}: painted title baked onto served v${activeIdx}`);
+    return { painted: true, imageData: res.imageData, spec: res.spec };
+  } catch (err) {
+    log.warn(`⚠️ [TITLE PAINT] ${coverKey}: ${err.message} — flat title kept`);
+    return { painted: false, reason: err.message };
+  }
+}
+
 module.exports = {
   composeCover, composeFrontTitle, composeDedication, composeBrand, applyCoverTypography, bakeCoverTypographyPostPersist,
-  restampCover, restampServedCover, sanitizeTitleStyle, sanitizeDedicationStyle,
+  restampCover, restampServedCover, paintServedCoverTitle, sanitizeTitleStyle, sanitizeDedicationStyle,
   TITLE_LAYOUTS, TITLE_FONT_IDS: Object.keys(FONTS), DEDICATION_FONTS: WFONTS.map(f => f.family),
   // exported for the standalone verify CLI / tests
   _internals: { occupancyFromFigures, bestRect, colorCandidates, finalizeColor, palette, garmentColors, FONTS, DEAL, FONT_FILES, renderSvg, buildTitleGroup, fitRender },

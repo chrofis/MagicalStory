@@ -2434,6 +2434,13 @@ export const storyService = {
     return api.put(`/api/stories/${storyId}/cover-typography`, { coverKey, style });
   },
 
+  /** Repaint the front-cover title in the artwork's medium (one model call).
+   *  Costs credits; the server charges nothing when it falls back to the flat title. */
+  repaintCoverTitle(storyId: string) {
+    return api.post<{ success: boolean; imageData: string; credits: number; charged: number }>(
+      `/api/stories/${storyId}/repaint-title`, {});
+  },
+
   // Select which image version is active (for scene images)
   async setActiveImage(storyId: string, pageNumber: number, versionIndex: number): Promise<{
     success: boolean;

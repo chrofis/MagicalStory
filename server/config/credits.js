@@ -9,6 +9,7 @@ const CREDIT_CONFIG = {
   COSTS: {
     IMAGE_REGENERATION: 2,    // Cost to regenerate a single scene image (~CHF 0.05–0.07 vs ~CHF 0.018 provider cost = ~3–4× margin)
     COVER_REGENERATION: 2,    // Cost to regenerate a cover image (composite path is 2 provider calls = ~CHF 0.035 cost, still positive margin)
+    TITLE_PAINT: 2,           // Repaint the cover title in the artwork's medium (one Grok call ~CHF 0.018)
     PER_PAGE: 10,             // Credits per story page (e.g., 20-page story = 200 credits)
   },
 

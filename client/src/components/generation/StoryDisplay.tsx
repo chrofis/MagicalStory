@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users, Pencil, Wand2, Eye } from 'lucide-react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users, Pencil, Wand2, Eye, Palette } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
@@ -211,6 +212,7 @@ interface StoryDisplayProps {
   onSaveTitleChange?: (title: string) => Promise<void>;
   /** User typography for cover text — front title / dedication. null resets to automatic. */
   onSetCoverTypography?: (coverKey: 'frontCover' | 'initialPage', style: { fontId?: string; layout?: string; color?: string; font?: string; align?: string } | null) => Promise<void>;
+  onRepaintCoverTitle?: () => Promise<void>;
   /** Edit the dedication text (no AI — initial page is re-stamped). Empty string removes it. */
   onSaveDedicationChange?: (dedication: string) => Promise<void>;
   // Image regeneration with credits
@@ -359,6 +361,7 @@ export function StoryDisplay({
   // Title editing
   onSaveTitleChange,
   onSetCoverTypography,
+  onRepaintCoverTitle,
   onSaveDedicationChange,
   // Image regeneration with credits
   userCredits = 0,
@@ -414,6 +417,25 @@ export function StoryDisplay({
 
   // Cover image history modal state
   const [coverHistoryModal, setCoverHistoryModal] = useState<{ coverType: 'frontCover' | 'initialPage' | 'backCover'; versions: ImageVersion[]; activeVersionIndex?: number } | null>(null);
+  const { user } = useAuth();
+  const isAdminUser = user?.role === 'admin';
+  const [repaintingTitle, setRepaintingTitle] = useState(false);
+  // Repaint the cover title in the artwork's medium (server: one model call,
+  // OCR-gated, falls back to the flat title and charges nothing on failure).
+  const handleRepaintTitle = async () => {
+    if (!onRepaintCoverTitle || repaintingTitle) return;
+    setRepaintingTitle(true);
+    try {
+      await onRepaintCoverTitle!();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert(language === 'de' ? `Titel konnte nicht neu gemalt werden: ${msg}`
+        : language === 'fr' ? `Impossible de repeindre le titre : ${msg}`
+        : `Could not repaint the title: ${msg}`);
+    } finally {
+      setRepaintingTitle(false);
+    }
+  };
 
   // Character repair popover state
   // Inpaint repair panel state
@@ -4477,9 +4499,27 @@ export function StoryDisplay({
                 </button>
               </div>
             )}
-            {/* Title typography — user-facing: font / effect / colour of the
-                composited cover title. Server restamps from the textless art. */}
-            {onSetCoverTypography && frontCoverObj && !isGenerating && (
+            {/* Repaint title — one image-model call that redraws the title in the
+                artwork's medium. Costs credits; the server falls back to the flat
+                title (and charges nothing) if the repaint fails its OCR check. */}
+            {onRepaintCoverTitle && frontCoverObj && !isGenerating && (
+              <div className="mt-2">
+                <button
+                  onClick={handleRepaintTitle}
+                  disabled={repaintingTitle}
+                  className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-indigo-600 disabled:opacity-60"
+                >
+                  <Palette size={16} />
+                  {repaintingTitle
+                    ? (language === 'de' ? 'Titel wird gemalt…' : language === 'fr' ? 'Titre en cours…' : 'Painting title…')
+                    : (language === 'de' ? 'Titel neu malen (2 Credits)' : language === 'fr' ? 'Repeindre le titre (2 crédits)' : 'Repaint title (2 credits)')}
+                </button>
+              </div>
+            )}
+            {/* Title typography (font / effect / colour) — ADMIN ONLY for now:
+                the painted title picks its own colour, so exposing a colour
+                picker to users would fight it. The endpoint still works. */}
+            {isAdminUser && onSetCoverTypography && frontCoverObj && !isGenerating && (
               <CoverTextStylePanel
                 kind="front"
                 language={language}
