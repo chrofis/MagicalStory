@@ -1289,6 +1289,8 @@ async function runGarmentHueStage(ctx, { experimentId, params = {} }) {
       garmentHueDeg: f.garmentHueDeg,
       avatarHueDeg: f.avatarHueDeg,
       illuminationCast: f.cast,   // {a,b} — the estimated global scene cast (discounted before measuring drift)
+      swatches: f.swatches,       // {before,target,after} RGB — the colours the summary chips show
+      garmentChroma: f.swatches?.before ? null : undefined,
       maskSource: f.maskSource,   // 'sam' (shared silhouette) | 'bodyBox' (rectangle fallback)
     })),
     steps: steps.length ? steps : undefined,
