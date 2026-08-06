@@ -5302,7 +5302,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // =======================================================================
       // UNIFIED PIPELINE: Generate all → Evaluate → Repair (if enabled)
       // =======================================================================
-      log.info(`🚀 [UNIFIED] Using unified pipeline (fullRepair=${enableFullRepair})`);
+      const _reqPasses = parseInt(inputData.maxRepairPasses, 10);
+      const repairPasses = Number.isFinite(_reqPasses)
+        ? Math.max(0, Math.min(REPAIR_DEFAULTS.maxPasses, _reqPasses))
+        : REPAIR_DEFAULTS.maxPasses;
+      log.info(`🚀 [UNIFIED] Using unified pipeline (fullRepair=${enableFullRepair}, repairPasses=${repairPasses})`);
 
       // Helper function to prepare page data without generation (for later use by pipeline)
       const preparePageData = async (scene, index) => {
@@ -6651,7 +6655,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           dbPool,
           storyData: pipelineStoryData
         }, {
-          maxRegenAttempts: enableFullRepair ? REPAIR_DEFAULTS.maxPasses : 0,  // 0 = evaluate only
+          // 0 = evaluate only. A run may request FEWER passes than the
+          // configured max: one round over all pages exercises the whole repair
+          // path (eval -> redo -> re-eval) at a third of the time and image
+          // spend, which is what measurement runs want. Rounds 2-3 cost 17.5 of
+          // the 46 images-stage minutes on a 14-page story. Admin-gated above;
+          // clamped so a request can never ask for MORE than configured.
+          maxRegenAttempts: enableFullRepair ? repairPasses : 0,
           evalConcurrency: 500,
           qualityModelOverride: modelOverrides.qualityModel,
           useIteratePage: true  // Use iterate (re-expansion) for better redo quality
@@ -8084,13 +8094,14 @@ async function _processStoryJobImpl(jobId) {
       delete inputData.skipCovers;
       delete inputData.layoutOverride;
       delete inputData.enableFullRepair; // fall back to default (ON)
+      delete inputData.maxRepairPasses;   // fall back to REPAIR_DEFAULTS.maxPasses
     }
 
     const skipImages = inputData.skipImages === true; // Developer mode: text only
     const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
     const enableFullRepair = inputData.enableFullRepair !== false; // Full repair after generation (default: ON)
 
-    log.info(`🔧 [PIPELINE] Settings: enableFullRepair=${enableFullRepair}, skipImages=${skipImages}, skipCovers=${skipCovers}`);
+    log.info(`🔧 [PIPELINE] Settings: enableFullRepair=${enableFullRepair}, skipImages=${skipImages}, skipCovers=${skipCovers}${inputData.maxRepairPasses != null ? `, maxRepairPasses=${inputData.maxRepairPasses}` : ''}`);
 
     // Developer mode: model overrides (admin only — non-admin overrides were
     // stripped above). Use centralized MODEL_DEFAULTS from textModels.js.
