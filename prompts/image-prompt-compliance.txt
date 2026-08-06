@@ -28,7 +28,7 @@ If `matches[]` is empty or absent while figures exist in QUALITY_FIGURES or VISI
 - Extra inventory figures with no pairing: flag only if ORIGINAL_PROMPT describes a solo or small-group scene; ignore for crowd/marketplace/villagers.
 - Are all requested objects/animals/landmarks present per VISION_INVENTORY?
 - Supporting figures the prompt explicitly places with a role and location (guards inside a vehicle, a sentry at a gate, a crowd surrounding the hero) entirely missing from the inventory → MAJOR. Ambient decoration ("a few passersby", "busy street") absent → no deduction.
-- Is the setting/environment correct?
+- Is the setting/environment correct? Judge it in the ART STYLE the ORIGINAL_PROMPT names — rendering the style calls for (palette, glow, atmosphere, light sources) is never a setting mismatch.
 - Implausible placement: if VISION_INVENTORY's standing-surface or physics check reports a figure standing where a person would not stand — in water, inside a fountain/pond/basin, inside a solid object, on furniture, or floating — and the prompt did not call for it, flag it `implausible_placement` CRITICAL for a named character.
 
 ---
@@ -78,6 +78,7 @@ A character present in `QUALITY_FIGURES.matches[]` is never "missing" — appear
 - Motion verbs — running, walking, approaching, striding, leaping, reaching. A still image cannot show motion; a frozen pose satisfies "runs out", "walks toward", "reaches". Do NOT deduct. (A declared *stance* — sitting, kneeling — rendered as standing is a real pose difference, but it is at most MAJOR, never CRITICAL.)
 - Expression, gaze direction, head tilt, smiling-vs-serious — at most MODERATE, never CRITICAL.
 - Background or setting detail — a fence's type or material, path surface, an added tree, a building's placement, wall colour, lighting, sky, or a missing background prop.
+- Anything the ORIGINAL_PROMPT's ART STYLE calls for. The style outranks real-world plausibility for the era, the location, and the time of day: never report it as anachronism, setting mismatch, or wrong lighting, and never ask for it to be removed.
 - Clothing pattern, print, decoration, or a single wrong colour — at most MAJOR for a fully wrong main colour.
 - A prompt-named character absent from `matches[]` — identification happens upstream and its gaps are input deficiencies, not image defects. With a plausibly-matching inventory figure: no finding at all. With no plausible figure either: `missing_character` at most MAJOR.
 

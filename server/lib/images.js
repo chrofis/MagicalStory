@@ -9014,6 +9014,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const styleInput = {
       sceneImages: stylePages,
       coverImages: styleCovers,
+      // Commissioned style — lets the audit judge the dominant cluster against
+      // what was actually ordered, not just against itself.
+      artStyle: storyData?.artStyle,
     };
     if (stylePages.filter(p => p.imageData).length >= 2) {
       styleConsistency = await checkStoryStyleConsistency(styleInput, { usageTracker });
@@ -9025,7 +9028,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // checkStyleMatch inside repairPageStyle. Flag-gated by
       // MODEL_DEFAULTS.styleRepairProduction (env STYLE_REPAIR_PRODUCTION,
       // default true); model per MODEL_DEFAULTS.styleRepairModel.
-      if (MODEL_DEFAULTS.styleRepairProduction && (styleConsistency.outliers?.length || 0) > 0) {
+      // Absolute guard (2026-08-06): style-repair repaints outliers TOWARD the
+      // dominant cluster. When the dominant cluster is itself off the
+      // commissioned style, that drags the few correctly-styled pages into the
+      // drift — observed on a "cyber" book that rendered mostly photoreal,
+      // where the two comic-styled pages were flagged as the outliers and one
+      // was repainted photoreal. No anchor is better than a wrong anchor.
+      const dominantOffStyle = styleConsistency.styleMatch && !styleConsistency.styleMatch.dominantMatches;
+      if (dominantOffStyle) {
+        log.warn(`🎨 [UNIFIED PIPELINE] Step 5: style-repair SKIPPED — the dominant cluster is off the commissioned style ("${storyData?.artStyle}"), so its anchor page would spread the drift. ${styleConsistency.outliers?.length || 0} outlier(s) surfaced only.`);
+      }
+      if (!dominantOffStyle && MODEL_DEFAULTS.styleRepairProduction && (styleConsistency.outliers?.length || 0) > 0) {
         const { planStyleRepair, repairPageStyle } = require('./styleRepair');
         const styleRepairModel = MODEL_DEFAULTS.styleRepairModel === 'grok' ? 'grok' : 'gemini';
         const plan = planStyleRepair(styleConsistency, styleInput);
@@ -9268,6 +9281,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       scoreSource: v.scoreSource || null,
       evalScore: v.evalScore ?? null,
       entityPenalty: v.entityPenalty ?? 0,
+      // Un-clamped diagnostics. finalScore pins at 0 and evalScore is derived
+      // back as finalScore + entityPenalty, so once a page bottoms out every
+      // version reads finalScore=0 with entityPenalty===evalScore and they are
+      // indistinguishable — exactly the state applyScore writes these two
+      // fields to disambiguate. They were never persisted, so the signal died
+      // at save time. rawScore says how far below zero; entityPenaltyRaw says
+      // how much entity penalty was capped away.
+      rawScore: v.rawScore ?? null,
+      entityPenaltyRaw: v.entityPenaltyRaw ?? null,
       // Detailed evaluator outputs — kept verbatim because the dev panel uses
       // the structured detail (visible/expected character lists from semantic,
       // visionInventory from three-stage) that doesn't fit in scoreBreakdown.

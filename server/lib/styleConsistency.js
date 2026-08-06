@@ -10,6 +10,16 @@
  * description?". A single multi-image vision call gives the model the
  * context it needs to spot odd-ones-out by comparison.
  *
+ * RELATIVE IS NOT ENOUGH ON ITS OWN (2026-08-06). When the MAJORITY of a book
+ * collapses away from the requested art style, "consistent with the rest"
+ * canonises the collapse: a cyberpunk book rendered mostly photoreal had its
+ * two correctly-stylised comic pages flagged as the outliers, and style-repair
+ * repainted one of them toward the photorealism. So the relative clustering
+ * stays exactly as it was, and an ABSOLUTE check rides alongside it:
+ * `styleMatch.dominantMatches` says whether the dominant cluster is actually
+ * the requested style. When it is false, the anchor is untrustworthy and
+ * callers must not repair outliers toward it.
+ *
  * Usage: const result = await checkStoryStyleConsistency(storyData)
  */
 
@@ -17,6 +27,7 @@ const sharp = require('sharp');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('./r2');
+const { resolveArtStyle } = require('./storyHelpers');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -102,7 +113,8 @@ async function buildStyleGrid(cells) {
  *   anchorPage: number,
  *   outliers: Array<{page: number, severity: 'major'|'moderate'|'minor', differences: string[]}>,
  *   reasoning: string,
- *   gridImage: string  // base64 data URL of the grid sent to Gemini (for UI display)
+ *   gridImage: string,  // base64 data URL of the grid sent to Gemini (for UI display)
+ *   styleMatch: {requestedStyle: string, dominantMatches: boolean, differences: string[]}|null
  * }>}
  */
 async function checkStoryStyleConsistency(storyData, opts = {}) {
@@ -139,6 +151,14 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
     throw new Error(`style-check needs ≥2 images, got ${cells.length}`);
   }
 
+  // Absolute anchor: what the book was actually commissioned as. Resolved from
+  // the story blob so no caller has to thread it through. Null (unknown style
+  // id) simply drops the absolute check and leaves the relative audit intact.
+  const requestedStyle = resolveArtStyle(storyData.artStyle) || null;
+  if (!requestedStyle && storyData.artStyle) {
+    log.warn(`🎨 [STYLE-CHECK] art style "${storyData.artStyle}" did not resolve — running relative check only`);
+  }
+
   log.info(`🎨 [STYLE-CHECK] Building grid for ${cells.length} images (${cells.length - coverCount} pages + ${coverCount} cover(s))`);
   const gridBuffer = await buildStyleGrid(cells);
   log.info(`🎨 [STYLE-CHECK] Grid built: ${(gridBuffer.length / 1024).toFixed(0)}KB, sending to ${modelId}...`);
@@ -149,6 +169,12 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
   const prompt = `You are a visual-style auditor for a children's storybook.
 
 The image you see is a labelled grid of every illustrated page from one storybook (and its front cover, if shown). Each cell has a label like "Page 3" or "Front cover".
+${requestedStyle ? `
+The book was commissioned in this art style:
+"""
+${requestedStyle}
+"""
+` : ''}
 
 Cluster the cells by VISUAL STYLE. Look at:
 - Color palette (warm/cool, saturated/muted, dominant hues)
@@ -164,14 +190,18 @@ For each outlier, name 2-4 SPECIFIC differences (not just "different style"). Se
 - "moderate" — same family but visibly off (palette shift, line weight different, lighting tone different)
 - "minor"    — subtle inconsistency (slight color cast, small edge-style variation)
 
-Return ONLY this JSON, no prose:
+${requestedStyle ? `Separately from the clustering, judge the dominant cluster against the commissioned art style above. Judge the rendering technique — is it drawn the way that style describes, or is it photographic when the style is not? Ignore whether individual scenes suit the subject matter. A majority is not evidence of correctness: if most cells drifted off the commissioned style, say so.
+
+` : ''}Return ONLY this JSON, no prose:
 {
   "verdict": "consistent" | "mixed" | "fragmented",
   "dominantCluster": [<page numbers in cluster>],
   "anchorPage": <page number>,
   "outliers": [
     { "page": <number>, "severity": "major"|"moderate"|"minor", "differences": ["...", "..."] }
-  ],
+  ],${requestedStyle ? `
+  "dominantMatchesRequestedStyle": true | false,
+  "requestedStyleDifferences": ["<how the dominant cluster departs from the commissioned style; empty when it matches>"],` : ''}
   "reasoning": "<2-3 sentences explaining what unifies the dominant cluster and how the outliers diverge>"
 }
 
@@ -218,9 +248,22 @@ Verdict rule:
     outliers: Array.isArray(parsed.outliers) ? parsed.outliers : [],
     reasoning: parsed.reasoning || '',
     gridImage: `data:image/jpeg;base64,${gridBuffer.toString('base64')}`,
+    // Absolute check. dominantMatches === false means the book as a whole
+    // drifted off the commissioned style, so anchorPage is NOT a valid repair
+    // target. null when no style was resolvable (check did not run).
+    styleMatch: requestedStyle
+      ? {
+          requestedStyle,
+          dominantMatches: parsed.dominantMatchesRequestedStyle !== false,
+          differences: Array.isArray(parsed.requestedStyleDifferences) ? parsed.requestedStyleDifferences : [],
+        }
+      : null,
   };
 
   log.info(`🎨 [STYLE-CHECK] verdict=${out.verdict}, dominant=${out.dominantCluster.length} pages, anchor=Page ${out.anchorPage}, outliers=${out.outliers.length}`);
+  if (out.styleMatch && !out.styleMatch.dominantMatches) {
+    log.warn(`🎨 [STYLE-CHECK] the DOMINANT style does not match the commissioned art style "${storyData.artStyle}" — the book drifted as a whole: ${out.styleMatch.differences.slice(0, 3).join('; ')}`);
+  }
   for (const o of out.outliers) {
     log.info(`🎨 [STYLE-CHECK] outlier Page ${o.page} [${o.severity}]: ${o.differences?.slice(0, 2).join('; ')}`);
   }

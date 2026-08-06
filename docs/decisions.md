@@ -4965,3 +4965,87 @@ from a hard-eroded (6σ) round-1 mask, so a seed must sit deep inside the area b
 share; combined with today's occluder subtraction on round 2.
 
 **Touched:** `server/lib/faceRepair.js`, `server/lib/samBlend.js`.
+
+---
+
+## 2026-08-06 — Art-style collapse: the plate is the style anchor, and "consistency" canonised the drift
+
+**Context:** Owner on story `job_1786024729214_zrjgzqiey` (artStyle `cyber`): "page 5 why is this
+photo realistic, it should be cyberpunk — I do not believe we passed the correct avatars."
+
+**The avatars were correct.** All five styled 2×4 sheets were genuinely cyberpunk (Pass-2 Grok
+style transfer, finalScore 9). The three references actually sent for p5 were the empty-scene
+plate + two correctly-stylised character cards. Page 5's v0 (pre-repair) is already photoreal, so
+the char-fix is not the cause either. Decisive counter-evidence for any avatar theory: the SAME
+illustrated Lily card produced an illustrated p1 and a fully photoreal p4.
+
+**It is book-wide, not page 5.** Photoreal: p4, p5, p6, p11, p14. Illustrated: p1, p7. The
+requested style survives only as neon set-dressing on some pages.
+
+**Root cause (two layers).**
+1. Every empty-scene plate renders photorealistically despite carrying the identical ART STYLE
+   block (verified on the p1 kitchen, p4 car and p5 bridge plates). In `empty-scene.txt` the style
+   sat LAST, after a long block instructing the model to match a real-world landmark photograph —
+   which primes photography. The plate is then reference #1 for the page, and
+   `image-generation.txt` told the model to "copy its setting, architecture, geography, and
+   lighting" with no style qualifier. Grok harmonises the stylised character cards down to the
+   plate's rendering. It is non-deterministic, which is why it reads as a per-page avatar bug.
+2. Nothing measured style adherence. `emptySceneQc` is null on all 14 pages; neither
+   `image-evaluation.txt` nor `image-semantic.txt` scores it.
+
+**The feedback loop made it worse.** `checkStoryStyleConsistency` is deliberately RELATIVE
+("is this consistent with the rest?"). With the majority collapsed, it declared the dominant style
+to be "soft, painterly, natural colour palettes, realistic characters", flagged the two
+correctly-stylised comic pages (3 and 10) as the outliers, and production style-repair repainted
+p3 toward the photorealism (`bestSource: style-repair-gemini`). The evaluator pushed the same way:
+p5's three-stage compliance raised a CRITICAL "anachronistic neon lights, inconsistent with an
+1815 historical bridge" and prescribed "remove the neon strips; brighten to natural sunlight" —
+judging the art style against real-world plausibility.
+
+**Decision:**
+1. `empty-scene.txt` — ART STYLE moves to the TOP (single site; the trailing duplicate is
+   removed), plus a line binding the backdrop to the style. The landmark-photo block now says to
+   take geometry from the photo and explicitly not its rendering.
+2. `image-generation.txt` — reference #1 supplies setting/architecture/geography/light DIRECTION;
+   "take its layout, not its rendering", and the ART STYLE governs how everything is drawn.
+3. Relative style consistency is KEPT as-is; an ABSOLUTE check rides alongside it.
+   `checkStoryStyleConsistency` now resolves the commissioned style from `storyData.artStyle` and
+   returns `styleMatch.dominantMatches`. When the dominant cluster is itself off-style, production
+   style-repair is SKIPPED — a wrong anchor spreads the drift instead of fixing it. Outliers are
+   still surfaced. Rationale: no anchor beats a wrong anchor; this does not re-litigate the
+   relative design, it guards its failure mode.
+4. Evaluators: art-style elements are never anachronism / setting-mismatch / wrong-lighting
+   findings, and must never be prescribed for removal (`image-prompt-compliance.txt`,
+   `image-evaluation.txt`).
+
+**Status:** 🟡 shipped to staging, UNVALIDATED. Per validating-prompt-changes these are corpus
+changes and must not be judged on page 5 alone — needs a Test Lab run across ≥3 stories in
+different art styles before promoting to master.
+
+**Touched:** `prompts/empty-scene.txt`, `prompts/image-generation.txt`,
+`prompts/image-prompt-compliance.txt`, `prompts/image-evaluation.txt`,
+`server/lib/styleConsistency.js`, `server/lib/images.js`.
+
+---
+
+## 2026-08-06 — Page 13 scored 0: not a scoring bug, but the diagnostics were dropped at save
+
+**Context:** Same story, p13 `finalScore: 0` with all five versions reading eval===penalty
+(40/40, 30/30, 10/10, 40/40, 35/35) — which looks like the entity penalty being clamped to the
+score.
+
+**It is not.** `applyScore` (scoring.js) derives `evalScore = finalScore + entityPenalty`, and
+`finalScore` is clamped at 0. Once a version bottoms out, evalScore necessarily reads back as
+exactly the entity penalty. p13 genuinely failed every round (deductions ≥ 100 each time), so all
+five versions tie at 0 and version selection has no signal left to pick on.
+
+**The real defect** is that `applyScore` writes `rawScore` (un-clamped, "how far below zero") and
+`entityPenaltyRaw` (pre-cap) specifically to disambiguate this state — and the version persist
+mapping in `images.js` is an explicit allowlist that never copied either one. Both were dropped
+before the story was saved, so the exact signal designed for this case is absent from the DB.
+Fixed: both fields are now persisted.
+
+**Still open:** nothing breaks the all-zero tie when every version fails. Worth deciding whether
+the picker should fall back to `rawScore` ordering.
+
+**Touched:** `server/lib/images.js`.
