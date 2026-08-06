@@ -421,6 +421,9 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   const t0 = Date.now();
   const result = await generateImageOnly(prompt, ctx.referencePhotos, {
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+    // params.imageModel: A/B the page render model (grok-imagine vs
+    // gemini-2.5-flash-image) — style-adherence routing tests. Null = prod default.
+    imageModelOverride: params.imageModel || null,
     landmarkPhotos: genLandmarkPhotos,
     visualBibleGrid,
     artStyle,
@@ -1501,7 +1504,9 @@ async function runCoverStage(target, { experimentId, promptOverride, params = {}
   }
   if (params.artStyle) storyData.artStyle = params.artStyle;
   const result = await iterateCover(coverKey, storyData, {
-    imageModel: MODEL_DEFAULTS.coverImage,
+    // params.imageModel: A/B the cover render model (e.g. grok-imagine vs
+    // gemini-2.5-flash-image) — style-adherence routing tests. Defaults to prod.
+    imageModel: params.imageModel || MODEL_DEFAULTS.coverImage,
     freshCharacters,
     compositeCovers: params.composite === true,
     landmarkBufOverride,

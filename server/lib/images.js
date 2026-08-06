@@ -5044,8 +5044,14 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
   // Whether slot-0 scene plates get magenta-extension padding (gen-only only).
   const slot0IsScenePlate = usePadExtension && !!(sceneBackground || (Array.isArray(landmarkPhotos) && landmarkPhotos.length) || previousImage);
 
-  // Priority: override param > CONFIG_DEFAULTS > 'gemini'
-  const imageBackend = imageBackendOverride || CONFIG_DEFAULTS?.imageBackend || 'gemini';
+  // Priority: explicit backend override > the overridden model's OWN backend >
+  // CONFIG_DEFAULTS > 'gemini'. Deriving the backend from imageModelOverride is
+  // what makes a model-key override actually switch providers: passing
+  // imageModelOverride='gemini-2.5-flash-image' with no imageBackendOverride
+  // previously stayed on the default (grok) backend and silently rendered on
+  // Grok — so any model-only A/B compared a model against itself.
+  const modelBackend = imageModelOverride ? IMAGE_MODELS[imageModelOverride]?.backend : null;
+  const imageBackend = imageBackendOverride || modelBackend || CONFIG_DEFAULTS?.imageBackend || 'gemini';
   if (verbose) {
     log.info(`🎨 [${logLabel}] Backend: ${imageBackend} (override=${imageBackendOverride || 'none'}, default=${CONFIG_DEFAULTS?.imageBackend || 'gemini'})`);
   } else {
