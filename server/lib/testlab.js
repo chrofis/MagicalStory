@@ -2430,7 +2430,12 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       );
       const t = Date.now();
       try {
-        const res = await callStream(prompt, 10000, null, params.sceneModel || null, { usageLabel: 'testlab_beats_scene_expansion' });
+        const res = await callStream(prompt, 10000, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
+          usageLabel: 'testlab_beats_scene_expansion',
+          // Scene expansion is transcription, not judgement — reasoning is pure
+          // waste here (measured 14,867 reasoning tokens for 2,505 of answer).
+          ...(params.sceneNoReasoning ? { reasoning: { enabled: false } } : {}),
+        });
         return {
           pageNumber: b.pageNumber,
           ok: true,

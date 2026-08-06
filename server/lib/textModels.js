@@ -943,6 +943,11 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
           stream: true,
           stream_options: { include_usage: true },
           usage: { include: true },                      // real cost, not our estimate
+          // Reasoning control. Measured on deepseek-v4-pro: {enabled:false}
+          // takes reasoning tokens to zero (1.7x cheaper, 1.5x faster, same
+          // answer). Do NOT use {effort:'low'} or {max_tokens:N} — both are
+          // ignored and measured 9x MORE expensive than the baseline.
+          ...(options.reasoning ? { reasoning: options.reasoning } : {}),
           // allow_fallbacks keeps the call alive if every pinned provider is
           // down — it drops to OpenRouter's own choice rather than failing.
           ...(providerPref !== 'off'
