@@ -444,6 +444,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
 
   const oldMask = oldMaskPng || (maskFetcher ? await maskFetcher(originalCropBuf) : await fetchMaskWithRetry(originalCropBuf, boxInCrop, 5, maskPoints || {}));
   if (!oldMask) throw fail('SAM could not mask the original figure (mask service unavailable?) — retry.');
+  const n0 = cropW * cropH;
   let newMask;
   if (maskFetcher) {
     newMask = await maskFetcher(candidateCropBuf);
@@ -460,7 +461,23 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
       Math.min(cropW, Math.round(boxInCrop[2] + bw * 0.04)),
       Math.min(cropH, Math.round(boxInCrop[3] + bh * 0.04)),
     ];
-    const seeds = await _interiorSeedPoints(oldMask, cropW, cropH);
+    // Seeds come from ROUND 1's mask — points inside the OLD figure — but they
+    // are applied to the MODEL'S output. If the model drew the figure narrower or
+    // shifted (it usually does, a few percent), a seed lands on background or on
+    // a NEIGHBOUR, and SAM grows that instead: this is the main reason round 2
+    // returns someone else's sleeve or shoe. Keep only seeds that still sit on
+    // figure-like content in the candidate: erode round 1's mask hard first, so
+    // a seed must be deep inside the shared area of both figures.
+    const eroded = await maskBlurThreshold(
+      await sharp(oldMask).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer().then(a => {
+        const st = Math.max(1, Math.round(a.length / n0));
+        const b = Buffer.alloc(n0);
+        for (let i = 0; i < n0; i++) b[i] = a[i * st] > 128 ? 255 : 0;
+        return b;
+      }), cropW, cropH, 6, 200);
+    const erodedPng = await sharp(Buffer.alloc(n0 * 3, 255), { raw: { width: cropW, height: cropH, channels: 3 } })
+      .ensureAlpha().joinChannel(eroded, { raw: { width: cropW, height: cropH, channels: 1 } }).png().toBuffer();
+    const seeds = await _interiorSeedPoints(erodedPng, cropW, cropH);
     const r2Opts = { ...(maskPoints || {}) };
     if (seeds.length) r2Opts.points = [...(r2Opts.points || []), ...seeds];
     newMask = await fetchMaskWithRetry(candidateCropBuf, padBox, 5, r2Opts);

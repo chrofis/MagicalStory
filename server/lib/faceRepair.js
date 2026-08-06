@@ -795,7 +795,13 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       // percent off (exp #345: ~40px lower, IoU 53% -> gate reject). Register
       // the candidate onto the original silhouette first; only kept if IoU
       // improves, so a genuinely re-posed figure is still rejected.
-      registerCandidate: regionSource === 'cutout',
+      // ALWAYS on. In cutout mode it also SHIFTS the candidate; in box mode the
+      // model edits in place, so a background that still mismatches after the
+      // best alignment means the model redrew the scene — reject it. Box-mode
+      // production repairs previously had no background check at all, which is
+      // why a misaligned paste shipped (story job_1786024729214_zrjgzqiey p5)
+      // while the same page was rejected in the Lab.
+      registerCandidate: true,
       // garmentOnly / bgBorderMatch default to true inside samUnionBlend; thread
       // them only when a caller (Test Lab A/B) overrides, so prod keeps the defaults.
       ...(opts.garmentOnly !== undefined ? { garmentOnly: opts.garmentOnly } : {}),

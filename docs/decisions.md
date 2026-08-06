@@ -4933,3 +4933,35 @@ break happened at page generation. The visible vertical seam through Margaret's 
 v1 is a separate paste defect, still open.
 
 **Touched:** `server/lib/faceRepair.js`, `server/lib/images.js`.
+
+---
+
+## 2026-08-06 — Why the Lab rejected and production didn't; and why round-2 SAM is poor
+
+**Q1 — different verdicts.** The gates ARE on in production (all default true; the production
+call sends no overrides), so it ran the same IoU gate and PASSED — that roll of Grok happened
+to align above 0.55 while the Lab's roll didn't. Not a config difference. BUT the
+background-alignment gate added earlier only ran when `registerCandidate` was set, i.e.
+CUTOUT only — so box-mode production repairs (the default) had no background check at all.
+That is the gate that catches "model redrew/misplaced the scene", which is exactly the p5
+failure. **Now enabled for every repair:** in cutout mode it also shifts the candidate; in box
+mode it purely gates (the model edits in place, so a background that still mismatches after
+best alignment means the scene was redrawn → reject).
+
+**Q2 — why round 2 is much worse than round 1.** They are not comparable operations:
+
+| | round 1 (original) | round 2 (model output) |
+|---|---|---|
+| image | the real page | the model's render |
+| framing | tight hatch crop (bbox+12%) | blend crop |
+| other characters | occluder-subtracted | none until today's fix |
+| seed points | — | taken from ROUND 1's mask |
+
+The seeds are the main defect: they are interior points of the OLD figure, applied to the
+NEW image. The model almost always draws the figure a few percent narrower or shifted, so a
+seed can land on background or on a NEIGHBOUR — and SAM then grows THAT region. This is the
+mechanism behind "round 2 returned someone else's shoe/sleeve". **Fix:** seeds are now taken
+from a hard-eroded (6σ) round-1 mask, so a seed must sit deep inside the area both figures
+share; combined with today's occluder subtraction on round 2.
+
+**Touched:** `server/lib/faceRepair.js`, `server/lib/samBlend.js`.
