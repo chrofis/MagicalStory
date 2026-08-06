@@ -305,7 +305,7 @@ function applyHueRotation(raw, n, maskBin, { clusterHueRad, cast, rotationRad, h
  * @returns {{ applied, reason, driftDeg, rotationDeg, garmentHueDeg, avatarHueDeg,
  *             cast, avatarCast, correctedRaw }}
  */
-function normalizeGarmentRaw({ pageRaw, n, pageMask, castMask, avatarRaw, avatarN, avatarMask, opts = {} }) {
+function normalizeGarmentRaw({ pageRaw, n, pageMask, sampleMask, castMask, avatarRaw, avatarN, avatarMask, opts = {} }) {
   const cfg = { ...DEFAULTS, ...opts };
   // Scene cast: gray-world over the page BACKGROUND (outside every figure), not
   // the whole frame. A figure that fills much of the frame otherwise dominates
@@ -323,7 +323,13 @@ function normalizeGarmentRaw({ pageRaw, n, pageMask, castMask, avatarRaw, avatar
   // yields cast (6.9, 3.6), and discounting it collapses chroma 27.2 → 6.5 and
   // flips the hue ~162°). Read the avatar hue in ABSOLUTE LAB space.
   const avatarCast = { a: 0, b: 0, count: avatarN };
-  const garment = sampleGarmentHue(pageRaw, n, pageMask, cast, cfg);
+  // MEASURE inside sampleMask (tight, high signal — e.g. the torso band), but
+  // APPLY across pageMask (the whole figure). They must not be the same mask: a
+  // full-length dress reads its hue from the bodice yet has to rotate all the
+  // way down, and rotating only the sampling rectangle leaves a hard horizontal
+  // seam mid-garment. Which pixels actually move is decided by the hue window in
+  // applyHueRotation, not by the extent of the mask.
+  const garment = sampleGarmentHue(pageRaw, n, sampleMask || pageMask, cast, cfg);
   const avatar = sampleGarmentClusters(avatarRaw, avatarN, avatarMask, avatarCast, cfg, 3);
   if (garment && garment.count < cfg.minGarmentPixels) {
     return { applied: false, reason: `too few garment px (${garment.count})`, driftDeg: 0, rotationDeg: 0, garmentHueDeg: +(garment.hueRad * DEG).toFixed(1), avatarHueDeg: avatar.length ? +(avatar[0].hueRad * DEG).toFixed(1) : null, cast, avatarCast, correctedRaw: pageRaw };
@@ -465,14 +471,18 @@ async function normalizeGarmentHue(pageImageData, bboxDetection, resolveAvatar, 
     try { avatarUri = await resolveAvatar(fig); } catch { avatarUri = null; }
     if (!avatarUri) { perFigure.push({ name, applied: false, reason: 'no avatar resolved' }); continue; }
 
-    // Sampling mask: the shared SAM silhouette when we have one (tight to the
-    // figure), else the TORSO band of the bodyBox — the raw rectangle carries
-    // head, legs and corner background, which dilute the garment sample.
-    let pageMask = null, maskSource = 'sam';
+    // TWO masks, deliberately different (see normalizeGarmentRaw):
+    //   pageMask   — where the rotation may be APPLIED: the whole figure.
+    //   sampleMask — where the hue is MEASURED: tight and high-signal.
+    // With a SAM silhouette both are the silhouette. Without one we apply over
+    // the full bodyBox but measure only its TORSO band, because the raw
+    // rectangle carries head, legs and corner background that dilute the sample.
+    let pageMask = null, sampleMask = null, maskSource = 'sam';
     if (masks && masks[fi]) pageMask = await maskToBin(masks[fi], W, H);
     if ((!pageMask || !pageMask.some(v => v)) && Array.isArray(fig.bodyBox)) {
-      pageMask = bboxToBin(torsoBoxFromBody(fig.bodyBox), W, H);
-      maskSource = 'torsoBox';
+      pageMask = bboxToBin(fig.bodyBox, W, H);
+      sampleMask = bboxToBin(torsoBoxFromBody(fig.bodyBox), W, H);
+      maskSource = 'bodyBox+torsoSample';
     }
     if (!pageMask) { perFigure.push({ name, applied: false, reason: 'no mask' }); continue; }
 
@@ -491,7 +501,7 @@ async function normalizeGarmentHue(pageImageData, bboxDetection, resolveAvatar, 
       continue;
     }
 
-    const res = normalizeGarmentRaw({ pageRaw: workingRaw, n, pageMask, castMask, avatarRaw, avatarN, avatarMask: null, opts: cfg });
+    const res = normalizeGarmentRaw({ pageRaw: workingRaw, n, pageMask, sampleMask, castMask, avatarRaw, avatarN, avatarMask: null, opts: cfg });
     const entry = {
       name,
       applied: res.applied,
@@ -509,6 +519,9 @@ async function normalizeGarmentHue(pageImageData, bboxDetection, resolveAvatar, 
         try {
           entry.beforeCrop = await cropDataUri(workingRaw, W, H, fig.bodyBox);
           entry.afterCrop = await cropDataUri(res.correctedRaw, W, H, fig.bodyBox);
+          // The styled avatar sheet the target hue was read FROM — so a reviewer
+          // can judge the correction against its reference, not just before/after.
+          entry.referenceSheet = avatarUri;
         } catch { /* crops are a debugging aid; ignore failure */ }
       }
       workingRaw = res.correctedRaw;

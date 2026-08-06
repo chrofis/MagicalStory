@@ -1109,9 +1109,15 @@ async function runGarmentHueStage(ctx, { experimentId, params = {} }) {
   });
   const elapsedMs = Date.now() - t0;
 
-  // Before/after crops per corrected figure as inspectable step images.
+  // REFERENCE → BEFORE → AFTER per corrected figure as inspectable step images.
+  // The reference sheet comes first deliberately: the correction is only
+  // judgeable against the avatar the target hue was actually read from.
   const steps = [];
   for (const f of out.perFigure) {
+    if (f.referenceSheet) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, f.referenceSheet, experimentId);
+      steps.push({ label: `${f.name} REFERENCE — styled avatar (avatar ${f.avatarHueDeg}°)`, imageType: 'tl_step', versionIndex: v });
+    }
     if (f.beforeCrop) {
       const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, f.beforeCrop, experimentId);
       steps.push({ label: `${f.name} BEFORE (garment ${f.garmentHueDeg}°)`, imageType: 'tl_step', versionIndex: v });

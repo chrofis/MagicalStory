@@ -329,5 +329,40 @@ function avatarBuf(garment) {
   check('a non-box passes through unchanged', G.torsoBoxFromBody(null) === null);
 })();
 
+// ── TEST 12 — REGRESSION: measure in the torso band, APPLY to the whole figure ─
+// The sampling mask and the application mask must NOT be the same buffer. A
+// full-length dress reads its hue from the bodice but has to rotate all the way
+// down; rotating only the sampling rectangle left a hard horizontal seam across
+// the skirt (observed on real pages — the recoloured region was literally the
+// torso rectangle). Which pixels move is decided by the hue window, not by the
+// extent of the sampling mask.
+(function testSampleMaskVsApplyMask() {
+  console.log('\nTEST 12 — hue is sampled in the torso band but applied to the whole garment');
+  const page = blank(BG);
+  // A "dress": one continuous garment from y=10 (bodice) to y=36 (hem).
+  fillRect(page, 12, 10, 28, 36, ORANGE);
+  const figure = rectMask(10, 8, 30, 38);                 // whole figure
+  const torso = rectMask(12, 12, 28, 22);                 // bodice only
+  const av = avatarBuf(RED);
+  const res = G.normalizeGarmentRaw({
+    pageRaw: page, n: N, pageMask: figure, sampleMask: torso,
+    avatarRaw: av.raw, avatarN: av.n, avatarMask: av.mask,
+  });
+  check('applied', res.applied === true, res.reason);
+  const changedAt = (x, y) => {
+    const i = y * W + x;
+    return res.correctedRaw[i * 3] !== page[i * 3] || res.correctedRaw[i * 3 + 1] !== page[i * 3 + 1] || res.correctedRaw[i * 3 + 2] !== page[i * 3 + 2];
+  };
+  check('bodice (inside the sampling band) is corrected', changedAt(20, 16));
+  check('HEM (far below the sampling band) is corrected too — no seam', changedAt(20, 33));
+  check('mid-skirt is corrected', changedAt(20, 27));
+  // Nothing outside the figure mask may move.
+  check('background outside the figure mask untouched', !changedAt(2, 2) && !changedAt(38, 38));
+  // And the whole garment must land on ONE hue — no two-tone split.
+  const hAt = (x, y) => { const i = y * W + x; return hueDeg(res.correctedRaw[i * 3], res.correctedRaw[i * 3 + 1], res.correctedRaw[i * 3 + 2]); };
+  check('bodice and hem end on the SAME hue (single-tone garment)', angDist(hAt(20, 16), hAt(20, 33)) < 3,
+    `bodice ${hAt(20, 16).toFixed(1)}° vs hem ${hAt(20, 33).toFixed(1)}°`);
+})();
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
