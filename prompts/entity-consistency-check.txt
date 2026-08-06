@@ -77,8 +77,27 @@ Return ONLY valid JSON (no markdown, no explanation):
       "severity": "minor" | "major" | "critical"
     }
   ],
+  "garmentColourMismatches": [
+    {
+      "cells": ["B"],
+      "pagesToFix": [2],
+      "garment": "top",
+      "expectedColour": "yellow",
+      "observedColour": "orange"
+    }
+  ],
   "summary": "Brief overall assessment of this entity's consistency"
 }
+
+## Garment Colour
+
+A garment of the right shape in the wrong colour goes in `garmentColourMismatches`, never in `issues`. It is corrected mechanically and must not cost score or trigger a redraw.
+
+Report it whenever the garment's colour differs from the expected clothing description, including neighbouring hues such as orange against yellow, teal against sky-blue, or white against sage-green.
+
+Judge hue only. Scene lighting legitimately changes brightness and saturation, so a garment that is darker or duller in a dim scene is the same colour.
+
+A garment of the wrong kind, cut or category still belongs in `issues` as `clothing_inconsistent`. When one cell has both, report each in its own place.
 
 ## Issue Detection Rules
 
@@ -121,5 +140,6 @@ If no issues found, return:
   "consistent": true,
   "score": 10,
   "issues": [],
+  "garmentColourMismatches": [],
   "summary": "{ENTITY_NAME} appears consistent across all {CELL_COUNT} appearances"
 }

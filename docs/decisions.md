@@ -2709,6 +2709,42 @@ which make the pass DEFER page 2 correctly instead of blessing it.
 is photo-trained; confirm a garment prompt on a painterly page before relying on
 it for all styles.
 
+### Garment colour drift is reported on its OWN channel, not as an issue (2026-08-06)
+**Context:** Lily's top rendered orange instead of yellow on p2. The entity
+consistency check DID catch it — grid cell B, "appears orange/yellowish ... the
+expected clothing description specifies a 'yellow short-sleeved cotton top'" —
+but rated it `minor`, worth 2 points of 100, so it never tripped the redo gate
+(`scoring.js`: "minor wobbles shouldn't trip the redo gate"). The same class of
+error was rated `major` twice in the SAME report (Rachel white-vs-sage,
+Ethan teal-vs-sky-blue), so severity was the only thing that varied. Re-running
+the unchanged prompt on the stored grid caught it 12/12 — detection is reliable,
+severity is not.
+**Decision:** do NOT raise the severity. A garment of the right shape in the
+wrong colour now goes in a separate `garmentColourMismatches` array, never in
+`issues`, carrying `{garment, expectedColour, observedColour, cells, pagesToFix}`.
+It charges no severity points and cannot trigger a redraw.
+**Rationale (owner):** bad colour is fixable MECHANICALLY — a masked L\*a\*b\*
+match toward the canonical colour — so routing it through the issue path would
+regenerate a whole character to change a shirt's hue, which is the expensive
+wrong answer and churns everything else in the frame. Wrong garment KIND, cut or
+category still belongs in `issues` as `clothing_inconsistent`; a cell can report
+one of each. The eval already knows the expected colour from
+`clothingRequirements`, so no new grid, no new model call, no DINO pass is
+needed for DETECTION — the screening is already running and already free.
+**Measured after the change** (stored Lily grid, production config, 5 runs):
+colour mismatch on the new channel 5/5, leaked into `issues` 0/5, and the −15
+that remains is the genuine shorts defect.
+**Open:** the CONSUMER is not built. Nothing yet reads `garmentColourMismatches`
+and applies the correction — see the DINO+SAM + full-L\*a\*b\* entry above for
+the validated repair shape. Also open: crop extraction returned blank cells for
+2 of Lily's 8 grid cells (p3, p7 — a hand and a book, no character) and one of
+Rachel's, which produced a spurious `face_mismatch` **critical**.
+**Touched:** `prompts/entity-consistency-check.txt` (new output field + a
+"Garment Colour" section), `server/lib/entityConsistency.js`
+(`evaluateEntityConsistency` parses and logs the channel, keeps it out of
+`issues`).
+**Status:** ✅ active for reporting — 🟡 no consumer yet.
+
 ## Image-first story prompt variant — one call, scenes authored before text (2026-07-30)
 
 **Context:** roadmap §4 (image-first, owner strategic direction) + §5 (outline

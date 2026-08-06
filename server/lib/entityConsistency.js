@@ -2148,10 +2148,34 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
         canonicalVersion: issue.canonicalVersion
       }));
 
+      // Garment colour drift is reported on its OWN channel, never merged into
+      // `issues`. A garment of the right shape in the wrong colour is fixable
+      // mechanically (masked L*a*b* match toward the character's canonical
+      // colour), so it must not charge severity points or trip the redo gate —
+      // regenerating a whole character to change a shirt's hue is the expensive
+      // wrong answer, and it churns everything else in the frame.
+      const garmentColourMismatches = (parsed.garmentColourMismatches || [])
+        .filter(m => m && Array.isArray(m.pagesToFix) && m.pagesToFix.length)
+        .map(m => ({
+          source: 'entity-garment-colour',
+          affectedCharacter: entityName,
+          clothingCategory: clothingCategory || null,
+          garment: m.garment || 'garment',
+          expectedColour: m.expectedColour || null,
+          observedColour: m.observedColour || null,
+          cells: m.cells || [],
+          pagesToFix: m.pagesToFix,
+        }));
+      if (garmentColourMismatches.length) {
+        log.info(`🎨 [ENTITY-CHECK] ${entityName}: ${garmentColourMismatches.length} garment-colour mismatch(es) → mechanical fix, no redraw: ` +
+          garmentColourMismatches.map(m => `p${m.pagesToFix.join('/')} ${m.garment} ${m.observedColour}→${m.expectedColour}`).join(', '));
+      }
+
       return {
         consistent: parsed.consistent ?? true,
         score: parsed.score ?? 10,
         issues,
+        garmentColourMismatches,
         summary: parsed.summary || 'Evaluation complete',
         // O7: verbatim model output — was kept only on parse failure, so a
         // successful eval's raw judgment was unreconstructable afterwards.
