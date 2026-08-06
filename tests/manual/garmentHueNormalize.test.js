@@ -21,7 +21,10 @@ const Module = require('module');
 
 // ── Slice the LAB block out of images.js and run it in a tiny sandbox so the
 //    test uses the PRODUCTION conversion (never a copy that can drift). ────────
-const IMAGES_SRC = fs.readFileSync(path.join(__dirname, '../../server/lib/images.js'), 'utf8');
+// Normalize CRLF → LF: on a Windows checkout with core.autocrlf=true the file on
+// disk has CRLF line endings, so the multi-line needles below (written with \n)
+// would never match and every run would die in sliceBetween.
+const IMAGES_SRC = fs.readFileSync(path.join(__dirname, '../../server/lib/images.js'), 'utf8').replace(/\r\n/g, '\n');
 function sliceBetween(src, startNeedle, endNeedleAfter) {
   const s = src.indexOf(startNeedle);
   assert(s !== -1, `slice: cannot find "${startNeedle}"`);
@@ -246,6 +249,84 @@ function avatarBuf(garment) {
   const av = avatarBuf(RED);
   const res = G.normalizeGarmentRaw({ pageRaw: page, n: N, pageMask: mask, avatarRaw: av.raw, avatarN: av.n, avatarMask: av.mask });
   check('not applied (no garment hue to align)', res.applied === false, res.reason);
+})();
+
+// ── TEST 8 — REGRESSION: a garment-dominated avatar sheet keeps its chroma ────
+// A styled avatar sheet is a tight crop of one figure on a plain background, so
+// a gray-world mean over it is mostly the GARMENT, not illumination. Discounting
+// that mean cancels the signal: measured on a real sheet, a pink top gave cast
+// (6.9, 3.6), chroma collapsed 27.2 → 6.5 (under the min of 8 → "low chroma"
+// skip) and the hue flipped ~162° (→ bogus "drift too large"). The avatar side
+// must therefore be read in ABSOLUTE LAB space, with no cast discount.
+(function testAvatarSheetNotSelfDiscounted() {
+  console.log('\nTEST 8 — garment-dominated avatar sheet is NOT self-discounted');
+  // Avatar sheet where the garment covers most of the frame (the real case).
+  const av = blank([250, 250, 250]);            // near-white sheet background
+  fillRect(av, 4, 4, 36, 34, RED);              // garment dominates the sheet
+  const clusters = G.sampleGarmentClusters(av, N, null, { a: 0, b: 0 }, {}, 3);
+  check('avatar cluster found', clusters.length >= 1);
+  check('avatar chroma survives (>= chromaMin)', clusters[0].chroma >= G.DEFAULTS.chromaMin,
+    `chroma=${clusters[0] && clusters[0].chroma.toFixed(1)}`);
+  check('avatar hue is the true garment hue (~red 33°)',
+    angDist(clusters[0].hueRad * 180 / Math.PI, hueDeg(RED[0], RED[1], RED[2])) < 8,
+    `got ${(clusters[0].hueRad * 180 / Math.PI).toFixed(1)}°`);
+  // End-to-end: a drifted page garment against this sheet must still correct.
+  const page = blank(BG);
+  fillRect(page, 12, 15, 28, 30, ORANGE);
+  const res = G.normalizeGarmentRaw({ pageRaw: page, n: N, pageMask: rectMask(12, 15, 28, 30), avatarRaw: av, avatarN: N, avatarMask: null });
+  check('drift IS corrected against a garment-dominated sheet', res.applied === true, res.reason);
+})();
+
+// ── TEST 9 — REGRESSION: two-garment character matches the RIGHT cluster ──────
+// Characters usually wear two coloured garments (top + trousers). The page mask
+// and the avatar sheet can each be dominated by a DIFFERENT one, so comparing
+// dominant-to-dominant invents a near-180° drift. The page cluster must be
+// matched to the NEAREST avatar cluster instead.
+(function testTwoGarmentClusterMatch() {
+  console.log('\nTEST 9 — two-garment character matches the nearest avatar cluster');
+  // Avatar sheet: BLUE trousers dominate by area, RED top is the smaller region.
+  const av = blank([250, 250, 250]);
+  fillRect(av, 4, 20, 36, 38, BLUE);   // trousers — larger
+  fillRect(av, 12, 4, 28, 18, RED);    // top — smaller
+  const clusters = G.sampleGarmentClusters(av, N, null, { a: 0, b: 0 }, {}, 3);
+  check('both avatar garments are found as clusters', clusters.length >= 2, `got ${clusters.length}`);
+  // Page shows only the TOP (torso mask), drifted orange. Dominant avatar cluster
+  // is BLUE (~-65°), which is ~124° from orange → would be "drift too large".
+  const page = blank(BG);
+  fillRect(page, 12, 15, 28, 30, ORANGE);
+  const res = G.normalizeGarmentRaw({ pageRaw: page, n: N, pageMask: rectMask(12, 15, 28, 30), avatarRaw: av, avatarN: N, avatarMask: null });
+  check('corrected against the RED cluster, not the dominant BLUE one', res.applied === true, res.reason);
+  check('target hue is the red top, not the blue trousers',
+    angDist(res.avatarHueDeg, hueDeg(RED[0], RED[1], RED[2])) < 12, `avatarHueDeg=${res.avatarHueDeg}`);
+})();
+
+// ── TEST 10 — REGRESSION: background-masked cast still discounts illumination ─
+// The scene cast must come from the page BACKGROUND (outside every figure). A
+// figure that fills much of the frame otherwise lands its own garment colour in
+// the "illumination" mean. Discounting must still work through that mask.
+(function testBackgroundCastMask() {
+  console.log('\nTEST 10 — cast from background mask still discounts a global tint');
+  const page = blank(BG);
+  fillRect(page, 6, 6, 34, 34, RED);            // figure fills most of the frame
+  const figMask = rectMask(6, 6, 34, 34);
+  const castMask = Buffer.alloc(N, 255);
+  for (let i = 0; i < N; i++) if (figMask[i] > 128) castMask[i] = 0; // background only
+  const lit = castAll(page, 12, 14);             // strong global sunset cast
+  const av = avatarBuf(RED);
+  const res = G.normalizeGarmentRaw({ pageRaw: lit, n: N, pageMask: figMask, castMask, avatarRaw: av.raw, avatarN: av.n, avatarMask: av.mask });
+  check('global cast is NOT mistaken for garment drift', res.applied === false, res.reason);
+  check('correctedRaw untouched', res.correctedRaw === lit);
+})();
+
+// ── TEST 11 — torso fallback box geometry ────────────────────────────────────
+(function testTorsoBox() {
+  console.log('\nTEST 11 — torsoBoxFromBody trims head, legs and side background');
+  const [ymin, xmin, ymax, xmax] = G.torsoBoxFromBody([0, 0, 1, 1]);
+  check('starts below the head', ymin > 0.1, `ymin=${ymin}`);
+  check('ends above the legs', ymax < 0.7, `ymax=${ymax}`);
+  check('inset horizontally on both sides', xmin > 0.1 && xmax < 0.9, `x=${xmin}..${xmax}`);
+  check('non-degenerate', ymax > ymin && xmax > xmin);
+  check('a non-box passes through unchanged', G.torsoBoxFromBody(null) === null);
 })();
 
 console.log(`\n${passed} passed, ${failed} failed`);

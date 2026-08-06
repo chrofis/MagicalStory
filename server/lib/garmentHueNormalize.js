@@ -147,11 +147,14 @@ function estimateCast(raw, n, maskBin = null) {
  * @param {object} opts
  * @returns {{ hueRad:number, chroma:number, a:number, b:number, count:number }|null}
  */
-function sampleGarmentHue(raw, n, maskBin, cast, opts = {}) {
+function sampleGarmentClusters(raw, n, maskBin, cast, opts = {}, maxClusters = 3) {
   const { hueWindowDeg } = { ...DEFAULTS, ...opts };
   const BINS = 72; // 5° per bin
   const hist = new Float64Array(BINS);
-  // First pass: chroma-weighted hue histogram in discounted space.
+  // Single pass: collect the qualifying garment pixels in discounted space AND
+  // build the chroma-weighted hue histogram. Keeping the pixel list lets us peel
+  // off several clusters without re-decoding LAB per cluster.
+  const pa = [], pb = [], pc = [], pang = [];
   for (let i = 0; i < n; i++) {
     if (maskBin && maskBin[i] <= 128) continue;
     const r = raw[i * 3], g = raw[i * 3 + 1], b = raw[i * 3 + 2];
@@ -161,32 +164,44 @@ function sampleGarmentHue(raw, n, maskBin, cast, opts = {}) {
     const chroma = Math.hypot(da, db);
     if (chroma < 1) continue; // no hue
     let ang = Math.atan2(db, da); if (ang < 0) ang += 2 * Math.PI;
+    pa.push(da); pb.push(db); pc.push(chroma); pang.push(ang);
     const bin = Math.min(BINS - 1, Math.floor((ang / (2 * Math.PI)) * BINS));
     hist[bin] += chroma; // weight strongly-coloured pixels
   }
-  // Peak bin.
-  let peak = -1, peakVal = 0;
-  for (let k = 0; k < BINS; k++) if (hist[k] > peakVal) { peakVal = hist[k]; peak = k; }
-  if (peak < 0) return null;
-  const peakHue = (peak + 0.5) / BINS * 2 * Math.PI;
   const win = hueWindowDeg * RAD;
-  // Second pass: chroma-weighted mean discounted (a,b) of pixels near the peak.
-  let sa = 0, sb = 0, wsum = 0, cnt = 0;
-  for (let i = 0; i < n; i++) {
-    if (maskBin && maskBin[i] <= 128) continue;
-    const r = raw[i * 3], g = raw[i * 3 + 1], b = raw[i * 3 + 2];
-    if (!isGarmentPixel(r, g, b)) continue;
-    const lab = _rgbToLab(r, g, b);
-    const da = lab[1] - cast.a, db = lab[2] - cast.b;
-    const chroma = Math.hypot(da, db);
-    if (chroma < 1) continue;
-    let ang = Math.atan2(db, da); if (ang < 0) ang += 2 * Math.PI;
-    if (Math.abs(angDiff(peakHue, ang)) > win) continue;
-    sa += da * chroma; sb += db * chroma; wsum += chroma; cnt++;
+  const clusters = [];
+  for (let c = 0; c < maxClusters; c++) {
+    // Peak bin of what's left.
+    let peak = -1, peakVal = 0;
+    for (let k = 0; k < BINS; k++) if (hist[k] > peakVal) { peakVal = hist[k]; peak = k; }
+    if (peak < 0) break;
+    const peakHue = (peak + 0.5) / BINS * 2 * Math.PI;
+    // Chroma-weighted mean discounted (a,b) of pixels near the peak.
+    let sa = 0, sb = 0, wsum = 0, cnt = 0;
+    for (let i = 0; i < pang.length; i++) {
+      if (Math.abs(angDiff(peakHue, pang[i])) > win) continue;
+      sa += pa[i] * pc[i]; sb += pb[i] * pc[i]; wsum += pc[i]; cnt++;
+    }
+    // Consume this cluster's bins so the next iteration finds a DIFFERENT hue.
+    for (let k = 0; k < BINS; k++) {
+      const binHue = (k + 0.5) / BINS * 2 * Math.PI;
+      if (Math.abs(angDiff(peakHue, binHue)) <= win) hist[k] = 0;
+    }
+    if (!cnt || wsum <= 0) continue;
+    const a = sa / wsum, bb = sb / wsum;
+    clusters.push({ hueRad: Math.atan2(bb, a), chroma: Math.hypot(a, bb), a, b: bb, count: cnt, weight: wsum });
   }
-  if (!cnt || wsum <= 0) return null;
-  const a = sa / wsum, bb = sb / wsum;
-  return { hueRad: Math.atan2(bb, a), chroma: Math.hypot(a, bb), a, b: bb, count: cnt };
+  return clusters;
+}
+
+/**
+ * Dominant garment hue = the highest-weight cluster. Thin wrapper over
+ * sampleGarmentClusters, kept as the single-cluster entry point.
+ * @returns {{ hueRad:number, chroma:number, a:number, b:number, count:number }|null}
+ */
+function sampleGarmentHue(raw, n, maskBin, cast, opts = {}) {
+  const clusters = sampleGarmentClusters(raw, n, maskBin, cast, opts, 1);
+  return clusters.length ? clusters[0] : null;
 }
 
 /**
@@ -198,17 +213,31 @@ function sampleGarmentHue(raw, n, maskBin, cast, opts = {}) {
  * @returns {{ applied:boolean, reason:string, driftDeg:number, rotationDeg:number,
  *             garmentHueDeg:number, avatarHueDeg:number }}
  */
-function decideHueCorrection(garment, avatar, opts = {}) {
+function decideHueCorrection(garment, avatarIn, opts = {}) {
   const cfg = { ...DEFAULTS, ...opts };
   if (!garment) return { applied: false, reason: 'no garment sample', driftDeg: 0, rotationDeg: 0, garmentHueDeg: null, avatarHueDeg: null };
-  if (!avatar) return { applied: false, reason: 'no avatar sample', driftDeg: 0, rotationDeg: 0, garmentHueDeg: +(garment.hueRad * DEG).toFixed(1), avatarHueDeg: null };
+  // The avatar target may be a single sample (legacy) or a list of hue clusters.
+  // A character usually wears TWO coloured garments (pink top + blue jeans); the
+  // page mask and the avatar sheet can each be dominated by a different one, so
+  // comparing dominant-to-dominant invents a ~180° "drift". Match the page
+  // cluster to the NEAREST avatar cluster instead — the association threshold IS
+  // hueDriftMaxDeg, so an unmatchable hue still reads as a garment-TYPE error.
+  const avatarList = Array.isArray(avatarIn) ? avatarIn.filter(Boolean) : (avatarIn ? [avatarIn] : []);
+  if (!avatarList.length) return { applied: false, reason: 'no avatar sample', driftDeg: 0, rotationDeg: 0, garmentHueDeg: +(garment.hueRad * DEG).toFixed(1), avatarHueDeg: null };
   const garmentHueDeg = +(garment.hueRad * DEG).toFixed(1);
-  const avatarHueDeg = +(avatar.hueRad * DEG).toFixed(1);
-  // A grey/near-neutral garment or avatar has no meaningful hue to align.
-  if (garment.chroma < cfg.chromaMin || avatar.chroma < cfg.chromaMin) {
-    return { applied: false, reason: `low chroma (garment ${garment.chroma.toFixed(1)}, avatar ${avatar.chroma.toFixed(1)}; min ${cfg.chromaMin})`, driftDeg: 0, rotationDeg: 0, garmentHueDeg, avatarHueDeg };
+  // Only avatar clusters with a usable hue can be a target.
+  const usable = avatarList.filter(c => c.chroma >= cfg.chromaMin);
+  if (garment.chroma < cfg.chromaMin || !usable.length) {
+    const best = avatarList.reduce((m, c) => (c.chroma > m.chroma ? c : m), avatarList[0]);
+    return { applied: false, reason: `low chroma (garment ${garment.chroma.toFixed(1)}, avatar ${best.chroma.toFixed(1)}; min ${cfg.chromaMin})`, driftDeg: 0, rotationDeg: 0, garmentHueDeg, avatarHueDeg: +(best.hueRad * DEG).toFixed(1) };
   }
-  const driftRad = angDiff(garment.hueRad, avatar.hueRad); // signed garment→avatar
+  // Nearest avatar cluster by absolute hue distance.
+  let avatar = usable[0], driftRad = angDiff(garment.hueRad, usable[0].hueRad);
+  for (const c of usable) {
+    const d = angDiff(garment.hueRad, c.hueRad);
+    if (Math.abs(d) < Math.abs(driftRad)) { avatar = c; driftRad = d; }
+  }
+  const avatarHueDeg = +(avatar.hueRad * DEG).toFixed(1);
   const driftDeg = +(driftRad * DEG).toFixed(1);
   const absDrift = Math.abs(driftDeg);
   if (absDrift < cfg.hueDriftMinDeg) {
@@ -276,17 +305,28 @@ function applyHueRotation(raw, n, maskBin, { clusterHueRad, cast, rotationRad, h
  * @returns {{ applied, reason, driftDeg, rotationDeg, garmentHueDeg, avatarHueDeg,
  *             cast, avatarCast, correctedRaw }}
  */
-function normalizeGarmentRaw({ pageRaw, n, pageMask, avatarRaw, avatarN, avatarMask, opts = {} }) {
+function normalizeGarmentRaw({ pageRaw, n, pageMask, castMask, avatarRaw, avatarN, avatarMask, opts = {} }) {
   const cfg = { ...DEFAULTS, ...opts };
-  const cast = estimateCast(pageRaw, n, null); // scene cast = WHOLE page (gray-world)
+  // Scene cast: gray-world over the page BACKGROUND (outside every figure), not
+  // the whole frame. A figure that fills much of the frame otherwise dominates
+  // the mean, so its own garment colour lands in the "illumination" estimate and
+  // discounting cancels the very signal we came to measure. Fall back to the
+  // whole frame when the background is too small to be a confident estimate.
+  let cast = estimateCast(pageRaw, n, castMask || null);
+  if (cast.count < cfg.minPagePixels) cast = estimateCast(pageRaw, n, null);
   if (cast.count < cfg.minPagePixels) {
     return { applied: false, reason: `low-confidence cast (${cast.count} px)`, driftDeg: 0, rotationDeg: 0, garmentHueDeg: null, avatarHueDeg: null, cast, correctedRaw: pageRaw };
   }
-  const avatarCast = estimateCast(avatarRaw, avatarN, null);
+  // Avatar cast: NONE. A styled avatar sheet is a neutral-lit reference render
+  // on a plain background — it carries no scene illumination to discount, and a
+  // gray-world mean over it is mostly the garment itself (measured: a pink top
+  // yields cast (6.9, 3.6), and discounting it collapses chroma 27.2 → 6.5 and
+  // flips the hue ~162°). Read the avatar hue in ABSOLUTE LAB space.
+  const avatarCast = { a: 0, b: 0, count: avatarN };
   const garment = sampleGarmentHue(pageRaw, n, pageMask, cast, cfg);
-  const avatar = sampleGarmentHue(avatarRaw, avatarN, avatarMask, avatarCast, cfg);
+  const avatar = sampleGarmentClusters(avatarRaw, avatarN, avatarMask, avatarCast, cfg, 3);
   if (garment && garment.count < cfg.minGarmentPixels) {
-    return { applied: false, reason: `too few garment px (${garment.count})`, driftDeg: 0, rotationDeg: 0, garmentHueDeg: +(garment.hueRad * DEG).toFixed(1), avatarHueDeg: avatar ? +(avatar.hueRad * DEG).toFixed(1) : null, cast, avatarCast, correctedRaw: pageRaw };
+    return { applied: false, reason: `too few garment px (${garment.count})`, driftDeg: 0, rotationDeg: 0, garmentHueDeg: +(garment.hueRad * DEG).toFixed(1), avatarHueDeg: avatar.length ? +(avatar[0].hueRad * DEG).toFixed(1) : null, cast, avatarCast, correctedRaw: pageRaw };
   }
   const decision = decideHueCorrection(garment, avatar, cfg);
   if (!decision.applied) {
@@ -299,7 +339,7 @@ function normalizeGarmentRaw({ pageRaw, n, pageMask, avatarRaw, avatarN, avatarM
     hueWindowDeg: cfg.hueWindowDeg,
     sigmaDeg: cfg.sigmaDeg,
   });
-  return { ...decision, cast, avatarCast, garmentChroma: +garment.chroma.toFixed(1), avatarChroma: +avatar.chroma.toFixed(1), correctedRaw };
+  return { ...decision, cast, avatarCast, garmentChroma: +garment.chroma.toFixed(1), avatarClusters: avatar.map(c => ({ hueDeg: +(c.hueRad * DEG).toFixed(1), chroma: +c.chroma.toFixed(1) })), correctedRaw };
 }
 
 // ── async orchestration (decode + mask + composite) ──────────────────────────
@@ -343,6 +383,20 @@ async function maskToBin(maskPng, width, height) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Torso sub-region of a full-body box [ymin,xmin,ymax,xmax] (0..1). Used ONLY as
+ * the fallback when no SAM silhouette is available: the raw bodyBox rectangle
+ * includes head (skin + hair), legs and the background in the corners, all of
+ * which dilute the garment sample. The torso band is where the primary garment
+ * lives, so it is the highest-signal rectangle we can name without a silhouette.
+ */
+function torsoBoxFromBody(box) {
+  if (!Array.isArray(box) || box.length !== 4) return box;
+  const [ymin, xmin, ymax, xmax] = box;
+  const h = ymax - ymin, w = xmax - xmin;
+  return [ymin + 0.20 * h, xmin + 0.18 * w, ymin + 0.58 * h, xmax - 0.18 * w];
 }
 
 /** A rectangle bodyBox [ymin,xmin,ymax,xmax] (0..1) → 0/255 mask at (w,h). */
@@ -391,6 +445,19 @@ async function normalizeGarmentHue(pageImageData, bboxDetection, resolveAvatar, 
   let workingRaw = pageRaw;
   let anyChange = false;
 
+  // Background mask for the illumination estimate: everything outside EVERY
+  // figure (SAM silhouette when present, full bodyBox otherwise — deliberately
+  // the full box here, not the torso band, so no part of a figure leaks into the
+  // "illumination" mean). Built once and shared by all figures on this page.
+  const castMask = Buffer.alloc(n, 255);
+  for (let fi = 0; fi < figures.length; fi++) {
+    let occ = null;
+    if (masks && masks[fi]) occ = await maskToBin(masks[fi], W, H);
+    if ((!occ || !occ.some(v => v)) && Array.isArray(figures[fi]?.bodyBox)) occ = bboxToBin(figures[fi].bodyBox, W, H);
+    if (!occ) continue;
+    for (let i = 0; i < n; i++) if (occ[i] > 128) castMask[i] = 0;
+  }
+
   for (let fi = 0; fi < figures.length; fi++) {
     const fig = figures[fi];
     const name = fig?.name || `fig${fi}`;
@@ -398,10 +465,15 @@ async function normalizeGarmentHue(pageImageData, bboxDetection, resolveAvatar, 
     try { avatarUri = await resolveAvatar(fig); } catch { avatarUri = null; }
     if (!avatarUri) { perFigure.push({ name, applied: false, reason: 'no avatar resolved' }); continue; }
 
-    // Figure mask: shared SAM silhouette first, bodyBox rectangle as fallback.
-    let pageMask = null;
+    // Sampling mask: the shared SAM silhouette when we have one (tight to the
+    // figure), else the TORSO band of the bodyBox — the raw rectangle carries
+    // head, legs and corner background, which dilute the garment sample.
+    let pageMask = null, maskSource = 'sam';
     if (masks && masks[fi]) pageMask = await maskToBin(masks[fi], W, H);
-    if ((!pageMask || !pageMask.some(v => v)) && Array.isArray(fig.bodyBox)) pageMask = bboxToBin(fig.bodyBox, W, H);
+    if ((!pageMask || !pageMask.some(v => v)) && Array.isArray(fig.bodyBox)) {
+      pageMask = bboxToBin(torsoBoxFromBody(fig.bodyBox), W, H);
+      maskSource = 'torsoBox';
+    }
     if (!pageMask) { perFigure.push({ name, applied: false, reason: 'no mask' }); continue; }
 
     // Avatar raw. No avatar figure mask available → whole-image sampler; the
@@ -419,7 +491,7 @@ async function normalizeGarmentHue(pageImageData, bboxDetection, resolveAvatar, 
       continue;
     }
 
-    const res = normalizeGarmentRaw({ pageRaw: workingRaw, n, pageMask, avatarRaw, avatarN, avatarMask: null, opts: cfg });
+    const res = normalizeGarmentRaw({ pageRaw: workingRaw, n, pageMask, castMask, avatarRaw, avatarN, avatarMask: null, opts: cfg });
     const entry = {
       name,
       applied: res.applied,
@@ -428,8 +500,9 @@ async function normalizeGarmentHue(pageImageData, bboxDetection, resolveAvatar, 
       rotationDeg: res.rotationDeg,
       garmentHueDeg: res.garmentHueDeg,
       avatarHueDeg: res.avatarHueDeg,
+      avatarClusters: res.avatarClusters || null,
       cast: res.cast ? { a: +res.cast.a.toFixed(1), b: +res.cast.b.toFixed(1) } : null,
-      maskSource: (masks && masks[fi]) ? 'sam' : 'bodyBox',
+      maskSource,
     };
     if (res.applied) {
       if (collectCrops && Array.isArray(fig.bodyBox)) {
@@ -605,6 +678,8 @@ module.exports = {
   normalizeGarmentRaw,
   estimateCast,
   sampleGarmentHue,
+  sampleGarmentClusters,
+  torsoBoxFromBody,
   decideHueCorrection,
   applyHueRotation,
   isGarmentPixel,

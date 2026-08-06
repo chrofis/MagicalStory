@@ -117,11 +117,14 @@ const det = (page, nFigures) => ({
     ok(imgUnchanged.bboxDetection.sourceImageFp === undefined, '(c) no re-stamp on unchanged entry');
   });
 
-  // ── (c2) graceful degradation when no fingerprinter can be resolved ─────────
-  // With no injected fp, the driver lazily requires ./images.imageFingerprint.
-  // In this stubbed test env that lazy require fails (real images.js pulls the
-  // absent native sharp) and is caught → fp=null. The contract: bytes are still
-  // written back, NO crash, and the re-stamp is simply skipped.
+  // ── (c2) graceful degradation when no fingerprinter is INJECTED ─────────────
+  // With no injected fp the driver falls back to lazily requiring
+  // ./images.imageFingerprint, wrapped in try/catch. Whether that lazy require
+  // succeeds is environment-dependent (it pulls native sharp, which is present
+  // on a dev box and absent in some CI images), so the contract under test is
+  // the part that must hold EITHER WAY: bytes are still written back, there is
+  // no crash, and if a fingerprint does get stamped it is derived from the
+  // CORRECTED bytes — never left stale on the pre-correction image.
   await withStub({ 9: { changed: true, corrected: 'CORRECTED9' } }, async () => {
     const img = { pageNumber: 9, imageData: 'img9', bboxDetection: det(9, 1) };
     await G.normalizeGarmentHueBatch([img], {
@@ -130,7 +133,14 @@ const det = (page, nFigures) => ({
       imageFingerprint: null,
     });
     ok(img.imageData === 'CORRECTED9', '(c2) bytes still written back without injected fp');
-    ok(img.bboxDetection.sourceImageFp === undefined, '(c2) re-stamp skipped when no fp resolvable (no crash)');
+    const stamped = img.bboxDetection.sourceImageFp;
+    ok(stamped === undefined || typeof stamped === 'string',
+      '(c2) no crash when no fp is injected');
+    if (typeof stamped === 'string') {
+      const { imageFingerprint } = require('../../server/lib/images');
+      ok(stamped === imageFingerprint('CORRECTED9'),
+        '(c2) any stamped fp is derived from the CORRECTED bytes, never stale');
+    }
   });
 
   // ── (d) honours the enable flag → total no-op ───────────────────────────────
