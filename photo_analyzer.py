@@ -2068,6 +2068,32 @@ def release_memory_endpoint():
     })
 
 
+
+def _cpu_stats():
+    """Cumulative process CPU + the container's real quota. Never raises."""
+    out = {}
+    try:
+        import resource
+        ru_self = resource.getrusage(resource.RUSAGE_SELF)
+        ru_kids = resource.getrusage(resource.RUSAGE_CHILDREN)
+        out["cpu_seconds"] = round(
+            ru_self.ru_utime + ru_self.ru_stime + ru_kids.ru_utime + ru_kids.ru_stime, 2
+        )
+    except Exception:
+        # Windows has no resource module; time.process_time is close enough.
+        try:
+            out["cpu_seconds"] = round(time.process_time(), 2)
+        except Exception:
+            out["cpu_seconds"] = None
+    try:
+        out["cpu_quota"] = _container_cpus()
+        out["host_cpus"] = os.cpu_count()
+        out["threads"] = int(os.environ.get('ANALYZER_THREADS') or out["cpu_quota"])
+    except Exception:
+        pass
+    return out
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint.
@@ -2095,6 +2121,13 @@ def health_check():
         "rss_mb": _rss_mb(),
         "mobilesam_loaded": _mobilesam_model is not None,
         "groundingdino_loaded": _gdino_model is not None,
+        # CPU accounting. cpu_seconds is CUMULATIVE process CPU (user+sys) since
+        # boot, so two reads around a story give the real CPU-seconds it burned
+        # — wall-clock over-counts badly because most of the images stage is
+        # network wait on the image model, not local compute. cpu_quota is what
+        # the container may actually use (Railway bills per vCPU-minute), which
+        # is also what the waitress thread pool is sized from.
+        "cpu": _cpu_stats(),
     }
     if request.args.get('probe') == 'sam':
         try:

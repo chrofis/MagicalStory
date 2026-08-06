@@ -66,15 +66,22 @@ router.get('/health/memory', async (req, res) => {
     const url = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
     const r = await fetch(`${url}/health`, { signal: AbortSignal.timeout(4000) });
     const j = await r.json();
-    python = { rss_mb: j.rss_mb, rembg_loaded: j.rembg_loaded, mobilesam_loaded: j.mobilesam_loaded, groundingdino_loaded: j.groundingdino_loaded, boot_rss: j.boot_rss };
+    python = { rss_mb: j.rss_mb, rembg_loaded: j.rembg_loaded, mobilesam_loaded: j.mobilesam_loaded, groundingdino_loaded: j.groundingdino_loaded, boot_rss: j.boot_rss, cpu: j.cpu };
   } catch (err) {
     python = { error: err.message };
   }
 
+  // Railway bills per vCPU-minute, so CPU-SECONDS is the billable figure —
+  // wall-clock over-states it badly (most of the images stage is network wait
+  // on the image model). Both numbers are cumulative since process start:
+  // read the endpoint before and after a story and subtract to get that
+  // story's true CPU cost, Node and analyzer separately.
+  const cpu = process.cpuUsage();
   res.json({
     timestamp: new Date().toISOString(),
     uptime_s: Math.round(process.uptime()),
     node: {
+      cpu_seconds: Math.round((cpu.user + cpu.system) / 1000) / 1000,
       rss_mb: mb(m.rss),
       heapUsed_mb: mb(m.heapUsed),
       heapTotal_mb: mb(m.heapTotal),
