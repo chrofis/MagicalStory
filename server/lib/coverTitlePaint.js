@@ -175,6 +175,7 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
       [`data:image/jpeg;base64,${sceneBuf.toString('base64')}`], opts.artStyle);
   }
   if (!result?.imageData) return { ...flat, reason: `${backend} returned no image` };
+  const debugOut = opts.debug ? { plate: `data:image/jpeg;base64,${plateBuf.toString('base64')}`, raw: result.imageData } : undefined;
 
   // 5. key on INKINESS (dark OR saturated), so any paper texture the model adds
   //    is dropped while every pigment pixel is kept.
@@ -194,6 +195,51 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     }
   }
   if (letterPx < 200) return { ...flat, reason: 'keyed layer is empty' };
+
+  // FILL SPECK HOLES. Light paper texture inside a stroke falls under the
+  // inkiness threshold and becomes transparent, so the cover artwork shows
+  // through the lettering as white specks (measured: 54 blobs / 1437px on one
+  // watercolour title). Fill transparent regions that are ENCLOSED by ink — but
+  // only SMALL ones: the counters of o, e, a, d are enclosed by design and must
+  // stay open, and they are orders of magnitude larger than a speck.
+  {
+    const reach = Buffer.alloc(pw * ph);   // transparency connected to the border
+    const st = [];
+    const push = q => { if (!reach[q] && rgba[q * 4 + 3] < 128) { reach[q] = 1; st.push(q); } };
+    for (let x = 0; x < pw; x++) { push(x); push((ph - 1) * pw + x); }
+    for (let y = 0; y < ph; y++) { push(y * pw); push(y * pw + pw - 1); }
+    while (st.length) {
+      const q = st.pop(), x = q % pw, y = (q / pw) | 0;
+      if (x > 0) push(q - 1); if (x < pw - 1) push(q + 1);
+      if (y > 0) push(q - pw); if (y < ph - 1) push(q + pw);
+    }
+    const MAX_HOLE = Math.max(60, Math.round(pw * ph * 0.0004));
+    const seen = Buffer.alloc(pw * ph);
+    let filled = 0;
+    for (let q0 = 0; q0 < pw * ph; q0++) {
+      if (reach[q0] || seen[q0] || rgba[q0 * 4 + 3] >= 128) continue;
+      const comp = [q0]; seen[q0] = 1; const list = [];
+      while (comp.length) {
+        const q = comp.pop(); list.push(q);
+        const x = q % pw, y = (q / pw) | 0;
+        for (const r of [x > 0 ? q - 1 : -1, x < pw - 1 ? q + 1 : -1, y > 0 ? q - pw : -1, y < ph - 1 ? q + pw : -1]) {
+          if (r >= 0 && !seen[r] && !reach[r] && rgba[r * 4 + 3] < 128) { seen[r] = 1; comp.push(r); }
+        }
+      }
+      if (list.length > MAX_HOLE) continue;   // a counter, not a speck — leave it
+      for (const q of list) {
+        // opaque, and take the colour from the nearest inked neighbour so the
+        // fill carries pigment rather than a flat patch
+        rgba[q * 4 + 3] = 255;
+        const x = q % pw, y = (q / pw) | 0;
+        for (const r of [x > 0 ? q - 1 : -1, x < pw - 1 ? q + 1 : -1, y > 0 ? q - pw : -1, y < ph - 1 ? q + pw : -1]) {
+          if (r >= 0 && rgba[r * 4 + 3] > 200) { rgba[q * 4] = rgba[r * 4]; rgba[q * 4 + 1] = rgba[r * 4 + 1]; rgba[q * 4 + 2] = rgba[r * 4 + 2]; break; }
+        }
+        filled++;
+      }
+    }
+    if (filled) log.debug(`🅰️ [TITLE PAINT] filled ${filled}px of speck holes inside the lettering`);
+  }
   const layer = await sharp(rgba, { raw: { width: pw, height: ph, channels: 4 } }).png().toBuffer();
 
   const base = await sharp(artBuffer).resize(W, H, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
@@ -234,9 +280,9 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     const verdict = await verifyTitleRender(`data:image/jpeg;base64,${crop.toString('base64')}`, title);
     if (!verdict.matches) {
       log.warn(`🅰️ [TITLE PAINT] final eval rejected the repaint: ${verdict.problem} (coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}) — keeping the flat title`);
-      return { ...flat, coverage, spill, reason: `eval: ${verdict.problem || 'title does not match'}` };
+      return { ...flat, coverage, spill, debug: debugOut, reason: `eval: ${verdict.problem || 'title does not match'}` };
     }
-    return { imageData: paintedUri, spec, ok: true, coverage, spill, cost: result.cost ?? null };
+    return { imageData: paintedUri, spec, ok: true, coverage, spill, debug: debugOut, cost: result.cost ?? null };
   } catch (e) {
     // The eval itself failing is not evidence the repaint is bad, but we do not
     // ship an unverified title either — fall back, and say why.

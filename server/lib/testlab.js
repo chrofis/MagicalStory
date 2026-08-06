@@ -1645,107 +1645,34 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   // extraction is a chroma key — every letter pixel, no leaves, no counters
   // filled, and the artwork is never re-rendered at all.
   if (mode === 'plate') {
-    const padP = Math.round(Math.min(W, H) * (params.platePad ?? 0.03));
-    const px0 = Math.max(0, minx - padP), py0 = Math.max(0, miny - padP);
-    const pw = Math.min(W, maxx + 1 + padP) - px0, ph = Math.min(H, maxy + 1 + padP) - py0;
-
-    // WHITE plate, SQUARE canvas (owner). White because the model paints on paper
-    // anyway — fighting it with a chroma colour just made it repaint the
-    // background. Square because Grok CENTRE-CROPS every input to the requested
-    // aspect preset: a wide title strip got scaled and clipped at both ends
-    // ("bestraf_t_" ran off the edge). A square canvas IS a preset, so nothing is
-    // cropped and the geometry is exact both ways.
-    const S = Math.max(pw, ph);
-    const offX = Math.round((S - pw) / 2), offY = Math.round((S - ph) / 2);
-    const glyphCrop = await sharp(grownMaskRaw, { raw: { width: W, height: H, channels: 1 } })
-      .extract({ left: px0, top: py0, width: pw, height: ph }).toColourspace('b-w').raw().toBuffer();
-    const lettersCrop = await sharp(composedBuf).extract({ left: px0, top: py0, width: pw, height: ph })
-      .removeAlpha().raw().toBuffer();
-    const stripRgba = Buffer.alloc(pw * ph * 4);
-    for (let q = 0, j = 0, m = 0; q < pw * ph; q++, j += 3, m += 4) {
-      const on = glyphCrop[q] > 8;
-      stripRgba[m] = lettersCrop[j]; stripRgba[m + 1] = lettersCrop[j + 1]; stripRgba[m + 2] = lettersCrop[j + 2];
-      stripRgba[m + 3] = on ? 255 : 0;
-    }
-    const stripPng = await sharp(stripRgba, { raw: { width: pw, height: ph, channels: 4 } }).png().toBuffer();
-    const plateBuf = await sharp({ create: { width: S, height: S, channels: 3, background: { r: 255, g: 255, b: 255 } } })
-      .composite([{ input: stripPng, left: offX, top: offY }]).jpeg({ quality: 96 }).toBuffer();
-
-    const sceneBuf = await sharp(artBytes).resize(1024, 1024, { fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
-    await addStep('INPUT 1 (style reference): the artwork', `data:image/jpeg;base64,${sceneBuf.toString('base64')}`);
-    await addStep(`INPUT 2 (edited): title on WHITE, square ${S}×${S} so nothing is cropped`,
-      `data:image/jpeg;base64,${plateBuf.toString('base64')}`);
-
-    const styleTxt = (() => {
-      try {
-        const { ART_STYLES } = require('./storyHelpers');
-        const raw = ART_STYLES[storyData.artStyle];
-        return (typeof raw === 'string' ? raw : (raw && raw.default) || '') || '';
-      } catch { return ''; }
-    })();
-    // Colour is FREE (owner): the model may choose a hue that suits the artwork —
-    // that is the point of showing it the scene. Only the words and geometry are
-    // fixed. The background must come back white so the key stays trivial.
-    const platePrompt = promptOverride || `The image is a book title on a plain white background. Repaint the LETTERING so it looks hand-painted in the medium of the reference artwork: visible brush and paper texture inside every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours. You may change the lettering colour to one that suits the artwork.
-Keep the same words, letters, letterforms, size and positions.
-Put the lettering back on a plain white background — do not paint any scenery, do not draw the illustration, do not add a border or a frame.${styleTxt ? ` Medium of the artwork: ${styleTxt}` : ''}`;
-
+    // Runs the PRODUCTION module — what the Lab shows here is exactly what ships
+    // (server/lib/coverTitlePaint.js). Lab-only copies of a production recipe are
+    // how #302/#304/#315 ended up comparing the wrong thing.
+    const { paintCoverTitle } = require('./coverTitlePaint');
     const t0p = Date.now();
-    const { editImageWithPrompt } = require('./images');
-    const backendP = params.backend || 'grok';
-    const modelKeyP = params.model || (backendP === 'grok' ? 'grok-imagine' : 'gemini-2.5-flash-image');
-    const rp = await editImageWithPrompt(
-      `data:image/jpeg;base64,${plateBuf.toString('base64')}`, platePrompt, modelKeyP,
-      [`data:image/jpeg;base64,${sceneBuf.toString('base64')}`], storyData.artStyle);
+    const r = await paintCoverTitle(artBytes, title, {
+      figures, seed: storyData?.title, artStyle: storyData?.artStyle,
+      style: params.style || cover.typographyStyle || undefined,
+      backend: params.backend, model: params.model, debug: true,
+    });
     const elapsedP = Date.now() - t0p;
-    if (!rp?.imageData) throw new Error(`${backendP} returned no image (plate mode)`);
-    await addStep('raw model output (lettering plate)', rp.imageData);
-
-    // Key on WHITENESS: letters are saturated and/or dark, any paper the model
-    // invents is bright and unsaturated. Robust even if it adds paper grain.
-    const outSq = await sharp(Buffer.from(rp.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
-      .resize(S, S, { fit: 'fill' }).removeAlpha().raw().toBuffer();
-    const outP = Buffer.alloc(pw * ph * 3);
-    for (let y = 0; y < ph; y++) {
-      for (let x = 0; x < pw; x++) {
-        const src = ((y + offY) * S + (x + offX)) * 3, dst = (y * pw + x) * 3;
-        outP[dst] = outSq[src]; outP[dst + 1] = outSq[src + 1]; outP[dst + 2] = outSq[src + 2];
-      }
-    }
-    const NEAR = params.keyNear ?? 26, FAR = params.keyFar ?? 70;
-    const rgbaP = Buffer.alloc(pw * ph * 4);
-    let letterPx = 0;
-    for (let q = 0, j = 0, m = 0; q < pw * ph; q++, j += 3, m += 4) {
-      const r = outP[j], g = outP[j + 1], b = outP[j + 2];
-      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-      const inkiness = Math.max(255 - mx, mx - mn);   // dark OR saturated ⇒ ink
-      const a = inkiness <= NEAR ? 0 : inkiness >= FAR ? 1 : (inkiness - NEAR) / (FAR - NEAR);
-      rgbaP[m] = r; rgbaP[m + 1] = g; rgbaP[m + 2] = b; rgbaP[m + 3] = Math.round(a * 255);
-      if (a > 0.5) letterPx++;
-    }
-    const layerP = await sharp(rgbaP, { raw: { width: pw, height: ph, channels: 4 } }).png().toBuffer();
-    await addStep(`keyed lettering (${letterPx}px) — white key, no detection`, `data:image/png;base64,${layerP.toString('base64')}`);
-
-    const basePlate = await sharp(artBytes).resize(W, H, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
-    const finalPlate = await sharp(basePlate).composite([{ input: layerP, left: px0, top: py0 }]).jpeg({ quality: 92 }).toBuffer();
-    const finalPlateUri = `data:image/jpeg;base64,${finalPlate.toString('base64')}`;
-
-    let ocrP = null, ocrPassP = null, ocrErrP = null;
-    try {
-      const cropOcr = await sharp(finalPlate).extract({ left: px0, top: py0, width: pw, height: ph }).jpeg({ quality: 95 }).toBuffer();
-      ocrP = await transcribeTextInImage(`data:image/jpeg;base64,${cropOcr.toString('base64')}`);
-      ocrPassP = normalizeTitleForGate(ocrP) === normalizeTitleForGate(title);
-    } catch (e) { ocrErrP = e.message; }
-
-    const viP = await saveTestVersion(target.storyId, coverKey, null, finalPlateUri, experimentId);
+    if (r.debug?.plate) await addStep('INPUT 2 (edited): title on WHITE square plate', r.debug.plate);
+    if (r.debug?.raw) await addStep('raw model output (lettering plate)', r.debug.raw);
+    const viP = await saveTestVersion(target.storyId, coverKey, null, r.imageData, experimentId);
     return {
       imageType: coverKey, coverType: coverKey, versionIndex: viP, steps,
-      promptUsed: platePrompt, modelId: rp.modelId || modelKeyP, elapsedMs: elapsedP, cost: rp.cost ?? null,
-      titleGate: { expected: title, ocr: ocrP, pass: ocrPassP, error: ocrErrP,
-        verdict: ocrPassP === true ? 'PASS — letters intact' : ocrPassP === false ? `FAIL — read "${ocrP}"` : `GATE ERROR — ${ocrErrP}` },
-      typography: { fontId: spec?.fontId, layout: spec?.layout, face: spec?.face, lines: spec?.lines },
-      paintinSetup: { mode: 'plate', backend: backendP, platePx: `${pw}×${ph}`, squarePx: `${S}×${S}`,
-        letterPx, refsSent: 2, deterministicColour: spec?.face || null },
+      modelId: params.model || params.backend || 'grok-imagine', elapsedMs: elapsedP, cost: r.cost ?? null,
+      alignGate: {
+        offMaskMeanDiff: r.spill ?? 0, threshold: 0, pass: !!r.ok,
+        coverage: r.coverage, spread: r.spill,
+        verdict: r.ok
+          ? `PASS — painted title kept (coverage ${(r.coverage ?? 0).toFixed(2)}, spill ${(r.spill ?? 0).toFixed(2)})`
+          : `FAIL — ${r.reason} (coverage ${(r.coverage ?? 0).toFixed(2)}, spill ${(r.spill ?? 0).toFixed(2)}) — flat title served`,
+      },
+      typography: { fontId: r.spec?.fontId, layout: r.spec?.layout, face: r.spec?.face, lines: r.spec?.lines },
+      paintinSetup: { mode: 'plate', backend: params.backend || 'grok', refsSent: 2,
+        deterministicColour: r.spec?.face || null },
+      issuesSummary: r.ok ? null : r.reason,
     };
   }
   const cropPctW = Math.round(crop.width / W * 100), cropPctH = Math.round(crop.height / H * 100);
