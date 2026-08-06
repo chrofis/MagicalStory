@@ -4721,3 +4721,22 @@ Registration is emitted as a Lab step and returned on the blend result.
 already isolated box vs cutout; no whiteout was involved.
 
 **Touched:** `server/lib/samBlend.js`, `server/lib/faceRepair.js`.
+
+---
+
+## 2026-08-05 — Candidate registration is TRANSLATION ONLY (owner)
+
+**Context:** Owner on the cutout fix: "no scaling, that is shit. You can move it but scaling
+I would be careful."
+
+**Decision:** registration slides the candidate only; `scale` is fixed at 1. Rationale: a
+wrong scale factor resizes the FIGURE — a systematic distortion that is hard to see and
+impossible to undo downstream — while a wrong translation only slides the paste and shows up
+immediately in the IoU acceptance check. Verified: 45px offset → dx −2, dy −45, scale 1,
+IoU 0.794 → 1.000.
+
+**Also checked:** the poor-looking SAM round 2 in #355's cutout is NOT from registration —
+registration was REJECTED in that run (IoU would have gone 0.686 → 0.664), so no warp was
+applied. The round-2 cutout is a clean silhouette plus one small stray fragment.
+
+**Touched:** `server/lib/samBlend.js`.

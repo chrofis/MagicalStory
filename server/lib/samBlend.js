@@ -504,9 +504,12 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
     try {
       const ob = await bboxOf(oldMask), nb = await bboxOf(newMask);
       if (ob && nb) {
-        const sx = ob.w / nb.w, sy = ob.h / nb.h;
-        const scale = Math.min(sx, sy); // uniform — never distort the figure
-        const inRange = scale > 0.75 && scale < 1.33;
+        // TRANSLATION ONLY (owner, 2026-08-05): a wrong scale factor resizes the
+        // FIGURE — a systematic error that is hard to see and impossible to undo
+        // downstream. A wrong translation just slides the paste and shows up
+        // immediately in the IoU check. So we never rescale; we only slide.
+        const scale = 1;
+        const inRange = true;
         const dx = (ob.x0 + ob.w / 2) - (nb.x0 + nb.w / 2) * scale - (cropW / 2) * (1 - scale);
         const dy = (ob.y0 + ob.h / 2) - (nb.y0 + nb.h / 2) * scale - (cropH / 2) * (1 - scale);
         if (inRange && (Math.abs(dx) > 2 || Math.abs(dy) > 2 || Math.abs(scale - 1) > 0.01)) {
