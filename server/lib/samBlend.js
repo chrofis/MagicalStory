@@ -438,7 +438,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, faceBoxInCrop = null, iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
   const sharp = require('sharp');
   let candidateCropBuf = candidateCropBufIn;
   const fail = (msg) => {
@@ -485,6 +485,32 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
     const seeds = await _interiorSeedPoints(erodedPng, cropW, cropH);
     const r2Opts = { ...(maskPoints || {}) };
     if (seeds.length) r2Opts.points = [...(r2Opts.points || []), ...seeds];
+    // HEAD ANCHOR FROM DINO, not guessed. Our seed rows are synthesised from
+    // round-1 geometry (widest interior run at fixed height fractions), but the
+    // DETECTOR already provides a FACE BOX for this character. Its centre is a
+    // far better head point than any fraction of mask height - evidence rather
+    // than inference. The height heuristic remains as the fallback.
+    if (Array.isArray(faceBoxInCrop) && faceBoxInCrop.length === 4) {
+      const fx = Math.round((faceBoxInCrop[0] + faceBoxInCrop[2]) / 2);
+      const fy = Math.round((faceBoxInCrop[1] + faceBoxInCrop[3]) / 2);
+      if (fx > 0 && fy > 0 && fx < cropW && fy < cropH) {
+        r2Opts.points = [[fx, fy], ...(r2Opts.points || [])];
+        log.info(`[TESTLAB] round-2 head seed from the DINO face box at (${fx},${fy})`);
+      }
+    }
+    // HEAD ANCHOR FROM DINO, not guessed. Our seed rows are synthesised from
+    // round-1 geometry (widest interior run at fixed height fractions) — but the
+    // detector already gives a FACE BOX for this character. Its centre is a far
+    // better head point than any fraction of mask height, and it is evidence
+    // rather than inference. Falls back to the height heuristic when absent.
+    if (Array.isArray(faceBoxInCrop) && faceBoxInCrop.length === 4) {
+      const fx = Math.round((faceBoxInCrop[0] + faceBoxInCrop[2]) / 2);
+      const fy = Math.round((faceBoxInCrop[1] + faceBoxInCrop[3]) / 2);
+      if (fx > 0 && fy > 0 && fx < cropW && fy < cropH) {
+        r2Opts.points = [[fx, fy], ...(r2Opts.points || [])];
+        log.info();
+      }
+    }
     newMask = await fetchMaskWithRetry(candidateCropBuf, padBox, 5, r2Opts);
     // WHAT ROUND 2 WAS PROMPTED WITH — box (yellow) + seed points (red). Round 1
     // has such a view; round 2 never did, so a bad box or a seed landing off the

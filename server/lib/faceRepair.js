@@ -782,6 +782,13 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       colorCorrect,
       bodyColorMode,
       // Other characters, in crop pixels — round 2 must not adopt their limbs.
+      // DINO's face box in crop pixels — round 2 uses its centre as the head seed.
+      faceBoxInCrop: (Array.isArray(faceBbox) && faceBbox.length === 4) ? [
+        Math.max(0, Math.round(faceBbox[1] * W) - crop.x),
+        Math.max(0, Math.round(faceBbox[0] * H) - crop.y),
+        Math.min(crop.w, Math.round(faceBbox[3] * W) - crop.x),
+        Math.min(crop.h, Math.round(faceBbox[2] * H) - crop.y),
+      ] : null,
       protectedBoxesInCrop: (Array.isArray(opts.protectedBodies) ? opts.protectedBodies : [])
         .filter(b => Array.isArray(b) && b.length === 4)
         .map(b => [

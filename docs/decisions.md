@@ -5138,3 +5138,24 @@ cannot overlap the round-1 silhouette well. Margaret's 46% → 50% recomputation
 the broken seeds still in place, so the true IoU should be re-measured after this fix.
 
 **Touched:** `server/lib/samBlend.js`.
+
+---
+
+## 2026-08-06 — Round-2 head seed comes from DINO's FACE BOX, not a height fraction
+
+**Context:** Owner: "where do you get the seeds from? DINO provides this, no?" Correct, and it
+exposes the real flaw. DINO provides BOXES (body + face — the red dots in the detection
+visualisation ARE its face points). The round-2 seed POINTS, however, were entirely our own
+invention: `_interiorSeedPoints` picks the widest interior run of ROUND-1's mask at fixed
+height fractions. Round 2 never consulted DINO's face box at all — so we were guessing at a
+head anchor we already had as evidence.
+
+**Decision:** `faceBoxInCrop` (DINO's face box mapped to crop pixels) is threaded into
+`samUnionBlend`, and its centre is prepended as the first round-2 seed point. The height
+fractions (now 0.12/0.3/0.55/0.8) remain only as the fallback for figures with no face box.
+
+**Why it matters:** the catastrophic round-2 mask (cardigan + trousers, no head) happened
+because every synthesised seed landed on garment. A detector-provided face point anchors the
+head directly, independent of how the model redrew the figure.
+
+**Touched:** `server/lib/samBlend.js`, `server/lib/faceRepair.js`.
