@@ -89,6 +89,7 @@ Then a single-line JSON object:
 
 ```
 {
+  "sceneIntent": "CharacterA kneels in the open doorway and reaches for a package on the floor. CharacterB stands beside the table and watches, head tilted. Bright midday light through the doorway, calm weekday mood.",
   "characters": [
     {"name": "CharacterA", "clothing": "standard", "position": "left foreground", "depth": "foreground", "expression": "wide-eyed, mouth half open, brows lifted"},
     {"name": "CharacterB", "clothing": "costumed", "position": "center background", "perspective": "back view", "depth": "background", "expression": "calm, faint smile"}
@@ -105,6 +106,8 @@ Then a single-line JSON object:
 ```
 
 ### Field rules
+
+**`sceneIntent`** (required): 2-3 present-tense sentences naming the single moment the image depicts. Sentence 1: who does what to whom, where. Sentence 2: what characters hold or reach for; give a gaze target to at most one or two characters, and never have a character face one person while gazing at another. Sentence 3: setting, lighting, mood. Name every character physically present, and list every name here in `characters[]`. One moment only — not cause plus effect.
 
 **`characters[]`**
 - One entry per character in the scene.
