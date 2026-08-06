@@ -4697,6 +4697,39 @@ provider echo).
 
 ---
 
+## Avatar sheet style transfer strips scene/environment from the style line (2026-08-06)
+
+**Context:** After the grok flip, cyber avatars ("Lily and Ethan's Eight Travellers",
+`job_1786024729214_zrjgzqiey`) came back with a full cyberpunk scene painted behind the figures
+(rainy street, neon signs, fog). A reference sheet must be plain white so the figure can be cut out
+and composited. Root cause: `buildStyleTransferPrompt` injected the *page* style descriptor via
+`resolveStyleLineForSheet`, and the cyber descriptor is written as a scene ("neon reflections, rainy
+streets, chrome surfaces … dark atmosphere with volumetric fog") — grok obeys those environment
+words, overriding the "pure white background" line. The split eval never checked background, so it
+false-passed (Lily/Ethan scored 9 with the scene present; only Rachel failed, for an unrelated body
+reason — exp #364).
+
+**Decision:** (1) `resolveArtStyleForSheet()` — the mirror of `resolveArtStyleForEmptyScene` — strips
+environment/scene clauses from the style line for pass-2, keeping rendering technique, palette,
+linework, faces; `resolveStyleLineForSheet` uses it. Clause-level, but sentences carrying a rule
+(negation / "only on …" / parentheticals / em-dash asides) are kept verbatim so a rule can't be
+inverted (steampunk's "gears never on faces" must not become "gears on faces"). (2)
+`buildStyleTransferPrompt` explicitly forbids scenery (pure white, empty, style on the figure only).
+(3) `sheet-row-bodies-eval` TASK 5 = plain-background check, folded into `finalScore` so a painted
+background now fails the sheet.
+
+**Rationale:** The descriptors conflate character-rendering style (wanted on the sheet) with
+scene/atmosphere (wanted only on pages). Stripping at the resolver — same pattern the empty-scene
+path already uses — fixes every scene-heavy style at once without touching page generation. Verified
+in Test Lab (staging): eval-with-bg-check fails all 3 cyber sheets on background (#367); regenerated
+cyber pass-2 with the stripped style line comes out plain white, bg=10, style intact (#368).
+
+**Touched:** `server/lib/storyHelpers.js` (resolveArtStyleForSheet + export),
+`server/lib/character2x4Sheet.js` (resolveStyleLineForSheet, buildStyleTransferPrompt),
+`prompts/sheet-row-bodies-eval.txt` (TASK 5 background check).
+
+---
+
 ## 2026-08-05 — Cutout repairs: register the candidate instead of rejecting it (exp #345)
 
 **Context:** The cutout variant was rejected — "Painted figure barely overlaps the original
