@@ -501,8 +501,11 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
 function resolveStyleLineForSheet(artStyle) {
   // Defer require until call time — storyHelpers.js is heavy and not
   // needed until Pass 2 runs.
-  const { resolveArtStyle } = require('./storyHelpers');
-  const style = resolveArtStyle(artStyle, 'grok');
+  const { resolveArtStyleForSheet } = require('./storyHelpers');
+  // Sheet-safe style line: environment/scene clauses stripped so the model
+  // does not paint a background behind the reference figures (see
+  // resolveArtStyleForSheet). Keeps rendering technique, palette, and faces.
+  const style = resolveArtStyleForSheet(artStyle, 'grok');
   if (style) return style;
   // Unknown style id (shouldn't happen — frontend constrains to ART_STYLES).
   // Fail loudly instead of silently swapping to watercolour.
@@ -516,7 +519,7 @@ function buildStyleTransferPrompt(artStyle) {
 Apply this exact same art style to ALL 8 cells equally. Every one of the 8 cells shows the SAME character rendered in the identical ${styleLine} treatment — the four head cells (top row) and the four full-body cells (bottom row) must match in rendering style, shading, skin finish, and degree of stylisation. No cell may stay photographic or semi-realistic while the others are stylised; the bottom-row full-body figures must look rendered in exactly the same style as the top-row heads.
 
 Preserve EVERYTHING except the visual style:
-- Same 4-column × 2-row grid layout, same thin black dividers, same pure white background.
+- Same 4-column × 2-row grid layout, same thin black dividers, same pure white background. Add no scenery, environment, weather, streets, buildings, or background of any kind — the background stays pure white and empty in all 8 cells. Apply the style only to the figure.
 - Top row cells 1-4: head and neck only, in the same order (front, three-quarter, profile, back). Same hair, same beard if any, same skin tone, same facial features — the same person.
 - Bottom row cells 5-8: full body head to feet in the same poses (front, three-quarter, profile, back), both feet and shoes fully visible exactly as in the source sheet — never crop at the thigh, knee, or ankle. Same costume — every accessory, every garment colour, every cut identical. Keep body proportions age-appropriate and matched to the head: an adult is roughly 7 to 8 heads tall, a teenager about 7 heads, a young child about 5 to 6 heads, a toddler about 4 heads. Do NOT shrink an adult into child-like proportions and do NOT put an oversized head on a small body — the full-body figures must read as the same age as the head cells.
 - No text, no numbers, no labels.

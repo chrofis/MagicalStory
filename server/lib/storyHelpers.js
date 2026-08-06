@@ -2270,6 +2270,63 @@ function resolveArtStyleForEmptyScene(artStyleId, backend) {
 }
 
 /**
+ * Resolve art style description for the 2×4 CHARACTER REFERENCE SHEET (Pass-2
+ * style transfer). The page-style descriptors bake in scene/environment prose
+ * ("rainy streets, chrome surfaces, volumetric fog") because they were authored
+ * for full illustrations. On a reference sheet those words make the model paint
+ * a whole environment behind the figure, defeating the plain-white background a
+ * cutout needs. This is the mirror of resolveArtStyleForEmptyScene: it strips
+ * ENVIRONMENT clauses while keeping the rendering technique, palette, linework,
+ * and face description.
+ *
+ * Strips at CLAUSE level (comma-delimited), not sentence level, because the
+ * scene words are often embedded in the same sentence that names the medium
+ * (e.g. cyber's "A cyberpunk graphic novel illustration with neon reflections,
+ * rainy streets, chrome surfaces, ..."). Dropping the whole sentence would lose
+ * the style identity; dropping only the scene clauses keeps it.
+ *
+ * @param {string} artStyleId - Style key (e.g., 'cyber')
+ * @param {string} [backend] - Image backend ('grok', 'gemini', 'runware')
+ * @returns {string|null} Sheet-safe style description or null if not found
+ */
+function resolveArtStyleForSheet(artStyleId, backend) {
+  const full = resolveArtStyle(artStyleId, backend);
+  if (!full) return null;
+
+  // Environment / scenery / composition words. "neon reflections" and "neon
+  // highlights" describe how light hits the character, so bare "neon" is NOT
+  // matched — only scene nouns like "neon sign" are.
+  const SCENE_RE = /\b(street|streets|road|roads|pavement|sidewalk|alley|alleys|rainy|rain|raining|puddle|puddles|fog|foggy|mist|misty|smoke|steamy|atmosphere|atmospheric|scenery|landscape|landscapes|cityscape|skyline|skyscraper|skyscrapers|chrome|backdrop|background|backgrounds|environment|environments|setting|settings|indoor|indoors|outdoor|outdoors|room|rooms|wall|walls|floor|sky|cloud|clouds|forest|building|buildings|architecture|storefront|window|windows|composition|staged|staging|photographed|neon signs?)\b/i;
+  // Sentences carrying an explicit RULE (negation, "only on …", parentheticals,
+  // em-dash asides) are kept verbatim — clause-splitting them risks inverting a
+  // rule ("gears never on faces" → "gears on faces"). Purity is worth less than
+  // not corrupting a constraint; a stray scene noun inside a negated rule won't
+  // make the model paint a background on an otherwise empty sheet.
+  const RULE_RE = /\b(never|not|no|only|exactly|must|preserve|keep|do not|appear only)\b|[()]|—/i;
+
+  const sentences = full.match(/[^.!?]+[.!?]+|\S[^.!?]*$/g) || [full];
+  const outSentences = [];
+  for (const raw of sentences) {
+    const m = raw.match(/([.!?]+)\s*$/);
+    const end = m ? m[1] : '';
+    const body = (m ? raw.slice(0, m.index) : raw).trim();
+    if (!body) continue;
+    if (RULE_RE.test(body)) { outSentences.push(body + end); continue; }
+    if (!SCENE_RE.test(body)) { outSentences.push(body + end); continue; }
+    // Scene-bearing, no rule markers: drop the environment clauses (split on
+    // commas AND semicolons), keep the rest. Strip a dangling leading "and ".
+    const keptClauses = body.split(/[,;]/).map(c => c.trim()).filter(Boolean)
+      .filter(c => !SCENE_RE.test(c))
+      .map(c => c.replace(/^and\s+/i, '').trim())
+      .filter(Boolean);
+    if (!keptClauses.length) continue;
+    outSentences.push(keptClauses.join(', ') + end);
+  }
+
+  return outSentences.join(' ').replace(/\s{2,}/g, ' ').trim() || null;
+}
+
+/**
  * Language level definitions - controls text length per page
  */
 const LANGUAGE_LEVELS = {
@@ -6801,6 +6858,7 @@ module.exports = {
   ART_STYLES,
   resolveArtStyle,
   resolveArtStyleForEmptyScene,
+  resolveArtStyleForSheet,
   LANGUAGE_LEVELS,
 
   // Level helpers

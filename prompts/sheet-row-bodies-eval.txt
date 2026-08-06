@@ -17,7 +17,10 @@ Read REQUESTED_OUTFIT below, split it into items, and check every figure wears e
 TASK 4: PROPORTIONS
 Body proportions match the person's apparent age — no oversized head on a small body, no adult shrunk to child proportions. Score 1-10.
 
-finalScore = lowest of fullBodyScore, anglesScore, outfitScore, proportionsScore. valid = finalScore ≥ 6.
+TASK 5: PLAIN BACKGROUND
+The area behind and around the figures must be plain white and empty (thin cell dividers are fine). Any painted scene, scenery, streets, walls, floor, sky, fog, or coloured/illustrated backdrop behind a figure = backgroundScore ≤ 2. Plain white/empty in every cell = 10. backgroundScore 1-10.
+
+finalScore = lowest of fullBodyScore, anglesScore, outfitScore, proportionsScore, backgroundScore. valid = finalScore ≥ 6.
 
 {REQUESTED_OUTFIT}
 
@@ -27,9 +30,10 @@ Return EXACTLY this JSON:
   "angles": {"score": 9, "reason": "Front, three-quarter, profile, back left to right"},
   "outfit": {"outfitScore": 9, "reason": "Every figure wears the requested items, consistent across cells"},
   "proportions": {"score": 9, "reason": "Proportions match the person's apparent age"},
+  "background": {"backgroundScore": 10, "reason": "Plain white background in every cell"},
   "finalScore": 8,
   "valid": true,
   "failureReasons": []
 }
 
-If invalid, populate failureReasons with short strings naming each failed sub-check (e.g. "fullBody: all 4 cells have no head — figures start at the waist").
+If invalid, populate failureReasons with short strings naming each failed sub-check (e.g. "fullBody: all 4 cells have no head — figures start at the waist", "background: painted street scene behind the figures").
