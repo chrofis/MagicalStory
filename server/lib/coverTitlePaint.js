@@ -149,11 +149,31 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
       return (typeof raw === 'string' ? raw : (raw && raw.default) || '') || '';
     } catch { return ''; }
   })();
+  // Call the backend DIRECTLY rather than through editImageWithPrompt. That
+  // helper wraps the caller's text in the `illustrationEdit` template, which
+  // (a) is empty unless loadPromptTemplates() ran — Grok then 400s with "Prompt
+  // cannot be empty" and the helper silently falls back to Gemini, so the repaint
+  // endpoint quietly used a different model than the Lab did — and (b) injects
+  // "match the source image's artistic style", which is wrong here: the image
+  // being edited is a title on WHITE, and we do not want the scene painted onto
+  // it. Our prompt is already complete.
   const backend = opts.backend || 'grok';
-  const modelKey = opts.model || (backend === 'grok' ? 'grok-imagine' : 'gemini-2.5-flash-image');
-  const result = await editImageWithPrompt(
-    `data:image/jpeg;base64,${plateBuf.toString('base64')}`, PLATE_PROMPT(styleTxt), modelKey,
-    [`data:image/jpeg;base64,${sceneBuf.toString('base64')}`], opts.artStyle);
+  let result = null;
+  if (backend === 'grok') {
+    const { editWithGrok } = require('./grok');
+    const { IMAGE_MODELS } = require('../config/models');
+    result = await editWithGrok(PLATE_PROMPT(styleTxt), [
+      `data:image/jpeg;base64,${plateBuf.toString('base64')}`,
+      `data:image/jpeg;base64,${sceneBuf.toString('base64')}`,
+    ], { model: IMAGE_MODELS[opts.model || 'grok-imagine']?.modelId, aspectRatio: '1:1', resolution: '1k' });
+  } else {
+    const { loadPromptTemplates } = require('../services/prompts');
+    await loadPromptTemplates();
+    result = await editImageWithPrompt(
+      `data:image/jpeg;base64,${plateBuf.toString('base64')}`, PLATE_PROMPT(styleTxt),
+      opts.model || 'gemini-2.5-flash-image',
+      [`data:image/jpeg;base64,${sceneBuf.toString('base64')}`], opts.artStyle);
+  }
   if (!result?.imageData) return { ...flat, reason: `${backend} returned no image` };
 
   // 5. key on INKINESS (dark OR saturated), so any paper texture the model adds
