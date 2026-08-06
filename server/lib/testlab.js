@@ -1836,7 +1836,16 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   // output. The solved-alpha path stays as the fallback / comparison detector.
   let foundMaskSmooth = alphaBuf;
   if (detect === 'sam' && samMaskRaw) {
-    foundMaskSmooth = await sharp(samMaskRaw, { raw: { width: outW, height: outH, channels: 1 } })
+    // UNION with the drawn glyphs (exp #340). SAM alone dropped letters wherever
+    // they sat over busy background — "LINDENBAUM" came back "LINDENB" with the
+    // tail over the tree canopy, and coverage fell to 0.61-0.75. The two sources
+    // are complementary and neither can contain background: SAM contributes the
+    // painted overshoot, the drawn mask guarantees every glyph is present.
+    const union = Buffer.alloc(outW * outH);
+    for (let p2 = 0; p2 < outW * outH; p2++) {
+      union[p2] = (samMaskRaw[p2] > 128 || drawnMaskRaw[p2] > 8) ? 255 : 0;
+    }
+    foundMaskSmooth = await sharp(union, { raw: { width: outW, height: outH, channels: 1 } })
       .blur(0.8).toColourspace('b-w').raw().toBuffer();
     foundN = 0; overlapN = 0;
     for (let p2 = 0; p2 < outW * outH; p2++) {
