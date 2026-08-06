@@ -1823,6 +1823,40 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
+      // STEP 0 COHERENCE GATE (wired 2026-08-06). image-evaluation.txt has always
+      // asked for `coherence_gate: {applied, reason}` — the "this image cannot be
+      // published, repainting one region cannot save it" verdict — and NOTHING in
+      // the codebase ever read it. It was write-only: the model emitted it, it sat
+      // in the raw reasoning text, and the redo it exists to trigger could not
+      // happen. Observed cost: a page framed by a full-perimeter comic-book border
+      // (a listed catastrophic trigger) was reported in STEP 4 as
+      // `composition/MINOR` instead, scored 68 — the highest in the book — and
+      // shipped unrepaired.
+      //
+      // The gate does not get its own repair path. Catastrophic severity already
+      // routes to regenerate (repairLogic: catastrophic visual/semantic → iterate),
+      // so an applied gate is expressed as a CATASTROPHIC issue and rides the
+      // existing route. If the model applied the gate but severitied the same
+      // defect lower in STEP 4, the gate wins — that mismatch is exactly the
+      // failure above.
+      const coherenceGate = parsedJson.coherence_gate || null;
+      if (coherenceGate?.applied === true) {
+        const reason = coherenceGate.reason || 'image is fundamentally broken (coherence gate)';
+        const alreadyCatastrophic = fixableIssues.some(i => /catastrophic/i.test(String(i.severity || '')));
+        if (!alreadyCatastrophic) {
+          fixableIssues.unshift({
+            description: reason,
+            severity: 'CATASTROPHIC',
+            type: 'coherence',
+            character: null,
+            fix: `Regenerate the page from scratch: ${reason}`,
+          });
+          log.warn(`🚧 [EVAL] coherence gate APPLIED → forcing CATASTROPHIC (no STEP 4 issue matched it): ${reason}`);
+        } else {
+          log.warn(`🚧 [EVAL] coherence gate APPLIED: ${reason}`);
+        }
+      }
+
       // MULTI-JUDGE JURY (EVAL_JUDGES): run the extra judges (Grok, Qwen) on the
       // SAME parts, then merge ALL judges by PURE MEDIAN per bucket (evalBuckets)
       // and replace fixableIssues with the deduplicated merged set before scoring.
@@ -2114,6 +2148,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         fixableIssues: Array.isArray(fixableIssues) ? fixableIssues : [],  // always an array — eliminates downstream null-checks
         figures,                          // Detected figures with descriptions
         matches,                          // Character name → figure mapping with face_bbox
+        coherenceGate,                    // STEP 0 gate {applied, reason} — drives the forced redo above
         semanticResult,                   // Full semantic evaluation result (if available)
         threeStageResult,                 // Full three-stage evaluation result (if available)
         usage: totalUsage,
@@ -9299,6 +9334,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       evaluatedAt: v.evaluatedAt || null,
       issuesSummary: v.evaluation?.issuesSummary || null,
       fixableIssues: v.evaluation?.fixableIssues || [],
+      // STEP 0 verdict, persisted so "why was this page redone / not redone"
+      // is answerable from the stored story instead of only from live logs.
+      coherenceGate: v.evaluation?.coherenceGate || null,
       source: v.source,
       type: typeFor(v.source),
       modelId: v.modelId,

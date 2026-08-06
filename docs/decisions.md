@@ -5049,3 +5049,43 @@ Fixed: both fields are now persisted.
 the picker should fall back to `rawScore` ordering.
 
 **Touched:** `server/lib/images.js`.
+
+---
+
+## 2026-08-06 — The coherence gate was write-only: STEP 0 CATASTROPHIC could never trigger a redo
+
+**Context:** Owner, on the reference-card frame leak (a green cross-shaped frame on p6, thick
+blue/red borders on p7 of `job_1786024729214_zrjgzqiey`): "why does the evaluator not catch it and
+we just redo?"
+
+**It half-caught it, and could not have acted on it either way.**
+1. On p7 the evaluator DID see it — it emitted `composition/MINOR: "Scene includes thick blue/red
+   decorative borders and a separate small framed planetary image"`. `image-evaluation.txt` STEP 0
+   lists a full-perimeter frame as an explicit CATASTROPHIC trigger, but the model reported the
+   same defect down in STEP 4 as a minor composition nitpick. p7 then scored 68 — the highest page
+   in the book — and shipped as `original` with no repair.
+2. On p6 the frame was not mentioned at all.
+3. Decisively: `coherence_gate` — the `{applied, reason}` field STEP 0 asks for on EVERY page — has
+   **zero readers anywhere in the codebase**. Grep returns exactly one hit: the line in the prompt
+   that requests it. The model emits it (it is visible inside the stored raw reasoning JSON), and
+   it is dropped. The gate that exists specifically to force a from-scratch redo instead of an
+   inpaint has never been able to force anything.
+
+**Decision:**
+1. Parse `coherence_gate`. When `applied === true`, express it as a CATASTROPHIC entry in
+   `fixableIssues` — it does NOT get its own repair path, because catastrophic severity already
+   routes to regenerate (`repairLogic`: catastrophic visual/semantic → iterate). One route, not a
+   parallel one. If the model applied the gate but severitied the same defect lower in STEP 4, the
+   gate wins; that mismatch is exactly the p7 failure.
+2. Persist `coherenceGate` on the version so "why was this page redone / not redone" is answerable
+   from the stored story rather than only from live logs.
+3. Prompt: the frame trigger now covers blank margins insetting the artwork and frames of any
+   colour/thickness/shape, and explicitly forbids downgrading one to a composition nitpick.
+
+**NOT fixed — the underlying leak.** Grok is copying the reference card's coloured frame and white
+padding into the scene as geometry. The frame is the card↔character binding (it replaced name
+captions, which leaked child names onto pages) and `frameCharacterImage` already carries scars from
+two earlier leak fixes. Changing it to corner ticks or a swatch needs a Test Lab A/B on identity
+binding first — not a blind edit. This entry makes the detection catch it in the meantime.
+
+**Touched:** `server/lib/images.js`, `prompts/image-evaluation.txt`.
