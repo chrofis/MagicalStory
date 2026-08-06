@@ -8145,6 +8145,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     })();
     const sceneDesc = img.sceneDescription || img.text || '';
     const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
+    // Appearance text for the repair prompt (face/hair/build). The Lab passed
+    // this; PRODUCTION did not, so every live repair rendered the appearance
+    // slot empty and identity rested on the avatar alone (found while auditing
+    // story job_1786024729214_zrjgzqiey, 4 char-fix rounds).
+    const charDescForPrompt = (() => {
+      const d = img.bboxDetection?.characterDescriptions?.[charName]
+        ?? (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.bboxDetection?.characterDescriptions?.[charName];
+      const txt = (typeof d === 'string' ? d : d?.richDescription) || '';
+      return txt || (character?.description || '');
+    })();
 
     log.info(`👤 [UNIFIED PIPELINE] Round ${roundNum} char-fix ${charName} on p${pageNumber}: ${useFaceOnly ? 'FACE' : 'BODY'} bbox=[${repairBbox.map(v => Math.round(v * 100) + '%').join(', ')}] (${decision.severity})`);
     let repairResult;
@@ -8153,6 +8163,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         imageBackend: 'grok',
         issueDescription: decision.issueDescription,
         clothingDescription: clothingDesc,
+        characterDescription: charDescForPrompt,
         photoType: avatarPhotoType,
         sceneDescription: sceneDesc,
         faceBbox,

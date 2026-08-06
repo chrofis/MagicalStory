@@ -4845,3 +4845,29 @@ one marked. It is the direct way to see whether a repair damaged or absorbed a n
 Diagnostic only; never gates anything.
 
 **Touched:** `server/lib/samBlend.js`, `server/lib/faceRepair.js`, `server/lib/testlab.js`.
+
+---
+
+## 2026-08-06 — Production repairs had no appearance text (audit of a live staging story)
+
+**Context:** Owner asked whether character repair ran on staging story
+`job_1786024729214_zrjgzqiey`. It did — `char-fix` on 4 of 14 pages (p2 Lily, p5 Margaret,
+p6 Lily, p9 Lily), and the stored prompts confirm today's template fixes ARE live in
+production: `{charName}` is substituted and the closing "everything to match" block is
+present.
+
+**But the appearance slot was empty.** `characterDescription` was wired into the TEST LAB
+stage only; the production pipeline call (`images.js` char-fix round) passed
+issueDescription / clothingDescription / photoType / sceneDescription and no appearance
+text — so every live repair identified the character by name, clothing and avatar alone.
+Fixed: the production call now resolves the stored per-character description
+(`bboxDetection.characterDescriptions[charName]`, falling back to the character record) and
+passes it.
+
+**Repair-quality note from the same audit** (evaluator scores, before → after char-fix):
+p2 30 → 35, p5 40 → 40, p6 50 → **30**, p9 60 → **50**. Two of four rounds made the page
+score WORSE, and both were pages where the pre-repair score was already the highest in the
+chain. Worth investigating whether char-fix should be skipped when the current best version
+already scores above some threshold.
+
+**Touched:** `server/lib/images.js`.
