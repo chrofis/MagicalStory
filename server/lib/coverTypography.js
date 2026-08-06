@@ -684,7 +684,7 @@ async function paintServedCoverTitle(storyId, storyData, { coverKey = 'frontCove
     await saveStoryImage(storyId, coverKey, null, res.imageData, { versionIndex: activeIdx, cacheBust: true });
     if (cover) { cover.typography = res.spec; cover.titlePainted = true; }
     log.info(`🅰️ [TITLE PAINT] ${coverKey}: painted title baked onto served v${activeIdx}`);
-    return { painted: true, imageData: res.imageData, spec: res.spec };
+    return { painted: true, imageData: res.imageData, spec: res.spec, coverage: res.coverage, spill: res.spill };
   } catch (err) {
     log.warn(`⚠️ [TITLE PAINT] ${coverKey}: ${err.message} — flat title kept`);
     return { painted: false, reason: err.message };

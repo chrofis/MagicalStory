@@ -3492,7 +3492,11 @@ router.post('/:id/repaint-title', authenticateToken, async (req, res) => {
     }
     await logActivity(req.user.id, req.user.username, 'COVER_TITLE_REPAINTED', { storyId: id, cost: creditCost }, req.user);
 
-    res.json({ success: true, imageData: result.imageData, credits: newCredits, charged: hasInfiniteCredits ? 0 : creditCost });
+    // coverage/spill are returned so a caller can VERIFY which path ran: the Grok
+    // plate path lands ~0.99 / ~0.00, the accidental Gemini fallback was 0.85 / 0.51.
+    res.json({ success: true, imageData: result.imageData, credits: newCredits,
+      charged: hasInfiniteCredits ? 0 : creditCost,
+      coverage: result.coverage, spill: result.spill });
   } catch (err) {
     console.error('Error repainting cover title:', err);
     res.status(500).json({ error: 'Failed to repaint title: ' + err.message });
