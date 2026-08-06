@@ -2489,9 +2489,38 @@ function _photoAnalyzerUrl() {
 //
 // Held around the HTTP request ONLY, so a caller can never hold a slot while
 // awaiting another analyzer call (which would deadlock).
-const analyzerLimit = pLimit(parseInt(process.env.ANALYZER_MAX_INFLIGHT, 10) || 6);
-function withAnalyzerSlot(fn) {
-  return analyzerLimit(fn);
+// Sized from the analyzer's OWN cpu_quota (exposed on /health), because the
+// right number is the one the service can actually serve: waitress runs one
+// thread per vCPU, so more in-flight than that only queues at the HTTP layer
+// while starving nothing. A hardcoded default risked the opposite error —
+// throttling to 6 on a 24-vCPU box would have left most cores idle.
+//
+// p-limit@3 has no working concurrency setter (assigning to .concurrency is a
+// silent no-op), so the limiter is BUILT once the quota is known rather than
+// resized. Probed once per process; the quota cannot change under us.
+let _analyzerLimit = null;
+let _analyzerLimitPromise = null;
+function _buildAnalyzerLimit() {
+  return (async () => {
+    let n = parseInt(process.env.ANALYZER_MAX_INFLIGHT, 10) || 0;
+    let source = n ? 'ANALYZER_MAX_INFLIGHT' : '';
+    if (!n) {
+      try {
+        const r = await fetch(`${_photoAnalyzerUrl()}/health`, { signal: AbortSignal.timeout(5000) });
+        const q = (await r.json())?.cpu?.cpu_quota;
+        if (Number.isFinite(q) && q >= 1) { n = Math.max(2, Math.min(32, q)); source = 'analyzer cpu_quota'; }
+      } catch { /* analyzer down/starting — fall through to the default */ }
+    }
+    if (!n) { n = 6; source = 'default (quota probe failed)'; }
+    log.info(`🔧 [ANALYZER] in-flight cap ${n} (${source})`);
+    _analyzerLimit = pLimit(n);
+    return _analyzerLimit;
+  })();
+}
+async function withAnalyzerSlot(fn) {
+  if (_analyzerLimit) return _analyzerLimit(fn);
+  if (!_analyzerLimitPromise) _analyzerLimitPromise = _buildAnalyzerLimit();
+  return (await _analyzerLimitPromise)(fn);
 }
 
 function _pxBoxToNorm(box, W, H) {
@@ -9069,9 +9098,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // drift — observed on a "cyber" book that rendered mostly photoreal,
       // where the two comic-styled pages were flagged as the outliers and one
       // was repainted photoreal. No anchor is better than a wrong anchor.
-      const dominantOffStyle = styleConsistency.styleMatch && !styleConsistency.styleMatch.dominantMatches;
+      // Only a wholesale medium change blocks. Gating on any style shortfall
+      // was measured against 5 stored books and read "off style" on 4 of them,
+      // including two the auditor called consistent — it would have disabled
+      // style-repair in practice.
+      const dominantOffStyle = styleConsistency.styleMatch?.verdict === 'wrong_medium';
       if (dominantOffStyle) {
-        log.warn(`🎨 [UNIFIED PIPELINE] Step 5: style-repair SKIPPED — the dominant cluster is off the commissioned style ("${storyData?.artStyle}"), so its anchor page would spread the drift. ${styleConsistency.outliers?.length || 0} outlier(s) surfaced only.`);
+        log.warn(`🎨 [UNIFIED PIPELINE] Step 5: style-repair SKIPPED — the dominant cluster is a different medium from the commissioned style ("${storyData?.artStyle}"), so its anchor page would spread the drift. ${styleConsistency.outliers?.length || 0} outlier(s) surfaced only.`);
       }
       if (!dominantOffStyle && MODEL_DEFAULTS.styleRepairProduction && (styleConsistency.outliers?.length || 0) > 0) {
         const { planStyleRepair, repairPageStyle } = require('./styleRepair');
