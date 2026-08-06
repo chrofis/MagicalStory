@@ -1687,7 +1687,7 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   // painted overshoot included) instead of where we drew them.
   // Boxes and positive points come from the drawn glyphs: we know which rows
   // carry a line and which pixels are certainly inside a stroke.
-  const detect = params.detect || 'sam';
+  const detect = params.detect || 'pigment';
   let samMaskRaw = null;
   if (detect === 'sam') {
     const { fetchFigureMaskPng } = require('./images');
@@ -1835,7 +1835,16 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   // SAM wins when it produced a mask: it followed the letters in the model's own
   // output. The solved-alpha path stays as the fallback / comparison detector.
   let foundMaskSmooth = alphaBuf;
-  if (detect === 'sam' && samMaskRaw) {
+  // SEED SOURCE. 'pigment' (default) needs no model at all: sample the deep
+  // INTERIOR of the old glyphs — eroded well inside every stroke, so a letter
+  // that shifted a few px is still covered by its own old footprint. SAM was
+  // only ever a seed generator, and it cost an analyzer round-trip per text line
+  // and missed whole letters (#340), so it is now opt-in.
+  const seedMask = detect === 'sam'
+    ? samMaskRaw
+    : await sharp(drawnMaskRaw, { raw: { width: outW, height: outH, channels: 1 } })
+      .blur(4).threshold(245).toColourspace('b-w').raw().toBuffer();
+  if ((detect === 'sam' && samMaskRaw) || detect === 'pigment') {
     // SAM SEEDS THE COLOUR; COLOUR FINDS THE LETTERS (owner, exp #342 → #343).
     // Unioning with the drawn glyphs was a crutch: it reinstates the OLD
     // letterform as a floor, so if the model reshapes a stroke the flat original
@@ -1868,20 +1877,45 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
     //    display type has a face colour plus an outline/shadow colour)
     const bins = new Map();
     for (let p2 = 0, i2 = 0; p2 < outW * outH; p2++, i2 += 3) {
-      if (samMaskRaw[p2] <= 128) continue;
+      if (seedMask[p2] <= 128) continue;
       const k = ((paintedRaw[i2] >> 4) << 8) | ((paintedRaw[i2 + 1] >> 4) << 4) | (paintedRaw[i2 + 2] >> 4);
       const e = bins.get(k) || { r: 0, g: 0, b: 0, n: 0 };
       e.r += paintedRaw[i2]; e.g += paintedRaw[i2 + 1]; e.b += paintedRaw[i2 + 2]; e.n++;
       bins.set(k, e);
     }
-    const seeds = [...bins.values()].filter(e => e.n > 40).sort((a, b) => b.n - a.n).slice(0, 6)
+    // Plate colours at the SAME sample positions — a "pigment" cluster that
+    // matches these is background we picked up because the letter moved away.
+    const plateBins = new Map();
+    for (let p2 = 0, i2 = 0; p2 < outW * outH; p2++, i2 += 3) {
+      if (seedMask[p2] <= 128) continue;
+      const k = ((artOutRaw[i2] >> 4) << 8) | ((artOutRaw[i2 + 1] >> 4) << 4) | (artOutRaw[i2 + 2] >> 4);
+      const e = plateBins.get(k) || { r: 0, g: 0, b: 0, n: 0 };
+      e.r += artOutRaw[i2]; e.g += artOutRaw[i2 + 1]; e.b += artOutRaw[i2 + 2]; e.n++;
+      plateBins.set(k, e);
+    }
+    const plateLabs = [...plateBins.values()].filter(e => e.n > 40)
       .map(e => toLab(e.r / e.n, e.g / e.n, e.b / e.n));
+    const rawSeeds = [...bins.values()].filter(e => e.n > 40).sort((a, b) => b.n - a.n).slice(0, 8)
+      .map(e => toLab(e.r / e.n, e.g / e.n, e.b / e.n));
+    let seeds = rawSeeds.filter(l => !plateLabs.some(pl =>
+      Math.hypot(l[0] - pl[0], l[1] - pl[1], l[2] - pl[2]) < (params.seedRejectDE ?? 10)));
+    let seedSource = 'sampled';
+    if (!seeds.length) {
+      // Every cluster looked like the plate ⇒ the letters are not where we drew
+      // them. Fail over to the colour composeCover DELIBERATELY chose — known
+      // exactly, needs no image — rather than selecting background.
+      const hex = spec?.face && /^#[0-9a-f]{6}$/i.test(spec.face) ? spec.face : null;
+      if (hex) {
+        seeds = [toLab(parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16))];
+        seedSource = 'composeCover spec (sample was all background)';
+      }
+    }
     // 2. title area: the bbox of the drawn glyphs generously padded — a REGION,
     //    not a shape, so it constrains where we look without dictating form.
     const bandPad = Math.round(Math.min(outW, outH) * (params.bandPct ?? 0.05));
     const bx0 = Math.max(0, minx - bandPad), bx1 = Math.min(outW - 1, maxx + bandPad);
     const by0 = Math.max(0, miny - bandPad), by1 = Math.min(outH - 1, maxy + bandPad);
-    const TOL = params.colorTol ?? 20;              // ΔE to a seed colour
+    const TOL = params.colorTol ?? 26;   // grab generously; filtering + feather clean up              // ΔE to a seed colour
     const CHANGED = params.plateDiff ?? 22;         // must differ from the plate
     const sel = Buffer.alloc(outW * outH);
     for (let y = by0; y <= by1; y++) {
@@ -1899,6 +1933,18 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
         if (best <= TOL) sel[p2] = 255;             // (a) pigment match
       }
     }
+    // 2b. OPENING — erode then dilate. Thin filaments (leaf wisps, a trunk edge
+    //     grazing a letter) are severed, so they become their own components and
+    //     die in the size test; letter strokes are far thicker and survive.
+    const openPx = params.openPx ?? 2;
+    if (openPx > 0) {
+      const eroded = await sharp(sel, { raw: { width: outW, height: outH, channels: 1 } })
+        .blur(openPx).threshold(200).toColourspace('b-w').raw().toBuffer();
+      const reopened = await sharp(eroded, { raw: { width: outW, height: outH, channels: 1 } })
+        .blur(openPx).threshold(60).toColourspace('b-w').raw().toBuffer();
+      for (let p2 = 0; p2 < outW * outH; p2++) sel[p2] = reopened[p2] > 128 ? 255 : 0;
+    }
+
     // 3. CONNECTED AREAS ONLY (owner): a letter is a big, connected blob sitting
     //    where a letter belongs. Two tests, both structural:
     //      size   — components below minComp are speckle (leaf fragments, grain)
@@ -1928,9 +1974,10 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
       for (const q of comp) { if (drawnMaskRaw[q] > 8 || samMaskRaw[q] > 128) { anchored2 = true; break; } }
       if (comp.length >= MIN_COMP && anchored2) for (const q of comp) cleaned[q] = 255;
     }
+    // FEATHER: grab generously, then soften the boundary so the paste has no cut.
     foundMaskSmooth = await sharp(cleaned, { raw: { width: outW, height: outH, channels: 1 } })
-      .blur(0.8).toColourspace('b-w').raw().toBuffer();
-    await addStep(`colour-selected letters (${seeds.length} pigment seeds from SAM, ΔE≤${TOL}) — no old-shape fallback`,
+      .blur(params.featherPx ?? 1.6).toColourspace('b-w').raw().toBuffer();
+    await addStep(`colour-selected letters — ${seeds.length} seed(s) [${seedSource}], ΔE≤${TOL}, open ${openPx}px, no old-shape fallback`,
       `data:image/png;base64,${(await sharp(cleaned, { raw: { width: outW, height: outH, channels: 1 } }).png().toBuffer()).toString('base64')}`);
     foundN = 0; overlapN = 0;
     for (let p2 = 0; p2 < outW * outH; p2++) {
