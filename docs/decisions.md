@@ -2656,6 +2656,59 @@ slicing), `tests/manual/garmentHueNormalizeBatch.test.js` (env-independent fp co
 CLI runner against local code + the staging DB, so staging's server still runs the old
 behaviour until this is pushed.
 
+### Garment colour match needs a real MASK and a full L\*a\*b\* target (2026-08-06)
+**Context:** Owner reported a shirt rendering ORANGE instead of yellow (story
+`job_1786024729214_zrjgzqiey` p2, Lily) that garment-hue reported as "below
+threshold (3.8°)". Investigating it invalidated two load-bearing assumptions of
+the pass. **Validated end-to-end on that page; NOT yet wired into production.**
+**Findings, each measured:**
+1. **The garment was never identified — only guessed.** The pass samples a
+   chroma-weighted hue histogram over a box and takes the modal hue; it never
+   decides "this pixel is shirt". `isGarmentPixel` rejects skin and grey but NOT
+   hair, so on a red-haired character the sheet's strongest cluster was her HAIR
+   (32.6°); the orange shirt matched it at 3.8° and was blessed, while the real
+   yellow shirt (106.3°) sat 70° away. Measurement and application shared one
+   weak criterion, so neither could be trusted past a gentle nudge.
+2. **Colour-space heuristics cannot recover it.** Two hand-rolled connected-region
+   segmenters were tried and both failed on the same page: growing from the
+   largest region found dark hair merged with shadow (12% of frame, shirt
+   untouched), and seeding from the chest failed because her hair covers the
+   chest. A washed-out garment's chroma overlaps JPEG chroma noise, so no
+   threshold separates them.
+3. **A text-prompted detector solves it directly.** GroundingDINO box
+   (`"the shirt or top worn by the person"`, score 0.62–0.76, colour-agnostic)
+   → MobileSAM mask gives an exact garment silhouette: hair strand over the
+   shoulder cut out, arms/skin/table/book excluded, alpha edge free. Measured
+   cost **15–40 s per figure** warm (DINO 12–32 s + SAM 3–7 s) plus an 84 s
+   one-time model load. The earlier verdict that a large rotation "fundamentally
+   cannot" work was a MASK failure, not a colour-space limit.
+4. **Hue-only cannot reach yellow.** With the mask, rotating hue alone landed at
+   102.9° against a 103.2° target — and still looked wrong, because
+   `L*` was pinned at 43.4 while the avatar's yellow is L=70. Yellow is
+   intrinsically light: with the avatar's exact a\*/b\*, L=45 is olive
+   `rgb(109,111,0)` and L=75 is yellow `rgb(193,189,75)`. A mean L\*a\*b\*
+   OFFSET (ΔL +26.6, Δa −39.2, Δb +21.2) inside the mask landed
+   `rgb(178,172,63)` vs target `rgb(178,176,62)`, folds and highlights intact.
+5. **The mask fixes the DIAGNOSIS too.** Rachel p5 measured 53.1° by the coarse
+   sampler (→ 84° drift → "defer to repair") but **165.9°** under the mask, a
+   real drift of only −28°. The pass was about to escalate a nearly-correct shirt.
+**Decision (shape of the fix, not yet built):** garment mask from DINO+SAM;
+target = the avatar garment's full L\*a\*b\* scaled by a scene-lighting factor
+estimated from the page (NOT raw avatar L\*, which would flatten night scenes —
+on this bright page the factor is ≈1, which is why a straight match looked
+right); apply as a mean offset, not a replacement. The 45° drift cap exists only
+to bound damage from a bad mask and can be raised once the mask is real.
+**Supersedes** the "preserve L\* and chroma absolutely" principle in
+`garmentHueNormalize.js` for the masked path — that rule assumed the rendered
+lightness was correct lighting, and here the model simply drew a darker garment.
+**Touched:** none yet in production. Demonstrated via the local `photo_analyzer`
+service (`/detect-figures-text`, `/figure-mask`). Committed so far: the
+hair-target guards (`a85dbce2b` — avatar torso band + `minTargetWeightFrac`),
+which make the pass DEFER page 2 correctly instead of blessing it.
+**Status:** 🟡 conditional — validated on one photorealistic page. GroundingDINO
+is photo-trained; confirm a garment prompt on a painterly page before relying on
+it for all styles.
+
 ## Image-first story prompt variant — one call, scenes authored before text (2026-07-30)
 
 **Context:** roadmap §4 (image-first, owner strategic direction) + §5 (outline
@@ -5159,3 +5212,41 @@ because every synthesised seed landed on garment. A detector-provided face point
 head directly, independent of how the model redrew the figure.
 
 **Touched:** `server/lib/samBlend.js`, `server/lib/faceRepair.js`.
+
+## Cyber (and any "setting" art style) must name a figure MEDIUM, not just a scene (2026-08-06)
+
+**Context:** A cyber-style story (`job_1786024729214_zrjgzqiey`) rendered its pages + covers
+photorealistically — "nothing like the references." The cyber descriptor was written as a SCENE
+("neon reflections, rainy streets, chrome surfaces, volumetric fog") and never said how to render
+the FIGURES. Grok (and Gemini) treat "cyberpunk" as a genre/setting, not a medium — and cyberpunk
+art is photoreal-friendly — so the model kept its photoreal prior and added neon set-dressing.
+Contrast: watercolor/anime/pixar "work" because they name an inherently non-photographic MEDIUM.
+Audit result: cyber was the only broken style; steampunk already leads with "graphic novel
+illustration" and renders illustrated; every other style is medium-named. Model swap is NOT the
+fix — Gemini refused the cover outright (IMAGE_OTHER on photoreal adult faces) and also missed the
+scene; the fix is the descriptor.
+
+**Decision:** Rewrote `ART_STYLES.cyber` to lead with a figure medium — "cyberpunk anime
+illustration, every figure cel-shaded anime, never photographic" — and deliver cyberpunk through
+**neon signs mounted on the scene's own fixtures** (roadside posts, billboards, walls; glowing
+shapes only, no readable text) + neon palette/tech accents, while explicitly preserving the story's
+own time of day/weather ("never switch daytime to night, never add rain"). Iterated v1→v5 in the
+Test Lab: v1 anime-only (no cyber on daytime scenes), v2 full-atmosphere (hijacked daytime scenes
+to night-neon + garbled signage), v3 palette-only (too faint), v4 signs (worked on built scenes,
+bare on open roads), v5 signs-on-fixtures (neon signage even on the countryside road, daytime kept)
+— owner-approved.
+
+**Rationale:** A single descriptor can't make a bright-daytime pastoral scene strongly cyberpunk
+without contradicting it, so the levers are: (a) name the medium so figures stop being photos, and
+(b) carry the cyber cue on neon SIGNAGE, which reads in daylight and hangs on fixtures the scene
+already has — unlike night/rain, which fight a daytime scene. "No readable text" avoids garbled
+neon lettering (the page prompt forbids text anyway).
+
+**Touched:** `server/lib/storyHelpers.js` (ART_STYLES.cyber). Supporting lab plumbing so a model
+override actually switches providers: `server/lib/images.js` (`_dispatchImageGeneration` now derives
+the backend from `imageModelOverride` — a model-only override previously stayed on the default
+backend and silently rendered on Grok, so model-only A/Bs compared a model against itself),
+`server/lib/testlab.js` (cover + image stages forward `params.imageModel`).
+
+**Status:** ✅ active (staging). Same "name the medium" fix likely needed for any future
+setting-named style; steampunk already complies.
