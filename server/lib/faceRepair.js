@@ -746,6 +746,11 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       clipRect: faceClip,
       colorCorrect,
       bodyColorMode,
+      // CUTOUT has no scene anchor, so the model redraws the figure a few
+      // percent off (exp #345: ~40px lower, IoU 53% -> gate reject). Register
+      // the candidate onto the original silhouette first; only kept if IoU
+      // improves, so a genuinely re-posed figure is still rejected.
+      registerCandidate: regionSource === 'cutout',
       // garmentOnly / bgBorderMatch default to true inside samUnionBlend; thread
       // them only when a caller (Test Lab A/B) overrides, so prod keeps the defaults.
       ...(opts.garmentOnly !== undefined ? { garmentOnly: opts.garmentOnly } : {}),

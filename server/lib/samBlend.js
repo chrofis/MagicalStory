@@ -433,8 +433,9 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
   const sharp = require('sharp');
+  let candidateCropBuf = candidateCropBufIn;
   const fail = (msg) => {
     const err = new Error(msg);
     err.partialResult = failCtx;
@@ -468,6 +469,72 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
 
   const raw1 = { raw: { width: cropW, height: cropH, channels: 1 } };
   const n = cropW * cropH;
+
+  // ---- CANDIDATE REGISTRATION (cutout mode) --------------------------------
+  // Without the surrounding scene the model has no anchor, so it redraws the
+  // figure a few percent off — exp #345: the same person, ~40px lower and
+  // slightly taller in a 390x866 crop, IoU 53% → rejected by a gate meant to
+  // catch REAL pose changes. The fix is to register, not to relax the gate:
+  // measure both silhouettes' bounding boxes, translate+scale the candidate so
+  // its figure lands on the original's, and re-segment. Applied ONLY if it
+  // improves IoU, so a genuinely moved figure still gets rejected.
+  const bboxOf = async (maskPng) => {
+    const a = await sharp(maskPng).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+    const st = Math.max(1, Math.round(a.length / n));
+    let x0 = cropW, y0 = cropH, x1 = -1, y1 = -1, cnt = 0;
+    for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
+      if (a[(y * cropW + x) * st] > 128) { cnt++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+    return cnt > 0 ? { x0, y0, x1, y1, w: x1 - x0 + 1, h: y1 - y0 + 1, px: cnt } : null;
+  };
+  const iouOf = async (mA, mB) => {
+    const a = await sharp(mA).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+    const b = await sharp(mB).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+    const sa = Math.max(1, Math.round(a.length / n)), sb = Math.max(1, Math.round(b.length / n));
+    let inter = 0, uni = 0;
+    for (let i = 0; i < n; i++) {
+      const A = a[i * sa] > 128, B = b[i * sb] > 128;
+      if (A && B) inter++;
+      if (A || B) uni++;
+    }
+    return uni ? inter / uni : 0;
+  };
+  let registration = null;
+  if (registerCandidate) {
+    try {
+      const ob = await bboxOf(oldMask), nb = await bboxOf(newMask);
+      if (ob && nb) {
+        const sx = ob.w / nb.w, sy = ob.h / nb.h;
+        const scale = Math.min(sx, sy); // uniform — never distort the figure
+        const inRange = scale > 0.75 && scale < 1.33;
+        const dx = (ob.x0 + ob.w / 2) - (nb.x0 + nb.w / 2) * scale - (cropW / 2) * (1 - scale);
+        const dy = (ob.y0 + ob.h / 2) - (nb.y0 + nb.h / 2) * scale - (cropH / 2) * (1 - scale);
+        if (inRange && (Math.abs(dx) > 2 || Math.abs(dy) > 2 || Math.abs(scale - 1) > 0.01)) {
+          const sw = Math.max(1, Math.round(cropW * scale)), sh = Math.max(1, Math.round(cropH * scale));
+          const scaled = await sharp(candidateCropBuf).resize(sw, sh, { fit: 'fill' }).png().toBuffer();
+          const left = Math.round((cropW - sw) / 2 + dx), top = Math.round((cropH - sh) / 2 + dy);
+          const warped = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).png().toBuffer();
+          const registered = await sharp(warped).composite([{ input: scaled, left, top }]).png().toBuffer();
+          const newMask2 = maskFetcher ? await maskFetcher(registered) : await fetchMaskWithRetry(registered, boxInCrop, 5, maskPoints || {});
+          if (newMask2) {
+            const before = await iouOf(oldMask, newMask);
+            const after = await iouOf(oldMask, newMask2);
+            if (after > before + 0.01) {
+              candidateCropBuf = registered;
+              newMask = newMask2;
+              registration = { dx: Math.round(dx), dy: Math.round(dy), scale: +scale.toFixed(3), iouBefore: +before.toFixed(3), iouAfter: +after.toFixed(3) };
+              log.info(`[TESTLAB] candidate registered: dx=${registration.dx} dy=${registration.dy} scale=${registration.scale} — IoU ${registration.iouBefore} → ${registration.iouAfter}`);
+              await addStep(`registered candidate (dx ${registration.dx}, dy ${registration.dy}, scale ${registration.scale}) — IoU ${registration.iouBefore}→${registration.iouAfter}`, `data:image/png;base64,${registered.toString('base64')}`);
+            } else {
+              log.info(`[TESTLAB] registration rejected — IoU would go ${before.toFixed(3)} → ${after.toFixed(3)} (the figure really moved)`);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      log.warn(`[TESTLAB] candidate registration failed (${err.message}) — blending unregistered`);
+    }
+  }
   const strip = (buf) => {
     const s = Math.max(1, Math.round(buf.length / n));
     if (s === 1) return buf;
@@ -857,7 +924,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf, boxInCrop, cro
     ? `composite alpha (figure-exact: full opacity over old ∪ new+pad, feather ${fpx}px outward into substituted-original band)`
     : `composite alpha (feather ${fpx}px, ramp ${mode}${padMode === 'newFigure' ? ', pad new-figure only' : ''} → net coverage ${mode === 'erode' ? padPx - fpx : mode === 'outward' ? padPx + fpx : padPx}px)`, `data:image/png;base64,${(await sharp(alphaSoft, raw1).png().toBuffer()).toString('base64')}`);
   const feathered = await sharp(pasteBuf).ensureAlpha().joinChannel(alphaSoft, raw1).png().toBuffer();
-  return { feathered, iou, redPx, colorInfo, blendRule: blendShape === 'figure-exact' ? 'figure-exact-pad6' : BLEND_RULE_VERSION };
+  return { feathered, iou, redPx, colorInfo, registration, blendRule: blendShape === 'figure-exact' ? 'figure-exact-pad6' : BLEND_RULE_VERSION };
 }
 
 module.exports = { samUnionBlend, maskBlurThreshold, _faceConnectedComponent, _interiorSeedPoints, fetchMaskWithRetry, BLEND_RULE_VERSION };

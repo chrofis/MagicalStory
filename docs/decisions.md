@@ -4694,3 +4694,30 @@ because the Inga Moore reference + photo-realism anchors dominated the wash cues
 **Touched:** `server/config/models.js` (avatarStyleTransferBackend), `server/lib/storyHelpers.js`
 (ART_STYLES.watercolor), `server/lib/character2x4Sheet.js` (runStyleTransferPass backendOverride +
 provider echo).
+
+---
+
+## 2026-08-05 — Cutout repairs: register the candidate instead of rejecting it (exp #345)
+
+**Context:** The cutout variant was rejected — "Painted figure barely overlaps the original
+(mask IoU 53%)". Owner: "this is wrong, it fits more or less perfectly — you have a scaling
+issue." Correct. The crop WAS preset-aligned (390x866 = 9:20 exactly, no stretch), but the
+SAM masks show Grok drew the same person ~40px lower and slightly taller: without the
+surrounding scene the model has no positional anchor, so it re-composes inside the frame.
+The IoU gate exists to catch REAL pose changes and was firing on a registration error.
+
+**Decision:** `registerCandidate` (on for `regionSource === 'cutout'`): measure both
+silhouettes' bounding boxes, compute a UNIFORM scale + translation mapping the candidate's
+figure onto the original's, warp the candidate, re-segment, and keep the registration ONLY if
+IoU improves. Guard rails: uniform scale only (never distort), scale limited to 0.75-1.33,
+and a genuinely re-posed figure still fails the gate.
+
+**Verified:** synthetic 45px offset → registration dy=-47, scale 0.989, IoU 0.786 → 0.989
+(passes). Genuine pose change (wide crouch → tall stand) → still rejected at IoU 21%.
+Registration is emitted as a Lab step and returned on the blend result.
+
+**Also confirmed for the record:** #345's two variants were `grok:box:crosshatch:body` and
+`grok:cutout:crosshatch:body`, both with `crosshatch+faceblur (slight, r=5)` — the comparison
+already isolated box vs cutout; no whiteout was involved.
+
+**Touched:** `server/lib/samBlend.js`, `server/lib/faceRepair.js`.
