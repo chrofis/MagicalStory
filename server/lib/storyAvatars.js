@@ -153,10 +153,9 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
     if (!nm) continue;
     const pose = (sc?.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
       ? sc.pose : 'threeQuarter';
-    const flip = sc?.flip === true;
     const depth = (sc?.depth && ['foreground', 'midground', 'background'].includes(sc.depth))
       ? sc.depth : 'foreground';
-    poseByName.set(nm.toLowerCase(), { pose, flip, depth });
+    poseByName.set(nm.toLowerCase(), { pose, depth });
   }
 
   for (const ref of referencePhotos) {
@@ -171,17 +170,16 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
     else slotKey = 'costumed';
     const sheetUri = story[slotKey] || story.costumed;
     if (!sheetUri) continue;
-    const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false, depth: 'foreground' };
+    const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', depth: 'foreground' };
     // Foreground → stack head + body into one ref (canvas-large faces need
     // a tight head anchor). Midground / background → body cell only.
     const includeFace = pf.depth === 'foreground';
     try {
-      const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, flip: pf.flip, includeFace, stack: includeFace });
+      const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, includeFace, stack: includeFace });
       const buf = stacked || body;
       ref.photoUrl = `data:image/png;base64,${buf.toString('base64')}`;
-      ref.photoType = `cell-${pf.pose}${pf.flip ? '-flip' : ''}${includeFace ? '-headbody' : ''}`;
+      ref.photoType = `cell-${pf.pose}${includeFace ? '-headbody' : ''}`;
       ref.cellPose = pf.pose;
-      ref.cellFlip = pf.flip;
       ref.cellDepth = pf.depth;
       ref.cellIncludesFace = includeFace;
     } catch (err) {

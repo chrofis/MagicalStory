@@ -500,7 +500,7 @@ const FACE_CELL = {
  * @returns {Promise<{ body: Buffer, face: Buffer|null }>} PNG buffers.
  */
 async function cropAvatarCell(sheet, opts = {}) {
-  const { pose = 'threeQuarter', flip = false, includeFace = false, stack = false } = opts;
+  const { pose = 'threeQuarter', includeFace = false, stack = false } = opts;
   // bytesFromAnyImage handles Buffer / data-URI / raw base64 / http(s) URL.
   // Pre-R2-migration this was a bare base64 decode, which turned stored R2
   // URLs into ~80 bytes of garbage and silently broke cell refs for every
@@ -513,13 +513,11 @@ async function cropAvatarCell(sheet, opts = {}) {
 
   const bodyIdx = POSE_CELL[pose] || POSE_CELL.threeQuarter;
   let body = await cropSheetCell(sheetBuf, bodyIdx);
-  if (flip) body = await flipHorizontal(body);
 
   let face = null;
   if (includeFace) {
     const faceIdx = FACE_CELL[pose] || FACE_CELL.threeQuarter;
     face = await cropSheetCell(sheetBuf, faceIdx);
-    if (flip) face = await flipHorizontal(face);
   }
 
   // When stack=true and face is included, vertically combine face (top) +

@@ -1,0 +1,47 @@
+You are reviewing every illustration brief for one children's book at once, before any image is generated. Judge them as a set: problems that matter most here are the ones only visible across pages.
+
+# TARGET
+
+Write in ENGLISH. These briefs are working notes for the illustrator, never shown to a reader.
+
+Pages: {PAGE_COUNT}
+Characters: {CHARACTER_NAMES}
+Max named characters per scene: {MAX_CHARACTERS_PER_SCENE}
+
+{STORY_BRIEF}
+
+# CHARACTER DETAILS
+
+{CHARACTER_DETAILS}
+
+# ALL SCENE BRIEFS
+
+{ALL_SCENES}
+
+# YOUR TASK
+
+Answer each check, naming pages. Then rewrite only the pages a check faulted.
+
+1. Repetition — name any two pages whose images would look near-identical: same location, same grouping, same camera distance, same action. Say which one should change and how.
+2. Visual arc — read as a flipbook, does framing build with the plot? Name the page where intensity sags or spikes out of order.
+3. Continuity — does anything contradict an earlier page: a character's clothing, an object that was left behind, a time of day that moves backwards, a location that changes shape?
+4. Single moment — name any brief that describes more than one moment in time, a montage, or an action with no visible subject.
+5. Cast — name any scene with more than {MAX_CHARACTERS_PER_SCENE} named characters, or a character present in the beat but absent from the brief.
+6. Character fields — every character needs depth and a drawable expression naming brows, eyes or mouth. Name any that is missing one, or that uses a bare mood word.
+7. Drawability — name any instruction an illustrator could not execute: a character facing one way while looking at someone behind them, an impossible viewpoint, a described detail too small to read at page size.
+
+# OUTPUT FORMAT
+
+Both blocks, in this order, nothing before or after.
+
+---ANALYSIS---
+<your answers to checks 1-7>
+
+---SCENES---
+## Page <number>
+<the corrected brief for that page, complete: prose then its JSON object, in the same shape it arrived>
+
+Include a page only if you rewrote it. Use its real page number. When nothing needs rewriting, still output the analysis, then:
+
+---SCENES---
+NONE

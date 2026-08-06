@@ -106,6 +106,9 @@ async function loadPromptTemplates() {
     // that locks scenes so image generation can start.
     ['storyBeats', 'story-beats.txt'],
     ['storyBeatsReview', 'story-beats-review.txt'],
+    // One review over ALL scene briefs at once — repetition, visual arc and
+    // continuity are only visible across pages, never per-scene.
+    ['sceneReview', 'scene-review.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
     ['incrementalConsistencyCheck', 'incremental-consistency-check.txt'],
