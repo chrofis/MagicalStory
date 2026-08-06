@@ -102,15 +102,21 @@ MAX_IMAGE_DIM = 2048
 # Nothing else does, which is why this exists.
 #
 # Strictly idle-gated so it can never interrupt work: zero requests in flight
-# AND nothing for RECYCLE_IDLE_S. A story keeps this process continuously busy,
-# so in practice the gate opens only once a story is finished — which is the
-# boundary where the memory should have been reclaimed all along.
+# AND nothing for RECYCLE_IDLE_S. Idle alone is not enough: a story's first
+# 7-12 minutes are text-only (writer, outline review, scene expansion) and touch
+# nothing here, so the gate would open right after /warmup and throw away the
+# models it had just loaded. /warmup therefore also holds the recycler off for
+# RECYCLE_WARM_HOLD_S. The hold expires on its own, so recycling between stories
+# still happens — that boundary is where the memory should be reclaimed.
 _request_lock = threading.Lock()
 _inflight_requests = 0
 _last_request_ts = time.time()
+_recycle_hold_until = 0.0
 # Below this there is nothing worth a restart — a fresh process is ~137MB.
 RECYCLE_RSS_MB = int(os.environ.get('RECYCLE_RSS_MB', '700'))
 RECYCLE_IDLE_S = int(os.environ.get('RECYCLE_IDLE_S', '180'))
+# Covers the text prologue between /warmup and the first image request.
+RECYCLE_WARM_HOLD_S = int(os.environ.get('RECYCLE_WARM_HOLD_S', '900'))
 RECYCLE_ENABLED = os.environ.get('RECYCLE_ENABLED', 'true').lower() == 'true'
 
 # Try to initialize MediaPipe (may fail on newer Python versions)
@@ -323,7 +329,8 @@ def _recycle_watchdog():
             with _request_lock:
                 inflight = _inflight_requests
                 idle_for = time.time() - _last_request_ts
-            if inflight > 0 or idle_for < RECYCLE_IDLE_S:
+                held = time.time() < _recycle_hold_until
+            if inflight > 0 or idle_for < RECYCLE_IDLE_S or held:
                 continue
             # Last chance for the cheap option: if a trim can get us back under
             # the threshold, take it and skip the restart entirely.
@@ -1959,13 +1966,16 @@ def warmup_endpoint():
     middle of character repair, where it costs ~570MB and several seconds of
     latency inside the repair loop.
 
-    It also keeps the recycler away: warming counts as a request, so the idle
-    window cannot open while someone is actually using the app.
+    It also holds the recycler off for RECYCLE_WARM_HOLD_S. Idle time alone
+    would not: the caller's next minutes are text-only, so the recycler would
+    exit and drop the models this call just loaded.
 
     Returns immediately; loading happens on a background thread. Poll /health
     for the *_loaded flags. Idempotent — get_*() are no-ops when already loaded.
     """
-    global _warmup_thread
+    global _warmup_thread, _recycle_hold_until
+    with _request_lock:
+        _recycle_hold_until = time.time() + RECYCLE_WARM_HOLD_S
     if _warmup_thread is not None and _warmup_thread.is_alive():
         return jsonify({"success": True, "status": "already warming"})
 
