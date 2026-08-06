@@ -263,7 +263,19 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
     // a RECTANGULAR hatch and skips the face blur — works on most pages, fails on
     // one, with only a warn that production never stores (owner: story
     // job_1786024729214_zrjgzqiey p5).
-    sil = maskFetch ? await maskFetch(hatchCrop, boxInHatch, {}) : await fetchFigureMaskPng(hatchCrop, boxInHatch, {});
+    // SAME CHARACTER SEGMENTATION AS ROUND 2. Round 2 prompts SAM with the figure
+    // box plus one point at the detector's face-box centre; round 1 must do the
+    // same, or the IoU gate is comparing two different procedures instead of two
+    // figures (owner, 2026-08-06). Face-specific paths may differ; this one may not.
+    const r1Points = (() => {
+      if (!Array.isArray(faceBoxInCrop) || faceBoxInCrop.length !== 4) return {};
+      const fx = Math.round((faceBoxInCrop[0] + faceBoxInCrop[2]) / 2) - hatchLeft;
+      const fy = Math.round((faceBoxInCrop[1] + faceBoxInCrop[3]) / 2) - hatchTop;
+      if (fx <= 0 || fy <= 0 || fx >= hatchWidth || fy >= hatchHeight) return {};
+      log.info(`[FACE REPAIR] round-1 head seed from the DINO face box at (${fx},${fy}) in hatch coords`);
+      return { points: [[fx, fy]] };
+    })();
+    sil = maskFetch ? await maskFetch(hatchCrop, boxInHatch, r1Points) : await fetchFigureMaskPng(hatchCrop, boxInHatch, r1Points);
     if (!sil) log.warn('[FACE REPAIR] crosshatch: no figure silhouette after retries — RECTANGULAR hatch, face blur skipped');
     if (sil) {
       // Occluder-subtract: rembg/SAM in the target crop returns ALL foreground
@@ -789,7 +801,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
         Math.min(crop.w, Math.round(faceBbox[3] * W) - crop.x),
         Math.min(crop.h, Math.round(faceBbox[2] * H) - crop.y),
       ] : null,
-      r2Prompt: opts.r2Prompt || 'seeds',
+      r2Prompt: opts.r2Prompt || 'face',
       protectedBoxesInCrop: (Array.isArray(opts.protectedBodies) ? opts.protectedBodies : [])
         .filter(b => Array.isArray(b) && b.length === 4)
         .map(b => [

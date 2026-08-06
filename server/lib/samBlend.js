@@ -438,7 +438,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, faceBoxInCrop = null, r2Prompt = 'seeds', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, faceBoxInCrop = null, r2Prompt = 'face', iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
   const sharp = require('sharp');
   let candidateCropBuf = candidateCropBufIn;
   const fail = (msg) => {
@@ -498,13 +498,18 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
         log.info(`[TESTLAB] round-2 head seed from the DINO face box at (${fx},${fy})`);
       }
     }
-    // r2Prompt decides HOW round 2 is prompted. The synthetic seeds are guessed
-    // from ROUND-1's shape and applied to a DIFFERENT image, so they can land off
-    // the figure; round 1 itself uses NO points and produces clean masks. This
-    // makes the three options measurable on identical pixels:
-    //   'seeds' — box + DINO face point + synthesised interior points (current)
-    //   'face'  — box + the DINO face point only (no guessing)
-    //   'box'   — box only, exactly like round 1 (fully symmetric)
+    // HOW round 2 is prompted. DEFAULT 'face' (owner, 2026-08-06), and ROUND 1
+    // uses the SAME construction — the CHARACTER must be segmented identically in
+    // both rounds or the IoU gate compares two different procedures rather than
+    // two figures. (Face-specific handling may differ; the character mask may not.)
+    //   'face'  — box + ONE point at the detector's face-box centre. Detector
+    //             evidence only, nothing invented.
+    //   'box'   — box only, no points.
+    //   'seeds' — adds points synthesised from ROUND-1's shape at fixed height
+    //             fractions: guesses applied to a DIFFERENT image that can land off
+    //             the figure or on a neighbour. Opt-in only.
+    // Measured on identical pixels (exp #392): all three passed once the head was
+    // anchored, so the guessing buys nothing and can only misfire.
     if (r2Prompt === 'box') {
       delete r2Opts.points;
     } else if (r2Prompt === 'face') {

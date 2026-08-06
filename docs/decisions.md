@@ -5250,3 +5250,35 @@ backend and silently rendered on Grok, so model-only A/Bs compared a model again
 
 **Status:** ✅ active (staging). Same "name the medium" fix likely needed for any future
 setting-named style; steampunk already complies.
+
+---
+
+## 2026-08-06 — Character segmentation identical in BOTH SAM rounds (box + detector face point)
+
+**Context:** Owner: "implement B and make sure it is same everywhere … I mean the character
+detection must be the same everywhere. The face detection can be different." The IoU gate
+compares round-1 and round-2 masks directly, so if the two rounds are prompted differently
+the gate measures a difference in PROCEDURE, not in the figure.
+
+**What was asymmetric:** round 1 (crosshatch builder) prompted SAM with the figure box and
+NO points; round 2 used the box grown 4% plus up to 6 points — one from the detector's face
+box and up to five synthesised from round-1's own shape at fixed height fractions. Those
+synthesised points are guesses from the OLD figure applied to the NEW image; they can land on
+background or a neighbour, and they are what produced the headless "cardigan only" mask.
+
+**Decision — one construction for the character in both rounds:** figure box + exactly ONE
+point at the centre of the detector's face box. Detector evidence only; nothing invented.
+`r2Prompt` defaults to `'face'` in both `samBlend` and `faceRepair`, and round 1 now passes
+the same point (mapped into hatch coordinates). `'box'` (no points) and `'seeds'` (the old
+synthesised set) remain selectable for A/B only.
+
+**Evidence:** exp #392 ran all three modes on IDENTICAL stored pixels — box-only, face-point,
+and synthetic seeds all passed the gate once the head was anchored, so the guessing adds risk
+without adding capability.
+
+**Still asymmetric (documented, not fixed):** round 1 segments the hatch crop (figure box
++12%) while round 2 segments the blend crop, so the two rounds still see slightly different
+framings. Face-only repairs keep their own head-mask path with face+hair dots — per the
+owner, face detection may differ.
+
+**Touched:** `server/lib/samBlend.js`, `server/lib/faceRepair.js`.
