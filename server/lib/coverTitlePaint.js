@@ -15,11 +15,12 @@
 // when pigment and scene share a palette.
 //
 // Spelling is safe by construction: the glyphs come from a real font via
-// composeCover; the model only restyles them. A deterministic SHAPE gate then
-// checks the repaint still covers those glyphs, and falls back to the flat
-// composite if not. (A Gemini OCR gate did this until 2026-08-06 and was removed:
-// reading stylised lettering with a VLM is less reliable than the thing it
-// checks — it misread correct titles and silently suppressed good repaints.)
+// composeCover; the model only restyles them. One FINAL EVAL then verifies the
+// result — given the expected text AND the image, it answers whether they match
+// (a comparison, which a VLM does well) rather than transcribing stylised
+// lettering cold (which it did worse than the thing it was checking). Shape
+// coverage/spill are computed alongside as diagnostics. Any failure falls back to
+// the flat composite, which is always correct and legible.
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
@@ -27,6 +28,49 @@ const { log } = require('../utils/logger');
 const PLATE_PROMPT = (styleTxt) => `The image is a book title on a plain white background. Repaint the LETTERING so it looks hand-painted in the medium of the reference artwork: visible brush and paper texture inside every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours. You may change the lettering colour to one that suits the artwork.
 Keep the same words, letters, letterforms, size and positions.
 Put the lettering back on a plain white background — do not paint any scenery, do not draw the illustration, do not add a border or a frame.${styleTxt ? ` Medium of the artwork: ${styleTxt}` : ''}`;
+
+
+/**
+ * FINAL EVAL — verification, not transcription. The model is given the expected
+ * title AND the painted image and asked whether they match. That is a comparison
+ * task, which a VLM does reliably; the previous gate asked it to READ stylised
+ * lettering cold, which it did worse than the thing it was checking (it misread
+ * correct titles as wrong and suppressed good repaints).
+ * Returns { matches, problem }. Throws only on transport/parse failure.
+ */
+async function verifyTitleRender(imageDataUri, expectedTitle) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured');
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const r2 = require('./r2');
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility}:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { inline_data: { mime_type: imageDataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(imageDataUri) } },
+          { text: `This is a children's book cover. The title is supposed to read exactly:
+
+"${expectedTitle}"
+
+Look at the title lettering in the image and answer:
+1. Does it show exactly these words, in this order, with no missing, extra, doubled or altered letters?
+2. Is every letter fully drawn and legible (not cut off, smeared or replaced by a shape)?
+Decorative styling, texture, colour and hand-painted irregularity are FINE and must not count as problems. Accents and umlauts must be present where the expected title has them.
+Return JSON: {"matches": true|false, "problem": "<short description, or empty if it matches>"}` },
+        ] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+      }),
+      signal: AbortSignal.timeout(45_000),
+    });
+  if (!res.ok) throw new Error(`verify failed: ${(await res.text()).slice(0, 160)}`);
+  const data = await res.json();
+  const raw = (data.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
+  const parsed = require('./storyHelpers').extractJsonFromText(raw);
+  if (!parsed || typeof parsed.matches !== 'boolean') throw new Error(`invalid verify response: ${raw.slice(0, 100)}`);
+  return { matches: parsed.matches, problem: String(parsed.problem || '') };
+}
 
 /**
  * Paint the title of one cover.
@@ -159,15 +203,26 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   }
   const coverage = glyphN ? hit / glyphN : 0;
   const spill = inkN ? out / inkN : 0;
-  const COVERAGE_MIN = 0.75, SPILL_MAX = 0.25;
-  if (coverage < COVERAGE_MIN || spill > SPILL_MAX) {
-    log.warn(`🅰️ [TITLE PAINT] shape gate failed (coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}) — keeping the flat title`);
-    return { ...flat, coverage, spill, reason: coverage < COVERAGE_MIN ? 'letters-missing' : 'ink-spill' };
+  // Shape metrics are DIAGNOSTIC only — the final eval below is the gate. They
+  // stay because they explain a failure ("letters missing" vs "ink spill") and
+  // cost nothing.
+  const paintedUri = `data:image/jpeg;base64,${painted.toString('base64')}`;
+
+  // FINAL EVAL: the expected text AND the painted cover, one call.
+  try {
+    const crop = await sharp(painted).extract({ left: px0, top: py0, width: pw, height: ph }).jpeg({ quality: 95 }).toBuffer();
+    const verdict = await verifyTitleRender(`data:image/jpeg;base64,${crop.toString('base64')}`, title);
+    if (!verdict.matches) {
+      log.warn(`🅰️ [TITLE PAINT] final eval rejected the repaint: ${verdict.problem} (coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}) — keeping the flat title`);
+      return { ...flat, coverage, spill, reason: `eval: ${verdict.problem || 'title does not match'}` };
+    }
+    return { imageData: paintedUri, spec, ok: true, coverage, spill, cost: result.cost ?? null };
+  } catch (e) {
+    // The eval itself failing is not evidence the repaint is bad, but we do not
+    // ship an unverified title either — fall back, and say why.
+    log.warn(`🅰️ [TITLE PAINT] final eval error (${e.message}) — keeping the flat title`);
+    return { ...flat, coverage, spill, reason: `eval-error: ${e.message}` };
   }
-  return {
-    imageData: `data:image/jpeg;base64,${painted.toString('base64')}`,
-    spec, ok: true, coverage, spill, cost: result.cost ?? null,
-  };
 }
 
 module.exports = { paintCoverTitle, PLATE_PROMPT };
