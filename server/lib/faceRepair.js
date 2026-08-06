@@ -218,7 +218,7 @@ async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop,
 // CROSSHATCH — magenta SVG crosshatch clipped to the figure silhouette (dest-in).
 // FAITHFULNESS-CHECK: images.js:12163-12172 (grok_cutout hatch SVG) +
 //                     images.js:12483-12496 / 12689-12695 (grok_inpaint hatch + silhouette clip).
-async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage, sceneBuffer, sceneWidth, sceneHeight, protectedBodies, bodyBbox, faceBoxInCrop = null, blurFace = true, blurStrength = 'strong' }) {
+async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage, sceneBuffer, sceneWidth, sceneHeight, protectedBodies, bodyBbox, faceBoxInCrop = null, blurFace = true, blurStrength = 'slight' }) {
   const sharp = require('sharp');
   const { fetchFigureMaskPng } = require('./images');
   const figureLeft = boxInCrop[0], figureTop = boxInCrop[1];
@@ -366,8 +366,8 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
           .extract({ left: fl, top: ft, width: fw, height: fh })
           .png().toBuffer();
         const faceCrop = await sharp(cropBuf).extract({ left: fl, top: ft, width: fw, height: fh }).jpeg({ quality: 90 }).toBuffer();
-        // blurStrength: 'strong' (default, features destroyed) | 'slight' (shape
-        // and tone survive — the model still sees roughly what was there).
+        // blurStrength: 'slight' (DEFAULT, owner-chosen 2026-08-05: shape and tone
+        // survive so pose/lighting read, identity does not) | 'strong' (r~12%).
         const factor = blurStrength === 'slight' ? 0.045 : 0.12;
         const radius = Math.max(4, Math.round(fw * factor));
         const blurredFull = await sharp(faceCrop).blur(radius).png().toBuffer();
@@ -642,7 +642,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       Math.min(crop.w, Math.round(faceBbox[3] * W) - crop.x),
       Math.min(crop.h, Math.round(faceBbox[2] * H) - crop.y),
     ] : null;
-    treated = await buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage: gates.coverage, sceneBuffer, sceneWidth: W, sceneHeight: H, protectedBodies: opts.protectedBodies, bodyBbox, faceBoxInCrop: fbForBlur, blurFace: opts.blurFace !== false, blurStrength: opts.blurStrength || 'strong' });
+    treated = await buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage: gates.coverage, sceneBuffer, sceneWidth: W, sceneHeight: H, protectedBodies: opts.protectedBodies, bodyBbox, faceBoxInCrop: fbForBlur, blurFace: opts.blurFace !== false, blurStrength: opts.blurStrength || 'slight' });
   } else if (treatment === 'blur') {
     treated = await buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCoverage: gates.coverage });
   } else {

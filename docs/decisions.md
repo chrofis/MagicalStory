@@ -4609,3 +4609,18 @@ warning existed and I read the wrong field. Gate rejections and treatment fallba
 `logLines`, not only `logWarnings`.
 
 **Touched:** `server/lib/faceRepair.js`.
+
+---
+
+## 2026-08-05 — Face-blur default = SLIGHT (owner, exp #335)
+
+**Context:** With the blur finally reaching the model (#335), the owner compared strong
+(r≈12% of face width) / slight (r≈4.5%) / none. Verdict: **slight**. Shape, tone and lighting
+survive so the model can read pose and head orientation, while the identity information is
+gone. Strong throws away pose cues the crosshatch is meant to preserve; none lets the old face
+be recreated.
+
+**Decision:** `blurStrength` defaults to `'slight'` for the crosshatch treatment; `'strong'`
+stays available per-run. Production body repairs (crosshatch, blurFace on) inherit it.
+
+**Touched:** `server/lib/faceRepair.js`.
