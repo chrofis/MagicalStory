@@ -154,7 +154,7 @@ function sampleGarmentClusters(raw, n, maskBin, cast, opts = {}, maxClusters = 3
   // Single pass: collect the qualifying garment pixels in discounted space AND
   // build the chroma-weighted hue histogram. Keeping the pixel list lets us peel
   // off several clusters without re-decoding LAB per cluster.
-  const pa = [], pb = [], pc = [], pang = [];
+  const pa = [], pb = [], pc = [], pang = [], pL = [];
   for (let i = 0; i < n; i++) {
     if (maskBin && maskBin[i] <= 128) continue;
     const r = raw[i * 3], g = raw[i * 3 + 1], b = raw[i * 3 + 2];
@@ -164,7 +164,7 @@ function sampleGarmentClusters(raw, n, maskBin, cast, opts = {}, maxClusters = 3
     const chroma = Math.hypot(da, db);
     if (chroma < 1) continue; // no hue
     let ang = Math.atan2(db, da); if (ang < 0) ang += 2 * Math.PI;
-    pa.push(da); pb.push(db); pc.push(chroma); pang.push(ang);
+    pa.push(da); pb.push(db); pc.push(chroma); pang.push(ang); pL.push(lab[0]);
     const bin = Math.min(BINS - 1, Math.floor((ang / (2 * Math.PI)) * BINS));
     hist[bin] += chroma; // weight strongly-coloured pixels
   }
@@ -177,10 +177,10 @@ function sampleGarmentClusters(raw, n, maskBin, cast, opts = {}, maxClusters = 3
     if (peak < 0) break;
     const peakHue = (peak + 0.5) / BINS * 2 * Math.PI;
     // Chroma-weighted mean discounted (a,b) of pixels near the peak.
-    let sa = 0, sb = 0, wsum = 0, cnt = 0;
+    let sa = 0, sb = 0, sL = 0, wsum = 0, cnt = 0;
     for (let i = 0; i < pang.length; i++) {
       if (Math.abs(angDiff(peakHue, pang[i])) > win) continue;
-      sa += pa[i] * pc[i]; sb += pb[i] * pc[i]; wsum += pc[i]; cnt++;
+      sa += pa[i] * pc[i]; sb += pb[i] * pc[i]; sL += pL[i] * pc[i]; wsum += pc[i]; cnt++;
     }
     // Consume this cluster's bins so the next iteration finds a DIFFERENT hue.
     for (let k = 0; k < BINS; k++) {
@@ -189,7 +189,12 @@ function sampleGarmentClusters(raw, n, maskBin, cast, opts = {}, maxClusters = 3
     }
     if (!cnt || wsum <= 0) continue;
     const a = sa / wsum, bb = sb / wsum;
-    clusters.push({ hueRad: Math.atan2(bb, a), chroma: Math.hypot(a, bb), a, b: bb, count: cnt, weight: wsum });
+    // L is the chroma-weighted mean LIGHTNESS of the cluster. Page correction
+    // never touches it (lightness is scene lighting), but sheet-row
+    // harmonization needs it: both rows of a reference sheet are the same
+    // garment under the same studio light, so a lightness gap there is drift,
+    // not illumination.
+    clusters.push({ hueRad: Math.atan2(bb, a), chroma: Math.hypot(a, bb), a, b: bb, L: sL / wsum, count: cnt, weight: wsum });
   }
   return clusters;
 }

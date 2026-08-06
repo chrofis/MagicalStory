@@ -29,6 +29,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('../config/models');
 const r2 = require('./r2');
 const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
+const { measureRowConsistency, harmonizeSheetRows } = require('./sheetRowHarmonize');
 
 // Minimal Gemini image-edit for the avatar style-transfer pass. Same contract
 // as editWithGrok (prompt + reference images → { imageData, usage, modelId }).
@@ -973,11 +974,32 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       if (!best || candidate.score > best.score) best = candidate;
       continue;
     }
+    // DETERMINISTIC row-colour gate. The prompt already forbids a sheet whose
+    // bottom row stays photographic while the top row is stylised, and the
+    // Gemini verdict above is meant to catch it — but it demonstrably passes
+    // such sheets (staging: a pink top at chroma 32.8 in the head row and 10.0
+    // in the body row scored valid). Colour agreement between the rows is
+    // measurable without a model, so measure it and override `valid` rather
+    // than trusting the judge on something arithmetic.
+    let rowConsistency = null;
+    try {
+      const { splitY } = await splitSheetRows(result.imageData);
+      rowConsistency = await measureRowConsistency(result.imageData, splitY);
+      if (!rowConsistency.consistent) {
+        verdict.valid = false;
+        verdict.failureReasons = [...(verdict.failureReasons || []), `row colour split: ${rowConsistency.reason}`];
+        log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt}: ${rowConsistency.reason} — forcing retry`);
+      }
+    } catch (err) {
+      // Never let a measurement failure block a sheet that the judge accepted.
+      log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 row-consistency check failed: ${err.message} — ignoring`);
+    }
     const score = verdict.finalScore ?? 0;
     attempts.push({
       attempt,
       stage: verdict.valid ? 'valid' : 'invalid',
       score,
+      rowConsistency,
       layoutScore: verdict.layoutScore,
       identityScore: verdict.identityScore,
       styleScore: verdict.styleScore,
@@ -1022,8 +1044,30 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   if (attempts.length > 1) {
     log.info(`[CHARACTER 2×4] ${characterName} Pass 2 best-of-${attempts.length}: attempt ${best.attempt} (score=${best.score})`);
   }
+  // BACKSTOP (opt-in): every retry may still come back row-split — the gate
+  // forces retries, it cannot make the model comply. Repainting the washed-out
+  // row onto the stylised row's colour is implemented and unit-tested, but it
+  // is OFF by default: separating a pale garment from a pale backdrop by colour
+  // alone is not reliable (see MODEL_DEFAULTS.avatarSheetRowHarmonize). A sheet
+  // that merely disagrees with itself is better than one with pink blotches on
+  // the backdrop, so without a figure mask we ship the sheet and let the
+  // detection above have done its job via the retries.
+  let winningImage = best.result.imageData;
+  let rowHarmonize = null;
+  if (MODEL_DEFAULTS.avatarSheetRowHarmonize) try {
+    const { splitY } = await splitSheetRows(winningImage);
+    const h = await harmonizeSheetRows(winningImage, splitY);
+    rowHarmonize = { changed: h.changed, authority: h.authority, deltaLab: h.deltaLab, measurement: h.measurement };
+    if (h.changed) {
+      winningImage = h.imageData;
+      log.info(`[CHARACTER 2×4] ${characterName} Pass 2 row-harmonize: ${h.authority} is authority, ΔLab (${h.deltaLab.L}, ${h.deltaLab.a}, ${h.deltaLab.b}) — ${h.measurement.reason}`);
+    }
+  } catch (err) {
+    log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 row-harmonize failed: ${err.message} — shipping the sheet unharmonized`);
+  }
   return {
-    imageData: best.result.imageData,
+    imageData: winningImage,
+    rowHarmonize,
     selectedAttempt: best.attempt,
     finalScore: best.score,
     finalVerdict: best.verdict,

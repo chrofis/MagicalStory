@@ -379,6 +379,19 @@ const MODEL_DEFAULTS = {
     ? process.env.GARMENT_HUE_NORMALIZE !== 'false'
     : true,
 
+  // Pixel-level backstop that repaints the washed-out row of a 2×4 avatar sheet
+  // onto the stylised row's garment colour (server/lib/sheetRowHarmonize.js).
+  // DEFAULT OFF, deliberately. The DETECTION half runs unconditionally and is
+  // safe — it forces a Pass-2 retry when the rows disagree. The REPAINT half is
+  // not: a washed-out garment measures chroma ~9.8 while JPEG chroma noise on
+  // the white studio backdrop measures ~4-8, so the two overlap and no
+  // colour-only threshold separates them. Every threshold tried either left the
+  // shirt mottled (floor too high — most of the garment excluded) or bled pink
+  // blotches into the backdrop (floor low enough to cover the garment). Making
+  // this safe needs a figure MASK, not a better threshold. Flip on only with a
+  // mask in place. Env: AVATAR_SHEET_ROW_HARMONIZE=true.
+  avatarSheetRowHarmonize: process.env.AVATAR_SHEET_ROW_HARMONIZE === 'true',
+
   // ─── Style-repair production wiring (Pt 10, owner directive 2026-07-31) ──
   // When true (default), the Step-5 style-consistency audit's outliers —
   // pages AND covers — are repainted toward the dominant style cluster via
