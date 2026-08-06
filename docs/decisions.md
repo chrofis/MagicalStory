@@ -4768,3 +4768,29 @@ exp #360 exposed three things:
 
 **Touched:** `prompts/character-repair-cutout.txt`, `server/lib/faceRepair.js`,
 `server/lib/testlab.js`.
+
+---
+
+## 2026-08-05 — Registration aligns on the BACKGROUND, and rejects when the scene itself moved
+
+**Context:** Owner: "can you do the IoU on the rest of the image, not on the character we
+repair — if you can align it so the background matches we can use it, otherwise reject
+outright." Correct, and it fixes two observed failures: the figure is exactly what CHANGED,
+so aligning on its silhouette is circular; and round-2 SAM sometimes grabs a neighbour's shoe
+(exp #360), which then drags the whole paste sideways.
+
+**Decision:** `registerCandidate` now scores alignment on BACKGROUND pixels only — everything
+outside both silhouettes, dilated 3px so the figure's soft edge never enters the score. A
+coarse-to-fine search over dx/dy (±12% of the crop) and a small scale set picks the minimum
+mean |grey diff|. Outcomes: background already aligned → no shift; a real offset → shift
+applied and re-segmented; residual still above 26 grey levels after the best alignment →
+the candidate is REJECTED ("model redrew the SCENE, not just the figure").
+
+**Verified:** background aligned + figure moved → no shift applied (the frame is fine);
+whole canvas shifted → detected and corrected (bg mismatch 25.6 → 1.6); scene genuinely
+redrawn → rejected at 77.3.
+
+**Open (owner-reported, not yet fixed):** SAM sometimes omits the HAND from the figure mask,
+so the old hand survives next to the new figure and reads as an artifact.
+
+**Touched:** `server/lib/samBlend.js`.
