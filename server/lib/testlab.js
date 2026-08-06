@@ -1971,7 +1971,7 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
         }
       }
       let anchored2 = false;
-      for (const q of comp) { if (drawnMaskRaw[q] > 8 || samMaskRaw[q] > 128) { anchored2 = true; break; } }
+      for (const q of comp) { if (drawnMaskRaw[q] > 8 || (samMaskRaw && samMaskRaw[q] > 128)) { anchored2 = true; break; } }
       if (comp.length >= MIN_COMP && anchored2) for (const q of comp) cleaned[q] = 255;
     }
     // FEATHER: grab generously, then soften the boundary so the paste has no cut.
