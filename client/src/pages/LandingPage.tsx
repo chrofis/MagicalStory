@@ -489,7 +489,7 @@ export default function LandingPage() {
 
               {/* Video Column */}
               <div className="text-center w-3/4 lg:w-[64%]">
-                <div className="rounded-xl overflow-hidden shadow-2xl mb-1 lg:mb-2 h-[280px] lg:h-[480px]">
+                <div className="rounded-xl overflow-hidden shadow-2xl mb-1 lg:mb-2 aspect-square">
                   <video
                     autoPlay
                     loop
