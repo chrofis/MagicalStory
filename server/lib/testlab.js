@@ -967,6 +967,20 @@ async function runCharRepairStage(ctx, opts) {
   };
   await addStep(`input: character reference (${avatarPhotoType})`, avatarPhoto);
 
+  // Replay support for the crosshatch/blur spine: params.reuseModelOutput is a
+  // tl_step version index (or a data URI) holding a previous 'model raw output'.
+  let reuseCandidateUri = null;
+  if (params.reuseModelOutput != null) {
+    const v = params.reuseModelOutput;
+    if (typeof v === 'string' && v.startsWith('data:image')) reuseCandidateUri = v;
+    else {
+      const img = await loadTestImage(ctx.storyId, 'tl_step', ctx.pageNumber, Number(v));
+      if (!img?.imageData) throw new Error(`reuseModelOutput: tl_step v${v} not found on this page`);
+      reuseCandidateUri = img.imageData;
+    }
+    log.info(`[TESTLAB] spine replay: reusing stored model output ${typeof v === 'number' ? 'tl_step v' + v : '(data URI)'}`);
+  }
+
   const t0 = Date.now();
   const result = await repairCharacterFace(imageData, avatarPhoto, {
     ...axes,
@@ -982,6 +996,8 @@ async function runCharRepairStage(ctx, opts) {
       return (typeof d === 'string' ? d : d?.richDescription) || '';
     })(),
     photoType: avatarPhotoType,
+    // Deterministic re-blend of a stored model output (Replay for the spine path).
+    ...(reuseCandidateUri ? { reuseCandidate: reuseCandidateUri } : {}),
     sceneDescription: ctx.scene.sceneDescription || ctx.scene.text || '',
     textPosition: ctx.textPosition,
     protectedFaces,

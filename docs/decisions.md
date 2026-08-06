@@ -4794,3 +4794,29 @@ redrawn → rejected at 77.3.
 so the old hand survives next to the new figure and reads as an artifact.
 
 **Touched:** `server/lib/samBlend.js`.
+
+---
+
+## 2026-08-05 — Replay for the crosshatch/blur spine + gate rejections carry their images
+
+**Context:** Owner: "can you just redo the shift using same images?" Two blockers: Replay
+only worked on the whiteout INSERT path (`reuseModelOutput` was read in runQwenInsertStage
+only), so any crosshatch/blur re-run rolled fresh Grok output and mixed model variance into
+every blend comparison. And a blend-gate rejection returned no images at all, so the Lab card
+showed a single step (exp #362's cutout).
+
+**Decisions:** (1) `opts.reuseCandidate` in `repairCharacterFace` skips the model call and
+blends a stored output — registration, gates and paste are deterministic, so a blend change
+can be tested at $0 against identical pixels. `runCharRepairStage` resolves
+`params.reuseModelOutput` (tl_step index or data URI) into it, so `replayOf` now works for
+every treatment. (2) The blend-gate rejection returns `blackoutImage`, `grokRawResult` and
+`promptSent`, so a rejected run renders like any other card.
+
+**Measured on the rerun (#362):** with `{charName}` substituted and the appearance text
+present, the FULL-PAGE repair succeeded; the CUTOUT was rejected by the new background test —
+"background still differs by 35.0 grey levels after best alignment (dx −21, dy −47, scale
+0.94)". That is the gate doing its job: in cutout mode Grok re-renders the whole crop rather
+than editing it. Whether 26 is the right rejection threshold for watercolour re-rendering is
+now measurable deterministically via replay.
+
+**Touched:** `server/lib/faceRepair.js`, `server/lib/testlab.js`.

@@ -666,7 +666,20 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   let usage;
   let grokRawResult;
   let sentToModelUri = null;   // EXACTLY what went to the model (scene or crop)
-  if (regionSource === 'box') {
+  // REUSE: skip the model entirely and blend a stored output again. Registration,
+  // gates and the paste are deterministic, so this isolates blend changes from
+  // Grok's run-to-run variance — and costs nothing.
+  const reuseUri = opts.reuseCandidate || null;
+  if (reuseUri) {
+    const buf = Buffer.from(String(reuseUri).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    grokRawResult = String(reuseUri);
+    usage = { cost: 0, reused: true };
+    sentToModelUri = `data:image/png;base64,${treatedBuf.toString('base64')}`;
+    candidateCrop = regionSource === 'box'
+      ? await sharp(buf).resize(W, H, { fit: 'fill' }).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer()
+      : await sharp(buf).resize(crop.w, crop.h, { fit: 'fill' }).png().toBuffer();
+    log.info(`[FACE REPAIR] reusing a stored model output — no model call (${descriptor})`);
+  } else if (regionSource === 'box') {
     // The model edits the WHOLE scene (treatment already painted on the crop
     // region of the scene). Composite the treated crop back into the scene,
     // send the full scene through the exact-aspect round-trip, then extract the
@@ -785,7 +798,14 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
     });
   } catch (blendErr) {
     log.warn(`🚫 [FACE REPAIR] ${descriptor} for ${charName} REJECTED by blend gate: ${blendErr.message}`);
-    return { imageData: null, character: charName, method: legacyMethod, descriptor, rejectedReason: 'blend_gate', gateMessage: blendErr.message, usage };
+    // Carry the images: a rejected run is exactly the one you need to LOOK at.
+    return {
+      imageData: null, character: charName, method: legacyMethod, descriptor,
+      rejectedReason: 'blend_gate', gateMessage: blendErr.message, usage,
+      blackoutImage: sentToModelUri || `data:image/png;base64,${treatedBuf.toString('base64')}`,
+      grokRawResult,
+      promptSent: prompt,
+    };
   }
 
   const composited = await sharp(sceneBuffer).composite([{ input: blend.feathered, left: crop.x, top: crop.y }]).jpeg({ quality: 95 }).toBuffer();
