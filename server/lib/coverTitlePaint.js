@@ -15,8 +15,11 @@
 // when pigment and scene share a palette.
 //
 // Spelling is safe by construction: the glyphs come from a real font via
-// composeCover; the model only restyles them. An OCR gate re-reads the result and
-// falls back to the flat composite on mismatch.
+// composeCover; the model only restyles them. A deterministic SHAPE gate then
+// checks the repaint still covers those glyphs, and falls back to the flat
+// composite if not. (A Gemini OCR gate did this until 2026-08-06 and was removed:
+// reading stylised lettering with a VLM is less reliable than the thing it
+// checks — it misread correct titles and silently suppressed good repaints.)
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
@@ -25,43 +28,13 @@ const PLATE_PROMPT = (styleTxt) => `The image is a book title on a plain white b
 Keep the same words, letters, letterforms, size and positions.
 Put the lettering back on a plain white background — do not paint any scenery, do not draw the illustration, do not add a border or a frame.${styleTxt ? ` Medium of the artwork: ${styleTxt}` : ''}`;
 
-/** Transcribe the title so a garbled repaint can never ship. */
-async function transcribeTitle(imageDataUri) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('Gemini API key not configured');
-  const { MODEL_DEFAULTS } = require('../config/models');
-  const r2 = require('./r2');
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility}:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [
-          { inline_data: { mime_type: imageDataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(imageDataUri) } },
-          { text: 'Transcribe the large title lettering character by character. Copy exactly what is drawn, including accents and umlauts, even if a letter looks malformed — do not correct it. Return JSON: {"text": "<transcription>"}' },
-        ] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      }),
-      signal: AbortSignal.timeout(45_000),
-    });
-  if (!res.ok) throw new Error(`OCR failed: ${(await res.text()).slice(0, 160)}`);
-  const data = await res.json();
-  const raw = (data.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
-  const parsed = require('./storyHelpers').extractJsonFromText(raw);
-  if (!parsed || typeof parsed.text !== 'string') throw new Error(`Invalid OCR response: ${raw.slice(0, 100)}`);
-  return parsed.text;
-}
-
-// Case-insensitive (several title fonts are uppercase-only) but diacritic-sensitive.
-const normalizeTitle = s => String(s).normalize('NFC').replace(/\s+/g, ' ').trim().toLowerCase();
-
 /**
  * Paint the title of one cover.
  *
  * @param {Buffer} artBuffer      TEXTLESS cover plate (the `${coverKey}Art` row)
  * @param {string} title
  * @param {Object} opts           { figures, seed, artStyle, style, backend, model }
- * @returns {Promise<{imageData, spec, ok, ocr, reason, cost}>}
+ * @returns {Promise<{imageData, spec, ok, coverage, spill, reason, cost}>}
  *          ok=false ⇒ imageData is the FLAT composite (safe fallback, never garbled)
  */
 async function paintCoverTitle(artBuffer, title, opts = {}) {
@@ -162,20 +135,39 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   const base = await sharp(artBuffer).resize(W, H, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
   const painted = await sharp(base).composite([{ input: layer, left: px0, top: py0 }]).jpeg({ quality: 92 }).toBuffer();
 
-  // 6. OCR gate — a garbled repaint must never ship; fall back to the flat lockup
-  try {
-    const crop = await sharp(painted).extract({ left: px0, top: py0, width: pw, height: ph }).jpeg({ quality: 95 }).toBuffer();
-    const ocr = await transcribeTitle(`data:image/jpeg;base64,${crop.toString('base64')}`);
-    if (normalizeTitle(ocr) !== normalizeTitle(title)) {
-      log.warn(`🅰️ [TITLE PAINT] OCR mismatch — keeping the flat title. expected "${title}", read "${ocr}"`);
-      return { ...flat, ocr, reason: 'ocr-mismatch' };
-    }
-    return { imageData: `data:image/jpeg;base64,${painted.toString('base64')}`, spec, ok: true, ocr, cost: result.cost ?? null };
-  } catch (e) {
-    // The gate itself failing is not a reason to ship an unverified title.
-    log.warn(`🅰️ [TITLE PAINT] OCR gate error (${e.message}) — keeping the flat title`);
-    return { ...flat, reason: `ocr-error: ${e.message}` };
+  // 6. SHAPE GATE (deterministic — replaced a Gemini OCR gate on 2026-08-06).
+  // Reading stylised lettering with a VLM introduced a reader less reliable than
+  // the thing it checked: it repeatedly misread a correct title ("der" as "den")
+  // and the cover silently kept its flat lockup for no reason. We already know
+  // exactly what the letters should look like — we rendered them — so compare
+  // the painted layer against that mask instead. Free, instant, no false reads.
+  //   coverage : share of the drawn glyphs that came back inked. A dropped or
+  //              mangled word collapses this.
+  //   spill    : ink landing far outside any glyph — a model that invented
+  //              decoration or drew scenery.
+  const glyphN = (() => { let n = 0; for (let q = 0; q < pw * ph; q++) if (glyphCrop[q] > 8) n++; return n; })();
+  // Tolerate the letters growing: strokes legitimately thicken and pool.
+  const grow = await sharp(glyphCrop, { raw: { width: pw, height: ph, channels: 1 } })
+    .blur(Math.max(3, Math.round(Math.min(pw, ph) * 0.02))).threshold(8).toColourspace('b-w').raw().toBuffer();
+  let hit = 0, out = 0, inkN = 0;
+  for (let q = 0, m = 3; q < pw * ph; q++, m += 4) {
+    const inked = rgba[m] > 128;
+    if (!inked) continue;
+    inkN++;
+    if (glyphCrop[q] > 8) hit++;
+    if (grow[q] <= 8) out++;
   }
+  const coverage = glyphN ? hit / glyphN : 0;
+  const spill = inkN ? out / inkN : 0;
+  const COVERAGE_MIN = 0.75, SPILL_MAX = 0.25;
+  if (coverage < COVERAGE_MIN || spill > SPILL_MAX) {
+    log.warn(`🅰️ [TITLE PAINT] shape gate failed (coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}) — keeping the flat title`);
+    return { ...flat, coverage, spill, reason: coverage < COVERAGE_MIN ? 'letters-missing' : 'ink-spill' };
+  }
+  return {
+    imageData: `data:image/jpeg;base64,${painted.toString('base64')}`,
+    spec, ok: true, coverage, spill, cost: result.cost ?? null,
+  };
 }
 
 module.exports = { paintCoverTitle, PLATE_PROMPT };
