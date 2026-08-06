@@ -4624,3 +4624,25 @@ be recreated.
 stays available per-run. Production body repairs (crosshatch, blurFace on) inherit it.
 
 **Touched:** `server/lib/faceRepair.js`.
+
+## Avatar style transfer (pass-2) uses Grok, not Gemini (2026-08-06)
+
+**Context:** Round-2 art/style transfer of the realistic 2×4 sheet had defaulted to
+gemini-2.5-flash-image (from a 2026-07-19 A/B that actually ran on gemini-3-pro). Re-tested in the
+Test Lab (exps #336 gemini-vs-grok, #341 Emma/grok, #344 Hans/grok, #339 prompt-strength A/B).
+
+**Decision:** `MODEL_DEFAULTS.avatarStyleTransferBackend` = `grok` (was `gemini`). Also rewrote
+`ART_STYLES.watercolor` (all variants) to a bolder, less photo-realistic descriptor.
+
+**Rationale:** gemini-2.5-flash-image returns a near-photographic sheet regardless of how forcefully
+the transfer prompt demands the style (prompt A/B moved it almost nothing) — the model, not the
+prompt, is the ceiling. Grok stylises strongly and correctly (watercolour/pixar/anime) on both a
+child (Emma) and an adult (Hans), with no content-moderation refusals on the adult (the original
+reason gemini was chosen). Grok's occasional child moderation false-reject is covered by the
+3-attempt retry in runStyleTransferPass. The styled-eval scores everything ~9 (validity/identity,
+not degree), so it can't arbitrate this — visual A/B did. Old watercolour read "too realistic"
+because the Inga Moore reference + photo-realism anchors dominated the wash cues.
+
+**Touched:** `server/config/models.js` (avatarStyleTransferBackend), `server/lib/storyHelpers.js`
+(ART_STYLES.watercolor), `server/lib/character2x4Sheet.js` (runStyleTransferPass backendOverride +
+provider echo).
