@@ -1088,6 +1088,9 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, opt
   log.verbose(`🤖 [TEXT] Calling ${modelName} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
 
   let result;
+  // Wall-clock per call, attached to usage below so the byFunction breakdown
+  // carries a duration for EVERY function without each stage timing itself.
+  const startedAt = Date.now();
   switch (model.provider) {
     case 'anthropic':
       result = await callAnthropicAPI(prompt, effectiveMaxTokens, model.modelId, options);
@@ -1106,6 +1109,7 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, opt
   }
   // Single source of truth for text usage: record EVERY call here so no caller
   // can silently escape accounting (see usageContext.js). No-op outside a job.
+  if (result.usage && typeof result.usage === 'object') result.usage.elapsed_ms = Date.now() - startedAt;
   recordTextUsage(USAGE_PROVIDER_KEY[model.provider] || model.provider, result.usage, options.usageLabel, model.modelId);
   // Same chokepoint, same reason: every Lab stage's prompt is captured here so
   // no stage has to remember to stash it (see promptCapture.js). No-op outside
@@ -1138,6 +1142,7 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
   log.verbose(`🌊 [TEXT STREAM] Calling ${modelName} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
 
   let result;
+  const streamStartedAt = Date.now();
   switch (model.provider) {
     case 'anthropic':
       result = await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, options);
@@ -1164,6 +1169,7 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
       // to avoid double-counting.
       return { ...result, modelId: model.modelId };
   }
+  if (result.usage && typeof result.usage === 'object') result.usage.elapsed_ms = Date.now() - streamStartedAt;
   recordTextUsage(USAGE_PROVIDER_KEY[model.provider] || model.provider, result.usage, options.usageLabel, model.modelId);
   require('./promptCapture').recordPrompt(options.usageLabel || 'text', model.modelId, prompt, { kind: 'text' });
   return { ...result, modelId: model.modelId };

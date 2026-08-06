@@ -150,6 +150,8 @@ interface StoryDisplayProps {
   /** Split outline review metadata (Sonnet writes, Opus reviews) — null when
       the review didn't run (trial, disabled, or reviewer failed). */
   outlineReview?: { model?: string; modelId?: string; durationMs?: number; fixCount?: number; reviewChars?: number; hintCount?: number; reviewedAt?: string } | null;
+  /** Per-function model/token/cost/time ledger (tokenUsage.byFunction). */
+  tokenUsage?: { byFunction?: Record<string, { models?: string[]; provider?: string | null; calls?: number; input_tokens?: number; output_tokens?: number; thinking_tokens?: number; direct_cost?: number; elapsed_ms?: number }> } | null;
   storyTextPrompts?: StoryTextPrompt[];
   visualBible?: VisualBible;
   sceneImages: SceneImage[];
@@ -315,6 +317,7 @@ export function StoryDisplay({
   outlineModelId,
   outlineUsage,
   outlineReview,
+  tokenUsage,
   storyTextPrompts = [],
   visualBible,
   sceneImages,
@@ -2405,6 +2408,84 @@ export function StoryDisplay({
               APPENDED at the bottom of the outline blob, so without this
               dedicated panel it's practically invisible. Extract it here:
               the reviewer's ---ANALYSIS--- is the LAST one, after the stub. */}
+          {/* Models used — one row per pipeline function, from the usage ledger
+              the text chokepoint already writes. Answers "which model ran this
+              stage, for how long, at what cost" without opening the DB. */}
+          {(() => {
+            const bf = tokenUsage?.byFunction || {};
+            const rows = Object.entries(bf)
+              .filter(([, v]) => (v?.calls || 0) > 0)
+              .map(([fn, v]) => ({
+                fn,
+                model: (v.models || []).join(', ') || '—',
+                calls: v.calls || 0,
+                inTok: v.input_tokens || 0,
+                outTok: v.output_tokens || 0,
+                cost: v.direct_cost || 0,
+                ms: v.elapsed_ms || 0,
+              }))
+              .sort((a, b) => (b.cost - a.cost) || (b.outTok - a.outTok));
+            if (!rows.length) return null;
+            const tot = rows.reduce((a, r) => ({
+              calls: a.calls + r.calls, inTok: a.inTok + r.inTok,
+              outTok: a.outTok + r.outTok, cost: a.cost + r.cost, ms: a.ms + r.ms,
+            }), { calls: 0, inTok: 0, outTok: 0, cost: 0, ms: 0 });
+            const n = (x: number) => x.toLocaleString();
+            return (
+              <details className="bg-slate-50 border-2 border-slate-300 rounded-xl p-4" open>
+                <summary className="cursor-pointer text-lg font-bold text-slate-800 hover:text-slate-900 flex items-center gap-2 flex-wrap">
+                  <FileText size={20} />
+                  {language === 'de' ? 'Verwendete Modelle' : language === 'fr' ? 'Modèles utilisés' : 'Models used'}
+                  <span className="text-xs font-normal text-slate-500">
+                    [{rows.length} {language === 'de' ? 'Funktionen' : 'functions'} · {n(tot.outTok)} out · ${tot.cost.toFixed(4)}]
+                  </span>
+                </summary>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full text-xs font-mono">
+                    <thead>
+                      <tr className="text-left text-slate-500 border-b border-slate-300">
+                        <th className="py-1 pr-3">{language === 'de' ? 'Funktion' : 'function'}</th>
+                        <th className="py-1 pr-3">{language === 'de' ? 'Modell' : 'model'}</th>
+                        <th className="py-1 pr-3 text-right">calls</th>
+                        <th className="py-1 pr-3 text-right">in</th>
+                        <th className="py-1 pr-3 text-right">out</th>
+                        <th className="py-1 pr-3 text-right">{language === 'de' ? 'Zeit' : 'time'}</th>
+                        <th className="py-1 text-right">{language === 'de' ? 'Kosten' : 'cost'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(r => (
+                        <tr key={r.fn} className="border-b border-slate-200 last:border-0">
+                          <td className="py-1 pr-3 text-slate-800">{r.fn}</td>
+                          <td className="py-1 pr-3 text-slate-600">{r.model}</td>
+                          <td className="py-1 pr-3 text-right">{r.calls}</td>
+                          <td className="py-1 pr-3 text-right">{n(r.inTok)}</td>
+                          <td className="py-1 pr-3 text-right">{n(r.outTok)}</td>
+                          <td className="py-1 pr-3 text-right">{r.ms ? `${(r.ms / 1000).toFixed(1)}s` : '—'}</td>
+                          <td className="py-1 text-right">{r.cost ? `$${r.cost.toFixed(4)}` : '—'}</td>
+                        </tr>
+                      ))}
+                      <tr className="font-bold text-slate-800">
+                        <td className="py-1 pr-3">TOTAL</td>
+                        <td className="py-1 pr-3" />
+                        <td className="py-1 pr-3 text-right">{tot.calls}</td>
+                        <td className="py-1 pr-3 text-right">{n(tot.inTok)}</td>
+                        <td className="py-1 pr-3 text-right">{n(tot.outTok)}</td>
+                        <td className="py-1 pr-3 text-right">{tot.ms ? `${(tot.ms / 1000).toFixed(0)}s` : '—'}</td>
+                        <td className="py-1 text-right">${tot.cost.toFixed(4)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p className="mt-2 text-[11px] text-slate-500 font-sans">
+                    {language === 'de'
+                      ? 'Zeit = summierte Wall-Clock pro Funktion (parallele Aufrufe addieren sich, daher > Gesamtdauer). Nur bei Läufen nach dem Timing-Deploy gefüllt.'
+                      : 'Time = summed wall-clock per function (parallel calls add up, so it exceeds elapsed run time). Only populated for runs after the timing deploy.'}
+                  </p>
+                </div>
+              </details>
+            );
+          })()}
+
           {(() => {
             if (!outline && !outlineReview) return null;
             const stubIdx = outline ? outline.indexOf('Reviewed externally.') : -1;

@@ -380,6 +380,7 @@ export default function StoryWizard() {
   const [outlineModelId, setOutlineModelId] = useState<string | undefined>(); // Model used for outline (dev mode)
   const [outlineUsage, setOutlineUsage] = useState<{ input_tokens: number; output_tokens: number } | undefined>(); // Token usage for outline (dev mode)
   const [outlineReview, setOutlineReview] = useState<{ model?: string; modelId?: string; durationMs?: number; fixCount?: number; reviewChars?: number; hintCount?: number; reviewedAt?: string } | null>(null); // Split-review metadata (dev mode)
+  const [tokenUsage, setTokenUsage] = useState<any>(null); // Per-function model/token ledger (dev mode)
   const [storyTextPrompts, setStoryTextPrompts] = useState<Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>>([]); // API prompts for story text (dev mode)
   const [visualBible, setVisualBible] = useState<VisualBible | null>(null); // Visual Bible for dev mode
   const [clothingRequirements, setClothingRequirements] = useState<Record<string, { standard?: { used: boolean; signature?: string }; winter?: { used: boolean; signature?: string }; summer?: { used: boolean; signature?: string }; costumed?: { used: boolean; costume?: string; description?: string } }> | null>(null); // Clothing requirements per character (dev mode)
@@ -1072,6 +1073,7 @@ export default function StoryWizard() {
             setOutlineModelId(fullMeta.outlineModelId);
             setOutlineUsage(fullMeta.outlineUsage);
             setOutlineReview((fullMeta as any).outlineReview || null);
+            setTokenUsage((fullMeta as any).tokenUsage || null);
             setStoryTextPrompts(fullMeta.storyTextPrompts || []);
             setStyledAvatarGeneration(fullMeta.styledAvatarGeneration || []);
             setCostumedAvatarGeneration(fullMeta.costumedAvatarGeneration || []);
@@ -4161,6 +4163,7 @@ export default function StoryWizard() {
           setOutlineModelId(status.result.outlineModelId);
           setOutlineUsage(status.result.outlineUsage);
           setOutlineReview((status.result as any).outlineReview || null);
+          setTokenUsage((status.result as any).tokenUsage || null);
           setStoryTextPrompts(status.result.storyTextPrompts || []);
           setStyledAvatarGeneration(status.result.styledAvatarGeneration || []);
           setCostumedAvatarGeneration(status.result.costumedAvatarGeneration || []);
@@ -4723,6 +4726,7 @@ export default function StoryWizard() {
               outlineModelId={outlineModelId}
               outlineUsage={outlineUsage}
               outlineReview={outlineReview}
+              tokenUsage={tokenUsage}
               storyTextPrompts={storyTextPrompts}
               visualBible={visualBible || undefined}
               sceneImages={displaySceneImages}

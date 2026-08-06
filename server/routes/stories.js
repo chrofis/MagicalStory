@@ -381,6 +381,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             'outlineModelId', data::jsonb->'outlineModelId',
             'outlineUsage', data::jsonb->'outlineUsage',
             'outlineReview', data::jsonb->'outlineReview',
+            'tokenUsage', data::jsonb->'tokenUsage',
             'storyTextPrompts', data::jsonb->'storyTextPrompts',
             'story', COALESCE(data::jsonb->'story', data::jsonb->'storyText'),
             'originalStory', COALESCE(data::jsonb->'originalStory', data::jsonb->'storyText'),

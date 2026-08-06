@@ -2828,12 +2828,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Auto-create the bucket so a label the chokepoint emits (e.g. text_check,
       // vb_chr_dedup) is never silently dropped from the breakdown.
       if (!tokenUsage.byFunction[functionName]) {
-        tokenUsage.byFunction[functionName] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() };
+        tokenUsage.byFunction[functionName] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, elapsed_ms: 0, provider: null, models: new Set() };
       }
       tokenUsage.byFunction[functionName].input_tokens += usage?.input_tokens || 0;
       tokenUsage.byFunction[functionName].output_tokens += usage?.output_tokens || 0;
       tokenUsage.byFunction[functionName].thinking_tokens += usage?.thinking_tokens || 0;
       tokenUsage.byFunction[functionName].calls += 1;
+      // Summed wall-clock across this function's calls. Stamped by the text
+      // chokepoint (textModels.js), so a function is timed without timing itself.
+      tokenUsage.byFunction[functionName].elapsed_ms = (tokenUsage.byFunction[functionName].elapsed_ms || 0) + (usage?.elapsed_ms || 0);
       tokenUsage.byFunction[functionName].provider = provider;
       // Coerce to a string id — a mis-wired caller can pass a model OBJECT,
       // which otherwise renders as "[object Object]" in the api_usage log.
@@ -7829,7 +7832,7 @@ async function _processStoryJobImpl(jobId) {
     // the text chokepoint emits is captured (never silently dropped).
     if (functionName) {
       if (!tokenUsage.byFunction[functionName]) {
-        tokenUsage.byFunction[functionName] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() };
+        tokenUsage.byFunction[functionName] = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, elapsed_ms: 0, provider: null, models: new Set() };
       }
       const func = tokenUsage.byFunction[functionName];
       func.input_tokens += usage.input_tokens || 0;
@@ -7837,6 +7840,8 @@ async function _processStoryJobImpl(jobId) {
       func.thinking_tokens += usage.thinking_tokens || 0;
       func.direct_cost = (func.direct_cost || 0) + (usage.direct_cost || 0);
       func.calls += 1;
+      // Summed wall-clock, stamped by the text chokepoint (textModels.js).
+      func.elapsed_ms = (func.elapsed_ms || 0) + (usage?.elapsed_ms || 0);
       func.provider = provider; // Track actual provider used
       // Coerce to a string id (a mis-wired caller can pass a model object).
       if (modelName) {
