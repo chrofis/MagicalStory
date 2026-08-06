@@ -1836,17 +1836,92 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   // output. The solved-alpha path stays as the fallback / comparison detector.
   let foundMaskSmooth = alphaBuf;
   if (detect === 'sam' && samMaskRaw) {
-    // UNION with the drawn glyphs (exp #340). SAM alone dropped letters wherever
-    // they sat over busy background — "LINDENBAUM" came back "LINDENB" with the
-    // tail over the tree canopy, and coverage fell to 0.61-0.75. The two sources
-    // are complementary and neither can contain background: SAM contributes the
-    // painted overshoot, the drawn mask guarantees every glyph is present.
-    const union = Buffer.alloc(outW * outH);
-    for (let p2 = 0; p2 < outW * outH; p2++) {
-      union[p2] = (samMaskRaw[p2] > 128 || drawnMaskRaw[p2] > 8) ? 255 : 0;
+    // SAM SEEDS THE COLOUR; COLOUR FINDS THE LETTERS (owner, exp #342 → #343).
+    // Unioning with the drawn glyphs was a crutch: it reinstates the OLD
+    // letterform as a floor, so if the model reshapes a stroke the flat original
+    // leaks out around it — and it hides detection failures instead of exposing
+    // them. The letters are supposed to be free to change form.
+    //
+    // So SAM is used only as a SEED: whatever letters it did find give us the
+    // pigment. Then every pixel of that pigment in the title area is taken, which
+    // recovers the letters SAM missed (LINDENBAUM's tail over the canopy) with no
+    // reference to the drawn shape at all.
+    //
+    // Green-title-on-green-forest is the hazard, so a pixel must satisfy BOTH:
+    //   (a) its colour matches the sampled pigment (ΔE in Lab), and
+    //   (b) it CHANGED versus the plate.
+    // Foliage that stayed foliage fails (b); foliage the model repainted in some
+    // other colour fails (a).
+    const toLab = (r, g, b) => {
+      let R = r / 255, G = g / 255, B = b / 255;
+      R = R > 0.04045 ? Math.pow((R + 0.055) / 1.055, 2.4) : R / 12.92;
+      G = G > 0.04045 ? Math.pow((G + 0.055) / 1.055, 2.4) : G / 12.92;
+      B = B > 0.04045 ? Math.pow((B + 0.055) / 1.055, 2.4) : B / 12.92;
+      let X = (R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047;
+      let Y = (R * 0.2126 + G * 0.7152 + B * 0.0722);
+      let Z = (R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883;
+      const f = v => v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116;
+      X = f(X); Y = f(Y); Z = f(Z);
+      return [116 * Y - 16, 500 * (X - Y), 200 * (Y - Z)];
+    };
+    // 1. sample pigment inside the SAM seed (bin, keep the dominant clusters —
+    //    display type has a face colour plus an outline/shadow colour)
+    const bins = new Map();
+    for (let p2 = 0, i2 = 0; p2 < outW * outH; p2++, i2 += 3) {
+      if (samMaskRaw[p2] <= 128) continue;
+      const k = ((paintedRaw[i2] >> 4) << 8) | ((paintedRaw[i2 + 1] >> 4) << 4) | (paintedRaw[i2 + 2] >> 4);
+      const e = bins.get(k) || { r: 0, g: 0, b: 0, n: 0 };
+      e.r += paintedRaw[i2]; e.g += paintedRaw[i2 + 1]; e.b += paintedRaw[i2 + 2]; e.n++;
+      bins.set(k, e);
     }
-    foundMaskSmooth = await sharp(union, { raw: { width: outW, height: outH, channels: 1 } })
+    const seeds = [...bins.values()].filter(e => e.n > 40).sort((a, b) => b.n - a.n).slice(0, 6)
+      .map(e => toLab(e.r / e.n, e.g / e.n, e.b / e.n));
+    // 2. title area: the bbox of the drawn glyphs generously padded — a REGION,
+    //    not a shape, so it constrains where we look without dictating form.
+    const bandPad = Math.round(Math.min(outW, outH) * (params.bandPct ?? 0.05));
+    const bx0 = Math.max(0, minx - bandPad), bx1 = Math.min(outW - 1, maxx + bandPad);
+    const by0 = Math.max(0, miny - bandPad), by1 = Math.min(outH - 1, maxy + bandPad);
+    const TOL = params.colorTol ?? 20;              // ΔE to a seed colour
+    const CHANGED = params.plateDiff ?? 22;         // must differ from the plate
+    const sel = Buffer.alloc(outW * outH);
+    for (let y = by0; y <= by1; y++) {
+      for (let x = bx0; x <= bx1; x++) {
+        const p2 = y * outW + x, i2 = p2 * 3;
+        const dPlate = Math.max(Math.abs(paintedRaw[i2] - artOutRaw[i2]),
+          Math.abs(paintedRaw[i2 + 1] - artOutRaw[i2 + 1]), Math.abs(paintedRaw[i2 + 2] - artOutRaw[i2 + 2]));
+        if (dPlate < CHANGED) continue;             // (b) unchanged ⇒ not letter
+        const lab = toLab(paintedRaw[i2], paintedRaw[i2 + 1], paintedRaw[i2 + 2]);
+        let best = 1e9;
+        for (const s2 of seeds) {
+          const d = Math.hypot(lab[0] - s2[0], lab[1] - s2[1], lab[2] - s2[2]);
+          if (d < best) best = d;
+        }
+        if (best <= TOL) sel[p2] = 255;             // (a) pigment match
+      }
+    }
+    // 3. drop specks: keep components of a sane size (letters are big blobs)
+    const MIN_COMP = params.minComp ?? Math.max(40, Math.round(outW * outH * 0.00002));
+    const seen = Buffer.alloc(outW * outH);
+    const cleaned = Buffer.alloc(outW * outH);
+    for (let p2 = 0; p2 < outW * outH; p2++) {
+      if (sel[p2] !== 255 || seen[p2]) continue;
+      const stack = [p2]; const comp = []; seen[p2] = 1;
+      while (stack.length) {
+        const q = stack.pop(); comp.push(q);
+        const qx = q % outW, qy = (q / outW) | 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const nx = qx + dx, ny = qy + dy;
+          if (nx < 0 || ny < 0 || nx >= outW || ny >= outH) continue;
+          const r2 = ny * outW + nx;
+          if (!seen[r2] && sel[r2] === 255) { seen[r2] = 1; stack.push(r2); }
+        }
+      }
+      if (comp.length >= MIN_COMP) for (const q of comp) cleaned[q] = 255;
+    }
+    foundMaskSmooth = await sharp(cleaned, { raw: { width: outW, height: outH, channels: 1 } })
       .blur(0.8).toColourspace('b-w').raw().toBuffer();
+    await addStep(`colour-selected letters (${seeds.length} pigment seeds from SAM, ΔE≤${TOL}) — no old-shape fallback`,
+      `data:image/png;base64,${(await sharp(cleaned, { raw: { width: outW, height: outH, channels: 1 } }).png().toBuffer()).toString('base64')}`);
     foundN = 0; overlapN = 0;
     for (let p2 = 0; p2 < outW * outH; p2++) {
       if (foundMaskSmooth[p2] > 8) { foundN++; if (drawnMaskRaw[p2] > 8) overlapN++; }
