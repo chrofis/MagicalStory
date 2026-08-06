@@ -470,81 +470,103 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
   const raw1 = { raw: { width: cropW, height: cropH, channels: 1 } };
   const n = cropW * cropH;
 
-  // ---- CANDIDATE REGISTRATION (cutout mode) --------------------------------
-  // Without the surrounding scene the model has no anchor, so it redraws the
-  // figure a few percent off — exp #345: the same person, ~40px lower and
-  // slightly taller in a 390x866 crop, IoU 53% → rejected by a gate meant to
-  // catch REAL pose changes. The fix is to register, not to relax the gate:
-  // measure both silhouettes' bounding boxes, translate+scale the candidate so
-  // its figure lands on the original's, and re-segment. Applied ONLY if it
-  // improves IoU, so a genuinely moved figure still gets rejected.
-  const bboxOf = async (maskPng) => {
-    const a = await sharp(maskPng).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
-    const st = Math.max(1, Math.round(a.length / n));
-    let x0 = cropW, y0 = cropH, x1 = -1, y1 = -1, cnt = 0;
-    for (let y = 0; y < cropH; y++) for (let x = 0; x < cropW; x++) {
-      if (a[(y * cropW + x) * st] > 128) { cnt++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-    }
-    return cnt > 0 ? { x0, y0, x1, y1, w: x1 - x0 + 1, h: y1 - y0 + 1, px: cnt } : null;
-  };
-  const iouOf = async (mA, mB) => {
-    const a = await sharp(mA).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
-    const b = await sharp(mB).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
-    const sa = Math.max(1, Math.round(a.length / n)), sb = Math.max(1, Math.round(b.length / n));
-    let inter = 0, uni = 0;
-    for (let i = 0; i < n; i++) {
-      const A = a[i * sa] > 128, B = b[i * sb] > 128;
-      if (A && B) inter++;
-      if (A || B) uni++;
-    }
-    return uni ? inter / uni : 0;
-  };
+  // ---- CANDIDATE REGISTRATION on the BACKGROUND (cutout mode) --------------
+  // The figure is the thing that CHANGED, so aligning on its silhouette is
+  // circular — and round-2 SAM sometimes grabs a neighbour's shoe, which then
+  // drags the whole paste sideways (owner, exp #360). The BACKGROUND is common
+  // to input and output and the model is instructed to preserve it, so it is
+  // the honest alignment signal: find the (dx,dy[,scale]) that best re-aligns
+  // the background, apply it, and if even the best alignment leaves the
+  // background clearly mismatched, REJECT the candidate — the model redrew the
+  // scene, not just the figure.
   let registration = null;
   if (registerCandidate) {
     try {
-      const ob = await bboxOf(oldMask), nb = await bboxOf(newMask);
-      if (ob && nb) {
-        // TRANSLATION ONLY (owner, 2026-08-05): a wrong scale factor resizes the
-        // FIGURE — a systematic error that is hard to see and impossible to undo
-        // downstream. A wrong translation just slides the paste and shows up
-        // immediately in the IoU check. So we never rescale; we only slide.
-        const scale = 1;
-        const inRange = true;
-        const dx = (ob.x0 + ob.w / 2) - (nb.x0 + nb.w / 2) * scale - (cropW / 2) * (1 - scale);
-        const dy = (ob.y0 + ob.h / 2) - (nb.y0 + nb.h / 2) * scale - (cropH / 2) * (1 - scale);
-        if (inRange && (Math.abs(dx) > 2 || Math.abs(dy) > 2 || Math.abs(scale - 1) > 0.01)) {
-          const sw = Math.max(1, Math.round(cropW * scale)), sh = Math.max(1, Math.round(cropH * scale));
-          const scaled = await sharp(candidateCropBuf).resize(sw, sh, { fit: 'fill' }).png().toBuffer();
-          const left = Math.round((cropW - sw) / 2 + dx), top = Math.round((cropH - sh) / 2 + dy);
-          const warped = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).png().toBuffer();
-          const registered = await sharp(warped).composite([{ input: scaled, left, top }]).png().toBuffer();
-          const newMask2 = maskFetcher ? await maskFetcher(registered) : await fetchMaskWithRetry(registered, boxInCrop, 5, maskPoints || {});
-          if (newMask2) {
-            const before = await iouOf(oldMask, newMask);
-            const after = await iouOf(oldMask, newMask2);
-            if (after > before + 0.01) {
-              candidateCropBuf = registered;
-              newMask = newMask2;
-              registration = { dx: Math.round(dx), dy: Math.round(dy), scale: +scale.toFixed(3), iouBefore: +before.toFixed(3), iouAfter: +after.toFixed(3) };
-              log.info(`[TESTLAB] candidate registered: dx=${registration.dx} dy=${registration.dy} scale=${registration.scale} — IoU ${registration.iouBefore} → ${registration.iouAfter}`);
-              await addStep(`registered candidate (dx ${registration.dx}, dy ${registration.dy}, scale ${registration.scale}) — IoU ${registration.iouBefore}→${registration.iouAfter}`, `data:image/png;base64,${registered.toString('base64')}`);
-            } else {
-              log.info(`[TESTLAB] registration rejected — IoU would go ${before.toFixed(3)} → ${after.toFixed(3)} (the figure really moved)`);
-            }
+      const SW = 200, SH = Math.max(1, Math.round(cropH * (SW / cropW)));   // small grid: the search is O(candidates × pixels)
+      const grey = async (buf) => sharp(buf).resize(SW, SH, { fit: 'fill' }).greyscale().raw().toBuffer();
+      const maskSmall = async (m) => {
+        const a = await sharp(m).resize(SW, SH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+        const st = Math.max(1, Math.round(a.length / (SW * SH)));
+        const o = new Uint8Array(SW * SH);
+        for (let i = 0; i < SW * SH; i++) o[i] = a[i * st] > 128 ? 1 : 0;
+        return o;
+      };
+      const gOrig = await grey(originalCropBuf);
+      const gCand = await grey(candidateCropBuf);
+      const mOld = await maskSmall(oldMask);
+      const mNew = await maskSmall(newMask);
+      // BACKGROUND = outside both silhouettes, dilated a little so the figure's
+      // soft edge never enters the score.
+      const bg = new Uint8Array(SW * SH);
+      let bgCount = 0;
+      const R = 3;
+      for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
+        let near = false;
+        for (let dy = -R; dy <= R && !near; dy++) for (let dx = -R; dx <= R; dx++) {
+          const yy = y + dy, xx = x + dx;
+          if (yy < 0 || xx < 0 || yy >= SH || xx >= SW) continue;
+          if (mOld[yy * SW + xx] || mNew[yy * SW + xx]) { near = true; break; }
+        }
+        if (!near) { bg[y * SW + x] = 1; bgCount++; }
+      }
+      if (bgCount > 0.06 * SW * SH) {
+        // Score a (dx,dy,scale) by mean |diff| over background pixels only.
+        const score = (dx, dy, sc) => {
+          let sum = 0, n2 = 0;
+          for (let y = 0; y < SH; y += 2) for (let x = 0; x < SW; x += 2) {
+            if (!bg[y * SW + x]) continue;
+            const sx = Math.round((x - SW / 2) / sc + SW / 2 - dx);
+            const sy = Math.round((y - SH / 2) / sc + SH / 2 - dy);
+            if (sx < 0 || sy < 0 || sx >= SW || sy >= SH) continue;
+            sum += Math.abs(gOrig[y * SW + x] - gCand[sy * SW + sx]); n2++;
+          }
+          return n2 > 0.3 * bgCount / 4 ? sum / n2 : Infinity;
+        };
+        const base = score(0, 0, 1);
+        let best = { dx: 0, dy: 0, sc: 1, err: base };
+        const RANGE = Math.round(SW * 0.12);                 // ±12% of the crop
+        for (const sc of [1, 0.97, 0.94, 1.03, 1.06]) {      // scale ONLY if the background proves it
+          for (let dy = -RANGE; dy <= RANGE; dy += 2) for (let dx = -RANGE; dx <= RANGE; dx += 2) {
+            const e = score(dx, dy, sc);
+            if (e < best.err) best = { dx, dy, sc, err: e };
           }
         }
+        for (let dy = best.dy - 2; dy <= best.dy + 2; dy++) for (let dx = best.dx - 2; dx <= best.dx + 2; dx++) {
+          const e = score(dx, dy, best.sc);
+          if (e < best.err) best = { dx, dy, sc: best.sc, err: e };
+        }
+        const k = cropW / SW;                                 // small grid → crop pixels
+        const dxF = best.dx * k, dyF = best.dy * k;
+        // ACCEPT / REJECT on the background residual, not on the figure.
+        const REJECT_ERR = 26;   // mean |grey diff| over background — above this the scene itself was redrawn
+        if (best.err > REJECT_ERR) {
+          throw fail(`Model redrew the SCENE, not just the figure — background still differs by ${best.err.toFixed(1)} grey levels after the best alignment (dx ${Math.round(dxF)}, dy ${Math.round(dyF)}, scale ${best.sc}). Redo.`);
+        }
+        if (Math.abs(best.dx) > 0 || Math.abs(best.dy) > 0 || best.sc !== 1) {
+          const sw = Math.max(1, Math.round(cropW * best.sc)), sh = Math.max(1, Math.round(cropH * best.sc));
+          const scaled = await sharp(candidateCropBuf).resize(sw, sh, { fit: 'fill' }).png().toBuffer();
+          const canvas = await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).png().toBuffer();
+          const left = Math.round((cropW - sw) / 2 + dxF), top = Math.round((cropH - sh) / 2 + dyF);
+          const registered = await sharp(canvas).composite([{ input: scaled, left, top }]).png().toBuffer();
+          const newMask2 = maskFetcher ? await maskFetcher(registered) : await fetchMaskWithRetry(registered, boxInCrop, 5, maskPoints || {});
+          if (newMask2) {
+            candidateCropBuf = registered;
+            newMask = newMask2;
+            registration = { dx: Math.round(dxF), dy: Math.round(dyF), scale: best.sc, bgErrBefore: +base.toFixed(1), bgErrAfter: +best.err.toFixed(1) };
+            log.info(`[TESTLAB] registered on BACKGROUND: dx=${registration.dx} dy=${registration.dy} scale=${registration.scale} — bg mismatch ${registration.bgErrBefore} → ${registration.bgErrAfter} grey levels`);
+            await addStep(`registered on background (dx ${registration.dx}, dy ${registration.dy}, scale ${registration.scale}) — bg err ${registration.bgErrBefore}→${registration.bgErrAfter}`, `data:image/png;base64,${registered.toString('base64')}`);
+          }
+        } else {
+          log.info(`[TESTLAB] background already aligned (err ${base.toFixed(1)}) — no registration needed`);
+        }
+      } else {
+        log.info('[TESTLAB] too little background visible to register on — blending unregistered');
       }
     } catch (err) {
-      log.warn(`[TESTLAB] candidate registration failed (${err.message}) — blending unregistered`);
+      if (err.partialResult) throw err;               // the reject above
+      log.warn(`[TESTLAB] background registration failed (${err.message}) — blending unregistered`);
     }
   }
-  const strip = (buf) => {
-    const s = Math.max(1, Math.round(buf.length / n));
-    if (s === 1) return buf;
-    const out = Buffer.alloc(n);
-    for (let i = 0; i < n; i++) out[i] = buf[i * s];
-    return out;
-  };
 
   // Both SAM rounds as APPLIED views (image-with-region-white + cutout) —
   // never raw masks.

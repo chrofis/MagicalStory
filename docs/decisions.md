@@ -4740,3 +4740,31 @@ registration was REJECTED in that run (IoU would have gone 0.686 → 0.664), so 
 applied. The round-2 cutout is a clean silhouette plus one small stray fragment.
 
 **Touched:** `server/lib/samBlend.js`.
+
+---
+
+## 2026-08-05 — Repair prompt: {charName} was sent UNSUBSTITUTED; appearance added; character facts consolidated
+
+**Context:** Owner asked what the prompt actually carries. Reading the stored prompt from
+exp #360 exposed three things:
+
+1. **`{charName}` was shipped literally.** Grok received "REFERENCE PORTRAIT of {charName}",
+   "paint one {charName}". My own regression: `buildPrompt` renamed the variable to
+   `identityName`, so the template's `{charName}` placeholder no longer had a matching key
+   and `fillTemplate` left it raw. The model was told a clothing colour and a pose but never
+   WHO to paint — which is the likeliest reason the cutout runs came back as "the old image,
+   cleaned up, shirt still green". Fixed: templates are filled with `charName: identityName`
+   (alias kept), so a swap still names the reference character.
+2. **No appearance description at all** on the crosshatch/blur path. The stored
+   per-character description (face, hair, build — the same text the detector matches on)
+   existed but was never passed. Now sent as `characterDescription` (following `refName`) and
+   rendered as `{appearanceContext}`; clothing is stripped from it since `clothingContext`
+   from the story's clothing requirements is authoritative.
+3. **Character facts were scattered** — name in the task line, "match X's face" mid-prompt,
+   clothing appended after the background rule, state after that. Owner: put everything about
+   the character together. The template now ends with one block:
+   `--- {charName} — everything to match ---` + face/hair source + appearance + clothing +
+   scene state. Generic instructions stay above it.
+
+**Touched:** `prompts/character-repair-cutout.txt`, `server/lib/faceRepair.js`,
+`server/lib/testlab.js`.

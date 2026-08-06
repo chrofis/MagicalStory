@@ -526,6 +526,15 @@ async function buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, f
   // identity swap sent B's avatar but still ordered "paint one A, match A's
   // clothing" — the text won and nothing changed (exp #329).
   const identityName = opts.promptName || charName;
+  // APPEARANCE FACTS. The reference image carries identity, but the crosshatch
+  // template had NO text description at all — the model got a name, a clothing
+  // line and an avatar (owner, exp #360). The stored per-character description
+  // (face, hair, build — the text the detector itself matches on) makes identity
+  // explicit. Clothing is stripped: clothingContext is authoritative.
+  const richDesc = (typeof opts.characterDescription == "string" ? opts.characterDescription : opts.richDescription) || "";
+  const appearanceContext = richDesc
+    ? `\n${richDesc.split(/Wearing:/i)[0].replace(/\s+/g, ' ').trim().slice(0, 380)}`
+    : '';
   const clothingContext = opts.clothingDescription ? `\nClothing: ${opts.clothingDescription}` : '';
   const issueContext = opts.issueContext || (opts.issueDescription ? `\nIssues to fix: ${opts.issueDescription}` : '');
   const textPositionContext = opts.textPositionContext || buildTextPositionContext(opts.textPosition, opts.sceneDescription);
@@ -568,11 +577,11 @@ async function buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, f
   const artStyleContext = opts.artStyle ? `\n\nArt style: ${opts.artStyle}` : '';
   if (treatment === 'blur') {
     const tpl = !faceOnly && PROMPT_TEMPLATES.characterRepairBodyBlended ? PROMPT_TEMPLATES.characterRepairBodyBlended : PROMPT_TEMPLATES.characterRepairBlended;
-    if (tpl) return fillTemplate(tpl, { identityName, clothingContext, actionContext, issueContext, textPositionContext });
+    if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, textPositionContext });
   }
   if (treatment === 'crosshatch') {
     const tpl = PROMPT_TEMPLATES.characterRepairCutout;
-    if (tpl) return fillTemplate(tpl, { identityName, clothingContext, actionContext, issueContext, artStyleContext, textPositionContext });
+    if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, artStyleContext, textPositionContext });
   }
   return `This is a children's book illustration. Redraw the marked figure to look like ${identityName} from the reference photo. Match face, hair, skin tone, build and clothing exactly. Preserve the original pose, expression and gaze. Keep art style and background unchanged.${clothingContext}${actionContext}${issueContext}${artStyleContext}`;
 }

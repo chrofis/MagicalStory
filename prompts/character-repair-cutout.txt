@@ -6,8 +6,6 @@ If you are tempted to return anything that looks like IMAGE 1, stop — return I
 
 Inpaint task: repaint the area covered by the magenta crosshatch in IMAGE 2 as {charName} from IMAGE 1. The crosshatch marks the figure that needs to be replaced — remove the crosshatch entirely and paint one {charName} underneath.
 
-Match {charName}'s face, hair, skin tone, build, and clothing from the reference.
-
 Keep the original pose, body language, hand positions, held items, facial expression, and gaze direction — infer these from the surrounding scene and from the figure still faintly visible through the crosshatch. Do not default to a smile or make the character face the camera.
 
 Keep the original head and body orientation exactly. A figure seen from behind stays seen from behind; a profile stays a profile. Never rotate the head or body to make a listed attribute (glasses, garment front, face) visible — an attribute the pose hides stays hidden.
@@ -16,4 +14,7 @@ Only one figure should appear in the result. If a partial figure is visible just
 
 {REPAIR_STYLE_GUARD}{artStyleContext}
 
-The background outside the crosshatch area should stay the same.{clothingContext}{actionContext}{issueContext}{textPositionContext}
+The background outside the crosshatch area should stay the same.{issueContext}{textPositionContext}
+
+--- {charName} — everything to match ---
+Face, hair, skin tone and build: from IMAGE 1.{appearanceContext}{clothingContext}{actionContext}

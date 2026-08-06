@@ -975,6 +975,12 @@ async function runCharRepairStage(ctx, opts) {
     bodyBbox: bbox,
     ...(params.issueDescription ? { issueDescription: params.issueDescription } : {}),
     clothingDescription,
+    // Face/hair/build text for the prompt. Follows refName so an identity swap
+    // describes the person we actually want painted.
+    characterDescription: (() => {
+      const d = ctx.scene.bboxDetection?.characterDescriptions?.[refName];
+      return (typeof d === 'string' ? d : d?.richDescription) || '';
+    })(),
     photoType: avatarPhotoType,
     sceneDescription: ctx.scene.sceneDescription || ctx.scene.text || '',
     textPosition: ctx.textPosition,
