@@ -4871,3 +4871,32 @@ chain. Worth investigating whether char-fix should be skipped when the current b
 already scores above some threshold.
 
 **Touched:** `server/lib/images.js`.
+
+---
+
+## 2026-08-06 — Why the face blur failed on ONE page: crosshatch never used the retrying mask fetcher
+
+**Context:** Owner: the blur works on most pages but not on p5 of story
+`job_1786024729214_zrjgzqiey` (job ran 13:58–14:58 UTC, so the blur code — live since
+08-05 23:55 — was definitely deployed).
+
+**Root cause:** `buildCrosshatchTreatment` RECEIVES `maskFetch` (the retrying,
+requireMobilesam-honouring fetcher every other treatment uses) and never calls it — it used
+`fetchFigureMaskPng` directly, with no retry. One transient MobileSAM miss therefore leaves
+`sil = null`, which silently degrades to a RECTANGULAR hatch AND skips the face blur (the
+blur is clipped to that silhouette). Per-page, non-deterministic, exactly matching "works on
+most pages, failed on this one". Production stored nothing about it because the only signal
+was a `log.warn`.
+
+**Fixes:** (1) crosshatch uses `maskFetch` (retries) and logs loudly when the silhouette is
+still missing. (2) `treatmentInfo` — `{treatment, regionSource, faceOnly, faceBlur:{applied,
+strength, radius | reason}, hatchClipped}` — is returned by the spine and persisted into
+`retryHistory` by the production char-fix, so every future repair records whether the blur
+ran and, if not, why.
+
+**Note on the same page:** the photorealism is NOT from the repair — page 5's v0 (pre-repair)
+is already photoreal while the avatar is a correctly stylised "cyber" sheet, so the style
+break happened at page generation. The visible vertical seam through Margaret's cardigan in
+v1 is a separate paste defect, still open.
+
+**Touched:** `server/lib/faceRepair.js`, `server/lib/images.js`.

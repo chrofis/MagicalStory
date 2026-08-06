@@ -258,7 +258,13 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
     // Silhouette over the hatch region for the dest-in clip AND the blend union.
     const boxInHatch = [figureLeft - hatchLeft, figureTop - hatchTop, figureLeft - hatchLeft + figureWidth, figureTop - hatchTop + figureHeight];
     const hatchCrop = await sharp(cropBuf).extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight }).jpeg({ quality: 90 }).toBuffer();
-    sil = await fetchFigureMaskPng(hatchCrop, boxInHatch, {});
+    // Use the RETRYING fetcher (maskFetch), like every other treatment. A single
+    // transient MobileSAM miss used to leave sil=null, which silently degrades to
+    // a RECTANGULAR hatch and skips the face blur — works on most pages, fails on
+    // one, with only a warn that production never stores (owner: story
+    // job_1786024729214_zrjgzqiey p5).
+    sil = maskFetch ? await maskFetch(hatchCrop, boxInHatch, {}) : await fetchFigureMaskPng(hatchCrop, boxInHatch, {});
+    if (!sil) log.warn('[FACE REPAIR] crosshatch: no figure silhouette after retries — RECTANGULAR hatch, face blur skipped');
     if (sil) {
       // Occluder-subtract: rembg/SAM in the target crop returns ALL foreground
       // figures — a neighbour standing in front lands inside the hatch too. For
@@ -342,6 +348,7 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
   //    included — carries the repaint marker; the blur only removes the
   //    identity underneath it.
   const blurLayers = [];
+  let faceBlurInfo = { applied: false, reason: blurFace ? 'no face box for this figure' : 'blurFace disabled' };
   if (blurFace && Array.isArray(faceBoxInCrop) && faceBoxInCrop.length === 4) {
     try {
       const fl = Math.max(0, Math.round(faceBoxInCrop[0])), ft = Math.max(0, Math.round(faceBoxInCrop[1]));
@@ -374,11 +381,14 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
         const clipped = await sharp(blurredFull).ensureAlpha()
           .composite([{ input: silHead, blend: 'dest-in' }]).png().toBuffer();
         blurLayers.push({ input: clipped, top: ft, left: fl });
+        faceBlurInfo = { applied: true, strength: blurStrength, radius, w: fw, h: fh };
         log.info(`[FACE REPAIR] crosshatch+faceblur: figure-silhouette head blurred (${blurStrength}, r=${radius}) inside ${fw}x${fh}, hatch on top`);
       } else if (fw > 8 && fh > 8) {
+        faceBlurInfo = { applied: false, reason: 'no figure silhouette (SAM returned nothing after retries)' };
         log.warn('[FACE REPAIR] no figure silhouette — skipping the face blur (a box blur would destroy the background)');
       }
     } catch (err) {
+      faceBlurInfo = { applied: false, reason: `error: ${err.message}` };
       log.warn(`[FACE REPAIR] face blur over crosshatch failed (${err.message}) — hatch only`);
     }
   }
@@ -386,7 +396,7 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
   const treatedBuf = await sharp(cropBuf)
     .composite([...blurLayers, { input: hatchRegion, top: hatchTop, left: hatchLeft }])
     .png().toBuffer();
-  return { treatedBuf, oldMaskPng, coverage: cov, hatchRect: { left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight } };
+  return { treatedBuf, oldMaskPng, coverage: cov, faceBlur: faceBlurInfo, hatchClipped: !!sil, hatchRect: { left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight } };
 }
 
 // BLUR — shape-aware silhouette-clipped blur over the figure.
@@ -658,6 +668,9 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
     throw new Error(`${descriptor}: unknown treatment "${treatment}"`);
   }
   const { treatedBuf, oldMaskPng } = treated;
+  // What the treatment ACTUALLY did — persisted by callers so a silent
+  // degradation (rectangular hatch, skipped blur) is visible after the fact.
+  const treatmentInfo = { treatment, regionSource, faceOnly, faceBlur: treated.faceBlur || null, hatchClipped: treated.hatchClipped !== false };
 
   // --- Prompt + model call ---------------------------------------------------
   const prompt = opts.prompt || await buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, faceBbox, sceneW: W, sceneH: H });
@@ -859,6 +872,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
     usage,
     method: legacyMethod,
     descriptor,
+    treatmentInfo,
     promptSent: prompt,
     iou: blend.iou,
     colorInfo: blend.colorInfo || null,

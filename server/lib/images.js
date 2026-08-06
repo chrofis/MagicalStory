@@ -8210,6 +8210,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       blendMask: repairResult.blendMask || repairResult.comparison?.blendMask || null,
       croppedAvatar: repairResult.croppedAvatar || repairResult.comparison?.croppedAvatar || null,
       method: repairResult.method || 'grok_blended',
+      // WHAT THE TREATMENT ACTUALLY DID (face blur applied? hatch clipped to the
+      // silhouette?). Without this a silent degradation - rectangular hatch, no
+      // blur - is invisible after the fact: it only ever logged a warning that
+      // production does not store (story job_1786024729214_zrjgzqiey p5).
+      treatmentInfo: repairResult.treatmentInfo || null,
       // promptSent is always returned; debug.prompt only when includeDebug.
       prompt: repairResult.promptSent || repairResult.debug?.prompt || null,
       avatarSent: repairResult.debug?.avatarSent || repairResult.croppedAvatar || null,
