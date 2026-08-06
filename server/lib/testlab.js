@@ -1574,7 +1574,105 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   //     whole cover at the same aspect, so nothing is offset or sub-sampled. The
   //     crop round-trip was the source of EVERY geometry bug this stage had.
   //   'crop' — the old crop-bounded path, kept only for comparison.
-  const mode = params.mode === 'crop' ? 'crop' : 'full';
+  const mode = params.mode === 'crop' ? 'crop' : (params.mode === 'plate' ? 'plate' : 'full');
+
+  // ── PLATE MODE ────────────────────────────────────────────────────────────
+  // Don't create the detection problem. Instead of restyling the title ON the
+  // cover and then trying to separate letters from re-rendered artwork, send TWO
+  // inputs: (1) the cover as a STYLE reference, (2) the title alone on a keyable
+  // background. The model redraws only the lettering, on that background, so
+  // extraction is a chroma key — every letter pixel, no leaves, no counters
+  // filled, and the artwork is never re-rendered at all.
+  if (mode === 'plate') {
+    const padP = Math.round(Math.min(W, H) * (params.platePad ?? 0.03));
+    const px0 = Math.max(0, minx - padP), py0 = Math.max(0, miny - padP);
+    const pw = Math.min(W, maxx + 1 + padP) - px0, ph = Math.min(H, maxy + 1 + padP) - py0;
+
+    // Key colour: far from the title's own pigment so despill never eats a letter.
+    const faceHex = /^#[0-9a-f]{6}$/i.test(spec?.face || '') ? spec.face : '#808080';
+    const fR = parseInt(faceHex.slice(1, 3), 16), fG = parseInt(faceHex.slice(3, 5), 16), fB = parseInt(faceHex.slice(5, 7), 16);
+    const KEYS = [[255, 0, 255], [0, 255, 0], [0, 255, 255], [255, 255, 0]];
+    const key = KEYS.map(k => ({ k, d: Math.hypot(k[0] - fR, k[1] - fG, k[2] - fB) })).sort((a, b) => b.d - a.d)[0].k;
+
+    // The plate: flat letters over the flat key colour, letters taken from the
+    // composed cover through the glyph mask (so it is exactly our typography).
+    const glyphCrop = await sharp(grownMaskRaw, { raw: { width: W, height: H, channels: 1 } })
+      .extract({ left: px0, top: py0, width: pw, height: ph }).toColourspace('b-w').raw().toBuffer();
+    const lettersCrop = await sharp(composedBuf).extract({ left: px0, top: py0, width: pw, height: ph })
+      .removeAlpha().raw().toBuffer();
+    const plateRaw = Buffer.alloc(pw * ph * 3);
+    for (let q = 0, j = 0; q < pw * ph; q++, j += 3) {
+      const on = glyphCrop[q] > 8;
+      plateRaw[j] = on ? lettersCrop[j] : key[0];
+      plateRaw[j + 1] = on ? lettersCrop[j + 1] : key[1];
+      plateRaw[j + 2] = on ? lettersCrop[j + 2] : key[2];
+    }
+    const plateBuf = await sharp(plateRaw, { raw: { width: pw, height: ph, channels: 3 } }).jpeg({ quality: 96 }).toBuffer();
+    const sceneBuf = await sharp(artBytes).resize(1024, 1024, { fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
+    await addStep(`INPUT 1 (style reference): the artwork`, `data:image/jpeg;base64,${sceneBuf.toString('base64')}`);
+    await addStep(`INPUT 2 (edited): title on a keyable plate ${pw}×${ph}`, `data:image/jpeg;base64,${plateBuf.toString('base64')}`);
+
+    const styleTxt = (() => {
+      try {
+        const { ART_STYLES } = require('./storyHelpers');
+        const raw = ART_STYLES[storyData.artStyle];
+        return (typeof raw === 'string' ? raw : (raw && raw.default) || '') || '';
+      } catch { return ''; }
+    })();
+    const keyName = key[0] === 255 && key[1] === 0 ? 'magenta' : key[1] === 255 && key[0] === 0 && key[2] === 0 ? 'green' : key[0] === 0 ? 'cyan' : 'yellow';
+    const platePrompt = promptOverride || `The second image is a book title on a flat ${keyName} background. Repaint the LETTERING so it belongs to the artwork in the first image: same painting medium, same brush and texture, pigment pooling at the stroke edges, slightly irregular hand-painted edges. Keep the same words, letters, letterforms, size and positions.
+Leave the ${keyName} background completely flat and untouched — do not paint any scenery, do not draw the illustration, output only the lettering on the flat ${keyName} background.${styleTxt ? ` The artwork's style: ${styleTxt}` : ''}`;
+
+    const t0p = Date.now();
+    const { editImageWithPrompt } = require('./images');
+    const backendP = params.backend || 'grok';
+    const modelKeyP = params.model || (backendP === 'grok' ? 'grok-imagine' : 'gemini-2.5-flash-image');
+    const rp = await editImageWithPrompt(
+      `data:image/jpeg;base64,${plateBuf.toString('base64')}`, platePrompt, modelKeyP,
+      [`data:image/jpeg;base64,${sceneBuf.toString('base64')}`], storyData.artStyle);
+    const elapsedP = Date.now() - t0p;
+    if (!rp?.imageData) throw new Error(`${backendP} returned no image (plate mode)`);
+    await addStep('raw model output (lettering plate)', rp.imageData);
+
+    // Chroma key: distance from the key colour → alpha. Despill removes the key
+    // tint that bleeds into anti-aliased letter edges.
+    const outP = await sharp(Buffer.from(rp.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
+      .resize(pw, ph, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+    const KEY_NEAR = params.keyNear ?? 60, KEY_FAR = params.keyFar ?? 130;
+    const rgbaP = Buffer.alloc(pw * ph * 4);
+    let letterPx = 0;
+    for (let q = 0, j = 0, m = 0; q < pw * ph; q++, j += 3, m += 4) {
+      const d = Math.hypot(outP[j] - key[0], outP[j + 1] - key[1], outP[j + 2] - key[2]);
+      let a = d <= KEY_NEAR ? 0 : d >= KEY_FAR ? 1 : (d - KEY_NEAR) / (KEY_FAR - KEY_NEAR);
+      rgbaP[m] = outP[j]; rgbaP[m + 1] = outP[j + 1]; rgbaP[m + 2] = outP[j + 2];
+      rgbaP[m + 3] = Math.round(a * 255);
+      if (a > 0.5) letterPx++;
+    }
+    const layerP = await sharp(rgbaP, { raw: { width: pw, height: ph, channels: 4 } }).png().toBuffer();
+    await addStep(`keyed lettering (${letterPx}px) — chroma key, no detection`, `data:image/png;base64,${layerP.toString('base64')}`);
+
+    const basePlate = await sharp(artBytes).resize(W, H, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
+    const finalPlate = await sharp(basePlate).composite([{ input: layerP, left: px0, top: py0 }]).jpeg({ quality: 92 }).toBuffer();
+    const finalPlateUri = `data:image/jpeg;base64,${finalPlate.toString('base64')}`;
+
+    let ocrP = null, ocrPassP = null, ocrErrP = null;
+    try {
+      const cropOcr = await sharp(finalPlate).extract({ left: px0, top: py0, width: pw, height: ph }).jpeg({ quality: 95 }).toBuffer();
+      ocrP = await transcribeTextInImage(`data:image/jpeg;base64,${cropOcr.toString('base64')}`);
+      ocrPassP = normalizeTitleForGate(ocrP) === normalizeTitleForGate(title);
+    } catch (e) { ocrErrP = e.message; }
+
+    const viP = await saveTestVersion(target.storyId, coverKey, null, finalPlateUri, experimentId);
+    return {
+      imageType: coverKey, coverType: coverKey, versionIndex: viP, steps,
+      promptUsed: platePrompt, modelId: rp.modelId || modelKeyP, elapsedMs: elapsedP, cost: rp.cost ?? null,
+      titleGate: { expected: title, ocr: ocrP, pass: ocrPassP, error: ocrErrP,
+        verdict: ocrPassP === true ? 'PASS — letters intact' : ocrPassP === false ? `FAIL — read "${ocrP}"` : `GATE ERROR — ${ocrErrP}` },
+      typography: { fontId: spec?.fontId, layout: spec?.layout, face: spec?.face, lines: spec?.lines },
+      paintinSetup: { mode: 'plate', backend: backendP, keyColour: keyName, platePx: `${pw}×${ph}`,
+        letterPx, refsSent: 2, deterministicColour: spec?.face || null },
+    };
+  }
   const cropPctW = Math.round(crop.width / W * 100), cropPctH = Math.round(crop.height / H * 100);
   const cropBuf = mode === 'crop'
     ? await sharp(composedBuf).extract(crop).jpeg({ quality: 95 }).toBuffer()
