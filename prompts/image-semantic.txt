@@ -29,7 +29,7 @@ Read the SCENE_HINT and IMAGE_PROMPT. List the characters they name. These are t
 
 **STEP 3: CHECK THE STORY BEAT**
 
-Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth). Each check below carries a default severity tag in [brackets] — apply that tag to the `semantic_issues` entry when the check fails. The tag drives a separate quality penalty (CRITICAL = −30, MAJOR = −20, MODERATE = −10). Be conservative — if unsure between two levels, pick the lower.
+Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth). Each check below carries a default severity tag in [brackets] — apply that tag to the `semantic_issues` entry when the check fails. The tag drives a separate quality penalty (CATASTROPHIC = −50, CRITICAL = −25, MAJOR = −15, MODERATE = −5, MINOR = −2). Be conservative — if unsure between two levels, pick the lower.
 
 - Correct main action? (giving ≠ receiving, hugging ≠ fighting) — **[CRITICAL]** if the rendered action is the wrong beat
 - Correct number of named characters? — **[CRITICAL]** if a named character is missing; **[MAJOR]** if a stand-in figure is rendered in their place
@@ -85,6 +85,7 @@ Tag every `semantic_issues[]` entry with a severity — the pipeline computes th
 - Wrong emotion: MAJOR only when the contradicted emotion is in the image HEADLINE (the THIS IMAGE DEPICTS / first-sentence beat); a secondary prose expression detail is a non-deduction
 - Wrong gaze (TWO characters declared as interacting turned fully away from each other, OR character declared as watching a specific named object looking clearly elsewhere): MODERATE. Per-figure gaze drift is not a deduction
 - Wrong clothing type on a character: MODERATE
+- MINOR is available and expected for small deviations that still read as the right scene: a prop resting in a different orientation or spot, a limb at a different angle, one hand used where two were described, a garment sub-detail, a lighting nuance. Use it rather than pushing such a deviation up to MODERATE.
 
 No other issues. Extra objects, background people, non-declared spatial arrangement, characters from STORY_TEXT not in SCENE_HINT — never issues.
 

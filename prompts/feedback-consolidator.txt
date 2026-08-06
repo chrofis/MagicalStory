@@ -51,19 +51,20 @@ Fill `spec_conflicts[]` before writing any fixes. This is the one exception to r
    - Score AFTER deduplicating across evaluators. The same physical problem flagged by quality, semantic, and entity is ONE issue, deducted ONCE.
    - **Be tolerant of small things.** A loose strand of hair, a colour shifted half a tone, a finger held slightly differently — these are minor cosmetic deviations from the prompt and should NOT tank the score. Most renders of a children's book scene contain a few of these and shipping them is fine.
    - Severity-based deduction (apply once per *unique* problem, not once per evaluator that flagged it):
-     * CRITICAL: −30 (figure missing, wrong character entirely, scene fundamentally wrong)
+     * CATASTROPHIC: −50 (cannot be published — fragment or fused figures, wrong narrative beat, artwork framed by a border)
+     * CRITICAL: −25 (figure missing, wrong character entirely, scene fundamentally wrong)
      * MAJOR: −15 (clearly wrong clothing or pose, visible anatomy bug, wrong landmark)
-     * MODERATE: −7 (noticeable but not story-breaking — wrong hair tie, missing accessory)
-     * MINOR: −2 (cosmetic — slight colour drift, tiny anatomy quirk, faint texture artifact)
+     * MODERATE: −5 (noticeable but not story-breaking — wrong hair tie, missing accessory)
+     * MINOR: −2 (small deviation from the prompt that a reader would not notice or would not mind — a prop resting in a different orientation or spot, an arm raised at a different angle, one hand used where two were described, a garment sub-detail such as a panel, strap, collar or trim, a lighting nuance, a slight colour drift, a faint texture artifact)
    - Floor at 0, ceiling at 100. If there are no issues at all, return 100.
    - Pages that ship as-is in a finished book should land at 70+. Pages that need redo should be ≤55. The grey zone 55–70 is for "noticeable but acceptable".
    - Apply the same dedupe/tolerance philosophy to the dropped issues (rule 7 / "requires_char_fix_not_inpaint" / etc.) — those count toward the score even though they're not in the fix list.
 
 10. Also return `final_score_reason`: a one-sentence explanation of what drove the score (which 1-2 issues hurt most, or "no significant issues" if 100).
 
-11. Also return `deduped_issues[]`: the full deduplicated issue list, NOT capped at 3. The pipeline computes the page score from this list, one deduction per entry by severity — it is the scoring source, not just display. One entry per unique physical problem regardless of how many evaluators flagged it. Each entry has:
+11. Also return `deduped_issues[]`: the full deduplicated issue list, NOT capped at 3. The pipeline computes the page score from this list, one deduction per entry by severity — it is the scoring source, not just display. One entry per unique physical problem regardless of how many evaluators flagged it, and regardless of how differently they worded it. Group by CAUSE, not by wording: one repaint fixes one entry. A single atmosphere or lighting treatment described from several angles is ONE entry, not one per phrase; several figures sharing one staging fault (all turned the same wrong way) is ONE entry naming them together; a setting described as wrong in one entry is not also charged as wrong lighting, wrong palette, and wrong props. Each entry has:
    - `description`: short, plain English. Reuse the evaluator wording when accurate; tighten when not.
-   - `severity`: `CATASTROPHIC` | `CRITICAL` | `MAJOR` | `MODERATE` | `MINOR` (the post-dedupe severity — when evaluators disagreed, take the highest). Use only this vocabulary; anything else is dropped by the parser.
+   - `severity`: `CATASTROPHIC` | `CRITICAL` | `MAJOR` | `MODERATE` | `MINOR`. Set it by consensus, not by the loudest evaluator: when two or more evaluators flagged the same defect, keep the highest severity among them; when only ONE flagged it, cap it at MODERATE. Evaluators do not share a severity vocabulary — one of them has no MINOR level at all — so a single high tag is one opinion, not agreement. Use only this vocabulary; anything else is dropped by the parser.
    - `sources`: array of evaluator names that flagged this problem (subset of `["quality","semantic","compliance","entity","final_checks"]`). At least one entry. When dedupe merged 3 raw flags into one, all 3 source names appear here.
    - Order by severity (CRITICAL first, MINOR last). Items also present in `per_character_fixes[]` / `scene_fix` are still listed here — this list is for display, the fix list is for execution.
 

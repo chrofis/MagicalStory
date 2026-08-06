@@ -5318,3 +5318,84 @@ framings. Face-only repairs keep their own head-mask path with face+hair dots �
 owner, face detection may differ.
 
 **Touched:** `server/lib/samBlend.js`, `server/lib/faceRepair.js`.
+
+---
+
+## 2026-08-06 — Scores were too harsh: 76% of deductions were one evaluator's unilateral opinion
+
+**Context:** Owner: "many images look good but score 0". Audited all 14 pages of
+`job_1786024729214_zrjgzqiey` — 278 deductions, 4121 penalty points, 14 versions at exactly 0.
+
+**Scoring is `max(0, 100 − Σ severity points)`, uncapped.** That model is fine — 7 MINORs is −14,
+as it should be. The defect is severity ASSIGNMENT, not the scale, so no cap was added.
+
+**Where the deductions come from:** the consolidator authors 219 of 278 (79%). Its distribution is
+catastrophic 2 / critical 47 / **major 133** / moderate 28 / **minor 9** — MINOR is 4.1%. The raw
+buckets barely participate (quality 4, semantic 1, compliance 0), since the deduped list replaces
+them by construction.
+
+**Four mechanisms, all fixed here:**
+1. **The merge rule could only ratchet up.** `feedback-consolidator.txt` said "when evaluators
+   disagreed, take the highest" — a pure max. Measured: **208 of 272 issues (76%) were flagged by
+   exactly ONE evaluator** and still charged at that evaluator's full severity. Now consensus-based:
+   2+ evaluators → keep the highest; single-source → capped at MODERATE.
+2. **Two of the three inputs had no low tier to contribute.** `image-semantic.txt` had no MINOR
+   level at all (floor MODERATE) and compliance defaults to MODERATE
+   (`feedbackConsolidator.js:343`), so max-of-three was structurally biased upward. MINOR added to
+   the semantic rubric.
+3. **MINOR was unreachable by definition** — "cosmetic: slight colour drift, tiny anatomy quirk,
+   faint texture artifact". Small PROMPT deviations (a prop resting in a different orientation, an
+   arm at a different angle, one hand where two were described, a garment sub-detail) had no MINOR
+   home, so they landed MODERATE minimum and ratcheted to MAJOR. Observed: "notebook standing
+   upright on its spine instead of lying flat" charged CRITICAL, the same 25 points as a missing
+   character. Definition widened to name that class.
+4. **Three inconsistent deduction tables.** Pipeline applies −50/−25/−15/−5/−2; semantic was told
+   CRITICAL −30 / MAJOR −20 / MODERATE −10; the consolidator CRITICAL −30 / MAJOR −15 / MODERATE
+   −7. Each model calibrated severity against a scale that was not the one applied. All unified to
+   the pipeline's table.
+
+Also tightened dedupe to group by CAUSE not wording — one atmosphere described from several angles
+was billed three times (45 points for one defect on p1), and one staging fault shared by four
+figures was billed four times (60 points on p13).
+
+**Modelled effect** (re-scoring the stored issues with the consensus cap alone, nothing else):
+page-best 30→50, 40→70, 48→76, 55→65, 60→80, 60→75, 68→88, 25→65, 55→75, 70→70, 40→60, 70→70,
+0→33, 75→85. Mean page-best **50 → 69**, which lands in the intended "ships as-is" band the
+consolidator prompt already documents (70+). The widened MINOR tier and the dedupe fix are not in
+that model and should add more.
+
+**Note on the consolidator's own score:** `final_score` is audit-only — the pipeline scores from
+`deduped_issues`. It is not the lenient number one might assume: across 48 versions it averaged 10
+points BELOW the pipeline. Its "be tolerant of small things" paragraph is attached to a number
+nobody reads.
+
+**Status:** 🟡 prompt-only changes, staging. The modelled table is arithmetic on stored issues, NOT
+a live run — a real story must be generated before trusting the calibration.
+
+**Touched:** `prompts/feedback-consolidator.txt`, `prompts/image-semantic.txt`.
+
+---
+
+## 2026-08-06 — Wardrobe tax: the garment NAME was dropped, not the structural clause
+
+**Context:** "Lily's shorts lack the square bib panel with shoulder straps" was charged MAJOR on
+nearly every page and version of `job_1786024729214_zrjgzqiey` — 505 points, 12.3% of all deduction
+weight — and no repair ever cleared it.
+
+**Not a new problem, and NOT a reason to reverse the existing rule.** Commit `516efb97e`
+(2026-06-10) established with local Grok evidence that a terse "denim dungaree shorts" renders as
+plain shorts and that spelling out the parts is what makes it render correctly. That rule stands.
+
+**What actually went wrong:** the writer kept the structural clause but dropped the garment noun.
+The rule's own correct example is "denim **dungaree** shorts — square bib panel…"; the story
+emitted "light denim **shorts** — square bib panel over the chest held by two shoulder straps".
+The image model renders the head noun (plain shorts) and the evaluator reads the clause, so the
+garment is reported wrong on every page forever. Proof the spec is the defect rather than the
+render: on p9 `char-fix-round-3` the deduction inverts — "shorts depicted WITH bib panel and
+shoulder straps instead of plain shorts". The same detail is penalised in both directions.
+
+**Decision:** strengthen the EXISTING rule rather than replace it — the garment name must stay in
+front of the parts. (A first attempt at a "one garment = one unambiguous noun phrase" rule was
+written and then removed: it would have banned exactly the pattern `516efb97e` proved necessary.)
+
+**Touched:** `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`.
