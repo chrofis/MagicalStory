@@ -182,6 +182,8 @@ export interface ExperimentResult {
   timeToLockMs?: number;
   beatsPlan?: BeatsCall;
   beatsReview?: BeatsReview | null;
+  /** One entry per scene-review arm; all judged the same frozen briefs. */
+  sceneReviews?: SceneReviewArm[] | null;
   finalBeats?: { pageNumber: number; beat: string; scene: string }[];
   timeToScenesMs?: number | null;
   sceneExpansions?: {
@@ -236,6 +238,12 @@ export interface BeatsReview extends BeatsCall {
   analysis?: string;
   changedPages?: number[];
   strayPages?: number[];
+}
+
+export interface SceneReviewArm extends BeatsCall {
+  analysis?: string;
+  rewrotePages?: number[];
+  error?: string;
 }
 
 export interface SentPrompt {

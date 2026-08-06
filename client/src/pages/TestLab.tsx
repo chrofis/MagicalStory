@@ -1448,6 +1448,42 @@ function BeatsScenesView({ result }: { result: ExperimentResult }) {
         })}
       </div>
 
+      {/* SCENE REVIEW — every arm judged the SAME frozen briefs, so a
+          difference here is the reviewer and not a different input. */}
+      {!!result.sceneReviews?.length && (
+        <div className="space-y-1">
+          <div className="text-xs font-semibold text-gray-700">
+            Scene review — {result.sceneReviews.length} reviewer{result.sceneReviews.length > 1 ? 's' : ''} on identical briefs
+          </div>
+          <div className={`grid gap-2 ${result.sceneReviews.length > 1 ? 'md:grid-cols-2' : ''}`}>
+            {result.sceneReviews.map((r, i) => (
+              <div key={r.modelKey + i} className="text-xs border border-gray-200 rounded-lg p-2">
+                <b>{r.modelKey}</b>{r.provider ? ` via ${r.provider}` : ''}
+                {i === 0 && result.sceneReviews!.length > 1 && <span className="text-emerald-600"> · applied</span>}
+                {' · '}{((r.elapsedMs || 0) / 1000).toFixed(1)}s
+                {r.cost != null && ` · $${r.cost.toFixed(4)}`}
+                {' · out '}{(r.usage?.output_tokens || 0).toLocaleString()}
+                {r.error
+                  ? <div className="text-red-600 mt-1">{r.error}</div>
+                  : <> · rewrote {r.rewrotePages?.length ? r.rewrotePages.join(', ') : <span className="text-emerald-600">nothing</span>}</>}
+                {r.analysis && (
+                  <details className="mt-1" open>
+                    <summary className="cursor-pointer text-indigo-600">Findings ({r.analysis.length.toLocaleString()} chars)</summary>
+                    <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-2 max-h-[32rem] overflow-auto whitespace-pre-wrap text-[11px] text-gray-700">{r.analysis}</pre>
+                  </details>
+                )}
+                {r.prompt && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-indigo-600">Prompt ({(r.promptChars || 0).toLocaleString()} chars)</summary>
+                    <pre className="mt-1 bg-white border border-gray-200 rounded-lg p-2 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-[11px]">{r.prompt}</pre>
+                  </details>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* SCENE CREATION FROM BEATS — the load-bearing test. Production expands
           scenes from finished page TEXT; a beats-first pipeline has none yet, so
           each result sits next to the scene description the real pipeline made

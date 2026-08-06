@@ -2572,6 +2572,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   // draw from" is a judgement about two visible artefacts rather than a guess.
   let sceneExpansions = null;
   let sceneReview = null;
+  let sceneReviews = null;
   let timeToScenesMs = null;
   if (params.expandScenes !== false) {
     const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
@@ -2636,36 +2637,54 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     const okScenes = sceneExpansions.filter(x => x.ok);
     if (params.reviewScenes !== false && okScenes.length > 0) {
       const { buildSceneReviewPrompt, parseRefinedText } = require('./storyHelpers');
-      const srModel = params.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel;
-      if (!TEXT_MODELS[srModel]) throw new Error('Unknown model "' + srModel + '"');
+      // Comma-separated list runs every model against ONE frozen set of briefs.
+      // Scene expansion is non-deterministic, so two separate experiments give
+      // the reviewers different inputs — measured on exp 357 vs 358, where the
+      // page-3 cast differed and made the comparison meaningless. Fanning out
+      // from a single expansion is the only way the difference is the reviewer.
+      const srModels = String(params.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel)
+        .split(',').map(s => s.trim()).filter(Boolean);
+      for (const m of srModels) if (!TEXT_MODELS[m]) throw new Error('Unknown model "' + m + '"');
+      const expectedPages = okScenes.map(x => x.pageNumber);
       const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })));
       if (srPrompt) {
-        const t2 = Date.now();
-        try {
-          const srRes = await callStream(srPrompt, 16000, null, srModel, { usageLabel: 'testlab_scene_review' });
-          const parsed = parseRefinedText(srRes.text || '', okScenes.map(x => x.pageNumber), 'SCENES');
-          const byPage = new Map(parsed.pages.map(x => [x.pageNumber, x.text]));
+        const reviewOnce = async (srModel) => {
+          const t2 = Date.now();
+          try {
+            const srRes = await callStream(srPrompt, 16000, null, srModel, { usageLabel: 'testlab_scene_review' });
+            const parsed = parseRefinedText(srRes.text || '', expectedPages, 'SCENES');
+            return {
+              modelKey: srModel,
+              modelId: srRes.modelId,
+              provider: srRes.provider || null,
+              elapsedMs: Date.now() - t2,
+              ttftMs: srRes.ttft ?? null,
+              usage: srRes.usage,
+              cost: costOf(srRes),
+              promptChars: srPrompt.length,
+              prompt: srPrompt,
+              rawResponse: (srRes.text || '').slice(0, 40000),
+              analysis: (parsed.analysis || '').slice(0, 40000),
+              rewrotePages: parsed.pages.map(x => x.pageNumber),
+              _pages: parsed.pages,
+            };
+          } catch (err) {
+            return { modelKey: srModel, ok: false, elapsedMs: Date.now() - t2, error: err.message };
+          }
+        };
+        sceneReviews = await Promise.all(srModels.map(reviewOnce));
+        // Only the FIRST reviewer's rewrites land on the briefs — with several
+        // arms their outputs conflict, and the comparison lives in sceneReviews.
+        const primary = sceneReviews[0];
+        if (primary && primary._pages) {
+          const byPage = new Map(primary._pages.map(x => [x.pageNumber, x.text]));
           for (const x of sceneExpansions) {
             const fixed = byPage.get(x.pageNumber);
             if (fixed) { x.reviewedBrief = fixed; x.reviewRewrote = true; }
           }
-          sceneReview = {
-            modelKey: srModel,
-            modelId: srRes.modelId,
-            provider: srRes.provider || null,
-            elapsedMs: Date.now() - t2,
-            ttftMs: srRes.ttft ?? null,
-            usage: srRes.usage,
-            cost: costOf(srRes),
-            promptChars: srPrompt.length,
-            prompt: srPrompt,
-            rawResponse: (srRes.text || '').slice(0, 40000),
-            analysis: (parsed.analysis || '').slice(0, 40000),
-            rewrotePages: parsed.pages.map(x => x.pageNumber),
-          };
-        } catch (err) {
-          sceneReview = { modelKey: srModel, ok: false, elapsedMs: Date.now() - t2, error: err.message };
         }
+        for (const r of sceneReviews) delete r._pages;
+        sceneReview = sceneReviews[0] || null;
       }
     }
     // Parallel, as production runs them — so this is wall-clock, not the sum.
@@ -2676,6 +2695,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     stageKind: 'beats_scenes',
     sceneExpansions,
     sceneReview,
+    sceneReviews,
     timeToScenesMs,
     storyId: target.storyId,
     title: storyData.title || null,
