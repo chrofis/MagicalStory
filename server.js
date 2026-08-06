@@ -1590,7 +1590,7 @@ const hasDistFolder = require('fs').existsSync(distPath);
 initSharingRoutes({ distPath, hasDistFolder });
 
 // Initialize job routes with server.js-local dependencies
-initJobRoutes({ processStoryJob, getCheckpoint, getAllCheckpoints });
+initJobRoutes({ processStoryJob, getCheckpoint, getAllCheckpoints, savePartialStoryFromCheckpoints });
 
 // Initialize admin routes with server.js-local dependencies
 initAdminRoutes({ processStoryJob, userLandmarkCache });
@@ -5957,7 +5957,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const genStartTime = Date.now();
       const genLimit = pLimit(50);
 
-      const rawImages = await Promise.all(
+      // Liveness heartbeat. progress/updated_at only move as a page STARTS, and
+      // all pages start at once — so updated_at freezes for the whole first
+      // pass and the status endpoint's 10-minute heartbeat check (jobs.js)
+      // declares a perfectly healthy job dead. Observed: a 14-page run killed at
+      // 28% while the analyzer was burning 5,776 CPU-seconds of real work.
+      // Touching updated_at on a timer says "alive" without faking progress.
+      const heartbeat = setInterval(() => {
+        dbPool.query('UPDATE story_jobs SET updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND status = $2', [jobId, 'processing'])
+          .catch(err => log.debug(`[HEARTBEAT] job ${jobId}: ${err.message}`));
+      }, 60_000);
+      heartbeat.unref?.();
+
+      let rawImages;
+      try {
+      rawImages = await Promise.all(
         pageDataArray.map(pageData => genLimit(async () => {
           await checkCancellation();
           // 11-30 = images generating (1 checkpoint per page, up to 20 pages)
@@ -6245,6 +6259,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }))
       );
+      } finally {
+        // Stop the liveness heartbeat whether generation succeeded or threw.
+        clearInterval(heartbeat);
+      }
 
       const genDuration = ((Date.now() - genStartTime) / 1000).toFixed(1);
       const successCount = rawImages.filter(r => r.imageData).length;

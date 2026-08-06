@@ -487,6 +487,19 @@ router.get('/:jobId/status', jobStatusLimiter, authenticateToken, async (req, re
             [jobId, errorMessage]
           );
 
+          // Rescue whatever finished. Every OTHER path that declares a job dead
+          // (worker throw, zombie recovery, stall sweeper) saves a [PARTIAL]
+          // story from the checkpoints; this one did not, so a job killed here
+          // left its completed pages stranded on disk and the user saw nothing
+          // in their library. Never let the rescue break the status response.
+          if (deps.savePartialStoryFromCheckpoints) {
+            try {
+              await deps.savePartialStoryFromCheckpoints(jobId, errorMessage);
+            } catch (rescueErr) {
+              log.warn(`[STATUS] partial rescue failed for ${jobId}: ${rescueErr.message}`);
+            }
+          }
+
           // Update local job object to return correct status
           job.status = 'failed';
           job.error_message = errorMessage;
