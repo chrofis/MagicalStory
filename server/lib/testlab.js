@@ -1126,6 +1126,82 @@ async function runEntityStage(ctx, { experimentId }) {
  * drift is corrected. Saves the corrected full page as a scene test version.
  * Target: {storyId, pageNumber}. params.opts = threshold overrides (A/B).
  */
+/**
+ * Render ONE "shift summary" image for a garment-hue run: one row per character,
+ * each showing the reference avatar, the figure before, the figure after, and
+ * three colour chips — garment as rendered, avatar target, garment after — plus
+ * the numbers and the verdict. Skipped figures are included, with their reason:
+ * "how did each character shift" has to answer "not at all, because X" too.
+ *
+ * Colour chips matter more than the hue numbers: "36.4° → 32.6°" tells a reader
+ * nothing about whether the shirt went the right way. Two squares do.
+ */
+async function renderGarmentHueSummary(perFigure, pageNumber) {
+  const sharp = require('sharp');
+  const ROW_H = 150, PAD = 12, THUMB = 126, CHIP = 38, W = 1180, HEAD_H = 46;
+  const rows = perFigure.filter(f => f.beforeCrop || f.swatches);
+  if (!rows.length) return null;
+  const H = HEAD_H + rows.length * ROW_H + PAD;
+
+  const esc = (s) => String(s == null ? '' : s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+  const rgb = (c) => (Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : '#ccc');
+
+  const composites = [];
+  let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="${W}" height="${H}" fill="#ffffff"/>
+    <text x="${PAD}" y="30" font-family="sans-serif" font-size="20" font-weight="700" fill="#111">Garment-hue shift — page ${pageNumber}</text>`;
+
+  for (let i = 0; i < rows.length; i++) {
+    const f = rows[i];
+    const y = HEAD_H + i * ROW_H;
+    // Three thumbnails: reference sheet, before, after.
+    const thumbs = [
+      ['referenceSheet', PAD],
+      ['beforeCrop', PAD + THUMB + 8],
+      ['afterCrop', PAD + 2 * (THUMB + 8)],
+    ];
+    for (const [key, left] of thumbs) {
+      if (!f[key]) continue;
+      try {
+        const buf = Buffer.from(String(f[key]).replace(/^data:[^;]+;base64,/, ''), 'base64');
+        composites.push({
+          input: await sharp(buf).resize(THUMB, THUMB - 20, { fit: 'contain', background: '#fff' }).png().toBuffer(),
+          left, top: y + 16,
+        });
+      } catch { /* a missing thumbnail must not sink the summary */ }
+    }
+    const textX = PAD + 3 * (THUMB + 8) + 8;
+    const chipY = y + 40;
+    const chips = [
+      ['page', f.swatches?.before],
+      ['avatar', f.swatches?.target],
+      ['result', f.swatches?.after],
+    ];
+    let chipSvg = '';
+    chips.forEach(([label, col], k) => {
+      const cx = textX + k * (CHIP + 46);
+      chipSvg += `<rect x="${cx}" y="${chipY}" width="${CHIP}" height="${CHIP}" fill="${rgb(col)}" stroke="#999" stroke-width="1"/>
+        <text x="${cx}" y="${chipY + CHIP + 13}" font-family="sans-serif" font-size="11" fill="#555">${label}</text>`;
+    });
+    const verdict = f.applied ? `SHIFTED ${f.rotationDeg > 0 ? '+' : ''}${f.rotationDeg}°` : 'unchanged';
+    const verdictFill = f.applied ? '#0a7d32' : '#777';
+    svg += `<line x1="0" y1="${y + 4}" x2="${W}" y2="${y + 4}" stroke="#e5e5e5" stroke-width="1"/>
+      <text x="${textX}" y="${y + 26}" font-family="sans-serif" font-size="16" font-weight="700" fill="#111">${esc(f.name)}</text>
+      <text x="${textX + 130}" y="${y + 26}" font-family="sans-serif" font-size="14" font-weight="700" fill="${verdictFill}">${esc(verdict)}</text>
+      ${chipSvg}
+      <text x="${textX + 3 * (CHIP + 46) + 10}" y="${chipY + 16}" font-family="sans-serif" font-size="13" fill="#333">garment ${f.garmentHueDeg ?? '–'}° → avatar ${f.avatarHueDeg ?? '–'}°</text>
+      <text x="${textX + 3 * (CHIP + 46) + 10}" y="${chipY + 34}" font-family="sans-serif" font-size="12" fill="#666">drift ${f.driftDeg ?? '–'}° · mask ${esc(f.maskSource || '–')}</text>
+      <text x="${textX}" y="${y + ROW_H - 14}" font-family="sans-serif" font-size="12" fill="#555">${esc(f.reason)}</text>`;
+  }
+  svg += `<text x="${PAD}" y="${HEAD_H - 6}" font-family="sans-serif" font-size="12" fill="#777">reference sheet · before · after</text></svg>`;
+
+  const out = await sharp(Buffer.from(svg))
+    .composite(composites)
+    .jpeg({ quality: 92 })
+    .toBuffer();
+  return 'data:image/jpeg;base64,' + out.toString('base64');
+}
+
 async function runGarmentHueStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
@@ -1168,6 +1244,17 @@ async function runGarmentHueStage(ctx, { experimentId, params = {} }) {
   // The reference sheet comes first deliberately: the correction is only
   // judgeable against the avatar the target hue was actually read from.
   const steps = [];
+  // The shift summary goes FIRST — one image that answers "what happened to
+  // every character on this page" without scrolling through per-figure crops.
+  try {
+    const summary = await renderGarmentHueSummary(out.perFigure, ctx.pageNumber);
+    if (summary) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, summary, experimentId);
+      steps.push({ label: `SHIFT SUMMARY — all ${out.perFigure.length} figures on page ${ctx.pageNumber}`, imageType: 'tl_step', versionIndex: v });
+    }
+  } catch (err) {
+    log.warn(`[TESTLAB] garment-hue shift summary failed: ${err.message} — per-figure steps still emitted`);
+  }
   for (const f of out.perFigure) {
     if (f.referenceSheet) {
       const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, f.referenceSheet, experimentId);

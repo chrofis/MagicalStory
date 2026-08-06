@@ -243,17 +243,20 @@ function decideHueCorrection(garment, avatarIn, opts = {}) {
     if (Math.abs(d) < Math.abs(driftRad)) { avatar = c; driftRad = d; }
   }
   const avatarHueDeg = +(avatar.hueRad * DEG).toFixed(1);
+  // Carry the matched cluster itself out: callers render a colour swatch of the
+  // exact target, and "hue 43.7°" alone cannot be turned back into a colour.
+  const avatarCluster = avatar;
   const driftDeg = +(driftRad * DEG).toFixed(1);
   const absDrift = Math.abs(driftDeg);
   if (absDrift < cfg.hueDriftMinDeg) {
-    return { applied: false, reason: `below threshold (${absDrift.toFixed(1)}° < ${cfg.hueDriftMinDeg}°)`, driftDeg, rotationDeg: 0, garmentHueDeg, avatarHueDeg };
+    return { applied: false, reason: `below threshold (${absDrift.toFixed(1)}° < ${cfg.hueDriftMinDeg}°)`, driftDeg, rotationDeg: 0, garmentHueDeg, avatarHueDeg, avatarCluster };
   }
   if (absDrift > cfg.hueDriftMaxDeg) {
-    return { applied: false, reason: `drift too large (${absDrift.toFixed(1)}° > ${cfg.hueDriftMaxDeg}° — likely garment-type error, defer to eval/repair)`, driftDeg, rotationDeg: 0, garmentHueDeg, avatarHueDeg };
+    return { applied: false, reason: `drift too large (${absDrift.toFixed(1)}° > ${cfg.hueDriftMaxDeg}° — likely garment-type error, defer to eval/repair)`, driftDeg, rotationDeg: 0, garmentHueDeg, avatarHueDeg, avatarCluster };
   }
   // Apply the drift, hard-capped (redundant with the max check but explicit).
   const rotationDeg = Math.max(-cfg.hueDriftMaxDeg, Math.min(cfg.hueDriftMaxDeg, driftDeg));
-  return { applied: true, reason: 'correct outlier', driftDeg, rotationDeg, garmentHueDeg, avatarHueDeg };
+  return { applied: true, reason: 'correct outlier', driftDeg, rotationDeg, garmentHueDeg, avatarHueDeg, avatarCluster };
 }
 
 /**
@@ -340,8 +343,27 @@ function normalizeGarmentRaw({ pageRaw, n, pageMask, sampleMask, castMask, avata
     return { applied: false, reason: `too few garment px (${garment.count})`, driftDeg: 0, rotationDeg: 0, garmentHueDeg: +(garment.hueRad * DEG).toFixed(1), avatarHueDeg: avatar.length ? +(avatar[0].hueRad * DEG).toFixed(1) : null, cast, avatarCast, correctedRaw: pageRaw };
   }
   const decision = decideHueCorrection(garment, avatar, cfg);
+  // Colour SWATCHES for the Test Lab shift summary. Hue angles alone cannot be
+  // turned back into a colour, so emit the three actual RGB triples the reader
+  // needs: what the page garment IS, what the avatar target is, and what the
+  // garment BECOMES. The garment sample lives in cast-discounted space, so the
+  // cast is added back to recover the colour as actually rendered on the page.
+  const swatches = (() => {
+    if (!garment) return null;
+    const asRgb = (L, a, b) => { const c = _labToRgb(L, a, b); return [c[0], c[1], c[2]]; };
+    const before = asRgb(garment.L, garment.a + cast.a, garment.b + cast.b);
+    const target = decision.avatarCluster
+      ? asRgb(decision.avatarCluster.L, decision.avatarCluster.a, decision.avatarCluster.b)
+      : null;
+    // AFTER = the same rotation applyHueRotation performs, at full weight.
+    const phi = (decision.rotationDeg || 0) * RAD;
+    const cs = Math.cos(phi), sn = Math.sin(phi);
+    const ra = garment.a * cs - garment.b * sn, rb = garment.a * sn + garment.b * cs;
+    const after = asRgb(garment.L, ra + cast.a, rb + cast.b);
+    return { before, target, after };
+  })();
   if (!decision.applied) {
-    return { ...decision, cast, avatarCast, correctedRaw: pageRaw };
+    return { ...decision, cast, avatarCast, swatches, correctedRaw: pageRaw };
   }
   const correctedRaw = applyHueRotation(pageRaw, n, pageMask, {
     clusterHueRad: garment.hueRad,
@@ -350,7 +372,7 @@ function normalizeGarmentRaw({ pageRaw, n, pageMask, sampleMask, castMask, avata
     hueWindowDeg: cfg.hueWindowDeg,
     sigmaDeg: cfg.sigmaDeg,
   });
-  return { ...decision, cast, avatarCast, garmentChroma: +garment.chroma.toFixed(1), avatarClusters: avatar.map(c => ({ hueDeg: +(c.hueRad * DEG).toFixed(1), chroma: +c.chroma.toFixed(1) })), correctedRaw };
+  return { ...decision, cast, avatarCast, swatches, garmentChroma: +garment.chroma.toFixed(1), avatarClusters: avatar.map(c => ({ hueDeg: +(c.hueRad * DEG).toFixed(1), chroma: +c.chroma.toFixed(1) })), correctedRaw };
 }
 
 // ── async orchestration (decode + mask + composite) ──────────────────────────
@@ -519,16 +541,23 @@ async function normalizeGarmentHue(pageImageData, bboxDetection, resolveAvatar, 
       cast: res.cast ? { a: +res.cast.a.toFixed(1), b: +res.cast.b.toFixed(1) } : null,
       maskSource,
     };
+    // Crops + reference for EVERY figure, corrected or not. "How did each
+    // character shift" has to include the ones that did NOT shift and say why —
+    // a summary that only shows the corrected figures hides the skips, which are
+    // the majority and the more interesting half.
+    entry.swatches = res.swatches || null;
+    if (collectCrops && Array.isArray(fig.bodyBox)) {
+      try {
+        entry.beforeCrop = await cropDataUri(workingRaw, W, H, fig.bodyBox);
+        entry.afterCrop = res.applied
+          ? await cropDataUri(res.correctedRaw, W, H, fig.bodyBox)
+          : entry.beforeCrop; // unchanged — same bytes both sides
+        // The styled avatar sheet the target hue was read FROM — so a reviewer
+        // can judge the correction against its reference, not just before/after.
+        entry.referenceSheet = avatarUri;
+      } catch { /* crops are a debugging aid; ignore failure */ }
+    }
     if (res.applied) {
-      if (collectCrops && Array.isArray(fig.bodyBox)) {
-        try {
-          entry.beforeCrop = await cropDataUri(workingRaw, W, H, fig.bodyBox);
-          entry.afterCrop = await cropDataUri(res.correctedRaw, W, H, fig.bodyBox);
-          // The styled avatar sheet the target hue was read FROM — so a reviewer
-          // can judge the correction against its reference, not just before/after.
-          entry.referenceSheet = avatarUri;
-        } catch { /* crops are a debugging aid; ignore failure */ }
-      }
       workingRaw = res.correctedRaw;
       anyChange = true;
       log.info(`🎨 [GARMENT-HUE] ${logLabel}${name}: rotated ${res.rotationDeg}° (drift ${res.driftDeg}°, garment ${res.garmentHueDeg}°→avatar ${res.avatarHueDeg}°, mask ${entry.maskSource})`);
