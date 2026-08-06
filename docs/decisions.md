@@ -2608,6 +2608,54 @@ aggregation).
 **Status:** ✅ active — pending a staging Test Lab smoke of a story that goes through
 repair rounds (confirm repaired pages are colour-normalized; flag-off = unchanged).
 
+### The AVATAR side gets no illumination discount (2026-08-06)
+**Context:** The first Test Lab measurement of the `garment_hue` stage on real
+content (experiments #332/#333, 12 benchmark pages, 52 figures) corrected only
+**3** figures, and those 3 were measured in a corrupted colour space. Skip reasons
+clustered oddly: 7 "low chroma" on visibly vivid garments, and 9 "drift too large"
+all falling in a narrow **141°–166°** band — near-antipodal, which is the signature
+of a sign-flipped vector, not of wrong-outfit errors. The same character with the
+same avatar measured `32.9°` on one page and `-95°/-102°/-118°` on three others.
+**Decision:** Three changes to the deterministic core, plus the matching rule that
+they require:
+1. The avatar garment hue is read in **absolute LAB space — no cast discount**.
+2. The page cast is estimated over the **background** (outside every figure mask),
+   falling back to the whole frame when the background is under `minPagePixels`.
+3. The sampling mask is the SAM silhouette when present, else the **torso band** of
+   the bodyBox (`torsoBoxFromBody`), not the raw rectangle.
+4. `sampleGarmentClusters` returns the top-K avatar hues and the page cluster is
+   matched to the **nearest** one; the association threshold is `hueDriftMaxDeg`.
+**Rationale:** `estimateCast` is an unmasked gray-world mean of a\*/b\*. On a page
+that is a defensible illumination proxy — a full scene averages toward neutral. On a
+**styled avatar sheet** it is not: the sheet is a tight crop of one figure on a plain
+background, so the mean is dominated by the garment being measured. Discounting it
+cancels the signal. Measured on a real sheet: a pink top yields cast `(6.9, 3.6)`,
+and discounting collapses chroma `27.2 → 6.5` (under `chromaMin` 8 → "low chroma"
+skip) and flips the hue `+0.8° → −161.5°` → bogus "drift too large". The avatar sheet
+is a neutral-lit reference render; there is no scene illumination on it to remove.
+Point 4 is **not optional given 1–3**: a character usually wears two coloured garments
+(pink top + blue jeans), and once the page mask is tightened to the torso while the
+avatar sheet still sees the whole outfit, dominant-vs-dominant comparison would invent
+a ~180° drift and could drive a *wrong* rotation — worse than the inert behaviour it
+replaced. Nearest-cluster matching removes the top-vs-trousers ambiguity entirely and
+is avatar-sheet-layout-agnostic (1×4 full-body and 2×4 headshot+body grids both work).
+**Measured effect** (same 12 pages, Test Lab #350): corrections **3 → 10**, false
+"low chroma" **7 → 1** (the survivor is a genuinely grey outfit — grey overalls, correctly
+skipped), bogus "drift too large" **9 → 6**. Verified visually: only the garment rotates;
+backpack, jeans, skin, hair and background are untouched.
+**Known residual:** on crowded pages a few figures still read a hue matching a
+*neighbouring* figure's garment, which trips the drift-too-large guard. That is a
+figure **detection / name-assignment** issue, not a colour one, and the guard
+correctly refuses to rotate on it — do not "fix" it by widening `hueDriftMaxDeg`.
+**Touched:** `server/lib/garmentHueNormalize.js` (`normalizeGarmentRaw` cast sources,
+`sampleGarmentClusters`, `decideHueCorrection` nearest-cluster match, `torsoBoxFromBody`,
+background `castMask` built once per page in `normalizeGarmentHue`),
+`tests/manual/garmentHueNormalize.test.js` (TESTs 8–11 regression + CRLF-safe source
+slicing), `tests/manual/garmentHueNormalizeBatch.test.js` (env-independent fp contract).
+**Status:** ✅ active — committed, **not yet deployed**; Test Lab #350 was run with the
+CLI runner against local code + the staging DB, so staging's server still runs the old
+behaviour until this is pushed.
+
 ## Image-first story prompt variant — one call, scenes authored before text (2026-07-30)
 
 **Context:** roadmap §4 (image-first, owner strategic direction) + §5 (outline
