@@ -2752,14 +2752,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   setCurrentLogger(genLog);
   genLog.setStage('outline');
 
-  // Preload the analyzer's models NOW, during the ~12 minutes of writer +
-  // review + scene work, instead of paying the ~90s GroundingDINO load on the
-  // first mask call inside the images stage. The /warmup endpoint was built for
-  // exactly this ("while the story's opening Claude calls run for minutes") but
-  // was only ever wired to the Test Lab. Fire-and-forget: warming must never
-  // delay or fail a generation.
-  require('./server/lib/analyzerClient').ensureWarm('story-start');
-
   // Token usage tracker - same structure as other modes
   const tokenUsage = {
     anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
