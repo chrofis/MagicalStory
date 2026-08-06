@@ -96,6 +96,7 @@ export interface ExperimentResult {
   qc?: { pass?: boolean; issues?: string[]; visionFeedback?: string | null; error?: string };
   method?: string | null;
   backend?: string;
+  model?: string;
   repairMode?: string;
   coverType?: string;
   decision?: { method: string; reason: string; charName?: string | null };

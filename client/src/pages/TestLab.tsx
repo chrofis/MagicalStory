@@ -2069,6 +2069,7 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
         <div className="text-sm font-semibold">
           {result.character ? result.character : `${result.storyId}${typeof result.pageNumber === 'number' ? ` · P${result.pageNumber}` : result.coverType ? ` · ${result.coverType}` : ''}`}
           {result.artStyle && <span className="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{result.artStyle}</span>}
+          {(result.model || result.backend) && <span className="ml-2 bg-teal-100 text-teal-800 text-xs px-2 py-0.5 rounded-full">{result.model || result.backend}</span>}
           {result.label && <span className="ml-2 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">{result.label}</span>}
           {isRedo && <span className="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">redo{result.promptOverridden ? ' · edited prompt' : ''}</span>}
           {superseded && <span className="ml-2 bg-gray-200 text-gray-600 text-xs px-2 py-0.5 rounded-full">superseded</span>}

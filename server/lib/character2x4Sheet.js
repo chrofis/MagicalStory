@@ -908,7 +908,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
  * style match + costume preserved. Returns the same shape as Pass 1's
  * collected fields so the dev panel can render both passes uniformly.
  */
-async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, usageTracker, promptOverride = null }) {
+async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, usageTracker, promptOverride = null, backendOverride = null }) {
   // promptOverride: Test Lab A/B — full replacement for the style-transfer
   // prompt (buildStyleTransferPrompt output), this call only.
   const prompt = promptOverride || buildStyleTransferPrompt(artStyle);
@@ -943,7 +943,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     // same refusal). See docs/decisions.md "Styled-avatar MUST guarantee".
     let result;
     try {
-      result = await styleTransferGenerate(prompt, pass1ImageData);
+      result = await styleTransferGenerate(prompt, pass1ImageData, backendOverride);
     } catch (err) {
       log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt}/${totalAttempts} (${MODEL_DEFAULTS.avatarStyleTransferBackend}) threw: ${err.message}${attempt < totalAttempts ? ' — retrying' : ''}`);
       attempts.push({ attempt, stage: 'gen-error', score: 0, reason: err.message });
@@ -1027,6 +1027,10 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     selectedAttempt: best.attempt,
     finalScore: best.score,
     finalVerdict: best.verdict,
+    // Echo the backend/model that actually produced the winning sheet, so
+    // callers (Test Lab) record the true model per result instead of a label.
+    provider: best.result.provider || null,
+    modelId: best.result.modelId || null,
     attempts,
     prompt,
     sentToGrok: best.result.sentToGrok || null,
