@@ -379,6 +379,17 @@ const MODEL_DEFAULTS = {
     ? process.env.GARMENT_HUE_NORMALIZE !== 'false'
     : true,
 
+  // Mechanical garment-colour repair (server/lib/garmentColourFix.js), the
+  // consumer of the entity check's `garmentColourMismatches` channel. Runs as
+  // Step 1b on ONLY the pages that channel names — DINO garment box -> SAM mask
+  // -> L*a*b* match toward the styled avatar, scaled by a skin-probed lighting
+  // factor. Needs the local photo_analyzer (GroundingDINO + MobileSAM); fails
+  // soft, so pages ship uncorrected if it is unavailable.
+  // Env: GARMENT_COLOUR_FIX=false to disable without a deploy.
+  garmentColourFix: process.env.GARMENT_COLOUR_FIX
+    ? process.env.GARMENT_COLOUR_FIX !== 'false'
+    : true,
+
   // Pixel-level backstop that repaints the washed-out row of a 2×4 avatar sheet
   // onto the stylised row's garment colour (server/lib/sheetRowHarmonize.js).
   // DEFAULT OFF, deliberately. The DETECTION half runs unconditionally and is

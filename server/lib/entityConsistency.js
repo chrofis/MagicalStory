@@ -810,6 +810,10 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
         report.characters[charName] = {
           byClothing: {},
           issues: [],
+          // Garment colour drift — reported separately from `issues` on purpose:
+          // it is mechanically fixable, so it must not charge severity points or
+          // trigger a redraw (decisions.md 2026-08-06).
+          garmentColourMismatches: [],
           overallConsistent: true,
           overallScore: 10,
           totalIssues: 0
@@ -1081,6 +1085,10 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           };
           delete annotated._gridCellToPage; // internal-only; don't persist
           report.characters[charName].issues.push(annotated);
+        }
+
+        for (const m of (evalResult.garmentColourMismatches || [])) {
+          report.characters[charName].garmentColourMismatches.push(m);
         }
 
         if (evalResult.score < report.characters[charName].overallScore) {

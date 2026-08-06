@@ -1206,6 +1206,71 @@ async function renderGarmentHueSummary(perFigure, pageNumber) {
   return 'data:image/jpeg;base64,' + out.toString('base64');
 }
 
+/**
+ * Mechanical garment-colour repair — the consumer of the entity check's
+ * `garmentColourMismatches` channel. DINO garment box → SAM mask → full
+ * L*a*b* match toward the styled avatar's colour, scaled by a skin-probed
+ * lighting factor. See server/lib/garmentColourFix.js.
+ *
+ * params.characterName — repair only that character (default: every figure with
+ *   a resolvable avatar, so a run shows what WOULD be touched page-wide).
+ */
+async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { fixFigureGarmentColour } = require('./garmentColourFix');
+  const { detectAllBoundingBoxes } = require('./images');
+  const { getStyledAvatarForClothing, normalizeClothingCategory } = require('./entityConsistency');
+
+  let imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  const t0 = Date.now();
+  const detection = await detectAllBoundingBoxes(imageData, {
+    expectedCharacters: buildExpectedCharacters(ctx),
+    sceneContext: (ctx.scene.sceneDescription || '').slice(0, 2000),
+    artStyle: ctx.artStyle,
+    skipCache: true,
+    pageContext: `testlab-exp${experimentId}-P${ctx.pageNumber}`,
+  });
+  if (!detection?.figures?.length) throw new Error('No figures detected on this page');
+
+  const chars = ctx.characters || [];
+  const pageClothing = ctx.scene.sceneCharacterClothing || ctx.scene.sceneMetadata?.characterClothing || {};
+  const only = params.characterName ? String(params.characterName).toLowerCase() : null;
+
+  const steps = [];
+  const perFigure = [];
+  let anyChange = false;
+  for (const fig of detection.figures) {
+    const name = fig?.name;
+    if (!name || name === 'UNKNOWN') { perFigure.push({ name: name || 'UNKNOWN', applied: false, reason: 'unnamed figure' }); continue; }
+    if (only && name.toLowerCase() !== only) continue;
+    const character = chars.find(c => (c.name || '').toLowerCase() === name.toLowerCase());
+    if (!character) { perFigure.push({ name, applied: false, reason: 'character not in story' }); continue; }
+    const cat = normalizeClothingCategory(pageClothing[character.name] || 'standard');
+    const avatarUri = await getStyledAvatarForClothing(character, ctx.artStyle, cat);
+    if (!avatarUri) { perFigure.push({ name, applied: false, reason: 'no styled avatar' }); continue; }
+
+    const res = await fixFigureGarmentColour(imageData, fig, avatarUri, { opts: params.opts || {}, collectSteps: true });
+    perFigure.push(res.report);
+    for (const s of res.steps) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, s.data, experimentId);
+      steps.push({ label: s.label, imageType: 'tl_step', versionIndex: v });
+    }
+    // Chain: each figure repairs on top of the previous one's output, so a
+    // multi-character page ends with ONE image carrying every correction.
+    if (res.changed) { imageData = res.imageData; anyChange = true; }
+  }
+
+  const correctedVersion = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, imageData, experimentId);
+  return {
+    elapsedMs: Date.now() - t0,
+    changed: anyChange,
+    correctedVersion,
+    perFigure,
+    steps: steps.length ? steps : undefined,
+  };
+}
+
 async function runGarmentHueStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
@@ -4502,6 +4567,7 @@ const STAGE_RUNNERS = {
   repair_verify: runRepairVerifyStage,
   qwen_insert: runQwenInsertStage,
   garment_hue: runGarmentHueStage,
+  garment_colour_fix: runGarmentColourFixStage,
 };
 
 // Story-level stages: target {storyId} (+ coverType for cover). No page context.

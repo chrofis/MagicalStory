@@ -7624,6 +7624,56 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }, 'entity_consistency_check', entityReport.tokenUsage.model || 'gemini-2.5-flash');
   }
 
+  // ── Step 1b — mechanical garment-colour repair ────────────────────────────
+  // The entity grid reports a garment of the right shape in the wrong colour on
+  // its own channel, carrying no severity and triggering no redraw, because the
+  // fix is deterministic: DINO garment box → SAM mask → L*a*b* match toward the
+  // styled avatar, scaled by a skin-probed lighting factor. Consume it here, on
+  // exactly the pages it names — no detection sweep, no extra model call for
+  // pages it did not flag. Guarded by MODEL_DEFAULTS.garmentColourFix.
+  if (CONFIG_DEFAULTS.garmentColourFix) {
+    const t1b = Date.now();
+    let fixedPages = 0, attempted = 0;
+    try {
+      const { fixFigureGarmentColour } = require('./garmentColourFix');
+      for (const [charName, charData] of Object.entries(entityReport?.characters || {})) {
+        for (const m of (charData.garmentColourMismatches || [])) {
+          for (const pageNumber of (m.pagesToFix || [])) {
+            const img = imagesWithData.find(i => i.pageNumber === pageNumber);
+            if (!img?.imageData) continue;
+            const fig = (img.bboxDetection?.figures || [])
+              .find(f => (f?.name || '').toLowerCase() === charName.toLowerCase());
+            if (!fig?.bodyBox) {
+              log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: no detected figure — skipped`);
+              continue;
+            }
+            const character = characters.find(c => (c.name || '').toLowerCase() === charName.toLowerCase());
+            if (!character) continue;
+            const avatarUri = await getStyledAvatarForClothing(character, artStyle, m.clothingCategory || 'standard');
+            if (!avatarUri) { log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: no styled avatar — skipped`); continue; }
+            attempted++;
+            const res = await fixFigureGarmentColour(img.imageData, fig, avatarUri, {});
+            if (res.changed) {
+              img.imageData = res.imageData;
+              fixedPages++;
+              // The bytes changed, so any detection stamped against the old
+              // bytes is stale for downstream reuse.
+              if (img.bboxDetection) img.bboxDetection.sourceImageFp = null;
+            } else {
+              log.info(`🎨 [GARMENT-COLOUR] ${charName} p${pageNumber}: no-op (${res.report?.reason || 'unknown'})`);
+            }
+          }
+        }
+      }
+      if (attempted) {
+        log.info(`🎨 [GARMENT-COLOUR] Step 1b: ${fixedPages}/${attempted} garment(s) recoloured in ${((Date.now() - t1b) / 1000).toFixed(1)}s`);
+      }
+    } catch (err) {
+      // Never let a colour repair sink the pipeline — the page ships uncorrected.
+      log.error(`❌ [GARMENT-COLOUR] Step 1b failed: ${err.message} — pages ship uncorrected`);
+    }
+  }
+
   const step1Duration = ((Date.now() - step1Start) / 1000).toFixed(1);
   const avgScore = evaluations.reduce((sum, e) => sum + (e.qualityScore || 0), 0) / Math.max(1, evaluations.length);
   log.info(`✅ [UNIFIED PIPELINE] Step 1 complete in ${step1Duration}s: avg score ${avgScore.toFixed(0)}%, entity issues: ${entityReport.totalIssues}`);
