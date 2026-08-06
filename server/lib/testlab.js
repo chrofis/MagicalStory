@@ -1012,6 +1012,7 @@ async function runCharRepairStage(ctx, opts) {
     // Lukas' = no change). Region/pose stay the target's.
     ...(params.referenceCharacter ? { promptName: refName } : {}),
     ...(params.blurStrength ? { blurStrength: params.blurStrength } : {}),
+    ...(params.r2Prompt ? { r2Prompt: params.r2Prompt } : {}),
     // Crosshatch carries a blurred head by default (body pose from the hatch,
     // identity from the avatar). params.blurFace=false A/Bs the plain hatch.
     ...(params.blurFace !== undefined ? { blurFace: params.blurFace } : {}),

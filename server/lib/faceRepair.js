@@ -789,6 +789,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
         Math.min(crop.w, Math.round(faceBbox[3] * W) - crop.x),
         Math.min(crop.h, Math.round(faceBbox[2] * H) - crop.y),
       ] : null,
+      r2Prompt: opts.r2Prompt || 'seeds',
       protectedBoxesInCrop: (Array.isArray(opts.protectedBodies) ? opts.protectedBodies : [])
         .filter(b => Array.isArray(b) && b.length === 4)
         .map(b => [
