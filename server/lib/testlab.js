@@ -2496,6 +2496,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   // description the real pipeline produced for the same page, so "good enough to
   // draw from" is a judgement about two visible artefacts rather than a guess.
   let sceneExpansions = null;
+  let sceneReview = null;
   let timeToScenesMs = null;
   if (params.expandScenes !== false) {
     const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
@@ -2552,6 +2553,46 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
         return { pageNumber: b.pageNumber, ok: false, elapsedMs: Date.now() - t, error: err.message };
       }
     }));
+    // ── Step 4: ONE review over ALL scene briefs ──────────────────────────
+    // Repetition between pages, visual arc and continuity are invisible to a
+    // per-scene reviewer — they only exist across the set — so every brief goes
+    // into a single call. Reviews whatever model wrote the scenes, so Sonnet vs
+    // DeepSeek can be compared as REVIEWER independently of who generated.
+    const okScenes = sceneExpansions.filter(x => x.ok);
+    if (params.reviewScenes !== false && okScenes.length > 0) {
+      const { buildSceneReviewPrompt, parseRefinedText } = require('./storyHelpers');
+      const srModel = params.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel;
+      if (!TEXT_MODELS[srModel]) throw new Error('Unknown model "' + srModel + '"');
+      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })));
+      if (srPrompt) {
+        const t2 = Date.now();
+        try {
+          const srRes = await callStream(srPrompt, 16000, null, srModel, { usageLabel: 'testlab_scene_review' });
+          const parsed = parseRefinedText(srRes.text || '', okScenes.map(x => x.pageNumber), 'SCENES');
+          const byPage = new Map(parsed.pages.map(x => [x.pageNumber, x.text]));
+          for (const x of sceneExpansions) {
+            const fixed = byPage.get(x.pageNumber);
+            if (fixed) { x.reviewedBrief = fixed; x.reviewRewrote = true; }
+          }
+          sceneReview = {
+            modelKey: srModel,
+            modelId: srRes.modelId,
+            provider: srRes.provider || null,
+            elapsedMs: Date.now() - t2,
+            ttftMs: srRes.ttft ?? null,
+            usage: srRes.usage,
+            cost: costOf(srRes),
+            promptChars: srPrompt.length,
+            prompt: srPrompt,
+            rawResponse: (srRes.text || '').slice(0, 40000),
+            analysis: (parsed.analysis || '').slice(0, 40000),
+            rewrotePages: parsed.pages.map(x => x.pageNumber),
+          };
+        } catch (err) {
+          sceneReview = { modelKey: srModel, ok: false, elapsedMs: Date.now() - t2, error: err.message };
+        }
+      }
+    }
     // Parallel, as production runs them — so this is wall-clock, not the sum.
     timeToScenesMs = timeToLockMs + (Date.now() - expStart);
   }
@@ -2559,6 +2600,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   return {
     stageKind: 'beats_scenes',
     sceneExpansions,
+    sceneReview,
     timeToScenesMs,
     storyId: target.storyId,
     title: storyData.title || null,

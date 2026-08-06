@@ -5660,7 +5660,7 @@ function buildTextRefinePrompt(inputData, pages = []) {
  * Tolerates the model echoing the ---STORY TEXT--- marker or omitting it.
  * @returns {{pages: Array<{pageNumber:number,text:string}>, missing: number[]}}
  */
-function parseRefinedText(raw, expectedPages = []) {
+function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT') {
   const full = String(raw || '');
   const marker = full.match(/---\s*STORY TEXT\s*---/i);
   const body = marker ? full.slice(marker.index + marker[0].length) : full;
@@ -5809,6 +5809,25 @@ function parseBeats(raw, expectedPages = []) {
 
   const got = new Set(pages.map(p => p.pageNumber));
   return { pages, missing: expectedPages.filter(n => !got.has(n)), analysis };
+}
+
+/**
+ * ONE review over ALL scene briefs. Repetition between pages, visual arc and
+ * continuity are invisible to a per-scene reviewer, so the whole set goes in a
+ * single call.
+ */
+function buildSceneReviewPrompt(inputData, scenes = []) {
+  const template = PROMPT_TEMPLATES.sceneReview;
+  if (!template) {
+    log.error('[PROMPT] sceneReview template not loaded — scene review unavailable');
+    return null;
+  }
+  const all = scenes.map(s => ['## Page ' + s.pageNumber, s.brief].join(String.fromCharCode(10))).join(String.fromCharCode(10, 10));
+  return fillTemplate(template, {
+    ...buildStoryContextFields(inputData),
+    PAGE_COUNT: scenes.length,
+    ALL_SCENES: all,
+  });
 }
 
 /**
@@ -6843,6 +6862,7 @@ module.exports = {
   parseRefinedText,
   buildBeatsPrompt,
   buildBeatsReviewPrompt,
+  buildSceneReviewPrompt,
   parseBeats,
   buildTrialStoryPrompt,
   buildPreviousScenesContext,
