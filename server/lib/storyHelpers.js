@@ -5662,10 +5662,18 @@ function buildTextRefinePrompt(inputData, pages = []) {
  */
 function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT') {
   const full = String(raw || '');
-  const marker = full.match(/---\s*STORY TEXT\s*---/i);
+  // Built from markerName, not hardcoded: callers pass 'SCENES' for the scene
+  // review. A literal /---\s*STORY TEXT\s*---/ here silently failed to match
+  // those responses, so `marker` was null and the analysis came back empty for
+  // every model. Internal whitespace is loosened so "STORY  TEXT" still hits.
+  const markerRe = new RegExp(
+    '---\\s*' + markerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+') + '\\s*---',
+    'i'
+  );
+  const marker = full.match(markerRe);
   const body = marker ? full.slice(marker.index + marker[0].length) : full;
 
-  // Everything before the STORY TEXT marker is the analysis — the findings that
+  // Everything before the body marker is the analysis — the findings that
   // justify each rewrite. Returned so the Lab can show WHY a page changed, not
   // just that it did. The ---ANALYSIS--- header itself is stripped if present.
   const analysis = marker

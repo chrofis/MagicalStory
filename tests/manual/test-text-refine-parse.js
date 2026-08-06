@@ -61,5 +61,24 @@ console.log('\ntolerance');
     parseRefinedText('---STORY TEXT---\n## Seite 3\nHallo.', [3]).pages[0].pageNumber, 3);
 }
 
+console.log('\ncustom marker name (scene review uses ---SCENES---)');
+{
+  // Regression: the marker regex was hardcoded to STORY TEXT and ignored
+  // markerName, so every ---SCENES--- response parsed with a null marker and
+  // returned an empty analysis regardless of which model produced it.
+  const raw = '---ANALYSIS---\n1. Repetition - pages 2 and 3 look alike.\n\n---SCENES---\n## Page 2\nA wider shot.';
+  const r = parseRefinedText(raw, [1, 2, 3], 'SCENES');
+  check('analysis is captured', r.analysis, '1. Repetition - pages 2 and 3 look alike.');
+  check('only the rewritten page returns', r.pages.map(p => p.pageNumber), [2]);
+  check('analysis does not leak into page text', r.pages[0].text, 'A wider shot.');
+  check('unrewritten pages reported missing', r.missing, [1, 3]);
+  check('NONE with custom marker yields no pages',
+    parseRefinedText('---ANALYSIS---\nAll good.\n---SCENES---\nNONE', [1], 'SCENES').pages, []);
+  check('analysis still captured when nothing was rewritten',
+    parseRefinedText('---ANALYSIS---\nAll good.\n---SCENES---\nNONE', [1], 'SCENES').analysis, 'All good.');
+  check('default marker still works', parseRefinedText(
+    '---ANALYSIS---\nFine.\n---STORY TEXT---\n## Page 1\nHi.', [1]).analysis, 'Fine.');
+}
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exitCode = fail ? 1 : 0;
