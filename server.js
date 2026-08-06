@@ -5269,6 +5269,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // text in place (startBackgroundRefine swallows and logs).
     const refineEnabled = process.env.TEXT_REFINE !== 'false';
     let textRefinePromise = null;
+    // Per-page before/after, filled at the join so dev mode can show WHAT the
+    // refiner changed rather than only that it ran.
+    let textRefineReport = null;
     if (refineEnabled) {
       const { extractRefinablePages, startBackgroundRefine } = require('./server/lib/textRefine');
       const refinablePages = extractRefinablePages(expandedScenes);
@@ -6788,6 +6791,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (textRefinePromise) {
       const refined = await textRefinePromise;
       if (refined?.changed?.length) {
+        // Capture the pre-refine prose BEFORE the overwrite below — it is the
+        // only moment both versions exist. Without it the refiner's work is
+        // invisible: the story ships the rewritten text with no record of what
+        // changed, and 10 of 14 pages were rewritten on the first real run.
+        textRefineReport = {
+          rounds: refined.rounds.length,
+          changedPages: refined.changed,
+          durationMs: refined.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
+          model: refined.rounds[0]?.modelId || refined.rounds[0]?.modelKey || null,
+          pages: refined.pages
+            .filter(p => refined.changed.includes(p.pageNumber))
+            .map(p => ({
+              pageNumber: p.pageNumber,
+              before: expandedScenes.find(sc => sc.pageNumber === p.pageNumber)?.text || '',
+              after: p.text,
+            })),
+        };
         // BOTH arrays: allImages[].text is a COPY taken when the page was
         // prepared, so updating only the scene would leave the saved story on
         // the pre-refinement prose.
@@ -7170,6 +7190,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       clothingRequirements: clothingRequirements, // Per-character clothing requirements
       tokenUsage: JSON.parse(JSON.stringify(tokenUsage, (k, v) => v instanceof Set ? [...v] : v)), // Token usage (Sets to Arrays)
       generationLog: genLog.getEntries(), // Generation log for dev mode
+      textRefineReport, // per-page before/after from the parallel refine pass
       finalChecksReport: finalChecksReport || null, // Final consistency checks report (dev mode)
       analytics: {
         // Cost

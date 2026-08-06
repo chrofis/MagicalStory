@@ -3,6 +3,7 @@ import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Sav
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { DiagnosticImage } from '@/components/common';
+import { wordDiff, diffStats } from '@/utils/wordDiff';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
@@ -150,6 +151,8 @@ interface StoryDisplayProps {
   /** Split outline review metadata (Sonnet writes, Opus reviews) — null when
       the review didn't run (trial, disabled, or reviewer failed). */
   outlineReview?: { model?: string; modelId?: string; durationMs?: number; fixCount?: number; reviewChars?: number; hintCount?: number; reviewedAt?: string } | null;
+  /** Per-page before/after from the parallel text-refine pass (dev mode). */
+  textRefineReport?: { rounds?: number; changedPages?: number[]; durationMs?: number; model?: string | null; pages?: { pageNumber: number; before: string; after: string }[] } | null;
   /** Per-function model/token/cost/time ledger (tokenUsage.byFunction). */
   tokenUsage?: { byFunction?: Record<string, { models?: string[]; provider?: string | null; calls?: number; input_tokens?: number; output_tokens?: number; thinking_tokens?: number; direct_cost?: number; elapsed_ms?: number }> } | null;
   storyTextPrompts?: StoryTextPrompt[];
@@ -318,6 +321,7 @@ export function StoryDisplay({
   outlineUsage,
   outlineReview,
   tokenUsage,
+  textRefineReport,
   storyTextPrompts = [],
   visualBible,
   sceneImages,
@@ -2408,6 +2412,60 @@ export function StoryDisplay({
               APPENDED at the bottom of the outline blob, so without this
               dedicated panel it's practically invisible. Extract it here:
               the reviewer's ---ANALYSIS--- is the LAST one, after the stub. */}
+          {/* Text refine diff — WHAT the reviewer changed, not just that it ran.
+              Word-level so a one-word swap doesn't read as a rewritten page. */}
+          {(() => {
+            const rep = textRefineReport;
+            const pages = rep?.pages || [];
+            if (!pages.length) return null;
+            return (
+              <details className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4" open>
+                <summary className="cursor-pointer text-lg font-bold text-amber-800 hover:text-amber-900 flex items-center gap-2 flex-wrap">
+                  <FileText size={20} />
+                  {language === 'de' ? 'Text-Überarbeitung (Diff)' : language === 'fr' ? 'Révision du texte (diff)' : 'Text refine (diff)'}
+                  <span className="text-xs font-normal text-amber-600">
+                    [{pages.length} {language === 'de' ? 'Seiten geändert' : 'pages changed'}
+                    {rep?.model && ` · ${rep.model}`}
+                    {rep?.rounds != null && ` · ${rep.rounds} ${language === 'de' ? 'Runden' : 'rounds'}`}
+                    {rep?.durationMs != null && ` · ${(rep.durationMs / 1000).toFixed(0)}s`}]
+                  </span>
+                </summary>
+                <div className="mt-3 space-y-3">
+                  {pages.map(pg => {
+                    const ops = wordDiff(pg.before, pg.after);
+                    const { added, removed } = diffStats(ops);
+                    return (
+                      <div key={pg.pageNumber} className="bg-white border border-amber-200 rounded-lg p-3">
+                        <div className="text-xs font-bold text-amber-800 mb-1">
+                          {language === 'de' ? 'Seite' : 'Page'} {pg.pageNumber}
+                          <span className="font-normal text-gray-500">
+                            {' '}· <span className="text-green-700">+{added}</span>{' '}
+                            <span className="text-red-700">−{removed}</span>{' '}
+                            {language === 'de' ? 'Wörter' : 'words'}
+                          </span>
+                        </div>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                          {ops.map((op, i) => (
+                            <span
+                              key={i}
+                              className={
+                                op.type === 'add' ? 'bg-green-100 text-green-900'
+                                  : op.type === 'del' ? 'bg-red-100 text-red-900 line-through'
+                                    : 'text-gray-700'
+                              }
+                            >
+                              {op.text}
+                            </span>
+                          ))}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            );
+          })()}
+
           {/* Models used — one row per pipeline function, from the usage ledger
               the text chokepoint already writes. Answers "which model ran this
               stage, for how long, at what cost" without opening the DB. */}
