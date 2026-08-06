@@ -26,7 +26,7 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 
 const PLATE_PROMPT = (styleTxt) => `The image is a book title on a plain white background. Repaint the LETTERING so it looks hand-painted in the medium of the reference artwork: visible brush and paper texture inside every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours. You may change the lettering colour to one that suits the artwork.
-Keep the same words, letters, letterforms, size and positions.
+Keep the same words, letters, letterforms, size and positions. Keep EXACTLY the same number of lines and the same line breaks — do not re-wrap the title, do not move words to another line, do not resize it to fill the canvas.
 Put the lettering back on a plain white background — do not paint any scenery, do not draw the illustration, do not add a border or a frame.${styleTxt ? ` Medium of the artwork: ${styleTxt}` : ''}`;
 
 
@@ -118,14 +118,23 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     .toColourspace('b-w').raw().toBuffer();
   if (maskRaw.length !== W * H) throw new Error(`glyph mask not single-channel (${maskRaw.length} for ${W}x${H})`);
 
-  // 3. the plate: letters over WHITE on a SQUARE canvas. Square because Grok
-  //    centre-crops inputs to the requested aspect preset — a wide title strip
-  //    came back scaled and clipped at both ends.
+  // 3. the plate: letters over WHITE, padded to 16:9 — the WIDEST ratio Grok
+  //    accepts (presets: 9:16, 2:3, 3:4, 4:5, 1:1, 5:4, 4:3, 3:2, 16:9).
+  //    Title strips run ~1.9:1 to 2.3:1, so no preset is wide enough and
+  //    something must give. A SQUARE canvas was the worst choice: the strip
+  //    floats in a sea of white and the model RE-FLOWS the title to fill it —
+  //    "Das Seil fliegt, die Freundschaft bleibt" came back re-wrapped from 2
+  //    lines into 5, which the shape gate then (correctly) rejected. 16:9 is the
+  //    closest legal shape, so the lettering nearly fills the canvas and there is
+  //    little empty space to re-wrap into. Nothing is cropped: the canvas is
+  //    grown to contain the strip, never the other way round.
   const pad = Math.round(Math.min(W, H) * 0.03);
   const px0 = Math.max(0, minx - pad), py0 = Math.max(0, miny - pad);
   const pw = Math.min(W, maxx + 1 + pad) - px0, ph = Math.min(H, maxy + 1 + pad) - py0;
-  const S = Math.max(pw, ph);
-  const offX = Math.round((S - pw) / 2), offY = Math.round((S - ph) / 2);
+  const AR = 16 / 9;
+  const cw = Math.max(pw, Math.round(ph * AR));
+  const chh = Math.max(ph, Math.round(cw / AR));
+  const offX = Math.round((cw - pw) / 2), offY = Math.round((chh - ph) / 2);
 
   const glyphCrop = await sharp(maskRaw, { raw: { width: W, height: H, channels: 1 } })
     .extract({ left: px0, top: py0, width: pw, height: ph }).toColourspace('b-w').raw().toBuffer();
@@ -137,7 +146,7 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     stripRgba[m + 3] = glyphCrop[q] > 8 ? 255 : 0;
   }
   const stripPng = await sharp(stripRgba, { raw: { width: pw, height: ph, channels: 4 } }).png().toBuffer();
-  const plateBuf = await sharp({ create: { width: S, height: S, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+  const plateBuf = await sharp({ create: { width: cw, height: chh, channels: 3, background: { r: 255, g: 255, b: 255 } } })
     .composite([{ input: stripPng, left: offX, top: offY }]).jpeg({ quality: 96 }).toBuffer();
   const sceneBuf = await sharp(artBuffer).resize(1024, 1024, { fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
 
@@ -165,7 +174,7 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     result = await editWithGrok(PLATE_PROMPT(styleTxt), [
       `data:image/jpeg;base64,${plateBuf.toString('base64')}`,
       `data:image/jpeg;base64,${sceneBuf.toString('base64')}`,
-    ], { model: IMAGE_MODELS[opts.model || 'grok-imagine']?.modelId, aspectRatio: '1:1', resolution: '1k' });
+    ], { model: IMAGE_MODELS[opts.model || 'grok-imagine']?.modelId, aspectRatio: '16:9', resolution: '1k' });
   } else {
     const { loadPromptTemplates } = require('../services/prompts');
     await loadPromptTemplates();
@@ -180,12 +189,12 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   // 5. key on INKINESS (dark OR saturated), so any paper texture the model adds
   //    is dropped while every pigment pixel is kept.
   const outSq = await sharp(Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
-    .resize(S, S, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+    .resize(cw, chh, { fit: 'fill' }).removeAlpha().raw().toBuffer();
   const rgba = Buffer.alloc(pw * ph * 4);
   let letterPx = 0;
   for (let y = 0; y < ph; y++) {
     for (let x = 0; x < pw; x++) {
-      const src = ((y + offY) * S + (x + offX)) * 3, m = (y * pw + x) * 4;
+      const src = ((y + offY) * cw + (x + offX)) * 3, m = (y * pw + x) * 4;
       const r = outSq[src], g = outSq[src + 1], b = outSq[src + 2];
       const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
       const inkiness = Math.max(255 - mx, mx - mn);
