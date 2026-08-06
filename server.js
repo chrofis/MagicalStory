@@ -5963,6 +5963,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // declares a perfectly healthy job dead. Observed: a 14-page run killed at
       // 28% while the analyzer was burning 5,776 CPU-seconds of real work.
       // Touching updated_at on a timer says "alive" without faking progress.
+      // Progress tracked on COMPLETION, not on start. Every page starts at once,
+      // so the old per-start update drove the bar straight to its ceiling (28%)
+      // and then sat there for the entire pass — looking hung to the user and to
+      // the watchdog. Counting finished pages makes the bar actually move.
+      let pagesDone = 0;
+      const bumpProgress = () => {
+        pagesDone++;
+        const pct = 11 + Math.min(19, Math.floor((pagesDone / expandedScenes.length) * 19));
+        dbPool.query(
+          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND status = $4',
+          [pct, `Illustration ${pagesDone}/${expandedScenes.length} done...`, jobId, 'processing']
+        ).catch(err => log.debug(`[PROGRESS] job ${jobId}: ${err.message}`));
+      };
+
       const heartbeat = setInterval(() => {
         dbPool.query('UPDATE story_jobs SET updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND status = $2', [jobId, 'processing'])
           .catch(err => log.debug(`[HEARTBEAT] job ${jobId}: ${err.message}`));
@@ -5974,12 +5988,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       rawImages = await Promise.all(
         pageDataArray.map(pageData => genLimit(async () => {
           await checkCancellation();
-          // 11-30 = images generating (1 checkpoint per page, up to 20 pages)
-          const progressPercent = 11 + Math.min(19, Math.floor((pageData.index / expandedScenes.length) * 19));
-          await dbPool.query(
-            'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-            [progressPercent, `Generating illustration ${pageData.pageNumber}/${expandedScenes.length}...`, jobId]
-          );
 
           // Trial mode: reuse pre-generated streaming image if available
           if (inputData.trialMode && streamingTrialPageImagePromises.has(pageData.pageNumber)) {
@@ -6257,7 +6265,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               scene: pageData.scene
             };
           }
-        }))
+        }).finally(bumpProgress))
       );
       } finally {
         // Stop the liveness heartbeat whether generation succeeded or threw.
