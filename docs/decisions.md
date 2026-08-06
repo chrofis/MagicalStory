@@ -5010,7 +5010,7 @@ judging the art style against real-world plausibility.
    "take its layout, not its rendering", and the ART STYLE governs how everything is drawn.
 3. Relative style consistency is KEPT as-is; an ABSOLUTE check rides alongside it.
    `checkStoryStyleConsistency` now resolves the commissioned style from `storyData.artStyle` and
-   returns `styleMatch.dominantMatches`. When the dominant cluster is itself off-style, production
+   returns `styleMatch.verdict`. When the dominant cluster is a different MEDIUM, production
    style-repair is SKIPPED — a wrong anchor spreads the drift instead of fixing it. Outliers are
    still surfaced. Rationale: no anchor beats a wrong anchor; this does not re-litigate the
    relative design, it guards its failure mode.
@@ -5018,9 +5018,31 @@ judging the art style against real-world plausibility.
    findings, and must never be prescribed for removal (`image-prompt-compliance.txt`,
    `image-evaluation.txt`).
 
-**Status:** 🟡 shipped to staging, UNVALIDATED. Per validating-prompt-changes these are corpus
-changes and must not be judged on page 5 alone — needs a Test Lab run across ≥3 stories in
-different art styles before promoting to master.
+**Measured afterwards on a 5-book corpus** (cyber / watercolor / oil / comic / manga, style check
+re-run against stored pages). Three corrections came out of it, all applied:
+1. **The boolean was far too strict.** `dominantMatches` read false on 4 of the 5 books —
+   including two the auditor itself called "consistent" — because the model scores style fidelity
+   pedantically ("lacks the named artist's brushwork", "shading is subtly digital rather than
+   strictly flat"). Gating repair on that would have disabled style-repair for almost every story.
+   Replaced with a three-level `styleMatch.verdict` (`matches` / `drifted` / `wrong_medium`);
+   only `wrong_medium` — a wholesale medium change — blocks. Re-measured: 2 matches, 2 drifted,
+   1 wrong_medium, and that one has zero outliers so nothing is blocked in practice.
+2. **The check ran at Gemini's default temperature** — the only judgment call in the repo that
+   still did. Two identical runs over the same 14 pages returned dominant clusters of 7 and 13
+   pages (7 outliers vs 1), making both the outlier list and the style verdict a coin flip. Now
+   pinned to `EVAL_TEMPERATURE` (0), same knob the image evaluator uses; consecutive runs then
+   agreed.
+3. **The audit is NOT a reliable detector for this failure mode.** Once pinned, it clusters the
+   photoreal pages together WITH the cyberpunk ones and calls the book "consistent"/"matches" —
+   at 256px grid thumbnails, photoreal and illustrated figures are not reliably separable. An
+   earlier unpinned run had split them correctly, which was luck, not signal. So the absolute
+   check is a backstop for gross medium changes, not the fix. The fix is generation-side (1) and
+   (2) above.
+
+**Status:** 🟡 on staging. The evaluator/audit changes are measured. The two GENERATION changes —
+the plate and the reference-#1 clause, which are the actual root cause — are still UNVALIDATED:
+they only show up in freshly generated plates, so they need an `empty_scene` Test Lab run across
+≥3 art styles before master.
 
 **Touched:** `prompts/empty-scene.txt`, `prompts/image-generation.txt`,
 `prompts/image-prompt-compliance.txt`, `prompts/image-evaluation.txt`,

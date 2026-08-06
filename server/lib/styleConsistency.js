@@ -16,9 +16,11 @@
  * two correctly-stylised comic pages flagged as the outliers, and style-repair
  * repainted one of them toward the photorealism. So the relative clustering
  * stays exactly as it was, and an ABSOLUTE check rides alongside it:
- * `styleMatch.dominantMatches` says whether the dominant cluster is actually
- * the requested style. When it is false, the anchor is untrustworthy and
- * callers must not repair outliers toward it.
+ * `styleMatch.verdict` says whether the dominant cluster is actually the
+ * requested style. Only `wrong_medium` — a wholesale medium change, e.g.
+ * photographic when an illustration style was ordered — means the anchor is
+ * untrustworthy and callers must not repair outliers toward it. Fidelity
+ * nitpicks are NOT a blocker; see the note on the parsed verdict below.
  *
  * Usage: const result = await checkStoryStyleConsistency(storyData)
  */
@@ -114,7 +116,7 @@ async function buildStyleGrid(cells) {
  *   outliers: Array<{page: number, severity: 'major'|'moderate'|'minor', differences: string[]}>,
  *   reasoning: string,
  *   gridImage: string,  // base64 data URL of the grid sent to Gemini (for UI display)
- *   styleMatch: {requestedStyle: string, dominantMatches: boolean, differences: string[]}|null
+ *   styleMatch: {requestedStyle: string, verdict: 'matches'|'drifted'|'wrong_medium', differences: string[]}|null
  * }>}
  */
 async function checkStoryStyleConsistency(storyData, opts = {}) {
@@ -190,7 +192,11 @@ For each outlier, name 2-4 SPECIFIC differences (not just "different style"). Se
 - "moderate" — same family but visibly off (palette shift, line weight different, lighting tone different)
 - "minor"    — subtle inconsistency (slight color cast, small edge-style variation)
 
-${requestedStyle ? `Separately from the clustering, judge the dominant cluster against the commissioned art style above. Judge the rendering technique — is it drawn the way that style describes, or is it photographic when the style is not? Ignore whether individual scenes suit the subject matter. A majority is not evidence of correctness: if most cells drifted off the commissioned style, say so.
+${requestedStyle ? `Separately from the clustering, classify the dominant cluster's RENDERING MEDIUM against the commissioned art style above:
+- "matches" — the same medium as commissioned. Use this even when the execution is imperfect: weaker brushwork, smoother shading, less texture, a missing named-artist mannerism, or any other fidelity shortfall is still "matches".
+- "drifted" — recognisably the commissioned medium, but a defining property named in the style is largely absent.
+- "wrong_medium" — a different medium altogether. The clearest case: photographic rendering (camera-real skin, fabric and light) when the commissioned style is an illustration style or says it is not photorealistic.
+Judge only how it is DRAWN, never whether a scene suits its subject. A majority is not evidence of correctness.
 
 ` : ''}Return ONLY this JSON, no prose:
 {
@@ -200,8 +206,8 @@ ${requestedStyle ? `Separately from the clustering, judge the dominant cluster a
   "outliers": [
     { "page": <number>, "severity": "major"|"moderate"|"minor", "differences": ["...", "..."] }
   ],${requestedStyle ? `
-  "dominantMatchesRequestedStyle": true | false,
-  "requestedStyleDifferences": ["<how the dominant cluster departs from the commissioned style; empty when it matches>"],` : ''}
+  "dominantStyleVerdict": "matches" | "drifted" | "wrong_medium",
+  "requestedStyleDifferences": ["<how the dominant cluster departs from the commissioned medium; empty when it matches>"],` : ''}
   "reasoning": "<2-3 sentences explaining what unifies the dominant cluster and how the outliers diverge>"
 }
 
@@ -212,7 +218,16 @@ Verdict rule:
 - "mixed" if 60-90% in dominant cluster, or any "moderate"+ outliers
 - "fragmented" if <60% in any single cluster`;
 
-  const model = genAI.getGenerativeModel({ model: modelId });
+  // Clustering is a judgment task, and this call was the only one still on
+  // Gemini's default temperature — two identical runs over the same 14 pages
+  // returned dominant clusters of 7 and 13 pages (7 outliers vs 1), which makes
+  // both the outlier list and the style verdict unreproducible and any repair
+  // decision built on them a coin flip. Same knob the image evaluator uses.
+  const evalTemperature = process.env.EVAL_TEMPERATURE != null ? Number(process.env.EVAL_TEMPERATURE) : 0;
+  const model = genAI.getGenerativeModel({
+    model: modelId,
+    generationConfig: { temperature: evalTemperature },
+  });
   const result = await model.generateContent([
     { inlineData: { mimeType: 'image/jpeg', data: gridBuffer.toString('base64') } },
     prompt,
@@ -254,15 +269,25 @@ Verdict rule:
     styleMatch: requestedStyle
       ? {
           requestedStyle,
-          dominantMatches: parsed.dominantMatchesRequestedStyle !== false,
+          // Three levels, not a boolean. A boolean read "false" on 4 of 5
+          // sampled books — including two the auditor itself called
+          // "consistent" — because the model scores style fidelity
+          // pedantically ("lacks the named artist's brushwork", "shading is
+          // subtly digital rather than strictly flat"). Gating repair on that
+          // would have disabled style-repair for almost every story. Only a
+          // wholesale medium change blocks.
+          verdict: ['matches', 'drifted', 'wrong_medium'].includes(parsed.dominantStyleVerdict)
+            ? parsed.dominantStyleVerdict
+            : 'matches',
           differences: Array.isArray(parsed.requestedStyleDifferences) ? parsed.requestedStyleDifferences : [],
         }
       : null,
   };
 
   log.info(`🎨 [STYLE-CHECK] verdict=${out.verdict}, dominant=${out.dominantCluster.length} pages, anchor=Page ${out.anchorPage}, outliers=${out.outliers.length}`);
-  if (out.styleMatch && !out.styleMatch.dominantMatches) {
-    log.warn(`🎨 [STYLE-CHECK] the DOMINANT style does not match the commissioned art style "${storyData.artStyle}" — the book drifted as a whole: ${out.styleMatch.differences.slice(0, 3).join('; ')}`);
+  if (out.styleMatch && out.styleMatch.verdict !== 'matches') {
+    const how = out.styleMatch.verdict === 'wrong_medium' ? 'is a DIFFERENT MEDIUM from' : 'has drifted from';
+    log.warn(`🎨 [STYLE-CHECK] the dominant style ${how} the commissioned art style "${storyData.artStyle}": ${out.styleMatch.differences.slice(0, 3).join('; ')}`);
   }
   for (const o of out.outliers) {
     log.info(`🎨 [STYLE-CHECK] outlier Page ${o.page} [${o.severity}]: ${o.differences?.slice(0, 2).join('; ')}`);
