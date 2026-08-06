@@ -4820,3 +4820,28 @@ than editing it. Whether 26 is the right rejection threshold for watercolour re-
 now measurable deterministically via replay.
 
 **Touched:** `server/lib/faceRepair.js`, `server/lib/testlab.js`.
+
+---
+
+## 2026-08-05 — Round-2 SAM adopted other characters; occluder subtract now applies there too
+
+**Context:** Owner on exp #362: "something with SAM 2 is still not good … we once made SAM of
+all characters and removed the other characters. Now it gets a lot of Sarah included."
+Correct, and the asymmetry is real: the crosshatch builder subtracts every protected
+character's silhouette when building the TARGET mask, so **round 1 is clean** — but **round 2**
+is segmented straight off the model output with no such treatment, and SAM returns a
+neighbour's sleeve/shoe as part of the figure. Round 2 feeds the union, the red zone and the
+paste, so those fragments become part of the repair.
+
+**Decision:** `protectedBoxesInCrop` is threaded into `samUnionBlend`, and after round 2 is
+fetched each protected character's silhouette is segmented from the CANDIDATE and
+dest-out-subtracted from the round-2 mask — the same operation the hatch already does, with
+the same revert guard (a subtraction that removes >70% of the target is a label mismatch and
+is reverted). The cleaned mask is emitted as its own step.
+
+**Also added (owner request):** after a successful repair, a per-figure diagnostic — one SAM
+silhouette per detected character segmented from the FINAL image, labelled, with the repaired
+one marked. It is the direct way to see whether a repair damaged or absorbed a neighbour.
+Diagnostic only; never gates anything.
+
+**Touched:** `server/lib/samBlend.js`, `server/lib/faceRepair.js`, `server/lib/testlab.js`.

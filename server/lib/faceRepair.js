@@ -768,6 +768,16 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       clipRect: faceClip,
       colorCorrect,
       bodyColorMode,
+      // Other characters, in crop pixels — round 2 must not adopt their limbs.
+      protectedBoxesInCrop: (Array.isArray(opts.protectedBodies) ? opts.protectedBodies : [])
+        .filter(b => Array.isArray(b) && b.length === 4)
+        .map(b => [
+          Math.max(0, Math.round(b[1] * W) - crop.x),
+          Math.max(0, Math.round(b[0] * H) - crop.y),
+          Math.min(crop.w, Math.round(b[3] * W) - crop.x),
+          Math.min(crop.h, Math.round(b[2] * H) - crop.y),
+        ])
+        .filter(b => b[2] > b[0] + 8 && b[3] > b[1] + 8),
       // CUTOUT has no scene anchor, so the model redraws the figure a few
       // percent off (exp #345: ~40px lower, IoU 53% -> gate reject). Register
       // the candidate onto the original silhouette first; only kept if IoU

@@ -1039,6 +1039,39 @@ async function runCharRepairStage(ctx, opts) {
   await addStep('sent to model (whiteout/crosshatch)', result.blackoutImage);
   await addStep('model raw output', result.grokRawResult);
 
+  // PER-FIGURE SAM AFTER THE REPAIR. One silhouette per detected character,
+  // segmented from the FINAL image: the direct way to see whether a repair
+  // damaged a neighbour or absorbed part of them (owner request). Diagnostic
+  // only — never gates anything, and failures are silent.
+  try {
+    const sharpL = require('sharp');
+    const { fetchFigureMaskPng } = require('./images');
+    const finalBuf = Buffer.from(String(finalImage).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const meta = await sharpL(finalBuf).metadata();
+    const FW = meta.width, FH = meta.height;
+    for (const f of detFigures) {
+      const nm = (f?.name || '').trim();
+      const bb = f?.bodyBox || f?.bbox || f?.box_2d;
+      if (!nm || !Array.isArray(bb) || bb.length !== 4) continue;
+      const box = [
+        Math.max(0, Math.round(bb[1] * FW)), Math.max(0, Math.round(bb[0] * FH)),
+        Math.min(FW, Math.round(bb[3] * FW)), Math.min(FH, Math.round(bb[2] * FH)),
+      ];
+      if (box[2] - box[0] < 12 || box[3] - box[1] < 12) continue;
+      const m = await fetchFigureMaskPng(finalBuf, box, {});
+      if (!m) continue;
+      const alpha = await sharpL(m).resize(FW, FH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
+      const cut = await sharpL(finalBuf).ensureAlpha()
+        .joinChannel(alpha, { raw: { width: FW, height: FH, channels: 1 } }).png().toBuffer();
+      const onDark = await sharpL({ create: { width: FW, height: FH, channels: 3, background: { r: 26, g: 26, b: 30 } } })
+        .composite([{ input: cut }]).jpeg({ quality: 88 }).toBuffer();
+      const isTarget = nm.toLowerCase() === charName.toLowerCase();
+      await addStep(`AFTER repair — SAM of ${nm}${isTarget ? ' (repaired)' : ''}`, `data:image/jpeg;base64,${onDark.toString('base64')}`);
+    }
+  } catch (err) {
+    log.warn(`[TESTLAB] per-figure SAM diagnostic failed (${err.message}) — skipped`);
+  }
+
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, finalImage, experimentId);
   return {
     imageType: 'scene', versionIndex, characterName: charName, bbox, faceBbox: faceBbox || undefined, boxSource, backend,

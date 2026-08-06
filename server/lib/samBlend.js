@@ -433,7 +433,7 @@ async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alph
  * Returns a feathered RGBA PNG to composite at the crop position; throws
  * (with steps attached) on gate failures. Every mask is emitted as a step.
  */
-async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
+async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropBufIn, boxInCrop, cropW, cropH, oldMaskPng = null, addStep = async () => {}, failCtx = {}, clipRect = null, maskPoints = null, maskFetcher = null, colorCorrect = true, featherPx = null, erodeFeather = true, colorBorderRefine = true, bodyColorMode = false, bgBorderMatch = true, garmentOnly = true, featherMode = null, padMode = 'union', blendShape = 'padded-union', rawPaste = false, registerCandidate = false, protectedBoxesInCrop = null, iouThreshold = 0.55, whiteCardMaxFrac = 0.22, gateIou = true, gateWhiteCard = true }) {
   const sharp = require('sharp');
   let candidateCropBuf = candidateCropBufIn;
   const fail = (msg) => {
@@ -465,6 +465,49 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
     if (seeds.length) r2Opts.points = [...(r2Opts.points || []), ...seeds];
     newMask = await fetchMaskWithRetry(candidateCropBuf, padBox, 5, r2Opts);
   }
+  // ---- OCCLUDER SUBTRACT on ROUND 2 ---------------------------------------
+  // The hatch builder already removes other characters from the TARGET
+  // silhouette, so round 1 is clean — but round 2 is segmented straight off the
+  // model output with no such treatment, and SAM happily returns a neighbour's
+  // sleeve or shoe as part of the figure (owner, exp #362: Sarah's clothing in
+  // round 2). Subtract every protected character's silhouette from round 2 the
+  // same way. Guard: if a subtraction removes >70% of the target it was a label
+  // mismatch — revert it rather than delete the figure.
+  if (Array.isArray(protectedBoxesInCrop) && protectedBoxesInCrop.length && newMask) {
+    try {
+      const { fetchFigureMaskPng } = require('./images');
+      const opaque = async (buf) => { try { const st = await sharp(buf).stats(); const ch = st?.channels?.[3]; return ch ? ch.mean / 255 : null; } catch { return null; } };
+      const before = await opaque(newMask);
+      let removed = 0;
+      for (const box of protectedBoxesInCrop) {
+        if (!Array.isArray(box) || box.length !== 4) continue;
+        const [x0, y0, x1, y1] = box.map(Math.round);
+        if (x1 - x0 < 8 || y1 - y0 < 8) continue;
+        const occ = await fetchFigureMaskPng(candidateCropBuf, [x0, y0, x1, y1], {});
+        if (!occ) continue;
+        const trial = await sharp(newMask).ensureAlpha()
+          .composite([{ input: await sharp(occ).resize(cropW, cropH, { fit: 'fill' }).png().toBuffer(), blend: 'dest-out' }])
+          .png().toBuffer();
+        const after = await opaque(trial);
+        if (before != null && after != null && after < before * 0.3) {
+          log.warn(`[TESTLAB] occluder subtract on round 2 would remove ${(100 * (1 - after / before)).toFixed(0)}% of the figure — reverted (label mismatch)`);
+          continue;
+        }
+        newMask = trial;
+        removed++;
+      }
+      if (removed) {
+        const after = await opaque(newMask);
+        log.info(`[TESTLAB] round 2: subtracted ${removed} protected character silhouette(s) — mask ${(before * 100).toFixed(1)}% → ${(after * 100).toFixed(1)}% of the crop`);
+        await addStep('SAM round 2 after removing other characters', `data:image/png;base64,${(await sharp(await sharp(candidateCropBuf).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().joinChannel(
+          await sharp(newMask).resize(cropW, cropH, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer(),
+          { raw: { width: cropW, height: cropH, channels: 1 } }).png().toBuffer()).png().toBuffer()).toString('base64')}`);
+      }
+    } catch (err) {
+      log.warn(`[TESTLAB] round-2 occluder subtract failed (${err.message}) — using the raw round-2 mask`);
+    }
+  }
+
   if (!newMask) throw fail('SAM found no figure in the model output inside the target box — the model likely painted the figure elsewhere or not at all. See the raw output step; Redo.');
 
   const raw1 = { raw: { width: cropW, height: cropH, channels: 1 } };
