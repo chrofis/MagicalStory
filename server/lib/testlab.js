@@ -1680,6 +1680,69 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
 
   const artOutRaw = await sharp(artBytes).resize(outW, outH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
 
+  // ── SAM DETECTION (params.detect='sam', default) ──────────────────────────
+  // The title is opaque display type sitting ON the artwork, so a region mask
+  // is all we need — box-prompted MobileSAM per text LINE, on the model's own
+  // output, so the mask follows the letters where they actually are (drift and
+  // painted overshoot included) instead of where we drew them.
+  // Boxes and positive points come from the drawn glyphs: we know which rows
+  // carry a line and which pixels are certainly inside a stroke.
+  const detect = params.detect || 'sam';
+  let samMaskRaw = null;
+  if (detect === 'sam') {
+    const { fetchFigureMaskPng } = require('./images');
+    // group ink rows into lines
+    const rowHas = new Array(outH).fill(false);
+    for (let y = 0; y < outH; y++) {
+      for (let x = 0; x < outW; x++) if (drawnMaskRaw[y * outW + x] > 8) { rowHas[y] = true; break; }
+    }
+    const lines = [];
+    for (let y = 0; y < outH; y++) {
+      if (!rowHas[y]) continue;
+      const y0 = y; while (y + 1 < outH && rowHas[y + 1]) y++;
+      lines.push([y0, y]);
+    }
+    samMaskRaw = Buffer.alloc(outW * outH);
+    const outJpeg = await sharp(paintedRaw, { raw: { width: outW, height: outH, channels: 3 } })
+      .jpeg({ quality: 95 }).toBuffer();
+    for (const [ly0, ly1] of lines) {
+      let lx0 = outW, lx1 = 0;
+      const pts = [];
+      for (let y = ly0; y <= ly1; y++) {
+        for (let x = 0; x < outW; x++) {
+          if (drawnMaskRaw[y * outW + x] > 8) { if (x < lx0) lx0 = x; if (x > lx1) lx1 = x; }
+        }
+      }
+      if (lx1 <= lx0) continue;
+      // positive points: a few certainly-inside-a-stroke pixels across the line
+      for (let k = 1; k <= 5; k++) {
+        const tx = Math.round(lx0 + (lx1 - lx0) * k / 6);
+        let best = -1;
+        for (let y = ly0; y <= ly1; y++) if (drawnMaskRaw[y * outW + tx] > 200) { best = y; break; }
+        if (best >= 0) pts.push([tx, best + Math.round((ly1 - ly0) * 0.15)]);
+      }
+      const pad = Math.round((ly1 - ly0) * 0.35);
+      const cx0 = Math.max(0, lx0 - pad), cy0 = Math.max(0, ly0 - pad);
+      const cw = Math.min(outW, lx1 + pad) - cx0, ch = Math.min(outH, ly1 + pad) - cy0;
+      const lineCrop = await sharp(outJpeg).extract({ left: cx0, top: cy0, width: cw, height: ch })
+        .jpeg({ quality: 95 }).toBuffer();
+      const boxInCrop = [lx0 - cx0, ly0 - cy0, lx1 - cx0, ly1 - cy0];
+      const png = await fetchFigureMaskPng(lineCrop, boxInCrop, {
+        points: pts.map(([px, py]) => [px - cx0, py - cy0]),
+        requireMobilesam: true,
+      });
+      if (!png) continue;
+      const m = await sharp(png).resize(cw, ch, { fit: 'fill' }).toColourspace('b-w').raw().toBuffer();
+      for (let y = 0; y < ch; y++) {
+        for (let x = 0; x < cw; x++) {
+          if (m[y * cw + x] > 128) samMaskRaw[(cy0 + y) * outW + (cx0 + x)] = 255;
+        }
+      }
+    }
+    await addStep(`SAM letter mask (${lines.length} text line(s), box+points prompted on the model output)`,
+      `data:image/png;base64,${(await sharp(samMaskRaw, { raw: { width: outW, height: outH, channels: 1 } }).png().toBuffer()).toString('base64')}`);
+  }
+
   // ── PAINT-LAYER EXTRACTION ────────────────────────────────────────────────
   // Copying pixels is wrong in principle: every pixel at a stroke edge is a MIX
   // of pigment and background, and the model's background has the trees shifted
@@ -1769,7 +1832,17 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
     if (!anchored[p]) { alphaBuf[p] = 0; } else if (alphaBuf[p] > 0) keptN++;
   }
   foundN = keptN;
-  const foundMaskSmooth = alphaBuf;              // real alpha now, not a binary mask
+  // SAM wins when it produced a mask: it followed the letters in the model's own
+  // output. The solved-alpha path stays as the fallback / comparison detector.
+  let foundMaskSmooth = alphaBuf;
+  if (detect === 'sam' && samMaskRaw) {
+    foundMaskSmooth = await sharp(samMaskRaw, { raw: { width: outW, height: outH, channels: 1 } })
+      .blur(0.8).toColourspace('b-w').raw().toBuffer();
+    foundN = 0; overlapN = 0;
+    for (let p2 = 0; p2 < outW * outH; p2++) {
+      if (foundMaskSmooth[p2] > 8) { foundN++; if (drawnMaskRaw[p2] > 8) overlapN++; }
+    }
+  }
 
   // LETTER GATE — replaces pixel-equality, which punished the backend with the
   // BEST lettering (Grok shifts global tone: #323 failed 3/4 with perfect
@@ -1786,7 +1859,8 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
 
   // The composited layer is PIGMENT (fgBuf) with the solved alpha — NOT model
   // pixels. Its partial-alpha edges therefore blend with our own background.
-  const paintedRgba = await sharp(fgBuf, { raw: { width: outW, height: outH, channels: 3 } })
+  const layerSource = (detect === 'sam' && samMaskRaw) ? paintedRaw : fgBuf;
+  const paintedRgba = await sharp(layerSource, { raw: { width: outW, height: outH, channels: 3 } })
     .joinChannel(foundMaskSmooth, { raw: { width: outW, height: outH, channels: 1 } })
     .png().toBuffer();
   await addStep(`solved alpha (${foundN} px, ${Math.round(coverage * 100)}% of the drawn glyphs)`,
@@ -1845,6 +1919,7 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
       recolor,
       backend,
       mode,
+      detect,
       searchPx,
       refsSent: refs.length,
       deterministicColour: spec?.face || null,
