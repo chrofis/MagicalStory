@@ -65,6 +65,10 @@ const DEFAULTS = {
   // Gaussian falloff (deg) for the soft per-pixel selection weight inside the
   // window — a smooth edge, like correctColorShift's colour-weighted blend.
   sigmaDeg: numEnv('GARMENT_HUE_SIGMA_DEG', 22),
+  // A candidate avatar target must carry at least this share of the strongest
+  // cluster's chroma-weighted evidence. Keeps hair/trim/incidental patches from
+  // being chosen as "the garment"; a real second garment easily clears it.
+  minTargetWeightFrac: numEnv('GARMENT_HUE_MIN_TARGET_WEIGHT_FRAC', 0.2),
   // Confidence floors: too few pixels → estimate is noise → skip.
   minGarmentPixels: 40,
   minPagePixels: 400,
@@ -230,8 +234,18 @@ function decideHueCorrection(garment, avatarIn, opts = {}) {
   const avatarList = Array.isArray(avatarIn) ? avatarIn.filter(Boolean) : (avatarIn ? [avatarIn] : []);
   if (!avatarList.length) return { applied: false, reason: 'no avatar sample', driftDeg: 0, rotationDeg: 0, garmentHueDeg: +(garment.hueRad * DEG).toFixed(1), avatarHueDeg: null };
   const garmentHueDeg = +(garment.hueRad * DEG).toFixed(1);
-  // Only avatar clusters with a usable hue can be a target.
-  const usable = avatarList.filter(c => c.chroma >= cfg.chromaMin);
+  // A target must (a) have a usable hue and (b) be a MAJOR colour on the sheet.
+  // Cropping the avatar to its torso band removes most hair, but long hair falls
+  // over the torso and still yields a small cluster — and nearest-cluster
+  // matching will happily choose it. On a red-haired character that let an
+  // ORANGE shirt match her hair (18.7 chroma, ~11% of the sheet's garment
+  // evidence) at 3.8 deg and be blessed, while the real YELLOW shirt sat 67 deg
+  // away. Requiring a target to carry a real share of the evidence keeps minor
+  // patches out of the running while leaving genuine second garments (a top AND
+  // trousers) eligible.
+  const maxWeight = avatarList.reduce((m, c) => Math.max(m, c.weight || 0), 0);
+  const usable = avatarList.filter(c =>
+    c.chroma >= cfg.chromaMin && (!maxWeight || (c.weight || 0) >= cfg.minTargetWeightFrac * maxWeight));
   if (garment.chroma < cfg.chromaMin || !usable.length) {
     const best = avatarList.reduce((m, c) => (c.chroma > m.chroma ? c : m), avatarList[0]);
     return { applied: false, reason: `low chroma (garment ${garment.chroma.toFixed(1)}, avatar ${best.chroma.toFixed(1)}; min ${cfg.chromaMin})`, driftDeg: 0, rotationDeg: 0, garmentHueDeg, avatarHueDeg: +(best.hueRad * DEG).toFixed(1) };
@@ -432,6 +446,32 @@ function torsoBoxFromBody(box) {
   return [ymin + 0.20 * h, xmin + 0.18 * w, ymin + 0.58 * h, xmax - 0.18 * w];
 }
 
+/**
+ * The torso band of a 2×4 styled avatar sheet: the region of the BODY row that
+ * shows the primary garment and nothing else. Everything above it is head cells
+ * (hair — which `isGarmentPixel` does not reject) and everything below is legs.
+ *
+ * The row divider is found with the SAME production detector the sheet splitter
+ * uses (grok.detectMinVarianceSeparator): the divider is a thin near-uniform
+ * line, so it is the minimum-variance row in the middle half. The head and body
+ * rows are NOT equal height, so the divider is not at H/2 and must be detected.
+ * Falls back to proportional bands if detection fails — never throws.
+ */
+async function avatarTorsoBand(buf, width, height) {
+  const BODY_TOP = 0.22, BODY_BOTTOM = 0.60; // fractions WITHIN the body row
+  let splitY = Math.round(height * 0.5);
+  try {
+    const { detectMinVarianceSeparator } = require('./grok');
+    const { data, info } = await sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true });
+    const y = detectMinVarianceSeparator(data, info.width, info.height, 'h', 0.25, 0.75);
+    if (Number.isFinite(y) && y > 0 && y < height) splitY = Math.round(y * (height / info.height));
+  } catch { /* proportional fallback */ }
+  const bodyH = height - splitY;
+  const top = Math.max(0, Math.min(height - 2, splitY + Math.round(bodyH * BODY_TOP)));
+  const h = Math.max(1, Math.min(height - top, Math.round(bodyH * (BODY_BOTTOM - BODY_TOP))));
+  return { left: 0, top, width, height: h };
+}
+
 /** A rectangle bodyBox [ymin,xmin,ymax,xmax] (0..1) → 0/255 mask at (w,h). */
 function bboxToBin(box, width, height) {
   const n = width * height;
@@ -513,15 +553,25 @@ async function normalizeGarmentHue(pageImageData, bboxDetection, resolveAvatar, 
     }
     if (!pageMask) { perFigure.push({ name, applied: false, reason: 'no mask' }); continue; }
 
-    // Avatar raw. No avatar figure mask available → whole-image sampler; the
-    // skin/grey rejection inside the sampler keeps the garment dominant.
+    // Avatar raw, cropped to the styled sheet's TORSO BAND.
+    //
+    // This crop is not an optimisation, it is a correctness fix. `isGarmentPixel`
+    // rejects skin and grey but NOT hair, and a 2×4 sheet is mostly head cells —
+    // so on a red-haired character the sheet yields a strong red-orange cluster
+    // that is her HAIR. Sampling the whole sheet then offers that cluster as a
+    // legitimate target, and nearest-cluster matching happily picks it: an
+    // ORANGE shirt on the page landed 3.8° from the hair cluster and was blessed
+    // as "below threshold", while the real target — her YELLOW shirt at 106.3° —
+    // sat 70° away and would have been deferred as a garment-type error.
+    // Cropping to the torso of the body row makes hair unreachable as a target.
     let avatarRaw, avatarN;
     try {
       const abuf = await bytes(avatarUri);
       const am = await sharp(abuf).metadata();
-      const aw = Math.min(am.width || 384, 384);
-      const ah = Math.round((am.height || 512) * (aw / (am.width || 384)));
-      avatarRaw = await toRawAt(abuf, aw, ah);
+      const band = await avatarTorsoBand(abuf, am.width, am.height);
+      const aw = Math.min(band.width || 384, 384);
+      const ah = Math.max(1, Math.round(band.height * (aw / band.width)));
+      avatarRaw = await toRawAt(await sharp(abuf).extract(band).png().toBuffer(), aw, ah);
       avatarN = aw * ah;
     } catch (e) {
       perFigure.push({ name, applied: false, reason: `avatar decode failed: ${e.message}` });
@@ -731,4 +781,5 @@ module.exports = {
   applyHueRotation,
   isGarmentPixel,
   DEFAULTS,
+  _internal: { avatarTorsoBand },
 };
