@@ -5683,3 +5683,53 @@ absent character's outfit from being offered to the vision model as something to
 hoodie now resolve to "sky-blue short-sleeved polo shirt … olive green cotton shorts" for Noah and
 "mid-grey short-sleeved linen shirt … dark navy chino shorts" for Daniel. End-to-end Lab `iterate`
 run on p10 still pending.
+
+---
+
+## 2026-08-07 — E1/E2: temperature is NOT the noise source; the model is NOT why the consensus rule failed
+
+Two experiments run in the Lab on `job_1786053708336_8cdsca519`. Both returned negative results
+that overturned a working assumption, which is why they were worth the ~10 minutes.
+
+**E1 — pinning temperature did NOT make the judges deterministic.** Experiments #403/#404: same six
+pages, same prompts, temperature pinned to 0 across compliance, semantic, the consolidator and all
+four sceneValidator judges. Result: **0 of 6 pages produced an identical issue set.** p1 4→7 issues,
+p2 3→1 (final 70→95), p3 2→3 (60→30), p14 5→3.
+
+One cause found and fixed: the three-stage **stage-1 vision inventory** — the blind free-text image
+description every compliance finding is derived from — was still at `temperature: 0.3`. If that
+description varies, findings vary regardless of how deterministic the judges are. Now pinned.
+Remaining suspects, untested: OpenRouter routes to different providers per call
+(`fastProviderOrder`), and Gemini is not bit-deterministic at temperature 0 either. **Do not assume
+determinism is achievable here** — the practical answer is to compare over repeats, not to trust a
+single run. The pin is still worth keeping (it removes one of several sources) but it did not buy
+what was expected.
+
+**E2 — the consolidator model is not why the 08-06 consensus rule was ignored.** Experiments
+#405/#407/#408/#409: identical stored eval as input (the consolidate stage replays it, so upstream
+noise is excluded), shipped rules unchanged, only the model varied.
+
+| model | issues | crit | major | mod | minor | single-source above MODERATE |
+|---|---|---|---|---|---|---|
+| qwen-plus (current default) | 20 | 7 | 10 | 2 | 1 | 6 |
+| qwen3-max | 20 | 8 | 7 | 2 | 3 | 4 |
+| claude-sonnet | 20 | 8 | 7 | 2 | 3 | 4 |
+| gemini-2.5-flash | 0 | — | — | — | — | 0 (**errored — returns an empty plan on every page**) |
+
+Claude Sonnet finds the same 20 issues, MORE criticals, and still leaves 4 single-source findings
+above MODERATE. The hypothesis "a mid-tier model drops the conditional instruction" is **disproved**;
+upgrading the model buys nothing here. Note also that `gemini-2.5-flash` fails as a consolidator and
+would silently zero every deduction — never configure it for this call.
+
+**Decision: enforce the consensus cap in code.** `capSingleSourceSeverity()` in
+`feedbackConsolidator.js` caps any issue with exactly one entry in `sources[]` at MODERATE, applied
+where `deduped_issues` is parsed. The prompt rule STAYS — a consolidator that applies it itself
+writes better fix instructions than one whose output is silently rewritten — but the code is now the
+backstop that makes the policy hold. `severityAsked` is retained on every issue so the gap between
+what the model wanted and what was applied stays auditable.
+
+**Modelled on stored data:** cyber story page-best mean **63.6 → 73.6**; the earlier story **49.7 →
+68.7**, its single 0-scoring page rising to 33. No page loses points — the cap can only lower a
+deduction.
+
+**Touched:** `server/lib/feedbackConsolidator.js`, `server/lib/images.js` (stage-1 vision pin).

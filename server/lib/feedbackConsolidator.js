@@ -174,6 +174,34 @@ function flattenEntityIssues(entityReport) {
  * @param {Array} [args.characters] - story characters [{ name, physicalDescription }]
  * @returns {Promise<{plan: object|null, usage: object|null, error: string|null}>}
  */
+/**
+ * Consensus cap. A defect flagged by exactly ONE evaluator cannot exceed
+ * MODERATE; two or more evaluators keep whatever severity the consolidator
+ * assigned.
+ *
+ * This is enforced in code, not asked for in the prompt, because asking did not
+ * work. The rule shipped in feedback-consolidator.txt on 2026-08-06 and a story
+ * generated with it live still had 46 of 60 single-source issues above MODERATE
+ * — the same 78% as before the change. Test Lab experiments #405/#407/#408 then
+ * ruled out the model as the cause: on identical stored input, qwen-plus left 6
+ * such issues, and qwen3-max and claude-sonnet each left 4. A top-tier model
+ * obeys it no better than a mid-tier one, so it is not a prompting problem.
+ *
+ * The prompt keeps the rule anyway — a consolidator that applies it itself
+ * produces better fix instructions than one whose output we silently rewrite.
+ * This is the backstop that makes the policy actually hold.
+ *
+ * `severityAsked` is retained on every issue so the gap stays auditable.
+ */
+const SEVERITY_ORDER = ['MINOR', 'MODERATE', 'MAJOR', 'CRITICAL', 'CATASTROPHIC'];
+function capSingleSourceSeverity(severity, sources) {
+  const sev = String(severity || 'MODERATE').toUpperCase();
+  if (!Array.isArray(sources) || sources.length !== 1) return sev;
+  const i = SEVERITY_ORDER.indexOf(sev);
+  const cap = SEVERITY_ORDER.indexOf('MODERATE');
+  return i > cap ? 'MODERATE' : sev;
+}
+
 async function consolidateFeedback({
   sceneDescription,
   evaluation = {},
@@ -344,11 +372,16 @@ async function consolidateFeedback({
     } else {
       plan.deduped_issues = plan.deduped_issues
         .filter(i => i && typeof i === 'object' && (i.description || i.problem || i.issue))
-        .map(i => ({
-          description: String(i.description || i.problem || i.issue || '').trim(),
-          severity: String(i.severity || 'MODERATE').toUpperCase(),
-          sources: Array.isArray(i.sources) ? i.sources.filter(s => typeof s === 'string') : [],
-        }));
+        .map(i => {
+          const sources = Array.isArray(i.sources) ? i.sources.filter(s => typeof s === 'string') : [];
+          const asked = String(i.severity || 'MODERATE').toUpperCase();
+          return {
+            description: String(i.description || i.problem || i.issue || '').trim(),
+            severity: capSingleSourceSeverity(asked, sources),
+            severityAsked: asked,
+            sources,
+          };
+        });
     }
 
     // Enforce the 3-fix cap even if the consolidator slipped past the prompt.
@@ -583,6 +616,7 @@ async function consolidateEvaluation({
 
 module.exports = {
   consolidateFeedback,
+  capSingleSourceSeverity, // exported for testing
   consolidateEvaluation,
   buildFeedbackInput, // exported for testing
   flattenEntityIssues, // exported for testing
