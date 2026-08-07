@@ -1060,7 +1060,10 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts }],
-            generationConfig: { maxOutputTokens: 4096, temperature: 0.3 },
+            // Stage 1 is the blind image description every downstream compliance
+            // finding is derived from — if it varies, the findings vary no matter
+            // how deterministic the judges are. Pinned with the rest of them.
+            generationConfig: { maxOutputTokens: 4096, temperature: EVAL_TEMPERATURE },
             safetySettings: GEMINI_SAFETY_SETTINGS
           }),
           // No timeout here froze jobs mid-eval (stuck-at-51% incident,
@@ -9748,6 +9751,15 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     const matched = characters.filter(c => names.includes(String(c.name || '').trim().toLowerCase()));
     return matched.length > 0 ? matched : characters;
   })();
+  // buildSceneClothingRequirements stamps 'standard' for a cast member with no
+  // per-page entry — the same guess by another door. Refuse it here instead:
+  // if the page cannot say what someone is wearing, the analysis does not run.
+  const undressed = analysisCharacters
+    .map(c => c.name)
+    .filter(n => !Object.entries(pageCharClothing || {}).some(([k]) => k.trim().toLowerCase() === String(n).trim().toLowerCase()));
+  if (undressed.length > 0) {
+    throw new Error(`[ITERATE] Page ${pageNumber}: no per-page clothing category for ${undressed.join(', ')} — refusing to default to 'standard' (it resolves to the character's stored wardrobe from another story).`);
+  }
   const analysisClothingRequirements = buildSceneClothingRequirements(
     analysisCharacters, pageCharClothing, clothingRequirements
   );
@@ -9798,8 +9810,14 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
   }
 
-  // Get expected clothing for this page
-  const expectedClothing = pageClothingData?.pageClothing?.[pageNumber] || pageClothingData?.primaryClothing || 'standard';
+  // Get expected clothing for this page. NO DEFAULT (owner, 2026-08-07): this
+  // value becomes the rewrite prompt's "This page's clothing" line, so a
+  // guessed 'standard' actively instructs the rewriter to dress the page in a
+  // category the story may not use.
+  const expectedClothing = pageClothingData?.pageClothing?.[pageNumber] || pageClothingData?.primaryClothing;
+  if (!expectedClothing) {
+    throw new Error(`[ITERATE] Page ${pageNumber}: no per-page clothing and no primaryClothing on the story. Refusing to tell the rewriter 'standard'.`);
+  }
 
   // Build available avatars
   const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
@@ -10047,7 +10065,15 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       clothingCategory = (firstClothing && firstClothing.startsWith('costumed:')) ? firstClothing : (firstClothing || 'standard');
       log.debug(`🔄 [ITERATE] Using per-character clothing from pageClothing: ${JSON.stringify(pageClothingEntry)}`);
     } else {
-      clothingCategory = parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+      // NO DEFAULT CLOTHING (owner, 2026-08-07). Reaching here means the page
+      // has no stored clothing, the rewrite named none, and the story has no
+      // primary category — there is nothing to dress this page from except a
+      // guess, and a guessed category resolves to the character-level avatars
+      // wardrobe, i.e. an outfit from an unrelated story.
+      clothingCategory = parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing;
+      if (!clothingCategory) {
+        throw new Error(`[ITERATE] Page ${pageNumber}: no clothing category from pageClothing, the rewrite, or the story's primaryClothing. Refusing to fall back to 'standard'.`);
+      }
     }
   }
 

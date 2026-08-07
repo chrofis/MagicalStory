@@ -5658,10 +5658,19 @@ flagged the hoodie as a *major* inconsistency (see the sibling entry on entity-p
 
 **Decision:** `iteratePageCore` builds the per-page view with `buildSceneClothingRequirements(cast,
 perCharClothing, clothingRequirements)` and passes THAT, plus only the page's own cast, to
-`analyzeGeneratedImage`. `formatCharacterContext` now logs a loud error when `_currentClothing` is
-missing instead of silently defaulting to `'standard'`.
+`analyzeGeneratedImage`. **A default clothing category is forbidden in this path (owner, 2026-08-07)
+— it throws.** Four doors were closed: `formatCharacterContext` throws when `_currentClothing` is
+missing and when the resolved category has no description (no `'unknown clothing'` placeholder
+either); `iteratePageCore` throws when the page cast has no per-page category (which
+`buildSceneClothingRequirements` would otherwise stamp `'standard'`), when `expectedClothing` has no
+source, and when the post-rewrite `clothingCategory` has none.
 
-**Rationale:** `buildSceneClothingRequirements` is the existing single source of truth for "what is
+**Rationale:** a guessed category is not a safe default — it is the *mechanism* of the bug. A
+category the story doesn't use has no description, so `buildClothingDescription` falls through to
+the character-level `avatars.clothing`, i.e. an outfit from an unrelated story, and that text is
+then stated as fact to the vision model. Failing the iterate loudly costs one repair attempt;
+guessing ships a wrong outfit and then charges the entity penalty to whichever version survives.
+`buildSceneClothingRequirements` is the existing single source of truth for "what is
 each character wearing on THIS page" (page generation and scale-repair already use it) — iterate was
 the one repair path that skipped it. Fixing the resolver's default instead would have hidden the
 real defect: the caller was handing over the wrong object. Passing only the page's cast keeps an

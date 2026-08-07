@@ -303,22 +303,26 @@ function formatCharacterContext(characters, clothingRequirements = {}) {
   }
 
   return characters.map(char => {
-    // `_currentClothing` is stamped per page by buildSceneClothingRequirements.
-    // Its absence means the caller handed over the STORY-level blob, and the
-    // 'standard' default below then resolves to whatever the character wore in
-    // some earlier story — the outfit leak this function's resolver was meant
-    // to prevent. Silent for two years; say it out loud.
-    const perPage = clothingRequirements[char.name]?._currentClothing;
-    if (!perPage) {
-      log.error(`❌ [SCENE-VALIDATOR] ${char.name}: clothingRequirements carries no _currentClothing — falling back to 'standard'. Pass the per-page view (buildSceneClothingRequirements) or the analysis will describe the wrong outfit.`);
+    // NO DEFAULT CLOTHING. `_currentClothing` is stamped per page by
+    // buildSceneClothingRequirements; its absence means the caller handed over
+    // the STORY-level blob. The old `|| 'standard'` then resolved to a category
+    // this story may not even use, which fell through to the character-level
+    // avatars wardrobe — an outfit from an unrelated earlier story — and that
+    // text propagated into the iterate rewrite and got rendered (staging
+    // job_1786053708336_8cdsca519 p10: a summer story regenerated in a winter
+    // hoodie). Guessing an outfit is worse than not running: throw.
+    const clothing = clothingRequirements[char.name]?._currentClothing;
+    if (!clothing) {
+      throw new Error(`[SCENE-VALIDATOR] ${char.name}: no _currentClothing in clothingRequirements — pass the per-page view (buildSceneClothingRequirements), never the story-level blob. Refusing to guess an outfit.`);
     }
-    const clothing = perPage || 'standard';
     // Per-story clothing is the source of truth. Use the SAME resolver as image
-    // generation (clothingRequirements → avatars fallback), never the raw
-    // avatars.clothing[category] default — that leaks the base-character outfit
-    // (e.g. red plaid) into the vision analysis, which then propagates into
-    // iterate rounds even though the rendered image shows the correct story outfit.
-    const clothingDesc = buildClothingDescription(char, clothing, null, clothingRequirements) || 'unknown clothing';
+    // generation, and refuse the result if it can't name the outfit — an
+    // "unknown clothing" placeholder in the analysis is the same guess by
+    // another name.
+    const clothingDesc = buildClothingDescription(char, clothing, null, clothingRequirements);
+    if (!clothingDesc) {
+      throw new Error(`[SCENE-VALIDATOR] ${char.name}: clothing category "${clothing}" has no description in this story's clothingRequirements. Refusing to guess an outfit.`);
+    }
     const physical = getPhysical(char);
 
     const traits = [];
