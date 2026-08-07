@@ -724,9 +724,53 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const {
     landmarkPhotos: coverLandmarkPhotos,
     visualBibleGrid: coverVbGrid,
-    sceneBackground: coverSceneBackground,
+    sceneBackground: rawCoverSceneBackground,
     sceneMetadata: coverSceneMetadata,
   } = refs;
+
+  // A1 (2026-08-07) — an EDIT gets ONLY the image being edited.
+  // The empty-scene plate is a style anchor for FIRST generation. Passing it
+  // alongside `previousImage` gives Grok two scene-sized references, and with
+  // more than one reference Grok COMPOSES instead of editing: on
+  // job_1786053708336_8cdsca519 the round-1 edit ("Remove all neon signs…")
+  // came back with the empty-scene background laid in as a band across the top
+  // of the cover — the "background twice" the owner reported. Same failure mode
+  // that made the title plate paste whole-cover content into a title crop.
+  const isEditOfExistingCover = !!previousImage;
+
+  // A2 (2026-08-07) — an EDIT must be rendered at the aspect of the image being
+  // edited, not at the config constant. MODEL_DEFAULTS.coverAspect is '3:4'
+  // (0.750) but real covers are 864x1222 (0.707); Grok CENTRE-CROPS every input
+  // to the requested ratio, so ~6% was being sliced off each reference before
+  // the model saw it, and the mismatch pushes it toward recomposition. Snap to
+  // the nearest preset both Grok and Gemini accept (raw ratios are rejected).
+  let coverAspectOverride = null;
+  if (isEditOfExistingCover) {
+    try {
+      const sharpLib = require('sharp');
+      const { bytesFromAnyImage } = require('./r2');
+      const pbuf = Buffer.isBuffer(previousImage) ? previousImage
+        : await bytesFromAnyImage(typeof previousImage === 'string' && previousImage.startsWith('data:')
+          ? previousImage : `data:image/jpeg;base64,${previousImage}`);
+      const pm = pbuf ? await sharpLib(pbuf).metadata() : null;
+      if (pm?.width && pm?.height) {
+        const r = pm.width / pm.height;
+        const PRESETS = [['9:16', 9 / 16], ['2:3', 2 / 3], ['3:4', 3 / 4], ['4:5', 4 / 5],
+          ['1:1', 1], ['5:4', 5 / 4], ['4:3', 4 / 3], ['3:2', 3 / 2], ['16:9', 16 / 9]];
+        coverAspectOverride = PRESETS.reduce((best, p2) =>
+          Math.abs(p2[1] - r) < Math.abs(best[1] - r) ? p2 : best)[0];
+        if (coverAspectOverride !== MODEL_DEFAULTS.coverAspect) {
+          log.info(`🔄 [COVER-ITERATE] ${coverLabelStr}: editing at the source aspect ${coverAspectOverride} (${pm.width}x${pm.height} = ${r.toFixed(3)}), not the ${MODEL_DEFAULTS.coverAspect} default`);
+        }
+      }
+    } catch (e) {
+      log.warn(`🔄 [COVER-ITERATE] ${coverLabelStr}: could not measure the source aspect (${e.message}) — using ${MODEL_DEFAULTS.coverAspect}`);
+    }
+  }
+  const coverSceneBackground = isEditOfExistingCover ? null : rawCoverSceneBackground;
+  if (isEditOfExistingCover && rawCoverSceneBackground) {
+    log.info(`🔄 [COVER-ITERATE] ${coverLabelStr}: edit of an existing cover — empty-scene plate withheld (it composes instead of edits)`);
+  }
 
   // --- Composite-vs-direct decision (unchanged gate) ────────────────────
   // `composite` is now an OPTION on the shared generateImageWithQualityRetry
@@ -803,7 +847,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, usageTracker, null,
     { imageModel: imageModel || null },
     `${coverLabelStr} ITERATE`,
-    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground, clothingRequirements: storyData.clothingRequirements || null, artStyle: artStyleId, composite: compositeOn, compositeInputs }
+    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground, clothingRequirements: storyData.clothingRequirements || null, artStyle: artStyleId, composite: compositeOn, compositeInputs, ...(coverAspectOverride ? { aspectRatio: coverAspectOverride } : {}) }
   );
 
   // Composite path skips quality eval AND the app-side restamp (title/dedication
