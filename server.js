@@ -258,6 +258,7 @@ const {
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { checkSceneConsistency, formatSceneConsistencySummary } = require('./server/lib/sceneConsistencyCheck');
+const { generateStoryViaBeats, resolvePipelineMode } = require('./server/lib/beatsPipeline');
 const { createJobHeartbeat } = require('./server/lib/jobHeartbeat');
 const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
@@ -2886,6 +2887,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       [1, 'Starting story generation...', jobId]
     );
 
+    // Beats-first pipeline (admin/env gated). When on, the unified writer call
+    // and the outline review are both replaced by the five staged beats calls
+    // in server/lib/beatsPipeline.js. Everything downstream of the parse
+    // (images, repair, text_refine, covers) runs unchanged.
+    const pipelineMode = resolvePipelineMode(inputData);
+    const beatsMode = pipelineMode === 'beats';
+    if (beatsMode) log.info(`🪜 [PIPELINE] pipelineMode=beats — unified writer + outline review are skipped`);
+
     const unifiedPrompt = inputData.trialMode
       ? buildTrialStoryPrompt(inputData, sceneCount)
       : buildUnifiedStoryPrompt(inputData, sceneCount);
@@ -4435,14 +4444,36 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // though the backend is happily streaming text. Long stories can take
     // 15+ minutes for the Sonnet response alone.
     const unifiedHeartbeat = createJobHeartbeat(jobId, dbPool);
-    const unifiedResult = await callTextModelStreaming(unifiedPrompt, 64000, (chunk, fullText) => {
-      progressiveParser.processChunk(chunk, fullText);
-      unifiedHeartbeat();  // throttled — fires at most every 30s
-    }, modelOverrides.outlineModel, { usageLabel: 'unified_story' });
+    let unifiedResponse;
+    let unifiedModelId;
+    let unifiedUsage;
+    // beatsResult carries the parsed pages + already-expanded scenes when the
+    // beats pipeline ran; null on the unified path.
+    let beatsResult = null;
+    if (beatsMode) {
+      beatsResult = await generateStoryViaBeats(inputData, {
+        jobId,
+        genLog,
+        checkCancellation,
+        pageCount: sceneCount,
+        modelOverrides,
+        heartbeat: unifiedHeartbeat,
+      });
+      // The beats transcript stands in for the raw writer response: it is what
+      // data.outline stores and what the dev outline view renders.
+      unifiedResponse = beatsResult.rawOutline;
+      unifiedModelId = beatsResult.meta?.textModelId || modelOverrides.outlineModel;
+      unifiedUsage = { input_tokens: 0, output_tokens: 0 };
+    } else {
+      const unifiedResult = await callTextModelStreaming(unifiedPrompt, 64000, (chunk, fullText) => {
+        progressiveParser.processChunk(chunk, fullText);
+        unifiedHeartbeat();  // throttled — fires at most every 30s
+      }, modelOverrides.outlineModel, { usageLabel: 'unified_story' });
+      unifiedResponse = unifiedResult.text;
+      unifiedModelId = unifiedResult.modelId;
+      unifiedUsage = unifiedResult.usage || { input_tokens: 0, output_tokens: 0 };
+    }
     timing.storyGenEnd = Date.now();
-    let unifiedResponse = unifiedResult.text;
-    const unifiedModelId = unifiedResult.modelId;
-    const unifiedUsage = unifiedResult.usage || { input_tokens: 0, output_tokens: 0 };
     // Determine provider from model ID since streaming doesn't return provider
     const isGeminiModel = unifiedModelId?.startsWith('gemini') || false;
     const unifiedProvider = isGeminiModel ? 'gemini_text' : 'anthropic';
@@ -4476,8 +4507,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // reviewer demanded. The reviewer's full text itself is appended to
     // unifiedResponse — which is what data.outline stores (see the storyData
     // assembly), so the Opus ANALYSIS is visible in the dev outline view.
+    // Beats mode: the beats review + the scene review already ran inside
+    // generateStoryViaBeats and replace this single outline critique.
     let outlineReviewMeta = null;
-    if (!inputData.trialMode && splitOutlineReviewEnabled) {
+    if (!beatsMode && !inputData.trialMode && splitOutlineReviewEnabled) {
       await checkCancellation();
       const reviewModel = modelOverrides.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel;
       timing.outlineReviewStart = Date.now();
@@ -4555,8 +4588,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       timing.outlineReviewEnd = Date.now();
     }
 
-    // Finalize streaming parser
-    progressiveParser.finalize();
+    // Finalize streaming parser (beats mode never fed it a stream)
+    if (!beatsMode) progressiveParser.finalize();
     log.debug(`📖 [UNIFIED] Response length: ${unifiedResponse.length} chars, ${streamingPagesDetected} pages detected during streaming`);
 
     // Parse the unified response (full parse for complete data). Pass
@@ -4564,7 +4597,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // the trial prompt deliberately omits. See docs/decisions.md → "Trial
     // stories skip draft → analysis → revise".
     const parser = new UnifiedStoryParser(unifiedResponse, { isTrial: !!inputData.trialMode });
-    const title = parser.extractTitle() || streamingTitle || inputData.storyType || 'Untitled Story';
+    const title = (beatsMode ? beatsResult.title : parser.extractTitle()) || streamingTitle || inputData.storyType || 'Untitled Story';
     const titleCandidates = parser.extractTitleCandidates();
     const clothingRequirements = inputData.trialMode
       ? inputData._trialClothingRequirements
@@ -4608,26 +4641,33 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
       }
     }
-    const storyPages = parser.extractPages();
+    // Beats mode assembled its own pages (text + beat scene line); the parser
+    // has no ---STORY PAGES--- draft/patch structure to merge in that path.
+    const storyPages = beatsMode ? beatsResult.pages : parser.extractPages();
 
     // Deterministic scene metadata ↔ scene design consistency check on the
     // FINAL pages (draft + reviewer patches merged). Mechanical string/set
     // parity only — semantic scene consistency is the outline reviewer's job
     // (see docs/decisions.md). Surfaced three ways: compact log lines, a
     // generationLog event, and finalChecksReport.sceneConsistency (dev panel).
+    // Skipped in beats mode: the check compares page metadata against the
+    // unified outline's SCENE DESIGN blocks, which a beats transcript has not
+    // got — the scene review is the equivalent gate there.
     let sceneConsistencyResult = null;
-    try {
-      sceneConsistencyResult = checkSceneConsistency(storyPages, unifiedResponse, {
-        knownCharacterNames: (inputData.characters || []).map(c => c.name)
-      });
-      const issueCount = sceneConsistencyResult.reduce((n, e) => n + e.issues.length, 0);
-      for (const line of formatSceneConsistencySummary(sceneConsistencyResult)) log.warn(line);
-      genLog.info('scene_consistency', `Scene consistency check: ${issueCount} issue(s) across ${sceneConsistencyResult.length} page(s)`, null, {
-        issueCount,
-        pages: sceneConsistencyResult
-      });
-    } catch (scErr) {
-      log.warn(`⚠️ [SCENE-CONSISTENCY] check failed (non-fatal): ${scErr.message}`);
+    if (!beatsMode) {
+      try {
+        sceneConsistencyResult = checkSceneConsistency(storyPages, unifiedResponse, {
+          knownCharacterNames: (inputData.characters || []).map(c => c.name)
+        });
+        const issueCount = sceneConsistencyResult.reduce((n, e) => n + e.issues.length, 0);
+        for (const line of formatSceneConsistencySummary(sceneConsistencyResult)) log.warn(line);
+        genLog.info('scene_consistency', `Scene consistency check: ${issueCount} issue(s) across ${sceneConsistencyResult.length} page(s)`, null, {
+          issueCount,
+          pages: sceneConsistencyResult
+        });
+      } catch (scErr) {
+        log.warn(`⚠️ [SCENE-CONSISTENCY] check failed (non-fatal): ${scErr.message}`);
+      }
     }
 
     // Construct fullStoryText from parsed pages (for storage compatibility)
@@ -4643,7 +4683,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Text consistency check removed (now handled by unified repair pipeline)
 
     // Compare streaming vs final parse results
-    if (streamingPagesDetected !== storyPages.length) {
+    if (!beatsMode && streamingPagesDetected !== storyPages.length) {
       log.warn(`⚠️ [UNIFIED] Page count mismatch: streaming detected ${streamingPagesDetected} pages, final parse found ${storyPages.length} pages`);
       log.warn(`⚠️ [UNIFIED] Pages from final parse: ${storyPages.map(p => p.pageNumber).join(', ')}`);
     }
@@ -4969,7 +5009,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // PHASE 3: Scene descriptions
     let expandedScenes;
 
-    if (inputData.trialMode) {
+    if (beatsMode) {
+      // Beats mode: scenes were expanded AND reviewed inside generateStoryViaBeats
+      // (steps 3 + 4), so there is nothing left to expand here.
+      expandedScenes = beatsResult.scenes;
+      log.info(`⏭️ [BEATS] Using ${expandedScenes.length} scene brief(s) from the beats pipeline`);
+      genLog.info('scenes_complete', `${expandedScenes.length} scene briefs from the beats pipeline`);
+    } else if (inputData.trialMode) {
       // Trial mode: use enriched scene hints directly as scene descriptions
       log.info(`⏭️ [TRIAL] Skipping scene expansion — using rich scene hints directly`);
       expandedScenes = storyPages.map(page => ({
@@ -8124,13 +8170,14 @@ async function _processStoryJobImpl(jobId) {
       delete inputData.layoutOverride;
       delete inputData.enableFullRepair; // fall back to default (ON)
       delete inputData.maxRepairPasses;   // fall back to REPAIR_DEFAULTS.maxPasses
+      delete inputData.pipelineMode;      // fall back to PIPELINE_MODE env / 'unified'
     }
 
     const skipImages = inputData.skipImages === true; // Developer mode: text only
     const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
     const enableFullRepair = inputData.enableFullRepair !== false; // Full repair after generation (default: ON)
 
-    log.info(`🔧 [PIPELINE] Settings: enableFullRepair=${enableFullRepair}, skipImages=${skipImages}, skipCovers=${skipCovers}${inputData.maxRepairPasses != null ? `, maxRepairPasses=${inputData.maxRepairPasses}` : ''}`);
+    log.info(`🔧 [PIPELINE] Settings: enableFullRepair=${enableFullRepair}, skipImages=${skipImages}, skipCovers=${skipCovers}, pipelineMode=${resolvePipelineMode(inputData)}${inputData.maxRepairPasses != null ? `, maxRepairPasses=${inputData.maxRepairPasses}` : ''}`);
 
     // Developer mode: model overrides (admin only — non-admin overrides were
     // stripped above). Use centralized MODEL_DEFAULTS from textModels.js.

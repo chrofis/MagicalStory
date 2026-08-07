@@ -129,6 +129,52 @@ grid generations. Logged at `[REF-SHEET] 🧑 N secondary CHARACTER reference(s)
 - `tests/manual/test-pt8-secondary-references.js` — unit test
 **Status:** ✅ active.
 
+### Beats-first pipeline is opt-in (`pipelineMode: 'beats'`) and ships without VB / clothing / cover hints
+**Context:** Production makes ONE Sonnet `unified_story` call (outline + visual
+bible + clothing + cover hints + text + scene hints) followed by ONE DeepSeek
+`outline_review`. The beats-first restructure splits that into five staged
+calls so each stage is reviewable and only faulted pages get rewritten:
+beats → beats review → per-page scene expansion → one review over all scene
+briefs → page text. Step 6 (`text_refine`) already existed and is unchanged.
+**Decision:** `server/lib/beatsPipeline.js` → `generateStoryViaBeats()`, gated
+behind `inputData.pipelineMode === 'beats'` (admin-only, stripped for
+non-admins exactly like `maxRepairPasses`) with a `PIPELINE_MODE` env default;
+`inputData` wins over env, anything unrecognised falls back to `unified`. When
+on, `processUnifiedStoryJob` skips BOTH the unified writer call and the
+`outline_review` call, and Phase 3 consumes the already-expanded scene briefs
+instead of running `startSceneExpansion`. Everything downstream (images,
+repair, `text_refine`, covers) runs unchanged.
+**Deliberate omissions in beats mode** — no beats-stage prompt produces them:
+- **Visual Bible** — empty `{}`. No secondary-character/location/artifact ids,
+  no VB grid references, no landmark photo fetch, no reference sheets.
+- **clothingRequirements** — `null`. Per-page clothing comes only from what the
+  scene brief's METADATA declares; avatar styling falls back to the late path.
+- **coverHints** — `null`. Only the front cover gets its built-in default hint;
+  initial page and back cover have none.
+- **Scene-consistency pre-check** (`checkSceneConsistency`) — skipped; it reads
+  the unified outline's SCENE DESIGN blocks, which a beats transcript has not
+  got. The scene review is the equivalent gate.
+`data.outline` stores a beats transcript (title, beats, both review analyses,
+final page text) instead of the raw writer response.
+**Rationale:** Gating on a flag keeps the default path byte-identical, so the
+restructure can be measured on staging against real runs without risking a
+paid story. Building VB/clothing/cover generation into the beats path is a
+separate piece of work; shipping the five stages first makes the gap visible
+and measurable rather than hidden behind a half-built sixth stage. Model
+choice mirrors the Test Lab `beats_scenes` stage: generation =
+`MODEL_DEFAULTS.outline`, reviews = `MODEL_DEFAULTS.outlineReviewModel`.
+**Touched:**
+- `server/lib/beatsPipeline.js` — the five stages, usage labels `beats_plan`,
+  `beats_review`, `beats_scene_expansion`, `beats_scene_review`,
+  `beats_story_text`; `resolvePipelineMode()`
+- `prompts/story-text-from-beats.txt` + `storyHelpers.buildStoryTextFromBeatsPrompt`
+- `server/lib/storyHelpers.js` — `buildDoNotWriteSection()` extracted so the
+  refiner and the beats writer ban the same categories
+- `server.js` — `beatsMode` branch at the writer call, outline-review gate,
+  title/storyPages/expandedScenes sources, non-admin `pipelineMode` strip
+**Status:** 🟡 conditional — staging experiment only; not a production default
+until the VB / clothing / cover gap is closed.
+
 ---
 
 ## Email
