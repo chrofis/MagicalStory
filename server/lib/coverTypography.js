@@ -557,6 +557,27 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
       await saveStoryImage(storyId, key, null, 'data:image/jpeg;base64,' + buffer.toString('base64'), { versionIndex: activeIdx, cacheBust: true });
       if (storyData?.coverImages?.[key]) storyData.coverImages[key].typography = spec;
       log.info(`🅰️ [COVER TYPO POST] ${key}: baked title${ded ? '+dedication' : ''} onto served v${activeIdx} (${spec.fontId || '?'}/${spec.layout || '?'})`);
+
+      // Stamp the NON-ACTIVE versions too. Only the active one used to get text,
+      // so switching version in the picker showed a bare, untitled cover — every
+      // alternative render looked broken. These are separate generations, not
+      // variants of the active one, so each is stamped from its OWN pixels (no
+      // ${key}Art row exists for them). Flat lockup only: no AI call per version.
+      const others = await dbQuery(
+        "SELECT version_index, image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test AND version_index <> $3",
+        [storyId, key, activeIdx]);
+      for (const o of others) {
+        try {
+          const osrc = o.image_url || (o.image_data ? 'data:image/jpeg;base64,' + o.image_data.toString('base64') : null);
+          const obytes = await r2.bytesFromAnyImage(osrc);
+          if (!obytes) continue;
+          const { buffer: obuf } = await composeCover({ artBuffer: obytes, kind, title: title || '', dedication: ded, seed: seed || title, figures });
+          await saveStoryImage(storyId, key, null, 'data:image/jpeg;base64,' + obuf.toString('base64'), { versionIndex: o.version_index, cacheBust: true });
+        } catch (oerr) {
+          log.warn(`[COVER TYPO POST] ${key} v${o.version_index}: ${oerr.message}`);
+        }
+      }
+      if (others.length) log.info(`🅰️ [COVER TYPO POST] ${key}: also stamped ${others.length} non-active version(s)`);
       // AUTOMATIC PAINTED TITLE (owner 2026-08-06): every new front cover gets the
       // painted treatment. Non-fatal by construction — paintServedCoverTitle keeps
       // the flat title on any failure, so generation cannot break on it.

@@ -411,13 +411,11 @@ export function StoryDisplay({
   const [editedStory, setEditedStory] = useState(story);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Title editing state
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editedTitle, setEditedTitle] = useState(title || '');
+  // Title editing state (dedication only — the story title is edited in the
+  // Change-title modal, which is the single entry point for it)
   const [isEditingDedication, setIsEditingDedication] = useState(false);
   const [editedDedication, setEditedDedication] = useState(dedication || '');
   const [savingDedication, setSavingDedication] = useState(false);
-  const [isSavingTitle, setIsSavingTitle] = useState(false);
 
   // Image history modal state
   const [imageHistoryModal, setImageHistoryModal] = useState<{ pageNumber: number; versions: ImageVersion[]; activeVersionIndex?: number } | null>(null);
@@ -427,18 +425,26 @@ export function StoryDisplay({
   const { user } = useAuth();
   const isAdminUser = user?.role === 'admin';
   const [repaintingTitle, setRepaintingTitle] = useState(false);
+  const [titleModalOpen, setTitleModalOpen] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
   // Repaint the cover title in the artwork's medium (server: one model call,
   // OCR-gated, falls back to the flat title and charges nothing on failure).
-  const handleRepaintTitle = async () => {
-    if (!onRepaintCoverTitle || repaintingTitle) return;
+  // ONE place to change the title: save the text if it changed (free, deterministic
+  // restamp), then repaint it in the artwork's medium (2 credits). Title design
+  // lives inside the same modal and is admin-only.
+  const handleTitleSave = async () => {
+    if (repaintingTitle) return;
     setRepaintingTitle(true);
     try {
-      await onRepaintCoverTitle!();
+      const next = titleDraft.trim();
+      if (next && next !== (title || '') && onSaveTitleChange) await onSaveTitleChange(next);
+      if (onRepaintCoverTitle) await onRepaintCoverTitle();
+      setTitleModalOpen(false);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      alert(language === 'de' ? `Titel konnte nicht neu gemalt werden: ${msg}`
-        : language === 'fr' ? `Impossible de repeindre le titre : ${msg}`
-        : `Could not repaint the title: ${msg}`);
+      alert(language === 'de' ? `Titel konnte nicht geändert werden: ${msg}`
+        : language === 'fr' ? `Impossible de modifier le titre : ${msg}`
+        : `Could not change the title: ${msg}`);
     } finally {
       setRepaintingTitle(false);
     }
@@ -878,11 +884,7 @@ export function StoryDisplay({
   }, [story, isEditMode]);
 
   // Update edited title when title prop changes
-  useEffect(() => {
-    if (!isEditingTitle) {
-      setEditedTitle(title || '');
-    }
-  }, [title, isEditingTitle]);
+
 
   // Handle save story text
   const handleSaveStory = async () => {
@@ -899,19 +901,6 @@ export function StoryDisplay({
   };
 
   // Handle save title
-  const handleSaveTitle = async () => {
-    if (!onSaveTitleChange || !editedTitle.trim()) return;
-    setIsSavingTitle(true);
-    try {
-      await onSaveTitleChange(editedTitle.trim());
-      setIsEditingTitle(false);
-    } catch (err) {
-      console.error('Failed to save title:', err);
-    } finally {
-      setIsSavingTitle(false);
-    }
-  };
-
   // Handle cancel edit
   const handleCancelEdit = () => {
     setEditedStory(story);
@@ -2088,59 +2077,63 @@ export function StoryDisplay({
     <div className="space-y-6 max-w-full overflow-x-hidden">
       {/* Story Title */}
       <div className="flex items-center justify-center gap-2">
-        {isEditingTitle ? (
-          <div className="flex items-center gap-2 w-full max-w-2xl">
+        <h1 className="text-3xl md:text-4xl font-bold text-gray-800 text-center">
+          {title || t.yourStory}
+        </h1>
+      </div>
+
+      {/* CHANGE TITLE — the single place the title is edited. Text for everyone,
+          design (font / effect / colour) for admins only. Saving applies the text
+          (free restamp) and then repaints it in the artwork's medium (2 credits). */}
+      {titleModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => !repaintingTitle && setTitleModalOpen(false)}>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">
+                {language === 'de' ? 'Titel ändern' : language === 'fr' ? 'Modifier le titre' : 'Change title'}
+              </h3>
+              <button onClick={() => !repaintingTitle && setTitleModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-700"><X size={18} /></button>
+            </div>
             <input
               type="text"
-              value={editedTitle}
-              onChange={(e) => setEditedTitle(e.target.value)}
-              className="flex-1 min-w-0 text-2xl md:text-3xl font-bold text-gray-800 text-center border-2 border-indigo-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+              value={titleDraft}
+              onChange={e => setTitleDraft(e.target.value)}
+              disabled={repaintingTitle}
+              className="w-full text-lg font-semibold border-2 border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-400"
+              onKeyDown={e => { if (e.key === 'Enter') handleTitleSave(); }}
               autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveTitle();
-                if (e.key === 'Escape') {
-                  setEditedTitle(title || '');
-                  setIsEditingTitle(false);
-                }
-              }}
             />
-            <button
-              onClick={handleSaveTitle}
-              disabled={isSavingTitle || !editedTitle.trim()}
-              className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
-              title={language === 'de' ? 'Speichern' : language === 'fr' ? 'Sauvegarder' : 'Save'}
-            >
-              {isSavingTitle ? <Loader className="animate-spin" size={20} /> : <Save size={20} />}
-            </button>
-            <button
-              onClick={() => {
-                setEditedTitle(title || '');
-                setIsEditingTitle(false);
-              }}
-              disabled={isSavingTitle}
-              className="p-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-              title={language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
-            >
-              <X size={20} />
-            </button>
-          </div>
-        ) : (
-          <>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 text-center">
-              {title || t.yourStory}
-            </h1>
-            {onSaveTitleChange && !isGenerating && (
-              <button
-                onClick={() => setIsEditingTitle(true)}
-                className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors"
-                title={language === 'de' ? 'Titel bearbeiten' : language === 'fr' ? 'Modifier le titre' : 'Edit title'}
-              >
-                <Edit3 size={18} />
-              </button>
+            {isAdminUser && onSetCoverTypography && coverImages?.frontCover && (
+              <div className="mt-3 border-t pt-3">
+                <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">Admin</div>
+                <CoverTextStylePanel
+                  kind="front"
+                  language={language}
+                  currentStyle={(coverImages.frontCover as any).typographyStyle || null}
+                  onApply={(style) => onSetCoverTypography('frontCover', style)}
+                />
+              </div>
             )}
-          </>
-        )}
-      </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={handleTitleSave}
+                disabled={repaintingTitle || !titleDraft.trim()}
+                className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-indigo-600 disabled:opacity-60"
+              >
+                {repaintingTitle ? <Loader className="animate-spin" size={16} /> : <Palette size={16} />}
+                {repaintingTitle
+                  ? (language === 'de' ? 'Wird gemalt…' : language === 'fr' ? 'En cours…' : 'Working…')
+                  : (language === 'de' ? 'Titel ändern (2 Credits)' : language === 'fr' ? 'Modifier le titre (2 crédits)' : 'Change title (2 credits)')}
+              </button>
+            </div>
+            <div className="text-[11px] text-gray-400 mt-2">
+              {language === 'de' ? 'Der Titel wird im Stil des Bildes neu gemalt. Schlägt es fehl, bleibt der bisherige Titel und es werden keine Credits belastet.'
+                : language === 'fr' ? "Le titre est repeint dans le style de l'illustration. En cas d'échec, l'ancien titre reste et aucun crédit n'est débité."
+                : "The title is repainted in the artwork's style. If it fails, the previous title stays and no credits are charged."}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Partial Story Warning Banner */}
       {isPartial && (
@@ -4644,28 +4637,18 @@ export function StoryDisplay({
             {onRepaintCoverTitle && frontCoverObj && !isGenerating && (
               <div className="mt-2">
                 <button
-                  onClick={handleRepaintTitle}
+                  onClick={() => { setTitleDraft(title || ''); setTitleModalOpen(true); }}
                   disabled={repaintingTitle}
                   className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-indigo-600 disabled:opacity-60"
                 >
                   <Palette size={16} />
                   {repaintingTitle
-                    ? (language === 'de' ? 'Titel wird gemalt…' : language === 'fr' ? 'Titre en cours…' : 'Painting title…')
-                    : (language === 'de' ? 'Titel neu malen (2 Credits)' : language === 'fr' ? 'Repeindre le titre (2 crédits)' : 'Repaint title (2 credits)')}
+                    ? (language === 'de' ? 'Titel wird gemalt…' : language === 'fr' ? 'Titre en cours…' : 'Changing title…')
+                    : (language === 'de' ? 'Titel ändern' : language === 'fr' ? 'Modifier le titre' : 'Change title')}
                 </button>
               </div>
             )}
-            {/* Title typography (font / effect / colour) — ADMIN ONLY for now:
-                the painted title picks its own colour, so exposing a colour
-                picker to users would fight it. The endpoint still works. */}
-            {isAdminUser && onSetCoverTypography && frontCoverObj && !isGenerating && (
-              <CoverTextStylePanel
-                kind="front"
-                language={language}
-                currentStyle={(frontCoverObj as any).typographyStyle || null}
-                onApply={(style) => onSetCoverTypography('frontCover', style)}
-              />
-            )}
+
             {/* Developer Mode Features for Front Cover */}
             {developerMode && frontCoverObj && (
               <div className="mt-3 space-y-2">
