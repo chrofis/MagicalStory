@@ -5481,3 +5481,66 @@ range so a laxer rule cannot be declared a win by only looking at the bad pages)
 **Touched:** `server/lib/feedbackConsolidator.js`, `server/lib/testlab.js`,
 `server/routes/admin/testlab.js`, `client/src/services/testlabService.ts`,
 `client/src/pages/TestLab.tsx`.
+
+---
+
+## 2026-08-07 — "Deducted for neon we asked for": measured in the Lab. The judges run hot.
+
+**Context:** Owner: "how would you fix the art issue that we get deduction for neon that we
+request. Take the pages, rerun them to see if it is consistent and try with improved prompt."
+Six pages of `job_1786053708336_8cdsca519` (p1, p3, p10, p11, p14 + p2 as a 100-scoring control),
+stage `quality_eval` (runs the visual evaluator AND the stage-2 compliance evaluator).
+
+**Finding 1 — the deduction is NOT consistent. Two identical baseline runs, same images, same
+prompts, same models:**
+
+| page | A run1 | A run2 | B run1 | B run2 |
+|---|---|---|---|---|
+| p1  | 1 | 1 | **0** | **0** |
+| p3  | 1 | 0 | **0** | **0** |
+| p10 | 2 | 1 | **0** | **0** |
+| p11 | 2 | 2 | 3 | 2 |
+| p14 | 4 | 0 | 2 | 0 |
+| p2 (control) | 0 | 0 | 0 | 0 |
+| **total** | **10** | **4** | **5** | **2** |
+
+Baseline found 10 neon issues in one run and 4 in the next. p14 went 4 → 0. Any single-run prompt
+comparison in this pipeline is therefore worthless on its own.
+
+**Finding 2 — root cause of the variance: the judges are not temperature-pinned.**
+`images.js:1594` pins the Gemini visual eval to `EVAL_TEMPERATURE` (0). But the compliance and
+semantic evaluators — which author most issues — go through `textModels.js`, where the Gemini paths
+hardcode **temperature 0.7** (lines 432, 561, no caller override) and the OpenRouter/qwen streaming
+path sets **no temperature at all**, taking the provider default (~1.0). The story-style audit had
+the same defect and was pinned on 08-06; the same fix was never applied to the evaluators. This is
+a prerequisite for any further prompt tuning here.
+
+**Finding 3 — the improved prompt works on the class that is genuinely wrong.** A
+"STYLE ELEMENTS ARE PART OF THE SPEC" block (patterned on this file's existing "PRESENCE IS AN
+INPUT" rule) added near the top of BOTH the compliance and visual evaluator templates: elements the
+ART STYLE block names are required and absent from the scene description by design, so they must
+never be reported as unrequested / "not described" / extra / cluttering / anachronistic /
+inconsistent with era, location or time of day.
+
+It reproducibly removed the false class — p1 ("kitchen contains neon fixtures not mentioned in
+prompt"), p3 ("neon installations contradict the prompt"), p10 ("extraneous neon signs clutter the
+riverbank") all went 1–2 findings → **0 in both variant runs**.
+
+It deliberately KEEPS three real defect classes, and all survived: a required prop replaced by a
+style element (p11, river-stone planet markers replaced by neon symbols), style signage carrying
+readable letters when the descriptor allows shapes only (p11, "R/S/E"), and a named garment
+restyled by the palette (p14, glowing circuit pattern on a specified T-shirt).
+
+**Control check:** p2 scored 100 / 95 / 100 / 60. The 60 is NOT the style block — it is two MAJOR
+footwear findings ("missing white canvas plimsolls") on a page where the children are bent over a
+table and their feet are out of frame. Separate eval noise, and arguably already covered by
+image-evaluation.txt's occluded-accessory rule.
+
+**Experiments:** #397, #399 (baseline), #400, #401 (variant) — prompt overrides stored on the rows,
+reviewable in `/admin/test-lab`.
+
+**Status:** 🟡 variant NOT shipped — it lives on the experiment rows only. Pin the eval temperature
+first; a hot judge makes the next comparison as unreliable as this one nearly was.
+
+**Touched:** `scripts/admin/testlab-run.js` (`--compliance-prompt`, `--compliance-model`,
+`--model` flags — quality_eval runs two templates and only one was reachable from the CLI).

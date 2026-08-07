@@ -19,6 +19,9 @@
  *   --benchmark        use ALL benchmark_scenes entries as targets
  *   --benchmark-ids <list>  comma-separated benchmark ids (subset)
  *   --prompt <file>    prompt-override template file (A/B variant)
+ *   --compliance-prompt <file>  quality_eval only: stage-2 compliance template
+ *   --compliance-model <id>     quality_eval only: stage-2 compliance model
+ *   --model <id>       consolidate only: model that applies the rules
  *   --label <text>     experiment label shown in the UI
  *   --character <name> character name (char_repair only)
  *   --no-eval          skip auto-eval on image stage results
@@ -106,6 +109,14 @@ async function main() {
     try { params.opts = JSON.parse(flags.opts); }
     catch (e) { die(`--opts must be valid JSON: ${e.message}`); }
   }
+  // quality_eval runs TWO templates: the visual evaluator (--prompt) and the
+  // stage-2 compliance evaluator. Compliance authors most of a page's issues,
+  // so A/B-ing it needs its own flag — --opts nests under params.opts, which
+  // the stage does not read.
+  if (flags['compliance-prompt']) params.compliancePrompt = fs.readFileSync(flags['compliance-prompt'], 'utf8');
+  if (flags['compliance-model']) params.complianceModel = flags['compliance-model'];
+  // consolidate stage: which model applies the consolidator's rules.
+  if (flags.model) params.model = flags.model;
 
   // Style-matrix mode: expand targets × styles; each unit = empty_scene + image.
   let styles = null;
