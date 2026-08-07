@@ -437,8 +437,16 @@ async function iterateCover(coverKey, storyData, options = {}) {
   const characters = storyData.characters || [];
   const visualBible = storyData.visualBible || null;
 
-  // Parse clothing from scene description
-  const coverClothing = parseClothingCategory(sceneDescription) || 'standard';
+  // Parse clothing from the cover's own scene description, then the story's
+  // primary category. NO DEFAULT (owner, 2026-08-07): 'standard' is a category
+  // most stories never use, so it has no description and resolves to the
+  // character's stored wardrobe from an unrelated story — on a cover, the most
+  // visible page in the book.
+  const coverClothing = parseClothingCategory(sceneDescription)
+    || storyData.pageClothing?.primaryClothing;
+  if (!coverClothing) {
+    throw new Error(`[COVER] No clothing category: the cover scene description names none and the story has no primaryClothing. Refusing to default to 'standard'.`);
+  }
   const clothingRequirements = convertClothingToCurrentFormat(storyData.clothingRequirements);
 
   // Re-hydrate avatars from the fresh characters-table rows. The usable-avatar

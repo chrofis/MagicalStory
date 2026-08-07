@@ -5736,3 +5736,43 @@ asked to emit, or accepting the current calibration.
 **Kept from this commit:** the stage-1 vision temperature pin only.
 
 **Touched:** `server/lib/images.js` (stage-1 vision pin). The consolidator is unchanged.
+
+---
+
+## No default clothing category anywhere — resolve canonically or refuse (2026-08-07)
+
+**Context:** the iterate outfit leak above was not one bad line. `|| 'standard'` appeared at ~20
+sites as the tail of every clothing-category resolution. The pattern is uniformly wrong for the same
+reason: `'standard'` is a category most stories never use, so it has no per-story description, so
+`buildClothingDescription` falls through to the character-level `avatars.clothing.standard` — an
+outfit from an unrelated earlier story. A "safe default" therefore silently sources wardrobe from
+another book. Owner ruling: **"Fallback to default clothing is forbidden. Rather fail loudly."**
+
+**Decision:** every clothing-category resolution either resolves from a canonical source (per-page
+`perCharClothing` → `resolvePageClothingCategory` → the story's `primaryClothing` → a
+`costumed.used` story's sole outfit) or refuses. Refusal takes the form that loses least work:
+
+| refusal | sites |
+| --- | --- |
+| **throw** — a wrong outfit would be rendered | `storyHelpers.buildSceneClothingRequirements`, `sceneValidator.formatCharacterContext`, `iteratePageCore` (expectedClothing, post-rewrite category, empty clothing map), `coverIterate`, `compositeCastBuilder` (both cover sites) |
+| **error result / HTTP 422** — caller can report it | char-fix in the unified pipeline, `entityConsistency.repairSinglePage`, `regeneration.js` (regen scene, cover + page reference photos, both char-repair paths) |
+| **log.error + skip this character** — cosmetic pass, story survives | garment-hue + garment-colour avatar resolution (3 sites), inpaint's missing-character avatar reference, entity-grid crop collection, `styledAvatars.ensureStyledAvatarCoverage`, `testlab` avatar lookups, `stories.js` reference-photo rebuild |
+| **propagate null** — "unknown", never "standard" | `outlineParser/unified.js` (the origin of every category), the page-level `clothing` label into the entity check, the entity-grid cell label (sends `'unknown'`, which the judge has no expectations for) |
+
+Untouched on purpose: `r2.js` filename sanitisation (`'standard'` is a path segment, not an outfit)
+and every `languageLevel || 'standard'` (unrelated meaning of the same word).
+
+**Rationale:** a guessed category is not a degraded-but-usable answer — it is a confident wrong one,
+and it enters the pipeline as fact (prompt text, reference image, colour target, or judge label).
+The four refusal modes exist so the cost matches the stake: a cosmetic hue pass skips one character,
+a render that would bake in the wrong outfit stops.
+
+**Touched:** `server/lib/images.js`, `server/lib/sceneValidator.js`, `server/lib/entityConsistency.js`,
+`server/lib/storyHelpers.js`, `server/lib/coverIterate.js`, `server/lib/compositeCastBuilder.js`,
+`server/lib/styledAvatars.js`, `server/lib/testlab.js`, `server/lib/outlineParser/unified.js`,
+`server/routes/regeneration.js`, `server/routes/stories.js`.
+
+**Status:** 🟡 staging pending. Syntax-checked; the refusal paths are by construction unreachable on
+data that carries per-page clothing (verified on `job_1786053708336_8cdsca519`), but a story with a
+genuine data gap will now fail where it previously shipped a wrong outfit — that is the intent, and
+it needs a full generation run to confirm nothing legitimate trips it.

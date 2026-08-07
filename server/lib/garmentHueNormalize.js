@@ -69,6 +69,12 @@ const DEFAULTS = {
   // cluster's chroma-weighted evidence. Keeps hair/trim/incidental patches from
   // being chosen as "the garment"; a real second garment easily clears it.
   minTargetWeightFrac: numEnv('GARMENT_HUE_MIN_TARGET_WEIGHT_FRAC', 0.2),
+  // Region growing (growGarmentRegion): max LAB distance for a pixel to join the
+  // garment region, and the smallest region worth considering. deltaE 14 is
+  // roughly "clearly a different colour to the eye" — loose enough to span a
+  // garment's own shading, tight enough to stop at skin or hair.
+  regionDeltaE: numEnv('GARMENT_HUE_REGION_DELTA_E', 14),
+  minRegionPx: numEnv('GARMENT_HUE_MIN_REGION_PX', 250),
   // Confidence floors: too few pixels → estimate is noise → skip.
   minGarmentPixels: 40,
   minPagePixels: 400,
@@ -472,6 +478,107 @@ async function avatarTorsoBand(buf, width, height) {
   return { left: 0, top, width, height: h };
 }
 
+/**
+ * SEGMENT the garment: the largest connected region of one colour on the figure,
+ * plus any same-colour patches elsewhere on it (a sleeve cut off by an arm).
+ *
+ * This replaces statistical sampling for both measuring AND applying. The
+ * histogram sampler never decides "this pixel is shirt" — it assumes the garment
+ * dominates a box and takes the modal hue. That assumption is what let a
+ * red-haired character's HAIR become the reference, and it is also why a large
+ * rotation smeared skin and hair: measurement and application shared one weak
+ * criterion, so neither could be trusted past a gentle nudge.
+ *
+ * Connectivity is the missing signal. Hair, skin and a shirt are contiguous
+ * regions of distinct colour; a flood fill gated on LAB distance separates them
+ * even when their hues are neighbours, because it also has to cross a colour
+ * boundary in SPACE. The head is additionally excluded up front via the
+ * detection's faceBox.
+ *
+ * @param {Buffer} raw   page RGB (n*3)
+ * @param {number} W,H   page dims
+ * @param {number[]} bodyBox  [ymin,xmin,ymax,xmax] 0..1
+ * @param {number[]|null} faceBox  same, excluded from the search
+ * @param {object} opts  { regionDeltaE, minRegionPx }
+ * @returns {{ mask:Buffer, count:number, meanLab:number[] }|null}
+ */
+function growGarmentRegion(raw, W, H, bodyBox, faceBox, opts = {}) {
+  const cfg = { ...DEFAULTS, ...opts };
+  const px = (v, d) => Math.max(0, Math.min(d, Math.round(v * d)));
+  const y0 = px(bodyBox[0], H), x0 = px(bodyBox[1], W);
+  const y1 = px(bodyBox[2], H), x1 = px(bodyBox[3], W);
+  if (y1 - y0 < 8 || x1 - x0 < 8) return null;
+  const sw = x1 - x0, sh = y1 - y0;
+
+  const lab = new Float32Array(sw * sh * 3);
+  const ok = new Uint8Array(sw * sh);
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const si = (y - y0) * sw + (x - x0), i = y * W + x;
+    const r = raw[i * 3], g = raw[i * 3 + 1], b = raw[i * 3 + 2];
+    if (!isGarmentPixel(r, g, b)) continue;
+    const l = _rgbToLab(r, g, b);
+    lab[si * 3] = l[0]; lab[si * 3 + 1] = l[1]; lab[si * 3 + 2] = l[2];
+    ok[si] = 1;
+  }
+
+  // SEED from the CHEST, not from "the largest region anywhere". Scanning for
+  // the biggest connected blob finds dark hair merged with shadow — on the
+  // reported page that blob was 12% of the frame and the shirt was untouched.
+  // The chest (centre of the body box, just below the chin) is the one place a
+  // torso garment is reliably visible.
+  const headBottom = faceBox ? px(faceBox[2], H) : y0;
+  const sy0 = Math.max(y0, Math.min(y1 - 2, headBottom + Math.round(sh * 0.04)));
+  const sy1 = Math.max(sy0 + 1, Math.min(y1, headBottom + Math.round(sh * 0.30)));
+  const sx0 = x0 + Math.round(sw * 0.30), sx1 = x0 + Math.round(sw * 0.70);
+  const seedLabs = [];
+  for (let y = sy0; y < sy1; y++) for (let x = sx0; x < sx1; x++) {
+    const si = (y - y0) * sw + (x - x0);
+    if (ok[si]) seedLabs.push([lab[si * 3], lab[si * 3 + 1], lab[si * 3 + 2]]);
+  }
+  if (seedLabs.length < cfg.minRegionPx / 4) return null;
+  // Median per channel — robust to hair strands crossing the chest patch, which
+  // a mean would let drag the reference.
+  const medOf = (k) => { const v = seedLabs.map(x => x[k]).sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
+  const ref = [medOf(0), medOf(1), medOf(2)];
+  const dRef = (si) => Math.hypot(ref[0] - lab[si * 3], ref[1] - lab[si * 3 + 1], ref[2] - lab[si * 3 + 2]);
+
+  // Flood fill judged against the FROZEN seed colour. A running mean lets the
+  // region walk shade-by-shade out of the garment and into hair or shadow —
+  // that is exactly how the first version escaped.
+  const seen = new Uint8Array(sw * sh);
+  const stack = new Int32Array(sw * sh);
+  let top = 0, count = 0;
+  const sumLab = [0, 0, 0];
+  for (let y = sy0; y < sy1; y++) for (let x = sx0; x < sx1; x++) {
+    const si = (y - y0) * sw + (x - x0);
+    if (ok[si] && !seen[si] && dRef(si) <= cfg.regionDeltaE) { seen[si] = 1; stack[top++] = si; }
+  }
+  const mask = Buffer.alloc(W * H);
+  while (top > 0) {
+    const si = stack[--top];
+    const sy = Math.floor(si / sw), sx = si % sw;
+    mask[(y0 + sy) * W + (x0 + sx)] = 255;
+    count++;
+    sumLab[0] += lab[si * 3]; sumLab[1] += lab[si * 3 + 1]; sumLab[2] += lab[si * 3 + 2];
+    for (const [dy, dx] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ny = sy + dy, nx = sx + dx;
+      if (ny < 0 || nx < 0 || ny >= sh || nx >= sw) continue;
+      const ni = ny * sw + nx;
+      if (!ok[ni] || seen[ni] || dRef(ni) > cfg.regionDeltaE) continue;
+      seen[ni] = 1; stack[top++] = ni;
+    }
+  }
+  if (count < cfg.minRegionPx) return null;
+  const meanLab = [sumLab[0] / count, sumLab[1] / count, sumLab[2] / count];
+
+  // Same-colour patches elsewhere on the figure (a sleeve cut off by an arm).
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const si = (y - y0) * sw + (x - x0), i = y * W + x;
+    if (ok[si] && !mask[i] && dRef(si) <= cfg.regionDeltaE) { mask[i] = 255; count++; }
+  }
+  return { mask, count, meanLab, seedLab: ref };
+}
+
 /** A rectangle bodyBox [ymin,xmin,ymax,xmax] (0..1) → 0/255 mask at (w,h). */
 function bboxToBin(box, width, height) {
   const n = width * height;
@@ -776,6 +883,7 @@ module.exports = {
   estimateCast,
   sampleGarmentHue,
   sampleGarmentClusters,
+  growGarmentRegion,
   torsoBoxFromBody,
   decideHueCorrection,
   applyHueRotation,

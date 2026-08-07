@@ -348,7 +348,14 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
     }
 
     // Log expected clothing for this page based on outline
-    const expectedClothing = pageClothingData?.pageClothing?.[pageNumber] || pageClothingData?.primaryClothing || 'standard';
+    // NO DEFAULT (owner, 2026-08-07): this becomes the rewrite prompt's
+    // "This page's clothing" line — a guessed 'standard' actively instructs the
+    // Art Director to dress the page in a category the story may not use, which
+    // resolves to the character's wardrobe from an unrelated story.
+    const expectedClothing = pageClothingData?.pageClothing?.[pageNumber] || pageClothingData?.primaryClothing;
+    if (!expectedClothing) {
+      return res.status(422).json({ error: `Page ${pageNumber} has no clothing category (pageClothing and primaryClothing both empty) — refusing to regenerate against a guessed outfit` });
+    }
     log.debug(`🔄 [REGEN SCENE ${pageNumber}] Expected clothing from outline: ${expectedClothing}`)
 
     // Build available avatars - only show clothing categories used in this story
@@ -651,10 +658,12 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       // Phase 5: clothing is always bare 'costumed' (no subtype) — preserve as-is.
       const clothingValues = Object.values(pageClothingEntry);
       const firstClothing = clothingValues[0];
-      clothingCategory = firstClothing || parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing || 'standard';
+      clothingCategory = firstClothing || parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing;
+      if (!clothingCategory) return res.status(422).json({ error: `Page ${pageNumber} has no clothing category — refusing to default to 'standard'` });
       log.debug(`🔄 [REGEN] Using per-character clothing for page ${pageNumber}: ${JSON.stringify(pageClothingEntry)}`);
     } else {
-      clothingCategory = parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing || 'standard';
+      clothingCategory = parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing;
+      if (!clothingCategory) return res.status(422).json({ error: `Page ${pageNumber} has no clothing category — refusing to default to 'standard'` });
     }
 
     const artStyle = storyData.artStyle || 'pixar';
@@ -1072,7 +1081,9 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       // Reuse the saved prompt verbatim if present; only fall back to a rebuild
       // for legacy covers that didn't persist the prompt.
       const chars = getCharactersInScene(cover.description || '', storyData.characters || []);
-      characterPhotos = getCharacterPhotoDetails(chars, parseClothingCategory(cover.description || '') || 'standard', artStyle, clothingReqs);
+      const coverClothing = parseClothingCategory(cover.description || '') || storyData.pageClothing?.primaryClothing;
+      if (!coverClothing) return res.status(422).json({ error: `Cover ${coverType} has no clothing category — refusing to build reference photos from a guessed outfit` });
+      characterPhotos = getCharacterPhotoDetails(chars, coverClothing, artStyle, clothingReqs);
       prompt = cover.prompt || buildImagePrompt(cover.description || '', storyData, chars, visualBible, pageNumber, characterPhotos);
     } else {
       const savedSceneImage = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
@@ -1080,7 +1091,8 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       const desc = savedSceneImage.sceneDescription || savedSceneImage.description || '';
       const chars = getCharactersInScene(desc, storyData.characters || []);
       const pcEntry = storyData.pageClothing?.pageClothing?.[pageNumber];
-      const clothing = (typeof pcEntry === 'string' ? pcEntry : null) || parseClothingCategory(desc) || storyData.pageClothing?.primaryClothing || 'standard';
+      const clothing = (typeof pcEntry === 'string' ? pcEntry : null) || parseClothingCategory(desc) || storyData.pageClothing?.primaryClothing;
+      if (!clothing) return res.status(422).json({ error: `Page ${pageNumber} has no clothing category — refusing to build reference photos from a guessed outfit` });
       characterPhotos = getCharacterPhotoDetails(chars, clothing, artStyle, clothingReqs);
       if (!clothing.startsWith('costumed')) characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
       sceneMetadata = extractSceneMetadata(desc);
@@ -1939,14 +1951,17 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       const cover = getCoverData(storyData, coverType);
       if (!cover) return res.status(400).json({ error: `No cover found for ${coverType}` });
       const chars = getCharactersInScene(cover.description || '', storyData.characters || []);
-      characterPhotos = getCharacterPhotoDetails(chars, parseClothingCategory(cover.description || '') || 'standard', artStyle, clothingReqs);
+      const coverClothing = parseClothingCategory(cover.description || '') || storyData.pageClothing?.primaryClothing;
+      if (!coverClothing) return res.status(422).json({ error: `Cover ${coverType} has no clothing category — refusing to build reference photos from a guessed outfit` });
+      characterPhotos = getCharacterPhotoDetails(chars, coverClothing, artStyle, clothingReqs);
     } else {
       const sceneDesc = (storyData.sceneDescriptions || []).find(s => s.pageNumber === pageNumber);
       if (!sceneDesc) return res.status(400).json({ error: `No scene description for page ${pageNumber}` });
       const desc = sceneDesc.description || '';
       const chars = getCharactersInScene(desc, storyData.characters || []);
       const pcEntry = storyData.pageClothing?.pageClothing?.[pageNumber];
-      const clothing = (typeof pcEntry === 'string' ? pcEntry : null) || parseClothingCategory(desc) || storyData.pageClothing?.primaryClothing || 'standard';
+      const clothing = (typeof pcEntry === 'string' ? pcEntry : null) || parseClothingCategory(desc) || storyData.pageClothing?.primaryClothing;
+      if (!clothing) return res.status(422).json({ error: `Page ${pageNumber} has no clothing category — refusing to build reference photos from a guessed outfit` });
       characterPhotos = getCharacterPhotoDetails(chars, clothing, artStyle, clothingReqs);
       if (!clothing.startsWith('costumed')) characterPhotos = applyStyledAvatars(characterPhotos, artStyle);
       const sceneMetadata = extractSceneMetadata(desc);
@@ -5253,11 +5268,16 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
             } else {
               const { normalizeClothingCategory, resolvePageClothingCategory } = require('../lib/clothingCategories');
+              // NO DEFAULT (owner, 2026-08-07): this category picks the styled
+              // avatar the repair paints the character to match.
               const clothingCategory = appearance.clothing
                 ? normalizeClothingCategory(appearance.clothing)
-                : (resolvePageClothingCategory(storyData, pageNumber, characterName) || 'standard');
+                : resolvePageClothingCategory(storyData, pageNumber, characterName);
+              if (!clothingCategory) {
+                throw new Error(`[REPAIR-WORKFLOW] ${characterName} p${pageNumber}: no clothing category (appearance and pageClothing both empty) — refusing to repair into a guessed outfit`);
+              }
               if (!appearance.clothing) {
-                log.warn(`⚠️ [REPAIR-WORKFLOW] ${characterName} p${pageNumber}: no appearance clothing — resolved "${clothingCategory}" from pageClothing/default`);
+                log.warn(`⚠️ [REPAIR-WORKFLOW] ${characterName} p${pageNumber}: no appearance clothing — resolved "${clothingCategory}" from pageClothing`);
               }
               const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
 
@@ -5444,11 +5464,16 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           }
 
           const { normalizeClothingCategory, resolvePageClothingCategory } = require('../lib/clothingCategories');
+          // NO DEFAULT (owner, 2026-08-07): this category picks the styled
+          // avatar the repair paints the character to match.
           const clothingCategory = storedAppearance.clothing
             ? normalizeClothingCategory(storedAppearance.clothing)
-            : (resolvePageClothingCategory(storyData, pageNumber, characterName) || 'standard');
+            : resolvePageClothingCategory(storyData, pageNumber, characterName);
+          if (!clothingCategory) {
+            return res.status(422).json({ error: `${characterName} p${pageNumber}: no clothing category (stored appearance and pageClothing both empty) — refusing to repair into a guessed outfit` });
+          }
           if (!storedAppearance.clothing) {
-            log.warn(`⚠️ [CHAR REPAIR] ${characterName} p${pageNumber}: no stored appearance clothing — resolved "${clothingCategory}" from pageClothing/default`);
+            log.warn(`⚠️ [CHAR REPAIR] ${characterName} p${pageNumber}: no stored appearance clothing — resolved "${clothingCategory}" from pageClothing`);
           }
           const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
           const avatarData = styledAvatar || character.avatars?.standard || character.avatarUrl;

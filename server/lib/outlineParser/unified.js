@@ -322,7 +322,13 @@ class UnifiedStoryParser {
         characterDetails[baseName] = {
           name: baseName,
           position,
-          clothing: characterClothing[baseName] || 'standard',
+          // NO DEFAULT CLOTHING (owner, 2026-08-07): the writer's outline is the
+          // origin of every downstream clothing category. Stamping 'standard'
+          // here where the outline named none seeds a category the story may
+          // not use, and it resolves to the character's wardrobe from an
+          // unrelated story. null propagates as "unknown" and the consumers
+          // refuse rather than guess.
+          clothing: characterClothing[baseName] || null,
           holds: ann.holds || 'nothing',
           gazesAt: ann.gazesAt || '',
           priority: (ann.priority || 'normal').toLowerCase(),

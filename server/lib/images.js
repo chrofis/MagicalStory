@@ -2658,14 +2658,19 @@ async function _gdinoDetect(imageDataUri, prompts) {
 // MobileSAM box→mask on the full page (box in full-page pixel coords).
 async function _mobilesamMaskFull(imageDataUri, boxPx, W, H) {
   try {
-    const res = await fetch(`${_photoAnalyzerUrl()}/figure-mask`, {
+    // Through withAnalyzerSlot like every other analyzer call (gdinoDetect, the
+    // repair-side figure-mask). This one had used a raw fetch, so a story's
+    // repair phase fired unbounded concurrent masks at the analyzer; the server
+    // now serializes SAM under a lock, and this bounds the in-flight queue so
+    // callers don't pile up decoded pages waiting on that lock.
+    const res = await withAnalyzerSlot(() => fetch(`${_photoAnalyzerUrl()}/figure-mask`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: imageDataUri, box: boxPx }),
       // 150s: an aborted request does NOT cancel the analyzer's computation —
       // short timeouts under CPU contention stack zombie work until the
       // service starves (observed SAM outage). Waiting beats re-firing.
       signal: AbortSignal.timeout(150_000),
-    });
+    }));
     if (!res.ok) return null;
     const j = await res.json();
     const m = j?.image?.match?.(/^data:image\/\w+;base64,(.+)$/);
@@ -6913,14 +6918,18 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   } = options;
 
   // Resolve the current-page clothing category for a character. Case-insensitive.
-  // Falls back to 'standard' if the scene metadata doesn't list this character.
+  // NO DEFAULT (owner, 2026-08-07): returns null when the scene metadata does
+  // not list this character. The old 'standard' fallback named a category the
+  // story may not use, which resolves to the character's stored wardrobe from
+  // an unrelated story — and here that wardrobe becomes the REFERENCE IMAGE the
+  // inpaint copies, so the guess is painted straight into the page.
   const clothingFor = (name) => {
-    if (!characterClothing || !name) return 'standard';
+    if (!characterClothing || !name) return null;
     const lower = name.toLowerCase();
     for (const [k, v] of Object.entries(characterClothing)) {
-      if (k.toLowerCase() === lower) return (v || 'standard').toLowerCase();
+      if (k.toLowerCase() === lower) return v ? String(v).toLowerCase() : null;
     }
-    return 'standard';
+    return null;
   };
 
   const { getStyledAvatarForClothing } = require('./entityConsistency');
@@ -7169,6 +7178,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       const mainChar = characters.find(c => c.name?.toLowerCase() === itemName);
       if (mainChar) {
         const pageClothing = clothingFor(mainChar.name);
+        if (!pageClothing) {
+          log.error(`❌ [INPAINT PAGE] ${mainChar.name}: no per-page clothing category — NOT adding an avatar reference. A guessed category would hand the inpaint an outfit from another story to copy.`);
+          continue;
+        }
         const avatar = await getStyledAvatarForClothing(mainChar, artStyle || 'watercolor', pageClothing);
         const photoUrl = typeof avatar === 'string' ? avatar : (avatar?.imageData || mainChar.photos?.body || mainChar.photos?.face);
         if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image') && !referenceImages.includes(photoUrl)) {
@@ -7555,7 +7568,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         imageData: entry.imageData,
         pageNumber: entry.pageNumber,
         characters: metadata.characters || [],
-        clothing: metadata.clothing || 'standard',
+        // NO DEFAULT (owner, 2026-08-07): this is the page-level clothing label
+        // the entity check falls back to per crop. null → that crop is excluded
+        // from the grid rather than judged against a guessed outfit.
+        clothing: metadata.clothing || null,
         characterClothing: perCharClothing,
         sceneSummary,
         referenceCharacters: (orig.characterPhotos || []).map(p => p.name).filter(Boolean),
@@ -7652,7 +7668,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             }
             const character = characters.find(c => (c.name || '').toLowerCase() === charName.toLowerCase());
             if (!character) continue;
-            const avatarUri = await getStyledAvatarForClothing(character, artStyle, m.clothingCategory || 'standard');
+            // NO DEFAULT (owner, 2026-08-07): the avatar is the colour target.
+            if (!m.clothingCategory) {
+              log.error(`❌ [GARMENT-COLOUR] ${charName} p${pageNumber}: mismatch carries no clothing category — skipping (refusing to recolour towards a guessed outfit).`);
+              continue;
+            }
+            const avatarUri = await getStyledAvatarForClothing(character, artStyle, m.clothingCategory);
             if (!avatarUri) { log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: no styled avatar — skipped`); continue; }
             attempted++;
             const res = await fixFigureGarmentColour(img.imageData, fig, avatarUri, {});
@@ -8222,11 +8243,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       .find(k => k.toLowerCase() === charName.toLowerCase());
     const { normalizeClothingCategory: normCat, resolvePageClothingCategory: pageCat } = require('./clothingCategories');
     const rawCharClothing = perCharClothingKey && img.perCharClothing[perCharClothingKey];
+    // NO DEFAULT (owner, 2026-08-07): the resolved category picks the styled
+    // avatar this repair paints the character to match, so a guessed 'standard'
+    // repaints the story outfit into a wardrobe from an unrelated story.
     const clothingCategory = rawCharClothing
       ? normCat(rawCharClothing)
-      : (pageCat(storyData, pageNumber, charName) || 'standard');
+      : pageCat(storyData, pageNumber, charName);
+    if (!clothingCategory) {
+      return { pageNumber, imageData: null, error: `no clothing category for ${charName} (perCharClothing and pageClothing both empty) — refusing to repair into a guessed outfit` };
+    }
     if (!rawCharClothing) {
-      log.warn(`⚠️ [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: no perCharClothing entry — resolved "${clothingCategory}" from pageClothing/default`);
+      log.warn(`⚠️ [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: no perCharClothing entry — resolved "${clothingCategory}" from pageClothing`);
     }
     const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
     const avatarPhoto = styledAvatar || getFacePhoto(character);
@@ -8728,12 +8755,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             || orig?.characterClothing
             || orig?.sceneMetadata?.characterClothing
             || {};
-          const cat = normalizeClothingCategory(
-            pageClothing[character.name]
-            || resolvePageClothingCategory(storyData, pageNumber, character.name)
-            || 'standard'
-          );
-          return getStyledAvatarForClothing(character, artStyle, cat);
+          // NO DEFAULT (owner, 2026-08-07). This avatar is the colour REFERENCE
+          // the hue pass normalises the rendered garment towards — a guessed
+          // category would recolour the story outfit to an unrelated one.
+          const raw = pageClothing[character.name]
+            || resolvePageClothingCategory(storyData, pageNumber, character.name);
+          if (!raw) {
+            log.error(`❌ [GARMENT-HUE] ${character.name} p${pageNumber}: no per-page clothing category — skipping (refusing to normalise towards a guessed outfit).`);
+            return null;
+          }
+          return getStyledAvatarForClothing(character, artStyle, normalizeClothingCategory(raw));
         };
         const hueOut = await normalizeGarmentHueBatch(roundSuccess, {
           resolveAvatarForPage,
@@ -9303,10 +9334,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         if (!character) return null;
         const orig = rawImages.find(i => i.pageNumber === pageNumber);
         const pageClothing = orig?.perCharClothing || orig?.characterClothing || orig?.sceneMetadata?.characterClothing || {};
-        const cat = normalizeClothingCategory(
-          pageClothing[character.name] || resolvePageClothingCategory(storyData, pageNumber, character.name) || 'standard'
-        );
-        return getStyledAvatarForClothing(character, artStyle, cat);
+        // NO DEFAULT (owner, 2026-08-07) — same reason as the round-loop
+        // resolver above: this avatar is the colour reference.
+        const raw = pageClothing[character.name] || resolvePageClothingCategory(storyData, pageNumber, character.name);
+        if (!raw) {
+          log.error(`❌ [GARMENT-HUE] ${character.name} p${pageNumber}: no per-page clothing category — skipping (refusing to normalise towards a guessed outfit).`);
+          return null;
+        }
+        return getStyledAvatarForClothing(character, artStyle, normalizeClothingCategory(raw));
       };
       const finalEntries = rawImages.map(img => {
         const pageNumber = img.pageNumber;
@@ -9751,15 +9786,8 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     const matched = characters.filter(c => names.includes(String(c.name || '').trim().toLowerCase()));
     return matched.length > 0 ? matched : characters;
   })();
-  // buildSceneClothingRequirements stamps 'standard' for a cast member with no
-  // per-page entry — the same guess by another door. Refuse it here instead:
-  // if the page cannot say what someone is wearing, the analysis does not run.
-  const undressed = analysisCharacters
-    .map(c => c.name)
-    .filter(n => !Object.entries(pageCharClothing || {}).some(([k]) => k.trim().toLowerCase() === String(n).trim().toLowerCase()));
-  if (undressed.length > 0) {
-    throw new Error(`[ITERATE] Page ${pageNumber}: no per-page clothing category for ${undressed.join(', ')} — refusing to default to 'standard' (it resolves to the character's stored wardrobe from another story).`);
-  }
+  // buildSceneClothingRequirements itself throws when a cast member has no
+  // per-page category — no second check here, one rule in one place.
   const analysisClothingRequirements = buildSceneClothingRequirements(
     analysisCharacters, pageCharClothing, clothingRequirements
   );
@@ -10024,7 +10052,13 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
     const clothingValues = Object.values(storedPageClothingMap);
     const firstClothing = clothingValues[0];
-    clothingCategory = (firstClothing && firstClothing.startsWith('costumed:')) ? firstClothing : (firstClothing || 'standard');
+    if (!firstClothing) {
+      // NO DEFAULT (owner, 2026-08-07): an empty clothing map means nothing
+      // on this page says what anyone wears; 'standard' would resolve to a
+      // wardrobe from an unrelated story.
+      throw new Error(`[ITERATE] Page ${pageNumber}: clothing map is empty. Refusing to default to 'standard'.`);
+    }
+    clothingCategory = firstClothing;
     const iterateCh = newSceneMetadata?.characterClothing || null;
     if (iterateCh && Object.values(iterateCh).some(v => !String(v).startsWith('costumed'))) {
       log.warn(`⚠️ [ITERATE] Page ${pageNumber}: Haiku tried to downgrade clothing to ${JSON.stringify(iterateCh)} — overriding with stored pageClothing ${JSON.stringify(storedPageClothing)}`);
@@ -10044,7 +10078,13 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
     const clothingValues = Object.values(sceneClothing);
     const firstClothing = clothingValues[0];
-    clothingCategory = (firstClothing && firstClothing.startsWith('costumed:')) ? firstClothing : (firstClothing || 'standard');
+    if (!firstClothing) {
+      // NO DEFAULT (owner, 2026-08-07): an empty clothing map means nothing
+      // on this page says what anyone wears; 'standard' would resolve to a
+      // wardrobe from an unrelated story.
+      throw new Error(`[ITERATE] Page ${pageNumber}: clothing map is empty. Refusing to default to 'standard'.`);
+    }
+    clothingCategory = firstClothing;
     log.debug(`🔄 [ITERATE] Using per-character clothing from scene description: ${JSON.stringify(sceneClothing)}`);
   } else {
     // Priority 2: Per-character clothing from pageClothing (stored data)
@@ -10062,7 +10102,13 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       }
       const clothingValues = Object.values(pageClothingEntry);
       const firstClothing = clothingValues[0];
-      clothingCategory = (firstClothing && firstClothing.startsWith('costumed:')) ? firstClothing : (firstClothing || 'standard');
+      if (!firstClothing) {
+      // NO DEFAULT (owner, 2026-08-07): an empty clothing map means nothing
+      // on this page says what anyone wears; 'standard' would resolve to a
+      // wardrobe from an unrelated story.
+      throw new Error(`[ITERATE] Page ${pageNumber}: clothing map is empty. Refusing to default to 'standard'.`);
+    }
+    clothingCategory = firstClothing;
       log.debug(`🔄 [ITERATE] Using per-character clothing from pageClothing: ${JSON.stringify(pageClothingEntry)}`);
     } else {
       // NO DEFAULT CLOTHING (owner, 2026-08-07). Reaching here means the page

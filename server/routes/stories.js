@@ -1827,12 +1827,18 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
             const char = characters.find(c => c.name === p.name);
             if (char) {
               const artStyle = story.artStyle || 'pixar';
-              const clothing = p.clothingCategory || 'standard';
-              photoUrl = char.avatars?.styledAvatars?.[artStyle]?.[clothing]
-                || char.avatars?.styled
-                || char.avatars?.standard
-                || char.photoUrl
-                || null;
+              // NO DEFAULT CLOTHING (owner, 2026-08-07): a guessed category
+              // picks a styled avatar from an unrelated story's wardrobe.
+              const clothing = p.clothingCategory;
+              if (!clothing) {
+                log.error(`❌ [STORY] ${p.name}: reference photo has no clothing category — leaving photoUrl null rather than substituting a guessed styled avatar.`);
+              } else {
+                photoUrl = char.avatars?.styledAvatars?.[artStyle]?.[clothing]
+                  || char.avatars?.styled
+                  || char.avatars?.standard
+                  || char.photoUrl
+                  || null;
+              }
             }
           }
           return {
@@ -2136,7 +2142,12 @@ router.get('/:id/composite-stages/:pageNumber', authenticateToken, async (req, r
       for (const name of Object.keys(meta.bboxes)) {
         const char = chars.find(c => (c?.name || '').toLowerCase() === name.toLowerCase());
         if (!char?.avatars?.styledAvatars) continue;
-        const clothing = String(perChar[name] || 'standard').toLowerCase();
+        // NO DEFAULT CLOTHING (owner, 2026-08-07).
+        if (!perChar[name]) {
+          log.error(`❌ [STORY] ${name}: no per-page clothing category — skipping the styled-avatar lookup rather than guessing 'standard'.`);
+          continue;
+        }
+        const clothing = String(perChar[name]).toLowerCase();
         const styledForStyle = char.avatars.styledAvatars[artStyleKey] || {};
         let raw = null;
         if (clothing === 'costumed' || clothing.startsWith('costumed:')) {

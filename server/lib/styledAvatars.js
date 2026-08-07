@@ -896,7 +896,14 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
   // name(lower) → Set of canonical categories the story requires
   const requiredCategories = new Map();
   for (const req of pageRequirements || []) {
-    const cat = normalizeClothingCategory(req?.clothingCategory || 'standard');
+    // NO DEFAULT CLOTHING (owner, 2026-08-07): pre-generating a 'standard'
+    // avatar for a requirement that names no category manufactures the very
+    // asset the guessed-category paths then paint characters into.
+    if (!req?.clothingCategory) {
+      log.error(`❌ [STYLED-AVATARS] page requirement has no clothingCategory (${(req?.characterNames || []).join(', ') || 'no names'}) — skipping rather than pre-generating 'standard'.`);
+      continue;
+    }
+    const cat = normalizeClothingCategory(req.clothingCategory);
     for (const n of req?.characterNames || []) {
       const key = String(n || '').trim().toLowerCase();
       if (!key) continue;

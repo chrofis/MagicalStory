@@ -65,7 +65,14 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
     if (!name) continue;
     const character = (inputData.characters || []).find(c => (c.name || '').toLowerCase() === String(name).toLowerCase());
     if (!character) return null;
-    const clothing = (pageData.perCharClothing?.[name] || sc.clothing || 'standard').toLowerCase();
+    // NO DEFAULT CLOTHING (owner, 2026-08-07) — see the sibling guard in
+    // buildCoverCompositeCast. A guessed category picks the wrong avatar sheet,
+    // i.e. the figure pasted into the composite wears another story's outfit.
+    const rawClothing = pageData.perCharClothing?.[name] || sc.clothing;
+    if (!rawClothing) {
+      throw new Error(`[COMPOSITE CAST] ${name}: no clothing category on the page or the scene character. Refusing to default to 'standard'.`);
+    }
+    const clothing = String(rawClothing).toLowerCase();
     const costumeKey = clothing.startsWith('costumed:')
       ? slugifyCostume(clothing.slice('costumed:'.length))
       : null;
@@ -347,8 +354,18 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
       // same depth bucket, but anyone with a vaguer position would slip
       // through and trigger an arbitrary split.
       depth: 'foreground',
-      clothing: (coverHint.characterClothing && coverHint.characterClothing[c.name])
-        || 'standard',
+      // NO DEFAULT CLOTHING (owner, 2026-08-07). 'standard' is a category most
+      // stories never use; with no description it resolves to the character's
+      // stored wardrobe from an unrelated story, and the cover is the most
+      // visible page in the book. Cover hint first, then the story's primary.
+      clothing: (() => {
+        const c1 = coverHint.characterClothing && coverHint.characterClothing[c.name];
+        const resolved = c1 || storyData?.pageClothing?.primaryClothing;
+        if (!resolved) {
+          throw new Error(`[COVER COMPOSITE] ${c.name}: no clothing category in the cover hint and no primaryClothing on the story. Refusing to default to 'standard'.`);
+        }
+        return resolved;
+      })(),
     });
     const detail = details[c.name] || Object.values(details).find(d => d?.name?.toLowerCase() === nameLower);
     const action = buildAction(detail);

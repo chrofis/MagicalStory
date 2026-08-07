@@ -1248,9 +1248,13 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
     let bboxDetection = bboxDetectionInit;
 
     // Get clothing info for this page - try multiple sources
-    // Priority: img.characterClothing > scene description metadata > clothingRequirements > 'standard'
+    // Priority: img.characterClothing > scene description metadata > clothingRequirements
+    // NO 'standard' DEFAULT (owner, 2026-08-07): this label decides which
+    // reference avatar each crop is judged against, so a guessed category
+    // manufactures "clothing_inconsistent" findings against an outfit the page
+    // never had. Null here means the crop is skipped, not relabelled.
     let characterClothing = img.characterClothing || img.sceneCharacterClothing || {};
-    let defaultClothing = img.clothing || 'standard';
+    let defaultClothing = img.clothing || null;
 
     // If no per-character clothing found, try to extract from scene description metadata
     if (Object.keys(characterClothing).length === 0 && sceneDescriptions.length > 0) {
@@ -1264,7 +1268,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
             log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: Extracted clothing from scene metadata: ${JSON.stringify(characterClothing)}`);
           }
           // Also check for global clothing in metadata
-          if (metadata.clothing && defaultClothing === 'standard') {
+          if (metadata.clothing && !defaultClothing) {
             defaultClothing = metadata.clothing;
           }
         }
@@ -1278,7 +1282,8 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
     // on EVERY page mis-flagged Emma (uses standard + costumed:ninja) as costumed on
     // page 1, where she is standard and merely HOLDS the costume — the entity check
     // then pulled her ninja avatar and repainted her (job_1783889777354 P1). A
-    // character who also uses standard/winter/summer keeps the standard default.
+    // character who also uses standard/winter/summer is left unresolved here and
+    // their crop is skipped downstream — ambiguity is not a licence to guess.
     if (Object.keys(characterClothing).length === 0 && clothingRequirements) {
       const NON_COSTUMED = ['standard', 'winter', 'summer', 'formal'];
       for (const char of characters) {
@@ -1518,7 +1523,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
       }
 
       if (matchingFigure) {
-        const clothing = normalizeClothingCategory(characterClothing[charName] || defaultClothing);
+        const rawClothing = characterClothing[charName] || defaultClothing;
+        if (!rawClothing) {
+          log.error(`❌ [ENTITY-COLLECT] ${charName} p${pageNumber}: no clothing category on the page — crop EXCLUDED from the consistency grid. Judging it against a guessed category invents clothing findings.`);
+          continue;
+        }
+        const clothing = normalizeClothingCategory(rawClothing);
         // Determine confidence based on how we matched
         const confidence = (matchingFigure.name || '').toLowerCase() === charNameLower
           ? (matchingFigure.confidence === 'high' ? 0.95 : matchingFigure.confidence === 'medium' ? 0.8 : 0.65)
@@ -2048,13 +2058,23 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
     };
   }
 
-  // Build cell info JSON
-  const cellInfo = manifest.cells.map(cell => ({
-    cell: cell.letter,
-    page: cell.isReference ? 'Reference Photo' : cell.pageNumber,
-    clothing: cell.clothing || clothingCategory || 'standard',
-    cropType: cell.cropType || 'face'
-  }));
+  // Build cell info JSON. NO DEFAULT (owner, 2026-08-07): every cell reaching
+  // here was labelled at collection time, so a missing category means the
+  // pipeline lost it — say so in the cell rather than telling the judge
+  // "standard" and having it score the crop against an outfit from another
+  // story. 'unknown' is inert: the prompt has no expectations attached to it.
+  const cellInfo = manifest.cells.map(cell => {
+    const clothing = cell.clothing || clothingCategory;
+    if (!clothing && !cell.isReference) {
+      log.error(`❌ [ENTITY-GRID] cell ${cell.letter} (page ${cell.pageNumber}) has no clothing category — sending 'unknown' rather than defaulting to 'standard'.`);
+    }
+    return {
+      cell: cell.letter,
+      page: cell.isReference ? 'Reference Photo' : cell.pageNumber,
+      clothing: clothing || 'unknown',
+      cropType: cell.cropType || 'face',
+    };
+  });
 
   // Build reference photo info
   const refPhotoInfo = referencePhoto
@@ -2510,15 +2530,20 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
       return { success: false, error: `Failed to extract crop for page ${pageNumber}` };
     }
 
-    // Determine clothing category for target page — crop metadata first,
-    // then the stored per-page clothing; a bare 'standard' default makes the
-    // repair repaint the story outfit into standard clothes.
+    // Determine clothing category for target page — crop metadata first, then
+    // the stored per-page clothing. NO DEFAULT (owner, 2026-08-07): the old
+    // bare 'standard' made this repair repaint the story outfit into standard
+    // clothes, because an unused category has no description and resolves to
+    // the character's stored wardrobe from an unrelated story.
     const { resolvePageClothingCategory } = require('./clothingCategories');
     const clothingCategory = targetCrop.clothing
       ? normalizeClothingCategory(targetCrop.clothing)
-      : (resolvePageClothingCategory(storyData, pageNumber, charName) || 'standard');
+      : resolvePageClothingCategory(storyData, pageNumber, charName);
+    if (!clothingCategory) {
+      return { success: false, error: `No clothing category for ${charName} on page ${pageNumber} (crop metadata and pageClothing both empty) — refusing to repair into a guessed outfit` };
+    }
     if (!targetCrop.clothing) {
-      log.warn(`⚠️ [SINGLE-PAGE-REPAIR] Page ${pageNumber} crop has no clothing metadata — resolved "${clothingCategory}" from pageClothing/default`);
+      log.warn(`⚠️ [SINGLE-PAGE-REPAIR] Page ${pageNumber} crop has no clothing metadata — resolved "${clothingCategory}" from pageClothing`);
     }
     log.info(`🔧 [SINGLE-PAGE-REPAIR] Target page ${pageNumber} has clothing: ${clothingCategory}`);
 

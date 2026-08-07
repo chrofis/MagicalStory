@@ -2845,7 +2845,7 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
         resolvedClothing = charReqs._currentClothing;
         log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${resolvedClothing}`);
       } else {
-        log.debug(`[AVATAR LOOKUP] ${char.name}: no per-scene clothing, defaulting to ${resolvedClothing || 'standard'}`);
+        log.debug(`[AVATAR LOOKUP] ${char.name}: no per-scene clothing; using the category the caller passed (${resolvedClothing || 'none'})`);
       }
 
       // Safety net against leaked/stale _currentClothing: if the requested
@@ -3079,8 +3079,11 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
       // quadrants waste reference attention. applyReferenceMode() reads these
       // and swaps photoUrl per scene shot type. Falls back to null when an
       // older avatar (no thumbnails generated) doesn't have these slots.
-      const variantClothing = (actualClothingUsed || resolvedClothing || 'standard');
-      const variantBase = variantClothing.startsWith('costumed') ? 'standard' : variantClothing;
+      // NO DEFAULT CLOTHING (owner, 2026-08-07): with no resolved category we
+      // pick no thumbnail variant rather than the 'standard' wardrobe's.
+      const variantClothing = (actualClothingUsed || resolvedClothing || null);
+      const variantBase = !variantClothing ? null
+        : (variantClothing.startsWith('costumed') ? 'standard' : variantClothing);
       // Dual-shape (Phase 1 migration): getFaceThumb/getBodyThumb read NEW
       // `faceThumb`/`bodyThumb` first, fall back to OLD `faceThumbnailsUrl`/
       // `faceThumbnails` (and same for body). One helper, one source of truth.
@@ -3269,7 +3272,6 @@ function buildLabeledPhysicalParts(profile, options = {}) {
  */
 function buildSceneClothingRequirements(sceneCharacters, perCharClothing, clothingRequirements) {
   const out = { ...(clothingRequirements || {}) };
-  const defaultClothing = 'standard';
   const perChar = perCharClothing || {};
   for (const char of (sceneCharacters || [])) {
     if (!char?.name) continue;
@@ -3281,10 +3283,16 @@ function buildSceneClothingRequirements(sceneCharacters, perCharClothing, clothi
       const globalReqs = clothingRequirements?.[char.name]
         || Object.entries(clothingRequirements || {}).find(([n]) => n.trim().toLowerCase() === charNameTrimmed)?.[1];
       if (globalReqs?.costumed?.used) {
+        // Not a guess: a fully-costumed story has exactly one outfit, so the
+        // page not restating it carries no ambiguity.
         charClothing = 'costumed';
-        log.debug(`👕 [CLOTHING FALLBACK] ${char.name}: no per-scene clothing, using global costumed (${globalReqs.costumed.costume || 'unnamed'})`);
+        log.debug(`👕 [CLOTHING] ${char.name}: no per-scene clothing, story is costumed (${globalReqs.costumed.costume || 'unnamed'})`);
       } else {
-        charClothing = defaultClothing;
+        // NO DEFAULT CLOTHING (owner, 2026-08-07). The old `'standard'` here
+        // named a category the story may not use, which has no description, so
+        // buildClothingDescription fell through to the character-level
+        // avatars.clothing — an outfit from an unrelated story.
+        throw new Error(`[CLOTHING] ${char.name}: no per-page clothing category and the story is not costumed. Refusing to default to 'standard'.`);
       }
     }
     out[char.name] = {

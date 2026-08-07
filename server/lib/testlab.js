@@ -1246,7 +1246,9 @@ async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
     if (only && name.toLowerCase() !== only) continue;
     const character = chars.find(c => (c.name || '').toLowerCase() === name.toLowerCase());
     if (!character) { perFigure.push({ name, applied: false, reason: 'character not in story' }); continue; }
-    const cat = normalizeClothingCategory(pageClothing[character.name] || 'standard');
+    // NO DEFAULT CLOTHING (owner, 2026-08-07): the avatar is the colour target.
+    if (!pageClothing[character.name]) { perFigure.push({ name, applied: false, reason: 'no per-page clothing category (refusing to default to standard)' }); continue; }
+    const cat = normalizeClothingCategory(pageClothing[character.name]);
     const avatarUri = await getStyledAvatarForClothing(character, ctx.artStyle, cat);
     if (!avatarUri) { perFigure.push({ name, applied: false, reason: 'no styled avatar' }); continue; }
 
@@ -1298,8 +1300,12 @@ async function runGarmentHueStage(ctx, { experimentId, params = {} }) {
   const resolveAvatar = async (fig) => {
     const character = findChar(fig?.name);
     if (!character) return null;
-    const cat = normalizeClothingCategory(pageClothing[character.name] || 'standard');
-    return getStyledAvatarForClothing(character, ctx.artStyle, cat);
+    // NO DEFAULT CLOTHING (owner, 2026-08-07).
+    if (!pageClothing[character.name]) {
+      log.error(`❌ [TESTLAB] ${character.name}: no per-page clothing category — skipping the avatar lookup rather than guessing 'standard'.`);
+      return null;
+    }
+    return getStyledAvatarForClothing(character, ctx.artStyle, normalizeClothingCategory(pageClothing[character.name]));
   };
 
   const out = await normalizeGarmentHue(imageData, detection, resolveAvatar, {
@@ -1390,11 +1396,14 @@ async function loadCharacterContext(storyId, characterName) {
     || characters.find(c => (c.name || '').toLowerCase() === characterName.toLowerCase());
   if (!character) throw new Error(`Character "${characterName}" not found`);
 
-  let costume = { category: 'standard', description: null };
+  // NO DEFAULT CLOTHING (owner, 2026-08-07): null category means "unknown", not
+  // "standard" — the caller must not dress a character from a guess.
+  let costume = { category: null, description: null };
   for (const scene of data.sceneImages || []) {
     const rp = (scene.referencePhotos || []).find(r => (r.name || '').toLowerCase() === characterName.toLowerCase());
-    if (rp) { costume = { category: rp.clothingCategory || 'standard', description: rp.clothingDescription || null }; break; }
+    if (rp?.clothingCategory) { costume = { category: rp.clothingCategory, description: rp.clothingDescription || null }; break; }
   }
+  if (!costume.category) log.error(`❌ [TESTLAB] ${characterName}: no clothing category found on any page's reference photos.`);
   return { storyId, character, costume };
 }
 
