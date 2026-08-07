@@ -5721,15 +5721,18 @@ above MODERATE. The hypothesis "a mid-tier model drops the conditional instructi
 upgrading the model buys nothing here. Note also that `gemini-2.5-flash` fails as a consolidator and
 would silently zero every deduction — never configure it for this call.
 
-**Decision: enforce the consensus cap in code.** `capSingleSourceSeverity()` in
-`feedbackConsolidator.js` caps any issue with exactly one entry in `sources[]` at MODERATE, applied
-where `deduped_issues` is parsed. The prompt rule STAYS — a consolidator that applies it itself
-writes better fix instructions than one whose output is silently rewritten — but the code is now the
-backstop that makes the policy hold. `severityAsked` is retained on every issue so the gap between
-what the model wanted and what was applied stays auditable.
+**Decision: NO code cap. Owner call, 2026-08-07 — do not re-add it.**
+A `capSingleSourceSeverity()` backstop was written and then REVERTED at the owner's instruction.
+Modelled effect before reverting (kept only as a record of what was on the table): cyber story
+page-best mean 63.6 → 73.6, earlier story 49.7 → 68.7, its 0-scoring page rising to 33.
 
-**Modelled on stored data:** cyber story page-best mean **63.6 → 73.6**; the earlier story **49.7 →
-68.7**, its single 0-scoring page rising to 33. No page loses points — the cap can only lower a
-deduction.
+Rationale for the reversal is the owner's to state, but the standing constraint is clear: severity
+policy lives in the consolidator prompt, and the pipeline does not silently rewrite what an
+evaluator returned. A future session that rediscovers the 78%-single-source statistic must NOT
+"fix" it in code — that path has been tried and rejected. Options that remain open: prompt
+iteration in the Lab (sets #5/#6 are loaded for exactly this), changing what the evaluators are
+asked to emit, or accepting the current calibration.
 
-**Touched:** `server/lib/feedbackConsolidator.js`, `server/lib/images.js` (stage-1 vision pin).
+**Kept from this commit:** the stage-1 vision temperature pin only.
+
+**Touched:** `server/lib/images.js` (stage-1 vision pin). The consolidator is unchanged.
