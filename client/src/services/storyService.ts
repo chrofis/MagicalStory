@@ -128,6 +128,9 @@ export interface StoryListItem {
 }
 
 interface StoryDetailsServer {
+  outlineReview?: SavedStory['outlineReview'];
+  tokenUsage?: SavedStory['tokenUsage'];
+  textRefineReport?: SavedStory['textRefineReport'];
   id: string;
   title: string;
   storyType: string;
@@ -391,6 +394,14 @@ export const storyService = {
       outlinePrompt: s.outlinePrompt,
       outlineModelId: s.outlineModelId,
       outlineUsage: s.outlineUsage,
+      // This mapper is an explicit whitelist — anything not named here is
+      // dropped before the UI ever sees it. These three carry the dev-mode
+      // panels (reviewer metadata, the per-function model/token/cost ledger,
+      // and the text-refine before/after); their absence is why those panels
+      // rendered blank while the API was returning the data all along.
+      outlineReview: s.outlineReview,
+      tokenUsage: s.tokenUsage,
+      textRefineReport: s.textRefineReport,
       story: storyContent,
       storyTextPrompts: s.storyTextPrompts,
       visualBible: s.visualBible,

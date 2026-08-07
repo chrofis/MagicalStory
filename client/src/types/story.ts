@@ -959,6 +959,12 @@ export interface SavedStory {
   outlinePrompt?: string;
   outlineModelId?: string;  // Model used for outline generation
   outlineUsage?: TokenUsage;  // Token usage for outline
+  /** Split-review metadata: which model reviewed, how long, how many fixes. */
+  outlineReview?: { model?: string; modelId?: string; durationMs?: number; fixCount?: number; reviewChars?: number; hintCount?: number; reviewedAt?: string } | null;
+  /** Per-function model/token/cost/time ledger (dev mode "Models used" panel). */
+  tokenUsage?: Record<string, unknown> | null;
+  /** Per-page before/after from the parallel text-refine pass (dev mode diff). */
+  textRefineReport?: { rounds?: number; changedPages?: number[]; durationMs?: number; model?: string | null; pages?: { pageNumber: number; before: string; after: string }[] } | null;
   story?: string;
   originalStory?: string;  // Original AI-generated story text (preserved on first edit)
   storyTextPrompts?: Array<{
