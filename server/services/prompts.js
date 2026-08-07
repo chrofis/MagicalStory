@@ -109,6 +109,10 @@ async function loadPromptTemplates() {
     // One review over ALL scene briefs at once — repetition, visual arc and
     // continuity are only visible across pages, never per-scene.
     ['sceneReview', 'scene-review.txt'],
+    // Page text written from the locked beats (beats-first pipeline, step 5).
+    // Same ---ANALYSIS--- / ---STORY TEXT--- shape as the refiner, so
+    // parseRefinedText reads it unchanged.
+    ['storyTextFromBeats', 'story-text-from-beats.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
     ['incrementalConsistencyCheck', 'incremental-consistency-check.txt'],

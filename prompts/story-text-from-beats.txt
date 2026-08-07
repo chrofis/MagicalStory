@@ -1,0 +1,65 @@
+You are writing the narrative text of an illustrated children's book. The page beats and the illustrations are already locked and cannot change.
+
+# LANGUAGE
+
+{LANGUAGE_INSTRUCTION}
+
+{LANGUAGE_NOTE}
+
+Write in {LANGUAGE}. Never switch to a dialect or a spoken regional form.
+
+# TARGET
+
+Reading level: {READING_LEVEL}
+Pages: {PAGE_COUNT}
+Characters: {CHARACTER_NAMES}
+
+{STORY_BRIEF}
+
+# CHARACTER DETAILS
+
+{CHARACTER_DETAILS}
+
+# LOCKED BEATS
+
+One block per page. BEAT is what happens on that page. SCENE is what the illustration shows. Both are fixed.
+
+{BEATS}
+
+# YOUR TASK
+
+Write the text for all {PAGE_COUNT} pages, in page order, plus a title.
+
+Each page covers its own beat and nothing from the next one.
+The illustration already shows the scene, so write what it cannot show: the interior, the dialogue, the turn.
+Never contradict a page's SCENE line, and never mention pages, beats or illustrations.
+Never use an em-dash or an en-dash. Use a comma, a full stop, a colon or parentheses.
+Vary sentence openings between consecutive pages.
+The title is in the story language and does not spoil the ending.
+
+Work in two steps.
+
+Step 1 — write the analysis: one line per page naming what the reader learns and what changed for the main character, then name any page whose text risks repeating the page before it.
+
+Step 2 — write the pages, fixing what the analysis found.
+
+{DO_NOT_WRITE_SECTION}
+
+# OUTPUT FORMAT
+
+Three blocks, in this order, nothing before or after.
+
+---TITLE---
+<the title, in the story language>
+
+---ANALYSIS---
+<one line per page>
+
+---STORY TEXT---
+## Page 1
+<text for page 1>
+
+## Page 2
+<text for page 2>
+
+(continue through page {PAGE_COUNT})

@@ -5669,22 +5669,7 @@ function buildTextRefinePrompt(inputData, pages = []) {
 
   // Reuse the canonical DO-NOT-WRITE list from the writer template so the ban
   // categories can never drift between writing and refining.
-  const variant = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
-  const writerTpl = (variant !== 'textFirst' && PROMPT_TEMPLATES.storyUnifiedImageFirst)
-    ? PROMPT_TEMPLATES.storyUnifiedImageFirst
-    : PROMPT_TEMPLATES.storyUnified;
-  let doNotWriteSection = '';
-  if (writerTpl) {
-    const start = writerTpl.indexOf('## DO-NOT-WRITE LIST');
-    if (start >= 0) {
-      const rest = writerTpl.slice(start);
-      const stops = ['\n**PACING:**', '\n---', '\n# OUTPUT FORMAT']
-        .map(s => rest.indexOf(s)).filter(i => i > 0);
-      const end = stops.length ? Math.min(...stops) : rest.length;
-      const list = rest.slice(0, end).replace(/^##\s*DO-NOT-WRITE LIST[^\n]*\n+/, '').trim();
-      if (list) doNotWriteSection = `# DO-NOT-WRITE LIST\n\n${list}`;
-    }
-  }
+  const doNotWriteSection = buildDoNotWriteSection(inputData);
 
   // The COMPLETE language definition, not the bare name. getLanguageNameEnglish
   // returns "Swiss German" for de-ch, which a model reads as Schwyzerdütsch — it
@@ -5892,6 +5877,50 @@ function buildSceneReviewPrompt(inputData, scenes = []) {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: scenes.length,
     ALL_SCENES: all,
+  });
+}
+
+/**
+ * The canonical DO-NOT-WRITE list, lifted out of the writer template so every
+ * prompt that produces narrative text bans the same categories. Shared by the
+ * refiner and by the beats-first text writer.
+ */
+function buildDoNotWriteSection(inputData = {}) {
+  const variant = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
+  const writerTpl = (variant !== 'textFirst' && PROMPT_TEMPLATES.storyUnifiedImageFirst)
+    ? PROMPT_TEMPLATES.storyUnifiedImageFirst
+    : PROMPT_TEMPLATES.storyUnified;
+  if (!writerTpl) return '';
+  const start = writerTpl.indexOf('## DO-NOT-WRITE LIST');
+  if (start < 0) return '';
+  const rest = writerTpl.slice(start);
+  const stops = ['\n**PACING:**', '\n---', '\n# OUTPUT FORMAT']
+    .map(s => rest.indexOf(s)).filter(i => i > 0);
+  const end = stops.length ? Math.min(...stops) : rest.length;
+  const list = rest.slice(0, end).replace(/^##\s*DO-NOT-WRITE LIST[^\n]*\n+/, '').trim();
+  return list ? `# DO-NOT-WRITE LIST\n\n${list}` : '';
+}
+
+/**
+ * Page text written FROM the locked beats (beats-first pipeline, step 5).
+ * Emits the same ---ANALYSIS--- / ---STORY TEXT--- shape the refiner emits, so
+ * parseRefinedText() reads it with no new parser. A ---TITLE--- block precedes
+ * both: in a beats run no other call produces a title.
+ */
+function buildStoryTextFromBeatsPrompt(inputData, beats = []) {
+  const template = PROMPT_TEMPLATES.storyTextFromBeats;
+  if (!template) {
+    log.error('[PROMPT] storyTextFromBeats template not loaded — beats text writing unavailable');
+    return null;
+  }
+  const blocks = beats
+    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`)
+    .join('\n\n');
+  return fillTemplate(template, {
+    ...buildStoryContextFields(inputData),
+    PAGE_COUNT: beats.length,
+    BEATS: blocks,
+    DO_NOT_WRITE_SECTION: buildDoNotWriteSection(inputData),
   });
 }
 
@@ -6929,6 +6958,8 @@ module.exports = {
   buildBeatsPrompt,
   buildBeatsReviewPrompt,
   buildSceneReviewPrompt,
+  buildStoryTextFromBeatsPrompt,
+  buildDoNotWriteSection,
   parseBeats,
   buildTrialStoryPrompt,
   buildPreviousScenesContext,

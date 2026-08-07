@@ -25,6 +25,11 @@ Three loading mechanisms feed these templates:
 | outline-analysis-textfirst.txt | storyHelpers.js `buildUnifiedStoryPrompt` + `buildOutlineReviewPrompt` | ANALYSIS instruction body for story-unified.txt (`{ANALYSIS_INSTRUCTIONS}` placeholder). Single-call mode injects it into the writer prompt; split mode injects it into the reviewer prompt instead |
 | outline-analysis-imagefirst.txt | storyHelpers.js `buildUnifiedStoryPrompt` + `buildOutlineReviewPrompt` | ANALYSIS instruction body for story-unified-imagefirst.txt — same dual use as above |
 | outline-review.txt | storyHelpers.js `buildOutlineReviewPrompt`; server.js split-review seam | External outline review (split mode, default ON): Opus receives the writer's full output + the same analysis instructions + REVIEW HINTS (deterministic scene-consistency findings) and emits ANALYSIS + FIXES REQUIRED + STORY PAGES patches; owns all SEMANTIC scene-consistency judgment (decisions.md 2026-07-31) |
+| story-beats.txt | storyHelpers.js `buildBeatsPrompt` | Beats-first pipeline step 1 (`pipelineMode: 'beats'`) + Test Lab `beats_scenes`: per-page BEAT + one-line SCENE |
+| story-beats-review.txt | storyHelpers.js `buildBeatsReviewPrompt` | Beats-first step 2: structural review, rewrites only faulted pages |
+| scene-review.txt | storyHelpers.js `buildSceneReviewPrompt` | Beats-first step 4: ONE review over ALL scene briefs (repetition, arc, continuity) |
+| story-text-from-beats.txt | storyHelpers.js `buildStoryTextFromBeatsPrompt` | Beats-first step 5: page TEXT written from the locked beats. Emits `---TITLE---` + `---ANALYSIS---` + `---STORY TEXT---` so `parseRefinedText` reads it |
+| text-refine.txt | storyHelpers.js `buildTextRefinePrompt` | Post-image text refinement (both pipelines) |
 | story-trial.txt | storyHelpers.js `buildTrialStoryPrompt` | Trial story call |
 | trial-idea.txt | trial.js `POST /generate-ideas-stream` | Trial idea generation |
 | generate-story-ideas.txt | storyIdeas.js `buildIdeasPromptContext` | Wizard story ideas (multi) |
