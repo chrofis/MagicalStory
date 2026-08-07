@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users, Pencil, Wand2, Eye, Palette } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { useAuth } from '@/context/AuthContext';
 import { DiagnosticImage } from '@/components/common';
 import { wordDiff, diffStats } from '@/utils/wordDiff';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection } from '@/types/story';
@@ -422,8 +421,6 @@ export function StoryDisplay({
 
   // Cover image history modal state
   const [coverHistoryModal, setCoverHistoryModal] = useState<{ coverType: 'frontCover' | 'initialPage' | 'backCover'; versions: ImageVersion[]; activeVersionIndex?: number } | null>(null);
-  const { user } = useAuth();
-  const isAdminUser = user?.role === 'admin';
   const [repaintingTitle, setRepaintingTitle] = useState(false);
   const [titleModalOpen, setTitleModalOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -2103,9 +2100,9 @@ export function StoryDisplay({
               onKeyDown={e => { if (e.key === 'Enter') handleTitleSave(); }}
               autoFocus
             />
-            {isAdminUser && onSetCoverTypography && coverImages?.frontCover && (
+            {developerMode && onSetCoverTypography && coverImages?.frontCover && (
               <div className="mt-3 border-t pt-3">
-                <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">Admin</div>
+                <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">Entwicklungsmodus</div>
                 <CoverTextStylePanel
                   kind="front"
                   language={language}
