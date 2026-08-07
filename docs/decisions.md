@@ -5439,3 +5439,45 @@ negatives there needs the re-eval endpoints to return an un-clamped total.
 
 **Touched:** `server/lib/scoring.js`, `server/routes/stories.js`,
 `client/src/utils/versionScore.ts`, `client/src/components/generation/story/ImageHistoryModal.tsx`.
+
+---
+
+## 2026-08-07 — Consolidator is A/B-able in the Test Lab; cyber scoring sets loaded
+
+**Context:** The 2026-08-06 scoring calibration shipped as PROMPT rules and did NOT take effect —
+measured on `job_1786053708336_8cdsca519` (ran 22:01–22:35 UTC, every change live): 46 of 60
+single-source consolidated issues were still above MODERATE, versus 78% on the story before the
+change. Owner's call: don't patch it blind in code, load the story into the Lab and experiment
+with different prompts and models.
+
+**Why the prompt rule probably lost:** the consolidator runs on the configured eval model and the
+compliance stage on qwen — a conditional instruction ("keep the highest only when two or more
+evaluators flagged it, else cap at MODERATE") is exactly what a mid-tier model drops. That is a
+hypothesis to TEST in the Lab, not an established fact.
+
+**The `consolidate` stage had no knobs at all** — no prompt override, no model override — despite
+authoring ~79% of every page's deductions. `quality_eval` already had `complianceModel` /
+`compliancePrompt` (added for the "over-strict CRITICAL" problem); the consolidator had nothing.
+
+**Decision:**
+1. `consolidateFeedback` accepts `promptOverride` (the inner call already had `modelOverride`);
+   `consolidateEvaluation` accepts and forwards BOTH. Shipped pipeline passes neither, so
+   production behaviour is unchanged.
+2. `runConsolidateStage` maps Lab `promptOverride` → rules and `params.model` → model, and returns
+   `severityMix` + `singleSourceAboveModerate` + `issueCount` so a comparison is readable without
+   opening every issue.
+3. `consolidate` registered in `STAGE_TEMPLATE_KEYS` (prefills `feedback-consolidator.txt`) and
+   flipped to `overridable: true` in the client mirror.
+4. Params-JSON placeholders name real model ids for `consolidate` and `quality_eval`.
+
+**Sets loaded** (both on `job_1786053708336_8cdsca519`, 9 pages each — deliberately spanning the
+range so a laxer rule cannot be declared a win by only looking at the bad pages):
+- **#5 `consolidate`** — "cyber scoring — consolidator A/B"
+- **#6 `quality_eval`** — "cyber scoring — quality+compliance A/B"
+- Members: p11 (scored 5, good page), p1 (0), p10 (15), p5 (36), p14 (53), p8 (60), and controls
+  p2 (100), p7 (100), p6 (95). **The controls are the point** — the failure mode of a lenient rule
+  is inflating genuinely broken pages, which is invisible if only low scorers are in the set.
+
+**Touched:** `server/lib/feedbackConsolidator.js`, `server/lib/testlab.js`,
+`server/routes/admin/testlab.js`, `client/src/services/testlabService.ts`,
+`client/src/pages/TestLab.tsx`.

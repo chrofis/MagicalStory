@@ -3003,7 +3003,7 @@ async function runTextZoneStage(ctx, { experimentId, params = {} }) {
 }
 
 /** Feedback consolidator on the page's stored eval + entity issues (report only). */
-async function runConsolidateStage(ctx, { experimentId, params = {} }) {
+async function runConsolidateStage(ctx, { promptOverride, experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { consolidateEvaluation } = require('./feedbackConsolidator');
@@ -3019,9 +3019,35 @@ async function runConsolidateStage(ctx, { experimentId, params = {} }) {
     storyId: ctx.storyId,
     pageNumber: ctx.pageNumber,
     round: 0,
+    // A/B knobs: `promptOverride` swaps the consolidator's rules (severity
+    // policy, dedupe, MINOR definition); `params.model` swaps the model that
+    // applies them (shipped default is the configured eval model).
+    promptOverride: promptOverride || null,
+    modelOverride: params.model || null,
   });
   const elapsedMs = Date.now() - t0;
-  return { elapsedMs, plan: result?.plan || null, dedupedIssues: result?.dedupedIssues || null, skipped: !!result?.skipped, consolidateError: result?.error || null };
+  // Severity mix is the point of these runs — surface it next to the plan so a
+  // comparison doesn't require reading every issue by hand.
+  const issues = result?.dedupedIssues || [];
+  const severityMix = {};
+  let singleSourceAboveModerate = 0;
+  for (const i of issues) {
+    const sev = String(i?.severity || '').toLowerCase();
+    severityMix[sev] = (severityMix[sev] || 0) + 1;
+    if (Array.isArray(i?.sources) && i.sources.length === 1
+      && ['major', 'critical', 'catastrophic'].includes(sev)) singleSourceAboveModerate++;
+  }
+  return {
+    elapsedMs,
+    plan: result?.plan || null,
+    dedupedIssues: result?.dedupedIssues || null,
+    skipped: !!result?.skipped,
+    consolidateError: result?.error || null,
+    model: params.model || null,
+    issueCount: issues.length,
+    severityMix,
+    singleSourceAboveModerate,
+  };
 }
 
 /** Targeted inpaint from the stored (or supplied) eval — the pipeline's inpaintPage. */

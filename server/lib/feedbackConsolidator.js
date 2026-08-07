@@ -197,9 +197,13 @@ async function consolidateFeedback({
   // Model override — defaults to the configured eval model (resolveEvalModel,
   // key-guarded). The A/B replay passes an explicit model to compare.
   modelOverride = null,
+  // Template override — Test Lab only. The consolidator authors most of a
+  // page's deductions, so its rules (severity policy, dedupe, MINOR
+  // definition) are the highest-leverage thing to A/B. Null = shipped template.
+  promptOverride = null,
 }) {
   try {
-    const template = PROMPT_TEMPLATES.feedbackConsolidator;
+    const template = promptOverride || PROMPT_TEMPLATES.feedbackConsolidator;
     if (!template) {
       return { plan: null, usage: null, error: 'feedbackConsolidator prompt template not loaded' };
     }
@@ -507,6 +511,10 @@ async function consolidateEvaluation({
   storyId = null,
   pageNumber = null,
   round = null,
+  // Forwarded to consolidateFeedback so the Test Lab can A/B the consolidator's
+  // model and rules without touching the shipped pipeline.
+  modelOverride = null,
+  promptOverride = null,
 } = {}) {
   if (!evalResult || typeof evalResult !== 'object') {
     return { plan: null, dedupedIssues: null, usage: null, error: 'no evalResult', skipped: true };
@@ -543,6 +551,8 @@ async function consolidateEvaluation({
     sceneClothing,
     storyId,
     round,
+    modelOverride,
+    promptOverride,
   });
   if (!plan) {
     return { plan: null, dedupedIssues: null, usage, error: error || 'consolidation failed', skipped: false };

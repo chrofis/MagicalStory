@@ -1140,6 +1140,10 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
             className="border rounded-lg px-3 py-2 text-sm w-full font-mono"
             placeholder={stage === 'qwen_insert'
               ? 'Params JSON — e.g. {"crop":{"x":0.1,"y":0.5,"w":0.3,"h":0.45},"pose":"standing on the grass, arms raised","base":"empty_scene"}'
+              : stage === 'consolidate'
+              ? 'Params JSON — e.g. {"model":"claude-sonnet"} · also: qwen-plus, qwen3-max, gemini-2.5-flash, deepseek-v4-pro, grok-4-fast'
+              : stage === 'quality_eval'
+              ? 'Params JSON — e.g. {"complianceModel":"claude-sonnet"} · compliancePrompt overrides the stage-2 template'
               : 'Params JSON (optional — extra stage parameters)'}
             value={paramsJson}
             onChange={e => setParamsJson(e.target.value)}

@@ -126,6 +126,10 @@ const STAGE_TEMPLATE_KEYS = {
   // Pass-2 style transfer. Marked overridable since it shipped but had no
   // prefill, so "Load current template" silently did nothing for it.
   avatar_style: 'styledCostumedAvatar',
+  // The consolidator writes most of a page's deductions (severity policy,
+  // dedupe, MINOR definition), so its rules are the highest-leverage prompt to
+  // A/B. Pair the override with params.model to vary the model applying them.
+  consolidate: 'feedbackConsolidator',
 };
 
 // GET /api/admin/testlab/templates — current template text per overridable stage

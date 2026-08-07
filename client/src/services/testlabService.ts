@@ -317,7 +317,7 @@ export const TESTLAB_STAGES = [
   { id: 'char_repair', label: 'Character repair', producesImage: true, overridable: false },
   { id: 'entity', label: 'Entity consistency', producesImage: false, overridable: false },
   { id: 'text_zone', label: 'Text zone (calm + wash)', producesImage: true, overridable: false },
-  { id: 'consolidate', label: 'Feedback consolidator', producesImage: false, overridable: false },
+  { id: 'consolidate', label: 'Feedback consolidator', producesImage: false, overridable: true },
   { id: 'inpaint', label: 'Inpaint repair', producesImage: true, overridable: false },
   { id: 'iterate', label: 'Iterate (full regen)', producesImage: true, overridable: false },
   { id: 'repair_round', label: 'Auto repair round', producesImage: true, overridable: false },
