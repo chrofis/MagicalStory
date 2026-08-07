@@ -2497,13 +2497,26 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
     throw new Error('Database mode required');
   }
 
+  // preserveScore: keep the row's existing quality_score when this save does not
+  // carry one. The upsert normally writes EXCLUDED.quality_score, so ANY re-save
+  // without a score NULLS it — which is how the cover typography bake silently
+  // wiped an evaluated cover's score (V2 scored 80 in stories.data but the
+  // picker, which reads this column, showed nothing). Text stamping rewrites the
+  // same evaluated image with lettering on top, so the score still applies.
+  // Regeneration paths must NOT set this: a new image needs a fresh score.
+
   // isTest/experimentId: Test Lab sandbox versions — excluded from every
   // user-facing read (see is_test filters below); promoted by flipping the flag.
   // cacheBust: the write REPLACES an existing version's content (cover restamp
   // after a title/dedication/typography edit). Versioned R2 keys are cached as
   // immutable, so overwriting the same key leaves every CDN/browser serving
   // the OLD image — a fresh revision suffix mints a new URL instead.
-  const { qualityScore = null, generatedAt = null, versionIndex = 0, isTest = false, experimentId = null, cacheBust = false } = options;
+  const { qualityScore = null, generatedAt = null, versionIndex = 0, isTest = false, experimentId = null, cacheBust = false, preserveScore = false } = options;
+  // See the preserveScore note above: COALESCE keeps the stored score when this
+  // save carries none, instead of nulling it.
+  const scoreExpr = preserveScore
+    ? 'COALESCE(EXCLUDED.quality_score, story_images.quality_score)'
+    : 'EXCLUDED.quality_score';
 
   // Normalize covers to exact A4 aspect at write time — every cover render
   // is the full bleed page, so a 1% Grok drift would show as a misaligned
@@ -2544,7 +2557,7 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
       `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, image_url, quality_score, generated_at, is_test, experiment_id)
        VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (story_id, image_type, version_index) WHERE page_number IS NULL
-       DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at, is_test = EXCLUDED.is_test, experiment_id = EXCLUDED.experiment_id`,
+       DO UPDATE SET image_data = EXCLUDED.image_data, image_url = EXCLUDED.image_url, quality_score = ${scoreExpr}, generated_at = EXCLUDED.generated_at, is_test = EXCLUDED.is_test, experiment_id = EXCLUDED.experiment_id`,
       [storyId, imageType, versionIndex, persistedImageData, imageUrl, qualityScore, generatedAt, isTest, experimentId]
     );
   } else {
@@ -3291,7 +3304,8 @@ module.exports = {
   saveStoryData,
   saveScenePageData,
   stripInlineImagesFromStoryData,
-  extractInlineImagesToR2,  upsertStory,
+  extractInlineImagesToR2,
+  upsertStory,
   // Image functions
   saveStoryImage,
   getNextVersionIndex,
