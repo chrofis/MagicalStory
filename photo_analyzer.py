@@ -1561,6 +1561,15 @@ def _release_memory():
 _mobilesam_model = None
 _mobilesam_last_used = 0.0
 _MOBILESAM_IDLE_UNLOAD_S = int(os.environ.get('MOBILESAM_IDLE_UNLOAD_S', '900'))
+# Serializes ALL access to the one shared MobileSAM model + its ultralytics
+# predictor (load, inference, cache-clear, idle-unload). The predictor is NOT
+# thread-safe — it stashes the current run's image / prompts / results on itself
+# (see _free_sam_cache) — so concurrent /figure-mask calls under waitress's 24
+# threads interleave and return a mask for the WRONG image. That is the root
+# cause of "SAM mask entirely outside the DINO box" appearing story-wide when
+# the repair phase fired masks in parallel. rembg and GroundingDINO are guarded
+# the same way; MobileSAM was the one heavy model left unlocked.
+_mobilesam_lock = threading.Lock()
 
 
 def _free_sam_cache():
@@ -1622,10 +1631,12 @@ def get_mobilesam():
     global _mobilesam_model, _mobilesam_last_used
     _mobilesam_last_used = time.time()
     if _mobilesam_model is None:
-        from ultralytics import SAM  # optional dep — endpoint 503s if missing
-        weights = os.environ.get('MOBILESAM_WEIGHTS', 'mobile_sam.pt')
-        print(f"[FIGURE-MASK] Loading MobileSAM ({weights})...")
-        _mobilesam_model = SAM(weights)
+        with _mobilesam_lock:
+            if _mobilesam_model is None:  # double-checked: another thread may have loaded it
+                from ultralytics import SAM  # optional dep — endpoint 503s if missing
+                weights = os.environ.get('MOBILESAM_WEIGHTS', 'mobile_sam.pt')
+                print(f"[FIGURE-MASK] Loading MobileSAM ({weights})...")
+                _mobilesam_model = SAM(weights)
     return _mobilesam_model
 
 
@@ -1718,13 +1729,22 @@ def figure_mask_endpoint():
                 prompt_kwargs['points'] = pts
                 prompt_kwargs['labels'] = labels
 
-        # imgsz 1024 keeps memory bounded (16GB rule); measured 573MB peak
-        results = model(img, imgsz=1024, verbose=False, **prompt_kwargs)
-        res = results[0]
-        if res.masks is None or len(res.masks.data) == 0:
+        # imgsz 1024 keeps memory bounded (16GB rule); measured 573MB peak.
+        # Held under _mobilesam_lock: the model + predictor are shared process
+        # state, so inference and the cache-clear must be atomic (see the lock's
+        # definition). Copy the mask off the predictor to a plain numpy array
+        # inside the lock; everything below runs on that copy and needs no lock.
+        with _mobilesam_lock:
+            results = model(img, imgsz=1024, verbose=False, **prompt_kwargs)
+            res = results[0]
+            has_mask = res.masks is not None and len(res.masks.data) > 0
+            m = res.masks.data.cpu().numpy() if has_mask else None  # [n, mh, mw] at inference scale
+            del results, res
+            _free_sam_cache()
+        if not has_mask:
+            _release_memory()
             return jsonify({"success": False, "error": "no mask returned"}), 200
 
-        m = res.masks.data.cpu().numpy()  # [n, mh, mw] at inference scale
         union = (m.max(axis=0) > 0.5).astype(np.uint8) * 255
         union = cv2.resize(union, (w, h), interpolation=cv2.INTER_NEAREST)
         binary = union > 128
@@ -1744,12 +1764,10 @@ def figure_mask_endpoint():
             "fill_pixels": fill_pixels,
         })
         # Drop the big per-call intermediates, then hand freed RSS back to the OS
-        # so this long-running process doesn't creep up into an OOM 500.
-        del results, res, m, union, binary, out, buffer, img, img_array
-        # Our own locals are gone, but ultralytics still holds the run's tensors
-        # on the predictor — that retention, not fragmentation, is what made RSS
-        # climb ~300MB per call even with the trim below. Model stays loaded.
-        _free_sam_cache()
+        # so this long-running process doesn't creep up into an OOM 500. The
+        # predictor's retained tensors (features/results — the ~300MB/call
+        # growth) were already cleared under the lock above via _free_sam_cache.
+        del m, union, binary, out, buffer, img, img_array
         _release_memory()
         print(f"[FIGURE-MASK] {w}x{h} crop, box={box_str}{pts_str}, fill px={fill_pixels}, rss={_rss_mb()}MB")
         return payload
@@ -1759,7 +1777,8 @@ def figure_mask_endpoint():
         # crop, so a run of 500s stacked ~300MB each. Clear here too.
         print(f"[FIGURE-MASK] Error: {e} (rss={_rss_mb()}MB)")
         traceback.print_exc()
-        _free_sam_cache()
+        with _mobilesam_lock:
+            _free_sam_cache()
         _release_memory()
         print(f"[FIGURE-MASK] after cleanup rss={_rss_mb()}MB")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -1825,7 +1844,8 @@ def _idle_model_reaper():
 
         if _mobilesam_model is not None and (now - _mobilesam_last_used) > _MOBILESAM_IDLE_UNLOAD_S:
             print(f"[FIGURE-MASK] idle {int(now - _mobilesam_last_used)}s — unloading MobileSAM to free RAM")
-            _mobilesam_model = None
+            with _mobilesam_lock:  # don't unload out from under an in-flight inference
+                _mobilesam_model = None
             _release_memory()
             print(f"[FIGURE-MASK] unloaded — RSS now {_rss_mb()} MB")
 

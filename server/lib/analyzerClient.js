@@ -63,9 +63,13 @@ const WARM_INTERVAL_MS = 5 * 60 * 1000;
  * Tell the analyzer to preload its models because a user is active.
  * Fire-and-forget: never block or fail a user request over warming.
  */
-function ensureWarm(reason = 'user-active') {
+function ensureWarm(reason = 'user-active', { force = false } = {}) {
   const now = Date.now();
-  if (now - lastWarmMs < WARM_INTERVAL_MS) return;
+  // force bypasses the debounce for a known-critical moment (e.g. the repair
+  // phase is about to run detection after a long text/image phase that let the
+  // models idle-unload). The debounce is shared across stories, so without
+  // force a concurrent story's recent warm could skip the one that matters.
+  if (!force && now - lastWarmMs < WARM_INTERVAL_MS) return;
   lastWarmMs = now;
   analyzerFetch('/warmup', { method: 'POST', signal: AbortSignal.timeout(8000) }, { retries: 1, retryDelayMs: 3000 })
     .then(() => log.debug(`[ANALYZER] warmup requested (${reason})`))

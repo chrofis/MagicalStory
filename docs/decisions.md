@@ -5776,3 +5776,39 @@ a render that would bake in the wrong outfit stops.
 data that carries per-page clothing (verified on `job_1786053708336_8cdsca519`), but a story with a
 genuine data gap will now fail where it previously shipped a wrong outfit — that is the intent, and
 it needs a full generation run to confirm nothing legitimate trips it.
+
+## MobileSAM figure-mask must be serialized — concurrency race, not memory (2026-08-08)
+
+**Context:** A cyber-anime story (`job_1786053708336`) logged `SAM mask entirely outside the DINO box`
+on ~10/14 pages, so every figure fell back to its raw box and masked character-repair was effectively
+off. First-guess causes (a coordinate transposition, then memory pressure) were both **wrong**: the
+stored boxes were correct once read as the app's Gemini y-first convention, and there was **no OOM**
+in the run (no kill, no allocation error; idle RSS ~132 MB). A fresh single-request GDINO+SAM replay
+on the same pages produced 10/10 clean masks. The differentiator is concurrency: the analyzer serves
+via **waitress with 24 threads in one process**, and MobileSAM was the one heavy model whose inference
+was neither locked server-side nor routed through Node's `withAnalyzerSlot` (rembg, GroundingDINO, and
+the *other* figure-mask caller all are). ultralytics' SAM predictor stashes the run's image / prompts /
+results on one shared object (see `_free_sam_cache`), so parallel repair-phase mask calls interleaved
+and returned masks for the wrong image.
+
+**Decision:** Serialize all MobileSAM access. Added `_mobilesam_lock` guarding load, inference,
+per-call cache-clear, and idle-unload in `photo_analyzer.py`; the mask is copied off the predictor to a
+plain numpy array inside the lock and the rest of the endpoint runs lock-free on that copy. Node-side,
+`_mobilesamMaskFull` now goes through `withAnalyzerSlot` like every other analyzer call, bounding the
+in-flight queue. Separately, the pipeline now `ensureWarm('repair-phase', {force:true})` at the start
+of the repair pipeline so MobileSAM/GroundingDINO reload before the first detection instead of cold
+mid-repair (a story's text+image phase can exceed the 15-min idle-unload).
+
+**Rationale:** The failure was correctness under concurrency, so the fix is a lock, not memory
+management. Memory was explicitly NOT the problem — the self-recycle already reclaims between stories
+(idle RSS is tiny) and there was no OOM; per owner direction we optimize for speed and only reclaim
+when idle, so NO mid-story recycling was added. Serializing SAM costs throughput (one inference at a
+time) but the calls contended on the CPU quota anyway; correctness wins.
+
+**Touched:** `photo_analyzer.py` (`_mobilesam_lock` + guarded load/inference/cache/unload),
+`server/lib/images.js` (`_mobilesamMaskFull` via `withAnalyzerSlot`),
+`server/lib/analyzerClient.js` (`ensureWarm` force option), `server.js` (repair-phase warm).
+
+**Status:** ✅ shipped to staging — needs a real multi-figure story run to confirm the masks land under
+concurrency (staging-only path; prod uses the Gemini bbox but DOES use MobileSAM for repair masks, so
+the lock + warm help prod too).

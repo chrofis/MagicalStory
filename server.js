@@ -6588,6 +6588,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }));
       } else {
         log.info(`🔧 [UNIFIED] Running unified repair pipeline...`);
+        // Warm the analyzer's vision models NOW, at the start of the repair
+        // phase. MobileSAM (repair masks, all backends) and GroundingDINO
+        // (staging figure detection) idle-unload after ~15 min, and a story's
+        // text+image phase can exceed that — so the first bbox detection below
+        // would otherwise pay a cold model load mid-repair (observed as cold
+        // "returned nothing" fallbacks). Fire-and-forget; the load overlaps the
+        // eval that follows. force=true so the shared 5-min debounce can't skip it.
+        require('./server/lib/analyzerClient').ensureWarm('repair-phase', { force: true });
 
         // Phase 5b-pre: Shared bbox detection — runs ONCE per image before quality eval
         // and entity consistency. Both consume the same result, avoiding redundant API calls.
