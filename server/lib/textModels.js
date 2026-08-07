@@ -393,7 +393,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
  * @param {function} onChunk - Callback function called with each text chunk
  * @returns {Promise<{text: string, usage: object, ttft: number|null}>}
  */
-async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
+async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -429,7 +429,9 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
         }],
         generationConfig: {
           maxOutputTokens: maxTokens,
-          temperature: 0.7
+          // Callers that are judging rather than writing pass 0 (see
+          // EVAL_TEMPERATURE). Default stays 0.7 for generation.
+          temperature: options?.temperature ?? 0.7
         }
       }),
       signal: controller.signal
@@ -558,7 +560,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
           maxOutputTokens: maxTokens,
-          temperature: 0.7
+          temperature: options?.temperature ?? 0.7
         }
       };
       if (options && options.system) reqBody.systemInstruction = { parts: [{ text: options.system }] };
@@ -765,6 +767,9 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
         body: JSON.stringify({
           model: modelId,
           max_tokens: maxTokens,
+          // Unset previously — the provider default (~1.0) is why the qwen
+          // compliance/consolidator judges were non-reproducible.
+          ...(options?.temperature != null ? { temperature: options.temperature } : {}),
           stream: true,
           stream_options: { include_usage: true },
           messages
@@ -1148,7 +1153,7 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
       result = await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, options);
       break;
     case 'google':
-      result = await callGeminiTextAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk);
+      result = await callGeminiTextAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, options);
       break;
     case 'xai':
       result = await callXaiAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, options);

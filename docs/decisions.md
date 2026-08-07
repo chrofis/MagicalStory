@@ -5544,3 +5544,47 @@ first; a hot judge makes the next comparison as unreliable as this one nearly wa
 
 **Touched:** `scripts/admin/testlab-run.js` (`--compliance-prompt`, `--compliance-model`,
 `--model` flags — quality_eval runs two templates and only one was reachable from the CLI).
+
+---
+
+## 2026-08-07 — Eval judges pinned to temperature 0; style block shipped; scene prose may not ban rendering
+
+Follow-up to the neon experiments (#397/#399 baseline vs #400/#401 variant). Owner picked all
+three actions.
+
+**1. The judges are pinned.** `EVAL_TEMPERATURE` (default 0) moves to `server/config/models.js` as
+the single source of truth; `images.js` imports it instead of defining its own copy. Applied to
+every judging call that was previously hot:
+- compliance / three-stage (`images.js`, qwen via OpenRouter — the OpenRouter body set NO
+  temperature at all, so it ran at the provider default ~1.0),
+- the feedback consolidator (same dispatcher),
+- `sceneValidator.js` — `describeImage`, `analyzeGeneratedImage`, `validateComposition` (no
+  generationConfig at all) and `evaluateSemanticFidelity` (was 0.3).
+
+`textModels.js` now honours `options.temperature` on the Gemini streaming, Gemini non-streaming and
+OpenRouter paths, defaulting to today's 0.7 / provider default. **Story generation is deliberately
+untouched** — only callers that are judging rather than writing opt in. Caught while implementing:
+`callGeminiTextAPIStreaming` had no `options` parameter, so the passthrough would have thrown at
+runtime; signature and its one call site fixed.
+
+**2. Style block shipped** into `image-prompt-compliance.txt` and `image-evaluation.txt` verbatim as
+tested in #400/#401.
+
+**3. Scene prose may not ban rendering.** Page 11 read "Wide shot, clear depth layers, no glowing
+objects or text" while its own ART STYLE block required neon signage — the page contradicted itself
+and the evaluator was right to flag it either way. The Art Director never sees the art style, and
+the template's own example ends "no other figures in the room", so it generalised the pattern from
+props to rendering. New rule: exclusions may only rule out PEOPLE or PROPS, never how the picture is
+drawn. Added to all THREE sites that emit scene prose — `scene-expansion.txt` (the fallback) plus
+`story-unified.txt` and `story-unified-imagefirst.txt` (the main writers, which produce most pages).
+
+**Status:** 🟡 staging. The variant measured 0 false neon findings on p1/p3/p10 across both runs, but
+that was against an unpinned judge. The clean re-measurement (baseline vs variant on a pinned judge)
+has NOT been run — worth doing before master, and it also re-tests whether the 08-06 consensus-cap
+rule was genuinely ignored or merely lost in the noise.
+
+**Touched:** `server/config/models.js`, `server/lib/textModels.js`, `server/lib/images.js`,
+`server/lib/feedbackConsolidator.js`, `server/lib/sceneValidator.js`,
+`prompts/image-evaluation.txt`, `prompts/image-prompt-compliance.txt`,
+`prompts/scene-expansion.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`.

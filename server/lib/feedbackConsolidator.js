@@ -303,6 +303,8 @@ async function consolidateFeedback({
     // the whole page to the legacy raw-issue fallback. Extra headroom only
     // costs more when the output is genuinely longer (the failing case).
     const result = await callTextModel(userInput, 6000, evalModel, {
+      // Judging, not writing — pinned so a rules/model A/B is reproducible.
+      temperature: require('../config/models').EVAL_TEMPERATURE,
       usageLabel: 'eval_consolidation',
       cachePrefix: `${template}\n\n---\n\n`
     });

@@ -16,6 +16,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { generateWithRunware, RUNWARE_MODELS, isRunwareConfigured } = require('./runware');
 const { callTextModel } = require('./textModels');
+const { EVAL_TEMPERATURE } = require('../config/models');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { log } = require('../utils/logger');
 const { expandPositionAbbreviations, stripEntityIds, buildHairDescription } = require('./storyHelpers');
@@ -259,7 +260,7 @@ function buildPreviewPrompt(sceneJson) {
 async function describeImage(imageData) {
   log.debug('[SCENE-VALIDATOR] Vision model describing image...');
 
-  const model = genAI.getGenerativeModel({ model: VISION_MODEL }, EVAL_REQUEST_OPTIONS);
+  const model = genAI.getGenerativeModel({ model: VISION_MODEL, generationConfig: { temperature: EVAL_TEMPERATURE } }, EVAL_REQUEST_OPTIONS);
   const startTime = Date.now();
 
   // Convert image to base64 if needed
@@ -302,7 +303,16 @@ function formatCharacterContext(characters, clothingRequirements = {}) {
   }
 
   return characters.map(char => {
-    const clothing = clothingRequirements[char.name]?._currentClothing || 'standard';
+    // `_currentClothing` is stamped per page by buildSceneClothingRequirements.
+    // Its absence means the caller handed over the STORY-level blob, and the
+    // 'standard' default below then resolves to whatever the character wore in
+    // some earlier story — the outfit leak this function's resolver was meant
+    // to prevent. Silent for two years; say it out loud.
+    const perPage = clothingRequirements[char.name]?._currentClothing;
+    if (!perPage) {
+      log.error(`❌ [SCENE-VALIDATOR] ${char.name}: clothingRequirements carries no _currentClothing — falling back to 'standard'. Pass the per-page view (buildSceneClothingRequirements) or the analysis will describe the wrong outfit.`);
+    }
+    const clothing = perPage || 'standard';
     // Per-story clothing is the source of truth. Use the SAME resolver as image
     // generation (clothingRequirements → avatars fallback), never the raw
     // avatars.clothing[category] default — that leaks the base-character outfit
@@ -368,7 +378,7 @@ function formatLandmarkContext(visualBible) {
 async function analyzeGeneratedImage(imageData, characters = null, visualBible = null, clothingRequirements = null) {
   log.debug('[SCENE-VALIDATOR] Analyzing generated image with character context...');
 
-  const model = genAI.getGenerativeModel({ model: VISION_MODEL }, EVAL_REQUEST_OPTIONS);
+  const model = genAI.getGenerativeModel({ model: VISION_MODEL, generationConfig: { temperature: EVAL_TEMPERATURE } }, EVAL_REQUEST_OPTIONS);
   const startTime = Date.now();
 
   // Build character info section
@@ -491,7 +501,7 @@ async function generatePreviewFeedback(sceneHint, characterNames = []) {
 async function validateComposition(sceneJson, imageDescription) {
   log.debug('[SCENE-VALIDATOR] Comparing scene vs image...');
 
-  const model = genAI.getGenerativeModel({ model: COMPARISON_MODEL }, EVAL_REQUEST_OPTIONS);
+  const model = genAI.getGenerativeModel({ model: COMPARISON_MODEL, generationConfig: { temperature: EVAL_TEMPERATURE } }, EVAL_REQUEST_OPTIONS);
   const startTime = Date.now();
 
   // Format scene JSON for the prompt
@@ -764,7 +774,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   const model = genAI.getGenerativeModel({
     model: VISION_MODEL,
     safetySettings: GEMINI_SAFETY_SETTINGS,
-    generationConfig: { maxOutputTokens: 24000, temperature: 0.3 }
+    generationConfig: { maxOutputTokens: 24000, temperature: EVAL_TEMPERATURE }
   }, EVAL_REQUEST_OPTIONS);
   const startTime = Date.now();
 

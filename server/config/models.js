@@ -591,6 +591,14 @@ const IMAGE_MODELS = {
 // three evaluators triple-counts to −30 from a perfect 100 → 70 < 80 → redo.
 // Lowered to 60 so a single moderate issue stays above the bar; only genuinely
 // bad pages (multiple issues OR one critical penalty) trip a regenerate.
+// Judgment calls (image evaluation, semantic fidelity, compliance, feedback
+// consolidation) run at this temperature. 0 by default: two identical baseline
+// runs over the same six pages returned 10 and 4 findings respectively because
+// only the Gemini visual eval was pinned — the compliance and semantic judges
+// ran at 0.7 / the provider default, which makes any prompt or model A/B
+// unmeasurable. Override with EVAL_TEMPERATURE to explore judge variance.
+const EVAL_TEMPERATURE = process.env.EVAL_TEMPERATURE != null ? Number(process.env.EVAL_TEMPERATURE) : 0;
+
 const REPAIR_DEFAULTS = {
   scoreThreshold: 60,       // Pages scoring below this need redo (0-100)
   issueThreshold: 5,        // Pages with this many fixable issues need redo
@@ -800,6 +808,7 @@ function resolveSceneValidationModel() { return guardModel(MODEL_DEFAULTS.sceneV
 function resolveSceneRewriteModel() { return guardModel(MODEL_DEFAULTS.sceneRewrite, 'SCENE REWRITE MODEL'); }
 
 module.exports = {
+  EVAL_TEMPERATURE,
   TEXT_MODELS,
   MODEL_DEFAULTS,
   resolveEvalModel,

@@ -79,7 +79,7 @@ const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS, TEXT_MOD
 // detection check from rationalising extra "problems" (it permanently
 // condemns good images). Semantic / three-stage evals are unaffected — they
 // keep their own calls and can keep thinking where reasoning genuinely helps.
-const EVAL_TEMPERATURE = process.env.EVAL_TEMPERATURE != null ? Number(process.env.EVAL_TEMPERATURE) : 0;
+const { EVAL_TEMPERATURE } = require('../config/models');
 const EVAL_THINKING_BUDGET = process.env.EVAL_THINKING_BUDGET != null ? Number(process.env.EVAL_THINKING_BUDGET) : 0;
 const { createDiffImage } = require('./repairVerification');
 
@@ -1144,7 +1144,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // Now configurable (resolveEvalModel, key-guarded to sonnet). NOTE: this is
     // quality-critical and NOT yet A/B-validated on Qwen — watch repair churn.
     const complianceModel = complianceModelOverride || require('../config/models').resolveComplianceModel();
-    const sonnetResult = await callTextModel(complianceInput, 8192, complianceModel, { usageLabel: 'semantic_compliance' });
+    const sonnetResult = await callTextModel(complianceInput, 8192, complianceModel, { usageLabel: 'semantic_compliance', temperature: EVAL_TEMPERATURE });
 
     stage2Usage = {
       input_tokens: sonnetResult.usage?.input_tokens || 0,
@@ -9687,7 +9687,8 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     parseProseMetadataFormat,
     parseClothingCategory,
     getLandmarkPhotosForScene,
-    convertClothingToCurrentFormat
+    convertClothingToCurrentFormat,
+    buildSceneClothingRequirements
   } = getStoryHelpers();
 
   const { callClaudeAPI } = require('./textModels');
@@ -9726,7 +9727,31 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Analyzing current image with vision model...`);
 
   // Step 1: Analyze the current image using analyzeGeneratedImage (composition analysis)
-  const imageDescription = await analyzeGeneratedImage(imageData, characters, visualBible, clothingRequirements);
+  // The analysis is told what each character is WEARING, and that text flows
+  // into the scene rewrite as previewFeedback.composition. It must therefore
+  // carry THIS PAGE's outfit: formatCharacterContext reads `_currentClothing`,
+  // which only the per-page view of clothingRequirements carries. Passing the
+  // story-level blob resolved every character to 'standard' → the unused
+  // standard category has no description → buildClothingDescription fell
+  // through to the character-level avatars.clothing.standard, and the rewrite
+  // dressed a summer story in the stored winter/standard wardrobe (observed on
+  // staging job_1786053708336_8cdsca519 p10: Noah's sky-blue polo became a
+  // "dark green T-Rex hoodie, dark grey sweatpants" — his avatars standard
+  // entry verbatim). Same reason only the page's cast is passed: an absent
+  // character's outfit is noise the vision model can attach to a figure.
+  const pageCharClothing = savedScene.perCharClothing
+    || pageClothingData?.pageClothing?.[pageNumber]
+    || null;
+  const analysisCharacters = (() => {
+    const names = (savedScene.sceneCharacters || []).map(c => String(c?.name || '').trim().toLowerCase()).filter(Boolean);
+    if (names.length === 0) return characters;
+    const matched = characters.filter(c => names.includes(String(c.name || '').trim().toLowerCase()));
+    return matched.length > 0 ? matched : characters;
+  })();
+  const analysisClothingRequirements = buildSceneClothingRequirements(
+    analysisCharacters, pageCharClothing, clothingRequirements
+  );
+  const imageDescription = await analyzeGeneratedImage(imageData, analysisCharacters, visualBible, analysisClothingRequirements);
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Composition analysis complete (${imageDescription.description.length} chars)`);
 
   // Step 2: Build previewFeedback from the image analysis.
