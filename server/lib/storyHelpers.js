@@ -4150,7 +4150,13 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     CHARACTER_COUNT: characters.length.toString(),
     HEIGHT_ORDER: heightOrder,
     RECURRING_ELEMENTS: recurringElements,
-    AVAILABLE_AVATARS: '', // Clothing comes from scene hint — no need to list all avatars
+    // Honour the caller's value. This was hardcoded to '' on the assumption that
+    // clothing always arrives via the scene hint — true in the unified pipeline,
+    // where the writer bakes outfits into each hint, but false in beats mode,
+    // where the hint is a one-line beat and clothingRequirements is the only
+    // source. With it discarded the Art Director invented its own categories.
+    // Every caller already passes a value; only this fill threw it away.
+    AVAILABLE_AVATARS: availableAvatars || '',
     LOCKED_PERSPECTIVES: lockedPerspectivesText,
     TEXT_ZONE_OVERRIDE: textZoneOverride,
     LANGUAGE_NAME: languageName,
