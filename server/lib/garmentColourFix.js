@@ -56,6 +56,15 @@ const DEFAULTS = {
   // alone is not enough); deltaE keeps the growth on-garment.
   dilateRadius: 3,
   dilateDeltaE: 12,
+  // Apply-side colour gate. The SAM mask is trusted for WHERE the garment is,
+  // not for WHAT every pixel inside it is: on a figure with folded arms the
+  // silhouette picked up a speckle of forearm, and without this gate those skin
+  // pixels took the full garment offset. Measured on that page: 88% of masked
+  // pixels sit within deltaE 30 of the garment mean (the shirt and its own
+  // shading) while skin sits at ~41. Full weight below `applyDeltaESoft`, ramped
+  // to zero at `applyDeltaEHard`, so folds survive and skin fades out.
+  applyDeltaESoft: 26,
+  applyDeltaEHard: 40,
   // Below this the garment is already right; skip rather than churn bytes.
   minDeltaE: 6,
   minMaskPx: 200,
@@ -296,14 +305,23 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
 
   // Apply inside the crop, weighted by the SAM alpha (free feathered edge).
   const out = Buffer.from(cropRaw);
+  const soft = cfg.applyDeltaESoft, hard = Math.max(cfg.applyDeltaESoft + 1, cfg.applyDeltaEHard);
+  let gated = 0;
   for (let i = 0; i < cw * ch; i++) {
     const a8 = seg.alpha[i];
     if (a8 <= 8) continue;
-    const w = Math.min(1, a8 / 255);
     const l = _rgbToLab(cropRaw[i * 3], cropRaw[i * 3 + 1], cropRaw[i * 3 + 2]);
+    // How far is THIS pixel from the garment colour we measured? Skin caught by
+    // a slightly generous silhouette sits far out and must not take the offset.
+    const d = Math.hypot(l[0] - cur.L, l[1] - cur.a, l[2] - cur.b);
+    let wColour = 1;
+    if (d >= hard) { gated++; continue; }
+    if (d > soft) wColour = (hard - d) / (hard - soft);
+    const w = Math.min(1, a8 / 255) * wColour;
     const rgb = _labToRgb(l[0] + w * dL, l[1] + w * da, l[2] + w * db);
     out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2];
   }
+  if (gated) report.colourGated = gated;
   const fixedCrop = await sharp(out, { raw: { width: cw, height: ch, channels: 3 } }).png().toBuffer();
   const merged = await sharp(pageBuf).composite([{ input: fixedCrop, left: x0, top: y0 }]).jpeg({ quality: 95 }).toBuffer();
 
