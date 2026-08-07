@@ -1,26 +1,47 @@
 /**
  * Beats-first story generation (pipelineMode: 'beats').
  *
- * Replaces the single unified Sonnet call + outline review with five staged
+ * Replaces the single unified Sonnet call + outline review with six staged
  * calls, so every stage is reviewable and only the faulted pages get rewritten:
  *
  *   1. beats_plan            Sonnet    per-page BEAT + one-line SCENE
  *   2. beats_review          DeepSeek  structural review, rewrites faulted pages
- *   3. beats_scene_expansion Sonnet    one call PER PAGE, in parallel
- *   4. beats_scene_review    DeepSeek  ONE call over ALL briefs, rewrites faulted
- *   5. beats_story_text      Sonnet    page text written from the locked beats
+ *   3. beats_story_bible     Sonnet    clothing + Visual Bible + cover hints
+ *   4. beats_scene_expansion Sonnet    one call PER PAGE, in parallel
+ *   5. beats_scene_review    DeepSeek  ONE call over ALL briefs, rewrites faulted
+ *   6. beats_story_text      Sonnet    page text written from the locked beats
  *
- * Step 6 (text_refine) already runs downstream in server.js and is untouched.
+ * Scheduling is by data dependency, not by list order:
+ *
+ *   beats ─> beats review ─> bible ─┬─> styled avatars   (caller-owned, long pole)
+ *                                   ├─> scene expansion ─> scene review
+ *                                   └─> page text
+ *
+ * Step 6 reads the beats only, never a brief, so it is started before step 4
+ * and awaited after step 5. Styled avatars need only clothingRequirements, so
+ * they start the instant step 3 returns (via opts.onClothingRequirements) and
+ * overlap everything after it — page images await briefs AND avatars, both in
+ * server.js, unchanged. Step 3 is the one thing that cannot overlap: its
+ * output IS step 4's input.
+ *
+ * Step 7 (text_refine) already runs downstream in server.js and is untouched.
  *
  * Every builder/parser here is the same one the Test Lab's `beats_scenes` stage
  * uses (server/lib/testlab.js → runBeatsScenesStage); that stage stays the
  * measurement harness, this module is the production wiring.
  *
- * KNOWN GAP (see docs/decisions.md): the unified call also produced the Visual
- * Bible, clothing requirements and cover hints. No beats-stage prompt produces
- * those yet, so a beats run ships with an empty VB, no clothingRequirements and
- * only the default front-cover hint. Beats mode is therefore a staging
- * experiment, not a production default.
+ * Step 3 closes the gap the unified call used to cover. It serves two consumers:
+ *  - IN-PIPELINE: the parsed Visual Bible becomes the Art Director's
+ *    {RECURRING_ELEMENTS} and the parsed clothing requirements its
+ *    {AVAILABLE_AVATARS}, so scene briefs are written with VB ids and the
+ *    right per-category outfits instead of blind.
+ *  - DOWNSTREAM: the raw sections are spliced into `rawOutline` — which
+ *    server.js feeds to UnifiedStoryParser as `unifiedResponse` — in the SAME
+ *    section format the unified writer used, so extractClothingRequirements(),
+ *    extractVisualBible() and extractCoverHints() work with no parsing change.
+ *
+ * If that one call fails the run still completes, degraded (blind briefs, empty
+ * VB, null clothing, default front-cover hint) rather than aborted.
  */
 
 const textModels = require('./textModels');
@@ -32,10 +53,12 @@ const {
   buildSceneExpansionPrompt,
   buildSceneReviewPrompt,
   buildStoryTextFromBeatsPrompt,
+  buildStoryBibleFromBeatsPrompt,
   parseRefinedText,
   buildAvailableAvatarsForPrompt,
   extractSceneMetadata,
 } = require('./storyHelpers');
+const { UnifiedStoryParser } = require('./outlineParser/unified');
 const { log } = require('../utils/logger');
 
 const PIPELINE_MODES = ['unified', 'beats'];
@@ -56,6 +79,36 @@ function resolvePipelineMode(inputData = {}) {
 }
 
 const NOOP_LOG = { info: () => {}, warn: () => {}, error: () => {}, setStage: () => {} };
+
+/**
+ * The three sections the unified writer used to emit alongside the story, and
+ * that UnifiedStoryParser still looks for in `unifiedResponse`:
+ * extractClothingRequirements / extractVisualBible / extractCoverHints.
+ * Spelling and spacing are the parser's regexes — do not "tidy" them.
+ */
+const BIBLE_MARKERS = ['---CLOTHING REQUIREMENTS---', '---VISUAL BIBLE---', '---COVER SCENE HINTS---'];
+
+/**
+ * Strip any preamble the bible model wrote before the first section marker and
+ * any trailing ---STORY PAGES--- it invented (that marker terminates the
+ * cover-hints regex, so a stray one would swallow the real cover hints once
+ * this block is spliced into the transcript).
+ *
+ * @returns {{body: string, found: string[]}|null} null when no section marker exists at all.
+ */
+function extractBibleSections(raw) {
+  const text = String(raw || '');
+  const positions = BIBLE_MARKERS.map(m => text.indexOf(m));
+  const present = positions.filter(i => i >= 0);
+  if (present.length === 0) return null;
+
+  let body = text.slice(Math.min(...present)).trim();
+  const stray = body.search(/---\s*STORY PAGES\s*---/i);
+  if (stray >= 0) body = body.slice(0, stray).trim();
+  if (!body) return null;
+
+  return { body, found: BIBLE_MARKERS.filter(m => body.includes(m)) };
+}
 
 /** Merge a reviewer's partial rewrite onto a base list keyed by pageNumber. */
 function mergeByPage(base, fixes, apply) {
@@ -82,6 +135,11 @@ function mergeByPage(base, fixes, apply) {
  * @param {number} [opts.pageCount]        - defaults to inputData.pages
  * @param {Object} [opts.modelOverrides]   - admin dev-mode model overrides
  * @param {Function} [opts.heartbeat]      - called during streaming to keep story_jobs fresh
+ * @param {Function} [opts.onClothingRequirements] - fired the moment the story-bible
+ *   stage yields clothing requirements, so the caller can start styled-avatar
+ *   generation (the long pole in front of every image) while scene expansion and
+ *   page text are still running. Same callback the unified stream's progressive
+ *   parser fires; it must be non-blocking and own its own error handling.
  * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta}>}
  *   pages[]  mirrors UnifiedStoryParser.extractPages() output consumed by server.js
  *   scenes[] mirrors the resolved value of startSceneExpansion() (expandedScenes)
@@ -93,6 +151,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     checkCancellation = async () => {},
     modelOverrides = {},
     heartbeat = null,
+    onClothingRequirements = null,
   } = opts;
   const gl = genLog || NOOP_LOG;
   const onChunk = heartbeat ? () => heartbeat() : null;
@@ -158,11 +217,97 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     }
   }
 
-  // ── Step 3: scene expansion, one call per page, in parallel ───────────────
+  // ── Step 3: visual contract from the locked beats ─────────────────────────
+  // MUST precede scene expansion: the Visual Bible fills the Art Director's
+  // {RECURRING_ELEMENTS}. Expanding a scene before it exists produces a brief
+  // with no recurring elements at all — no location, artifact, animal or
+  // secondary-character continuity — and the scene review downstream then has
+  // nothing to check it against. It also gates the avatar kickoff below.
+  //
+  // The call never throws: a beats run without a bible is degraded (blind scene
+  // briefs, empty VB, null clothing, default front-cover hint) but must still
+  // produce a story, exactly as it did before this stage existed.
+  await checkCancellation();
+  const bibleModel = planModel;
+  let bibleSections = null;
+  let visualBible = null;
+  let clothingRequirements = null;
+  const biblePrompt = buildStoryBibleFromBeatsPrompt(inputData, beats);
+  if (!biblePrompt) {
+    log.warn('⚠️ [BEATS] story-bible-from-beats template unavailable — no Visual Bible, clothing or cover hints');
+    gl.warn('beats_story_bible_failed', 'Bible template unavailable — story ships with an empty Visual Bible');
+  } else {
+    t = Date.now();
+    try {
+      const bibleRes = await textModels.callTextModelStreaming(biblePrompt, 16000, onChunk, bibleModel, { usageLabel: 'beats_story_bible' });
+      const sections = extractBibleSections(bibleRes.text || '');
+      meta.timings.storyBibleMs = Date.now() - t;
+      if (!sections) {
+        log.warn(`🚨 [BEATS] Bible call returned no parseable section markers (${(bibleRes.text || '').length} chars)`);
+        gl.warn('beats_story_bible_failed', `${bibleRes.modelId || bibleModel} emitted no section markers — story ships with an empty Visual Bible`);
+      } else {
+        bibleSections = sections.body;
+        // Parse with the SAME parser server.js will run over the finished
+        // transcript, so what the Art Director sees here and what the story
+        // stores downstream can never diverge.
+        const bibleParser = new UnifiedStoryParser(bibleSections);
+        visualBible = bibleParser.extractVisualBible();
+        clothingRequirements = bibleParser.extractClothingRequirements();
+        const missing = BIBLE_MARKERS.filter(m => !sections.found.includes(m));
+        if (missing.length > 0) {
+          log.warn(`⚠️ [BEATS] Bible missing section(s): ${missing.join(', ')}`);
+          gl.warn('beats_story_bible_partial', `Bible missing ${missing.map(m => m.replace(/-/g, '')).join(', ')}`);
+        }
+        const vbCount = visualBible
+          ? Object.values(visualBible).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0)
+          : 0;
+        gl.info('beats_story_bible', `Visual contract by ${bibleRes.modelId || bibleModel}: ${vbCount} VB entries, ${Object.keys(clothingRequirements || {}).length} clothing reqs (${(meta.timings.storyBibleMs / 1000).toFixed(1)}s)`, null, {
+          vbEntries: vbCount, clothingChars: Object.keys(clothingRequirements || {}).length, model: bibleRes.modelId || bibleModel,
+        });
+      }
+    } catch (err) {
+      meta.timings.storyBibleMs = Date.now() - t;
+      log.warn(`🚨 [BEATS] Bible call failed (${err.message}) — story ships with an empty Visual Bible`);
+      gl.warn('beats_story_bible_failed', `${bibleModel} failed: ${err.message} — story ships with an empty Visual Bible`);
+    }
+  }
+
+  // ── Styled avatars start HERE, not after the pipeline ─────────────────────
+  // Their only input is clothingRequirements, which now exists. They are the
+  // long pole in front of every cover and page image, so they run concurrently
+  // with scene expansion, scene review and page text. The caller owns the
+  // promise (and its error handling) — this pipeline never awaits it, exactly
+  // like the unified stream's mid-stream kickoff.
+  if (clothingRequirements && Object.keys(clothingRequirements).length > 0 && typeof onClothingRequirements === 'function') {
+    gl.info('beats_avatars_kickoff', `Styled avatars started early from ${Object.keys(clothingRequirements).length} clothing req(s) — overlapping scene expansion and page text`, null, {
+      characters: Object.keys(clothingRequirements),
+    });
+    try {
+      onClothingRequirements(clothingRequirements);
+    } catch (err) {
+      // The callback owns its async failures; a synchronous throw here would
+      // otherwise abort a story over an avatar kickoff.
+      log.warn(`🚨 [BEATS] Avatar kickoff threw synchronously (${err.message}) — avatars fall back to the post-pipeline pass`);
+      gl.warn('beats_avatars_kickoff_failed', `Avatar kickoff failed: ${err.message} — falling back to the post-pipeline pass`);
+    }
+  } else if (typeof onClothingRequirements === 'function') {
+    log.warn('⚠️ [BEATS] No clothing requirements — styled avatars deferred to the post-pipeline pass');
+    gl.warn('beats_avatars_kickoff_skipped', 'No clothing requirements — styled avatars deferred to the post-pipeline pass');
+  }
+
+  // ── Step 6 (page text) is kicked off here, awaited after the scene review ──
+  // It reads the locked beats only — never the briefs — so it overlaps the
+  // scene work instead of adding wall clock. The rejection is captured, not
+  // left floating: a scene-expansion throw must not surface as an unhandled
+  // rejection from this promise.
+  let textError = null;
+  const textPromise = runStoryText().catch(err => { textError = err; return null; });
+
+  // ── Step 4: scene expansion, one call per page, in parallel ───────────────
   await checkCancellation();
   const lang = inputData.language || 'en';
   const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel || inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage];
-  const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], inputData.clothingRequirements || null);
+  const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
 
   t = Date.now();
   const expansions = await Promise.all(beats.map(async b => {
@@ -171,7 +316,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     const pageContent = `BEAT: ${b.beat}\nSCENE: ${b.scene}`;
     const prompt = buildSceneExpansionPrompt(
       b.pageNumber, pageContent, inputData.characters || [], lang,
-      null, availableAvatars, null,
+      visualBible, availableAvatars, null,
       {
         maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
         artStyleId: inputData.artStyle,
@@ -229,33 +374,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     }
   }
 
-  // ── Step 5: page text from the locked beats ───────────────────────────────
-  await checkCancellation();
-  const textPrompt = buildStoryTextFromBeatsPrompt(inputData, beats);
-  if (!textPrompt) throw new Error('story-text-from-beats template unavailable — beats pipeline cannot run');
-  const beatPages = beats.map(b => b.pageNumber);
-  let textRaw = '';
-  let textModelId = textModel;
-  let parsedText = null;
-  t = Date.now();
-  for (let attempt = 1; attempt <= 2 && !parsedText; attempt++) {
-    try {
-      const res = await textModels.callTextModelStreaming(textPrompt, 24000, onChunk, textModel, { usageLabel: 'beats_story_text' });
-      const candidate = parseRefinedText(res.text || '', beatPages);
-      if (candidate.pages.length === 0 || candidate.missing.length > 0) {
-        log.warn(`⚠️ [BEATS] Text attempt ${attempt}: ${candidate.pages.length} page(s) parsed, missing ${candidate.missing.join(', ') || 'none'}`);
-        if (attempt < 2) continue;
-      }
-      textRaw = res.text || '';
-      textModelId = res.modelId || textModel;
-      parsedText = candidate;
-    } catch (err) {
-      log.warn(`⚠️ [BEATS] Story text attempt ${attempt} failed: ${err.message}`);
-      if (attempt >= 2) throw err;
-    }
-  }
-  meta.timings.storyTextMs = Date.now() - t;
-  if (!parsedText || parsedText.pages.length === 0) throw new Error('Beats text writer returned no parseable pages');
+  // ── Step 6: page text (kicked off before scene expansion) ─────────────────
+  const textResult = await textPromise;
+  if (textError) throw textError;
+  const { textRaw, textModelId, parsedText } = textResult;
+
   if (parsedText.missing.length > 0) {
     log.warn(`⚠️ [BEATS] Text writer omitted page(s) ${parsedText.missing.join(', ')} after retry — those pages are dropped`);
     gl.warn('beats_text_incomplete', `Text writer omitted page(s) ${parsedText.missing.join(', ')}`);
@@ -269,6 +392,42 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   gl.info('beats_story_text', `Page text by ${textModelId}: ${parsedText.pages.length} page(s)${title ? ` — "${title}"` : ''} (${(meta.timings.storyTextMs / 1000).toFixed(1)}s)`, null, {
     pages: parsedText.pages.length, title, model: textModelId,
   });
+
+  /**
+   * Page text written from the LOCKED beats. Hoisted so it can be started
+   * before scene expansion (it reads no brief) and awaited after the scene
+   * review. Uses its own timer — the shared `t` belongs to the stage the
+   * caller is running concurrently.
+   */
+  async function runStoryText() {
+    await checkCancellation();
+    const textPrompt = buildStoryTextFromBeatsPrompt(inputData, beats);
+    if (!textPrompt) throw new Error('story-text-from-beats template unavailable — beats pipeline cannot run');
+    const beatPages = beats.map(b => b.pageNumber);
+    let raw = '';
+    let modelId = textModel;
+    let parsed = null;
+    const t0 = Date.now();
+    for (let attempt = 1; attempt <= 2 && !parsed; attempt++) {
+      try {
+        const res = await textModels.callTextModelStreaming(textPrompt, 24000, onChunk, textModel, { usageLabel: 'beats_story_text' });
+        const candidate = parseRefinedText(res.text || '', beatPages);
+        if (candidate.pages.length === 0 || candidate.missing.length > 0) {
+          log.warn(`⚠️ [BEATS] Text attempt ${attempt}: ${candidate.pages.length} page(s) parsed, missing ${candidate.missing.join(', ') || 'none'}`);
+          if (attempt < 2) continue;
+        }
+        raw = res.text || '';
+        modelId = res.modelId || textModel;
+        parsed = candidate;
+      } catch (err) {
+        log.warn(`⚠️ [BEATS] Story text attempt ${attempt} failed: ${err.message}`);
+        if (attempt >= 2) throw err;
+      }
+    }
+    meta.timings.storyTextMs = Date.now() - t0;
+    if (!parsed || parsed.pages.length === 0) throw new Error('Beats text writer returned no parseable pages');
+    return { textRaw: raw, textModelId: modelId, parsedText: parsed };
+  }
 
   // ── Assemble the downstream contract ──────────────────────────────────────
   const textByPage = new Map(parsedText.pages.map(p => [p.pageNumber, p.text]));
@@ -315,8 +474,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   if (pages.length === 0) throw new Error('Beats pipeline produced no usable pages');
 
   // Human-readable transcript, stored as data.outline so the dev outline view
-  // shows what each stage produced. Uses the unified section markers so the
-  // existing viewers/parsers can still find the title and the page text.
+  // shows what each stage produced — AND the string server.js hands to
+  // UnifiedStoryParser as `unifiedResponse`. Uses the unified section markers
+  // so the existing parsers find the title, the page text, and (via the step-5b
+  // block spliced in ahead of ---STORY PAGES---, which terminates the
+  // cover-hints regex) the clothing requirements, Visual Bible and cover hints.
   const rawOutline = [
     '---TITLE---',
     `TITLE: ${title || '(none)'}`,
@@ -330,6 +492,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     '---SCENE REVIEW---',
     sceneReviewAnalysis || '(no review)',
     '',
+    ...(bibleSections ? [bibleSections, ''] : []),
     '---STORY PAGES---',
     pages.map(p => `## Page ${p.pageNumber}\n${p.text}`).join('\n\n'),
   ].join('\n');

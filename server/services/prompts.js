@@ -113,6 +113,12 @@ async function loadPromptTemplates() {
     // Same ---ANALYSIS--- / ---STORY TEXT--- shape as the refiner, so
     // parseRefinedText reads it unchanged.
     ['storyTextFromBeats', 'story-text-from-beats.txt'],
+    // Visual contract from the locked beats (beats-first pipeline, step 3 —
+    // it runs BEFORE scene expansion, which consumes its Visual Bible). Emits
+    // ---CLOTHING REQUIREMENTS--- / ---VISUAL BIBLE--- / ---COVER SCENE
+    // HINTS--- in the unified section format, so UnifiedStoryParser reads a
+    // beats transcript with no parser change.
+    ['storyBibleFromBeats', 'story-bible-from-beats.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
     ['incrementalConsistencyCheck', 'incremental-consistency-check.txt'],

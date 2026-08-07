@@ -5925,6 +5925,53 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = []) {
 }
 
 /**
+ * Visual contract written FROM the locked beats (beats-first pipeline, step 3).
+ * The unified writer emitted clothing requirements, the Visual Bible and the
+ * cover scene hints as part of one call; no beats stage produced them, so a
+ * beats run shipped with an empty VB, null clothing and no cover hints.
+ *
+ * It runs BEFORE scene expansion, not after: the Visual Bible feeds
+ * buildSceneExpansionPrompt's {RECURRING_ELEMENTS}, so a brief written without
+ * it has no location, artifact, animal or secondary-character continuity to
+ * weave in. The clothing requirements also gate the styled-avatar kickoff.
+ *
+ * The three sections use the same markers/format the unified writer used, and
+ * beatsPipeline splices them into the transcript that becomes
+ * `unifiedResponse` — so UnifiedStoryParser.extractClothingRequirements() /
+ * extractVisualBible() / extractCoverHints() work unchanged.
+ *
+ * @param {Object} inputData
+ * @param {Array<{pageNumber:number, beat:string, scene:string}>} beats
+ * @returns {string|null}
+ */
+function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
+  const template = PROMPT_TEMPLATES.storyBibleFromBeats;
+  if (!template) {
+    log.error('[PROMPT] storyBibleFromBeats template not loaded — beats visual contract unavailable');
+    return null;
+  }
+  const mainIds = inputData.mainCharacters || [];
+  const chars = inputData.characters || [];
+  const named = (predicate) => chars.filter(predicate).map(c => c.name).join(', ') || 'None';
+
+  const beatBlocks = beats
+    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`)
+    .join('\n\n');
+
+  return fillTemplate(template, {
+    ...buildStoryContextFields(inputData),
+    PAGE_COUNT: beats.length,
+    MAIN_CHARACTER_NAMES: named(c => mainIds.includes(c.id)),
+    PRIMARY_CHARACTER_NAMES: named(c => !mainIds.includes(c.id)),
+    CHARACTER_PHYSICAL_BLOCK: chars
+      .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
+      .join('\n\n') || '(no character appearance available)',
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
+    BEATS: beatBlocks,
+  });
+}
+
+/**
  * Build unified story generation prompt
  * Generates complete story with character arcs, plot structure, visual bible, and all pages
  * @param {Object} inputData - Story parameters
@@ -6959,6 +7006,7 @@ module.exports = {
   buildBeatsReviewPrompt,
   buildSceneReviewPrompt,
   buildStoryTextFromBeatsPrompt,
+  buildStoryBibleFromBeatsPrompt,
   buildDoNotWriteSection,
   parseBeats,
   buildTrialStoryPrompt,

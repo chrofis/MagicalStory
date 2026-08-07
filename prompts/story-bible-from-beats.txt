@@ -1,4 +1,4 @@
-You are the continuity editor for an illustrated children's book. The beats and the illustration briefs are locked. Extract the visual contract the illustrator needs: clothing requirements, Visual Bible, cover scene hints.
+You are the continuity editor for an illustrated children's book. The page beats are locked. Write the visual contract the illustrator works from: clothing requirements, Visual Bible, cover scene hints. Every later stage — scene briefs, page illustrations, covers — reads only what you write here, so an element you omit will not appear consistently.
 
 Do not rewrite, extend or comment on the story. Only the three output sections below.
 
@@ -25,13 +25,9 @@ Primary characters: {PRIMARY_CHARACTER_NAMES}
 
 {BEATS}
 
-# LOCKED SCENE BRIEFS
-
-{SCENE_BRIEFS}
-
 # CLOTHING REQUIREMENTS
 
-Determine which clothing variants each character needs, based on the beats and briefs.
+Determine which clothing variants each character needs, based on the beats.
 
 - Mark `used: true` only for variants that actually appear.
 - Set `costumed.used: true` whenever the theme, setting or era implies special clothing, and name it in `costumed.costume` (`medieval`, `wizard`, `pirate`, `firefighter`, `1920s`, …). Leave it false only for a present-day story in everyday clothes.
@@ -45,7 +41,7 @@ Determine which clothing variants each character needs, based on the beats and b
 
 # VISUAL BIBLE
 
-Scan the beats and briefs and list every element that must stay consistent across illustrations.
+Scan the beats and list every element that must stay consistent across illustrations. An element a beat only implies still needs an entry — the scene writer can only reference what is listed here.
 
 - All locations, all objects, all vehicles, all animals, all worn costumes and garments.
 - Secondary characters you invented only. Never {CHARACTER_NAMES} — they have reference photos.
@@ -53,7 +49,7 @@ Scan the beats and briefs and list every element that must stay consistent acros
 - Every item in exactly one category. A worn garment belongs to `clothing` only, never also to `artifacts`.
 - At least {PAGE_COUNT} entries. Include an element even if it appears once.
 - Empty categories are `[]`.
-- One entry per secondary character, no matter how the briefs refer to them; a person named both by relation and by attribute is one entry. Never reuse an id.
+- One entry per secondary character, no matter how the beats refer to them; a person named both by relation and by attribute is one entry. Never reuse an id.
 
 Every entry needs specific colours, one signature element, and a description that works without seeing the other scenes.
 

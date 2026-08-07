@@ -3992,13 +3992,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.debug(`⚡ [STREAM-COVER] Started generation for ${coverType}`);
     };
 
-    // Progressive parser with callbacks for streaming updates AND parallel task initiation
-    const progressiveParser = new ProgressiveUnifiedParser({
-      onTitle: (title) => {
-        streamingTitle = title;
-        // Trial cover generation moved to onCoverScene (richer structured data from Claude)
-      },
-      onClothingRequirements: (requirements) => {
+    // Clothing requirements are the ONLY input styled-avatar generation needs,
+    // and styled avatars are the long pole in front of cover + page images. So
+    // this runs the moment they exist, whatever produced them:
+    //  - unified: the progressive parser's onClothingRequirements callback,
+    //    mid-stream (behaviour unchanged — this is a verbatim extraction).
+    //  - beats:   generateStoryViaBeats calls it as soon as the story-bible
+    //    stage returns, so avatars overlap scene expansion + page text instead
+    //    of waiting for the whole pipeline.
+    // Idempotent: the `!streamingAvatarStylingPromise` guard means a second
+    // caller is a no-op, and the awaits downstream (line ~4870) are unchanged.
+    const onClothingRequirementsReady = (requirements) => {
         streamingClothingRequirements = requirements;
         // Bug #13 fix: Log completeness check for clothing requirements
         const reqCharCount = Object.keys(requirements).length;
@@ -4053,7 +4057,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
           })();
         }
+    };
+
+    // Progressive parser with callbacks for streaming updates AND parallel task initiation
+    const progressiveParser = new ProgressiveUnifiedParser({
+      onTitle: (title) => {
+        streamingTitle = title;
+        // Trial cover generation moved to onCoverScene (richer structured data from Claude)
       },
+      onClothingRequirements: onClothingRequirementsReady,
       onVisualBible: (vb) => {
         streamingVisualBible = vb;
         // Filter main characters from Visual Bible
@@ -4458,6 +4470,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         pageCount: sceneCount,
         modelOverrides,
         heartbeat: unifiedHeartbeat,
+        // Styled avatars are the long pole in front of every image. In beats
+        // mode their only input (clothingRequirements) exists the moment the
+        // story-bible stage returns — long before scene briefs or page text —
+        // so kick them off there instead of after the whole pipeline. Same
+        // trigger the unified stream uses; the awaits downstream are unchanged.
+        onClothingRequirements: onClothingRequirementsReady,
       });
       // The beats transcript stands in for the raw writer response: it is what
       // data.outline stores and what the dev outline view renders.
