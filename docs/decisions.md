@@ -5679,10 +5679,15 @@ absent character's outfit from being offered to the vision model as something to
 **Touched:** `server/lib/images.js` (iteratePageCore step 1), `server/lib/sceneValidator.js`
 (formatCharacterContext).
 
-**Status:** ✅ active. Verified against the stored story data: the same inputs that produced the
-hoodie now resolve to "sky-blue short-sleeved polo shirt … olive green cotton shorts" for Noah and
-"mid-grey short-sleeved linen shirt … dark navy chino shorts" for Daniel. End-to-end Lab `iterate`
-run on p10 still pending.
+**Status:** ✅ active, verified end to end. Lab experiment **#410** (`iterate` on p10 of
+`job_1786053708336_8cdsca519`, staging) rendered Noah in the sky-blue polo + olive shorts + white
+Velcro trainers and Daniel in the mid-grey shirt + navy chino shorts + brown sandals — the story's
+own summer outfits, in the prose, the image prompt's per-character `wears:` lines, and the pixels.
+Daniel also came back an ADULT: the analysis now carries his real age (38) because only the page's
+cast is passed with correct per-page clothing, so the rewriter no longer inherits the evaluator's
+"kindergartner" wording. Non-clothing defects persist in that render and are tracked separately
+(Daniel rendered mid-ground rather than tiny — the "a sixth Noah's height" phrasing survives; a
+duplicated NEPTUNE stone with Venus/Earth transposed; residual `cyber`-style neon signage).
 
 ---
 
@@ -5795,9 +5800,15 @@ and returned masks for the wrong image.
 per-call cache-clear, and idle-unload in `photo_analyzer.py`; the mask is copied off the predictor to a
 plain numpy array inside the lock and the rest of the endpoint runs lock-free on that copy. Node-side,
 `_mobilesamMaskFull` now goes through `withAnalyzerSlot` like every other analyzer call, bounding the
-in-flight queue. Separately, the pipeline now `ensureWarm('repair-phase', {force:true})` at the start
-of the repair pipeline so MobileSAM/GroundingDINO reload before the first detection instead of cold
-mid-repair (a story's text+image phase can exceed the 15-min idle-unload).
+in-flight queue. Separately — keep the models warm for the WHOLE story instead of reloading them cold at repair. A
+story warms the analyzer at story-start, but the models aren't needed until the repair phase 20-30 min
+later, and the text+image phase makes zero analyzer calls, so the 15-min idle model-reaper unloaded
+them and repair hit them cold. Fix: the idle model-reaper now skips while the warm-hold is active
+(`now < _recycle_hold_until`), and `RECYCLE_WARM_HOLD_S` is bumped 900→2400 s so one story-start
+`/warmup` keeps every model resident for a full story; the pipeline also fires
+`ensureWarm('repair-phase', {force:true})` to refresh the hold for anything longer. The hold lapses
+between stories, so idle reclaim (models + self-recycle) still happens — memory is only held while a
+story is actually running, which is exactly the owner's rule (optimize for speed, reclaim when idle).
 
 **Rationale:** The failure was correctness under concurrency, so the fix is a lock, not memory
 management. Memory was explicitly NOT the problem — the self-recycle already reclaims between stories
@@ -5805,7 +5816,8 @@ management. Memory was explicitly NOT the problem — the self-recycle already r
 when idle, so NO mid-story recycling was added. Serializing SAM costs throughput (one inference at a
 time) but the calls contended on the CPU quota anyway; correctness wins.
 
-**Touched:** `photo_analyzer.py` (`_mobilesam_lock` + guarded load/inference/cache/unload),
+**Touched:** `photo_analyzer.py` (`_mobilesam_lock` + guarded load/inference/cache/unload; idle
+model-reaper respects the warm-hold; `RECYCLE_WARM_HOLD_S` 900→2400),
 `server/lib/images.js` (`_mobilesamMaskFull` via `withAnalyzerSlot`),
 `server/lib/analyzerClient.js` (`ensureWarm` force option), `server.js` (repair-phase warm).
 

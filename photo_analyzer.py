@@ -115,8 +115,13 @@ _recycle_hold_until = 0.0
 # Below this there is nothing worth a restart — a fresh process is ~137MB.
 RECYCLE_RSS_MB = int(os.environ.get('RECYCLE_RSS_MB', '700'))
 RECYCLE_IDLE_S = int(os.environ.get('RECYCLE_IDLE_S', '180'))
-# Covers the text prologue between /warmup and the first image request.
-RECYCLE_WARM_HOLD_S = int(os.environ.get('RECYCLE_WARM_HOLD_S', '900'))
+# Must cover a WHOLE story generation, not just the text prologue: /warmup fires
+# at story-start, but the models aren't needed until the repair phase 20-30 min
+# later, and this hold now also keeps the idle model-reaper from unloading them
+# (see _idle_model_reaper). 40 min covers a long multi-figure story from a single
+# story-start warm; the repair-phase warm refreshes it for anything longer. It
+# lapses on its own between stories, so idle reclaim still happens.
+RECYCLE_WARM_HOLD_S = int(os.environ.get('RECYCLE_WARM_HOLD_S', '2400'))
 RECYCLE_ENABLED = os.environ.get('RECYCLE_ENABLED', 'true').lower() == 'true'
 
 # Try to initialize MediaPipe (may fail on newer Python versions)
@@ -1841,6 +1846,16 @@ def _idle_model_reaper():
     while True:
         time.sleep(60)
         now = time.time()
+
+        # While a story is warm-held (set by /warmup, refreshed at the repair
+        # phase), keep EVERY model resident. A story's text+image phase makes no
+        # analyzer calls for 10-20 min, so these idle timers would otherwise
+        # unload the models we just warmed and the repair phase would hit them
+        # cold. Reclaim only once the hold lapses — i.e. no story is running.
+        # Holding ~1.9GB for a few extra minutes is negligible; a cold reload
+        # mid-repair is the thing we are paying to avoid.
+        if now < _recycle_hold_until:
+            continue
 
         if _mobilesam_model is not None and (now - _mobilesam_last_used) > _MOBILESAM_IDLE_UNLOAD_S:
             print(f"[FIGURE-MASK] idle {int(now - _mobilesam_last_used)}s — unloading MobileSAM to free RAM")
