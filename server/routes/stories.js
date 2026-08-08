@@ -2693,6 +2693,63 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
   }
 });
 
+// POST /api/stories/:id/restamp-covers — re-apply title / dedication / branding
+// to every cover from its textless art. No AI call, no credits, idempotent.
+//
+// Exists because the text could only be repaired as a SIDE EFFECT of editing the
+// title or the dedication, and the BACK cover has neither — so when its
+// magicalstory.ch branding went missing there was no supported way to put it
+// back. Also restamps non-active versions, which older stories never received.
+router.post('/:id/restamp-covers', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    let rows = canReadAnyStory(req)
+      ? await dbQuery('SELECT data FROM stories WHERE id = $1', [id])
+      : await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Story not found' });
+    const storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+
+    const { restampServedCover, restampCover } = require('../lib/coverTypography');
+    const { saveStoryImage } = require('../services/database');
+    const r2 = require('../lib/r2');
+    const done = [];
+    for (const coverKey of ['frontCover', 'initialPage', 'backCover']) {
+      if (!storyData.coverImages?.[coverKey]) continue;
+      try {
+        const out = await restampServedCover(id, storyData, coverKey);
+        done.push({ coverKey, versionIndex: out.versionIndex, ok: true });
+      } catch (e) {
+        done.push({ coverKey, ok: false, error: e.code === 'NO_ART_LAYER' ? 'no textless art layer' : e.message });
+        continue;
+      }
+      // Non-active versions are separate renders with no ${key}Art row of their
+      // own, so each is stamped from its own pixels.
+      try {
+        const meta = (await dbQuery('SELECT image_version_meta FROM stories WHERE id=$1', [id]))[0]?.image_version_meta || {};
+        const activeIdx = meta[coverKey]?.activeVersion ?? 0;
+        const others = await dbQuery(
+          'SELECT version_index, image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test AND version_index <> $3',
+          [id, coverKey, activeIdx]);
+        for (const o of others) {
+          const src = o.image_url || (o.image_data ? 'data:image/jpeg;base64,' + o.image_data.toString('base64') : null);
+          const bytes = await r2.bytesFromAnyImage(src);
+          if (!bytes) continue;
+          const stamped = await restampCover(storyData, coverKey, bytes, { seed: storyData.title, figures: storyData.coverImages[coverKey]?.bboxDetection?.figures || [] });
+          await saveStoryImage(id, coverKey, null, stamped.titledData, { versionIndex: o.version_index, cacheBust: true, preserveScore: true });
+        }
+      } catch { /* non-active stamping is best-effort */ }
+    }
+
+    storyData.updatedAt = new Date().toISOString();
+    await saveStoryData(id, storyData);
+    await logActivity(req.user.id, req.user.username, 'COVERS_RESTAMPED', { storyId: id, covers: done }, req.user);
+    res.json({ success: true, covers: done });
+  } catch (err) {
+    console.error('Error restamping covers:', err);
+    res.status(500).json({ error: 'Failed to restamp covers: ' + err.message });
+  }
+});
+
 // GET /api/stories/:id/title-paint — developer-mode evidence for the painted
 // cover title: the WHITE PLATE that was sent to the model, the model's RAW
 // output, and the outcome (ok / reason / metrics). Without this a flat title is

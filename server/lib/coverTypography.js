@@ -719,20 +719,27 @@ async function paintServedCoverTitle(storyId, storyData, { coverKey = 'frontCove
     // needing a local re-run to find out why. Two rows per cover, overwritten on
     // each attempt; `${coverKey}TitleIn` is the white plate we sent,
     // `${coverKey}TitleOut` is the model's raw painting.
+    const outcome = {
+      ok: !!res.ok,
+      reason: res.reason || null,
+      coverage: res.coverage ?? null,
+      spill: res.spill ?? null,
+      outOfBand: res.outOfBand ?? null,
+      backend: backend || 'grok',
+      at: new Date().toISOString(),
+    };
+    // Write it to the IN-MEMORY cover too, not just the row. Callers that persist
+    // storyData afterwards (the repaint endpoint does) would otherwise overwrite
+    // the jsonb_set with their stale copy — which is why a successful repaint
+    // showed `outcome: null` in the developer panel while the images were there.
+    if (cover) cover.titlePaint = outcome;
     try {
       if (res.debug?.plate) await saveStoryImage(storyId, `${coverKey}TitleIn`, null, res.debug.plate, { versionIndex: 0, cacheBust: true });
       if (res.debug?.raw) await saveStoryImage(storyId, `${coverKey}TitleOut`, null, res.debug.raw, { versionIndex: 0, cacheBust: true });
       await dbQuery(
         `UPDATE stories SET data = jsonb_set(data, ARRAY['coverImages',$2,'titlePaint'], $3::jsonb, true)
          WHERE id = $1 AND data->'coverImages' ? $2`,
-        [storyId, coverKey, JSON.stringify({
-          ok: !!res.ok,
-          reason: res.reason || null,
-          coverage: res.coverage ?? null,
-          spill: res.spill ?? null,
-          backend: backend || 'grok',
-          at: new Date().toISOString(),
-        })]);
+        [storyId, coverKey, JSON.stringify(outcome)]);
     } catch (dErr) {
       log.warn(`[TITLE PAINT] ${coverKey}: could not persist debug evidence: ${dErr.message}`);
     }
