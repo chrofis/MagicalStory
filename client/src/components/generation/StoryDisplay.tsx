@@ -4608,9 +4608,9 @@ export function StoryDisplay({
         const isCoverLazyLoading = !frontCoverImageData && frontCoverObj?.hasImage;
         return (
           <div className="mt-6 max-w-2xl mx-auto">
-            <p className="text-sm text-gray-500 text-center mb-2">
+            <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">
               {storyLang === 'de' ? 'Titelseite' : storyLang === 'fr' ? 'Couverture' : 'Front Cover'}
-            </p>
+            </h4>
             <div className="relative">
               {isCoverLazyLoading ? (
                 <div className="aspect-[3/4] bg-gradient-to-br from-indigo-100 to-indigo-100 rounded-lg shadow-lg flex flex-col items-center justify-center">
@@ -4802,9 +4802,9 @@ export function StoryDisplay({
         const initialPageObj = coverImages.initialPage;
         return (
           <div className="mt-6 max-w-2xl mx-auto">
-            <p className="text-sm text-gray-500 text-center mb-2">
+            <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">
               {storyLang === 'de' ? 'Widmungsseite' : storyLang === 'fr' ? 'Page de dédicace' : 'Dedication Page'}
-            </p>
+            </h4>
             <div className="relative">
               <DiagnosticImage
                 src={getCoverImageData(coverImages.initialPage)!}
@@ -6267,9 +6267,9 @@ export function StoryDisplay({
         const backCoverObj = coverImages.backCover;
         return (
           <div className="mt-8 max-w-2xl mx-auto">
-            <p className="text-sm text-gray-500 text-center mb-2">
+            <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">
               {storyLang === 'de' ? 'Rückseite' : storyLang === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
-            </p>
+            </h4>
             <div className="relative">
               <DiagnosticImage
                 src={getCoverImageData(coverImages.backCover)!}

@@ -57,7 +57,8 @@ async function verifyTitleRender(imageDataUri, expectedTitle) {
 Look at the title lettering in the image and answer:
 1. Does it show exactly these words, in this order, with no missing, extra, doubled or altered letters?
 2. Is every letter fully drawn and legible (not cut off, smeared or replaced by a shape)?
-Decorative styling, texture, colour and hand-painted irregularity are FINE and must not count as problems. Accents and umlauts must be present where the expected title has them.
+Decorative styling, texture, colour, letter case and hand-painted irregularity are FINE and must not count as problems. Accents and umlauts must be present where the expected title has them.
+The lettering sits ON TOP of the illustration, so artwork visible behind or beside a letter can never obscure it — never report a letter as hidden, covered or obscured by the picture. Judge ONLY whether the words and letters themselves are there and legible. Normal spacing between words is not a spelling error.
 Return JSON: {"matches": true|false, "problem": "<short description, or empty if it matches>"}` },
         ] }],
         generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
@@ -188,14 +189,66 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
 
   // 5. key on INKINESS (dark OR saturated), so any paper texture the model adds
   //    is dropped while every pigment pixel is kept.
-  const outSq = await sharp(Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
+  const outFull = await sharp(Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
     .resize(cw, chh, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+
+  // RE-FIT the model's ink into OUR box instead of demanding it preserve geometry.
+  // Grok routinely re-cases and enlarges the lettering ("Die Piraten der Thur" came
+  // back as correct all-caps DIE PIRATEN DER THUR, drawn bigger than the strip we
+  // sent). Cropping the original strip rectangle then CLIPPED it, and the eval —
+  // reading our broken composite, not the model's output — reported letters cut off
+  // and words missing (coverage 0.22, spill 0.83) on a perfectly good repaint.
+  // We own the placement, so measure the ink and scale it back into the strip.
+  const inkAt = (i) => {
+    const mx = Math.max(outFull[i], outFull[i + 1], outFull[i + 2]);
+    const mn = Math.min(outFull[i], outFull[i + 1], outFull[i + 2]);
+    return Math.max(255 - mx, mx - mn);
+  };
+  let ix0 = cw, iy0 = chh, ix1 = -1, iy1 = -1;
+  for (let y = 0; y < chh; y++) {
+    for (let x = 0; x < cw; x++) {
+      if (inkAt((y * cw + x) * 3) > 40) {
+        if (x < ix0) ix0 = x; if (x > ix1) ix1 = x;
+        if (y < iy0) iy0 = y; if (y > iy1) iy1 = y;
+      }
+    }
+  }
+  let refitted = null;
+  if (ix1 > ix0 && iy1 > iy0) {
+    // Fit the ink bbox into the strip, preserving aspect and centring it.
+    // Target is the ORIGINAL TITLE FOOTPRINT inside the strip — not the padded
+    // strip itself. Fitting to the strip maximises the lettering and it overran
+    // the artwork (a title landing across a character's face). composeCover
+    // already chose where and how big the title should be; we only re-house the
+    // model's ink in that box.
+    const tX = minx - px0, tY = miny - py0;
+    const tW = Math.max(1, maxx - minx + 1), tH = Math.max(1, maxy - miny + 1);
+    const iw = ix1 - ix0 + 1, ih = iy1 - iy0 + 1;
+    const scale = Math.min(tW / iw, tH / ih);
+    const fitW = Math.max(1, Math.round(iw * scale)), fitH = Math.max(1, Math.round(ih * scale));
+    const fitted = await sharp(outFull, { raw: { width: cw, height: chh, channels: 3 } })
+      .extract({ left: ix0, top: iy0, width: iw, height: ih })
+      .resize(fitW, fitH, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+    const canvas = Buffer.alloc(pw * ph * 3, 255);   // white, keyed out later
+    const dx = tX + Math.round((tW - fitW) / 2), dy = tY + Math.round((tH - fitH) / 2);
+    for (let y = 0; y < fitH; y++) {
+      for (let x = 0; x < fitW; x++) {
+        const py = y + dy, px2 = x + dx;
+        if (py < 0 || px2 < 0 || py >= ph || px2 >= pw) continue;
+        const src = (y * fitW + x) * 3, dst = (py * pw + px2) * 3;
+        canvas[dst] = fitted[src]; canvas[dst + 1] = fitted[src + 1]; canvas[dst + 2] = fitted[src + 2];
+      }
+    }
+    refitted = canvas;
+  }
+
   const rgba = Buffer.alloc(pw * ph * 4);
   let letterPx = 0;
   for (let y = 0; y < ph; y++) {
     for (let x = 0; x < pw; x++) {
-      const src = ((y + offY) * cw + (x + offX)) * 3, m = (y * pw + x) * 4;
-      const r = outSq[src], g = outSq[src + 1], b = outSq[src + 2];
+      const src = refitted ? (y * pw + x) * 3 : ((y + offY) * cw + (x + offX)) * 3, m = (y * pw + x) * 4;
+      const buf = refitted || outFull;
+      const r = buf[src], g = buf[src + 1], b = buf[src + 2];
       const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
       const inkiness = Math.max(255 - mx, mx - mn);
       const a = inkiness <= 26 ? 0 : inkiness >= 70 ? 1 : (inkiness - 26) / 44;
@@ -276,8 +329,11 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     if (glyphCrop[q] > 8) hit++;
     if (grow[q] <= 8) out++;
   }
-  const coverage = glyphN ? hit / glyphN : 0;
-  const spill = inkN ? out / inkN : 0;
+  // After a re-fit these compare the model's re-housed ink against the ORIGINAL
+  // glyph shape — two different geometries — so they always read 0.00/1.00 and
+  // mean nothing. Report null rather than a misleading number; the eval decides.
+  const coverage = refitted ? null : (glyphN ? hit / glyphN : 0);
+  const spill = refitted ? null : (inkN ? out / inkN : 0);
   // Shape metrics are DIAGNOSTIC only — the final eval below is the gate. They
   // stay because they explain a failure ("letters missing" vs "ink spill") and
   // cost nothing.
@@ -288,7 +344,8 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     const crop = await sharp(painted).extract({ left: px0, top: py0, width: pw, height: ph }).jpeg({ quality: 95 }).toBuffer();
     const verdict = await verifyTitleRender(`data:image/jpeg;base64,${crop.toString('base64')}`, title);
     if (!verdict.matches) {
-      log.warn(`🅰️ [TITLE PAINT] final eval rejected the repaint: ${verdict.problem} (coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}) — keeping the flat title`);
+      const m = coverage == null ? 're-fitted' : `coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}`;
+      log.warn(`🅰️ [TITLE PAINT] final eval rejected the repaint: ${verdict.problem} (${m}) — keeping the flat title`);
       return { ...flat, coverage, spill, debug: debugOut, reason: `eval: ${verdict.problem || 'title does not match'}` };
     }
     return { imageData: paintedUri, spec, ok: true, coverage, spill, debug: debugOut, cost: result.cost ?? null };
