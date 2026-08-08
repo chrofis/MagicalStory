@@ -544,10 +544,11 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
     {
       evalTemplateOverride: promptOverride || null,
-      // The stage feeds the scene DESCRIPTION as originalPrompt, which carries no
-      // ART STYLE block — pass the style from the stored page prompt so a Lab run
-      // exercises the same style rules production does.
-      artStyle: require('../services/prompts').extractArtStyle(ctx.scene.prompt || ''),
+      // Lab/staging parity: the SAME resolver the production repair-round eval
+      // uses, from the same source (the story's art-style key). Never re-derive
+      // this locally - a second derivation is how the Lab silently stopped
+      // reproducing production for style-dependent rules.
+      artStyle: require('../services/prompts').resolveEvalArtStyle(ctx.artStyle, ctx.scene.prompt || null),
       // Stage-2 compliance A/B: swap the model (default qwen-plus) and/or its
       // template to test the over-strict-CRITICAL problem.
       complianceModelOverride: params.complianceModel || null,

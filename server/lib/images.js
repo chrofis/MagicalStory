@@ -6362,6 +6362,10 @@ async function evaluateImageBatch(images, options = {}) {
 
       // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
       // Use img.evaluationType if set (covers use 'cover' for text-focused eval)
+      // Lab/staging parity: resolveEvalArtStyle is the ONE resolver both this
+      // path and the Test Lab quality_eval stage use. ORIGINAL_PROMPT here is the
+      // scene DESCRIPTION (no ART STYLE block), so without this every
+      // style-dependent evaluator rule skipped silently in production too.
       const qualityResult = await evaluateImageQuality(
         img.imageData,
         sceneDescWithClothing,
@@ -6374,7 +6378,9 @@ async function evaluateImageBatch(images, options = {}) {
         img.sceneCharacters || null,  // Enables STEP 2C head-to-body proportion check
         // evalOptions: story-level context so the eval records per-style/genre
         // stats to eval_findings (best-effort; no behaviour change).
-        { storyMeta: {
+        {
+          artStyle: require('../services/prompts').resolveEvalArtStyle(artStyle, img.prompt || null),
+          storyMeta: {
           storyId, pageNumber: img.pageNumber, artStyle, genre, language,
           charCount: Array.isArray(img.sceneCharacters) ? img.sceneCharacters.length : null,
         } }

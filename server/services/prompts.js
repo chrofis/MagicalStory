@@ -280,6 +280,33 @@ function extractArtStyle(imagePrompt) {
 }
 
 /**
+ * The ONE way an evaluator learns which medium a page was commissioned in.
+ *
+ * Both the production repair-round eval and the Test Lab quality_eval stage call
+ * this, so the Lab cannot silently diverge from staging. It previously did: the
+ * pipeline passed the scene DESCRIPTION as ORIGINAL_PROMPT and the Lab passed a
+ * different string, and neither carried the ART STYLE block, so every
+ * style-dependent rule skipped without a trace.
+ *
+ * Prefers the style KEY (authoritative, the same value the generator used) and
+ * falls back to parsing a built page prompt. Returns an empty string when
+ * neither is available, which the templates treat as "skip the style rule".
+ *
+ * @param {string|null} artStyleKey  e.g. 'cyber' - from storyData.artStyle
+ * @param {string|null} [pagePrompt] a built page prompt, used only as fallback
+ */
+function resolveEvalArtStyle(artStyleKey, pagePrompt = null) {
+  if (artStyleKey) {
+    try {
+      const { resolveArtStyle } = require('../lib/storyHelpers');
+      const desc = resolveArtStyle(artStyleKey);
+      if (desc) return desc;
+    } catch { /* storyHelpers unavailable - fall through to the prompt */ }
+  }
+  return extractArtStyle(pagePrompt || '');
+}
+
+/**
  * Build the image-evaluation prompt from a known opts contract.
  *
  * The image-evaluation template (prompts/image-evaluation.txt) has four
@@ -323,6 +350,7 @@ module.exports = {
   buildEmptyScenePrompt,
   buildEvaluationPrompt,
   extractArtStyle,
+  resolveEvalArtStyle,
   REPAIR_STYLE_GUARD,
   applyRepairStyleGuard,
 };
