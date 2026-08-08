@@ -3849,11 +3849,20 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
       let scene;
       let evaluationType = 'scene';
       let pageLabel = `PAGE ${pageNumber}`;
+      // Active-version keys are 'frontCover'/'initialPage'/'backCover' for
+      // covers (scoring.js recomputeAllActiveVersions, setActiveVersion) —
+      // NOT the negative page number. Passing -1/-2/-3 to getActiveVersion
+      // never matched a stored key, so it fell through to 0 and every cover
+      // re-evaluation read and re-stamped v0 instead of the active version.
+      let versionKey = pageNumber;
+      let versionType = 'scene';
       if (isCoverPage(pageNumber)) {
         const coverType = getCoverType(pageNumber);
         scene = getCoverData(storyData, coverType);
         evaluationType = 'cover';
         pageLabel = coverType.toUpperCase();
+        versionKey = coverType;
+        versionType = coverType;
       } else {
         scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
       }
@@ -3863,8 +3872,8 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         // Get image data - look up active version from DB, then fallback to scene.imageData
         let imageData = scene.imageData;
         if (scene.imageVersions?.length > 0) {
-          const activeDbIndex = await getActiveVersion(id, pageNumber);
-          const activeVersion = scene.imageVersions?.[activeDbIndex];
+          const activeDbIndex = await getActiveVersion(id, versionKey);
+          const activeVersion = scene.imageVersions?.[arrayIndexForDb(scene.imageVersions, activeDbIndex, versionType)];
           if (activeVersion?.imageData) {
             imageData = activeVersion.imageData;
           }
@@ -3955,13 +3964,17 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
 
         // Compute entity/image-check penalties + collect the issues that
         // produced them so the dev panel can list them.
-        let entityPenalty = 0;
+        // CANONICAL TABLE + CANONICAL CAP. This used to carry its own
+        // {critical:30, major:20, else:10} literal and no cap — a third entity
+        // scale alongside SEVERITY_POINTS (25/15/5/2, what the score actually
+        // charges) and the pipeline's derived table. Re-evaluating a page
+        // therefore rewrote its scores onto a scale no other code path uses.
+        const { SEVERITY_POINTS: REEVAL_SEV_POINTS, capEntityPenalty: reevalCapEntity } = require('../lib/scoring');
+        let entityPenaltyRaw = 0;
         const entityIssues = [];
         for (const issue of allIssues) {
           if (issue.source === 'entity check' || issue.source === 'image checks') {
-            if (issue.severity === 'critical') entityPenalty += 30;
-            else if (issue.severity === 'major') entityPenalty += 20;
-            else entityPenalty += 10;
+            entityPenaltyRaw += REEVAL_SEV_POINTS[String(issue.severity || '').toLowerCase()] || 0;
             entityIssues.push({
               name: issue.character || issue.element || '',
               severity: issue.severity,
@@ -3970,9 +3983,10 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
             });
           }
         }
+        const entityPenalty = reevalCapEntity(entityPenaltyRaw);
         const adjustedScore = Math.max(0, evaluation.score - entityPenalty);
         if (entityPenalty > 0) {
-          log.info(`📊 [RE-EVALUATE] ${pageLabel}: entity penalty ${entityPenalty} (${evaluation.score} → ${adjustedScore})`);
+          log.info(`📊 [RE-EVALUATE] ${pageLabel}: entity penalty ${entityPenalty} (raw ${entityPenaltyRaw}, cap ${entityPenalty}) — audit only; scene.finalScore is re-read from the version after stampCanonicalScore`);
         }
 
         // Run bbox enrichment — always run to keep bboxDetection in sync with active image
@@ -4000,8 +4014,8 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
 
         // Store combined issues + bbox results on scene and active version
         scene.fixableIssues = allIssues;
-        const activeDbIdx = await getActiveVersion(id, pageNumber);
-        const activeVersion = scene.imageVersions?.[activeDbIdx];
+        const activeDbIdx = await getActiveVersion(id, versionKey);
+        const activeVersion = scene.imageVersions?.[arrayIndexForDb(scene.imageVersions, activeDbIdx, versionType)];
         if (activeVersion) {
           activeVersion.fixTargets = scene.fixTargets;
           activeVersion.fixableIssues = allIssues;
@@ -4035,9 +4049,22 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           });
         }
 
-        // Update scene with adjusted score (mirror; finalScore canonical)
-        scene.qualityScore = adjustedScore;
-        scene.finalScore = adjustedScore;
+        // Scene-level scores are MIRRORS of the stamped version's canonical
+        // record — never independently computed. Identical rule to the
+        // generation pipeline (images.js buildSceneEntry): qualityScore = the
+        // version's evalScore, finalScore = computeFinalScore(version).
+        // Writing `adjustedScore` (evaluator scale, eval.score − entity) into
+        // BOTH fields put a number on a different scale than the one
+        // applyScore had just written onto the very version this scene mirrors
+        // — the two disagreeing scores the owner sees in the UI.
+        if (activeVersion) {
+          const { computeFinalScore: reevalFinalScore } = require('../lib/scoring');
+          scene.qualityScore = activeVersion.evalScore ?? adjustedScore;
+          scene.finalScore = reevalFinalScore(activeVersion);
+        } else {
+          scene.qualityScore = adjustedScore;
+          scene.finalScore = adjustedScore;
+        }
 
         pages[pageNumber] = {
           score: adjustedScore,                       // Combined final score (quality - semantic - entity penalties)
