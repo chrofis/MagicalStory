@@ -1217,6 +1217,27 @@ export function CharacterForm({
             </button>
           )}
 
+          {/* No avatar, nothing running, nothing failed. Reachable whenever a
+              generation run was never started for this character (photo
+              analysis fell back to the raw photo, or the photo was uploaded
+              before the name existed). Without this branch the step renders
+              zero buttons and the wizard is a dead end — the character can
+              neither be saved nor abandoned. */}
+          {!hasAvatar && !isStillGenerating && !hasFailed && (
+            <button
+              onClick={onSave}
+              disabled={isLoading}
+              className="w-full px-6 py-4 text-base font-semibold bg-gray-600 text-white rounded-xl hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Save size={20} />
+              )}
+              {language === 'de' ? 'Charakter trotzdem speichern' : language === 'fr' ? 'Enregistrer quand même' : 'Save character anyway'}
+            </button>
+          )}
+
           {/* When generation failed: Show save anyway */}
           {hasFailed && (
             <button

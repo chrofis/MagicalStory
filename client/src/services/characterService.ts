@@ -1079,7 +1079,12 @@ export const characterService = {
     // Check if avatars are missing or incomplete
     const avatars = character.avatars;
     if (!avatars) return true;
-    if (avatars.status === 'generating' || avatars.status === 'pending') return false; // Already in progress
+    if (avatars.status === 'generating') return false; // Already in progress
+    // 'pending' is NOT in progress — the server writes it when it stores a
+    // photo for a character that has no name yet (avatars.js:1304/1318/1333),
+    // i.e. "queued, nobody has started this". Treating it as in-flight left
+    // such characters with no avatar and nothing running.
+    if (avatars.status === 'pending') return true;
     if (avatars.status === 'failed') return true; // Retry failed ones
 
     // Check if at least one avatar exists (or hasFullAvatars flag is set)

@@ -3187,25 +3187,39 @@ export default function StoryWizard() {
     }
   };
 
-  // Handler for "Save & Generate Avatar" button
-  // Moves to traits step and triggers avatar generation in background
-  const handleSaveAndGenerateAvatar = async () => {
+  // Single source of truth for "does this character still need an avatar run?".
+  // Called from the name step (once a name exists) AND again when the avatar
+  // step is entered, because several upstream paths legitimately leave a
+  // character with no run in flight: photo analysis falling back to the raw
+  // photo clears `avatars` entirely, and a photo uploaded before the name is
+  // typed parks the character at status 'pending'. Without a second attempt
+  // those characters reach the avatar step with no image and nothing running.
+  const ensureAvatarGeneration = async () => {
     if (!currentCharacter) return;
 
     // Capture character ID for closure - user may navigate to different character during generation
     const charId = currentCharacter.id;
 
-    // Clear changed traits indicator after saving
-    setChangedTraits(undefined);
-
-    // Move to traits step immediately so user can continue editing
-    setCharacterStep('traits');
+    // Never run two generations for the same character concurrently
+    if (generatingAvatarForId === charId) {
+      log.info(`⏭️ Skipping avatar generation - already running for ${charId}`);
+      return;
+    }
 
     // Skip avatar generation if already generating or complete
     const avatarStatus = currentCharacter.avatars?.status;
     const hasAvatar = !!(currentCharacter.avatars?.standard || currentCharacter.avatars?.winter || currentCharacter.avatars?.summer || currentCharacter.avatars?.hasFullAvatars);
     if (avatarStatus === 'generating' || (avatarStatus === 'complete' && hasAvatar)) {
       log.info(`⏭️ Skipping avatar generation - already ${avatarStatus}${hasAvatar ? ' with avatars' : ''}`);
+      return;
+    }
+
+    // No photo means there is nothing to generate from — leave the status
+    // untouched rather than marking it 'failed', which would blame the
+    // generator for a missing input.
+    if (!currentCharacter.photos?.bodyNoBg && !currentCharacter.photos?.body
+        && !currentCharacter.photos?.face && !currentCharacter.photos?.original) {
+      log.info(`⏭️ Skipping avatar generation - no photo for ${charId}`);
       return;
     }
 
@@ -3258,6 +3272,20 @@ export default function StoryWizard() {
     } finally {
       setGeneratingAvatarForId(null);
     }
+  };
+
+  // Handler for "Save & Generate Avatar" button
+  // Moves to traits step and triggers avatar generation in background
+  const handleSaveAndGenerateAvatar = async () => {
+    if (!currentCharacter) return;
+
+    // Clear changed traits indicator after saving
+    setChangedTraits(undefined);
+
+    // Move to traits step immediately so user can continue editing
+    setCharacterStep('traits');
+
+    await ensureAvatarGeneration();
   };
 
   const saveCharacter = async (options?: { keepCurrentCharacter?: boolean }) => {
@@ -4432,7 +4460,12 @@ export default function StoryWizard() {
             onCharacterRoleChange={handleCharacterRoleChange}
             onCharacterChange={setCurrentCharacter}
             onCharacterStepChange={setCharacterStep}
-            onContinueToAvatar={() => setCharacterStep('avatar')}
+            onContinueToAvatar={() => {
+              setCharacterStep('avatar');
+              // Last chance to start a run before the user is looking at the
+              // avatar placeholder. No-op when one is already in flight.
+              void ensureAvatarGeneration();
+            }}
             onPhotoSelect={handlePhotoSelect}
             onSaveAndGenerateAvatar={handleSaveAndGenerateAvatar}
             onSaveCharacter={saveCharacter}
