@@ -205,6 +205,25 @@ function resolveCharacterReqs(clothingRequirements, name) {
  */
 function resolvePageClothingCategory(storyData, pageNumber, charName) {
   const pc = storyData?.pageClothing;
+  // COVERS (negative page numbers) never appear in pageClothing — their cast's
+  // outfits live on the outline's coverHints. Without this the covers resolved
+  // to null and every cover-side consumer skipped (observed live after the
+  // no-default sweep: garment-hue refused every character on p-2/p-3).
+  if (Number(pageNumber) < 0) {
+    const { COVER_PAGE_NUMBERS, coverKeyToHintKey } = require('./coverKeys');
+    const coverKey = Object.keys(COVER_PAGE_NUMBERS).find(k => COVER_PAGE_NUMBERS[k] === Number(pageNumber));
+    const hint = coverKey ? storyData?.coverHints?.[coverKeyToHintKey(coverKey)] : null;
+    const byChar = hint?.characterClothing;
+    if (byChar && typeof byChar === 'object') {
+      const lower = String(charName || '').trim().toLowerCase();
+      const key = Object.keys(byChar).find(k => k.trim().toLowerCase() === lower);
+      if (key && byChar[key]) return normalizeClothingCategory(byChar[key]);
+    }
+    // The story's primary category is canonical, not a guess: it is what the
+    // writer decided the book's cast wears.
+    if (pc?.primaryClothing) return normalizeClothingCategory(pc.primaryClothing);
+    return null;
+  }
   const entry = pc?.pageClothing?.[pageNumber] ?? pc?.[pageNumber];
   if (typeof entry === 'string' && entry.trim()) return normalizeClothingCategory(entry);
   if (entry && typeof entry === 'object') {

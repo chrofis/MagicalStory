@@ -5777,10 +5777,21 @@ a render that would bake in the wrong outfit stops.
 `server/lib/styledAvatars.js`, `server/lib/testlab.js`, `server/lib/outlineParser/unified.js`,
 `server/routes/regeneration.js`, `server/routes/stories.js`.
 
+**Follow-up (same day) — covers were a genuine gap the sweep exposed.** Live staging logs showed
+`GARMENT-HUE … no per-page clothing category — skipping` for every character on p-2 and p-3: covers
+carry negative page numbers and never appear in `pageClothing`, so the refusal fired on data that was
+not actually missing — the cast's cover outfits live on the outline's `coverHints`. Fixed at the
+shared resolver rather than per caller: `resolvePageClothingCategory` now maps a negative page number
+to its cover key (`coverKeys.COVER_PAGE_NUMBERS` → `coverKeyToHintKey`), reads
+`coverHints[hintKey].characterClothing[name]`, then falls back to the story's `primaryClothing` —
+canonical, not a guess. Verified on `job_1786147254924_8nuyywjii`: p-1/-2/-3 now resolve for every
+character that was being skipped.
+
 **Status:** 🟡 staging pending. Syntax-checked; the refusal paths are by construction unreachable on
 data that carries per-page clothing (verified on `job_1786053708336_8cdsca519`), but a story with a
 genuine data gap will now fail where it previously shipped a wrong outfit — that is the intent, and
-it needs a full generation run to confirm nothing legitimate trips it.
+it needs a full generation run to confirm nothing else legitimate trips it. The cover gap above is
+exactly the class of thing that run is meant to surface; assume there may be more.
 
 ## MobileSAM figure-mask must be serialized — concurrency race, not memory (2026-08-08)
 
