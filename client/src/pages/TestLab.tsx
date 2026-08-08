@@ -17,6 +17,7 @@ import { Button } from '@/components/common/Button';
 import {
   testlabService,
   TESTLAB_STAGES,
+  type EvalFinding,
   type TestLabStory,
   type TestLabPagination,
   type BenchmarkScene,
@@ -76,7 +77,7 @@ function ReviewRunView({ run, title }: { run: ReviewRun; title?: string }) {
   );
 }
 
-type Tab = 'stories' | 'benchmark' | 'sheetsets' | 'experiments';
+type Tab = 'stories' | 'benchmark' | 'sheetsets' | 'experiments' | 'findings';
 
 const tabBtn = (active: boolean) =>
   `px-4 py-2 rounded-lg font-medium transition-colors ${active ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`;
@@ -139,12 +140,14 @@ export default function TestLab() {
           <button className={tabBtn(tab === 'benchmark')} onClick={() => setTab('benchmark')}>Benchmark</button>
           <button className={tabBtn(tab === 'sheetsets')} onClick={() => setTab('sheetsets')}>Sets</button>
           <button className={tabBtn(tab === 'experiments')} onClick={() => setTab('experiments')}>Experiments</button>
+          <button className={tabBtn(tab === 'findings')} onClick={() => setTab('findings')}>Findings</button>
         </div>
 
         {tab === 'stories' && <StoriesTab onReviewStory={useStoryForReview} />}
         {tab === 'benchmark' && <BenchmarkTab />}
         {tab === 'sheetsets' && <SetsTab />}
         {tab === 'experiments' && <ExperimentsTab preset={preset} onPresetApplied={() => setPreset(null)} />}
+        {tab === 'findings' && <FindingsTab />}
       </div>
     </div>
   );
@@ -298,6 +301,142 @@ function StoriesTab({ onReviewStory }: { onReviewStory: (storyId: string) => voi
 // ─────────────────────────────────────────────────────────────────────
 // Benchmark tab
 // ─────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────
+// Findings tab — the eval knowledge base
+//
+// Everything the evaluator prompts used to carry as inline history lives here.
+// The prompt keeps `rule_text`; the rationale and the measurement live in this
+// registry, read by humans instead of re-sent to a model on every page.
+// ─────────────────────────────────────────────────────────────────────
+
+const FINDING_CATEGORIES = ['non-deduction', 'severity-policy', 'detection', 'determinism', 'input-plumbing', 'output-format'];
+
+const FINDING_BADGE: Record<string, string> = {
+  'non-deduction': 'bg-green-100 text-green-800',
+  'severity-policy': 'bg-amber-100 text-amber-800',
+  'detection': 'bg-blue-100 text-blue-800',
+  'determinism': 'bg-purple-100 text-purple-800',
+  'input-plumbing': 'bg-slate-200 text-slate-800',
+  'output-format': 'bg-pink-100 text-pink-800',
+};
+
+function FindingsTab() {
+  const [findings, setFindings] = useState<EvalFinding[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState('');
+  const [status, setStatus] = useState('');
+  const [open, setOpen] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await testlabService.listFindings({
+        category: category || undefined,
+        status: status || undefined,
+      });
+      setFindings(r.findings);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load findings');
+    }
+    setLoading(false);
+  }, [category, status]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const badge = (c: string) => FINDING_BADGE[c] || 'bg-gray-100 text-gray-700';
+  const counts = FINDING_CATEGORIES
+    .map(c => ({ c, n: findings.filter(f => f.category === c).length }))
+    .filter(x => x.n > 0);
+
+  return (
+    <div>
+      <div className="mb-4 text-sm text-gray-600">
+        Why an evaluator rule exists — the incident, the measurement, the experiment that proved it.
+        Prompts carry the one-line rule only; the reasoning lives here so it is read by people rather
+        than re-sent to a model on every page.
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-4 items-center">
+        <select className="border rounded-lg px-3 py-2 text-sm" value={category} onChange={e => setCategory(e.target.value)}>
+          <option value="">All categories</option>
+          {FINDING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select className="border rounded-lg px-3 py-2 text-sm" value={status} onChange={e => setStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          <option value="active">active</option>
+          <option value="superseded">superseded</option>
+          <option value="rejected">rejected</option>
+        </select>
+        <button className="border rounded-lg px-3 py-2 text-sm hover:bg-gray-50" onClick={() => void load()}>Refresh</button>
+        <span className="text-sm text-gray-500">{findings.length} finding(s)</span>
+        {counts.map(x => (
+          <span key={x.c} className={`text-xs px-2 py-1 rounded ${badge(x.c)}`}>{x.c} {x.n}</span>
+        ))}
+      </div>
+
+      {error && <div className="text-sm text-red-600 mb-3">{error}</div>}
+
+      {loading ? <div className="text-sm text-gray-500">Loading…</div> : (
+        <div className="space-y-2">
+          {findings.map(f => {
+            const ev = (f.evidence || {}) as {
+              experiments?: number[]; stories?: string[]; pages?: number[];
+              commits?: string[]; measurements?: string;
+            };
+            const isOpen = open === f.slug;
+            return (
+              <div key={f.slug} className="border rounded-lg overflow-hidden">
+                <button
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-start gap-3"
+                  onClick={() => setOpen(isOpen ? null : f.slug)}
+                >
+                  <span className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${badge(f.category)}`}>{f.category}</span>
+                  <span className="flex-1">
+                    <span className="font-medium text-sm">{f.title}</span>
+                    <span className="block text-xs text-gray-500 font-mono mt-0.5">
+                      {f.slug}{f.prompt_file ? ` · ${f.prompt_file}` : ''}{f.prompt_section ? ` · ${f.prompt_section}` : ''}
+                    </span>
+                  </span>
+                  {f.status !== 'active' && (
+                    <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 whitespace-nowrap">{f.status}</span>
+                  )}
+                </button>
+                {isOpen && (
+                  <div className="px-4 pb-4 pt-1 text-sm space-y-3 bg-gray-50">
+                    {f.rule_text && (
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Rule the prompt carries</div>
+                        <div className="font-mono text-xs bg-white border rounded p-2 whitespace-pre-wrap">{f.rule_text}</div>
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Why — never put this in a prompt</div>
+                      <div className="whitespace-pre-wrap">{f.rationale}</div>
+                    </div>
+                    {(ev.measurements || ev.experiments?.length || ev.stories?.length || ev.commits?.length) && (
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Evidence</div>
+                        {ev.measurements && <div className="mb-1">{ev.measurements}</div>}
+                        {!!ev.experiments?.length && <div className="text-xs">experiments: {ev.experiments.join(', ')}</div>}
+                        {!!ev.stories?.length && <div className="text-xs font-mono break-all">stories: {ev.stories.join(', ')}</div>}
+                        {!!ev.pages?.length && <div className="text-xs">pages: {ev.pages.join(', ')}</div>}
+                        {!!ev.commits?.length && <div className="text-xs font-mono">commits: {ev.commits.join(', ')}</div>}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {!findings.length && <div className="text-sm text-gray-500">No findings match.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function BenchmarkTab() {
   const [benchmarks, setBenchmarks] = useState<BenchmarkScene[]>([]);

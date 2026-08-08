@@ -6125,3 +6125,40 @@ rule for it already exists and is being ignored before appending another carve-o
 
 **Touched:** `docs/prompt-inventory.md` (Evaluation section: char/line counts + size warning),
 `tasks/lessons.md`.
+
+---
+
+## 2026-08-08 — Eval findings registry in the Lab: learnings leave the prompt
+
+**Context:** Owner: "Make sure we have all findings and points first documented. The learnings can
+not live in a prompt. Make a better way to document findings. It should be in the lab."
+
+**The problem restated precisely.** `image-evaluation.txt` is not a specification, it is an incident
+log. Of its 166 rule-lines, 12 carry ~4,710 chars of inline rationale — "image generators can't
+render fine expression deltas", "manga is the ONLY style where this applies", "the reason for the
+carveout". That prose is written for a human maintainer and re-sent to a model on every page of
+every story.
+
+**Decision: split rule from reason.**
+- `migrations/013_eval_findings.sql` — `eval_findings` table. `rule_text` is the ONE terse line a
+  prompt may carry; `rationale` is the incident/measurement and must NEVER appear in a prompt;
+  `evidence` is JSONB holding story ids, page numbers, Test Lab experiment ids and commits;
+  `status` is active / superseded / **rejected** (so a measured dead end is not retried).
+- `scripts/admin/seed-eval-findings.js` — idempotent upsert-by-slug, seeded with 23 findings:
+  the 12 mined out of the prompts plus 11 measured in this session (art-style conditionality,
+  the 3000-char ORIGINAL_PROMPT truncation, judge non-determinism, the consensus-cap dead end,
+  gemini-flash failing as consolidator, the entity mis-crop, the standard-clothing phantom, the
+  write-only coherence gate, the garment-name loss, the scene-prose prohibition, prompt length).
+- `GET/POST/PATCH /api/admin/testlab/findings` + a **Findings tab** in `/admin/test-lab`:
+  category and status filters, counts per category, and each row expanding to show the rule the
+  prompt carries, the reason it exists, and the evidence.
+
+**7,325 chars of rationale now live in the registry instead of in prompts.** A prompt line may
+reference a finding by slug so the reasoning is one click away in the Lab.
+
+**Status:** registry live on staging and seeded. The prompt has NOT been cut yet — that is the next
+step, and per `judges-not-deterministic` it must be measured over repeats, not a single run.
+
+**Touched:** `migrations/013_eval_findings.sql`, `scripts/admin/seed-eval-findings.js`,
+`server/routes/admin/testlab.js`, `client/src/services/testlabService.ts`,
+`client/src/pages/TestLab.tsx`.

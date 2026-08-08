@@ -265,6 +265,71 @@ function setTargetKey(target) {
   return JSON.stringify(Object.keys(t).sort().reduce((o, k) => { o[k] = t[k]; return o; }, {}));
 }
 
+// ─── Eval findings registry ──────────────────────────────────────────────────
+// The durable home for what the evaluator prompts used to carry as inline
+// history. A prompt keeps the one-line rule; the rationale, the incident and the
+// measurement live here and are read by humans, not re-sent to a model per page.
+// See migrations/013_eval_findings.sql for why.
+
+// GET /api/admin/testlab/findings?category=&status=&file=
+router.get('/findings', async (req, res) => {
+  try {
+    const where = [], params = [];
+    const add = (clause, value) => { params.push(value); where.push(clause.replace('?', `$${params.length}`)); };
+    if (req.query.category) add('category = ?', req.query.category);
+    if (req.query.status) add('status = ?', req.query.status);
+    if (req.query.file) add('prompt_file ILIKE ?', `%${req.query.file}%`);
+    const rows = await dbQuery(
+      `SELECT id, slug, title, category, prompt_file, prompt_section, rule_text, rationale,
+              evidence, status, superseded_by, created_by, created_at, updated_at
+         FROM eval_findings
+         ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+         ORDER BY category, slug`,
+      params
+    );
+    res.json({ findings: rows, total: rows.length });
+  } catch (err) { res.status(500).json({ error: 'Failed to load findings', details: err.message }); }
+});
+
+// POST /api/admin/testlab/findings — create or update by slug.
+router.post('/findings', async (req, res) => {
+  try {
+    const b = req.body || {};
+    if (!b.slug || !b.title || !b.category || !b.rationale) {
+      return res.status(400).json({ error: 'slug, title, category and rationale are required' });
+    }
+    const rows = await dbQuery(
+      `INSERT INTO eval_findings (slug, title, category, prompt_file, prompt_section, rule_text, rationale, evidence, status, superseded_by, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ON CONFLICT (slug) DO UPDATE SET
+         title=EXCLUDED.title, category=EXCLUDED.category, prompt_file=EXCLUDED.prompt_file,
+         prompt_section=EXCLUDED.prompt_section, rule_text=EXCLUDED.rule_text,
+         rationale=EXCLUDED.rationale, evidence=EXCLUDED.evidence, status=EXCLUDED.status,
+         superseded_by=EXCLUDED.superseded_by, updated_at=NOW()
+       RETURNING id, slug`,
+      [b.slug, b.title, b.category, b.prompt_file || null, b.prompt_section || null,
+       b.rule_text || null, b.rationale, JSON.stringify(b.evidence || {}),
+       b.status || 'active', b.superseded_by || null, req.user?.email || 'admin']
+    );
+    res.json(rows[0]);
+  } catch (err) { res.status(500).json({ error: 'Failed to save finding', details: err.message }); }
+});
+
+// PATCH /api/admin/testlab/findings/:slug — status/supersede only.
+router.patch('/findings/:slug', async (req, res) => {
+  try {
+    const { status, superseded_by } = req.body || {};
+    if (!status && !superseded_by) return res.status(400).json({ error: 'status or superseded_by required' });
+    const rows = await dbQuery(
+      `UPDATE eval_findings SET status = COALESCE($2, status), superseded_by = COALESCE($3, superseded_by),
+              updated_at = NOW() WHERE slug = $1 RETURNING id, slug, status, superseded_by`,
+      [req.params.slug, status || null, superseded_by || null]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'No such finding' });
+    res.json(rows[0]);
+  } catch (err) { res.status(500).json({ error: 'Failed to update finding', details: err.message }); }
+});
+
 // GET /api/admin/testlab/sets
 router.get('/sets', async (req, res) => {
   try {

@@ -308,6 +308,27 @@ export interface ExperimentDetail {
   completedAt: string | null;
 }
 
+/**
+ * A durable eval finding. The prompt carries `ruleText`; `rationale` is the part
+ * that must NOT live in a prompt — the incident, the measurement, the reason.
+ */
+export interface EvalFinding {
+  id: number;
+  slug: string;
+  title: string;
+  category: string;
+  prompt_file: string | null;
+  prompt_section: string | null;
+  rule_text: string | null;
+  rationale: string;
+  evidence: Record<string, unknown>;
+  status: string;
+  superseded_by: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export const TESTLAB_STAGES = [
   { id: 'image', label: 'Page image', producesImage: true, overridable: true },
   { id: 'empty_scene', label: 'Empty scene', producesImage: true, overridable: true },
@@ -455,6 +476,23 @@ export const testlabService = {
     return api.post<{ id: number; members: number }>(`/api/admin/testlab/sets/${setId}/run`, { params, ...opts });
   },
 
+
+  listFindings(filters: { category?: string; status?: string; file?: string } = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => { if (v) qs.set(k, v); });
+    const q = qs.toString();
+    return api.get<{ findings: EvalFinding[]; total: number }>(`/api/admin/testlab/findings${q ? `?${q}` : ''}`);
+  },
+
+  saveFinding(body: Partial<EvalFinding>) {
+    return api.post<{ id: number; slug: string }>('/api/admin/testlab/findings', body);
+  },
+
+  setFindingStatus(slug: string, status: string, supersededBy?: string) {
+    return api.patch<{ slug: string; status: string }>(`/api/admin/testlab/findings/${slug}`, {
+      status, superseded_by: supersededBy,
+    });
+  },
 };
 
 export interface TestLabSet {
