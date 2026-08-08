@@ -52,6 +52,7 @@ If `matches[]` is empty or absent while figures exist in QUALITY_FIGURES or VISI
 **STEP 2: CHARACTER COMPLIANCE (per paired row)**
 
 For each paired row from STEP 1 with a non-null `vision_description`:
+- **Undressed figure**: a figure the inventory describes with a bare torso, bare buttocks or bare groin, or wearing only headwear or only an accessory = CATASTROPHIC, `type: "nudity"`. A children's book cannot publish it, so this outranks every clothing rule below and fires whatever the prompt asked for. Occlusion, cropping, water and blankets are not nudity; bare arms or bare feet with normal clothes are not nudity.
 - **Clothing type**: Vision clothing vs prompt. Modern clothes (sweatshirt, jeans, sneakers) when medieval/costume was requested = CRITICAL. Wrong main colour = MAJOR. Accessories that can be occluded (apron under cloak, scarf, jewellery, belt) missing from vision are NOT a deduction.
 - **Age appearance**: Vision age group vs prompt.
 - **Hair**: Vision hair vs prompt.
@@ -99,6 +100,7 @@ A character present in `QUALITY_FIGURES.matches[]` is never "missing" — appear
 - A prompt-named character absent from `matches[]` — identification happens upstream and its gaps are input deficiencies, not image defects. With a plausibly-matching inventory figure: no finding at all. With no plausible figure either: `missing_character` at most MAJOR.
 
 Tag each `fixable_issues[]` entry with a severity — the pipeline computes the deduction from these tags:
+- CATASTROPHIC: an undressed figure (`nudity`, see STEP 2) — cannot be published
 - CRITICAL: Clothing completely wrong TYPE (modern vs medieval/costume), declared interaction object missing or in a genuinely different category (held-vs-pocket-vs-on-head — NOT left arm vs right arm), extra limbs, floating figure, `implausible_placement` (a named figure standing in water, inside a fountain/pond/basin, or inside a solid object the scene did not call for), `wrong_action` (main beat intent contradicted by inventory — e.g. prompt says offering, inventory shows aiming; never based on direction of travel inferred from a mid-motion pose)
 - MAJOR: Missing character (named in ORIGINAL_PROMPT, absent from `matches[]`, AND no plausible VISION figure — never higher than MAJOR: absence inferred from inputs is a report, not proof; the image-seeing evaluator owns confirmed absences), character facing the wrong way for a DECLARED INTERACTION (e.g. two characters declared as interacting but facing away from each other; character declared as watching a named object but looking elsewhere), wrong clothing color, wrong age appearance, cross-eyes
 - MODERATE: Minor clothing detail, key object missing
