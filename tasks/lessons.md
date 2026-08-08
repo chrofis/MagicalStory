@@ -17,6 +17,16 @@ Each lesson should include:
 
 <!-- Add lessons below as they occur -->
 
+### 2026-08-08: Verify every assumption twice (or ask) BEFORE coding — never build on an unverified conclusion
+
+- **Context**: Story `job_1786193650012_7baiaeftb` — Daniel & Sarah shipped 3 bad realistic avatars in a row. User asked (at the very start) to reproduce the generation prompt in the lab. Instead I ran a long analysis and repeatedly jumped to conclusions: first mis-stated the timing ("pose didn't run" — it did, proven by `poseCells` in the stored verdict + gen timestamp 12:59 > deploy 12:39), then glanced at a montage and concluded "the avatars are actually fine, it's a split artifact" — which contradicted BOTH the user AND my own pose data (`head_max 0.001` = headless). I then started proposing/writing code fixes on top of that wrong conclusion.
+- **Mistake**: Let a fast visual impression override hard evidence I already had; constructed a theory to reconcile the contradiction instead of re-checking the raw data; and moved toward code changes before the conclusion was verified. Wasted a lot of the user's time.
+- **Rule**:
+  - **Before writing/proposing ANY code, each assumption behind it must be verified twice from independent evidence, OR surfaced to the user and confirmed** — unless explicitly in auto/autonomous mode. No coding on an unverified conclusion.
+  - **When a new conclusion contradicts existing hard data (a stored score, a measurement) or the user's stated observation, STOP.** Do not build a reconciling theory. Re-pull the raw data and trust the measurement over a quick visual read. If they still disagree, surface the contradiction and ask — don't pick a side and code.
+  - **Reproduce before theorising.** If the user asks to reproduce something in the lab, do THAT first — a reproduction is worth more than any amount of after-the-fact analysis.
+  - An occasional bad output is expected; a *pattern* (e.g. 3-in-a-row) is a real signal — investigate the cause (prompt/template), don't explain it away.
+
 ### 2026-04-20: Field-subset drift — prompt builders that each copy their own subset of character traits
 
 - **Context**: Roger has `physical.glasses = "schwarze Brille"`. Image correctly rendered him with glasses. Quality eval flagged them as "anachronistic", repair loop thrashed for 3 rounds trying to remove them. Unified-pass prose had also hallucinated "short dark beard" although Roger is clean-shaven.

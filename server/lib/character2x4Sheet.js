@@ -72,7 +72,10 @@ async function styleTransferGenerate(prompt, pass1ImageData, backendOverride = n
 // Best-of-N cap: first attempt + N retries. The loop short-circuits on the
 // first valid eval — retries only fire when an attempt fails. If all attempts
 // fail, we pick the best and ship it. Two retries = up to 3 Grok calls per pass.
-const MAX_SHEET_RETRIES = 2;
+// Max 1 retry per stage (user direction 2026-08-09). Pass 1 (body/head rows)
+// hardcodes ≤2 tries each inside generateComposited2x4; this governs Pass 2
+// (style transfer) → 1 + 1 = 2 attempts.
+const MAX_SHEET_RETRIES = 1;
 
 const ASSETS_DIR = path.resolve(__dirname, '..', 'assets');
 // The -axes variants overlay a 3-axis RGB gizmo (red X / green Y / blue Z)
@@ -164,6 +167,244 @@ function buildHairBlock(character) {
   }
   if (!hairBits.length) return '';
   return `\n${hairBits.join(' ')} Reproduce the hair EXACTLY in every cell — same length, same color, same shape, same parting. The back-of-head cell (cell 4) must show the same hair from behind. Do NOT invent a different cut.\n`;
+}
+
+// ── Decoupled two-call sheet generation (2026-08-08) ────────────────────────
+// ONE combined 2×4 edit produced a HEADLESS bottom (body) row ~70% of the time:
+// squeezed into the near-square bottom cells the model rendered the two rows as
+// one tall figure and cropped the head off the bottom half. Reproduced 7/10 with
+// identical params (not variance); the axes-vs-headed phantom made no difference.
+// Fix: two calls — (1) a dedicated 1×4 FULL-BODY row with TALL cells, then (2) a
+// 1×4 HEAD-SHOT row that references the just-rendered body so the heads belong to
+// it — composited into the 2×4. Validated: body call 0/15 headless, head call
+// good identity + quality (a fresh render beats crop-and-scale). Grok edit takes
+// only 3 refs; the head call uses [mannequin heads, face photo, body row].
+// See docs/decisions.md (decoupled-avatar-sheet).
+
+// Load an age-tier phantom in the requested variant: 'axes' (arrow direction
+// guides — used for the head-shot row) or 'plain' (no arrows, headed bottom
+// mannequins — used for the body row). Same tier-fallback as loadPhantom.
+function loadPhantomVariant(age, variant) {
+  const tier = phantomTierForAge(age);
+  const suffix = variant === 'axes' ? '-axes' : '';
+  const tierPath = path.join(ASSETS_DIR, `phantom-watercolor-${tier}${suffix}.png`);
+  const fallback = variant === 'axes' ? DEFAULT_PHANTOM_PATH : path.join(ASSETS_DIR, 'phantom-watercolor-adult.png');
+  const file = fs.existsSync(tierPath) ? tierPath : fallback;
+  if (phantomCache.has(file)) return phantomCache.get(file);
+  if (!fs.existsSync(file)) throw new Error(`Phantom asset missing at ${file}`);
+  const dataUrl = `data:image/png;base64,${fs.readFileSync(file).toString('base64')}`;
+  phantomCache.set(file, dataUrl);
+  return dataUrl;
+}
+
+// Crop a phantom into its top (head) row and bottom (body) row at the mid line.
+async function phantomRow(phantomDataUrl, which) {
+  const buf = Buffer.from(r2.stripDataUriPrefix(phantomDataUrl), 'base64');
+  const { width, height } = await sharp(buf).metadata();
+  const mid = Math.round(height / 2);
+  const region = which === 'top'
+    ? { left: 0, top: 0, width, height: mid }
+    : { left: 0, top: mid, width, height: height - mid };
+  const out = await sharp(buf).extract(region).png().toBuffer();
+  return `data:image/png;base64,${out.toString('base64')}`;
+}
+
+// Body-row prompt (call 1): one row of 4 full bodies, tall cells. Keeps the
+// outer layer in the profile (validated wording). Generic — no story specifics.
+function buildBodyRowPrompt(costumeDescription, character = null, redress = false) {
+  const hairBlock = buildHairBlock(character);
+  const bodyRef = redress
+    ? `Image 2 shows the character's body shape, build, and identity ONLY — IGNORE the clothing in Image 2, it is the wrong outfit. Image 3 is the character's face.`
+    : `Image 2 is the character's body. Image 3 is the character's face.`;
+  const outfitRule = redress
+    ? `Costume (the ONLY outfit — every cell wears exactly this, NOT the clothing from Image 2): ${costumeDescription}`
+    : `Costume: ${costumeDescription}`;
+  return `Image 1 indicates only the camera angle and facing direction in each cell — ignore its silhouette, body, and face. The output contains no arrows.
+${bodyRef}
+
+${outfitRule}${hairBlock}
+Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, natural proportions matching the person's apparent age in Image 3. No cartoon, no anime, no watercolour. This sheet is an identity anchor.
+
+Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background, same cell layout as Image 1.
+Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the soles of the feet, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 back. The whole figure — head, hair, face, torso, legs, and both feet with shoes — sits inside its cell with white margin above the head and below the shoes. Never crop the head and never crop the feet; if the figure does not fit, scale it down until the entire head and both feet are inside the cell. Body proportions match the person's apparent age (an adult is roughly 7 to 8 heads tall).
+The outfit is identical in all four cells, layers included. When the costume has an outer layer — vest, jacket, cardigan, coat, or overshirt — it stays on in the profile and back cells. Seen edge-on in the profile, its front opening runs as a vertical band down the side of the torso, with the shoulder seam, armhole, and the back panel visible behind the arm. No text, numbers, labels, arrows, or symbols anywhere.`;
+}
+
+// Head-row prompt (call 2): one row of 4 head-shots that match the body sheet.
+// Refs: Image 1 = mannequin head row (angles), Image 2 = face photo (identity),
+// Image 3 = the body row from call 1 (match its rendered face/hair).
+function buildHeadRowPrompt(character = null) {
+  const hairBlock = buildHairBlock(character);
+  return `Image 1 shows the four camera angles for a head-shot row — use it ONLY for facing direction (cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 back of head); ignore its face and features, and never draw arrows.
+Image 2 is the character's face photo — the identity; match this exact face.
+Image 3 is the character's full-body reference sheet — match the SAME face, hair colour, hairstyle, and skin tone shown there so the heads belong to that body.${hairBlock}
+Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is a HEAD-AND-NECK close-up — head and neck only, no shoulders, no torso, no clothing — of the SAME PERSON. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 back of head. Photographic / lifelike; identity from Image 2; hair and skin tone consistent with Image 3. No text, numbers, labels, arrows, or symbols.`;
+}
+
+// Composite the head row (top) over the body row (bottom) into one 2×4 sheet,
+// with a thin black seam so the row splitter (detectSheetRowDivider) locks onto
+// the boundary. Widths are matched to the body row; heights stay native.
+// Returns { imageData, splitY } — splitY is where the head/body divider sits.
+async function stackRowsInto2x4(headRowData, bodyRowData) {
+  const headBuf = Buffer.from(r2.stripDataUriPrefix(headRowData), 'base64');
+  const bodyBuf = Buffer.from(r2.stripDataUriPrefix(bodyRowData), 'base64');
+  const bMeta = await sharp(bodyBuf).metadata();
+  const W = bMeta.width;
+  const headResized = await sharp(headBuf).resize({ width: W }).toBuffer();
+  const hMeta = await sharp(headResized).metadata();
+  const SEAM = 4;
+  const splitY = hMeta.height + Math.round(SEAM / 2);
+  const H = hMeta.height + SEAM + bMeta.height;
+  const out = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+    .composite([
+      { input: headResized, top: 0, left: 0 },
+      { input: bodyBuf, top: hMeta.height + SEAM, left: 0 },
+    ])
+    .jpeg({ quality: 92 })
+    .toBuffer();
+  return { imageData: `data:image/jpeg;base64,${out.toString('base64')}`, splitY };
+}
+
+// SINGLE source of truth for the body-row head axis. Pose (geometry) owns "is
+// there a head"; Gemini owns feet/outfit/proportions/background. Mutates
+// `bodies` in place: sets fullBody.fullBodyScore = min(pose-head, gemini-feet),
+// recomputes bodies.finalScore/valid, and stamps headSource. poseHeads === null
+// → fall back to Gemini's headScore, loudly. Used by BOTH evaluateSheetSplit
+// (whole-sheet eval / Test Lab) and generateComposited2x4 (per-row review).
+function applyPoseHeadGate(bodies, poseHeads) {
+  const fb = bodies?.fullBody;
+  if (!fb) return bodies;
+  const gemFeet = fb.feetScore ?? fb.fullBodyScore ?? 10;
+  const gemHead = fb.headScore ?? fb.fullBodyScore ?? 10;
+  let headScoreEff, headReason;
+  if (poseHeads && Array.isArray(poseHeads.cells)) {
+    fb.headSource = 'pose';
+    fb.poseCells = poseHeads.cells.map(c => ({ head: c.head, head_max: c.head_max, clipped: c.clipped }));
+    const missing = poseHeads.cells.map((c, i) => ({ c, i })).filter(({ c }) => !c.head || c.clipped);
+    headScoreEff = missing.length ? 1 : 10;
+    headReason = missing.length
+      ? `pose head-check: ${missing.length}/4 body cells have no head (${missing.map(({ i }) => `cell${i + 1}`).join(', ')})`
+      : 'pose head-check: all 4 body cells have a head';
+  } else {
+    fb.headSource = 'gemini-fallback';
+    headScoreEff = gemHead;
+    headReason = `pose UNAVAILABLE — head axis fell back to Gemini (headScore=${gemHead}, unreliable on headless torsos)`;
+    log.error(`[CHARACTER 2×4] pose /pose-heads unavailable — body-row head check FELL BACK to Gemini (headScore=${gemHead}). Fix the analyzer; Gemini hallucinates heads on headless bodies.`);
+  }
+  fb.fullBodyScore = Math.min(headScoreEff, gemFeet);
+  fb.reason = `${headReason}; feet=${gemFeet}`;
+  bodies.finalScore = Math.min(
+    fb.fullBodyScore,
+    bodies.angles?.score ?? 10,
+    bodies.outfit?.outfitScore ?? 10,
+    bodies.proportions?.score ?? 10,
+    bodies.background?.backgroundScore ?? 10,
+  );
+  bodies.valid = bodies.finalScore >= 6;
+  if (fb.fullBodyScore <= 2) bodies.failureReasons = [...(bodies.failureReasons || []), `fullBody: ${headReason}`];
+  return bodies;
+}
+
+// Review the 1×4 body row on its own (it IS the bottom-body crop the eval wants,
+// so no split needed): pose head-check + Gemini bodies eval, merged by the gate.
+async function reviewBodyRow(bodyRowData, { costumeDescription, model, usageTracker }) {
+  const [poseHeads, bodiesR] = await Promise.all([
+    detectBodyRowHeads(bodyRowData),
+    evaluateSheetRow(bodyRowData, 'bodies', { costumeDescription, model, usageTracker }),
+  ]);
+  const bodies = applyPoseHeadGate(bodiesR.report, poseHeads);
+  return { valid: !!bodies.valid, score: bodies.finalScore ?? 0, bodies, promptUsed: bodiesR.promptUsed };
+}
+
+// Review the 1×4 head row: heads-structure eval + identity vs face photo/avatar.
+async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usageTracker }) {
+  const hasRefs = !!(facePhoto || avatarFaces);
+  const [headsR, identityR] = await Promise.all([
+    evaluateSheetRow(headRowData, 'heads', { model, usageTracker }),
+    hasRefs ? evaluateIdentity(headRowData, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker }) : Promise.resolve(null),
+  ]);
+  const heads = headsR.report;
+  const identity = identityR?.report || null;
+  const idScore = identity?.identityScore ?? 10;
+  const score = Math.min(heads?.finalScore ?? 0, idScore);
+  return { valid: score >= 6, score, heads, identity, promptUsed: headsR.promptUsed };
+}
+
+// Two-call generation → one composited 2×4 sheet, WITH review between the calls.
+// (1) body row, reviewed (pose + bodies eval); max 1 retry, keep least-bad.
+// (2) head row on the ACCEPTED body, reviewed (heads + identity); max 1 retry,
+// keep least-bad. Then composite. Rejected rows are discarded. Returns a verdict
+// in the evaluateSheetSplit shape so generateCharacter2x4Sheet / styledAvatars
+// consume it unchanged. skipReview → 1 try each, no eval (fast path for tests).
+async function generateComposited2x4(character, { costumeDescription, redress = false, usageTracker = null, skipReview = false } = {}) {
+  const facePhoto = await resolveFacePhoto(character);
+  if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
+  const standardAvatar = await resolveStandardAvatar(character);
+  const avatarFaces = standardAvatar ? (await splitSheetRows(standardAvatar)).topHeads : null;
+  const bodyPhantom = await phantomRow(loadPhantomVariant(character?.age, 'plain'), 'bottom');
+  const headPhantom = await phantomRow(loadPhantomVariant(character?.age, 'axes'), 'top');
+  const model = MODEL_DEFAULTS.sheetEvalModel;
+  const bodyRefs = standardAvatar ? [bodyPhantom, standardAvatar, facePhoto] : [bodyPhantom, facePhoto];
+  const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress);
+  const headPrompt = buildHeadRowPrompt(character);
+  const attemptHistory = [];
+  let usage = { input_tokens: 0, output_tokens: 0 };
+  const addUsage = (u, fn, id) => { if (u) { usage.input_tokens += u.input_tokens || 0; usage.output_tokens += u.output_tokens || 0; if (usageTracker) usageTracker('grok', u, fn, id); } };
+
+  // ── Stage 1: body row (max 1 retry, keep least-bad) ──
+  let bestBody = null;
+  for (let t = 1; t <= 2; t++) {
+    const res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD });
+    if (!res?.imageData) { attemptHistory.push({ stage: 'body', try: t, error: 'no image' }); continue; }
+    addUsage(res.usage, 'character_2x4_body_row', res.modelId);
+    let review = { valid: true, score: 10, bodies: null };
+    if (!skipReview) review = await reviewBodyRow(res.imageData, { costumeDescription, model, usageTracker });
+    attemptHistory.push({ stage: 'body', try: t, score: review.score, valid: review.valid, reasons: review.bodies?.failureReasons || [] });
+    if (!bestBody || review.score > bestBody.review.score) bestBody = { row: res.imageData, review };
+    if (review.valid) break;
+    log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t} invalid (score=${review.score}) — ${skipReview ? '' : (review.bodies?.failureReasons || []).join('; ')}`);
+  }
+  if (!bestBody) throw new Error(`[CHARACTER 2×4] body row produced no image for ${character?.name}`);
+
+  // ── Stage 2: head row on the accepted body (max 1 retry, keep least-bad) ──
+  const headRefs = [headPhantom, facePhoto, bestBody.row]; // exactly 3
+  let bestHead = null;
+  for (let t = 1; t <= 2; t++) {
+    const res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD });
+    if (!res?.imageData) { attemptHistory.push({ stage: 'head', try: t, error: 'no image' }); continue; }
+    addUsage(res.usage, 'character_2x4_head_row', res.modelId);
+    let review = { valid: true, score: 10, heads: null, identity: null };
+    if (!skipReview) review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker });
+    attemptHistory.push({ stage: 'head', try: t, score: review.score, valid: review.valid });
+    if (!bestHead || review.score > bestHead.review.score) bestHead = { row: res.imageData, review };
+    if (review.valid) break;
+    log.warn(`[CHARACTER 2×4] ${character?.name} head try ${t} invalid (score=${review.score})`);
+  }
+  if (!bestHead) throw new Error(`[CHARACTER 2×4] head row produced no image for ${character?.name}`);
+
+  // ── Composite + build the evaluateSheetSplit-shape verdict from the reviews ──
+  const { imageData, splitY } = await stackRowsInto2x4(bestHead.row, bestBody.row);
+  const bodies = bestBody.review.bodies;
+  const heads = bestHead.review.heads;
+  const identity = bestHead.review.identity;
+  const idScore = identity?.identityScore ?? 10;
+  const finalScore = skipReview ? 10 : Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0, idScore);
+  const verdict = {
+    split: true, splitY, finalScore, valid: finalScore >= 6,
+    failureReasons: [...(heads?.failureReasons || []), ...(bodies?.failureReasons || [])],
+    layout: { layoutScore: bodies?.fullBody?.fullBodyScore ?? 10 },
+    identity: { identityScore: idScore, reason: identity?.reason },
+    outfit: { outfitScore: bodies?.outfit?.outfitScore ?? 10 },
+    sourceMatch: { sourceMatchScore: idScore },
+    cleanRender: { cleanScore: heads?.cleanRender?.cleanScore ?? 10 },
+    heads, bodies, identityReport: identity,
+  };
+  return {
+    imageData, verdict, usage, modelId: GROK_MODELS.STANDARD,
+    refs: { phantom: headPhantom, bodyPhantom, standardAvatar, facePhoto },
+    prompt: `— BODY ROW —\n${bodyPrompt}\n\n— HEAD ROW —\n${headPrompt}`,
+    bodyRow: bestBody.row, headRow: bestHead.row, attemptHistory,
+  };
 }
 
 function buildPrompt(_artStyle, costumeDescription, character = null, redress = false) {
@@ -726,51 +967,11 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
   const identity = identityR?.report || null;
   const idScore = identity?.identityScore ?? 10;
 
-  // HEAD GATE — the body-row head axis has TWO possible sources:
-  //   pose (preferred): geometry, doesn't hallucinate heads on headless torsos.
-  //   Gemini headScore (fallback): used ONLY when pose is unavailable. A VLM
-  //     hallucinates heads, so this is best-effort — hence the loud ERROR below,
-  //     so a pose outage is trivial to spot in the logs instead of silently
-  //     shipping unverified heads.
-  // Feet ALWAYS come from Gemini (feetScore). fullBodyScore = min(head, feet),
-  // and bodies.finalScore is recomputed from it so the retry gate sees the merge.
-  const fb = bodies?.fullBody;
-  if (fb) {
-    const gemFeet = fb.feetScore ?? fb.fullBodyScore ?? 10;
-    const gemHead = fb.headScore ?? fb.fullBodyScore ?? 10;
-    let headScoreEff, headReason;
-    if (poseHeads && Array.isArray(poseHeads.cells)) {
-      fb.headSource = 'pose';
-      fb.poseCells = poseHeads.cells.map(c => ({ head: c.head, head_max: c.head_max, clipped: c.clipped }));
-      const missing = poseHeads.cells.map((c, i) => ({ c, i })).filter(({ c }) => !c.head || c.clipped);
-      headScoreEff = missing.length ? 1 : 10;
-      headReason = missing.length
-        ? `pose head-check: ${missing.length}/4 body cells have no head (${missing.map(({ i }) => `cell${i + 1}`).join(', ')})`
-        : 'pose head-check: all 4 body cells have a head';
-    } else {
-      // Pose unavailable → fall back to Gemini's head judgment, and make the
-      // degradation LOUD (detectBodyRowHeads already warn-logged the transport
-      // failure; this ERROR marks that the eval actually ran head-blind).
-      fb.headSource = 'gemini-fallback';
-      headScoreEff = gemHead;
-      headReason = `pose UNAVAILABLE — head axis fell back to Gemini (headScore=${gemHead}, unreliable on headless torsos)`;
-      log.error(`[CHARACTER 2×4] pose /pose-heads unavailable — body-row head check FELL BACK to Gemini (headScore=${gemHead}). Fix the analyzer; Gemini hallucinates heads on headless bodies.`);
-    }
-    fb.fullBodyScore = Math.min(headScoreEff, gemFeet);
-    fb.reason = `${headReason}; feet=${gemFeet}`;
-    // Recompute the bodies verdict from the merged fullBodyScore.
-    bodies.finalScore = Math.min(
-      fb.fullBodyScore,
-      bodies.angles?.score ?? 10,
-      bodies.outfit?.outfitScore ?? 10,
-      bodies.proportions?.score ?? 10,
-      bodies.background?.backgroundScore ?? 10,
-    );
-    bodies.valid = bodies.finalScore >= 6;
-    if (fb.fullBodyScore <= 2) {
-      bodies.failureReasons = [...(bodies.failureReasons || []), `fullBody: ${headReason}`];
-    }
-  }
+  // HEAD GATE — pose owns "is there a head" on the body row, Gemini owns
+  // feet/outfit/etc.; applyPoseHeadGate merges them (shared with the decoupled
+  // generator so there is ONE gate). Mutates `bodies` (fullBodyScore/finalScore/
+  // valid/headSource). poseHeads === null → loud Gemini fallback.
+  applyPoseHeadGate(bodies, poseHeads);
 
   // finalScore spans structure of both rows + identity (heads only).
   const finalScore = Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0, idScore);
@@ -870,133 +1071,41 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     redress = false,
   } = opts;
 
-  const phantom = loadPhantom(character?.age);
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) {
     throw new Error(`No face photo for ${character?.name || 'character'}.`);
   }
   const standardAvatar = await resolveStandardAvatar(character);
-  // The standard avatar is the preferred body reference. If it's missing
-  // (e.g. avatar generation failed earlier), fall back to face-only —
-  // Grok will rebuild the body from the prompt.
-  const refs = standardAvatar
-    ? [phantom, standardAvatar, facePhoto]
-    : [phantom, facePhoto];
 
-  const prompt = buildPrompt(artStyle, costumeDescription, character, redress);
-
-  // Track every attempt — when all retries fail to produce a `valid` sheet
-  // (per the eval), we pick the highest-scoring attempt instead of throwing.
-  // Better to ship the least-bad sheet and surface the attempt history in
-  // the dev panel than to fail the whole story on a marginal eval miss.
-  const attemptHistory = [];
-  let bestAttempt = null;  // { result, score, verdict|null, quick|null }
-  const totalAttempts = 1 + MAX_SHEET_RETRIES;
-  for (let attempt = 1; attempt <= totalAttempts; attempt++) {
-    log.info(`[CHARACTER 2×4] Generating sheet for ${character?.name} (${clothingCategory}, ${artStyle}, refs=${refs.length}, attempt ${attempt}/${totalAttempts})`);
-    // A thrown Grok call must consume ONE attempt, not abort the whole sheet.
-    // Previously this line was unprotected, so a single transient API error
-    // (timeout, 5xx, refusal) escaped the retry loop, propagated out of
-    // generateCharacter2x4Sheet, and the character lost its avatar entirely
-    // even though two retries remained.
-    let result;
-    try {
-      result = await editWithGrok(prompt, refs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD });
-    } catch (err) {
-      log.warn(`[CHARACTER 2×4] ${character?.name} attempt ${attempt}/${totalAttempts} Grok generation threw: ${err.message}${attempt < totalAttempts ? ' — retrying' : ' — no attempts left'}`);
-      attemptHistory.push({ attempt, stage: 'gen-error', score: 0, reason: err.message });
-      continue;
-    }
-    if (usageTracker && result.usage) usageTracker('grok', result.usage, 'character_2x4_sheet', result.modelId);
-
-    if (skipQualityEval) {
-      // Caller bypassed eval — first attempt's result IS the result.
-      bestAttempt = { result, score: 10, verdict: null, quick: null, attempt };
-      attemptHistory.push({ attempt, stage: 'skipped', score: 10, imageData: result.imageData });
-      break;
-    }
-
-    // Cheap pixel gutter check — ADVISORY ONLY, never a gate. It is over-eager
-    // (documented): it false-positives on structurally-fine sheets, and when it
-    // did that as a hard gate it scored good versions 0 AND skipped the Gemini
-    // eval, so a worse quick-PASSING version won (observed live: 2 good Sarah
-    // versions quick-failed → the crap 3rd version was selected). The Gemini eval
-    // below is authoritative — it scores layout (catching genuine gutter-crossing
-    // via layoutScore), identity, outfit, source-match — so we ALWAYS run it and
-    // select by its finalScore. quick is kept only for the dev-panel signal.
-    const quick = await quickLayoutCheck(result.imageData);
-    if (!quick.valid) {
-      log.warn(`[CHARACTER 2×4] ${character?.name} attempt ${attempt} quick-layout advisory: ${quick.reason} — running full Gemini eval anyway (quick check is over-eager, not a gate)`);
-    }
-
-    // Gemini eval — verifies heads-only / bodies / identity / outfit.
-    if (!process.env.GEMINI_API_KEY) {
-      log.warn('[CHARACTER 2×4] GEMINI_API_KEY missing — accepting after quick-check only');
-      bestAttempt = { result, score: 10, verdict: null, quick, attempt };
-      attemptHistory.push({ attempt, stage: 'no-eval-key', score: 10, imageData: result.imageData });
-      break;
-    }
-    let verdict = null;
-    try {
-      // SPLIT eval — the SAME shared evaluator the Test Lab uses. Crops the
-      // sheet at the row divider and judges the 4 heads and 4 bodies
-      // separately (each anchored on the face photo + the 2×2 avatar's face
-      // row), so the judge can't rubber-stamp "bottom row full body" on a crop
-      // that isn't, and a cut/missing head is caught. `verdict` is a drop-in
-      // for the old whole-sheet shape (finalScore/valid/layout/identity/
-      // outfit/sourceMatch/cleanRender/failureReasons).
-      // pass 1 (realistic base) via the single-source evaluator — SAME call the
-      // Test Lab makes, so lab == production.
-      const { split } = await evaluateAvatarSheet(result.imageData, {
-        pass: 1, facePhoto, standardAvatar, costumeDescription, usageTracker,
-      });
-      verdict = split.verdict;
-      log.info(`[CHARACTER 2×4]   split eval: heads=${split.heads?.finalScore} bodies=${split.bodies?.finalScore} layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} sourceMatch=${verdict.sourceMatch?.sourceMatchScore} clean=${verdict.cleanRender?.cleanScore} final=${verdict.finalScore} valid=${verdict.valid}`);
-    } catch (err) {
-      // Eval errors no longer get a free score=10. Treat them as score=5
-      // (neutral) so a later successful eval can win the best-of-N selection,
-      // but a JSON-truncation failure can't promote a marginal Grok output to
-      // "best attempt" over a real `valid` verdict on the next retry.
-      log.warn(`[CHARACTER 2×4] Gemini eval error on attempt ${attempt}: ${err.message} — counting as neutral (score=5) and continuing retries`);
-      const candidate = { result, score: 5, verdict: null, quick, attempt };
-      attemptHistory.push({ attempt, stage: 'eval-error', score: 5, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
-      if (!bestAttempt || candidate.score > bestAttempt.score) bestAttempt = candidate;
-      continue;
-    }
-    const score = verdict.finalScore ?? 0;
-    const candidate = { result, score, verdict, quick, attempt };
-    attemptHistory.push({
-      attempt,
-      stage: verdict.valid ? 'valid' : 'invalid',
-      score,
-      layoutScore: verdict.layout?.layoutScore,
-      identityScore: verdict.identity?.identityScore,
-      outfitScore: verdict.outfit?.outfitScore,
-      sourceMatchScore: verdict.sourceMatch?.sourceMatchScore,
-      reasons: verdict.failureReasons || [],
-      imageData: result.imageData,
-      sentToGrok: result.sentToGrok || null,
+  // ── PASS 1 (realistic anchor) — DECOUPLED two-call generation with review ──
+  // A single combined 2×4 call produced a headless bottom row ~70% of the time
+  // (reproduced with identical params, not variance — see docs/decisions.md).
+  // Split into a full-body row, then a head-shot row that references the
+  // ACCEPTED body, each reviewed with ≤1 retry (keep least-bad), then
+  // composited. generateComposited2x4 owns that loop and returns a verdict in
+  // the evaluateSheetSplit shape, so Pass 2 and the return below are unchanged.
+  // skipReview mirrors the old skipQualityEval fast path (1 try each, no eval).
+  let composed;
+  try {
+    composed = await generateComposited2x4(character, {
+      costumeDescription, redress, usageTracker, skipReview: skipQualityEval,
     });
-    if (!bestAttempt || candidate.score > bestAttempt.score) bestAttempt = candidate;
-    if (verdict.valid) break;
-    log.warn(`[CHARACTER 2×4] ${character?.name} attempt ${attempt} eval finalScore=${score} (valid=false): ${(verdict.failureReasons || []).join('; ')}`);
+  } catch (err) {
+    throw new Error(`[CHARACTER 2×4] pass-1 generation failed for ${character?.name}: ${err.message}`);
   }
-
-  if (!bestAttempt) {
-    throw new Error(`[CHARACTER 2×4] no usable image produced after ${totalAttempts} attempts for ${character?.name}`);
-  }
-  if (attemptHistory.length > 1) {
-    log.info(`[CHARACTER 2×4] ${character?.name} Pass 1 best-of-${attemptHistory.length}: attempt ${bestAttempt.attempt} (score=${bestAttempt.score})`);
-  }
+  const verdict = composed.verdict;
+  log.info(`[CHARACTER 2×4] ${character?.name} pass-1 (decoupled 2-call): layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} final=${verdict.finalScore} valid=${verdict.valid}`);
 
   const pass1 = {
-    imageData: bestAttempt.result.imageData,
-    selectedAttempt: bestAttempt.attempt,
-    finalScore: bestAttempt.score,
-    finalVerdict: bestAttempt.verdict,
-    attempts: attemptHistory,
-    prompt,
-    sentToGrok: bestAttempt.result.sentToGrok || null,
+    imageData: composed.imageData,
+    selectedAttempt: 1,
+    finalScore: verdict.finalScore,
+    finalVerdict: verdict,
+    attempts: composed.attemptHistory,
+    prompt: composed.prompt,
+    bodyRow: composed.bodyRow,
+    headRow: composed.headRow,
+    sentToGrok: null,
   };
 
   // ── PASS 2: style transfer (always runs when artStyle is non-realistic) ─
@@ -1039,10 +1148,10 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   return {
     imageData: finalImage,
     realisticImageData: pass1.imageData,
-    usage: bestAttempt.result.usage,
+    usage: composed.usage,
     prompt: pass1.prompt,
     refs: {
-      phantom,
+      phantom: composed.refs?.phantom || null,
       standardAvatar: standardAvatar || null,
       facePhoto,
     },

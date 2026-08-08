@@ -6503,3 +6503,43 @@ any severity.
 **Touched:** `prompts/image-semantic.txt`, `prompts/entity-consistency-check.txt`,
 `server/lib/scoring.js`, `server/lib/evalBuckets.js`, `server/lib/sceneValidator.js`,
 `server/lib/entityConsistency.js`, `server/lib/feedbackConsolidator.js`.
+
+## 2026-08-09 — Realistic 2×4 sheet is generated in TWO calls (body row, then head row referencing it), not one
+**Context:** The single combined 2×4 Grok edit (`buildPrompt` → one `editWithGrok`)
+produced a HEADLESS bottom (body) row ~70% of the time. Reproduced with identical
+stored params (Daniel 4/5, Sarah 3/5 headless; a second run 5/5 each) — a systematic
+generation defect, not variance. Cause: in the near-square bottom cells the model
+renders the two rows as one tall figure and crops the head off the bottom half. Ruled
+OUT by A/B: the phantom's arrow-circles (axes vs plain phantom made it worse, 10/10),
+so the head-covering was never the driver — the tall-vs-square cell shape is.
+**Decision:** Pass 1 is now two calls, composited:
+1. **Body row** — a dedicated 1×4 full-body row (tall cells ~1:2.25). Refs
+   `[plain-phantom bottom row, standardAvatar, facePhoto]`. Reviewed on its own
+   (pose head-check + bodies eval); max 1 retry, keep least-bad.
+2. **Head row** — a 1×4 head-shot row that REFERENCES the accepted body so the heads
+   belong to it. Refs `[axes-phantom top row, facePhoto, body row]` (Grok takes only
+   3). Reviewed (heads eval + identity); max 1 retry, keep least-bad.
+3. **Composite** head row over body row with a black seam; the seam is the row
+   divider `splitSheetRows` locks onto. `generateComposited2x4` owns this and returns
+   a verdict in the exact `evaluateSheetSplit` shape, so `generateCharacter2x4Sheet`,
+   `styledAvatars`, and the Test Lab consume it unchanged.
+The head axis is owned by pose in ONE place — `applyPoseHeadGate` — shared by both
+`evaluateSheetSplit` (whole-sheet / Test Lab) and the per-row review. The body-row
+prompt also carries an explicit outer-layer-in-profile line (an open vest/cardigan
+was vanishing side-on).
+**Rationale:** Validated — body call 0/15 headless across three runs; end-to-end
+`generateCharacter2x4Sheet` on Daniel scored valid=9 (layout 10 / identity 9 / outfit
+10, all four bodies headed, vest present in profile & back) in 2 Grok calls, no
+retries; the composite re-splits at the seam. A fresh head render beats crop-and-scale
+from the small body heads (owner call). Reviewing the body BEFORE the head means a bad
+body never wastes a head call.
+**Cost:** 2 Grok edits (~$0.04) typical vs 1 (~$0.02) before — the reliability is worth
+one extra call; retries are near-zero at these pass rates.
+**Touched:** `server/lib/character2x4Sheet.js` (`generateComposited2x4`,
+`buildBodyRowPrompt`, `buildHeadRowPrompt`, `stackRowsInto2x4`, `applyPoseHeadGate`,
+`reviewBodyRow`, `reviewHeadRow`, `loadPhantomVariant`, `phantomRow`; pass-1 loop in
+`generateCharacter2x4Sheet` replaced), `prompts/sheet-row-bodies-eval.txt`
+(head+feet as separate scores; pose owns head).
+**Status:** ✅ active on staging (2026-08-09). ⚠ To verify before master: the
+composited sheet is 1280×1444 (taller cells) vs the old 1280×720 — smoke-test one
+costumed avatar → page + cover on staging to confirm nothing assumed the old aspect.
