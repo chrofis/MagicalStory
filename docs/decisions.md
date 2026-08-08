@@ -5914,3 +5914,53 @@ deterministic (face-detector presence per bottom cell) rather than trusting the 
 **Touched:** `server/lib/testlab.js` (runAvatarEvalStage pass-keyed eval; splitRows removed).
 
 **Status:** ✅ parity fix ready; ❌ recognition gap open (structural + judge).
+
+---
+
+## 2026-08-08 — The style rule is style-CONDITIONAL and passed per call (neon ≠ ok in watercolour)
+
+**Context:** Owner caught a real defect in the fix shipped earlier today: "Neon is only ok for
+cyberpunk. If it is a watercolour image, this would be an issue. So it must get the art style
+passed and not have this baked into the general prompt." Correct — the shipped rule enumerated
+neon/glow/holographic as always-ignorable, which would have suppressed genuine defects in every
+non-neon style.
+
+**Root cause of the original neon deductions, found while fixing this:** the compliance evaluator
+truncates `ORIGINAL_PROMPT` to 3000 chars, and the ART STYLE block sits at the END of a ~7000-char
+page prompt. **The compliance judge never saw the art style at all** — which is exactly why it
+reported required style elements as "no mention in prompt".
+
+**Decision:**
+1. New `{ART_STYLE}` placeholder in both evaluator templates, listed as an INPUT.
+   `prompts.extractArtStyle(imagePrompt)` reads the block; `buildEvaluationPrompt` accepts an
+   explicit `artStyle` and otherwise derives it, so all three existing call sites get it for free.
+   Compliance is filled explicitly (it truncates). The quality path resolves it from the
+   UNSTRIPPED prompt — the cover branch deletes the ART STYLE block from `promptForEval` as
+   evaluator noise, which would have left covers with no style to judge against.
+2. The rule is now a single question — *does this style call for this KIND of element?* Yes → never
+   a finding, at any severity. No → judged normally. Empty style → rule skipped entirely.
+
+**Two failed wordings, both measured, worth not repeating:**
+- **#413** ("the style is above — read the block; do not assume") made the model POLICE THE STYLE'S
+  FINE PRINT: it flagged neon for carrying Japanese lettering (the descriptor says shapes only) and
+  for sitting on a house facade. 4 neon findings, and total issues jumped 13 → 37. Telling an
+  evaluator to read a spec closely turns it into a spec auditor.
+- The fix was to add: do not police how many, which surface, whether a sign carries lettering, or
+  whether it suits a rural or period setting — that is the art director's business, not a page
+  defect.
+
+**Measured on the same four pages** (`job_1786147254924_8nuyywjii` p1/p4/p5/p10):
+
+| variant | issues | false neon findings |
+|---|---|---|
+| #412 baked-in blanket rule (wrong for watercolour) | 13 | 0 |
+| #413 style passed, "read the block" | 37 | 4 |
+| **#414 style-conditional, no fine-print policing** | **21** | **0** |
+
+#414's only two glow-matching findings are a garment MISSING its specified glow and a river colour —
+neither is a "neon shouldn't be there" complaint. Note 13 vs 21 is not a clean comparison: #412
+suppressed a whole class unconditionally, and the judges were measured non-deterministic (E1, 0/6
+identical runs).
+
+**Touched:** `prompts/image-evaluation.txt`, `prompts/image-prompt-compliance.txt`,
+`server/services/prompts.js`, `server/lib/images.js`.

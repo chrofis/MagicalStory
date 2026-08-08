@@ -258,6 +258,28 @@ function buildEmptyScenePrompt(opts = {}) {
 }
 
 /**
+ * Pull the ART STYLE block out of a built image prompt.
+ *
+ * The evaluators must judge style elements against the style THIS book was
+ * commissioned in — neon signage is required in a cyberpunk story and a defect
+ * in a watercolour one — so the rule cannot be a fixed list baked into the
+ * evaluator template. It is passed per call instead.
+ *
+ * Extraction rather than a new threaded parameter because every eval call site
+ * already has the built page prompt, and the compliance evaluator truncates
+ * ORIGINAL_PROMPT to 3000 chars — the ART STYLE block sits at the END of a
+ * ~7000-char page prompt, so it was being cut off before the model ever saw it.
+ *
+ * @param {string} imagePrompt - a built page/cover prompt
+ * @returns {string} the style text, or '' when the prompt has no style block
+ */
+function extractArtStyle(imagePrompt) {
+  if (!imagePrompt || typeof imagePrompt !== 'string') return '';
+  const m = imagePrompt.match(/\*\*ART STYLE:\*\*\s*([\s\S]*?)(?:\n\s*\n|$)/i);
+  return m ? m[1].trim() : '';
+}
+
+/**
  * Build the image-evaluation prompt from a known opts contract.
  *
  * The image-evaluation template (prompts/image-evaluation.txt) has four
@@ -288,6 +310,9 @@ function buildEvaluationPrompt(opts = {}) {
     INTERACTIONS_BLOCK: opts.interactionsBlock || '',
     SCENE_INTENT: opts.sceneIntent || '',
     FIGURE_PROPORTIONS: opts.figureProportions || '',
+    // Empty when the caller has no prompt to read a style from — the template
+    // then tells the model to skip the style rule and judge normally.
+    ART_STYLE: opts.artStyle || extractArtStyle(opts.originalPrompt) || '',
   });
 }
 
@@ -297,6 +322,7 @@ module.exports = {
   fillTemplate,
   buildEmptyScenePrompt,
   buildEvaluationPrompt,
+  extractArtStyle,
   REPAIR_STYLE_GUARD,
   applyRepairStyleGuard,
 };
