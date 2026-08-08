@@ -9867,7 +9867,23 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         log.info(`🔄 [ITERATE] Page ${pageNumber}: scene has no characters — analysis runs without a cast`);
         return [];
       }
-      throw new Error(`[ITERATE] Page ${pageNumber}: the scene names ${metaNames.join(', ')} but none resolved to the story roster (${characters.map(c => c.name).join(', ')}). Refusing to fall back to the whole roster.`);
+      // SECONDARY CHARACTERS are a third, legitimate state. They live in the
+      // Visual Bible, not the roster: no photo, no avatar, no identity to check,
+      // rendered from their VB description alone. getCharactersInScene matches
+      // the ROSTER only, so a page whose cast is entirely secondary yields an
+      // empty sceneCharacters — that is correct, not unknown. Only a name that
+      // is in neither place means we genuinely do not know who is in the picture.
+      const secondaryNames = new Set(
+        ((visualBible?.secondaryCharacters) || [])
+          .map(sc => String(sc?.name || '').trim().toLowerCase())
+          .filter(Boolean)
+      );
+      const unknown = metaNames.filter(n => !secondaryNames.has(n.trim().toLowerCase()));
+      if (unknown.length === 0) {
+        log.info(`🔄 [ITERATE] Page ${pageNumber}: cast is entirely secondary characters (${metaNames.join(', ')}) — no roster identities to analyse`);
+        return [];
+      }
+      throw new Error(`[ITERATE] Page ${pageNumber}: the scene names ${unknown.join(', ')}, who are in neither the story roster (${characters.map(c => c.name).join(', ')}) nor the Visual Bible's secondary characters. Refusing to fall back to the whole roster.`);
     }
     const matched = characters.filter(c => names.includes(String(c.name || '').trim().toLowerCase()));
     if (matched.length === 0) {

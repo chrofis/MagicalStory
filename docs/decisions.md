@@ -6045,9 +6045,15 @@ in the picture.
 
 **Touched:** `server.js`, `server/lib/images.js`.
 
-**Status:** ✅ verified against stored data. `job_1786147254924_8nuyywjii`: 10/10 pages now resolve,
-zero throws (was: every page). `job_1786053708336_8cdsca519`: 12 pages resolve and **2 throw
-correctly** — p3/p4 name "Rachel" and "Margaret" in the scene while the story roster is
-Emma/Noah/Daniel/Sarah/Hans. That is a real upstream defect (the outline's character names diverge
-from the uploaded cast, and `pageClothing` carries entries for both sets) which this change surfaces
-instead of silently analysing six wrong people. Not fixed here — worth its own investigation.
+**Secondary characters are the third state.** The first cut of this threw on p3/p4 of
+`job_1786053708336_8cdsca519`, whose scenes name "Rachel" and "Margaret" — and I wrongly read that as
+the outline diverging from the uploaded cast. They are `visualBible.secondaryCharacters`
+(CHR001/CHR002): legitimate story people with no photo, no avatar and no roster entry, rendered from
+their VB description alone. `getCharactersInScene` matches the ROSTER only, so a page whose cast is
+entirely secondary yields an empty `sceneCharacters` — correct, not unknown. The check now treats a
+metadata name as known when it is in the roster OR in `visualBible.secondaryCharacters`, and throws
+only on a name in neither.
+
+**Status:** ✅ verified against stored data, zero throws on both stories.
+`job_1786147254924_8nuyywjii`: 10/10 pages resolve (was: every page threw).
+`job_1786053708336_8cdsca519`: 12 pages resolve, 2 correctly recognised as secondary-only casts.
