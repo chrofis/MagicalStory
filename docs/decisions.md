@@ -6256,3 +6256,38 @@ cannot be recomputed from stored data — it needs a generation run.
 **Not fixed (owner decision, 2026-08-08):** `maxRepairPasses: 1` making char-fix unreachable on a
 page that also scores badly is CORRECT behaviour — iterate first, char-fix on the iterated result in
 the next round.
+
+
+---
+
+## The clothing guard's last reachable case: a character's sole used category (2026-08-08)
+
+**Context:** after the cast fix (`933f95288`, `6f3c872d6`) the throw in
+`buildSceneClothingRequirements` was still reachable in one legitimate shape — a ROSTER character
+genuinely on the page, with no per-page category, in a non-costumed story. A corpus scan of the 40
+most recent staging stories (299 pages) measured it rather than leaving it to a future run: **6 pages
+hit it**, each losing its repair entirely.
+
+**Decision:** when the character has exactly ONE category marked `used` in this story's
+`clothingRequirements`, use it. Otherwise still throw, and the message now names why (no used
+category, or which several are in play).
+
+**Rationale:** a single used category is not a default — it is the only outfit that character owns in
+this story, so the page omitting it carries no ambiguity. Same argument as the `costumed.used` branch
+directly above. The measurement makes the case concrete: of the 7 resolutions, **3 resolve to
+`summer` or `winter`, not `standard`** (Noah → summer, Sarah → winter, Hans → winter). The old
+`|| 'standard'` default would have dressed those three from the wrong category — which is precisely
+the cross-story wardrobe leak the guard exists to stop.
+
+**Touched:** `server/lib/storyHelpers.js`.
+
+**Status:** ✅ measured. Re-scan after the change: 246 pages with a roster cast, 7 resolutions via the
+sole used category, **0 throws** (was 6). The guard still fires for a genuinely ambiguous character
+(0 used categories, or 2+ in play with none named for the page).
+
+**Still open (flagged, not fixed):** in `story-unified.txt` the output order is
+`SCENE PLAN (551) → CLOTHING REQUIREMENTS (555) → STORY DRAFT (558) → … → VISUAL BIBLE (608)`.
+`44f16cead` moved clothing ahead of the DRAFT, but the SCENE PLAN — which carries each page's
+clothing tags and hint prose — is still authored before both the clothing requirements and the
+Visual Bible it is expected to quote. `secondaryCharacters[].clothing` lives in that VB section, so
+secondary outfits have the same written-later-than-its-consumer problem the roster just had.

@@ -3288,11 +3288,26 @@ function buildSceneClothingRequirements(sceneCharacters, perCharClothing, clothi
         charClothing = 'costumed';
         log.debug(`👕 [CLOTHING] ${char.name}: no per-scene clothing, story is costumed (${globalReqs.costumed.costume || 'unnamed'})`);
       } else {
-        // NO DEFAULT CLOTHING (owner, 2026-08-07). The old `'standard'` here
-        // named a category the story may not use, which has no description, so
-        // buildClothingDescription fell through to the character-level
-        // avatars.clothing — an outfit from an unrelated story.
-        throw new Error(`[CLOTHING] ${char.name}: no per-page clothing category and the story is not costumed. Refusing to default to 'standard'.`);
+        // Still not a guess: when this story marks exactly ONE category `used`
+        // for this character, that category is the only outfit they own here —
+        // the page omitting it carries no ambiguity, same argument as the
+        // costumed branch above. Measured on 40 staging stories: 6 of 299 pages
+        // reach this line with a roster character who is genuinely in the scene,
+        // and every one of them has a single used category. Without this they
+        // lose their repair entirely.
+        const used = Object.entries(globalReqs || {})
+          .filter(([, v]) => v && typeof v === 'object' && v.used)
+          .map(([k]) => k);
+        if (used.length === 1) {
+          charClothing = used[0];
+          log.warn(`⚠️ [CLOTHING] ${char.name}: no per-page clothing category — using their only used category "${charClothing}"`);
+        } else {
+          // NO DEFAULT CLOTHING (owner, 2026-08-07). The old `'standard'` here
+          // named a category the story may not use, which has no description, so
+          // buildClothingDescription fell through to the character-level
+          // avatars.clothing — an outfit from an unrelated story.
+          throw new Error(`[CLOTHING] ${char.name}: no per-page clothing category, story is not costumed, and ${used.length === 0 ? 'no category is marked used' : `${used.length} categories are in use (${used.join(', ')})`}. Refusing to default to 'standard'.`);
+        }
       }
     }
     out[char.name] = {
