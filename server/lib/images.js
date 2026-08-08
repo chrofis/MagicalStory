@@ -8793,59 +8793,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       });
     }
 
-    // Full-chain garment-hue normalization (mirror of the initial pre-eval
-    // Phase 5b-hue in server.js). iterate REDRAWS the whole page, so a redraw
-    // can reintroduce the garment-colour drift the initial pass corrected — and
-    // that drift can waste a repair round. Normalize each repaired page that
-    // carries a fresh output detection (iterate does; inpaint/char-fix don't
-    // produce a full-image detection → skipped, never forcing a detect) BEFORE
-    // it is scored below, reusing the round's own detection + SAM mask. Mutates
-    // roundSuccess[].imageData in place, so both the eval (buildEvalInputs) and
-    // the persisted version row read the corrected bytes. Same feature flag as
-    // the initial pass → flip GARMENT_HUE_NORMALIZE off = today's behaviour.
-    if (CONFIG_DEFAULTS.garmentHueNormalize && roundSuccess.length > 0) {
-      try {
-        const { normalizeGarmentHueBatch } = require('./garmentHueNormalize');
-        const { normalizeClothingCategory, resolvePageClothingCategory } = require('./clothingCategories');
-        const resolveAvatarForPage = async (pageNumber, fig) => {
-          const character = characters.find(c => (c.name || '').toLowerCase() === String(fig?.name || '').toLowerCase());
-          if (!character) return null; // unnamed/UNKNOWN figure → skip (no-op)
-          const orig = rawImages.find(i => i.pageNumber === pageNumber);
-          const re = roundSuccess.find(r => r.pageNumber === pageNumber);
-          // Per-page clothing priority (same sources the char-fix + entity paths
-          // use): the repaired entry's own (iterate-rewritten) scene metadata →
-          // the original page's clothing → the story's page-clothing resolver →
-          // 'standard'. Resolves the avatar matching THIS page's outfit.
-          const pageClothing = re?.sceneMetadata?.characterClothing
-            || orig?.perCharClothing
-            || orig?.characterClothing
-            || orig?.sceneMetadata?.characterClothing
-            || {};
-          // NO DEFAULT (owner, 2026-08-07). This avatar is the colour REFERENCE
-          // the hue pass normalises the rendered garment towards — a guessed
-          // category would recolour the story outfit to an unrelated one.
-          const raw = pageClothing[character.name]
-            || resolvePageClothingCategory(storyData, pageNumber, character.name);
-          if (!raw) {
-            log.error(`❌ [GARMENT-HUE] ${character.name} p${pageNumber}: no per-page clothing category — skipping (refusing to normalise towards a guessed outfit).`);
-            return null;
-          }
-          return getStyledAvatarForClothing(character, artStyle, normalizeClothingCategory(raw));
-        };
-        const hueOut = await normalizeGarmentHueBatch(roundSuccess, {
-          resolveAvatarForPage,
-          getDetection: (r) => r.bboxDetection,
-          imageFingerprint,
-          logLabel: `Round ${round} `,
-        });
-        if (hueOut.pagesChanged > 0) {
-          log.info(`🎨 [UNIFIED PIPELINE] Round ${round}: garment-hue normalized ${hueOut.figuresApplied} figure(s) across ${hueOut.pagesChanged} page(s) before eval`);
-        }
-      } catch (err) {
-        log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round}: garment-hue normalization skipped: ${err.message}`);
-      }
-    }
-
     // Run fresh entity consistency AND quality eval in parallel. They're
     // independent — `evaluateImageBatch` doesn't consume the entity report
     // (entity penalties are applied later when scores are combined). Running
@@ -9397,57 +9344,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }
     }
   }));
-
-  // Full chain (final catch): normalize the garment hue of every REPAIRED page's
-  // picked-best one last time, before the flatten. The per-round pass only covers
-  // iterate redraws (they return a fresh output detection); inpaint / char-fix do
-  // not, so a page whose final version came from one of those could still ship a
-  // colour-drifted garment. This pass reuses the detection just computed above
-  // (freshBboxMap or the best's own paired eval detection — no extra detect) and
-  // corrects it. Originals were already normalized in Phase 5b-hue (pre-eval), so
-  // they're skipped. Runs after scoring, like the other post-repair recovery steps
-  // (calm-zone / text overlay), so the shipped bytes carry the corrected colour.
-  if (CONFIG_DEFAULTS.garmentHueNormalize) {
-    try {
-      const { normalizeGarmentHueBatch } = require('./garmentHueNormalize');
-      const { normalizeClothingCategory, resolvePageClothingCategory } = require('./clothingCategories');
-      const finalResolveAvatar = async (pageNumber, fig) => {
-        const character = characters.find(c => (c.name || '').toLowerCase() === String(fig?.name || '').toLowerCase());
-        if (!character) return null;
-        const orig = rawImages.find(i => i.pageNumber === pageNumber);
-        const pageClothing = orig?.perCharClothing || orig?.characterClothing || orig?.sceneMetadata?.characterClothing || {};
-        // NO DEFAULT (owner, 2026-08-07) — same reason as the round-loop
-        // resolver above: this avatar is the colour reference.
-        const raw = pageClothing[character.name] || resolvePageClothingCategory(storyData, pageNumber, character.name);
-        if (!raw) {
-          log.error(`❌ [GARMENT-HUE] ${character.name} p${pageNumber}: no per-page clothing category — skipping (refusing to normalise towards a guessed outfit).`);
-          return null;
-        }
-        return getStyledAvatarForClothing(character, artStyle, normalizeClothingCategory(raw));
-      };
-      const finalEntries = rawImages.map(img => {
-        const pageNumber = img.pageNumber;
-        const versions = pageVersions.get(pageNumber) || [];
-        const best = finalBestPerPage.get(pageNumber) || versions[0];
-        const detection = freshBboxMap.get(pageNumber) || best?.evaluation?.bboxDetection || null;
-        return { pageNumber, best, detection };
-      }).filter(e => e.best && e.best.source !== 'original'); // originals already normalized pre-eval
-      const finalHue = await normalizeGarmentHueBatch(finalEntries, {
-        resolveAvatarForPage: finalResolveAvatar,
-        getPageNumber: (e) => e.pageNumber,
-        getImageData: (e) => e.best?.imageData,
-        setImageData: (e, v) => { if (e.best) e.best.imageData = v; },
-        getDetection: (e) => e.detection,
-        imageFingerprint,
-        logLabel: 'Final ',
-      });
-      if (finalHue.pagesChanged > 0) {
-        log.info(`🎨 [UNIFIED PIPELINE] Final: garment-hue normalized ${finalHue.figuresApplied} figure(s) across ${finalHue.pagesChanged} repaired page(s)`);
-      }
-    } catch (err) {
-      log.warn(`⚠️ [UNIFIED PIPELINE] Final garment-hue normalization skipped: ${err.message}`);
-    }
-  }
 
   const results = rawImages.map(img => {
     const pageNumber = img.pageNumber;

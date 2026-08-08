@@ -64,6 +64,10 @@ const TYPE_TO_BUCKET = {
   action_interaction: 'action_interaction', interaction: 'action_interaction',
   action: 'action_interaction', orientation: 'action_interaction', physics: 'action_interaction',
   object: 'object_presence', object_presence: 'object_presence',
+  // missing_element: two images.js paths key on this string to look up a Visual
+  // Bible reference image for the absent item, so the prompt must keep emitting
+  // it; map it here so it routes to inpaint instead of falling through to 'other'.
+  missing_element: 'object_presence', object_quality: 'object_presence',
   object_count: 'object_count', count: 'object_count',
   style: 'style_consistency', style_consistency: 'style_consistency', style_drift: 'style_consistency',
   composition: 'composition_textzone', position_and_scale: 'composition_textzone',

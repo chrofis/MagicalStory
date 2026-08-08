@@ -6291,3 +6291,63 @@ sole used category, **0 throws** (was 6). The guard still fires for a genuinely 
 clothing tags and hint prose — is still authored before both the clothing requirements and the
 Visual Bible it is expected to quote. `secondaryCharacters[].clothing` lives in that VB section, so
 secondary outfits have the same written-later-than-its-consumer problem the roster just had.
+
+---
+
+## 2026-08-08 — The lean image-evaluation.txt overhaul measured WORSE. Reverted, kept as a variant.
+
+**Context:** Owner: "Make one complete overhaul. Then check your new prompt against the findings 2x."
+
+**What was built.** `image-evaluation.txt` rewritten 36,321 → 14,309 chars (61% smaller, 406 → 156
+lines): rules renumbered N-01..N-15 / D-01..D-25 so a finding can cite one, non-deductions moved to
+the FRONT, ONE severity table instead of a table plus per-step restatements, all inline rationale
+removed to the findings registry, and the `object_matches` / `rendering` / `scene` / `spatial`
+output blocks dropped after grepping for consumers.
+
+**Three real contradictions the rewrite exposed and resolved** — worth keeping even though the
+rewrite lost:
+1. Left/right placement was simultaneously "never deduct" (§4), "MINOR" (STEP 5) and "CRITICAL
+   position/scale" (STEP 0). Three sections, three answers.
+2. Missing glasses was MAJOR (STEP 2 glasses rule) and MODERATE-capped (STEP 2 accessory rule) in
+   the same section.
+3. Age was "never CRITICAL" (STEP 2) and "CRITICAL on a bucket swap" (STEP 2C).
+
+**Check 1 — mechanical coverage: PASS.** All 15 image-evaluation findings covered (8 of the 23
+registry entries belong to other files or are plumbing), all 15 evalBuckets type codes present, all
+5 placeholders, every output key the code reads.
+
+**Two contract bugs caught by that check, both fixed and KEPT:**
+- The `rendering` block is read at `images.js:6549` (`rendering.physics_ok`, `rendering.extra_limbs`
+  drive a repair path). Dropping it would have silently disabled that path — restored.
+- `missing_element` is keyed on by two `images.js` paths that look up a Visual Bible reference image
+  for an absent item, but was NOT in `TYPE_TO_BUCKET`, so it fell through to `other`/regen. Added
+  (with `object_quality`) to `evalBuckets`.
+
+**Check 2 — empirical, 2 runs: FAIL.**
+
+| variant | issues | deduction pts | mean page score |
+|---|---|---|---|
+| old 36k prompt (#414) | 21 | 315 | **21.3** |
+| lean 14k run 1 (#420) | 37 | 386 | **7.5** |
+| lean 14k run 2 (#421) | 35 | 349 | **16.5** |
+
+More findings, more deductions, lower scores — in BOTH runs. The explicit "report at most 8
+findings" cap was ignored (~9/page). Working hypothesis, UNTESTED: verbosity acted as a brake on
+marginal findings and a terse rule list reads as an invitation to enumerate.
+
+**A separate defect found while measuring, fixed and KEPT:** the Test Lab `quality_eval` stage feeds
+the scene DESCRIPTION as `ORIGINAL_PROMPT`, which carries no ART STYLE block — so `{ART_STYLE}` was
+empty and every style-dependent rule silently skipped. **Lab runs were not reproducing production
+for style rules**, which makes the earlier neon experiments (#412–#418) unreliable for that rule
+specifically. `evaluateImageQuality` now accepts an `artStyle` option and the stage passes it from
+the stored page prompt.
+
+**Decision: REVERT the prompt, keep everything else.** `prompts/image-evaluation.txt` is back to the
+shipped version. The overhaul lives at `prompts/variants/image-evaluation-lean-v2.txt` for further
+Lab iteration. Recorded as finding `lean-eval-prompt-v2-scored-worse` (status `rejected`) so the
+next session does not re-attempt a straight shortening without a volume control that is actually
+obeyed — a per-page cap enforced in CODE, or an explicit if-in-doubt-omit instruction — measured
+over ≥2 runs per arm.
+
+**Touched:** `prompts/variants/image-evaluation-lean-v2.txt` (new), `server/lib/evalBuckets.js`,
+`server/lib/images.js`, `server/lib/testlab.js`, `scripts/admin/seed-eval-findings.js`.

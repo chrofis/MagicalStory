@@ -192,6 +192,14 @@ const FINDINGS = [
     rationale: '406 lines, 129 bullet rules, 119 instances of "never / do not deduct". Filled for one page: 46,019 chars ~11,500 tokens; a 10-page story spent 862,221 eval input tokens over 109 calls. Three measured consequences: its own §4 accessory cap is ignored (5x MAJOR glasses), two identical runs give 0/6 identical issue sets, and the art-style rule had to be written into four places because no single spot is reliably read. When an eval misfires, check whether a rule already exists and is being ignored BEFORE appending another carve-out.',
     evidence: { measurements: '36,321 chars / 406 lines / 129 bullets / 119 "never"; 86k input tokens per page' },
   },
+  {
+    slug: 'lean-eval-prompt-v2-scored-worse', title: 'A 61%-shorter image-evaluation.txt measured WORSE, twice',
+    category: 'detection', prompt_file: EVAL, prompt_section: null,
+    rule_text: null,
+    rationale: 'A full overhaul cut image-evaluation.txt from 36,321 to 14,309 chars (61%): rules renumbered N-xx/D-xx, non-deductions moved first, ONE severity table, contradictions resolved (left/right placement was simultaneously never-deduct in §4, MINOR in STEP 5 and CRITICAL in STEP 0), all inline rationale moved to this registry, and the object_matches/rendering/scene/spatial output blocks dropped after confirming no code reads them. Coverage was verified mechanically before running: all 15 image-evaluation findings, all 15 evalBuckets type codes, all 5 placeholders, every output key the code reads. It still scored WORSE on the same four pages in BOTH runs — mean page score fell from 21.3 (old prompt, #414) to 7.5 and 16.5, issue counts rose from 21 to 37 and 35, and the explicit at-most-8-findings cap was ignored at ~9 per page. Working hypothesis, UNTESTED: the old prompt verbosity acted as a brake on marginal findings, and a terse rule list reads as an invitation to enumerate. DO NOT re-attempt a straight shortening without a volume control that is actually obeyed — a per-page cap enforced in CODE, or an explicit if-in-doubt-omit instruction — measured over at least 2 runs per arm. The variant is kept at prompts/variants/image-evaluation-lean-v2.txt.',
+    status: 'rejected',
+    evidence: { experiments: [412, 414, 417, 418, 420, 421], stories: ['job_1786147254924_8nuyywjii'], measurements: 'old 36k: 21 issues / 315 pts / 21.3 mean. lean 14k: 37/386/7.5 and 35/349/16.5' },
+  },
 ];
 
 (async () => {

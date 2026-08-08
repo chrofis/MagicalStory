@@ -544,6 +544,10 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
     {
       evalTemplateOverride: promptOverride || null,
+      // The stage feeds the scene DESCRIPTION as originalPrompt, which carries no
+      // ART STYLE block — pass the style from the stored page prompt so a Lab run
+      // exercises the same style rules production does.
+      artStyle: require('../services/prompts').extractArtStyle(ctx.scene.prompt || ''),
       // Stage-2 compliance A/B: swap the model (default qwen-plus) and/or its
       // template to test the over-strict-CRITICAL problem.
       complianceModelOverride: params.complianceModel || null,
