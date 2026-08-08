@@ -4004,9 +4004,25 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     return null;
   }
   const characters = inputData.characters || [];
+  // Clothing TEXT per character, not the category key. Passing null here left
+  // the all-pages Art Director with no outfit at all, so it wrote the key into
+  // the prose ("wearing his standard clothes") — the metadata label as an
+  // English phrase, which the quality evaluator then judges the render against.
+  // Story-level requirements are the source; the per-page category picks which
+  // entry, defaulting to the story's primary when the beat doesn't say.
+  const clothingReqs = options.clothingRequirements || inputData.clothingRequirements || null;
+  const primaryCategory = options.primaryClothing || inputData.pageClothing?.primaryClothing || null;
   const characterDescriptions = characters
-    .map((char, idx) => buildCharacterDescriptionForExpansion(char, null, idx + 1))
+    .map((char, idx) => {
+      const outfit = (clothingReqs && primaryCategory)
+        ? resolveClothingForPage(char, primaryCategory, clothingReqs)
+        : null;
+      return buildCharacterDescriptionForExpansion(char, outfit || null, idx + 1);
+    })
     .join('\n');
+  if (!clothingReqs) {
+    log.warn('[PROMPT] all-pages scene expansion has no clothingRequirements — the Art Director sees no outfit text and may write category keys into the prose');
+  }
 
   const allBeats = beats
     .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`)
@@ -4483,16 +4499,40 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       previewFeedbackText = '(No preview available - create scene from hint, run all checks)';
     }
 
-    // Format expected clothing for the prompt (tells Claude which clothing to use during iteration)
+    // Format expected clothing for the prompt. The Art Director MUST receive the
+    // outfit TEXT, not just the category key: given only "Emma: standard" it has
+    // nothing else to write and produces "wearing her standard clothes" — the
+    // metadata key as an English phrase. That prose is the contract the quality
+    // evaluator judges against, so the judge then scores a correct render as
+    // off-spec ("clothing is non-standard"). Observed on staging
+    // job_1786147254924_8nuyywjii p7/p10. Same rule as story-unified.txt:127.
     let expectedClothingText = '';
+    const clothingReqsForPrompt = options.clothingRequirements || null;
+    const describeOutfit = (name, category) => {
+      if (!clothingReqsForPrompt || !category) return null;
+      const char = (characters || []).find(c => String(c?.name || '').trim().toLowerCase() === String(name).trim().toLowerCase());
+      if (!char) return null;
+      return resolveClothingForPage(char, category, clothingReqsForPrompt) || null;
+    };
     if (characterClothing) {
       if (typeof characterClothing === 'string' && characterClothing !== 'standard') {
         expectedClothingText = `- **This page's clothing**: ${characterClothing} (use this for all characters)`;
       } else if (typeof characterClothing === 'object' && Object.keys(characterClothing).length > 0) {
-        const entries = Object.entries(characterClothing)
-          .map(([name, clothing]) => `${name}: ${clothing}`)
-          .join(', ');
-        expectedClothingText = `- **This page's clothing**: ${entries}`;
+        const described = Object.entries(characterClothing)
+          .map(([name, clothing]) => {
+            const outfit = describeOutfit(name, clothing);
+            return outfit ? `  - ${name} (${clothing}): ${outfit}` : null;
+          })
+          .filter(Boolean);
+        if (described.length > 0) {
+          expectedClothingText = `- **This page's clothing** — write these outfits into the prose. Never write the category name ("standard clothes", "a summer outfit"); it is a metadata key, not a description.\n${described.join('\n')}`;
+        } else {
+          const entries = Object.entries(characterClothing)
+            .map(([name, clothing]) => `${name}: ${clothing}`)
+            .join(', ');
+          expectedClothingText = `- **This page's clothing**: ${entries}`;
+          log.warn(`[SCENE PROMPT P${pageNumber}] No outfit text resolved for any character — the Art Director sees category keys only and will write them into the prose`);
+        }
       }
     }
 

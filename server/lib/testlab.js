@@ -4513,20 +4513,19 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     realisticVersionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, realistic, experimentId);
   }
 
-  // Mirror PRODUCTION exactly, keyed off the pass — the lab must eval what the
-  // pipeline evals, or a lab verdict is meaningless (owner, 2026-08-08):
-  //   pass 1 (realistic base) → evaluateSheetSplit         (generateCharacter2x4Sheet)
-  //   pass 2 (styled)         → evaluateStyledSheetWithGemini (runStyleTransferPass)
-  // The old `splitRows` toggle is gone: it let the lab split a pass-2 sheet that
-  // production never splits, which fabricated a headless-crop "failure".
+  // The lab calls the SINGLE-SOURCE evaluator (evaluateAvatarSheet) — the exact
+  // function production calls — so a lab verdict IS the production verdict. There
+  // is no lab-only eval path: pass keys the behaviour (1 → split head/body/
+  // identity; 2 → holistic styled), identical to generateCharacter2x4Sheet /
+  // runStyleTransferPass. Divergence is only ever a recorded promptOverride/model.
   let evalResult;
   let splitSteps;
   let splitPromptUsed;
   let splitPrompts;
   if (pass === 1) {
     const standardAvatar = await resolveAvatarSlotBytes(entry.inputs?.standardAvatar);
-    const split = await _internal.evaluateSheetSplit(sheetForDisplay, {
-      facePhoto, standardAvatar,
+    const { split } = await _internal.evaluateAvatarSheet(sheetForDisplay, {
+      pass: 1, facePhoto, standardAvatar,
       costumeDescription: costume.description || 'standard outfit',
       model, promptOverride,
     });
@@ -4549,11 +4548,10 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
       { label: `Bottom row · bodies (final ${bodies?.finalScore ?? '?'})`, imageType: 'tl_step', versionIndex: vBottom },
     ];
   } else {
-    evalResult = await _internal.evaluateStyledSheetWithGemini(
-      facePhoto, realistic, sheetForDisplay, artStyle, process.env.GEMINI_API_KEY,
-      null /* usageTracker */, params.declaredAge ?? null,
-      { model, promptOverride }
-    );
+    ({ verdict: evalResult } = await _internal.evaluateAvatarSheet(sheetForDisplay, {
+      pass: 2, facePhoto, realisticSheet: realistic, artStyle,
+      declaredAge: params.declaredAge ?? null, model, promptOverride,
+    }));
   }
 
   // Persist the scored sheet as a test version so the lab renders it next to the
@@ -4562,7 +4560,6 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   const evalVersionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, sheetForDisplay, experimentId, scoreForBadge);
   return {
     character: character.name, source: 'storedSheet', pass, styled: pass === 2, model, artStyle,
-    splitRows: !!params.splitRows,
     imageType: 'tl_avatar', versionIndex: evalVersionIndex,
     ...(realisticVersionIndex != null ? { realisticVersionIndex } : {}),
     ...(splitSteps ? { steps: splitSteps } : {}),

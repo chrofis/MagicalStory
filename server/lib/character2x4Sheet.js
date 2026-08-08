@@ -580,12 +580,39 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
 // the actual divider line with the SAME production detector used to split avatar
 // grids (grok.detectMinVarianceSeparator): the divider — a thin black/white line
 // — is near-uniform, so it sits at the minimum-variance row within 0.25–0.75 H.
-async function splitSheetRows(imageData) {
+// ONE splitter for the whole app. The head/body row divider is found by the
+// SAME robust line-detector the story uses to crop avatar cells — the Python
+// /split-reference-sheet endpoint (_detect_separators: the near-uniform-colour
+// row is the gutter). NEVER a blind 50% cut: a 2×4 sheet's rows are not equal
+// (head-shots are shorter than full bodies), and a fixed cut sliced the bodies'
+// heads off (Daniel, 2026-08-08). Falls back to the JS variance separator only
+// if the analyzer is unreachable, so an eval never hard-fails on a cold service.
+async function detectSheetRowDivider(imageData, buf, W, H) {
+  try {
+    const url = (process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000') + '/split-reference-sheet';
+    const r = await fetch(url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageData, count: 8, cols: 4, rows: 2 }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (r.ok) {
+      const j = await r.json();
+      const h = j?.separators?.horizontal;
+      if (j?.success && Array.isArray(h) && h.length && h[0] > 0 && h[0] < H) return Math.round(h[0]);
+    }
+    log.warn(`[CHARACTER 2×4] split-reference-sheet gave no horizontal separator — falling back to variance detector`);
+  } catch (err) {
+    log.warn(`[CHARACTER 2×4] split-reference-sheet unreachable (${err.message}) — falling back to variance detector`);
+  }
   const { detectMinVarianceSeparator } = require('./grok');
+  const { data } = await sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true });
+  return detectMinVarianceSeparator(data, W, H, 'h', 0.25, 0.75);
+}
+
+async function splitSheetRows(imageData) {
   const buf = Buffer.from(r2.stripDataUriPrefix(imageData), 'base64');
-  const { data, info } = await sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true });
-  const W = info.width, H = info.height;
-  const mid = detectMinVarianceSeparator(data, W, H, 'h', 0.25, 0.75);
+  const { width: W, height: H } = await sharp(buf).metadata();
+  const mid = await detectSheetRowDivider(imageData, buf, W, H);
   const [top, bottom] = await Promise.all([
     sharp(buf).extract({ left: 0, top: 0, width: W, height: mid }).jpeg().toBuffer(),
     sharp(buf).extract({ left: 0, top: mid, width: W, height: H - mid }).jpeg().toBuffer(),
@@ -683,6 +710,47 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
   ];
   const promptUsed = prompts.map(p => `— ${p.label} —\n${p.text}`).join('\n\n');
   return { verdict, heads, bodies, identity, topHeads, bottomBody, avatarFaces, splitY, prompts, promptUsed };
+}
+
+/**
+ * SINGLE SOURCE OF TRUTH for scoring an avatar 2×4 sheet.
+ *
+ * Production (pass 1 in generateCharacter2x4Sheet, pass 2 in runStyleTransferPass)
+ * AND the Test Lab (runAvatarEvalStage) all call THIS — never their own copy — so
+ * a lab verdict is always the production verdict. The ONLY way the lab can differ
+ * is an explicit promptOverride/model (a recorded experiment), never a separate
+ * code path. Owner rule (2026-08-08): lab == production by construction.
+ *
+ *   pass 1 (realistic base) → evaluateSheetSplit: head row + body row + identity
+ *                             judged SEPARATELY (this is the only place the
+ *                             "does each body have a head" check runs).
+ *   pass 2 (styled)         → evaluateStyledSheetWithGemini: holistic identity /
+ *                             style / outfit. Style transfer re-renders an
+ *                             existing good sheet and cannot lose heads, so no
+ *                             per-cell head/body check is run here.
+ *
+ * Always returns a normalised shape: { verdict, split } — verdict is the drop-in
+ * (finalScore/valid/…); split is the pass-1 detail (heads/bodies/identity/crops/
+ * prompts) or null on pass 2.
+ */
+async function evaluateAvatarSheet(sheet, opts = {}) {
+  const {
+    pass, facePhoto = null, standardAvatar = null, realisticSheet = null,
+    costumeDescription = 'standard outfit', artStyle = 'watercolor',
+    declaredAge = null, model = null, promptOverride = null, usageTracker = null,
+  } = opts;
+  if (Number(pass) === 1) {
+    const split = await evaluateSheetSplit(sheet, {
+      facePhoto, standardAvatar, costumeDescription,
+      model: model || MODEL_DEFAULTS.sheetEvalModel, promptOverride, usageTracker,
+    });
+    return { verdict: split.verdict, split };
+  }
+  const styled = await evaluateStyledSheetWithGemini(
+    facePhoto, realisticSheet, sheet, artStyle, process.env.GEMINI_API_KEY,
+    usageTracker, declaredAge, { model: model || undefined, promptOverride }
+  );
+  return { verdict: styled, split: null };
 }
 
 /**
@@ -795,9 +863,10 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
       // that isn't, and a cut/missing head is caught. `verdict` is a drop-in
       // for the old whole-sheet shape (finalScore/valid/layout/identity/
       // outfit/sourceMatch/cleanRender/failureReasons).
-      const split = await evaluateSheetSplit(result.imageData, {
-        facePhoto, standardAvatar, costumeDescription, usageTracker,
-        model: MODEL_DEFAULTS.sheetEvalModel,
+      // pass 1 (realistic base) via the single-source evaluator — SAME call the
+      // Test Lab makes, so lab == production.
+      const { split } = await evaluateAvatarSheet(result.imageData, {
+        pass: 1, facePhoto, standardAvatar, costumeDescription, usageTracker,
       });
       verdict = split.verdict;
       log.info(`[CHARACTER 2×4]   split eval: heads=${split.heads?.finalScore} bodies=${split.bodies?.finalScore} layout=${verdict.layout?.layoutScore} identity=${verdict.identity?.identityScore} outfit=${verdict.outfit?.outfitScore} sourceMatch=${verdict.sourceMatch?.sourceMatchScore} clean=${verdict.cleanRender?.cleanScore} final=${verdict.finalScore} valid=${verdict.valid}`);
@@ -964,7 +1033,11 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
 
     let verdict = null;
     try {
-      verdict = await evaluateStyledSheetWithGemini(facePhoto, pass1ImageData, result.imageData, artStyle, process.env.GEMINI_API_KEY, usageTracker, characterAge);
+      // pass 2 (styled) via the single-source evaluator — holistic styled eval,
+      // no head/body split (style transfer can't lose heads). SAME call the lab makes.
+      ({ verdict } = await evaluateAvatarSheet(result.imageData, {
+        pass: 2, facePhoto, realisticSheet: pass1ImageData, artStyle, declaredAge: characterAge, usageTracker,
+      }));
       log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       // Mirror Pass-1 behaviour (line 414): a Gemini eval failure should NOT
@@ -1094,5 +1167,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit },
+  _internal: { buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet },
 };

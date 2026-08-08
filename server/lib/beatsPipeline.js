@@ -381,6 +381,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     visualBible,
     availableAvatars,
     maxCharactersPerScene,
+    // The Art Director needs the outfit TEXT, not just the category key — see
+    // buildSceneExpansionAllPrompt. In beats mode the visual contract is the
+    // only source, and it is resolved by the time scenes are expanded.
+    clothingRequirements,
   });
   if (!allPrompt) {
     log.error('🚨 [BEATS] scene-expansion-all template unavailable — falling back to per-page expansion for every page');

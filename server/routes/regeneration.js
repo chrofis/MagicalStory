@@ -362,7 +362,7 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
     const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
 
     // Generate new scene description (includes Visual Bible recurring elements) — iteration model for regen
-    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars);
+    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars, null, null, { clothingRequirements: storyData.clothingRequirements || null });
     const sceneResult = await callClaudeAPI(scenePrompt, 10000, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[', usageLabel: 'regen_scene' });
     const newSceneDescription = sceneResult.text;
 
@@ -617,7 +617,10 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         previousScenes,
         clothingData,
         correctionNotes,
-        availableAvatars
+        availableAvatars,
+        null,  // rawOutlineContext
+        null,  // previewFeedback
+        { clothingRequirements: storyData.clothingRequirements || null }
       );
 
       try {

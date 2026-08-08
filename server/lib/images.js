@@ -9972,7 +9972,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     availableAvatars,
     null,  // rawOutlineContext
     previewFeedback,  // The actual image analysis feedback!
-    { freeIterate, textInImage: iterateTextInImage, extraRule: options.sceneExtraRule || null }
+    // clothingRequirements so the EXPECTED_CLOTHING block can state each
+    // character's actual outfit TEXT. Without it the Art Director only sees the
+    // category key and writes it into the prose ("wearing her standard clothes"),
+    // which the evaluator then judges the render against.
+    { freeIterate, textInImage: iterateTextInImage, extraRule: options.sceneExtraRule || null, clothingRequirements }
   );
 
   // Step 4: Call Claude to run 18 checks and generate corrected scene (uses iteration model).

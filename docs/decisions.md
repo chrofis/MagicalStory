@@ -5964,3 +5964,52 @@ identical runs).
 
 **Touched:** `prompts/image-evaluation.txt`, `prompts/image-prompt-compliance.txt`,
 `server/services/prompts.js`, `server/lib/images.js`.
+
+---
+
+## The Art Director gets the outfit TEXT, never only the category key (2026-08-08)
+
+**Context:** an evaluation lost 215 points across fifteen findings of the form *"Emma's clothing is
+non-standard (yellow t-shirt, denim shorts)"*, *"Sarah is wearing a red t-shirt and blue jeans
+instead of her standard clothing"*. Nothing was mis-rendered. The scene prose on
+`job_1786147254924_8nuyywjii` p7/p10 literally reads *"wearing her standard clothes"*, *"dressed in
+standard clothing"* — the metadata key written as an English phrase.
+
+The evaluator DOES receive the outfit mechanically: `buildEvalClothingHeader` (`images.js:6294`)
+prepends "CHARACTER CLOTHING REFERENCE … - Emma: A light yellow short-sleeved cotton t-shirt …",
+and those descriptions were correctly populated. But the same prompt then carries the prose, and the
+prose is the CONTRACT the judge scores against while the header is only a preamble. Given two
+clothing statements the judge anchored on the prose, read `standard` as ordinary English meaning
+*normal*, and marked a correct render off-spec. `standard` is uniquely dangerous among the four keys
+because it is also an English adjective — "summer outfit" at least denotes light clothes.
+
+Root cause: the Art Director was never given the outfit text.
+`buildSceneDescriptionPrompt` (iterate + regeneration) passed category keys only —
+`AVAILABLE_AVATARS: "- Emma: standard"`, `EXPECTED_CLOTHING: "Emma: standard"`, `CHARACTERS` names
+only. `buildSceneExpansionAllPrompt` (beats, all pages) passed `clothingDescription = null`
+outright. With nothing but the key available, writing the key is the only thing the model can do.
+
+**Decision:** every Art Director path receives the resolved outfit text.
+`buildSceneDescriptionPrompt` takes `options.clothingRequirements` and emits a per-character block
+(`- Emma (standard): A light yellow short-sleeved cotton t-shirt …`) with an explicit instruction
+that the category name is a metadata key and must not appear in prose; it warns loudly when no
+outfit resolves. `buildSceneExpansionAllPrompt` resolves each character's outfit from the visual
+contract instead of passing null. The same one-line rule was added to `scene-iteration.txt`,
+`scene-expansion.txt` and `scene-expansion-all.txt`, mirroring `story-unified.txt:127` which already
+carried it.
+
+**Rationale:** the prose is the evaluation contract, so anything the writer cannot say correctly
+becomes a scoring defect on a correct picture — and those phantom findings then drive repairs that
+can only make good pages worse. Fixing the evaluator instead (teach it to prefer the header) would
+leave the image model reading "standard clothes" too, and would keep two disagreeing statements in
+one prompt.
+
+**Touched:** `server/lib/storyHelpers.js`, `server/lib/images.js`, `server/lib/beatsPipeline.js`,
+`server/routes/regeneration.js`, `prompts/scene-iteration.txt`, `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`.
+
+**Status:** 🟡 staging pending. Verified statically against the stored story: p7's block now resolves
+to Emma's yellow star t-shirt and Noah's mid-blue striped t-shirt. `story-unified.txt` (the unified
+writer, which produced the p7/p10 prose) already carries the rule at line 127 but violated it — its
+`clothingRequirements` descriptions are authored later in the SAME response, so the scene section
+cannot quote them. That ordering problem is NOT fixed here and is the remaining leak for unified mode.

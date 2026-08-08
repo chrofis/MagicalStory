@@ -49,6 +49,7 @@ A feedback line marked SPEC CONFLICT overrides the declared interactions: rewrit
 Clothing rules:
 - Select clothing for each character ONLY from their available avatars listed above.
 - If a `costumed` entry appears in a character's available list, prefer it for every page unless the page text explicitly shows them changing clothes. Do not downgrade to `standard` just because the current scene description doesn't re-state the costume.
+- When the prose mentions clothing, write the outfit itself. `standard`, `summer`, `winter` and `costumed` are metadata keys — never write them as prose ("wearing his standard clothes", "in a summer outfit").
 {EXPECTED_CLOTHING}
 {LOCKED_PERSPECTIVES}
 
