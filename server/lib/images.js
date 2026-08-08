@@ -9374,7 +9374,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return 'repair';
     };
     // Single canonical writer. Stamps finalScore + deductions + scoreBreakdown
-    // + mathFinalScore + promptFinalScore + scoreModel + evalScore +
+    // + promptFinalScore + scoreModel + evalScore +
     // entityPenalty on the version. Legacy fields (qualityScore, semanticScore,
     // threeStageScore, rawQualityScore) are no longer written — readers go
     // through computeFinalScore or version.finalScore, and per-evaluator
@@ -9413,12 +9413,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       imageData: v.imageData,
       // Canonical scoring fields written by applyScore. finalScore is the
       // single number the frontend + picker read. scoreBreakdown is the
-      // per-evaluator detail for the dev panel. deductions / mathFinalScore
-      // / promptFinalScore / scoreModel are audit-only.
+      // per-evaluator detail for the dev panel. deductions /
+      // promptFinalScore / scoreModel are audit-only.
       finalScore: v.finalScore,
       scoreBreakdown: v.scoreBreakdown || null,
       deductions: v.deductions || null,
-      mathFinalScore: v.mathFinalScore ?? null,
       promptFinalScore: v.promptFinalScore ?? null,
       scoreModel: v.scoreModel || null,
       // Eval-time consolidation: deduped issue list that fed the math score
@@ -9434,7 +9433,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // fields to disambiguate. They were never persisted, so the signal died
       // at save time. rawScore says how far below zero; entityPenaltyRaw says
       // how much entity penalty was capped away.
-      rawScore: v.rawScore ?? null,
       entityPenaltyRaw: v.entityPenaltyRaw ?? null,
       // Detailed evaluator outputs — kept verbatim because the dev panel uses
       // the structured detail (visible/expected character lists from semantic,

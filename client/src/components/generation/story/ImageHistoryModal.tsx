@@ -4,7 +4,7 @@ import { Images, X, Check, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } f
 import { useLanguage } from '@/context/LanguageContext';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import type { ImageVersion } from '@/types/story';
-import { versionScore, versionDisplayScore } from '@/utils/versionScore';
+import { versionScore } from '@/utils/versionScore';
 
 // Cover type names for display
 const COVER_LABELS = {
@@ -199,7 +199,7 @@ export function ImageHistoryModal({
               {(() => {
                 const score = versionScore(versions[fullscreenIndex]);
                 if (!developerMode || score == null) return null;
-                const shown = versionDisplayScore(versions[fullscreenIndex], true);
+                const shown = versionScore(versions[fullscreenIndex]);
                 return (
                   <span className={`ml-2 text-xs font-bold px-1.5 py-0.5 rounded ${scoreBgColor(score)}`}>
                     {shown}%
@@ -333,7 +333,7 @@ export function ImageHistoryModal({
                           // Developer surfaces print the un-clamped score, so
                           // several failing versions stay distinguishable
                           // (−10 vs −140) instead of all reading 0%.
-                          const shown = versionDisplayScore(version, true);
+                          const shown = versionScore(version);
                           return (
                             <span className={`text-white text-[10px] sm:text-[11px] font-bold px-1 sm:px-1.5 py-0.5 rounded ${scoreBgColor(score)}`}>
                               {shown}%
@@ -632,7 +632,7 @@ export function ImageHistoryModal({
                       <div className="flex flex-wrap items-center gap-3 text-sm">
                         <span className="font-semibold text-gray-700">{language === 'de' ? 'Endwert:' : 'Final:'}</span>
                         <span className={`font-bold text-lg ${scoreColor(score)}`}>
-                          {versionDisplayScore(v, true)}%
+                          {versionScore(v)}%
                         </span>
                         {showVisual && (
                           <span className="text-xs text-gray-500">

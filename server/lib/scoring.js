@@ -80,9 +80,11 @@ const { log } = require('../utils/logger');
 //     entity:     [{severity, description, name, ...}, …],    // entityConsistency.js
 //   }
 //
-//   mathFinalScore   = max(0, 100 − Σ SEVERITY_POINTS[d.severity])
+//   finalScore       = 100 − Σ SEVERITY_POINTS[d.severity]   — THE score.
+//                      No floor: negative means the evaluators exceeded 100
+//                      points of penalty. There is exactly one score per
+//                      version; do not add a second, differently-clamped copy.
 //   promptFinalScore = the evaluator/consolidator merged score — AUDIT ONLY
-//   finalScore       = mathFinalScore, always (single scale, 2026-07-10)
 //
 // Writers call `applyScore(version, {evalResult, entityResult, promptFinalScore})`
 // — single entry point. Readers (`findBadPages`, `pickBestVersionIndex`)
@@ -233,22 +235,6 @@ function sumDeductionPoints(deductions) {
   return total;
 }
 
-/**
- * Un-clamped score for a version: `100 − Σ deductions`, negative when the
- * evaluators exceeded 100 points. Prefers the value applyScore stamped; falls
- * back to recomputing from the stored `deductions` so versions written before
- * rawScore was persisted still resolve. null when neither is available.
- *
- * Admin surfaces print this instead of finalScore — clamping every failing
- * version to 0 hides whether one is barely over the line (−10) or the
- * evaluator ran away with it (−140), and makes repair progress invisible.
- */
-function computeRawScore(version) {
-  if (!version || typeof version !== 'object') return null;
-  if (typeof version.rawScore === 'number') return version.rawScore;
-  if (!version.deductions || typeof version.deductions !== 'object') return null;
-  return 100 - sumDeductionPoints(version.deductions);
-}
 
 /**
  * Sum severity points across every category and clamp 100−sum to [0, 100].
@@ -305,18 +291,12 @@ function applyScore(version, { evalResult = null, entityResult = null, promptFin
       log.warn(`[SCORE] ${pnWarn}: no consolidated evaluation — scoring ${rawCount} raw (undeduped) evaluator issue(s)`);
     }
   }
-  const mathFinalScore = computeMathFinalScore(deductions);
-  const finalScore = mathFinalScore;
+  const finalScore = computeMathFinalScore(deductions);
 
   // Canonical fields written by the single writer.
   version.deductions = deductions;
-  version.mathFinalScore = mathFinalScore;
   version.promptFinalScore = (typeof promptFinalScore === 'number') ? promptFinalScore : null;
   version.finalScore = finalScore;
-  // rawScore is now identical to finalScore — kept only so versions written
-  // before the floor was removed still resolve through the same field. Do not
-  // reintroduce a separate clamped/unclamped pair: one score, one scale.
-  version.rawScore = finalScore;
   version.scoreModel = 'math';
   // Which issue set fed the math: 'consolidated' (deduped) or 'raw'.
   version.scoreSource = dedupedIssues ? 'consolidated' : 'raw';
@@ -338,7 +318,9 @@ function applyScore(version, { evalResult = null, entityResult = null, promptFin
   const entityPoints = capEntityPenalty(entityRaw);
   version.entityPenaltyRaw = entityRaw;
   version.entityPenalty = entityPoints;
-  version.evalScore = Math.max(0, Math.min(100, finalScore + entityPoints));
+  // No floor here either — a floored evalScore would re-collapse negatives for
+  // any reader that consults it instead of finalScore.
+  version.evalScore = Math.min(100, finalScore + entityPoints);
 
   // Info-level visibility for threshold calibration. Without this, prod logs
   // show "page X scored Y" with no indication whether Y came from the
@@ -789,7 +771,6 @@ module.exports = {
   SEVERITY_POINTS,
   composeDeductions,
   computeMathFinalScore,
-  computeRawScore,
   applyScore,
   logScoreModelSummary,
   capEntityPenalty,
