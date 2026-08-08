@@ -365,20 +365,6 @@ const MODEL_DEFAULTS = {
   // path is validated on a test story.
   unifiedSceneProse: true,
 
-  // Lighting-aware garment HUE normalization — a cheap, deterministic pre-eval
-  // pass that rotates a figure's drifted garment hue toward its styled avatar's
-  // garment colour WITHOUT touching L* (lighting) or chroma, so eval never
-  // triggers a full redraw for a mere hue shift. Estimates + discounts the
-  // page's global illumination cast before measuring drift (a red jacket that
-  // reads warm only because the whole scene is a warm sunset is left alone).
-  // Runs on every figure with a resolvable avatar; corrects only outliers;
-  // defers very large drifts (likely garment-TYPE errors) to eval+repair. See
-  // server/lib/garmentHueNormalize.js + docs/decisions.md. Env override:
-  // GARMENT_HUE_NORMALIZE=false to disable on staging without a deploy.
-  garmentHueNormalize: process.env.GARMENT_HUE_NORMALIZE
-    ? process.env.GARMENT_HUE_NORMALIZE !== 'false'
-    : true,
-
   // Mechanical garment-colour repair (server/lib/garmentColourFix.js), the
   // consumer of the entity check's `garmentColourMismatches` channel. Runs as
   // Step 1b on ONLY the pages that channel names — DINO garment box -> SAM mask
@@ -447,6 +433,15 @@ const MODEL_DEFAULTS = {
   // correctness wins. Set SHEET_EVAL_MODEL=qwen3-vl to trade it back for cost.
   // Must be a TEXT_MODELS key.
   sheetEvalModel: process.env.SHEET_EVAL_MODEL || 'gemini-2.5-flash',
+  // The BODY-row head check is NOT done by Gemini at all: any VLM hallucinates a
+  // head on a headless torso because head+body co-occur in training (POPE-
+  // adversarial object hallucination — verified deterministically, even
+  // gemini-2.5-pro is only a partial mitigation and costs ~2.4¢/call). Head
+  // presence on the body row is owned by local YOLO pose (Python /pose-heads,
+  // detectBodyRowHeads in character2x4Sheet.js — $0, deterministic; validated on
+  // set #2 / exp #419: headed 0.86–1.00, headless 0.00–0.10, no overlap). The
+  // bodies row eval therefore runs on the cheap sheetEvalModel (flash) for
+  // feet/angles/outfit/proportions/background, and pose gates the head axis.
 
   // ─── Composite Cover mode ────────────────────────────────────────────
   // When true, cover pages (frontCover, initialPage, backCover) skip the

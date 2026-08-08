@@ -6637,51 +6637,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const sharedCount = rawImages.filter(img => img.sharedBboxDetection).length;
         log.info(`🔍 [UNIFIED] Phase 5b-pre: ${sharedCount}/${rawImages.length} shared bbox detections in ${bboxElapsed}s`);
 
-        // Phase 5b-hue: Lighting-aware garment HUE normalization. Runs AFTER the
-        // shared detection (reusing its SAM masks — no re-detect) and BEFORE the
-        // quality/semantic/entity SCORING in runUnifiedRepairPipeline, so eval
-        // scores the ALREADY-corrected image and never triggers a full redraw
-        // for a mere hue drift. For each figure with a resolvable styled avatar,
-        // rotates the garment's drifted hue toward the avatar's garment colour
-        // while preserving L* (lighting) + chroma; corrects only outliers, and
-        // defers very large drifts (likely garment-TYPE errors) to eval+repair.
-        // Gated by MODEL_DEFAULTS.garmentHueNormalize (env GARMENT_HUE_NORMALIZE).
-        if (MODEL_DEFAULTS.garmentHueNormalize) {
-          try {
-            // Runs the SHARED full-chain driver (normalizeGarmentHueBatch) — the
-            // ONE implementation the per-round repair passes also call, so the
-            // initial pre-eval pass and every redraw normalize identically.
-            const { normalizeGarmentHueBatch } = require('./server/lib/garmentHueNormalize');
-            const { imageFingerprint } = require('./server/lib/images');
-            const { getStyledAvatarForClothing } = require('./server/lib/entityConsistency');
-            const { normalizeClothingCategory } = require('./server/lib/clothingCategories');
-            const chars = inputData.characters || [];
-            const findChar = (name) => name && chars.find(c => (c.name || '').toLowerCase() === String(name).toLowerCase());
-            const hueStart = Date.now();
-            // Per-page clothing per character (same priority as the entity check):
-            // explicit page clothing → scene metadata → 'standard'. Resolves the
-            // avatar matching THIS page's outfit, so a costume-change page
-            // corrects toward the right (costumed) avatar.
-            const resolveAvatarForPage = async (pageNumber, fig) => {
-              const character = findChar(fig?.name);
-              if (!character) return null; // unnamed/UNKNOWN figure → skip (no-op)
-              const img = rawImages.find(i => i.pageNumber === pageNumber);
-              const pageClothing = img?.characterClothing || img?.sceneCharacterClothing || img?.sceneMetadata?.characterClothing || {};
-              const cat = normalizeClothingCategory(pageClothing[character.name] || 'standard');
-              return getStyledAvatarForClothing(character, inputData.artStyle, cat);
-            };
-            const hueOut = await normalizeGarmentHueBatch(rawImages, {
-              resolveAvatarForPage,
-              getDetection: (img) => img.sharedBboxDetection,
-              imageFingerprint,
-              concurrency: 50,
-            });
-            log.info(`🎨 [UNIFIED] Phase 5b-hue: corrected ${hueOut.figuresApplied} figure(s) across ${hueOut.pagesChanged} page(s) in ${((Date.now() - hueStart) / 1000).toFixed(1)}s`);
-          } catch (err) {
-            log.warn(`⚠️ [UNIFIED] Phase 5b-hue skipped: ${err.message}`);
-          }
-        }
-
         // Build storyData for iterate (needs scene descriptions, characters, visual bible)
         const pipelineStoryData = {
           characters: inputData.characters,

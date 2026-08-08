@@ -1135,79 +1135,76 @@ async function runEntityStage(ctx, { experimentId }) {
  * Target: {storyId, pageNumber}. params.opts = threshold overrides (A/B).
  */
 /**
- * Render ONE "shift summary" image for a garment-hue run: one row per character,
- * each showing the reference avatar, the figure before, the figure after, and
- * three colour chips — garment as rendered, avatar target, garment after — plus
- * the numbers and the verdict. Skipped figures are included, with their reason:
- * "how did each character shift" has to answer "not at all, because X" too.
+ * Render ONE "shift summary" image for a garment-colour run: a row per
+ * character showing the figure before, the SAM garment mask, the figure after,
+ * three colour chips (garment as rendered / avatar target / result), and the
+ * numbers. Skipped figures are included with their reason — "how did each
+ * character shift" has to answer "not at all, because X" too.
  *
- * Colour chips matter more than the hue numbers: "36.4° → 32.6°" tells a reader
- * nothing about whether the shirt went the right way. Two squares do.
+ * The MASK is on the row deliberately. It is the one artifact that separates
+ * "the mask was wrong" from "the colour maths was wrong", which is the first
+ * question anyone asks of a bad result.
  */
-async function renderGarmentHueSummary(perFigure, pageNumber) {
+async function renderGarmentColourSummary(perFigure, stepsByFigure, pageNumber) {
   const sharp = require('sharp');
-  const ROW_H = 150, PAD = 12, THUMB = 126, CHIP = 38, W = 1180, HEAD_H = 46;
-  const rows = perFigure.filter(f => f.beforeCrop || f.swatches);
+  const { _labToRgb } = require('./images');
+  const ROW_H = 168, PAD = 12, THUMB = 140, CHIP = 38, W = 1260, HEAD_H = 46;
+  const rows = perFigure.filter(f => f && f.name);
   if (!rows.length) return null;
   const H = HEAD_H + rows.length * ROW_H + PAD;
-
-  const esc = (s) => String(s == null ? '' : s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
-  const rgb = (c) => (Array.isArray(c) ? `rgb(${c[0]},${c[1]},${c[2]})` : '#ccc');
+  const esc = (v) => String(v == null ? '' : v).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+  const RAD = Math.PI / 180;
+  // The report stores hue+chroma+L, not RGB — rebuild the swatch from them.
+  const chip = (c) => {
+    if (!c || c.hueDeg == null || c.chroma == null || c.L == null) return '#ccc';
+    const rgb = _labToRgb(c.L, c.chroma * Math.cos(c.hueDeg * RAD), c.chroma * Math.sin(c.hueDeg * RAD));
+    return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+  };
 
   const composites = [];
   let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
     <rect width="${W}" height="${H}" fill="#ffffff"/>
-    <text x="${PAD}" y="30" font-family="sans-serif" font-size="20" font-weight="700" fill="#111">Garment-hue shift — page ${pageNumber}</text>`;
+    <text x="${PAD}" y="30" font-family="sans-serif" font-size="20" font-weight="700" fill="#111">Garment colour fix — page ${pageNumber}</text>
+    <text x="${PAD}" y="${HEAD_H - 6}" font-family="sans-serif" font-size="12" fill="#777">before · SAM mask · after</text>`;
 
   for (let i = 0; i < rows.length; i++) {
     const f = rows[i];
     const y = HEAD_H + i * ROW_H;
-    // Three thumbnails: reference sheet, before, after.
-    const thumbs = [
-      ['referenceSheet', PAD],
-      ['beforeCrop', PAD + THUMB + 8],
-      ['afterCrop', PAD + 2 * (THUMB + 8)],
-    ];
-    for (const [key, left] of thumbs) {
-      if (!f[key]) continue;
+    const imgs = stepsByFigure[f.name] || {};
+    const slots = [['before', PAD], ['mask', PAD + THUMB + 8], ['after', PAD + 2 * (THUMB + 8)]];
+    for (const [key, left] of slots) {
+      if (!imgs[key]) continue;
       try {
-        const buf = Buffer.from(String(f[key]).replace(/^data:[^;]+;base64,/, ''), 'base64');
+        const buf = Buffer.from(String(imgs[key]).replace(/^data:[^;]+;base64,/, ''), 'base64');
         composites.push({
-          input: await sharp(buf).resize(THUMB, THUMB - 20, { fit: 'contain', background: '#fff' }).png().toBuffer(),
+          input: await sharp(buf).resize(THUMB, THUMB - 22, { fit: 'contain', background: '#fff' }).png().toBuffer(),
           left, top: y + 16,
         });
       } catch { /* a missing thumbnail must not sink the summary */ }
     }
-    const textX = PAD + 3 * (THUMB + 8) + 8;
-    const chipY = y + 40;
-    const chips = [
-      ['page', f.swatches?.before],
-      ['avatar', f.swatches?.target],
-      ['result', f.swatches?.after],
-    ];
+    const tx = PAD + 3 * (THUMB + 8) + 10;
+    const chipY = y + 44;
+    const chips = [['page', chip(f.current)], ['avatar', chip(f.target)], ['result', chip(f.applied ? f.target : f.current)]];
     let chipSvg = '';
     chips.forEach(([label, col], k) => {
-      const cx = textX + k * (CHIP + 46);
-      chipSvg += `<rect x="${cx}" y="${chipY}" width="${CHIP}" height="${CHIP}" fill="${rgb(col)}" stroke="#999" stroke-width="1"/>
+      const cx = tx + k * (CHIP + 46);
+      chipSvg += `<rect x="${cx}" y="${chipY}" width="${CHIP}" height="${CHIP}" fill="${col}" stroke="#999" stroke-width="1"/>
         <text x="${cx}" y="${chipY + CHIP + 13}" font-family="sans-serif" font-size="11" fill="#555">${label}</text>`;
     });
-    const verdict = f.applied ? `SHIFTED ${f.rotationDeg > 0 ? '+' : ''}${f.rotationDeg}°` : 'unchanged';
-    const verdictFill = f.applied ? '#0a7d32' : '#777';
+    const verdict = f.applied ? `SHIFTED  ΔE ${f.delta?.deltaE ?? '–'}` : 'unchanged';
+    const fill = f.applied ? '#0a7d32' : '#777';
+    const nx = tx + 3 * (CHIP + 46) + 12;
     svg += `<line x1="0" y1="${y + 4}" x2="${W}" y2="${y + 4}" stroke="#e5e5e5" stroke-width="1"/>
-      <text x="${textX}" y="${y + 26}" font-family="sans-serif" font-size="16" font-weight="700" fill="#111">${esc(f.name)}</text>
-      <text x="${textX + 130}" y="${y + 26}" font-family="sans-serif" font-size="14" font-weight="700" fill="${verdictFill}">${esc(verdict)}</text>
+      <text x="${tx}" y="${y + 28}" font-family="sans-serif" font-size="16" font-weight="700" fill="#111">${esc(f.name)}</text>
+      <text x="${tx + 140}" y="${y + 28}" font-family="sans-serif" font-size="14" font-weight="700" fill="${fill}">${esc(verdict)}</text>
       ${chipSvg}
-      <text x="${textX + 3 * (CHIP + 46) + 10}" y="${chipY + 16}" font-family="sans-serif" font-size="13" fill="#333">garment ${f.garmentHueDeg ?? '–'}° → avatar ${f.avatarHueDeg ?? '–'}°</text>
-      <text x="${textX + 3 * (CHIP + 46) + 10}" y="${chipY + 34}" font-family="sans-serif" font-size="12" fill="#666">drift ${f.driftDeg ?? '–'}° · mask ${esc(f.maskSource || '–')}</text>
-      <text x="${textX}" y="${y + ROW_H - 14}" font-family="sans-serif" font-size="12" fill="#555">${esc(f.reason)}</text>`;
+      <text x="${nx}" y="${chipY + 14}" font-family="sans-serif" font-size="13" fill="#333">hue ${f.current?.hueDeg ?? '–'}° → ${f.target?.hueDeg ?? '–'}°   ·   L ${f.current?.L ?? '–'} → ${f.target?.L != null && f.lighting != null ? (f.target.L * f.lighting).toFixed(0) : '–'}</text>
+      <text x="${nx}" y="${chipY + 32}" font-family="sans-serif" font-size="12" fill="#666">DINO ${f.dinoScore ?? '–'}${f.dinoScore != null && f.dinoScore < 0.6 ? ' (low)' : ''}   ·   ${f.current?.px ?? 0} px   ·   dilated +${f.maskDilated || 0}   ·   gated −${f.colourGated || 0}</text>
+      <text x="${nx}" y="${chipY + 50}" font-family="sans-serif" font-size="12" fill="#666">lighting ×${f.lighting ?? '–'} (${esc(f.lightingSource || '–')})</text>
+      <text x="${tx}" y="${y + ROW_H - 14}" font-family="sans-serif" font-size="12" fill="#555">${esc(f.reason || '')}</text>`;
   }
-  svg += `<text x="${PAD}" y="${HEAD_H - 6}" font-family="sans-serif" font-size="12" fill="#777">reference sheet · before · after</text></svg>`;
-
-  const out = await sharp(Buffer.from(svg))
-    .composite(composites)
-    .jpeg({ quality: 92 })
-    .toBuffer();
-  return 'data:image/jpeg;base64,' + out.toString('base64');
+  svg += '</svg>';
+  return 'data:image/jpeg;base64,' + (await sharp(Buffer.from(svg)).composite(composites).jpeg({ quality: 92 }).toBuffer()).toString('base64');
 }
 
 /**
@@ -1243,6 +1240,7 @@ async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
 
   const steps = [];
   const perFigure = [];
+  const stepsByFigure = {};
   let anyChange = false;
   for (const fig of detection.figures) {
     const name = fig?.name;
@@ -1258,13 +1256,30 @@ async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
 
     const res = await fixFigureGarmentColour(imageData, fig, avatarUri, { opts: params.opts || {}, collectSteps: true });
     perFigure.push(res.report);
-    for (const s of res.steps) {
-      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, s.data, experimentId);
-      steps.push({ label: s.label, imageType: 'tl_step', versionIndex: v });
+    const slot = {};
+    for (const st of res.steps) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, st.data, experimentId);
+      steps.push({ label: st.label, imageType: 'tl_step', versionIndex: v });
+      if (/BEFORE/.test(st.label)) slot.before = st.data;
+      else if (/MASK/.test(st.label)) slot.mask = st.data;
+      else if (/AFTER/.test(st.label)) slot.after = st.data;
     }
+    stepsByFigure[name] = slot;
     // Chain: each figure repairs on top of the previous one's output, so a
     // multi-character page ends with ONE image carrying every correction.
     if (res.changed) { imageData = res.imageData; anyChange = true; }
+  }
+
+  // Summary FIRST in the step list — one image answering "what happened to every
+  // character on this page", mask included, without scrolling per-figure crops.
+  try {
+    const summary = await renderGarmentColourSummary(perFigure, stepsByFigure, ctx.pageNumber);
+    if (summary) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, summary, experimentId);
+      steps.unshift({ label: `SHIFT SUMMARY — all ${perFigure.length} figure(s) on page ${ctx.pageNumber}`, imageType: 'tl_step', versionIndex: v });
+    }
+  } catch (err) {
+    log.warn(`[TESTLAB] garment-colour summary failed: ${err.message} — per-figure steps still emitted`);
   }
 
   const correctedVersion = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, imageData, experimentId);
@@ -1276,111 +1291,6 @@ async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
     steps: steps.length ? steps : undefined,
   };
 }
-
-async function runGarmentHueStage(ctx, { experimentId, params = {} }) {
-  const { loadPromptTemplates } = require('../services/prompts');
-  await loadPromptTemplates();
-  const { normalizeGarmentHue } = require('./garmentHueNormalize');
-  const { detectAllBoundingBoxes } = require('./images');
-  const { getStyledAvatarForClothing, normalizeClothingCategory } = require('./entityConsistency');
-
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
-  const expectedCharacters = buildExpectedCharacters(ctx);
-  const t0 = Date.now();
-  // Fresh detection on the ACTIVE bytes → in-process _gdinoMasks for the reuse
-  // path (falls back to bodyBox rectangle when the backend returns no mask).
-  const detection = await detectAllBoundingBoxes(imageData, {
-    expectedCharacters,
-    sceneContext: (ctx.scene.sceneDescription || '').slice(0, 2000),
-    artStyle: ctx.artStyle,
-    skipCache: true,
-    pageContext: `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-  });
-  if (!detection?.figures?.length) throw new Error('No figures detected on this page — nothing to normalize');
-
-  const chars = ctx.characters || [];
-  const findChar = (name) => name && chars.find(c => (c.name || '').toLowerCase() === String(name).toLowerCase());
-  const pageClothing = ctx.scene.sceneCharacterClothing || ctx.scene.sceneMetadata?.characterClothing || {};
-  const resolveAvatar = async (fig) => {
-    const character = findChar(fig?.name);
-    if (!character) return null;
-    // NO DEFAULT CLOTHING (owner, 2026-08-07).
-    if (!pageClothing[character.name]) {
-      log.error(`❌ [TESTLAB] ${character.name}: no per-page clothing category — skipping the avatar lookup rather than guessing 'standard'.`);
-      return null;
-    }
-    return getStyledAvatarForClothing(character, ctx.artStyle, normalizeClothingCategory(pageClothing[character.name]));
-  };
-
-  const out = await normalizeGarmentHue(imageData, detection, resolveAvatar, {
-    opts: params.opts || {},
-    logLabel: `exp${experimentId}-P${ctx.pageNumber} `,
-    collectCrops: true,
-  });
-  const elapsedMs = Date.now() - t0;
-
-  // REFERENCE → BEFORE → AFTER per corrected figure as inspectable step images.
-  // The reference sheet comes first deliberately: the correction is only
-  // judgeable against the avatar the target hue was actually read from.
-  const steps = [];
-  // The shift summary goes FIRST — one image that answers "what happened to
-  // every character on this page" without scrolling through per-figure crops.
-  try {
-    const summary = await renderGarmentHueSummary(out.perFigure, ctx.pageNumber);
-    if (summary) {
-      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, summary, experimentId);
-      steps.push({ label: `SHIFT SUMMARY — all ${out.perFigure.length} figures on page ${ctx.pageNumber}`, imageType: 'tl_step', versionIndex: v });
-    }
-  } catch (err) {
-    log.warn(`[TESTLAB] garment-hue shift summary failed: ${err.message} — per-figure steps still emitted`);
-  }
-  for (const f of out.perFigure) {
-    if (f.referenceSheet) {
-      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, f.referenceSheet, experimentId);
-      steps.push({ label: `${f.name} REFERENCE — styled avatar (avatar ${f.avatarHueDeg}°)`, imageType: 'tl_step', versionIndex: v });
-    }
-    if (f.beforeCrop) {
-      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, f.beforeCrop, experimentId);
-      steps.push({ label: `${f.name} BEFORE (garment ${f.garmentHueDeg}°)`, imageType: 'tl_step', versionIndex: v });
-    }
-    if (f.afterCrop) {
-      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, f.afterCrop, experimentId);
-      steps.push({ label: `${f.name} AFTER (→ avatar ${f.avatarHueDeg}°, rotated ${f.rotationDeg}°)`, imageType: 'tl_step', versionIndex: v });
-    }
-  }
-  // Always save the resulting full page as a version so BOTH sides of the
-  // colour on/off A/B are directly comparable: the ON variant yields the
-  // corrected page, the OFF variant (opts.disable) yields the original page =
-  // the "without" side. (out.correctedImageData === the original when unchanged.)
-  const correctedVersion = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, out.correctedImageData, experimentId);
-
-  return {
-    elapsedMs,
-    changed: out.changed,
-    detectionBackend: detection.detectionBackend || null,
-    correctedVersion,
-    perFigure: out.perFigure.map(f => ({
-      name: f.name,
-      applied: f.applied,
-      reason: f.reason,
-      hueDriftDeg: f.driftDeg,
-      rotationDeg: f.rotationDeg,
-      garmentHueDeg: f.garmentHueDeg,
-      avatarHueDeg: f.avatarHueDeg,
-      illuminationCast: f.cast,   // {a,b} — the estimated global scene cast (discounted before measuring drift)
-      swatches: f.swatches,       // {before,target,after} RGB — the colours the summary chips show
-      garmentChroma: f.swatches?.before ? null : undefined,
-      maskSource: f.maskSource,   // 'sam' (shared silhouette) | 'bodyBox' (rectangle fallback)
-    })),
-    steps: steps.length ? steps : undefined,
-  };
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// Avatar stages — production two-pass sheet flow, split so the realistic
-// anchor (Pass 1) is generated once per character and every style transfer
-// (Pass 2) reuses it.
-// ─────────────────────────────────────────────────────────────────────
 
 /** Character record + story costume description for one character. */
 async function loadCharacterContext(storyId, characterName) {
@@ -4599,7 +4509,6 @@ const STAGE_RUNNERS = {
   rewrite_blocked: runRewriteBlockedStage,
   repair_verify: runRepairVerifyStage,
   qwen_insert: runQwenInsertStage,
-  garment_hue: runGarmentHueStage,
   garment_colour_fix: runGarmentColourFixStage,
 };
 

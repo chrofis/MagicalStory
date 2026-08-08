@@ -362,7 +362,6 @@ export const TESTLAB_STAGES = [
   { id: 'beats_scenes', label: 'Beats + scenes → fast review (time-to-lock)', producesImage: false, overridable: true, storyLevel: true },
   // Both runners existed server-side but were absent from this list, so the
   // dropdown could never select them — unreachable except by hand-posting.
-  { id: 'garment_hue', label: 'Garment hue normalization (ON/OFF)', producesImage: true, overridable: false },
   { id: 'garment_colour_fix', label: 'Garment colour fix (DINO+SAM mask → L*a*b* match)', producesImage: true, overridable: false },
   { id: 'style_repair', label: 'Style repair (story-wide)', producesImage: true, overridable: false, storyLevel: true },
   { id: 'avatar_realistic', label: 'Avatar pass 1 (realistic anchor)', producesImage: true, overridable: false, characterLevel: true },
