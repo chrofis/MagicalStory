@@ -2031,6 +2031,67 @@ router.get('/:id/retry-images/:pageNumber', authenticateToken, async (req, res) 
 });
 
 // GET /api/stories/:id/composite-stages/:pageNumber - Dev-only: fetch the
+// Garment-colour repair audit for a page — DEVELOPER PANEL ONLY.
+//
+// Step 1b recolours a garment the entity check flagged as the right shape in the
+// wrong colour. Its outcome is written onto the mismatch entry in the stored
+// entityReport, and when it changed pixels the pre-repair bytes are kept as a
+// `garment_before` image. Both survive a container restart, which stdout does
+// not — that is exactly how the first production run became undiagnosable.
+//
+// `garment_before` is deliberately NOT the `scene` type, so these never enter
+// the user-facing version cycle; only this route surfaces them.
+router.get('/:id/garment-colour/:pageNumber', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pageNum = parseInt(req.params.pageNumber, 10);
+    if (!Number.isFinite(pageNum)) return res.status(400).json({ error: 'Invalid page number' });
+
+    const rows = canReadAnyStory(req)
+      ? await dbQuery('SELECT id, data FROM stories WHERE id = $1', [id])
+      : await dbQuery('SELECT id, data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+
+    const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    const report = (data?.sceneImages || []).find(si => si?.entityReport)?.entityReport;
+
+    // Every mismatch naming this page, with whatever outcome Step 1b recorded.
+    const entries = [];
+    for (const [charName, charData] of Object.entries(report?.characters || {})) {
+      for (const m of (charData.garmentColourMismatches || [])) {
+        if (!(m.pagesToFix || []).includes(pageNum)) continue;
+        entries.push({
+          character: charName,
+          garment: m.garment || null,
+          expectedColour: m.expectedColour || null,
+          observedColour: m.observedColour || null,
+          clothingCategory: m.clothingCategory || null,
+          outcome: m.fixOutcome || null,
+        });
+      }
+    }
+    if (entries.length === 0) return res.json({ entries: [], before: null, after: null });
+
+    // BEFORE: the highest-numbered stored pre-repair image for this page (a page
+    // can be repaired more than once — the last one is the one that produced the
+    // shipped bytes). AFTER: the page's current active scene image.
+    const beforeVersions = entries.map(e => e.outcome?.beforeVersion).filter(v => Number.isFinite(v));
+    let before = null;
+    if (beforeVersions.length) {
+      const row = await getStoryImage(id, 'garment_before', pageNum, Math.max(...beforeVersions));
+      if (row) before = { imageData: normalizeImageData(row.imageData), imageUrl: row.imageUrl };
+    }
+    const activeIdx = await getActiveVersion(id, 'scene', pageNum);
+    const afterRow = await getStoryImage(id, 'scene', pageNum, activeIdx ?? 0);
+    const after = afterRow ? { imageData: normalizeImageData(afterRow.imageData), imageUrl: afterRow.imageUrl } : null;
+
+    res.json({ entries, before, after });
+  } catch (error) {
+    console.error('Garment-colour audit error:', error);
+    res.status(500).json({ error: 'Failed to load garment-colour audit' });
+  }
+});
+
 // scene-composite pipeline intermediates for a page (clean BG → blocking →
 // composited → final). Returns null fields for stages not persisted (pre-
 // migration stories or pages that fell back to the direct path).

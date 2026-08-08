@@ -7672,47 +7672,107 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // styled avatar, scaled by a skin-probed lighting factor. Consume it here, on
   // exactly the pages it names — no detection sweep, no extra model call for
   // pages it did not flag. Guarded by MODEL_DEFAULTS.garmentColourFix.
+  //
+  // AUDITABLE (owner requirement, 2026-08-08): every attempt writes its outcome
+  // back onto the mismatch entry, and a change also stores the BEFORE bytes as a
+  // `garment_before` image. Both persist with the story, so after a container
+  // restart — which erases stdout and is exactly how the first production run
+  // became undiagnosable — the record is still there. `garment_before` is a
+  // developer-only image type: it is not `scene`, so it never enters the
+  // user-facing version cycle.
   if (CONFIG_DEFAULTS.garmentColourFix) {
     const t1b = Date.now();
-    let fixedPages = 0, attempted = 0;
+    let fixedPages = 0, attempted = 0, skipped = 0;
     try {
-      const { fixFigureGarmentColour } = require('./garmentColourFix');
+      const { fixFigureGarmentColour, garmentPromptFor, DEFAULTS: GCF } = require('./garmentColourFix');
+      const { getNextVersionIndex, saveStoryImage } = require('../services/database');
+      // Same identity this file uses everywhere else for storage.
+      const gcStoryId = storyData?.id || jobId || null;
+
+      // DEDUPE first. The channel reports one entry per garment, so a character
+      // with two drifted items on the same page yields two entries naming the
+      // same pages — without this the figure is segmented and recoloured twice,
+      // the second pass measuring bytes the first already changed.
+      const work = new Map();
       for (const [charName, charData] of Object.entries(entityReport?.characters || {})) {
         for (const m of (charData.garmentColourMismatches || [])) {
           for (const pageNumber of (m.pagesToFix || [])) {
-            const img = imagesWithData.find(i => i.pageNumber === pageNumber);
-            if (!img?.imageData) continue;
-            const fig = (img.bboxDetection?.figures || [])
-              .find(f => (f?.name || '').toLowerCase() === charName.toLowerCase());
-            if (!fig?.bodyBox) {
-              log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: no detected figure — skipped`);
-              continue;
-            }
-            const character = characters.find(c => (c.name || '').toLowerCase() === charName.toLowerCase());
-            if (!character) continue;
-            // NO DEFAULT (owner, 2026-08-07): the avatar is the colour target.
-            if (!m.clothingCategory) {
-              log.error(`❌ [GARMENT-COLOUR] ${charName} p${pageNumber}: mismatch carries no clothing category — skipping (refusing to recolour towards a guessed outfit).`);
-              continue;
-            }
-            const avatarUri = await getStyledAvatarForClothing(character, artStyle, m.clothingCategory);
-            if (!avatarUri) { log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: no styled avatar — skipped`); continue; }
-            attempted++;
-            const res = await fixFigureGarmentColour(img.imageData, fig, avatarUri, {});
-            if (res.changed) {
-              img.imageData = res.imageData;
-              fixedPages++;
-              // The bytes changed, so any detection stamped against the old
-              // bytes is stale for downstream reuse.
-              if (img.bboxDetection) img.bboxDetection.sourceImageFp = null;
-            } else {
-              log.info(`🎨 [GARMENT-COLOUR] ${charName} p${pageNumber}: no-op (${res.report?.reason || 'unknown'})`);
-            }
+            const kind = garmentPromptFor(m.garment, GCF).kind;
+            const key = `${charName.toLowerCase()}|${pageNumber}|${kind}`;
+            if (!work.has(key)) work.set(key, { charName, pageNumber, kind, m });
           }
         }
       }
-      if (attempted) {
-        log.info(`🎨 [GARMENT-COLOUR] Step 1b: ${fixedPages}/${attempted} garment(s) recoloured in ${((Date.now() - t1b) / 1000).toFixed(1)}s`);
+
+      for (const { charName, pageNumber, kind, m } of work.values()) {
+        // Outcome is recorded on the entry itself, whatever happens.
+        const audit = { garmentKind: kind, at: new Date().toISOString() };
+        m.fixOutcome = audit;
+        const img = imagesWithData.find(i => i.pageNumber === pageNumber);
+        if (!img?.imageData) { audit.skipped = 'page has no image'; skipped++; continue; }
+        const fig = (img.bboxDetection?.figures || [])
+          .find(f => (f?.name || '').toLowerCase() === charName.toLowerCase());
+        if (!fig?.bodyBox) {
+          audit.skipped = 'no detected figure on the page';
+          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber} ${kind}: no detected figure — skipped`);
+          skipped++; continue;
+        }
+        const character = characters.find(c => (c.name || '').toLowerCase() === charName.toLowerCase());
+        if (!character) { audit.skipped = 'character not in the story'; skipped++; continue; }
+        // NO DEFAULT (owner, 2026-08-07): the avatar is the colour target.
+        if (!m.clothingCategory) {
+          audit.skipped = 'mismatch carries no clothing category';
+          log.error(`❌ [GARMENT-COLOUR] ${charName} p${pageNumber}: no clothing category — refusing to recolour toward a guessed outfit.`);
+          skipped++; continue;
+        }
+        const avatarUri = await getStyledAvatarForClothing(character, artStyle, m.clothingCategory);
+        if (!avatarUri) {
+          audit.skipped = 'no styled avatar for this clothing category';
+          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: no styled avatar — skipped`);
+          skipped++; continue;
+        }
+
+        attempted++;
+        const before = img.imageData;
+        const res = await fixFigureGarmentColour(before, fig, avatarUri, { garment: m.garment });
+        Object.assign(audit, {
+          applied: !!res.changed,
+          reason: res.report?.reason || null,
+          dinoScore: res.report?.dinoScore ?? null,
+          current: res.report?.current ?? null,
+          target: res.report?.target ?? null,
+          delta: res.report?.delta ?? null,
+          lighting: res.report?.lighting ?? null,
+          lightingSource: res.report?.lightingSource ?? null,
+          maskPx: res.report?.current?.px ?? null,
+          maskDilated: res.report?.maskDilated ?? 0,
+          colourGated: res.report?.colourGated ?? 0,
+          elapsedMs: res.report?.elapsedMs ?? null,
+        });
+
+        if (res.changed) {
+          try {
+            if (!gcStoryId) throw new Error('no story id in context');
+            const v = await getNextVersionIndex(gcStoryId, 'garment_before', pageNumber);
+            await saveStoryImage(gcStoryId, 'garment_before', pageNumber, before, {
+              versionIndex: v, generatedAt: new Date().toISOString(),
+            });
+            audit.beforeVersion = v;
+          } catch (e) {
+            // The audit image is a debugging aid — never fail the repair for it.
+            audit.beforeSaveError = e.message;
+            log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: before-image not stored (${e.message})`);
+          }
+          img.imageData = res.imageData;
+          fixedPages++;
+          // Bytes changed → a detection stamped against the old bytes is stale.
+          if (img.bboxDetection) img.bboxDetection.sourceImageFp = null;
+        } else {
+          log.info(`🎨 [GARMENT-COLOUR] ${charName} p${pageNumber} ${kind}: no-op (${res.report?.reason || 'unknown'})`);
+        }
+      }
+      if (work.size) {
+        log.info(`🎨 [GARMENT-COLOUR] Step 1b: ${fixedPages} recoloured, ${attempted - fixedPages} no-op, ${skipped} skipped of ${work.size} flagged in ${((Date.now() - t1b) / 1000).toFixed(1)}s`);
       }
     } catch (err) {
       // Never let a colour repair sink the pipeline — the page ships uncorrected.

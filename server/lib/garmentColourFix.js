@@ -35,10 +35,20 @@ const { sampleGarmentClusters, isGarmentPixel } = require('./garmentHueNormalize
 const DEG = 180 / Math.PI;
 
 const DEFAULTS = {
-  // GroundingDINO garment query. Colour-agnostic on purpose: naming the colour
-  // we EXPECT would bias the detector toward finding it, and naming the colour
-  // we SEE requires knowing it first. Measured 0.62-0.82 across three pages.
-  garmentPrompt: 'the shirt or top worn by the person',
+  // GroundingDINO queries per garment KIND. Colour-agnostic on purpose: naming
+  // the colour we EXPECT would bias the detector toward finding it, and naming
+  // the colour we SEE requires knowing it first. Measured 0.62-0.82 for tops.
+  // The entity channel says WHICH garment drifted, so ask for that one — asking
+  // for a shirt when the report flagged footwear repairs the wrong region.
+  garmentPrompts: {
+    top: 'the shirt or top worn by the person',
+    dress: 'the dress worn by the person',
+    outer: 'the jacket or coat worn by the person',
+    bottom: 'the trousers or shorts worn by the person',
+    footwear: 'the shoes worn by the person',
+    headwear: 'the hat or headwear worn by the person',
+  },
+  defaultGarment: 'top',
   boxThreshold: 0.18,
   textThreshold: 0.14,
   // Crop padding around the figure box before asking for the garment.
@@ -70,6 +80,23 @@ const DEFAULTS = {
   minMaskPx: 200,
 };
 
+/**
+ * Map the entity channel's free-text garment word onto one of the grounding
+ * prompts. Unknown words fall back to the top, which is what the channel reports
+ * for the overwhelming majority of drifts.
+ */
+function garmentPromptFor(garment, cfg) {
+  const g = String(garment || '').toLowerCase();
+  const kind =
+    /shoe|boot|sandal|trainer|sneaker|footwear|plimsoll/.test(g) ? 'footwear' :
+    /hat|cap|bandana|headwear|beanie|hood/.test(g) ? 'headwear' :
+    /trouser|short|jean|legging|skirt|bottom|pant/.test(g) ? 'bottom' :
+    /dress|gown|pinafore/.test(g) ? 'dress' :
+    /jacket|coat|cardigan|vest|outer|hoodie/.test(g) ? 'outer' :
+    'top';
+  return { kind, prompt: cfg.garmentPrompts[kind] || cfg.garmentPrompts[cfg.defaultGarment] };
+}
+
 function _photoAnalyzerUrl() {
   return process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 }
@@ -87,7 +114,7 @@ async function detectGarmentBox(cropUri, opts = {}) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       image: cropUri,
-      prompts: [{ name: 'garment', text: cfg.garmentPrompt }],
+      prompts: [{ name: 'garment', text: opts.prompt || cfg.garmentPrompts[cfg.defaultGarment] }],
       box_threshold: cfg.boxThreshold, text_threshold: cfg.textThreshold,
     }),
     signal: AbortSignal.timeout(300_000),
@@ -198,17 +225,46 @@ function medianSkinL(raw, W, H, box01) {
  * torso band (hair-free by construction — see garmentHueNormalize.avatarTorsoBand).
  * @returns {{L,a,b,chroma,hueDeg}|null}
  */
-async function avatarGarmentLab(avatarUri) {
+async function avatarGarmentLab(avatarUri, opts = {}) {
+  const cfg = { ...DEFAULTS, ...opts };
   const { _internal } = require('./garmentHueNormalize');
   const buf = bytesOf(avatarUri);
   const meta = await sharp(buf).metadata();
+
+  // For anything that is NOT a torso garment, the torso band is the wrong place
+  // to look — shoes are not in it, and a hat certainly is not. Ask DINO for the
+  // SAME garment on the avatar that we asked for on the page, so the target is
+  // the matching item rather than whatever happens to dominate the chest.
+  if (opts.prompt && opts.kind && opts.kind !== 'top' && opts.kind !== 'dress') {
+    try {
+      const det = await detectGarmentBox(toDataUri(await sharp(buf).jpeg({ quality: 95 }).toBuffer()), { ...cfg, prompt: opts.prompt });
+      if (det?.box) {
+        const [x1, y1, x2, y2] = det.box.map(Math.round);
+        const w = Math.max(2, Math.min(meta.width - Math.max(0, x1), x2 - x1));
+        const h = Math.max(2, Math.min(meta.height - Math.max(0, y1), y2 - y1));
+        const { data, info } = await sharp(buf)
+          .extract({ left: Math.max(0, x1), top: Math.max(0, y1), width: w, height: h })
+          .removeAlpha().raw().toBuffer({ resolveWithObject: true });
+        const cl = sampleGarmentClusters(data, info.width * info.height, null, { a: 0, b: 0 }, {}, 3);
+        if (cl.length) {
+          const c = cl[0];
+          return { L: c.L, a: c.a, b: c.b, chroma: c.chroma, hueDeg: +(c.hueRad * DEG).toFixed(1), source: `dino:${opts.kind}` };
+        }
+      }
+    } catch (e) {
+      log.warn(`[GARMENT-COLOUR] avatar ${opts.kind} lookup failed (${e.message}) — falling back to the torso band`);
+    }
+  }
+
+  // Torso garments: the band is hair-free by construction and needs no model.
   const band = await _internal.avatarTorsoBand(buf, meta.width, meta.height);
   const { data, info } = await sharp(buf).extract(band).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const cl = sampleGarmentClusters(data, info.width * info.height, null, { a: 0, b: 0 }, {}, 3);
   if (!cl.length) return null;
   const c = cl[0];
-  return { L: c.L, a: c.a, b: c.b, chroma: c.chroma, hueDeg: +(c.hueRad * DEG).toFixed(1) };
+  return { L: c.L, a: c.a, b: c.b, chroma: c.chroma, hueDeg: +(c.hueRad * DEG).toFixed(1), source: 'torsoBand' };
 }
+
 
 /**
  * Repair ONE figure's garment colour on a page.
@@ -222,15 +278,16 @@ async function avatarGarmentLab(avatarUri) {
 async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options = {}) {
   const cfg = { ...DEFAULTS, ...(options.opts || {}) };
   const t0 = Date.now();
-  const report = { name: figure?.name || 'figure', applied: false, reason: null };
+  const { kind, prompt } = garmentPromptFor(options.garment, cfg);
+  const report = { name: figure?.name || 'figure', garment: options.garment || kind, garmentKind: kind, applied: false, reason: null };
   const pageBuf = bytesOf(pageImageData);
   const meta = await sharp(pageBuf).metadata();
   const W = meta.width, H = meta.height;
   const steps = [];
 
-  const target = await avatarGarmentLab(avatarUri);
+  const target = await avatarGarmentLab(avatarUri, { ...cfg, kind, prompt });
   if (!target) { report.reason = 'no avatar garment sample'; return { changed: false, imageData: pageImageData, report, steps }; }
-  report.target = { L: +target.L.toFixed(1), hueDeg: target.hueDeg, chroma: +target.chroma.toFixed(1) };
+  report.target = { L: +target.L.toFixed(1), hueDeg: target.hueDeg, chroma: +target.chroma.toFixed(1), source: target.source };
 
   // Crop to the figure so the garment query has one unambiguous referent — a
   // whole-page "shirt" query on a multi-figure page returns person-sized boxes.
@@ -245,8 +302,8 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
 
   let det = null, seg = null;
   try {
-    det = await detectGarmentBox(cropUri, cfg);
-    if (!det) { report.reason = 'DINO found no garment'; return { changed: false, imageData: pageImageData, report, steps }; }
+    det = await detectGarmentBox(cropUri, { ...cfg, prompt });
+    if (!det) { report.reason = `DINO found no ${kind}`; return { changed: false, imageData: pageImageData, report, steps }; }
     seg = await segmentGarment(cropUri, det.box, cw, ch);
   } catch (e) {
     report.reason = `segmentation failed: ${e.message}`;
@@ -338,6 +395,7 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
 
 module.exports = {
   fixFigureGarmentColour,
+  garmentPromptFor,
   avatarGarmentLab,
   detectGarmentBox,
   segmentGarment,

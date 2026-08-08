@@ -139,6 +139,36 @@ interface CharacterClothingRequirements {
 
 type ClothingRequirements = Record<string, CharacterClothingRequirements>;
 
+// Garment-colour repair audit (dev panel). Mirrors
+// GET /api/stories/:id/garment-colour/:page — see server/routes/stories.js.
+interface GarmentAuditImage { imageData?: string | null; imageUrl?: string | null }
+interface GarmentAuditOutcome {
+  applied?: boolean;
+  skipped?: string | null;
+  reason?: string | null;
+  dinoScore?: number | null;
+  maskPx?: number | null;
+  maskDilated?: number | null;
+  colourGated?: number | null;
+  lighting?: number | null;
+  lightingSource?: string | null;
+  delta?: { L: number; a: number; b: number; deltaE: number } | null;
+  beforeVersion?: number | null;
+}
+interface GarmentAuditEntry {
+  character: string;
+  garment: string | null;
+  expectedColour: string | null;
+  observedColour: string | null;
+  clothingCategory: string | null;
+  outcome: GarmentAuditOutcome | null;
+}
+interface GarmentAudit {
+  entries: GarmentAuditEntry[];
+  before: GarmentAuditImage | null;
+  after: GarmentAuditImage | null;
+}
+
 interface StoryDisplayProps {
   title: string;
   dedication?: string;
@@ -587,6 +617,28 @@ export function StoryDisplay({
     elementIds: string[];
   }> | null>(null);
   const [refSheetSourcesLoading, setRefSheetSourcesLoading] = useState(false);
+
+  // Garment-colour repair audit (developer panel only). Loaded per page on
+  // demand — the record lives on the stored entityReport, and the pre-repair
+  // bytes are a `garment_before` image, so both survive a container restart.
+  const [garmentAudit, setGarmentAudit] = useState<Record<number, GarmentAudit | 'loading' | 'none'>>({});
+
+  const fetchGarmentAudit = async (pageNumber: number) => {
+    if (!storyId || garmentAudit[pageNumber]) return;
+    setGarmentAudit(prev => ({ ...prev, [pageNumber]: 'loading' }));
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${storyId}/garment-colour/${pageNumber}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (!response.ok) { setGarmentAudit(prev => ({ ...prev, [pageNumber]: 'none' })); return; }
+      const data = await response.json();
+      setGarmentAudit(prev => ({ ...prev, [pageNumber]: (data.entries || []).length ? data : 'none' }));
+    } catch (err) {
+      console.error('Failed to load garment-colour audit:', err);
+      setGarmentAudit(prev => ({ ...prev, [pageNumber]: 'none' }));
+    }
+  };
 
   const fetchReferenceSheetSources = async () => {
     if (!storyId || refSheetSources !== null || refSheetSourcesLoading) return;
@@ -1799,6 +1851,93 @@ export function StoryDisplay({
           </div>
         )}
       </div>
+    );
+  };
+
+  // Garment-colour repair audit — DEV ONLY. Answers "was this page recoloured,
+  // and if not, why not" without stdout, which a container restart erases.
+  const renderGarmentColourAudit = (pageNumber: number) => {
+    if (!developerMode || !storyId || pageNumber < 1) return null;
+    const state = garmentAudit[pageNumber];
+    if (state === 'none') return null;
+    const data = state && state !== 'loading' ? state : null;
+
+    return (
+      <details
+        className="bg-amber-50 border border-amber-300 rounded-lg p-3"
+        onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) fetchGarmentAudit(pageNumber); }}
+      >
+        <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900 flex items-center justify-between">
+          <span>{language === 'de' ? 'Kleidungsfarbe — Audit' : 'Garment colour — audit'}</span>
+          {data && (
+            <span className="text-xs font-normal text-amber-700">
+              {data.entries.filter(e => e.outcome?.applied).length}/{data.entries.length}{' '}
+              {language === 'de' ? 'korrigiert' : 'corrected'}
+            </span>
+          )}
+        </summary>
+
+        {state === 'loading' && <div className="mt-3 text-xs text-gray-500">…</div>}
+
+        {data && (
+          <div className="mt-3 space-y-3">
+            {data.entries.map((e, i) => (
+              <div key={i} className="text-xs bg-white rounded border border-amber-200 p-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-gray-800">{e.character}</span>
+                  <span className="text-gray-500">{e.garment}</span>
+                  <span className="text-gray-700">{e.observedColour} → {e.expectedColour}</span>
+                  <span className={`font-semibold ${e.outcome?.applied ? 'text-green-600' : 'text-gray-500'}`}>
+                    {e.outcome?.applied
+                      ? `${language === 'de' ? 'korrigiert' : 'corrected'}${e.outcome.delta ? ` (ΔE ${e.outcome.delta.deltaE})` : ''}`
+                      : (language === 'de' ? 'nicht korrigiert' : 'not corrected')}
+                  </span>
+                </div>
+                {/* The reason is the point of the audit: a skip must say why. */}
+                {(e.outcome?.skipped || e.outcome?.reason) && (
+                  <div className="mt-1 text-gray-600">{e.outcome.skipped || e.outcome.reason}</div>
+                )}
+                {!e.outcome && (
+                  <div className="mt-1 text-red-600">
+                    {language === 'de'
+                      ? 'Kein Ergebnis gespeichert — der Schritt lief nicht.'
+                      : 'No outcome recorded — the step did not run.'}
+                  </div>
+                )}
+                {e.outcome?.applied && (
+                  <div className="mt-1 text-gray-500 font-mono text-[10px]">
+                    DINO {e.outcome.dinoScore ?? '–'} · {e.outcome.maskPx ?? 0}px
+                    {e.outcome.maskDilated ? ` +${e.outcome.maskDilated}` : ''}
+                    {e.outcome.colourGated ? ` −${e.outcome.colourGated}` : ''}
+                    {e.outcome.lighting != null ? ` · lighting ×${e.outcome.lighting}` : ''}
+                    {e.outcome.lightingSource ? ` (${e.outcome.lightingSource})` : ''}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {(data.before || data.after) && (
+              <div className="grid grid-cols-2 gap-3">
+                {[['before', data.before], ['after', data.after]].map(([label, img]) => {
+                  const src = (img as GarmentAuditImage | null)?.imageData || (img as GarmentAuditImage | null)?.imageUrl;
+                  if (!src) return null;
+                  return (
+                    <div key={label as string} className="flex flex-col items-center">
+                      <img
+                        src={src}
+                        alt={label as string}
+                        className="w-full rounded border border-gray-200 bg-white cursor-pointer hover:opacity-80"
+                        onClick={() => setEnlargedImage({ src, title: `Garment colour — ${label}` })}
+                      />
+                      <span className="text-[10px] text-gray-500 mt-1 uppercase">{label as string}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </details>
     );
   };
 
@@ -5325,6 +5464,7 @@ export function StoryDisplay({
                             {onIteratePage && renderIteratePanel(pageNumber)}
                             {/* Character repair result - full width */}
                             {renderCharRepairResult(pageNumber)}
+                            {renderGarmentColourAudit(pageNumber)}
                             {/* Test Models button */}
                             <button
                               onClick={() => setTestModelsPage(testModelsPage === pageNumber ? null : pageNumber)}
@@ -5909,6 +6049,7 @@ export function StoryDisplay({
                             {onIteratePage && renderIteratePanel(pageNumber)}
                             {/* Character repair result - full width */}
                             {renderCharRepairResult(pageNumber)}
+                            {renderGarmentColourAudit(pageNumber)}
                             {/* Test Models button */}
                             <button
                               onClick={() => setTestModelsPage(testModelsPage === pageNumber ? null : pageNumber)}
