@@ -127,18 +127,19 @@ Then a single-line JSON object:
 
 ### Field rules
 
-**`sceneIntent`** (required): 2-3 present-tense sentences naming the single moment the image depicts. Sentence 1: who does what to whom, where. Sentence 2: what characters hold or reach for; give a gaze target to at most one or two characters, and never have a character face one person while gazing at another. Sentence 3: setting, lighting, mood. Name every character physically present, and list every name here in `characters[]`. One moment only — not cause plus effect.
+**`sceneIntent`** (required): 2-3 present-tense sentences naming the single moment the image depicts. Sentence 1: who does what to whom, where. Sentence 2: what characters hold or reach for; give a gaze target to at most one or two characters, and never have a character face one person while gazing at another. Sentence 3: setting, lighting, mood. Name every character physically present. List the main and primary characters among them in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`. One moment only — not cause plus effect.
 
 **`characters[]`**
-- One entry per character in the scene.
+- One entry per main or primary character in the scene. Secondary characters never appear here.
 - Always `name`, `clothing`, `position`.
-- `clothing` is one of `standard | winter | summer | costumed`, taken from AVAILABLE CLOTHING PER CHARACTER. One costume per character per story; when a character is `costumed`, also describe the costume in the prose.
+- `clothing` is one of `standard | winter | summer | costumed`, taken from AVAILABLE CLOTHING PER CHARACTER. That list covers main and primary characters only — a secondary character never carries a clothing category, because they have no avatar for a category to select. One costume per character per story; when a character is `costumed`, also describe the costume in the prose.
 - `position` is a short phrase matching the prose ("right foreground", "center", "left background", "behind the desk") — the bbox detector reads it structurally.
 - Only add `perspective` for back view or side profile.
 - Only add `depth` when the character is in the background (default is foreground/midground).
 
 **`objects[]`**
-- String array of Visual Bible IDs only (`LOC001`, `ART002.2`).
+- String array of Visual Bible IDs only (`LOC001`, `ART002.2`, `CHR001`).
+- Secondary characters visible in the scene go here by CHR id. Write their full appearance and their COMPLETE outfit into the prose on every page they appear on, copied from their Visual Bible entry. They have no avatar and no consistency check — the prose is the only thing holding them stable.
 - Include every recurring visual element visible in the scene.
 - Real-landmark LOCs use the dotted vantage form (`LOC003.2`). Pick the variant matching the scene's perspective; default to `.1` if unsure.
 - Invented LOCs (`isRealLandmark: false`) use the bare id `LOC001` — no dotted form, they have no vantages.
