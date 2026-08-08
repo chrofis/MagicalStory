@@ -930,6 +930,19 @@ export interface TokenUsage {
   output_tokens: number;
 }
 
+/**
+ * Per-page before/after produced by a review stage that rewrites pages.
+ * Shared shape so the dev-mode diff panels (beats review, scene review, text
+ * refine) render from one contract instead of three near-copies.
+ */
+export interface ReviewDiffReport {
+  model?: string | null;
+  durationMs?: number;
+  changedPages?: number[];
+  analysis?: string;
+  pages?: { pageNumber: number; before: string; after: string }[];
+}
+
 export interface SavedStory {
   id: string;
   title: string;
@@ -965,6 +978,10 @@ export interface SavedStory {
   tokenUsage?: Record<string, unknown> | null;
   /** Per-page before/after from the parallel text-refine pass (dev mode diff). */
   textRefineReport?: { rounds?: number; changedPages?: number[]; durationMs?: number; model?: string | null; pages?: { pageNumber: number; before: string; after: string }[] } | null;
+  /** Per-page before/after from the beats review (beats pipeline, dev-mode diff). */
+  beatsReviewReport?: ReviewDiffReport | null;
+  /** Per-page before/after from the scene review (beats pipeline, dev-mode diff). */
+  sceneReviewReport?: ReviewDiffReport | null;
   story?: string;
   originalStory?: string;  // Original AI-generated story text (preserved on first edit)
   storyTextPrompts?: Array<{

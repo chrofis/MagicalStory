@@ -141,9 +141,12 @@ function mergeByPage(base, fixes, apply) {
  *   generation (the long pole in front of every image) while scene expansion and
  *   page text are still running. Same callback the unified stream's progressive
  *   parser fires; it must be non-blocking and own its own error handling.
- * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta}>}
+ * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, sceneReviewReport}>}
  *   pages[]  mirrors UnifiedStoryParser.extractPages() output consumed by server.js
  *   scenes[] mirrors the resolved value of startSceneExpansion() (expandedScenes)
+ *   *ReviewReport  {model, durationMs, changedPages[], analysis, pages:[{pageNumber,before,after}]},
+ *                  the same shape as textRefineReport so the dev-mode diff panels
+ *                  render all three review stages identically. null = stage never ran.
  */
 async function generateStoryViaBeats(inputData, opts = {}) {
   const {
@@ -190,6 +193,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   await checkCancellation();
   let beats = plan.pages;
   let beatsReviewAnalysis = '';
+  // Before/after for every page the reviewer rewrote, same shape as
+  // textRefineReport. Without it two of the three review stages are
+  // unmeasurable: the log says "3 pages rewritten" and nothing says WHAT.
+  // Stays null only when the review never ran (missing template or a throw).
+  let beatsReviewReport = null;
   const reviewPrompt = buildBeatsReviewPrompt(inputData, plan.pages);
   if (!reviewPrompt) {
     log.warn('⚠️ [BEATS] story-beats-review template unavailable — beats shipped unreviewed');
@@ -200,13 +208,30 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       const revRes = await textModels.callTextModelStreaming(reviewPrompt, 12000, onChunk, reviewModel, { usageLabel: 'beats_review' });
       const parsed = parseBeats(revRes.text || '', []);
       beatsReviewAnalysis = parsed.analysis || '';
-      const { merged, changed, stray } = mergeByPage(plan.pages, parsed.pages, (p, fix) => ({
-        ...p,
-        beat: fix.beat || p.beat,
-        scene: fix.scene || p.scene,
-      }));
+      // The apply callback is the ONLY point where both the planned and the
+      // rewritten beat exist — capture the pair here or it is gone.
+      const rewrites = [];
+      const { merged, changed, stray } = mergeByPage(plan.pages, parsed.pages, (p, fix) => {
+        const next = { ...p, beat: fix.beat || p.beat, scene: fix.scene || p.scene };
+        rewrites.push({
+          pageNumber: p.pageNumber,
+          before: `BEAT: ${p.beat}\nSCENE: ${p.scene}`,
+          after: `BEAT: ${next.beat}\nSCENE: ${next.scene}`,
+        });
+        return next;
+      });
       beats = merged;
       meta.timings.beatsReviewMs = Date.now() - t;
+      // changedPages counts only pages whose text actually moved — a reviewer
+      // that echoes a page unchanged is not a rewrite.
+      const beatsDiffs = rewrites.filter(r => r.before !== r.after);
+      beatsReviewReport = {
+        model: revRes.modelId || reviewModel,
+        durationMs: meta.timings.beatsReviewMs,
+        changedPages: beatsDiffs.map(r => r.pageNumber),
+        analysis: beatsReviewAnalysis,
+        pages: beatsDiffs,
+      };
       if (stray.length > 0) log.warn(`⚠️ [BEATS] Review returned page(s) ${stray.join(', ')} that are not in the plan — ignored`);
       gl.info('beats_review', `Beat review by ${revRes.modelId || reviewModel}: ${changed.length} page(s) rewritten (${(meta.timings.beatsReviewMs / 1000).toFixed(1)}s)`, null, {
         changedPages: changed, model: revRes.modelId || reviewModel,
@@ -397,6 +422,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // ── Step 4: ONE review over ALL scene briefs ──────────────────────────────
   await checkCancellation();
   let sceneReviewAnalysis = '';
+  // Same contract as beatsReviewReport above: null only when the review never
+  // ran; an object with empty pages[] when it ran and rewrote nothing.
+  let sceneReviewReport = null;
   const srPrompt = buildSceneReviewPrompt(inputData, expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })));
   if (!srPrompt) {
     log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
@@ -409,15 +437,25 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       sceneReviewAnalysis = parsed.analysis || '';
       const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
       const changed = [];
+      // Captured at the overwrite, the only moment both briefs exist.
+      const sceneDiffs = [];
       for (const x of expansions) {
         const fixed = byPage.get(x.pageNumber);
         if (fixed && fixed.trim()) {
+          if (fixed !== x.brief) sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed });
           x.brief = fixed;
           x.reviewRewrote = true;
           changed.push(x.pageNumber);
         }
       }
       meta.timings.sceneReviewMs = Date.now() - t;
+      sceneReviewReport = {
+        model: srRes.modelId || reviewModel,
+        durationMs: meta.timings.sceneReviewMs,
+        changedPages: sceneDiffs.map(d => d.pageNumber),
+        analysis: sceneReviewAnalysis,
+        pages: sceneDiffs,
+      };
       gl.info('beats_scene_review', `Scene review by ${srRes.modelId || reviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
         changedPages: changed, model: srRes.modelId || reviewModel,
       });
@@ -555,7 +593,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   meta.textModelId = textModelId;
   log.info(`🪜 [BEATS] job=${jobId} done: ${pages.length} pages in ${(meta.totalMs / 1000).toFixed(1)}s`);
 
-  return { title, beats, pages, scenes, rawOutline, meta };
+  return { title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, sceneReviewReport };
 }
 
 module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES };

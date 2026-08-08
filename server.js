@@ -5336,6 +5336,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Per-page before/after, filled at the join so dev mode can show WHAT the
     // refiner changed rather than only that it ran.
     let textRefineReport = null;
+    // The other two review stages' before/after (beats mode only). Same shape,
+    // captured inside generateStoryViaBeats at each rewrite; null on the
+    // unified path, which has no beats or scene review.
+    const beatsReviewReport = beatsResult?.beatsReviewReport || null;
+    const sceneReviewReport = beatsResult?.sceneReviewReport || null;
     if (refineEnabled) {
       const { extractRefinablePages, startBackgroundRefine } = require('./server/lib/textRefine');
       const refinablePages = extractRefinablePages(expandedScenes);
@@ -7299,6 +7304,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       tokenUsage: JSON.parse(JSON.stringify(tokenUsage, (k, v) => v instanceof Set ? [...v] : v)), // Token usage (Sets to Arrays)
       generationLog: genLog.getEntries(), // Generation log for dev mode
       textRefineReport, // per-page before/after from the parallel refine pass
+      beatsReviewReport, // per-page before/after from the beats review (beats mode)
+      sceneReviewReport, // per-page before/after from the scene review (beats mode)
       finalChecksReport: finalChecksReport || null, // Final consistency checks report (dev mode)
       analytics: {
         // Cost

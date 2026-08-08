@@ -131,6 +131,8 @@ interface StoryDetailsServer {
   outlineReview?: SavedStory['outlineReview'];
   tokenUsage?: SavedStory['tokenUsage'];
   textRefineReport?: SavedStory['textRefineReport'];
+  beatsReviewReport?: SavedStory['beatsReviewReport'];
+  sceneReviewReport?: SavedStory['sceneReviewReport'];
   id: string;
   title: string;
   storyType: string;
@@ -402,6 +404,10 @@ export const storyService = {
       outlineReview: s.outlineReview,
       tokenUsage: s.tokenUsage,
       textRefineReport: s.textRefineReport,
+      // The other two review stages' before/after (beats pipeline). Same
+      // whitelist rule: omitted here = silently dropped before the UI.
+      beatsReviewReport: s.beatsReviewReport,
+      sceneReviewReport: s.sceneReviewReport,
       story: storyContent,
       storyTextPrompts: s.storyTextPrompts,
       visualBible: s.visualBible,

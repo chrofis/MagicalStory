@@ -3,7 +3,7 @@ import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Sav
 import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
 import { wordDiff, diffStats } from '@/utils/wordDiff';
-import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection } from '@/types/story';
+import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection, ReviewDiffReport } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
 import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
@@ -152,6 +152,10 @@ interface StoryDisplayProps {
   outlineReview?: { model?: string; modelId?: string; durationMs?: number; fixCount?: number; reviewChars?: number; hintCount?: number; reviewedAt?: string } | null;
   /** Per-page before/after from the parallel text-refine pass (dev mode). */
   textRefineReport?: { rounds?: number; changedPages?: number[]; durationMs?: number; model?: string | null; pages?: { pageNumber: number; before: string; after: string }[] } | null;
+  /** Per-page before/after from the beats review (beats pipeline, dev mode). */
+  beatsReviewReport?: ReviewDiffReport | null;
+  /** Per-page before/after from the scene review (beats pipeline, dev mode). */
+  sceneReviewReport?: ReviewDiffReport | null;
   /** Per-function model/token/cost/time ledger (tokenUsage.byFunction). */
   tokenUsage?: { byFunction?: Record<string, { models?: string[]; provider?: string | null; calls?: number; input_tokens?: number; output_tokens?: number; thinking_tokens?: number; direct_cost?: number; elapsed_ms?: number }> } | null;
   storyTextPrompts?: StoryTextPrompt[];
@@ -321,6 +325,8 @@ export function StoryDisplay({
   outlineReview,
   tokenUsage,
   textRefineReport,
+  beatsReviewReport,
+  sceneReviewReport,
   storyTextPrompts = [],
   visualBible,
   sceneImages,
@@ -2402,57 +2408,132 @@ export function StoryDisplay({
               APPENDED at the bottom of the outline blob, so without this
               dedicated panel it's practically invisible. Extract it here:
               the reviewer's ---ANALYSIS--- is the LAST one, after the stub. */}
-          {/* Text refine diff — WHAT the reviewer changed, not just that it ran.
-              Word-level so a one-word swap doesn't read as a rewritten page. */}
+          {/* Review diffs — WHAT each review stage changed, not just that it ran.
+              Word-level so a one-word swap doesn't read as a rewritten page.
+              All three stages in pipeline order (beats review → scene review →
+              text refine) through ONE renderer: only the colour and the label
+              differ, so the panels stay comparable at a glance. Each review's
+              ---ANALYSIS--- rides along in a collapsed sub-block — that is where
+              the findings that justify a rewrite live. */}
           {(() => {
-            const rep = textRefineReport;
-            const pages = rep?.pages || [];
-            if (!pages.length) return null;
-            return (
-              <details className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4" open>
-                <summary className="cursor-pointer text-lg font-bold text-amber-800 hover:text-amber-900 flex items-center gap-2 flex-wrap">
-                  <FileText size={20} />
-                  {language === 'de' ? 'Text-Überarbeitung (Diff)' : language === 'fr' ? 'Révision du texte (diff)' : 'Text refine (diff)'}
-                  <span className="text-xs font-normal text-amber-600">
-                    [{pages.length} {language === 'de' ? 'Seiten geändert' : 'pages changed'}
-                    {rep?.model && ` · ${rep.model}`}
-                    {rep?.rounds != null && ` · ${rep.rounds} ${language === 'de' ? 'Runden' : 'rounds'}`}
-                    {rep?.durationMs != null && ` · ${(rep.durationMs / 1000).toFixed(0)}s`}]
-                  </span>
-                </summary>
-                <div className="mt-3 space-y-3">
-                  {pages.map(pg => {
-                    const ops = wordDiff(pg.before, pg.after);
-                    const { added, removed } = diffStats(ops);
-                    return (
-                      <div key={pg.pageNumber} className="bg-white border border-amber-200 rounded-lg p-3">
-                        <div className="text-xs font-bold text-amber-800 mb-1">
-                          {language === 'de' ? 'Seite' : 'Page'} {pg.pageNumber}
-                          <span className="font-normal text-gray-500">
-                            {' '}· <span className="text-green-700">+{added}</span>{' '}
-                            <span className="text-red-700">−{removed}</span>{' '}
-                            {language === 'de' ? 'Wörter' : 'words'}
-                          </span>
-                        </div>
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                          {ops.map((op, i) => (
-                            <span
-                              key={i}
-                              className={
-                                op.type === 'add' ? 'bg-green-100 text-green-900'
-                                  : op.type === 'del' ? 'bg-red-100 text-red-900 line-through'
-                                    : 'text-gray-700'
-                              }
-                            >
-                              {op.text}
+            // Full class strings, not composed — Tailwind only ships classes it
+            // can find literally in the source.
+            const TONES = {
+              sky: {
+                box: 'bg-sky-50 border-2 border-sky-300 rounded-xl p-4',
+                head: 'cursor-pointer text-lg font-bold text-sky-800 hover:text-sky-900 flex items-center gap-2 flex-wrap',
+                meta: 'text-xs font-normal text-sky-600',
+                card: 'bg-white border border-sky-200 rounded-lg p-3',
+                label: 'text-xs font-bold text-sky-800 mb-1',
+                sub: 'cursor-pointer text-xs font-bold text-sky-700 hover:text-sky-900',
+              },
+              violet: {
+                box: 'bg-violet-50 border-2 border-violet-300 rounded-xl p-4',
+                head: 'cursor-pointer text-lg font-bold text-violet-800 hover:text-violet-900 flex items-center gap-2 flex-wrap',
+                meta: 'text-xs font-normal text-violet-600',
+                card: 'bg-white border border-violet-200 rounded-lg p-3',
+                label: 'text-xs font-bold text-violet-800 mb-1',
+                sub: 'cursor-pointer text-xs font-bold text-violet-700 hover:text-violet-900',
+              },
+              amber: {
+                box: 'bg-amber-50 border-2 border-amber-300 rounded-xl p-4',
+                head: 'cursor-pointer text-lg font-bold text-amber-800 hover:text-amber-900 flex items-center gap-2 flex-wrap',
+                meta: 'text-xs font-normal text-amber-600',
+                card: 'bg-white border border-amber-200 rounded-lg p-3',
+                label: 'text-xs font-bold text-amber-800 mb-1',
+                sub: 'cursor-pointer text-xs font-bold text-amber-700 hover:text-amber-900',
+              },
+            } as const;
+
+            const renderDiffPanel = (
+              rep: (ReviewDiffReport & { rounds?: number }) | null | undefined,
+              panelKey: string,
+              title: string,
+              tone: keyof typeof TONES,
+            ) => {
+              const pages = rep?.pages || [];
+              const analysis = (rep?.analysis || '').trim();
+              // A stage that ran and rewrote nothing still has findings worth
+              // reading, so analysis alone is enough to render the panel.
+              if (!pages.length && !analysis) return null;
+              const c = TONES[tone];
+              return (
+                <details key={panelKey} className={c.box} open={pages.length > 0}>
+                  <summary className={c.head}>
+                    <FileText size={20} />
+                    {title}
+                    <span className={c.meta}>
+                      [{pages.length} {language === 'de' ? 'Seiten geändert' : 'pages changed'}
+                      {rep?.model && ` · ${rep.model}`}
+                      {rep?.rounds != null && ` · ${rep.rounds} ${language === 'de' ? 'Runden' : 'rounds'}`}
+                      {rep?.durationMs != null && ` · ${(rep.durationMs / 1000).toFixed(0)}s`}]
+                    </span>
+                  </summary>
+                  {analysis && (
+                    <details className="mt-3 bg-white/70 border border-gray-200 rounded-lg p-2">
+                      <summary className={c.sub}>
+                        {language === 'de' ? 'Analyse' : language === 'fr' ? 'Analyse' : 'Analysis'}
+                      </summary>
+                      <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{analysis}</pre>
+                    </details>
+                  )}
+                  <div className="mt-3 space-y-3">
+                    {pages.map(pg => {
+                      const ops = wordDiff(pg.before, pg.after);
+                      const { added, removed } = diffStats(ops);
+                      return (
+                        <div key={pg.pageNumber} className={c.card}>
+                          <div className={c.label}>
+                            {language === 'de' ? 'Seite' : 'Page'} {pg.pageNumber}
+                            <span className="font-normal text-gray-500">
+                              {' '}· <span className="text-green-700">+{added}</span>{' '}
+                              <span className="text-red-700">−{removed}</span>{' '}
+                              {language === 'de' ? 'Wörter' : 'words'}
                             </span>
-                          ))}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </details>
+                          </div>
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                            {ops.map((op, i) => (
+                              <span
+                                key={i}
+                                className={
+                                  op.type === 'add' ? 'bg-green-100 text-green-900'
+                                    : op.type === 'del' ? 'bg-red-100 text-red-900 line-through'
+                                      : 'text-gray-700'
+                                }
+                              >
+                                {op.text}
+                              </span>
+                            ))}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
+              );
+            };
+
+            return (
+              <>
+                {renderDiffPanel(
+                  beatsReviewReport,
+                  'beats-review',
+                  language === 'de' ? 'Beats-Review (Diff)' : language === 'fr' ? 'Revue des beats (diff)' : 'Beats review (diff)',
+                  'sky',
+                )}
+                {renderDiffPanel(
+                  sceneReviewReport,
+                  'scene-review',
+                  language === 'de' ? 'Szenen-Review (Diff)' : language === 'fr' ? 'Revue des scènes (diff)' : 'Scene review (diff)',
+                  'violet',
+                )}
+                {renderDiffPanel(
+                  textRefineReport,
+                  'text-refine',
+                  language === 'de' ? 'Text-Überarbeitung (Diff)' : language === 'fr' ? 'Révision du texte (diff)' : 'Text refine (diff)',
+                  'amber',
+                )}
+              </>
             );
           })()}
 
