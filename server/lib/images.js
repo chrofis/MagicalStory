@@ -1838,9 +1838,21 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.debug(`📊 [EVAL] Response is not JSON, trying legacy format`);
     }
 
-    if (parsedJson && typeof parsedJson.score === 'number') {
-      // Full JSON format with 0-10 scale and detailed analysis
-      // parsedJson.score is deliberately NOT read — the prompts no longer emit one.
+    // Gate on the DEFECT REPORT, not on a score. The prompts stopped emitting
+    // `score` (b9658b501: "the prompts report defects; the score is the defects")
+    // but this condition still required it, so every well-formed evaluation fell
+    // through to the legacy regex fallbacks, matched none of them, and returned
+    // null — which left the three-stage compliance call waiting forever on
+    // figures[]/matches[] that never arrived. Recognise the response by the
+    // fields the prompt actually produces.
+    const isDefectReport = parsedJson && typeof parsedJson === 'object' && (
+      Array.isArray(parsedJson.fixable_issues) || Array.isArray(parsedJson.figures)
+      || parsedJson.coherence_gate || typeof parsedJson.verdict === 'string'
+      || typeof parsedJson.score === 'number'
+    );
+    if (isDefectReport) {
+      // The score below is DERIVED from the defect list; parsedJson.score is
+      // deliberately not read even when a stale prompt still emits one.
       const verdict = parsedJson.verdict || parsedJson.final_verdict || 'UNKNOWN';
       // Support both old 'issues' and new 'issues_summary' field
       // Handle case where issues might be an array (convert to string)
@@ -2306,7 +2318,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       return mergeSemanticResult(numericScore, responseText);
     }
 
-    log.warn(`⚠️  [QUALITY] Could not parse score from response (finishReason=${finishReason}, ${responseText.length} chars):`, responseText.substring(0, 200));
+    log.warn(`⚠️  [QUALITY] Response is neither a defect report nor a legacy score (finishReason=${finishReason}, ${responseText.length} chars):`, responseText.substring(0, 200));
     // Await parallel promises to prevent memory leak
     if (p1Promise) await p1Promise.catch(() => {});
     if (semanticPromise) await semanticPromise.catch(() => {});
