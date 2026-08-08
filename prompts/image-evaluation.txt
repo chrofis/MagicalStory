@@ -10,6 +10,7 @@ Report only defects a reader would notice. Rule codes (N-xx, D-xx) exist so a fi
 5. SCENE INTENT: {SCENE_INTENT}
 6. ART STYLE (the commissioned medium — empty if not supplied): {ART_STYLE}
 7. EXPECTED FIGURE PROPORTIONS: {FIGURE_PROPORTIONS}
+8. CLOTHING CONTRACT (the outfit each character wears on this page — empty if not supplied): {CLOTHING_CONTRACT}
 
 ---
 
@@ -32,6 +33,7 @@ Check every candidate finding against this list BEFORE reporting it. These are n
 - **N-13 Manga monochrome.** If the style is manga AND the render is predominantly monochrome, skip all colour deductions (no `type: color`). Garment TYPE and hair LENGTH still apply.
 - **N-14 Small in-world signage.** A shop sign, book spine or background poster is acceptable. The story-text overlay is composited later and is not in this image.
 - **N-15 Clothing category names.** Compare a garment to the outfit DESCRIPTION in the prompt, never to a category label. "standard", "summer", "winter" are metadata keys, not looks — never report an outfit as "non-standard" or as not matching "standard clothing".
+- **N-16 Clothing contract.** CLOTHING CONTRACT is the only description of what a character wears on this page. Judge every clothing finding against it, never against what the story's theme suggests an outfit should be — a pirate story does not owe you striped trousers and a waistcoat. When the USER_PROMPT and the contract disagree, the contract wins. When the block is empty you have no contract: report no clothing finding at all except D-05a, because an invented contract flags correct wardrobes as wrong.
 
 Everything not listed in section C is stylistic flavour — descriptive intent for the generator, not a contract. Never deduct for it.
 

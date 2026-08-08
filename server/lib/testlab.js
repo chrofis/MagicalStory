@@ -312,21 +312,28 @@ async function saveTestVersion(storyId, imageType, pageNumber, imageData, experi
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * Scene description for quality/semantic eval — production NEVER calls
- * evaluateImageQuality with the raw description: its batch path prepends the
- * CHARACTER CLOTHING REFERENCE block first (otherwise the evaluator flags
- * canonical outfits as off-spec and lab scores run systematically harsher
- * than production, skewing every A/B). Same header, same helper.
+ * Scene description for quality/semantic eval. The clothing facts no longer
+ * ride in this string: evaluateImageQuality builds the CLOTHING CONTRACT input
+ * itself, from the reference photos it is handed (2026-08-08). Production and
+ * the Lab therefore share one mechanism again — prepending the old header here
+ * would state the outfit twice in the Lab and once in production, which is the
+ * systematic score skew this helper was written to prevent.
+ *
+ * The Lab's job is to pass the same photos production does; when its own
+ * referencePhotos carry no clothing, fall back to the expected characters so
+ * the contract is still populated.
  */
 function evalSceneDescription(ctx) {
-  const { buildEvalClothingHeader } = require('./images');
-  let photos = (ctx.referencePhotos || []).filter(p => p?.name && p?.clothingDescription);
-  if (photos.length === 0) {
-    photos = buildExpectedCharacters(ctx)
-      .filter(c => c.clothing)
-      .map(c => ({ name: c.name, clothingDescription: c.clothing }));
-  }
-  return `${buildEvalClothingHeader(photos)}${ctx.scene.sceneDescription || ''}`;
+  return `${ctx.scene.sceneDescription || ''}`;
+}
+
+/** Reference photos for eval, guaranteed to carry clothingDescription. */
+function evalReferencePhotos(ctx) {
+  const photos = (ctx.referencePhotos || []).filter(p => p?.name && p?.clothingDescription);
+  if (photos.length > 0) return photos;
+  return buildExpectedCharacters(ctx)
+    .filter(c => c.clothing)
+    .map(c => ({ name: c.name, clothingDescription: c.clothing }));
 }
 
 async function runImageStage(ctx, { promptOverride, experimentId, autoEval = true, params = {} }) {
@@ -440,7 +447,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     try {
       const { evaluateImageQuality } = require('./images');
       const evalRes = await evaluateImageQuality(
-        result.imageData, evalSceneDescription(ctx), ctx.referencePhotos, 'scene',
+        result.imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), 'scene',
         null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
         ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null
       );
@@ -539,7 +546,7 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
   const t0 = Date.now();
   const result = await evaluateImageQuality(
-    imageData, evalSceneDescription(ctx), ctx.referencePhotos, 'scene',
+    imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), 'scene',
     null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
     ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
     {

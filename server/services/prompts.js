@@ -336,6 +336,10 @@ function buildEvaluationPrompt(opts = {}) {
     ORIGINAL_PROMPT: opts.originalPrompt || '',
     INTERACTIONS_BLOCK: opts.interactionsBlock || '',
     SCENE_INTENT: opts.sceneIntent || '',
+    // Empty when the caller could not resolve the per-page outfit — the
+    // template then tells the model to skip clothing judgments entirely
+    // rather than invent a contract from the theme.
+    CLOTHING_CONTRACT: opts.clothingContract || '',
     FIGURE_PROPORTIONS: opts.figureProportions || '',
     // Empty when the caller has no prompt to read a style from — the template
     // then tells the model to skip the style rule and judge normally.

@@ -1471,6 +1471,48 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }
     } catch { /* silent — evaluator tolerates empty block */ }
 
+    // CLOTHING CONTRACT (owner, 2026-08-08). The evaluator used to infer the
+    // outfit from ORIGINAL_PROMPT alone. When the prompt carried no clothing —
+    // job_1786193650012_7baiaeftb page 11 v2 had none at all, not even the word
+    // "wears" — it invented one from the story's theme ("a full pirate costume
+    // including red-and-white striped trousers and a black waistcoat") and
+    // flagged the CORRECT wardrobe as wrong, four times, sinking the one
+    // properly-dressed version of that page. Pass the resolved per-page outfit
+    // as its own input so the judge compares against the contract, not against
+    // its prior of what a pirate looks like. Empty when unknown — the template
+    // then tells it not to judge clothing at all, which is the honest default.
+    // Two sources, one block. The reference photos already carry the resolved
+    // per-page outfit (`clothingDescription`, set by the prompt builder) and
+    // that is what every call site has in scope; evalOptions.clothingRequirements
+    // is the explicit override for callers that resolved it themselves. Built
+    // HERE rather than at each call site so all of them are covered without
+    // threading a new argument through callGeminiAPIForImage's 17 parameters.
+    let clothingContractBlock = '';
+    try {
+      const lines = [];
+      const reqs = evalOptions.clothingRequirements || null;
+      if (reqs) {
+        const { buildClothingDescription } = require('./entityConsistency');
+        for (const c of (sceneCharacters || [])) {
+          if (!c?.name) continue;
+          const category = reqs[c.name]?._currentClothing;
+          if (!category) continue;
+          const outfit = buildClothingDescription(c, category, artStyleForEval, reqs);
+          if (outfit && String(outfit).trim()) lines.push(`- ${c.name}: ${String(outfit).trim()}`);
+        }
+      }
+      if (lines.length === 0) {
+        for (const p of (referenceImages || [])) {
+          if (p?.name && p?.clothingDescription) lines.push(`- ${p.name}: ${String(p.clothingDescription).trim()}`);
+        }
+      }
+      clothingContractBlock = lines.join('\n');
+      if (!clothingContractBlock && evaluationType === 'scene') {
+        // Loud, because an empty contract is what let the judge invent one.
+        log.warn(`👕 [EVAL] ${pageContext || 'page'}: no clothing contract available — clothing findings suppressed (N-16)`);
+      }
+    } catch (err) { log.debug(`[EVAL] clothing contract block skipped: ${err.message}`); }
+
     const { buildEvaluationPrompt } = require('../services/prompts');
     const evaluationPrompt = evaluationTemplate
       ? buildEvaluationPrompt({
@@ -1479,6 +1521,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           interactionsBlock,
           figureProportions: figureProportionsBlock,
           sceneIntent: sceneIntentBlock,
+          clothingContract: clothingContractBlock,
           template: evalOptions.evalTemplateOverride || undefined,
         })
       : 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
@@ -1654,6 +1697,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             interactionsBlock,
             figureProportions: figureProportionsBlock,
             sceneIntent: sceneIntentBlock,
+            clothingContract: clothingContractBlock,
             template: evalOptions.evalTemplateOverride || undefined,
           })
         : evaluationPrompt;
@@ -6261,24 +6305,6 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
 //    inpaints, picks best versions, and runs character repair on entity issues
 // =============================================================================
 
-/**
- * CHARACTER CLOTHING REFERENCE block for quality/semantic eval prompts, built
- * from the canonical per-page clothing description (resolved by the pipeline
- * against the outline's clothingRequirements[char][category].description).
- * Without this the eval doesn't know what each character's "standard" outfit
- * actually IS — it sees a butterfly graphic on Emma's shirt, doesn't know the
- * butterfly is canonical, and flags it MAJOR as an off-spec addition. Every
- * caller of evaluateImageQuality must prepend this to the scene description
- * (the batch path below does; the Test Lab eval stages call it too).
- */
-function buildEvalClothingHeader(photos) {
-  const lines = (photos || [])
-    .filter(p => p?.name && p?.clothingDescription)
-    .map(p => `- ${p.name}: ${p.clothingDescription}`);
-  return lines.length > 0
-    ? `CHARACTER CLOTHING REFERENCE (the canonical outfit each character is wearing — treat anything matching this as correct, NOT as an off-spec addition):\n${lines.join('\n')}\n\n`
-    : '';
-}
 
 /**
  * Evaluate multiple images in parallel for quality and issues
@@ -6333,7 +6359,10 @@ async function evaluateImageBatch(images, options = {}) {
         };
       }
 
-      const sceneDescWithClothing = `${buildEvalClothingHeader(img.allCharacterPhotos || img.characterPhotos || [])}${img.sceneDescription || img.prompt || ''}`;
+      // The clothing facts now travel as the CLOTHING CONTRACT input, built
+      // inside evaluateImageQuality from these same photos — prepending them to
+      // the prompt as well would state the outfit twice.
+      const sceneDescWithClothing = `${img.sceneDescription || img.prompt || ''}`;
 
       // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
       // Use img.evaluationType if set (covers use 'cover' for text-focused eval)
@@ -15232,7 +15261,6 @@ module.exports = {
   REPAIR_SHARPNESS_MIN_ORIG,
   REPAIR_SHARPNESS_REJECT_RATIO,
   closestGrokAspect,
-  buildEvalClothingHeader,
   buildPageCompositeRefs,
   detectSubRegion,  // Sub-region detection for targeted repairs (shoes, shirt, hands, etc.)
   createBboxOverlayImage,  // Create overlay image with boxes drawn
