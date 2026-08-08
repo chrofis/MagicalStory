@@ -1,6 +1,11 @@
 # Getting the cover title INTO the artwork — model landscape + our architecture
 
-**Date:** 2026-08-05 · **Status:** Test Lab stage `cover_title_paintin` built, not yet run
+**Date:** 2026-08-05, superseded 2026-08-07 · **Status:** SHIPPED TO STAGING as the PLATE pass
+(`server/lib/coverTitlePaint.js`), 4/4 on the benchmark set.
+
+> ⚠️ **Sections 3–5 below describe the ORIGINAL crop-and-extract design, which FAILED and was
+> abandoned.** They are kept because the failures are the argument for the final design. The
+> architecture that shipped is at the bottom: **"Final architecture — the plate pass"**.
 **Trigger:** the flat title overlay reads as "pasted on"; asking Grok to draw the title garbles letters,
 and retry-plus-eval can't be trusted to catch a single wrong character.
 
@@ -166,3 +171,64 @@ composite served, as production would). Zero changed pixels below the letters �
   cover the picker chose `#678c0d` — a green title on green foliage. It maximises WCAG contrast
   against a sampled background box but is blind to composition. That is the next thing to fix, and it
   needs no model at all.
+
+
+---
+
+# Final architecture — the plate pass (2026-08-07)
+
+## The turn
+
+Sixteen runs tried to restyle the title ON the cover and then cut the letters back out: diff mask →
+solved alpha (known-background matting) → SAM → SAM ∪ glyphs → SAM-seeded colour selection →
+colour + connected components + morphological opening. **Every one traded a missed letter pixel for
+an admitted background pixel.** On a re-rendered frame "letter or artwork" has no clean answer when
+the pigment and the scene share a palette — a green title on green foliage is unsolvable by any
+threshold. Owner ended it: *"pass the image and the text as 2 inputs and say redraw the text so it
+fits on the scene"*. That does not solve the separation problem — it removes it.
+
+## What ships
+
+1. `composeCover` renders the title from a real TTF (spelling correct by construction).
+2. Glyph mask = composed − textless plate. `toColourspace('b-w')` + a length assert.
+3. The title alone on a **WHITE 16:9 canvas**; the canvas is grown to contain the strip, never cropped.
+4. `editWithGrok` directly: plate = input 1, artwork (1024px) = input 2 as a **style reference only**.
+5. Key on **inkiness** (dark OR saturated) → any paper the model invents drops out.
+6. Fill enclosed specks < 0.04% of plate area (counters are far larger and stay open).
+7. Composite onto the untouched textless plate.
+8. **One final eval**: expected TEXT + image → "do these match?" (verification, not transcription).
+   Any failure keeps the flat lockup. coverage/spill are diagnostics.
+
+## Run log
+
+| Exp | Change | Result |
+|---|---|---|
+| #311 | crop 0.12 + full-cover context ref | unusable — **3 own-goal bugs**: wrong textless plate (double title), context ref → composition, 3-channel mask → comb striping |
+| #313 | plate guard added | 4/4 loud errors — correctly refused to double-stamp |
+| #316 | real plate, single ref | OCR 4/4, alignment 1/4 — still striped |
+| #318 | mask channel fixed | OCR 4/4, alignment 3/4, zero changed px below the letters |
+| #322 | aggressive restyle prompt | real impasto — **the prompt was the limiter**, not the model |
+| #323 / #324 | Grok / Gemini backends | **Grok ✅ true watercolour**; Gemini ❌ washed out, degraded letters; Qwen 🟡 plastic |
+| #328 | full frame + find-the-letters | clean on 3, but the found mask contained tree trunks |
+| #340 | SAM detection | tree-free mask, but **dropped whole letters** (LINDENB…) |
+| #342 | SAM ∪ drawn glyphs | 4/4 — but reinstates the OLD letterform as a floor (owner rejected) |
+| #343–#353 | colour selection, components, opening, SAM-free pigment seed | letterforms good, still both false-neg and false-pos |
+| #356 | **plate mode**, cyan key | gorgeous lettering, but the model repainted the background and re-framed |
+| #359 | white **square** plate | clean extraction; long title **re-flowed 2 lines → 5** |
+| #383 | white **16:9** plate + line count pinned | **4/4**, coverage 0.75–0.92, spill ≤0.01 |
+
+## Verdicts
+
+- ✅ **Grok** for the lettering; the medium is right and the letterforms hold.
+- ❌ Never `editImageWithPrompt` for this — empty template → 400 → silent Gemini fallback.
+- ❌ Never a square plate — the empty space invites re-flow.
+- ❌ Never let a model spell the title: 2026 SOTA is ~90–95% on short copy and worst on ä/ö/ü/é.
+- 🟡 Grok still varies run to run on long titles; the eval catches it and nothing is charged. No
+  automatic retry (owner's call).
+
+## Still open
+
+- Not verified inside a full generation (only via the Lab and the repaint endpoint).
+- No restamp route for the back cover, so branding cannot be repaired without regenerating.
+- The cover prompt asks for a naturalistic lighting phrase AND the cyber style at once, so the
+  evaluator penalises style elements as a setting mismatch — a prompt conflict, not an eval gap.

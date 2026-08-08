@@ -6356,3 +6356,107 @@ over ≥2 runs per arm.
 
 **Touched:** `prompts/variants/image-evaluation-lean-v2.txt` (new), `server/lib/evalBuckets.js`,
 `server/lib/images.js`, `server/lib/testlab.js`, `scripts/admin/seed-eval-findings.js`.
+
+## 2026-08-07 — Painted cover title: the PLATE pass (supersedes the 2026-08-05 paint-in entry)
+
+**Context:** The flat app-side title reads as a graphic pasted on the art. Sixteen Test Lab runs
+(#311–#383) tried to restyle the title ON the cover and then separate the letters back out — diff
+masks, solved alpha, SAM, colour selection with connected components, morphological opening. Every
+variant traded a missed letter pixel for an admitted background pixel, because on a re-rendered
+frame "letter or artwork" has no clean answer when pigment and scene share a palette (green title,
+green forest). Owner's call ended it: *"pass the image and the text as 2 inputs and say redraw the
+text so it fits on the scene"*.
+
+**Decision:** the model NEVER sees the cover it is editing.
+1. `composeCover` renders the title from a real TTF → spelling correct by construction.
+2. Glyph mask = composed − textless plate (`toColourspace('b-w')`, hard length assert).
+3. The title alone is drawn on a **WHITE 16:9 canvas** (canvas grown to contain the strip, never cropped).
+4. `editWithGrok` DIRECTLY — plate as input 1, the artwork (1024px) as input 2, a *style reference only*.
+5. Extraction is a key on **inkiness** (dark OR saturated), so any paper texture the model invents drops out.
+6. Enclosed transparent specks smaller than 0.04% of the plate are filled (letter counters are orders
+   of magnitude larger and stay open); the layer is composited onto the untouched textless plate.
+7. **One final eval**: the model is given the expected TEXT *and* the image and asked whether they
+   match — verification, not transcription. Any failure (model, eval, empty key) keeps the flat
+   lockup, which is always correct and legible. Shape coverage/spill are diagnostics only.
+
+**Rationale:** extraction becomes a chroma key instead of a detection problem, and the artwork cannot
+degrade because it is never re-rendered — faces and background are original pixels by construction.
+
+**Traps that cost a day each, do not re-introduce:**
+- `editImageWithPrompt` wraps the caller's text in the `illustrationEdit` template. Unless
+  `loadPromptTemplates()` ran it fills to an empty string → Grok 400 "Prompt cannot be empty" → the
+  helper's moderation branch silently falls back to **Gemini**. The endpoint ran a different model
+  than the Lab for a full day. Call the backend directly.
+- **Square plate ⇒ re-flow.** Grok's presets top out at 16:9 while title strips are ~1.9:1–2.3:1;
+  1:1 is the furthest from a strip and the empty space invites re-wrapping (2 lines → 5, coverage
+  0.21). 16:9 + "keep the same number of lines" → 4/4.
+- sharp emits **sRGB even from 1-channel raw input**; a 3-channel mask indexed as 1 channel becomes a
+  squeezed, row-wrapped alpha — comb striping across the whole frame.
+- The textless plate is the `story_images` `${key}Art` row, NOT `cover.artImageData` (which does not
+  exist on real stories). Reading the wrong one double-stamps the title.
+
+**Backends (same prompt, same 4 covers):** Grok ✅ true medium; Qwen 🟡 plastic impasto; Gemini ❌
+washed out and degraded letters. The "Gemini for style, Qwen/Grok for small edits" rule is from
+avatars/repair and does NOT transfer to text — owner correction.
+
+**Production wiring:** automatic in `bakeCoverTypographyPostPersist` (frontCover, non-trial, non-fatal
+on every failure path); `POST /stories/:id/repaint-title` costs `CREDIT_COSTS.TITLE_PAINT` (2),
+charged ONLY when a painted title is produced; a title edit clears `titlePainted` and re-offers it;
+title font/effect/colour controls are gated on **developerMode** (not the admin role, so the real
+user view can be previewed); the Test Lab stage calls the production module so the two cannot drift.
+
+**Touched:** `server/lib/coverTitlePaint.js`, `server/lib/coverTypography.js`,
+`server/routes/stories.js`, `server/config/credits.js`, `client/src/components/generation/StoryDisplay.tsx`,
+`server/lib/testlab.js`.
+
+**Status:** 🟡 on staging, 4/4 on the benchmark set — but NOT yet verified inside a full generation.
+
+## 2026-08-07 — Stamping cover text must not wipe the version's score (preserveScore)
+
+**Context:** The version picker showed "original 40%" for V1 and no score for V2, while
+`stories.data` held `finalScore: 80`. The picker reads `story_images.quality_score`, which was NULL.
+
+**Decision:** `saveStoryImage` accepts `preserveScore`, making the upsert write
+`COALESCE(EXCLUDED.quality_score, story_images.quality_score)`. Set on the four TEXT-STAMPING paths
+only (typography bake active + non-active, `restampServedCover`, `paintServedCoverTitle`).
+
+**Rationale:** the upsert does `quality_score = EXCLUDED.quality_score`, so ANY re-save without a
+score NULLs it — and stamping a title re-saves the row. Text stamping rewrites the SAME evaluated
+image with lettering on top, so the score still applies. Regeneration paths deliberately keep the old
+behaviour: a genuinely new image must not inherit an old score. 61 cover rows across 27 stories were
+already affected; only the reported story was backfilled.
+
+**Touched:** `server/services/database.js`, `server/lib/coverTypography.js`.
+
+## 2026-08-07 — NEVER saveStoryData() after the cover-typography bake
+
+**Context:** A one-line "persist the titlePainted marker" addition wiped the title, dedication AND
+branding off all three covers of job_1786147254924_8nuyywjii, and reset their scores to 0.
+
+**Decision:** the bake persists its markers with a targeted `jsonb_set` on `stories.data`; it must
+never call `saveStoryData`/`upsertStory`.
+
+**Rationale:** `upsertStory` deep-clones the story and strips `imageData` from its COPY, so the
+caller's in-memory `storyData` still holds every cover's ORIGINAL TEXTLESS bytes. Re-saving the blob
+re-extracts those and overwrites the covers that were just stamped. Any future "just persist this
+flag" in the post-persist phase has the same trap.
+
+**Touched:** `server.js`, `server/lib/coverTypography.js`.
+
+## 2026-08-07 — Cover EDITS get only the image being edited, at the source aspect
+
+**Context:** A round-1 cover iterate ("Remove all neon signs…") came back with the empty-scene plate
+laid in as a band across the top — the owner's "background twice".
+
+**Decision:** when `previousImage` is set (an edit of an existing cover), the empty-scene plate is
+withheld from the reference pack, and the output aspect is measured from the image being edited and
+snapped to the nearest preset instead of using `MODEL_DEFAULTS.coverAspect`.
+
+**Rationale:** given two scene-sized references Grok COMPOSES instead of editing — the same failure
+that made the title plate paste whole-cover content into a title crop. The empty scene is a style
+anchor for FIRST generation only. Separately, `coverAspect` is '3:4' (0.750) while real covers are
+864×1222 (0.707); Grok centre-crops inputs to the requested ratio, slicing ~6% off every reference
+and pushing further toward recomposition.
+
+**Touched:** `server/lib/coverIterate.js`.
+**Status:** 🟡 reasoned from stored evidence; not yet observed on a fresh cover iterate.
