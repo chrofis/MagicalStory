@@ -20,10 +20,18 @@ const COVER_PAGES: Record<string, number> = { frontCover: -1, initialPage: -2, b
 const IMAGE_CONCURRENCY = 50;
 
 // Entity penalty values by severity — mirrors the backend's single scale:
-// SEVERITY_POINTS in server/lib/scoring.js (critical 25 / major 15 / minor 2),
-// which is what computeMathFinalScore actually charges. Keep in sync with
-// the derived ENTITY_PENALTIES in server/lib/images.js.
-const ENTITY_PENALTIES = { critical: 25, major: 15, minor: 2 } as const;
+// SEVERITY_POINTS in server/lib/scoring.js, which is what computeMathFinalScore
+// actually charges. Keep in sync with server/lib/images.js ENTITY_PENALTIES.
+// `catastrophic` and `moderate` were missing here: both fell through the
+// `?? ENTITY_PENALTIES.minor` default and were charged 2 instead of 50 / 5,
+// so the panel's penalty disagreed with the server's for those severities.
+const ENTITY_PENALTIES = { catastrophic: 50, critical: 25, major: 15, moderate: 5, minor: 2 } as const;
+
+// Mirror of capEntityPenalty (server/lib/scoring.js): at most 40 points of
+// entity penalty apply to a score. Without it the client showed uncapped
+// −70/−90 deductions the server never charged.
+const ENTITY_PENALTY_CAP = 40;
+const capEntityPenalty = (raw: number) => Math.min(Math.max(0, raw || 0), ENTITY_PENALTY_CAP);
 
 /** Simple concurrency limiter (like p-limit) */
 function pLimit(concurrency: number) {
@@ -505,11 +513,11 @@ export function useRepairWorkflow({
         for (const si of feedback.semanticIssues) {
           entityPenalty += ENTITY_PENALTIES[si.severity as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
         }
-        feedback.entityPenalty = entityPenalty;
+        feedback.entityPenalty = capEntityPenalty(entityPenalty);
         // Score convention: qualityScore = raw visual (Gemini), score = final after penalties.
         // Use qualityScore as base, subtract entity penalties to get final score.
         const baseScore = feedback.qualityScore ?? 100;
-        feedback.score = Math.max(0, baseScore - entityPenalty);
+        feedback.score = Math.max(0, baseScore - feedback.entityPenalty);
 
         totalIssues += feedback.fixableIssues.length + feedback.entityIssues.length +
                        feedback.objectIssues.length + feedback.semanticIssues.length;
@@ -586,9 +594,9 @@ export function useRepairWorkflow({
           for (const ei of feedback.entityIssues) {
             entityPenalty += ENTITY_PENALTIES[ei.severity as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
           }
-          feedback.entityPenalty = entityPenalty;
+          feedback.entityPenalty = capEntityPenalty(entityPenalty);
           const baseScore = feedback.qualityScore ?? 100;
-          feedback.score = Math.max(0, baseScore - entityPenalty);
+          feedback.score = Math.max(0, baseScore - feedback.entityPenalty);
 
           totalIssues += feedback.fixableIssues.length + feedback.entityIssues.length +
                          feedback.objectIssues.length + feedback.semanticIssues.length;
