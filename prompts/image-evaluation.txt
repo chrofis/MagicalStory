@@ -116,6 +116,14 @@ Never fire D-11 to D-13 for a figure cropped by the frame edge, occluded by scen
 **D-24 `character_marking` → CATASTROPHIC / CRITICAL.** An arrow, symbol, logo, badge, decal or coloured graphic painted on a character's skin, hair, face or clothing that the scene did not ask for — prominent CATASTROPHIC, subtle CRITICAL. Typically on the back of a head. A print the costume specifies is allowed. `fix`: "Inpaint the marked region as plain skin, hair, or clothing."
 **D-25 `anachronism` → MAJOR.** An element contradicting the setting era (a smartphone in an 1800s scene, modern signage on a period building). Never for N-01 style elements, never for N-12 identity features.
 
+## Setting and rendering
+
+**D-26 `setting` → MAJOR / MODERATE.** The place is wrong: a different location from the one described, a background that contradicts it, or weather or time of day that does. MAJOR when the scene reads as somewhere else entirely; MODERATE for a detail of the right place being wrong. Never fire this for lighting, palette or atmosphere the ART STYLE produces — that is N-01.
+
+**D-27 `style_consistency` → MAJOR.** The page is drawn in a different MEDIUM from the supplied ART STYLE — photographic where the style is an illustration style, flat cartoon where it is painterly, and so on. This is the opposite of N-01: N-01 protects the elements a style asks for, this catches a page that ignored the style itself. Judge the rendering of the figures and surfaces, not the subject matter. Skip when no ART STYLE is supplied.
+
+**D-28 `naturalness` → MODERATE.** A genuine defect a reader would notice that none of D-01..D-27 describes. Use sparingly and never as a way to report something the NEVER DEDUCT list already excuses — if no code fits and the list does not cover it, prefer to omit it.
+
 ---
 
 # D — OUTPUT
