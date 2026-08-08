@@ -7,7 +7,7 @@
  *   1. beats_plan            Sonnet    per-page BEAT + one-line SCENE
  *   2. beats_review          DeepSeek  structural review, rewrites faulted pages
  *   3. beats_story_bible     Sonnet    clothing + Visual Bible + cover hints
- *   4. beats_scene_expansion Sonnet    one call PER PAGE, in parallel
+ *   4. beats_scene_expansion Sonnet    ONE call over ALL pages (cross-page continuity)
  *   5. beats_scene_review    DeepSeek  ONE call over ALL briefs, rewrites faulted
  *   6. beats_story_text      Sonnet    page text written from the locked beats
  *
@@ -51,6 +51,7 @@ const {
   buildBeatsReviewPrompt,
   parseBeats,
   buildSceneExpansionPrompt,
+  buildSceneExpansionAllPrompt,
   buildSceneReviewPrompt,
   buildStoryTextFromBeatsPrompt,
   buildStoryBibleFromBeatsPrompt,
@@ -303,14 +304,25 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let textError = null;
   const textPromise = runStoryText().catch(err => { textError = err; return null; });
 
-  // ── Step 4: scene expansion, one call per page, in parallel ───────────────
+  // ── Step 4: scene expansion — ALL pages in ONE call ───────────────────────
+  // The fan-out this replaced expanded each page blind to its neighbours, so
+  // location, time of day, clothing and composition could only drift and be
+  // repaired afterwards by the scene review (a mid-story page landing in an
+  // indoor interior between two riverbank pages, with no narrative transition
+  // into a house). Continuity is a property of the SET, so the set is written
+  // in one call. Per-page expansion survives ONLY as the shortfall fallback
+  // below — never as the primary path.
   await checkCancellation();
   const lang = inputData.language || 'en';
   const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel || inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage];
   const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
+  const maxCharactersPerScene = imgModelConfig?.maxCharactersPerScene || 3;
 
-  t = Date.now();
-  const expansions = await Promise.all(beats.map(async b => {
+  /**
+   * Per-page expansion — the fallback for pages the single call omitted, and
+   * the only remaining user of the per-page scene-expansion.txt template here.
+   */
+  async function expandOnePage(b) {
     // BEAT + SCENE stands in for page.text: in a beats-first run the text does
     // not exist yet, so the Art Director works from the locked plan.
     const pageContent = `BEAT: ${b.beat}\nSCENE: ${b.scene}`;
@@ -318,7 +330,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       b.pageNumber, pageContent, inputData.characters || [], lang,
       visualBible, availableAvatars, null,
       {
-        maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
+        maxCharactersPerScene,
         artStyleId: inputData.artStyle,
         imageBackend: imgModelConfig?.backend,
       }
@@ -335,10 +347,51 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       }
     }
     throw new Error(`Scene expansion failed for page ${b.pageNumber}: ${lastErr?.message || 'unknown error'}`);
-  }));
+  }
+
+  t = Date.now();
+  const beatPageNumbers = beats.map(b => b.pageNumber);
+  let expansions = [];
+  const allPrompt = buildSceneExpansionAllPrompt(inputData, beats, {
+    visualBible,
+    availableAvatars,
+    maxCharactersPerScene,
+  });
+  if (!allPrompt) {
+    log.error('🚨 [BEATS] scene-expansion-all template unavailable — falling back to per-page expansion for every page');
+    gl.warn('beats_scene_expansion_fallback', 'All-pages template unavailable — every page expanded per-page (no cross-page continuity)');
+  } else {
+    // Output is `## Page N` + prose + METADATA per page — the same shape the
+    // scene review returns, so the review's parser reads it unchanged.
+    let allRaw = '';
+    let allModelId = sceneModel;
+    try {
+      const res = await textModels.callTextModelStreaming(allPrompt, 40000, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion' });
+      allRaw = res?.text || '';
+      allModelId = res?.modelId || sceneModel;
+    } catch (err) {
+      log.error(`🚨 [BEATS] All-pages scene expansion failed (${err.message}) — falling back to per-page expansion`);
+      gl.warn('beats_scene_expansion_failed', `All-pages call failed: ${err.message} — falling back to per-page expansion`);
+    }
+    const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES');
+    const byPage = new Map(parsed.pages.filter(p => p.text && p.text.trim()).map(p => [p.pageNumber, p.text]));
+    expansions = beats
+      .filter(b => byPage.has(b.pageNumber))
+      .map(b => ({ pageNumber: b.pageNumber, brief: byPage.get(b.pageNumber), prompt: allPrompt, modelId: allModelId }));
+  }
+
+  // Page-count guard: a short response must never ship a story with pages that
+  // have no brief. Only the MISSING pages are re-expanded per-page.
+  const missingBriefs = beats.filter(b => !expansions.some(x => x.pageNumber === b.pageNumber));
+  if (missingBriefs.length > 0) {
+    log.error(`🚨 [BEATS] All-pages expansion returned ${expansions.length}/${beats.length} briefs — re-expanding page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} per-page`);
+    gl.warn('beats_scene_expansion_incomplete', `All-pages call returned ${expansions.length}/${beats.length} briefs — page(s) ${missingBriefs.map(b => b.pageNumber).join(', ')} expanded per-page`);
+    const recovered = await Promise.all(missingBriefs.map(expandOnePage));
+    expansions = expansions.concat(recovered).sort((a, b) => a.pageNumber - b.pageNumber);
+  }
   meta.timings.sceneExpansionMs = Date.now() - t;
-  gl.info('beats_scenes', `${expansions.length} scene briefs expanded by ${sceneModel} (${(meta.timings.sceneExpansionMs / 1000).toFixed(1)}s)`, null, {
-    pages: expansions.length, model: sceneModel,
+  gl.info('beats_scenes', `${expansions.length} scene briefs expanded by ${sceneModel} in one call${missingBriefs.length ? ` (+${missingBriefs.length} per-page fallback)` : ''} (${(meta.timings.sceneExpansionMs / 1000).toFixed(1)}s)`, null, {
+    pages: expansions.length, fallbackPages: missingBriefs.map(b => b.pageNumber), model: sceneModel,
   });
 
   // ── Step 4: ONE review over ALL scene briefs ──────────────────────────────

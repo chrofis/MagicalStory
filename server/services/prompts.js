@@ -48,6 +48,11 @@ async function loadPromptTemplates() {
   // Each line: [key, filename]. Order doesn't matter — failures are isolated.
   const FILES = [
     ['sceneExpansion', 'scene-expansion.txt'],
+    // ALL-pages scene expansion (beats pipeline). One call writes every page's
+    // brief with the others in view, so location, time of day, clothing and
+    // composition cannot drift between neighbours. scene-expansion.txt stays
+    // the per-page variant used by the unified pipeline's fallback.
+    ['sceneExpansionAll', 'scene-expansion-all.txt'],
     ['sceneIteration', 'scene-iteration.txt'],
     ['sceneIterationFree', 'scene-iteration-free.txt'],
     ['imageGeneration', 'image-generation.txt'],

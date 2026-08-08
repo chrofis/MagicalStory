@@ -3899,6 +3899,134 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
 }
 
 /**
+ * Render the Visual Bible as the {RECURRING_ELEMENTS} block.
+ *
+ * Shared by the per-page expansion (which filters to the ids the scene hint
+ * names, saving ~500 tokens) and the all-pages expansion (which passes the
+ * whole bible, because every page draws on a different slice of it). Extracted
+ * so the two callers can never format the same bible differently.
+ *
+ * @param {Object|null} visualBible
+ * @param {Set<string>} [filterIds] - upper-cased VB ids to keep; empty = keep all
+ * @returns {string}
+ */
+function buildRecurringElementsText(visualBible, filterIds = new Set()) {
+  let recurringElements = '';
+  const isRelevant = (entry) => {
+    if (!filterIds || filterIds.size === 0) return true; // No filter — pass everything
+    return entry.id && filterIds.has(entry.id.toUpperCase());
+  };
+  if (visualBible) {
+    if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
+      for (const sc of visualBible.secondaryCharacters) {
+        if (!isRelevant(sc)) continue;
+        const description = sc.extractedDescription || sc.description;
+        recurringElements += `* **${sc.name}** (secondary character): ${description}\n`;
+      }
+    }
+    if (visualBible.locations && visualBible.locations.length > 0) {
+      for (const loc of visualBible.locations) {
+        if (!isRelevant(loc)) continue;
+        const description = loc.extractedDescription || loc.description;
+        if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
+          recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
+          const variantStrs = loc.photoVariants.map(v => {
+            const desc = v.description || `Photo ${v.variantNumber}`;
+            return `[${loc.id}.${v.variantNumber}] ${desc}`;
+          });
+          recurringElements += `  Photo variants: ${variantStrs.join(', ')}\n`;
+        } else {
+          const locType = loc.isRealLandmark ? 'real landmark' : 'location';
+          recurringElements += `* **${loc.name}** (${locType}): ${description}\n`;
+        }
+      }
+    }
+    if (visualBible.vehicles && visualBible.vehicles.length > 0) {
+      for (const veh of visualBible.vehicles) {
+        if (!isRelevant(veh)) continue;
+        const description = veh.extractedDescription || veh.description;
+        recurringElements += `* **${veh.name}** (vehicle): ${description}\n`;
+      }
+    }
+    if (visualBible.animals && visualBible.animals.length > 0) {
+      for (const animal of visualBible.animals) {
+        if (!isRelevant(animal)) continue;
+        const description = animal.extractedDescription || animal.description;
+        recurringElements += `* **${animal.name}** (animal): ${description}\n`;
+      }
+    }
+    if (visualBible.artifacts && visualBible.artifacts.length > 0) {
+      for (const artifact of visualBible.artifacts) {
+        if (!isRelevant(artifact)) continue;
+        const description = artifact.extractedDescription || artifact.description;
+        recurringElements += `* **${artifact.name}** (object): ${description}\n`;
+      }
+    }
+    if (visualBible.clothing && visualBible.clothing.length > 0) {
+      for (const item of visualBible.clothing) {
+        if (!isRelevant(item)) continue;
+        const description = item.extractedDescription || item.description;
+        const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
+        recurringElements += `* **${item.name}**${wornBy} (clothing): ${description}\n`;
+      }
+    }
+  }
+  return recurringElements || '(None available)';
+}
+
+/**
+ * ALL-pages scene expansion (beats pipeline, step 4).
+ *
+ * The per-page fan-out expanded each page blind to its neighbours, and the
+ * scene review then had to repair the drift it caused (a page landing in a
+ * "warmly lit indoor domestic interior" with no narrative transition into a
+ * house, between two riverbank pages). Location, time of day, clothing and
+ * composition continuity are properties of the SET, so the set is written in
+ * one call. Repetition and visual arc were already reviewed set-wide; now they
+ * are authored set-wide too.
+ *
+ * Output shape is `## Page N` + prose + METADATA per page — exactly what the
+ * scene review returns — so parseRefinedText(raw, expected, 'SCENES') reads it
+ * with no new parser.
+ *
+ * @param {Object} inputData
+ * @param {Array<{pageNumber:number, beat:string, scene:string}>} beats
+ * @param {Object} [options]
+ * @param {Object} [options.visualBible]
+ * @param {string} [options.availableAvatars]
+ * @param {number} [options.maxCharactersPerScene]
+ * @returns {string|null} null when the template is unavailable
+ */
+function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
+  const template = PROMPT_TEMPLATES.sceneExpansionAll;
+  if (!template) {
+    log.error('[PROMPT] sceneExpansionAll template not loaded — all-pages scene expansion unavailable');
+    return null;
+  }
+  const characters = inputData.characters || [];
+  const characterDescriptions = characters
+    .map((char, idx) => buildCharacterDescriptionForExpansion(char, null, idx + 1))
+    .join('\n');
+
+  const allBeats = beats
+    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`)
+    .join('\n\n');
+
+  return fillTemplate(template, {
+    PAGE_COUNT: beats.length,
+    ALL_BEATS: allBeats,
+    CHARACTER_DESCRIPTIONS: characterDescriptions,
+    CHARACTER_COUNT: characters.length,
+    HEIGHT_ORDER: buildRelativeHeightDescription(characters) || '',
+    // The whole bible, unfiltered: each page draws on a different slice and a
+    // per-page objects[] filter has nothing to key on in a single call.
+    RECURRING_ELEMENTS: buildRecurringElementsText(options.visualBible || null),
+    AVAILABLE_AVATARS: options.availableAvatars || buildAvailableAvatarsForPrompt(characters),
+    MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
+  });
+}
+
+/**
  * Build simplified scene expansion prompt for initial generation (fast/cheap)
  * Uses scene-expansion.txt template - no validation checks, no preview feedback
  * @param {number} pageNumber - Current page number
@@ -3959,73 +4087,11 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
   } catch { /* ignore parse errors */ }
 
   // Build Visual Bible recurring elements — ONLY those referenced by this scene's objects[].
-  // This avoids passing 12 elements when only 2 are relevant, saving ~500 tokens.
-  let recurringElements = '';
-  const isRelevant = (entry) => {
-    if (hintObjectIds.size === 0) return true; // No filter available — pass everything
-    return entry.id && hintObjectIds.has(entry.id.toUpperCase());
-  };
-  if (visualBible) {
-    if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
-      for (const sc of visualBible.secondaryCharacters) {
-        if (!isRelevant(sc)) continue;
-        const description = sc.extractedDescription || sc.description;
-        recurringElements += `* **${sc.name}** (secondary character): ${description}\n`;
-      }
-    }
-    if (visualBible.locations && visualBible.locations.length > 0) {
-      for (const loc of visualBible.locations) {
-        if (!isRelevant(loc)) continue;
-        const description = loc.extractedDescription || loc.description;
-        if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
-          recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
-          const variantStrs = loc.photoVariants.map(v => {
-            const desc = v.description || `Photo ${v.variantNumber}`;
-            return `[${loc.id}.${v.variantNumber}] ${desc}`;
-          });
-          recurringElements += `  Photo variants: ${variantStrs.join(', ')}\n`;
-        } else {
-          const locType = loc.isRealLandmark ? 'real landmark' : 'location';
-          recurringElements += `* **${loc.name}** (${locType}): ${description}\n`;
-        }
-      }
-    }
-    if (visualBible.vehicles && visualBible.vehicles.length > 0) {
-      for (const veh of visualBible.vehicles) {
-        if (!isRelevant(veh)) continue;
-        const description = veh.extractedDescription || veh.description;
-        recurringElements += `* **${veh.name}** (vehicle): ${description}\n`;
-      }
-    }
-    if (visualBible.animals && visualBible.animals.length > 0) {
-      for (const animal of visualBible.animals) {
-        if (!isRelevant(animal)) continue;
-        const description = animal.extractedDescription || animal.description;
-        recurringElements += `* **${animal.name}** (animal): ${description}\n`;
-      }
-    }
-    if (visualBible.artifacts && visualBible.artifacts.length > 0) {
-      for (const artifact of visualBible.artifacts) {
-        if (!isRelevant(artifact)) continue;
-        const description = artifact.extractedDescription || artifact.description;
-        recurringElements += `* **${artifact.name}** (object): ${description}\n`;
-      }
-    }
-    if (visualBible.clothing && visualBible.clothing.length > 0) {
-      for (const item of visualBible.clothing) {
-        if (!isRelevant(item)) continue;
-        const description = item.extractedDescription || item.description;
-        const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
-        recurringElements += `* **${item.name}**${wornBy} (clothing): ${description}\n`;
-      }
-    }
-  }
-  if (!recurringElements) {
-    recurringElements = '(None available)';
-  }
+  const recurringElements = buildRecurringElementsText(visualBible, hintObjectIds);
 
   // Previous scenes are intentionally NOT passed — focus on this scene only.
   let sceneContextText = '';
+
 
   // Build draft scene description from scene hint
   let draftSceneDescription = '';
@@ -7004,6 +7070,7 @@ module.exports = {
   // Prompt builders
   buildBasePrompt,
   buildSceneExpansionPrompt,
+  buildSceneExpansionAllPrompt,
   buildSceneDescriptionPrompt,
   buildSceneIterationPrompt: buildSceneDescriptionPrompt,  // Alias: iteration = full description prompt
   buildImagePrompt,
