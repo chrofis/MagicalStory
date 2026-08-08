@@ -175,6 +175,50 @@ choice mirrors the Test Lab `beats_scenes` stage: generation =
 **Status:** 🟡 conditional — staging experiment only; not a production default
 until the VB / clothing / cover gap is closed.
 
+### Clothing categories are roster-only; secondary characters are described, never dressed
+**Context:** Three prompt files told the writer to list *every* character
+present in `characters[]` with a `clothing` value, while also requiring that
+value to name an available avatar category. A secondary character has no
+avatar and therefore no category, so the instruction pair was unsatisfiable
+and the writer resolved it differently each run: `job_1786053708336` put
+Margaret and Rachel in `pageClothing` but not `clothingRequirements`;
+`job_1786147254924` put them in both. The first points a per-page category at
+an outfit that does not exist; the second invents an avatar spec for someone
+who will never have an avatar.
+**Decision:** `clothingRequirements`, `characters[].clothing` and therefore
+`pageClothing` cover main and primary characters only. Secondary characters
+are named in the SCENE prose and carried by CHR id in `objects[]`. Their
+outfit lives solely in `secondaryCharacters[].clothing`, must be the COMPLETE
+outfit, and must be repeated verbatim in the prose on every page they appear.
+**Rationale:** A roster character is held consistent by three independent
+mechanisms — a reference avatar, the entity-consistency grid, and character
+repair. A secondary has none of them (entity grids are built for the roster
+only), so the prose repeating the Visual Bible text IS the consistency
+mechanism, exactly as for any other recurring VB element. Detection is
+asymmetric by design, not by bug: `bboxDetection.figures` does locate
+secondaries by name, but there is no avatar to repair them toward.
+No code change was required — `buildSceneClothingRequirements` receives a
+roster-filtered cast (`images.js:9888`), so a secondary never reaches the
+clothing guard, and no consumer enumerates `pageClothing` keys as a cast
+list. Two take a representative value (`images.js:10215`,
+`clothingCategories.js:231`); dropping secondary entries strictly improves
+both, since today a secondary's invented category can be picked as the page's
+category for a roster character's repair.
+**Touched:**
+- `prompts/story-unified.txt` — scene-hint `characters[]` scoped, `clothing`
+  carries its reason, `clothingRequirements` is one entry per main/primary
+  character, `secondaryCharacters[].clothing` demands the complete outfit
+- `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt` — same
+  rule, plus `objects[]` extended to accept CHR ids. These two had no other
+  home for a secondary (`CHR` appeared nowhere in either file), so scoping
+  `characters[]` without that addition would have dropped secondaries out of
+  the illustration entirely. `getElementReferenceImagesByIds`
+  (`visualBible.js:2037`) already resolves CHR ids against
+  `secondaryCharacters`.
+**Status:** ✅ active. Note the beats path (`scene-expansion-all.txt`) is what
+runs while `PIPELINE_MODE=beats`; fixing `story-unified.txt` alone would have
+had no effect on staging.
+
 ---
 
 ## Email
