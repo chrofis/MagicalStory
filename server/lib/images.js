@@ -9841,11 +9841,42 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const pageCharClothing = savedScene.perCharClothing
     || pageClothingData?.pageClothing?.[pageNumber]
     || null;
+  // NO CAST FALLBACK (owner, 2026-08-08). The old code fell back to the whole
+  // story roster when the page's cast was unknown. That is the same class of
+  // guess as defaulting the clothing category, and it cost more: the roster
+  // includes characters who are not in the picture, so the analysis described
+  // absent people to the vision model AND the no-default clothing guard threw
+  // on them (they legitimately have no per-page outfit), killing the repair for
+  // every page of job_1786147254924_8nuyywjii. If we do not know who is on the
+  // page, we do not guess — we fail here.
   const analysisCharacters = (() => {
     const names = (savedScene.sceneCharacters || []).map(c => String(c?.name || '').trim().toLowerCase()).filter(Boolean);
-    if (names.length === 0) return characters;
+    if (names.length === 0) {
+      // An EMPTY cast and an UNKNOWN cast are different states. A landscape page
+      // legitimately has nobody in it; a page whose prose names people the roster
+      // could not resolve is a failure we must not paper over. The scene metadata
+      // decides which one this is.
+      const metaNames = (() => {
+        try {
+          const m = extractSceneMetadata(currentScene.description || currentScene.sceneDescription || '');
+          const cs = m?.characters;
+          return Array.isArray(cs) ? cs.map(c => String(c?.name || c || '').trim()).filter(Boolean) : [];
+        } catch { return []; }
+      })();
+      if (metaNames.length === 0) {
+        log.info(`🔄 [ITERATE] Page ${pageNumber}: scene has no characters — analysis runs without a cast`);
+        return [];
+      }
+      throw new Error(`[ITERATE] Page ${pageNumber}: the scene names ${metaNames.join(', ')} but none resolved to the story roster (${characters.map(c => c.name).join(', ')}). Refusing to fall back to the whole roster.`);
+    }
     const matched = characters.filter(c => names.includes(String(c.name || '').trim().toLowerCase()));
-    return matched.length > 0 ? matched : characters;
+    if (matched.length === 0) {
+      throw new Error(`[ITERATE] Page ${pageNumber}: none of the page's characters (${names.join(', ')}) match the story roster (${characters.map(c => c.name).join(', ')}). Refusing to fall back to the whole roster.`);
+    }
+    if (matched.length !== names.length) {
+      log.warn(`⚠️ [ITERATE] Page ${pageNumber}: ${matched.length}/${names.length} scene characters matched the story roster`);
+    }
+    return matched;
   })();
   // buildSceneClothingRequirements itself throws when a cast member has no
   // per-page category — no second check here, one rule in one place.

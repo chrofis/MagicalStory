@@ -6013,3 +6013,41 @@ to Emma's yellow star t-shirt and Noah's mid-blue striped t-shirt. `story-unifie
 writer, which produced the p7/p10 prose) already carries the rule at line 127 but violated it — its
 `clothingRequirements` descriptions are authored later in the SAME response, so the scene section
 cannot quote them. That ordering problem is NOT fixed here and is the remaining leak for unified mode.
+
+---
+
+## Iterate never guesses the page's cast either (2026-08-08)
+
+**Context:** the no-default clothing guard killed every page repair on
+`job_1786147254924_8nuyywjii` — 9 of 12 iterates threw, the pages shipped their originals (several
+at semantic 0), story average 34 against 61–64 on healthy runs. The covers survived only because
+`iterateCover` is a different path.
+
+The clothing guard was not the defect. `iteratePageCore` asked *who is on this page?* by reading
+`storyData.sceneImages[N].sceneCharacters`, and the repair pipeline's own projection
+(`server.js:6707`) never carried that field — five keys, no cast. So the code fell back to the whole
+story roster, then demanded a per-page outfit for characters who are **not in the scene** (Hans on
+9 of 10 pages), and the guard correctly refused. The wrong question was being asked; the refusal was
+just where it surfaced. The same fallback also described absent characters to the vision model —
+the exact noise the surrounding comment claims to prevent.
+
+**Decision:** two halves.
+1. `server.js:6707` now carries `sceneCharacters` and `perCharClothing` into the pipeline's
+   `storyData.sceneImages`. `rawImages` had both all along; the projection dropped them.
+2. `iteratePageCore` no longer falls back to the roster. An **empty** cast and an **unknown** cast are
+   separated: if the scene metadata also names nobody, the page is a landscape and the analysis runs
+   with no cast; if the metadata names people who do not resolve to the roster, it throws.
+
+**Rationale:** owner rule — "if we do not know the cast we fail loudly, like if we do not have the
+clothing". Guessing the cast is the same class of error as guessing the outfit and strictly worse in
+its effects, because it manufactures both a false clothing demand and a false description of who is
+in the picture.
+
+**Touched:** `server.js`, `server/lib/images.js`.
+
+**Status:** ✅ verified against stored data. `job_1786147254924_8nuyywjii`: 10/10 pages now resolve,
+zero throws (was: every page). `job_1786053708336_8cdsca519`: 12 pages resolve and **2 throw
+correctly** — p3/p4 name "Rachel" and "Margaret" in the scene while the story roster is
+Emma/Noah/Daniel/Sarah/Hans. That is a real upstream defect (the outline's character names diverge
+from the uploaded cast, and `pageClothing` carries entries for both sets) which this change surfaces
+instead of silently analysing six wrong people. Not fixed here — worth its own investigation.

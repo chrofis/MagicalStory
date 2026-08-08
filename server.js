@@ -6708,6 +6708,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             pageNumber: r.pageNumber,
             imageData: r.imageData,
             description: r.sceneDescription,
+            // The page's CAST and its per-character clothing. Without these,
+            // iteratePageCore could not tell who is on the page and fell back to
+            // the whole story roster — it then demanded an outfit for characters
+            // who are not in the scene, and the no-default clothing guard threw,
+            // killing the page's repair outright (job_1786147254924_8nuyywjii:
+            // every page had at least one absent character, so every page-iterate
+            // died while the covers, which use iterateCover, survived).
+            sceneCharacters: r.sceneCharacters || null,
+            perCharClothing: r.perCharClothing || null,
             imageAspect: inputData?.layout?.imageAspect,
             textInImage: inputData?.layout?.textInImage,
             // The page's locked text-overlay position. Used by iteratePageCore
