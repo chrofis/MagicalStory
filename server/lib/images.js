@@ -1411,7 +1411,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Resolved from the UNSTRIPPED prompt: the cover branch below deletes the
     // ART STYLE block from promptForEval as evaluator noise, which would leave
     // covers with no style to judge style elements against.
-    const artStyleForEval = require('../services/prompts').extractArtStyle(originalPrompt);
+    // evalOptions.artStyle lets a caller supply the style when originalPrompt is
+    // not the full page prompt — the Test Lab passes the scene DESCRIPTION, which
+    // has no ART STYLE block, so without this the style rule silently skipped and
+    // Lab runs could not reproduce production behaviour for style-dependent rules.
+    const artStyleForEval = evalOptions.artStyle
+      || require('../services/prompts').extractArtStyle(originalPrompt);
 
     // For cover evaluations: strip art style noise and prepend expected text prominently
     if (evaluationType === 'cover' && promptForEval) {
@@ -9048,7 +9053,23 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
         const evScore = ev.score ?? ev.qualityScore ?? null;
         if (evScore == null) continue;
-        const entityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
+        // ENTITY EVIDENCE MUST FOLLOW THE PIXELS. `currentEntityReport` is the
+        // LAST round's report, and the round loop runs the entity check on the
+        // round OUTPUT (see `latestImages` above) — not on this version. The
+        // version rescued here is the unscored ORIGINAL, so charging it the
+        // round's findings blames it for defects that exist only in an image
+        // that was then discarded. Observed on job_1786053708336_8cdsca519 p10:
+        // the original shipped at 15/100 after a −40 entity penalty for a teal
+        // hoodie and a child-aged Daniel that appear only in iterate-round-1,
+        // while its own evaluator recorded Noah in the correct polo and
+        // clothing_match:true for both characters. The originals' entity
+        // evidence is the STEP-1 report, which was computed on their pixels.
+        const isOriginalVersion = !entry.version.source || entry.version.source === 'original';
+        const rescueEntityReport = isOriginalVersion ? (entityReport || null) : currentEntityReport;
+        if (isOriginalVersion && !entityReport) {
+          log.warn(`⚠️ [UNIFIED PIPELINE] Page ${ev.pageNumber}: rescue-eval has no Step-1 entity report for the original — scoring it with no entity penalty rather than charging it the round's findings`);
+        }
+        const entityResult = getEntityPenaltyAndIssues(ev.pageNumber, rescueEntityReport);
         entry.version.evaluation = ev;
         entry.version.entityIssues = entityResult.issues;
         entry.version.evaluatedAt = new Date().toISOString();

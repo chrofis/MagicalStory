@@ -4271,9 +4271,24 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   const vbMatches = [];
   const vbMisses = [];
 
-  // Build character names list ONLY - physical descriptions are passed directly to image generation
-  // This prevents the text model from "copying" and potentially modifying character traits
-  const characterDetails = characters.map(c => {
+  // FULL character blocks — age look, build, hair, eyes, features, outfit.
+  // This block used to be names only ("* **Daniel**"), while the template right
+  // beside it instructs the writer to "weave each named character's appearance
+  // on first mention from CHARACTER DETAILS — age look, build, hair, eyes,
+  // distinctive features, clothing". With nothing to weave, the rewrite invented
+  // the traits or copied them out of the evaluator's feedback: a 38-year-old
+  // came back as "Daniel — a kindergartner" because a bullet had called him
+  // "kindergartner-aged" (job_1786053708336_8cdsca519 p10). The initial
+  // Art Director (scene-expansion) has always received the full block via
+  // buildCharacterDescriptionForExpansion; iterate now uses the same builder,
+  // so both writers describe a character from one source.
+  const perPageCategoryFor = (name) => {
+    if (!characterClothing) return null;
+    if (typeof characterClothing === 'string') return characterClothing;
+    const key = Object.keys(characterClothing).find(k => k.trim().toLowerCase() === String(name).trim().toLowerCase());
+    return key ? characterClothing[key] : null;
+  };
+  const characterDetails = characters.map((c, idx) => {
     // Track Visual Bible matches for logging
     if (visualBible && visualBible.mainCharacters) {
       const vbChar = visualBible.mainCharacters.find(vbc =>
@@ -4285,8 +4300,11 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         vbMisses.push(c.name);
       }
     }
-    // Only return the character name - NO physical traits (those go directly to image generation)
-    return `* **${c.name}**`;
+    const cat = perPageCategoryFor(c.name);
+    const outfit = (options.clothingRequirements && cat)
+      ? resolveClothingForPage(c, cat, options.clothingRequirements)
+      : null;
+    return buildCharacterDescriptionForExpansion(c, outfit || null, idx + 1);
   }).join('\n');
 
   // Build Visual Bible recurring elements section - include ALL entries (not filtered by page)

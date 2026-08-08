@@ -6206,3 +6206,53 @@ step, and per `judges-not-deterministic` it must be measured over repeats, not a
 **Touched:** `migrations/013_eval_findings.sql`, `scripts/admin/seed-eval-findings.js`,
 `server/routes/admin/testlab.js`, `client/src/services/testlabService.ts`,
 `client/src/pages/TestLab.tsx`.
+
+---
+
+## Entity evidence follows the pixels; the iterate writer gets full character blocks (2026-08-08)
+
+**Context — two defects found while auditing `job_1786053708336_8cdsca519` p10.**
+
+**(1) Entity penalty charged to a version that was never examined.** The page shipped at 15/100:
+`evalScore 55 − entityPenalty 40`. The three entity issues behind that penalty (Noah in a "dark
+teal/green long-sleeved hoodie", Daniel "as a young boy") describe **iterate-round-1**, a version the
+picker discarded. The original's own evaluator had recorded Noah in a "blue polo shirt, olive green
+shorts" with `clothing_match: true` for both characters.
+
+Path: the round loop runs the entity check on `latestImages`, which for a repaired page is the round
+OUTPUT (`images.js:8760-8771`) — correct for scoring that output. Step 3b then rescue-evaluates the
+unscored ORIGINAL (originals are stored `score: null` before a scale-repair, and `selectBestVersion`
+skips nulls, so a damaged repair could otherwise never lose to the image it replaced) and attached
+`currentEntityReport` — the last round's report — to it. Entity attribution is page-scoped and
+version-blind, so the surviving version inherited another image's defects.
+
+**(2) The iterate writer had no character appearance.** `buildSceneDescriptionPrompt` emitted
+`* **Daniel**` and nothing else, while the template beside it instructs the writer to weave in
+"age look, build, hair, eyes, distinctive features, clothing" from CHARACTER DETAILS. With nothing
+to weave the rewrite invented traits or copied the evaluator's wording — a 38-year-old came back as
+"Daniel — a kindergartner" because a feedback bullet had called him "kindergartner-aged".
+
+**Decision:**
+1. The rescue eval takes the **Step-1** entity report when the version being rescued is an original
+   (that report was computed on the originals' pixels), and warns rather than borrowing if it is
+   absent. Derived versions that legitimately inherit their parent's evaluation (post-repair
+   text-space recovery) are unchanged — they are the same pixels re-cropped.
+2. `buildSceneDescriptionPrompt` builds full character blocks with
+   `buildCharacterDescriptionForExpansion` — the same builder scene-expansion has always used —
+   including the per-page outfit resolved from `clothingRequirements`.
+
+**Rationale:** a penalty is evidence about an image; carrying it to a different image is simply a
+wrong measurement, and here it demoted a good page below the repair threshold. For (2), two Art
+Directors describing the same character from different inputs is how one of them ends up inventing;
+one builder, one source.
+
+**Touched:** `server/lib/images.js`, `server/lib/storyHelpers.js`.
+
+**Status:** 🟡 (2) verified — the block now renders "Noah, Looks: kindergartner … Wearing: sky-blue
+polo …" and "Daniel, Looks: adult, man … adult proportions about 7.5-8 heads tall" from the stored
+story. (1) is logic-verified only: the Step-1 report is not persisted, so the corrected penalty
+cannot be recomputed from stored data — it needs a generation run.
+
+**Not fixed (owner decision, 2026-08-08):** `maxRepairPasses: 1` making char-fix unreachable on a
+page that also scores badly is CORRECT behaviour — iterate first, char-fix on the iterated result in
+the next round.
