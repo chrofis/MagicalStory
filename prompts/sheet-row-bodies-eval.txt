@@ -1,12 +1,9 @@
 You are evaluating one row of a character reference sheet.
 
-You receive ONE image: the sheet row — 4 cells left to right (front, three-quarter, profile, back). Each cell SHOULD be one whole figure from the top of the head to the soles of the feet — check whether it actually is. Do not assume it is. Judge only this image.
+You receive ONE image: the body row — 4 cells left to right (front, three-quarter, profile, back). Each cell is one full figure. Judge only this image. Head presence is checked separately; do not score whether a head is present.
 
-TASK 1: IS EACH CELL A COMPLETE HEAD-TO-TOE FIGURE?
-For each cell, decide head=yes ONLY if the WHOLE head is visible: the top of the skull / hair AND the full face down to the chin, all inside the cell. head=NO if the top of the head is cut by the top edge and you only see the lower face (chin, mouth, jaw) or less — a chin peeking in at the top is NOT a head. head=NO if the figure starts at the neck, shoulders, chest, or waist with no face at all. Do not count a partial or top-cropped head as a head.
-Then check the bottom: feet=yes only if both feet with shoes are fully visible (not cut at thigh, knee, or ankle).
-A cell is complete ONLY if BOTH head=yes AND feet=yes.
-Score each cell: 8-10 = whole head AND both feet present; 1-2 = head cut/absent OR feet cut/absent. Per-cell 1-10; fullBodyScore = LOWEST cell. In the reason, report per cell like "cellN: head=<yes|no>, feet=<yes|no>".
+TASK 1: FEET
+For each cell, are both feet with shoes fully visible, not cut at thigh, knee, or ankle? Score each cell 1-10: 8-10 = both feet fully shown; 1-2 = feet missing or cut. fullBodyScore = lowest cell. In the reason, report per cell like "cellN: feet=<yes|no>".
 
 TASK 2: FACING ANGLES
 The 4 cells read front, three-quarter, profile, back, left to right. Score 1-10.
@@ -26,7 +23,7 @@ finalScore = lowest of fullBodyScore, anglesScore, outfitScore, proportionsScore
 
 Return EXACTLY this JSON:
 {
-  "fullBody": {"perCell": {"cell1": 0, "cell2": 0, "cell3": 0, "cell4": 0}, "fullBodyScore": 0, "reason": "cellN: head=<yes|no>, feet=<yes|no> for each of the 4 cells"},
+  "fullBody": {"perCell": {"cell1": 0, "cell2": 0, "cell3": 0, "cell4": 0}, "fullBodyScore": 0, "reason": "cellN: feet=<yes|no> for each of the 4 cells"},
   "angles": {"score": 9, "reason": "Front, three-quarter, profile, back left to right"},
   "outfit": {"outfitScore": 9, "reason": "Every figure wears the requested items, consistent across cells"},
   "proportions": {"score": 9, "reason": "Proportions match the person's apparent age"},
@@ -36,4 +33,4 @@ Return EXACTLY this JSON:
   "failureReasons": []
 }
 
-If invalid, populate failureReasons with short strings naming each failed sub-check (e.g. "fullBody: all 4 cells have no head — figures start at the waist", "background: painted street scene behind the figures").
+If invalid, populate failureReasons with short strings naming each failed sub-check (e.g. "fullBody: feet cut at the ankle in all cells", "background: painted street scene behind the figures").

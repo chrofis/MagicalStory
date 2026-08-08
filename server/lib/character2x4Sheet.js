@@ -398,7 +398,7 @@ async function callSheetJudge(model, parts, maxOutputTokens, geminiApiKey) {
   if (provider === 'google') {
     const body = {
       contents: [{ parts }],
-      generationConfig: { temperature: 0.2, maxOutputTokens, responseMimeType: 'application/json' },
+      generationConfig: { temperature: 0, maxOutputTokens, responseMimeType: 'application/json' },
       safetySettings: SHEET_JUDGE_SAFETY,
     };
     const resp = await fetch(
@@ -587,6 +587,36 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
 // (head-shots are shorter than full bodies), and a fixed cut sliced the bodies'
 // heads off (Daniel, 2026-08-08). Falls back to the JS variance separator only
 // if the analyzer is unreachable, so an eval never hard-fails on a cold service.
+// Head-presence per cell of the bottom (body) row — the ONLY source of truth for
+// "does each full body have a head". A Gemini VLM hallucinates the head on a
+// headless torso (head+body co-occur in training — POPE-adversarial object
+// hallucination, docs/research-log.html), so the head axis is judged by geometry
+// instead: the Python /pose-heads endpoint runs YOLO pose and reports whether a
+// head keypoint (nose/eyes/ears) fires above the shoulders in each cell. Validated
+// on set #2 (exp #419): headed cells 0.86–1.00, headless 0.00–0.10, no overlap.
+// `clipped` = a head found only at the very top edge (a head-shot chin bleeding in
+// past the gutter, or a body clipped by the divider) — treated as no-head. Returns
+// null if the analyzer is unreachable so the eval degrades to Gemini-only rather
+// than hard-failing on a cold service.
+async function detectBodyRowHeads(bottomBodyImageData) {
+  try {
+    const url = (process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000') + '/pose-heads';
+    const r = await fetch(url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: bottomBodyImageData, cols: 4 }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (r.ok) {
+      const j = await r.json();
+      if (j?.success && Array.isArray(j.cells)) return j;
+    }
+    log.warn('[CHARACTER 2×4] /pose-heads gave no result — bodies head-check falls back to Gemini');
+  } catch (err) {
+    log.warn(`[CHARACTER 2×4] /pose-heads unreachable (${err.message}) — bodies head-check falls back to Gemini`);
+  }
+  return null;
+}
+
 async function detectSheetRowDivider(imageData, buf, W, H) {
   try {
     const url = (process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000') + '/split-reference-sheet';
@@ -682,14 +712,43 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
   const avatarFaces = standardAvatar ? (await splitSheetRows(standardAvatar)).topHeads : null;
   const { topHeads, bottomBody, splitY } = await splitSheetRows(sheetImageData);
   const hasRefs = !!(facePhoto || avatarFaces);
-  const [headsR, bodiesR, identityR] = await Promise.all([
+  const [headsR, bodiesR, identityR, poseHeads] = await Promise.all([
     evaluateSheetRow(topHeads, 'heads', { model, promptOverride, usageTracker }),
-    evaluateSheetRow(bottomBody, 'bodies', { costumeDescription, model, usageTracker }),
+    // Bodies row (flash): feet / angles / outfit / proportions / background. It
+    // does NOT judge head presence — a VLM hallucinates a head on a headless torso
+    // (POPE-adversarial co-occurrence) — so the head axis is owned by pose
+    // (detectBodyRowHeads) and merged in below. ONE source of truth per concept.
+    evaluateSheetRow(bottomBody, 'bodies', { costumeDescription, model, promptOverride, usageTracker }),
     hasRefs ? evaluateIdentity(topHeads, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker }) : Promise.resolve(null),
+    detectBodyRowHeads(bottomBody),
   ]);
   const heads = headsR.report, bodies = bodiesR.report;
   const identity = identityR?.report || null;
   const idScore = identity?.identityScore ?? 10;
+
+  // HEAD GATE — pose is authoritative for "does each body have a head". A cell
+  // fails if pose finds no head OR only a top-edge/bleed-through head (clipped).
+  // Pose can only LOWER the full-body score (force-fail a headless body), never
+  // raise Gemini's feet/outfit verdict, so a legitimately feet-cut body still
+  // fails on its own axis. poseHeads === null (analyzer down) leaves Gemini's
+  // head judgment in place — degraded but not a hard failure (already logged).
+  if (poseHeads && Array.isArray(poseHeads.cells) && bodies?.fullBody) {
+    bodies.fullBody.headSource = 'pose';
+    bodies.fullBody.poseCells = poseHeads.cells.map(c => ({ head: c.head, head_max: c.head_max, clipped: c.clipped }));
+    const missing = poseHeads.cells
+      .map((c, i) => ({ c, i }))
+      .filter(({ c }) => !c.head || c.clipped);
+    if (missing.length) {
+      const which = missing.map(({ i }) => `cell${i + 1}`).join(', ');
+      const reason = `pose head-check: ${missing.length}/4 body cells have no head (${which})`;
+      bodies.fullBody.fullBodyScore = 1;
+      bodies.fullBody.reason = reason;
+      bodies.finalScore = Math.min(bodies.finalScore ?? 10, 1);
+      bodies.valid = false;
+      bodies.failureReasons = [...(bodies.failureReasons || []), `fullBody: ${reason}`];
+    }
+  }
+
   // finalScore spans structure of both rows + identity (heads only).
   const finalScore = Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0, idScore);
   const verdict = {

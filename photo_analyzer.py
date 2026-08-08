@@ -1789,6 +1789,115 @@ def figure_mask_endpoint():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+# YOLO pose for HEAD-PRESENCE on the avatar 2×4 bottom (body) row (lazy loaded,
+# ~6MB weights, <0.5GB RSS). The bodies structure eval used to ask Gemini "does
+# each figure have a head"; a VLM hallucinates the head on a headless torso
+# because head+body co-occur in training (POPE-adversarial object hallucination —
+# see docs/research-log.html). Pose grounds the answer in geometry instead: the
+# COCO-17 skeleton has 5 dedicated head keypoints (nose, eyes, ears), each with a
+# visibility confidence. Head present ⇔ a head keypoint fires above the shoulders.
+# Validated on set #2 (exp #419): headed cells score 0.86–1.00, headless 0.00–0.10
+# — no overlap. Runs only on the realistic pass-1 sheet, where pose models are
+# strongest; pass-2 styled sheets never lose heads so they don't hit this.
+_pose_model = None
+_pose_last_used = 0.0
+_POSE_IDLE_UNLOAD_S = int(os.environ.get('POSE_IDLE_UNLOAD_S', '900'))
+# Ultralytics' YOLO predictor stashes the last run's results/batch on itself, so
+# it is NOT thread-safe — the same reason MobileSAM is locked. Serialize load +
+# inference so concurrent /pose-heads calls under waitress don't interleave.
+_pose_lock = threading.Lock()
+
+
+def get_pose_model():
+    global _pose_model, _pose_last_used
+    _pose_last_used = time.time()
+    if _pose_model is None:
+        with _pose_lock:
+            if _pose_model is None:  # double-checked
+                from ultralytics import YOLO  # optional dep — endpoint 503s if missing
+                weights = os.environ.get('POSE_WEIGHTS', 'yolo11n-pose.pt')
+                print(f"[POSE-HEADS] Loading YOLO pose ({weights})...")
+                _pose_model = YOLO(weights)
+    return _pose_model
+
+
+# COCO-17 head keypoints: nose, left/right eye, left/right ear.
+_POSE_HEAD_KP = [0, 1, 2, 3, 4]
+
+
+@app.route('/pose-heads', methods=['POST'])
+def pose_heads():
+    """Head-presence per cell of an avatar body row (the 2×4 sheet's bottom strip).
+
+    Splits the strip into `cols` equal cells (the 4 facing angles) and, for each,
+    runs YOLO pose and reports whether a head is present.
+
+    Expected JSON: { "image": "<data uri or base64>", "cols": 4 }
+
+    Returns:
+    {
+      "success": true,
+      "cells": [ { "head": bool, "head_max": 0-1, "n_kp": int,
+                   "head_y_frac": 0-1|null, "clipped": bool }, ... ],
+      "all_heads": bool, "any_clipped": bool
+    }
+
+    head        : a head keypoint fired above 0.5 confidence.
+    clipped     : a head WAS found but its topmost keypoint sits in the top 8% of
+                  the cell — i.e. the row-splitter cut through the head (the
+                  divider landed too low). Caller treats this as a failure.
+    """
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({"success": False, "error": "Missing 'image'"}), 400
+        image_data = data['image']
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+        img = cv2.imdecode(np.frombuffer(base64.b64decode(image_data), np.uint8), cv2.IMREAD_COLOR)
+        if img is None:
+            return jsonify({"success": False, "error": "Failed to decode image"}), 400
+        cols = int(data.get('cols', 4))
+        conf_th = float(data.get('conf', 0.5))
+        clip_frac = float(data.get('clip_frac', 0.08))
+        H, W = img.shape[:2]
+        cw = W // max(cols, 1)
+        model = get_pose_model()
+        cells = []
+        with _pose_lock:  # predictor is shared + not thread-safe
+            for c in range(cols):
+                cell = img[:, c * cw:(c + 1) * cw]
+                r = model.predict(cell, verbose=False, conf=0.10)[0]
+                if (r.keypoints is None or len(r.keypoints) == 0
+                        or r.boxes is None or len(r.boxes) == 0):
+                    cells.append({"head": False, "head_max": 0.0, "n_kp": 0,
+                                  "head_y_frac": None, "clipped": False})
+                    continue
+                bi = int(np.argmax(r.boxes.conf.cpu().numpy()))
+                kxy = r.keypoints.xy.cpu().numpy()[bi]
+                kcf = r.keypoints.conf.cpu().numpy()[bi]
+                head_conf = [float(kcf[i]) for i in _POSE_HEAD_KP]
+                head_max = max(head_conf)
+                n_kp = sum(1 for x in head_conf if x > conf_th)
+                head_ys = [kxy[i][1] for i in _POSE_HEAD_KP if kcf[i] > 0.3]
+                head_y_frac = float(min(head_ys) / cell.shape[0]) if head_ys else None
+                has_head = n_kp >= 1 and head_max > conf_th
+                clipped = bool(has_head and head_y_frac is not None and head_y_frac < clip_frac)
+                cells.append({"head": has_head, "head_max": round(head_max, 3),
+                              "n_kp": n_kp,
+                              "head_y_frac": round(head_y_frac, 3) if head_y_frac is not None else None,
+                              "clipped": clipped})
+        return jsonify({
+            "success": True, "cols": cols, "cells": cells,
+            "all_heads": all(c["head"] and not c["clipped"] for c in cells),
+            "any_clipped": any(c["clipped"] for c in cells),
+        })
+    except Exception as e:
+        print(f"[POSE-HEADS] Error: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # GroundingDINO for text-prompted figure DETECTION (lazy loaded, ~1.9GB peak RSS).
 # Stage 1 of the local Grounded-SAM detection path: a full-identity text prompt
 # -> the loose box for WHICH character is where. The box then goes to
