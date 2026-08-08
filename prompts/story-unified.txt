@@ -443,48 +443,11 @@ Page 10: medium — 2 chars — Luna and fox at the meadow, back view walking aw
 Rules: no two consecutive pages with same shot + same character count. At least 30% solo scenes. Emit this section exactly once, here — do not repeat it later in the output.
 
 
----STORY DRAFT---
-Draft the story with scene output. Focus on creativity first.
-For EACH of the {PAGES} pages:
-
-**Draft [Page number]**
-[Story text]
-*(Word count: X)*
-[SCENE prose paragraph + METADATA JSON — use format from "Scene Output Format" section above]
-
-... continue for ALL {PAGES} pages ...
-
-
----ANALYSIS---
-{ANALYSIS_INSTRUCTIONS}
-
----TITLE---
-Now that you have written and analyzed the full story, propose 5 distinct title candidates. The server picks one at random — your job is to make every option strong enough to ship, with genuinely different angles.
-
-Each candidate must:
-- Be SPECIFIC to this story (not generic like "The Big Adventure" or "A Magical Day")
-- Reference a unique element: a character name, location, object, or pivotal moment from the story
-- Create curiosity or intrigue
-- Avoid clichés like "The [Adjective] [Noun]" patterns
-- Work well in {LANGUAGE}
-
-VARY ANGLE — each of the 5 must hit a different facet:
-1. character-focused (a name + a verb or stake)
-2. location/setting-focused
-3. object/artifact-focused
-4. emotion/relationship-focused
-5. pivotal-moment or unexpected-detail focused
-
-Do not produce 5 variations of the same iconic phrase. If your first candidate is the most-obvious-line-from-the-source (the iconic object or deed every reader would name first), the other 4 must come from totally different angles — a side character, a quiet moment, a setting nobody else would name.
-
-TITLE_CANDIDATES:
-1. [first candidate]
-2. [second candidate]
-3. [third candidate]
-4. [fourth candidate]
-5. [fifth candidate]
-
-
+# Authored BEFORE the draft on purpose: the draft's SCENE blocks must quote
+# the full outfit text, and it cannot quote descriptions that do not exist yet.
+# Emitted after the scene plan (which decides what the story needs) and before
+# the draft (which consumes it). Moving this back below the draft reintroduces
+# category labels like "wearing his standard clothes" in the scene prose.
 ---CLOTHING REQUIREMENTS---
 Based on the story draft, determine which clothing variants each character needs.
 
@@ -537,11 +500,59 @@ Based on the story draft, determine which clothing variants each character needs
 - Character doesn't appear in winter → `"winter": { "used": false }` (omit `description`)
 - Character uses standard but the story doesn't modify it → `"standard": { "used": true, "description": "[copy the character's stored standard outfit verbatim]" }`. Always include the description when `used: true`; the avatar generator needs it.
 
+---STORY DRAFT---
+Every SCENE block writes the outfit out in full, copied from the CLOTHING
+REQUIREMENTS section above. The descriptions exist by now — quote them.
+Never write the category key ("wearing his standard clothes") as the outfit.
+Draft the story with scene output. Focus on creativity first.
+For EACH of the {PAGES} pages:
+
+**Draft [Page number]**
+[Story text]
+*(Word count: X)*
+[SCENE prose paragraph + METADATA JSON — use format from "Scene Output Format" section above]
+
+... continue for ALL {PAGES} pages ...
+
+
+---ANALYSIS---
+{ANALYSIS_INSTRUCTIONS}
+
+---TITLE---
+Now that you have written and analyzed the full story, propose 5 distinct title candidates. The server picks one at random — your job is to make every option strong enough to ship, with genuinely different angles.
+
+Each candidate must:
+- Be SPECIFIC to this story (not generic like "The Big Adventure" or "A Magical Day")
+- Reference a unique element: a character name, location, object, or pivotal moment from the story
+- Create curiosity or intrigue
+- Avoid clichés like "The [Adjective] [Noun]" patterns
+- Work well in {LANGUAGE}
+
+VARY ANGLE — each of the 5 must hit a different facet:
+1. character-focused (a name + a verb or stake)
+2. location/setting-focused
+3. object/artifact-focused
+4. emotion/relationship-focused
+5. pivotal-moment or unexpected-detail focused
+
+Do not produce 5 variations of the same iconic phrase. If your first candidate is the most-obvious-line-from-the-source (the iconic object or deed every reader would name first), the other 4 must come from totally different angles — a side character, a quiet moment, a setting nobody else would name.
+
+TITLE_CANDIDATES:
+1. [first candidate]
+2. [second candidate]
+3. [third candidate]
+4. [fourth candidate]
+5. [fifth candidate]
+
+
 **Brief example:**
 ```
 ---SCENE PLAN---
 Page 1: close-up — 1 char — the main character at the window, snow falling outside
 ... (one line per page) ...
+
+---CLOTHING REQUIREMENTS---
+{ "clothingRequirements": { "CharacterA": { "standard": { "used": true, "description": "navy blue striped jumper, dark blue jeans, white sneakers" }, "winter": { "used": true, "description": "navy blue striped jumper under a red wool coat, dark blue jeans tucked into brown leather boots, red scarf, white mittens" }, "costumed": { "used": false } } } }
 
 ---STORY DRAFT---
 **Draft 1**
@@ -590,8 +601,6 @@ FIXES REQUIRED:
 ---TITLE---
 TITLE: CharacterA's Snowy Surprise
 
----CLOTHING REQUIREMENTS---
-{ "clothingRequirements": { "CharacterA": { "standard": { "used": true, "description": "navy blue striped jumper, dark blue jeans, white sneakers" }, "winter": { "used": true, "description": "navy blue striped jumper under a red wool coat, dark blue jeans tucked into brown leather boots, red scarf, white mittens" }, "costumed": { "used": false } } } }
 ```
 
 
