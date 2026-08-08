@@ -58,6 +58,9 @@ const TYPE_TO_BUCKET = {
   duplicate_character: 'character_presence', extra_character: 'character_presence',
   character_identity: 'character_identity', identity: 'character_identity', reference: 'character_identity',
   clothing: 'clothing', color: 'clothing', garment: 'clothing',
+  // hair is NOT clothing: typing it so put ponytail/parting complaints in the
+  // clothing bucket, where the repair repaints a garment and cannot fix hair.
+  hair: 'character_identity',
   anatomy: 'anatomy', proportion: 'anatomy',
   incomplete_figure: 'figure_completeness', figure_completeness: 'figure_completeness',
   camera_facing: 'camera_facing', face_direction: 'camera_facing', view: 'camera_facing',

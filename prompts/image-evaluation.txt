@@ -51,7 +51,9 @@ Tag every `fixable_issues[]` entry with one of these. The pipeline computes the 
 
 MINOR is the correct tag for a small deviation from the prompt, not only for cosmetic artifacts: a prop resting in a different orientation or spot, a limb at a different angle, one hand used where two were described, a garment sub-detail (panel, strap, collar, trim), a lighting nuance, slight colour drift, a faint texture artifact.
 
-One defect, one entry, one tag — the highest that applies. Never charge the same problem twice under two codes. Report at most 8 findings, worst first.
+One defect, one entry, one tag — the highest that applies. Never charge the same problem twice under two codes.
+
+Before returning: sort your findings worst-first, then KEEP ONLY THE FIRST 8 and delete the rest. A page with nine small deviations is a good page, and reporting all nine scores it as a broken one. When two findings describe the same figure or the same region, merge them into one.
 
 `score` (0-10) and `verdict` (PASS 5+, SOFT_FAIL 3-4, HARD_FAIL 0-2) are display-only — the pipeline ignores both.
 
@@ -82,8 +84,8 @@ Always output `coherence_gate: {applied, reason}`. When applied, also emit one `
 **D-03 `duplicate_character` → CRITICAL.** Two figures match the same reference while another character is missing.
 **D-04 `missing_character` → CRITICAL.** A required character is entirely absent. Name the target region in the description.
 **D-05 `clothing` → MAJOR.** Wrong MAIN garment colour, or wrong garment TYPE (dress rendered as trousers).
-**D-06 `clothing` → MODERATE, capped at ONE per figure.** Accessory and small-item detail: eyewear frame colour or tint, lanyard, shoe or sock colour, belt, watch, jewellery, hairclip, button colour, a missing stripe, a slightly off shade. Missing glasses entirely counts here too. Never MAJOR — do not let several small details stack into the weight of a real failure.
-**D-07 `clothing` → MAJOR / MODERATE / MINOR.** Hair: wrong colour MAJOR; dramatic length change (waist-length as a buzz cut) MAJOR; different style at the same colour MODERATE; length variation within one band (ear/chin/shoulder) MINOR.
+**D-06 `clothing` → MODERATE. Exactly ONE entry per figure, never more.** Accessory and small-item detail: eyewear frame colour or tint, missing glasses, lanyard, shoe or sock colour, belt, watch, jewellery, hairclip, button colour, a missing stripe, a missing pocket, a fabric that reads as the wrong material, a slightly off shade. Collect every such deviation for one figure and emit them as a SINGLE finding naming that figure — "Emma: shoes are trainers not slip-ons, t-shirt stripe missing" — never one finding per detail. Never MAJOR. If a figure has no MAIN garment error, at most one MODERATE may be charged against it in total.
+**D-07 `hair` → MAJOR / MINOR.** Wrong colour MAJOR. Dramatic length change (waist-length rendered as a buzz cut) MAJOR. Everything else about hair is MINOR and at most ONE entry per figure: how it is worn or arranged (down instead of a ponytail, a different parting, tied instead of loose), waves vs straight, and any length variation within one band (ear / chin / shoulder). A reader recognises the character by colour and length band, not by the tie.
 **D-08 `character_identity` → CRITICAL / MAJOR.** Age. A clear age-STAGE swap (adult rendered as a child, teenager as a young child) CRITICAL. A drift that still reads as the right stage MAJOR. Judge by head-to-body ratio, face roundness, and height beside other figures — never by stylisation. Within-stage differences (a 7-year-old reading as 6) do not deduct. Never deduct age twice for one figure. Skip entirely when the figure is sitting, kneeling, crouching, lying, cropped below the waist, occluded, or too small in the background; skip when EXPECTED FIGURE PROPORTIONS is empty.
 
 ## Anatomy and completeness
@@ -153,4 +155,4 @@ Return JSON only, no other text. Emit exactly these keys.
 }
 ```
 
-`zone` is one of `{left|center|right}-{foreground|midground|background}` — a downstream evaluator pairs figures by it. `items_held` lists every distinct object in that figure's hands. `face_bbox` is `[x1,y1,x2,y2]` normalised 0-1, omitted when no face is visible. `rendering` carries the two booleans the pipeline reads plus a plain-text `issues` list for physics detail. `character` is null for scene-level findings. Use only the `type` codes from section C.
+`zone` is one of `{left|center|right}-{foreground|midground|background}` — a downstream evaluator pairs figures by it. `items_held` lists every distinct object in that figure's hands. `face_bbox` is `[x1,y1,x2,y2]` normalised 0-1, omitted when no face is visible. `rendering` carries the two booleans the pipeline reads plus a plain-text `issues` list for physics detail. `character` is null for scene-level findings. Use only the `type` codes from section C — never invent one, never combine two with an underscore.
