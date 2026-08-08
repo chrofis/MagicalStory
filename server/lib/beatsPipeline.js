@@ -429,7 +429,40 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // Same contract as beatsReviewReport above: null only when the review never
   // ran; an object with empty pages[] when it ran and rewrote nothing.
   let sceneReviewReport = null;
-  const srPrompt = buildSceneReviewPrompt(inputData, expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })));
+  // Mechanical clothing faults, computed here and handed to the review — the
+  // ONE place they get fixed (owner decision 2026-08-08). Free: no API call, no
+  // image. Only the findings measured to carry signal are rendered
+  // (outfit_misattributed, removal_unstated); see clothingCheck.js.
+  let clothingFindings = '';
+  let clothingByPage = null;
+  try {
+    const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
+    const checkPages = expansions.map(x => {
+      const meta = extractSceneMetadata(x.brief) || {};
+      return {
+        pageNumber: x.pageNumber,
+        prose: String(x.brief || '').split('---METADATA---')[0],
+        cast: (meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
+        perCharClothing: meta.characterClothing || {},
+      };
+    });
+    const res = checkScenes(checkPages, clothingRequirements, { artifacts: (visualBible || {}).artifacts });
+    clothingByPage = res.byPage;
+    clothingFindings = renderFindingsBlock(res.byPage);
+    if (clothingFindings) {
+      const pages = [...res.byPage.keys()].sort((a, b) => a - b).join(', ');
+      log.info(`👕 [BEATS] clothing check: ${res.findings.length} finding(s) on page(s) ${pages} — sent to the scene review`);
+      gl.info('beats_clothing_check', `Clothing check found ${res.findings.length} fault(s) on page(s) ${pages}`, null, { findings: res.findings });
+    }
+  } catch (ccErr) {
+    log.warn(`⚠️ [BEATS] clothing check failed (${ccErr.message}) — review runs without findings`);
+  }
+
+  const srPrompt = buildSceneReviewPrompt(
+    inputData,
+    expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+    { clothingFindings }
+  );
   if (!srPrompt) {
     log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
     gl.warn('beats_scene_review_failed', 'Scene review template unavailable — briefs shipped unreviewed');
@@ -473,6 +506,38 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         log.warn(`⚠️ [BEATS] Scene review named page(s) ${faultedNotFixed.join(', ')} but rewrote none of them`);
         gl.warn('beats_scene_review_incomplete',
           `Reviewer named page(s) ${faultedNotFixed.join(', ')} in its analysis but rewrote only ${changed.length ? changed.join(', ') : 'nothing'} — those findings shipped unfixed`);
+      }
+
+      // RE-CHECK. The clothing findings were handed to the reviewer above;
+      // whether it acted on them is not a matter of trust. The check is free
+      // and deterministic, so run it again on the rewritten briefs and say what
+      // survived instead of shipping it quietly (owner rule: fail loudly).
+      if (clothingByPage && clothingByPage.size > 0) {
+        try {
+          const { checkScenes } = require('./clothingCheck');
+          const after = checkScenes(expansions.map(x => {
+            const m2 = extractSceneMetadata(x.brief) || {};
+            return {
+              pageNumber: x.pageNumber,
+              prose: String(x.brief || '').split('---METADATA---')[0],
+              cast: (m2.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
+              perCharClothing: m2.characterClothing || {},
+            };
+          }), clothingRequirements, { artifacts: (visualBible || {}).artifacts });
+          const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
+          const left = after.findings.filter(f => REVIEWABLE.has(f.type));
+          const before = [...clothingByPage.values()].flat().filter(f => REVIEWABLE.has(f.type)).length;
+          if (left.length > 0) {
+            const pages = [...new Set(left.map(f => f.pageNumber))].sort((a, b) => a - b).join(', ');
+            log.warn(`⚠️ [BEATS] clothing check after review: ${left.length}/${before} fault(s) still present on page(s) ${pages}`);
+            gl.warn('beats_clothing_unfixed',
+              `Clothing faults survived the scene review on page(s) ${pages}: ${left.map(f => `p${f.pageNumber} ${f.type} (${f.character})`).join('; ')}`);
+          } else {
+            log.info(`👕 [BEATS] clothing check after review: all ${before} fault(s) resolved`);
+          }
+        } catch (rcErr) {
+          log.warn(`⚠️ [BEATS] clothing re-check failed (${rcErr.message})`);
+        }
       }
 
       sceneReviewReport = {

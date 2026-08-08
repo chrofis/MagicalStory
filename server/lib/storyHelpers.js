@@ -4770,88 +4770,22 @@ function stripWornStateFromDescription(description) {
 }
 
 /**
- * Worn-vs-held guard for the injected CLOTHING wears-lines (page sibling of
- * applyCoverWornHeldDedupe):
- *   - a garment segment the scene places elsewhere (held, on the ground,
- *     removed) is DROPPED from the wears-line — the scene prose carries the
- *     item's real placement, the wears-line must not re-attach it to the body;
- *   - raw VB entry names inside kept segments (internal, story-language,
- *     often carrying a "(WearerName)" parenthetical per the VB clothing name
- *     convention) are replaced by the entry's English description-derived ref;
- *   - leftover "(CharacterName)" parentheticals are removed.
+ * REMOVED 2026-08-08: filterWornClothingAgainstScene, the worn-vs-held guard
+ * for the injected CLOTHING wears-lines. It sieved an outfit description
+ * clause by clause and dropped anything that looked like a garment the scene
+ * placed off-body. Measured over 30 stories / 457 clothing lines: 34% GUTTED
+ * (>60% of the text lost), only 34% untouched, on ordinary stories as much as
+ * costumed ones — a clause died on token coincidence. A whole pirate costume
+ * came out as "no brim, mid-thigh length, belt/waist: none, outer layer: none".
  *
- * @returns {string|null} filtered clothing description, or null when nothing
- *                        wearable remains (caller skips the wears-line).
+ * The case it guarded is now handled in prose instead of by deletion:
+ * clothingCheck's `removal_unstated` reports the page and the scene review
+ * writes "she is without the bandana, it lies in the chest". See
+ * docs/decisions.md, 2026-08-08.
+ *
+ * sceneDeclaresNonWornState / stripWornStateFromDescription survive — the
+ * REQUIRED OBJECTS path still uses them to describe an object's own state.
  */
-function filterWornClothingAgainstScene(clothingDescription, proseText, interactions, visualBible, characterNames = []) {
-  const raw = String(clothingDescription || '').trim();
-  if (!raw) return null;
-
-  const vbEntries = [
-    ...(Array.isArray(visualBible?.clothing) ? visualBible.clothing : []),
-    ...(Array.isArray(visualBible?.artifacts) ? visualBible.artifacts : []),
-  ].filter(e => e && (e.name || e.description || e.extractedDescription));
-
-  const entryMeta = vbEntries.map(e => ({
-    entry: e,
-    nameRaw: String(e.name || '').trim(),
-    nameTokens: significantEntityTokens(e.name),
-    allTokens: new Set([
-      ...significantEntityTokens(e.name),
-      ...significantEntityTokens(e.extractedDescription || e.description),
-    ]),
-    placedElsewhere: sceneDeclaresNonWornState(e, proseText, interactions),
-  }));
-
-  const segmentMatchesEntry = (segment, meta) => {
-    const segTokens = significantEntityTokens(segment);
-    let overlap = 0;
-    let nameHit = false;
-    for (const t of segTokens) {
-      if (meta.allTokens.has(t)) overlap++;
-      if (meta.nameTokens.has(t)) nameHit = true;
-    }
-    return overlap >= 2 || nameHit;
-  };
-
-  const segments = raw.split(/\s*[,;]\s*/).filter(Boolean);
-  const kept = [];
-  for (const segment of segments) {
-    // (1) direct: the prose/interactions declare this garment's own tokens
-    //     off-body (works when clothing text and prose share a language)
-    let drop = sceneDeclaresNonWornState({ name: '', description: segment }, proseText, interactions);
-    // (2) VB bridge: the segment matches a VB entry the scene places elsewhere
-    if (!drop) {
-      drop = entryMeta.some(m => m.placedElsewhere && segmentMatchesEntry(segment, m));
-    }
-    if (drop) continue;
-    // Kept segment: never emit an internal VB entry name — swap it for the
-    // English description-derived ref. The ref is built from the description
-    // MINUS its attachment clauses: the surrounding segment usually carries
-    // its own worn-state wording ("<name> tied around his neck"), so a ref
-    // that repeats the entry's "tied at the neck" would double it.
-    let cleaned = segment;
-    for (const m of entryMeta) {
-      if (!m.nameRaw || m.nameRaw.length < 3) continue;
-      const idx = cleaned.toLowerCase().indexOf(m.nameRaw.toLowerCase());
-      if (idx === -1) continue;
-      const genericNoun = m.entry.type === 'clothing' || m.entry.wornBy ? 'outfit' : 'object';
-      const strippedDesc = stripWornStateFromDescription(m.entry.extractedDescription || m.entry.description);
-      const ref = englishEntityRef({ description: strippedDesc }, genericNoun);
-      cleaned = cleaned.slice(0, idx) + ref + cleaned.slice(idx + m.nameRaw.length);
-    }
-    // Drop "(CharacterName)" parentheticals that rode in on internal names.
-    for (const charName of (characterNames || [])) {
-      if (!charName) continue;
-      const esc = String(charName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      cleaned = cleaned.replace(new RegExp(`\\s*\\(\\s*${esc}\\s*\\)`, 'gi'), '');
-    }
-    cleaned = cleaned.replace(/\s{2,}/g, ' ').trim();
-    if (cleaned) kept.push(cleaned);
-  }
-  if (kept.length === 0) return null;
-  return kept.join(', ');
-}
 
 function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, visualBible = null, pageNumber = null, referencePhotos = null, options = {}) {
   // Build image generation prompt. The unified pipeline is the only generation
@@ -4989,19 +4923,21 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       referencePhotos.forEach(photo => {
         if (!photo.name || !photo.clothingDescription) return;
         log.debug(`[IMAGE PROMPT] ${photo.name} wears: "${photo.clothingDescription}" (${photo.clothingCategory})`);
-        // Worn-vs-held guard: a garment the scene places OFF the body (held,
-        // lying on the ground, removed) must not be re-attached by the
-        // wears-line; internal VB entry names are swapped for English refs.
-        const guarded = filterWornClothingAgainstScene(
-          photo.clothingDescription, cleanSceneDescription, metadata?.interactions, visualBible, guardCharNames
-        );
-        if (!guarded) {
-          log.info(`🧥 [IMAGE PROMPT] Page ${pageNumber}: ${photo.name}'s wears-line skipped — scene places the outfit's item(s) off-body`);
-          return;
-        }
-        if (guarded !== photo.clothingDescription) {
-          log.info(`🧥 [IMAGE PROMPT] Page ${pageNumber}: ${photo.name}'s wears-line adjusted for scene placement: "${guarded}"`);
-        }
+        // THE WORN-VS-HELD FILTER IS GONE (owner, 2026-08-08). It used to sieve
+        // this description clause by clause, dropping any fragment that looked
+        // like a garment the scene placed off-body. Measured over 30 stories /
+        // 457 clothing lines: 34% were GUTTED (>60% of the text lost) and only
+        // 34% survived untouched — on ordinary stories as much as costumed ones,
+        // because a clause was matched on token coincidence. Emma's whole pirate
+        // costume came out as "no brim, mid-thigh length, belt/waist: none,
+        // outer layer: none" and the run averaged 16.7.
+        //
+        // What it was guarding — a removed garment being re-asserted as worn —
+        // is now handled where it belongs: `clothingCheck.removal_unstated`
+        // reports the page and the SCENE REVIEW states the removal in prose.
+        // Deleting the outfit was never the right remedy; saying "she is without
+        // the bandana, it lies in the chest" is.
+        const guarded = photo.clothingDescription;
         const items = guarded.toLowerCase().split(/[^a-zäöüéèà-]+/)
           .filter(w => w.length >= 4 && !CLOTHING_STOPWORDS.has(w));
         const hits = new Set(items.filter(w => proseLower.includes(w)));
@@ -6019,7 +5955,7 @@ function parseBeats(raw, expectedPages = []) {
  * continuity are invisible to a per-scene reviewer, so the whole set goes in a
  * single call.
  */
-function buildSceneReviewPrompt(inputData, scenes = []) {
+function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
   const template = PROMPT_TEMPLATES.sceneReview;
   if (!template) {
     log.error('[PROMPT] sceneReview template not loaded — scene review unavailable');
@@ -6030,6 +5966,11 @@ function buildSceneReviewPrompt(inputData, scenes = []) {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: scenes.length,
     ALL_SCENES: all,
+    // Mechanical clothing faults (server/lib/clothingCheck.js) — free to
+    // compute, and the review is the ONE place they get fixed (owner decision
+    // 2026-08-08). Empty string when nothing was found, so fillTemplate drops
+    // the placeholder and the prompt is unchanged for a clean story.
+    CLOTHING_FINDINGS: options.clothingFindings || '',
   });
 }
 
@@ -7151,7 +7092,6 @@ module.exports = {
   textDeclaresNonWornPlacement,
   sceneDeclaresNonWornState,
   stripWornStateFromDescription,
-  filterWornClothingAgainstScene,
   buildUnifiedStoryPrompt,
   buildOutlineReviewPrompt,
   buildTextRefinePrompt,

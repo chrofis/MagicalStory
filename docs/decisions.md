@@ -6577,11 +6577,25 @@ character's outfit is essentially nonexistent (3% in the worst stories, 0% in go
 gutting the `wears:` line while the prose happened to be silent too. **The filter is the direct
 cause; the check is a supplement, not the fix.**
 
-**Decision:** ship the check with `outfit_misattributed` + `removal_unstated` only. The filter fix
-(annotate instead of delete) remains the primary repair and is NOT yet done.
+**Decision:** ship the check with `outfit_misattributed` + `removal_unstated` only.
+
+**Follow-up the same day — the filter is DELETED, not annotated (owner).** `filterWornClothingAgainstScene`
+is gone, along with its export; the wears-line now carries the canonical outfit verbatim. The case it
+guarded — a removed garment re-asserted as worn — moves to prose: `clothingCheck.removal_unstated`
+reports the page and the scene review writes "she is without the bandana, it lies in the chest".
+Deleting the outfit was never the right remedy for a garment being in the wrong place.
+`sceneDeclaresNonWornState` / `stripWornStateFromDescription` survive — the REQUIRED OBJECTS path
+still uses them for an object's own state.
+
+**Wired:** `scene-review.txt` gains `{CLOTHING_FINDINGS}`; `buildSceneReviewPrompt` takes
+`options.clothingFindings` (empty string → placeholder dropped, prompt unchanged for a clean story);
+`beatsPipeline` computes findings before the review, logs them to the generation log, and — because
+the reviewer demonstrably does not always comply — **re-runs the identical check on the rewritten
+briefs afterwards** and warns loudly about anything that survived.
 
 **Touched:** `server/lib/clothingCheck.js` (new), `prompts/story-unified.txt`,
 `prompts/story-unified-imagefirst.txt`, `prompts/story-bible-from-beats.txt`.
 
-**Status:** 🟡 module built and measured; NOT yet wired into `buildSceneReviewPrompt` /
-`scene-review.txt`. Prompt changes (slot omission, `wornAs`) are live in the templates.
+**Status:** 🟡 built, measured and wired; no generation run yet. Verified statically against the
+pirate story: the block renders 2 findings (Emma's bandana on Daniel p5, Noah's sandals on Emma p11),
+reaches the review prompt, and the placeholder is dropped when there are no findings.
