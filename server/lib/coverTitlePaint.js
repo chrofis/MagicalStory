@@ -200,14 +200,12 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   const pw = W, ph = H;
   const rgba = Buffer.alloc(W * H * 4);
   let letterPx = 0;
-  // THE BAND IS ENFORCED, not merely requested (owner 2026-08-08: "it must stay
-  // in the same area — the text you pass is in the top 20-30% and it must stay
-  // there"). Ink outside the title band is discarded, so a model that starts
-  // painting the page cannot reach the cover: page-fill becomes a no-op instead
-  // of a failure. Inside the band it stays free to restyle the letters.
+  // NEVER clip ink at the band edge (owner 2026-08-08: "if you remove pixels we
+  // lose letters"). Cropping at a boundary is the same mistake as the old fixed
+  // rectangle that sliced DER THUR into RTHUR — descenders, flourishes and any
+  // letter sitting a few px lower get destroyed. Every ink pixel is kept; a
+  // model that paints the page is REJECTED WHOLESALE below instead.
   for (let q = 0, j = 0, m = 0; q < W * H; q++, j += 3, m += 4) {
-    const yy = (q / W) | 0;
-    if (yy < bandY0 || yy > bandY1) continue;   // outside the title band → transparent
     const r = outRaw[j], g = outRaw[j + 1], b = outRaw[j + 2];
     const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
     const inkiness = Math.max(255 - mx, mx - mn);
@@ -216,6 +214,30 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     if (a > 0.5) letterPx++;
   }
   if (letterPx < 200) return { ...flat, reason: 'keyed layer is empty' };
+
+  // PAGE-FILL GATE. The band is requested in the prompt but not carved into the
+  // pixels: instead we measure how much ink landed far outside it. Slack of 5%
+  // of the page height keeps descenders and painterly overshoot innocent. If the
+  // model painted the illustration onto the plate the ratio is overwhelming
+  // (measured 0.83-0.96 on exps #424/#425), and the whole attempt is dropped —
+  // the flat title is served, intact, rather than a title with its letters cut.
+  {
+    const slack = Math.round(H * 0.05);
+    const lo = Math.max(0, bandY0 - slack), hi = Math.min(H - 1, bandY1 + slack);
+    let outside = 0, total = 0;
+    for (let q = 0; q < W * H; q++) {
+      if (rgba[q * 4 + 3] <= 128) continue;
+      total++;
+      const yy = (q / W) | 0;
+      if (yy < lo || yy > hi) outside++;
+    }
+    const outOfBand = total ? outside / total : 0;
+    const MAX_OUT_OF_BAND = opts.maxOutOfBand ?? 0.15;
+    if (outOfBand > MAX_OUT_OF_BAND) {
+      log.warn(`🅰️ [TITLE PAINT] ${Math.round(outOfBand * 100)}% of the ink landed outside the title band — the model painted the page; keeping the flat title`);
+      return { ...flat, outOfBand: +outOfBand.toFixed(2), reason: `page-fill: ${Math.round(outOfBand * 100)}% of ink outside the title band` };
+    }
+  }
 
   // FILL SPECK HOLES. Light paper texture inside a stroke falls under the
   // inkiness threshold and becomes transparent, so the cover artwork shows
