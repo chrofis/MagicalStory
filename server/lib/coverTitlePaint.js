@@ -25,8 +25,8 @@
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 
-const PLATE_PROMPT = (styleTxt, strictEmptyPage = true) => `The image is a book title on a plain white page.${strictEmptyPage ? ' Nothing else is on the page and nothing else may be added.' : ''} Repaint the LETTERING so it looks hand-painted in the medium of the reference artwork: visible brush and paper texture inside every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours. You may change the lettering colour to one that suits the artwork.
-Keep the same words, letters, letterforms, size and positions. Keep EXACTLY the same number of lines and the same line breaks — do not re-wrap the title, do not move words to another line, do not resize it to fill the canvas.
+const PLATE_PROMPT = (styleTxt, strictEmptyPage = true, bandPct = 30) => `The image is a book title on a plain white page. The lettering sits in the TOP ${bandPct}% of the page and must stay inside that band — do not move it down, do not spread it over the page, do not re-centre it vertically.${strictEmptyPage ? ' The rest of the page is empty and must stay empty.' : ''} Repaint the LETTERING so it looks hand-painted in the medium of the reference artwork: visible brush and paper texture inside every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours. You may change the lettering colour to one that suits the artwork.
+Keep the same words, letters and the same number of lines. You MAY refine the letterforms, weight and colour so they suit the artwork; you may NOT re-wrap the title, move words to another line, or resize it to fill the page.
 ${strictEmptyPage
   ? 'The rest of the page stays PURE WHITE and completely empty: no people, no objects, no scenery, no illustration, no background wash, no border or frame. Only the letters may be painted.'
   : 'Put the lettering back on a plain white background — do not paint any scenery, do not draw the illustration, do not add a border or a frame.'}${styleTxt ? ` Medium of the artwork: ${styleTxt}` : ''}`;
@@ -129,6 +129,13 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   //    the nearest one — padding, never cropping — and the padding is removed
   //    from the output again. The lettering is therefore never scaled, never
   //    re-fitted and never offset: what comes back overlays the cover at 1:1.
+  // The title band: the glyph rows plus a small margin, full width. This is the
+  // area the lettering owns — the model is told about it and held to it.
+  const bandPad = Math.round(H * 0.03);
+  const bandY0 = Math.max(0, miny - bandPad);
+  const bandY1 = Math.min(H - 1, maxy + bandPad);
+  const bandPct = Math.max(10, Math.min(60, Math.round((bandY1 + 1) / H * 100)));
+
   const PRESETS = [['9:16', 9 / 16], ['2:3', 2 / 3], ['3:4', 3 / 4], ['4:5', 4 / 5],
     ['1:1', 1], ['5:4', 5 / 4], ['4:3', 4 / 3], ['3:2', 3 / 2], ['16:9', 16 / 9]];
   const coverRatio = W / H;
@@ -171,13 +178,13 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     // isolating its effect in the Lab, not for production use.
     const refs = [`data:image/jpeg;base64,${plateBuf.toString('base64')}`];
     if (opts.sceneRef !== false) refs.push(`data:image/jpeg;base64,${sceneBuf.toString('base64')}`);
-    result = await editWithGrok(PLATE_PROMPT(styleTxt, opts.strictEmptyPage !== false), refs,
+    result = await editWithGrok(PLATE_PROMPT(styleTxt, opts.strictEmptyPage !== false, bandPct), refs,
       { model: IMAGE_MODELS[opts.model || 'grok-imagine']?.modelId, aspectRatio: presetName, resolution: '1k' });
   } else {
     const { loadPromptTemplates } = require('../services/prompts');
     await loadPromptTemplates();
     result = await editImageWithPrompt(
-      `data:image/jpeg;base64,${plateBuf.toString('base64')}`, PLATE_PROMPT(styleTxt, opts.strictEmptyPage !== false),
+      `data:image/jpeg;base64,${plateBuf.toString('base64')}`, PLATE_PROMPT(styleTxt, opts.strictEmptyPage !== false, bandPct),
       opts.model || 'gemini-2.5-flash-image',
       [`data:image/jpeg;base64,${sceneBuf.toString('base64')}`], opts.artStyle);
   }
@@ -193,7 +200,14 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   const pw = W, ph = H;
   const rgba = Buffer.alloc(W * H * 4);
   let letterPx = 0;
+  // THE BAND IS ENFORCED, not merely requested (owner 2026-08-08: "it must stay
+  // in the same area — the text you pass is in the top 20-30% and it must stay
+  // there"). Ink outside the title band is discarded, so a model that starts
+  // painting the page cannot reach the cover: page-fill becomes a no-op instead
+  // of a failure. Inside the band it stays free to restyle the letters.
   for (let q = 0, j = 0, m = 0; q < W * H; q++, j += 3, m += 4) {
+    const yy = (q / W) | 0;
+    if (yy < bandY0 || yy > bandY1) continue;   // outside the title band → transparent
     const r = outRaw[j], g = outRaw[j + 1], b = outRaw[j + 2];
     const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
     const inkiness = Math.max(255 - mx, mx - mn);
