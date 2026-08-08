@@ -148,6 +148,11 @@ function flattenEntityIssues(entityReport) {
       out.push({
         characterName: charName,
         description: iss.description || iss.issue || '',
+        // The entity prompt already emits a type (face_mismatch, hair_change,
+        // age_shift, clothing_inconsistent, ...) and it was being dropped here,
+        // so 100% of entity findings reached scoring with no category and routed
+        // to a full regenerate. evalBuckets.normalizeType maps these.
+        type: iss.type || iss.category || null,
         severity: iss.severity || 'MODERATE',
         pageNumbers: iss.pageNumbers,
       });

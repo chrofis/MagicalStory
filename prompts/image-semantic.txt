@@ -102,6 +102,9 @@ VERDICT: PASS (7+), FAIL (0-6) — audit/display only.
 Return JSON only. Put every issue you find in the `semantic_issues` array. Do not use any other field name for issues — the parser reads `semantic_issues` and discards anything else.
 
 **Output rules (strict):**
+- Every `semantic_issues[]` entry MUST carry a `type` from this closed list — it routes the repair, and an unlisted value is discarded as unroutable:
+  `action_interaction` (wrong or missing declared interaction, wrong main action, wrong pose) · `missing_character` · `missing_element` (a named object, animal or landmark absent) · `object_presence` (present but wrong, misplaced, or unrequested) · `object_count` · `setting` (wrong location, background, weather or time of day) · `camera_facing` (front/back/profile, gaze direction) · `character_identity` (wrong person, age or hair) · `clothing` · `scale` · `figure_completeness` · `anatomy` · `rendered_text` · `naturalness` (anything else)
+  Use ONE type per entry. Never invent a value, never join two with an underscore, comma or slash.
 - The `score` field must be an integer 0–10 — no decimals, no fractions.
 - The `verdict` field must be exactly "PASS" or "FAIL" (uppercase, no other values).
 - Do not add explanatory text before or after the JSON. Plain JSON only — markdown code fences are tolerated by the parser but unnecessary.
@@ -124,10 +127,12 @@ Return JSON only. Put every issue you find in the `semantic_issues` array. Do no
   },
   "semantic_issues": [
     {
+      "type": "missing_element",
       "problem": "Map not visible — girl should be giving it to boy",
       "severity": "MAJOR"
     },
     {
+      "type": "naturalness",
       "problem": "Boy shows a broad smile; scene expects an alarmed/urgent expression (STORY_TEXT says he shouts 'STOP!' as the figure runs away)",
       "severity": "MODERATE"
     }

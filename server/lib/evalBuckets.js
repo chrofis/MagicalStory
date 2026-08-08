@@ -40,6 +40,7 @@ const BUCKETS = {
   action_interaction:   { owner: 'semantic', kind: 'graded', repair: 'inpaint_or_regen' }, // rope slack while pulling, wrong aim, faces away from target
   object_presence:      { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
   object_count:         { owner: 'quality',  kind: 'graded', repair: 'inpaint' },
+  setting:              { owner: 'quality',  kind: 'graded', repair: 'inpaint' }, // wrong/missing environment detail: location, background, weather, time of day
   style_consistency:    { owner: 'quality',  kind: 'graded', repair: 'style_transfer' },
   composition_textzone: { owner: 'quality',  kind: 'graded', repair: 'iterate_placement' },
   rendered_text:        { owner: 'quality',  kind: 'binary', repair: 'regen' },
@@ -79,10 +80,57 @@ const TYPE_TO_BUCKET = {
   character_marking: 'character_marking', marking: 'character_marking',
   anachronism: 'anachronism',
   naturalness: 'naturalness', artifact: 'naturalness',
+  // ── Absorbed 2026-08-08 after measuring 5 stories / 62 pages / 4 art styles.
+  // These are the singular types the evaluators actually emit. Only 73% (quality)
+  // and 36% (compliance) of findings used a known code; everything else fell to
+  // `other` and was routed to a full regenerate instead of a targeted repair.
+  face: 'character_identity', facial_hair: 'character_identity',
+  appearance: 'character_identity', age_appearance: 'character_identity',
+  age: 'character_identity', character_identification: 'character_identity',
+  glasses: 'clothing', accessory: 'clothing', clothing_detail: 'clothing',
+  costume: 'clothing', headwear: 'clothing',
+  pose: 'action_interaction', main_action: 'action_interaction',
+  gesture: 'action_interaction', holding: 'action_interaction',
+  facing: 'camera_facing', gaze: 'camera_facing', gaze_direction: 'camera_facing',
+  object_missing: 'object_presence', object_placement: 'object_presence',
+  object_mismatch: 'object_presence', object_detail: 'object_presence',
+  object_quality: 'object_presence', prop: 'object_presence',
+  prop_placement: 'object_presence', extra_object: 'object_presence',
+  extra_objects: 'object_presence', unauthorized_objects: 'object_presence',
+  setting: 'setting', environment: 'setting', background: 'setting',
+  background_placement: 'setting', lighting: 'setting', weather: 'setting',
+  // Expression nuance is a documented non-deduction; if one still arrives it is
+  // a naturalness note, never a structural defect.
+  expression: 'naturalness', emotion: 'naturalness',
+  // entity-consistency-check.txt emits its own closed vocabulary; map it here so
+  // cross-page consistency findings route like everything else.
+  face_mismatch: 'character_identity', hair_change: 'character_identity',
+  skin_tone: 'character_identity', age_shift: 'character_identity',
+  clothing_inconsistent: 'clothing', color_change: 'clothing',
+  shape_change: 'object_presence',
 };
 
+// Compound types were the long tail: `pose_clothing_age`, `position_and_appearance`,
+// `clothing, prop`, `facing/interaction` — 60 distinct strings across 5 stories,
+// each seen once or twice. Rather than alias every permutation, split on the
+// separators the models actually use and resolve to the FIRST recognised token.
+// One finding gets one bucket, which is the contract anyway: one defect, one entry.
+const COMPOUND_SPLIT = /\s*(?:_and_|_&_|\/|,|\+|\s+and\s+)\s*|_(?=[a-z])/;
+
+function normalizeType(type) {
+  const raw = String(type || '').toLowerCase().trim();
+  if (!raw) return '';
+  if (TYPE_TO_BUCKET[raw]) return raw;
+  // whole-string didn't match — try the pieces, left to right
+  for (const part of raw.split(COMPOUND_SPLIT)) {
+    const t = part.trim();
+    if (t && TYPE_TO_BUCKET[t]) return t;
+  }
+  return raw;
+}
+
 function bucketForType(type) {
-  return TYPE_TO_BUCKET[String(type || '').toLowerCase()] || 'other';
+  return TYPE_TO_BUCKET[normalizeType(type)] || 'other';
 }
 
 /**
@@ -166,5 +214,5 @@ function bucketsToIssues(merged = {}) {
 
 module.exports = {
   BUCKETS, TYPE_TO_BUCKET, SEVERITY_RANK, RANK_TO_SEVERITY,
-  sevRank, bucketForType, mapIssuesToBuckets, mergeJudges, bucketsToIssues, medianRank,
+  sevRank, bucketForType, normalizeType, mapIssuesToBuckets, mergeJudges, bucketsToIssues, medianRank,
 };
