@@ -1805,7 +1805,7 @@ export function StoryDisplay({
     const c = r.comparison;
     if (!c) return null;
     return (
-      <details open className="bg-purple-50 border border-purple-300 rounded-lg p-3">
+      <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
         <summary className="cursor-pointer text-sm font-semibold text-purple-800 hover:text-purple-900 flex items-center justify-between">
           <span>{language === 'de' ? 'Reparatur-Ergebnis' : 'Repair Result'}</span>
           <span className="flex items-center gap-2">
@@ -2348,9 +2348,9 @@ export function StoryDisplay({
 
       {/* Style Check result panel */}
       {developerMode && styleCheckResult && (
-        <div className="mt-3 border-2 rounded-xl p-4 bg-purple-50 border-purple-300">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
+        <details className="mt-3 border-2 rounded-xl p-4 bg-purple-50 border-purple-300">
+          <summary className="flex items-center justify-between mb-2 cursor-pointer list-none">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-bold text-purple-900">Style consistency:</span>
               <span className={`text-xs font-mono px-2 py-0.5 rounded ${
                 styleCheckResult.verdict === 'consistent' ? 'bg-green-200 text-green-900' :
@@ -2363,8 +2363,13 @@ export function StoryDisplay({
                 {styleCheckResult.dominantCluster.length} in cluster, {styleCheckResult.outliers.length} outlier{styleCheckResult.outliers.length === 1 ? '' : 's'}, anchor: {styleCheckResult.anchorPage === -1 ? 'Front cover' : `Page ${styleCheckResult.anchorPage}`}
               </span>
             </div>
-            <button onClick={() => setStyleCheckResult(null)} className="p-1 hover:bg-purple-200 rounded text-gray-500"><X size={16} /></button>
-          </div>
+            {/* Inside <summary>: without preventDefault the dismiss click also
+                toggles the section open. */}
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setStyleCheckResult(null); }}
+              className="p-1 hover:bg-purple-200 rounded text-gray-500"
+            ><X size={16} /></button>
+          </summary>
           <p className="text-xs text-gray-700 mb-3">{styleCheckResult.reasoning}</p>
           {styleCheckResult.outliers.length > 0 && (
             <div className="space-y-2 mb-3">
@@ -2389,7 +2394,7 @@ export function StoryDisplay({
             <summary className="text-xs text-purple-700 cursor-pointer">Show grid sent to model</summary>
             <img src={styleCheckResult.gridImage} alt="Style grid" className="mt-2 max-w-full border rounded" />
           </details>
-        </div>
+        </details>
       )}
 
       {/* Developer Mode: Generation Settings Panel */}
@@ -2450,6 +2455,7 @@ export function StoryDisplay({
               panelKey: string,
               title: string,
               tone: keyof typeof TONES,
+              withImage = false,
             ) => {
               const pages = rep?.pages || [];
               const analysis = (rep?.analysis || '').trim();
@@ -2458,7 +2464,7 @@ export function StoryDisplay({
               if (!pages.length && !analysis) return null;
               const c = TONES[tone];
               return (
-                <details key={panelKey} className={c.box} open={pages.length > 0}>
+                <details key={panelKey} className={c.box}>
                   <summary className={c.head}>
                     <FileText size={20} />
                     {title}
@@ -2491,20 +2497,50 @@ export function StoryDisplay({
                               {language === 'de' ? 'Wörter' : 'words'}
                             </span>
                           </div>
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                            {ops.map((op, i) => (
-                              <span
-                                key={i}
-                                className={
-                                  op.type === 'add' ? 'bg-green-100 text-green-900'
-                                    : op.type === 'del' ? 'bg-red-100 text-red-900 line-through'
-                                      : 'text-gray-700'
-                                }
-                              >
-                                {op.text}
-                              </span>
-                            ))}
-                          </p>
+                          {/* Diff and final are siblings so the shipped text is
+                              one click away from the change that produced it —
+                              reading the diff alone never showed what actually
+                              went into the book. */}
+                          <details open className="mt-1">
+                            <summary className={c.sub}>
+                              {language === 'de' ? 'Diff' : 'Diff'}
+                            </summary>
+                            <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                              {ops.map((op, i) => (
+                                <span
+                                  key={i}
+                                  className={
+                                    op.type === 'add' ? 'bg-green-100 text-green-900'
+                                      : op.type === 'del' ? 'bg-red-100 text-red-900 line-through'
+                                        : 'text-gray-700'
+                                  }
+                                >
+                                  {op.text}
+                                </span>
+                              ))}
+                            </p>
+                          </details>
+                          <details className="mt-2">
+                            <summary className={c.sub}>
+                              {language === 'de' ? 'Endfassung' : language === 'fr' ? 'Version finale' : 'Final version'}
+                            </summary>
+                            <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap break-words text-gray-800">
+                              {pg.after}
+                            </p>
+                            {withImage && (() => {
+                              const img = sceneImages.find(s => s.pageNumber === pg.pageNumber);
+                              const src = img?.imageData;
+                              if (!src) return null;
+                              return (
+                                <img
+                                  draggable={false}
+                                  src={src}
+                                  alt={`${language === 'de' ? 'Seite' : 'Page'} ${pg.pageNumber}`}
+                                  className="mt-2 w-48 rounded border border-gray-300"
+                                />
+                              );
+                            })()}
+                          </details>
                         </div>
                       );
                     })}
@@ -2526,6 +2562,7 @@ export function StoryDisplay({
                   'scene-review',
                   language === 'de' ? 'Szenen-Review (Diff)' : language === 'fr' ? 'Revue des scènes (diff)' : 'Scene review (diff)',
                   'violet',
+                  true,
                 )}
                 {renderDiffPanel(
                   textRefineReport,
@@ -2561,7 +2598,7 @@ export function StoryDisplay({
             }), { calls: 0, inTok: 0, outTok: 0, cost: 0, ms: 0 });
             const n = (x: number) => x.toLocaleString();
             return (
-              <details className="bg-slate-50 border-2 border-slate-300 rounded-xl p-4" open>
+              <details className="bg-slate-50 border-2 border-slate-300 rounded-xl p-4">
                 <summary className="cursor-pointer text-lg font-bold text-slate-800 hover:text-slate-900 flex items-center gap-2 flex-wrap">
                   <FileText size={20} />
                   {language === 'de' ? 'Verwendete Modelle' : language === 'fr' ? 'Modèles utilisés' : 'Models used'}
@@ -2625,7 +2662,7 @@ export function StoryDisplay({
             // Nothing to show for single-call stories (no stub, no meta).
             if (!reviewText && !outlineReview && stubIdx < 0) return null;
             return (
-              <details className="bg-violet-50 border-2 border-violet-300 rounded-xl p-4" open>
+              <details className="bg-violet-50 border-2 border-violet-300 rounded-xl p-4">
                 <summary className="cursor-pointer text-lg font-bold text-violet-800 hover:text-violet-900 flex items-center gap-2 flex-wrap">
                   <FileText size={20} />
                   {language === 'de' ? 'Outline-Review (externes Modell)' : language === 'fr' ? 'Revue du plan (modèle externe)' : 'Outline Review (external model)'}
