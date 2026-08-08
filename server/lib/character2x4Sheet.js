@@ -726,26 +726,49 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
   const identity = identityR?.report || null;
   const idScore = identity?.identityScore ?? 10;
 
-  // HEAD GATE — pose is authoritative for "does each body have a head". A cell
-  // fails if pose finds no head OR only a top-edge/bleed-through head (clipped).
-  // Pose can only LOWER the full-body score (force-fail a headless body), never
-  // raise Gemini's feet/outfit verdict, so a legitimately feet-cut body still
-  // fails on its own axis. poseHeads === null (analyzer down) leaves Gemini's
-  // head judgment in place — degraded but not a hard failure (already logged).
-  if (poseHeads && Array.isArray(poseHeads.cells) && bodies?.fullBody) {
-    bodies.fullBody.headSource = 'pose';
-    bodies.fullBody.poseCells = poseHeads.cells.map(c => ({ head: c.head, head_max: c.head_max, clipped: c.clipped }));
-    const missing = poseHeads.cells
-      .map((c, i) => ({ c, i }))
-      .filter(({ c }) => !c.head || c.clipped);
-    if (missing.length) {
-      const which = missing.map(({ i }) => `cell${i + 1}`).join(', ');
-      const reason = `pose head-check: ${missing.length}/4 body cells have no head (${which})`;
-      bodies.fullBody.fullBodyScore = 1;
-      bodies.fullBody.reason = reason;
-      bodies.finalScore = Math.min(bodies.finalScore ?? 10, 1);
-      bodies.valid = false;
-      bodies.failureReasons = [...(bodies.failureReasons || []), `fullBody: ${reason}`];
+  // HEAD GATE — the body-row head axis has TWO possible sources:
+  //   pose (preferred): geometry, doesn't hallucinate heads on headless torsos.
+  //   Gemini headScore (fallback): used ONLY when pose is unavailable. A VLM
+  //     hallucinates heads, so this is best-effort — hence the loud ERROR below,
+  //     so a pose outage is trivial to spot in the logs instead of silently
+  //     shipping unverified heads.
+  // Feet ALWAYS come from Gemini (feetScore). fullBodyScore = min(head, feet),
+  // and bodies.finalScore is recomputed from it so the retry gate sees the merge.
+  const fb = bodies?.fullBody;
+  if (fb) {
+    const gemFeet = fb.feetScore ?? fb.fullBodyScore ?? 10;
+    const gemHead = fb.headScore ?? fb.fullBodyScore ?? 10;
+    let headScoreEff, headReason;
+    if (poseHeads && Array.isArray(poseHeads.cells)) {
+      fb.headSource = 'pose';
+      fb.poseCells = poseHeads.cells.map(c => ({ head: c.head, head_max: c.head_max, clipped: c.clipped }));
+      const missing = poseHeads.cells.map((c, i) => ({ c, i })).filter(({ c }) => !c.head || c.clipped);
+      headScoreEff = missing.length ? 1 : 10;
+      headReason = missing.length
+        ? `pose head-check: ${missing.length}/4 body cells have no head (${missing.map(({ i }) => `cell${i + 1}`).join(', ')})`
+        : 'pose head-check: all 4 body cells have a head';
+    } else {
+      // Pose unavailable → fall back to Gemini's head judgment, and make the
+      // degradation LOUD (detectBodyRowHeads already warn-logged the transport
+      // failure; this ERROR marks that the eval actually ran head-blind).
+      fb.headSource = 'gemini-fallback';
+      headScoreEff = gemHead;
+      headReason = `pose UNAVAILABLE — head axis fell back to Gemini (headScore=${gemHead}, unreliable on headless torsos)`;
+      log.error(`[CHARACTER 2×4] pose /pose-heads unavailable — body-row head check FELL BACK to Gemini (headScore=${gemHead}). Fix the analyzer; Gemini hallucinates heads on headless bodies.`);
+    }
+    fb.fullBodyScore = Math.min(headScoreEff, gemFeet);
+    fb.reason = `${headReason}; feet=${gemFeet}`;
+    // Recompute the bodies verdict from the merged fullBodyScore.
+    bodies.finalScore = Math.min(
+      fb.fullBodyScore,
+      bodies.angles?.score ?? 10,
+      bodies.outfit?.outfitScore ?? 10,
+      bodies.proportions?.score ?? 10,
+      bodies.background?.backgroundScore ?? 10,
+    );
+    bodies.valid = bodies.finalScore >= 6;
+    if (fb.fullBodyScore <= 2) {
+      bodies.failureReasons = [...(bodies.failureReasons || []), `fullBody: ${headReason}`];
     }
   }
 

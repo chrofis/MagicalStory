@@ -91,7 +91,7 @@ No other issues. Extra objects, background people, non-declared spatial arrangem
 
 **SCORING (audit + wrong-scene tripwire)**
 
-`score` 0-10 reflects overall scene fidelity: start at 10 and lower it in proportion to the severities found. The pipeline uses it only as the wrong-scene tripwire (a very low score routes the page to full regeneration) and for display — the severity tags above drive the actual deduction.
+Do not report a score. The fidelity score is computed from the severity tags on your findings, including the wrong-scene tripwire that routes a page to full regeneration — a number of your own would compete with it.
 
 VERDICT: PASS (7+), FAIL (0-6) — audit/display only.
 
@@ -105,7 +105,6 @@ Return JSON only. Put every issue you find in the `semantic_issues` array. Do no
 - Every `semantic_issues[]` entry MUST carry a `type` from this closed list — it routes the repair, and an unlisted value is discarded as unroutable:
   `action_interaction` (wrong or missing declared interaction, wrong main action, wrong pose) · `missing_character` · `missing_element` (a named object, animal or landmark absent) · `object_presence` (present but wrong, misplaced, or unrequested) · `object_count` · `setting` (wrong location, background, weather or time of day) · `camera_facing` (front/back/profile, gaze direction) · `character_identity` (wrong person, age or hair) · `clothing` · `scale` · `figure_completeness` · `anatomy` · `rendered_text` · `naturalness` (anything else)
   Use ONE type per entry. Never invent a value, never join two with an underscore, comma or slash.
-- The `score` field must be an integer 0–10 — no decimals, no fractions.
 - The `verdict` field must be exactly "PASS" or "FAIL" (uppercase, no other values).
 - Do not add explanatory text before or after the JSON. Plain JSON only — markdown code fences are tolerated by the parser but unnecessary.
 - **Do NOT emit `issues_summary`, `notes`, `comments`, or any other prose field.** Every observation — including emotion/tone mismatches, posture mismatches, gaze defects — goes in `semantic_issues[]` as a structured entry with `problem` and `severity`. Prose fields are silently dropped by the downstream repair pipeline; an issue you describe in prose but not in `semantic_issues[]` will never trigger a fix.
@@ -137,7 +136,6 @@ Return JSON only. Put every issue you find in the `semantic_issues` array. Do no
       "severity": "MODERATE"
     }
   ],
-  "score": 7,
   "verdict": "PASS"
 }
 ```

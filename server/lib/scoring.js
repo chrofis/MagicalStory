@@ -84,9 +84,8 @@ const { log } = require('../utils/logger');
 //                      No floor: negative means the evaluators exceeded 100
 //                      points of penalty. There is exactly one score per
 //                      version; do not add a second, differently-clamped copy.
-//   promptFinalScore = the evaluator/consolidator merged score — AUDIT ONLY
 //
-// Writers call `applyScore(version, {evalResult, entityResult, promptFinalScore})`
+// Writers call `applyScore(version, {evalResult, entityResult})`
 // — single entry point. Readers (`findBadPages`, `pickBestVersionIndex`)
 // read `version.finalScore` only.
 //
@@ -255,14 +254,12 @@ function computeMathFinalScore(deductions) {
  * Single entry point that mutates a version with the canonical scoring
  * fields. Writers call this; readers read `version.finalScore`.
  *
- * SINGLE SCALE (2026-07-10): finalScore is ALWAYS the math model
- * (100 − Σ SEVERITY_POINTS over structured issues, entity capped). The former
- * 'prompt' score model was dead in the pipeline (nothing ever plumbed the
- * consolidator's final_score into evaluation.promptFinalScore) while the regen
- * routes laundered the merged-eval score through the promptFinalScore
- * parameter — leaving two incomparable finalScore scales in the same
- * imageVersions[] arrays that pickBestVersionIndex compared directly.
- * promptFinalScore is kept as an AUDIT field only; it never drives finalScore.
+ * ONE SCALE, ONE NUMBER (2026-08-08): finalScore = 100 − Σ SEVERITY_POINTS
+ * over the structured issues (entity capped), with no floor. The evaluators
+ * do not report a score of their own any more — the prompts return defects
+ * only — so there is nothing left to reconcile against. The former 'prompt'
+ * score model, its promptFinalScore audit field, mathFinalScore and the
+ * version-level rawScore are all deleted; do not reintroduce a second scale.
  *
  * CONSOLIDATED SCORING (Jul 2026): pass `consolidatedPlan` (the feedback
  * consolidator's plan for THIS evaluation) and the math runs over its
@@ -274,10 +271,9 @@ function computeMathFinalScore(deductions) {
  * @param {object} params
  * @param {object} [params.evalResult]     evaluateImageQuality output
  * @param {object} [params.entityResult]   { penalty, issues } from getEntityPenaltyAndIssues
- * @param {number|null} [params.promptFinalScore]   audit-only: the evaluator/consolidator combined score, if any
  * @param {object|null} [params.consolidatedPlan]   consolidator plan whose deduped_issues drive the deductions
  */
-function applyScore(version, { evalResult = null, entityResult = null, promptFinalScore = null, consolidatedPlan = null } = {}) {
+function applyScore(version, { evalResult = null, entityResult = null, consolidatedPlan = null } = {}) {
   if (!version || typeof version !== 'object') return;
   const dedupedIssues = Array.isArray(consolidatedPlan?.deduped_issues)
     ? consolidatedPlan.deduped_issues
@@ -295,7 +291,6 @@ function applyScore(version, { evalResult = null, entityResult = null, promptFin
 
   // Canonical fields written by the single writer.
   version.deductions = deductions;
-  version.promptFinalScore = (typeof promptFinalScore === 'number') ? promptFinalScore : null;
   version.finalScore = finalScore;
   version.scoreModel = 'math';
   // Which issue set fed the math: 'consolidated' (deduped) or 'raw'.
@@ -327,7 +322,7 @@ function applyScore(version, { evalResult = null, entityResult = null, promptFin
   // consolidator (lenient) or the math fallback (conservative) — meaning the
   // 60-threshold can't be tuned from logs alone.
   const pn = version.pageNumber != null ? `page ${version.pageNumber}` : 'version';
-  log.info(`[SCORE] ${pn}: math model (${version.scoreSource}) → finalScore=${finalScore} (evalAudit=${promptFinalScore}, entity=−${entityPoints})`);
+  log.info(`[SCORE] ${pn}: math model (${version.scoreSource}) → finalScore=${finalScore} (entity=−${entityPoints})`);
 
   return version;
 }
@@ -403,7 +398,6 @@ function logScoreModelSummary(storyId, versions) {
 function computeFinalScore(version) {
   if (!version || typeof version !== 'object') return null;
   // New shape (May 2026): applyScore wrote finalScore directly. Trust it.
-  // mathFinalScore + promptFinalScore are stored alongside for audit.
   if (typeof version.finalScore === 'number') return version.finalScore;
   // Older shape: evalScore + entityPenalty separate, no finalScore field.
   if (typeof version.evalScore === 'number') {

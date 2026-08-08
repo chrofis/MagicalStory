@@ -1161,14 +1161,17 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
 
     // Parse JSON from compliance response
     const parsed = getStoryHelpers().extractJsonFromText(sonnetResult.text);
-    if (parsed && typeof parsed.score === 'number') {
+    // Gate on the STRUCTURE, not on a score — the prompt no longer returns
+    // one. Keying this on parsed.score would make every three-stage eval
+    // return null the moment the score field was dropped.
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       complianceResult = parsed;
     } else {
       log.warn(`[THREE-STAGE] ${pageLabel}Stage 2 could not parse JSON from Sonnet response`);
       return null;
     }
 
-    log.info(`[THREE-STAGE] ${pageLabel}Stage 2 compliance: score=${complianceResult.score}/10, verdict=${complianceResult.verdict || 'N/A'}`);
+    log.info(`[THREE-STAGE] ${pageLabel}Stage 2 compliance: ${(complianceResult.fixable_issues || []).length} finding(s), verdict=${complianceResult.verdict || 'N/A'}`);
   } catch (err) {
     log.warn(`[THREE-STAGE] ${pageLabel}Stage 2 failed: ${err.message}`);
     return null;
@@ -1194,8 +1197,14 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     capComplianceIdentitySeverity(fixableIssues);
   }
 
-  // Convert 0-10 score to 0-100
-  const score100 = complianceResult.score * 10;
+  // THE SCORE IS THE DEFECTS (owner, 2026-08-08). Same 0-10 rubric as the
+  // visual and semantic evaluators, so all three subscores stay comparable.
+  const COMPLIANCE_SEVERITY_PENALTY = { CATASTROPHIC: 5, CRITICAL: 3, MAJOR: 2, MODERATE: 1, MINOR: 0.5 };
+  const compliancePenalty = fixableIssues.reduce(
+    (sum, i) => sum + (COMPLIANCE_SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1),
+    0
+  );
+  const score100 = Math.max(0, Math.min(10, 10 - compliancePenalty)) * 10;
 
   // Issues summary
   let issuesSummary = complianceResult.issues_summary || '';
@@ -1205,7 +1214,6 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
 
   return {
     score: score100,
-    rawScore: complianceResult.score,
     verdict: complianceResult.verdict || 'UNKNOWN',
     issuesSummary,
     fixableIssues,
@@ -1279,26 +1287,6 @@ const isBlockedResponse = (responseData) => {
   }
   return false;
 };
-
-/**
- * Blend the model's own 0-10 quality score with the score computed from its
- * fixable_issues[] list. The issue list double-counts nitpicks (the same
- * physical flaw flagged as several moderates collapses the computed score to
- * 0 on an image the model itself rated 8/10), while the model score sees the
- * whole image — so the computed score may pull at most 3 points below the
- * model's own judgment: final = max(computed, model − 3).
- * When the model gave no numeric score, the computed score stands alone.
- *
- * @param {number|null} modelRawScore   model's own score, 0-10 scale
- * @param {number} computedRawScore     rubric score from issue severities, 0-10
- * @returns {number} blended 0-10 score
- */
-function blendVisualScore(modelRawScore, computedRawScore) {
-  if (typeof modelRawScore !== 'number' || !Number.isFinite(modelRawScore)) {
-    return computedRawScore;
-  }
-  return Math.max(computedRawScore, modelRawScore - 3);
-}
 
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
   // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
@@ -1808,7 +1796,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     if (parsedJson && typeof parsedJson.score === 'number') {
       // Full JSON format with 0-10 scale and detailed analysis
-      const modelRawScore = parsedJson.score; // What the model claimed (kept for logging only)
+      // parsedJson.score is deliberately NOT read — the prompts no longer emit one.
       const verdict = parsedJson.verdict || parsedJson.final_verdict || 'UNKNOWN';
       // Support both old 'issues' and new 'issues_summary' field
       // Handle case where issues might be an array (convert to string)
@@ -1931,38 +1919,25 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         log.warn(`[EVAL] eval_findings record skipped (${recErr.message})`);
       }
 
-      // DETERMINISTIC SCORING: compute from fixable_issues[] severities using the
-      // §2 rubric (the eval prompt's single source of truth). The model's own
-      // `score` field is unreliable — the same image rerendered through eval
-      // gets different scores because the model recomputes its own arithmetic.
-      // fixable_issues[] is the structured contract; this function turns it
-      // into a number by the published rubric.
+      // THE SCORE IS THE DEFECTS (owner, 2026-08-08). The eval prompts no
+      // longer return a score — they return fixable_issues[], and every number
+      // downstream is derived from it by the §2 rubric here. blendVisualScore
+      // used to let the model's own number pull the result back UP
+      // (max(computed, model − 3)), so an image the model felt good about
+      // outranked what its own defect list justified.
       //
-      // BLEND (Jul 2026): the Apr-2026 "ignore the model's score" rule
-      // over-corrected — the issue list double-counts nitpicks (5 moderates
-      // = 0/10 on an image the model itself rated 8/10), so the computed
-      // score can only pull at most 3 points below the model's own judgment:
-      // final = max(computed, model − 3). See blendVisualScore.
-      // One of THREE severity→number tables that exist on purpose — see the
-      // note above SEVERITY_POINTS in scoring.js. This one is the legacy
-      // 0-10 audit blend (qualityScore/rawScore) + repair-method gates; it
-      // never feeds finalScore (that's SEVERITY_POINTS).
+      // One of TWO severity→number tables that exist on purpose — see the note
+      // above SEVERITY_POINTS in scoring.js. This one is the 0-10 scale used by
+      // qualityScore + the repair-method gates; it never feeds finalScore.
       const SEVERITY_PENALTY = { CATASTROPHIC: 5, CRITICAL: 3, MAJOR: 2, MODERATE: 1, MINOR: 0.5 };
       const totalPenalty = fixableIssues.reduce(
         (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1),
         0
       );
-      const computedRawScore = Math.max(0, Math.min(10, 10 - totalPenalty));
-      const rawScore = blendVisualScore(modelRawScore, computedRawScore);
-      const score = rawScore * 10; // 0-100 for compatibility
+      const visualScore10 = Math.max(0, Math.min(10, 10 - totalPenalty));
+      const score = visualScore10 * 10; // 0-100 for compatibility
 
-      const scoreDelta = Math.abs(modelRawScore - computedRawScore);
-      if (scoreDelta > 3) {
-        log.warn(`📊 [EVAL] Score divergence: model=${modelRawScore}/10, computed-from-issues=${computedRawScore}/10 (Δ=${scoreDelta}). Using blended=${rawScore}/10.`);
-      } else if (scoreDelta >= 1) {
-        log.debug(`[EVAL] Score divergence: model=${modelRawScore}/10, computed=${computedRawScore}/10 (Δ=${scoreDelta}). Using blended=${rawScore}/10.`);
-      }
-      log.info(`📊 [EVAL] Score: ${rawScore}/10 (${score}/100) [computed ${computedRawScore}/10 from ${fixableIssues.length} issues; model said ${modelRawScore}/10], Verdict: ${verdict}`);
+      log.info(`📊 [EVAL] Score: ${visualScore10}/10 (${score}/100) from ${fixableIssues.length} defect(s), Verdict: ${verdict}`);
       const hasRealIssues = issuesSummary && issuesSummary !== 'none' && issuesSummary.toLowerCase() !== 'none';
       if (hasRealIssues) {
         log.info(`📊 [EVAL] Issues: ${issuesSummary}`);
@@ -2156,7 +2131,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         qualityScore: visualScore,            // Visual quality score AFTER three-stage merge
         semanticScore: semanticResult?.score ?? null,  // Semantic fidelity score (0-100)
         threeStageScore: threeStageResult?.score ?? null, // Three-stage compliance score (0-100)
-        rawScore, // Original 0-10 score (visual only, BEFORE three-stage merge — kept for audit)
+        visualScore10, // 0-10 defect-derived visual score, BEFORE the three-stage merge (audit)
         verdict,
         reasoning,
         rawOutput: responseText,              // Full unparsed API response (for dev testing)
@@ -8103,7 +8078,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         stampAtCreation(v, {
           evalResult: v.evaluation,
           entityResult: { issues: v.entityIssues || [], penalty: v.entityPenaltyRaw ?? v.entityPenalty ?? 0 },
-          promptFinalScore: v.score ?? null,
         });
       }
     }
@@ -9000,7 +8974,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           applyScore(newVersion, {
             evalResult: ev,
             entityResult: evEntityResult,
-            promptFinalScore: evScore,
             // Deduped issue list drives the math score; also persisted on
             // the version (consolidatedPlan) for the dev panel + finalize
             // re-stamp.
@@ -9093,7 +9066,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // version with its own rewritten description is consolidated against
         // THAT, not the original.
         const rescuePlan = await consolidatePageEval(ev, entityResult.issues, ev.pageNumber, null, entry.version?.description || null);
-        rescueApplyScore(entry.version, { evalResult: ev, entityResult, promptFinalScore: evScore, consolidatedPlan: rescuePlan });
+        rescueApplyScore(entry.version, { evalResult: ev, entityResult, consolidatedPlan: rescuePlan });
         const repicked = selectBestVersion(pageVersions.get(ev.pageNumber));
         const prevBest = finalBestPerPage.get(ev.pageNumber);
         finalBestPerPage.set(ev.pageNumber, repicked);
@@ -9216,7 +9189,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         stampTextSpace(newVersion, {
           evalResult: newVersion.evaluation,
           entityResult: { issues: newVersion.entityIssues, penalty: best.entityPenaltyRaw ?? best.entityPenalty ?? 0 },
-          promptFinalScore: best.score ?? null,
         });
         versions.push(newVersion);
         finalBestPerPage.set(pageNumber, newVersion);
@@ -9347,7 +9319,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             stampStyleRepair(newVersion, {
               evalResult: newVersion.evaluation,
               entityResult: { issues: newVersion.entityIssues, penalty: prevBest.entityPenaltyRaw ?? prevBest.entityPenalty ?? 0 },
-              promptFinalScore: prevBest.score ?? null,
             });
             versions.push(newVersion);
             finalBestPerPage.set(target.page, newVersion);
@@ -9434,7 +9405,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return 'repair';
     };
     // Single canonical writer. Stamps finalScore + deductions + scoreBreakdown
-    // + promptFinalScore + scoreModel + evalScore +
+    // + scoreModel + evalScore +
     // entityPenalty on the version. Legacy fields (qualityScore, semanticScore,
     // threeStageScore, rawQualityScore) are no longer written — readers go
     // through computeFinalScore or version.finalScore, and per-evaluator
@@ -9461,7 +9432,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         evalResult: v.evaluation || null,
         entityResult,
         // Audit-only: the evaluator's merged score. finalScore is always math.
-        promptFinalScore: v.evaluation?.score ?? v.evaluation?.qualityScore ?? null,
         // Deduped issue list from the eval-time consolidation (attached at
         // version creation) — reused here, no second LLM call.
         consolidatedPlan: v.consolidatedPlan || null,
@@ -9473,12 +9443,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       imageData: v.imageData,
       // Canonical scoring fields written by applyScore. finalScore is the
       // single number the frontend + picker read. scoreBreakdown is the
-      // per-evaluator detail for the dev panel. deductions /
-      // promptFinalScore / scoreModel are audit-only.
+      // per-evaluator detail for the dev panel. deductions / scoreModel
+      // are audit-only.
       finalScore: v.finalScore,
       scoreBreakdown: v.scoreBreakdown || null,
       deductions: v.deductions || null,
-      promptFinalScore: v.promptFinalScore ?? null,
       scoreModel: v.scoreModel || null,
       // Eval-time consolidation: deduped issue list that fed the math score
       // (dev panel shows the dedupe) + which issue set was scored.
@@ -9486,13 +9455,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       scoreSource: v.scoreSource || null,
       evalScore: v.evalScore ?? null,
       entityPenalty: v.entityPenalty ?? 0,
-      // Un-clamped diagnostics. finalScore pins at 0 and evalScore is derived
-      // back as finalScore + entityPenalty, so once a page bottoms out every
-      // version reads finalScore=0 with entityPenalty===evalScore and they are
-      // indistinguishable — exactly the state applyScore writes these two
-      // fields to disambiguate. They were never persisted, so the signal died
-      // at save time. rawScore says how far below zero; entityPenaltyRaw says
-      // how much entity penalty was capped away.
+      // entityPenaltyRaw says how much entity penalty was capped away.
+      // (finalScore no longer pins at 0, so the rawScore companion this comment
+      // used to describe is gone — see scoring.js.)
       entityPenaltyRaw: v.entityPenaltyRaw ?? null,
       // Detailed evaluator outputs — kept verbatim because the dev panel uses
       // the structured detail (visible/expected character lists from semantic,
@@ -15192,7 +15157,6 @@ module.exports = {
   // Core image functions
   validateEmptyScene,
   evaluateImageQuality,
-  blendVisualScore,
   evaluateThreeStage,
   capComplianceIdentitySeverity,
   callGeminiAPIForImage,

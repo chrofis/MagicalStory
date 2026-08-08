@@ -53,9 +53,9 @@ MINOR is the correct tag for a small deviation from the prompt, not only for cos
 
 One defect, one entry, one tag — the highest that applies. Never charge the same problem twice under two codes.
 
-Before returning: sort your findings worst-first, then KEEP ONLY THE FIRST 8 and delete the rest. A page with nine small deviations is a good page, and reporting all nine scores it as a broken one. When two findings describe the same figure or the same region, merge them into one.
+Before returning: sort your findings worst-first, then KEEP ONLY THE FIRST 8 and delete the rest. A page with nine small deviations is a good page, and reporting all nine makes it read as a broken one. When two findings describe the same figure or the same region, merge them into one.
 
-`score` (0-10) and `verdict` (PASS 5+, SOFT_FAIL 3-4, HARD_FAIL 0-2) are display-only — the pipeline ignores both.
+Do not report a score. The page score is computed from the tags on your `fixable_issues[]` — reporting a number of your own would compete with it. `verdict` is one of PASS / SOFT_FAIL / HARD_FAIL and is display-only.
 
 ---
 
@@ -148,7 +148,6 @@ Return JSON only, no other text. Emit exactly these keys.
   ],
   "rendering": { "extra_limbs": false, "physics_ok": true, "issues": [] },
   "coherence_gate": { "applied": false, "reason": null },
-  "score": 7,
   "verdict": "PASS",
   "issues_summary": "One-sentence summary of what is wrong, or empty when nothing is.",
   "fixable_issues": [

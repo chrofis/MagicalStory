@@ -104,7 +104,7 @@ Tag each `fixable_issues[]` entry with a severity — the pipeline computes the 
 - MODERATE: Minor clothing detail, key object missing
 - MINOR: Small differences
 
-The 0-10 `score` (start at 10, lower it in proportion to the severities found) and VERDICT (PASS 5+, SOFT_FAIL 3-4, HARD_FAIL 0-2) are audit/display values only.
+Do not report a score. It is computed from the severity tags on your findings. VERDICT is one of PASS / SOFT_FAIL / HARD_FAIL and is display-only.
 
 ---
 
@@ -134,7 +134,6 @@ Return JSON only:
     "severity": "CRITICAL",
     "issue": "wrong_action: prompt and story text narrate offering/hand-over; inventory shows aiming"
   },
-  "score": 4,
   "verdict": "SOFT_FAIL",
   "issues_summary": "CharacterA in modern clothes facing wrong way; crossbow not aimed correctly",
   "fixable_issues": [

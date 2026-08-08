@@ -299,10 +299,11 @@ const MODEL_DEFAULTS = {
 
   // DEAD CONFIG (scoring audit 2026-07-10): scoreModel is read by nothing.
   // The 'prompt' model was never plumbed (no code ever wrote the consolidator's
-  // final_score into evaluation.promptFinalScore), so every finalScore was
-  // silently the math model while telemetry claimed 'prompt'. applyScore is now
-  // math-only by design — ONE score scale across pipeline + regen versions —
-  // and promptFinalScore survives as an audit-only field. Kept per mark-not-delete.
+  // final_score into the audit field), so every finalScore was silently the
+  // math model while telemetry claimed 'prompt'. That audit field was deleted
+  // 2026-08-08 along with every other duplicate score — there is ONE number
+  // now, derived from the defect list. This key is inert; the value is left
+  // alone only so nothing keys off a changed string.
   scoreModel: 'prompt',
   // Feature flags for generation pipeline
   // DEAD CONFIG (audit 2026-07-09): enableAutoRepair is read by nothing — the

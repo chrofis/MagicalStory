@@ -29,7 +29,7 @@ const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
 // Canonical scoring writer. Every newVersion / newImageData construction
 // in this file routes its score data through `applyScore` so the persisted
 // version row carries the canonical fields (finalScore, deductions,
-// scoreBreakdown, mathFinalScore, promptFinalScore, scoreModel, evalScore,
+// scoreBreakdown, scoreModel, evalScore,
 // entityPenalty). Legacy fields (qualityScore, semanticScore,
 // rawQualityScore) are kept on the literal during the transition for
 // in-flight consumers; saveStoryData/saveStoryImage and the frontend now
@@ -41,10 +41,9 @@ const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
 // SINGLE SCALE (2026-07-10): finalScore is the math model computed from the
 // structured issues below — the same formula the unified pipeline persists —
 // so regen versions and pipeline versions are comparable in the same
-// imageVersions[] array. imageResult.score (the merged evaluator number) is
-// passed only as the promptFinalScore AUDIT field; it no longer drives
-// finalScore (it used to be laundered through the prompt-model branch,
-// leaving two incomparable scales in one array).
+// imageVersions[] array. imageResult.score is itself derived
+// from that same defect list — the model no longer reports a score of its
+// own — so there is no second number to reconcile and nothing to launder.
 // EVAL CONSOLIDATION (Jul 2026, owner decision "3-4 evals, ONE summarize"):
 // pass `opts.consolidation = { sceneDescription, characters, sceneClothing,
 // storyId, pageNumber, round }` and the evaluation is deduped through the
@@ -90,7 +89,6 @@ async function stampCanonicalScore(version, imageResult, opts = {}) {
   applyScore(version, {
     evalResult,
     entityResult,
-    promptFinalScore: imageResult?.score ?? null,
     consolidatedPlan,
   });
 }
@@ -4074,7 +4072,6 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           qualityScore: evaluation.qualityScore ?? evaluation.score,  // Visual quality only
           semanticScore: evaluation.semanticScore ?? null,            // Semantic fidelity only
           entityPenalty: entityPenalty || 0,           // Penalty from entity/image-check issues
-          rawScore: evaluation.rawScore,
           verdict: evaluation.verdict,
           issuesSummary: evaluation.issuesSummary || '',
           reasoning: evaluation.reasoning,
@@ -4256,7 +4253,6 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
         rawOutput: evaluation.rawOutput || evaluation.reasoning || null,
         score: evaluation.score ?? evaluation.qualityScore ?? null,
         qualityScore: evaluation.qualityScore,
-        rawScore: evaluation.rawScore,
         verdict: evaluation.verdict,
         issuesSummary: evaluation.issuesSummary,
         fixableIssues: evaluation.fixableIssues,
@@ -4304,14 +4300,13 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
         pageNumber,
         prompt: filledPrompt,
         rawResponse: semanticResult.rawResponse || JSON.stringify({
-          score: semanticResult.rawScore,
+          score: semanticResult.score,
           verdict: semanticResult.verdict,
           semanticIssues: semanticResult.semanticIssues,
           visible: semanticResult.visible,
           expected: semanticResult.expected
         }, null, 2),
         score: semanticResult.score,
-        rawScore: semanticResult.rawScore,
         verdict: semanticResult.verdict,
         semanticIssues: semanticResult.semanticIssues,
         visible: semanticResult.visible,

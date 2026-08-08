@@ -839,19 +839,29 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
       return { score: null, verdict: 'UNKNOWN', semanticIssues: [], usage: { tokens, estimatedCost, elapsed }, error: err.message };
     }
 
-    const score = analysis.score ?? null;
+    // analysis.score is deliberately NOT read — image-semantic.txt no longer
+    // returns one. The score is computed from semanticIssues below.
     const semanticIssues = analysis.semantic_issues || [];
 
     log.info(`🔍 [SEMANTIC] Token usage - input: ${usageMeta?.promptTokenCount?.toLocaleString() || 0}, output: ${usageMeta?.candidatesTokenCount?.toLocaleString() || 0}, cost: $${estimatedCost.toFixed(4)}`);
     if (semanticIssues.length > 0) {
       log.info(`🔍 [SEMANTIC] Found ${semanticIssues.length} semantic issues: ${semanticIssues.map(i => i.problem).join('; ')}`);
     } else {
-      log.verbose(`[SEMANTIC] No semantic issues found (score: ${score}/10)`);
+      log.verbose('[SEMANTIC] No semantic issues found (score: 10/10)');
     }
 
+    // THE SCORE IS THE DEFECTS (owner, 2026-08-08). image-semantic.txt no
+    // longer returns a score; it returns semanticIssues[]. Same 0-10 rubric the
+    // visual eval uses, so the two subscores stay comparable.
+    const SEMANTIC_SEVERITY_PENALTY = { CATASTROPHIC: 5, CRITICAL: 3, MAJOR: 2, MODERATE: 1, MINOR: 0.5 };
+    const semanticPenalty = (semanticIssues || []).reduce(
+      (sum, i) => sum + (SEMANTIC_SEVERITY_PENALTY[String(i && i.severity).toUpperCase()] ?? 1),
+      0
+    );
+    const semanticScore10 = Math.max(0, Math.min(10, 10 - semanticPenalty));
     return {
-      score: score !== null ? score * 10 : null,
-      rawScore: score,
+      score: semanticScore10 * 10,
+      semanticScore10,
       verdict: analysis.verdict || 'UNKNOWN',
       semanticIssues,
       visible: analysis.visible || null,
