@@ -6,12 +6,16 @@
  *   visual      — Gemini quality eval (composition, lighting, anatomy).
  *                 Always runs. Range 0–100.
  *
- *   semantic    — Story-text fidelity eval. Scenes only (covers have no
- *                 narrative text to compare against). Range 0–100, null
- *                 when not evaluated.
+ *   semantic    — Story-text fidelity eval. Scenes always; covers only when
+ *                 a fidelity reference exists (they pass storyText=null, so a
+ *                 cover without an outlineExtract/sceneHint gets no semantic
+ *                 eval — images.js `fidelityRef`/`runFidelity`). Range 0–100,
+ *                 null when not evaluated.
  *
- *   threeStage  — Vision-inventory + Sonnet-compliance eval. Scenes only
- *                 (gated by evaluationType === 'scene' in evaluateImageQuality).
+ *   threeStage  — Vision-inventory + Sonnet-compliance eval. Scenes AND covers
+ *                 (images.js: `evaluationType === 'scene' || isCover`). This
+ *                 header used to say "scenes only"; that has not been true
+ *                 since covers were added to the three-stage gate.
  *                 Range 0–100, null when not evaluated.
  *
  *   entity      — Per-character consistency check across pages. Returns
@@ -29,9 +33,13 @@
  * `entity` separate because entity penalties can be added or revised
  * by a re-run of entity consistency, after the visual eval.
  *
- * COVERS vs SCENES: same fields, same helper, same picker. Covers just
- * have null for semantic/threeStage and zero entity penalty — they
- * naturally collapse to `finalScore = visual`.
+ * COVERS vs SCENES: same fields, same helper (applyScore), same picker
+ * (pickBestVersionIndex), same persistence helpers (dbIndexFor /
+ * arrayIndexForDb). Covers usually have null semantic and zero entity
+ * penalty. Known remaining cover-only divergences are catalogued in
+ * docs/scoring-review.md — notably composite covers, which come back with
+ * score:null (coverIterate.js) and are therefore unscoreable by
+ * pickBestVersionIndex, worked around with a hard `pinned: true`.
  *
  * VERSION SHAPE on the wire:
  *
