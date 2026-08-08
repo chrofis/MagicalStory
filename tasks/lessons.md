@@ -493,3 +493,36 @@ not the accumulated stories, they do not need RAM." Correct — Postgres RSS is
 `shared_buffers` + per-backend memory + page cache, not table size. Checked
 after: 12 connections, `shared_buffers=160MB`. Disk growth and the memory line
 are separate problems; don't conflate "the DB is big" with "the DB needs RAM".
+
+## Batch through the lab's run mechanism — not per-item bespoke scripts (2026-08-06)
+Debugging the cyber-avatar background bug I wrote three separate throwaway node
+scripts, each looping `runStageOnTarget` per character and hand-inserting its own
+`testlab_experiments` row (#364 eval, #367 eval+bg-check, #368 regen). It worked,
+but the user: "do fucking experiments not individually." The reproducible path is
+the lab's OWN batch machinery: pin the failing cases to a `testlab_set` ONCE, then
+re-run the set with the prompt/param change as a `variant` (executeExperiment /
+`POST /sets/:id/run`). One row per run, every target inside it, re-runnable from the
+UI with the override recorded — vs a bespoke script that vanishes and can't be
+replayed. RULE: never author a per-item loop that hand-builds experiment rows. If
+the same set of targets needs a second pass (new prompt, new eval, regen), it's a
+set re-run with a variant, not a new script.
+
+## Eval prompts grew into incident logs — length is a defect, not thoroughness (2026-08-08)
+Owner, seeing the evaluator prompt: "This is way way too long and has to get fixed."
+`image-evaluation.txt` is 36,321 chars / 406 lines — 129 bullet rules and 119 instances of
+"never / do not deduct". Filled for one page: 46,019 chars ≈ 11,500 tokens. One 10-page
+story spent 862,221 input tokens over 109 eval calls (~86k input tokens PER PAGE).
+
+Every paragraph in there is individually defensible — each was added to stop one specific
+false positive. Together they stop working: §4 already caps accessory details at MODERATE
+and "missing glasses" still came back MAJOR five times in one story; two identical runs at
+temperature 0 produced 0/6 identical issue sets. I contributed to this — I added the same
+art-style rule in FOUR places across two files, because there is no single place in a 406-line
+file where a rule is reliably read.
+
+RULE: when an eval misfires, do not append another carve-out paragraph. First check whether a
+rule for it already exists and is being ignored — if it is, the fix is consolidation or
+removal, not addition. Adding text to a prompt this size measurably buys nothing and makes
+the next person's rule less likely to be read. Before editing any eval prompt, check its size
+in `docs/prompt-inventory.md` (Evaluation section carries char/line counts) and prefer
+deleting or merging over appending.

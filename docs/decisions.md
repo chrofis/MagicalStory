@@ -6057,3 +6057,71 @@ only on a name in neither.
 **Status:** ✅ verified against stored data, zero throws on both stories.
 `job_1786147254924_8nuyywjii`: 10/10 pages resolve (was: every page threw).
 `job_1786053708336_8cdsca519`: 12 pages resolve, 2 correctly recognised as secondary-only casts.
+
+---
+
+## 2026-08-08 — Eval prompts are too long. Documented as a defect, baseline recorded.
+
+**Context:** Owner, shown the evaluator prompt: "This is way way too long and has to get fixed.
+Which evals do we have and how long is each?"
+
+**Baseline as of this commit** (`docs/prompt-inventory.md` Evaluation section now carries these
+per-template, keep it updated):
+
+| template | chars | lines | cadence |
+|---|---|---|---|
+| **image-evaluation.txt** | **36,321** | **406** | per page, per repair round, per cover |
+| feedback-consolidator.txt | 15,497 | 158 | per page, per round |
+| image-semantic.txt | 15,092 | 145 | per page |
+| image-prompt-compliance.txt | 13,441 | 152 | per page (three-stage stage 2) |
+| outline-review.txt | 8,660 | 111 | once per story |
+| avatar-evaluation.txt | 8,072 | 113 | per character |
+| sheet-2x4-evaluation.txt | 7,831 | 104 | per character per pass |
+| entity-consistency-check.txt | 6,930 | 146 | once per story |
+| sheet-2x4-style-eval.txt | 5,814 | 79 | per character (pass 2) |
+| image-visual-inventory.txt | 5,357 | 139 | per page |
+| sheet-row-bodies-eval.txt | 3,367 | 42 | per character |
+| story-text-quality-judge.txt | 2,880 | 48 | Test Lab text harness |
+| incremental-consistency-check.txt | 2,572 | 63 | per story |
+| image-inspection.txt | 2,457 | 53 | per image |
+| scene-review.txt | 2,306 | 49 | once per story (beats mode) |
+| story-beats-review.txt | 2,262 | 52 | once per story (beats mode) |
+| image-vision-inventory.txt | 2,033 | 33 | per page (three-stage stage 1) |
+| repair-verification.txt | 1,799 | 48 | per repair |
+| sheet-row-heads-eval.txt | 1,255 | 23 | per character |
+| generated-image-analysis.txt | 1,106 | 40 | per image |
+| sheet-row-identity-eval.txt | 1,024 | 17 | per character |
+| **total** | **~152k** | | |
+
+**Measured cost, not estimated.** `image-evaluation.txt` filled for one page is **46,019 chars
+≈ 11,500 tokens** (36.3k template + the 8.9k page prompt as ORIGINAL_PROMPT). Story
+`job_1786147254924_8nuyywjii` (10 pages) spent **862,221 eval input tokens over 109 calls —
+~86k input tokens per page**. Biggest consumers: page_quality 297k, semantic_compliance 137k,
+cover_quality 117k, eval_consolidation 104k.
+
+**Why it is a defect and not thoroughness.** `image-evaluation.txt` holds 129 bullet rules and
+119 instances of "never / do not deduct" — an accumulated incident log, one paragraph per false
+positive somebody once hit. Three measured consequences:
+1. **Rules inside it are not applied.** §4 caps accessory details at MODERATE; "missing glasses"
+   came back MAJOR five times in one story. The rule exists, on line 122 of 406.
+2. **Non-determinism.** Two identical runs at temperature 0 produced **0 of 6** identical issue
+   sets (experiments #403/#404).
+3. **Edits stop landing.** The art-style rule now appears in FOUR places across two templates
+   because no single location in a 406-line file is reliably read.
+
+**Section breakdown of the worst offender** (for whoever cuts it): STEP 3 rendering/physics 6,001
+(16.5%), §6 output format 5,839 (16.1%), STEP 0 coherence gate 4,512 (12.4%), §2 scoring 3,636,
+§3 defects 3,419, STEP 2 reference matching 3,201, §4 non-deductions 2,629, STEP 2D completeness
+2,326, remaining 7 sections 4,758.
+
+**Decision: documented, NOT cut in this commit.** Shortening a prompt that encodes this much
+hard-won history regresses silently, and with the judges measured non-deterministic a single
+before/after run cannot tell a better version from a differently-wrong one. Any consolidation
+needs the Lab sets (#5/#6 loaded) and repeated runs per arm. Recorded here so the next session
+starts from the numbers instead of re-deriving them.
+
+**A rule to stop it growing** is in `tasks/lessons.md`: when an eval misfires, check whether a
+rule for it already exists and is being ignored before appending another carve-out.
+
+**Touched:** `docs/prompt-inventory.md` (Evaluation section: char/line counts + size warning),
+`tasks/lessons.md`.
