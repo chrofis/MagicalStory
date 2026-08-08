@@ -578,6 +578,22 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
         }
       }
       if (others.length) log.info(`🅰️ [COVER TYPO POST] ${key}: also stamped ${others.length} non-active version(s)`);
+
+      // Persist ONLY the typography markers, with a targeted jsonb_set.
+      // NEVER saveStoryData() here: upsertStory deep-clones and strips imageData
+      // from its COPY, so the caller's storyData still holds every cover's
+      // ORIGINAL TEXTLESS bytes — re-saving the blob re-extracts those and
+      // overwrites the covers we just stamped. That is exactly what wiped the
+      // title, dedication and branding off all three covers of
+      // job_1786147254924_8nuyywjii.
+      try {
+        await dbQuery(
+          `UPDATE stories SET data = jsonb_set(data, ARRAY['coverImages',$2,'typography'], $3::jsonb, true)
+           WHERE id = $1 AND data->'coverImages' ? $2`,
+          [storyId, key, JSON.stringify(spec || {})]);
+      } catch (mErr) {
+        log.warn(`[COVER TYPO POST] ${key}: marker persist failed: ${mErr.message}`);
+      }
       // AUTOMATIC PAINTED TITLE (owner 2026-08-06): every new front cover gets the
       // painted treatment. Non-fatal by construction — paintServedCoverTitle keeps
       // the flat title on any failure, so generation cannot break on it.
@@ -704,6 +720,15 @@ async function paintServedCoverTitle(storyId, storyData, { coverKey = 'frontCove
     }
     await saveStoryImage(storyId, coverKey, null, res.imageData, { versionIndex: activeIdx, cacheBust: true, preserveScore: true });
     if (cover) { cover.typography = res.spec; cover.titlePainted = true; }
+    try {
+      await dbQuery(
+        `UPDATE stories SET data = jsonb_set(jsonb_set(data, ARRAY['coverImages',$2,'typography'], $3::jsonb, true),
+                                             ARRAY['coverImages',$2,'titlePainted'], 'true'::jsonb, true)
+         WHERE id = $1 AND data->'coverImages' ? $2`,
+        [storyId, coverKey, JSON.stringify(res.spec || {})]);
+    } catch (mErr) {
+      log.warn(`[TITLE PAINT] ${coverKey}: marker persist failed: ${mErr.message}`);
+    }
     log.info(`🅰️ [TITLE PAINT] ${coverKey}: painted title baked onto served v${activeIdx}`);
     return { painted: true, imageData: res.imageData, spec: res.spec, coverage: res.coverage, spill: res.spill };
   } catch (err) {

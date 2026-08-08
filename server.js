@@ -7421,17 +7421,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           seed: jobId,
           trial: !!inputData.skipQualityEval,
         });
-        // D1 (2026-08-07) — PERSIST what the bake wrote. bakeCoverTypographyPostPersist
-        // (and the painted-title step inside it) stamp `typography` and
-        // `titlePainted` onto storyData, but upsertStory already ran ABOVE, so
-        // those mutations were being dropped: covers came back with a painted
-        // title while the DB said titlePainted=null and typography=undefined,
-        // leaving the UI unable to tell a painted title from a flat one.
-        try {
-          await saveStoryData(storyId, storyData);
-        } catch (persistErr) {
-          log.warn(`⚠️ [UNIFIED] Could not persist cover typography markers: ${persistErr.message}`);
-        }
       } catch (e) {
         log.warn(`⚠️ [UNIFIED] Post-persist cover typography failed: ${e.message}`);
       }
