@@ -5884,3 +5884,33 @@ entity mis-crop is upstream of scoring, and severity re-tiering was not re-attem
 08-07 code-cap reversal.
 
 **Touched:** `prompts/image-evaluation.txt`, `prompts/image-prompt-compliance.txt`.
+
+## Test Lab avatar_eval mirrors production per pass — and the pass-2 head-check gap (2026-08-08)
+
+**Context:** Owner asked why a headless-bottom-row styled avatar (Daniel) passed eval. Investigation
+found the lab was NOT evaluating what production evaluates. Production: pass-1 (realistic base) →
+`evaluateSheetSplit` (per-cell head/body/identity check, `sheet-row-bodies-eval.txt` TASK-1 head
+check); pass-2 (styled) → `evaluateStyledSheetWithGemini` (holistic identity/style/layout, `sheet-
+2x4-style-eval.txt`, NO per-cell head check). The lab's `runAvatarEvalStage` had a `splitRows` toggle
+that forced the split on pass-2 — which production never does — AND used the wrong evaluator
+(`evaluateSheetWithGemini`) for a non-split pass-1. So lab verdicts didn't match production.
+
+**Decision:** `runAvatarEvalStage` now selects the evaluator strictly by pass to match production
+(pass-1 → `evaluateSheetSplit`; pass-2 → `evaluateStyledSheetWithGemini`); the `splitRows` param is
+removed. Reverted a wrong `splitSheetRows` "add a top margin" crop change — the bottom crop clip was
+misdiagnosed (Daniel's styled bottom bodies are genuinely headless; the margin only drags the top-row
+head-shots into the body crop, making a false head=yes MORE likely).
+
+**Rationale:** A lab verdict is only useful if it's the production verdict. The headless-Daniel
+"failure" I first showed came from the lab splitting a pass-2 sheet — a lab-only artifact.
+
+**Real recognition gap (NOT yet fixed — needs owner call):** (1) STRUCTURAL — pass-2 styled sheets
+get no per-cell "does each bottom body have a head" check (that check lives only in the pass-1 split),
+so a head lost during style transfer is never head-checked. (2) JUDGE — when the split WAS run on
+Daniel's headless pass-2 crop (lab #411), Gemini still scored `head=yes ×4`, so the head check is
+unreliable even when it runs. Fix direction: run a per-cell head/body check on pass-2 too, and make it
+deterministic (face-detector presence per bottom cell) rather than trusting the VLM's word.
+
+**Touched:** `server/lib/testlab.js` (runAvatarEvalStage pass-keyed eval; splitRows removed).
+
+**Status:** ✅ parity fix ready; ❌ recognition gap open (structural + judge).

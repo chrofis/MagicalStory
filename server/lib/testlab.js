@@ -4513,14 +4513,17 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     realisticVersionIndex = await saveTestVersion(target.storyId, 'tl_avatar', null, realistic, experimentId);
   }
 
+  // Mirror PRODUCTION exactly, keyed off the pass — the lab must eval what the
+  // pipeline evals, or a lab verdict is meaningless (owner, 2026-08-08):
+  //   pass 1 (realistic base) → evaluateSheetSplit         (generateCharacter2x4Sheet)
+  //   pass 2 (styled)         → evaluateStyledSheetWithGemini (runStyleTransferPass)
+  // The old `splitRows` toggle is gone: it let the lab split a pass-2 sheet that
+  // production never splits, which fabricated a headless-crop "failure".
   let evalResult;
   let splitSteps;
   let splitPromptUsed;
   let splitPrompts;
-  if (params.splitRows) {
-    // Run the SAME shared split evaluator production uses — parity by
-    // construction. It crops the sheet + the 2×2 avatar's face row and judges
-    // heads and bodies separately (anchored on face photo + avatar faces).
+  if (pass === 1) {
     const standardAvatar = await resolveAvatarSlotBytes(entry.inputs?.standardAvatar);
     const split = await _internal.evaluateSheetSplit(sheetForDisplay, {
       facePhoto, standardAvatar,
@@ -4545,12 +4548,6 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
       { label: `Top row · heads (final ${heads?.finalScore ?? '?'})`, imageType: 'tl_step', versionIndex: vTop },
       { label: `Bottom row · bodies (final ${bodies?.finalScore ?? '?'})`, imageType: 'tl_step', versionIndex: vBottom },
     ];
-  } else if (pass === 1) {
-    evalResult = await _internal.evaluateSheetWithGemini(
-      sheetForDisplay, costume.description || 'standard outfit',
-      process.env.GEMINI_API_KEY, facePhoto, null,
-      { characterDescription: character.description || '', model, promptOverride }
-    );
   } else {
     evalResult = await _internal.evaluateStyledSheetWithGemini(
       facePhoto, realistic, sheetForDisplay, artStyle, process.env.GEMINI_API_KEY,
