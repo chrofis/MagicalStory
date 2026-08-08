@@ -253,9 +253,16 @@ function computeRawScore(version) {
 /**
  * Sum severity points across every category and clamp 100−sum to [0, 100].
  */
+// NO FLOOR (owner, 2026-08-08). The old `Math.max(0, …)` made every badly
+// failing version read exactly 0, so selectBestVersion could not rank them and
+// fell back to `original` — that is how job_1786193650012_7baiaeftb page 11
+// shipped the nude first draft while a fully clothed repair (also clamped to 0)
+// sat unused in imageVersions[]. finalScore now carries the true distance below
+// zero (−35 and −255 are different facts) and IS the single score; rawScore is
+// kept as an alias for older readers.
 function computeMathFinalScore(deductions) {
   if (!deductions || typeof deductions !== 'object') return 100;
-  return Math.max(0, Math.min(100, 100 - sumDeductionPoints(deductions)));
+  return Math.min(100, 100 - sumDeductionPoints(deductions));
 }
 
 /**
@@ -306,11 +313,10 @@ function applyScore(version, { evalResult = null, entityResult = null, promptFin
   version.mathFinalScore = mathFinalScore;
   version.promptFinalScore = (typeof promptFinalScore === 'number') ? promptFinalScore : null;
   version.finalScore = finalScore;
-  // Un-clamped score (can go below 0). finalScore pins to 0 once deductions pass
-  // 100, so several failing versions all read 0 and become indistinguishable in
-  // the UI; rawScore preserves how-far-below-zero so they can be told apart
-  // (e.g. −30 vs −140) and is a hint that the eval may be over-penalizing.
-  version.rawScore = 100 - sumDeductionPoints(deductions);
+  // rawScore is now identical to finalScore — kept only so versions written
+  // before the floor was removed still resolve through the same field. Do not
+  // reintroduce a separate clamped/unclamped pair: one score, one scale.
+  version.rawScore = finalScore;
   version.scoreModel = 'math';
   // Which issue set fed the math: 'consolidated' (deduped) or 'raw'.
   version.scoreSource = dedupedIssues ? 'consolidated' : 'raw';
@@ -645,10 +651,10 @@ function pickBestVersionIndex(versions, { tieBreak = 'latest' } = {}) {
     const s = computeFinalScore(versions[i]);
     if (s == null) continue;
     const ded = versionDeductionTotal(versions[i]);
-    // Primary: clamped finalScore (higher better). Tiebreak when the clamped
-    // scores are equal — typically several candidates pinned at 0: prefer the
-    // one with the smallest un-clamped deduction total (fewest/lightest
-    // issues), which the 0-floor erased. Final full-tie break is direction-
+    // Primary: finalScore (higher better; may be negative since the 0-floor
+    // was removed 2026-08-08, so failing versions now rank against each other
+    // instead of all reading 0). Tiebreak on the deduction total for genuine
+    // ties. Final full-tie break is direction-
     // parameterized — BOTH directions are deliberate, do not "fix" one:
     //   'latest'   (<=): newer version wins a full tie — interactive flows,
     //               where the user's just-made regen should show.

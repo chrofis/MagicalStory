@@ -2069,7 +2069,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
               else if (issue.severity === 'MAJOR') semanticPenalty += 20;
               else semanticPenalty += 10;
             }
-            finalScore = Math.max(0, score - semanticPenalty);
+            finalScore = score - semanticPenalty;  // no 0-floor: see scoring.js computeMathFinalScore
             log.info(`🔍 [SEMANTIC] Semantic score: ${semanticResult.score}/100, penalty: ${semanticPenalty} points (quality ${score} → final ${finalScore})`);
             // Append semantic issues to summary
             const semanticSummary = semanticResult.semanticIssues.map(i => i.problem).join('; ');
@@ -2117,7 +2117,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
                 else semanticPenalty += 10;
               }
             }
-            finalScore = Math.max(0, visualScore - semanticPenalty);
+            finalScore = visualScore - semanticPenalty;  // no 0-floor: see scoring.js computeMathFinalScore
             log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Merged ${threeStageResult.fixableIssues.length} issue(s); recomputed visual ${score}→${visualScore}, final ${finalScore} (semantic −${semanticPenalty})`);
           }
           if (threeStageResult?.issuesSummary) {
@@ -2203,7 +2203,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
               else if (issue.severity === 'MAJOR') semanticPenalty += 20;
               else semanticPenalty += 10;
             }
-            finalScore = Math.max(0, qualityScore - semanticPenalty);
+            finalScore = qualityScore - semanticPenalty;  // no 0-floor: see scoring.js computeMathFinalScore
             log.info(`🔍 [SEMANTIC] Applied ${semanticPenalty} point penalty for semantic issues (${qualityScore} → ${finalScore})`);
             issuesSummary = `SEMANTIC: ${semanticResult.semanticIssues.map(i => i.problem).join('; ')}`;
           }
