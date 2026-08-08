@@ -101,6 +101,7 @@ async function main() {
   const promptOverride = flags.prompt ? fs.readFileSync(flags.prompt, 'utf8') : null;
   const params = {};
   if (flags.character) params.characterName = flags.character;
+  if (flags.garment) params.garment = flags.garment;
   if (flags['no-eval'] === 'true') params.autoEval = false;
   // --opts '<json>': per-stage tunables, forwarded verbatim as params.opts.
   // Stages that take thresholds (garment_hue) read them from here, so a knob can

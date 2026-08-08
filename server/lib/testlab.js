@@ -1226,13 +1226,24 @@ async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
 
   let imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
   const t0 = Date.now();
-  const detection = await detectAllBoundingBoxes(imageData, {
-    expectedCharacters: buildExpectedCharacters(ctx),
-    sceneContext: (ctx.scene.sceneDescription || '').slice(0, 2000),
-    artStyle: ctx.artStyle,
-    skipCache: true,
-    pageContext: `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-  });
+  // Reuse the STORED detection, exactly as production Step 1b does (it reads
+  // img.bboxDetection). Re-detecting here tests a different input: a fresh pass
+  // can fail to attribute figures and return UNKNOWN, which then skips every
+  // figure and makes the Lab disagree with the pipeline for reasons that have
+  // nothing to do with the colour repair. Fall back to a fresh detect only when
+  // the story carries none. params.freshDetection forces one.
+  let detection = params.freshDetection ? null : (ctx.scene.bboxDetection || null);
+  let detectionSource = detection?.figures?.length ? 'stored' : null;
+  if (!detection?.figures?.length) {
+    detection = await detectAllBoundingBoxes(imageData, {
+      expectedCharacters: buildExpectedCharacters(ctx),
+      sceneContext: (ctx.scene.sceneDescription || '').slice(0, 2000),
+      artStyle: ctx.artStyle,
+      skipCache: true,
+      pageContext: `testlab-exp${experimentId}-P${ctx.pageNumber}`,
+    });
+    detectionSource = 'fresh';
+  }
   if (!detection?.figures?.length) throw new Error('No figures detected on this page');
 
   const chars = ctx.characters || [];
@@ -1255,7 +1266,11 @@ async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
     const avatarUri = await getStyledAvatarForClothing(character, ctx.artStyle, cat);
     if (!avatarUri) { perFigure.push({ name, applied: false, reason: 'no styled avatar' }); continue; }
 
-    const res = await fixFigureGarmentColour(imageData, fig, avatarUri, { opts: params.opts || {}, collectSteps: true });
+    // params.garment lets the Lab exercise the garment ROUTING (top vs footwear
+    // vs headwear...) the way production does from the entity channel's word.
+    const res = await fixFigureGarmentColour(imageData, fig, avatarUri, {
+      opts: params.opts || {}, garment: params.garment, collectSteps: true,
+    });
     perFigure.push(res.report);
     const slot = {};
     for (const st of res.steps) {
@@ -1287,6 +1302,7 @@ async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
   return {
     elapsedMs: Date.now() - t0,
     changed: anyChange,
+    detectionSource,
     correctedVersion,
     perFigure,
     steps: steps.length ? steps : undefined,
