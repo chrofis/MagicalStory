@@ -670,7 +670,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "hair": "[color, style, length]",
       "face": "[eye color, skin tone, distinctive features]",
       "signatureLook": "[ONE memorable visual element]",
-      "clothing": "[the COMPLETE outfit — top, bottom, footwear, accessories, with specific colours. Nothing else fixes this character's clothing: they have no avatar, no reference photo, and no consistency check. Repeat it in the SCENE prose on every page they appear on, exactly as written here.]"
+      "clothing": "[the COMPLETE outfit — top, bottom, footwear, accessories, with specific colours. This entry is what the character's reference image is drawn from, and they have no photo-based avatar or repair pass to correct a mismatch. Repeat it in the SCENE prose on every page they appear on, exactly as written here.]"
     }
   ],
   "animals": [

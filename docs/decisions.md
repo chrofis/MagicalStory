@@ -191,12 +191,17 @@ are named in the SCENE prose and carried by CHR id in `objects[]`. Their
 outfit lives solely in `secondaryCharacters[].clothing`, must be the COMPLETE
 outfit, and must be repeated verbatim in the prose on every page they appear.
 **Rationale:** A roster character is held consistent by three independent
-mechanisms — a reference avatar, the entity-consistency grid, and character
-repair. A secondary has none of them (entity grids are built for the roster
-only), so the prose repeating the Visual Bible text IS the consistency
-mechanism, exactly as for any other recurring VB element. Detection is
-asymmetric by design, not by bug: `bboxDetection.figures` does locate
-secondaries by name, but there is no avatar to repair them toward.
+mechanisms — a photo-derived avatar, the entity-consistency grid, and
+character repair. A secondary has none of the three (entity grids are built
+for the roster only). It does get a generated reference image — every
+secondary gets one even on a single page, per owner instruction
+(`visualBible.js:1835`) — but that image is drawn FROM the Visual Bible
+entry, so the entry plus the prose repeating it is the whole consistency
+mechanism, exactly as for any other recurring VB element. Prose that
+disagrees with the entry fights the reference image rather than being
+corrected by it. Detection is asymmetric by design, not by bug:
+`bboxDetection.figures` does locate secondaries by name, but there is no
+photo-derived avatar to repair them toward.
 No code change was required — `buildSceneClothingRequirements` receives a
 roster-filtered cast (`images.js:9888`), so a secondary never reaches the
 clothing guard, and no consumer enumerates `pageClothing` keys as a cast

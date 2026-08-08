@@ -139,7 +139,7 @@ Then a single-line JSON object:
 
 **`objects[]`**
 - String array of Visual Bible IDs only (`LOC001`, `ART002.2`, `CHR001`).
-- Secondary characters visible in the scene go here by CHR id. Write their full appearance and their COMPLETE outfit into the prose on every page they appear on, copied from their Visual Bible entry. They have no avatar and no consistency check — the prose is the only thing holding them stable.
+- Secondary characters visible in the scene go here by CHR id. Write their full appearance and their COMPLETE outfit into the prose on every page they appear on, copied from their Visual Bible entry — that entry is what their reference image is drawn from, so prose that disagrees with it fights the reference.
 - Include every recurring visual element visible in the scene.
 - Real-landmark LOCs use the dotted vantage form (`LOC003.2`). Pick the variant matching the scene's perspective; default to `.1` if unsure.
 - Invented LOCs (`isRealLandmark: false`) use the bare id `LOC001` — no dotted form, they have no vantages.
