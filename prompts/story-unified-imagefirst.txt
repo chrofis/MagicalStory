@@ -13,7 +13,6 @@ Your strengths:
 - **Selective detail**: You include only what serves the story, never cramming in details just because they exist
 
 
-
 Your task is to create a COMPLETE story, authored IMAGE-FIRST. Strict working order:
 1. Story arc and planning — character arcs, plot structure, one narrative beat per page. No prose, no visuals yet.
 2. ALL scene designs as one visual sequence — every page's illustration designed from the beats, for renderability, BEFORE any story prose exists. Critique and lock the scene set.
@@ -200,10 +199,10 @@ If any check fails, rewrite the prose AND fix the metadata before returning. Do 
 
 **Character fields:**
 - `name` is always the character's real name (`Luca`), never a Visual Bible id (`CHR001`). Same rule for `interactions[].character`, `background`, and the SCENE prose. Ids belong only in `objects[]` and `interactions[].object`.
-- Every named character visible in the scene — foreground, midground, or background — belongs in `characters[]`, even if the prose or `background` field only names them once. If you mention a character by name anywhere in the prose or metadata, include them here with `clothing`.
+- Every main or primary character ({CHARACTER_NAMES}) visible in the scene — foreground, midground, or background — belongs in `characters[]`, even if the prose or `background` field only names them once. If you mention one of them by name anywhere in the prose or metadata, include them here with `clothing`. Secondary characters do not go in `characters[]`: name them in the SCENE prose and list their CHR id in `objects[]`.
 - A figure without a story name still belongs in `characters[]` (and gets a placeholder name like `Soldier1`, `Guard2`, `Innkeeper`) whenever the page text shows that figure performing a specific physical action on a named character or Visual Bible object — freeing, handing, taking, pointing, opening, lifting, striking, embracing. Anonymous extras stay in `background` only when they're scene atmosphere with no named-action role.
 - `position` (required): a short phrase placing the character in the scene. Prefer relational phrasing tied to a named entity — `on the boat's rim`, `behind CharacterD`, `a few paces ahead`, `at the rock's edge`, `across the bench from CharacterE`. Use left/right only when it carries cross-page continuity (a character sits to CharacterD's right in the train and must stay there next page), or when the page is an `ultra-wide` chase where horizontal placement matters. Always pair with a `depth` field.
-- `clothing` (required): must match an available avatar category exactly.
+- `clothing` (required): must match an available avatar category exactly. Clothing applies to main and primary characters only — a secondary character never carries a clothing category, because they have no avatar for a category to select.
 - `depth` (optional, default `foreground`): camera distance, NOT frame position. `foreground` = large and close, filling ~1/3+ of frame height. `midground` = head and torso visible, middle band. `background` = small/distant; a tiny silhouette roughly 1/6 of frame height or less. If the prose calls the character "tiny", "small", "distant", "silhouette", or gives a fractional size, `depth` MUST be `background`. If `shot` is `ultra-wide` and the character is named as a single distant figure, `depth` MUST be `background`.
 - `perspective` (optional, default `front`): `front`, `side`, `back view`, `over-the-shoulder`.
 - `pose` (optional, **default `threeQuarter`**): one of `front`, `threeQuarter`, `profile`, `back`. Picks which cell of the character's pre-rendered 2×4 reference sheet the composite path uses for this scene. `front` = facing the camera straight on. `threeQuarter` = body rotated ~45° away from the camera, both eyes still visible (the natural, lifelike default — most real scenes look like this). `profile` = full side view, one eye visible. `back` = back of the figure, no face. **Default to `threeQuarter` for almost every character.** Only switch to one of the others when the scene EXPLICITLY requires that exact angle: `profile` for a strict side-by-side confrontation or someone reading from a book held in profile; `back` for a character walking away from the camera or watching a distant target; `front` only when the character directly addresses the reader (cover-style head-on portrait, group "introduction" page). If you find yourself reaching for `front` because the character is just "facing toward the action", that's a `threeQuarter`. `pose` selects which cell of the 2x4 reference sheet is cropped and sent as this character's reference photo for the page (`cropAvatarCell` → `POSE_CELL`), so it steers every normal image generation, not just the composite path.
@@ -462,8 +461,65 @@ REVISIONS (one line per change): `Scene N: [problem] → [revised Setting/Cast/A
 After this section the scene sequence is LOCKED. The SCENE PAGES below must realize these designs, and the story text must serve them; no later stage may change what a scene depicts.
 
 
+---CLOTHING REQUIREMENTS---
+Based on the LOCKED scene sequence above, determine which clothing variants each
+character needs. This runs BEFORE the scene pages on purpose: every SCENE block
+below writes the outfit out in full, quoted from here, so the descriptions must
+exist first.
+
+**Guidelines:**
+- **ONE ENTRY PER MAIN OR PRIMARY CHARACTER** ({CHARACTER_NAMES}). Never create an entry for a secondary character — their outfit belongs in `secondaryCharacters[].clothing`. These entries drive avatar generation, and a secondary character has no avatar.
+- **COSTUME PRIORITY**: Any story with a theme, setting, or era that implies special clothing MUST set `costumed.used: true` and name the costume in `costumed.costume` (and describe it in `costumed.description`). Examples of costume names:
+  - Historical: `medieval`, `1920s`, `roman`, etc.
+  - Fantasy: `wizard`, `pirate`, `knight`, etc.
+  - Profession: `firefighter`, `detective`, etc.
+  - Swiss historical: `mittelalterliche`, `1800s`, etc.
+  - ONLY leave `costumed.used: false` when the story is set in the present day with normal everyday clothing.
+- **Costumed is PREFERRED** — when in doubt, mark `costumed.used: true`. Characters in costume look better and are more immersive.
+- **COVER IMAGES MUST use costumed when the story has costumes** — if `costumed.used: true` for any character, every cover (title page, initial page, back cover) MUST use that costumed variant for them, not `standard`. If the story is present-day with no costumes, covers use `standard` like the rest of the pages — do not invent a costume just for the cover.
+- **Description** (standard/winter/summer): the FULL final clothing description for this story. The Main Characters block above lists each character's stored clothing as a starting point. You may keep it verbatim, ADD a story-relevant accessory (red scarf, scout badge, watch), or CHANGE a garment if the story calls for it (e.g., a snowy adventure replaces standard sneakers with hiking boots). Output the complete outfit — top, bottom, footwear, any accessories — as one self-contained description. The avatar generator uses this verbatim with no concatenation; whatever you write IS the outfit. Omit only when `used: false`.
+- **Name structural garment parts, not just the garment.** Garments with defining structure the image model drops when only named — dungarees/overalls (denim bib panel over the chest held by two shoulder straps), pinafore (bib front over a blouse), suspenders/braces (two straps over the shoulders), kilt (pleats + sporran), kimono (wide wrap collar + obi sash), sari (draped shoulder pleat) — must spell out those parts in the description. A terse name like "denim dungaree shorts" renders as plain shorts; "denim dungaree shorts — square bib panel over the chest held by two shoulder straps" renders correctly. Keep the garment NAME in front of the parts — dropping it leaves a plain garment contradicted by its own clause ("denim shorts — square bib panel held by two shoulder straps"), which renders as the plain garment and is then reported as wrong on every page with no repair that can satisfy it. Same principle as the Visual Bible object-anatomy rule.
+- **Costumed**: Full outfit, every slot explicit — headwear (or `none`), top, bottom, footwear, belt/waist, outer layer (or `none`). Each slot states colour AND material. CLOTHING ONLY — no pets, companions, carried objects, or bag contents.
+- Only mark `used: true` for variations that actually appear in the story.
+- **CRITICAL — No Face Coverings**: NEVER include hats, helmets, crowns, masks, or anything covering/obstructing the face. Faces must stay fully visible for character recognition.
+- **Distinct Styles — three tests every costumed description must pass:**
+  1. **Different primary garment color**: No two characters may describe the same dominant color word (e.g., if one wears "dark blue cloak", no other character can wear "dark blue" anything — pick a different color for each).
+  2. **Different silhouette**: At least one of {garment type, length, cut} must differ. Not just different buttons, accessories, or trim.
+  3. **Costume-faithful signature**: the description MUST include at least TWO signature visual elements that identify the costume type at a glance. Generic "shirt + trousers + boots" with only colour variation FAILS — a reader must recognise the costume from the description alone. Examples per costume type (pick two or more per character):
+     - **Pirate**: striped shirt; leather vest with metal buttons; wide sash at the waist; boots tucked into trousers / tall cuffed boots; hoop earring; eyepatch.
+     - **Knight**: chainmail or scale armour; tabard or surcoat with heraldic colours; gauntlets; scabbard or sword belt; greaves over the boots.
+     - **Wizard**: pointed hood (no face cover); star- or moon-patterned robe; rope-cord belt; oversized sleeves; staff loop on the belt.
+     - **Medieval / Mittelalterliche**: linen tunic with leather lacings; hose / breeches; pointed leather shoes; wide leather belt with pouch; hooded short cape.
+     - **Cowboy**: fringed leather vest; bandana at the neck; chaps over the trousers; tall cuffed boots; large oval belt buckle.
+     - **1920s**: drop-waist dress / pinstripe waistcoat; T-bar shoes / two-tone oxfords; long pearl strand / bow tie; cloche or newsboy silhouette (no full face cover).
+     - For costume types not listed above: invent two signature elements that any child looking at a picture-book illustration would name as "that's a <costume>" — and write them into the description verbatim.
+  - WRONG (fails test 3): "headwear: none; top: burgundy wool vest over white undershirt; bottom: charcoal trousers; footwear: black leather boots; belt: burgundy sash" — colour-varied but no pirate signature → reads as a peasant.
+  - WRONG (all fail tests): three characters each "dark blue cloak with silver stars" with different buckles/brooches.
+  - WRONG (fails test 1): one "dark blue cloak", another "deep blue robe".
+  - RIGHT (pirate): "headwear: none; top: red-and-white striped linen shirt with rolled sleeves under a brown leather vest with brass buttons; bottom: dark indigo trousers tucked into tall cuffed black leather boots; belt/waist: wide crimson sash with a brass-buckled leather strap; outer layer: none; accessories: gold hoop earring".
+
+**Output format:**
+```json
+{
+  "clothingRequirements": {
+    "[CharacterName]": {
+      "standard": { "used": true/false, "description": "[FULL final outfit for this story — top, bottom, footwear, accessories. Start from the character's stored standard clothing (shown in the Main Characters block above), keep it as-is OR add an accessory OR change a garment if the story needs it. Output the complete outfit as one self-contained description; the avatar generator uses it verbatim with no concatenation.]" },
+      "winter": { "used": true/false, "description": "[FULL winter outfit — coat/jacket, bottoms, footwear, gloves/scarf/hat. Same rule as standard: start from the stored winter clothing, output the complete final outfit.]" },
+      "summer": { "used": true/false, "description": "[FULL summer outfit — top, bottoms, footwear, sun accessories. Same rule as standard: start from the stored summer clothing, output the complete final outfit.]" },
+      "costumed": { "used": true/false, "costume": "[real costume name like 'wizard' or 'knight'; OMIT this field and set used:false if no costume]", "description": "[full outfit; OMIT if no costume]" }
+    }
+  }
+}
+```
+
+**No placeholder strings.** Never write `"none"`, `"n/a"`, `"tbd"`, or empty `""` as a value. If the field doesn't apply, omit it. Examples:
+- Story has no costumes → `"costumed": { "used": false }` (omit `costume` and `description`)
+- Character doesn't appear in winter → `"winter": { "used": false }` (omit `description`)
+- Character uses standard but the story doesn't modify it → `"standard": { "used": true, "description": "[copy the character's stored standard outfit verbatim]" }`. Always include the description when `used: true`; the avatar generator needs it.
+
+
 ---SCENE PAGES---
-NOW author the COMPLETE illustration brief for EVERY page — this is where ALL scene work happens. One block per page, realizing the LOCKED **Scene N** design above: same setting, same cast + depths, same single action moment, same shot/framing. Derive each character's `expression` from the page's PAGE BEAT emotional beat. Use the exact format from the "Scene Output Format" section above; run its coherence self-check on every page before moving on.
+NOW author the COMPLETE illustration brief for EVERY page — this is where ALL scene work happens. Every SCENE block writes each character's outfit out in full, copied from the CLOTHING REQUIREMENTS section above; the descriptions exist by now, so quote them. Never write the category key ("wearing his standard clothes") as the outfit. One block per page, realizing the LOCKED **Scene N** design above: same setting, same cast + depths, same single action moment, same shot/framing. Derive each character's `expression` from the page's PAGE BEAT emotional beat. Use the exact format from the "Scene Output Format" section above; run its coherence self-check on every page before moving on.
 
 No story prose exists yet — do not write any story text in this section, and do not repeat these blocks anywhere else later.
 
@@ -524,58 +580,6 @@ TITLE_CANDIDATES:
 5. [fifth candidate]
 
 
----CLOTHING REQUIREMENTS---
-Based on the story draft, determine which clothing variants each character needs.
-
-**Guidelines:**
-- **COSTUME PRIORITY**: Any story with a theme, setting, or era that implies special clothing MUST set `costumed.used: true` and name the costume in `costumed.costume` (and describe it in `costumed.description`). Examples of costume names:
-  - Historical: `medieval`, `1920s`, `roman`, etc.
-  - Fantasy: `wizard`, `pirate`, `knight`, etc.
-  - Profession: `firefighter`, `detective`, etc.
-  - Swiss historical: `mittelalterliche`, `1800s`, etc.
-  - ONLY leave `costumed.used: false` when the story is set in the present day with normal everyday clothing.
-- **Costumed is PREFERRED** — when in doubt, mark `costumed.used: true`. Characters in costume look better and are more immersive.
-- **COVER IMAGES MUST use costumed when the story has costumes** — if `costumed.used: true` for any character, every cover (title page, initial page, back cover) MUST use that costumed variant for them, not `standard`. If the story is present-day with no costumes, covers use `standard` like the rest of the pages — do not invent a costume just for the cover.
-- **Description** (standard/winter/summer): the FULL final clothing description for this story. The Main Characters block above lists each character's stored clothing as a starting point. You may keep it verbatim, ADD a story-relevant accessory (red scarf, scout badge, watch), or CHANGE a garment if the story calls for it (e.g., a snowy adventure replaces standard sneakers with hiking boots). Output the complete outfit — top, bottom, footwear, any accessories — as one self-contained description. The avatar generator uses this verbatim with no concatenation; whatever you write IS the outfit. Omit only when `used: false`.
-- **Name structural garment parts, not just the garment.** Garments with defining structure the image model drops when only named — dungarees/overalls (denim bib panel over the chest held by two shoulder straps), pinafore (bib front over a blouse), suspenders/braces (two straps over the shoulders), kilt (pleats + sporran), kimono (wide wrap collar + obi sash), sari (draped shoulder pleat) — must spell out those parts in the description. A terse name like "denim dungaree shorts" renders as plain shorts; "denim dungaree shorts — square bib panel over the chest held by two shoulder straps" renders correctly. Keep the garment NAME in front of the parts — dropping it leaves a plain garment contradicted by its own clause ("denim shorts — square bib panel held by two shoulder straps"), which renders as the plain garment and is then reported as wrong on every page with no repair that can satisfy it. Same principle as the Visual Bible object-anatomy rule.
-- **Costumed**: Full outfit, every slot explicit — headwear (or `none`), top, bottom, footwear, belt/waist, outer layer (or `none`). Each slot states colour AND material. CLOTHING ONLY — no pets, companions, carried objects, or bag contents.
-- Only mark `used: true` for variations that actually appear in the story.
-- **CRITICAL — No Face Coverings**: NEVER include hats, helmets, crowns, masks, or anything covering/obstructing the face. Faces must stay fully visible for character recognition.
-- **Distinct Styles — three tests every costumed description must pass:**
-  1. **Different primary garment color**: No two characters may describe the same dominant color word (e.g., if one wears "dark blue cloak", no other character can wear "dark blue" anything — pick a different color for each).
-  2. **Different silhouette**: At least one of {garment type, length, cut} must differ. Not just different buttons, accessories, or trim.
-  3. **Costume-faithful signature**: the description MUST include at least TWO signature visual elements that identify the costume type at a glance. Generic "shirt + trousers + boots" with only colour variation FAILS — a reader must recognise the costume from the description alone. Examples per costume type (pick two or more per character):
-     - **Pirate**: striped shirt; leather vest with metal buttons; wide sash at the waist; boots tucked into trousers / tall cuffed boots; hoop earring; eyepatch.
-     - **Knight**: chainmail or scale armour; tabard or surcoat with heraldic colours; gauntlets; scabbard or sword belt; greaves over the boots.
-     - **Wizard**: pointed hood (no face cover); star- or moon-patterned robe; rope-cord belt; oversized sleeves; staff loop on the belt.
-     - **Medieval / Mittelalterliche**: linen tunic with leather lacings; hose / breeches; pointed leather shoes; wide leather belt with pouch; hooded short cape.
-     - **Cowboy**: fringed leather vest; bandana at the neck; chaps over the trousers; tall cuffed boots; large oval belt buckle.
-     - **1920s**: drop-waist dress / pinstripe waistcoat; T-bar shoes / two-tone oxfords; long pearl strand / bow tie; cloche or newsboy silhouette (no full face cover).
-     - For costume types not listed above: invent two signature elements that any child looking at a picture-book illustration would name as "that's a <costume>" — and write them into the description verbatim.
-  - WRONG (fails test 3): "headwear: none; top: burgundy wool vest over white undershirt; bottom: charcoal trousers; footwear: black leather boots; belt: burgundy sash" — colour-varied but no pirate signature → reads as a peasant.
-  - WRONG (all fail tests): three characters each "dark blue cloak with silver stars" with different buckles/brooches.
-  - WRONG (fails test 1): one "dark blue cloak", another "deep blue robe".
-  - RIGHT (pirate): "headwear: none; top: red-and-white striped linen shirt with rolled sleeves under a brown leather vest with brass buttons; bottom: dark indigo trousers tucked into tall cuffed black leather boots; belt/waist: wide crimson sash with a brass-buckled leather strap; outer layer: none; accessories: gold hoop earring".
-
-**Output format:**
-```json
-{
-  "clothingRequirements": {
-    "[CharacterName]": {
-      "standard": { "used": true/false, "description": "[FULL final outfit for this story — top, bottom, footwear, accessories. Start from the character's stored standard clothing (shown in the Main Characters block above), keep it as-is OR add an accessory OR change a garment if the story needs it. Output the complete outfit as one self-contained description; the avatar generator uses it verbatim with no concatenation.]" },
-      "winter": { "used": true/false, "description": "[FULL winter outfit — coat/jacket, bottoms, footwear, gloves/scarf/hat. Same rule as standard: start from the stored winter clothing, output the complete final outfit.]" },
-      "summer": { "used": true/false, "description": "[FULL summer outfit — top, bottoms, footwear, sun accessories. Same rule as standard: start from the stored summer clothing, output the complete final outfit.]" },
-      "costumed": { "used": true/false, "costume": "[real costume name like 'wizard' or 'knight'; OMIT this field and set used:false if no costume]", "description": "[full outfit; OMIT if no costume]" }
-    }
-  }
-}
-```
-
-**No placeholder strings.** Never write `"none"`, `"n/a"`, `"tbd"`, or empty `""` as a value. If the field doesn't apply, omit it. Examples:
-- Story has no costumes → `"costumed": { "used": false }` (omit `costume` and `description`)
-- Character doesn't appear in winter → `"winter": { "used": false }` (omit `description`)
-- Character uses standard but the story doesn't modify it → `"standard": { "used": true, "description": "[copy the character's stored standard outfit verbatim]" }`. Always include the description when `used: true`; the avatar generator needs it.
-
 **Brief example:**
 ```
 ---SCENE SEQUENCE---
@@ -595,6 +599,9 @@ Arc note: quiet establishing image before the adventure starts
 REVISIONS:
 Scene 5: same shot as Scene 4 → over-the-shoulder from behind the main character
 Scene 6: four distinct villagers with tools → one villager (midground, holds a lantern), others as background silhouettes
+
+---CLOTHING REQUIREMENTS---
+{ "clothingRequirements": { "CharacterA": { "standard": { "used": true, "description": "navy blue striped jumper, dark blue jeans, white sneakers" }, "winter": { "used": true, "description": "navy blue striped jumper under a red wool coat, dark blue jeans tucked into brown leather boots, red scarf, white mittens" }, "costumed": { "used": false } } } }
 
 ---SCENE PAGES---
 **Scene 1**
@@ -648,8 +655,6 @@ FIXES REQUIRED:
 ---TITLE---
 TITLE: CharacterA's Snowy Surprise
 
----CLOTHING REQUIREMENTS---
-{ "clothingRequirements": { "CharacterA": { "standard": { "used": true, "description": "navy blue striped jumper, dark blue jeans, white sneakers" }, "winter": { "used": true, "description": "navy blue striped jumper under a red wool coat, dark blue jeans tucked into brown leather boots, red scarf, white mittens" }, "costumed": { "used": false } } } }
 ```
 
 
@@ -705,7 +710,6 @@ Scan the draft and extract all elements that need to be consistent for visualiza
 **Each secondary character is ONE entry, no matter how the prose refers to them.** Before finalising `secondaryCharacters`, scan your prose for any character referenced both by relation (the friend's mother, the shopkeeper's daughter) AND by attribute (the woman with the basket, the man at the door) — those are the same person, write a single entry. Never reuse a CHR id across entries.
 
 
-
 ```json
 {
   "secondaryCharacters": [
@@ -718,7 +722,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "hair": "[color, style, length]",
       "face": "[eye color, skin tone, distinctive features]",
       "signatureLook": "[ONE memorable visual element]",
-      "clothing": "[specific colors and details]"
+      "clothing": "[the COMPLETE outfit — top, bottom, footwear, accessories, with specific colours. Nothing else fixes this character's clothing: they have no avatar, no reference photo, and no consistency check. Repeat it in the SCENE prose on every page they appear on, exactly as written here.]"
     }
   ],
   "animals": [
