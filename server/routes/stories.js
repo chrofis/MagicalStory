@@ -2639,6 +2639,46 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/stories/:id/title-paint — developer-mode evidence for the painted
+// cover title: the WHITE PLATE that was sent to the model, the model's RAW
+// output, and the outcome (ok / reason / metrics). Without this a flat title is
+// unexplainable from the UI — the only way to learn why was to re-run the paint
+// locally against the story's plate.
+router.get('/:id/title-paint', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const coverKey = ['frontCover', 'initialPage', 'backCover'].includes(req.query.coverKey)
+      ? req.query.coverKey : 'frontCover';
+    let rows = canReadAnyStory(req)
+      ? await dbQuery('SELECT data FROM stories WHERE id = $1', [id])
+      : await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Story not found' });
+    const storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    const cover = storyData?.coverImages?.[coverKey] || {};
+
+    const load = async (type) => {
+      const r = await dbQuery(
+        'SELECT image_data, image_url FROM story_images WHERE story_id=$1 AND image_type=$2 AND page_number IS NULL AND version_index=0 AND NOT is_test',
+        [id, type]);
+      if (!r.length) return null;
+      if (r[0].image_url) return r[0].image_url;
+      return r[0].image_data ? 'data:image/jpeg;base64,' + r[0].image_data.toString('base64') : null;
+    };
+
+    res.json({
+      coverKey,
+      painted: cover.titlePainted === true,
+      outcome: cover.titlePaint || null,
+      typography: cover.typography || null,
+      plateSent: await load(`${coverKey}TitleIn`),
+      modelOutput: await load(`${coverKey}TitleOut`),
+    });
+  } catch (err) {
+    console.error('Error loading title-paint evidence:', err);
+    res.status(500).json({ error: 'Failed to load title paint evidence: ' + err.message });
+  }
+});
+
 // GET /api/stories/:id/image/:pageNumber - Get individual page image
 // Optimized: First tries separate story_images table, falls back to data blob
 // Returns activeVersion from image_version_meta for version selection

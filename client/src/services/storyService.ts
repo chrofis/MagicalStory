@@ -2451,6 +2451,17 @@ export const storyService = {
     return api.put(`/api/stories/${storyId}/cover-typography`, { coverKey, style });
   },
 
+  /** Developer-mode evidence for the painted title: the white plate that was sent
+   *  to the model, the model's raw output, and the outcome. */
+  getTitlePaintEvidence(storyId: string, coverKey = 'frontCover') {
+    return api.get<{
+      coverKey: string; painted: boolean;
+      outcome: { ok: boolean; reason: string | null; coverage: number | null; spill: number | null; backend: string; at: string } | null;
+      typography: { fontId?: string; layout?: string; face?: string; lines?: string[] } | null;
+      plateSent: string | null; modelOutput: string | null;
+    }>(`/api/stories/${storyId}/title-paint?coverKey=${coverKey}`);
+  },
+
   /** Repaint the front-cover title in the artwork's medium (one model call).
    *  Costs credits; the server charges nothing when it falls back to the flat title. */
   repaintCoverTitle(storyId: string) {

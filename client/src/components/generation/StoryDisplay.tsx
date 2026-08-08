@@ -429,6 +429,10 @@ export function StoryDisplay({
   const [coverHistoryModal, setCoverHistoryModal] = useState<{ coverType: 'frontCover' | 'initialPage' | 'backCover'; versions: ImageVersion[]; activeVersionIndex?: number } | null>(null);
   const [repaintingTitle, setRepaintingTitle] = useState(false);
   const [titleModalOpen, setTitleModalOpen] = useState(false);
+  // Developer-mode evidence for the painted title: what the model was SENT and
+  // what it RETURNED. A flat title is otherwise unexplainable from the UI.
+  const [titlePaintEvidence, setTitlePaintEvidence] = useState<Awaited<ReturnType<typeof storyService.getTitlePaintEvidence>> | null>(null);
+  const [titleEvidenceOpen, setTitleEvidenceOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   // Repaint the cover title in the artwork's medium (server: one model call,
   // OCR-gated, falls back to the flat title and charges nothing on failure).
@@ -4761,6 +4765,68 @@ export function StoryDisplay({
                     ? (language === 'de' ? 'Titel wird gemalt…' : language === 'fr' ? 'Titre en cours…' : 'Changing title…')
                     : (language === 'de' ? 'Titel ändern' : language === 'fr' ? 'Modifier le titre' : 'Change title')}
                 </button>
+              </div>
+            )}
+            {/* TITLE PAINT — developer mode only. Shows the exact plate sent to
+                the model and the raw painting it returned, so a flat title can be
+                diagnosed from the page instead of by re-running it locally. */}
+            {developerMode && storyId && frontCoverObj && (
+              <div className="mt-2 border rounded-lg bg-gray-50 p-2">
+                <button
+                  className="text-xs font-semibold text-indigo-700 hover:underline"
+                  onClick={async () => {
+                    const next = !titleEvidenceOpen;
+                    setTitleEvidenceOpen(next);
+                    if (next && !titlePaintEvidence) {
+                      try { setTitlePaintEvidence(await storyService.getTitlePaintEvidence(storyId)); }
+                      catch { /* leave null — the panel shows "no data" */ }
+                    }
+                  }}
+                >
+                  {titleEvidenceOpen ? '▾' : '▸'} Titel-Malvorgang (Entwicklungsmodus)
+                </button>
+                {titleEvidenceOpen && (
+                  <div className="mt-2 text-xs">
+                    {!titlePaintEvidence ? (
+                      <div className="text-gray-400">lädt…</div>
+                    ) : (
+                      <>
+                        <div className={titlePaintEvidence.painted ? 'text-green-700' : 'text-amber-700'}>
+                          <b>{titlePaintEvidence.painted ? 'GEMALT' : 'FLACH (Fallback)'}</b>
+                          {titlePaintEvidence.outcome?.backend ? ` · ${titlePaintEvidence.outcome.backend}` : ''}
+                          {titlePaintEvidence.outcome?.at ? ` · ${new Date(titlePaintEvidence.outcome.at).toLocaleString()}` : ''}
+                        </div>
+                        {titlePaintEvidence.outcome?.reason && (
+                          <div className="mt-1 text-gray-700"><b>Grund:</b> {titlePaintEvidence.outcome.reason}</div>
+                        )}
+                        {(titlePaintEvidence.outcome?.coverage != null || titlePaintEvidence.outcome?.spill != null) && (
+                          <div className="text-gray-500">
+                            coverage {titlePaintEvidence.outcome?.coverage ?? '—'} · spill {titlePaintEvidence.outcome?.spill ?? '—'}
+                          </div>
+                        )}
+                        <div className="flex gap-3 mt-2 overflow-x-auto">
+                          {titlePaintEvidence.plateSent && (
+                            <figure className="shrink-0 w-56 m-0">
+                              <img src={titlePaintEvidence.plateSent} alt="plate sent" className="w-full border rounded cursor-zoom-in"
+                                onClick={() => window.open(titlePaintEvidence.plateSent!, '_blank')} />
+                              <figcaption className="text-[11px] text-gray-500 mt-1">1 · an Grok gesendet</figcaption>
+                            </figure>
+                          )}
+                          {titlePaintEvidence.modelOutput && (
+                            <figure className="shrink-0 w-56 m-0">
+                              <img src={titlePaintEvidence.modelOutput} alt="model output" className="w-full border rounded cursor-zoom-in"
+                                onClick={() => window.open(titlePaintEvidence.modelOutput!, '_blank')} />
+                              <figcaption className="text-[11px] text-gray-500 mt-1">2 · von Grok gemalt</figcaption>
+                            </figure>
+                          )}
+                          {!titlePaintEvidence.plateSent && !titlePaintEvidence.modelOutput && (
+                            <div className="text-gray-400">Keine Bilder gespeichert (Titel vor diesem Update erzeugt).</div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

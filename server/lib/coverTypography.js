@@ -711,7 +711,31 @@ async function paintServedCoverTitle(storyId, storyData, { coverKey = 'frontCove
       artStyle: storyData?.artStyle,
       style: cover?.typographyStyle || undefined,
       backend,
+      debug: true,   // keep the plate + raw output so developer mode can show them
     });
+
+    // DEVELOPER-MODE EVIDENCE. Persist exactly what the model was given and what
+    // it returned, plus the outcome, so a flat title explains itself instead of
+    // needing a local re-run to find out why. Two rows per cover, overwritten on
+    // each attempt; `${coverKey}TitleIn` is the white plate we sent,
+    // `${coverKey}TitleOut` is the model's raw painting.
+    try {
+      if (res.debug?.plate) await saveStoryImage(storyId, `${coverKey}TitleIn`, null, res.debug.plate, { versionIndex: 0, cacheBust: true });
+      if (res.debug?.raw) await saveStoryImage(storyId, `${coverKey}TitleOut`, null, res.debug.raw, { versionIndex: 0, cacheBust: true });
+      await dbQuery(
+        `UPDATE stories SET data = jsonb_set(data, ARRAY['coverImages',$2,'titlePaint'], $3::jsonb, true)
+         WHERE id = $1 AND data->'coverImages' ? $2`,
+        [storyId, coverKey, JSON.stringify({
+          ok: !!res.ok,
+          reason: res.reason || null,
+          coverage: res.coverage ?? null,
+          spill: res.spill ?? null,
+          backend: backend || 'grok',
+          at: new Date().toISOString(),
+        })]);
+    } catch (dErr) {
+      log.warn(`[TITLE PAINT] ${coverKey}: could not persist debug evidence: ${dErr.message}`);
+    }
     // paintCoverTitle always returns a usable image; only persist when it is the
     // PAINTED one (ok), otherwise the served flat render already matches.
     if (!res.ok) {
