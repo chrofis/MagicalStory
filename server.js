@@ -6866,6 +6866,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             if (coverKey && coverImages[coverKey]) {
               // Update cover with pipeline eval results
               coverImages[coverKey].qualityScore = img.qualityScore;
+              // Covers get the same canonical mirror as scenes (see the
+              // sceneImages mapping above). This whitelist dropped finalScore,
+              // so every stored cover root had finalScore undefined and
+              // database.js fell back to qualityScore — covers and pages
+              // ended up carrying different fields for "the score".
+              coverImages[coverKey].finalScore = img.finalScore ?? null;
               coverImages[coverKey].qualityReasoning = img.qualityReasoning;
               coverImages[coverKey].fixTargets = img.fixTargets;
               coverImages[coverKey].fixableIssues = img.fixableIssues;
