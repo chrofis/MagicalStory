@@ -5835,3 +5835,52 @@ model-reaper respects the warm-hold; `RECYCLE_WARM_HOLD_S` 900→2400),
 **Status:** ✅ shipped to staging — needs a real multi-figure story run to confirm the masks land under
 concurrency (staging-only path; prod uses the Gemini bbox but DOES use MobileSAM for repair masks, so
 the lock + warm help prod too).
+
+---
+
+## 2026-08-08 — Neon is never a deduction; severity audit of a full story
+
+**Context:** Owner, on `job_1786147254924_8nuyywjii` (cyber, 10 pages, mean score 11.4): "The neon
+stuff is wanted and should not deduct... Do we still get too many high and critical?"
+
+**Neon fix (shipped).** The 08-07 style block listed banned phrasings, and the judge simply used
+different ones — "Unauthorized glowing holographic screens", "added to bridge despite no mention in
+prompt", "Modern neon signs/screens present". Three CRITICALs, 75 points. Replaced the phrasing
+blacklist with an unconditional rule in BOTH evaluator templates plus the canonical never-deduct
+lists: style elements are **never a finding, at any severity, on any axis**, explicitly including
+neon signage that carries lettering, and explicitly including incongruity with a period or rural
+setting. Verified in experiment #412 on the four worst pages: **0 neon findings** (was 3 CRITICAL);
+issue counts p1 9→3, p4 10→4, p5 13→2, p10 8→4.
+
+**Severity audit — 84 deductions, 1363 points on 10 pages.** Categories, with a verdict on whether
+the severity is defensible:
+
+| category | findings | points | share | verdict |
+|---|---|---|---|---|
+| Neon / style set-dressing | 3 | 75 | 6% | **wrong — fixed above** |
+| FALSE identity (elderly/adult mix-up) | 6 | 225 | 17% | **wrong — false positives, see below** |
+| "standard clothing" phantom | 15 | 215 | 16% | **wrong — invented expectation** |
+| Missing glasses | 5 | 75 | 6% | defensible (rubric says MAJOR) but compounds per page |
+| Micro-detail (freckles, earrings, t-shirt star, shoe colour) | 11 | 83 | 6% | mostly correct tier |
+| Pose / position / props / setting | 44 | 690 | 51% | **over-tiered — 11 CRITICAL, 25 MAJOR** |
+
+**The false-identity class is the worst, and it is verifiable from the images.** p10 charges
+CATASTROPHIC "Emma rendered as an elderly woman with grey hair" — Emma is the child in the yellow
+shirt on the left; the grey-haired woman is MARGARET standing beside her. p8 charges CRITICAL "Noah
+is depicted as an elderly person" — Noah is the blond boy on the right; the elderly figure is again
+Margaret. The entity check is assigning one character's crop to another character's name and then
+reporting a catastrophic identity failure. 225 points on a cast that contains both a preschooler
+and a grandmother. NOT a severity-tier problem — a wrong-crop problem, upstream of scoring.
+
+**The "standard clothing" class is an invented expectation.** Fifteen findings of the form "Emma's
+clothing is non-standard (yellow t-shirt, denim shorts)", "Sarah is wearing a red t-shirt and blue
+jeans instead of her standard clothing", "instead of naturalistic child attire". A yellow t-shirt
+and denim shorts on a five-year-old IS naturalistic child attire; "standard" is a CATEGORY KEY in
+`clothingRequirements`, not a description of an outfit. The evaluator is comparing the render to the
+word "standard" rather than to the category's description text.
+
+**Status:** neon fix shipped and verified. The other three classes are diagnosed, NOT fixed — the
+entity mis-crop is upstream of scoring, and severity re-tiering was not re-attempted after the
+08-07 code-cap reversal.
+
+**Touched:** `prompts/image-evaluation.txt`, `prompts/image-prompt-compliance.txt`.
