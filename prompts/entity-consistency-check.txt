@@ -62,23 +62,27 @@ Return ONLY valid JSON (no markdown, no explanation):
 {
   "consistent": true/false,
   "score": 1-10,
-  "issues": [
+  "fixable_issues": [
     {
+      "type": "hair_change",
+      "severity": "MAJOR",
+      "character": "CharacterA",
+      "description": "Clear description of what's inconsistent between cells",
+      "fix": "Specific action to fix (e.g. 'Change hair to blonde to match cell A')",
       "cells": ["B", "D"],
       "pagesToFix": [3],
-      "type": "face_mismatch" | "hair_change" | "skin_tone" | "age_shift" | "clothing_inconsistent" | "color_change" | "shape_change",
-      "description": "Clear description of what's inconsistent between cells",
       "details": {
         "cellA": "What it looks like in cell A (reference/correct version)",
         "cellB": "What it looks like in problematic cell B"
       },
-      "canonicalVersion": "Description of what the correct appearance should be",
-      "fixInstruction": "Specific action to fix (e.g., 'Change hair to blonde to match cell A')",
-      "severity": "minor" | "major" | "critical"
-    }
-  ],
-  "garmentColourMismatches": [
+      "canonicalVersion": "Description of what the correct appearance should be"
+    },
     {
+      "type": "garment_colour",
+      "severity": "MINOR",
+      "character": "CharacterA",
+      "description": "Top is orange in cell B; canonical colour is yellow",
+      "fix": "Shift the top toward yellow — mechanical colour match, no redraw.",
       "cells": ["B"],
       "pagesToFix": [2],
       "garment": "top",
@@ -91,13 +95,13 @@ Return ONLY valid JSON (no markdown, no explanation):
 
 ## Garment Colour
 
-A garment of the right shape in the wrong colour goes in `garmentColourMismatches`, never in `issues`. It is corrected mechanically and must not cost score or trigger a redraw.
+A garment of the right shape in the wrong colour is `type: "garment_colour"` — never `clothing_inconsistent`. Always give it `garment`, `expectedColour` and `observedColour`; it is corrected mechanically from those fields, costs no score, and must never trigger a redraw. A garment of the wrong SHAPE or TYPE is `clothing_inconsistent` and does count.
 
 Report it whenever the garment's colour differs from the expected clothing description, including neighbouring hues such as orange against yellow, teal against sky-blue, or white against sage-green.
 
 Judge hue only. Scene lighting legitimately changes brightness and saturation, so a garment that is darker or duller in a dim scene is the same colour.
 
-A garment of the wrong kind, cut or category still belongs in `issues` as `clothing_inconsistent`. When one cell has both, report each in its own place.
+A garment of the wrong kind, cut or category still belongs in `fixable_issues` as `clothing_inconsistent`. When one cell has both, report each in its own place.
 
 ## Issue Detection Rules
 
@@ -139,7 +143,6 @@ If no issues found, return:
 {
   "consistent": true,
   "score": 10,
-  "issues": [],
-  "garmentColourMismatches": [],
+  "fixable_issues": [],
   "summary": "{ENTITY_NAME} appears consistent across all {CELL_COUNT} appearances"
 }

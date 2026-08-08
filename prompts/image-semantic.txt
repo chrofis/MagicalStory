@@ -29,7 +29,7 @@ Read the SCENE_HINT and IMAGE_PROMPT. List the characters they name. These are t
 
 **STEP 3: CHECK THE STORY BEAT**
 
-Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth). Each check below carries a default severity tag in [brackets] — apply that tag to the `semantic_issues` entry when the check fails. The tag drives a separate quality penalty (CATASTROPHIC = −50, CRITICAL = −25, MAJOR = −15, MODERATE = −5, MINOR = −2). Be conservative — if unsure between two levels, pick the lower.
+Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth). Each check below carries a default severity tag in [brackets] — apply that tag to the `fixable_issues` entry when the check fails. The tag drives a separate quality penalty (CATASTROPHIC = −50, CRITICAL = −25, MAJOR = −15, MODERATE = −5, MINOR = −2). Be conservative — if unsure between two levels, pick the lower.
 
 - Correct main action? (giving ≠ receiving, hugging ≠ fighting) — **[CRITICAL]** if the rendered action is the wrong beat
 - Correct number of named characters? — **[CRITICAL]** if a named character is missing; **[MAJOR]** if a stand-in figure is rendered in their place
@@ -74,7 +74,7 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 
 **SEVERITIES**
 
-Tag every `semantic_issues[]` entry with a severity — the pipeline computes the deduction from these tags. Only these defects exist:
+Tag every `fixable_issues[]` entry with a severity — the pipeline computes the deduction from these tags. Only these defects exist:
 - Missing character (listed in SCENE_HINT or IMAGE_PROMPT — depth label "foreground/midground/background" is not part of the requirement): CRITICAL
 - Character merged into or clipped through an object (AI compositing artifact): CRITICAL
 - Declared interaction missing or in a genuinely different category (e.g. object in pocket drawn as large held plush, on-head drawn in-hand): CRITICAL. Any left/right mirror (arm, hand, foot, shoulder, pocket, or compound body-part swap) is equivalent and does NOT deduct — treat the interaction as matched. Pose details in the scene prose that are NOT in DECLARED INTERACTIONS do NOT deduct.
@@ -99,15 +99,15 @@ VERDICT: PASS (7+), FAIL (0-6) — audit/display only.
 
 **OUTPUT FORMAT**
 
-Return JSON only. Put every issue you find in the `semantic_issues` array. Do not use any other field name for issues — the parser reads `semantic_issues` and discards anything else.
+Return JSON only. Put every issue you find in the `fixable_issues` array. Do not use any other field name for issues — the parser reads `fixable_issues` and discards anything else.
 
 **Output rules (strict):**
-- Every `semantic_issues[]` entry MUST carry a `type` from this closed list — it routes the repair, and an unlisted value is discarded as unroutable:
+- Every `fixable_issues[]` entry MUST carry `type`, `severity`, `description` and `fix` (and `character`, or null for scene-level). `type` MUST come from this closed list — it routes the repair, and an unlisted value is discarded as unroutable:
   `action_interaction` (wrong or missing declared interaction, wrong main action, wrong pose) · `missing_character` · `missing_element` (a named object, animal or landmark absent) · `object_presence` (present but wrong, misplaced, or unrequested) · `object_count` · `setting` (wrong location, background, weather or time of day) · `camera_facing` (front/back/profile, gaze direction) · `character_identity` (wrong person, age or hair) · `clothing` · `scale` · `figure_completeness` · `anatomy` · `rendered_text` · `naturalness` (anything else)
   Use ONE type per entry. Never invent a value, never join two with an underscore, comma or slash.
 - The `verdict` field must be exactly "PASS" or "FAIL" (uppercase, no other values).
 - Do not add explanatory text before or after the JSON. Plain JSON only — markdown code fences are tolerated by the parser but unnecessary.
-- **Do NOT emit `issues_summary`, `notes`, `comments`, or any other prose field.** Every observation — including emotion/tone mismatches, posture mismatches, gaze defects — goes in `semantic_issues[]` as a structured entry with `problem` and `severity`. Prose fields are silently dropped by the downstream repair pipeline; an issue you describe in prose but not in `semantic_issues[]` will never trigger a fix.
+- **Do NOT emit `issues_summary`, `notes`, `comments`, or any other prose field.** Every observation — including emotion/tone mismatches, posture mismatches, gaze defects — goes in `fixable_issues[]` as a structured entry with `description`, `severity`, `type` and `fix`. Prose fields are silently dropped by the downstream repair pipeline; an issue you describe in prose but not in `fixable_issues[]` will never trigger a fix.
 
 ```json
 {
@@ -124,23 +124,27 @@ Return JSON only. Put every issue you find in the `semantic_issues` array. Do no
     "setting": "forest",
     "action": "girl gives map to boy"
   },
-  "semantic_issues": [
+  "fixable_issues": [
     {
       "type": "missing_element",
-      "problem": "Map not visible — girl should be giving it to boy",
-      "severity": "MAJOR"
+      "severity": "MAJOR",
+      "character": null,
+      "description": "Map not visible — girl should be giving it to boy",
+      "fix": "Add the folded map into the girl's outstretched hands."
     },
     {
       "type": "naturalness",
-      "problem": "Boy shows a broad smile; scene expects an alarmed/urgent expression (STORY_TEXT says he shouts 'STOP!' as the figure runs away)",
-      "severity": "MODERATE"
+      "severity": "MODERATE",
+      "character": "boy",
+      "description": "Boy shows a broad smile; the beat is alarm as he shouts 'STOP!'",
+      "fix": "Repaint the boy's expression as alarmed — mouth open, brows raised."
     }
   ],
   "verdict": "PASS"
 }
 ```
 
-**Examples of emotion/tone problems — all go into `semantic_issues[]`:**
+**Examples of emotion/tone problems — all go into `fixable_issues[]`:**
 - `"CharacterA shows a neutral/serious expression; scene expects a smiling expression (STORY_TEXT describes a warm greeting)"` — severity MODERATE
 - `"CharacterB is smiling broadly; scene expects alarmed/concerned (STORY_TEXT: shouts 'NO!' as kids run into danger)"` — severity MODERATE
 - `"CharacterC looks bored; scene expects excited (STORY_TEXT: 'jumped up clapping hands')"` — severity MODERATE

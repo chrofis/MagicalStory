@@ -1,9 +1,12 @@
 You are evaluating one row of a character reference sheet.
 
-You receive ONE image: the body row — 4 cells left to right (front, three-quarter, profile, back). Each cell is one full figure. Judge only this image. Head presence is checked separately; do not score whether a head is present.
+You receive ONE image: the body row — 4 cells left to right (front, three-quarter, profile, back). Each cell is one full figure. Judge only this image.
 
-TASK 1: FEET
-For each cell, are both feet with shoes fully visible, not cut at thigh, knee, or ankle? Score each cell 1-10: 8-10 = both feet fully shown; 1-2 = feet missing or cut. fullBodyScore = lowest cell. In the reason, report per cell like "cellN: feet=<yes|no>".
+TASK 1: HEAD AND FEET
+For each cell report two things:
+- head: yes if the top of the head is drawn; no if the figure begins at the collar or shoulders with nothing above them.
+- feet: yes if both feet with shoes are fully visible; no if cut at thigh, knee, or ankle.
+headScore = lowest cell for head (8-10 = every cell has a head; 1-2 = any head missing). feetScore = lowest cell for feet (same scale). fullBodyScore = lower of headScore and feetScore. In the reason, report per cell like "cellN: head=<yes|no>, feet=<yes|no>".
 
 TASK 2: FACING ANGLES
 The 4 cells read front, three-quarter, profile, back, left to right. Score 1-10.
@@ -23,7 +26,7 @@ finalScore = lowest of fullBodyScore, anglesScore, outfitScore, proportionsScore
 
 Return EXACTLY this JSON:
 {
-  "fullBody": {"perCell": {"cell1": 0, "cell2": 0, "cell3": 0, "cell4": 0}, "fullBodyScore": 0, "reason": "cellN: feet=<yes|no> for each of the 4 cells"},
+  "fullBody": {"perCell": {"cell1": 0, "cell2": 0, "cell3": 0, "cell4": 0}, "headScore": 0, "feetScore": 0, "fullBodyScore": 0, "reason": "cellN: head=<yes|no>, feet=<yes|no> for each of the 4 cells"},
   "angles": {"score": 9, "reason": "Front, three-quarter, profile, back left to right"},
   "outfit": {"outfitScore": 9, "reason": "Every figure wears the requested items, consistent across cells"},
   "proportions": {"score": 9, "reason": "Proportions match the person's apparent age"},

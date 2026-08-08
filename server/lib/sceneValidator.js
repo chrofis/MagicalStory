@@ -841,11 +841,13 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
 
     // analysis.score is deliberately NOT read — image-semantic.txt no longer
     // returns one. The score is computed from semanticIssues below.
-    const semanticIssues = analysis.semantic_issues || [];
+    // Unified issue array (2026-08-08). semantic_issues is the pre-unification
+    // name and stays readable so stored evaluations keep parsing.
+    const semanticIssues = analysis.fixable_issues || analysis.semantic_issues || [];
 
     log.info(`🔍 [SEMANTIC] Token usage - input: ${usageMeta?.promptTokenCount?.toLocaleString() || 0}, output: ${usageMeta?.candidatesTokenCount?.toLocaleString() || 0}, cost: $${estimatedCost.toFixed(4)}`);
     if (semanticIssues.length > 0) {
-      log.info(`🔍 [SEMANTIC] Found ${semanticIssues.length} semantic issues: ${semanticIssues.map(i => i.problem).join('; ')}`);
+      log.info(`🔍 [SEMANTIC] Found ${semanticIssues.length} semantic issues: ${semanticIssues.map(i => i.description || i.problem).join('; ')}`);
     } else {
       log.verbose('[SEMANTIC] No semantic issues found (score: 10/10)');
     }

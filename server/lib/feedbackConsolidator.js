@@ -152,7 +152,9 @@ function flattenEntityIssues(entityReport) {
         // age_shift, clothing_inconsistent, ...) and it was being dropped here,
         // so 100% of entity findings reached scoring with no category and routed
         // to a full regenerate. evalBuckets.normalizeType maps these.
-        type: iss.type || iss.category || null,
+        // The entity report stores its own vocabulary in subType (type is the
+        // constant string "consistency", which routes nowhere), so prefer it.
+        type: iss.subType || iss.type || iss.category || null,
         severity: iss.severity || 'MODERATE',
         pageNumbers: iss.pageNumbers,
       });

@@ -6460,3 +6460,46 @@ and pushing further toward recomposition.
 
 **Touched:** `server/lib/coverIterate.js`.
 **Status:** 🟡 reasoned from stored evidence; not yet observed on a fresh cover iterate.
+
+---
+
+## 2026-08-08 — One issue shape across all four evaluators; garment colour becomes a category
+
+**Context:** Owner, after seeing the four output formats side by side: "Yes unify this. The garment
+colour should also be a category. They should all have identical format."
+
+**What was inconsistent.** The issue array had three names (`fixable_issues`, `semantic_issues`,
+`issues`), the text field two (`description`, `problem`), the fix field two (`fix`,
+`fixInstruction`), and severity was uppercase in three prompts and lowercase in entity. Entity also
+had no CATASTROPHIC tier and routed garment colour to a private `garmentColourMismatches` array that
+never reached scoring or per-category stats.
+
+**The unified shape, in all four prompts:**
+```
+{ "type", "severity", "character", "description", "fix" }   inside  "fixable_issues": []
+```
+Entity keeps its extra fields (`cells`, `pagesToFix`, `details`, `canonicalVersion`) — extra keys are
+harmless, and the mechanical colour fixer needs `garment` / `expectedColour` / `observedColour`.
+
+**Garment colour is now `type: "garment_colour"`** inside the same array, with its own bucket and
+`garment_colour_fix` repair. **It still costs zero score** — `scoring.js` gained `ZERO_POINT_TYPES`,
+so the 2026-07 decision ("corrected mechanically, must not cost score or trigger a redraw") is
+preserved by construction rather than by living on a separate channel. It is now visible in
+per-category stats instead of hiding.
+
+**Parsers accept BOTH shapes** so stored evaluations keep reading: `fixable_issues || semantic_issues`
+(sceneValidator), `fixable_issues || issues` plus the legacy colour array (entityConsistency),
+`fix || fixInstruction`, `description || problem`.
+
+**One bug found while wiring it.** `entityConsistency` stores the entity vocabulary in `subType` and
+sets `type: 'consistency'` — a constant that routes to `other`. Yesterday's fix to carry entity types
+through `flattenEntityIssues` would therefore have routed every entity finding to `other`/regen
+anyway. It now prefers `subType`.
+
+**Verified:** all five issue variants carry the identical five keys and route to a real bucket;
+scoring unchanged for the four real categories (15/25/15/15 points) and zero for garment colour at
+any severity.
+
+**Touched:** `prompts/image-semantic.txt`, `prompts/entity-consistency-check.txt`,
+`server/lib/scoring.js`, `server/lib/evalBuckets.js`, `server/lib/sceneValidator.js`,
+`server/lib/entityConsistency.js`, `server/lib/feedbackConsolidator.js`.

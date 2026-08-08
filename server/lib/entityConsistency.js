@@ -1081,7 +1081,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             cellsToPages,
             description: annotateCells(issue.description, cellToPage),
             issue: annotateCells(issue.issue, cellToPage),
-            fixInstruction: annotateCells(issue.fixInstruction, cellToPage),
+            fixInstruction: annotateCells(issue.fix || issue.fixInstruction, cellToPage),
           };
           delete annotated._gridCellToPage; // internal-only; don't persist
           report.characters[charName].issues.push(annotated);
@@ -2160,7 +2160,9 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
       }
 
       // Convert issues to unified format
-      const issues = (parsed.issues || []).map(issue => ({
+      const issues = (Array.isArray(parsed.fixable_issues)
+        ? parsed.fixable_issues.filter(i => !isGarmentColour(i))
+        : (parsed.issues || [])).map(issue => ({
         id: `entity_${entityName.toLowerCase().replace(/\s+/g, '_')}_${issue.pagesToFix?.[0] || 'unknown'}`,
         source: 'entity',
         pageNumber: issue.pagesToFix?.[0] || null,
@@ -2169,7 +2171,7 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
         subType: issue.type,
         severity: issue.severity || 'major',
         description: issue.description,
-        fixInstruction: issue.fixInstruction,
+        fixInstruction: issue.fix || issue.fixInstruction,
         affectedCharacter: entityName,
         cells: issue.cells,
         pagesToFix: issue.pagesToFix,
@@ -2182,7 +2184,17 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
       // colour), so it must not charge severity points or trip the redo gate —
       // regenerating a whole character to change a shirt's hue is the expensive
       // wrong answer, and it churns everything else in the frame.
-      const garmentColourMismatches = (parsed.garmentColourMismatches || [])
+      // Unified issue array (2026-08-08): garment colour is now type
+      // "garment_colour" inside fixable_issues rather than a private channel.
+      // It still routes to the mechanical fixer and still costs no score
+      // (scoring.js ZERO_POINT_TYPES) - only where it travels has changed.
+      // The legacy array is still read so stored evaluations keep working.
+      const unified = Array.isArray(parsed.fixable_issues) ? parsed.fixable_issues : [];
+      const isGarmentColour = (i) => /^garment_colou?r$/i.test(String(i && i.type || ""));
+      const garmentColourMismatches = [
+        ...unified.filter(isGarmentColour),
+        ...(parsed.garmentColourMismatches || []),
+      ]
         .filter(m => m && Array.isArray(m.pagesToFix) && m.pagesToFix.length)
         .map(m => ({
           source: 'entity-garment-colour',
@@ -2592,7 +2604,7 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
           if (issue.canonicalVersion) {
             issuesFoundText += `- Correct appearance (match IMAGE 1): ${issue.canonicalVersion}\n`;
           }
-          if (issue.fixInstruction) {
+          if (issue.fix || issue.fixInstruction) {
             // Clean up fix instructions - replace cell references with IMAGE 1
             let fix = issue.fixInstruction;
             fix = fix.replace(/cell [A-Z]/gi, 'IMAGE 1');

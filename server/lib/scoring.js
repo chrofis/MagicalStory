@@ -105,6 +105,10 @@ const { log } = require('../utils/logger');
 // Entity display/rank derives from SEVERITY_POINTS (see images.js
 // ENTITY_PENALTIES).
 // =====================================================================
+// Types that are recorded and routed but never charged. Garment colour is
+// fixed mechanically, so charging it would trip the redo gate for a hue shift.
+const ZERO_POINT_TYPES = new Set(['garment_colour', 'garment_color']);
+
 const SEVERITY_POINTS = {
   catastrophic: 50,
   critical:     25,
@@ -218,18 +222,20 @@ function composeDeductions({ evalResult = null, entityResult = null, consolidate
 function sumDeductionPoints(deductions) {
   if (!deductions || typeof deductions !== 'object') return 0;
   let total = 0;
+  const points = (d) => (ZERO_POINT_TYPES.has(String(d?.type || '').toLowerCase())
+    ? 0 : (SEVERITY_POINTS[d.severity] || 0));
   // `consolidated` is the deduped cross-evaluator list (one entry per unique
   // defect) — mutually exclusive with the raw buckets by construction in
   // composeDeductions, so summing all four never double-counts.
   for (const cat of ['quality', 'semantic', 'compliance', 'consolidated']) {
     const list = deductions[cat] || [];
-    for (const d of list) total += SEVERITY_POINTS[d.severity] || 0;
+    for (const d of list) total += points(d);
   }
   // Entity penalty capped (see capEntityPenalty): an uncapped −70/−90 entity
   // sum zeroed otherwise-good versions on flags the consolidator itself
   // marked not-actionable. capEntityPenalty is idempotent, so it's safe to
   // apply at every entity-penalty site.
-  const entityRaw = (deductions.entity || []).reduce((s, d) => s + (SEVERITY_POINTS[d.severity] || 0), 0);
+  const entityRaw = (deductions.entity || []).reduce((s, d) => s + points(d), 0);
   total += capEntityPenalty(entityRaw);
   return total;
 }

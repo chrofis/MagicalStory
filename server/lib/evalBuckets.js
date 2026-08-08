@@ -40,7 +40,13 @@ const BUCKETS = {
   action_interaction:   { owner: 'semantic', kind: 'graded', repair: 'inpaint_or_regen' }, // rope slack while pulling, wrong aim, faces away from target
   object_presence:      { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
   object_count:         { owner: 'quality',  kind: 'graded', repair: 'inpaint' },
-  setting:              { owner: 'quality',  kind: 'graded', repair: 'inpaint' }, // wrong/missing environment detail: location, background, weather, time of day
+  setting:              { owner: 'quality',  kind: 'graded', repair: 'inpaint' },
+  // Garment colour is corrected mechanically (masked L*a*b* match toward the
+  // character's canonical colour), so it routes to that fixer and NEVER costs
+  // score — regenerating a character to change a shirt's hue is the expensive
+  // wrong answer. scoring.js zeroes its points; the category exists so it is
+  // visible in per-category stats instead of hiding on a private channel.
+  garment_colour:       { owner: 'entity',   kind: 'graded', repair: 'garment_colour_fix' }, // wrong/missing environment detail: location, background, weather, time of day
   style_consistency:    { owner: 'quality',  kind: 'graded', repair: 'style_transfer' },
   composition_textzone: { owner: 'quality',  kind: 'graded', repair: 'iterate_placement' },
   rendered_text:        { owner: 'quality',  kind: 'binary', repair: 'regen' },
@@ -104,6 +110,7 @@ const TYPE_TO_BUCKET = {
   expression: 'naturalness', emotion: 'naturalness',
   // entity-consistency-check.txt emits its own closed vocabulary; map it here so
   // cross-page consistency findings route like everything else.
+  garment_colour: 'garment_colour', garment_color: 'garment_colour',
   face_mismatch: 'character_identity', hair_change: 'character_identity',
   skin_tone: 'character_identity', age_shift: 'character_identity',
   clothing_inconsistent: 'clothing', color_change: 'clothing',
