@@ -25,6 +25,7 @@ Answer each check, naming pages. Then rewrite only the pages a check faulted.
 1. Repetition — name any two pages whose images would look near-identical: same location, same grouping, same camera distance, same action. Say which one should change and how.
 2. Visual arc — read as a flipbook, does framing build with the plot? Name the page where intensity sags or spikes out of order.
 3. Continuity — does anything contradict an earlier page: a character's clothing, an object that was left behind, a time of day that moves backwards, a location that changes shape?
+3b. Clothing completeness — every character in a brief must be described wearing a top, a bottom and footwear. Name any page whose prose dresses a character in headwear alone, or in fewer than those three, or that names a clothing category key (`standard`, `costumed`) instead of the garments.
 4. Single moment — name any brief that describes more than one moment in time, a montage, or an action with no visible subject.
 5. Cast — name any scene with more than {MAX_CHARACTERS_PER_SCENE} named characters, or a character present in the beat but absent from the brief.
 6. Character fields — every character needs depth and a drawable expression naming brows, eyes or mouth. Name any that is missing one, or that uses a bare mood word.
@@ -37,6 +38,9 @@ Both blocks, in this order, nothing before or after.
 
 ---ANALYSIS---
 <your answers to checks 1-7>
+
+Every page you named as faulted in the analysis must appear below. Naming a
+page's defect and not rewriting it leaves the defect in the book.
 
 ---SCENES---
 ## Page <number>

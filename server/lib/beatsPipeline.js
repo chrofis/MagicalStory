@@ -453,10 +453,33 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         }
       }
       meta.timings.sceneReviewMs = Date.now() - t;
+
+      // FAULTED-BUT-NOT-REWRITTEN (owner, 2026-08-08). The reviewer is told to
+      // rewrite every page a check faulted, and it does not always comply: on
+      // job_1786193650012_7baiaeftb it named defects on pages 4, 8 and 13
+      // (characters missing from characters[], an expression with no brows, a
+      // two-moment sceneIntent) and rewrote only 1, 2 and 3. Those defects then
+      // shipped. Nothing surfaced the gap, because "3 briefs rewritten" reads
+      // like success. Compare the page numbers the analysis names against the
+      // ones it actually rewrote and say so out loud.
+      const namedPages = [...new Set(
+        (sceneReviewAnalysis.match(/\bpages?\s+\d+(\s*(?:,|and|&)\s*\d+)*/gi) || [])
+          .flatMap(m => m.match(/\d+/g) || [])
+          .map(Number)
+          .filter(n => expansions.some(x => x.pageNumber === n))
+      )];
+      const faultedNotFixed = namedPages.filter(n => !changed.includes(n));
+      if (faultedNotFixed.length > 0) {
+        log.warn(`⚠️ [BEATS] Scene review named page(s) ${faultedNotFixed.join(', ')} but rewrote none of them`);
+        gl.warn('beats_scene_review_incomplete',
+          `Reviewer named page(s) ${faultedNotFixed.join(', ')} in its analysis but rewrote only ${changed.length ? changed.join(', ') : 'nothing'} — those findings shipped unfixed`);
+      }
+
       sceneReviewReport = {
         model: srRes.modelId || reviewModel,
         durationMs: meta.timings.sceneReviewMs,
         changedPages: sceneDiffs.map(d => d.pageNumber),
+        namedButNotRewritten: faultedNotFixed,
         analysis: sceneReviewAnalysis,
         pages: sceneDiffs,
       };
