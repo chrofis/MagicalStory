@@ -6543,3 +6543,45 @@ one extra call; retries are near-zero at these pass rates.
 **Status:** ✅ active on staging (2026-08-09). ⚠ To verify before master: the
 composited sheet is 1280×1444 (taller cells) vs the old 1280×720 — smoke-test one
 costumed avatar → page + cover on staging to confirm nothing assumed the old aspect.
+
+---
+
+## Clothing check: two of three findings measured worthless, one kept (2026-08-08)
+
+**Context:** the plan was a mechanical clothing check whose findings feed the existing scene review
+(owner decisions: omit empty costume slots; link prop-garments via `wornAs`; findings go to the
+scene review and nowhere else). Built as `server/lib/clothingCheck.js` — pure, no API cost — then
+measured against the 25 most recent staging stories before wiring anything.
+
+**What the measurement said.**
+
+| finding | stories scoring <40 | stories ≥60 | verdict |
+| --- | --- | --- | --- |
+| `outfit_misattributed` | fires on both worst (avg 11, 17) | silent | **sent** |
+| `removal_unstated` | rare, needs a `wornAs` link | rare | **sent** |
+| `outfit_missing` | 24% of pages | 21% of pages | **not sent** |
+
+`outfit_missing` — "the prose never says what this character wears" — has **no discriminating
+power**. Prose omitting the outfit is normal and harmless while the canonical `wears:` line still
+carries it; sending it would have the reviewer rewriting one page in five for nothing. It stays as a
+diagnostic and is filtered out of the review block.
+
+Two tightenings were needed before `outfit_misattributed` was usable: fault only on TOTAL prose
+silence (partial omission is normal — a close-up has no reason to mention shoes), and ignore tokens
+shared by two or more characters on the page (a matching pirate crew otherwise "proves" everyone is
+wearing everyone else's clothes — one 4-page story produced 28 false positives).
+
+**The wider result, which contradicts the original framing:** a page where NOTHING anywhere states a
+character's outfit is essentially nonexistent (3% in the worst stories, 0% in good ones). So the
+215-point pirate disaster was not "the prose forgot the costume" — it was the worn-vs-held filter
+gutting the `wears:` line while the prose happened to be silent too. **The filter is the direct
+cause; the check is a supplement, not the fix.**
+
+**Decision:** ship the check with `outfit_misattributed` + `removal_unstated` only. The filter fix
+(annotate instead of delete) remains the primary repair and is NOT yet done.
+
+**Touched:** `server/lib/clothingCheck.js` (new), `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/story-bible-from-beats.txt`.
+
+**Status:** 🟡 module built and measured; NOT yet wired into `buildSceneReviewPrompt` /
+`scene-review.txt`. Prompt changes (slot omission, `wornAs`) are live in the templates.
