@@ -465,7 +465,16 @@ function groupAppearancesByClothing(appearances) {
  * @param {string} clothingCategory - Clothing category (e.g., 'standard', 'winter', 'costumed:pirate')
  * @returns {string|null} Styled avatar URL/data URI, or null if not found
  */
-async function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
+async function getStyledAvatarForClothing(character, artStyle, clothingCategory, options = {}) {
+  // exactCategory: return the styled avatar for THIS category or null — never a
+  // cross-category substitute. Required by the garment-colour repair, which uses
+  // the avatar's PIXELS as the colour target: falling back to another outfit's
+  // sheet repaints the garment toward a colour from a different costume, and it
+  // does so while looking like a confident correction. Measured: a character
+  // whose only watercolour sheet was `costumed` had a `standard` page resolved
+  // to the pirate sheet, so the "target colour" came from the pirate t-shirt.
+  // Callers that only need a face/identity reference should NOT set this.
+  const { exactCategory = false } = options;
   const avatars = character.avatars;
   const charName = character.name || 'Unknown';
   // Normalize at the single entry point — callers pass raw scene-metadata
@@ -528,6 +537,12 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory)
     return bytes ? `data:image/jpeg;base64,${bytes}` : null;
   };
 
+  if (exactCategory && !avatars?.styledAvatars?.[artStyle]?.[
+    (clothingCategory === 'costumed' || String(clothingCategory).startsWith('costumed:')) ? 'costumed' : clothingCategory
+  ]) {
+    log.info(`🔍 [AVATAR-LOOKUP] ${charName}: no styled avatar at [${artStyle}][${clothingCategory}] — exact lookup, returning null`);
+    return null;
+  }
   if (!avatars?.styledAvatars?.[artStyle]) {
     // No styled avatars for this art style — try base avatar before face
     // photo, REQUESTED CATEGORY FIRST: this branch is the normal path for
@@ -573,6 +588,10 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory)
   if (resolved) {
     log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: Found ${clothingCategory} avatar`);
     return resolved;
+  }
+  if (exactCategory) {
+    log.info(`🔍 [AVATAR-LOOKUP] ${charName}: no ${clothingCategory} styled avatar for ${artStyle} — exact lookup, refusing a cross-category substitute`);
+    return null;
   }
 
   // Realistic: styledAvatars.realistic only holds story-REDRESSED categories

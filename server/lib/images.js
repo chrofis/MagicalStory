@@ -7741,10 +7741,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           log.error(`❌ [GARMENT-COLOUR] ${charName} p${pageNumber}: no clothing category — refusing to recolour toward a guessed outfit.`);
           skipped++; continue;
         }
-        const avatarUri = await getStyledAvatarForClothing(character, artStyle, m.clothingCategory);
+        // EXACT category only. The avatar's pixels ARE the colour target, so a
+        // cross-category substitute repaints the garment toward a different
+        // outfit's colour while looking like a confident correction. Observed:
+        // a character whose only watercolour sheet was `costumed` had a
+        // `standard` page silently resolved to the pirate sheet.
+        const avatarUri = await getStyledAvatarForClothing(character, artStyle, m.clothingCategory, { exactCategory: true });
         if (!avatarUri) {
-          audit.skipped = 'no styled avatar for this clothing category';
-          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: no styled avatar — skipped`);
+          audit.skipped = `no styled avatar for category ${m.clothingCategory}`;
+          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: no styled avatar for category ${m.clothingCategory} — skipped (refusing a cross-category colour target)`);
           skipped++; continue;
         }
 

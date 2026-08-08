@@ -1270,8 +1270,10 @@ async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
     // NO DEFAULT CLOTHING (owner, 2026-08-07): the avatar is the colour target.
     if (!pageClothing[character.name]) { perFigure.push({ name, applied: false, reason: 'no per-page clothing category (refusing to default to standard)' }); continue; }
     const cat = normalizeClothingCategory(pageClothing[character.name]);
-    const avatarUri = await getStyledAvatarForClothing(character, ctx.artStyle, cat);
-    if (!avatarUri) { perFigure.push({ name, applied: false, reason: 'no styled avatar' }); continue; }
+    // EXACT category — same rule as production Step 1b: the avatar's pixels are
+    // the colour target, so never accept another outfit's sheet as a stand-in.
+    const avatarUri = await getStyledAvatarForClothing(character, ctx.artStyle, cat, { exactCategory: true });
+    if (!avatarUri) { perFigure.push({ name, applied: false, reason: `no styled avatar for category ${cat}` }); continue; }
 
     // params.garment lets the Lab exercise the garment ROUTING (top vs footwear
     // vs headwear...) the way production does from the entity channel's word.
