@@ -1134,6 +1134,11 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
 
     const complianceInput = fillTemplate(complianceTemplate, {
       ORIGINAL_PROMPT: (imagePrompt || '').substring(0, 3000),
+      // Passed separately: ORIGINAL_PROMPT is truncated at 3000 chars and the
+      // ART STYLE block sits at the end of the page prompt, so the compliance
+      // judge never saw the style and treated required style elements as
+      // unrequested additions.
+      ART_STYLE: require('../services/prompts').extractArtStyle(imagePrompt),
       VISUAL_INVENTORY: visionText,
       QUALITY_FIGURES: qualityFiguresBlock,
       INTERACTIONS_BLOCK: interactionsBlock,
@@ -1403,6 +1408,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     // Pre-sanitize for 2.5 models to reduce content blocking on first attempt
     let promptForEval = modelId.includes('2.5') ? sanitizeForGemini(originalPrompt, 'light') : originalPrompt;
+    // Resolved from the UNSTRIPPED prompt: the cover branch below deletes the
+    // ART STYLE block from promptForEval as evaluator noise, which would leave
+    // covers with no style to judge style elements against.
+    const artStyleForEval = require('../services/prompts').extractArtStyle(originalPrompt);
 
     // For cover evaluations: strip art style noise and prepend expected text prominently
     if (evaluationType === 'cover' && promptForEval) {
@@ -1473,6 +1482,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     const evaluationPrompt = evaluationTemplate
       ? buildEvaluationPrompt({
           originalPrompt: promptForEval,
+          artStyle: artStyleForEval,
           interactionsBlock,
           figureProportions: figureProportionsBlock,
           sceneIntent: sceneIntentBlock,
@@ -1647,6 +1657,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const fullEvalPrompt = evaluationTemplate
         ? buildEvaluationPrompt({
             originalPrompt: fullSanitized,
+            artStyle: artStyleForEval,
             interactionsBlock,
             figureProportions: figureProportionsBlock,
             sceneIntent: sceneIntentBlock,
@@ -7753,12 +7764,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // equals what computeMathFinalScore actually deducts. The old independent
   // table {30/20/10} made the dev panel show −10 where the score charged −2.
   // Client mirror: useRepairWorkflow.ts ENTITY_PENALTIES — keep in sync.
-  const { SEVERITY_POINTS: ENTITY_SEV_POINTS } = require('./scoring');
-  const ENTITY_PENALTIES = {
-    critical: ENTITY_SEV_POINTS.critical,
-    major: ENTITY_SEV_POINTS.major,
-    minor: ENTITY_SEV_POINTS.minor,
-  };
+  // Use SEVERITY_POINTS wholesale rather than re-listing a subset of its keys:
+  // the hand-copied {critical, major, minor} literal silently dropped
+  // `moderate` and `catastrophic`, so a moderate entity issue DISPLAYED as −0
+  // while computeMathFinalScore charged it −5 (normalizeIssues accepts every
+  // severity in SEVERITY_POINTS). Same table, no subsetting, no drift.
+  const { SEVERITY_POINTS: ENTITY_PENALTIES } = require('./scoring');
   // Returns { penalty, issues } so callers can persist BOTH the number AND the
   // source issues on each version. Without the issues, the dev panel shows a
   // mysterious "−N" deduction that the user can't drill into.
@@ -7888,7 +7899,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const baseEntityPenaltyRaw = baseEntityResult.penalty;
     const baseEntityPenalty = capEntityPenalty(baseEntityPenaltyRaw);
     const baseEntityIssues = baseEntityResult.issues;
-    const baseFinalScore = baseScore != null ? Math.max(0, baseScore - baseEntityPenalty) : null;
+    // NO INLINE RECOMPUTE. This used to be `max(0, baseScore − baseEntityPenalty)`
+    // — an EVALUATOR-scale number written into the same `finalScore` field that
+    // applyScore fills with the MATH-scale score a few lines below (stampAtCreation),
+    // i.e. two incomparable scales in one field depending on whether the version
+    // happened to carry an evaluation. Seed null; applyScore is the only writer
+    // of finalScore, and an un-evaluated version legitimately has no score
+    // ("no evidence of issues" is not "the image is perfect").
+    const baseFinalScore = null;
 
     const baseVersion = hasScaleRepair
       ? {
@@ -8483,29 +8501,65 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       if (!img.imageData) continue;
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
-      if (bestSoFar && bestSoFar.score != null) {
-        const visualScore = bestSoFar.evaluation?.qualityScore ?? bestSoFar.score;
-        const imageScore = bestSoFar.score;
-        const semanticPenalty = Math.max(0, visualScore - imageScore);
-        // Canonical: the version's own single-scale finalScore (stamped by
-        // applyScore at creation) — the same number the pickers and persist
-        // path use. Was an inline eval-scale max(0, imageScore − entity)
-        // recompute that disagreed with the persisted score.
-        const { computeFinalScore: roundScoreOf } = require('./scoring');
-        const finalScore = roundScoreOf(bestSoFar);
-        const entityPenalty = bestSoFar.entityPenalty || 0;
+      if (!bestSoFar) {
+        // A page with image bytes but no version object at all can never be
+        // repaired — it is not in pageVersions, so no round will ever act on
+        // it. Loud, because the symptom (a bad page shipping untouched) is
+        // otherwise indistinguishable from "the page was fine".
+        log.error(`❌ [PIPELINE] Round ${round} page ${img.pageNumber}: no version object — page cannot be scored or repaired`);
+        continue;
+      }
+      // GATE ON THE CANONICAL SCORE, not the legacy `.score` mirror. `.score`
+      // is the evaluator's merged number (ev.score ?? ev.qualityScore); it is
+      // null whenever the eval failed or returned an unexpected shape, and the
+      // old `if (bestSoFar.score != null)` guard then dropped the page out of
+      // roundEvalPages entirely — before findBadPages could see it. That made
+      // findBadPages' own `evaluated === false → redo` branch (repairLogic.js)
+      // unreachable from the pipeline: a page whose evaluation errored was
+      // silently shipped instead of redone.
+      const { computeFinalScore: roundScoreOf } = require('./scoring');
+      const finalScore = roundScoreOf(bestSoFar);
+      const entityPenalty = bestSoFar.entityPenalty || 0;
+      // Single-scale visual read — the SAME chain decideRepairMethod uses, so
+      // the number logged here is the number the <50 catastrophic gate sees.
+      const visualScore =
+        bestSoFar.scoreBreakdown?.visual?.score
+        ?? bestSoFar.evaluation?.qualityScore
+        ?? null;
 
-        log.debug(`📊 [PIPELINE] Round ${round} Page ${img.pageNumber}: vis=${visualScore} sem=-${semanticPenalty} img=${imageScore} ent=-${entityPenalty} final=${finalScore}`);
-
+      if (finalScore == null) {
+        // No readable score anywhere on the best version. Never skip silently:
+        // mark it evaluated:false so findBadPages redoes it, and say so at
+        // ERROR level naming the page.
+        log.error(`❌ [PIPELINE] Round ${round} page ${img.pageNumber}: no readable score on best version (source=${bestSoFar.source || '?'}, evaluated=${bestSoFar.evaluation?.evaluated}) — treating as bad so it is not silently skipped`);
         roundEvalPages[img.pageNumber] = {
           ...bestSoFar.evaluation,
+          evaluated: false,
+          evalError: bestSoFar.evaluation?.evalError || 'no readable score on best version',
+        };
+        continue;
+      }
+
+      const imageScore = bestSoFar.score ?? null;
+      const semanticPenalty = (visualScore != null && imageScore != null)
+        ? Math.max(0, visualScore - imageScore)
+        : 0;
+
+      log.debug(`📊 [PIPELINE] Round ${round} Page ${img.pageNumber}: vis=${visualScore} sem=-${semanticPenalty} img=${imageScore} ent=-${entityPenalty} final=${finalScore}`);
+
+      roundEvalPages[img.pageNumber] = {
+          ...bestSoFar.evaluation,
+          // scoreBreakdown travels with the eval object so decideRepairMethod
+          // reads the version's canonical per-evaluator scores instead of
+          // falling back to the legacy evaluator-scale qualityScore.
+          scoreBreakdown: bestSoFar.scoreBreakdown || bestSoFar.evaluation?.scoreBreakdown || null,
+          consolidatedPlan: bestSoFar.consolidatedPlan || bestSoFar.evaluation?.consolidatedPlan || null,
           visualScore,
           semanticPenalty,
           imageScore,
           entityPenalty,
           finalScore,
         };
-      }
     }
 
     const badPageNums = findBadPages(roundEvalPages, { scoreThreshold: regenThreshold });
@@ -8534,7 +8588,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const pageStrategies = badPages.map(img => {
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
-      const latestEval = bestSoFar?.evaluation || evalMap.get(img.pageNumber);
+      // Use the SAME enriched entry findBadPages just judged — it carries the
+      // version's canonical scoreBreakdown + finalScore on top of the raw
+      // evaluation. Reading bestSoFar.evaluation directly instead made the
+      // bad-page gate and the method decision run on two different score
+      // scales (canonical math vs legacy evaluator qualityScore).
+      const latestEval = roundEvalPages[img.pageNumber]
+        || bestSoFar?.evaluation
+        || evalMap.get(img.pageNumber);
 
       if (bothStrategiesTriedAndRegressed(versions)) {
         // Never silently drop unaddressed high-severity issues. When a page is

@@ -184,15 +184,27 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // (qualityScore / rawQualityScore / semanticScore on the evaluator object
   // itself) kept for stories that predate the migration. Default of 100 keeps
   // the legacy "no eval data → don't trigger catastrophic gate" behavior.
-  const visualScore =
+  const visualRead =
     evaluator.scoreBreakdown?.visual?.score
     ?? evaluator.qualityScore
     ?? evaluator.rawQualityScore
-    ?? 100;
-  const semanticScore =
+    ?? null;
+  const semanticRead =
     evaluator.scoreBreakdown?.semantic?.score
     ?? evaluator.semanticScore
-    ?? 100;
+    ?? null;
+
+  // A page that reaches the repair decision with NO readable score is a bug,
+  // not a pass. The `?? 100` defaults below keep the historical behaviour
+  // (an un-evaluated page must not trip the catastrophic gate on a phantom 0),
+  // but the condition is now LOUD: silently treating an unscored page as
+  // perfect is exactly how an entire repair stage can go missing without a
+  // single line in the logs.
+  if (visualRead == null) {
+    log.error(`❌ [REPAIR-DECIDE] page ${pageNumber}: no readable visual score (scoreBreakdown.visual.score / qualityScore / rawQualityScore all absent) — defaulting to 100, so the catastrophic-iterate gate CANNOT fire for this page`);
+  }
+  const visualScore = visualRead ?? 100;
+  const semanticScore = semanticRead ?? 100;
 
   // 0. Spec conflict — the consolidator judged the declared requirements
   // mutually unsatisfiable. No render can fix a broken contract: iterate
