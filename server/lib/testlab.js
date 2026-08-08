@@ -1738,6 +1738,12 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
       figures, seed: storyData?.title, artStyle: storyData?.artStyle,
       style: params.style || cover.typographyStyle || undefined,
       backend: params.backend, model: params.model, debug: true,
+      // A/B levers — both default to the production setting:
+      //   sceneRef        : send the artwork as a style reference (default ON —
+      //                     it carries the cover's colour and style)
+      //   strictEmptyPage : the "page stays pure white and empty" wording
+      sceneRef: params.sceneRef,
+      strictEmptyPage: params.strictEmptyPage,
     });
     const elapsedP = Date.now() - t0p;
     if (r.debug?.plate) await addStep('INPUT 2 (edited): title on WHITE square plate', r.debug.plate);
@@ -1754,7 +1760,10 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
           : `FAIL — ${r.reason} (coverage ${(r.coverage ?? 0).toFixed(2)}, spill ${(r.spill ?? 0).toFixed(2)}) — flat title served`,
       },
       typography: { fontId: r.spec?.fontId, layout: r.spec?.layout, face: r.spec?.face, lines: r.spec?.lines },
-      paintinSetup: { mode: 'plate', backend: params.backend || 'grok', refsSent: 2,
+      paintinSetup: { mode: 'plate', backend: params.backend || 'grok',
+        refsSent: params.sceneRef === false ? 1 : 2,
+        sceneRef: params.sceneRef !== false,
+        strictEmptyPage: params.strictEmptyPage !== false,
         deterministicColour: r.spec?.face || null },
       issuesSummary: r.ok ? null : r.reason,
     };
