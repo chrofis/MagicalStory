@@ -595,10 +595,23 @@ const IMAGE_MODELS = {
 // unmeasurable. Override with EVAL_TEMPERATURE to explore judge variance.
 const EVAL_TEMPERATURE = process.env.EVAL_TEMPERATURE != null ? Number(process.env.EVAL_TEMPERATURE) : 0;
 
+// Repair passes are environment-split (owner, 2026-08-08). Production keeps 3
+// — a paying customer's book should get every recovery attempt. Staging runs 1
+// so a showcase finishes in a reviewable time: rounds 2 and 3 of the Berger run
+// (job_1786193650012_7baiaeftb) cost ~15 minutes of a 50-minute story and the
+// owner is watching the result, not the convergence.
+// Deliberately keyed on RAILWAY_ENVIRONMENT_NAME, the same signal /api/health
+// reports, so the value the log prints is the value the environment ran.
+// REPAIR_MAX_PASSES overrides both, for a local or one-off experiment.
+const _envPasses = Number(process.env.REPAIR_MAX_PASSES);
+const REPAIR_MAX_PASSES = Number.isFinite(_envPasses) && _envPasses >= 0
+  ? _envPasses
+  : (process.env.RAILWAY_ENVIRONMENT_NAME === 'staging' ? 1 : 3);
+
 const REPAIR_DEFAULTS = {
   scoreThreshold: 60,       // Pages scoring below this need redo (0-100)
   issueThreshold: 5,        // Pages with this many fixable issues need redo
-  maxPasses: 3,             // Global passes over all pages
+  maxPasses: REPAIR_MAX_PASSES,  // Global passes over all pages — 1 on staging, 3 on prod
   maxCharRepairPages: 20,   // Max pages to character-repair per run (hard ceiling: bounds the worst-case spend even on "Repair All" against a 32-page story)
   // DEAD CONFIG (audit 2026-07-09): neither threshold below is read anywhere —
   // the real gate is hardcoded in repairLogic.js decideRepairMethod()
