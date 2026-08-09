@@ -435,6 +435,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // (outfit_misattributed, removal_unstated); see clothingCheck.js.
   let clothingFindings = '';
   let clothingByPage = null;
+  let clothingUnfixedList = [];
   try {
     const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
     const checkPages = expansions.map(x => {
@@ -469,6 +470,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   } else {
     t = Date.now();
     try {
+      // Snapshot every brief as it was SENT. sceneDiffs only captures pages the
+      // reviewer changed, so a run where it rewrote nothing left the dev panel
+      // with nothing to show — exactly the run we needed to inspect
+      // (job_1786235099497_ytd5c7eek: 3 faults handed over, 0 briefs rewritten).
+      const briefsIn = expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
       const srRes = await textModels.callTextModelStreaming(srPrompt, 16000, onChunk, reviewModel, { usageLabel: 'beats_scene_review' });
       const parsed = parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES');
       sceneReviewAnalysis = parsed.analysis || '';
@@ -526,6 +532,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           }), clothingRequirements, { artifacts: (visualBible || {}).artifacts });
           const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
           const left = after.findings.filter(f => REVIEWABLE.has(f.type));
+          clothingUnfixedList = left;
           const before = [...clothingByPage.values()].flat().filter(f => REVIEWABLE.has(f.type)).length;
           if (left.length > 0) {
             const pages = [...new Set(left.map(f => f.pageNumber))].sort((a, b) => a - b).join(', ');
@@ -547,6 +554,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         namedButNotRewritten: faultedNotFixed,
         analysis: sceneReviewAnalysis,
         pages: sceneDiffs,
+        // Dev-mode inspection (owner request 2026-08-09): the exact prompt the
+        // reviewer received, every brief as sent, and the clothing trail — so
+        // "it rewrote nothing" can be diagnosed without the DB.
+        prompt: srPrompt,
+        briefsIn,
+        clothingFindings: clothingFindings || null,
+        clothingUnfixed: clothingUnfixedList,
       };
       gl.info('beats_scene_review', `Scene review by ${srRes.modelId || reviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
         changedPages: changed, model: srRes.modelId || reviewModel,

@@ -938,6 +938,16 @@ export interface ReviewDiffReport {
   changedPages?: number[];
   analysis?: string;
   pages?: { pageNumber: number; before: string; after: string }[];
+  /** Pages the analysis faulted but never rewrote (surfaced in dev mode). */
+  namedButNotRewritten?: number[];
+  /** The exact prompt this reviewer received — dev-mode inspection. */
+  prompt?: string | null;
+  /** Every brief as SENT, including the ones the reviewer left alone. */
+  briefsIn?: { pageNumber: number; brief: string }[];
+  /** The mechanical clothing-fault block handed to the reviewer, if any. */
+  clothingFindings?: string | null;
+  /** Clothing faults still present after the review. */
+  clothingUnfixed?: { pageNumber: number; type: string; character?: string; detail?: string }[];
 }
 
 export interface SavedStory {

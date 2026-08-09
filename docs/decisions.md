@@ -6637,3 +6637,44 @@ next person to notice the apparent redundancy should read this instead of
 re-deriving it.
 
 **Status:** ✅ active — gates unchanged.
+
+---
+
+## Clothing faults are mandatory for the reviewer, and the whole handoff is visible in dev mode (2026-08-09)
+
+**Context:** the first run with the clothing check live (`job_1786235099497_ytd5c7eek`) worked
+perfectly up to the fix and then stopped dead:
+
+```
+CHECK    3 faults sent   p4 Daniel's teal coat on Noah · p12 Sarah's burgundy blouse on Hans
+                         p13 Noah's white shirt on Hans
+REVIEW   deepseek-v4-pro, 120s, 0 briefs rewritten
+RECHECK  all 3 still present
+```
+
+The findings were correct — p12 explains the rendered defect exactly, Hans wearing a burgundy coat
+instead of his navy captain's coat on three pages of four. The reviewer simply ignored them, and
+`changedPages: []` meant the dev panel had nothing to show for the one run we most needed to inspect.
+
+**Decision, two parts.**
+
+1. **The findings are not advisory.** They are now `# MECHANICAL CLOTHING FAULTS` with their own
+   mandatory check (`0.`) ahead of every other check in `scene-review.txt`: every listed page is
+   faulted, they are facts from an exact comparison rather than opinions, the reviewer may not answer
+   NONE while the section is non-empty, and it must fix only the named fault.
+2. **The handoff is inspectable.** `sceneReviewReport` now carries `prompt` (the exact reviewer
+   input), `briefsIn` (every brief AS SENT, not only the changed ones), `clothingFindings` (the block
+   handed over) and `clothingUnfixed` (what survived). The dev-mode "Scene review (diff)" panel
+   renders all four, and the panel now opens even when nothing changed.
+
+**Rationale:** a review stage that silently declines to act is indistinguishable from a clean run —
+"0 briefs rewritten" reads like success. Storing the inputs costs roughly 70 KB of text per story and
+buys the ability to answer "why did it do nothing" without the database.
+
+**Touched:** `prompts/scene-review.txt`, `server/lib/clothingCheck.js` (findings block wording),
+`server/lib/beatsPipeline.js`, `client/src/types/story.ts`,
+`client/src/components/generation/StoryDisplay.tsx`.
+
+**Status:** 🟡 shipped to staging, unproven. The next beats run shows whether a mandatory framing
+makes deepseek act; if it still returns 0 rewrites, the fix path has to stop being a request — either
+a targeted per-page rewrite call for the faulted pages only, or a deterministic repair.

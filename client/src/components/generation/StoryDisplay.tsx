@@ -2617,9 +2617,13 @@ export function StoryDisplay({
             ) => {
               const pages = rep?.pages || [];
               const analysis = (rep?.analysis || '').trim();
+              const briefsIn = rep?.briefsIn || [];
+              const unfixed = rep?.clothingUnfixed || [];
               // A stage that ran and rewrote nothing still has findings worth
-              // reading, so analysis alone is enough to render the panel.
-              if (!pages.length && !analysis) return null;
+              // reading — and that is exactly the case worth inspecting — so the
+              // prompt, the briefs it saw and the clothing trail keep the panel
+              // alive even with zero diffs and no analysis.
+              if (!pages.length && !analysis && !briefsIn.length && !rep?.prompt) return null;
               const c = TONES[tone];
               return (
                 <details key={panelKey} className={c.box}>
@@ -2633,6 +2637,63 @@ export function StoryDisplay({
                       {rep?.durationMs != null && ` · ${(rep.durationMs / 1000).toFixed(0)}s`}]
                     </span>
                   </summary>
+                  {(rep?.clothingFindings || unfixed.length > 0) && (
+                    <div className="mt-3 bg-white/70 border border-gray-200 rounded-lg p-2">
+                      <div className={c.sub}>
+                        {language === 'de' ? 'Kleidungs-Befunde (mechanisch)' : 'Clothing faults (mechanical)'}
+                        {unfixed.length > 0 && (
+                          <span className="ml-2 text-red-600 font-semibold">
+                            {unfixed.length} {language === 'de' ? 'nicht behoben' : 'unfixed'}
+                          </span>
+                        )}
+                      </div>
+                      {rep?.clothingFindings && (
+                        <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{rep.clothingFindings}</pre>
+                      )}
+                      {unfixed.length > 0 && (
+                        <ul className="mt-2 text-xs text-red-700 list-disc pl-5">
+                          {unfixed.map((f, i) => (
+                            <li key={i}>p{f.pageNumber} [{f.type}] {f.character}{f.detail ? ` — ${f.detail}` : ''}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                  {rep?.prompt && (
+                    <details className="mt-3 bg-white/70 border border-gray-200 rounded-lg p-2">
+                      <summary className={c.sub}>
+                        {language === 'de' ? 'Prompt an den Reviewer' : 'Prompt sent to the reviewer'}
+                        <span className="ml-2 text-gray-500">({rep.prompt.length.toLocaleString()} {language === 'de' ? 'Zeichen' : 'chars'})</span>
+                      </summary>
+                      <pre className="mt-2 text-[11px] text-gray-700 whitespace-pre-wrap break-words font-mono max-h-96 overflow-auto">{rep.prompt}</pre>
+                    </details>
+                  )}
+                  {briefsIn.length > 0 && (
+                    <details className="mt-3 bg-white/70 border border-gray-200 rounded-lg p-2">
+                      <summary className={c.sub}>
+                        {language === 'de' ? 'Alle Original-Szenen (wie gesendet)' : 'All original scenes (as sent)'}
+                        <span className="ml-2 text-gray-500">({briefsIn.length})</span>
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        {briefsIn.map(b => {
+                          const changed = (rep?.changedPages || []).includes(b.pageNumber);
+                          return (
+                            <details key={b.pageNumber} className="border border-gray-200 rounded p-2">
+                              <summary className="text-xs font-semibold text-gray-700 cursor-pointer">
+                                {language === 'de' ? 'Seite' : 'Page'} {b.pageNumber}
+                                <span className={`ml-2 ${changed ? 'text-emerald-600' : 'text-gray-400'}`}>
+                                  {changed
+                                    ? (language === 'de' ? 'überarbeitet' : 'rewritten')
+                                    : (language === 'de' ? 'unverändert' : 'unchanged')}
+                                </span>
+                              </summary>
+                              <pre className="mt-2 text-[11px] text-gray-700 whitespace-pre-wrap break-words font-sans">{b.brief}</pre>
+                            </details>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  )}
                   {analysis && (
                     <details className="mt-3 bg-white/70 border border-gray-200 rounded-lg p-2">
                       <summary className={c.sub}>

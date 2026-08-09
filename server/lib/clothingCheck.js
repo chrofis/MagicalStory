@@ -248,9 +248,13 @@ function renderFindingsBlock(byPage) {
   }
   if (lines.length === 0) return '';
   return [
-    '**Clothing faults found by a mechanical check — fix these pages:**',
+    '# MECHANICAL CLOTHING FAULTS',
+    '',
+    "Found by exact comparison against this story's clothing requirements. Every page listed here is faulted and MUST be rewritten under ---SCENES---.",
+    '',
     ...lines,
-    "Rewrite the prose of those pages so each character wears their own outfit. Change nothing else.",
+    '',
+    'For each page above: move the garment onto its rightful owner, or state the outfit the fault says is missing. Change nothing else on the page.',
   ].join('\n');
 }
 

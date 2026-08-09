@@ -24,6 +24,13 @@ Max named characters per scene: {MAX_CHARACTERS_PER_SCENE}
 
 Answer each check, naming pages. Then rewrite only the pages a check faulted.
 
+0. **Mechanical clothing faults — not optional.** If a MECHANICAL CLOTHING FAULTS section appears
+above, every page it lists is faulted. These were found by exact comparison against the story's
+clothing requirements, so they are facts, not opinions: do not re-judge them, do not argue that the
+prose reads fine. Rewrite EVERY page listed there, and output each one under ---SCENES---. You may
+not answer NONE while that section is non-empty. Fix only the named fault — move the garment onto
+its rightful owner, or state the outfit the fault says is missing — and change nothing else on the page.
+
 1. Repetition — name any two pages whose images would look near-identical: same location, same grouping, same camera distance, same action. Say which one should change and how.
 2. Visual arc — read as a flipbook, does framing build with the plot? Name the page where intensity sags or spikes out of order.
 3. Continuity — does anything contradict an earlier page: a character's clothing, an object that was left behind, a time of day that moves backwards, a location that changes shape?
