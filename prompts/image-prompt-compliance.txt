@@ -90,7 +90,9 @@ If the inventory is roughly compatible with the declared action, do not deduct. 
 
 **STEP 4: SEVERITIES**
 
-A character present in `QUALITY_FIGURES.matches[]` is never "missing" — appearance differences on them are per-character issues (wrong age = MAJOR, wrong hair = MAJOR), never CRITICAL missing-character. Do not bundle several appearance differences into one entry: one deviation = one entry, each severitied on its own.
+A character present in `QUALITY_FIGURES.matches[]` is never "missing" — appearance differences on them are per-character issues (wrong age = MAJOR, wrong hair = MAJOR), never CRITICAL missing-character. Do not bundle several appearance differences into one entry: one deviation = one entry, each severitied on its own. The single exception is accessories, which STEP 2 collects into one entry per figure.
+
+**One defect, one entry, one code.** Each finding names exactly one problem and carries the code for that problem. Never restate a second defect inside a finding about something else — a facing finding describes facing and nothing else, even when the same figure is also dressed wrongly. The wardrobe is its own entry under its own code. Charging a defect a second time inside another finding double-counts it, because the pipeline scores every entry.
 
 **NEVER CRITICAL — these are never a CRITICAL, and usually not a deduction at all. Check every finding against this list BEFORE tagging it CRITICAL:**
 - Left vs right anything — which hand grips, which arm reaches, which side a figure stands, which hand holds what. Mirror. Ignore entirely.

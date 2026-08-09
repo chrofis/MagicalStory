@@ -7067,3 +7067,46 @@ adding the main-garment guard.
 **Touched:** `server/lib/evalBuckets.js`, `server/lib/scoring.js`, `server/lib/imageInpainting.js`,
 `server/lib/images.js`, `prompts/image-evaluation.txt`, `prompts/image-prompt-compliance.txt`,
 `prompts/feedback-consolidator.txt`.
+
+## 2026-08-09 — Compliance may not charge one defect twice; and the "cannot see it" theory is dead
+
+**Context:** follow-up to the accessory ceiling. Two candidate defects were proposed for the
+compliance evaluator. Measuring first killed one of them and reframed the other.
+
+**REJECTED — "compliance opines on things it cannot see."** The theory was that compliance, which
+never receives the image, cannot ground `setting` / `camera_facing` / `composition_textzone` /
+`naturalness` / `figure_completeness`, and that removing those checks would cut 142 findings
+(21% of its output, 2,219 points) with no loss. **`prompts/image-vision-inventory.txt` refutes it
+line by line** — stage 1 explicitly reports Zone (nine named zones), Facing direction, Setting
+(key visual elements, lighting, camera angle), Expression, and a Physics check covering detached
+body parts. Every bucket alleged to be ungroundable is directly inventoried. Compliance is not
+guessing; it is comparing a structured observation against the commission. There are no tokens to
+reclaim here, and this is the SECOND time the "compliance is weakly-evidenced" instinct has been
+measured and found wrong (see the 2026-08-09 accessory entry for the first). Do not propose it a
+third time without new evidence.
+
+**Also rejected as a bug — expressions.** 3 findings, 15 points, all MODERATE. Compliance's line
+"Expression, gaze direction, head tilt — at most MODERATE, never CRITICAL" was being obeyed. It is
+however a genuine POLICY DIVERGENCE from the quality evaluator's N-03 ("any expression that reads
+at all satisfies the beat" — never deduct). Left unchanged deliberately: `docs/SETTLED.md` requires
+a severity-philosophy change to carry real evidence, and 15 points across 8 stories is not it.
+Logged here so the divergence is findable when someone has the evidence to settle it.
+
+**FIXED — a defect charged twice under two codes.** Compliance had no equivalent of the quality
+evaluator's "One defect, one entry, one tag — never charge the same problem twice under two codes",
+and was bundling a second defect into an unrelated finding:
+`[CRITICAL] Emma faces viewer in front view wearing red-and-white striped t-shirt with diaper-like
+shorts; should be …` — typed `camera_facing`, but charging the wardrobe as well, while clothing is
+separately the largest bucket. Every entry is scored, so the same figure is billed twice. The rule
+is now in STEP 4.
+
+**FIXED — a contradiction introduced by the accessory commit.** STEP 4 already said "one deviation =
+one entry, each severitied on its own", which directly contradicts the accessory rule added to
+STEP 2 ("one entry per figure covering every accessory deviation"). The model would have followed
+one arbitrarily. STEP 4 now names accessories as the single exception.
+
+**Touched:** `prompts/image-prompt-compliance.txt` (STEP 4 only).
+**Verified:** 63/63 templates load; both new rules and both pre-existing rules present in the loaded
+text; `check-settled` passes.
+**Not verified:** whether the model obeys the new rule — that needs a Lab run on fresh output. Prior
+evidence says a prompt rule lowers a ceiling without holding it, so expect partial compliance.
