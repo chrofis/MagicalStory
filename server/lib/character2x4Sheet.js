@@ -269,18 +269,18 @@ async function stackRowsInto2x4(headRowData, bodyRowData) {
   const W = bMeta.width;
   const headResized = await sharp(headBuf).resize({ width: W }).toBuffer();
   const hMeta = await sharp(headResized).metadata();
-  const SEAM = 4;
+  const SEAM = 12;
   // Full-width stack, NO side padding: head row generated at 20:9 (576 tall) +
   // body row at 16:9 (720 tall) ≈ 1280×1300 ≈ 1:1, a native preset. Pass-2 style
   // transfer runs at the nearest preset (aspectPresetFor → 1:1, ~1% off = no
-  // visible squeeze), columns stay at W/4 (no margins), and the head/body
-  // boundary is the dark seam the shared splitter (splitSheetRows) locks onto.
+  // visible squeeze), columns stay at W/4 (no margins). The head/body boundary
+  // is a SOLID WHITE gutter — a clean uniform (zero-variance) band the shared
+  // splitter locks onto, matching the sheet's white background (owner request).
   const H = hMeta.height + SEAM + bMeta.height;
   const splitY = hMeta.height + Math.round(SEAM / 2);
   const out = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } } })
     .composite([
       { input: headResized, top: 0, left: 0 },
-      { input: { create: { width: W, height: SEAM, channels: 3, background: { r: 20, g: 20, b: 20 } } }, top: hMeta.height, left: 0 },
       { input: bodyBuf, top: hMeta.height + SEAM, left: 0 },
     ])
     .jpeg({ quality: 92 })

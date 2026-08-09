@@ -360,6 +360,10 @@ export const TESTLAB_STAGES = [
   { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
   { id: 'text_refine', label: 'Text refine — full text in, full text out (rounds)', producesImage: false, overridable: true, storyLevel: true },
   { id: 'beats_scenes', label: 'Beats + scenes → fast review (time-to-lock)', producesImage: false, overridable: true, storyLevel: true },
+  // Replays the scene review over a story's STORED briefs, so a reviewer-prompt
+  // change is measurable: the clothing findings are deterministic, and the
+  // briefs are frozen, so the only variable is the prompt (or the model).
+  { id: 'scene_review_replay', label: 'Scene review replay (frozen briefs → does it fix the faults?)', producesImage: false, overridable: true, storyLevel: true },
   // Both runners existed server-side but were absent from this list, so the
   // dropdown could never select them — unreachable except by hand-posting.
   { id: 'garment_colour_fix', label: 'Garment colour fix (DINO+SAM mask → L*a*b* match)', producesImage: true, overridable: false },

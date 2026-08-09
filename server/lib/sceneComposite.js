@@ -387,11 +387,23 @@ async function findSilhouettesByDiff(populatedBuf, cleanBgBuf, cast, opts = {}) 
 async function cropSheetCellFixed(sheetBuf, cellIdx) {
   const meta = await sharp(sheetBuf).metadata();
   const cellW = Math.floor(meta.width / 4);
-  const cellH = Math.floor(meta.height / 2);
   const col = (cellIdx - 1) % 4;
   const row = Math.floor((cellIdx - 1) / 4);
+  // Head/body divider by min-variance (the decoupled sheet has UNEQUAL rows — a
+  // short head row over a taller body row — so it is NOT at height/2). Same
+  // detector the edge-splitter uses; the injected gutter is the low-variance row.
+  const { data, info } = await sharp(sheetBuf).greyscale().raw().toBuffer({ resolveWithObject: true });
+  let minVar = Infinity, sepY = Math.floor(info.height / 2);
+  for (let y = Math.floor(info.height * 0.2); y < Math.floor(info.height * 0.8); y++) {
+    let s = 0, sq = 0;
+    for (let x = 0; x < info.width; x++) { const v = data[y * info.width + x]; s += v; sq += v * v; }
+    const mean = s / info.width; const variance = sq / info.width - mean * mean;
+    if (variance < minVar) { minVar = variance; sepY = y; }
+  }
+  const top = row === 0 ? 0 : sepY;
+  const cellH = row === 0 ? sepY : info.height - sepY;
   return sharp(sheetBuf)
-    .extract({ left: col * cellW, top: row * cellH, width: cellW, height: cellH })
+    .extract({ left: col * cellW, top, width: cellW, height: cellH })
     .png()
     .toBuffer();
 }

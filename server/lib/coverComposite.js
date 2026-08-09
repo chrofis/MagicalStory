@@ -239,16 +239,26 @@ async function extractQuadrant(buffer, which = 'body-front') {
   if (!meta.width || !meta.height) return null;
   const aspect = meta.height / meta.width;
 
-  // 2×4 sheet (4 cols × 2 rows, 16:9 → aspect ≈ 0.56).
-  if (aspect < 0.8) {
-    const cellW = Math.floor(meta.width / 4);
-    const cellH = Math.floor(meta.height / 2);
-    // Body row (row 1): cell 5 front / cell 6 three-quarter (45°) / cell 7
-    // profile (90°) / cell 8 back — see styled-costumed-avatar-2x4.txt.
+  // 2×4 sheet (4 cols × 2 rows). Old sheets were 16:9 (aspect ≈ 0.56) with equal
+  // rows; the decoupled sheet is ~1:1 with UNEQUAL rows (short head row over a
+  // taller body row). So the head/body divider is NOT at height/2 — find it by
+  // min-variance (the injected dark seam), same detector as the 2×2 branch
+  // below. Columns are 4-equal, full-width (no margins). One path for both.
+  if (aspect < 1.3) {
+    const { data, info } = await sharp(buffer).greyscale().raw().toBuffer({ resolveWithObject: true });
+    const { width, height } = info;
+    let minHVar = Infinity, sepY = Math.floor(height / 2);
+    for (let y = Math.floor(height * 0.2); y < Math.floor(height * 0.8); y++) {
+      let s = 0, sq = 0;
+      for (let x = 0; x < width; x++) { const v = data[y * width + x]; s += v; sq += v * v; }
+      const mean = s / width; const variance = sq / width - mean * mean;
+      if (variance < minHVar) { minHVar = variance; sepY = y; }
+    }
+    const cellW = Math.floor(width / 4);
+    // Body row is below the divider: cell 5 front / 6 three-quarter / 7 profile / 8 back.
     const col = which === 'body-profile' ? 2 : which === 'body-three-quarter' ? 1 : 0;
-    const row = 1;
     return sharp(buffer)
-      .extract({ left: col * cellW, top: row * cellH, width: cellW, height: cellH })
+      .extract({ left: col * cellW, top: sepY, width: cellW, height: height - sepY })
       .png()
       .toBuffer();
   }
