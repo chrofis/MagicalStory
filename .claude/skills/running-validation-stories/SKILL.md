@@ -21,6 +21,7 @@ Validation runs cost real money (a full story ~CHF 2) and time (~20 min). **Clim
 
 **Reuse the smoke account; never recreate characters unless the change is about character creation.**
 
+- Auth: `TOKEN=$(node scripts/admin/get-admin-token.js)` is the canonical way to get an admin Bearer token (see CLAUDE.md → "Admin API auth"); the runner below does its own login with the same account. The staging Basic gate covers HTML only — `/api/*` needs just the Bearer.
 - Account: `demo-b-hnecf@magicalstory.ch` (admin: unlimited quota, allows 4-page stories + skipCovers, bypassing the wizard's 10-page minimum). It already has characters and styled avatars — pick a story category matching the existing avatars so nothing regenerates.
 - Runner: `scripts/test-scene-composite-smoke.js` — historic name, but it IS the generic cheap-run harness: logs in, POSTs `/api/jobs/create-story` with `pages: 4`, `skipCovers: true`, optional `--skipEval=false` for the full eval/repair pipeline, then polls to completion.
 

@@ -355,6 +355,18 @@ PostgreSQL with tables: `users`, `characters`, `stories`, `story_jobs`, `orders`
 
 Character data stored as JSONB in `characters.data` column.
 
+## Admin API auth (for scripts, agents, Test Lab, smoke stories)
+
+Any script or agent that needs an admin Bearer token — Test Lab runs, `/api/admin/*`, 4-page smoke/validation stories — gets it ONE way:
+
+```bash
+TOKEN=$(node scripts/admin/get-admin-token.js)                    # staging (default)
+TOKEN=$(node scripts/admin/get-admin-token.js --base=https://magicalstory.ch)  # prod
+curl -H "Authorization: Bearer $TOKEN" https://staging.magicalstory.ch/api/admin/...
+```
+
+It logs in as the admin smoke-test account (`demo-b-hnecf@magicalstory.ch`; overrides via `TESTLAB_USER`/`TESTLAB_PASSWORD` env). Two facts agents keep getting wrong: (1) the staging Basic-auth gate (`STAGING_AUTH_USER/PASSWORD` in `.env`) protects HTML/static ONLY — `/api/*` needs just the Bearer token; (2) don't hand-roll a login flow or hunt for credentials — the helper is the canonical path. Runners that already embed this flow: `scripts/admin/run-testlab-set.js`, `scripts/test-scene-composite-smoke.js`.
+
 ## Log Analysis
 
 When user asks to **"analyze log"**, **"check the log"**, **"analyze story run"**, or similar:
