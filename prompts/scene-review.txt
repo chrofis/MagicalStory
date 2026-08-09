@@ -47,9 +47,11 @@ Both blocks, in this order, nothing before or after.
 
 ---ANALYSIS---
 <your answers to checks 1-7>
+FAULTED PAGES: <the page numbers a check faulted, comma-separated, or NONE>
 
-Every page you named as faulted in the analysis must appear below. Naming a
-page's defect and not rewriting it leaves the defect in the book.
+The FAULTED PAGES line is the last line of the analysis, and every page on it
+must appear below. Naming a page's defect and not rewriting it leaves the
+defect in the book.
 
 ---SCENES---
 ## Page <number>

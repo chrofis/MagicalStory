@@ -582,19 +582,25 @@ SCENE: ${x.scene || ''}`.trim(),
 
       // FAULTED-BUT-NOT-REWRITTEN (owner, 2026-08-08). The reviewer is told to
       // rewrite every page a check faulted, and it does not always comply: on
-      // job_1786193650012_7baiaeftb it named defects on pages 4, 8 and 13
-      // (characters missing from characters[], an expression with no brows, a
-      // two-moment sceneIntent) and rewrote only 1, 2 and 3. Those defects then
-      // shipped. Nothing surfaced the gap, because "3 briefs rewritten" reads
-      // like success. Compare the page numbers the analysis names against the
-      // ones it actually rewrote and say so out loud.
-      const namedPages = [...new Set(
-        (sceneReviewAnalysis.match(/\bpages?\s+\d+(\s*(?:,|and|&)\s*\d+)*/gi) || [])
-          .flatMap(m => m.match(/\d+/g) || [])
-          .map(Number)
-          .filter(n => expansions.some(x => x.pageNumber === n))
-      )];
-      const faultedNotFixed = namedPages.filter(n => !changed.includes(n));
+      // job_1786193650012_7baiaeftb it named defects on pages 4, 8 and 13 and
+      // rewrote only 1, 2 and 3. Those defects then shipped, unremarked.
+      //
+      // Read the reviewer's OWN "FAULTED PAGES:" line (scene-review.txt output
+      // contract), never the free prose. The first version of this check
+      // regex-matched every "page N" in the analysis, so pages mentioned as
+      // PRAISE ("framing peaks on page 12") were reported as unfixed faults
+      // (job_1786277779744 flagged 1 and 13 that way). No line → the reviewer
+      // predates the contract → skip rather than guess.
+      const faultLine = sceneReviewAnalysis.match(/^\s*FAULTED PAGES?:\s*(.+)\s*$/mi);
+      const namedPages = faultLine
+        ? [...new Set((faultLine[1].match(/\d+/g) || [])
+            .map(Number)
+            .filter(n => expansions.some(x => x.pageNumber === n)))]
+        : null;
+      if (!faultLine) {
+        log.debug('[BEATS] Scene review analysis has no FAULTED PAGES line — incompleteness check skipped');
+      }
+      const faultedNotFixed = (namedPages || []).filter(n => !changed.includes(n));
       if (faultedNotFixed.length > 0) {
         log.warn(`⚠️ [BEATS] Scene review named page(s) ${faultedNotFixed.join(', ')} but rewrote none of them`);
         gl.warn('beats_scene_review_incomplete',
