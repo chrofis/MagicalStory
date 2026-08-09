@@ -26,7 +26,7 @@
 8c. **Shared-action facing consistency.** Characters moving to the same destination or sharing one activity get the SAME facing treatment — all back view when the group heads for a background target, never one companion facing the camera while the others walk away. A look-down task (reading, examining a held object) cannot combine with `facing the camera`. Never describe front-only details (visor front, chest emblem, garment print) as visible on a back-view figure.
 8d. **Age = apparent-age category.** Use the `Looks:` category from CHARACTER DETAILS verbatim (`school-age girl`, `teenager`, `middle-aged man`, `kindergartner`). Never use a numeric age in years and never substitute a different bucket.
 9. **No age collectives.** Never write "the children", "the kids", "the boys", "the girls". Use names or group size ("all three", "the group").
-10. **Prose construction.** Output one continuous paragraph followed by the metadata block — no headers, labels, bullet points, or section breaks. Open with the main subject and main action. Weave each character's physical description on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing — as flowing language, not a labeled list. Clothing means the outfit itself; `standard`, `summer`, `winter` and `costumed` are metadata keys and never appear in prose. Same for recurring Visual Bible elements: name them and interleave their identifying detail naturally.
+10. **Prose construction.** Output one continuous paragraph followed by the metadata block — no headers, labels, bullet points, or section breaks. Open with the main subject and main action. Weave each character's physical description on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing — as flowing language, not a labeled list. Clothing means the outfit itself; `standard`, `summer`, `winter` and `costumed` are metadata keys and never appear in prose. Name the TOP, the BOTTOM and the FOOTWEAR for every character on every page — the image model draws only what the prose names, so a character given a hat and a shirt is drawn in a hat and a shirt and nothing else. Same for recurring Visual Bible elements: name them and interleave their identifying detail naturally.
 11. **Framing pattern.** If the scene hint sets `framingPattern`, compose the prose as:
     - `solo-before`: close-up on the acting character, weapon drawn and aimed forward if applicable, gaze following the weapon's direction. No opponent or target in the frame.
     - `solo-after`: close-up on the character after the moment, no opponent, strong emotion.
@@ -67,7 +67,7 @@ One continuous paragraph of prose, then the metadata block. Start immediately wi
 
 The prose must include, interleaved naturally:
 - the main action of this page, opening the prose
-- each named character described on first mention (age look, build, hair, eyes, distinctive features, clothing)
+- each named character described on first mention (age look, build, hair, eyes, distinctive features, and the full outfit: top, bottom, footwear)
 - where each character is positioned (left/right/center, foreground/midground/background), what they hold, how they face
 - the setting: location, time of day, weather, lighting, mood
 - any recurring visual elements named with their identifying detail
