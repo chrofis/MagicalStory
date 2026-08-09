@@ -131,6 +131,47 @@ function rect(buf, x0, y0, x1, y1, rgb) {
   check('a recolour invalidates the fingerprint on the detection it used',
     /const stale = detectionForPage\(pageNumber\);[\s\S]{0,80}stale\.sourceImageFp = null/.test(step1b));
 
+  // ── TEST 6 ───────────────────────────────────────────────────────────────
+  // The low-chroma blind spot, which is WHY the reference now gets a SAM mask.
+  // Old avatar path: DINO box -> raw rectangle -> sampleGarmentClusters. The
+  // rectangle around a cream hat also holds background, white hair and brown
+  // boots; the clustering rejects near-grey as "not garment", so the cream is
+  // discarded and the saturated brown beside it is returned. That is exactly
+  // how a correct cream hat was repainted brown (Lab exp 485). A plain mean
+  // over a true silhouette has no such blind spot.
+  console.log('\nTEST 6 — a cream garment survives a masked mean but is lost to the clustering');
+  const { meanLabMasked } = require('../../server/lib/garmentColourFix');
+  const CREAM = [232, 224, 200];   // low chroma, high L — a cream hat
+  const BOOT = [120, 74, 34];      // saturated brown sitting in the same box
+  const cropBuf = canvas(BOOT);                 // the rectangle is mostly NOT the hat
+  rect(cropBuf, 0, 0, W, 18, CREAM);            // the hat occupies the top band
+  const creamHue = hueOf(CREAM);
+
+  const clustered = G.sampleGarmentClusters(cropBuf, N, null, { a: 0, b: 0 }, {}, 3);
+  check('the clustering does NOT return the cream', clustered.length === 0
+    || angDist(clustered[0].hueRad * DEG, creamHue) > angDist(clustered[0].hueRad * DEG, hueOf(BOOT)),
+    clustered.length ? `got ${(clustered[0].hueRad * DEG).toFixed(1)}deg, cream ${creamHue.toFixed(1)}deg` : 'no cluster at all');
+
+  // Same pixels, but with a silhouette covering only the hat.
+  const alpha = Buffer.alloc(N);
+  for (let y = 0; y < 18; y++) for (let x = 0; x < W; x++) alpha[y * W + x] = 255;
+  const m = meanLabMasked(cropBuf, alpha);
+  const creamLab = _rgbToLab(CREAM[0], CREAM[1], CREAM[2]);
+  check('the masked mean returns the cream', m && Math.abs(m.L - creamLab[0]) < 1.5,
+    m ? `L ${m.L.toFixed(1)} vs cream L ${creamLab[0].toFixed(1)}` : 'null');
+  check('it counts only the masked pixels', m && m.count === W * 18, `count=${m?.count}`);
+
+  // Source guard: the avatar path must segment, not crop-and-cluster.
+  const gsrc = require('fs')
+    .readFileSync(require.resolve('../../server/lib/garmentColourFix.js'), 'utf8')
+    .replace(/\r\n/g, '\n');
+  const aFrom = gsrc.indexOf('async function avatarGarmentLab');
+  const aTo = gsrc.indexOf('async function fixFigureGarmentColour');
+  const avatarFn = gsrc.slice(aFrom, aTo);
+  check('avatarGarmentLab segments the reference', /await segmentGarment\(/.test(avatarFn));
+  check('and takes a plain masked mean', /meanLabMasked\(data, seg\.alpha\)/.test(avatarFn));
+  check('the torso band is only reached after that', avatarFn.indexOf('segmentGarment(') < avatarFn.indexOf('avatarTorsoBand('));
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

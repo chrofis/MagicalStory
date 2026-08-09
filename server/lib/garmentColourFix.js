@@ -78,6 +78,10 @@ const DEFAULTS = {
   // Below this the garment is already right; skip rather than churn bytes.
   minDeltaE: 6,
   minMaskPx: 200,
+  // Same floor for the avatar-side mask. Lower than the page's: on a 2x4 sheet
+  // one panel's hat or shoe is a small silhouette, and it is still a valid
+  // sample as long as it is genuinely that garment's pixels.
+  minAvatarMaskPx: 400,
 };
 
 /**
@@ -229,32 +233,51 @@ async function avatarGarmentLab(avatarUri, opts = {}) {
   const buf = bytesOf(avatarUri);
   const meta = await sharp(buf).metadata();
 
-  // For anything that is NOT a torso garment, the torso band is the wrong place
-  // to look — shoes are not in it, and a hat certainly is not. Ask DINO for the
-  // SAME garment on the avatar that we asked for on the page, so the target is
-  // the matching item rather than whatever happens to dominate the chest.
-  if (opts.prompt && opts.kind && opts.kind !== 'top' && opts.kind !== 'dress') {
-    try {
-      const det = await detectGarmentBox(toDataUri(await sharp(buf).jpeg({ quality: 95 }).toBuffer()), { ...cfg, prompt: opts.prompt });
-      if (det?.box) {
-        const [x1, y1, x2, y2] = det.box.map(Math.round);
-        const w = Math.max(2, Math.min(meta.width - Math.max(0, x1), x2 - x1));
-        const h = Math.max(2, Math.min(meta.height - Math.max(0, y1), y2 - y1));
-        const { data, info } = await sharp(buf)
-          .extract({ left: Math.max(0, x1), top: Math.max(0, y1), width: w, height: h })
-          .removeAlpha().raw().toBuffer({ resolveWithObject: true });
-        const cl = sampleGarmentClusters(data, info.width * info.height, null, { a: 0, b: 0 }, {}, 3);
-        if (cl.length) {
-          const c = cl[0];
-          return { L: c.L, a: c.a, b: c.b, chroma: c.chroma, hueDeg: +(c.hueRad * DEG).toFixed(1), source: `dino:${opts.kind}` };
-        }
+  // SAME MACHINERY ON BOTH SIDES (owner, 2026-08-09). The page measures its
+  // garment as DINO box -> SAM silhouette -> plain mean. The reference used to
+  // measure it as DINO box -> RAW RECTANGLE -> chroma-weighted clustering, and
+  // that asymmetry was the bug: a rectangle around a wide-brimmed hat also
+  // contains background, white hair and skin, so the sample had to be rescued by
+  // `sampleGarmentClusters`, which rejects near-grey pixels as "not garment".
+  // A cream hat IS near-grey. Its own pixels were discarded and the dominant
+  // saturated cluster left in the rectangle — brown — was returned as the
+  // target, turning a correct cream hat brown (job_1786287569165, Lab exp 485).
+  //
+  // Any low-chroma garment hits this: white, cream, black, grey. Tops were not
+  // exempt — the torso band is the same impure-crop heuristic, so Hans's cream
+  // shirt would have measured as his blue sash.
+  //
+  // With a true silhouette the crop is pure, so the mean needs no rescuing and
+  // the grey rejection can go. The torso band survives only as the fallback for
+  // when DINO or SAM comes up empty.
+  const prompt = opts.prompt || cfg.garmentPrompts[opts.kind] || cfg.garmentPrompts[cfg.defaultGarment];
+  try {
+    const sheetUri = toDataUri(await sharp(buf).jpeg({ quality: 95 }).toBuffer());
+    const det = await detectGarmentBox(sheetUri, { ...cfg, prompt });
+    if (det?.box) {
+      // Box is in sheet coords and segmentGarment returns the mask at sheet
+      // size, so no extract/offset juggling — same call shape as the page side.
+      const seg = await segmentGarment(sheetUri, det.box, meta.width, meta.height);
+      const { data } = await sharp(buf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      const m = meanLabMasked(data, seg.alpha);
+      if (m && m.count >= cfg.minAvatarMaskPx) {
+        return {
+          L: m.L, a: m.a, b: m.b,
+          chroma: Math.hypot(m.a, m.b),
+          hueDeg: +(Math.atan2(m.b, m.a) * DEG).toFixed(1),
+          source: `sam:${opts.kind || 'garment'}`,
+          maskPx: m.count,
+          dinoScore: det.score == null ? null : +Number(det.score).toFixed(2),
+        };
       }
-    } catch (e) {
-      log.warn(`[GARMENT-COLOUR] avatar ${opts.kind} lookup failed (${e.message}) — falling back to the torso band`);
+      log.warn(`[GARMENT-COLOUR] avatar ${opts.kind}: SAM mask too small (${m?.count || 0}px < ${cfg.minAvatarMaskPx}) — falling back to the torso band`);
     }
+  } catch (e) {
+    log.warn(`[GARMENT-COLOUR] avatar ${opts.kind} segmentation failed (${e.message}) — falling back to the torso band`);
   }
 
-  // Torso garments: the band is hair-free by construction and needs no model.
+  // Fallback only. Keeps the old clustering, and with it the low-chroma blind
+  // spot — so `source` naming it torsoBand is a signal the sample is weaker.
   const band = await _internal.avatarTorsoBand(buf, meta.width, meta.height);
   const { data, info } = await sharp(buf).extract(band).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const cl = sampleGarmentClusters(data, info.width * info.height, null, { a: 0, b: 0 }, {}, 3);
@@ -286,7 +309,16 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
 
   const target = await avatarGarmentLab(avatarUri, { ...cfg, kind, prompt });
   if (!target) { report.reason = 'no avatar garment sample'; return { changed: false, imageData: pageImageData, report, steps }; }
-  report.target = { L: +target.L.toFixed(1), hueDeg: target.hueDeg, chroma: +target.chroma.toFixed(1), source: target.source };
+  // maskPx/dinoScore are the AVATAR side's own confidence. Without them a
+  // mislocated target is invisible: `dinoScore` on the report is the PAGE box,
+  // and exp 485 passed every page-side check while the target was measured off
+  // the wrong garment entirely.
+  report.target = {
+    L: +target.L.toFixed(1), hueDeg: target.hueDeg, chroma: +target.chroma.toFixed(1),
+    source: target.source,
+    maskPx: target.maskPx ?? null,
+    dinoScore: target.dinoScore ?? null,
+  };
 
   // Crop to the figure so the garment query has one unambiguous referent — a
   // whole-page "shirt" query on a multi-figure page returns person-sized boxes.

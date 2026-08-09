@@ -1229,6 +1229,7 @@ async function renderGarmentColourSummary(perFigure, stepsByFigure, pageNumber) 
       <text x="${nx}" y="${chipY + 14}" font-family="sans-serif" font-size="13" fill="#333">hue ${f.current?.hueDeg ?? '–'}° → ${f.target?.hueDeg ?? '–'}°   ·   L ${f.current?.L ?? '–'} → ${f.target?.L != null && f.lighting != null ? (f.target.L * f.lighting).toFixed(0) : '–'}</text>
       <text x="${nx}" y="${chipY + 32}" font-family="sans-serif" font-size="12" fill="#666">DINO ${f.dinoScore ?? '–'}${f.dinoScore != null && f.dinoScore < 0.6 ? ' (low)' : ''}   ·   ${f.current?.px ?? 0} px   ·   dilated +${f.maskDilated || 0}   ·   gated −${f.colourGated || 0}</text>
       <text x="${nx}" y="${chipY + 50}" font-family="sans-serif" font-size="12" fill="#666">lighting ×${f.lighting ?? '–'} (${esc(f.lightingSource || '–')})</text>
+      <text x="${nx}" y="${chipY + 68}" font-family="sans-serif" font-size="12" fill="${f.target?.source?.startsWith('sam:') ? '#666' : '#a15c00'}">target from ${esc(f.target?.source || '–')}${f.target?.maskPx != null ? ` · ${f.target.maskPx} px` : ''}${f.target?.dinoScore != null ? ` · DINO ${f.target.dinoScore}` : ''}${f.target?.source && !f.target.source.startsWith('sam:') ? '  ← fallback, low-chroma blind spot' : ''}</text>
       <text x="${tx}" y="${y + ROW_H - 14}" font-family="sans-serif" font-size="12" fill="#555">${esc(f.reason || '')}</text>`;
   }
   svg += '</svg>';
