@@ -7125,9 +7125,11 @@ evidence says a prompt rule lowers a ceiling without holding it, so expect parti
   **photographic FACES on otherwise-watercolor pages**, not a whole-page medium flip.
 - **The drift is in ORIGINAL generation.** Served versions are `bestSource:"original"` (v0); the
   `iterate-round-1` repairs scored −110/−40/−2 and were discarded. v0 pages already have
-  photographic adult faces. The page reference pack is mostly watercolor styled avatars but Grok
-  renders adult faces photographically anyway (known Grok adult-realism tendency), and a photographic
-  face crop can sit in the ref pack.
+  photographic adult faces. **The page reference pack is 100% watercolor** (both VB-grid ref sheets,
+  including the head-detail cells — verified full-res, no photographic crop). Grok renders adult
+  faces toward realism on the generated page ANYWAY, despite fully-watercolor refs + a watercolor
+  style prompt. So the cause is purely Grok's adult-face realism ceiling at page generation (the same
+  tendency behind realistic avatar Round-1), NOT a bad reference.
 - **In-place restyle CANNOT fix it.** Three tests: (a) anchor-page-as-reference makes Grok copy the
   ANCHOR's content (pixel-diff ~73/255 — page redrawn as the anchor scene); (b) prompt-only and
   (c) a maximally aggressive instruction both leave the image ~unchanged (diff ~10-15/255). Grok
