@@ -231,18 +231,24 @@ async function phantomRow(phantomDataUrl, which) {
 
 // Body-row prompt (call 1): one row of 4 full bodies, tall cells. Keeps the
 // outer layer in the profile (validated wording). Generic — no story specifics.
-function buildBodyRowPrompt(costumeDescription, character = null, redress = false) {
+function buildBodyRowPrompt(costumeDescription, character = null, redress = false, costumeName = null) {
   const hairBlock = buildHairBlock(character);
   const bodyRef = redress
     ? `Image 2 shows the character's body shape, build, and identity ONLY — IGNORE the clothing in Image 2, it is the wrong outfit. Image 3 is the character's face.`
     : `Image 2 is the character's body. Image 3 is the character's face.`;
+  // The costume NAME, not just its garments. Without it the model gets a bare
+  // garment list and renders each item by its most common association — a cloth
+  // head wrap on a small child reads as a headband bow, not as pirate headwear.
+  const named = costumeName ? ` — a ${costumeName}` : '';
   const outfitRule = redress
-    ? `Costume (the ONLY outfit — every cell wears exactly this, NOT the clothing from Image 2): ${costumeDescription}`
-    : `Costume: ${costumeDescription}`;
+    ? `Costume${named} (the ONLY outfit — every cell wears exactly this, NOT the clothing from Image 2): ${costumeDescription}`
+    : `Costume${named}: ${costumeDescription}`;
+  const readsAs = costumeName ? `
+The figure reads as a ${costumeName} at a glance. Each garment is worn the way that costume wears it.` : '';
   return `Image 1 indicates only the camera angle and facing direction in each cell — ignore its silhouette, body, and face. The output contains no arrows.
 ${bodyRef}
 
-${outfitRule}${hairBlock}
+${outfitRule}${readsAs}${hairBlock}
 Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, natural proportions matching the person's apparent age in Image 3. No cartoon, no anime, no watercolour. This sheet is an identity anchor.
 
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background, same cell layout as Image 1.
@@ -319,10 +325,15 @@ function applyPoseHeadGate(bodies, poseHeads) {
   }
   fb.fullBodyScore = Math.min(headScoreEff, gemFeet);
   fb.reason = `${headReason}; feet=${gemFeet}`;
+  // This recompute — not the model's own finalScore — is what the gate reads, so
+  // every sub-score the bodies template emits must appear here or it is scored
+  // and then silently dropped. costumeReads defaults to 10 for the standard
+  // (uncostumed) case, where the template is told to return 10.
   bodies.finalScore = Math.min(
     fb.fullBodyScore,
     bodies.angles?.score ?? 10,
     bodies.outfit?.outfitScore ?? 10,
+    bodies.costumeReads?.costumeReadsScore ?? 10,
     bodies.proportions?.score ?? 10,
     bodies.background?.backgroundScore ?? 10,
   );
@@ -333,10 +344,10 @@ function applyPoseHeadGate(bodies, poseHeads) {
 
 // Review the 1×4 body row on its own (it IS the bottom-body crop the eval wants,
 // so no split needed): pose head-check + Gemini bodies eval, merged by the gate.
-async function reviewBodyRow(bodyRowData, { costumeDescription, model, usageTracker }) {
+async function reviewBodyRow(bodyRowData, { costumeDescription, costumeName = null, model, usageTracker }) {
   const [poseHeads, bodiesR] = await Promise.all([
     detectBodyRowHeads(bodyRowData),
-    evaluateSheetRow(bodyRowData, 'bodies', { costumeDescription, model, usageTracker }),
+    evaluateSheetRow(bodyRowData, 'bodies', { costumeDescription, costumeName, model, usageTracker }),
   ]);
   const bodies = applyPoseHeadGate(bodiesR.report, poseHeads);
   return { valid: !!bodies.valid, score: bodies.finalScore ?? 0, bodies, promptUsed: bodiesR.promptUsed };
@@ -362,7 +373,7 @@ async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usage
 // keep least-bad. Then composite. Rejected rows are discarded. Returns a verdict
 // in the evaluateSheetSplit shape so generateCharacter2x4Sheet / styledAvatars
 // consume it unchanged. skipReview → 1 try each, no eval (fast path for tests).
-async function generateComposited2x4(character, { costumeDescription, redress = false, usageTracker = null, skipReview = false } = {}) {
+async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false } = {}) {
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
   const standardAvatar = await resolveStandardAvatar(character);
@@ -371,7 +382,7 @@ async function generateComposited2x4(character, { costumeDescription, redress = 
   const headPhantom = await phantomRow(loadPhantomVariant(character?.age, 'axes'), 'top');
   const model = MODEL_DEFAULTS.sheetEvalModel;
   const bodyRefs = standardAvatar ? [bodyPhantom, standardAvatar, facePhoto] : [bodyPhantom, facePhoto];
-  const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress);
+  const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress, costumeName);
   const headPrompt = buildHeadRowPrompt(character);
   const attemptHistory = [];
   let usage = { input_tokens: 0, output_tokens: 0 };
@@ -384,7 +395,7 @@ async function generateComposited2x4(character, { costumeDescription, redress = 
     if (!res?.imageData) { attemptHistory.push({ stage: 'body', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_body_row', res.modelId);
     let review = { valid: true, score: 10, bodies: null };
-    if (!skipReview) review = await reviewBodyRow(res.imageData, { costumeDescription, model, usageTracker });
+    if (!skipReview) review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker });
     attemptHistory.push({ stage: 'body', try: t, score: review.score, valid: review.valid, reasons: review.bodies?.failureReasons || [] });
     if (!bestBody || review.score > bestBody.review.score) bestBody = { row: res.imageData, review };
     if (review.valid) break;
@@ -437,7 +448,7 @@ async function generateComposited2x4(character, { costumeDescription, redress = 
   };
 }
 
-function buildPrompt(_artStyle, costumeDescription, character = null, redress = false) {
+function buildPrompt(_artStyle, costumeDescription, character = null, redress = false, costumeName = null) {
   const hairBlock = buildHairBlock(character);
   // redress=true: the story dressed this character in an outfit that DIFFERS
   // from the clothing shown in Image 2 (the stored avatar). Image 2's clothing
@@ -448,9 +459,10 @@ function buildPrompt(_artStyle, costumeDescription, character = null, redress = 
   const bodyRef = redress
     ? `Image 2 shows the character's body shape, build, and identity ONLY — IGNORE the clothing in Image 2, it is the wrong outfit. Image 3 is the character's face.`
     : `Image 2 is the character's body. Image 3 is the character's face.`;
+  const named = costumeName ? ` — a ${costumeName}` : '';
   const outfitRule = redress
-    ? `Costume (the ONLY outfit — every body cell wears exactly this, NOT the clothing from Image 2): ${costumeDescription}`
-    : `Costume: ${costumeDescription}`;
+    ? `Costume${named} (the ONLY outfit — every body cell wears exactly this, NOT the clothing from Image 2): ${costumeDescription}`
+    : `Costume${named}: ${costumeDescription}`;
   return `Image 1 indicates only the camera angle and facing direction in each cell — ignore its silhouette, body, and face. The coloured arrows (red, green, blue) on each head in Image 1 are direction guides ONLY — never render, copy, or paint them onto the character, the face, the hair, or anywhere in the output. The output contains no arrows.
 ${bodyRef}
 
@@ -959,12 +971,15 @@ const inlinePartOf = (dataUri) => ({ inline_data: { mime_type: dataUri.match(/^d
 // / angles / clean); 'bodies' → sheet-row-bodies-eval (head-to-toe / angles /
 // outfit / proportions). Identity is a SEPARATE call — see evaluateIdentity.
 async function evaluateSheetRow(rowImageData, which, opts = {}) {
-  const { costumeDescription = '', model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null } = opts;
+  const { costumeDescription = '', costumeName = null, model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null } = opts;
   const tplKey = which === 'heads' ? 'sheetRowHeadsEval' : 'sheetRowBodiesEval';
   let prompt = promptOverride || PROMPT_TEMPLATES[tplKey];
   if (!prompt) throw new Error(`${tplKey} template not loaded`);
   if (which === 'bodies') {
-    prompt = fillTemplate(prompt, { REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '' });
+    prompt = fillTemplate(prompt, {
+      REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '',
+      REQUESTED_COSTUME: costumeName ? `REQUESTED_COSTUME: ${costumeName}` : '',
+    });
   }
   const parts = [inlinePartOf(rowImageData), { text: prompt }];
   const { text, usageMetadata } = await callSheetJudge(model, parts, 4000, process.env.GEMINI_API_KEY);
@@ -1003,7 +1018,7 @@ async function evaluateIdentity(headsCrop, opts = {}) {
 // them but only against the heads. Returns the sub-reports + a merged `verdict`
 // whose flat fields are a drop-in for the whole-sheet verdict the retry gate reads.
 async function evaluateSheetSplit(sheetImageData, opts = {}) {
-  const { facePhoto = null, standardAvatar = null, costumeDescription = 'standard outfit', model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null } = opts;
+  const { facePhoto = null, standardAvatar = null, costumeDescription = 'standard outfit', costumeName = null, model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null } = opts;
   const avatarFaces = standardAvatar ? (await splitSheetRows(standardAvatar)).topHeads : null;
   const { topHeads, bottomBody, splitY } = await splitSheetRows(sheetImageData);
   const hasRefs = !!(facePhoto || avatarFaces);
@@ -1013,7 +1028,7 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
     // does NOT judge head presence — a VLM hallucinates a head on a headless torso
     // (POPE-adversarial co-occurrence) — so the head axis is owned by pose
     // (detectBodyRowHeads) and merged in below. ONE source of truth per concept.
-    evaluateSheetRow(bottomBody, 'bodies', { costumeDescription, model, promptOverride, usageTracker }),
+    evaluateSheetRow(bottomBody, 'bodies', { costumeDescription, costumeName, model, promptOverride, usageTracker }),
     hasRefs ? evaluateIdentity(topHeads, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker }) : Promise.resolve(null),
     detectBodyRowHeads(bottomBody),
   ]);
@@ -1073,12 +1088,12 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
 async function evaluateAvatarSheet(sheet, opts = {}) {
   const {
     pass, facePhoto = null, standardAvatar = null, realisticSheet = null,
-    costumeDescription = 'standard outfit', artStyle = 'watercolor',
+    costumeDescription = 'standard outfit', costumeName = null, artStyle = 'watercolor',
     declaredAge = null, model = null, promptOverride = null, usageTracker = null,
   } = opts;
   if (Number(pass) === 1) {
     const split = await evaluateSheetSplit(sheet, {
-      facePhoto, standardAvatar, costumeDescription,
+      facePhoto, standardAvatar, costumeDescription, costumeName,
       model: model || MODEL_DEFAULTS.sheetEvalModel, promptOverride, usageTracker,
     });
     return { verdict: split.verdict, split };
@@ -1116,6 +1131,10 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   const {
     clothingCategory = 'standard',
     costumeDescription = 'standard outfit',
+    // The costume's own name ('pirate', 'knight'). Separate from the garment
+    // prose deliberately: costumeDescription is stored and reused verbatim in
+    // scene prompts, so the name must not be smuggled into that string.
+    costumeName = null,
     artStyle = 'watercolor',
     usageTracker = null,
     skipQualityEval = false,
@@ -1142,7 +1161,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   let composed;
   try {
     composed = await generateComposited2x4(character, {
-      costumeDescription, redress, usageTracker, skipReview: skipQualityEval,
+      costumeDescription, costumeName, redress, usageTracker, skipReview: skipQualityEval,
     });
   } catch (err) {
     throw new Error(`[CHARACTER 2×4] pass-1 generation failed for ${character?.name}: ${err.message}`);

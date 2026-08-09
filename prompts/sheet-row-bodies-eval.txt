@@ -14,21 +14,26 @@ The 4 cells read front, three-quarter, profile, back, left to right. Score 1-10.
 TASK 3: SAME COSTUME
 Read REQUESTED_OUTFIT below, split it into items, and check every figure wears each item and all 4 cells wear the same outfit. All items present and consistent = 10; one item missing or wrong colour ≤5; outfit varies between cells 1-3. outfitScore 1-10.
 
+TASK 3b: COSTUME READS
+Only when REQUESTED_COSTUME is given below. Ignoring the item list, judge whether a reader seeing this figure alone would name that costume. Every garment is worn the way that costume wears it. A figure carrying the right items that still reads as everyday clothing scores ≤4. costumeReadsScore 1-10. When no REQUESTED_COSTUME is given, score 10.
+
 TASK 4: PROPORTIONS
 Body proportions match the person's apparent age — no oversized head on a small body, no adult shrunk to child proportions. Score 1-10.
 
 TASK 5: PLAIN BACKGROUND
 The area behind and around the figures must be plain white and empty (thin cell dividers are fine). Any painted scene, scenery, streets, walls, floor, sky, fog, or coloured/illustrated backdrop behind a figure = backgroundScore ≤ 2. Plain white/empty in every cell = 10. backgroundScore 1-10.
 
-finalScore = lowest of fullBodyScore, anglesScore, outfitScore, proportionsScore, backgroundScore. valid = finalScore ≥ 6.
+finalScore = lowest of fullBodyScore, anglesScore, outfitScore, costumeReadsScore, proportionsScore, backgroundScore. valid = finalScore ≥ 6.
 
 {REQUESTED_OUTFIT}
+{REQUESTED_COSTUME}
 
 Return EXACTLY this JSON:
 {
   "fullBody": {"perCell": {"cell1": 0, "cell2": 0, "cell3": 0, "cell4": 0}, "headScore": 0, "feetScore": 0, "fullBodyScore": 0, "reason": "cellN: head=<yes|no>, feet=<yes|no> for each of the 4 cells"},
   "angles": {"score": 9, "reason": "Front, three-quarter, profile, back left to right"},
   "outfit": {"outfitScore": 9, "reason": "Every figure wears the requested items, consistent across cells"},
+  "costumeReads": {"costumeReadsScore": 9, "reason": "Reads as the requested costume; 10 when none was requested"},
   "proportions": {"score": 9, "reason": "Proportions match the person's apparent age"},
   "background": {"backgroundScore": 10, "reason": "Plain white background in every cell"},
   "finalScore": 8,

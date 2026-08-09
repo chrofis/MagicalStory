@@ -7218,3 +7218,40 @@ constraining anything outside them.
 **Touched:**   `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
 `prompts/story-bible-from-beats.txt`, `prompts/styled-costumed-avatar.txt`
 **Status:**    ✅ active
+
+### The styled avatar is told the costume's NAME, not only its garments
+
+**Context:**   `projectStoryCostumeDescriptions` deliberately dropped the
+`costumed.costume` subkey ("Stories have ONE costume per character so we don't
+preserve the costume-type subkey"), and `costumeDescription` — the garment prose
+alone — was the only costume input to the 2×4 sheet prompt and its eval. So the
+generator drawing Noah in `job_1786277779744_vorw1f7ve` was never told it was
+drawing a pirate; it received a bare item list ending in "a blue cotton bandana
+tied around his head with the knot at the back above the nape of the neck". With
+no costume to anchor it, the most probable rendering of cloth-on-a-small-child's-
+head is a headband bow, which is what it drew, in every panel, on the sheet all
+14 pages copy from. The eval could not catch it either: `REQUESTED_OUTFIT` is the
+same description-only string, so it scored item presence and never asked whether
+the figure reads as a pirate.
+
+**Decision:** `costumeName` is threaded to `generateCharacter2x4Sheet` →
+`generateComposited2x4` → `buildBodyRowPrompt` (prompt) and →
+`evaluateSheetRow('bodies')` (eval, as `REQUESTED_COSTUME` + a new
+`costumeReads` sub-score). It is derived from `clothingCategory`
+(`costumed:pirate` → `pirate`), which already carried it, so nothing new is
+stored or plumbed from the bible.
+
+**Rationale:** Kept as its own field rather than prefixed onto
+`costumeDescription` — that string is stored on the character and reused verbatim
+in scene prompts, so a name folded into it would leak onto every page.
+`costumeReads` had to be added to the `applyPoseHeadGate` recompute as well: that
+function, not the model's own `finalScore`, is what the retry gate reads, so a
+sub-score absent from its `Math.min` is scored and then silently discarded.
+Defaults to 10 for standard/winter/summer, which have no costume to read as.
+
+**Touched:**   `server/lib/character2x4Sheet.js` (`buildBodyRowPrompt`,
+`buildPrompt`, `reviewBodyRow`, `generateComposited2x4`, `evaluateSheetRow`,
+`evaluateSheetSplit`, `evaluateAvatarSheet`, `generateCharacter2x4Sheet`,
+`applyPoseHeadGate`), `server/lib/styledAvatars.js`,
+`prompts/sheet-row-bodies-eval.txt`
+**Status:**    ✅ active

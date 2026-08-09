@@ -303,6 +303,13 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
             : clothingCategory === 'costumed'
               ? 'costume'
               : 'standard outfit');
+    // The costume's NAME, kept out of costumeDescription on purpose: that string
+    // is stored on the character and reused verbatim in scene prompts, so the
+    // name would leak into every page. The sheet prompt and its eval take it as
+    // its own field. Null for standard/winter/summer — nothing to read as.
+    const costumeName = clothingCategory.startsWith('costumed:')
+      ? clothingCategory.split(':')[1] || null
+      : null;
     // ONE call per pass, no outer retry. The inner generator already does
     // best-of-N for both Pass 1 (realistic identity anchor — one Gemini call
     // checks layout + identity-vs-source + costume-match) and Pass 2 (style
@@ -315,6 +322,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     const result = await generateCharacter2x4Sheet(adHocChar, {
       clothingCategory,
       costumeDescription,
+      costumeName,
       artStyle,
       usageTracker: addUsage,
       redress,
