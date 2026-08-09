@@ -6,6 +6,11 @@
 const { log } = require('../utils/logger');
 const { OutlineParser, extractCharacterNamesFromScene } = require('./outlineParser');
 
+/**
+ * Extract JSON object from a string that may have text before/after it or be wrapped in code blocks
+ * @param {string} text - Raw text that may contain JSON
+ * @returns {Object|null} Parsed JSON object or null if not found
+ */
 function extractJsonFromText(text) {
   if (!text || typeof text !== 'string') return null;
 
@@ -471,14 +476,6 @@ function stripSceneMetadata(sceneDescription) {
 }
 
 /**
- * Extract metadata from scene description
- * Supports two formats:
- * 1. NEW: Full JSON with thinking.draft, thinking.review, output.* fields
- * 2. LEGACY: Markdown with embedded ```json block
- * @param {string} sceneDescription - The scene description text
- * @returns {Object|null} Parsed metadata or null if not found/invalid
- */
-/**
  * Parse character descriptions from image prompt to extract age/gender info
  * Parses formats:
  * - Scene format: "1. Lukas, Looks: school age, 7 years old, boy, Build: ..."
@@ -594,24 +591,6 @@ function parseCharacterDescriptions(prompt) {
  * Even pages (right side of spread) → must use right or full, never left.
  * Flips wrong-side positions to the correct side.
  */
-/**
- * Build the `characterDescriptions` map that bbox detection consumes.
- *
- * Combines:
- *   - Primary characters from `storyData.characters` (avatars + clothing).
- *   - Visual Bible secondaryCharacters / animals when their name or VB-id
- *     (e.g. "CHR003") appears in the page's `expectedPositions` keys.
- *
- * Without the VB enrichment, secondary characters like Gessler (CHR003) or
- * tracked animals (Floh = ANI001) are sent to the detector with no
- * description and come back as UNKNOWN — even though the renderer drew
- * them into the image. Used by every bbox call site so primary + VB
- * characters are always presented to the detector together.
- *
- * @param {object} storyData - story.data (must have .characters and optionally .visualBible)
- * @param {object} expectedPositions - sceneMetadata.characterPositions ({name|VBid: prosePosition})
- * @returns {{[name: string]: { richDescription: string, clothingDescriptions?: object }}}
- */
 
 function enforceSpreadTextPosition(textPosition, pageNumber) {
   if (!textPosition || !pageNumber || pageNumber < 1) return textPosition;
@@ -698,18 +677,15 @@ function mirrorLeftRight(text) {
   return out;
 }
 
-/**
- * Build the calm-zone paragraph that gets injected into image prompts.
- * Story text is rendered in WHITE, so the zone must be a saturated, high-contrast
- * surface — not pale, not pure black, not a box. Uses Sonnet's textZoneDescription
- * when available; falls back to a generic surface list otherwise.
- *
- * @param {string} textPosition - e.g. 'top-right', 'bottom-full'
- * @param {string|null} textZoneDescription - Sonnet's 5–15 word description
- * @param {string} areaPct - e.g. '30%'
- * @returns {string} Instruction paragraph for the image model
- */
 
+/**
+ * Extract metadata from scene description
+ * Supports two formats:
+ * 1. NEW: Full JSON with thinking.draft, thinking.review, output.* fields
+ * 2. LEGACY: Markdown with embedded ```json block
+ * @param {string} sceneDescription - The scene description text
+ * @returns {Object|null} Parsed metadata or null if not found/invalid
+ */
 function extractSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return null;
 
@@ -1070,14 +1046,14 @@ function extractSceneMetadata(sceneDescription) {
 // AGE CATEGORY MAPPING - Maps numeric age to category for image generation
 // ============================================================================
 
-/**
- * Get age category from numeric age
- * Categories: infant (0-1), toddler (1-2), preschooler (3-4), kindergartner (5-6),
- * young-school-age (7-8), school-age (9-10), preteen (11-12), young-teen (13-14),
- * teenager (15-17), young-adult (18-25), adult (26-39), middle-aged (40-59),
- * senior (60-75), elderly (75+)
- */
 
+/**
+ * Detect which characters are mentioned in a scene description
+ * Priority: 1) JSON metadata block, 2) Markdown parsing, 3) Text search fallback
+ * @param {string} sceneDescription - The scene text
+ * @param {Array} characters - Array of character objects (main characters with reference photos)
+ * @returns {Array} Characters that appear in this scene
+ */
 function getCharactersInScene(sceneDescription, characters) {
   if (!sceneDescription || typeof sceneDescription !== 'string' || !characters || characters.length === 0) {
     return [];
@@ -1165,11 +1141,11 @@ function getCharactersInScene(sceneDescription, characters) {
 }
 
 /**
- * Get photo URLs for specific characters based on clothing category
- * Prefers clothing avatar for the category > fallback categories > body with no background > body crop > face photo
- * @param {Array} characters - Array of character objects (filtered to scene)
- * @param {string} clothingCategory - Optional clothing category (winter, summer, formal, standard, costumed)
- * @returns {Array} Array of photo URLs for image generation
+ * Extract scene metadata (characters, setting, time, weather) from scene hint
+ * Parses format: "Characters: Luis: knight, Noel: standard\nSetting: indoor | Time: midday | Weather: n/a"
+ *
+ * @param {string} sceneHint - The scene hint text from outline
+ * @returns {Object|null} { characters, setting, time, weather } or null if not found
  */
 function parseSceneHintMetadata(sceneHint) {
   if (!sceneHint || typeof sceneHint !== 'string') return null;
@@ -1237,28 +1213,8 @@ function parseSceneHintMetadata(sceneHint) {
 }
 
 /**
- * Get detailed photo info for characters (for dev mode display)
- * @param {Array} characters - Array of character objects
- * @param {string} defaultClothing - Optional clothing category to show which avatar is used
- * @param {string} costumeType - Optional costume type for 'costumed' category (e.g., 'pirate', 'superhero')
- * @param {string} artStyle - Optional art style to look for styled avatars first
- * @param {Object} clothingRequirements - Optional per-character clothing requirements from outline
- * @returns {Array} Array of objects with character name and photo type used
+ * Parse story text into pages
  */
-/**
- * Pre-load avatar bytes for a list of characters so the synchronous
- * getCharacterPhotoDetails() can resolve URL-only avatars from a cache
- * instead of needing await.
- *
- * Returns a Map keyed by `${charId}:${slot}` → base64 string (no data: prefix).
- * Caller should await this BEFORE calling getCharacterPhotoDetails and pass
- * the result via the optional `avatarBytesCache` parameter.
- *
- * @param {Array} characters
- * @param {string[]} slotsNeeded - default ['standard', 'summer', 'winter']
- * @returns {Promise<Map<string, string>>}
- */
-
 function parseStoryPages(storyText) {
   // Split by page markers (## Seite/Page X, or --- Page/Seite/Página X ---)
   const pageRegex = /(?:##\s*(?:Seite|Page|Página)\s+(\d+)|---\s*(?:Page|Seite|Página|Pagina)\s+(\d+)\s*---)/gi;
@@ -1365,10 +1321,21 @@ function extractPageClothing(outline, totalPages = 20) {
 // PROMPT BUILDERS
 // ============================================================================
 
-/**
- * Build base prompt for story text generation
- */
 
+/**
+ * Extract the page's primary location vantage from scene metadata.
+ *
+ * Convention: the FIRST `LOC###` (or `LOC###.N`) entry in `metadata.objects[]`
+ * is the page's primary backdrop. The N suffix names a vantage on that LOC.
+ *
+ * Returns the resolved vantage object (with `id`, `name`, `shot`, `description`,
+ * plus a `locId` and `locationName` from the parent), or null when the page
+ * has no LOC reference or the LOC has no vantages defined (legacy stories).
+ *
+ * @param {Object} sceneMetadata - per-page metadata, expected to have `objects: []`
+ * @param {Object} visualBible   - story-level visual bible with `locations[]`
+ * @returns {Object|null} { locId, locationName, vantageId, name, shot, description, location } or null
+ */
 function getPrimaryVantageForPage(sceneMetadata, visualBible) {
   if (!sceneMetadata?.objects || !Array.isArray(sceneMetadata.objects)) return null;
   if (!visualBible?.locations) return null;
@@ -1481,15 +1448,13 @@ function normalizePositionToLCR(position) {
 // EXPORTS
 // ============================================================================
 
-/**
- * Build previous scenes context for scene description prompts
- * Used when regenerating images to provide context from earlier pages
- * @param {Array} sceneDescriptions - Array of scene description objects with pageNumber and description
- * @param {number} currentPage - The current page number being generated
- * @param {number} maxPrevious - Maximum number of previous scenes to include (default 2)
- * @returns {Array} Array of {pageNumber, summary} objects for previous scenes
- */
 
+/**
+ * Get text for a specific page from storyText
+ * @param {string|Array} storyText - Full story text with page markers, or array of {pageNumber, text}
+ * @param {number} pageNumber - Page number to extract
+ * @returns {string|null} Page text or null if not found
+ */
 function getPageText(storyText, pageNumber) {
   if (!storyText) return null;
   const safeNum = parseInt(pageNumber, 10);
@@ -1549,15 +1514,6 @@ function updatePageText(storyText, pageNumber, newText) {
   }
 }
 
-/**
- * Age → head-to-body ratio lookup, used both at avatar-generation time
- * (prescribes the expected proportion) and at image-evaluation time (verifies
- * the generated figure matches). Returns a string like "1:6" or null if age
- * is missing/non-numeric.
- *
- * Keep this the single source of truth — `styledAvatars.js` and
- * `images.js` both call it so the prescribed and checked ratios can't drift.
- */
 
 module.exports = {
   extractJsonFromText,

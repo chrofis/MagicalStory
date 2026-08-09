@@ -1,43 +1,34 @@
 /**
- * Story Helpers Module
+ * Story Helpers — re-export facade
  *
- * Common utilities for story generation, prompt building, and text parsing.
- * Used by both processStoryJob and processStorybookJob.
+ * storyHelpers.js was split into domain modules (docs/plans/storyhelpers-split.md):
+ *   - promptBuilders.js  — story/scene/image prompt builders + support data
+ *                          (character descriptions, teaching guides, historical
+ *                          locations/objects, art styles, language levels, ages)
+ *   - sceneMetadata.js   — scene/page metadata parsers + position handling
+ *   - clothingResolve.js — clothing/avatar category resolution + photo assembly
+ *
+ * This facade re-exports everything so existing `require('./storyHelpers')`
+ * importers keep working byte-identically. New code may require the domain
+ * modules directly; importer migration is opportunistic, never bulk
+ * (docs/decisions.md). Only small residue lives here: landmark photo loaders,
+ * calculateStoryPageCount, getHeadBodyRatio.
  */
 
-const fs = require('fs');
-const path = require('path');
 const { log } = require('../utils/logger');
-const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
-const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
-const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens } = require('./visualBible');
-const { getPrimaryPhoto, getFacePhoto, getStandardAvatar, getFaceThumb, getBodyThumb } = require('./characterPhotos');
-const { getPhysical } = require('./characterPhysical');
-const { getTraits } = require('./characterTraits');
-const { frameColorForName } = require('./characterFrames');
-
-// Lazy-load images module to avoid circular dependency
-// (images.js imports storyHelpers.js, so we can't import at top level)
-const { parseClothingCategory, parseCharacterClothing, resolveClothingForPage, buildSceneClothingRequirements, buildAvailableAvatarsForPrompt, convertClothingToCurrentFormat, getCharacterPhotos, getCharacterPhotoDetails, prefetchAvatarBytesForCharacters, applyReferenceMode } = require('./clothingResolve');
-const { OutlineParser, UnifiedStoryParser, extractCharacterNamesFromScene } = require('./outlineParser');
-const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
-const { getEventById } = require('./historicalEvents');
 const { loadLandmarkPhotoVariant } = require('./landmarkPhotos');
-const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Wrap user-provided text in XML boundary markers to mitigate prompt injection.
- * The <user_input> tags signal to the AI model that the enclosed content is
- * user-provided data and should be treated as data only, not as instructions.
- * @param {string} value - The user-provided string
- * @returns {string} The value wrapped in <user_input> tags, or the original if empty/None
- */
+const { parseClothingCategory, parseCharacterClothing, resolveClothingForPage, buildSceneClothingRequirements, buildAvailableAvatarsForPrompt, convertClothingToCurrentFormat, getCharacterPhotos, getCharacterPhotoDetails, prefetchAvatarBytesForCharacters, applyReferenceMode } = require('./clothingResolve');
 const { wrapUserInput, stripAgeWords, buildHairDescription, buildCharacterDescriptionsForBbox, buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, getAgeCategory, getAgeCategoryLabel, AGE_CATEGORY_ORDER, getAgeCategoryIndex, clampApparentAge, getTeachingGuide, preloadHistoricalLocations, getHistoricalLocations, preloadHistoricalObjects, getHistoricalObjects, getAdventureGuide, getSceneComplexityGuide, ART_STYLES, WORLD_ART_STYLES, buildStyleWardrobeBlock, resolveArtStyle, resolveArtStyleForEmptyScene, resolveArtStyleForSheet, LANGUAGE_LEVELS, getReadingLevel, getTokensPerPage, extractCharacterVisualProfile, buildCharacterPhysicalDescription, buildGroundingPrompt, buildCharacterPromptBlock, buildRelativeHeightDescription, buildCharacterRestriction, buildCharacterReferenceList, buildBasePrompt, buildSceneExpansionAllPrompt, buildSceneExpansionPrompt, buildSceneDescriptionPrompt, textDeclaresNonWornPlacement, sceneDeclaresNonWornState, stripWornStateFromDescription, buildImagePrompt, sanitizeVbIdsInPrompt, buildOutlineReviewPrompt, buildTextRefinePrompt, parseRefinedText, buildBeatsPrompt, buildBeatsReviewPrompt, buildClothingReviewPrompt, parseClothingReview, parseBeats, buildSceneReviewPrompt, buildDoNotWriteSection, buildStoryTextFromBeatsPrompt, buildStoryBibleFromBeatsPrompt, buildUnifiedStoryPrompt, buildTrialStoryPrompt, buildAvailableLandmarksSection, buildPreviousScenesContext } = require('./promptBuilders');
 const { extractJsonFromText, parseProseMetadataFormat, POSITION_ABBREVIATIONS, expandPositionAbbreviations, stripEntityIds, stripSceneMetadata, parseCharacterDescriptions, enforceSpreadTextPosition, mirrorLeftRight, extractSceneMetadata, getCharactersInScene, parseSceneHintMetadata, parseStoryPages, parseSceneDescriptions, extractShortSceneDescriptions, extractCoverScenes, extractPageClothing, getPrimaryVantageForPage, groupPagesByVantage, normalizePositionToLCR, getPageText, updatePageText } = require('./sceneMetadata');
+
+/**
+ * Calculate the actual page count for a story
+ * Picture-book layout is the default for all reading levels: 1 scene = 1 page
+ * (image on top, text below). Reading level only controls text density, not layout.
+ * @param {Object} storyData - The story data object
+ * @param {boolean} includeCoverPages - Whether to add 3 pages for covers (default: true)
+ * @returns {number} Total page count
+ */
 function calculateStoryPageCount(storyData, includeCoverPages = true) {
   const sceneCount = storyData?.sceneImages?.length || storyData?.scenes?.length || 0;
   if (sceneCount === 0) return 0;
@@ -48,15 +39,15 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
 }
 
 // ============================================================================
-// CHARACTER HELPERS
+// LANDMARK PHOTO LOADERS
 // ============================================================================
 
 /**
- * Detect which characters are mentioned in a scene description
- * Priority: 1) JSON metadata block, 2) Markdown parsing, 3) Text search fallback
- * @param {string} sceneDescription - The scene text
- * @param {Array} characters - Array of character objects (main characters with reference photos)
- * @returns {Array} Characters that appear in this scene
+ * Get landmark reference photos for a specific page
+ * Returns photos for real-world landmarks that appear on the given page
+ * @param {Object} visualBible - Visual Bible object with locations
+ * @param {number} pageNumber - The page number to get landmarks for
+ * @returns {Array<{name: string, photoData: string, attribution: string}>} Landmark photos
  */
 function getLandmarkPhotosForPage(visualBible, pageNumber) {
   if (!visualBible?.locations) return [];
@@ -196,14 +187,14 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
   return results;
 }
 
-// ============================================================================
-// AVAILABLE LANDMARKS SECTION BUILDER
-// ============================================================================
-
 /**
- * Build the available landmarks section for the outline prompt
- * @param {Array} landmarks - Pre-discovered landmarks from userLandmarkCache
- * @returns {string} - Prompt section with available landmarks, or empty string if none
+ * Age → head-to-body ratio lookup, used both at avatar-generation time
+ * (prescribes the expected proportion) and at image-evaluation time (verifies
+ * the generated figure matches). Returns a string like "1:6" or null if age
+ * is missing/non-numeric.
+ *
+ * Keep this the single source of truth — `styledAvatars.js` and
+ * `images.js` both call it so the prescribed and checked ratios can't drift.
  */
 function getHeadBodyRatio(age) {
   const n = parseInt(age, 10);

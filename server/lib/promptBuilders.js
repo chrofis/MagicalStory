@@ -20,6 +20,13 @@ const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, enforceSpreadTextPosition, parseSceneHintMetadata } = require('./sceneMetadata');
 const { resolveClothingForPage, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 
+/**
+ * Wrap user-provided text in XML boundary markers to mitigate prompt injection.
+ * The <user_input> tags signal to the AI model that the enclosed content is
+ * user-provided data and should be treated as data only, not as instructions.
+ * @param {string} value - The user-provided string
+ * @returns {string} The value wrapped in <user_input> tags, or the original if empty/None
+ */
 function wrapUserInput(value) {
   if (!value || value === 'None') return value;
   return `<user_input>${value}</user_input>`;
@@ -37,9 +44,18 @@ function getPhysicalFromChar(char) {
 }
 
 /**
- * Format a clothing object into a readable string
- * @param {Object} clothingObj - Object with upperBody, lowerBody, shoes, fullBody properties
- * @returns {string} Formatted clothing description
+ * Strip age-correlated words from freeform face/distinguishing-marks text.
+ *
+ * Belt-and-braces defense for legacy character data that was analyzed before
+ * the character-analysis prompt was tightened. The intended source of age info
+ * is the apparentAge field — face and distinguishing-marks lines should never
+ * carry an age signal that can contradict it.
+ *
+ * Strips qualifier phrases (e.g. "typical of a child", "youthful", "baby-faced",
+ * "mature", "weathered") and trims any leftover whitespace/dangling commas.
+ *
+ * @param {string} text - The text to clean
+ * @returns {string} Cleaned text, or the original if nothing matched
  */
 function stripAgeWords(text) {
   if (!text || typeof text !== 'string') return text;
@@ -280,12 +296,25 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
 // JSON METADATA EXTRACTION - Parse structured data from scene descriptions
 // ============================================================================
 
-/**
- * Extract JSON object from a string that may have text before/after it or be wrapped in code blocks
- * @param {string} text - Raw text that may contain JSON
- * @returns {Object|null} Parsed JSON object or null if not found
- */
 
+/**
+ * Build the `characterDescriptions` map that bbox detection consumes.
+ *
+ * Combines:
+ *   - Primary characters from `storyData.characters` (avatars + clothing).
+ *   - Visual Bible secondaryCharacters / animals when their name or VB-id
+ *     (e.g. "CHR003") appears in the page's `expectedPositions` keys.
+ *
+ * Without the VB enrichment, secondary characters like Gessler (CHR003) or
+ * tracked animals (Floh = ANI001) are sent to the detector with no
+ * description and come back as UNKNOWN — even though the renderer drew
+ * them into the image. Used by every bbox call site so primary + VB
+ * characters are always presented to the detector together.
+ *
+ * @param {object} storyData - story.data (must have .characters and optionally .visualBible)
+ * @param {object} expectedPositions - sceneMetadata.characterPositions ({name|VBid: prosePosition})
+ * @returns {{[name: string]: { richDescription: string, clothingDescriptions?: object }}}
+ */
 function buildCharacterDescriptionsForBbox(storyData, expectedPositions) {
   const out = {};
   // Per-story clothingRequirements is the source of truth — raw
@@ -358,6 +387,17 @@ function buildCharacterDescriptionsForBbox(storyData, expectedPositions) {
   return out;
 }
 
+/**
+ * Build the calm-zone paragraph that gets injected into image prompts.
+ * Story text is rendered in WHITE, so the zone must be a saturated, high-contrast
+ * surface — not pale, not pure black, not a box. Uses Sonnet's textZoneDescription
+ * when available; falls back to a generic surface list otherwise.
+ *
+ * @param {string} textPosition - e.g. 'top-right', 'bottom-full'
+ * @param {string|null} textZoneDescription - Sonnet's 5–15 word description
+ * @param {string} areaPct - e.g. '30%'
+ * @returns {string} Instruction paragraph for the image model
+ */
 function buildTextZoneInstruction(textPosition, textZoneDescription, areaPct, opts = {}) {
   const { isEmptyScene = false } = opts;
   const cornerDesc = {
@@ -445,33 +485,11 @@ function buildLandmarkFidelityBlock(landmark) {
 }
 
 /**
- * Apply a reference mode to a page's image-generation inputs. The mode controls
- * how many character / landmark photos get attached to the model call. The
- * Visual Bible grid is ALWAYS kept (it carries identity for proper-named
- * entities the model can't infer from the image alone). Looser modes trade
- * identity stability for painterly cohesion.
- *
- * Modes:
- *   'strict'      — pass the full 2×2 quadrant grid (face+body, front+profile)
- *                   on every shot (legacy behaviour)
- *   'loose'       — shot-aware reference packing using the pre-cropped
- *                   quadrants instead of the 2×2 grid:
- *                     close / medium / OTS  →  TWO refs per character
- *                                              (face crop + body crop)
- *                     wide                  →  ONE ref per character (body)
- *                   The face quadrant would anchor portrait scale on wide
- *                   shots, so it's dropped there. Older avatars without
- *                   thumbnail URLs fall back to the full 2×2 grid.
- *   'styled-only' — keep the full 2×2 grid (already styled) on every shot
- *   'off'         — drop character photos, landmarks, and empty-scene plate
- *
- * @param {Object} args
- * @param {string} args.mode               — one of strict|loose|styled-only|off
- * @param {Array}  args.characterPhotos    — current page character refs
- * @param {Buffer|string|null} args.visualBibleGrid — passed through untouched
- * @param {Array}  args.landmarkPhotos
- * @param {string|null} args.sceneBackground
- * @param {Object|null} args.sceneMetadata — used to read the shot type
+ * Get age category from numeric age
+ * Categories: infant (0-1), toddler (1-2), preschooler (3-4), kindergartner (5-6),
+ * young-school-age (7-8), school-age (9-10), preteen (11-12), young-teen (13-14),
+ * teenager (15-17), young-adult (18-25), adult (26-39), middle-aged (40-59),
+ * senior (60-75), elderly (75+)
  */
 function getAgeCategory(age) {
   const numAge = parseInt(age, 10);
@@ -1214,14 +1232,6 @@ function getTokensPerPage(languageLevel) {
 // PAGE CALCULATIONS
 // ============================================================================
 
-/**
- * Calculate the actual page count for a story
- * Picture-book layout is the default for all reading levels: 1 scene = 1 page
- * (image on top, text below). Reading level only controls text density, not layout.
- * @param {Object} storyData - The story data object
- * @param {boolean} includeCoverPages - Whether to add 3 pages for covers (default: true)
- * @returns {number} Total page count
- */
 
 const NONE_WORDS = new Set(['none', 'no', 'nein', 'aucun', 'niente', '-', 'keine']);
 const isNone = (v) => !v || NONE_WORDS.has(String(v).toLowerCase().trim());
@@ -1321,44 +1331,6 @@ function buildLabeledPhysicalParts(profile, options = {}) {
  *
  * @param {Object} char - Character object
  * @returns {string} Prose description
- */
-/**
- * Resolve the page-level clothing label (e.g. "costumed:medieval", "winter",
- * "summer", "standard") to a plain-text clothing description suitable as
- * `clothingOverride` for buildCharacterPhysicalDescription. Mirrors the
- * resolution priority used by buildScenePromptWithCharacters.
- *
- * @param {Object} char - Character object
- * @param {string|null} clothingLabel - per-page clothing label (e.g. 'costumed:medieval')
- * @param {Object|null} clothingRequirements - per-character clothing requirements
- *                                             from the unified outline pass
- * @returns {string|null} resolved clothing text, or null when nothing applies
- */
-/**
- * Build the per-page resolved view of clothingRequirements. Single source of
- * truth for "what is each character wearing on THIS page" — used by page
- * generation, scale-repair, and any other path that needs the per-page outfit.
- *
- * Story-level `clothingRequirements` holds the FULL outfit description per
- * (character, category). Per-page `perCharClothing` holds the CATEGORY label
- * for each character on this page. This function combines them: shallow-clones
- * the story-level requirements, then stamps `_currentClothing: <category>` on
- * each scene character's entry so downstream `resolveClothingForPage(char,
- * label, sceneClothingRequirements)` can pick the right description (handling
- * per-page outfit swaps like a character starting in standard and switching
- * to costumed mid-story).
- *
- * Fallback when a scene character has no per-page entry: use the character's
- * `costumed.used: true` variant if present (story is fully costumed), else
- * default to 'standard'.
- *
- * Shallow-clones the inner entry before stamping `_currentClothing` so the
- * story-level `clothingRequirements` is not mutated.
- *
- * @param {Array<{name: string}>} sceneCharacters - chars present in this page
- * @param {Object} perCharClothing - per-page category map (e.g. { Hans: 'standard' })
- * @param {Object} clothingRequirements - story-level requirements blob
- * @returns {Object} sceneClothingRequirements with _currentClothing per char
  */
 function buildCharacterPhysicalDescription(char, clothingOverride = null) {
   const p = extractCharacterVisualProfile(char, { clothingOverride });
@@ -1487,15 +1459,6 @@ function estimateHeightFromAgeGender(char) {
 }
 
 /**
- * Build relative height description for characters
- * Instead of absolute cm values, describes relative heights which AI understands better.
- * Characters without explicit height fall back to age+gender estimation so they
- * can still be placed in the ordering — the output is just a rank order, not
- * absolute cm values, so approximate estimates are sufficient.
- * @param {Array} characters - Array of character objects with name and height properties
- * @returns {string} Description like "Height order: Emma (shortest) -> Max (taller) -> Dad (slightly taller)"
- */
-/**
  * Build a single character's full physical + clothing description for scene expansion.
  *
  * Returns a numbered-list line in the same format buildImagePrompt currently uses for
@@ -1574,6 +1537,15 @@ function buildCharacterPromptBlock(char, opts = {}) {
   return lines.join('\n');
 }
 
+/**
+ * Build relative height description for characters
+ * Instead of absolute cm values, describes relative heights which AI understands better.
+ * Characters without explicit height fall back to age+gender estimation so they
+ * can still be placed in the ordering — the output is just a rank order, not
+ * absolute cm values, so approximate estimates are sufficient.
+ * @param {Array} characters - Array of character objects with name and height properties
+ * @returns {string} Description like "Height order: Emma (shortest) -> Max (taller) -> Dad (slightly taller)"
+ */
 function buildRelativeHeightDescription(characters) {
   if (!characters || characters.length < 2) return '';
 
@@ -1630,13 +1602,6 @@ function buildRelativeHeightDescription(characters) {
 }
 
 /**
- * Build character reference list for image prompts (covers and story pages)
- * Creates a numbered list with consistent formatting across all image types
- * @param {Array} photos - Reference photos with name, clothingDescription
- * @param {Array} characters - Original character data with physical descriptions
- * @returns {string} Formatted character reference list
- */
-/**
  * Explicit character-restriction block appended to an image / cover prompt when
  * the user regenerates with a subset of characters. Filtering the reference
  * photos is NOT enough — the scene prose still names excluded characters and the
@@ -1650,6 +1615,13 @@ function buildCharacterRestriction(selectedNames, excludedNames) {
   return `\n\n**CRITICAL CHARACTER RESTRICTION:**\nONLY show these characters: ${(selectedNames || []).join(', ')}\nDo NOT include: ${excludedNames.join(', ')}\nIf the scene description mentions excluded characters, IGNORE those mentions and show ONLY the specified characters.`;
 }
 
+/**
+ * Build character reference list for image prompts (covers and story pages)
+ * Creates a numbered list with consistent formatting across all image types
+ * @param {Array} photos - Reference photos with name, clothingDescription
+ * @param {Array} characters - Original character data with physical descriptions
+ * @returns {string} Formatted character reference list
+ */
 function buildCharacterReferenceList(photos, characters = null, { includeClothing = false } = {}) {
   if (!photos || photos.length === 0) return '';
 
@@ -1691,7 +1663,7 @@ function buildCharacterReferenceList(photos, characters = null, { includeClothin
 // ============================================================================
 
 /**
- * Parse story text into pages
+ * Build base prompt for story text generation
  */
 function buildBasePrompt(inputData, textPageCount = null) {
   const mainCharacterIds = inputData.mainCharacters || [];
@@ -1755,10 +1727,16 @@ function buildBasePrompt(inputData, textPageCount = null) {
 }
 
 /**
- * Build available avatars list for scene expansion prompt
- * @param {Array} characters - Character array with avatars
- * @param {Object} clothingRequirements - Optional: only show categories with used=true
- * @returns {string} Formatted string showing available clothing per character
+ * Render the Visual Bible as the {RECURRING_ELEMENTS} block.
+ *
+ * Shared by the per-page expansion (which filters to the ids the scene hint
+ * names, saving ~500 tokens) and the all-pages expansion (which passes the
+ * whole bible, because every page draws on a different slice of it). Extracted
+ * so the two callers can never format the same bible differently.
+ *
+ * @param {Object|null} visualBible
+ * @param {Set<string>} [filterIds] - upper-cased VB ids to keep; empty = keep all
+ * @returns {string}
  */
 function buildRecurringElementsText(visualBible, filterIds = new Set()) {
   let recurringElements = '';
@@ -4437,14 +4415,12 @@ Output: Title, then each page with story text and a scene hint for illustration.
 // LANDMARK PHOTO HELPERS
 // ============================================================================
 
-/**
- * Get landmark reference photos for a specific page
- * Returns photos for real-world landmarks that appear on the given page
- * @param {Object} visualBible - Visual Bible object with locations
- * @param {number} pageNumber - The page number to get landmarks for
- * @returns {Array<{name: string, photoData: string, attribution: string}>} Landmark photos
- */
 
+/**
+ * Build the available landmarks section for the outline prompt
+ * @param {Array} landmarks - Pre-discovered landmarks from userLandmarkCache
+ * @returns {string} - Prompt section with available landmarks, or empty string if none
+ */
 function buildAvailableLandmarksSection(landmarks) {
   if (!landmarks || landmarks.length === 0) {
     return '';
@@ -4492,18 +4468,12 @@ Your "name" can be creative, but "landmarkQuery" MUST match the original name ex
 // ============================================================================
 
 /**
- * Extract the page's primary location vantage from scene metadata.
- *
- * Convention: the FIRST `LOC###` (or `LOC###.N`) entry in `metadata.objects[]`
- * is the page's primary backdrop. The N suffix names a vantage on that LOC.
- *
- * Returns the resolved vantage object (with `id`, `name`, `shot`, `description`,
- * plus a `locId` and `locationName` from the parent), or null when the page
- * has no LOC reference or the LOC has no vantages defined (legacy stories).
- *
- * @param {Object} sceneMetadata - per-page metadata, expected to have `objects: []`
- * @param {Object} visualBible   - story-level visual bible with `locations[]`
- * @returns {Object|null} { locId, locationName, vantageId, name, shot, description, location } or null
+ * Build previous scenes context for scene description prompts
+ * Used when regenerating images to provide context from earlier pages
+ * @param {Array} sceneDescriptions - Array of scene description objects with pageNumber and description
+ * @param {number} currentPage - The current page number being generated
+ * @param {number} maxPrevious - Maximum number of previous scenes to include (default 2)
+ * @returns {Array} Array of {pageNumber, summary} objects for previous scenes
  */
 function buildPreviousScenesContext(sceneDescriptions, currentPage, maxPrevious = 2) {
   if (!sceneDescriptions || !Array.isArray(sceneDescriptions)) return [];
@@ -4522,13 +4492,6 @@ function buildPreviousScenesContext(sceneDescriptions, currentPage, maxPrevious 
 // CLOTHING FORMAT CONVERSION
 // ============================================================================
 
-/**
- * Convert clothingRequirements to _currentClothing format for getCharacterPhotoDetails
- * This ensures characters use the story's costumes (not 'standard' fallback) for covers
- *
- * @param {Object} clothingRequirements - Raw clothing requirements from story/streaming
- * @returns {Object} - Converted requirements with _currentClothing set for each character
- */
 
 module.exports = {
   wrapUserInput,

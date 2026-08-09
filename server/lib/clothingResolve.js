@@ -14,6 +14,11 @@ function getImagesModule() {
   return imagesModule;
 }
 
+/**
+ * Format a clothing object into a readable string
+ * @param {Object} clothingObj - Object with upperBody, lowerBody, shoes, fullBody properties
+ * @returns {string} Formatted clothing description
+ */
 function formatClothingObject(clothingObj) {
   if (!clothingObj) return '';
   if (typeof clothingObj === 'string') return clothingObj;
@@ -30,21 +35,36 @@ function formatClothingObject(clothingObj) {
   return parts.join(', ');
 }
 
-/**
- * Strip age-correlated words from freeform face/distinguishing-marks text.
- *
- * Belt-and-braces defense for legacy character data that was analyzed before
- * the character-analysis prompt was tightened. The intended source of age info
- * is the apparentAge field — face and distinguishing-marks lines should never
- * carry an age signal that can contradict it.
- *
- * Strips qualifier phrases (e.g. "typical of a child", "youthful", "baby-faced",
- * "mature", "weathered") and trims any leftover whitespace/dangling commas.
- *
- * @param {string} text - The text to clean
- * @returns {string} Cleaned text, or the original if nothing matched
- */
 
+/**
+ * Apply a reference mode to a page's image-generation inputs. The mode controls
+ * how many character / landmark photos get attached to the model call. The
+ * Visual Bible grid is ALWAYS kept (it carries identity for proper-named
+ * entities the model can't infer from the image alone). Looser modes trade
+ * identity stability for painterly cohesion.
+ *
+ * Modes:
+ *   'strict'      — pass the full 2×2 quadrant grid (face+body, front+profile)
+ *                   on every shot (legacy behaviour)
+ *   'loose'       — shot-aware reference packing using the pre-cropped
+ *                   quadrants instead of the 2×2 grid:
+ *                     close / medium / OTS  →  TWO refs per character
+ *                                              (face crop + body crop)
+ *                     wide                  →  ONE ref per character (body)
+ *                   The face quadrant would anchor portrait scale on wide
+ *                   shots, so it's dropped there. Older avatars without
+ *                   thumbnail URLs fall back to the full 2×2 grid.
+ *   'styled-only' — keep the full 2×2 grid (already styled) on every shot
+ *   'off'         — drop character photos, landmarks, and empty-scene plate
+ *
+ * @param {Object} args
+ * @param {string} args.mode               — one of strict|loose|styled-only|off
+ * @param {Array}  args.characterPhotos    — current page character refs
+ * @param {Buffer|string|null} args.visualBibleGrid — passed through untouched
+ * @param {Array}  args.landmarkPhotos
+ * @param {string|null} args.sceneBackground
+ * @param {Object|null} args.sceneMetadata — used to read the shot type
+ */
 function applyReferenceMode({
   mode,
   characterPhotos = [],
@@ -117,6 +137,13 @@ function applyReferenceMode({
 }
 
 
+/**
+ * Get photo URLs for specific characters based on clothing category
+ * Prefers clothing avatar for the category > fallback categories > body with no background > body crop > face photo
+ * @param {Array} characters - Array of character objects (filtered to scene)
+ * @param {string} clothingCategory - Optional clothing category (winter, summer, formal, standard, costumed)
+ * @returns {Array} Array of photo URLs for image generation
+ */
 function getCharacterPhotos(characters, clothingCategory = null) {
   if (!characters || characters.length === 0) return [];
 
@@ -291,14 +318,20 @@ function parseCharacterClothing(sceneDescription) {
   return null;
 }
 
-/**
- * Extract scene metadata (characters, setting, time, weather) from scene hint
- * Parses format: "Characters: Luis: knight, Noel: standard\nSetting: indoor | Time: midday | Weather: n/a"
- *
- * @param {string} sceneHint - The scene hint text from outline
- * @returns {Object|null} { characters, setting, time, weather } or null if not found
- */
 
+/**
+ * Pre-load avatar bytes for a list of characters so the synchronous
+ * getCharacterPhotoDetails() can resolve URL-only avatars from a cache
+ * instead of needing await.
+ *
+ * Returns a Map keyed by `${charId}:${slot}` → base64 string (no data: prefix).
+ * Caller should await this BEFORE calling getCharacterPhotoDetails and pass
+ * the result via the optional `avatarBytesCache` parameter.
+ *
+ * @param {Array} characters
+ * @param {string[]} slotsNeeded - default ['standard', 'summer', 'winter']
+ * @returns {Promise<Map<string, string>>}
+ */
 async function prefetchAvatarBytesForCharacters(characters, slotsNeeded = ['standard', 'summer', 'winter']) {
   const { loadAvatarBytes } = require('./characterPhotos');
   const cache = new Map();
@@ -310,6 +343,15 @@ async function prefetchAvatarBytesForCharacters(characters, slotsNeeded = ['stan
   return cache;
 }
 
+/**
+ * Get detailed photo info for characters (for dev mode display)
+ * @param {Array} characters - Array of character objects
+ * @param {string} defaultClothing - Optional clothing category to show which avatar is used
+ * @param {string} costumeType - Optional costume type for 'costumed' category (e.g., 'pirate', 'superhero')
+ * @param {string} artStyle - Optional art style to look for styled avatars first
+ * @param {Object} clothingRequirements - Optional per-character clothing requirements from outline
+ * @returns {Array} Array of objects with character name and photo type used
+ */
 function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle = null, clothingRequirements = null, avatarBytesCache = null) {
   if (!characters || characters.length === 0) return [];
 
@@ -665,6 +707,32 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
 
 // Synonyms for "no / none / absent" across the languages our users type in.
 
+/**
+ * Build the per-page resolved view of clothingRequirements. Single source of
+ * truth for "what is each character wearing on THIS page" — used by page
+ * generation, scale-repair, and any other path that needs the per-page outfit.
+ *
+ * Story-level `clothingRequirements` holds the FULL outfit description per
+ * (character, category). Per-page `perCharClothing` holds the CATEGORY label
+ * for each character on this page. This function combines them: shallow-clones
+ * the story-level requirements, then stamps `_currentClothing: <category>` on
+ * each scene character's entry so downstream `resolveClothingForPage(char,
+ * label, sceneClothingRequirements)` can pick the right description (handling
+ * per-page outfit swaps like a character starting in standard and switching
+ * to costumed mid-story).
+ *
+ * Fallback when a scene character has no per-page entry: use the character's
+ * `costumed.used: true` variant if present (story is fully costumed), else
+ * default to 'standard'.
+ *
+ * Shallow-clones the inner entry before stamping `_currentClothing` so the
+ * story-level `clothingRequirements` is not mutated.
+ *
+ * @param {Array<{name: string}>} sceneCharacters - chars present in this page
+ * @param {Object} perCharClothing - per-page category map (e.g. { Hans: 'standard' })
+ * @param {Object} clothingRequirements - story-level requirements blob
+ * @returns {Object} sceneClothingRequirements with _currentClothing per char
+ */
 function buildSceneClothingRequirements(sceneCharacters, perCharClothing, clothingRequirements) {
   const out = { ...(clothingRequirements || {}) };
   const perChar = perCharClothing || {};
@@ -713,6 +781,18 @@ function buildSceneClothingRequirements(sceneCharacters, perCharClothing, clothi
   return out;
 }
 
+/**
+ * Resolve the page-level clothing label (e.g. "costumed:medieval", "winter",
+ * "summer", "standard") to a plain-text clothing description suitable as
+ * `clothingOverride` for buildCharacterPhysicalDescription. Mirrors the
+ * resolution priority used by buildScenePromptWithCharacters.
+ *
+ * @param {Object} char - Character object
+ * @param {string|null} clothingLabel - per-page clothing label (e.g. 'costumed:medieval')
+ * @param {Object|null} clothingRequirements - per-character clothing requirements
+ *                                             from the unified outline pass
+ * @returns {string|null} resolved clothing text, or null when nothing applies
+ */
 function resolveClothingForPage(char, clothingLabel, clothingRequirements = null) {
   if (!char) return null;
   const avatars = char.avatars || char.clothingAvatars || {};
@@ -747,6 +827,12 @@ function resolveClothingForPage(char, clothingLabel, clothingRequirements = null
 }
 
 
+/**
+ * Build available avatars list for scene expansion prompt
+ * @param {Array} characters - Character array with avatars
+ * @param {Object} clothingRequirements - Optional: only show categories with used=true
+ * @returns {string} Formatted string showing available clothing per character
+ */
 function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null) {
   if (!characters || characters.length === 0) return '(No characters)';
 
@@ -804,19 +890,14 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
   }).join('\n');
 }
 
-/**
- * Render the Visual Bible as the {RECURRING_ELEMENTS} block.
- *
- * Shared by the per-page expansion (which filters to the ids the scene hint
- * names, saving ~500 tokens) and the all-pages expansion (which passes the
- * whole bible, because every page draws on a different slice of it). Extracted
- * so the two callers can never format the same bible differently.
- *
- * @param {Object|null} visualBible
- * @param {Set<string>} [filterIds] - upper-cased VB ids to keep; empty = keep all
- * @returns {string}
- */
 
+/**
+ * Convert clothingRequirements to _currentClothing format for getCharacterPhotoDetails
+ * This ensures characters use the story's costumes (not 'standard' fallback) for covers
+ *
+ * @param {Object} clothingRequirements - Raw clothing requirements from story/streaming
+ * @returns {Object} - Converted requirements with _currentClothing set for each character
+ */
 function convertClothingToCurrentFormat(clothingRequirements) {
   const converted = {};
   for (const [charName, charData] of Object.entries(clothingRequirements || {})) {
@@ -855,12 +936,6 @@ function convertClothingToCurrentFormat(clothingRequirements) {
 // PAGE TEXT HELPERS
 // ============================================================================
 
-/**
- * Get text for a specific page from storyText
- * @param {string|Array} storyText - Full story text with page markers, or array of {pageNumber, text}
- * @param {number} pageNumber - Page number to extract
- * @returns {string|null} Page text or null if not found
- */
 
 module.exports = {
   formatClothingObject,

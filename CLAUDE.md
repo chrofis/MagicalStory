@@ -279,7 +279,10 @@ before touching that code:
 - `server/lib/textRegion.js` - Text region detection + white wash compositing
 - `server/lib/entityConsistency.js` - Entity consistency, cascade face merge, object canonicalization
 - `server/lib/referral.js` - Referral code generation
-- `server/lib/storyHelpers.js` - Scene metadata extraction, image prompt building, text area instruction
+- `server/lib/storyHelpers.js` - Re-export facade over the three modules below (all old imports keep working) + landmark photo loaders
+- `server/lib/promptBuilders.js` - Story/scene/image prompt builders + support data (guides, art styles, language levels, character descriptions)
+- `server/lib/sceneMetadata.js` - Scene/page metadata parsers, position handling, page-text helpers
+- `server/lib/clothingResolve.js` - Clothing/avatar category resolution + character photo assembly
 - `server/lib/runware.js` - Runware API (FLUX, ACE++, inpainting)
 - `server/lib/textModels.js` - Claude/Gemini text generation
 - `server/lib/visualBible.js` - Visual Bible entity tracking

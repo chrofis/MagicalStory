@@ -7979,3 +7979,40 @@ this entry deletes — revisit only with a real occurrence.
 `tests/manual/garmentHueNormalize.test.js`.
 
 **Status:** ✅ active
+
+## 2026-08-09 — storyHelpers.js split into domain modules behind a re-export facade
+
+**Context:** `server/lib/storyHelpers.js` had grown to 7,256 lines / 110 top-level functions.
+Parallel agent sessions kept colliding in it, and every session read 7k lines to edit 20.
+42 files require it — a rename-the-imports sweep would have been a 42-file shape change.
+
+**Decision:** Split into three domain modules, with `storyHelpers.js` remaining as a re-export
+facade (`docs/plans/storyhelpers-split.md` has the full inventory table):
+- `promptBuilders.js` (~4.6k lines) — all prompt builders + their support data (character
+  description builders, teaching guides, historical locations/objects, ART_STYLES,
+  LANGUAGE_LEVELS, age-category cluster, worn-state guards, review/beats parsers).
+- `sceneMetadata.js` (~1.6k lines) — scene/page metadata parsers, position handling,
+  page-text helpers. Leaf module: depends on no other bucket.
+- `clothingResolve.js` (~0.9k lines) — clothing/avatar category resolution, character photo
+  assembly, `applyReferenceMode`, private lazy `getImagesModule` cache.
+- `storyHelpers.js` (~370 lines) — destructured re-imports + `module.exports` (public surface
+  byte-identical, private helpers stay private) + residue (landmark photo loaders,
+  `calculateStoryPageCount`, `getHeadBodyRatio`).
+
+Import DAG is acyclic: facade → promptBuilders → {sceneMetadata, clothingResolve}. The only
+upward references are lazy `require('./storyHelpers')` inside two clothingResolve function
+bodies (`parseClothingCategory`/`parseCharacterClothing` → `extractSceneMetadata`), the same
+lazy pattern images.js already uses.
+
+**Importer-migration policy:** opportunistic, never bulk. Existing `require('./storyHelpers')`
+importers are correct and stay; new code may require the domain module directly. Do not sweep
+the 42 importers.
+
+**Rationale:** zero behavior change (verified: all moved blocks byte-compared against the
+pre-split file; parsers + prompt renders re-run on 4 stored staging stories deep-equal
+IDENTICAL to the pre-split baseline), zero importer churn, and sessions now open the ~1-5k-line
+module they need instead of a 7k-line god file.
+
+**Touched files:** server/lib/storyHelpers.js, server/lib/promptBuilders.js,
+server/lib/sceneMetadata.js, server/lib/clothingResolve.js, docs/plans/storyhelpers-split.md,
+CLAUDE.md.
