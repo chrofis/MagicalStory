@@ -25,11 +25,17 @@
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 
-const PLATE_PROMPT = (styleTxt, strictEmptyPage = true, bandPct = 30) => `The image is a book title on a plain white page. The lettering sits in the TOP ${bandPct}% of the page and must stay inside that band — do not move it down, do not spread it over the page, do not re-centre it vertically.${strictEmptyPage ? ' The rest of the page is empty and must stay empty.' : ''} Repaint the LETTERING so it looks hand-painted in the medium of the reference artwork: visible brush and paper texture inside every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours. You may change the lettering colour to one that suits the artwork.
-Keep the same words, letters and the same number of lines. You MAY refine the letterforms, weight and colour so they suit the artwork; you may NOT re-wrap the title, move words to another line, or resize it to fill the page.
-${strictEmptyPage
-  ? 'The rest of the page stays PURE WHITE and completely empty: no people, no objects, no scenery, no illustration, no background wash, no border or frame. Only the letters may be painted.'
-  : 'Put the lettering back on a plain white background — do not paint any scenery, do not draw the illustration, do not add a border or a frame.'}${styleTxt ? ` Medium of the artwork: ${styleTxt}` : ''}`;
+const PLATE_PROMPT = (styleTxt, strictEmptyPage = true, bandPct = 30) => `EDIT THE FIRST IMAGE. It is a book title printed on a plain white page. Change ONLY the letters that are already there.
+
+WHAT TO CHANGE: repaint those letters so they look hand-painted — visible brush and paper texture inside every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours instead of mechanical edges. You may also change their colour. You may refine the letterforms and their weight.
+
+WHAT THE SECOND IMAGE IS: a COLOUR AND TEXTURE SAMPLE ONLY. Look at it to choose the palette, the medium and the brush character. Never copy it. Never draw it. Nothing from it may appear in your output — no people, no faces, no children, no animals, no objects, no landscape, no buildings, no background, no scene of any kind.
+
+WHAT MUST NOT CHANGE: the words, the letters, their spelling, the number of lines, and where they sit. The lettering stays inside the top ${bandPct}% of the page. Do not re-wrap the title, do not move words to another line, do not shift the block, do not enlarge it to fill the page.
+
+ADD NOTHING. Every white pixel of the page stays white. When you are finished the page must contain the painted letters and nothing else — no illustration, no background wash, no border, no frame, no shadow on the page, no decoration.${styleTxt ? `
+
+The medium to imitate: ${styleTxt}` : ''}`;
 
 
 /**
