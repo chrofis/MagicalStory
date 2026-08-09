@@ -615,9 +615,9 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   const sharp = require('sharp');
   const { samUnionBlend, fetchMaskWithRetry } = require('./samBlend');
   const {
-    detectPersonBoxInCrop,
     REPAIR_SHARPNESS_MIN_ORIG, REPAIR_SHARPNESS_REJECT_RATIO,
   } = require('./images');
+  const { detectPersonBoxInCrop } = require('./figureDetection');
   const {
     fetchFigureHeadMaskPng, measureRegionSharpness, grokEditSceneExact,
   } = require('./imageCompositing');

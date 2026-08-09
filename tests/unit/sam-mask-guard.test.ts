@@ -1,5 +1,5 @@
 /**
- * SAM mask acceptance rule (_cleanMaskAndCheck in server/lib/images.js).
+ * SAM mask acceptance rule (_cleanMaskAndCheck in server/lib/figureDetection.js).
  *
  * The mask decides each figure's bodyBox, and a bad accept silently replaces a
  * correct GroundingDINO box with garbage. Geometry here is taken verbatim from
@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { _cleanMaskAndCheck } = require('../../server/lib/images.js');
+const { _cleanMaskAndCheck } = require('../../server/lib/figureDetection.js');
 
 const W = 1024;
 const H = 1024;

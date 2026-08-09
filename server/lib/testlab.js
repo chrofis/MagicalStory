@@ -890,7 +890,7 @@ async function runCharRepairStage(ctx, opts) {
   // re-run face detection) or fail loudly — never silently repair the body.
   const whiteoutTarget = params.whiteoutTarget || 'face';
   if (backend === 'grok' && whiteoutTarget === 'face' && !(faceBbox?.length === 4)) {
-    const { recoverFaceBox } = require('./images');
+    const { recoverFaceBox } = require('./figureDetection');
     faceBbox = await recoverFaceBox(imageData, bbox, `testlab-P${ctx.pageNumber} ${charName}: `);
     if (faceBbox) boxSource = `${boxSource} + face-recovered`;
     else throw new Error(`Face repair requested for "${charName}" but no face box — full-page detection AND body-crop zoom recovery both found no face. Use whiteoutTarget "body" explicitly if a body repair is intended.`);
@@ -3750,7 +3750,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
     if (params.whiteoutTarget === 'face') {
       let fb = resolved?.faceBbox?.length === 4 ? resolved.faceBbox : null;
       if (!fb && resolved?.bbox?.length === 4) {
-        const { recoverFaceBox } = require('./images');
+        const { recoverFaceBox } = require('./figureDetection');
         fb = await recoverFaceBox(baseUri, resolved.bbox, `testlab-P${ctx.pageNumber} ${charName}: `);
         if (fb) resolved = { ...resolved, faceBbox: fb, source: `${resolved.source} + face-recovered` };
       }
@@ -4149,7 +4149,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   params._r2BodyBox = null;
   if (params._faceMode && figureBox) {
     try {
-      const { detectPersonBoxInCrop } = require('./images');
+      const { detectPersonBoxInCrop } = require('./figureDetection');
       const candFull = await sharp(baseBuf).composite([{ input: back, left: crop.x, top: crop.y }]).jpeg({ quality: 92 }).toBuffer();
       const facePagePx = [Math.round(figureBox[1] * W), Math.round(figureBox[0] * H), Math.round(figureBox[3] * W), Math.round(figureBox[2] * H)];
       const pageBox = await detectPersonBoxInCrop(candFull, facePagePx, `testlab-P${ctx.pageNumber} ${charName} (full-page): `);
@@ -4595,6 +4595,126 @@ const STAGE_RUNNERS = {
 };
 
 // Story-level stages: target {storyId} (+ coverType for cover). No page context.
+
+/**
+ * SCENE REVIEW REPLAY — the reviewer, and only the reviewer, on frozen input.
+ *
+ * Production runs the scene review once, inside a generation, over briefs that
+ * were just written. That makes a reviewer-prompt change unmeasurable: rerun the
+ * pipeline and the briefs differ, so any change in behaviour could be the new
+ * briefs rather than the new prompt.
+ *
+ * This replays the review against a story's STORED briefs. The clothing check is
+ * deterministic, so it regenerates byte-identical findings, and the only variable
+ * is the prompt (or the model). Built for the question left open by
+ * job_1786235099497_ytd5c7eek: three correct faults were handed to deepseek and
+ * it rewrote nothing — does a mandatory framing change that, or does the fix path
+ * have to stop being a request?
+ *
+ * params.reviewModel   — override the reviewer (comma-separated fans out)
+ * promptOverride       — full replacement template, the usual Lab A/B lever
+ */
+async function runSceneReviewReplayStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildSceneReviewPrompt, parseRefinedText, extractSceneMetadata } = require('./storyHelpers');
+  const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
+  const { callTextModelStreaming } = require('./textModels');
+  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const scenes = (storyData.sceneImages || [])
+    .filter(s => s.sceneDescription)
+    .map(s => ({ pageNumber: s.pageNumber, brief: s.sceneDescription }));
+  if (scenes.length === 0) throw new Error('story has no stored scene briefs to replay');
+
+  // Findings from the STORED briefs — deterministic, so a rerun compares like
+  // with like.
+  const checkPages = scenes.map(x => {
+    const stored = (storyData.sceneImages || []).find(s => s.pageNumber === x.pageNumber) || {};
+    const meta = stored.sceneMetadata || extractSceneMetadata(x.brief) || {};
+    return {
+      pageNumber: x.pageNumber,
+      prose: String(x.brief).split('---METADATA---')[0],
+      cast: (stored.sceneCharacters || meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
+      perCharClothing: stored.perCharClothing
+        || (storyData.pageClothing?.pageClothing || {})[String(x.pageNumber)]
+        || meta.characterClothing || {},
+    };
+  });
+  const artifacts = (storyData.visualBible || {}).artifacts;
+  const before = checkScenes(checkPages, storyData.clothingRequirements, { artifacts });
+  const findingsBlock = renderFindingsBlock(before.byPage);
+
+  const orig = PROMPT_TEMPLATES.sceneReview;
+  if (promptOverride) PROMPT_TEMPLATES.sceneReview = promptOverride;
+  let prompt;
+  try {
+    prompt = buildSceneReviewPrompt(storyData, scenes, { clothingFindings: findingsBlock });
+  } finally {
+    PROMPT_TEMPLATES.sceneReview = orig;
+  }
+  if (!prompt) throw new Error('scene-review template unavailable');
+
+  const models = String(params.reviewModel || MODEL_DEFAULTS.outlineReviewModel)
+    .split(',').map(x => x.trim()).filter(Boolean);
+  for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+
+  const runs = [];
+  for (const model of models) {
+    const t = Date.now();
+    const res = await callTextModelStreaming(prompt, 16000, null, model, { usageLabel: 'testlab_scene_review_replay' });
+    const parsed = parseRefinedText(res.text || '', scenes.map(x => x.pageNumber), 'SCENES');
+    const byPage = new Map((parsed.pages || []).map(x => [x.pageNumber, x.text]));
+
+    // Merge onto a COPY — the next model in the fan-out must see the same input.
+    const merged = scenes.map(x => ({
+      pageNumber: x.pageNumber,
+      brief: (byPage.get(x.pageNumber) || '').trim() || x.brief,
+    }));
+    const diffs = merged
+      .filter((m, i) => m.brief !== scenes[i].brief)
+      .map(m => ({ pageNumber: m.pageNumber, before: scenes.find(x => x.pageNumber === m.pageNumber).brief, after: m.brief }));
+
+    const afterPages = checkPages.map(cp => {
+      const m = merged.find(x => x.pageNumber === cp.pageNumber);
+      return { ...cp, prose: String(m.brief).split('---METADATA---')[0] };
+    });
+    const after = checkScenes(afterPages, storyData.clothingRequirements, { artifacts });
+    const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
+    const sentBefore = before.findings.filter(f => REVIEWABLE.has(f.type));
+    const leftAfter = after.findings.filter(f => REVIEWABLE.has(f.type));
+
+    runs.push({
+      model,
+      modelId: res.modelId,
+      elapsedMs: Date.now() - t,
+      cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+      usage: res.usage,
+      analysis: parsed.analysis || '',
+      changedPages: diffs.map(d => d.pageNumber),
+      pages: diffs,
+      // The headline: faults in, faults out. Anything but 0 out means the
+      // reviewer was handed a fact and declined to act on it.
+      faultsBefore: sentBefore.length,
+      faultsAfter: leftAfter.length,
+      faultsFixed: sentBefore.length - leftAfter.length,
+      unfixed: leftAfter,
+    });
+  }
+
+  return {
+    storyId: target.storyId,
+    pageCount: scenes.length,
+    promptChars: prompt.length,
+    prompt,
+    clothingFindings: findingsBlock || null,
+    findingsIn: before.findings,
+    briefsIn: scenes,
+    runs,
+  };
+}
+
 const STORY_STAGES = {
   cover: runCoverStage,
   cover_title_paintin: runCoverTitlePaintinStage,
@@ -4603,6 +4723,7 @@ const STORY_STAGES = {
   outline_review: runOutlineReviewStage,
   text_refine: runTextRefineStage,
   beats_scenes: runBeatsScenesStage,
+  scene_review_replay: runSceneReviewReplayStage,
 };
 
 // Avatar stages take {storyId, character} targets, not page targets.
