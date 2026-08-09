@@ -1,0 +1,126 @@
+<!doctype html><meta charset="utf-8"><title>Pipeline structure — beats · art director · text</title>
+<style>
+body{font:14px/1.55 -apple-system,Segoe UI,sans-serif;margin:0;background:#f6f7f9;color:#1a1a1a}
+header{background:#1f2937;color:#fff;padding:18px 24px}
+header h1{margin:0 0 4px;font-size:19px}
+header p{margin:0;opacity:.8;font-size:13px}
+.flow{display:flex;gap:10px;padding:16px 24px;background:#fff;border-bottom:1px solid #e5e7eb;flex-wrap:wrap}
+.step{flex:1;min-width:190px;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;background:#fafafa}
+.step b{display:block;font-size:13px}
+.step span{font-size:12px;color:#6b7280}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:99px;margin-top:5px}
+.s{background:#dbeafe;color:#1e40af}.d{background:#fae8ff;color:#86198f}
+section{background:#fff;margin:14px 24px;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px}
+h2{margin:0 0 10px;font-size:16px}
+h3{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#374151}
+.who{text-transform:none;letter-spacing:0;color:#9ca3af;font-weight:400}
+.grid{display:grid;gap:14px;grid-template-columns:1fr 1fr}
+@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.beat{margin:0 0 6px}.scene{margin:0;color:#4b5563}
+.text{margin:0;background:#fffbeb;border-left:3px solid #fbbf24;padding:8px 10px;border-radius:0 6px 6px 0}
+pre{white-space:pre-wrap;font:12px/1.5 ui-monospace,Menlo,monospace;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;margin:0 0 8px;overflow-x:auto}
+.meta{background:#f0fdf4;border-color:#bbf7d0}
+.rev{color:#7c3aed;font-size:12px;font-weight:400}
+</style>
+<header><h1>Pipeline structure — beats → art director → text</h1>
+<p>Experiment 349 · Das Seil fliegt, die Freundschaft bleibt · Sonnet writes, DeepSeek reviews</p></header>
+<div class="flow">
+ <div class="step"><b>1 · Beats</b><span>Structure only. English. 21.8s</span><span class="tag s">Sonnet</span></div>
+ <div class="step"><b>1b · Fast review</b><span>Causality, arc, drawability. Rewrote pages 4, 5. 55.1s</span><span class="tag d">DeepSeek</span></div>
+ <div class="step"><b>2 · Art Director</b><span>Illustration brief + metadata, per page, parallel. 26.6s</span><span class="tag s">Sonnet</span></div>
+ <div class="step"><b>3 · Text</b><span>Written, then refined in parallel with images</span><span class="tag s">Sonnet</span> <span class="tag d">DeepSeek reviews</span></div>
+ <div class="step"><b>Lock → images</b><span>Scenes ready in 103s vs 327s today</span></div>
+</div>
+<section>
+   <h2>Page 1</h2>
+   <div class="grid">
+     <div class="col"><h3>1 · BEAT <span class="who">Sonnet, reviewed by DeepSeek</span></h3>
+       <p class="beat">Lukas arrives at the Western festival on the square beside the Odeon Theatre and is dazzled by the costumes, horses, and noise — he wants to try everything at once.</p>
+       <p class="scene"><b>SCENE</b> Lukas and Roger stand at the entrance to the festival square, the grand Odeon Theatre facade visible behind the colourful stalls; Lukas's eyes are wide under his oversized cowboy hat, arms stretched out as if he could grab the whole scene.</p></div>
+     <div class="col"><h3>3 · TEXT <span class="who">what the reader sees</span></h3>
+       <p class="text">Das Fest riecht nach Sägemehl und Popcorn. Lukas tritt durch das grosse Holztor und bleibt stehen.<br><br>Überall sind Zelte in Braun und Rot, Männer und Frauen in Cowboy-Kostümen, und irgendwo in der Ferne wiehert ein Pferd. Eine Blaskapelle spielt etwas Fröhliches. Lukas dreht den Kopf nach links, nach rechts, nach links.<br><br>Es gibt so viel zu sehen, dass er gar nicht weiss, wo er anfangen soll.</p></div>
+   </div>
+   <h3>2 · ART DIRECTOR <span class="who">Sonnet · 21.0s · what the illustrator draws</span></h3>
+   <pre class="ad">Lukas — a kindergartner with average build, light brown straight short hair with bangs above his eyebrows, brown eyes, a soft jawline, rounded nose tip, and a gap where his front teeth should be — stands at the entrance to the Western Festival Grounds at Odeon Theatre, facing the camera with his arms flung wide as if trying to embrace the whole square at once, his light beige straw cowboy hat sitting oversized on his small head, the wide flat brim curling up slightly at the sides and the dark brown leather hatband visible around the creased crown. His brown eyes are stretched wide, brows lifted high, mouth open in delighted shock. Beside him and noticeably taller, Roger — a middle-aged man with average build, gray wavy ear-length hair with a right side part, gray eyes, rectangular black-framed glasses, stubble, and a goatee — stands slightly to Lukas's right, facing the camera with one hand resting on the top of the wooden entrance gate's carved post, looking down at Lukas with a faint amused smile. The hand-painted wooden entrance gate frames the pair: two carved wooden posts and a crossbeam overhead, decorated with rope and pennant flags in orange and beige. Beyond the gate, the festival square opens into a warm golden midday scene — gravel paths, colourful canvas tents in brown and beige with orange pennant flags, wooden signposts, and far behind it all the Odeon Theatre facade rising in the background, warm sunlight falling across its surface. Lukas occupies the left foreground, small and bright under his hat; Roger stands center-right foreground, half a head taller than the gate post beside him. Medium wide shot, the entrance gate forming a natural arch around both figures, the festival activity receding into the colourful midground behind them.
+
+---METADATA---
+
+```json</pre>
+   <pre class="meta">{
+  "characters": [
+    {"name": "Lukas", "clothing": "costumed", "position": "left foreground", "depth": "foreground", "expression": "eyes wide, brows lifted high, mouth open"},
+    {"name": "Roger", "clothing": "standard", "position": "center-right foreground", "depth": "foreground", "expression": "looking down at Lukas, faint amused smile"}
+  ],
+  "objects": ["Western Festival Grounds at Odeon Theatre", "Cowboy Hat"],
+  "interactions": [
+    {"character": "Lukas", "object": "the festival square entrance", "where": "spreads both arms wide toward the festival square", "storyRelevant": true, "priority": "essential"},
+    {"character": "Roger", "object": "the carved wooden gate post", "where": "rests one hand on top of the carved wooden gate post", "storyRelevant": false, "priority": "normal"}
+  ],
+  "textPosition": "bottom-left",
+  "textZoneDescription": "warm gravel path in golden midday light below the gate",
+  "emptyScenePrompt": "The hand-painted wooden entrance gate of the Western Festival Grounds stands at the centre of the frame, its two carved wooden posts and overhead crossbeam strung with orange pennant flags and rope decorations. Beyond the gate, gravel paths lead into a busy festival square filled with colourful canvas tents in brown and beige, orange banners, and wooden signposts; festival-goers in warm tones of red, tan, and brown — a mix of wide-brimmed hats, vests, and long skirts — mill about in the midground at varied distances, dense enough to feel lively but no single figure prominent. In the far background, the Odeon Theatre facade rises in warm stone, visible above the tent rooflines under clear midday golden sunlight. Open foreground space on the left and centre in front of the gate is uncluttered, ready for characters to be composited in."
+}</pre>
+  </section>
+<section>
+   <h2>Page 2</h2>
+   <div class="grid">
+     <div class="col"><h3>1 · BEAT <span class="who">Sonnet, reviewed by DeepSeek</span></h3>
+       <p class="beat">Lukas spots the lasso stand and sees a boy his age — Matei — spinning a rope with easy confidence; Lukas decides he must learn to do that too.</p>
+       <p class="scene"><b>SCENE</b> Lukas stops mid-step, staring across the square at Matei, who twirls a lasso in a wide, smooth loop above his head; Roger stands just behind Lukas, one hand on his shoulder.</p></div>
+     <div class="col"><h3>3 · TEXT <span class="who">what the reader sees</span></h3>
+       <p class="text">«Hier», sagt Roger und hält den hellbeigen Hut vor Lukas' Gesicht. Er setzt ihn dem Buben langsam auf den Kopf, beide Hände an den Krempen.<br><br>Lukas schaut nach oben. Der Hut ist einen Tick zu gross und rutscht ihm fast über die Nase, aber Roger schiebt ihn mit dem Daumen zurück. «So», sagt er. «Jetzt bist du ein echter Cowboy.»<br><br>Lukas lacht lautlos mit offenem Mund — er hat vorne zwei Zähne verloren.</p></div>
+   </div>
+   <h3>2 · ART DIRECTOR <span class="who">Sonnet · 26.6s · what the illustrator draws</span></h3>
+   <pre class="ad">Lukas — a kindergartner-age boy with average build, light brown straight short hair with bangs above his eyebrows, brown eyes, soft rounded features, and a gap where his two front teeth should be — stops mid-step at the centre-left foreground, body facing right, gaze locked across the square on Matei at the lasso training stand in the midground. Roger stands just behind Lukas at the left foreground, noticeably taller, a middle-aged man with average build, ear-length wavy gray hair parted on the right, gray eyes behind rectangular black-framed glasses, a soft jawline with goatee and light stubble, one hand resting on Lukas's shoulder as he looks in the same direction. Across the square in the midground-right, Matei — a school-age child, slightly taller than Lukas, with short close-cropped straight black hair, brown eyes, warm brown skin, and broad rounded child features — twirls a lasso in a wide smooth loop above his head, the dark brown braided leather rope spinning in a full open circle, the honda knot riding the edge of the loop; he wears his red leather cowboy vest with silver dome studs along the front edges over a plain white shirt, black straight-leg jeans, and black leather boots with a heel, and he faces left with his body angled into the swing, gaze following the rope's arc. The lasso training stand sits just behind and beside Matei — a wooden frame structure with a horizontal sign beam at the top, rope decorations along the frame, and the round wooden target ring on a post planted in the sandy gravel in front — its warm natural wood tones catching the golden afternoon sunlight that falls across the whole Western Festival Grounds at Odeon Theatre square: warm browns, beige, and orange-red canvas tents with pennant flags line the background, gravel paths wind between them, and the hand-painted wooden entrance gate with its two carved posts and crossbeam is visible at the far background edge. Wide shot, camera positioned at ground level behind and to the left of Lukas and Roger, taking in the full distance between the two boys across the festival square, Lukas and Roger filling the centre-left foreground while Matei is a noticeably smaller figure in the midground-right, roughly a third the apparent height of the foreground pair.
+
+---METADATA---
+
+```json</pre>
+   <pre class="meta">{
+  "characters": [
+    {"name": "Lukas", "clothing": "standard", "position": "center-left foreground", "depth": "foreground", "expression": "eyes wide, brows lifted, mouth open slightly in surprise"},
+    {"name": "Roger", "clothing": "standard", "position": "left foreground, behind Lukas", "depth": "foreground", "expression": "brows slightly raised, eyes directed across the square, lips neutral"},
+    {"name": "Matei", "clothing": "costumed", "position": "midground right", "depth": "midground", "expression": "broad smile, eyes tracking the rope arc, brows relaxed"}
+  ],
+  "objects": ["LOC001", "LOC002"],
+  "interactions": [
+    {"character": "Lukas", "object": "Matei spinning the lasso", "where": "stares across the square at Matei twirling the lasso", "storyRelevant": true, "priority": "essential"},
+    {"character": "Roger", "object": "Lukas", "where": "rests one hand on Lukas's shoulder", "storyRelevant": false, "priority": "normal"},
+    {"character": "Matei", "object": "Lasso", "where": "spins the lasso in a wide loop above his head across the square", "storyRelevant": true, "priority": "essential"}
+  ],
+  "textPosition": "bottom-left",
+  "textZoneDescription": "warm gravel ground in sandy beige and brown tones",
+  "emptyScenePrompt": "An outdoor Western festival square at the grounds of the Odeon Theatre on a warm golden afternoon. The centre and left foreground are open uncluttered gravel path in sandy beige. In the midground-right, a lasso training stand — a wooden frame structure with a horizontal sign beam, rope decorations on the frame, and a round wooden target ring on a post in front planted in sandy gravel — sits in warm natural brown tones under golden sunlight. Behind it, colourful canvas tents in brown, beige, and orange-red with orange pennant flags line the background, and wooden signposts mark the gravel paths. At the far background edge, the hand-painted wooden entrance gate with two carved wooden posts and a painted crossbeam anchors the scene. Festival visitors in the background move in loose clusters among the tents — a mix of red, blue, and cream garments, some in wide-brimmed hats and vests, others in plain shirts — their silhouettes small and varied, none occupying the centre or left foreground."
+}</pre>
+  </section>
+<section>
+   <h2>Page 3</h2>
+   <div class="grid">
+     <div class="col"><h3>1 · BEAT <span class="who">Sonnet, reviewed by DeepSeek</span></h3>
+       <p class="beat">Lukas walks straight up to Matei and introduces himself, asking Matei to teach him — the moment a friendship becomes possible.</p>
+       <p class="scene"><b>SCENE</b> Lukas stands face to face with Matei at the lasso stand, hand extended for a handshake, cowboy hat slightly crooked; Matei grins, rope still loosely coiled in his hands.</p></div>
+     <div class="col"><h3>3 · TEXT <span class="who">what the reader sees</span></h3>
+       <p class="text">Beim Lasso-Stand dreht ein Bub das Seil in grossen Kreisen über seinem Kopf. Das Lasso surrt durch die Luft und landet jedes Mal genau über dem Holzring auf dem Pfosten.<br><br>Lukas bleibt am Rand stehen. Er schaut zu, wie das Seil fliegt. Er möchte das auch können. Aber noch mehr möchte er wissen, wer dieser Bub ist.</p></div>
+   </div>
+   <h3>2 · ART DIRECTOR <span class="who">Sonnet · 21.7s · what the illustrator draws</span></h3>
+   <pre class="ad">Lukas, a kindergartner-age boy with average build, light brown straight short hair with bangs above his eyebrows, brown eyes, a soft jawline, and a gap-toothed smile showing missing front teeth, stands at the centre foreground facing right, his right arm extended forward in a handshake toward Matei, his light beige straw cowboy hat — roughly 30 centimetres wide at the brim, with a creased crown and dark brown leather hatband — sitting slightly crooked on his head. Across from him in the right midground, Matei — a school-age child with short straight close-cropped black hair, brown eyes, warm brown skin, and rounded child features — faces left toward Lukas, grinning broadly, his hands loosely holding a dark brown braided leather lasso coiled in front of him, the honda-knot loop hanging slack; he wears his red leather cowboy vest with silver dome studs along the front edges and shoulder seams over a plain white shirt, black straight-leg jeans, and black boots with a heel. Between them and slightly behind, the lasso training stand anchors the composition — a natural-wood-brown frame structure with a horizontal sign beam at top and a round wooden target ring on a post in front, gravel underfoot. The setting is the Western Festival Grounds at Odeon Theatre: warm golden afternoon sunlight falls across the gravel paths, colourful canvas tents in brown and beige with orange pennant flags fill the middle distance, and the hand-painted wooden entrance gate with its two carved posts and crossbeam is visible in the soft background. Medium shot, both figures at roughly three-quarter height in the frame, the handshake gesture bridging the centre of the composition.
+
+---METADATA---
+
+```json</pre>
+   <pre class="meta">{
+  "characters": [
+    {"name": "Lukas", "clothing": "costumed", "position": "center-left foreground", "expression": "wide gap-toothed smile, brows lifted, eyes on Matei", "depth": "foreground"},
+    {"name": "Matei", "clothing": "costumed", "position": "center-right midground", "expression": "broad grin, cheeks raised, eyes on Lukas", "depth": "midground"}
+  ],
+  "objects": ["LOC001", "LOC002", "OBJ_CowboyHat", "OBJ_Lasso"],
+  "interactions": [
+    {"character": "Lukas", "object": "Matei", "where": "extends right hand toward Matei in a handshake across the space between them", "storyRelevant": true, "priority": "essential"},
+    {"character": "Matei", "object": "lasso", "where": "holds the coiled lasso loosely in both hands in front of him", "storyRelevant": true, "priority": "normal"},
+    {"character": "Lukas", "object": "cowboy hat", "where": "wears the cowboy hat slightly crooked on his head", "storyRelevant": false, "priority": "low"}
+  ],
+  "textPosition": "top-left",
+  "textZoneDescription": "warm golden sky above the canvas tents and pennant flags",
+  "emptyScenePrompt": "The lasso training stand occupies the right-centre of the composition — a natural wood-brown frame with a horizontal sign beam at the top and a round wooden target ring on a post in front, set on sandy gravel ground with rope decorations on the frame sides. The Western Festival Grounds at Odeon Theatre spread behind it: warm golden afternoon light across gravel paths, colourful canvas tents in brown, beige, and orange with pennant flags strung between poles, and the hand-painted wooden entrance gate with two carved posts and a crossbeam visible in the soft midground. The open foreground is uncluttered gravel with scattered festival-goers as small distant silhouettes in reds, browns, and yellows, leaving a broad clear centre for composited figures."
+}</pre>
+  </section>

@@ -1061,7 +1061,7 @@ async function runCharRepairStage(ctx, opts) {
   // only — never gates anything, and failures are silent.
   try {
     const sharpL = require('sharp');
-    const { fetchFigureMaskPng } = require('./images');
+    const { fetchFigureMaskPng } = require('./imageCompositing');
     const finalBuf = Buffer.from(String(finalImage).replace(/^data:image\/\w+;base64,/, ''), 'base64');
     const meta = await sharpL(finalBuf).metadata();
     const FW = meta.width, FH = meta.height;
@@ -1908,7 +1908,7 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
   const detect = params.detect || 'pigment';
   let samMaskRaw = null;
   if (detect === 'sam') {
-    const { fetchFigureMaskPng } = require('./images');
+    const { fetchFigureMaskPng } = require('./imageCompositing');
     // group ink rows into lines
     const rowHas = new Array(outH).fill(false);
     for (let y = 0; y < outH; y++) {
@@ -3578,7 +3578,7 @@ function warmupFigureMask() {
     try {
       const sharp = require('sharp');
       const buf = await sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 128, g: 128, b: 128 } } }).jpeg().toBuffer();
-      const { fetchFigureMaskPng } = require('./images');
+      const { fetchFigureMaskPng } = require('./imageCompositing');
       await fetchFigureMaskPng(buf, [8, 8, 56, 56]);
       log.info('[TESTLAB] SAM warm-up complete');
     } catch { /* warm-up is best-effort */ }
@@ -3599,7 +3599,7 @@ async function fetchFaceHeadMask(buf, faceBox, cropW, cropH, opts = {}) {
   // whole-figure fallback produced garbage head whiteouts during a SAM
   // outage (rectangle over a church tower) — better to retry/fail loudly.
   // opts {rawFaceBox, boxScale, singleCall, onGeom} tune the SAM box + dots.
-  const { fetchFaceHeadMaskPng } = require('./images');
+  const { fetchFaceHeadMaskPng } = require('./imageCompositing');
   return fetchFaceHeadMaskPng(buf, faceBox, cropW, cropH,
     (b, box, o) => fetchMaskWithRetry(b, box, 4, { ...(o || {}), requireMobilesam: true }),
     opts);
@@ -3610,7 +3610,7 @@ async function fetchFaceHeadMask(buf, faceBox, cropW, cropH, opts = {}) {
 // Head mask via the whole figure (robust): SAM the figure from the body box,
 // keep only the pixels inside the face box. No fragile face-region dots.
 async function fetchFigureHeadMask(buf, bodyBoxInCrop, faceBoxInCrop, cropW, cropH, opts = {}) {
-  const { fetchFigureHeadMaskPng } = require('./images');
+  const { fetchFigureHeadMaskPng } = require('./imageCompositing');
   return fetchFigureHeadMaskPng(buf, bodyBoxInCrop, faceBoxInCrop, cropW, cropH,
     (b, box, o) => fetchMaskWithRetry(b, box, 4, { ...(o || {}), requireMobilesam: true }),
     opts);

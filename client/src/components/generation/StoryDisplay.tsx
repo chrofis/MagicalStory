@@ -2671,7 +2671,9 @@ export function StoryDisplay({
                   {briefsIn.length > 0 && (
                     <details className="mt-3 bg-white/70 border border-gray-200 rounded-lg p-2">
                       <summary className={c.sub}>
-                        {language === 'de' ? 'Alle Original-Szenen (wie gesendet)' : 'All original scenes (as sent)'}
+                        {panelKey === 'beats-review'
+                          ? (language === 'de' ? 'Alle Original-Beats (wie gesendet)' : 'All original beats (as sent)')
+                          : (language === 'de' ? 'Alle Original-Szenen (wie gesendet)' : 'All original scenes (as sent)')}
                         <span className="ml-2 text-gray-500">({briefsIn.length})</span>
                       </summary>
                       <div className="mt-2 space-y-2">

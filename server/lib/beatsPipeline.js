@@ -231,6 +231,15 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         changedPages: beatsDiffs.map(r => r.pageNumber),
         analysis: beatsReviewAnalysis,
         pages: beatsDiffs,
+        // Same dev-mode inspection as the scene review (owner request
+        // 2026-08-09): the exact prompt, and EVERY beat as sent — not only the
+        // ones that changed, which is all a diff can ever show.
+        prompt: reviewPrompt,
+        briefsIn: plan.pages.map(x => ({
+          pageNumber: x.pageNumber,
+          brief: `BEAT: ${x.beat || ''}
+SCENE: ${x.scene || ''}`.trim(),
+        })),
       };
       if (stray.length > 0) log.warn(`⚠️ [BEATS] Review returned page(s) ${stray.join(', ')} that are not in the plan — ignored`);
       gl.info('beats_review', `Beat review by ${revRes.modelId || reviewModel}: ${changed.length} page(s) rewritten (${(meta.timings.beatsReviewMs / 1000).toFixed(1)}s)`, null, {

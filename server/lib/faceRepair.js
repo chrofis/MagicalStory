@@ -151,7 +151,7 @@ function resolveRegion({ regionSource, faceOnly, faceBbox, bodyBbox, sceneWidth,
 
   if (regionSource === 'cutout') {
     // FAITHFULNESS-CHECK: images.js:12102-12114 (PAD_FACTOR 0.4 preset-aligned extract).
-    const { computePresetAlignedExtract } = require('./images');
+    const { computePresetAlignedExtract } = require('./imageCompositing');
     const PAD_FACTOR = 0.4;
     const aligned = computePresetAlignedExtract({
       pixelLeft, pixelTop, pixelWidth, pixelHeight,
@@ -195,7 +195,7 @@ function resolveRegion({ regionSource, faceOnly, faceBbox, bodyBbox, sceneWidth,
 // FAITHFULNESS-CHECK: images.js:11205-11220 (grokFaceInsertRepair head whiteout).
 async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, requireMobilesam, gateCoverage }) {
   const sharp = require('sharp');
-  const { fetchFigureHeadMaskPng } = require('./images');
+  const { fetchFigureHeadMaskPng } = require('./imageCompositing');
   const rawMask = await fetchFigureHeadMaskPng(cropBuf, bodyBoxInCrop, boxInCrop, crop.w, crop.h, maskFetch, { clipMode: 'bottom', hairBox });
   if (!rawMask) throw new Error('SAM head mask unavailable for whiteout (MobileSAM down?)');
   const a = await sharp(rawMask).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
@@ -220,7 +220,7 @@ async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop,
 //                     images.js:12483-12496 / 12689-12695 (grok_inpaint hatch + silhouette clip).
 async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage, sceneBuffer, sceneWidth, sceneHeight, protectedBodies, bodyBbox, faceBoxInCrop = null, blurFace = true, blurStrength = 'slight' }) {
   const sharp = require('sharp');
-  const { fetchFigureMaskPng } = require('./images');
+  const { fetchFigureMaskPng } = require('./imageCompositing');
   const figureLeft = boxInCrop[0], figureTop = boxInCrop[1];
   const figureWidth = boxInCrop[2] - boxInCrop[0], figureHeight = boxInCrop[3] - boxInCrop[1];
   // FAITHFULNESS-CHECK: images.js:12140-12148 (HATCH_SAFETY 0.12 margin around figure box).
@@ -415,7 +415,7 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
 // FAITHFULNESS-CHECK: images.js:11535-11582 (blurFace shapeAware branch).
 async function buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCoverage }) {
   const sharp = require('sharp');
-  const { fetchFaceHeadMaskPng, fetchSilhouettePng, fetchFigureMaskPng } = require('./images');
+  const { fetchFaceHeadMaskPng, fetchSilhouettePng, fetchFigureMaskPng } = require('./imageCompositing');
   const fLeft = boxInCrop[0], fTop = boxInCrop[1];
   const fWidth = boxInCrop[2] - boxInCrop[0], fHeight = boxInCrop[3] - boxInCrop[1];
   // FAITHFULNESS-CHECK: images.js:11524 + 11547 (FACE_BLUR_RADIUS_FACTOR 0.03, min 10).
@@ -514,7 +514,7 @@ function buildActionContext(sceneDescription, charName) {
     }
   } catch { /* fall through */ }
   try {
-    const { buildCharActionContextFromInteractions } = require('./images');
+    const { buildCharActionContextFromInteractions } = require('./imageCompositing');
     return buildCharActionContextFromInteractions(sceneDescription, charName) || '';
   } catch { return ''; }
 }
@@ -615,10 +615,12 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   const sharp = require('sharp');
   const { samUnionBlend, fetchMaskWithRetry } = require('./samBlend');
   const {
-    fetchFigureHeadMaskPng, detectPersonBoxInCrop,
-    measureRegionSharpness, REPAIR_SHARPNESS_MIN_ORIG, REPAIR_SHARPNESS_REJECT_RATIO,
-    grokEditSceneExact,
+    detectPersonBoxInCrop,
+    REPAIR_SHARPNESS_MIN_ORIG, REPAIR_SHARPNESS_REJECT_RATIO,
   } = require('./images');
+  const {
+    fetchFigureHeadMaskPng, measureRegionSharpness, grokEditSceneExact,
+  } = require('./imageCompositing');
   const { checkStyleMatch } = require('./styleAnalysis');
 
   // --- Axis normalisation + defaults (reproduce today's dominant path) -------

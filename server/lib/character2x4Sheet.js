@@ -270,21 +270,18 @@ async function stackRowsInto2x4(headRowData, bodyRowData) {
   const headResized = await sharp(headBuf).resize({ width: W }).toBuffer();
   const hMeta = await sharp(headResized).metadata();
   const SEAM = 4;
-  const stackH = hMeta.height + SEAM + bMeta.height;
-  // Pad to an EXACT 1:1 square so Pass-2 style transfer can output the same
-  // aspect. Gemini/Grok take only preset aspect strings; two stacked 16:9 rows
-  // = ~8:9, which has no preset, so forcing 16:9 in Pass 2 cropped the heads
-  // and squeezed the bodies. White L/R margins (matches the sheet background),
-  // a dark thin seam between the rows for the splitter to lock onto.
-  const square = Math.max(W, stackH);
-  const left = Math.round((square - W) / 2);
-  const top = Math.round((square - stackH) / 2);
-  const splitY = top + hMeta.height + Math.round(SEAM / 2);
-  const out = await sharp({ create: { width: square, height: square, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+  // Full-width stack, NO side padding: the head row is generated at 16:3 and the
+  // body row at 16:9, so head (¾×W? no) — with equal width W they stack to
+  // 16:(3+9) = 16:12 = 4:3, a native preset. Style transfer then runs at 4:3
+  // (no squeeze), columns stay at W/4 (no margins), and the head/body boundary
+  // is the dark seam the shared splitter (splitSheetRows) already locks onto.
+  const H = hMeta.height + SEAM + bMeta.height;
+  const splitY = hMeta.height + Math.round(SEAM / 2);
+  const out = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } } })
     .composite([
-      { input: headResized, top, left },
-      { input: { create: { width: W, height: SEAM, channels: 3, background: { r: 20, g: 20, b: 20 } } }, top: top + hMeta.height, left },
-      { input: bodyBuf, top: top + hMeta.height + SEAM, left },
+      { input: headResized, top: 0, left: 0 },
+      { input: { create: { width: W, height: SEAM, channels: 3, background: { r: 20, g: 20, b: 20 } } }, top: hMeta.height, left: 0 },
+      { input: bodyBuf, top: hMeta.height + SEAM, left: 0 },
     ])
     .jpeg({ quality: 92 })
     .toBuffer();
@@ -393,10 +390,13 @@ async function generateComposited2x4(character, { costumeDescription, redress = 
   if (!bestBody) throw new Error(`[CHARACTER 2×4] body row produced no image for ${character?.name}`);
 
   // ── Stage 2: head row on the accepted body (max 1 retry, keep least-bad) ──
+  // Head row is generated at 16:3 (short/wide) so that stacked under the 16:9
+  // body row the composite is exactly 16:12 = 4:3 — a native Grok/Gemini preset,
+  // full-width, no padding/squeeze. See stackRowsInto2x4.
   const headRefs = [headPhantom, facePhoto, bestBody.row]; // exactly 3
   let bestHead = null;
   for (let t = 1; t <= 2; t++) {
-    const res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD });
+    const res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '16:3', model: GROK_MODELS.STANDARD });
     if (!res?.imageData) { attemptHistory.push({ stage: 'head', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_head_row', res.modelId);
     let review = { valid: true, score: 10, heads: null, identity: null };

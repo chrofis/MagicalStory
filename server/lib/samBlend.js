@@ -12,7 +12,7 @@ const { log } = require('../utils/logger');
 const BLEND_RULE_VERSION = 'union-soft2-pad6';
 
 async function fetchMaskWithRetry(buf, box, tries = 5, opts = {}) {
-  const { fetchFigureMaskPng } = require('./images');
+  const { fetchFigureMaskPng } = require('./imageCompositing');
   for (let i = 0; i < tries; i++) {
     const m = await fetchFigureMaskPng(buf, box, opts);
     if (m) return m;
@@ -135,7 +135,7 @@ async function _interiorSeedPoints(maskPng, w, h) {
  */
 async function matchIntroducedBackground({ origRaw, pasteRaw, cropW, cropH, alpha1, redZone, newDil, bgBorderMatch, localField = false, oldBin = null, newBin = null }) {
   const n = cropW * cropH;
-  const { _rgbToLab, _labToRgb, _deltaE, _ccKMeans } = require('./images');
+  const { _rgbToLab, _labToRgb, _deltaE, _ccKMeans } = require('./imageCompositing');
   const sharpL = require('sharp');
   if (localField) {
     // The old mask is DILATED ~2px before defining the footprint: the original's
@@ -558,7 +558,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
   // mismatch — revert it rather than delete the figure.
   if (Array.isArray(protectedBoxesInCrop) && protectedBoxesInCrop.length && newMask) {
     try {
-      const { fetchFigureMaskPng } = require('./images');
+      const { fetchFigureMaskPng } = require('./imageCompositing');
       const opaque = async (buf) => { try { const st = await sharp(buf).stats(); const ch = st?.channels?.[3]; return ch ? ch.mean / 255 : null; } catch { return null; } };
       const before = await opaque(newMask);
       let removed = 0;
@@ -956,7 +956,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
   // union being pasted (alpha1).
   // Build the paste as RAW RGB: start from the candidate, colour-correct the
   // figure, then colour-match the background the paste introduces.
-  const { correctColorShift } = require('./images');
+  const { correctColorShift } = require('./imageCompositing');
   const origRaw = await sharp(origResized).removeAlpha().raw().toBuffer();
   let pasteRaw = await sharp(candResized).removeAlpha().raw().toBuffer();
   let colorInfo = null;
