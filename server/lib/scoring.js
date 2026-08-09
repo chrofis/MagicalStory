@@ -125,7 +125,19 @@ const ZERO_POINT_TYPES = new Set(['garment_colour', 'garment_color']);
 // a WRONG version of an accessory is detail; a contract-named accessory that is
 // entirely ABSENT is a real miss and may cost MAJOR. Neither may ever reach
 // CRITICAL, which is where the 57 compliance criticals were landing.
-const MAX_SEVERITY_TYPES = { accessory: 'moderate', accessory_missing: 'major', clothing_detail: 'moderate' };
+// accessory_missing lowered MAJOR -> MODERATE (2026-08-09): verified against the
+// images, 5 of quality's 10 accessory_missing findings were false — a
+// contract-named item occupying under 1% of frame is a coin flip even for an
+// evaluator that sees the page.
+// unverified_absence capped at MINOR by owner decision: compliance cannot see
+// the image, 55% of its absence claims were wrong, but a nudge is wanted over
+// silence.
+const MAX_SEVERITY_TYPES = {
+  accessory: 'moderate',
+  accessory_missing: 'moderate',
+  clothing_detail: 'moderate',
+  unverified_absence: 'minor',
+};
 
 // NO TEXT MATCHING IN SCORING. Owner rule, 2026-08-09: "you can not build this
 // into some regex. This must come from the prompt. You can change a severity

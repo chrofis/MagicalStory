@@ -46,6 +46,13 @@ const BUCKETS = {
   // 78 wardrobe findings were this, worth 670 points, three of them CRITICAL
   // for a rolled sleeve.
   clothing_detail:      { owner: 'quality',  kind: 'graded', repair: 'grok_blended' },
+  // An absence the BLIND compliance evaluator inferred from a silent inventory
+  // field, having not seen the image. Measured over 154 absence findings across
+  // two stories: 55% of compliance's absences were false (the item plainly
+  // visible), against 0% for the two evaluators that DO see the image. Its own
+  // type so the low ceiling in scoring.js binds only to the unreliable class —
+  // a confirmed absence from quality or semantic is untouched.
+  unverified_absence:   { owner: 'quality',  kind: 'graded', repair: 'inpaint' },
   anatomy:              { owner: 'quality',  kind: 'graded', repair: 'regen' },
   figure_completeness:  { owner: 'quality',  kind: 'binary', repair: 'regen' },
   // `camera_facing` was MERGED into action_interaction (2026-08-09). It was an
@@ -124,6 +131,7 @@ const TYPE_TO_BUCKET = {
   // Accessory detail is its own bucket (see BUCKETS.accessory) — it carries a
   // MODERATE ceiling in scoring.js that must NOT apply to main-garment failures.
   clothing_detail: 'clothing_detail', sleeve: 'clothing_detail', collar: 'clothing_detail',
+  unverified_absence: 'unverified_absence', inferred_absence: 'unverified_absence',
   accessory: 'accessory', glasses: 'accessory', eyewear: 'accessory',
   bandana: 'accessory', jewellery: 'accessory', jewelry: 'accessory',
   footwear: 'accessory',

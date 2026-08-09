@@ -2077,9 +2077,18 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         try {
           const p1Result = await p1Promise;
           if (p1Result) {
-            // Use P1's figures/matches (more honest, no prompt bias)
-            figures = p1Result.figures || figures;
-            matches = p1Result.matches || matches;
+            // Use P1's figures/matches (more honest, no prompt bias) — but only
+            // when P1 actually produced some. runVisualInventory returns
+            // `matches = inventoryJson.matches || []`, i.e. ALWAYS an array, and
+            // an empty array is truthy: `p1Result.matches || matches` therefore
+            // discarded the quality evaluator's matches unconditionally on every
+            // successful P1 pass. Compliance's "authoritative for who is where"
+            // input then came from an empty list, and it reported present
+            // characters as missing — measured 9 false absence findings worth
+            // 135 points across two stories, e.g. quality matched all five
+            // characters at 0.90 while compliance declared two of them absent.
+            if (p1Result.figures?.length) figures = p1Result.figures;
+            if (p1Result.matches?.length) matches = p1Result.matches;
             p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens };
           }
         } catch (e) {

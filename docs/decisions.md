@@ -7612,3 +7612,78 @@ pick — bounded convergence.
 **Touched files:** `server/lib/figureDetection.js` (undercount continues; attachSamMasksToFigures),
 `server/lib/images.js` (stash + arbitration + failure-path returns), `server/lib/testlab.js`
 (bbox stage accepts 'gemini-second-opinion'), `server/lib/repairPipeline.js` (Step 4b).
+
+## 2026-08-09 — False absence claims: fix the INPUT, not the score (and one real bug)
+
+**Context:** the owner's page-by-page review found evaluators reporting items as missing that are
+visibly present ("Sarah missing rectangular black-framed glasses" — she is wearing them). A subagent
+verified **all 154 absence-worded findings across two 14-page stories against their images**.
+
+| evaluator | findings | FALSE | wasted pts |
+|---|---|---|---|
+| **compliance** (never sees the image) | 77 | **42 — 55%** | 610 |
+| quality (sees the image) | 41 | 9 — 22% | 115 |
+| semantic (sees the image) | 29 | **0** | 0 |
+| entity | 7 | **0** | 0 |
+
+**The evaluators that look at the picture are essentially never wrong about absence; the blind one is
+wrong more often than right.** That asymmetry is the whole finding.
+
+### Cause 1 — the vision inventory has no field for the things being reported missing (375 pts)
+
+`image-vision-inventory.txt` asked per figure for zone, facing, hair, garments, items *in each hand*,
+expression, age, standing surface. **Glasses, hats, facial hair and a cutlass hung at a hip are none
+of those.** The inventory was silent, and compliance read silence as absence — two of its findings
+said so outright: *"Glasses absent from vision inventory despite being specified in prompt."* The
+existing carve-out only excused four "occludable" examples; glasses are not occluded, they were
+unrepresentable.
+
+**Fix: fix the input.** The inventory now has MANDATORY per-figure fields for eyewear, headwear,
+facial hair, and worn/carried items, each requiring an explicit `none visible` or `cannot tell at
+this size`. Silence stops being ambiguous because silence stops existing. Compliance may treat an
+explicit `none visible` as a real absence; anything else is `unverified_absence` or omitted.
+
+### Cause 2 — a real code bug: quality's `matches[]` was discarded on every page (135 pts)
+
+`server/lib/images.js:2082` read `matches = p1Result.matches || matches`, and
+`runVisualInventory` returns `matches = inventoryJson.matches || []` — **always an array**. An empty
+array is truthy, so a successful P1 pass unconditionally clobbered the quality evaluator's matches.
+Compliance's "authoritative for who is where" input then came from an empty list. Evidence: on one
+page quality matched all five characters at 0.90 confidence while compliance reported Daniel and
+Sarah missing — both standing in frame. Now `if (p1Result.matches?.length)`.
+
+**Wider than scoring:** every downstream consumer of the merged `figures`/`matches` has been running
+on P1's output exclusively, never quality's. Not chased here — worth its own investigation.
+
+### Cause 3 — the ceilings could never bind (my own miss, same day)
+
+STEP 2 of the compliance prompt was told to emit `accessory` / `accessory_missing`, but neither value
+was in the closed `type` list at the bottom of that same prompt. Compliance emitted
+`accessory_missing` exactly ONCE in 154 findings; its accessory absences arrived typed
+`clothing/MAJOR` or `character_identity/MAJOR`, so the ceilings shipped earlier today never applied
+to compliance at all. Both types added to the list. **Lesson: adding a type to a prompt's rules is
+half the change — the closed list is the other half.**
+
+### Ruled out
+
+- **The clothing contract is CORRECT.** `clothingRequirements` explicitly names Sarah's glasses and
+  Noah's cutlass. Only 2 findings (20 pts) invent a spec, both from quality, both N-16 violations
+  ("trousers without a specified colour, *implying* neutral"). N-16 now states that an attribute the
+  contract does not mention is not a requirement — silence is permission, not a default.
+- **Prompt truncation is not the cause**, though it is a latent risk: `ORIGINAL_PROMPT` is cut at
+  3000 chars and 27 of 28 scene briefs exceed it (compliance saw 28% of one brief). Logged, not fixed.
+
+### Decisions
+
+- **`unverified_absence` → MINOR (owner's call).** An absence compliance inferred from a silent or
+  unreadable inventory field. I proposed zero; the owner chose a 2-point nudge over silence.
+- **`accessory_missing` MAJOR → MODERATE.** 5 of quality's 10 were false — a contract-named item
+  under 1% of frame is a coin flip even for an evaluator that sees the page. D-06a now requires
+  confirming the attachment point is visible and bare before reporting.
+
+**Verified:** 10/10 ceiling cases; routing for both new types; the P1 merge keeps quality's matches
+when P1 is empty and prefers P1's when populated; 64/64 templates load; `check-settled` OK.
+
+**Touched:** `server/lib/images.js`, `server/lib/scoring.js`, `server/lib/evalBuckets.js`,
+`prompts/image-vision-inventory.txt`, `prompts/image-prompt-compliance.txt`,
+`prompts/image-evaluation.txt`.
