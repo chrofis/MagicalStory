@@ -25,7 +25,7 @@ const { photoAnalyzerUrl: _photoAnalyzerUrl, withAnalyzerSlot } = require('./pho
 // mask/edit cluster; the inpaint prompt builders here still call it.
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const { blackoutIssueRegions } = require('./imageInpainting');
-const { detectFiguresWithGroundingDino } = require('./figureDetection');
+const { detectFiguresWithGroundingDino, _shortGarmentPhrase } = require('./figureDetection');
 const { buildEmptySceneVbGrid, buildPageCompositeRefs } = require('./referenceSheets');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
 
@@ -3371,38 +3371,6 @@ function buildBboxSceneContext(sceneMetadata, sceneCharacters = [], characterClo
  * @param {Object} characterClothing - Map of charName → clothing description string
  * @returns {Array<{name: string, description: string, position: string}>}
  */
-/**
- * Short visible-garment phrase from a clothing description, for grounding /
- * SoM identity lines. Handles both shapes clothing strings come in:
- *   structured — "headwear: none; top: red striped shirt under a vest; …"
- *                → the `top:` value (else first non-"none" value)
- *   plain prose — "Pink long-sleeved t-shirt, dark jeans, sandals"
- *                → the first clause
- * Word-boundary capped; "key: none" segments never leak.
- */
-function _shortGarmentPhrase(clothing, maxLen = 60) {
-  if (!clothing) return '';
-  const s = String(clothing).trim();
-  let phrase = '';
-  const segments = s.split(';').map(seg => seg.trim()).filter(Boolean);
-  const keyed = segments
-    .map(seg => { const m = seg.match(/^([a-z][a-z/ -]{2,20}):\s*(.+)$/i); return m ? { key: m[1].toLowerCase(), value: m[2].trim() } : null; })
-    .filter(Boolean)
-    .filter(kv => kv.value && !/^none$/i.test(kv.value));
-  if (keyed.length > 0) {
-    phrase = (keyed.find(kv => kv.key === 'top') || keyed[0]).value;
-  } else {
-    phrase = s.split(/[.;]/)[0].trim();
-  }
-  // First clause of the chosen phrase, word-boundary cap.
-  phrase = phrase.split(/[,.]/)[0].trim();
-  if (phrase.length > maxLen) phrase = phrase.slice(0, maxLen).replace(/\s+\S*$/, '');
-  // No dangling connectives/articles after the cap ("…rolled sleeves under",
-  // "…lacing at the") — strip repeatedly since they stack.
-  let prev;
-  do { prev = phrase; phrase = phrase.replace(/\s+(under|over|with|and|on|in|at|of|the|a|an)$/i, ''); } while (phrase !== prev);
-  return phrase;
-}
 
 function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing = {}) {
   const chars = [];

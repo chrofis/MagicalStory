@@ -17,6 +17,8 @@
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
 
+const getStoryHelpers = () => require('./storyHelpers');
+
 /**
  * Analyze the art style of an image using Gemini vision.
  * Returns a text description of the style that can be used for style transfer.
