@@ -631,7 +631,16 @@ function pickBestVersionIndex(versions, { tieBreak = 'latest' } = {}) {
   let bestDeduction = Infinity;
   for (let i = 0; i < versions.length; i++) {
     const s = computeFinalScore(versions[i]);
-    if (s == null) continue;
+    // An unscored version used to be SKIPPED silently, which meant a repair
+    // did not have to WIN — it won by walkover, because the thing it replaced
+    // had no number to lose with. That is how a page shipped a repair scoring
+    // 30 over the original it damaged. Nothing may enter this array unscored;
+    // if it does, say so and rank it last rather than letting it decide the
+    // outcome by absence.
+    if (s == null) {
+      log.error(`[SCORE] ${versions[i]?.source || 'version'} ${versions[i]?.pageNumber != null ? 'p' + versions[i].pageNumber : ''} has NO score — score every version before selecting`);
+      continue;
+    }
     const ded = versionDeductionTotal(versions[i]);
     // Primary: finalScore (higher better; may be negative since the 0-floor
     // was removed 2026-08-08, so failing versions now rank against each other

@@ -8706,7 +8706,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         return { img, method: null, latestEval, skipped: true };
       }
 
-      const decision = decideRepairMethod(img.pageNumber, latestEval || {}, currentEntityReport);
+      // NEVER REPAIR BLIND (owner, 2026-08-09). This passed `latestEval || {}`,
+      // so a page whose evaluation was missing still got a repair method: every
+      // gate in decideRepairMethod compares a number (visualScore < 50,
+      // semanticScore < 30) and `undefined < 50` is false, so all of them fall
+      // through and a method is chosen from nothing. Repairing an image before
+      // we know what is wrong with it is how a good page gets replaced by a
+      // worse one. No score, no repair — skip the page and say why.
+      if (!latestEval || latestEval.qualityScore == null) {
+        log.warn(`  ⏭️  [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: skipped — no evaluation to repair from (qualityScore is ${latestEval ? 'null' : 'absent'})`);
+        return { img, method: null, latestEval, skipped: true };
+      }
+
+      const decision = decideRepairMethod(img.pageNumber, latestEval, currentEntityReport);
       let method = decision.method;
       let reason = decision.reason;
 
@@ -9237,7 +9249,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           entityResult: { issues: newVersion.entityIssues, penalty: best.entityPenaltyRaw ?? best.entityPenalty ?? 0 },
         });
         versions.push(newVersion);
-        finalBestPerPage.set(pageNumber, newVersion);
+        // COMPETE, DO NOT APPOINT (owner, 2026-08-09). This used to force
+        // itself in as the best version regardless of score, so a repair that
+        // scored WORSE than what it replaced still shipped. One image, one
+        // score, highest wins — no exceptions and no side doors.
+        finalBestPerPage.set(pageNumber, selectBestVersion(versions));
       }
       img.textCoverageReport = { ...result.report, postRepairChecked: true };
     }));
@@ -9367,7 +9383,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               entityResult: { issues: newVersion.entityIssues, penalty: prevBest.entityPenaltyRaw ?? prevBest.entityPenalty ?? 0 },
             });
             versions.push(newVersion);
-            finalBestPerPage.set(target.page, newVersion);
+            // COMPETE, DO NOT APPOINT — see the text-space note above.
+            finalBestPerPage.set(target.page, selectBestVersion(versions));
             log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair applied on ${pageLabel} (${styleRepairModel}, gate=${rep.passedGate === null ? 'unavailable' : 'pass'}, ref=Page ${target.targetRefPage})`);
           } catch (repErr) {
             log.warn(`⚠️ [UNIFIED PIPELINE] Step 5: style-repair for ${pageLabel} failed: ${repErr.message} — original kept`);
