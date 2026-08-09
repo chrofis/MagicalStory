@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { chTime } = require('./lib/chTime');
 
 // ============================================================================
 // HELPERS
@@ -1054,11 +1055,11 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
 
   // Timing
   console.log('\n\u23f1\ufe0f  TIMING');
-  console.log(`   Started: ${job.startTime.toISOString().substring(11, 19)}`);
+  console.log(`   Started: ${chTime(job.startTime)}`);
   if (job.completionTime) {
     // Use actual completion time for accurate duration
     const completionDuration = job.completionTime - job.startTime;
-    console.log(`   Completed: ${job.completionTime.toISOString().substring(11, 19)}`);
+    console.log(`   Completed: ${chTime(job.completionTime)}`);
     console.log(`   Generation Duration: ${formatDuration(completionDuration)}`);
     // Note if there were post-completion activities
     if (job.endTime && job.endTime > job.completionTime) {
@@ -1066,7 +1067,7 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
       console.log(`   Post-completion activity: +${formatDuration(postDuration)}`);
     }
   } else if (job.endTime) {
-    console.log(`   Ended: ${job.endTime.toISOString().substring(11, 19)}`);
+    console.log(`   Ended: ${chTime(job.endTime)}`);
     console.log(`   Total Duration: ${formatDuration(duration)}`);
   }
 

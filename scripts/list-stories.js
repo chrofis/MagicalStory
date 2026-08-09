@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { Pool } = require('pg');
+const { ch, fromPgNaive } = require('./lib/chTime');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function main() {
@@ -8,7 +9,8 @@ async function main() {
   );
   console.log('Recent stories:');
   for (const row of result.rows) {
-    console.log('  ' + row.id + ' - ' + row.title + ' (' + new Date(row.created_at).toISOString().slice(0,10) + ')');
+    // created_at is a naive TIMESTAMP — node-pg parses it as local; rehome first.
+    console.log('  ' + row.id + ' - ' + row.title + ' (' + ch(fromPgNaive(row.created_at)) + ')');
   }
   await pool.end();
 }

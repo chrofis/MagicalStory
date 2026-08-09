@@ -227,7 +227,7 @@ async function api(pathSegment, { method = 'GET', body = null, token = null, con
     const { status: s, progress, progress_message, error_message } = status.body;
     const msg = `${progress || 0}% ${progress_message || ''}`.trim();
     if (msg !== lastMsg) {
-      const t = new Date().toISOString().slice(11, 19);
+      const t = require('./lib/chTime').chTime(new Date());
       console.log(`   [${t}] ${s}: ${msg}`);
       lastMsg = msg;
     }

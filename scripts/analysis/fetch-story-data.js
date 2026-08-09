@@ -22,6 +22,7 @@ require('dotenv').config();
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
+const { ch, chTime, fromPgNaive } = require('../lib/chTime');
 
 // Connect to Railway database
 const pool = new Pool({
@@ -705,7 +706,7 @@ function printAnalysisSummary(analysis) {
   console.log('\n' + '='.repeat(80));
   console.log(`Story: ${analysis.title || '(no title)'}`);
   console.log(`ID: ${analysis.storyId}`);
-  console.log(`Created: ${analysis.createdAt}`);
+  console.log(`Created: ${analysis.createdAt ? ch(fromPgNaive(analysis.createdAt)) : 'N/A'}`);
   console.log(`Language: ${analysis.language || 'N/A'} | Art: ${analysis.artStyle || 'N/A'} | Pages: ${analysis.pages}`);
   console.log('='.repeat(80));
 
@@ -991,7 +992,7 @@ function printAnalysisSummary(analysis) {
     console.log('-'.repeat(60));
     for (const cp of analysis.checkpoints) {
       const dataSize = JSON.stringify(cp.data).length;
-      console.log(`   ${cp.stepName}[${cp.stepIndex}] - ${(dataSize / 1024).toFixed(1)}KB (${cp.createdAt ? new Date(cp.createdAt).toISOString().slice(11, 19) : 'N/A'})`);
+      console.log(`   ${cp.stepName}[${cp.stepIndex}] - ${(dataSize / 1024).toFixed(1)}KB (${cp.createdAt ? chTime(fromPgNaive(cp.createdAt)) : 'N/A'})`);
     }
   }
 }

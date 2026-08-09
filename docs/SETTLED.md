@@ -47,3 +47,4 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
 - **Checkpoints are deliberately KEPT** — never propose deleting them.
 - **Search ads land on the HOMEPAGE** — final, do not re-litigate.
 - **Prod deploys: staging-first, per-push approval, pushes gated on an idle target environment.**
+- **Timestamps shown to the owner: Swiss local (`… CH`) ONLY, via `scripts/lib/chTime.js` — UTC never shown, no hand arithmetic.** Settled 2026-08-09; supersedes UTC-only (May 2026), which superseded dual-labeling. Naive pg TIMESTAMP columns must be rehomed with `fromPgNaive()` before formatting.

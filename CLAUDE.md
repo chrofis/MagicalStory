@@ -372,16 +372,13 @@ The script analyzes Railway logs and shows:
 
 Log files are downloaded from Railway and stored in `~/Downloads/logs.*.log`
 
-### Timezone — Railway logs are UTC, user lives in Switzerland (CEST / CET)
+### Timezone — Swiss local ONLY, via `scripts/lib/chTime.js` (settled 2026-08-09)
 
-**Every timestamp in Railway logs, Railway dashboards, and the Postgres DB is UTC.** The user talks in Swiss local time. Always translate before comparing:
+**Every timestamp shown to the user — in scripts and in replies — is Swiss local time, marked `CH`. UTC is never shown, and no timezone arithmetic is ever done by hand.** Format via the helper: `ch(d)` → `2026-07-30 22:01:15 CH`, `chTime(d)` → `22:01:15 CH`. `Intl`/`Europe/Zurich` handles DST. (This supersedes the May-2026 UTC-only rule, which superseded dual-labeling — see docs/SETTLED.md; a third reversal needs the full protocol.)
 
-- **Summer (CEST, last Sunday of March → last Sunday of October)**: local = UTC + 2h
-- **Winter (CET, rest of the year)**: local = UTC + 1h
+Three timestamp behaviors exist; pick the right entry point:
+- **Railway logs / ISO strings with Z**: true UTC → `ch()` directly.
+- **Naive Postgres `TIMESTAMP` columns via node-pg**: the driver parses the stored-UTC wall clock as LOCAL — rehome with `fromPgNaive(d)` FIRST, then format (skipping this double-shifts; the trap once killed two live Test Lab runs via client-side age math — or compute ages in SQL).
+- **Browser-rendered admin pages**: already local; leave alone.
 
-Examples for unambiguity:
-- User says "around 01:40" in summer → look for events near **23:40 UTC the previous day**.
-- Log says `2026-04-19T06:39 UTC` in summer → that's **08:39 CEST** in the user's day.
-- User says "yesterday evening 21:00" in winter → look at **20:00 UTC** in the log.
-
-When reporting log findings back to the user, convert UTC → local time or quote both, so there's no confusion. "23:50 UTC (01:50 CEST)" is fine; quoting UTC alone invites a miscount.
+When searching logs for a time the user named, convert silently in code (Swiss → UTC) — never narrate the conversion, never show the UTC value in the reply.
