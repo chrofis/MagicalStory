@@ -7825,3 +7825,34 @@ the field is mandatory, so its absence means the gate was skipped or a stale pro
 result (the fold failed) and a structural argument, not yet a positive measurement.
 
 **Touched:** `prompts/image-evaluation.txt`, `server/lib/images.js`.
+
+## 2026-08-09 — Iterate thresholds lowered and WIRED; the config had been dead and disagreeing
+
+**Context:** owner — *"we are now doing a completely new image far too often."* Measured on
+`job_1786287569165_7f75jspcz`: **13 of 14 pages ran a full regenerate**, and the result came back
+WORSE than the original on **8 of 13**. p7 went 58 → −20; p13 went 30 → −180. `pick-best` discards
+the regressions, so the book is protected — but every one of those 13 regenerations was paid for to
+keep 5 improvements.
+
+**Two sources of truth, silently disagreeing.** `REPAIR_DEFAULTS.qualityThresholdForIterate: 20` and
+`semanticThresholdForIterate: 30` were marked DEAD CONFIG in July — nothing read them — while
+`decideRepairMethod` hardcoded `visualScore < 50` / `semanticScore < 30`. The visual gate has
+therefore been running at **50** for a month while the documented intent was **20**.
+
+**Decision:** wire the config and resolve toward the documented 20. Also lower the REDO gate 60 → 50.
+All four iterate conditions are KEPT — this does not reverse the 2026-08-09 "the numeric gates stay"
+verdict, it corrects their values and gives them one source of truth.
+
+**Measured effect on the same story:** iterate 11 → 8, inpaint 3 → 6. Of the three pages spared, two
+were regressions avoided (p2 worse, p7 worse) and one was an improvement lost (p12).
+
+**Why `visual` is a poor gate input, for whoever tunes this next:** it is CLAMPED at 0, so eight of
+the fourteen pages read exactly `0` whether they earned 105 points of deductions or 300. All the
+discriminating information is already destroyed at the floor. `finalScore` is un-clamped (it reaches
+−180 here) and still carries it.
+
+**Caveat, stated deliberately:** today's eval ceilings (accessory, clothing_detail,
+unverified_absence, mirrors) all RAISE scores, and this change lowers thresholds — two corrections in
+the same direction. Re-measure before tuning further, or the pipeline will under-repair.
+
+**Touched:** `server/config/models.js`, `server/lib/repairLogic.js`.

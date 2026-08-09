@@ -609,14 +609,18 @@ const REPAIR_MAX_PASSES = Number.isFinite(_envPasses) && _envPasses >= 0
   : (process.env.RAILWAY_ENVIRONMENT_NAME === 'staging' ? 1 : 3);
 
 const REPAIR_DEFAULTS = {
-  scoreThreshold: 60,       // Pages scoring below this need redo (0-100)
+  scoreThreshold: 50,       // Pages scoring below this need redo (0-100). Lowered
+                            // from 60 (2026-08-09): measured, a page entering
+                            // repair at 50-59 was regenerated and came back
+                            // WORSE far more often than better.
   issueThreshold: 5,        // Pages with this many fixable issues need redo
   maxPasses: REPAIR_MAX_PASSES,  // Global passes over all pages — 1 on staging, 3 on prod
   maxCharRepairPages: 20,   // Max pages to character-repair per run (hard ceiling: bounds the worst-case spend even on "Repair All" against a 32-page story)
-  // DEAD CONFIG (audit 2026-07-09): neither threshold below is read anywhere —
-  // the real gate is hardcoded in repairLogic.js decideRepairMethod()
-  // (visualScore<50, semanticScore<30). Note the values DISAGREE (20 vs 50);
-  // wiring these in would change behavior, so they are only marked, not wired.
+  // WIRED 2026-08-09. These were dead config for a month while
+  // decideRepairMethod hardcoded visualScore<50 / semanticScore<30, and the two
+  // sources DISAGREED (config said 20, code did 50). Resolved toward the
+  // documented intent — 20 — which also cuts full regenerations: measured on a
+  // 14-page story, 13 pages were regenerated and 8 came back worse.
   semanticThresholdForIterate: 30, // Below this semantic score → iterate (scene fundamentally wrong)
   qualityThresholdForIterate: 20,  // Below this quality score → iterate immediately
   inpaintMaxPasses: 1,             // Inpaint attempts per page per round

@@ -218,11 +218,20 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   }
 
   // 1. Catastrophic — iterate immediately (figure unrecognisable).
-  if (visualScore < 50) {
-    return { method: 'iterate', reason: `image visually broken (visual=${visualScore})` };
+  //
+  // Thresholds come from REPAIR_DEFAULTS, not from literals here. They were
+  // hardcoded for a month while the config carried DIFFERENT values that nothing
+  // read (config 20 vs code 50) — two sources of truth, silently disagreeing.
+  // Resolved toward the documented intent (20), which also cuts regenerations:
+  // measured on a 14-page story, 13 pages were regenerated and 8 came back
+  // WORSE than the original, with pick-best then discarding the work.
+  const iterateVisualFloor = REPAIR_DEFAULTS.qualityThresholdForIterate ?? 20;
+  const iterateSemanticFloor = REPAIR_DEFAULTS.semanticThresholdForIterate ?? 30;
+  if (visualScore < iterateVisualFloor) {
+    return { method: 'iterate', reason: `image visually broken (visual=${visualScore} < ${iterateVisualFloor})` };
   }
-  if (semanticScore < 30) {
-    return { method: 'iterate', reason: `wrong scene (semantic=${semanticScore})` };
+  if (semanticScore < iterateSemanticFloor) {
+    return { method: 'iterate', reason: `wrong scene (semantic=${semanticScore} < ${iterateSemanticFloor})` };
   }
   // Severity-based catastrophic gate: a CATASTROPHIC finding (large wrong
   // text, unrecognisable figure) is beyond what inpaint can recover even when
