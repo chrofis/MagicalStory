@@ -40,6 +40,7 @@ const BUCKETS = {
   action_interaction:   { owner: 'semantic', kind: 'graded', repair: 'inpaint_or_regen' }, // rope slack while pulling, wrong aim, faces away from target
   object_presence:      { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
   object_count:         { owner: 'quality',  kind: 'graded', repair: 'inpaint' },
+  // wrong/missing environment detail: location, background, weather, time of day
   setting:              { owner: 'quality',  kind: 'graded', repair: 'inpaint' },
   // Garment colour is corrected mechanically (masked L*a*b* match toward the
   // character's canonical colour), so it routes to that fixer and NEVER costs
@@ -51,7 +52,7 @@ const BUCKETS = {
   // rather than a clothing sub-case so it is countable on its own: in a
   // correctly-specified story it should never fire, so a non-zero count is a
   // signal that the CLOTHING contract failed upstream, not just a page defect.
-  nudity:               { owner: 'quality',  kind: 'binary', repair: 'regen' }, // wrong/missing environment detail: location, background, weather, time of day
+  nudity:               { owner: 'quality',  kind: 'binary', repair: 'regen' },
   style_consistency:    { owner: 'quality',  kind: 'graded', repair: 'style_transfer' },
   composition_textzone: { owner: 'quality',  kind: 'graded', repair: 'iterate_placement' },
   rendered_text:        { owner: 'quality',  kind: 'binary', repair: 'regen' },

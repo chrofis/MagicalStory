@@ -67,31 +67,39 @@ Three loading mechanisms feed these templates:
 
 ## Evaluation
 
-> **SIZE WARNING (measured 2026-08-08).** These templates have grown into incident logs —
-> a paragraph per false positive somebody once hit. `image-evaluation.txt` alone is **36,321
-> chars / 406 lines**, with 129 bullet rules and 119 instances of "never / do not deduct".
-> Filled for one page it is **46,019 chars ≈ 11,500 tokens**. A 10-page story spent
-> **862,221 input tokens across 109 eval calls — ~86k input tokens PER PAGE**.
-> Rules inside them are demonstrably not applied reliably (§4 caps accessory details at
-> MODERATE; "missing glasses" still came back MAJOR five times in one story), and two
+> **SIZE WARNING (measured 2026-08-08, re-measured 2026-08-09).** These templates grow into
+> incident logs — a paragraph per false positive somebody once hit. `image-evaluation.txt` had
+> reached **36,321 chars / 406 lines**, with 129 bullet rules and 119 instances of "never / do
+> not deduct"; filled for one page that was **46,019 chars ≈ 11,500 tokens**, and a 10-page
+> story spent **862,221 input tokens across 109 eval calls — ~86k input tokens PER PAGE**.
+> The 2026-08-09 overhaul restructured it into four sections (A never-deduct N-01…N-15,
+> B severity, C defects D-01…D-28, D output) and cut it to **18,511 chars / 180 lines** — 49%
+> smaller. Rules inside these templates are demonstrably not applied reliably ("missing
+> glasses" came back MAJOR five times in one story despite a rule capping it), and two
 > identical runs at temperature 0 produced 0 of 6 identical issue sets. Treat length as a
 > defect: see `docs/decisions.md` 2026-08-08 "Eval prompts are too long".
+>
+> **A lean rewrite is not automatically better.** The first lean overhaul measured *worse*
+> (21.3 → 7.5/16.5) and was reverted before the owner overrode and shipped the current one.
+> Measure over a corpus, never on the page that motivated the change.
 >
 > **RULE when an eval misfires: do not append another carve-out paragraph.** First check whether
 > a rule for it already exists and is being ignored. If it does, the fix is consolidation or
 > removal, not addition — adding text to a template this size measurably buys nothing and makes
 > the next person's rule less likely to be read. Prefer deleting or merging over appending.
 
+Sizes measured 2026-08-09.
+
 | Template | chars | lines | Consumer | Stage |
 |---|---|---|---|---|
-| image-evaluation.txt | 36,321 | 406 | images.js `evaluateImageQuality`; regeneration.js evaluate-single | Quality eval (fix_targets need gemini-2.5-flash) |
-| image-semantic.txt | 15,092 | 145 | images.js `evaluateThreeStage`; sceneValidator.js `evaluateSemanticFidelity` | Semantic fidelity eval |
-| image-vision-inventory.txt | 2,033 | 33 | images.js `evaluateThreeStage` | Three-stage eval: vision inventory |
-| image-prompt-compliance.txt | 13,441 | 152 | images.js `evaluateThreeStage` | Three-stage eval: prompt compliance |
-| image-visual-inventory.txt | 5,357 | 139 | images.js `runVisualInventory`; regeneration.js | Visual inventory pass |
-| image-inspection.txt | 2,457 | 53 | images.js `inspectImageForErrors` | Image error inspection |
-| generated-image-analysis.txt | 1,106 | 40 | sceneValidator.js `analyzeGeneratedImage` | Generated-image analysis |
-| feedback-consolidator.txt | 15,497 | 158 | feedbackConsolidator.js `consolidateFeedback` | Consolidates eval + entity issues into per-page fix plan |
+| image-evaluation.txt | 18,511 | 180 | images.js `evaluateImageQuality`; regeneration.js evaluate-single | Quality eval (fix_targets need gemini-2.5-flash) |
+| image-semantic.txt | 16,061 | 151 | images.js `evaluateThreeStage`; sceneValidator.js `evaluateSemanticFidelity` | Semantic fidelity eval |
+| image-vision-inventory.txt | 2,039 | 32 | images.js `evaluateThreeStage` | Three-stage eval: vision inventory |
+| image-prompt-compliance.txt | 15,268 | 155 | images.js `evaluateThreeStage` | Three-stage eval: prompt compliance (never sees the image) |
+| image-visual-inventory.txt | 5,377 | 138 | images.js `runVisualInventory`; regeneration.js | Visual inventory pass |
+| image-inspection.txt | 2,457 | 52 | images.js `inspectImageForErrors` | Image error inspection |
+| generated-image-analysis.txt | 1,106 | 39 | sceneValidator.js `analyzeGeneratedImage` | Generated-image analysis |
+| feedback-consolidator.txt | 17,739 | 167 | feedbackConsolidator.js `consolidateFeedback` | Merges all four evaluators into `deduped_issues[]` — **this list is what scoring charges** |
 | repair-verification.txt | 1,799 | 48 | repairVerification.js `verifyRepairWithGemini` | Verifies a repair changed the target region |
 | story-text-quality-judge.txt | 2,880 | 48 | textQualityJudge.js `judgeStoryText` | Test Lab text-only harness: scores story TEXT on 5 criteria (cross-model judge) |
 

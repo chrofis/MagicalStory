@@ -135,12 +135,12 @@ const FINDINGS = [
     evidence: { experiments: [403, 404, 397, 399], measurements: '0/6 identical issue sets at temp 0; baseline neon findings 10 vs 4 across identical runs' },
   },
   {
-    slug: 'consensus-cap-in-prompt-does-not-work', title: 'Asking the consolidator to cap single-source severities does not work — and code enforcement was rejected',
+    slug: 'consensus-cap-in-prompt-does-not-work', title: 'The consolidator cannot be asked to set severity — it is derived in code from the votes it records',
     category: 'severity-policy', prompt_file: CONS, prompt_section: 'deduped_issues',
-    rule_text: 'Set severity by consensus: 2+ evaluators keep the highest; a single-source flag caps at MODERATE.',
-    rationale: 'The rule shipped 2026-08-06 and a live story still had 46 of 60 single-source issues above MODERATE — the same 78% as before. Model was ruled out: on identical stored input qwen-plus left 6, qwen3-max 4, claude-sonnet 4. A code-side cap (capSingleSourceSeverity) was written, measured to lift page-best means 63.6→73.6 and 49.7→68.7, and then REVERTED at owner instruction: severity policy stays in the prompt and the pipeline does not rewrite evaluator output. DO NOT re-add the code cap.',
-    status: 'active',
-    evidence: { experiments: [405, 407, 408], commits: ['a8cd04ed6 (added)', '0312533c3 (reverted)'], measurements: '76% of issues are single-source; model ladder made no difference' },
+    rule_text: 'The prompt RECORDS severities{} per evaluator. medianSeverity() in feedbackConsolidator.js DERIVES the severity. Do not ask the model to pick it.',
+    rationale: 'Three prompt-side attempts failed. (1) The 2026-08-06 consensus cap shipped and a live story still had 46 of 60 single-source issues above MODERATE — the same 78% as before; ruled out the model, since on identical stored input qwen-plus left 6, qwen3-max 4, claude-sonnet 4. (2) A code-side capSingleSourceSeverity lifted page-best means 63.6→73.6 and 49.7→68.7 but was reverted at owner instruction — a cap imposes a rule no evaluator voted on. (3) An explicit median rule with five worked examples scored WORSE (81%→75% agreement) and contradicted its own records, writing {"quality":"MINOR"} then setting MAJOR. SUPERSEDED 2026-08-09 by 61066accf: the model records the votes (type/sources/severities all return at 100%) and code takes the median — one vote → that vote, two → the LOWER, three+ → the middle. This is not overwriting an evaluator; it combines votes the evaluators themselves reported. The model pick is kept as severityChosen for audit. Verified 48/48 = 100% enforced, 8 model picks overridden.',
+    status: 'superseded',
+    evidence: { experiments: [405, 407, 408, 445], commits: ['a8cd04ed6 (cap added)', '0312533c3 (cap reverted)', '65d132d06 (votes recorded)', '61066accf (median in code)'], measurements: '76% of issues are single-source; model ladder made no difference; median enforced 48/48 with 8 overrides' },
   },
   {
     slug: 'gemini-flash-fails-as-consolidator', title: 'gemini-2.5-flash returns an empty consolidator plan',

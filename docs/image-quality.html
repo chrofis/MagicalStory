@@ -40,43 +40,81 @@
 <h3>Persistence</h3>
 <p>Bbox results land on <code>sceneImage.bboxDetection</code> per page. <strong>Not</strong> shared across versions: each round of repair runs fresh detection on the new image. Reusing <code>sharedBboxDetection</code> across rounds caused a long-running bug where v3's bbox showed v0's figures.</p>
 
-<h2 id="evals">2. Three evaluators</h2>
+<h2 id="evals">2. Four evaluators, one consolidator</h2>
 
-<p>Run in parallel after image generation:</p>
+<p>Run in parallel after image generation. <strong>None of them returns a score</strong> — since
+<code>b9658b501</code> they report defects and the score is derived from the defects (§3).</p>
 
 <table>
-<thead><tr><th>Evaluator</th><th>Model</th><th>Output</th><th>Prompt</th></tr></thead>
+<thead><tr><th>Evaluator</th><th>Sees the image?</th><th>Output</th><th>Prompt</th></tr></thead>
 <tbody>
-<tr><td>Quality</td><td>Gemini 2.5 Flash</td><td><code>qualityScore</code> 0-100, <code>fixableIssues[]</code></td><td><code>image-evaluation.txt</code></td></tr>
-<tr><td>Semantic</td><td>Gemini 2.5 Flash</td><td>Semantic penalties (already deducted from final)</td><td><code>image-semantic.txt</code></td></tr>
-<tr><td>Entity</td><td>Gemini + Python cascade</td><td><code>finalChecksReport.entity</code> with severities</td><td>see §1</td></tr>
+<tr><td>Quality</td><td>yes</td><td><code>fixable_issues[]</code>, <code>coherence_gate</code>, <code>verdict</code></td><td><code>image-evaluation.txt</code></td></tr>
+<tr><td>Prompt compliance</td><td><strong>no</strong> — stage 2 of the three-stage call, judges a stage-1 vision inventory against the prompt</td><td><code>fixable_issues[]</code>, <code>figures[]</code></td><td><code>image-prompt-compliance.txt</code></td></tr>
+<tr><td>Semantic</td><td>yes</td><td><code>fixable_issues[]</code> — does the image tell the story beat</td><td><code>image-semantic.txt</code></td></tr>
+<tr><td>Entity</td><td>yes (cross-page grid)</td><td><code>fixable_issues[]</code> + <code>cells</code> / <code>pagesToFix</code> / <code>garment</code> / <code>expectedColour</code></td><td><code>entity-consistency-check.txt</code></td></tr>
 </tbody>
 </table>
 
-<p>Evaluators are <em>tolerant</em> by design: pose mirror (left/right body-part swap), minor framing nits, and aesthetic preferences don't deduct. The <a href="#decisions">decision log</a> records which deductions were rejected and why.</p>
+<p><strong>One issue shape across all four</strong> (2026-08-08): every finding is
+<code>{ type, severity, character, description, fix }</code> inside <code>fixable_issues[]</code>.
+Parsers still accept the legacy names (<code>semantic_issues</code>, <code>issues</code>,
+<code>problem</code>, <code>fixInstruction</code>) so stored evaluations keep reading.</p>
+
+<p><code>type</code> comes from a <strong>closed list</strong> owned by
+<code>server/lib/evalBuckets.js</code>, which maps it to a bucket and a repair method. Unknown types
+land in <code>other</code> — tracked, never silently dropped. <code>normalizeType()</code> splits the
+compound values models invent (<code>clothing_and_hair</code>). Note <code>hair</code> →
+<code>character_identity</code>, <em>not</em> <code>clothing</code>: the clothing repair repaints a
+garment and cannot fix a ponytail. 99% of raw findings route to a real bucket.</p>
+
+<p><strong>The consolidator is the scoring source.</strong>
+<code>prompts/feedback-consolidator.txt</code> merges all four into <code>deduped_issues[]</code>,
+and <em>that</em> list is what <code>scoring.js</code> charges — an important trap: category work on
+the four evaluator prompts is worthless until it survives the consolidator (it did not, until
+<code>994cb85e1</code>).</p>
+
+<p>Evaluators are <em>tolerant</em> by design: pose mirror (left/right body-part swap), minor framing
+nits, and aesthetic preferences don't deduct. Style rules are <strong>style-conditional</strong> —
+neon is not a defect in a cyber story and is one in a watercolour story — so the art style must be
+passed in, resolved via <code>resolveEvalArtStyle()</code> so the Lab and staging always match. The
+<a href="#decisions">decision log</a> records which deductions were rejected and why.</p>
 
 <h2 id="score">3. The unified score</h2>
 
-<p>One number drives every redo decision:</p>
+<p>One number drives every redo decision, and it is <em>only</em> the defect list:</p>
 
-<pre><code>finalScore = qualityScore − semanticPenalties − entityPenalties</code></pre>
-
-<p>Severity bands (used by both eval paths and the consolidator):</p>
+<pre><code>finalScore = 100 − Σ SEVERITY_POINTS[issue.severity]</code></pre>
 
 <table>
 <thead><tr><th>Severity</th><th>Deduction</th></tr></thead>
 <tbody>
-<tr><td>CRITICAL</td><td>−30</td></tr>
-<tr><td>MAJOR</td><td>−15 (entity: −20)</td></tr>
-<tr><td>MODERATE</td><td>−7</td></tr>
-<tr><td>MINOR</td><td>−2 (entity: −10)</td></tr>
+<tr><td>CATASTROPHIC</td><td>−50</td></tr>
+<tr><td>CRITICAL</td><td>−25</td></tr>
+<tr><td>MAJOR</td><td>−15</td></tr>
+<tr><td>MODERATE</td><td>−5</td></tr>
+<tr><td>MINOR</td><td>−2</td></tr>
 </tbody>
 </table>
 
-<p>Quality-eval issues are NOT double-counted — they're already inside <code>qualityScore</code>. The dev panel reconciles by showing <code>Endwert = max(0, 100 − totalPenalty)</code> alongside the raw backend score; if they differ, the backend score is shown as a small annotation.</p>
+<p><strong>No floor.</strong> A negative <code>finalScore</code> means the evaluators exceeded 100
+points of penalty, and admin surfaces show it (−10, −140) rather than a wall of zeros that hides how
+bad a page is. There is exactly one score per version — do not add a second, differently-clamped
+copy.</p>
 
-<h3>Final score from the consolidator</h3>
-<p><code>server/lib/feedbackConsolidator.js</code> validates and clamps <code>plan.final_score</code> to [0, 100] and stores <code>final_score_reason</code>. <code>findBadPages</code> in <code>server/lib/repairLogic.js</code> prefers <code>consolidatorFinalScore</code> when present.</p>
+<p><strong>Zero-point types.</strong> <code>ZERO_POINT_TYPES</code> in <code>scoring.js</code>
+currently holds <code>garment_colour</code>: it is corrected mechanically (masked L*a*b* match toward
+the character's canonical colour), so charging it would trip the redo gate over a hue shift. It is
+still a first-class category so it appears in per-category stats instead of hiding on a private
+channel.</p>
+
+<h3>Severity is the median of the evaluators' own votes</h3>
+<p>~76% of issues are flagged by a single evaluator, and one evaluator shouting CRITICAL was costing
+25 points. The consolidator <strong>records</strong> each evaluator's own severity per merged defect
+(<code>severities: {"quality":"MAJOR","semantic":"CRITICAL"}</code>) and
+<code>medianSeverity()</code> in <code>feedbackConsolidator.js</code> <strong>derives</strong> the
+value in code: one vote → that vote; two → the <em>lower</em>; three or more → the middle. The
+model's own pick is kept as <code>severityChosen</code> so the gap stays auditable. Three attempts to
+do this inside the prompt all failed — see the 2026-08-09 decision entry before re-litigating.</p>
 
 <h2 id="workflow">4. Repair workflow loop</h2>
 

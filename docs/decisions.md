@@ -6737,3 +6737,134 @@ Result: 5/5 (exps #447 + #448), including the Thurbrücke story that failed at 8
 **Touched:** `server/lib/coverTitlePaint.js`, `server/lib/testlab.js` (step label).
 **Status:** ✅ on staging. Still pending before master: observe the automatic path inside one full
 generation.
+
+## 2026-08-09 — The eval category system: every finding is typed, and the type reaches the score
+
+**Context:** Owner: *"So ensure we first get types for all evaluators. Than enhance the list with the
+ones it 'invented' — we need to get to 99 percent predefined."* The four evaluators were emitting
+free-form `type` strings, so per-category statistics were impossible and the repair router could not
+tell a garment-colour shift from a missing character.
+
+**Decision — one closed list, emitted by all four evaluators.** `server/lib/evalBuckets.js` owns the
+taxonomy: `BUCKETS` (bucket → `owner` / `kind` / `repair` method) plus `TYPE_TO_BUCKET`, which maps
+every synonym the evaluators actually produced onto a bucket. Anything unrecognised lands in `other`
+— tracked, never silently dropped. Gaps found by sampling real output and closed: `setting`,
+`style_consistency`, `naturalness`, `nudity`, `garment_colour`. `hair` deliberately maps to
+`character_identity`, **not** `clothing`: the clothing repair repaints a garment and cannot fix a
+ponytail. `normalizeType()` splits the compound values the models invent (`clothing_and_hair`,
+`anatomy/scale`) on `_and_`, `&`, `/`, `,`, `+` and a trailing `_`, and ~40 singular aliases were
+added.
+
+**Result:** 99% of raw evaluator findings route to a real bucket.
+
+**The bug this exposed — the categories never reached the score.** The consolidator's
+`deduped_issues` is what scoring actually consumes, and its parser was not carrying `type` at all:
+measured 73 of 73 scored deductions with no type, 1,201 points, every one routed to `other` → regen.
+All the category work on the four evaluator prompts stopped at the consolidator and never touched a
+single score. Fixed in `feedbackConsolidator.js` (`type: i.type || i.category || null`) plus the
+closed list added to `prompts/feedback-consolidator.txt`, which now requires exactly one type per
+entry and states that an unlisted value is discarded as unroutable. Typed share of the *consolidated*
+list: 0% → 100%.
+
+**Nudity is a last-resort safety net, not a modesty check.** Owner: *"nudity should be its own
+category, but should only flag on completely nude. Not on swimsuit or shorts… In real life this
+should never fire if we get the clothing thing fixed."* The trigger was narrowed to *no garment on
+the lower body AND none on the torso* — the first version charged two false CATASTROPHICs against a
+page of children in tops and shorts. It is its own bucket rather than a `clothing` sub-case
+specifically so it is countable alone: a non-zero count means the upstream clothing contract failed,
+not that a page needs a redo.
+
+**Touched:** `server/lib/evalBuckets.js`, `server/lib/feedbackConsolidator.js`,
+`prompts/feedback-consolidator.txt`, `prompts/image-evaluation.txt`, `prompts/image-semantic.txt`,
+`prompts/image-prompt-compliance.txt`, `prompts/entity-consistency-check.txt`.
+Commits: `a95da1eb9`, `fc32960de`, `747a85c8f`, `994cb85e1`, `e6e652ebc`.
+
+## 2026-08-09 — Consolidated severity is the MEDIAN of the evaluators' own votes, computed in code
+
+**Supersedes** the 2026-08-06 `consensus-cap-in-prompt-does-not-work` verdict ("severity policy stays
+in the prompt; DO NOT re-add the code cap"). That verdict was correct about the *cap*; it was being
+applied to a mechanism that had not yet been tried.
+
+**Context:** ~76% of issues are flagged by exactly one evaluator, and a single evaluator calling
+something CRITICAL was costing a full 25 points. Three attempts to fix this inside the prompt all
+failed:
+
+1. The 2026-08-06 consensus cap — ignored by qwen-plus, qwen3-max **and** claude-sonnet alike.
+2. A code-side `capSingleSourceSeverity` — measured good, reverted at owner instruction.
+3. An explicit median rule with five worked examples — scored **worse** (81% → 75% agreement) and
+   contradicted its own records: it wrote `{"quality":"MINOR"}` and then set `MAJOR`. The model
+   reverts to "take the highest" every time.
+
+**Decision (owner: "No, use code now that we have it structured — this should work").** The
+consolidator **records** the votes and **code derives** the severity:
+
+- The prompt asks for `severities: {"quality":"MAJOR","semantic":"CRITICAL"}` — each evaluator's own
+  severity per merged defect, copied verbatim, no reconciling. Recording is the thing the model does
+  reliably: `type`, `sources` and `severities` all come back at 100%.
+- `medianSeverity()` in `feedbackConsolidator.js` computes the value: one vote → that vote; two → the
+  **lower**; three or more → the middle, lower-middle on an even count.
+- The model's own pick is kept as `severityChosen`, so the gap stays auditable.
+
+**Rationale:** this is not the pipeline inventing a policy or overwriting an evaluator — it combines
+votes the evaluators themselves reported, which is what a consolidator is for. The distinction that
+made the earlier rejection right and this one acceptable: a *cap* imposes a rule the evaluators never
+voted on; a *median* is the evaluators' own agreement.
+
+**Verified end-to-end** — exp #445, consolidate stage, pages 4/5/7/13 of
+`job_1786235099497_ytd5c7eek`: 48 consolidated issues carrying votes, **48/48 (100%)** severity ==
+median, code overrode the model's pick on **8**.
+
+**Touched:** `prompts/feedback-consolidator.txt`, `server/lib/feedbackConsolidator.js`,
+`server/lib/scoring.js` (`severities` preserved through `normalizeIssues` so disagreement survives
+into the stored story). Commits: `65d132d06`, `61066accf`.
+
+## 2026-08-09 — The eval parser gated on a `score` the prompts no longer emit
+
+**Symptom:** a Lab eval run sat for 9 minutes and produced zero results. Not a timeout, not the model.
+
+**Root cause:** `b9658b501` ("the prompts report defects; the score is the defects") removed `score`
+from the evaluator prompts, but the response gate in `images.js` still required
+`typeof parsedJson.score === 'number'`. Every well-formed evaluation therefore fell through to the
+legacy regex fallbacks, matched none of them, and returned `null` — which left the three-stage
+compliance call waiting forever on `figures[]` / `matches[]` that never arrived.
+
+**Decision:** recognise the response by the fields the prompt actually produces — `fixable_issues[]`
+**or** `figures[]` **or** `coherence_gate` **or** a string `verdict`. A numeric `score` is still
+accepted so stored evaluations keep parsing, but it is never *read*: the score is always derived from
+the defect list. `server/lib/images.js` ~L1856, commit `bb90abc18`.
+
+**Lesson worth generalising:** when a prompt change removes a field, grep every parser that consumes
+it. Same failure mode as the sweeping-shape-changes rule; it cost an afternoon.
+
+## 2026-08-09 — Entity consistency failed silently on every new-shape grid (TDZ)
+
+**Context:** surfaced by a parallel session as a cosmetic oddity — a stored entity result reading
+`consistent: false` with `totalIssues: 0`. It was not cosmetic.
+
+**Root cause:** `isGarmentColour` was referenced in the `issues` assignment *above* its `const`
+declaration in `entityConsistency.js` — a temporal dead zone throw
+(`Cannot access 'isGarmentColour' before initialization`) on every grid using the new unified issue
+shape, i.e. every entity check since `5d9b70080`. The error was swallowed, so the check reported
+"inconsistent, zero issues" instead of failing loudly.
+
+**Decision:** hoist the helper above its first use (`d5365fb09`).
+
+**Open, deliberately not fixed in the same commit:** the entity `summary` string is derived from
+`totalIssues` alone and ignores `overallConsistent`, so a failed check still reads *"All N entities
+are consistent"* — which is exactly what disguised this crash. That is a behaviour change and needs
+its own decision.
+
+## 2026-08-09 — The Lab and staging resolve the eval art style through ONE function
+
+**Context:** owner: *"Ensure that lab and staging always match."* A Lab eval was feeding the scene
+description where production feeds the page prompt, so `{ART_STYLE}` came through empty and the
+style-conditional rules (N-01: *does that style call for this KIND of element?*) could not fire — the
+Lab was silently judging by different rules than staging.
+
+**Decision:** `resolveEvalArtStyle(artStyleKey, pagePrompt)` in `server/services/prompts.js` is the
+single resolver, called by both paths; `extractArtStyle()` parses the style block out of a page
+prompt. Related trap fixed in the same pass: the **cover** branch deletes the ART STYLE block from
+the prompt before sending, so `artStyleForEval` must be resolved from the *unstripped* prompt.
+
+**Rule:** any new eval entry point resolves art style through `resolveEvalArtStyle`, never by
+re-parsing the prompt locally. A Lab result is only evidence if the Lab ran what production runs.
