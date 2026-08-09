@@ -106,12 +106,12 @@ const {
   generateImageOnly,
   evaluateImageBatch,
   // Unified repair pipeline
-  runUnifiedRepairPipeline,
   // Bbox detection for covers
   detectAllBoundingBoxes,
   createBboxOverlayImage
 } = require('./server/lib/images');
 const { generateReferenceSheet, buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./server/lib/referenceSheets');
+const { runUnifiedRepairPipeline } = require('./server/lib/repairPipeline');
 const {
   runEntityConsistencyChecks
 } = require('./server/lib/entityConsistency');

@@ -36,9 +36,6 @@ const images = () => require('./images');
 
 function selectBestVersion(versions) {
   if (!versions || versions.length === 0) return null;
-
-function selectBestVersion(versions) {
-  if (!versions || versions.length === 0) return null;
   if (versions.length === 1) return versions[0];
 
   // Same canonical loop as scoring.js pickBestVersionIndex, with the
@@ -230,7 +227,7 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
   // stored box stamped for different bytes (bboxPairsWith) — the entity
   // report can predate a repair and its boxes then point at the wrong spot
   // on the repaired pixels.
-  const pairs = (det) => !imageData || bboxPairsWith(det, imageData);
+  const pairs = (det) => !imageData || images().bboxPairsWith(det, imageData);
   const lowerName = charName.toLowerCase();
   const toRect = (b) => {
     if (!b) return null;
@@ -486,7 +483,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   // Run both in parallel
   const [evaluations, entityReport] = await Promise.all([
-    evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle }),
+    images().evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle }),
     runEntityConsistencyChecks(imageCheckData, characters, {
       checkCharacters: true,
       // Objects (LOC/ART/VEH/ANI) are NOT cross-page identity entities — a boat
@@ -673,7 +670,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
   const baselineEvalsByPage = new Map();
   if (baselineEvalInputs.length > 0) {
-    const baselineEvals = await evaluateImageBatch(baselineEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle });
+    const baselineEvals = await images().evaluateImageBatch(baselineEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle });
     for (const ev of baselineEvals) {
       baselineEvalsByPage.set(ev.pageNumber, ev);
       if (ev.usage && usageTracker) {
@@ -1024,7 +1021,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const regenPrompt = feedbackSuffix
         ? `${img.prompt}\n\n${feedbackSuffix}`
         : img.prompt;
-      result = await generateImageOnly(regenPrompt, img.characterPhotos, {
+      result = await images().generateImageOnly(regenPrompt, img.characterPhotos, {
         imageModelOverride: modelOverrides.imageModel,
         imageBackendOverride: modelOverrides.imageBackend,
         landmarkPhotos: img.landmarkPhotos,
@@ -1093,7 +1090,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
       } catch (e) { /* fall back: inpaint the served image, no restamp */ }
     }
-    const result = await inpaintPage(inputImage, latestEval || {}, {
+    const result = await images().inpaintPage(inputImage, latestEval || {}, {
       visualBible: storyData?.visualBible || null,
       characters: storyData?.characters || characters || null,
       entityReport: currentEntityReport,
@@ -1270,7 +1267,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     log.info(`👤 [UNIFIED PIPELINE] Round ${roundNum} char-fix ${charName} on p${pageNumber}: ${useFaceOnly ? 'FACE' : 'BODY'} bbox=[${repairBbox.map(v => Math.round(v * 100) + '%').join(', ')}] (${decision.severity})`);
     let repairResult;
     try {
-      repairResult = await repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, charName, {
+      repairResult = await images().repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, charName, {
         imageBackend: 'grok',
         issueDescription: decision.issueDescription,
         clothingDescription: clothingDesc,
@@ -1766,7 +1763,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           saveGrids: false,
           onHeartbeat: pingHeartbeat
         }),
-        evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle }),
+        images().evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle }),
       ]);
 
       if (freshEntityResult.status === 'fulfilled') {
@@ -1925,7 +1922,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
     if (rescueEntries.length > 0) {
       log.info(`📊 [UNIFIED PIPELINE] Step 3b: scoring ${rescueEntries.length} unscored version(s) so every candidate has a score: page(s) ${rescueEntries.map(r => r.pageNumber).join(', ')}`);
-      const rescueEvals = await evaluateImageBatch(buildEvalInputs(rescueEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle });
+      const rescueEvals = await images().evaluateImageBatch(buildEvalInputs(rescueEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle });
       for (const ev of rescueEvals) {
         const entry = rescueEntries.find(r => r.pageNumber === ev.pageNumber);
         if (!entry) continue;
@@ -2018,7 +2015,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.imageAspect
         || null;
 
-      const generateImage = (repairPrompt, opts) => generateImageOnly(repairPrompt, img.characterPhotos || [], {
+      const generateImage = (repairPrompt, opts) => images().generateImageOnly(repairPrompt, img.characterPhotos || [], {
         imageModelOverride: img.sceneMetadata?.pageImageModel || null,
         imageBackendOverride: img.sceneMetadata?.pageImageBackend || null,
         landmarkPhotos: img.landmarkPhotos || [],
@@ -2258,10 +2255,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // Figures only count when the detection was computed on this version's
     // bytes — a stale stamp means the boxes belong to another version.
     const hasFigures = Array.isArray(bestBbox?.figures) && bestBbox.figures.length > 0
-      && bboxPairsWith(bestBbox, best?.imageData);
+      && images().bboxPairsWith(bestBbox, best?.imageData);
     if (best?.imageData && !hasFigures && best.source !== 'original') {
       try {
-        const fresh = await detectAllBoundingBoxes(best.imageData, {
+        const fresh = await images().detectAllBoundingBoxes(best.imageData, {
           pageContext: `P${pageNumber}-final-bbox`,
           artStyle,
         });
@@ -2378,8 +2375,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // (see detectionForVersion). hasBboxOverlay tells the viewer an
       // overlay can be rendered for this version (the dev endpoint draws it
       // on the fly from the version's detection + bytes).
-      bboxDetection: detectionForVersion(v),
-      hasBboxOverlay: !!detectionForVersion(v),
+      bboxDetection: images().detectionForVersion(v),
+      hasBboxOverlay: !!images().detectionForVersion(v),
       // Prefer per-version prompt/description (iterate stores its own
       // feedback-augmented prompt + new scene). Original generations and
       // inpaints fall back to the page's prompt/description. sceneMetadata /
@@ -2427,7 +2424,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       type: 'unified_pipeline',
       source: v.source,
       score: v.score,
-      bboxDetection: detectionForVersion(v),
+      bboxDetection: images().detectionForVersion(v),
       bboxOverlayImage: v.evaluation?.bboxOverlayImage,
       charName: v.charName || null,
       targetBbox: v.targetBbox || null,

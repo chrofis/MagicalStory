@@ -3,7 +3,7 @@
 // page 2 scored 0 and the LAST repair round (most content-mangled image) won
 // the tie over the original. Pipeline tie-break must prefer the EARLIEST
 // version; null-scored versions are skipped.
-const { selectBestVersion } = require('../../server/lib/images.js');
+const { selectBestVersion } = require('../../server/lib/repairPipeline.js');
 
 // Case 1 (the bug): all-zero tie → original must win
 const tie = [
