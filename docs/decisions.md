@@ -6599,3 +6599,41 @@ briefs afterwards** and warns loudly about anything that survived.
 **Status:** 🟡 built, measured and wired; no generation run yet. Verified statically against the
 pirate story: the block renders 2 findings (Emma's bandana on Daniel p5, Noah's sandals on Emma p11),
 reaches the review prompt, and the placeholder is dropped when there are no findings.
+
+## Repair gates: the numeric ones stay — measured, not assumed (2026-08-09)
+
+**Context:** `decideRepairMethod` (`server/lib/repairLogic.js`) routes a page to
+`iterate` on four conditions: a consolidator `spec_conflict`, `visualScore < 50`,
+`semanticScore < 30`, and any CATASTROPHIC finding. Once the evaluators stopped
+reporting scores of their own (2026-08-08) and every number became a function of
+the defect list, rules 2–4 looked like three spellings of one test — a candidate
+for collapsing into a single severity check.
+
+**Decision:** keep all four. The numeric gates are NOT redundant.
+
+**Rationale:** measured across the 40 most recent staging stories, 527 versions
+trip a numeric gate. Of those:
+
+| | count | |
+|---|---|---|
+| no deductions recorded at all | 235 | unjudgeable — see below |
+| deductions WITH a catastrophic/critical finding | 156 | the collapse would cover these |
+| deductions with NO catastrophic/critical finding | **136** | the collapse would MISS these |
+
+So 136 of the 292 judgeable cases — 47% — reach `iterate` only because of a
+numeric gate. Collapsing rules 2–4 would silently downgrade all of them to
+inpaint or skip. A page can accumulate enough MAJOR/MODERATE defects to score
+below 50 without any single one being critical, and that page still needs a
+regeneration rather than a repaint.
+
+**Second finding, unresolved:** 235 of the 527 (45%) carry a visual or semantic
+score but no `deductions` array at all. Their score came from somewhere the
+deduction record does not explain. That is worth its own investigation — it also
+means any future analysis of "why did this page score X" is blind on nearly half
+the corpus.
+
+**Touched:** nothing. This entry exists so the collapse is not re-proposed; the
+next person to notice the apparent redundancy should read this instead of
+re-deriving it.
+
+**Status:** ✅ active — gates unchanged.
