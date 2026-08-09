@@ -25,17 +25,9 @@
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 
-const PLATE_PROMPT = (styleTxt, strictEmptyPage = true, bandPct = 30) => `EDIT THE FIRST IMAGE. It is a book title printed on a plain white page. Change ONLY the letters that are already there.
-
-WHAT TO CHANGE: repaint those letters so they look hand-painted — visible brush and paper texture inside every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours instead of mechanical edges. You may also change their colour. You may refine the letterforms and their weight.
-
-WHAT THE SECOND IMAGE IS: a COLOUR AND TEXTURE SAMPLE ONLY. Look at it to choose the palette, the medium and the brush character. Never copy it. Never draw it. Nothing from it may appear in your output — no people, no faces, no children, no animals, no objects, no landscape, no buildings, no background, no scene of any kind.
-
-WHAT MUST NOT CHANGE: the words, the letters, their spelling, the number of lines, and where they sit. The lettering stays inside the top ${bandPct}% of the page. Do not re-wrap the title, do not move words to another line, do not shift the block, do not enlarge it to fill the page.
-
-ADD NOTHING. Every white pixel of the page stays white. When you are finished the page must contain the painted letters and nothing else — no illustration, no background wash, no border, no frame, no shadow on the page, no decoration.${styleTxt ? `
-
-The medium to imitate: ${styleTxt}` : ''}`;
+const PLATE_PROMPT = (styleTxt, strictEmptyPage = true, _bandPct = 30) => `The image is a book title on a strip of white paper. Repaint the lettering so it looks hand-painted: visible brush and paper texture in every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours. You may change the lettering colour and refine the letterforms and weight.
+The second image is a colour and style reference only - take the palette and the medium from it. Nothing from it may appear in the output.
+Keep the same words, letters, line breaks and positions.${strictEmptyPage ? ' The background stays plain white; add nothing else - no scenery, no border, no frame, no second copy of the title.' : ''}${styleTxt ? ` Medium to imitate: ${styleTxt}` : ''}`;
 
 
 /**
@@ -127,42 +119,45 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     .toColourspace('b-w').raw().toBuffer();
   if (maskRaw.length !== W * H) throw new Error(`glyph mask not single-channel (${maskRaw.length} for ${W}x${H})`);
 
-  // 3. THE PLATE IS THE SAME SHAPE AS THE COVER (owner directive 2026-08-08:
-  //    "stop scaling them — take the result from Grok and put it on the image;
-  //    just make sure the format we send is the same as the image").
-  //    White canvas at the cover's exact W×H, letters drawn where they belong.
-  //    Grok only accepts preset ratios, so the canvas is PADDED with white to
-  //    the nearest one — padding, never cropping — and the padding is removed
-  //    from the output again. The lettering is therefore never scaled, never
-  //    re-fitted and never offset: what comes back overlays the cover at 1:1.
-  // The title band: the glyph rows plus a small margin, full width. This is the
-  // area the lettering owns — the model is told about it and held to it.
+  // 3. SEND ONLY THE TITLE BAND (owner-picked fix, 2026-08-09). A mostly-empty
+  //    page is a generative invitation: the full-page plate page-filled on three
+  //    different covers across three prompt wordings (children drawn in, the
+  //    whole illustration reproduced, the title duplicated large), while the
+  //    strip runs never page-filled once - letters occupy most of a strip, so
+  //    there is nothing to fill. The strip is cut at FULL COVER WIDTH and pasted
+  //    back at its known y-offset, so both directions stay 1:1 - no scaling, no
+  //    re-fitting, no offsets we did not choose. Padding to a Grok preset grows
+  //    the canvas around the strip and is removed again on return.
   const bandPad = Math.round(H * 0.03);
   const bandY0 = Math.max(0, miny - bandPad);
   const bandY1 = Math.min(H - 1, maxy + bandPad);
+  const stripH = bandY1 - bandY0 + 1;
   const bandPct = Math.max(10, Math.min(60, Math.round((bandY1 + 1) / H * 100)));
+
+  // Letters over white at their true coordinates, band rows only.
+  const composedRgb = await sharp(composedBuf).removeAlpha().raw().toBuffer();
+  const stripRgba = Buffer.alloc(W * stripH * 4);
+  for (let y = 0; y < stripH; y++) {
+    for (let x = 0; x < W; x++) {
+      const src = (y + bandY0) * W + x, j = src * 3, m = (y * W + x) * 4;
+      stripRgba[m] = composedRgb[j]; stripRgba[m + 1] = composedRgb[j + 1];
+      stripRgba[m + 2] = composedRgb[j + 2];
+      stripRgba[m + 3] = maskRaw[src] > 8 ? 255 : 0;
+    }
+  }
+  const stripPng = await sharp(stripRgba, { raw: { width: W, height: stripH, channels: 4 } }).png().toBuffer();
 
   const PRESETS = [['9:16', 9 / 16], ['2:3', 2 / 3], ['3:4', 3 / 4], ['4:5', 4 / 5],
     ['1:1', 1], ['5:4', 5 / 4], ['4:3', 4 / 3], ['3:2', 3 / 2], ['16:9', 16 / 9]];
-  const coverRatio = W / H;
+  const stripRatio = W / stripH;
   const [presetName, presetRatio] = PRESETS.reduce((best, p2) =>
-    Math.abs(p2[1] - coverRatio) < Math.abs(best[1] - coverRatio) ? p2 : best);
-  // Grow (never shrink) to the preset so no pixel of the cover is cut.
-  const cw = Math.max(W, Math.round(H * presetRatio));
-  const chh = Math.max(H, Math.round(cw / presetRatio));
-  const offX = Math.round((cw - W) / 2), offY = Math.round((chh - H) / 2);
-
-  // Letters over white, at their true cover coordinates.
-  const composedRgb = await sharp(composedBuf).removeAlpha().raw().toBuffer();
-  const lettersOnWhite = Buffer.alloc(W * H * 4);
-  for (let q = 0, j = 0, m = 0; q < W * H; q++, j += 3, m += 4) {
-    lettersOnWhite[m] = composedRgb[j]; lettersOnWhite[m + 1] = composedRgb[j + 1];
-    lettersOnWhite[m + 2] = composedRgb[j + 2];
-    lettersOnWhite[m + 3] = maskRaw[q] > 8 ? 255 : 0;
-  }
-  const lettersPng = await sharp(lettersOnWhite, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+    Math.abs(p2[1] - stripRatio) < Math.abs(best[1] - stripRatio) ? p2 : best);
+  // Grow (never shrink) to the preset so no letter pixel is cut.
+  const cw = Math.max(W, Math.round(stripH * presetRatio));
+  const chh = Math.max(stripH, Math.round(cw / presetRatio));
+  const offX = Math.round((cw - W) / 2), offY = Math.round((chh - stripH) / 2);
   const plateBuf = await sharp({ create: { width: cw, height: chh, channels: 3, background: { r: 255, g: 255, b: 255 } } })
-    .composite([{ input: lettersPng, left: offX, top: offY }]).jpeg({ quality: 96 }).toBuffer();
+    .composite([{ input: stripPng, left: offX, top: offY }]).jpeg({ quality: 96 }).toBuffer();
   const sceneBuf = await sharp(artBuffer).resize(1024, 1024, { fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
   // Evidence is attached to EVERY exit from here on. It used to ride only on the
   // success and eval-rejection paths, so a page-fill rejection — the case you
@@ -202,22 +197,49 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   dbg.raw = result.imageData;
   const debugOut = dbg;
 
-  // 5. strip the padding back off, then key on INKINESS (dark OR saturated) so
-  //    any paper texture the model invents drops out. Straight 1:1 overlay.
-  const outRaw = await sharp(Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
-    .resize(cw, chh, { fit: 'fill' })
-    .extract({ left: offX, top: offY, width: W, height: H })
-    .removeAlpha().raw().toBuffer();
-  const pw = W, ph = H;
-  const rgba = Buffer.alloc(W * H * 4);
+  // 5. read the padded canvas back at its own size, then key on INKINESS
+  //    (dark OR saturated) so any paper texture the model invents drops out.
+  const outPad = await sharp(Buffer.from(result.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
+    .resize(cw, chh, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const pw = W, ph = stripH;
+  // Glyph mask restricted to the band, for the shape diagnostics below.
+  const bandMask = Buffer.alloc(pw * ph);
+  for (let y = 0; y < ph; y++) bandMask.set(maskRaw.subarray((y + bandY0) * W, (y + bandY0) * W + W), y * W);
+
+  // PADDING GATE. Ink in the padding has no home on the cover - the strip is
+  // everything we paste back. A little bleed past the strip edge is harmless
+  // (and discarded), but a re-flowed title or an invented composition puts a
+  // large share of its ink there, and pasting only the strip would then ship a
+  // partial title. Reject the whole attempt instead - never clip letters.
+  {
+    let inStrip = 0, inPad = 0;
+    for (let y = 0; y < chh; y++) {
+      for (let x = 0; x < cw; x++) {
+        const i = (y * cw + x) * 3;
+        const mx = Math.max(outPad[i], outPad[i + 1], outPad[i + 2]);
+        const mn = Math.min(outPad[i], outPad[i + 1], outPad[i + 2]);
+        if (Math.max(255 - mx, mx - mn) <= 40) continue;
+        if (x >= offX && x < offX + W && y >= offY && y < offY + ph) inStrip++; else inPad++;
+      }
+    }
+    const padShare = (inStrip + inPad) ? inPad / (inStrip + inPad) : 0;
+    if (padShare > (opts.maxOutOfBand ?? 0.15)) {
+      log.warn(`\u{1F170}\uFE0F [TITLE PAINT] ${Math.round(padShare * 100)}% of the ink landed in the padding outside the title strip - keeping the flat title`);
+      return { ...flat, outOfBand: +padShare.toFixed(2), debug: dbg, reason: `page-fill: ${Math.round(padShare * 100)}% of ink outside the title strip` };
+    }
+  }
+
+  const rgba = Buffer.alloc(pw * ph * 4);
   let letterPx = 0;
   // NEVER clip ink at the band edge (owner 2026-08-08: "if you remove pixels we
   // lose letters"). Cropping at a boundary is the same mistake as the old fixed
   // rectangle that sliced DER THUR into RTHUR — descenders, flourishes and any
   // letter sitting a few px lower get destroyed. Every ink pixel is kept; a
   // model that paints the page is REJECTED WHOLESALE below instead.
-  for (let q = 0, j = 0, m = 0; q < W * H; q++, j += 3, m += 4) {
-    const r = outRaw[j], g = outRaw[j + 1], b = outRaw[j + 2];
+  for (let q = 0, m = 0; q < pw * ph; q++, m += 4) {
+    const x = q % pw, y = (q / pw) | 0;
+    const j = ((y + offY) * cw + (x + offX)) * 3;
+    const r = outPad[j], g = outPad[j + 1], b = outPad[j + 2];
     const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
     const inkiness = Math.max(255 - mx, mx - mn);
     const a = inkiness <= 26 ? 0 : inkiness >= 70 ? 1 : (inkiness - 26) / 44;
@@ -225,30 +247,6 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     if (a > 0.5) letterPx++;
   }
   if (letterPx < 200) return { ...flat, debug: dbg, reason: 'keyed layer is empty' };
-
-  // PAGE-FILL GATE. The band is requested in the prompt but not carved into the
-  // pixels: instead we measure how much ink landed far outside it. Slack of 5%
-  // of the page height keeps descenders and painterly overshoot innocent. If the
-  // model painted the illustration onto the plate the ratio is overwhelming
-  // (measured 0.83-0.96 on exps #424/#425), and the whole attempt is dropped —
-  // the flat title is served, intact, rather than a title with its letters cut.
-  {
-    const slack = Math.round(H * 0.05);
-    const lo = Math.max(0, bandY0 - slack), hi = Math.min(H - 1, bandY1 + slack);
-    let outside = 0, total = 0;
-    for (let q = 0; q < W * H; q++) {
-      if (rgba[q * 4 + 3] <= 128) continue;
-      total++;
-      const yy = (q / W) | 0;
-      if (yy < lo || yy > hi) outside++;
-    }
-    const outOfBand = total ? outside / total : 0;
-    const MAX_OUT_OF_BAND = opts.maxOutOfBand ?? 0.15;
-    if (outOfBand > MAX_OUT_OF_BAND) {
-      log.warn(`🅰️ [TITLE PAINT] ${Math.round(outOfBand * 100)}% of the ink landed outside the title band — the model painted the page; keeping the flat title`);
-      return { ...flat, outOfBand: +outOfBand.toFixed(2), debug: dbg, reason: `page-fill: ${Math.round(outOfBand * 100)}% of ink outside the title band` };
-    }
-  }
 
   // FILL SPECK HOLES. Light paper texture inside a stroke falls under the
   // inkiness threshold and becomes transparent, so the cover artwork shows
@@ -297,7 +295,7 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   const layer = await sharp(rgba, { raw: { width: pw, height: ph, channels: 4 } }).png().toBuffer();
 
   const base = await sharp(artBuffer).resize(W, H, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
-  const painted = await sharp(base).composite([{ input: layer, left: 0, top: 0 }]).jpeg({ quality: 92 }).toBuffer();
+  const painted = await sharp(base).composite([{ input: layer, left: 0, top: bandY0 }]).jpeg({ quality: 92 }).toBuffer();
 
   // 6. SHAPE GATE (deterministic — replaced a Gemini OCR gate on 2026-08-06).
   // Reading stylised lettering with a VLM introduced a reader less reliable than
@@ -309,16 +307,16 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   //              mangled word collapses this.
   //   spill    : ink landing far outside any glyph — a model that invented
   //              decoration or drew scenery.
-  const glyphN = (() => { let n = 0; for (let q = 0; q < W * H; q++) if (maskRaw[q] > 8) n++; return n; })();
+  const glyphN = (() => { let n = 0; for (let q = 0; q < pw * ph; q++) if (bandMask[q] > 8) n++; return n; })();
   // Tolerate the letters growing: strokes legitimately thicken and pool.
-  const grow = await sharp(maskRaw, { raw: { width: W, height: H, channels: 1 } })
+  const grow = await sharp(bandMask, { raw: { width: pw, height: ph, channels: 1 } })
     .blur(Math.max(3, Math.round(Math.min(pw, ph) * 0.02))).threshold(8).toColourspace('b-w').raw().toBuffer();
   let hit = 0, out = 0, inkN = 0;
   for (let q = 0, m = 3; q < pw * ph; q++, m += 4) {
     const inked = rgba[m] > 128;
     if (!inked) continue;
     inkN++;
-    if (maskRaw[q] > 8) hit++;
+    if (bandMask[q] > 8) hit++;
     if (grow[q] <= 8) out++;
   }
   // After a re-fit these compare the model's re-housed ink against the ORIGINAL

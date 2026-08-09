@@ -1772,7 +1772,7 @@ async function runCoverTitlePaintinStage(target, { experimentId, promptOverride,
       strictEmptyPage: params.strictEmptyPage,
     });
     const elapsedP = Date.now() - t0p;
-    if (r.debug?.plate) await addStep('INPUT 2 (edited): title on WHITE square plate', r.debug.plate);
+    if (r.debug?.plate) await addStep('INPUT 2 (edited): title strip on WHITE, preset-padded', r.debug.plate);
     if (r.debug?.raw) await addStep('raw model output (lettering plate)', r.debug.raw);
     const viP = await saveTestVersion(target.storyId, coverKey, null, r.imageData, experimentId);
     return {
