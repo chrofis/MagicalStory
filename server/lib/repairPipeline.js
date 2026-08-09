@@ -576,7 +576,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const t1b = Date.now();
     let fixedPages = 0, attempted = 0, skipped = 0;
     try {
-      const { fixFigureGarmentColour, garmentPromptFor, DEFAULTS: GCF } = require('./garmentColourFix');
+      const { fixFigureGarmentColour, garmentQueryFor } = require('./garmentColourFix');
       const { getNextVersionIndex, saveStoryImage } = require('../services/database');
       // Same identity this file uses everywhere else for storage.
       const gcStoryId = storyData?.id || jobId || null;
@@ -589,9 +589,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       for (const [charName, charData] of Object.entries(entityReport?.characters || {})) {
         for (const m of (charData.garmentColourMismatches || [])) {
           for (const pageNumber of (m.pagesToFix || [])) {
-            const kind = garmentPromptFor(m.garment, GCF).kind;
-            const key = `${charName.toLowerCase()}|${pageNumber}|${kind}`;
-            if (!work.has(key)) work.set(key, { charName, pageNumber, kind, m });
+            // Dedupe on the GARMENT WORD, not a coarse kind. Under the old kind
+            // table "breeches" and "sash" both collapsed to `top`, so the second
+            // of the two was dropped before it could even record a skip — no
+            // fix, no reason, indistinguishable from never having been flagged.
+            const garmentKey = garmentQueryFor(m.garment).key || '(unnamed)';
+            const key = `${charName.toLowerCase()}|${pageNumber}|${garmentKey}`;
+            if (!work.has(key)) work.set(key, { charName, pageNumber, garmentKey, m });
           }
         }
       }
@@ -614,9 +618,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           || null;
       };
 
-      for (const { charName, pageNumber, kind, m } of work.values()) {
+      for (const { charName, pageNumber, garmentKey, m } of work.values()) {
         // Outcome is recorded on the entry itself, whatever happens.
-        const audit = { garmentKind: kind, at: new Date().toISOString() };
+        const audit = { garment: garmentKey, at: new Date().toISOString() };
         m.fixOutcome = audit;
         const img = imagesWithData.find(i => i.pageNumber === pageNumber);
         if (!img?.imageData) { audit.skipped = 'page has no image'; skipped++; continue; }
@@ -624,7 +628,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           .find(f => (f?.name || '').toLowerCase() === charName.toLowerCase());
         if (!fig?.bodyBox) {
           audit.skipped = 'no detected figure on the page';
-          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber} ${kind}: no detected figure — skipped`);
+          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber} ${garmentKey}: no detected figure — skipped`);
           skipped++; continue;
         }
         const character = characters.find(c => (c.name || '').toLowerCase() === charName.toLowerCase());

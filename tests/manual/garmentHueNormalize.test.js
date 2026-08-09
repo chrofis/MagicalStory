@@ -170,7 +170,55 @@ function rect(buf, x0, y0, x1, y1, rgb) {
   const avatarFn = gsrc.slice(aFrom, aTo);
   check('avatarGarmentLab segments the reference', /await segmentGarment\(/.test(avatarFn));
   check('and takes a plain masked mean', /meanLabMasked\(data, seg\.alpha\)/.test(avatarFn));
-  check('the torso band is only reached after that', avatarFn.indexOf('segmentGarment(') < avatarFn.indexOf('avatarTorsoBand('));
+  // The torso band used to be the fallback here. It is gone entirely now — see
+  // TEST 7, which asserts that — so this only checks nothing measures a target
+  // by any route other than the mask.
+  check('there is no second, unmasked way to produce a target',
+    !/sampleGarmentClusters\(/.test(avatarFn));
+
+  // ── TEST 7 ───────────────────────────────────────────────────────────────
+  // The garment word goes to GroundingDINO verbatim. The old table mapped it
+  // onto one of six canned prompts with an unconditional `'top'` fallback, and
+  // `top` selected the avatar's TORSO — so an unrecognised word aimed the repair
+  // at the wrong part of the body. On job_1786287569165_7f75jspcz "breeches"
+  // became `top` (legwear matched to the chest) and "sash" became `top` too,
+  // colliding with breeches on the caller's dedupe key so the sash vanished with
+  // no outcome recorded at all.
+  console.log('\nTEST 7 — the garment word is passed through, not translated');
+  const { garmentQueryFor } = require('../../server/lib/garmentColourFix');
+  const q = (g) => garmentQueryFor(g);
+
+  check('breeches stay breeches', q('breeches').prompt === 'the breeches worn by the person',
+    q('breeches').prompt);
+  check('sash stays sash', q('sash').prompt === 'the sash worn by the person', q('sash').prompt);
+  // "hood" fell through too: a stray 0x08 byte had been written into the
+  // headwear pattern where \b was intended, so the alternative required a
+  // literal backspace after "hood" and never matched.
+  check('hood stays hood', q('hood').prompt === 'the hood worn by the person', q('hood').prompt);
+  check('multi-word garments survive', q('tricorn hat').key === 'tricorn hat', q('tricorn hat').key);
+  check('the key is normalised for dedupe', q('  Waistcoat! ').key === 'waistcoat', q('  Waistcoat! ').key);
+
+  check('no garment word REFUSES rather than defaulting', q('').key === null && q(null).key === null);
+  check('and offers no prompt to fall back on', q('').prompt === null);
+
+  // Distinct garments must not collide on the caller's dedupe key.
+  const dedupeKey = (name, page, garment) => `${name.toLowerCase()}|${page}|${garmentQueryFor(garment).key || '(unnamed)'}`;
+  check('breeches and sash no longer share a dedupe key',
+    dedupeKey('Hans', 8, 'breeches') !== dedupeKey('Hans', 8, 'sash'),
+    `${dedupeKey('Hans', 8, 'breeches')} vs ${dedupeKey('Hans', 8, 'sash')}`);
+  check('the same garment still dedupes', dedupeKey('Hans', 8, 'Sash') === dedupeKey('Hans', 8, 'sash'));
+
+  const gfix = require('fs')
+    .readFileSync(require.resolve('../../server/lib/garmentColourFix.js'), 'utf8')
+    .replace(/\r\n/g, '\n');
+  check('the kind table is gone', !/garmentPrompts\s*:/.test(gfix));
+  check('and so is its default', !/defaultGarment/.test(gfix));
+  check('the torso-band fallback is gone with it', !/avatarTorsoBand\(/.test(gfix));
+  const pipe = require('fs')
+    .readFileSync(require.resolve('../../server/lib/repairPipeline.js'), 'utf8')
+    .replace(/\r\n/g, '\n');
+  check('the pipeline dedupes on the garment word',
+    /\$\{charName\.toLowerCase\(\)\}\|\$\{pageNumber\}\|\$\{garmentKey\}/.test(pipe));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);

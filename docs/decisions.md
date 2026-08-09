@@ -7933,3 +7933,49 @@ addressed here and remains open.
 **Touched:** `server/lib/entityConsistency.js`, `tests/manual/entityCellToPage.test.js`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-08-09 — Garment word goes to DINO verbatim; the kind→prompt table is deleted
+
+**Context:** `garmentPromptFor()` mapped the entity channel's free-text garment word onto one of
+six canned GroundingDINO prompts, ending in an unconditional `'top'`. `kind` was not just a prompt
+selector — `top` measured the target against the avatar's TORSO, so an unrecognised word aimed the
+repair at the wrong part of the body. Both failure modes landed on one page of
+`job_1786287569165_7f75jspcz`: **"breeches"** became `top` and legwear was colour-matched to the
+chest (`source: torsoBand`, applied, ΔE 30.6); **"sash"** became `top` as well and therefore
+collided with breeches on Step 1b's `character|page|kind` dedupe key, so it was dropped with **no
+`fixOutcome` at all** — no fix, no skip, no reason, indistinguishable from never being flagged.
+The table also carried a latent defect: a stray `0x08` byte sat where `\b` was intended in the
+headwear pattern (`beanie|hood<BS>`), so "hood" never matched headwear either.
+
+**Decision:** Delete the table. `garmentQueryFor(garment)` returns
+`{ key, prompt: \`the ${key} worn by the person\` }`, passing the word through verbatim, and
+`{ key: null, prompt: null }` when there is no garment word at all. Step 1b dedupes on `key`.
+The avatar-side torso-band fallback is removed: on DINO/SAM failure `avatarGarmentLab` returns
+null and the caller records the refusal.
+
+**Rationale:** GroundingDINO is open-vocabulary — *"the breeches worn by the person"* is already a
+valid query. Mapping it to *"the trousers or shorts worn by the person"* was not merely
+unnecessary, it discarded the specific word the entity check supplied and substituted a wrong one.
+Breeches never failed because DINO cannot find breeches; they failed because we replaced the word
+"breeches" with the word "shirt". Passing it through also makes page and avatar ask the SAME
+question, the symmetry the SAM change established for segmentation, and removes the
+unknown-word class entirely rather than chasing vocabulary.
+
+The torso band goes because it was only ever valid for a torso garment, and without the table
+there is no claim that any given garment is one — falling back would mean measuring a shoe against
+a chest. It also carried the low-chroma blind spot (see the SAM entry). Every wrong recolour
+observed so far came from a confident wrong target, never from a missing one, so refusing is the
+cheaper error.
+
+**Known limitation:** the query is built from free text, so a colour word in the entity channel's
+`garment` field (e.g. "red shirt") would reach DINO, and the prompts are deliberately
+colour-agnostic because naming the expected colour biases the detector toward finding it. Every
+value observed so far is a bare garment noun. Not guarded, because the guard would be the lexicon
+this entry deletes — revisit only with a real occurrence.
+
+**Touched:** `server/lib/garmentColourFix.js`, `server/lib/repairPipeline.js`,
+`tests/manual/garmentHueNormalize.test.js`.
+
+**Status:** ✅ active

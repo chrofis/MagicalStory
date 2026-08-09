@@ -30,25 +30,15 @@
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { _rgbToLab, _labToRgb } = require('./imageCompositing');
-const { sampleGarmentClusters, isGarmentPixel } = require('./garmentHueNormalize');
+const { isGarmentPixel } = require('./garmentHueNormalize');
 
 const DEG = 180 / Math.PI;
 
 const DEFAULTS = {
-  // GroundingDINO queries per garment KIND. Colour-agnostic on purpose: naming
-  // the colour we EXPECT would bias the detector toward finding it, and naming
-  // the colour we SEE requires knowing it first. Measured 0.62-0.82 for tops.
-  // The entity channel says WHICH garment drifted, so ask for that one — asking
-  // for a shirt when the report flagged footwear repairs the wrong region.
-  garmentPrompts: {
-    top: 'the shirt or top worn by the person',
-    dress: 'the dress worn by the person',
-    outer: 'the jacket or coat worn by the person',
-    bottom: 'the trousers or shorts worn by the person',
-    footwear: 'the shoes worn by the person',
-    headwear: 'the hat or headwear worn by the person',
-  },
-  defaultGarment: 'top',
+  // Queries are colour-agnostic on purpose: naming the colour we EXPECT would
+  // bias the detector toward finding it, and naming the colour we SEE requires
+  // knowing it first. The garment WORD comes from the entity channel and is
+  // passed through verbatim — see garmentQueryFor.
   boxThreshold: 0.18,
   textThreshold: 0.14,
   // Crop padding around the figure box before asking for the garment.
@@ -85,20 +75,43 @@ const DEFAULTS = {
 };
 
 /**
- * Map the entity channel's free-text garment word onto one of the grounding
- * prompts. Unknown words fall back to the top, which is what the channel reports
- * for the overwhelming majority of drifts.
+ * The GroundingDINO query for a garment, plus the key that identifies it.
+ *
+ * NO TRANSLATION TABLE (owner, 2026-08-09). This used to map the entity
+ * channel's word onto one of six canned prompts with an unconditional `'top'`
+ * at the end of the chain — and `top` selected the avatar's TORSO, so an
+ * unrecognised word did not merely pick a wrong prompt, it aimed the repair at
+ * the wrong part of the body. Both failure modes hit one page of
+ * job_1786287569165_7f75jspcz: "breeches" became `top` and legwear was matched
+ * to the chest; "sash" became `top` as well, colliding with breeches on the
+ * caller's dedupe key, so the sash vanished with NO outcome recorded at all.
+ *
+ * The table is deleted rather than extended. GroundingDINO is open-vocabulary,
+ * so "the breeches worn by the person" is already a valid query — mapping it to
+ * "the trousers or shorts worn by the person" was not just unnecessary, it threw
+ * away the specific word the entity check handed us and substituted a wrong one.
+ * Breeches never failed because DINO cannot find breeches; they failed because
+ * we replaced the word "breeches" with the word "shirt".
+ *
+ * (The deleted table also carried a latent defect: a stray 0x08 byte had been
+ * written into the headwear pattern where `\b` was intended, so "hood" never
+ * matched headwear either and fell through to `top` like the rest.)
+ *
+ * Passing the word through also makes the two sides symmetric by construction:
+ * page and avatar are asked the SAME question, the property the SAM change
+ * established for segmentation.
+ *
+ * `key` is the normalised word and is what the caller dedupes on, so two
+ * distinct garments can never collapse into one entry and disappear.
+ *
+ * @returns {{key: string|null, prompt: string|null}} key is null when there is
+ *   no garment word at all; the caller records that refusal.
  */
-function garmentPromptFor(garment, cfg) {
-  const g = String(garment || '').toLowerCase();
-  const kind =
-    /shoe|boot|sandal|trainer|sneaker|footwear|plimsoll/.test(g) ? 'footwear' :
-    /hat|cap|bandana|headwear|beanie|hood/.test(g) ? 'headwear' :
-    /trouser|short|jean|legging|skirt|bottom|pant/.test(g) ? 'bottom' :
-    /dress|gown|pinafore/.test(g) ? 'dress' :
-    /jacket|coat|cardigan|vest|outer|hoodie/.test(g) ? 'outer' :
-    'top';
-  return { kind, prompt: cfg.garmentPrompts[kind] || cfg.garmentPrompts[cfg.defaultGarment] };
+function garmentQueryFor(garment) {
+  const key = String(garment == null ? '' : garment)
+    .toLowerCase().replace(/[^a-z0-9 -]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!key) return { key: null, prompt: null };
+  return { key, prompt: `the ${key} worn by the person` };
 }
 
 const { photoAnalyzerUrl: _photoAnalyzerUrl } = require('./photoAnalyzerClient');
@@ -116,7 +129,7 @@ async function detectGarmentBox(cropUri, opts = {}) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       image: cropUri,
-      prompts: [{ name: 'garment', text: opts.prompt || cfg.garmentPrompts[cfg.defaultGarment] }],
+      prompts: [{ name: 'garment', text: opts.prompt }],
       box_threshold: cfg.boxThreshold, text_threshold: cfg.textThreshold,
     }),
     signal: AbortSignal.timeout(300_000),
@@ -223,13 +236,13 @@ function medianSkinL(raw, W, H, box01) {
 }
 
 /**
- * The canonical garment colour for a character, read from the styled avatar's
- * torso band (hair-free by construction — see garmentHueNormalize.avatarTorsoBand).
- * @returns {{L,a,b,chroma,hueDeg}|null}
+ * The canonical colour of ONE garment for a character, measured off the styled
+ * avatar: DINO box -> SAM silhouette -> mean L*a*b* of the masked pixels.
+ * @returns {{L,a,b,chroma,hueDeg,source,maskPx,dinoScore}|null} null when the
+ *   garment could not be located on the sheet — never a guessed region.
  */
 async function avatarGarmentLab(avatarUri, opts = {}) {
   const cfg = { ...DEFAULTS, ...opts };
-  const { _internal } = require('./garmentHueNormalize');
   const buf = bytesOf(avatarUri);
   const meta = await sharp(buf).metadata();
 
@@ -248,9 +261,16 @@ async function avatarGarmentLab(avatarUri, opts = {}) {
   // shirt would have measured as his blue sash.
   //
   // With a true silhouette the crop is pure, so the mean needs no rescuing and
-  // the grey rejection can go. The torso band survives only as the fallback for
-  // when DINO or SAM comes up empty.
-  const prompt = opts.prompt || cfg.garmentPrompts[opts.kind] || cfg.garmentPrompts[cfg.defaultGarment];
+  // the grey rejection can go.
+  //
+  // The torso band that used to catch DINO/SAM failures went with the kind
+  // table. It was only ever valid for a TORSO garment, and without the table
+  // there is no longer any claim that this garment is one — falling back would
+  // mean measuring a shoe against a chest. It also carried the very low-chroma
+  // blind spot described above. Refuse and record instead: every wrong recolour
+  // seen so far came from a confident wrong target, never from a missing one.
+  const prompt = opts.prompt;
+  if (!prompt) return null;
   try {
     const sheetUri = toDataUri(await sharp(buf).jpeg({ quality: 95 }).toBuffer());
     const det = await detectGarmentBox(sheetUri, { ...cfg, prompt });
@@ -265,25 +285,19 @@ async function avatarGarmentLab(avatarUri, opts = {}) {
           L: m.L, a: m.a, b: m.b,
           chroma: Math.hypot(m.a, m.b),
           hueDeg: +(Math.atan2(m.b, m.a) * DEG).toFixed(1),
-          source: `sam:${opts.kind || 'garment'}`,
+          source: `sam:${opts.garmentKey || 'garment'}`,
           maskPx: m.count,
           dinoScore: det.score == null ? null : +Number(det.score).toFixed(2),
         };
       }
-      log.warn(`[GARMENT-COLOUR] avatar ${opts.kind}: SAM mask too small (${m?.count || 0}px < ${cfg.minAvatarMaskPx}) — falling back to the torso band`);
+      log.warn(`[GARMENT-COLOUR] avatar "${opts.garmentKey}": SAM mask too small (${m?.count || 0}px < ${cfg.minAvatarMaskPx}) — no target`);
+    } else {
+      log.warn(`[GARMENT-COLOUR] avatar "${opts.garmentKey}": DINO found no such garment on the sheet — no target`);
     }
   } catch (e) {
-    log.warn(`[GARMENT-COLOUR] avatar ${opts.kind} segmentation failed (${e.message}) — falling back to the torso band`);
+    log.warn(`[GARMENT-COLOUR] avatar "${opts.garmentKey}" segmentation failed (${e.message}) — no target`);
   }
-
-  // Fallback only. Keeps the old clustering, and with it the low-chroma blind
-  // spot — so `source` naming it torsoBand is a signal the sample is weaker.
-  const band = await _internal.avatarTorsoBand(buf, meta.width, meta.height);
-  const { data, info } = await sharp(buf).extract(band).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-  const cl = sampleGarmentClusters(data, info.width * info.height, null, { a: 0, b: 0 }, {}, 3);
-  if (!cl.length) return null;
-  const c = cl[0];
-  return { L: c.L, a: c.a, b: c.b, chroma: c.chroma, hueDeg: +(c.hueRad * DEG).toFixed(1), source: 'torsoBand' };
+  return null;
 }
 
 
@@ -300,14 +314,18 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
   require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.()).count('garment_colour_fix_run');
   const cfg = { ...DEFAULTS, ...(options.opts || {}) };
   const t0 = Date.now();
-  const { kind, prompt } = garmentPromptFor(options.garment, cfg);
-  const report = { name: figure?.name || 'figure', garment: options.garment || kind, garmentKind: kind, applied: false, reason: null };
+  const { key: garmentKey, prompt } = garmentQueryFor(options.garment);
+  const report = { name: figure?.name || 'figure', garment: options.garment || null, garmentKey, applied: false, reason: null };
+  if (!garmentKey) {
+    report.reason = 'no garment named — refusing to guess which garment to recolour';
+    return { changed: false, imageData: pageImageData, report, steps: [] };
+  }
   const pageBuf = bytesOf(pageImageData);
   const meta = await sharp(pageBuf).metadata();
   const W = meta.width, H = meta.height;
   const steps = [];
 
-  const target = await avatarGarmentLab(avatarUri, { ...cfg, kind, prompt });
+  const target = await avatarGarmentLab(avatarUri, { ...cfg, garmentKey, prompt });
   if (!target) { report.reason = 'no avatar garment sample'; return { changed: false, imageData: pageImageData, report, steps }; }
   // maskPx/dinoScore are the AVATAR side's own confidence. Without them a
   // mislocated target is invisible: `dinoScore` on the report is the PAGE box,
@@ -334,7 +352,7 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
   let det = null, seg = null;
   try {
     det = await detectGarmentBox(cropUri, { ...cfg, prompt });
-    if (!det) { report.reason = `DINO found no ${kind}`; return { changed: false, imageData: pageImageData, report, steps }; }
+    if (!det) { report.reason = `DINO found no "${garmentKey}" on the page`; return { changed: false, imageData: pageImageData, report, steps }; }
     seg = await segmentGarment(cropUri, det.box, cw, ch);
   } catch (e) {
     report.reason = `segmentation failed: ${e.message}`;
@@ -448,7 +466,7 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
 
 module.exports = {
   fixFigureGarmentColour,
-  garmentPromptFor,
+  garmentQueryFor,
   avatarGarmentLab,
   detectGarmentBox,
   segmentGarment,
