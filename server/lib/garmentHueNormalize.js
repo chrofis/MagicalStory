@@ -24,7 +24,7 @@
 // Consumers: garmentColourFix.js, sheetRowHarmonize.js.
 
 const sharp = require('sharp');
-const { _rgbToLab } = require('./images');
+const { _rgbToLab } = require('./imageCompositing');
 
 // Sampler thresholds. The pass-level knobs (drift min/max, rotation cap, page
 // cast confidence floors) were retired with the pass.

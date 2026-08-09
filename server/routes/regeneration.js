@@ -122,7 +122,6 @@ const {
   generateImageWithQualityRetry,
   evaluateImageQuality,
   editImageWithPrompt,
-  sanitizeIssueForInpaint,
   deleteFromImageCache,
   generateImageCacheKey,
   buildVisualBibleGrid,
@@ -3568,6 +3567,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
           log.info(`🔧 [REPAIR] Pass ${pass}: Using Grok text edit with ${combinedIssues.length} issues (quality: ${qualityIssues.length}, semantic: ${semanticIssues.length}): ${editInstruction.substring(0, 200)}`);
           // Same entity-grid vocabulary guard as inpaintPage — image models
           // draw what the prompt names ("cells A, D, F" ends up painted).
+          const { sanitizeIssueForInpaint } = require('../lib/imageCompositing');
           const sentInstruction = `Fix these issues in this children's book illustration: ${sanitizeIssueForInpaint(editInstruction)}`;
           const editResult = await editImageWithPrompt(currentImageData, sentInstruction);
           if (editResult?.imageData) {

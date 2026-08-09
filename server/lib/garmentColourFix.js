@@ -29,7 +29,7 @@
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
-const { _rgbToLab, _labToRgb } = require('./images');
+const { _rgbToLab, _labToRgb } = require('./imageCompositing');
 const { sampleGarmentClusters, isGarmentPixel } = require('./garmentHueNormalize');
 
 const DEG = 180 / Math.PI;
