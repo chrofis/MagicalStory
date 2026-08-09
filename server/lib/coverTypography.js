@@ -65,7 +65,20 @@ const WFONTS = [
   { family: 'Gochi Hand', weight: 400, style: 'normal' },
   { family: 'EB Garamond', weight: 400, style: 'italic' },
 ];
-const BFONT = 'Poppins'; // branding
+// branding fonts — owner-approved pool (2026-08-09), picked per book by the
+// same deterministic hash the title uses: random across books, stable within
+// one, so a repaired/redone back cover restamps in the SAME font. Poppins and
+// Baloo 2 were explicitly cut from this set. All eight ship in fonts/.
+const BRAND_FONTS = [
+  { family: 'Fredoka',      weight: 600, style: 'normal' },
+  { family: 'Chewy',        weight: 400, style: 'normal' },
+  { family: 'Shrikhand',    weight: 400, style: 'normal' },
+  { family: 'EB Garamond',  weight: 400, style: 'italic' },
+  { family: 'Lilita One',   weight: 400, style: 'normal' },
+  { family: 'Titan One',    weight: 400, style: 'normal' },
+  { family: 'Kalam',        weight: 400, style: 'normal' },
+  { family: 'Patrick Hand', weight: 400, style: 'normal' },
+];
 const BRAND_TEXT = 'magicalstory.ch';
 
 // ---------------------------------------------------------------------------
@@ -439,17 +452,23 @@ async function composeDedication(artBuffer, dedication, figures, seed, style) {
   return { buffer, spec: { kind: 'initial', font: wf.family, face: colors.face, lines, ...(styleOv ? { style: styleOv } : {}) } };
 }
 
-async function composeBrand(artBuffer, figures) {
+// seed note: first bake passes jobId as seed while restamps pass the title, so
+// the pick keys on the title first — it is the one value identical in both
+// paths, keeping the font stable across repair/redo restamps.
+async function composeBrand(artBuffer, figures, seed) {
   const meta = await sharp(artBuffer).metadata(); const W = meta.width, H = meta.height;
   const occ = occupancyFromFigures(figures);
   const slot = brandSlot(occ.grid, occ.gw, occ.gh, 0.30, 0.05);
   const bg = await boxDominant(artBuffer, slot.x0, slot.y0, slot.x1, Math.min(0.97, slot.y1));
   const colors = bottomColor(bg);
-  const group = buildBottomGroup([BRAND_TEXT], colors, slot, W, H, BFONT, 700, 'normal');
+  // Salt 21 — distinct from the title (7), dedication (33) and tilt (5/9)
+  // hashes, so the brand pick does not correlate with the title font.
+  const bf = BRAND_FONTS[hash(seed || BRAND_TEXT, 21) % BRAND_FONTS.length];
+  const group = buildBottomGroup([BRAND_TEXT], colors, slot, W, H, bf.family, bf.weight, bf.style);
   const overlay = await fitRender(group, W, H, slot, 'bottom');
   if (!overlay) return { buffer: artBuffer, spec: { kind: 'back', skipped: 'no-ink' } };
   const buffer = await sharp(artBuffer).composite([{ input: overlay }]).jpeg({ quality: 92 }).toBuffer();
-  return { buffer, spec: { kind: 'back', slot } };
+  return { buffer, spec: { kind: 'back', slot, font: bf.family } };
 }
 
 // dispatch: kind = 'front' | 'initial' | 'back'
@@ -459,7 +478,7 @@ async function composeCover({ artBuffer, kind, title, dedication, seed, figures,
   const figs = (figures || []).filter(f => f && (f.bodyBox || f.faceBox));
   if (kind === 'front') return composeFrontTitle(artBuffer, title || '', figs, seed, style);
   if (kind === 'initial') return composeDedication(artBuffer, dedication || '', figs, seed, style);
-  if (kind === 'back') return composeBrand(artBuffer, figs);
+  if (kind === 'back') return composeBrand(artBuffer, figs, title || seed);
   throw new Error(`composeCover: unknown kind ${kind}`);
 }
 
