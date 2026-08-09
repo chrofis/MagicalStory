@@ -19,6 +19,7 @@ const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
 const r2Lib = require('./r2');
 const { photoAnalyzerUrl: _photoAnalyzerUrl, withAnalyzerSlot } = require('./photoAnalyzerClient');
+const { getCurrentLogger } = require('./generationLogger');
 
 const getStoryHelpers = () => require('./storyHelpers');
 

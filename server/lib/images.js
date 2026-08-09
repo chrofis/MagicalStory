@@ -8744,6 +8744,12 @@ async function applyStyleTransfer(imageData, artStyle, options = {}) {
 }
 
 module.exports = {
+  // Gemini plumbing consumed by imageInpainting via lazy accessors (the
+  // inpaint LLM-verify path); exported for that one consumer.
+  withRetry,
+  modelSupportsThinking,
+  getImageSystemInstruction,
+  extractThinkingFromParts,
   // Utility functions
   hashImageData,
   generateImageCacheKey,

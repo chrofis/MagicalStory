@@ -21,7 +21,7 @@
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
-const { closestGrokAspect } = require('./grokAspect');
+const { closestGrokAspect, GROK_ASPECT_PRESETS } = require('./grokAspect');
 const { editWithGrok } = require('./grok');
 const r2Lib = require('./r2');
 const { MODEL_DEFAULTS } = require('../config/models');
@@ -547,7 +547,7 @@ async function correctColorShift(originalCropBuf, candidateCropBuf, maskAlpha, w
 }
 
 async function fetchFigureMaskPng(cropJpegBuffer, boxInCrop, opts = {}) {
-  const backend = CONFIG_DEFAULTS.figureMaskBackend || 'rembg';
+  const backend = MODEL_DEFAULTS.figureMaskBackend || 'rembg';
   if (backend === 'mobilesam' && Array.isArray(boxInCrop) && boxInCrop.length === 4) {
     const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
     try {

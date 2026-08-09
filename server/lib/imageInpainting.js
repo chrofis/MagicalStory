@@ -34,6 +34,10 @@ const LOCAL_PROMPTS = {
 
 const getStoryHelpers = () => require('./storyHelpers');
 const compressImageToJPEG = (...args) => require('./images').compressImageToJPEG(...args);
+const withRetry = (...args) => require('./images').withRetry(...args);
+const modelSupportsThinking = (...args) => require('./images').modelSupportsThinking(...args);
+const getImageSystemInstruction = (...args) => require('./images').getImageSystemInstruction(...args);
+const extractThinkingFromParts = (...args) => require('./images').extractThinkingFromParts(...args);
 
 async function inspectImageForErrors(imageData) {
   try {

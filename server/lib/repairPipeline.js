@@ -30,6 +30,8 @@ const { MODEL_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/mod
 const { pickBestVersionIndex, applyScore, computeFinalScore } = require('./scoring');
 const { decideRepairMethod } = require('./repairLogic');
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
+const pLimit = require('p-limit');
+const { getFacePhoto } = require('./characterPhotos');
 
 const getStoryHelpers = () => require('./storyHelpers');
 const images = () => require('./images');
@@ -529,7 +531,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // became undiagnosable — the record is still there. `garment_before` is a
   // developer-only image type: it is not `scene`, so it never enters the
   // user-facing version cycle.
-  if (CONFIG_DEFAULTS.garmentColourFix) {
+  if (MODEL_DEFAULTS.garmentColourFix) {
     const t1b = Date.now();
     let fixedPages = 0, attempted = 0, skipped = 0;
     try {
@@ -981,7 +983,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const sceneAspect = img.imageAspect
         || storyData?.sceneImages?.find(s => s.pageNumber === img.pageNumber)?.imageAspect
         || null;
-      result = await iteratePage(inputImage, img.pageNumber, storyData, {
+      result = await images().iteratePage(inputImage, img.pageNumber, storyData, {
         aspectRatio: sceneAspect,
         modelOverrides,
         usageTracker, // pass through so Haiku scene re-expansion + image gen are tracked
