@@ -254,4 +254,76 @@ function renderFindingsBlock(byPage) {
   ].join('\n');
 }
 
-module.exports = { checkPage, checkScenes, renderFindingsBlock, splitSlots, tokens };
+/**
+ * The slice of page prose that describes ONE character.
+ *
+ * Whole-page prose cannot answer "is Emma dressed": on a five-character pirate
+ * page every outfit shares its vocabulary, so Noah's shorts make Emma's shorts
+ * look stated. Measured on job_1786235099497_ytd5c7eek p12 — the prose dresses
+ * Emma in a shirt and nothing else, and every clause of her outfit scored as
+ * present because four other pirates were on the page.
+ *
+ * The scene templates introduce a character as `Name — appearance — action`,
+ * and the appearance span is where clothing lives. Take that span when it is
+ * there; fall back to the whole prose when it is not, which is the old,
+ * conservative behaviour (misses rather than false-fires).
+ */
+function characterProse(prose, characterName) {
+  const text = String(prose || '');
+  if (!characterName) return text;
+  const esc = String(characterName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // `Name — … —` (em dash, en dash or a double hyphen)
+  const m = new RegExp(`${esc}\\s*[—–]\\s*([\\s\\S]{0,600}?)\\s*[—–]`, 'i').exec(text);
+  return m ? m[1] : text;
+}
+
+/**
+ * Which garments of an outfit the prose fails to state.
+ *
+ * Outfit descriptions arrive in two shapes and BOTH must be handled here, in
+ * one place — a caller that only understood the labelled shape reported
+ * "nothing missing" for a girl the prose dressed in a shirt and a hat, whose
+ * page then rendered her in underwear (job_1786235099497_ytd5c7eek p10):
+ *
+ *   labelled    "top: …; bottom: …; footwear: …"   → check the required slots
+ *   unlabelled  "A striped shirt; navy shorts; …"  → check every clause
+ *
+ * Returns the missing garment names (slot label, or the clause's first words
+ * when unlabelled). Empty means the prose dresses this character.
+ *
+ * @param {string} clothingDescription  the canonical outfit
+ * @param {string} prose                the scene brief's prose
+ * @param {string[]} [requiredSlots]    labelled shape only; default top/bottom/footwear
+ */
+function missingGarments(clothingDescription, prose, requiredSlots = ['top', 'bottom', 'footwear'], characterName = null) {
+  const parts = splitSlots(clothingDescription);
+  if (parts.length === 0) return [];
+  const proseTokens = tokens(characterProse(prose, characterName));
+
+  const labelled = parts.filter(p => p.slot);
+  if (labelled.length > 0) {
+    return labelled
+      .filter(p => requiredSlots.includes(p.slot) && !slotStated(p.text, proseTokens))
+      .map(p => p.slot);
+  }
+
+  // Unlabelled: each semicolon-separated clause is a garment in its own right,
+  // so "any one clause matched" is not evidence the character is dressed.
+  // Accessories are skipped, matching the labelled path — it requires only
+  // top/bottom/footwear, and a belt or a hat going unmentioned in prose is
+  // normal. Without this the check fired on 64.9% of character-pages, which is
+  // a warning nobody reads.
+  const ACCESSORY = /\b(belt|sash|hat|cap|bandana|tricorn|headband|scarf|glove|mitten|earring|badge|feather|brooch|necklace|bracelet|watch|apron|bow)\b/i;
+  return String(clothingDescription || '')
+    .split(/\s*;\s*/)
+    .map(s => s.replace(/^[Aa]n?\s+/, '').trim())
+    .filter(Boolean)
+    .filter(clause => !ACCESSORY.test(clause))
+    .filter(clause => !slotStated(clause, proseTokens))
+    .map(clause => clause.split(/\s+/).slice(0, 3).join(' '));
+}
+
+// slotStated + missingGarments are exported so the image-prompt clothing check
+// (storyHelpers buildImagePrompt) uses THIS definition of "is this garment in
+// the prose" rather than growing a second one.
+module.exports = { checkPage, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, tokens };

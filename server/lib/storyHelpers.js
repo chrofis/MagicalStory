@@ -4891,63 +4891,39 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // the default outfit into the vision analysis and, via iterate rounds, into
     // this prose.
     //
-    // BACKSTOP: the prose is a single point of failure — Sonnet dropped the
-    // main character's outfit entirely on a page (and again on every iterate
-    // re-expansion), leaving the image model to invent clothing and the
-    // evaluator without a contract (it hallucinated one and flagged the
-    // character's CORRECT wardrobe for four rounds). When a character's
-    // wardrobe items don't appear in the prose, append an explicit wears-line
-    // for just that character. Complete prose ⇒ no duplication.
+    // NO BACKSTOP (owner, 2026-08-09). This used to APPEND the canonical outfit
+    // to the prompt whenever it thought the prose had omitted it. Two problems,
+    // both observed in production:
+    //
+    //   - it decided by counting outfit WORDS in the prose, so it could not
+    //     tell "wearing a hat" from "fully dressed". On p10 of
+    //     job_1786235099497_ytd5c7eek it scored 9 hits for a girl in a shirt and
+    //     a tricorn — five of them noise from "arms folded across her chest" —
+    //     stayed silent, and the image model drew a child in underwear.
+    //   - its companion filter used to DELETE garments from the line it
+    //     appended, producing "wears: no brim, mid-thigh length" on the page
+    //     that rendered a naked child.
+    //
+    // The prose is the single owner of what a character wears. An incomplete
+    // brief is a writer bug, reported here and fixed in the writer — not
+    // patched downstream by a second, worse copy of the same job.
     if (referencePhotos && referencePhotos.length > 0) {
-      const proseLower = String(cleanSceneDescription || '').toLowerCase();
-      // Colours and generic adjectives are excluded from the match — they
-      // collide across characters and scenery ("white paper", another
-      // character's "light grey blouse") and fake a present outfit. Only
-      // distinctive garment words (leggings, rucksack, blouse, corduroy…)
-      // count as evidence the prose carries the outfit.
-      const CLOTHING_STOPWORDS = new Set([
-        'with', 'worn', 'small', 'large', 'light', 'dark', 'pale', 'deep', 'the', 'and', 'over', 'under',
-        'open', 'closed', 'front', 'back', 'side', 'style', 'pair', 'long', 'short', 'soft', 'wide', 'slim',
-        'white', 'black', 'grey', 'gray', 'brown', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink',
-        'coral', 'navy', 'cream', 'beige', 'olive', 'teal', 'turquoise', 'lavender', 'silver', 'gold',
-        'golden', 'crimson', 'maroon', 'burgundy', 'khaki', 'tan', 'ivory', 'charcoal', 'mustard', 'rose',
-        'dusty', 'heather', 'medium', 'bright', 'muted',
-      ]);
-      const missingClothingLines = [];
-      const guardCharNames = [
-        ...new Set([
-          ...referencePhotos.map(p => p && p.name).filter(Boolean),
-          ...((sceneCharacters || []).map(c => c && c.name).filter(Boolean)),
-        ]),
-      ];
-      referencePhotos.forEach(photo => {
-        if (!photo.name || !photo.clothingDescription) return;
-        log.debug(`[IMAGE PROMPT] ${photo.name} wears: "${photo.clothingDescription}" (${photo.clothingCategory})`);
-        // THE WORN-VS-HELD FILTER IS GONE (owner, 2026-08-08). It used to sieve
-        // this description clause by clause, dropping any fragment that looked
-        // like a garment the scene placed off-body. Measured over 30 stories /
-        // 457 clothing lines: 34% were GUTTED (>60% of the text lost) and only
-        // 34% survived untouched — on ordinary stories as much as costumed ones,
-        // because a clause was matched on token coincidence. Emma's whole pirate
-        // costume came out as "no brim, mid-thigh length, belt/waist: none,
-        // outer layer: none" and the run averaged 16.7.
-        //
-        // What it was guarding — a removed garment being re-asserted as worn —
-        // is now handled where it belongs: `clothingCheck.removal_unstated`
-        // reports the page and the SCENE REVIEW states the removal in prose.
-        // Deleting the outfit was never the right remedy; saying "she is without
-        // the bandana, it lies in the chest" is.
-        const guarded = photo.clothingDescription;
-        const items = guarded.toLowerCase().split(/[^a-zäöüéèà-]+/)
-          .filter(w => w.length >= 4 && !CLOTHING_STOPWORDS.has(w));
-        const hits = new Set(items.filter(w => proseLower.includes(w)));
-        if (hits.size < 2) {
-          missingClothingLines.push(`- ${photo.name} wears: ${guarded}`);
-          log.warn(`[IMAGE PROMPT] Prose omitted ${photo.name}'s outfit (${hits.size} wardrobe terms found) — appending explicit wears-line`);
+      try {
+        const { missingGarments } = require('./clothingCheck');
+        // Slots that must be named, because an unstated garment is simply not
+        // drawn. Deliberately stricter than clothingCheck's REVIEW rules, which
+        // treat a partial omission as normal (a close-up need not mention
+        // shoes) — right for nagging a reviewer, wrong for the image prompt.
+        const pageLabel = pageNumber != null ? `page ${pageNumber}` : 'page';
+        for (const photo of referencePhotos) {
+          if (!photo?.name || !photo?.clothingDescription) continue;
+          const missing = missingGarments(photo.clothingDescription, cleanSceneDescription || '', undefined, photo.name);
+          if (missing.length > 0) {
+            log.error(`👕 [CLOTHING] ${pageLabel}: the scene prose does not dress ${photo.name} — missing ${missing.join(', ')}. The prose is the only description the image model gets; fix the brief, nothing downstream will.`);
+          }
         }
-      });
-      if (missingClothingLines.length > 0) {
-        characterReferenceList += `\nCLOTHING (the scene prose omitted these outfits — they are canonical):\n${missingClothingLines.join('\n')}\n`;
+      } catch (err) {
+        log.warn(`👕 [CLOTHING] slot check skipped: ${err.message}`);
       }
     }
 
