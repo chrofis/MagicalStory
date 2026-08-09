@@ -389,23 +389,20 @@ const MODEL_DEFAULTS = {
   // repaint attempt per outlier, gated by checkStyleMatch. The repainted
   // image is stored as a new version through the normal version plumbing.
   // Env override: STYLE_REPAIR_PRODUCTION=false to fall back to
-  // detection-only. Model per styleRepairModel ('gemini' | 'grok') — the
-  // Test Lab `style_repair` stage remains the A/B harness for this choice.
-  // Default is 'grok' (2026-08-09): Gemini image-edit REFUSES realistic adult
-  // faces (IMAGE_OTHER → no image), so every outlier repaint threw and was
-  // discarded — the same refusal that moved avatars off Gemini.
-  // DISABLED by default 2026-08-09: in-place restyle is a confirmed no-op —
-  // Grok under-stylises on edits (pixel-diff ~10-15/255 regardless of prompt
-  // strength) and Gemini refuses adult faces, so an outlier page cannot be
-  // repainted in place. Detection (checkStoryStyleConsistency, which runs
-  // BEFORE this gate) still fires; only the futile repaint is off. Re-enable
-  // with STYLE_REPAIR_PRODUCTION=true once a working lever exists (full-page
-  // REDO, not edit). The r2Lib gate fix, prompt-only refs, and grok default
-  // below are kept so the path is correct if re-enabled.
+  // detection-only. Model per styleRepairModel ('gemini' | 'grok').
+  // RE-ENABLED 2026-08-09 with a WORKING recipe (supersedes the 2026-08-09
+  // disable): repairPageStyle now sends a validated, character-focused,
+  // feature-preserving prompt RAW to the Gemini image edit (prompt-only, no
+  // style-reference image, temp 0.7, retry on safety no-image). Validated on
+  // p3/p10/initial page — photographic adult faces become watercolor while
+  // eyes/eyewear/identity are preserved (keeps glasses if present, never
+  // invents them). GEMINI is the engine (it restyles faces; Grok no-ops on
+  // this edit — the earlier "Gemini refuses" verdict was a prompt bug, not a
+  // real refusal). A page Gemini refuses after retries keeps its original.
   styleRepairProduction: process.env.STYLE_REPAIR_PRODUCTION
     ? process.env.STYLE_REPAIR_PRODUCTION !== 'false'
-    : false,
-  styleRepairModel: process.env.STYLE_REPAIR_MODEL || 'grok',
+    : true,
+  styleRepairModel: process.env.STYLE_REPAIR_MODEL || 'gemini',
 
   // Output aspect ratios — one config per image type, read by every
   // generation / iterate / repair path. Defaults: A4 portrait for pages

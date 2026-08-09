@@ -49,17 +49,67 @@ const STYLE_REPAIR_MODEL_IDS = {
 };
 
 /**
- * Generic style-repaint instruction. MUST stay story-agnostic (repo rule) —
- * no names, characters, settings or plot. It is passed as the EDIT_INSTRUCTION
- * of `editImageWithPrompt`'s `illustrationEdit` template (the same wrapping
- * every live inpaint uses), so it needs only to describe the transform.
+ * Generic style-repaint prompt. MUST stay story-agnostic (repo rule) — no
+ * names, characters, settings or plot. Validated 2026-08-09 on real pages
+ * (p3 / p10 / the initial page): character-focused and feature-PRESERVING —
+ * keeps eyewear if a character has it and never invents it, keeps eyes exactly
+ * as shown. It is sent RAW to the Gemini image edit (see geminiStyleRepaint),
+ * NOT through editImageWithPrompt's `illustration-edit` template — that
+ * template's "keep faces unchanged / maintain the same palette" lines fight a
+ * style repaint. The earlier "minimal detail / only suggest features" wording
+ * DROPPED small features (a child's eyes) and let the model reinvent the eye
+ * area as glasses — removed. `${artStyleDesc}` = the resolved medium.
  */
-const STYLE_REPAIR_INSTRUCTION =
-  'Repaint this illustration so its artistic style exactly matches the style reference image: ' +
-  'the same medium, brushwork, line quality, colour palette, shading and texture. ' +
-  'This is a STYLE transfer ONLY — keep the existing composition, characters, poses, ' +
-  'facial identity, layout and every content element unchanged. Change nothing except the ' +
-  'rendering technique, so this page belongs to the same visual style as the rest of the book.';
+function buildStyleRepairPrompt(artStyleDesc) {
+  return `The background of this illustration is already in the correct art style, but the CHARACTERS are rendered too realistically and photographically — the people are the main thing to fix. Repaint the people into this art style so they match the rest of the illustration: ${artStyleDesc}
+Change ONLY the art style. Every other detail of each person stays exactly as in the source: identical facial features, eyes exactly as shown, identical expression, identical eyewear or lack of eyewear, identical hair and clothing. Add nothing and remove nothing — no invented glasses, no closed or missing eyes. Keep the background, composition and framing unchanged; add no white paper border.`;
+}
+
+/**
+ * Direct Gemini image-edit for style repair — ships EXACTLY the validated call
+ * (raw prompt, temp 0.7, the page's own aspect), bypassing editImageWithPrompt's
+ * illustration-edit template. Retries on Gemini's intermittent safety no-image
+ * (IMAGE_OTHER / IMAGE_SAFETY, observed 1-in-3 on some pages); throws when
+ * exhausted so the caller keeps the original page as the fallback.
+ */
+async function geminiStyleRepaint(prompt, pageImage, { retries = 3 } = {}) {
+  const r2 = require('./r2');
+  const sharp = require('sharp');
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY missing for style repair');
+  // Output at the page's own aspect, snapped to the nearest preset Gemini takes.
+  let aspectRatio = '1:1';
+  try {
+    const buf = Buffer.from(r2.stripDataUriPrefix(pageImage), 'base64');
+    const { width, height } = await sharp(buf).metadata();
+    if (width && height) {
+      const presets = [['9:16', 9 / 16], ['2:3', 2 / 3], ['3:4', 3 / 4], ['1:1', 1], ['4:3', 4 / 3], ['3:2', 3 / 2], ['16:9', 16 / 9]];
+      const rr = width / height;
+      aspectRatio = presets.reduce((b, p) => Math.abs(Math.log(rr / p[1])) < Math.abs(Math.log(rr / b[1])) ? p : b)[0];
+    }
+  } catch { /* keep default 1:1 */ }
+  const mime = String(pageImage).match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
+  const parts = [{ text: prompt }, { inlineData: { mimeType: mime, data: r2.stripDataUriPrefix(pageImage) } }];
+  const body = { contents: [{ parts }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.7, imageConfig: { aspectRatio } } };
+  let lastReason = 'unknown';
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(120000) });
+    if (!resp.ok) { lastReason = `HTTP ${resp.status}`; log.warn(`🎨 [STYLE-REPAIR] gemini ${lastReason} (attempt ${attempt}/${retries})`); continue; }
+    const j = await resp.json();
+    const cand = j?.candidates?.[0];
+    const part = (cand?.content?.parts || []).find(p => p.inlineData || p.inline_data);
+    const inline = part?.inlineData || part?.inline_data;
+    if (inline) {
+      const um = j?.usageMetadata;
+      const usage = { input_tokens: um?.promptTokenCount || 0, output_tokens: um?.candidatesTokenCount || 0, cost: 0.039 };
+      return { imageData: 'data:image/jpeg;base64,' + inline.data, usage };
+    }
+    lastReason = cand?.finishReason || 'no-image';
+    log.warn(`🎨 [STYLE-REPAIR] gemini returned no image (${lastReason}, attempt ${attempt}/${retries})`);
+  }
+  throw new Error(`gemini style repaint produced no image after ${retries} attempts (${lastReason})`);
+}
 
 /**
  * Resolve the opts.model selector to a production model id.
@@ -172,7 +222,7 @@ function planStyleRepair(detection, storyData) {
  */
 async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
   const {
-    model = 'grok',
+    model = 'gemini',
     artStyle = null,
     aspectRatio = null,
     editFn = null,
@@ -197,19 +247,25 @@ async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
     }
   }
 
-  // REPAINT via the shared production edit dispatcher, PROMPT-ONLY — no style
-  // reference image. Passing the dominant page as a reference makes Grok copy
-  // that page's CONTENT (verified 2026-08-09: outlier pages came back redrawn
-  // as the anchor scene). The style signal instead comes from the resolved
-  // art-style descriptor that editImageWithPrompt injects from `artStyle`.
-  // targetStyleRef is retained ONLY for the before/after gate below, never as a
-  // content input.
-  const refs = [];
-  log.info(`🎨 [STYLE-REPAIR] repainting page toward dominant style via ${model} (${modelId}), refs=${refs.length}`);
-  const result = await editImage(pageImage, STYLE_REPAIR_INSTRUCTION, modelId, refs, artStyle, aspectRatio);
-  if (!result || !result.imageData) {
-    throw new Error(`repairPageStyle: ${model} (${modelId}) edit produced no image`);
+  // REPAINT — PROMPT-ONLY, no style-reference image (a content-rich reference
+  // makes the model copy the reference's people/scene — verified 2026-08-09).
+  // The style signal is the resolved art-style descriptor baked into the prompt.
+  // Gemini is the validated engine (it restyles faces where Grok no-ops); Grok
+  // is kept only as the Test Lab A/B alternate.
+  const { resolveArtStyle } = require('./storyHelpers');
+  const styleDesc = (artStyle && resolveArtStyle(artStyle, model)) || 'the art style of the rest of the illustration';
+  const prompt = buildStyleRepairPrompt(styleDesc);
+  log.info(`🎨 [STYLE-REPAIR] repainting page toward dominant style via ${model} (${modelId})`);
+  let imageData;
+  let usage = null;
+  if (model === 'grok') {
+    const r = await editImage(pageImage, prompt, modelId, [], artStyle, aspectRatio);
+    if (!r || !r.imageData) throw new Error(`repairPageStyle: grok (${modelId}) produced no image`);
+    imageData = r.imageData; usage = r.usage || null;
+  } else {
+    ({ imageData, usage } = await geminiStyleRepaint(prompt, pageImage));
   }
+  const result = { imageData, usage };
 
   // GATE on the path's OWN output: did the repaint actually land in the target
   // style CLASS? Mirrors the Test Lab char-repair style gate. Gate
@@ -247,6 +303,7 @@ module.exports = {
   planStyleRepair,
   resolveStyleRepairModelId,
   STYLE_REPAIR_MODEL_IDS,
-  STYLE_REPAIR_INSTRUCTION,
+  buildStyleRepairPrompt,
+  geminiStyleRepaint,
   COVER_PAGE_BY_KEY,
 };

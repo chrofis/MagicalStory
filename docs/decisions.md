@@ -7281,3 +7281,24 @@ sweep missed; now logs and marks UNRESOLVED instead.
 
 **Touched:** `server/lib/storyHelpers.js`, this file.
 **Status:** ✅ active
+
+---
+
+## 2026-08-09 (later) — Style-repair RE-ENABLED with a working Gemini recipe (supersedes the same-day disable)
+
+**Supersedes** the earlier 2026-08-09 "in-place style-repair is a no-op; disabled" entry. That conclusion was wrong — it rested on two of my own prompt bugs, not a real limitation:
+- The "Gemini refuses adult faces" evidence came from (a) a 9.5k-char page-GEN prompt and (b) a self-contradictory edit instruction ("match the style reference image" with NO reference attached → Gemini replied with text, logged as "no image"). With a clean prompt Gemini returns `finishReason=STOP` and a real image on the same adult-face page.
+- "Grok can restyle" — it can't (no-op, diff ~10/255). **Gemini is the engine that actually restyles faces.**
+
+**Working recipe (validated on p3 / p10 / the initial page of job_1786277779744, incl. the both-ways glasses test):**
+- **Gemini** `gemini-2.5-flash-image`, **prompt-only** (no style-reference image — a content-rich ref makes the model copy the ref's people; this is what leaked the anchor family into avatar sheets), **temp 0.7**, **retry ≤3** on safety no-image, page's own aspect. Raw prompt — NOT through the `illustration-edit` template (its "keep faces unchanged / maintain palette" lines fight a restyle).
+- Prompt is **character-focused + feature-PRESERVING**: "the background is already correct; the CHARACTERS are too realistic — repaint the people into {artStyle}; change only the art style; keep every facial feature exactly, eyes as shown, eyewear if present and none if absent; add nothing, remove nothing." Generic — no story specifics.
+- Key fixes vs the broken iterations: removed "minimal detail / only suggest features" (it DROPPED a child's eyes and let the model reinvent the eye area as glasses); positive preservation instead of the story-specific "no glasses" hack (which would strip glasses off a character who has them).
+
+**Also fixed at the source (separate commits):** removed the "minimal hard linework — faint graphite guide lines" clause from the watercolor `ART_STYLES` descriptor (it made watercolor render as tight ink-and-wash on avatars/scenes/pages/covers/titles); the avatar-anchor content-leak prompt fix; and the single-subject (`soloScore`) styled-sheet eval check.
+
+**Config:** `styleRepairProduction` default false→**true**; `styleRepairModel` default grok→**gemini** (env overrides unchanged). Detection (`checkStoryStyleConsistency`) already ran before the gate; now the repaint actually works.
+
+**Known limits:** a page Gemini refuses after 3 retries keeps its original (fallback, no crash). The repaint restyles the whole page's style uniformly but only the characters change materially (backgrounds are already in-style).
+
+**Touched:** `server/lib/styleRepair.js` (buildStyleRepairPrompt + geminiStyleRepaint direct call + prompt-only), `server/config/models.js` (re-enable + gemini). **Verified:** modules load; check-settled OK; repairPageStyle reproduces the validated p10 result. **Not verified:** a full fresh story run end-to-end (safe — worst case a refused page keeps its original).
