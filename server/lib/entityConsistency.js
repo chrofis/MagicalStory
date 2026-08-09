@@ -1048,9 +1048,9 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
         // every other page's entity noise, ~80% of the prompt wasted on
         // irrelevant cross-page issues.
         //
-        // If the eval text names a specific cell ("Cell B"), narrow to that
-        // single page; otherwise attribute to all pages in the group.
-        const groupPages = groupAppearances.map(a => a.pageNumber).filter(n => n != null);
+        // An issue is stamped with the ONE page its first cell resolves to, or
+        // with none at all. There is deliberately no "attribute it to the whole
+        // group" path any more — see the NO DEFAULT note below.
         // Cell→page comes from the grid MANIFEST the model saw (stamped per grid
         // at eval time), NOT from groupAppearances collection order — the latter
         // diverged whenever covers (appended last but sorted first in the grid)
@@ -1067,41 +1067,97 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
         // log output and dev panels surface page numbers directly. The Gemini
         // API call already happened on the grid image where the model saw
         // bare cell letters — we're only rewriting the stored display strings.
+        // Handles the plural/lowercase form too — see cellLettersOf for why.
         const annotateCells = (text, cellMap) => {
           if (!text || typeof text !== 'string') return text;
-          return text.replace(/\bCell\s+([A-Z])\b(?!\s*\(page)/g, (match, letter) => {
-            const page = cellMap.get(letter);
-            return page != null ? `${match} (page ${page})` : match;
-          });
+          return text
+            .replace(/\bCell\s+([A-Z])\b(?!\s*\(page)/g, (match, letter) => {
+              const page = cellMap.get(letter);
+              return page != null ? `${match} (page ${page})` : match;
+            })
+            .replace(/\b([Cc]ells\s+)([A-Z]\b(?:\s*(?:,|and|&)\s*[A-Z]\b)*)/g, (match, lead, list) =>
+              lead + list.replace(/[A-Z]\b(?!\s*\(page)/g, (L) => {
+                const page = cellMap.get(L);
+                return page != null ? `${L} (page ${page})` : L;
+              }));
+        };
+
+        /**
+         * The cell letters an issue is about.
+         *
+         * PREFER THE STRUCTURED FIELD (2026-08-09). This used to read the prose
+         * only, via /\bCell\s+([A-Z])\b/. The model routinely writes the plural
+         * lowercase form — "Hans's hat in cells A, B, C, D, F is a soft white
+         * cap" — where `cells A` cannot match `Cell` + whitespace. The mapping
+         * then came out EMPTY and `pageNumbers` fell back to every page in the
+         * group: job_1786287569165_7f75jspcz stored `cellsToPages: {}` with
+         * `pageNumbers: [3,4,5,7,8,10,12,13,14,-2,-3]` — eleven pages including
+         * both covers — for a finding about five cells. Silent, because an empty
+         * map is indistinguishable from "no cells were named".
+         *
+         * `issue.cells` is emitted by the model as an array and needs no parsing.
+         * Letters are still resolved through OUR manifest, never the model's own
+         * page numbers, so the guarantee the previous fix established holds.
+         * Prose stays as the fallback for evaluations that omit the field.
+         */
+        const cellLettersOf = (issue, desc) => {
+          const out = [];
+          const push = (s) => {
+            const L = String(s == null ? '' : s).trim().toUpperCase();
+            if (/^[A-Z]$/.test(L) && !out.includes(L)) out.push(L);
+          };
+          if (Array.isArray(issue.cells)) issue.cells.forEach(push);
+          if (out.length) return out;
+          // Letters are matched uppercase-only and must end on a word boundary,
+          // so the "and" in "cells A and B" cannot itself be read as cell A.
+          for (const m of desc.matchAll(/\b[Cc]ells?\s+([A-Z]\b(?:\s*(?:,|and|&)\s*[A-Z]\b)*)/g)) {
+            for (const L of m[1].split(/[^A-Z]+/)) push(L);
+          }
+          return out;
         };
 
         for (const issue of (evalResult.issues || [])) {
           const cellToPage = issue._gridCellToPage
             ? new Map(Object.entries(issue._gridCellToPage))
             : primaryCellToPage;
-          let pageNumbers = groupPages;
           const desc = String(issue.description || issue.issue || '');
-          // Use ONLY the FIRST cell mentioned as the target page. Earlier code
-          // unioned every cell letter in the description — but most issues
-          // name a problematic cell ("Cell B (page -2)") AND one or more
-          // reference cells ("...different from Cell A (page 3) and Cell R").
-          // Stamping all of those into pageNumbers caused the consolidator to
-          // pipe the issue into every mentioned page's repair call. The
-          // page=3 consolidator then received a finding about page -2's cell
-          // B and asked Grok to "fix" page 3 against a description that
-          // wasn't about page 3 at all.
-          const firstCellMatch = desc.match(/\bCell\s+([A-Z])\b/);
-          if (firstCellMatch) {
-            const p = cellToPage.get(firstCellMatch[1]);
-            if (p != null) pageNumbers = [p];
-          }
+          const cellsMentioned = cellLettersOf(issue, desc);
 
-          // Build cell→page mapping for every cell letter mentioned in the issue.
-          const cellsMentioned = [...new Set([...desc.matchAll(/\bCell\s+([A-Z])\b/g)].map(m => m[1]))];
+          // Build cell→page mapping for every cell letter named by the issue.
           const cellsToPages = {};
           for (const letter of cellsMentioned) {
             const p = cellToPage.get(letter);
             if (p != null) cellsToPages[letter] = p;
+          }
+
+          // Use ONLY the FIRST cell as the target page. Earlier code unioned
+          // every cell letter in the description — but most issues name a
+          // problematic cell ("Cell B (page -2)") AND one or more reference
+          // cells ("...different from Cell A (page 3) and Cell R"). Stamping
+          // all of those into pageNumbers caused the consolidator to pipe the
+          // issue into every mentioned page's repair call. The page=3
+          // consolidator then received a finding about page -2's cell B and
+          // asked Grok to "fix" page 3 against a description that wasn't about
+          // page 3 at all. First-RESOLVED, so a leading "Cell R" — the identity
+          // reference, which has no page — falls through to the real target.
+          const firstResolved = cellsMentioned.find(L => cellToPage.get(L) != null);
+
+          // NO DEFAULT (2026-08-09). The old fallback was `pageNumbers =
+          // groupPages` — an unlocatable finding was attributed to EVERY page in
+          // the group, covers included, and the consolidator then asked for a
+          // repair on each. An unplaceable finding is not a finding about all
+          // pages; it is a finding we cannot place. Empty means the per-page
+          // filter in feedbackConsolidator excludes it everywhere, while the
+          // issue still appears in the report carrying the reason.
+          let pageNumbers = [];
+          let unlocatedReason = null;
+          if (firstResolved != null) {
+            pageNumbers = [cellToPage.get(firstResolved)];
+          } else {
+            unlocatedReason = cellsMentioned.length
+              ? `named cells [${cellsMentioned.join(',')}] map to no page in this grid`
+              : 'issue names no cell';
+            log.warn(`⚠️ [ENTITY-CHECK] ${charName}: issue not attributable to a page (${unlocatedReason}) — not routed to any repair`);
           }
 
           const annotated = {
@@ -1109,6 +1165,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             clothingCategory,
             pageNumbers,
             cellsToPages,
+            ...(unlocatedReason ? { unlocatedReason } : {}),
             description: annotateCells(issue.description, cellToPage),
             issue: annotateCells(issue.issue, cellToPage),
             fixInstruction: annotateCells(issue.fix || issue.fixInstruction, cellToPage),

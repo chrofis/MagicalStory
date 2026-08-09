@@ -7892,3 +7892,44 @@ changes LOWER the bar. Three corrections now point the same way. Re-measure on a
 tuning any of them again — the risk has flipped from over-repairing to under-repairing.
 
 **Touched:** `server/config/models.js`, `server/lib/repairLogic.js`.
+
+---
+
+## 2026-08-09 — Entity issue → page: read the structured `cells` field, and an unplaceable issue reaches NO page
+
+**Context:** Entity-consistency issues were mapped to a page by regex over the issue PROSE:
+`/\bCell\s+([A-Z])\b/`. The model routinely writes the plural lowercase form — *"Hans's hat in
+cells A, B, C, D, F is a soft white cap"* — where `cells A` cannot match `Cell` followed by
+whitespace. Nothing matched, so `cellsToPages` came out `{}` and `pageNumbers` fell back to
+`groupPages`, i.e. every page in the group. Stored proof on staging
+`job_1786287569165_7f75jspcz`: five cells named, and
+`pageNumbers: [3,4,5,7,8,10,12,13,14,-2,-3]` — eleven pages **including both covers**, each of
+which the feedback consolidator would then be asked to repair. It failed silently, because an
+empty map is indistinguishable from "the issue named no cells".
+
+**Decision:** Two changes.
+1. `cellLettersOf()` prefers `issue.cells`, the array the model already emits, and needs no
+   parsing at all. Prose is the fallback only, with a matcher that handles singular/plural and
+   lower/upper case (`cells A, B and C`). Letters are still resolved through OUR grid manifest,
+   never the model's own page numbers, so the earlier per-grid-manifest guarantee is untouched.
+2. **NO DEFAULT.** There is no attribute-to-the-whole-group path any more. `pageNumbers` starts
+   `[]` and is filled only from the first cell that RESOLVES to a page (so a leading `Cell R` —
+   the identity reference, which has no page — falls through to the real target). An issue that
+   cannot be placed keeps `unlocatedReason` and is logged, so it stays visible in the report
+   while reaching no repair.
+
+**Rationale:** An unplaceable finding is not a finding about all pages; it is a finding we cannot
+place. Spraying it across the group is how a note about one cell became a repair request on the
+front and back covers. `feedbackConsolidator` filters with
+`!e.pageNumbers || e.pageNumbers.includes(pageNumber)` — `[]` is truthy and `[].includes()` is
+false, so empty excludes everywhere, whereas leaving the field `undefined` would have INCLUDED it
+everywhere. That asymmetry is asserted in the test rather than left to be rediscovered.
+
+This is one half of the wrong-flags problem. The other half — a grid cell showing a DIFFERENT
+character, which is how Hans was reported wearing another man's black hat, orange sash and dark
+breeches while the same evaluation called his identity "consistent across all cells" — is not
+addressed here and remains open.
+
+**Touched:** `server/lib/entityConsistency.js`, `tests/manual/entityCellToPage.test.js`.
+
+**Status:** ✅ active
