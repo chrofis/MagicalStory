@@ -7687,3 +7687,39 @@ when P1 is empty and prefers P1's when populated; 64/64 templates load; `check-s
 **Touched:** `server/lib/images.js`, `server/lib/scoring.js`, `server/lib/evalBuckets.js`,
 `prompts/image-vision-inventory.txt`, `prompts/image-prompt-compliance.txt`,
 `prompts/image-evaluation.txt`.
+
+## 2026-08-09 — D-27 folded into N-01: the medium check moved from 78% into the prompt to 8%
+
+**Context:** two photographic pages shipped in a steampunk book (`job_1786287569165_7f75jspcz`, p4
+and p14) with ZERO `style_consistency` findings. The other session fixed the CAUSE — the steampunk
+descriptor's grok variant literally ordered realism. This entry is about the DETECTOR, which should
+have caught it regardless and never has: `style_consistency` has fired 0 times in every story
+measured.
+
+**It was not a spec problem.** `resolveArtStyle()` ignores its backend argument and returns the
+default descriptor, so the EVALUATOR was handed *"clearly hand-drawn, never photographic and never a
+photo with a filter (no skin pores, no camera-real skin)… an illustrated graphic-novel face, not a
+photoreal one"* — while the GENERATOR got the realism variant. The evaluator had an explicit,
+four-times-repeated instruction, was shown two photographs, and said nothing.
+
+**Root cause is position, not wording.** D-27's own text said *"This is the opposite of N-01"* — yet
+N-01 was the FIRST rule in the prompt and D-27 the 27th of 28 defect codes, 119 lines apart. The
+model read "protect whatever the style calls for" first, then fifteen more never-deduct rules, and
+reached the "catch a page that ignored the style" half last, if at all.
+
+**Decision (owner: "fold D-27 into N-01 for now").** N-01 is now TWO questions answered together:
+(a) does the style call for this KIND of element → if yes, never a finding (unchanged, and preserves
+the settled neon/style-conditional verdict verbatim); (b) is the page DRAWN IN that style's medium →
+if not, `style_consistency` MAJOR, reported FIRST. D-27's slot keeps its number (D-28 references the
+D-01..D-27 range) but is now a pointer to N-01 (b), so there is exactly one definition.
+
+**Measured effect on position:** the medium check sits at 8% into the prompt, was ~78%.
+
+**"For now"** — the fallback if this does not fire is promoting it to a forced STEP-0 gate like
+`coherence_gate`, where an answer cannot be skipped. Chose the cheaper structural fix first because
+it is prompt-only and testable for pennies: pages 4 and 14 are stored, so the reordered prompt can be
+replayed against two known-photoreal pages without generating anything.
+
+**NOT yet verified** — no replay has run. A rule that moved is still a rule that can be skimmed.
+
+**Touched:** `prompts/image-evaluation.txt`.
