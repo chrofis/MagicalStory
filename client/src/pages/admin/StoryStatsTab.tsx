@@ -17,6 +17,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Loader2, RefreshCw, Copy, Check } from 'lucide-react';
 import { adminService } from '@/services';
+import { testlabService, type EvalFinding } from '@/services/testlabService';
 import type { StoryMetricsRow, NumericField } from '@/types/storyMetrics';
 import { Button } from '@/components/common/Button';
 
@@ -233,6 +234,150 @@ function CounterCard({ name, total, daily }: { name: string; total: number; dail
           ))}
         </svg>
       </div>
+    </div>
+  );
+}
+
+// ---------- findings registry panel ----------
+
+/**
+ * Eval-findings registry (eval_findings table, migration 013): the durable home
+ * for evaluator rules + their rationale. Read-only view here — editing lives in
+ * the Test Lab. Independent of the story-metrics window, so it fetches on its
+ * own and renders even when there are no metrics rows.
+ */
+const STATUS_BADGE: Record<string, string> = {
+  active: 'bg-green-100 text-green-700',
+  superseded: 'bg-amber-100 text-amber-700',
+  rejected: 'bg-red-100 text-red-700',
+};
+
+function FindingsRegistryPanel() {
+  const [findings, setFindings] = useState<EvalFinding[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    testlabService.listFindings()
+      .then(data => { if (!cancelled) setFindings(data.findings || []); })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load findings'); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Recent first (endpoint orders by category/slug for the Lab view).
+  const sorted = useMemo(() =>
+    [...findings].sort((a, b) => {
+      const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      return tb - ta;
+    }),
+  [findings]);
+
+  const catCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const f of findings) {
+      const cat = f.category || 'uncategorized';
+      counts[cat] = (counts[cat] || 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [findings]);
+
+  return (
+    <div className="bg-white rounded-xl shadow overflow-hidden">
+      <div className="px-6 py-4 border-b">
+        <h3 className="font-semibold text-gray-800">Findings registry</h3>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Durable eval findings (rule + rationale + evidence) — maintained in the Test Lab.
+        </p>
+      </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8 text-sm text-gray-500">
+          <Loader2 className="w-5 h-5 animate-spin text-indigo-500 mr-2" />
+          Loading findings…
+        </div>
+      ) : error ? (
+        <div className="px-6 py-4 text-sm text-red-600">{error}</div>
+      ) : findings.length === 0 ? (
+        <div className="px-6 py-8 text-center text-sm text-gray-500">No findings recorded yet.</div>
+      ) : (
+        <>
+          {/* per-category counts */}
+          <div className="px-6 py-3 border-b bg-gray-50 flex flex-wrap gap-2">
+            {catCounts.map(([cat, n]) => (
+              <span key={cat} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-700">
+                {cat}
+                <span className="font-semibold text-gray-900">{n}</span>
+              </span>
+            ))}
+            <span className="inline-flex items-center px-2.5 py-1 text-xs text-gray-400 ml-auto">
+              {findings.length} total
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Updated</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Slug</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Category</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Finding</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Prompt file</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {sorted.map(f => {
+                  const expanded = expandedSlug === f.slug;
+                  return (
+                    <tr
+                      key={f.slug}
+                      className="hover:bg-gray-50 cursor-pointer align-top"
+                      onClick={() => setExpandedSlug(expanded ? null : f.slug)}
+                      title={expanded ? 'Collapse' : 'Show rule + rationale'}
+                    >
+                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtDateCH(f.updated_at || f.created_at)}</td>
+                      <td className="px-4 py-3 text-sm font-mono text-gray-800 whitespace-nowrap">{f.slug}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{f.category || '—'}</td>
+                      <td className="px-4 py-3 text-sm whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[f.status] || 'bg-gray-100 text-gray-600'}`}>
+                          {f.status || '—'}
+                        </span>
+                        {f.superseded_by && (
+                          <span className="ml-1.5 text-xs text-gray-400">→ {f.superseded_by}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-800">
+                        <p className={expanded ? '' : 'line-clamp-2'}>{f.title || '—'}</p>
+                        {expanded && (
+                          <div className="mt-2 space-y-2 text-xs">
+                            {f.rule_text && (
+                              <p className="text-gray-700"><span className="font-semibold text-gray-500">Rule:</span> {f.rule_text}</p>
+                            )}
+                            <p className="text-gray-600 whitespace-pre-wrap"><span className="font-semibold text-gray-500">Rationale:</span> {f.rationale || '—'}</p>
+                            {f.evidence && Object.keys(f.evidence).length > 0 && (
+                              <p className="text-gray-500 font-mono break-all">
+                                <span className="font-semibold font-sans">Evidence:</span> {JSON.stringify(f.evidence)}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {f.prompt_file || '—'}
+                        {f.prompt_section && <span className="text-gray-400"> · {f.prompt_section}</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -546,6 +691,9 @@ export function StoryStatsTab() {
           </div>
         </>
       )}
+
+      {/* Findings registry — independent of the story-metrics window */}
+      <FindingsRegistryPanel />
     </div>
   );
 }
