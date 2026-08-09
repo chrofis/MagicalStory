@@ -391,8 +391,8 @@ async function iterateCover(coverKey, storyData, options = {}) {
     generateImageWithQualityRetry,
     generateImageCacheKey,
     deleteFromImageCache,
-    blackoutIssueRegions,
   } = require('./images');
+  const { blackoutIssueRegions } = require('./imageInpainting');
 
   const { buildFullVisualBiblePrompt } = require('./visualBible');
 

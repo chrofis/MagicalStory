@@ -270,11 +270,11 @@ async function stackRowsInto2x4(headRowData, bodyRowData) {
   const headResized = await sharp(headBuf).resize({ width: W }).toBuffer();
   const hMeta = await sharp(headResized).metadata();
   const SEAM = 4;
-  // Full-width stack, NO side padding: the head row is generated at 16:3 and the
-  // body row at 16:9, so head (¾×W? no) — with equal width W they stack to
-  // 16:(3+9) = 16:12 = 4:3, a native preset. Style transfer then runs at 4:3
-  // (no squeeze), columns stay at W/4 (no margins), and the head/body boundary
-  // is the dark seam the shared splitter (splitSheetRows) already locks onto.
+  // Full-width stack, NO side padding: head row generated at 20:9 (576 tall) +
+  // body row at 16:9 (720 tall) ≈ 1280×1300 ≈ 1:1, a native preset. Pass-2 style
+  // transfer runs at the nearest preset (aspectPresetFor → 1:1, ~1% off = no
+  // visible squeeze), columns stay at W/4 (no margins), and the head/body
+  // boundary is the dark seam the shared splitter (splitSheetRows) locks onto.
   const H = hMeta.height + SEAM + bMeta.height;
   const splitY = hMeta.height + Math.round(SEAM / 2);
   const out = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } } })
@@ -390,13 +390,14 @@ async function generateComposited2x4(character, { costumeDescription, redress = 
   if (!bestBody) throw new Error(`[CHARACTER 2×4] body row produced no image for ${character?.name}`);
 
   // ── Stage 2: head row on the accepted body (max 1 retry, keep least-bad) ──
-  // Head row is generated at 16:3 (short/wide) so that stacked under the 16:9
-  // body row the composite is exactly 16:12 = 4:3 — a native Grok/Gemini preset,
-  // full-width, no padding/squeeze. See stackRowsInto2x4.
+  // Head row uses 20:9 — the widest/shortest ratio in Grok's aspect enum
+  // (16:3 is not allowed). Stacked under the 16:9 body row the composite is
+  // ~1:1 (720 + 576 ≈ 1280 tall), a native preset for the Pass-2 style call, so
+  // no padding/squeeze; full-width, no side margins. See stackRowsInto2x4.
   const headRefs = [headPhantom, facePhoto, bestBody.row]; // exactly 3
   let bestHead = null;
   for (let t = 1; t <= 2; t++) {
-    const res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '16:3', model: GROK_MODELS.STANDARD });
+    const res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD });
     if (!res?.imageData) { attemptHistory.push({ stage: 'head', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_head_row', res.modelId);
     let review = { valid: true, score: 10, heads: null, identity: null };

@@ -126,7 +126,6 @@ const {
   generateImageCacheKey,
   buildVisualBibleGrid,
   buildEmptySceneVbGrid,
-  blackoutIssueRegions,
   iteratePageCore,
   enrichWithBoundingBoxes,
   collectAllIssuesForPage,
