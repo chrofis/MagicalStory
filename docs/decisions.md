@@ -6712,3 +6712,23 @@ fitting.
 `server/lib/images.js`, `server/routes/regeneration.js`.
 
 **Status:** 🟡 shipped; re-running experiment #444 on identical input is the proof.
+
+## 2026-08-09 — Title paint: the plate is a STRIP, never a page (settled by #439-#448)
+
+**Context:** the cover-shaped plate page-filled on three different covers across three prompt
+wordings — children drawn in (#439), the whole illustration reproduced (#443 Der Turm), the title
+duplicated large and misspelled (#442). Prompt engineering moved the failure around but never
+removed it (old prompt 4/4 then 85% page-fill in production; rewritten prompt 1/4).
+
+**Decision:** send ONLY the title band — glyph rows + 3% margin, cut at full cover width, padded
+with white to the nearest Grok preset (grown, never cropped), un-padded on return, keyed, pasted
+back at its known y-offset. 1:1 in both directions. Page-fill gate = share of ink in the padding
+(>15% rejects the whole attempt; letters are never clipped).
+
+**Rationale:** a mostly-empty page is a generative invitation — the model fills blank canvas, and
+no wording reliably stops it. A strip has nothing to fill: letters occupy most of the canvas.
+Result: 5/5 (exps #447 + #448), including the Thurbrücke story that failed at 84-85% twice.
+
+**Touched:** `server/lib/coverTitlePaint.js`, `server/lib/testlab.js` (step label).
+**Status:** ✅ on staging. Still pending before master: observe the automatic path inside one full
+generation.
