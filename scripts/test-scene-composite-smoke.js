@@ -64,6 +64,24 @@ const STRATEGY_MODE = arg('strategy', 'auto').toLowerCase();
 // --skipEval=false runs the FULL pipeline (quality/semantic eval + repair
 // scoring) — for Test Lab benchmark stories. Default true = original smoke.
 const SKIP_EVAL = arg('skipEval', 'true').toLowerCase() !== 'false';
+// Story-content overrides — same account/characters (no character creation),
+// but vary one knob per rerun. Defaults reproduce the original smoke story,
+// so an unchanged invocation is byte-identical to before.
+//   --artStyle=comic          swap art style, story otherwise identical
+//   --category=adventure      storyType/storyCategory
+//   --topic=pirate            storyTopic/storyTheme
+//   --details="..."           storyDetails prose — set the LOCATION here
+//                             (e.g. "Die Geschichte spielt in Paris.")
+//   --skipCovers=false        full-length reruns usually want covers
+//   --repair=true             enableFullRepair (auto-repair passes)
+//   --dryRun                  print the payload and exit before any API call
+const ART_STYLE = arg('artStyle', 'watercolor');
+const CATEGORY = arg('category', 'adventure');
+const TOPIC = arg('topic', 'pirate');
+const DETAILS = arg('details', 'Eine kurze Piratengeschichte für einen Pipeline-Smoke-Test.');
+const SKIP_COVERS = arg('skipCovers', 'true').toLowerCase() !== 'false';
+const REPAIR = arg('repair', 'false').toLowerCase() === 'true';
+const DRY_RUN = process.argv.includes('--dryRun');
 
 const basicHeader = BASIC_USER && BASIC_PASS
   ? `Basic ${Buffer.from(`${BASIC_USER}:${BASIC_PASS}`).toString('base64')}`
@@ -96,12 +114,25 @@ async function api(pathSegment, { method = 'GET', body = null, token = null, con
 }
 
 (async () => {
-  console.log('═══ Scene-Composite Smoke Test ════════════════════════════');
+  console.log('═══ Story Validation Run (smoke / rerun) ══════════════════');
   console.log(`  Backend: ${BASE_URL}`);
   console.log(`  Account: ${EMAIL}`);
   console.log(`  Pages:   ${PAGES} (dev minimum: 4)`);
-  console.log(`  Skip:    covers, repair, quality eval`);
+  console.log(`  Story:   ${CATEGORY}/${TOPIC}, artStyle=${ART_STYLE}`);
+  console.log(`  Flags:   skipCovers=${SKIP_COVERS} repair=${REPAIR} skipEval=${SKIP_EVAL}`);
   console.log('═══════════════════════════════════════════════════════════');
+
+  if (DRY_RUN) {
+    console.log('\n--dryRun: payload that would be POSTed to /api/jobs/create-story:');
+    console.log(JSON.stringify({
+      storyType: CATEGORY, storyTopic: TOPIC, storyTheme: TOPIC, artStyle: ART_STYLE,
+      pages: PAGES, storyDetails: DETAILS, skipCovers: SKIP_COVERS,
+      enableFullRepair: REPAIR, skipQualityEval: SKIP_EVAL,
+      characters: '<fetched from account>',
+    }, null, 2));
+    console.log('\nNo API calls made. Remove --dryRun to launch.');
+    return;
+  }
 
   // 1. Login
   console.log('\n1. Logging in...');
@@ -143,22 +174,22 @@ async function api(pathSegment, { method = 'GET', body = null, token = null, con
   console.log('\n3. Submitting smoke-test story job...');
   const idempotencyKey = `smoke_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
   const payload = {
-    storyType: 'adventure',
-    storyTypeName: 'Adventure',
-    storyCategory: 'adventure',
-    storyTopic: 'pirate',
-    storyTheme: 'pirate',
-    artStyle: 'watercolor',
+    storyType: CATEGORY,
+    storyTypeName: CATEGORY.charAt(0).toUpperCase() + CATEGORY.slice(1),
+    storyCategory: CATEGORY,
+    storyTopic: TOPIC,
+    storyTheme: TOPIC,
+    artStyle: ART_STYLE,
     language: 'de',
     languageLevel: 'standard',
     pages: PAGES,
-    storyDetails: 'Eine kurze Piratengeschichte für einen Pipeline-Smoke-Test.',
+    storyDetails: DETAILS,
     characters,
     mainCharacters,
     relationships: {},
     relationshipTexts: {},
-    skipCovers: true,
-    enableFullRepair: false,
+    skipCovers: SKIP_COVERS,
+    enableFullRepair: REPAIR,
     skipQualityEval: SKIP_EVAL,
     idempotencyKey,
   };

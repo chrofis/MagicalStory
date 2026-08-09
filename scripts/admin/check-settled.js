@@ -16,10 +16,6 @@ const CHECKS = [
   {
     name: 'Text zone: calm, never "for white text"',
     dirs: ['prompts'], ext: ['.txt'],
-    // story-unified*.txt currently carry a disputed "for white text" line —
-    // excluded pending the owner's ruling (see SETTLED.md text-zone entry).
-    // Remove the excludes once that wording is settled/cleaned.
-    exclude: ['story-unified.txt', 'story-unified-imagefirst.txt'],
     pattern: /for white text/i,
     verdict: 'Text-overlay zone is CALM, never dark (docs/SETTLED.md)',
   },

@@ -124,7 +124,7 @@ When the user says **"run a new showcase story"** (or any short variant: "run a 
 
 Rotation config: `tests/helpers/demo-rotation.json`; state: `tests/demo-rotation-state.json`; orchestrator source is the doc (`scripts/admin/showcase.js`).
 
-**A showcase is the LAST resort for validation, not the first.** For validating a change, use the running-validation-stories skill's ladder: stored evidence → single-page rerun → cheap 4-page run on the existing smoke account (`demo-b-hnecf@magicalstory.ch`, no character recreation) → full showcase only after long/structural changes or character-pipeline changes.
+**A showcase is the LAST resort for validation, not the first.** For validating a change, use the running-validation-stories skill's ladder: stored evidence → single-page rerun → cheap 4-page run on the existing smoke account (`demo-b-hnecf@magicalstory.ch`, no character recreation) → full-story rerun on that same account (identical wizard start point; vary one knob like art style or location) → full showcase only after long/structural changes or character-pipeline changes.
 
 ## Folder Organization Rules
 
