@@ -7156,3 +7156,65 @@ when the API lands (candidate IDs `grok-imagine-image-2` / `grok-imagine-image-q
 `server/lib/styleRepair.js` (prompt-only refs), `server/lib/styleAnalysis.js` (r2Lib require).
 **Verified:** modules load; gate returns a real verdict after the r2Lib fix. NOT verified: a fresh
 full story run with the flag off (safe — it only removes a no-op call).
+
+### The clothing contract is reviewed before the avatars are built, not after
+
+**Context:**   The beats pipeline reviews the plan (step 2) and the scene briefs
+(step 5). Step 3, the story bible, writes `clothingRequirements` and nothing
+checked it. In `job_1786277779744_vorw1f7ve` a pirate's only pirate garment was
+a "bandana"; the avatar sheet drew it as a toddler's headband bow with the knot
+on top, and that sheet is what all 14 pages copy from. The image evaluator saw
+it and scored it as a minor accessory ("bandana placements inaccurate", p4) —
+the correct call for an accessory, and useless here. The avatar eval could not
+catch it either: it scores `clothingMatch` as fidelity to the clothing TEXT, and
+a bow is a faithful rendering of "bandana tied around his head". Test Lab #457
+then found the same class of fault in a second story — in
+`job_1786193650012_7baiaeftb` three of five characters had no pirate garment at
+all, in a story whose plot has Hans handing out pirate hats from a chest.
+
+**Decision:** New step 3b (`beats_clothing_review`) runs between the bible parse
+and the `onClothingRequirements` avatar kickoff. Text in, text out, no image
+spend. Contained like its two sibling reviews — a failure ships the unreviewed
+wardrobe and never blocks the story. The prompt ranks recognisability above
+distinguishability: a character in the right costume sharing a colour is better
+than a distinct colour on a garment that does not read as the costume.
+
+**Rationale:** Position is the entire point. After the kickoff, correcting an
+outfit costs a regenerated avatar; before it, the outfit is still only text.
+Reviewing the *image* instead was considered and rejected for this fault class —
+it fires after the spend, and a faithfully-drawn bad costume passes.
+
+Two failure modes the review itself showed on first run, both fixed: it emitted
+a flawed outfit and then a corrected duplicate heading for the same slot (the
+parser now keeps the last entry per character+category, so the reviewer's final
+answer wins deliberately rather than by arrival order), and it "fixed" a clash by
+swapping two characters' colours, leaving them equally hard to tell apart (the
+prompt now requires a rewrite to be checked against every other outfit).
+
+**Touched:**   `prompts/clothing-review.txt`, `server/lib/storyHelpers.js`
+(`buildClothingReviewPrompt`, `parseClothingReview`),
+`server/lib/beatsPipeline.js` (step 3b), `server/lib/testlab.js`
+(`clothing_review` stage), `server/services/prompts.js`, `server.js`
+**Status:**    ✅ active
+
+### Costume rules carry no exemplar garment lists
+
+**Context:**   The costume rule used to name example garments per costume
+("Pirate: striped shirt, sash, tricorn, headscarf, ..."). It did not bind — the
+bible invented a bandana, which was not on the list — while still steering the
+model toward the handful of garments it half-remembered. Owner call: drop the
+examples, and stop treating "different garment type per character" as a fault at
+all, since a boy and a girl in the same hat were never hard to tell apart.
+
+**Decision:** The rule states the requirement and nothing else: the costume must
+read as that costume at a glance, and characters are told apart by a different
+dominant colour on their largest garment. Two characters in the same garment is
+fine when the colours differ. Recognisability outranks distinction.
+
+**Rationale:** Exemplar lists in a generic prompt are the same failure as
+story-specific examples — they narrow the model to the listed instances without
+constraining anything outside them.
+
+**Touched:**   `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+`prompts/story-bible-from-beats.txt`, `prompts/styled-costumed-avatar.txt`
+**Status:**    ✅ active
