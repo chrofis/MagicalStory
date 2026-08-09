@@ -85,7 +85,18 @@ Always output `coherence_gate: {applied, reason}`. When applied, also emit one `
 **D-02 `character_identity` → CRITICAL.** Wrong reference matched, or the character is unrecognisable from face and build.
 **D-03 `duplicate_character` → CRITICAL.** Two figures match the same reference while another character is missing.
 **D-04 `missing_character` → CRITICAL.** A required character is entirely absent. Name the target region in the description.
-**D-05a `nudity` → CATASTROPHIC.** A figure is undressed: bare torso, bare buttocks, bare groin, or wearing only headwear or only an accessory. Fires whatever the brief says and whatever the figure is doing — a children's book cannot publish it. Judge only what is rendered: a garment hidden by occlusion, cropping, water or a blanket is not nudity, and a bare-armed or barefoot figure in normal clothes is not nudity. Report ONE entry per undressed figure. `fix`: "Regenerate the figure fully dressed in the outfit named in CLOTHING."
+**D-05a `nudity` → CATASTROPHIC. A LAST-RESORT SAFETY NET — it should almost never fire.**
+
+Fires ONLY when a figure is genuinely unclothed: NO garment on the lower body AND none on the torso. That is the whole test.
+
+It is NOT nudity — do not report it — when the figure wears ANY of these, however brief or however wrong for the scene:
+- shorts, briefs, bloomers, underwear, swim trunks, a swimsuit, a skirt, trousers, or anything else covering the lower body. A bare chest above any lower garment is never nudity.
+- a top, shirt, dress or coat with the legs bare.
+- bare arms, bare legs, bare feet, or a swimming/bathing scene.
+
+A garment hidden by occlusion, cropping, water or a blanket is not nudity either — judge only what is rendered.
+
+If the brief named a garment and the figure is wearing something else, or too little for the scene, that is **D-05 `clothing`**, not this. This code exists for one case: the clothing spec produced no garment at all and the model drew a naked figure. When in doubt it is not nudity. Report ONE entry per figure. `fix`: "Regenerate the figure fully dressed in the outfit named in CLOTHING."
 
 **D-05 `clothing` → MAJOR.** Wrong MAIN garment colour, or wrong garment TYPE (dress rendered as trousers).
 **D-06 `clothing` → MODERATE. Exactly ONE entry per figure, never more.** Accessory and small-item detail: eyewear frame colour or tint, missing glasses, lanyard, shoe or sock colour, belt, watch, jewellery, hairclip, button colour, a missing stripe, a missing pocket, a fabric that reads as the wrong material, a slightly off shade. Collect every such deviation for one figure and emit them as a SINGLE finding naming that figure — "Emma: shoes are trainers not slip-ons, t-shirt stripe missing" — never one finding per detail. Never MAJOR. If a figure has no MAIN garment error, at most one MODERATE may be charged against it in total.

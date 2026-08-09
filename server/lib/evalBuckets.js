@@ -46,7 +46,12 @@ const BUCKETS = {
   // score — regenerating a character to change a shirt's hue is the expensive
   // wrong answer. scoring.js zeroes its points; the category exists so it is
   // visible in per-category stats instead of hiding on a private channel.
-  garment_colour:       { owner: 'entity',   kind: 'graded', repair: 'garment_colour_fix' }, // wrong/missing environment detail: location, background, weather, time of day
+  garment_colour:       { owner: 'entity',   kind: 'graded', repair: 'garment_colour_fix' },
+  // Last-resort safety net for a genuinely unclothed figure. Its own bucket
+  // rather than a clothing sub-case so it is countable on its own: in a
+  // correctly-specified story it should never fire, so a non-zero count is a
+  // signal that the CLOTHING contract failed upstream, not just a page defect.
+  nudity:               { owner: 'quality',  kind: 'binary', repair: 'regen' }, // wrong/missing environment detail: location, background, weather, time of day
   style_consistency:    { owner: 'quality',  kind: 'graded', repair: 'style_transfer' },
   composition_textzone: { owner: 'quality',  kind: 'graded', repair: 'iterate_placement' },
   rendered_text:        { owner: 'quality',  kind: 'binary', repair: 'regen' },
@@ -111,6 +116,7 @@ const TYPE_TO_BUCKET = {
   // entity-consistency-check.txt emits its own closed vocabulary; map it here so
   // cross-page consistency findings route like everything else.
   garment_colour: 'garment_colour', garment_color: 'garment_colour',
+  nudity: 'nudity', undressed: 'nudity', nude: 'nudity',
   face_mismatch: 'character_identity', hair_change: 'character_identity',
   skin_tone: 'character_identity', age_shift: 'character_identity',
   clothing_inconsistent: 'clothing', color_change: 'clothing',
