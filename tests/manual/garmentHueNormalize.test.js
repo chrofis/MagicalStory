@@ -104,6 +104,33 @@ function rect(buf, x0, y0, x1, y1, rgb) {
     angDist(bandCl[0].hueRad * DEG, hueOf(RED)) < angDist(bandCl[0].hueRad * DEG, hueOf(HAIR)),
     `got ${(bandCl[0].hueRad * DEG).toFixed(1)}deg, garment ${hueOf(RED).toFixed(1)}deg, hair ${hueOf(HAIR).toFixed(1)}deg`);
 
+  // ── TEST 5 ───────────────────────────────────────────────────────────────
+  // Step 1b consumes the entity channel and needs a body box per flagged page.
+  // On a fresh generation `imagesWithData[].bboxDetection` is unset — the
+  // detection for those exact bytes lives on the evaluation produced by the
+  // other half of Step 1. Reading only the image skipped 10/10 flagged fixes on
+  // job_1786277779744_vorw1f7ve ("no detected figure") while the stored
+  // detections held every figure. Source-level guard: the block must consult
+  // `evaluations`, and must invalidate the detection it actually used once the
+  // bytes change. (CRLF-normalized: core.autocrlf=true checks this repo out
+  // with \r\n, so \n needles would never match.)
+  console.log('\nTEST 5 — Step 1b resolves the figure box from the evaluation, not just the image');
+  const fs = require('fs');
+  const src = fs.readFileSync(require.resolve('../../server/lib/repairPipeline.js'), 'utf8')
+    .replace(/\r\n/g, '\n');
+  const from = src.indexOf('if (MODEL_DEFAULTS.garmentColourFix) {');
+  const to = src.indexOf('[GARMENT-COLOUR] Step 1b failed');
+  check('the Step 1b block is locatable', from > 0 && to > from, `from=${from} to=${to}`);
+  const step1b = src.slice(from, to);
+  check('it looks the figure up through a page-level detection resolver',
+    /detectionForPage\s*\(\s*pageNumber\s*\)\s*\?\.figures/.test(step1b));
+  check('that resolver reads the evaluation for the page',
+    /const detectionForPage[\s\S]*?evaluations\.find\(e => e\.pageNumber === pageNumber\)/.test(step1b));
+  check('it does NOT take the figure box off the image alone',
+    !/const fig = \(img\.bboxDetection\?\.figures/.test(step1b));
+  check('a recolour invalidates the fingerprint on the detection it used',
+    /const stale = detectionForPage\(pageNumber\);[\s\S]{0,80}stale\.sourceImageFp = null/.test(step1b));
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

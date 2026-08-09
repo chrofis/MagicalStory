@@ -555,13 +555,31 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
       }
 
+      // WHERE THE DETECTION LIVES (2026-08-09): `imagesWithData` entries only
+      // carry `bboxDetection` when the caller happened to attach one; on a fresh
+      // generation they do not. The detection for these exact bytes was produced
+      // moments ago by the `evaluateImageBatch` half of this same Step 1 — it
+      // sits on the evaluation, and `evalMap` is not built until after the
+      // regen loop below. Reading `img.bboxDetection` alone therefore skipped
+      // EVERY page: job_1786277779744_vorw1f7ve logged 10/10 "no detected
+      // figure" while the stored detections held the figures all along.
+      // Alignment is structural, not hopeful: `buildEvalInputs(imagesWithData)`
+      // evaluated the very `entry.imageData` we are about to recolour.
+      const detectionForPage = (pageNumber) => {
+        const ev = evaluations.find(e => e.pageNumber === pageNumber);
+        return ev?.bboxDetection
+          || imagesWithData.find(i => i.pageNumber === pageNumber)?.bboxDetection
+          || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.bboxDetection
+          || null;
+      };
+
       for (const { charName, pageNumber, kind, m } of work.values()) {
         // Outcome is recorded on the entry itself, whatever happens.
         const audit = { garmentKind: kind, at: new Date().toISOString() };
         m.fixOutcome = audit;
         const img = imagesWithData.find(i => i.pageNumber === pageNumber);
         if (!img?.imageData) { audit.skipped = 'page has no image'; skipped++; continue; }
-        const fig = (img.bboxDetection?.figures || [])
+        const fig = (detectionForPage(pageNumber)?.figures || [])
           .find(f => (f?.name || '').toLowerCase() === charName.toLowerCase());
         if (!fig?.bodyBox) {
           audit.skipped = 'no detected figure on the page';
@@ -622,6 +640,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           img.imageData = res.imageData;
           fixedPages++;
           // Bytes changed → a detection stamped against the old bytes is stale.
+          // Invalidate EVERY copy, not just the one on the image: the detection
+          // we read now normally comes off the evaluation, and that is the copy
+          // downstream forwards as `sharedBboxDetection`.
+          const stale = detectionForPage(pageNumber);
+          if (stale) stale.sourceImageFp = null;
           if (img.bboxDetection) img.bboxDetection.sourceImageFp = null;
         } else {
           log.info(`🎨 [GARMENT-COLOUR] ${charName} p${pageNumber} ${kind}: no-op (${res.report?.reason || 'unknown'})`);
