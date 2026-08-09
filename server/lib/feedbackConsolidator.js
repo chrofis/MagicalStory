@@ -354,6 +354,11 @@ async function consolidateFeedback({
         .map(i => ({
           description: String(i.description || i.problem || i.issue || '').trim(),
           severity: String(i.severity || 'MODERATE').toUpperCase(),
+          // The consolidated list IS the scoring source, so dropping `type` here
+          // meant every scored deduction was uncategorised (measured: 73/73 with
+          // no type, 1201 points) and routed to `other`/regen — the category work
+          // on the four evaluator prompts never reached the score.
+          type: i.type || i.category || null,
           sources: Array.isArray(i.sources) ? i.sources.filter(s => typeof s === 'string') : [],
         }));
     }

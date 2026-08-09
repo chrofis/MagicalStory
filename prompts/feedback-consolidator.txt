@@ -63,6 +63,9 @@ Fill `spec_conflicts[]` before writing any fixes. This is the one exception to r
 10. Also return `final_score_reason`: a one-sentence explanation of what drove the score (which 1-2 issues hurt most, or "no significant issues" if 100).
 
 11. Also return `deduped_issues[]`: the full deduplicated issue list, NOT capped at 3. The pipeline computes the page score from this list, one deduction per entry by severity — it is the scoring source, not just display. One entry per unique physical problem regardless of how many evaluators flagged it, and regardless of how differently they worded it. Group by CAUSE, not by wording: one repaint fixes one entry. A single atmosphere or lighting treatment described from several angles is ONE entry, not one per phrase; several figures sharing one staging fault (all turned the same wrong way) is ONE entry naming them together; a setting described as wrong in one entry is not also charged as wrong lighting, wrong palette, and wrong props. Each entry has:
+   - `type`: the category, from this closed list. Carry it over from the findings you merged — when they disagree, pick the one that names the DEFECT rather than its symptom (a figure wearing the wrong garment is `clothing`, not `character_identity`). This value routes the repair, so an unlisted value is discarded as unroutable and the defect is reported but never fixed:
+     `image_coherence` · `character_identity` · `duplicate_character` · `missing_character` · `clothing` · `hair` · `nudity` · `anatomy` · `figure_completeness` · `camera_facing` · `action_interaction` · `object_presence` · `missing_element` · `object_count` · `scale` · `setting` · `style_consistency` · `rendered_text` · `character_marking` · `anachronism` · `garment_colour` · `naturalness`
+     ONE type per entry. Never invent a value and never join two with an underscore, comma or slash.
    - `description`: short, plain English. Reuse the evaluator wording when accurate; tighten when not.
    - `severity`: `CATASTROPHIC` | `CRITICAL` | `MAJOR` | `MODERATE` | `MINOR`. Set it by consensus, not by the loudest evaluator: when two or more evaluators flagged the same defect, keep the highest severity among them; when only ONE flagged it, cap it at MODERATE. Evaluators do not share a severity vocabulary — one of them has no MINOR level at all — so a single high tag is one opinion, not agreement. Use only this vocabulary; anything else is dropped by the parser.
    - `sources`: array of evaluator names that flagged this problem (subset of `["quality","semantic","compliance","entity","final_checks"]`). At least one entry. When dedupe merged 3 raw flags into one, all 3 source names appear here.
@@ -141,10 +144,10 @@ Final: `"Open the eyes wide."`
   "final_score": 78,
   "final_score_reason": "One MAJOR pose issue (head facing camera instead of stone) drives the score down; everything else is cosmetic and tolerable.",
   "deduped_issues": [
-    {"description": "Boy's head facing camera instead of the stone in his hands", "severity": "MAJOR", "sources": ["quality", "semantic"]},
-    {"description": "CharacterB's face turned toward camera instead of toward the boy", "severity": "MAJOR", "sources": ["quality"]},
-    {"description": "Stone lacks the prompt's blue-golden glow", "severity": "MODERATE", "sources": ["semantic"]},
-    {"description": "Hair colour slightly lighter than reference", "severity": "MINOR", "sources": ["entity"]}
+    {"type": "camera_facing", "description": "Boy's head facing camera instead of the stone in his hands", "severity": "MAJOR", "sources": ["quality", "semantic"]},
+    {"type": "camera_facing", "description": "CharacterB's face turned toward camera instead of toward the boy", "severity": "MAJOR", "sources": ["quality"]},
+    {"type": "object_presence", "description": "Stone lacks the prompt's blue-golden glow", "severity": "MODERATE", "sources": ["semantic"]},
+    {"type": "hair", "description": "Hair colour slightly lighter than reference", "severity": "MINOR", "sources": ["entity"]}
   ]
 }
 ```

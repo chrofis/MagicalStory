@@ -117,6 +117,7 @@ const TYPE_TO_BUCKET = {
   // cross-page consistency findings route like everything else.
   garment_colour: 'garment_colour', garment_color: 'garment_colour',
   nudity: 'nudity', undressed: 'nudity', nude: 'nudity',
+  implausible_placement: 'action_interaction', placement: 'action_interaction',
   face_mismatch: 'character_identity', hair_change: 'character_identity',
   skin_tone: 'character_identity', age_shift: 'character_identity',
   clothing_inconsistent: 'clothing', color_change: 'clothing',
