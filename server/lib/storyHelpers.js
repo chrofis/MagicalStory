@@ -3885,8 +3885,12 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
           return `- ${char.name}: ${usedCategories.join(', ')}`;
         }
       }
-      // Fallback to standard if character not in requirements
-      return `- ${char.name}: standard`;
+      // No entry (or no used category) for this character in clothingRequirements.
+      // Settled rule (decisions.md 2026-08-07): never default a clothing category —
+      // resolve canonically or refuse. Defaulting to 'standard' here dressed
+      // characters in stale outfits from unrelated stories with zero log trace.
+      try { require('../utils/logger').log.warn(`⚠️ [AVATARS-PROMPT] ${char.name} missing from clothingRequirements — refusing to default to 'standard' (unresolved)`); } catch { /* logger optional */ }
+      return `- ${char.name}: UNRESOLVED — no clothing requirement recorded for this character; do not invent an outfit, reuse this character's outfit exactly as described elsewhere in this brief's CHARACTER DETAILS`;
     }
 
     // Legacy behavior: show all available avatars

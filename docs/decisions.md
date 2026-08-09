@@ -7255,3 +7255,29 @@ Defaults to 10 for standard/winter/summer, which have no costume to read as.
 `applyPoseHeadGate`), `server/lib/styledAvatars.js`,
 `prompts/sheet-row-bodies-eval.txt`
 **Status:**    ✅ active
+
+## 2026-08-09 — Review-audit corrections: clothing-ordering leak IS fixed; L/R positions in scene-expansion are the sanctioned bbox exception
+
+**Context:** A scene-creation code review found (a) the earlier entry (~line 6060) still
+recording the unified writer's clothing-requirements-after-draft ordering leak as
+unfixed, although `prompts/story-unified.txt` (~446-497) already emits
+`---CLOTHING REQUIREMENTS---` before `---STORY DRAFT---` with a comment saying the
+move was deliberate; and (b) `prompts/scene-expansion.txt` (~71,118) /
+`scene-expansion-all.txt` (~89,136) instructing left/right/foreground position
+phrasing for `characters[].position`, which reads like a violation of the settled
+relational-positions rule.
+
+**Decision:** (a) The ordering leak is FIXED — do not re-derive or re-fix it.
+(b) The L/R phrasing in the scene-expansion `characters[].position` field is the
+DELIBERATE exception to the relational-positions rule: that field is consumed
+structurally (bbox detection / layout), not as prose. Do not "fix" it into
+relational language — that breaks the detector. Relational language applies to
+prose/metadata shown to image models, per the original verdict.
+
+**Also fixed in the same audit:** `buildAvailableAvatarsForPrompt`
+(storyHelpers.js ~3888) silently defaulted characters missing from
+clothingRequirements to `standard` — the one site the 2026-08-07 no-default
+sweep missed; now logs and marks UNRESOLVED instead.
+
+**Touched:** `server/lib/storyHelpers.js`, this file.
+**Status:** ✅ active

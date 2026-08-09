@@ -208,7 +208,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
     "check2_objectPlacement": "Tower: VERTICAL, top-left background. CONSISTENT",
     "check3_actionCompatibility": "CharacterA pointing at distant tower = arm extended. VALID",
     "check4_characterPositioning": "CharacterA: bottom-right, facing left. CharacterB: bottom-left, facing right. YES",
-    "check5_cameraView": "Three-quarter front = expressions OK. YES",
+    "check5_cameraView": "Facing camera = expressions OK. YES",
     "check6_differentiation": "CharacterA: pointing. CharacterB: walking. UNIQUE. YES",
     "check7_physics": "N/A - no ropes or heavy objects",
     "check8_weather": "OUTDOOR. Light snow directly on scene. YES",
