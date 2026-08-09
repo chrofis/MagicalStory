@@ -9066,28 +9066,29 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
   log.info(`✅ [UNIFIED PIPELINE] Step 3: ${finalUpgradedCount} pages upgraded total`);
 
-  // Step 3b: rescue-eval unscored originals on pages where every scored
-  // version is poor. The pre-scale-repair original is stored with
-  // score:null (eval only runs on the promoted image), and selectBestVersion
-  // skips null scores — so a damaged repair could never lose to the image it
-  // replaced (job_1781289599516 p9: original with Gessler locked out, the
-  // Gessler-less scale-repair shipped at score 30). Evaluate the unscored
-  // original with the same eval the repairs got, then re-pick.
+  // Step 3b: EVERY VERSION GETS A SCORE (owner, 2026-08-09).
+  //
+  // One image, one score, highest wins. A version with no score cannot take
+  // part in that, and until now some could not: the pre-scale-repair original
+  // is stored with score:null because the eval only ran on the promoted image.
+  // pickBestVersionIndex skipped nulls, so a repair beat the image it replaced
+  // by walkover rather than on merit.
+  //
+  // This used to run only when the best score was already below 60 — a
+  // "rescue". That conditional was the bug's hiding place: above the threshold
+  // the unscored original stayed unscored and silently unbeatable. There is no
+  // threshold now. If an image is a candidate, it is scored; if it is not
+  // scored, it is not a candidate.
   try {
-    // Single-sourced: same threshold the repair rounds use (REPAIR_DEFAULTS
-    // .scoreThreshold, default 60) — was a hardcoded 60 here.
-    const RESCUE_THRESHOLD = REPAIR_DEFAULTS?.scoreThreshold ?? 60;
     const { computeFinalScore: rescueScoreOf, applyScore: rescueApplyScore } = require('./scoring');
     const rescueEntries = [];
     for (const [pageNumber, versions] of pageVersions) {
-      const bestScore = rescueScoreOf(finalBestPerPage.get(pageNumber));
-      if (bestScore != null && bestScore >= RESCUE_THRESHOLD) continue;
       const unscored = versions.find(v => v.imageData && rescueScoreOf(v) == null);
       if (!unscored) continue;
       rescueEntries.push({ pageNumber, imageData: unscored.imageData, version: unscored });
     }
     if (rescueEntries.length > 0) {
-      log.info(`🛟 [UNIFIED PIPELINE] Step 3b: best score < ${RESCUE_THRESHOLD} on ${rescueEntries.length} page(s) with an unscored original — evaluating originals: ${rescueEntries.map(r => r.pageNumber).join(', ')}`);
+      log.info(`📊 [UNIFIED PIPELINE] Step 3b: scoring ${rescueEntries.length} unscored version(s) so every candidate has a score: page(s) ${rescueEntries.map(r => r.pageNumber).join(', ')}`);
       const rescueEvals = await evaluateImageBatch(buildEvalInputs(rescueEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle });
       for (const ev of rescueEvals) {
         const entry = rescueEntries.find(r => r.pageNumber === ev.pageNumber);
