@@ -7856,3 +7856,39 @@ unverified_absence, mirrors) all RAISE scores, and this change lowers thresholds
 the same direction. Re-measure before tuning further, or the pipeline will under-repair.
 
 **Touched:** `server/config/models.js`, `server/lib/repairLogic.js`.
+
+## 2026-08-09 — Salvage floor: never regenerate a page that still has something worth keeping
+
+**Extends** the same-day threshold wiring. Owner: *"lower the gate to the value you suggest."*
+
+**The evidence.** On `job_1786287569165_7f75jspcz` all 13 regenerations have a known outcome, and
+they split cleanly by the score the page started from:
+
+| starting finalScore | iterate improved it | iterate made it WORSE |
+|---|---|---|
+| ≥ 13 | 1 | **6** |
+| < 0 | **4** | 2 |
+
+Iterate pays off only when the page is already beyond saving. Above that line there is something to
+lose — and regenerating discards the whole image, so composition, likeness and background that
+nobody complained about go with it.
+
+**Decision:** `REPAIR_DEFAULTS.iterateSalvageFloor = 0`. A page whose finalScore is at or above the
+floor is never sent to `iterate` by the two NUMERIC gates; it gets char-fix or inpaint instead, and
+the skip is logged. **Exempt, deliberately:** a consolidator `spec_conflict` (a broken contract that
+no repaint can satisfy) and any CATASTROPHIC finding (the page cannot be published). Both verified
+to still iterate at finalScore 80 and 90.
+
+**Measured on the same story:** iterate 11 → 4, inpaint 3 → 10. Of the seven pages that moved out of
+iterate — p2, p3, p5, p6, p7, p13 and p12 — **six were regressions avoided and one was an
+improvement lost.**
+
+**Input is finalScore, not `visual`, on purpose.** `visual` is clamped at 0, so eight of these
+fourteen pages read exactly 0 whether they earned 105 points of deductions or 300; the signal is
+destroyed before the gate sees it. finalScore is un-clamped and reaches −180 here.
+
+**Caveat, repeated from the threshold entry:** today's eval ceilings RAISE scores while these gate
+changes LOWER the bar. Three corrections now point the same way. Re-measure on a fresh story before
+tuning any of them again — the risk has flipped from over-repairing to under-repairing.
+
+**Touched:** `server/config/models.js`, `server/lib/repairLogic.js`.

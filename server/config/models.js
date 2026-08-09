@@ -621,6 +621,12 @@ const REPAIR_DEFAULTS = {
   // sources DISAGREED (config said 20, code did 50). Resolved toward the
   // documented intent — 20 — which also cuts full regenerations: measured on a
   // 14-page story, 13 pages were regenerated and 8 came back worse.
+  // SALVAGE FLOOR (2026-08-09): a page at or above this finalScore is never sent
+  // for a full regenerate by the two NUMERIC gates — it still gets char-fix or
+  // inpaint. Regenerating discards an image that already has something worth
+  // keeping, and measured it came back worse 6 times out of 7 above this line.
+  // A spec conflict and a CATASTROPHIC finding still iterate regardless.
+  iterateSalvageFloor: 0,
   semanticThresholdForIterate: 30, // Below this semantic score → iterate (scene fundamentally wrong)
   qualityThresholdForIterate: 20,  // Below this quality score → iterate immediately
   inpaintMaxPasses: 1,             // Inpaint attempts per page per round

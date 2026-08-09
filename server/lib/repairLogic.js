@@ -227,11 +227,41 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // WORSE than the original, with pick-best then discarding the work.
   const iterateVisualFloor = REPAIR_DEFAULTS.qualityThresholdForIterate ?? 20;
   const iterateSemanticFloor = REPAIR_DEFAULTS.semanticThresholdForIterate ?? 30;
-  if (visualScore < iterateVisualFloor) {
-    return { method: 'iterate', reason: `image visually broken (visual=${visualScore} < ${iterateVisualFloor})` };
+
+  // SALVAGE FLOOR. Regenerating is a GAMBLE: the whole image is discarded for a
+  // fresh roll, so nothing that was already right carries over. Measured on
+  // job_1786287569165 (13 regenerations, outcome known per page):
+  //
+  //   starting finalScore >= 13  ->  1 improved, 6 WORSE
+  //   starting finalScore <  0   ->  4 improved, 2 worse
+  //
+  // Iterate pays off only when the page is already beyond saving. Above the
+  // floor there is something to lose, and local repair (char-fix / inpaint)
+  // keeps the composition, likeness and background nobody complained about.
+  // Applying the floor to the same story spares p3/p5/p6/p13 — and iterate made
+  // ALL FOUR worse. Net: 6 of 8 regressions avoided for 1 of 5 improvements lost.
+  //
+  // The two NUMERIC gates only. A spec conflict (above) is a broken contract and
+  // a CATASTROPHIC finding (below) means the page cannot be published — neither
+  // is a gamble worth skipping, and no repaint fixes either.
+  //
+  // finalScore is deliberately the input rather than `visual`: visual is CLAMPED
+  // at 0, so a page with 105 points of deductions and one with 300 both read 0,
+  // and the gate cannot tell them apart. finalScore is un-clamped.
+  const ITERATE_SALVAGE_FLOOR = REPAIR_DEFAULTS.iterateSalvageFloor ?? 0;
+  const pageFinalScore = typeof evaluator.finalScore === 'number'
+    ? evaluator.finalScore
+    : computeFinalScore(evaluator);
+  const worthSalvaging = typeof pageFinalScore === 'number' && pageFinalScore >= ITERATE_SALVAGE_FLOOR;
+
+  if (visualScore < iterateVisualFloor && !worthSalvaging) {
+    return { method: 'iterate', reason: `image visually broken (visual=${visualScore} < ${iterateVisualFloor}, finalScore=${pageFinalScore})` };
   }
-  if (semanticScore < iterateSemanticFloor) {
-    return { method: 'iterate', reason: `wrong scene (semantic=${semanticScore} < ${iterateSemanticFloor})` };
+  if (semanticScore < iterateSemanticFloor && !worthSalvaging) {
+    return { method: 'iterate', reason: `wrong scene (semantic=${semanticScore} < ${iterateSemanticFloor}, finalScore=${pageFinalScore})` };
+  }
+  if ((visualScore < iterateVisualFloor || semanticScore < iterateSemanticFloor) && worthSalvaging) {
+    log.info(`🛟 [REPAIR-DECIDE] page ${pageNumber}: numeric gate tripped (visual=${visualScore}, semantic=${semanticScore}) but finalScore=${pageFinalScore} >= ${ITERATE_SALVAGE_FLOOR} — repairing locally instead of regenerating`);
   }
   // Severity-based catastrophic gate: a CATASTROPHIC finding (large wrong
   // text, unrecognisable figure) is beyond what inpaint can recover even when
