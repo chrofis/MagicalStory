@@ -14,6 +14,12 @@ Max named characters per scene: {MAX_CHARACTERS_PER_SCENE}
 
 {CHARACTER_DETAILS}
 
+# PAGE BEATS
+
+One line per page — the story beat each brief must depict.
+
+{PAGE_BEATS}
+
 # ALL SCENE BRIEFS
 
 {ALL_SCENES}
@@ -36,7 +42,7 @@ its rightful owner, or state the outfit the fault says is missing — and change
 3. Continuity — does anything contradict an earlier page: a character's clothing, an object that was left behind, a time of day that moves backwards, a location that changes shape?
 3b. Clothing completeness — every character in a brief must be described wearing a top, a bottom and footwear. Name any page whose prose dresses a character in headwear alone, or in fewer than those three, or that names a clothing category key (`standard`, `costumed`) instead of the garments.
 4. Single moment — name any brief that describes more than one moment in time, a montage, or an action with no visible subject.
-5. Cast — name any scene with more than {MAX_CHARACTERS_PER_SCENE} named characters, or a character present in the beat but absent from the brief.
+5. Cast — name any scene with more than {MAX_CHARACTERS_PER_SCENE} named characters, or a character present in the page's beat (PAGE BEATS above) but absent from the brief. If PAGE BEATS reads (no beat data), skip the beat comparison.
 6. Character fields — every character needs depth and a drawable expression naming brows, eyes or mouth. Name any that is missing one, or that uses a bare mood word.
 6b. Scene intent — every page needs a `sceneIntent`. Name any that is missing, that covers more than one moment, or that names a character absent from `characters[]`.
 7. Drawability — name any instruction an illustrator could not execute: a character facing one way while looking at someone behind them, an impossible viewpoint, a described detail too small to read at page size.

@@ -6015,10 +6015,19 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     return null;
   }
   const all = scenes.map(s => ['## Page ' + s.pageNumber, s.brief].join(String.fromCharCode(10))).join(String.fromCharCode(10, 10));
+  // Per-page beat lines so check 5 (character in the beat but absent from the
+  // brief) has beats to compare against — without them the check was dead
+  // (ALL_SCENES + STORY_BRIEF never carried per-page beats). One line per page,
+  // truncated; "(no beat data)" tells the reviewer to skip the comparison
+  // instead of hallucinating one (non-beats callers pass no beats).
+  const beatLines = (Array.isArray(options.beats) ? options.beats : [])
+    .filter(b => b && b.pageNumber != null && String(b.beat || '').trim())
+    .map(b => `Page ${b.pageNumber}: ${String(b.beat).replace(/\s+/g, ' ').trim().slice(0, 200)}`);
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: scenes.length,
     ALL_SCENES: all,
+    PAGE_BEATS: beatLines.length ? beatLines.join('\n') : '(no beat data)',
     // Mechanical clothing faults (server/lib/clothingCheck.js) — free to
     // compute, and the review is the ONE place they get fixed (owner decision
     // 2026-08-08). Empty string when nothing was found, so fillTemplate drops

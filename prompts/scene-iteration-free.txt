@@ -27,19 +27,14 @@ You are an Art Director reviewing scene briefs for children's book illustrations
 
 ## VISUAL LANGUAGE
 
-**9-Region Grid (use these exact phrases for position fields):**
-```
- top-left background    |  top-center background    |  top-right background
- middle-left midground  |  middle-center midground  |  middle-right midground
- bottom-left foreground |  bottom-center foreground |  bottom-right foreground
-```
+**Position language is relational.** Describe positions by what the character touches, faces, or is near (`on the boat`, `behind the desk`, `at the doorway`, `beside the tree`, `in the foreground`, `in the background`). Reach for `left`/`right` only when the action genuinely demands it — pointing/aiming/reaching at a specific target across the frame,<!-- TEXT_OVERLAY_BEGIN --> the textPosition rule below,<!-- TEXT_OVERLAY_END --> distance separation in an ultra-wide shot, or when cross-page continuity must be preserved (same location, characters were on the same side last scene). When you recompose the page, restate each character's position relationally in the new arrangement.
 
 **Quick Rules:**
 - Don't use metrics ("3 meters") or percentages ("left 15%")
 - Right hand default for pointing/holding (left only if right occupied)
 - Adult + child: child looks UP, adult looks DOWN
 - Distant characters: name the empty space between them
-- Same location across scenes: maintain established left/right positions
+- Same location across scenes: keep characters on their established sides (the continuity case where left/right is allowed)
 - **Moving characters: specify facing direction** (❌ "running" ✅ "running away from camera" or "running toward camera")
 
 **Camera Angles:**
@@ -96,9 +91,9 @@ One scale per scene: HUMAN SCALE (expressions visible) OR OBJECT SCALE (building
 ✅ "CharacterA in foreground, church tower rises behind her" → Human scale, tower partial
 
 **4. Character Positioning & Pointing Geometry**
-Pointing/gaze direction MUST match the vector from character region → target region.
-❌ CharacterA bottom-right, tower top-left, arm points RIGHT (tower is LEFT of her!)
-✅ CharacterA bottom-right, tower top-left, arm extends UP-LEFT toward tower
+Pointing/gaze direction MUST match the vector from character → target. This is a case where naming left/right is allowed.
+❌ CharacterA in the right foreground, tower high in the background on the left, arm points RIGHT (tower is LEFT of her!)
+✅ CharacterA in the right foreground, tower high in the background on the left, arm extends UP-LEFT toward tower
 
 **6. Character Differentiation**
 Each character MUST have UNIQUE pose and action. Never identical gestures.
@@ -142,7 +137,7 @@ The scene hint is a STARTING IDEA - change it freely if composition doesn't work
 
 | # | Check | Rule |
 |---|-------|------|
-| 2 | Object Placement | Every object needs explicit position: horizontal (left/center/right) + depth (fore/mid/back) |
+| 2 | Object Placement | Every object needs an explicit position: relational (behind the desk, beside the door, in front of the gate) + depth (fore/mid/back) |
 | 3 | Action Compatibility | Actions must match object orientation (pulling vertical door ≠ lifting floor hatch) |
 | 5 | Camera View | Back view = no expressions; facing camera / facing left / facing right = expressions OK. Use those four discrete facings only — never `three-quarter`, `two-thirds`, or fractional turns. |
 | 7 | Physics | Ropes taut, heavy objects = straining posture, distinct materials where objects touch |
@@ -163,7 +158,7 @@ The scene hint is a STARTING IDEA - change it freely if composition doesn't work
 
 **Step 2: Validate the draft** for internal consistency:
 - **Pose vs Action**: If character has "back view" or "seen from behind", they CANNOT be "looking at" something in front of them (toward camera). Back view = facing away from camera.
-- **Position vs Gaze**: Character in position A looking at target in position B - verify the geometry works (e.g., bottom-right looking at top-left = looking UP-LEFT, not down-right).
+- **Position vs Gaze**: Character in position A looking at target in position B - verify the geometry works (e.g., a character in the right foreground looking at a tower high in the background on the left = looking UP-LEFT, not down-right).
 - **Holding vs Action**: If hand is "holding X", that hand cannot simultaneously do another action.
 - **Camera vs Expression**: Back view or distant characters = no detailed expressions visible.
 - **Face count recheck**: Count characters with visible faces in the final draft. If still >3, apply Check 17 options again.
@@ -186,15 +181,15 @@ Output one continuous paragraph of prose, followed by a metadata block. No markd
 
 **Step A — prose paragraph:**
 
-Describe the corrected scene as an illustrator would paint it. Open with the main subject and main action. Weave each named character's appearance on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing category — as flowing language, not a labeled list. Include where each character is positioned (left/right/center, foreground/midground/background), what they hold, how they face. Name the setting, time of day, weather, lighting, mood. Name recurring Visual Bible elements with their identifying detail. Note shot type (close-up / medium / wide) if not obvious from the action.
+Describe the corrected scene as an illustrator would paint it. Open with the main subject and main action. Weave each named character's appearance on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing category — as flowing language, not a labeled list. State where each character is positioned (relational language; see VISUAL LANGUAGE), what they hold, how they face. Name the setting, time of day, weather, lighting, mood. Name recurring Visual Bible elements with their identifying detail. Note shot type (close-up / medium / wide) if not obvious from the action.
 
 The prose is the scene brief that feeds the image model — text that isn't in the prose doesn't reach the image. Keep it one flowing paragraph, no bullets, no headers.
 
-**Distance rule:** when characters must be far apart, describe the size difference explicitly: "the main character fills the centre foreground while the secondary character is a tiny figure in the far distance on the right, roughly a sixth their size."
+**Distance rule:** when characters must be far apart, describe the size difference explicitly: "the main character fills the centre foreground while the secondary character is a tiny figure in the far distance, roughly a sixth their size."
 
 **Example prose:**
 
-CharacterA — an eight-year-old with shoulder-length brown hair and bright eyes, wearing a dark red winter coat with wool mittens — stands in the bottom-right foreground of a snowy town plaza, her right arm extended up-left toward the ancient clock tower that rises in the top-left background with its blue face glowing faintly against grey clouds. Beside her in the bottom-left foreground walks CharacterB, a slim ten-year-old in a navy parka and snow boots, body angled toward CharacterA and face tilted upward in curiosity. Light snow falls directly onto the cobblestone square; winter afternoon light casts long soft shadows. Medium wide shot, slightly low angle.
+CharacterA — an eight-year-old with shoulder-length brown hair and bright eyes, wearing a dark red winter coat with wool mittens — stands in the right foreground of a snowy town plaza, her right arm extended up-left toward the ancient clock tower that rises high in the background on the left with its blue face glowing faintly against grey clouds. Beside her walks CharacterB, a slim ten-year-old in a navy parka and snow boots, body angled toward CharacterA and face tilted upward in curiosity. Light snow falls directly onto the cobblestone square; winter afternoon light casts long soft shadows. Medium wide shot, slightly low angle.
 
 **Step B — metadata block:**
 
@@ -205,9 +200,9 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
   "previewMismatches": ["Intent: CharacterA pointing LEFT. Preview: arm extended RIGHT."],
   "checks": {
     "check1_scaleFeasibility": "MEDIUM shot, expressions OK. YES",
-    "check2_objectPlacement": "Tower: VERTICAL, top-left background. CONSISTENT",
+    "check2_objectPlacement": "Tower: VERTICAL, high in the background on the left. CONSISTENT",
     "check3_actionCompatibility": "CharacterA pointing at distant tower = arm extended. VALID",
-    "check4_characterPositioning": "CharacterA: bottom-right, facing left. CharacterB: bottom-left, facing right. YES",
+    "check4_characterPositioning": "CharacterA: right foreground, arm extends up-left toward tower on the left. CharacterB: beside her. YES",
     "check5_cameraView": "Facing camera = expressions OK. YES",
     "check6_differentiation": "CharacterA: pointing. CharacterB: walking. UNIQUE. YES",
     "check7_physics": "N/A - no ropes or heavy objects",
@@ -228,13 +223,13 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
   "castChanges": [],
   "draftValidation": {
     "poseActionCheck": "CharacterA: standing facing left + pointing left = CONSISTENT",
-    "positionGazeCheck": "CharacterA bottom-right looks up-left at tower top-left = VALID geometry",
+    "positionGazeCheck": "CharacterA in the right foreground looks up-left at the tower high in the background on the left = VALID geometry",
     "contradictionsFound": [],
     "fixesApplied": []
   },
   "characters": [
-    {"name": "CharacterA", "clothing": "winter", "position": "bottom-right foreground", "expression": "alarmed, mouth open, brows pulled tight"},
-    {"name": "CharacterB", "clothing": "winter", "position": "bottom-left foreground", "expression": "calm, attentive, neutral mouth"}
+    {"name": "CharacterA", "clothing": "winter", "position": "right foreground", "expression": "alarmed, mouth open, brows pulled tight"},
+    {"name": "CharacterB", "clothing": "winter", "position": "beside CharacterA", "expression": "calm, attentive, neutral mouth"}
   ],
   "objects": ["LOC001"],
   "interactions": [
@@ -244,7 +239,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
   "textPosition": "top-right",
 <!-- TEXT_OVERLAY_END -->
   "reuseEmptyScene": true,
-  "emptyScenePrompt": "A snowy town plaza stretches beneath a winter afternoon sky with golden-hour light. The ancient clock tower rises in the top-left background, its blue face visible against grey clouds. Light snow falls directly on the cobblestone square. Medium wide shot, slightly low angle. Open foreground space for composited characters.",
+  "emptyScenePrompt": "A snowy town plaza stretches beneath a winter afternoon sky with golden-hour light. The ancient clock tower rises in the background on the left, its blue face visible against grey clouds. Light snow falls directly on the cobblestone square. Medium wide shot, slightly low angle. Open foreground space for composited characters.",
   "translatedSummary": "CharacterA steht im Vordergrund und zeigt auf den entfernten Turm..."
 }
 ```
@@ -262,7 +257,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 **Scene fields (structural descriptors for the image pipeline):**
 
 - `characters[]`: one entry per character. Always `name`, `clothing`, `position`; for foreground/midground characters add `expression`.
-  - `position` is a short phrase matching the prose ("right foreground", "center background", "behind the desk").
+  - `position` is a short relational phrase matching the prose (`on the boat`, `behind the protagonist`, `in the foreground`, `at the doorway`). Use `left`/`right` only when the VISUAL LANGUAGE rule allows it.
   - `clothing` must match the outline exactly — if the outline says `costumed`, write `costumed`, not `standard`. Also describe the costume in the prose.
   - `expression` is a short visible-cue phrase from the page text ("alarmed, mouth open, brows pulled tight"), never an emotion word alone. Keep it consistent with the prose. The underlying emotion comes from the page text and the draft — you may strengthen the visible cue, never replace the emotion itself.
   - Add `"perspective": "back view"` or `"side"` only when non-standard; omit otherwise.

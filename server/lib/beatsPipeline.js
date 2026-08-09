@@ -539,7 +539,8 @@ SCENE: ${x.scene || ''}`.trim(),
   const srPrompt = buildSceneReviewPrompt(
     inputData,
     expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-    { clothingFindings }
+    // Locked beats feed the review's check 5 (character in beat vs brief).
+    { clothingFindings, beats }
   );
   if (!srPrompt) {
     log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
