@@ -792,8 +792,12 @@ function resolveStyleLineForSheet(artStyle) {
 // "Image 2 is the style reference" line only when styleTransferGenerate passes one.
 function buildStyleTransferPrompt(artStyle, { hasAnchor = false } = {}) {
   const styleLine = resolveStyleLineForSheet(artStyle);
+  // "match its technique" alone made the model paste Image 2's PEOPLE into the
+  // sheet (the anchor family's woman/boy/old-man leaked into every character —
+  // staging job_1786277779744, 2026-08-09). Say explicitly that Image 2 is a
+  // technique sample of unrelated people whose figures must not be copied.
   const anchorLine = hasAnchor
-    ? ' Image 2 is a reference of that art style; match its technique.'
+    ? ' Image 2 is only a style sample showing unrelated people — copy its technique, palette and texture, not its figures, faces, clothing, or composition. None of Image 2\'s people appear in the output; the only character is the one in Image 1.'
     : '';
   return `Change the art style of Image 1 — a 2×4 character reference sheet (8 cells) — to: ${styleLine}
 ${anchorLine} Render all 8 cells uniformly in this style — no cell left photographic.
