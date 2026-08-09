@@ -284,10 +284,17 @@ export function StoryStatsTab() {
     });
 
   const scorePts = useMemo(() => pointsFor(r => num(r.mean_page_score)), [filtered]);
-  const costPts = useMemo(() => pointsFor(r => num(r.cost_usd)), [filtered]);
+  // Per-page normalization so a 4-page smoke story is comparable to a 20-page one.
+  // pages NULL/0 → null point (charts skip NULLs).
+  const costPts = useMemo(() => pointsFor(r => {
+    const v = num(r.cost_usd);
+    const pages = num(r.pages);
+    return v === null || !pages ? null : v / pages;
+  }), [filtered]);
   const durationPts = useMemo(() => pointsFor(r => {
     const v = num(r.duration_s);
-    return v === null ? null : v / 60;
+    const pages = num(r.pages);
+    return v === null || !pages ? null : v / 60 / pages;
   }), [filtered]);
   const repairRatePts = useMemo(() => pointsFor(r => {
     const v = num(r.repair_rate);
@@ -448,8 +455,8 @@ export function StoryStatsTab() {
           {/* Headline trends */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <TrendChart title="Mean page score" points={scorePts} color="#4f46e5" fmt={fmtScore} yDomain={scoreDomain} />
-            <TrendChart title="Cost per story" points={costPts} color="#059669" fmt={fmtCost} />
-            <TrendChart title="Duration" points={durationPts} color="#0284c7" fmt={fmtMin} />
+            <TrendChart title="Cost / page (USD)" points={costPts} color="#059669" fmt={fmtCost} />
+            <TrendChart title="Min / page" points={durationPts} color="#0284c7" fmt={fmtMin} />
             <TrendChart title="Repair rate" points={repairRatePts} color="#d97706" fmt={fmtPct} />
           </div>
 
@@ -497,13 +504,17 @@ export function StoryStatsTab() {
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Created</th>
                     <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Score</th>
                     <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Pages &lt; 80</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Pages</th>
                     <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Cost</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Cost / page</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {worst.map(r => {
                     const score = num(r.mean_page_score);
                     const cost = num(r.cost_usd);
+                    const pages = num(r.pages);
+                    const costPerPage = cost !== null && pages ? cost / pages : null;
                     return (
                       <tr key={r.story_id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm font-mono text-gray-800">
@@ -523,7 +534,9 @@ export function StoryStatsTab() {
                           {score !== null ? score.toFixed(1) : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-right text-gray-600">{r.pages_below_80 ?? '—'}</td>
+                        <td className="px-4 py-3 text-sm text-right text-gray-600">{pages ?? '—'}</td>
                         <td className="px-4 py-3 text-sm text-right text-gray-600">{cost !== null ? fmtCost(cost) : '—'}</td>
+                        <td className="px-4 py-3 text-sm text-right text-gray-600">{costPerPage !== null ? fmtCost(costPerPage) : '—'}</td>
                       </tr>
                     );
                   })}
