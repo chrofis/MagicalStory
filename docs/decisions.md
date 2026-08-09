@@ -7501,3 +7501,19 @@ is this" is the kind of split this codebase keeps paying for.
 `buildStyleWardrobeBlock`, both wardrobe builders),
 `prompts/story-bible-from-beats.txt`, `prompts/clothing-review.txt`
 **Status:**    ✅ active
+
+---
+
+## 2026-08-09 — Art styles: ONE description per style; steampunk realism clauses removed
+
+**Context.** A steampunk-commissioned book (job_1786287569165) rendered photorealistic, not steampunk. Root cause was the descriptor itself, and the per-backend variants that had drifted.
+
+**Two decisions (owner-directed):**
+1. **Removed per-backend `{default, grok, gemini}` variants — ONE description per style.** They were an attempt to fix model-specific behaviour via prompt wording; owner verdict: "we cannot change the prompt to fix model issues," and three copies only let them drift. `steampunk`, `watercolor`, `realistic` collapsed to single strings (the rest already were). `resolveArtStyle(id, backend)` keeps `backend` in its signature for caller compatibility but no longer selects a variant.
+2. **Rewrote the steampunk descriptor.** The grok/gemini variants literally ordered realism — "Realistic human faces… grounded realism… smooth gradients… smooth texture rendering" — so Grok produced photoreal people the "graphic novel" label was meant to prevent (same class of bug as the watercolor "graphite guide lines" clause). New single descriptor: "bold ink linework and graphic ink-and-wash shading, clearly hand-drawn, never photographic (no skin pores, no camera-real skin), warm sepia-and-amber palette; faces drawn with clean ink lines and graphic shading, stylised not photoreal." Extends the 2026-08-06 "setting-named styles render photoreal → name the medium" fix, which had been applied to cyber but NOT steampunk.
+
+**Verified:** a $0.02 Grok render with the new steampunk descriptor (boy/woman/old-man in a Victorian attic) came back a genuine steampunk graphic novel — inked linework, sepia, brass gears on the machinery, illustrated (not photoreal) faces. Text checks: no realism clause, has ink-linework + sepia; watercolor/realistic resolve to strings.
+
+**Not verified:** a full fresh story run (descriptor change only affects NEW generations; existing books keep their baked images).
+
+**Touched:** `server/lib/storyHelpers.js` (ART_STYLES steampunk/watercolor/realistic → single strings; resolveArtStyle simplified).
