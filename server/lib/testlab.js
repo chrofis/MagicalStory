@@ -1234,8 +1234,14 @@ async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
 
   let imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
   const t0 = Date.now();
-  // Reuse the STORED detection, exactly as production Step 1b does (it reads
-  // img.bboxDetection). Re-detecting here tests a different input: a fresh pass
+  // Reuse the STORED detection. Production Step 1b resolves the same box from
+  // the evaluation it just produced for those bytes, falling back to the image
+  // and then to the stored scene (repairPipeline.js → detectionForPage). Note
+  // what that means for this stage: it feeds off stored data, which is ALWAYS
+  // populated, so it kept working through the whole period Step 1b was skipping
+  // 100% of its fixes for want of a box. A green run here is not evidence the
+  // production path is wired — only a real generation is.
+  // Re-detecting here tests a different input: a fresh pass
   // can fail to attribute figures and return UNKNOWN, which then skips every
   // figure and makes the Lab disagree with the pipeline for reasons that have
   // nothing to do with the colour repair. Fall back to a fresh detect only when
