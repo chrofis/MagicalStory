@@ -17,6 +17,12 @@ Each lesson should include:
 
 <!-- Add lessons below as they occur -->
 
+### 2026-08-09: "Redo X in the lab" after a detection discussion ≠ regenerate the image
+
+- **Context**: User was analyzing why the Charakterkonsistenz report flipped Emma/Hans on P8. They said "Redo page 8 in the lab... image must be able to differentiate between an old man and a child". I ran the `image` stage (paid regeneration, $0.02 + evals) — they wanted the `bbox` stage: re-run detection/identification on the STORED image.
+- **Mistake**: Picked the expensive, destructive-ish interpretation of an ambiguous "redo" when the whole conversation context was about identification, not rendering. The word "redo" anchored me to the redo/regen machinery.
+- **Rule**: When a request is ambiguous between a read-only re-analysis and a paid regeneration, default to the read-only interpretation — or ask. The conversation's subject (detection/eval vs image quality) decides what "redo/rerun" means, not the verb alone.
+
 ### 2026-08-08: Verify every assumption twice (or ask) BEFORE coding — never build on an unverified conclusion
 
 - **Context**: Story `job_1786193650012_7baiaeftb` — Daniel & Sarah shipped 3 bad realistic avatars in a row. User asked (at the very start) to reproduce the generation prompt in the lab. Instead I ran a long analysis and repeatedly jumped to conclusions: first mis-stated the timing ("pose didn't run" — it did, proven by `poseCells` in the stored verdict + gen timestamp 12:59 > deploy 12:39), then glanced at a montage and concluded "the avatars are actually fine, it's a split artifact" — which contradicted BOTH the user AND my own pose data (`head_max 0.001` = headless). I then started proposing/writing code fixes on top of that wrong conclusion.

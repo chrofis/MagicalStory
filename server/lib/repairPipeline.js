@@ -401,10 +401,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       pageText: orig.text,
       sceneHint: orig.scene?.outlineExtract || orig.scene?.sceneHint || null,
       evaluationType: orig.evaluationType,
-      // Only forward the pre-detected bbox when the image is the original.
-      // For round-result images, leave null so enrichWithBoundingBoxes runs
-      // fresh detection against the actual rendered pixels.
-      sharedBboxDetection: isOriginalImage ? (orig.sharedBboxDetection || null) : null,
+      // Detection reuse, in pairing order: the entry's OWN detection first —
+      // a round-result entry carries the detection made on its accepted new
+      // bytes (iterate's internal re-detect, or the round pre-detect step) —
+      // else the pre-pipeline shared detection when the bytes are still the
+      // original's. Never the original's detection for repaired bytes.
+      // bboxPairsWith re-verifies the fingerprint before any reuse.
+      sharedBboxDetection: entry.bboxDetection
+        || (isOriginalImage ? (orig.sharedBboxDetection || null) : null),
     };
   });
 
@@ -453,10 +457,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           return acc;
         }, {}),
         retryHistory: [],
-        // Shared bbox detection from pre-step (avoids redundant Gemini call) —
-        // only when the bytes are the ones it was computed on; otherwise the
-        // entity check re-detects on the current pixels.
-        sharedBboxDetection: isOriginalImage ? (orig.sharedBboxDetection || null) : null,
+        // Shared detection, in pairing order: the entry's OWN detection (made
+        // on its exact bytes — round results carry one), else the pre-step
+        // detection when the bytes are still the original's. The entity check
+        // MUST consume the same detection the eval consumes: two independent
+        // SoM passes on the same repaired image can disagree, and the entity
+        // grid then crops figures under different names than the persisted
+        // detection (observed: Emma↔Hans swapped in the consistency report
+        // while the stored detection named them correctly).
+        sharedBboxDetection: entry.bboxDetection
+          || (isOriginalImage ? (orig.sharedBboxDetection || null) : null),
       };
     }),
     // Pass scene descriptions so entity-collect can determine per-page characters.
@@ -1766,17 +1776,54 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // Build entity check inputs (snapshot of latest images: repaired pages
       // from this round + best-so-far for pages not touched this round).
       const roundImageMap = new Map(roundSuccess.map(r => [r.pageNumber, r]));
+
+      // ONE detection per repaired image, consumed by BOTH the entity check
+      // and the eval below — the round-loop mirror of Phase 5b-pre. iterate
+      // results already carry the detection made on their accepted redraw;
+      // inpaint / char-fix results don't, so detect those here. Without this,
+      // eval and entity each ran their own detection on the same new bytes,
+      // and the two SoM identity calls could disagree.
+      const roundDetectLimit = pLimit(8);
+      await Promise.all(roundSuccess.filter(r => !r.bboxDetection).map(r => roundDetectLimit(async () => {
+        const orig = rawImages.find(i => i.pageNumber === r.pageNumber);
+        try {
+          const sceneChars = r.sceneCharacters || orig?.sceneCharacters || [];
+          const meta = r.sceneMetadata || orig?.sceneMetadata || {};
+          r.bboxDetection = await images().detectAllBoundingBoxes(r.imageData, {
+            expectedCharacters: sceneChars.map(c => ({
+              name: c.name || c,
+              description: typeof c === 'object' ? (c.description || '') : '',
+            })),
+            expectedObjects: Array.isArray(meta.objects) ? meta.objects.filter(o => typeof o === 'string') : [],
+            sceneContext: r.description || orig?.sceneDescription || null,
+            pageContext: `PAGE ${r.pageNumber} r${round}`,
+            artStyle,
+          });
+        } catch (err) {
+          log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round} P${r.pageNumber}: shared detection failed (${err.message}) — eval and entity will detect independently`);
+          r.bboxDetection = null;
+        }
+      })));
+
       const latestImages = rawImages.filter(img => img.imageData).map(img => {
         if (roundImageMap.has(img.pageNumber)) {
           const re = roundImageMap.get(img.pageNumber);
           // Carry the round entry's own scene contract (iterate rewrites it)
           // so the entity check judges the repaired image against what was
-          // actually asked of it.
-          return { imageData: re.imageData, pageNumber: img.pageNumber, description: re.description || null };
+          // actually asked of it — and its detection, so the entity crops use
+          // the same figure names every other consumer of this version sees.
+          return { imageData: re.imageData, pageNumber: img.pageNumber, description: re.description || null, bboxDetection: re.bboxDetection || null };
         }
         const versions = pageVersions.get(img.pageNumber) || [];
         const best = selectBestVersion(versions);
-        return { imageData: best?.imageData || img.imageData, pageNumber: img.pageNumber };
+        // A best version from an earlier round carries the detection stamped
+        // when it was scored; forward it so the entity check never re-detects
+        // (and possibly re-names) bytes that already have a paired detection.
+        return {
+          imageData: best?.imageData || img.imageData,
+          pageNumber: img.pageNumber,
+          bboxDetection: best?.bboxDetection || best?.evaluation?.bboxDetection || null,
+        };
       });
       const freshEntityCheckData = buildEntityCheckData(latestImages);
       const roundEvalInputs = buildEvalInputs(roundSuccess);
