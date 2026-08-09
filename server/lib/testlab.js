@@ -4665,6 +4665,15 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
   for (const model of models) {
     const t = Date.now();
     const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_scene_review_replay' });
+    // AN EMPTY RESPONSE IS A FAILED CALL, NOT A CLEAN REVIEW. Run #450 came back
+    // after 50s with input_tokens:0, output_tokens:0 on an 80k-char prompt — the
+    // provider returned nothing — and this stage happily reported "0 faults
+    // fixed, 0 pages rewritten", which is indistinguishable from a reviewer that
+    // read everything and declined. Never publish that as a measurement.
+    const outTok = res.usage?.output_tokens ?? null;
+    if (!String(res.text || '').trim() || outTok === 0) {
+      throw new Error(`reviewer ${model} returned an empty response (${outTok} output tokens, ${Math.round((res.usage?.elapsed_ms || 0) / 1000)}s) — provider failure, not a review`);
+    }
     const parsed = parseRefinedText(res.text || '', scenes.map(x => x.pageNumber), 'SCENES');
     const byPage = new Map((parsed.pages || []).map(x => [x.pageNumber, x.text]));
 

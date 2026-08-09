@@ -485,6 +485,16 @@ SCENE: ${x.scene || ''}`.trim(),
       // (job_1786235099497_ytd5c7eek: 3 faults handed over, 0 briefs rewritten).
       const briefsIn = expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
       const srRes = await textModels.callTextModelStreaming(srPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_scene_review' });
+      // "0 briefs rewritten" has meant three different things: a reviewer that
+      // genuinely found nothing, a reviewer TRUNCATED at its token cap (this
+      // story: out=16000, exactly the old budget), and a provider returning
+      // nothing at all (Lab #450: in=0 out=0 after 50s on an 80k prompt). Only
+      // the first is success — separate them or the log reports failure as a pass.
+      const srOutTok = srRes.usage?.output_tokens ?? null;
+      if (!String(srRes.text || '').trim() || srOutTok === 0) {
+        log.error(`❌ [BEATS] Scene review returned an EMPTY response (${srOutTok} output tokens) — briefs ship unreviewed`);
+        gl.warn('beats_scene_review_empty', `Scene review returned nothing (${srOutTok} output tokens) — provider failure, briefs shipped unreviewed`);
+      }
       const parsed = parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES');
       sceneReviewAnalysis = parsed.analysis || '';
       const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
