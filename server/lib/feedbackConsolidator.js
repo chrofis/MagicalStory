@@ -181,6 +181,36 @@ function flattenEntityIssues(entityReport) {
  * @param {Array} [args.characters] - story characters [{ name, physicalDescription }]
  * @returns {Promise<{plan: object|null, usage: object|null, error: string|null}>}
  */
+/**
+ * Severity from the evaluators' own votes, computed here rather than asked for.
+ *
+ * The consolidator RECORDS reliably and DERIVES unreliably. Measured: `type`,
+ * `sources` and `severities` all come back at 100%, but three attempts to make
+ * it choose the severity from those votes failed — the 2026-08-06 consensus cap
+ * (ignored by qwen-plus, qwen3-max AND claude-sonnet alike), and an explicit
+ * median rule with worked examples, which scored WORSE (81% -> 75% agreement)
+ * and contradicted its own single-vote records: it wrote {"quality":"MINOR"}
+ * and then set MAJOR. It reverts to "take the highest" every time.
+ *
+ * This is not the pipeline inventing a policy or overwriting an evaluator — it
+ * combines votes the evaluators themselves reported, which is what a
+ * consolidator is for. The model's own pick is kept as `severityChosen` so the
+ * gap stays auditable.
+ *
+ * Rule: one vote → that vote. Two → the lower. Three or more → the middle,
+ * lower-middle on an even count.
+ */
+const SEVERITY_RANK = ['MINOR', 'MODERATE', 'MAJOR', 'CRITICAL', 'CATASTROPHIC'];
+function medianSeverity(severities) {
+  if (!severities || typeof severities !== 'object') return null;
+  const votes = Object.values(severities)
+    .map(v => String(v || '').toUpperCase())
+    .filter(v => SEVERITY_RANK.includes(v))
+    .sort((a, b) => SEVERITY_RANK.indexOf(a) - SEVERITY_RANK.indexOf(b));
+  if (!votes.length) return null;
+  return votes[Math.floor((votes.length - 1) / 2)];
+}
+
 async function consolidateFeedback({
   sceneDescription,
   evaluation = {},
@@ -353,7 +383,12 @@ async function consolidateFeedback({
         .filter(i => i && typeof i === 'object' && (i.description || i.problem || i.issue))
         .map(i => ({
           description: String(i.description || i.problem || i.issue || '').trim(),
-          severity: String(i.severity || 'MODERATE').toUpperCase(),
+          severity: (() => {
+            const chosen = String(i.severity || 'MODERATE').toUpperCase();
+            return medianSeverity(i.severities) || chosen;
+          })(),
+          // What the model picked, kept for audit against the computed value.
+          severityChosen: String(i.severity || 'MODERATE').toUpperCase(),
           // The consolidated list IS the scoring source, so dropping `type` here
           // meant every scored deduction was uncategorised (measured: 73/73 with
           // no type, 1201 points) and routed to `other`/regen — the category work
@@ -604,6 +639,7 @@ async function consolidateEvaluation({
 
 module.exports = {
   consolidateFeedback,
+  medianSeverity, // exported for testing
   consolidateEvaluation,
   buildFeedbackInput, // exported for testing
   flattenEntityIssues, // exported for testing
