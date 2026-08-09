@@ -220,7 +220,7 @@ Tests check: homepage images, character photos, API health, auth, no JS errors, 
 | Image Generation | Gemini (Google) + Grok (xAI) | Page illustrations, covers, avatars |
 | Character Repair | Grok Imagine (xAI) | Cutout + blended character repair ($0.02/img) |
 | Cheap Images | Runware | Dev mode, inpainting (SDXL $0.002/img) |
-| Avatar Faces | Grok Imagine (xAI) | Clothing avatars (winter/standard/summer) via edit endpoint with face-photo reference. Switched from Gemini after IMAGE_OTHER safety refusals on adult-face photos left avatars stuck pending. Costumed/styled avatars: Pass 1 (identity sheet) = Grok; Pass 2 (style transfer) = Gemini by default with an automatic one-shot Grok retry on failure/refusal, and a hard never-zero-avatar backstop (see decisions.md avatar-guarantee entry). |
+| Avatar Faces | Grok Imagine (xAI) | Clothing avatars (winter/standard/summer) via edit endpoint with face-photo reference. Switched from Gemini after IMAGE_OTHER safety refusals on adult-face photos left avatars stuck pending. Costumed/styled avatars: Pass 1 (identity sheet) = Grok; Pass 2 (style transfer) = **Grok** (default `avatarStyleTransferBackend`, env `AVATAR_STYLE_BACKEND`). Gemini is NOT used by default: it refuses realistic adult faces (IMAGE_OTHER — confirmed even reframed as a fictional character) and is not stronger, so the 2026-07-19 "Gemini stylises better" verdict is reversed. Grok stylises acceptably and handles adults; a one-shot alternate-backend retry + never-zero-avatar backstop remain (see decisions.md avatar-guarantee entry). |
 | Face Detection | Python service (MediaPipe/Haar) | Cascade face detection for illustrations |
 
 ### Story Generation Pipeline (Unified Mode)

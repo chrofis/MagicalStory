@@ -75,14 +75,17 @@ async function aspectPresetFor(imageData) {
   } catch { return '16:9'; }
 }
 
-async function styleTransferGenerate(prompt, pass1ImageData, backendOverride = null) {
+async function styleTransferGenerate(prompt, pass1ImageData, backendOverride = null, styleAnchor = null) {
   const backend = backendOverride || MODEL_DEFAULTS.avatarStyleTransferBackend;
-  const aspectRatio = await aspectPresetFor(pass1ImageData);
+  const aspectRatio = await aspectPresetFor(pass1ImageData); // aspect follows the sheet, not the anchor
+  // Image 1 = the sheet to repaint; Image 2 (when present) = the style anchor
+  // referenced by buildStyleTransferPrompt ("Image 2 is a reference of that art style").
+  const refs = styleAnchor ? [pass1ImageData, styleAnchor] : [pass1ImageData];
   if (backend === 'gemini') {
-    const r = await editWithGeminiImage(prompt, [pass1ImageData], { aspectRatio, model: MODEL_DEFAULTS.avatarStyleTransferModel });
+    const r = await editWithGeminiImage(prompt, refs, { aspectRatio, model: MODEL_DEFAULTS.avatarStyleTransferModel });
     return { ...r, provider: 'gemini_image' };
   }
-  const r = await editWithGrok(prompt, [pass1ImageData], { aspectRatio, model: GROK_MODELS.STANDARD });
+  const r = await editWithGrok(prompt, refs, { aspectRatio, model: GROK_MODELS.STANDARD });
   return { ...r, provider: 'grok' };
 }
 
@@ -780,19 +783,39 @@ function resolveStyleLineForSheet(artStyle) {
   throw new Error(`[CHARACTER 2×4] Unknown artStyle "${artStyle}" — add it to ART_STYLES in server/lib/storyHelpers.js`);
 }
 
-function buildStyleTransferPrompt(artStyle) {
+// Clean, non-redundant style-transfer prompt (2026-08-09): task first, the style
+// descriptor mentioned ONCE, an optional Image-2 style anchor, and a single
+// content-preservation line. Replaces the old version that inlined the whole
+// descriptor 3× with a long preserve-list — A/B showed the wording doesn't move
+// Grok's stylisation ceiling, but the tidy prompt holds the style without the
+// realism backfire the over-constrained variant caused. `hasAnchor` adds the
+// "Image 2 is the style reference" line only when styleTransferGenerate passes one.
+function buildStyleTransferPrompt(artStyle, { hasAnchor = false } = {}) {
   const styleLine = resolveStyleLineForSheet(artStyle);
-  return `Re-render this 2×4 character reference sheet in ${styleLine}.
+  const anchorLine = hasAnchor
+    ? ' Image 2 is a reference of that art style; match its technique.'
+    : '';
+  return `Change the art style of Image 1 — a 2×4 character reference sheet (8 cells) — to: ${styleLine}
+${anchorLine} Render all 8 cells uniformly in this style — no cell left photographic.
 
-Apply this exact same art style to ALL 8 cells equally. Every one of the 8 cells shows the SAME character rendered in the identical ${styleLine} treatment — the four head cells (top row) and the four full-body cells (bottom row) must match in rendering style, shading, skin finish, and degree of stylisation. No cell may stay photographic or semi-realistic while the others are stylised; the bottom-row full-body figures must look rendered in exactly the same style as the top-row heads.
+Keep the content of Image 1 unchanged; only the art style changes.`;
+}
 
-Preserve EVERYTHING except the visual style:
-- Same 4-column × 2-row grid layout, same thin black dividers, same pure white background. Add no scenery, environment, weather, streets, buildings, or background of any kind — the background stays pure white and empty in all 8 cells. Apply the style only to the figure.
-- Top row cells 1-4: head and neck only, in the same order (front, three-quarter, profile, back). Same hair, same beard if any, same skin tone, same facial features — the same person.
-- Bottom row cells 5-8: full body head to feet in the same poses (front, three-quarter, profile, back), both feet and shoes fully visible exactly as in the source sheet — never crop at the thigh, knee, or ankle. Same costume — every accessory, every garment colour, every cut identical. Keep body proportions age-appropriate and matched to the head: an adult is roughly 7 to 8 heads tall, a teenager about 7 heads, a young child about 5 to 6 heads, a toddler about 4 heads. Do NOT shrink an adult into child-like proportions and do NOT put an oversized head on a small body — the full-body figures must read as the same age as the head cells.
-- No text, no numbers, no labels.
-
-Only the surface treatment changes from photographic to ${styleLine}.`;
+// Optional per-art-style STYLE ANCHOR asset (server/assets/style-anchor-<style>.jpg|png)
+// — a strong, character-free reference painting of that medium (e.g. a watercolour
+// family group). Passed as Image 2 in styleTransferGenerate; the prompt then names
+// it. Returns a data URI, or null if no asset exists (graceful → no anchor).
+function loadStyleAnchor(artStyle) {
+  if (!artStyle) return null;
+  const id = String(artStyle).toLowerCase().replace(/[^a-z0-9]+/g, '');
+  for (const ext of ['jpg', 'png']) {
+    const file = path.join(ASSETS_DIR, `style-anchor-${id}.${ext}`);
+    if (fs.existsSync(file)) {
+      const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
+      return `data:${mime};base64,${fs.readFileSync(file).toString('base64')}`;
+    }
+  }
+  return null;
 }
 
 /**
@@ -1200,9 +1223,13 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
  * collected fields so the dev panel can render both passes uniformly.
  */
 async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, usageTracker, promptOverride = null, backendOverride = null }) {
+  // Optional per-style anchor image (Image 2). The prompt references it only
+  // when present; styleTransferGenerate passes it as the 2nd reference.
+  const styleAnchor = loadStyleAnchor(artStyle);
   // promptOverride: Test Lab A/B — full replacement for the style-transfer
   // prompt (buildStyleTransferPrompt output), this call only.
-  const prompt = promptOverride || buildStyleTransferPrompt(artStyle);
+  const prompt = promptOverride || buildStyleTransferPrompt(artStyle, { hasAnchor: !!styleAnchor });
+  if (styleAnchor) log.info(`[CHARACTER 2×4] ${characterName} Pass 2 using style anchor (style-anchor-${artStyle})`);
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
   const attempts = [];
   let best = null;
@@ -1234,7 +1261,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     // same refusal). See docs/decisions.md "Styled-avatar MUST guarantee".
     let result;
     try {
-      result = await styleTransferGenerate(prompt, pass1ImageData, backendOverride);
+      result = await styleTransferGenerate(prompt, pass1ImageData, backendOverride, styleAnchor);
     } catch (err) {
       log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt}/${totalAttempts} (${MODEL_DEFAULTS.avatarStyleTransferBackend}) threw: ${err.message}${attempt < totalAttempts ? ' — retrying' : ''}`);
       attempts.push({ attempt, stage: 'gen-error', score: 0, reason: err.message });
@@ -1321,7 +1348,7 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     const altBackend = primaryBackend === 'gemini' ? 'grok' : 'gemini';
     log.warn(`[CHARACTER 2×4] ${characterName} Pass 2: all ${totalAttempts} ${primaryBackend} attempts failed — retrying once via alternate backend (${altBackend})`);
     try {
-      const result = await styleTransferGenerate(prompt, pass1ImageData, altBackend);
+      const result = await styleTransferGenerate(prompt, pass1ImageData, altBackend, styleAnchor);
       trackUsage(result);
       best = { result, attempt: totalAttempts + 1, score: 5, verdict: null };
       attempts.push({ attempt: totalAttempts + 1, stage: 'alt-backend', score: 5, backend: altBackend, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
