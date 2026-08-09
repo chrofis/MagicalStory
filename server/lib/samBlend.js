@@ -679,6 +679,7 @@ async function samUnionBlend({ originalCropBuf, candidateCropBuf: candidateCropB
             candidateCropBuf = registered;
             newMask = newMask2;
             registration = { dx: Math.round(dxF), dy: Math.round(dyF), scale: best.sc, bgErrBefore: +base.toFixed(1), bgErrAfter: +best.err.toFixed(1) };
+            require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.()).count('repair_registration');
             log.info(`[TESTLAB] registered on BACKGROUND: dx=${registration.dx} dy=${registration.dy} scale=${registration.scale} — bg mismatch ${registration.bgErrBefore} → ${registration.bgErrAfter} grey levels`);
             await addStep(`registered on background (dx ${registration.dx}, dy ${registration.dy}, scale ${registration.scale}) — bg err ${registration.bgErrBefore}→${registration.bgErrAfter}`, `data:image/png;base64,${registered.toString('base64')}`);
           }

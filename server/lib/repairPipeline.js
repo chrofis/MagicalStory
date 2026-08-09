@@ -1294,6 +1294,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     })();
 
     log.info(`👤 [UNIFIED PIPELINE] Round ${roundNum} char-fix ${charName} on p${pageNumber}: ${useFaceOnly ? 'FACE' : 'BODY'} bbox=[${repairBbox.map(v => Math.round(v * 100) + '%').join(', ')}] (${decision.severity})`);
+    require('./runMetrics').forJob(storyData?.id || jobId).count('consistency_regen');
     let repairResult;
     try {
       repairResult = await images().repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, charName, {
@@ -1522,6 +1523,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       log.info(`✅ [UNIFIED PIPELINE] Round ${round}: No bad pages, stopping repair loop`);
       break;
     }
+    require('./runMetrics').forJob(storyData?.id || jobId).add('redo_trigger', badPages.length);
 
     // Progress: spread rounds across 35-60% range
     const progressBase = 35 + Math.floor((round - 1) / maxRegenAttempts * 25);
@@ -2200,6 +2202,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         for (const target of plan.targets) {
           const pageLabel = target.page < 0 ? `cover ${target.page}` : `page ${target.page}`;
           try {
+            require('./runMetrics').forJob(storyData?.id || jobId).count('style_repair_run');
             const rep = await repairPageStyle(target.image, target.targetRefImage, {
               model: styleRepairModel,
               artStyle,

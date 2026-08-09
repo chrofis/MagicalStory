@@ -7068,6 +7068,11 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     throw new Error('XAI_API_KEY not configured for Grok repair');
   }
 
+  // Runtime metrics: every char-repair invocation. The styled-avatar cache
+  // scope IS the jobId (== storyId) inside a full-mode pipeline run; undefined
+  // outside one (manual repair endpoints) → forJob() no-ops.
+  require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.()).count('char_repair_run');
+
   let [ymin, xmin, ymax, xmax] = bbox;
 
   // Validate bbox coordinates — NaN or out-of-range values crash Sharp.

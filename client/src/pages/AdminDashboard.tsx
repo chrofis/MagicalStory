@@ -38,12 +38,13 @@ import {
   TrendingUp,
   AlertCircle,
   RotateCcw,
-  Activity
+  Activity,
+  BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { Input } from '@/components/common/Input';
-import { adminTranslations, StatCard, TokenUsageTab } from './admin';
+import { adminTranslations, StatCard, TokenUsageTab, StoryStatsTab } from './admin';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -52,8 +53,8 @@ export default function AdminDashboard() {
   const { language } = useLanguage();
 
   // Read initial tab from URL query parameter
-  const tabFromUrl = searchParams.get('tab') as 'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs' | null;
-  const initialTab = tabFromUrl && ['stats', 'activity', 'users', 'products', 'tokens', 'jobs'].includes(tabFromUrl) ? tabFromUrl : 'stats';
+  const tabFromUrl = searchParams.get('tab') as 'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs' | 'storystats' | null;
+  const initialTab = tabFromUrl && ['stats', 'activity', 'users', 'products', 'tokens', 'jobs', 'storystats'].includes(tabFromUrl) ? tabFromUrl : 'stats';
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [trialStats, setTrialStats] = useState<TrialStats | null>(null);
@@ -66,7 +67,7 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs' | 'storystats'>(initialTab);
 
   // Activity feed state
   const [activityFeed, setActivityFeed] = useState<ActivityFeed | null>(null);
@@ -217,7 +218,7 @@ export default function AdminDashboard() {
   }, [isAuthenticated, user, isImpersonating, activeTab]);
 
   // Update URL when tab changes
-  const handleTabChange = (tab: 'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs') => {
+  const handleTabChange = (tab: 'stats' | 'activity' | 'users' | 'products' | 'tokens' | 'jobs' | 'storystats') => {
     setActiveTab(tab);
     setSearchParams(tab === 'stats' ? {} : { tab });
   };
@@ -715,6 +716,17 @@ export default function AdminDashboard() {
                 {failedJobs.length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => handleTabChange('storystats')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              activeTab === 'storystats'
+                ? 'bg-indigo-500 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <BarChart3 size={18} />
+            Story Stats
           </button>
           <button
             onClick={() => navigate('/admin/test-lab')}
@@ -1435,6 +1447,11 @@ export default function AdminDashboard() {
         {/* Token Usage Tab */}
         {activeTab === 'tokens' && (
           <TokenUsageTab texts={texts} />
+        )}
+
+        {/* Story Stats Tab (story_metrics trends) */}
+        {activeTab === 'storystats' && (
+          <StoryStatsTab />
         )}
 
         {/* Failed Jobs Tab */}

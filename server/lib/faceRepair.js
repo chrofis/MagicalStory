@@ -878,6 +878,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       ]);
       if (origSharpness >= REPAIR_SHARPNESS_MIN_ORIG && repairedSharpness < origSharpness * REPAIR_SHARPNESS_REJECT_RATIO) {
         log.warn(`🚫 [FACE REPAIR] ${descriptor} for ${charName} REJECTED: repaired figure blurred (${repairedSharpness.toFixed(0)} vs ${origSharpness.toFixed(0)})`);
+        require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.()).count('blur_gate_reject');
         return { imageData: null, character: charName, method: legacyMethod, descriptor, rejectedReason: 'repaired_figure_blurred', sharpness: { original: origSharpness, repaired: repairedSharpness }, usage };
       }
     } catch (e) { log.warn(`[FACE REPAIR] sharpness gate failed (${e.message}) — accepting unchecked`); }
@@ -991,7 +992,7 @@ function legacyFlagsToAxes({ useBlended = null, useCutout = null, useFullScene =
   if (useCutout === true) return { regionSource: 'cutout', treatment: 'crosshatch', model, faceOnly: false };
   if (useFullScene === true) return { regionSource: 'box', treatment: 'crosshatch', model, faceOnly: false };
   // Default: body → inpaint (box+crosshatch); face (no faceBbox) → blur+box+face.
-  if (target === 'face') return { regionSource: 'box', treatment: 'blur', model, faceOnly: true };
+  if (target === 'face') { require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.()).count('legacy_blend_fallback'); return { regionSource: 'box', treatment: 'blur', model, faceOnly: true }; }
   // grok_blackout is deprecated (Stage 5): route through the gated crosshatch
   // box path instead of a no-gate verbatim full-scene repaint.
   return { regionSource: 'box', treatment: 'crosshatch', model, faceOnly: false };

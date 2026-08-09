@@ -271,6 +271,7 @@ const storyDraftRoutes = require('./server/routes/storyDraft');
 const storiesRoutes = require('./server/routes/stories');
 const filesRoutes = require('./server/routes/files');
 const { adminRoutes, initAdminRoutes } = require('./server/routes/admin');
+const adminStatsRoutes = require('./server/routes/adminStats');
 const photosRoutes = require('./server/routes/photos');
 const avatarsRoutes = require('./server/routes/avatars');
 const aiProxyRoutes = require('./server/routes/ai-proxy');
@@ -1645,6 +1646,7 @@ app.use('/api/stories', express.json({ limit: '50mb' }), storiesRoutes);
 app.use('/api/stories', express.json({ limit: '50mb' }), regenerationRoutes);  // Image/scene/cover regeneration & repair
 app.use('/api/files', filesRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin', adminStatsRoutes);  // /api/admin/story-metrics (Story Stats tab; /stats is taken by analytics)
 app.use('/api/photos', photosRoutes);
 app.use('/api', express.json({ limit: '50mb' }), avatarsRoutes);  // /api/analyze-photo, /api/avatar-prompt, /api/generate-clothing-avatars
 app.use('/api', aiProxyRoutes);  // /api/claude, /api/gemini
@@ -7613,6 +7615,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     );
     if (completionRes.rowCount === 0) {
       log.warn(`⚠️ [UNIFIED] Job ${jobId} was no longer 'processing' at completion (cancelled/failed by watchdog?) — not marking completed. Story is saved; job status left unchanged.`);
+    } else {
+      // Story stats scorecard (docs/plans/story-stats-page.md) — fire-and-forget,
+      // a metrics failure must never touch the completed story. This is the ONLY
+      // path that marks a story-producing job 'completed'; the text-only early
+      // return (~line 5219) also sets status='completed' but never saves a
+      // stories row, so there is nothing for the collector to read there.
+      // Trial + main + admin-rerun jobs all funnel through processUnifiedStoryJob
+      // into this write.
+      setImmediate(() => {
+        try {
+          const { collectStoryMetrics } = require('./server/lib/storyMetrics');
+          collectStoryMetrics(storyId, { pool: dbPool }).catch(err =>
+            log.warn(`⚠️ [METRICS] collection failed for ${storyId}: ${err.message}`));
+        } catch (err) {
+          log.warn(`⚠️ [METRICS] collector unavailable: ${err.message}`);
+        }
+      });
     }
 
     // Clean up checkpoints immediately - story is saved, no longer needed

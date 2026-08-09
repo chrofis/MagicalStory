@@ -1,4 +1,5 @@
 import { api } from './api';
+import type { StoryMetricsRow } from '@/types/storyMetrics';
 
 export interface DashboardStats {
   totalUsers: number;
@@ -515,5 +516,13 @@ export const adminService = {
 
   async getJobDetails(jobId: string): Promise<{ job: FailedJobDetails }> {
     return api.get<{ job: FailedJobDetails }>(`/api/admin/jobs/${jobId}`);
+  },
+
+  // Story Metrics (Story Stats tab — story_metrics table)
+  async getStoryMetrics(days = 90, environment?: string, pipelineMode?: string): Promise<{ rows: StoryMetricsRow[] }> {
+    const params = new URLSearchParams({ days: String(days) });
+    if (environment) params.set('env', environment);
+    if (pipelineMode) params.set('mode', pipelineMode);
+    return api.get<{ rows: StoryMetricsRow[] }>(`/api/admin/story-metrics?${params.toString()}`);
   },
 };

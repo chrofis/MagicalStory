@@ -274,6 +274,7 @@ async function avatarGarmentLab(avatarUri, opts = {}) {
  * @returns {Promise<{changed, imageData, report, steps}>}
  */
 async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options = {}) {
+  require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.()).count('garment_colour_fix_run');
   const cfg = { ...DEFAULTS, ...(options.opts || {}) };
   const t0 = Date.now();
   const { kind, prompt } = garmentPromptFor(options.garment, cfg);

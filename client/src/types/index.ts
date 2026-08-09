@@ -3,3 +3,4 @@ export * from './character';
 export * from './story';
 export * from './user';
 export * from './api';
+export * from './storyMetrics';

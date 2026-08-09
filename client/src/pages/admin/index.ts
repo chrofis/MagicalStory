@@ -5,3 +5,4 @@
 export { adminTranslations, type AdminTranslations } from './translations';
 export { StatCard } from './StatCard';
 export { TokenUsageTab } from './TokenUsageTab';
+export { StoryStatsTab } from './StoryStatsTab';

@@ -23,6 +23,13 @@ const { getCurrentLogger } = require('./generationLogger');
 
 const getStoryHelpers = () => require('./storyHelpers');
 
+// Job id for runtime metric counters (runMetrics): the styled-avatar cache
+// scope IS the jobId (== storyId) inside a full-mode story pipeline run;
+// undefined outside one (admin tools, Test Lab) → forJob() no-ops. Same lazy
+// require generationLogger._getScope uses (dodges the styledAvatars ⇄ images
+// boot-order cycle). Trial jobs scope as `trial-${userId}` and are not counted.
+const _metricsJobId = () => require('./styledAvatars')._cacheContext?.getStore?.();
+
 /**
  * Short visible-garment phrase from a clothing description, for grounding /
  * SoM identity lines. Handles both shapes clothing strings come in:
@@ -196,7 +203,7 @@ async function _gdinoDetect(imageDataUri, prompts) {
     const j = await res.json();
     if (!j?.success) { log.warn(`⚠️ [GDINO-DETECT] endpoint error: ${j?.error}`); return null; }
     return j;
-  } catch (e) { log.warn(`⚠️ [GDINO-DETECT] detect failed: ${e.message}`); return null; }
+  } catch (e) { log.warn(`⚠️ [GDINO-DETECT] detect failed: ${e.message}`); require('./runMetrics').forJob(_metricsJobId()).count('dino_detect_fail'); return null; }
 }
 
 // MobileSAM box→mask on the full page (box in full-page pixel coords).
@@ -223,7 +230,7 @@ async function _mobilesamMaskFull(imageDataUri, boxPx, W, H) {
     const mask = await _binMaskFromBuffer(pngBuf, W, H);
     if (mask) mask.pngBuf = pngBuf; // kept for the overlay's cutout strip (never persisted)
     return mask;
-  } catch (e) { log.warn(`⚠️ [GDINO-DETECT] mask failed: ${e.message}`); return null; }
+  } catch (e) { log.warn(`⚠️ [GDINO-DETECT] mask failed: ${e.message}`); require('./runMetrics').forJob(_metricsJobId()).count('dino_mask_fail'); return null; }
 }
 
 /**
@@ -268,6 +275,7 @@ async function detectPersonBoxInCrop(cropJpegBuffer, faceBoxInCrop = null, pageL
     return pick.p.box.map(v => Math.round(v));
   } catch (e) {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}round-2 person re-detect failed: ${e.message}`);
+    require('./runMetrics').forJob(_metricsJobId()).count('dino_round2_fail');
     return null;
   }
 }
@@ -355,6 +363,7 @@ async function recoverFaceBox(imageDataUri, bodyBoxNorm, pageLabel = '') {
     return _padDinoFaceBox(pagePxBox, W, H, bodyBoxNorm);
   } catch (e) {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}face recovery failed: ${e.message}`);
+    require('./runMetrics').forJob(_metricsJobId()).count('face_recovery_fail');
     return null;
   }
 }
@@ -776,6 +785,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM identity failed (${e.message}) — layout fallback`);
   }
   if (!nameByDet) {
+    require('./runMetrics').forJob(_metricsJobId()).count('som_identity_fallback');
     const sh = getStoryHelpers();
     const chars = expectedCharacters.map(c => {
       const lcr = c.position ? sh.normalizePositionToLCR(c.position) : null;

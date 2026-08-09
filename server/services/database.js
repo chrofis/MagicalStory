@@ -1753,6 +1753,15 @@ async function saveStoryData(storyId, storyData) {
 async function persistStoryToDatabase(storyId, storyData, { firstSave = false } = {}) {
   const TAG = firstSave ? 'UPSERT' : 'SAVE';
 
+  // Runtime metrics flush (stats framework): merge the in-memory counter bag
+  // into the stored data on every save so counters survive crashes. Never fatal.
+  try {
+    const runMetrics = require('../lib/runMetrics').getSnapshot(storyId);
+    if (Object.keys(runMetrics).length > 0) {
+      storyData.runMetrics = { ...(storyData.runMetrics || {}), ...runMetrics };
+    }
+  } catch { /* metrics must never fail a save */ }
+
   // Clone so we can strip inline image bytes without mutating the caller's
   // object. See cloneForStorage: avoids both the 512MB-string RangeError of a
   // JSON round-trip and the Buffer→Uint8Array blowup of structuredClone.
