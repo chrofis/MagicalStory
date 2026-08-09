@@ -7723,3 +7723,32 @@ replayed against two known-photoreal pages without generating anything.
 **NOT yet verified** — no replay has run. A rule that moved is still a rule that can be skimmed.
 
 **Touched:** `prompts/image-evaluation.txt`.
+
+## 2026-08-09 — Compliance may REPORT an absence but never CHARGE for one (no exception)
+
+**Supersedes** the same-day rule that let compliance charge full severity when the vision inventory
+said `none visible`.
+
+**Owner:** *"compliance should not be allowed to decide this if it is 55% wrong."*
+
+The first pass fixed the SILENCE path (mandatory inventory fields) and capped only inferred
+absences, leaving an explicit `none visible` as grounds for a full-severity finding. Two arguments
+killed that exception:
+
+1. The 55%-wrong measurement was taken on the OLD inventory. Trusting `none visible` means trusting
+   a field added an hour earlier, unmeasured.
+2. **The inventory is already known to be wrong about exactly these items** — it described an eye
+   patch as "black sunglasses". A stage that misreads a patch as sunglasses can write `none visible`
+   for glasses on a small face, and compliance would then charge full severity on a false premise
+   with a clean-looking audit trail.
+
+**Decision:** every absence compliance reports is `unverified_absence` (ceiling MINOR, 2 pts). It may
+never use `clothing`, `character_identity`, `accessory_missing` or `missing_element` for an absence.
+`accessory` remains available for a WRONG VERSION of an item the inventory actually named — that is
+comparing two descriptions, not inferring from a gap.
+
+**Cost of the change is near zero:** quality and semantic both see the page and were measured 0%
+false on missing characters and missing scene elements. A genuine absence is still caught, by an
+evaluator that can actually see it.
+
+**Touched:** `prompts/image-prompt-compliance.txt`.
