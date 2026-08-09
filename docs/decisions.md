@@ -7784,3 +7784,44 @@ The 256px cells + label strips + padding, all packed into one downscaled composi
 Verified: steampunk book → `wrong_medium` reliably (whole-book miss); the watercolour photographic covers (-2/-3) are caught ~2/3 of runs as `major` (up from a blurry near-miss). Residual: a single lenient Gemini draw still misses on ~1/3 of runs (owner accepted single-pass "good enough"; a 3× union vote would close it but costs more calls — deferred).
 
 **Touched:** `server/lib/styleConsistency.js` (buildStyleGrid layout + THUMB 448; ≤9 chunk; red-code prompt; worst-batch wrong_medium).
+
+## 2026-08-09 — STYLE GATE: the medium is a required output field, asked before anything else
+
+**Supersedes** the same-day "fold D-27 into N-01" entry, which was measured and FAILED.
+
+**The failed attempt, for the record.** D-27 (medium check) was moved from defect code 27-of-28 to
+the first rule in the prompt — 78% of the way in, to 8%. Replayed on the two known-photoreal pages of
+`job_1786287569165_7f75jspcz` (Test Lab exp **#488**): **zero style findings on both.** Page 4 came
+back `100/100, 0 defects, verdict PASS` — a photograph in a book commissioned as "steampunk graphic
+novel illustration, clearly hand-drawn, never photographic". Position was not the cause. **A rule can
+be skimmed wherever it sits**, and nothing in the output distinguishes "checked, it's fine" from
+"never read it".
+
+**Decision (owner: "add the gate. Call it style gate, and ask what style the image is drawn in
+first").** `style_gate` is now a REQUIRED field in the evaluator's JSON, answered before the
+never-deduct list:
+
+```json
+"style_gate": { "observed": "ink illustration", "matches_style": true, "reason": null }
+```
+
+`observed` is asked FIRST and independently — name the medium you see, in your own words, before
+looking at what was commissioned. The prompt explicitly forbids reading the ART STYLE first and
+back-filling a matching label. Only then does `matches_style` compare the two. Naming what you see is
+an act of description; it is much harder to skip than a judgement against a spec, and once the model
+has written `observed: photographic` next to a style that says "never photographic", the
+contradiction is in its own output.
+
+**Why a gate and not a better rule:** silence stops being ambiguous because there is no silence — the
+field is always present and always says something. Identical logic to the vision-inventory fix earlier
+today (mandatory `none visible` instead of an omitted line). Same disease, same cure.
+
+**Wiring** mirrors the proven `coherence_gate` (`images.js`): `matches_style: false` emits a
+`style_consistency` MAJOR finding, and the GATE WINS over a mis-severitied STEP-4 finding — the exact
+failure the coherence gate was wired for in August. A MISSING `style_gate` is logged as a warning:
+the field is mandatory, so its absence means the gate was skipped or a stale prompt is live.
+
+**NOT yet verified** — exp #488 must be re-run against the gate. The honest state: one hard negative
+result (the fold failed) and a structural argument, not yet a positive measurement.
+
+**Touched:** `prompts/image-evaluation.txt`, `server/lib/images.js`.

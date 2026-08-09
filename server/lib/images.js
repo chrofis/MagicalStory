@@ -1928,6 +1928,46 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
+      // STYLE GATE (wired 2026-08-09). The medium check spent its life as a
+      // defect code — D-27, 27th of 28 — and fired ZERO times in every story
+      // measured. Moving it to the front of the prompt (folded into N-01)
+      // changed nothing: replayed on two known-photoreal pages of a steampunk
+      // book (exp #488), one came back a clean PASS, 100/100, zero defects.
+      // A rule can be skimmed wherever it sits; a required output FIELD cannot.
+      //
+      // The prompt now asks for the observed medium FIRST, in the model's own
+      // words, before it is allowed to look at what was commissioned — naming
+      // what you see is harder to skip than judging against a spec.
+      const styleGate = parsedJson.style_gate || null;
+      if (styleGate) {
+        const observed = String(styleGate.observed || '').trim();
+        if (styleGate.matches_style === false) {
+          // Gate wins over a mis-severitied STEP 4 finding — same precedence as
+          // the coherence gate, and the same failure it exists to prevent.
+          const already = fixableIssues.some(i => /style_consistency/i.test(String(i.type || '')));
+          if (!already) {
+            const reason = styleGate.reason
+              || `page is rendered as ${observed || 'a different medium'}, not the commissioned art style`;
+            fixableIssues.unshift({
+              description: reason,
+              severity: 'MAJOR',
+              type: 'style_consistency',
+              character: null,
+              fix: 'Regenerate the page in the commissioned art style — match the medium, not just the subject.',
+            });
+            log.warn(`🎨 [EVAL] style gate FAILED (observed "${observed}") → style_consistency MAJOR: ${reason}`);
+          } else {
+            log.warn(`🎨 [EVAL] style gate FAILED (observed "${observed}") — STEP 4 already reported it`);
+          }
+        } else if (observed) {
+          log.debug(`🎨 [EVAL] style gate ok — observed "${observed}"`);
+        }
+      } else {
+        // Absence is itself the signal: the field is mandatory, so a missing
+        // one means the model skipped the gate (or an old prompt is live).
+        log.warn('🎨 [EVAL] style_gate MISSING from the evaluator response — medium was not checked');
+      }
+
       // MULTI-JUDGE JURY (EVAL_JUDGES): run the extra judges (Grok, Qwen) on the
       // SAME parts, then merge ALL judges by PURE MEDIAN per bucket (evalBuckets)
       // and replace fixableIssues with the deduplicated merged set before scoring.
