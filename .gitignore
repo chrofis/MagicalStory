@@ -147,3 +147,6 @@ emails-preview/
 
 # Local creative drafts (not committed)
 drafts/
+
+# ML model weights — never commit (auto-downloaded by ultralytics: yolo*-pose.pt, mobile_sam.pt, FastSAM-*.pt)
+*.pt
