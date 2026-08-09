@@ -1157,7 +1157,7 @@ async function runEntityStage(ctx, { experimentId }) {
 async function renderGarmentColourSummary(perFigure, stepsByFigure, pageNumber) {
   const sharp = require('sharp');
   const { _labToRgb } = require('./imageCompositing');
-  const ROW_H = 168, PAD = 12, THUMB = 140, CHIP = 38, W = 1260, HEAD_H = 46;
+  const ROW_H = 196, PAD = 12, THUMB = 140, CHIP = 38, W = 1420, HEAD_H = 52;
   const rows = perFigure.filter(f => f && f.name);
   if (!rows.length) return null;
   const H = HEAD_H + rows.length * ROW_H + PAD;
@@ -1174,35 +1174,51 @@ async function renderGarmentColourSummary(perFigure, stepsByFigure, pageNumber) 
   let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
     <rect width="${W}" height="${H}" fill="#ffffff"/>
     <text x="${PAD}" y="30" font-family="sans-serif" font-size="20" font-weight="700" fill="#111">Garment colour fix — page ${pageNumber}</text>
-    <text x="${PAD}" y="${HEAD_H - 6}" font-family="sans-serif" font-size="12" fill="#777">before · SAM mask · after</text>`;
+    <text x="${PAD}" y="${HEAD_H - 8}" font-family="sans-serif" font-size="12" fill="#777">page before  ·  SAM mask (magenta = moved, cyan = gated out)  ·  page after  ·  STYLE REFERENCE the target colour was measured from</text>`;
 
   for (let i = 0; i < rows.length; i++) {
     const f = rows[i];
     const y = HEAD_H + i * ROW_H;
     const imgs = stepsByFigure[f.name] || {};
-    const slots = [['before', PAD], ['mask', PAD + THUMB + 8], ['after', PAD + 2 * (THUMB + 8)]];
-    for (const [key, left] of slots) {
-      if (!imgs[key]) continue;
+    // Fourth panel is the avatar sheet. Without it a wrong result is unreadable:
+    // a perfect mask and a wrong target look identical in the numbers.
+    const slots = [
+      ['before', PAD, 'page BEFORE'],
+      ['mask', PAD + THUMB + 8, 'SAM mask'],
+      ['after', PAD + 2 * (THUMB + 8), 'page AFTER'],
+      ['avatar', PAD + 3 * (THUMB + 8) + 14, 'STYLE REFERENCE'],
+    ];
+    for (const [key, left, caption] of slots) {
+      const has = !!imgs[key];
+      svg += `<text x="${left}" y="${y + 16}" font-family="sans-serif" font-size="10" font-weight="700" fill="${key === 'avatar' ? '#8a4b00' : '#888'}">${esc(caption)}</text>`;
+      if (!has) {
+        svg += `<text x="${left}" y="${y + 78}" font-family="sans-serif" font-size="11" fill="#bbb">— none —</text>`;
+        continue;
+      }
       try {
         const buf = Buffer.from(String(imgs[key]).replace(/^data:[^;]+;base64,/, ''), 'base64');
         composites.push({
           input: await sharp(buf).resize(THUMB, THUMB - 22, { fit: 'contain', background: '#fff' }).png().toBuffer(),
-          left, top: y + 16,
+          left, top: y + 22,
         });
       } catch { /* a missing thumbnail must not sink the summary */ }
     }
-    const tx = PAD + 3 * (THUMB + 8) + 10;
+    const tx = PAD + 4 * (THUMB + 8) + 24;
     const chipY = y + 44;
-    const chips = [['page', chip(f.current)], ['avatar', chip(f.target)], ['result', chip(f.applied ? f.target : f.current)]];
+    const chips = [
+      ['as rendered', chip(f.current)],
+      [`target (${f.target?.source || 'avatar'})`, chip(f.target)],
+      ['result', chip(f.applied ? f.target : f.current)],
+    ];
     let chipSvg = '';
     chips.forEach(([label, col], k) => {
-      const cx = tx + k * (CHIP + 46);
+      const cx = tx + k * (CHIP + 76);
       chipSvg += `<rect x="${cx}" y="${chipY}" width="${CHIP}" height="${CHIP}" fill="${col}" stroke="#999" stroke-width="1"/>
-        <text x="${cx}" y="${chipY + CHIP + 13}" font-family="sans-serif" font-size="11" fill="#555">${label}</text>`;
+        <text x="${cx}" y="${chipY + CHIP + 13}" font-family="sans-serif" font-size="10" fill="#555">${esc(label)}</text>`;
     });
     const verdict = f.applied ? `SHIFTED  ΔE ${f.delta?.deltaE ?? '–'}` : 'unchanged';
     const fill = f.applied ? '#0a7d32' : '#777';
-    const nx = tx + 3 * (CHIP + 46) + 12;
+    const nx = tx + 3 * (CHIP + 76) + 12;
     svg += `<line x1="0" y1="${y + 4}" x2="${W}" y2="${y + 4}" stroke="#e5e5e5" stroke-width="1"/>
       <text x="${tx}" y="${y + 28}" font-family="sans-serif" font-size="16" font-weight="700" fill="#111">${esc(f.name)}</text>
       <text x="${tx + 140}" y="${y + 28}" font-family="sans-serif" font-size="14" font-weight="700" fill="${fill}">${esc(verdict)}</text>
@@ -1295,6 +1311,24 @@ async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
       if (/BEFORE/.test(st.label)) slot.before = st.data;
       else if (/MASK/.test(st.label)) slot.mask = st.data;
       else if (/AFTER/.test(st.label)) slot.after = st.data;
+    }
+    // THE STYLE REFERENCE IS EVIDENCE, NOT PLUMBING (owner, 2026-08-09). The
+    // avatar sheet decides the whole result — the fix reads its colour and
+    // paints the page toward it — so a run that hides it cannot be judged. On
+    // job_1786277779744 Hans's sheet had a leaked anchor family pasted in (a
+    // boy, a woman, three old men); the torso band averaged across them to
+    // brown and a correct light-blue shirt was repainted brown. The numbers
+    // alone looked healthy: every gate passed. Emit the sheet full size AND on
+    // the summary row so "is the target believable" is answerable at a glance.
+    try {
+      const av = await toDataUri(avatarUri);
+      if (av) {
+        const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, av, experimentId);
+        steps.push({ label: `${name} STYLE REFERENCE — the avatar sheet the target colour is measured from`, imageType: 'tl_step', versionIndex: v });
+        slot.avatar = av;
+      }
+    } catch (err) {
+      log.warn(`[TESTLAB] ${name}: style reference not attached (${err.message})`);
     }
     stepsByFigure[name] = slot;
     // Chain: each figure repairs on top of the previous one's output, so a
@@ -2745,7 +2779,9 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
         .split(',').map(s => s.trim()).filter(Boolean);
       for (const m of srModels) if (!TEXT_MODELS[m]) throw new Error('Unknown model "' + m + '"');
       const expectedPages = okScenes.map(x => x.pageNumber);
-      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })));
+      // finalBeats feeds the review's check 5 (character in beat vs brief),
+      // same as the production callsite in beatsPipeline.js.
+      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: finalBeats });
       if (srPrompt) {
         const reviewOnce = async (srModel) => {
           const t2 = Date.now();
@@ -4624,7 +4660,7 @@ const STAGE_RUNNERS = {
 async function runSceneReviewReplayStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildSceneReviewPrompt, parseRefinedText, extractSceneMetadata } = require('./storyHelpers');
+  const { buildSceneReviewPrompt, parseRefinedText, extractSceneMetadata, parseBeats } = require('./storyHelpers');
   const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
   const { callTextModelStreaming } = require('./textModels');
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
@@ -4653,11 +4689,18 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
   const before = checkScenes(checkPages, storyData.clothingRequirements, { artifacts });
   const findingsBlock = renderFindingsBlock(before.byPage);
 
+  // Beats for check 5, recovered from the stored outline's ---BEATS--- section
+  // (the locked, post-review beats — see beatsPipeline rawOutline). Unified
+  // stories have no such section; the builder renders "(no beat data)".
+  const beatsSection = (String(storyData.outline || '')
+    .match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
+  const outlineBeats = parseBeats(beatsSection).pages;
+
   const orig = PROMPT_TEMPLATES.sceneReview;
   if (promptOverride) PROMPT_TEMPLATES.sceneReview = promptOverride;
   let prompt;
   try {
-    prompt = buildSceneReviewPrompt(storyData, scenes, { clothingFindings: findingsBlock });
+    prompt = buildSceneReviewPrompt(storyData, scenes, { clothingFindings: findingsBlock, beats: outlineBeats });
   } finally {
     PROMPT_TEMPLATES.sceneReview = orig;
   }
