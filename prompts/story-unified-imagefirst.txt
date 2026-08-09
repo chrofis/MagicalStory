@@ -486,6 +486,7 @@ exist first.
   - A different dominant colour per character, on their largest garment.
   - Plain colour words only: red, blue, green, yellow, orange, purple, brown, black, white, grey. Not burgundy, maroon, crimson, sage, coral, teal, ivory, taupe, indigo.
   - Different garment types where the story allows; the same garment on two characters is fine when their colours differ. A winter story may dress everyone in coats.
+  - Two characters wearing the same garment differ in its colour, not only on their largest one. Two patterned garments differ in pattern, and stripes count as one pattern.
   - Never distinguish by a print, badge, pin, brooch, embroidery, trim, buckle, laces, feather, earring, watch or buttons, or anything small.
 - **Each costumed character wears at least one garment that names the costume.** Pirate: striped shirt, sash, tricorn, headscarf, long coat, tall boots, leather vest. Knight: mail, tabard, greaves. Wizard: robe, pointed hood, cloak. Cowboy: fringed vest, chaps, wide-brimmed hat, neckerchief.
 - **One state per garment slot.** Never two that exclude each other. Omit a slot the character does not wear.
