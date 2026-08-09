@@ -28,7 +28,7 @@
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { pickBestVersionIndex, applyScore, computeFinalScore } = require('./scoring');
-const { decideRepairMethod } = require('./repairLogic');
+const { decideRepairMethod, findBadPages } = require('./repairLogic');
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const pLimit = require('p-limit');
 const { getFacePhoto } = require('./characterPhotos');
