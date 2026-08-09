@@ -41,6 +41,25 @@ const STOPWORDS = new Set([
   'none', 'slot', 'chest', 'waist', 'shoulder', 'sleeve', 'sleeves', 'cotton', 'linen',
 ]);
 
+// A word only attributes an outfit if it NAMES A GARMENT. Colours, materials
+// and shapes do not: "The open buried treasure chest — dark brown planks …
+// spilling round coins — lies in front of Hans" tripped the misattribution rule
+// because "open", "brown" and "round" each happen to appear in exactly one
+// character's outfit (Lab #451, p13). A chest is not clothing.
+const GARMENT_NOUNS = new Set([
+  'shirt', 'blouse', 'coat', 'jacket', 'vest', 'waistcoat', 'cardigan', 'jumper', 'sweater',
+  'hoodie', 'tunic', 'dress', 'skirt', 'trousers', 'pants', 'shorts', 'breeches', 'jeans',
+  'leggings', 'dungarees', 'overalls', 'boots', 'shoes', 'trainers', 'sneakers', 'sandals',
+  'loafers', 'plimsolls', 'slippers', 'hat', 'cap', 'tricorn', 'bandana', 'headscarf',
+  'scarf', 'gloves', 'mittens', 'belt', 'sash', 'apron', 'cloak', 'cape', 'parka', 'blazer',
+  'shirts', 'boots', 'socks', 'tights', 'glasses', 'earrings', 'buckle', 'lapels', 'cuffs',
+]);
+
+// The sentence must ATTACH the clothing to the character, not merely mention
+// their name. "To Hans's right sits Noah — in his white linen shirt" describes
+// Noah; Hans is only a landmark.
+const ATTACHES = /(wearing|wears|dressed in|clad in|in (?:his|her|their|a|an|the))/i;
+
 /** Significant lowercase tokens (≥4 chars, not stopwords). */
 function tokens(text) {
   return new Set(
@@ -162,8 +181,13 @@ function checkPage(page, clothingRequirements, opts = {}) {
         for (const sentence of sentences) {
           if (!new RegExp(`\\b${other.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(sentence)) continue;
           if (new RegExp(`\\b${owner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(sentence)) continue;
+          if (!ATTACHES.test(sentence)) continue;
           const st = tokens(sentence);
-          const hits = t.filter(w => st.has(w)).length;
+          const matched = t.filter(w => st.has(w));
+          // At least one match must be a garment noun — otherwise the "evidence"
+          // is colours and shapes that belong to no one in particular.
+          if (!matched.some(w => GARMENT_NOUNS.has(w))) continue;
+          const hits = matched.length;
           if (hits >= 3) {
             // WORD THE FAULT AS THE FIX. The first version said "the prose puts
             // Sarah's blouse on Hans" — and Hans was not wearing a blouse, he was
@@ -172,7 +196,7 @@ function checkPage(page, clothingRequirements, opts = {}) {
             // What is actually wrong is that words belonging only to another
             // character's outfit appear on this one, so name those words and
             // state this character's own outfit as the replacement.
-            const borrowed = t.filter(w => st.has(w));
+            const borrowed = matched;
             const ownOutfit = outfits.get(other);
             const ownText = ownOutfit ? ownOutfit.parts.map(x => (x.slot ? `${x.slot}: ` : '') + x.text).join('; ') : null;
             findings.push({

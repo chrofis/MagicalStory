@@ -6905,3 +6905,49 @@ means a persistently erroring entity check will keep a story flagged rather than
 Preferred over the alternative, since the silent pass is what cost days on the TDZ.
 
 **Touched:** `server/lib/entityConsistency.js`, `server/routes/regeneration.js`.
+
+---
+
+## Costume descriptions must be drawable at thumbnail size (2026-08-09)
+
+**Context:** owner observation, confirmed by this session's renders — the writer keeps choosing
+identity details too small to draw. `job_1786235099497_ytd5c7eek` specified "a small white anchor
+print at the chest", "a gold-coloured skull-and-crossbones badge pinned to the front fold", "a small
+white feather tucked into the left fold", "a plain rectangular brass buckle". None survived a single
+page. The image model redraws every page from scratch, so anything smaller than a hand comes out
+different each time, the entity check reports it missing on page after page, and no repair can
+satisfy it.
+
+The counter-example is in the same story: **Emma's costume rendered correctly on nearly every page**,
+and hers is the simplest — striped shirt, plain shorts, plain shoes, plain hat. Hans, Daniel and
+Sarah, whose descriptions are three times longer and ornate, drifted on every page.
+
+The prompt was actively pushing the wrong way: rule 3 demanded "two signature visual elements" and
+its own examples offered *hoop earring*, *metal buttons*, *large oval belt buckle*, *staff loop on
+the belt*, and the accessory examples were *scout badge, watch*. Concrete examples beat abstract
+rules, so the writer followed them.
+
+**Decision:** two rules added to `story-unified.txt`, `story-unified-imagefirst.txt` and
+`story-bible-from-beats.txt` (the live beats path), and every contradicting example rewritten:
+
+1. **The signature must be a SHAPE or a COLOUR BLOCK.** Good: full-length coat, cape, wide sash,
+   tricorn, bib panel, contrasting vest, knee boots, broad stripes. Banned as the identifying
+   element: print, logo, badge, pin, brooch, emblem, embroidery, stitching, trim, buckle, laces,
+   feather, earring, watch, buttons, or anything called "small", "tiny" or "fine". At most ONE small
+   detail per character, and only after two large signatures exist.
+2. **Plain, far-apart colour words** — red, blue, green, yellow, orange, purple, brown, black, white,
+   grey. Banned: burgundy, maroon, crimson, sage, dusty rose, coral, teal, ivory, taupe, mustard,
+   indigo. Two characters' dominant colours must be far apart on the wheel, not two shades of one
+   hue: a burgundy blouse and a navy coat came back as two burgundy garments on three pages of four.
+
+**Rationale:** the existing "distinct styles" tests already demanded a different colour and
+silhouette per character, and the writer complied — Sarah burgundy, Hans navy. The render still
+collapsed them, because the difference was a shade name rather than a hue, and because the
+identifying details were too small to survive redrawing. Distinctness on paper is not distinctness in
+a picture.
+
+**Touched:** `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+`prompts/story-bible-from-beats.txt`.
+
+**Status:** 🟡 shipped, unmeasured. The test is a fresh story: are the costume descriptions shorter
+and blockier, and does the entity check stop reporting missing badges and feathers?
