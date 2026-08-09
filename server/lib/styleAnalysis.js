@@ -16,6 +16,11 @@
 
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
+// r2 is a leaf module (no require cycle) — `stripDataUriPrefix` is used by every
+// vision call below. It was referenced as `r2Lib` without ever being required,
+// so checkStyleMatch/analyzeImageStyle threw `r2Lib is not defined` on every
+// call and the style-repair gate silently returned "unavailable" in production.
+const r2Lib = require('./r2');
 
 const getStoryHelpers = () => require('./storyHelpers');
 

@@ -7110,3 +7110,47 @@ one arbitrarily. STEP 4 now names accessories as the single exception.
 text; `check-settled` passes.
 **Not verified:** whether the model obeys the new rule — that needs a Lab run on fresh output. Prior
 evidence says a prompt rule lowers a ceiling without holding it, so expect partial compliance.
+
+---
+
+## 2026-08-09 — In-place style-repair is a no-op; disabled in prod (supersedes 2026-07-31 Pt 10 wiring)
+
+**Context.** Owner reported "some pages in a story look a different art style." Investigated a real
+14-page watercolor story (`job_1786235099497_ytd5c7eek`).
+
+**Findings (evidence-based):**
+- **Detection works.** `checkStoryStyleConsistency` ran (`finalChecksReport.styleConsistency`,
+  verdict `mixed`) and correctly flagged the outliers (pages 3/6/10 + covers) as *"figures appear
+  photographic with a watercolor filter, sharp photorealistic facial details."* The drift is
+  **photographic FACES on otherwise-watercolor pages**, not a whole-page medium flip.
+- **The drift is in ORIGINAL generation.** Served versions are `bestSource:"original"` (v0); the
+  `iterate-round-1` repairs scored −110/−40/−2 and were discarded. v0 pages already have
+  photographic adult faces. The page reference pack is mostly watercolor styled avatars but Grok
+  renders adult faces photographically anyway (known Grok adult-realism tendency), and a photographic
+  face crop can sit in the ref pack.
+- **In-place restyle CANNOT fix it.** Three tests: (a) anchor-page-as-reference makes Grok copy the
+  ANCHOR's content (pixel-diff ~73/255 — page redrawn as the anchor scene); (b) prompt-only and
+  (c) a maximally aggressive instruction both leave the image ~unchanged (diff ~10-15/255). Grok
+  under-stylises on edits regardless of wording; Gemini refuses adult faces (no image). No prompt or
+  model swap breaks this ceiling.
+
+**Decision.** `styleRepairProduction` default **true → false** (env `STYLE_REPAIR_PRODUCTION=true`
+to force on). Detection still runs (it's before the repair gate); only the futile repaint is off.
+Kept as correct-if-re-enabled: the `r2Lib` require fix in `styleAnalysis.js` (the gate threw
+`r2Lib is not defined` on every call → always "unavailable"), `repairPageStyle` now PROMPT-ONLY
+(drops the content-leaking anchor ref), and `styleRepairModel` default **gemini → grok** (Gemini
+refuses adult faces).
+
+**Real fix (not yet built).** A style-outlier page must be REGENERATED (full redo — the only op that
+renders faces in-medium), or the root cause fixed at generation (why adult faces render photographic
+despite watercolor refs). Owner chose: (1) pursue root cause + (3) park the no-op.
+
+**Watch:** Grok **Imagine Image 2.0** shipped 2026-08-07 (region/segmentation edit, magic-wand,
+multi-image ref up to 5). **No API yet** ("coming soon") — testable only via grok.com/imagine
+"Quality Mode" + iOS/Android apps. Its region edit may break the in-place-restyle ceiling; re-test
+when the API lands (candidate IDs `grok-imagine-image-2` / `grok-imagine-image-quality`).
+
+**Touched:** `server/config/models.js` (styleRepairProduction false, styleRepairModel grok),
+`server/lib/styleRepair.js` (prompt-only refs), `server/lib/styleAnalysis.js` (r2Lib require).
+**Verified:** modules load; gate returns a real verdict after the r2Lib fix. NOT verified: a fresh
+full story run with the flag off (safe — it only removes a no-op call).

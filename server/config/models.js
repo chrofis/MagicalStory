@@ -391,10 +391,21 @@ const MODEL_DEFAULTS = {
   // Env override: STYLE_REPAIR_PRODUCTION=false to fall back to
   // detection-only. Model per styleRepairModel ('gemini' | 'grok') — the
   // Test Lab `style_repair` stage remains the A/B harness for this choice.
+  // Default is 'grok' (2026-08-09): Gemini image-edit REFUSES realistic adult
+  // faces (IMAGE_OTHER → no image), so every outlier repaint threw and was
+  // discarded — the same refusal that moved avatars off Gemini.
+  // DISABLED by default 2026-08-09: in-place restyle is a confirmed no-op —
+  // Grok under-stylises on edits (pixel-diff ~10-15/255 regardless of prompt
+  // strength) and Gemini refuses adult faces, so an outlier page cannot be
+  // repainted in place. Detection (checkStoryStyleConsistency, which runs
+  // BEFORE this gate) still fires; only the futile repaint is off. Re-enable
+  // with STYLE_REPAIR_PRODUCTION=true once a working lever exists (full-page
+  // REDO, not edit). The r2Lib gate fix, prompt-only refs, and grok default
+  // below are kept so the path is correct if re-enabled.
   styleRepairProduction: process.env.STYLE_REPAIR_PRODUCTION
     ? process.env.STYLE_REPAIR_PRODUCTION !== 'false'
-    : true,
-  styleRepairModel: process.env.STYLE_REPAIR_MODEL || 'gemini',
+    : false,
+  styleRepairModel: process.env.STYLE_REPAIR_MODEL || 'grok',
 
   // Output aspect ratios — one config per image type, read by every
   // generation / iterate / repair path. Defaults: A4 portrait for pages

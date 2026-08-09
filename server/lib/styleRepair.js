@@ -197,10 +197,14 @@ async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
     }
   }
 
-  // REPAINT via the shared production edit dispatcher. The target-style page is
-  // attached as a reference image so the model can see the dominant look; the
-  // model id selects the backend (grok → editWithGrok, gemini → Gemini edit).
-  const refs = targetStyleRef ? [targetStyleRef] : [];
+  // REPAINT via the shared production edit dispatcher, PROMPT-ONLY — no style
+  // reference image. Passing the dominant page as a reference makes Grok copy
+  // that page's CONTENT (verified 2026-08-09: outlier pages came back redrawn
+  // as the anchor scene). The style signal instead comes from the resolved
+  // art-style descriptor that editImageWithPrompt injects from `artStyle`.
+  // targetStyleRef is retained ONLY for the before/after gate below, never as a
+  // content input.
+  const refs = [];
   log.info(`🎨 [STYLE-REPAIR] repainting page toward dominant style via ${model} (${modelId}), refs=${refs.length}`);
   const result = await editImage(pageImage, STYLE_REPAIR_INSTRUCTION, modelId, refs, artStyle, aspectRatio);
   if (!result || !result.imageData) {
