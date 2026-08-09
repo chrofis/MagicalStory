@@ -7393,3 +7393,71 @@ makes the entity grid, the eval, the garment fix and the UI all tell the same st
 **Touched files:** `server/lib/repairPipeline.js` (round pre-detect, builder forwarding, version
 stamp, rescue + final-refresh resolution). Guards already existed in `server/lib/images.js`
 (`bboxPairsWith`) and `server/lib/entityConsistency.js` (`firstPairing`).
+
+## 2026-08-09 — `camera_facing` is deleted: orientation is judged against the TARGET, not an axis
+
+**Supersedes** the same-day entry that zeroed left/right mirrors inside `camera_facing`. That fix
+was correct but treated the symptom; the owner's question — *"why do we score this at all? The
+question is whether the person is facing the correct object or other person. Left/right is
+irrelevant"* — identified the cause.
+
+**The category was defined around a proxy and forbidden from the real question.** D-18 read:
+*"Front/back only … never judge which character a figure is turned toward — that is the semantic
+evaluator's job."* So it asked "can we see the face?" and was banned from asking "is he engaging the
+right thing?"
+
+**Measured on all 31 findings from `job_1786277779744_vorw1f7ve`:**
+
+| class | findings | points |
+|---|---|---|
+| left/right mirror | 12 | 170 |
+| "front/back" | 2 | 30 |
+| target-relative | 10 | 90 |
+| other (gaze/target) | 7 | 85 |
+
+**Zero were genuine axis claims.** Even the two front/back entries were target claims in camera
+language: *"Noah is facing the camera instead of facing Emma"* — the defect is that he is not
+engaging Emma. The evaluators ignored the ban because the ban is unnatural: in a picture, the only
+facing defect that matters IS target-relative. Pointing the definition at an axis is also what
+generated the left/right phrasing in the first place.
+
+A matching routing bug hid it: `gaze` and `gaze_direction` were aliased to `camera_facing` in code,
+so target findings were filed into the axis bucket automatically.
+
+**Decision — merge into `action_interaction`,** which already claims "faces away from target" in its
+own definition. The facing vocabulary (`camera_facing`, `face_direction`, `view`, `facing`, `gaze`,
+`gaze_direction`) is kept as ALIASES pointing at the new bucket, never deleted, so every stored
+finding still routes. D-18 is retyped and reframed: the only question is whether the figure is
+oriented toward the person or object the scene has them engaging; the group-photo case (3+ figures
+facing the camera while the prompt has them interacting) is preserved because it has no single
+target; front vs back matters only when it breaks the engagement.
+
+**Repair routing improves as a side effect.** `camera_facing` routed to `regen` — a full page redo —
+while `SETTLED.md` says *"Grok inpaint handles structural changes (pose, gaze, body rotation)"*.
+`action_interaction` routes to `inpaint_or_regen`, so facing defects can now be inpainted, matching
+the settled verdict instead of contradicting it.
+
+**The mirror guard had to be rebuilt FIRST, and doing so caught a bug in it.** The original
+`isMirrorOnlyFacing()` keyed on `type === 'camera_facing'` — deleting the type would have silently
+restored 170 points of mirror noise with no test failing. It is now TYPE-INDEPENDENT and uses a
+BOTH-SIDES test: the finding must contrast one side against the other ("facing right instead of
+left"). Requiring both `left` AND `right` is what makes it safe inside `action_interaction`, which
+legitimately contains one-sided language ("grips with his right hand").
+
+That stricter test also exposed a FALSE POSITIVE in the shipped version: *"Hans is facing forward
+instead of RIGHT toward the river below"* names a target (the river) and must still deduct, but the
+loose regex zeroed it. Corrected count on the same story: **7 findings / 105 points zeroed**, not
+12 / 170. The 5 findings recovered are all legitimate target claims.
+
+**Trade-off accepted:** `action_interaction` was already the largest category (26%, 755 pts) and
+absorbing this takes it past 30%, so facing defects can no longer be counted separately. Judged
+worth it — a category that never contained what it claimed to measure was worse than a large one
+that does.
+
+**Verified:** bucket removed; 9/9 facing aliases route to `action_interaction`; no orphan aliases;
+9/9 mirror-guard cases including the three target claims that must survive; the clothing figure-redo
+route still fires; 64/64 templates load; `check-settled` OK.
+
+**Touched:** `server/lib/evalBuckets.js`, `server/lib/scoring.js`, `prompts/image-evaluation.txt`,
+`prompts/image-prompt-compliance.txt`, `prompts/image-semantic.txt`,
+`prompts/feedback-consolidator.txt`.

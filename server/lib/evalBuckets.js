@@ -42,7 +42,15 @@ const BUCKETS = {
   accessory:            { owner: 'quality',  kind: 'graded', repair: 'grok_blended' },
   anatomy:              { owner: 'quality',  kind: 'graded', repair: 'regen' },
   figure_completeness:  { owner: 'quality',  kind: 'binary', repair: 'regen' },
-  camera_facing:        { owner: 'quality',  kind: 'binary', repair: 'regen' },
+  // `camera_facing` was MERGED into action_interaction (2026-08-09). It was an
+  // axis category — "can we see the face?" — that explicitly forbade the only
+  // question ever actually asked of it ("never judge which character a figure
+  // is turned toward"). Measured on a 14-page story: of 31 findings, 12 were
+  // left/right mirrors and the remaining 19 ALL named a target (a person or an
+  // object). Zero were genuine axis claims. Merging also aligns repair with a
+  // settled verdict — camera_facing routed to `regen` (full page redo) while
+  // SETTLED.md says Grok inpaint handles facing/gaze/body rotation, which is
+  // what action_interaction's `inpaint_or_regen` allows.
   action_interaction:   { owner: 'semantic', kind: 'graded', repair: 'inpaint_or_regen' }, // rope slack while pulling, wrong aim, faces away from target
   object_presence:      { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
   object_count:         { owner: 'quality',  kind: 'graded', repair: 'inpaint' },
@@ -82,7 +90,9 @@ const TYPE_TO_BUCKET = {
   hair: 'character_identity',
   anatomy: 'anatomy', proportion: 'anatomy',
   incomplete_figure: 'figure_completeness', figure_completeness: 'figure_completeness',
-  camera_facing: 'camera_facing', face_direction: 'camera_facing', view: 'camera_facing',
+  // Facing vocabulary → action_interaction (merge 2026-08-09). Kept as ALIASES,
+  // never deleted: every stored finding typed `camera_facing` still routes.
+  camera_facing: 'action_interaction', face_direction: 'action_interaction', view: 'action_interaction',
   action_interaction: 'action_interaction', interaction: 'action_interaction',
   action: 'action_interaction', orientation: 'action_interaction', physics: 'action_interaction',
   object: 'object_presence', object_presence: 'object_presence',
@@ -117,7 +127,9 @@ const TYPE_TO_BUCKET = {
   costume: 'clothing', headwear: 'clothing',
   pose: 'action_interaction', main_action: 'action_interaction',
   gesture: 'action_interaction', holding: 'action_interaction',
-  facing: 'camera_facing', gaze: 'camera_facing', gaze_direction: 'camera_facing',
+  // gaze/gaze_direction were ALREADY target claims mis-filed into the axis
+  // bucket by these very aliases — the routing bug that hid the merge case.
+  facing: 'action_interaction', gaze: 'action_interaction', gaze_direction: 'action_interaction',
   object_missing: 'object_presence', object_placement: 'object_presence',
   object_mismatch: 'object_presence', object_detail: 'object_presence',
   object_quality: 'object_presence', prop: 'object_presence',

@@ -134,22 +134,32 @@ const MAX_SEVERITY_TYPES = { accessory: 'moderate', accessory_missing: 'major' }
 // evaluator, which lost 45 points on ONE page for "facing right instead of
 // left" against three separate figures.
 //
-// Scoped deliberately to `camera_facing`, because that code is DEFINED as
-// front/back only (D-18: "Never judge left vs right here"). A left/right
-// camera_facing finding is out of spec by the pipeline's own definition, so
-// zeroing it needs no judgement about the image.
+// TYPE-INDEPENDENT by design. The first version keyed on `camera_facing`, which
+// broke the moment that code was folded into `action_interaction` (2026-08-09) —
+// a guard that depends on a category cannot survive the category being merged.
+// It now recognises the CLAIM, not the label.
 //
-// NOT applied to clothing/accessory findings that mention a side — those often
-// carry a real second defect ("missing the eye patch") and the one-defect-one-
-// code rule has to land first. `missing` anywhere in the text also disqualifies
-// it here: an absent item is a real finding whichever side it belongs on.
-const MIRROR_FACING = /\b(?:facing|faces|turned|oriented)\b[^.;]{0,40}\b(?:left|right)\b/i;
+// The test is BOTH-SIDES: the finding must contrast one side against the other
+// ("facing right instead of left"). Requiring both `left` AND `right` is what
+// makes this safe inside action_interaction, which legitimately contains
+// one-sided language. Checking the real corpus caught a false positive in the
+// first version: "Hans is facing forward instead of RIGHT toward the river
+// below" names a TARGET (the river) and must still deduct — it mentions only
+// one side, so the both-sides test spares it. Likewise "Emma is facing right
+// instead of the stone carving" and "Hans is facing left instead of the wall".
+//
+// `missing`/`absent` still disqualifies: an absent item is a real finding
+// whichever side it belongs on.
+const FACING_VERB = /\b(?:facing|faces|face|turned|oriented)\b/i;
+const HAS_LEFT = /\bleft\b/i;
+const HAS_RIGHT = /\bright\b/i;
 const FRONT_BACK = /\b(?:toward|towards)\s+the\s+(?:viewer|camera)|front view|back view|back to (?:the )?(?:camera|viewer)|facing (?:the )?(?:camera|viewer)|away from (?:the )?(?:viewer|camera)|from behind|over (?:his|her|their) shoulder\b/i;
 
 function isMirrorOnlyFacing(d) {
-  if (String(d?.type || '').toLowerCase() !== 'camera_facing') return false;
   const text = String(d?.description || '');
-  if (!MIRROR_FACING.test(text)) return false;
+  if (!FACING_VERB.test(text)) return false;
+  // Both sides named = axis-vs-axis = a mirror. One side named = a target claim.
+  if (!HAS_LEFT.test(text) || !HAS_RIGHT.test(text)) return false;
   if (FRONT_BACK.test(text)) return false;      // a real front/back call
   if (/\bmissing\b|\babsent\b/i.test(text)) return false; // carries a second, real defect
   return true;
