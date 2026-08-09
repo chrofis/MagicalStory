@@ -2297,9 +2297,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Parse "Score: X/10" format (new simplified format)
     const score10Match = responseText.match(/Score:\s*(\d+)\/10\b/i);
     if (score10Match) {
-      const rawScore = parseInt(score10Match[1]);
-      const qualityScore = rawScore * 10; // Convert 0-10 to 0-100 for compatibility
-      log.verbose(`📊 [EVAL] Image quality score: ${rawScore}/10 (${qualityScore}/100)`);
+      const visualScore10 = parseInt(score10Match[1]);
+      const qualityScore = visualScore10 * 10; // legacy text format; new prompts emit no score
+      log.verbose(`📊 [EVAL] Image quality score: ${visualScore10}/10 (${qualityScore}/100)`);
       return mergeSemanticResult(qualityScore, responseText);
     }
 
@@ -9469,7 +9469,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return 'repair';
     };
     // Single canonical writer. Stamps finalScore + deductions + scoreBreakdown
-    // + scoreModel + evalScore +
+    // + evalScore +
     // entityPenalty on the version. Legacy fields (qualityScore, semanticScore,
     // threeStageScore, rawQualityScore) are no longer written — readers go
     // through computeFinalScore or version.finalScore, and per-evaluator
@@ -9507,12 +9507,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       imageData: v.imageData,
       // Canonical scoring fields written by applyScore. finalScore is the
       // single number the frontend + picker read. scoreBreakdown is the
-      // per-evaluator detail for the dev panel. deductions / scoreModel
-      // are audit-only.
+      // per-evaluator detail for the dev panel. deductions are audit-only.
       finalScore: v.finalScore,
       scoreBreakdown: v.scoreBreakdown || null,
       deductions: v.deductions || null,
-      scoreModel: v.scoreModel || null,
       // Eval-time consolidation: deduped issue list that fed the math score
       // (dev panel shows the dedupe) + which issue set was scored.
       consolidatedPlan: v.consolidatedPlan || null,
@@ -9520,8 +9518,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       evalScore: v.evalScore ?? null,
       entityPenalty: v.entityPenalty ?? 0,
       // entityPenaltyRaw says how much entity penalty was capped away.
-      // (finalScore no longer pins at 0, so the rawScore companion this comment
-      // used to describe is gone — see scoring.js.)
       entityPenaltyRaw: v.entityPenaltyRaw ?? null,
       // Detailed evaluator outputs — kept verbatim because the dev panel uses
       // the structured detail (visible/expected character lists from semantic,

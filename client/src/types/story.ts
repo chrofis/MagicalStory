@@ -143,7 +143,6 @@ export interface SceneDescription {
 // Semantic fidelity evaluation result (parallel check for action/relationship accuracy)
 export interface SemanticEvaluationResult {
   score: number | null;
-  rawScore?: number;
   verdict: string;
   semanticIssues: Array<{
     action?: string;
@@ -694,8 +693,7 @@ export interface ImageVersion {
   // what Gemini actually described in the image vs how Sonnet judged it.
   threeStageResult?: {
     score?: number;
-    rawScore?: number;
-    verdict?: string;
+      verdict?: string;
     issuesSummary?: string;
     visionInventory?: string;
     complianceResult?: Record<string, unknown> | null;
@@ -767,8 +765,7 @@ export interface SceneImage {
   // (Stage 1) and how Sonnet judged it against the prompt (Stage 2).
   threeStageResult?: {
     score?: number;
-    rawScore?: number;
-    verdict?: string;
+      verdict?: string;
     issuesSummary?: string;
     visionInventory?: string;
     complianceResult?: Record<string, unknown> | null;
@@ -1238,8 +1235,7 @@ export interface RepairWorkflowState {
       qualityScore: number;          // Visual quality score only
       semanticScore?: number | null; // Semantic fidelity score only
       entityPenalty?: number;        // Penalty from entity/image-check issues
-      rawScore?: number;
-      verdict?: string;
+          verdict?: string;
       issuesSummary?: string;
       reasoning?: string;
       fixableIssues: EvaluationData['fixableIssues'];

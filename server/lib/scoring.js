@@ -301,7 +301,6 @@ function applyScore(version, { evalResult = null, entityResult = null, consolida
   // Canonical fields written by the single writer.
   version.deductions = deductions;
   version.finalScore = finalScore;
-  version.scoreModel = 'math';
   // Which issue set fed the math: 'consolidated' (deduped) or 'raw'.
   version.scoreSource = dedupedIssues ? 'consolidated' : 'raw';
   // Persist the consolidator output on the version (same shape/field the

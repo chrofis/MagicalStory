@@ -29,7 +29,7 @@ const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
 // Canonical scoring writer. Every newVersion / newImageData construction
 // in this file routes its score data through `applyScore` so the persisted
 // version row carries the canonical fields (finalScore, deductions,
-// scoreBreakdown, scoreModel, evalScore,
+// scoreBreakdown, evalScore,
 // entityPenalty). Legacy fields (qualityScore, semanticScore,
 // rawQualityScore) are kept on the literal during the transition for
 // in-flight consumers; saveStoryData/saveStoryImage and the frontend now

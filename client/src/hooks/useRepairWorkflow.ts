@@ -814,7 +814,6 @@ export function useRepairWorkflow({
     qualityScore: number;
     semanticScore?: number | null;
     entityPenalty?: number;
-    rawScore?: number;
     verdict?: string;
     issuesSummary?: string;
     reasoning?: string;
@@ -847,7 +846,6 @@ export function useRepairWorkflow({
           qualityScore: pr.qualityScore,
           semanticScore: pr.semanticScore,
           entityPenalty: pr.entityPenalty,
-          rawScore: pr.rawScore,
           verdict: pr.verdict,
           issuesSummary: pr.issuesSummary,
           reasoning: pr.reasoning,

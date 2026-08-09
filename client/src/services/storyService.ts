@@ -2551,7 +2551,6 @@ export const storyService = {
       qualityScore: number;
       semanticScore?: number | null;
       entityPenalty?: number;
-      rawScore?: number;
       verdict?: string;
       issuesSummary?: string;
       reasoning?: string;
@@ -2566,7 +2565,6 @@ export const storyService = {
         qualityScore: number;
         semanticScore?: number | null;
         entityPenalty?: number;
-        rawScore?: number;
         verdict?: string;
         issuesSummary?: string;
         reasoning?: string;
