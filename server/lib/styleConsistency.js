@@ -33,10 +33,8 @@ const { resolveArtStyle } = require('./storyHelpers');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const THUMB_SIZE = 256;        // px per cell
+const THUMB_SIZE = 448;        // px per cell — big enough for the model to judge medium (photographic vs painted) after it downscales the composite
 const COLS = 3;                // grid columns
-const LABEL_HEIGHT = 24;       // px above each thumbnail for the page label
-const CELL_PADDING = 8;        // px of padding around each cell
 
 /**
  * Build a labelled thumbnail-grid JPEG from a list of page images.
@@ -50,54 +48,46 @@ async function buildStyleGrid(cells) {
     throw new Error('buildStyleGrid: cells array empty');
   }
 
-  const cellW = THUMB_SIZE + CELL_PADDING * 2;
-  const cellH = THUMB_SIZE + LABEL_HEIGHT + CELL_PADDING * 2;
   const cols = Math.min(COLS, cells.length);
   const rows = Math.ceil(cells.length / cols);
-  const gridW = cols * cellW;
-  const gridH = rows * cellH;
+  const gridW = cols * THUMB_SIZE;
+  const gridH = rows * THUMB_SIZE;
 
-  // Resize all thumbnails in parallel
-  const resized = await Promise.all(cells.map(async (cell) => {
+  // Cells packed EDGE-TO-EDGE at full THUMB_SIZE — no gaps, no label strip.
+  // Those wasted pixels and shrank each cell; the vision model downscales the
+  // whole composite, so every pixel of a cell counts for judging watercolour-
+  // vs-photographic. Each cell instead carries a small RED code in its top-left
+  // corner (the page token the model returns): -1/-2/-3 for the covers, the
+  // page number otherwise. A stray failed cell leaves a blank slot (positions
+  // are by index) rather than shifting the whole grid.
+  const composites = [];
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i];
     const base64 = stripDataUriPrefix(cell.imageData || '');
-    if (!base64) return null;
-    const buf = Buffer.from(base64, 'base64');
+    if (!base64) continue;
+    let thumb;
     try {
-      const thumb = await sharp(buf)
+      thumb = await sharp(Buffer.from(base64, 'base64'))
         .resize({ width: THUMB_SIZE, height: THUMB_SIZE, fit: 'cover' })
-        .jpeg({ quality: 82 })
         .toBuffer();
-      return { label: cell.label, buffer: thumb };
     } catch (err) {
       log.warn(`[STYLE-CHECK] Failed to resize ${cell.label}: ${err.message}`);
-      return null;
+      continue;
     }
-  }));
-
-  const composites = [];
-  resized.forEach((r, i) => {
-    if (!r) return;
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const cellLeft = col * cellW;
-    const cellTop = row * cellH;
-
-    // Label strip — dark background, white text, escapes XML special chars.
-    const labelText = r.label.length > 28 ? r.label.slice(0, 25) + '…' : r.label;
-    const safe = labelText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const labelSvg = `<svg width="${THUMB_SIZE + CELL_PADDING * 2}" height="${LABEL_HEIGHT}">
-      <rect width="${THUMB_SIZE + CELL_PADDING * 2}" height="${LABEL_HEIGHT}" fill="#222"/>
-      <text x="${(THUMB_SIZE + CELL_PADDING * 2) / 2}" y="17" font-family="Arial,sans-serif" font-size="14" fill="white" text-anchor="middle">${safe}</text>
-    </svg>`;
-    composites.push({ input: Buffer.from(labelSvg), left: cellLeft, top: cellTop });
-    composites.push({ input: r.buffer, left: cellLeft + CELL_PADDING, top: cellTop + LABEL_HEIGHT + CELL_PADDING });
-  });
+    const code = cell.page != null ? String(cell.page) : String(cell.label || '');
+    const safe = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const codeSvg = Buffer.from(
+      `<svg width="${THUMB_SIZE}" height="${THUMB_SIZE}"><text x="10" y="40" font-family="Arial,sans-serif" font-size="34" font-weight="bold" fill="#ff2020" stroke="#000" stroke-width="1.5" paint-order="stroke">${safe}</text></svg>`
+    );
+    const labelled = await sharp(thumb).composite([{ input: codeSvg, top: 0, left: 0 }]).jpeg({ quality: 88 }).toBuffer();
+    composites.push({ input: labelled, left: (i % cols) * THUMB_SIZE, top: Math.floor(i / cols) * THUMB_SIZE });
+  }
 
   return sharp({
-    create: { width: gridW, height: gridH, channels: 3, background: { r: 245, g: 245, b: 245 } },
+    create: { width: gridW, height: gridH, channels: 3, background: { r: 255, g: 255, b: 255 } },
   })
     .composite(composites)
-    .jpeg({ quality: 85 })
+    .jpeg({ quality: 88 })
     .toBuffer();
 }
 
@@ -161,16 +151,21 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
     log.warn(`🎨 [STYLE-CHECK] art style "${storyData.artStyle}" did not resolve — running relative check only`);
   }
 
-  log.info(`🎨 [STYLE-CHECK] Building grid for ${cells.length} images (${cells.length - coverCount} pages + ${coverCount} cover(s))`);
-  const gridBuffer = await buildStyleGrid(cells);
-  log.info(`🎨 [STYLE-CHECK] Grid built: ${(gridBuffer.length / 1024).toFixed(0)}KB, sending to ${modelId}...`);
+  // Batch into grids of <=9 cells so each thumbnail stays large (less downscale
+  // by the model → faces big enough to judge medium). Safe because the judgment
+  // is ABSOLUTE per-page — there is no cross-page clustering to lose across
+  // batches. ceil(17/9) = 2 cheap Flash calls for a typical book.
+  const CHUNK = 9;
+  const batches = [];
+  for (let i = 0; i < cells.length; i += CHUNK) batches.push(cells.slice(i, i + CHUNK));
+  log.info(`🎨 [STYLE-CHECK] ${cells.length} images (${cells.length - coverCount} pages + ${coverCount} cover(s)) → ${batches.length} grid(s) of ≤${CHUNK}`);
 
   // Prompt: cluster by style, return strict JSON.
   // pageNumber values: -1 front cover, -2 initial page, -3 back cover,
   // 1+ for pages. The model returns the same numbers so we can act on them.
   const prompt = `You are a visual-style auditor for a children's storybook.
 
-The image you see is a labelled grid of every illustrated page from one storybook (and its front cover, if shown). Each cell has a label like "Page 3" or "Front cover".
+The image is a grid of pages from one storybook. Each cell has a small RED code in its top-left corner identifying it: -1 = front cover, -2 = initial page, -3 = back cover, and the page number (1, 2, 3, …) for every other page. Return these exact code numbers.
 ${requestedStyle ? `
 The book was commissioned in this art style:
 """
@@ -208,86 +203,105 @@ Judge only how it is DRAWN, never whether a scene suits its subject. A majority 
   "reasoning": "<2-3 sentences: is the book in the commissioned style, and which pages depart>"
 }
 
-Use -1 for "Front cover", -2 for "Initial page", -3 for "Back cover" if they appear. Use the page numbers from the labels for everything else.
+Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3 back cover, the page number otherwise.
 
 Verdict rule (against the COMMISSIONED style, not the majority):
 - "consistent" if ≥90% of pages match the commissioned style and outliers are all "minor"
 - "mixed" if 60-90% match, or any "moderate"+ outliers
 - "fragmented" if <60% match the commissioned style`;
 
-  // Clustering is a judgment task, and this call was the only one still on
-  // Gemini's default temperature — two identical runs over the same 14 pages
-  // returned dominant clusters of 7 and 13 pages (7 outliers vs 1), which makes
-  // both the outlier list and the style verdict unreproducible and any repair
-  // decision built on them a coin flip. Same knob the image evaluator uses.
   const evalTemperature = process.env.EVAL_TEMPERATURE != null ? Number(process.env.EVAL_TEMPERATURE) : 0;
-  const model = genAI.getGenerativeModel({
-    model: modelId,
-    generationConfig: { temperature: evalTemperature },
-  });
-  const result = await model.generateContent([
-    { inlineData: { mimeType: 'image/jpeg', data: gridBuffer.toString('base64') } },
-    prompt,
-  ]);
+  const model = genAI.getGenerativeModel({ model: modelId, generationConfig: { temperature: evalTemperature } });
 
-  const usage = result.response.usageMetadata || {};
-  if (usageTracker && (usage.promptTokenCount || usage.candidatesTokenCount)) {
-    usageTracker('gemini', {
-      input_tokens: usage.promptTokenCount || 0,
-      output_tokens: usage.candidatesTokenCount || 0,
-      thinking_tokens: usage.thoughtsTokenCount || 0,
-    }, 'style_check', modelId);
+  const judgeBatch = async (batch) => {
+    const gridBuffer = await buildStyleGrid(batch);
+    const result = await model.generateContent([
+      { inlineData: { mimeType: 'image/jpeg', data: gridBuffer.toString('base64') } },
+      prompt,
+    ]);
+    const usage = result.response.usageMetadata || {};
+    if (usageTracker && (usage.promptTokenCount || usage.candidatesTokenCount)) {
+      usageTracker('gemini', {
+        input_tokens: usage.promptTokenCount || 0,
+        output_tokens: usage.candidatesTokenCount || 0,
+        thinking_tokens: usage.thoughtsTokenCount || 0,
+      }, 'style_check', modelId);
+    }
+    const raw = result.response.text() || '';
+    const s = raw.indexOf('{');
+    const e = raw.lastIndexOf('}');
+    if (s === -1 || e === -1) throw new Error(`style-check returned no JSON. Raw: ${raw.slice(0, 200)}`);
+    let parsed;
+    try {
+      parsed = JSON.parse(raw.slice(s, e + 1));
+    } catch (err) {
+      throw new Error(`style-check JSON parse failed: ${err.message}. Raw: ${raw.slice(s, s + 300)}`);
+    }
+    return {
+      outliers: Array.isArray(parsed.outliers) ? parsed.outliers : [],
+      dominantStyleVerdict: ['matches', 'drifted', 'wrong_medium'].includes(parsed.dominantStyleVerdict) ? parsed.dominantStyleVerdict : 'matches',
+      requestedStyleDifferences: Array.isArray(parsed.requestedStyleDifferences) ? parsed.requestedStyleDifferences : [],
+      reasoning: parsed.reasoning || '',
+      gridBuffer,
+    };
+  };
+
+  // One failed batch (parse/API) shouldn't sink the whole check.
+  const settled = await Promise.allSettled(batches.map(judgeBatch));
+  const results = settled.filter(r => r.status === 'fulfilled').map(r => r.value);
+  if (results.length === 0) throw new Error(settled[0]?.reason?.message || 'all style-check batches failed');
+
+  // Merge per-page outliers (each page is in exactly one batch); keep the
+  // highest severity and union the reasons.
+  const SEV = { major: 3, moderate: 2, minor: 1 };
+  const seen = new Map();
+  for (const r of results) {
+    for (const o of r.outliers) {
+      if (typeof o?.page !== 'number') continue;
+      const cand = { page: o.page, severity: SEV[o.severity] ? o.severity : 'moderate', differences: Array.isArray(o.differences) ? o.differences : [] };
+      const prev = seen.get(o.page);
+      if (!prev || (SEV[cand.severity] || 0) > (SEV[prev.severity] || 0)) seen.set(o.page, cand);
+    }
+  }
+  const outliers = [...seen.values()];
+  const outlierPages = new Set(outliers.map(o => o.page));
+  const dominantCluster = cells.map(c => c.page).filter(p => !outlierPages.has(p));
+  const anchorPage = dominantCluster.find(p => p >= 1) ?? dominantCluster[0] ?? (cells[0]?.page ?? null);
+
+  const ratio = cells.length ? outliers.length / cells.length : 0;
+  const allMinor = outliers.every(o => o.severity === 'minor');
+  const verdict = (ratio <= 0.1 && allMinor) ? 'consistent' : (ratio > 0.4 ? 'fragmented' : 'mixed');
+
+  // Book-level medium check = WORST per-batch verdict (a strict batch flagging a
+  // wholesale medium change propagates; a lenient batch can't hide it). Only
+  // wrong_medium blocks — the repair pipeline reads it to SKIP per-page repair
+  // (a whole-book miss is a generation problem, not a per-page fix).
+  const RANK = { matches: 0, drifted: 1, wrong_medium: 2 };
+  let medium = 'matches';
+  let mediumDiffs = [];
+  for (const r of results) {
+    if ((RANK[r.dominantStyleVerdict] || 0) > (RANK[medium] || 0)) { medium = r.dominantStyleVerdict; mediumDiffs = r.requestedStyleDifferences; }
   }
 
-  const raw = result.response.text() || '';
-  const jsonStart = raw.indexOf('{');
-  const jsonEnd = raw.lastIndexOf('}');
-  if (jsonStart === -1 || jsonEnd === -1) {
-    throw new Error(`style-check returned no JSON. Raw: ${raw.slice(0, 200)}`);
-  }
-  let parsed;
-  try {
-    parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
-  } catch (err) {
-    throw new Error(`style-check JSON parse failed: ${err.message}. Raw: ${raw.slice(jsonStart, jsonStart + 300)}`);
-  }
-
-  // Sanity-defaults so callers can rely on the shape.
   const out = {
-    verdict: parsed.verdict || 'mixed',
-    dominantCluster: Array.isArray(parsed.dominantCluster) ? parsed.dominantCluster : [],
-    anchorPage: typeof parsed.anchorPage === 'number' ? parsed.anchorPage : (cells[0]?.page ?? null),
-    outliers: Array.isArray(parsed.outliers) ? parsed.outliers : [],
-    reasoning: parsed.reasoning || '',
-    gridImage: `data:image/jpeg;base64,${gridBuffer.toString('base64')}`,
-    // Absolute check. dominantMatches === false means the book as a whole
-    // drifted off the commissioned style, so anchorPage is NOT a valid repair
-    // target. null when no style was resolvable (check did not run).
+    verdict,
+    dominantCluster,
+    anchorPage,
+    outliers,
+    reasoning: results.map(r => r.reasoning).filter(Boolean)[0] || '',
+    gridImage: `data:image/jpeg;base64,${results[0].gridBuffer.toString('base64')}`,
     styleMatch: requestedStyle
-      ? {
-          requestedStyle,
-          // Three levels, not a boolean. A boolean read "false" on 4 of 5
-          // sampled books — including two the auditor itself called
-          // "consistent" — because the model scores style fidelity
-          // pedantically ("lacks the named artist's brushwork", "shading is
-          // subtly digital rather than strictly flat"). Gating repair on that
-          // would have disabled style-repair for almost every story. Only a
-          // wholesale medium change blocks.
-          verdict: ['matches', 'drifted', 'wrong_medium'].includes(parsed.dominantStyleVerdict)
-            ? parsed.dominantStyleVerdict
-            : 'matches',
-          differences: Array.isArray(parsed.requestedStyleDifferences) ? parsed.requestedStyleDifferences : [],
-        }
+      ? { requestedStyle, verdict: medium, differences: medium === 'matches' ? [] : mediumDiffs.slice(0, 4) }
       : null,
   };
 
-  log.info(`🎨 [STYLE-CHECK] verdict=${out.verdict}, dominant=${out.dominantCluster.length} pages, anchor=Page ${out.anchorPage}, outliers=${out.outliers.length}`);
+  log.info(`🎨 [STYLE-CHECK] verdict=${out.verdict}, ${dominantCluster.length}/${cells.length} on-style, outliers=${outliers.length} (${batches.length} batch(es))`);
   if (out.styleMatch && out.styleMatch.verdict !== 'matches') {
     const how = out.styleMatch.verdict === 'wrong_medium' ? 'is a DIFFERENT MEDIUM from' : 'has drifted from';
-    log.warn(`🎨 [STYLE-CHECK] the dominant style ${how} the commissioned art style "${storyData.artStyle}": ${out.styleMatch.differences.slice(0, 3).join('; ')}`);
+    log.warn(`🎨 [STYLE-CHECK] the book ${how} the commissioned art style "${storyData.artStyle}": ${out.styleMatch.differences.slice(0, 3).join('; ')}`);
   }
   for (const o of out.outliers) {
-    log.info(`🎨 [STYLE-CHECK] outlier Page ${o.page} [${o.severity}]: ${o.differences?.slice(0, 2).join('; ')}`);
+    log.info(`🎨 [STYLE-CHECK] outlier Page ${o.page} [${o.severity}]: ${(o.differences || []).slice(0, 2).join('; ')}`);
   }
 
   return out;

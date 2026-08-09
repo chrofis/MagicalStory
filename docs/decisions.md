@@ -7774,3 +7774,13 @@ over-engineered (owner: "rethink the final eval — we only need a punishment pe
 
 **Touched files:** `server/lib/entityConsistency.js` (gridsOnly option),
 `server/lib/repairPipeline.js` (per-round scope, mergeEntityIssues, assembled Step 4b).
+
+---
+
+## 2026-08-09 — Style-check grid: bigger cells, no gaps, red corner codes, ≤9 chunk
+
+The 256px cells + label strips + padding, all packed into one downscaled composite, left each page too blurry for the model to tell watercolour from photographic (owner: "so blurry it's hard to tell"). Redesigned `buildStyleGrid`: THUMB 256→**448**, **edge-to-edge (no gaps, no label strip)**, a **small red code** in each cell's top-left corner (the page token the model returns: -1/-2/-3 for covers, page number otherwise) instead of a label strip. Combined with **≤9-per-grid batching** (absolute per-page judgment, so batching is safe — no cross-page clustering to lose): a typical 17-image book = 2 cheap Flash calls. Book-level `wrong_medium` = WORST per-batch verdict (a strict batch propagates; a lenient one can't hide it).
+
+Verified: steampunk book → `wrong_medium` reliably (whole-book miss); the watercolour photographic covers (-2/-3) are caught ~2/3 of runs as `major` (up from a blurry near-miss). Residual: a single lenient Gemini draw still misses on ~1/3 of runs (owner accepted single-pass "good enough"; a 3× union vote would close it but costs more calls — deferred).
+
+**Touched:** `server/lib/styleConsistency.js` (buildStyleGrid layout + THUMB 448; ≤9 chunk; red-code prompt; worst-batch wrong_medium).
