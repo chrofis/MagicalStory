@@ -163,6 +163,9 @@ function normalizeIssues(rawIssues, source) {
       // Consolidator deduped issues carry the evaluator names that flagged
       // them — keep for the dev panel's dedupe display.
       ...(Array.isArray(it.sources) && it.sources.length ? { sources: it.sources } : {}),
+      // ...and each of those evaluators' own severity, so disagreement survives
+      // into the stored story and can be measured after the fact.
+      ...(it.severities && typeof it.severities === 'object' ? { severities: it.severities } : {}),
     });
   }
   return out;

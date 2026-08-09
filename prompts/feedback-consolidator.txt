@@ -69,6 +69,7 @@ Fill `spec_conflicts[]` before writing any fixes. This is the one exception to r
    - `description`: short, plain English. Reuse the evaluator wording when accurate; tighten when not.
    - `severity`: `CATASTROPHIC` | `CRITICAL` | `MAJOR` | `MODERATE` | `MINOR`. Set it by consensus, not by the loudest evaluator: when two or more evaluators flagged the same defect, keep the highest severity among them; when only ONE flagged it, cap it at MODERATE. Evaluators do not share a severity vocabulary — one of them has no MINOR level at all — so a single high tag is one opinion, not agreement. Use only this vocabulary; anything else is dropped by the parser.
    - `sources`: array of evaluator names that flagged this problem (subset of `["quality","semantic","compliance","entity","final_checks"]`). At least one entry. When dedupe merged 3 raw flags into one, all 3 source names appear here.
+   - `severities`: an object mapping each of those evaluator names to the severity THAT evaluator gave this defect, copied verbatim from its finding — `{"quality": "MAJOR", "semantic": "CRITICAL"}`. Report what each one actually said; do not reconcile them, do not round them toward your own `severity`, and do not add an evaluator that did not flag this defect. One key per name in `sources`, and no others. This is a record of the raw votes, kept so disagreement between evaluators is visible.
    - Order by severity (CRITICAL first, MINOR last). Items also present in `per_character_fixes[]` / `scene_fix` are still listed here — this list is for display, the fix list is for execution.
 
 ## Fix-instruction shape
@@ -144,10 +145,10 @@ Final: `"Open the eyes wide."`
   "final_score": 78,
   "final_score_reason": "One MAJOR pose issue (head facing camera instead of stone) drives the score down; everything else is cosmetic and tolerable.",
   "deduped_issues": [
-    {"type": "camera_facing", "description": "Boy's head facing camera instead of the stone in his hands", "severity": "MAJOR", "sources": ["quality", "semantic"]},
-    {"type": "camera_facing", "description": "CharacterB's face turned toward camera instead of toward the boy", "severity": "MAJOR", "sources": ["quality"]},
-    {"type": "object_presence", "description": "Stone lacks the prompt's blue-golden glow", "severity": "MODERATE", "sources": ["semantic"]},
-    {"type": "hair", "description": "Hair colour slightly lighter than reference", "severity": "MINOR", "sources": ["entity"]}
+    {"type": "camera_facing", "description": "Boy's head facing camera instead of the stone in his hands", "severity": "MAJOR", "sources": ["quality", "semantic"], "severities": {"quality": "MAJOR", "semantic": "CRITICAL"}},
+    {"type": "camera_facing", "description": "CharacterB's face turned toward camera instead of toward the boy", "severity": "MAJOR", "sources": ["quality"], "severities": {"quality": "MAJOR"}},
+    {"type": "object_presence", "description": "Stone lacks the prompt's blue-golden glow", "severity": "MODERATE", "sources": ["semantic"], "severities": {"semantic": "MODERATE"}},
+    {"type": "hair", "description": "Hair colour slightly lighter than reference", "severity": "MINOR", "sources": ["entity"], "severities": {"entity": "MINOR"}}
   ]
 }
 ```

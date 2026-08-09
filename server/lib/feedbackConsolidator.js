@@ -360,6 +360,15 @@ async function consolidateFeedback({
           // on the four evaluator prompts never reached the score.
           type: i.type || i.category || null,
           sources: Array.isArray(i.sources) ? i.sources.filter(s => typeof s === 'string') : [],
+          // Raw per-evaluator votes, recorded not acted on. `severity` above is
+          // still whatever the consolidator chose; this is the evidence needed to
+          // judge whether a median/consensus rule is worth adopting, and to see
+          // how often the evaluators actually disagree.
+          severities: (i.severities && typeof i.severities === 'object' && !Array.isArray(i.severities))
+            ? Object.fromEntries(Object.entries(i.severities)
+                .filter(([k, v]) => typeof k === 'string' && typeof v === 'string')
+                .map(([k, v]) => [k, v.toUpperCase()]))
+            : null,
         }));
     }
 
