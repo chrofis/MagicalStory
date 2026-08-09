@@ -164,3 +164,82 @@ generate ──> evaluate (4 evaluators -> defects) ──> applyScore -> finalS
 
 Repair rounds: **1 on staging, 3 on production** (`REPAIR_DEFAULTS.maxPasses`,
 keyed on `RAILWAY_ENVIRONMENT_NAME`).
+
+---
+
+## 7. Simplification backlog after the split (2026-08-09)
+
+State at time of writing: `images.js` 15,334 → 8,861; seven modules extracted;
+five stale-import bugs found by destructure audit and fixed (`5ee87e072`).
+Everything below is KNOWN, DELIBERATE residue — parked for the post-showcase
+round, not forgotten.
+
+### A. Core loop and the god-file (biggest payoff)
+
+1. **Hoist the ten closures in `runUnifiedRepairPipeline`** into named step
+   functions taking an explicit context (evaluate, consolidate, iterate,
+   inpaint, charFix, selectBest, rescue, textSpace, styleAudit, finalize).
+   The move made the loop findable; this makes it readable. Deferred so a
+   behaviour change could not hide inside the 2,246-line move diff.
+2. **Break the generation↔evaluation cycle.** `callGeminiAPIForImage` calls
+   `evaluateImageQuality` internally (2 sites). Generation should generate and
+   return; the CALLER evaluates. This cycle is the reason all five lazy-require
+   accessors exist — remove the cycle and they all become plain imports.
+3. **`evaluateImageQuality` (1,058 lines, 10 positional params).** Split into
+   evaluator dispatch / parse / record; replace the parameter list with one
+   options object. The clothing contract had to be built INSIDE it precisely
+   because threading an 11th parameter was untenable.
+4. **`generateImageWithQualityRetry` (761 lines)** — same treatment; the
+   second-widest fan-out in the file.
+5. After 2–4, the remaining `images.js` clusters (dispatch, evaluation, bbox)
+   separate cleanly; the file should land well under 4k lines.
+6. **`inpaintPage` (461 lines)** has one caller (the pipeline). Move next to
+   its caller or into `imageInpainting.js` once the cycle is broken.
+
+### B. Scoring residue
+
+7. **Three severity tables.** `SEVERITY_POINTS` is canonical. The 0-10
+   `SEVERITY_PENALTY` survives only because the repair gates' visual/semantic
+   subscores speak 0-10 (gates measured as load-bearing — 81/520 fire alone —
+   so retire the SCALE by deriving the subscores from SEVERITY_POINTS, not by
+   deleting the gates). `RANK_SEVERITY_WEIGHT` is the tiebreak, documented.
+8. **Five deduction buckets.** `consolidated` vs raw quality/semantic/compliance
+   already caused one bad measurement (the 4-of-5 bucket error corrected in
+   `c2da7262a`). Either always consolidate, or store one flat `issues[]` with a
+   source tag. One shape, one query.
+9. **`evalScore`** = finalScore + entityPenalty — a derived field readers could
+   compute. `scoreBreakdown` and `deductions` are two representations of the
+   same issues. Candidates to collapse after the UI's reads are audited.
+10. **Version-object weight**: retryHistory, entityHistory, grokRefImages,
+    thinkingText, compositeDebug… audit which fields the dev panel actually
+    reads and stop persisting the rest.
+
+### C. Small and mechanical
+
+11. `IMAGE_MODELS` imported unused in `repairPipeline.js`.
+12. `detectGrokBorder` moved with compositing but has zero callers — delete.
+13. `resolveOutputAspect`, `truncatePromptForModel`, `extractDataImageUrls`,
+    `detectionForVersion` are exported for tests only — mark or move to a
+    test-support module.
+
+### D. Clothing / prose checks
+
+14. **Two thresholds for "is this character dressed"** — the reviewer tolerates
+    partial omission (measured: faulting partials fired on stories scoring
+    74/84), the prompt-check demands top+bottom+footwear. Intentional, but the
+    asymmetry lives in two files; keep both callers on `missingGarments` and
+    document the divergence in ONE place.
+15. **`characterProse()` depends on the `Name — … —` format.** If the writer's
+    format drifts, the check silently falls back to whole-page prose — the very
+    cross-character contamination it was built to fix. Consider a loud fallback.
+16. **Verify the writer fix**: re-run the sweep from `eea385113`; the 61.5%
+    outfit-omission rate must drop sharply. The next showcase produces the data.
+
+### E. Process
+
+17. **The destructure audit must outlive this session.** Five real bugs came
+    from parallel-agent commits invalidating a completed repoint sweep. The
+    audit script (~40 lines) should become a unit test that requires each
+    lib module and verifies every cross-module destructure resolves — cheap,
+    and it turns the shared-tree hazard into a red test instead of a runtime
+    TypeError.
