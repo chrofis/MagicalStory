@@ -768,7 +768,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // semantic + compliance + entity counts ONCE. One Sonnet call per
   // evaluated version (zero-issue evals skip the call), parallelized.
   // The plan lands on the version as `consolidatedPlan`; the finalize
-  // stampScores pass reuses it — no second LLM call.
+  // creation stamp reuses it — no second LLM call.
   // ---------------------------------------------------------------------
   const { consolidateEvaluation } = require('./feedbackConsolidator');
   const consolidatorStoryId = storyData?.id || jobId || null;
@@ -982,6 +982,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         stampAtCreation(v, {
           evalResult: v.evaluation,
           entityResult: { issues: v.entityIssues || [], penalty: v.entityPenaltyRaw ?? v.entityPenalty ?? 0 },
+          // Same deduped plan every other writer passes. Omitting it here was
+          // the drift: originals scored RAW at creation, CONSOLIDATED at save,
+          // and the pick sat between the two states (p9 −77/−65, task #15/16).
+          consolidatedPlan: v.consolidatedPlan || null,
         });
       }
     }
@@ -1883,7 +1887,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // math the persist path uses, so Step-3 selectBestVersion and
           // findBadPages decide on the SAME numbers that get persisted and
           // re-picked by recomputeAllActiveVersions. Previously this used
-          // setVersionScores (signed merged-eval scale) and stampScores
+          // setVersionScores (signed merged-eval scale) and a persist-time re-stamp
           // rewrote finalScore with math at persist — the Step-3 winner and
           // the saved activeVersion could disagree.
           newVersion.pageNumber = ev.pageNumber;
@@ -2098,14 +2102,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         };
         // Canonical stamp (inherits the pre-recovery best's evaluation).
         // Previously this copied finalScore inline WITHOUT an .evaluation-aware
-        // stamp, so the persist-time stampScores nulled its finalScore and the
+        // stamp, so the (since-deleted) persist-time re-stamp nulled its finalScore and the
         // chosen text-space winner could never win pickBestVersionIndex —
         // activeVersion then pointed at a different version than the flattened
         // root imageData.
         const { applyScore: stampTextSpace } = require('./scoring');
+        newVersion.consolidatedPlan = best.consolidatedPlan || null;
         stampTextSpace(newVersion, {
           evalResult: newVersion.evaluation,
           entityResult: { issues: newVersion.entityIssues, penalty: best.entityPenaltyRaw ?? best.entityPenalty ?? 0 },
+          consolidatedPlan: newVersion.consolidatedPlan,
         });
         versions.push(newVersion);
         // COMPETE, DO NOT APPOINT (owner, 2026-08-09). This used to force
@@ -2237,9 +2243,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               },
               pageNumber: target.page,
             };
+            newVersion.consolidatedPlan = prevBest.consolidatedPlan || null;
             stampStyleRepair(newVersion, {
               evalResult: newVersion.evaluation,
               entityResult: { issues: newVersion.entityIssues, penalty: prevBest.entityPenaltyRaw ?? prevBest.entityPenalty ?? 0 },
+              consolidatedPlan: newVersion.consolidatedPlan,
             });
             versions.push(newVersion);
             // COMPETE, DO NOT APPOINT — see the text-space note above.
@@ -2307,8 +2315,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const results = rawImages.map(img => {
     const pageNumber = img.pageNumber;
     const versions = pageVersions.get(pageNumber) || [];
-    // The pick happens BELOW, after stampScores has re-derived every version's
-    // finalScore — see FINAL NUMBERS FIRST. Declarations only here.
+    // The pick happens below over numbers that are ALREADY final — every
+    // writer stamps at input-change time (SCORE ONCE, task #16); there is no
+    // save-time re-stamp. Declarations only here.
     let best, wasCharFixed, finalImageData, finalEval;
 
     // Build imageVersions array — ALL versions in chronological order
@@ -2325,41 +2334,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // threeStageScore, rawQualityScore) are no longer written — readers go
     // through computeFinalScore or version.finalScore, and per-evaluator
     // sub-scores live under version.scoreBreakdown.<evaluator>.score.
-    const { applyScore } = require('./scoring');
-    const stampScores = (v) => {
-      // Stamp the page number so applyScore's [SCORE] log identifies the page
-      // (was logging a bare "version" with no page).
-      if (v.pageNumber == null) v.pageNumber = pageNumber;
-      if (!v.evaluation && !v.entityIssues && (v.entityPenalty == null || v.entityPenalty === 0)) {
-        // Un-evaluated version (e.g. a just-pushed original before any eval
-        // result is attached). Leave canonical fields null rather than
-        // defaulting to 100 (which composeDeductions on empty would yield —
-        // "no evidence of issues" is not the same as "image is perfect").
-        v.finalScore = null;
-        v.scoreBreakdown = null;
-        v.deductions = null;
-        return;
-      }
-      const entityResult = (v.entityIssues || v.entityPenalty != null)
-        ? { issues: v.entityIssues || [], penalty: v.entityPenalty || 0 }
-        : null;
-      applyScore(v, {
-        evalResult: v.evaluation || null,
-        entityResult,
-        // Audit-only: the evaluator's merged score. finalScore is always math.
-        // Deduped issue list from the eval-time consolidation (attached at
-        // version creation) — reused here, no second LLM call.
-        consolidatedPlan: v.consolidatedPlan || null,
-      });
-    };
 
-    // FINAL NUMBERS FIRST (task #15). stampScores re-derives finalScore from
-    // the version's consolidated plan, so persisted numbers can differ from
-    // the numbers the round loop picked on. Picking before stamping is how p9
-    // of job_1786277779744 shipped a −77 version beside a stored −65 sibling.
-    // Stamp everything, THEN pick — the shipped image is the max of exactly
-    // the numbers the story stores. Fallbacks cover an all-unscored page.
-    versions.forEach(stampScores);
+    // SCORE ONCE (task #16). Every writer stamps a version the moment its
+    // inputs change — creation, rescue, text-space, style repair — all with
+    // the same applyScore and the same consolidatedPlan handling. There is no
+    // save-time re-stamp any more, so the numbers the pick sees ARE the
+    // numbers the story stores, by construction rather than by ordering.
     best = selectBestVersion(versions) || finalBestPerPage.get(pageNumber) || versions[0];
     // Char-fix used to be a separate Map; the round loop now writes char-fix
     // versions into pageVersions like every other repair, so we derive the
@@ -2371,7 +2351,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     finalEval = best?.evaluation;
 
     const buildVersionEntry = (v) => {
-      stampScores(v);
       return {
       imageData: v.imageData,
       // Canonical scoring fields written by applyScore. finalScore is the
