@@ -998,7 +998,8 @@ async function buildCoverReferences({
   logLabel = null,
 }) {
   const { resolveArtStyle, resolveArtStyleForEmptyScene, extractSceneMetadata, getLandmarkPhotosForScene } = getStoryHelpers();
-  const { generateImageOnly, buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./images');
+  const { generateImageOnly } = require('./images');
+  const { buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./referenceSheets');
   const { getElementReferenceImagesForPage, getElementReferenceImagesByIds } = require('./visualBible');
 
   const label = logLabel || coverLabel(coverKey);

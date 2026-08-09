@@ -124,8 +124,6 @@ const {
   editImageWithPrompt,
   deleteFromImageCache,
   generateImageCacheKey,
-  buildVisualBibleGrid,
-  buildEmptySceneVbGrid,
   iteratePageCore,
   enrichWithBoundingBoxes,
   collectAllIssuesForPage,
@@ -139,6 +137,7 @@ const {
   compressImageToJPEG,
   runVisualInventory
 } = require('../lib/images');
+const { buildVisualBibleGrid, buildEmptySceneVbGrid } = require('../lib/referenceSheets');
 const { callClaudeAPI } = require('../lib/textModels');
 const {
   getVisualBibleEntriesForPage,

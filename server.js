@@ -101,9 +101,6 @@ const {
   generateImageWithQualityRetry,
   deleteFromImageCache,
   compressImageToJPEG,
-  generateReferenceSheet,
-  buildVisualBibleGrid,
-  buildEmptySceneVbGrid,
   IMAGE_QUALITY_THRESHOLD,
   // Separated evaluation pipeline functions
   generateImageOnly,
@@ -114,6 +111,7 @@ const {
   detectAllBoundingBoxes,
   createBboxOverlayImage
 } = require('./server/lib/images');
+const { generateReferenceSheet, buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./server/lib/referenceSheets');
 const {
   runEntityConsistencyChecks
 } = require('./server/lib/entityConsistency');

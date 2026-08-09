@@ -340,7 +340,8 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
   const { buildImagePrompt } = require('./storyHelpers');
-  const { generateImageOnly, buildPageCompositeRefs } = require('./images');
+  const { generateImageOnly } = require('./images');
+  const { buildPageCompositeRefs } = require('./referenceSheets');
   const { getTextAreaMask } = require('./textMasks');
   const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 
