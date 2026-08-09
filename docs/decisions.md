@@ -6927,18 +6927,33 @@ its own examples offered *hoop earring*, *metal buttons*, *large oval belt buckl
 the belt*, and the accessory examples were *scout badge, watch*. Concrete examples beat abstract
 rules, so the writer followed them.
 
-**Decision:** two rules added to `story-unified.txt`, `story-unified-imagefirst.txt` and
+**Reframed the same day (owner):** drop the "signature element" concept entirely. The goal was never
+that a costume announces itself with two badges — it is that **a child can point at the picture and
+say which character is which**. Identical twins are fine if one wears a green shirt and the other a
+red one; a gold earring against a silver chain distinguishes nobody. And the differences must include
+GARMENT TYPES, not one outfit in five colours: the pirate story put a tricorn on four of five
+characters. The rules below are written as one distinguishability test.
+
+**Decision:** rules added to `story-unified.txt`, `story-unified-imagefirst.txt` and
 `story-bible-from-beats.txt` (the live beats path), and every contradicting example rewritten:
 
-1. **The signature must be a SHAPE or a COLOUR BLOCK.** Good: full-length coat, cape, wide sash,
-   tricorn, bib panel, contrasting vest, knee boots, broad stripes. Banned as the identifying
-   element: print, logo, badge, pin, brooch, emblem, embroidery, stitching, trim, buckle, laces,
-   feather, earring, watch, buttons, or anything called "small", "tiny" or "fine". At most ONE small
-   detail per character, and only after two large signatures exist.
-2. **Plain, far-apart colour words** — red, blue, green, yellow, orange, purple, brown, black, white,
+1. **Dominant colour on the LARGEST garment**, different for every character — that is the block a
+   reader actually sees.
+2. **Different garment TYPES** — a long coat against a short vest against a cape; trousers against a
+   skirt. Headwear especially: if one wears a tricorn, the next wears a headscarf, the next a hood,
+   and at least one wears nothing. Five identical hats make five characters look like one.
+3. **Never distinguish by** print, logo, badge, pin, brooch, emblem, embroidery, stitching, trim,
+   buckle, laces, feather, earring, watch, buttons, or anything called "small", "tiny" or "fine".
+4. **Plain, far-apart colour words** — red, blue, green, yellow, orange, purple, brown, black, white,
    grey. Banned: burgundy, maroon, crimson, sage, dusty rose, coral, teal, ivory, taupe, mustard,
-   indigo. Two characters' dominant colours must be far apart on the wheel, not two shades of one
-   hue: a burgundy blouse and a navy coat came back as two burgundy garments on three pages of four.
+   indigo. Two shades of one hue are not a difference: a burgundy blouse and a navy coat came back as
+   two burgundy garments on three pages of four.
+
+**Also fixed, a straight contradiction:** the templates said *"NEVER include hats, helmets, crowns,
+masks"* under a "No Face Coverings" heading, while the costume rules handed out tricorns — and the
+pirate story gave everyone a hat regardless. It now bans what it means: masks, visors, veils,
+enclosing helmets and brims pulled over the eyes. Headwear worn clear of the face is explicitly
+encouraged as a distinguishing feature.
 
 **Rationale:** the existing "distinct styles" tests already demanded a different colour and
 silhouette per character, and the writer complied — Sarah burgundy, Hans navy. The render still
