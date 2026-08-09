@@ -61,10 +61,25 @@ interface StyledAvatarGenerationEntry {
       prompt?: string;
       selectedAttempt: number | null;
       finalScore: number | null;
+      // Decoupled two-call pipeline (2026-08-09): the full-body row (call 1),
+      // the head-shot row (call 2), and the composited 2×4 — all R2 URLs.
+      bodyRow?: string | null;
+      headRow?: string | null;
+      imageData?: string | null;
+      finalVerdict?: {
+        finalScore?: number;
+        valid?: boolean;
+        layout?: { layoutScore?: number };
+        identity?: { identityScore?: number; reason?: string };
+        outfit?: { outfitScore?: number };
+        sourceMatch?: { sourceMatchScore?: number };
+      } | null;
       attempts: Array<{
-        attempt: number;
+        attempt?: number;
+        try?: number;
         stage: string;
         score: number;
+        valid?: boolean;
         layoutScore?: number | null;
         identityScore?: number | null;
         outfitScore?: number | null;
@@ -3674,52 +3689,68 @@ export function StoryDisplay({
                         <div className="bg-purple-50 border border-purple-200 p-3 rounded text-xs space-y-3">
                           <div className="font-semibold text-purple-800">2-Pass Pipeline</div>
 
-                          {entry.passes.pass1 && entry.passes.pass1.attempts && entry.passes.pass1.attempts.length > 0 && (
-                            <div>
-                              <div className="font-semibold text-purple-700 mb-2">
-                                Pass 1: Realistic (identity anchor) — {entry.passes.pass1.attempts.length} attempt{entry.passes.pass1.attempts.length > 1 ? 's' : ''}
-                                {entry.passes.pass1.selectedAttempt != null && (
-                                  <span className="ml-2 text-[10px] font-normal text-purple-600">
-                                    selected #{entry.passes.pass1.selectedAttempt}
-                                    {entry.passes.pass1.finalScore != null ? ` · score ${entry.passes.pass1.finalScore}/10` : ''}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {entry.passes.pass1.attempts.map((a, i) => {
-                                  const isSelected = entry.passes!.pass1.selectedAttempt === a.attempt;
-                                  return (
-                                    <div key={i} className={`border-2 rounded p-1.5 ${isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 bg-white'} w-[180px]`}>
-                                      <div className="flex items-center justify-between mb-1">
-                                        <span className="text-[10px] font-bold text-gray-700">#{a.attempt} {a.stage}</span>
-                                        {isSelected && <span className="text-[9px] px-1 rounded bg-emerald-500 text-white">SELECTED</span>}
+                          {entry.passes.pass1 && (() => {
+                            const p1 = entry.passes!.pass1;
+                            // Decoupled two-call pipeline (2026-08-09): full body → face → composite.
+                            const decoupled = !!(p1.bodyRow || p1.headRow || p1.finalVerdict);
+                            const chip = (label: string, val?: number | null, cls = 'bg-blue-100 text-blue-700') =>
+                              val != null ? <span className={`px-1 py-0.5 rounded text-[9px] ${cls}`}>{label} {val}</span> : null;
+
+                            if (!decoupled) {
+                              // Legacy single-sheet attempts view (pre-2026-08-09 stories).
+                              if (!p1.attempts || p1.attempts.length === 0) return null;
+                              return (
+                                <div>
+                                  <div className="font-semibold text-purple-700 mb-2">Pass 1: Realistic (identity anchor) — {p1.attempts.length} attempt{p1.attempts.length > 1 ? 's' : ''}</div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {p1.attempts.map((a, i) => (
+                                      <div key={i} className="border-2 rounded p-1.5 border-gray-200 bg-white w-[180px]">
+                                        <div className="text-[10px] font-bold text-gray-700 mb-1">#{a.attempt} {a.stage}</div>
+                                        {a.imageData && <img src={a.imageData} alt="" className="w-full h-auto rounded cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: a.imageData!, title: `Pass 1 #${a.attempt}` })} />}
+                                        <div className="mt-1 flex flex-wrap gap-1">
+                                          {a.score != null && <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${a.score >= 6 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>final {a.score}</span>}
+                                          {chip('L', a.layoutScore)}{chip('I', a.identityScore, 'bg-indigo-100 text-indigo-700')}{chip('O', a.outfitScore, 'bg-amber-100 text-amber-700')}{chip('S', a.sourceMatchScore, 'bg-pink-100 text-pink-700')}
+                                        </div>
+                                        {a.reasons && a.reasons.length > 0 && <div className="mt-1 text-[9px] text-gray-600 line-clamp-3">{a.reasons.join(' · ')}</div>}
                                       </div>
-                                      {a.imageData && (
-                                        <img
-                                          src={a.imageData}
-                                          alt={`Pass 1 attempt ${a.attempt}`}
-                                          className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                          onClick={() => setEnlargedImage({ src: a.imageData!, title: `Pass 1 attempt ${a.attempt}` })}
-                                        />
-                                      )}
-                                      <div className="mt-1 flex flex-wrap gap-1">
-                                        {a.score != null && (
-                                          <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${a.score >= 6 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>final {a.score}</span>
-                                        )}
-                                        {a.layoutScore != null && <span className="px-1 py-0.5 rounded text-[9px] bg-blue-100 text-blue-700">L {a.layoutScore}</span>}
-                                        {a.identityScore != null && <span className="px-1 py-0.5 rounded text-[9px] bg-indigo-100 text-indigo-700">I {a.identityScore}</span>}
-                                        {a.outfitScore != null && <span className="px-1 py-0.5 rounded text-[9px] bg-amber-100 text-amber-700">O {a.outfitScore}</span>}
-                                        {a.sourceMatchScore != null && <span className="px-1 py-0.5 rounded text-[9px] bg-pink-100 text-pink-700">S {a.sourceMatchScore}</span>}
-                                      </div>
-                                      {a.reasons && a.reasons.length > 0 && (
-                                        <div className="mt-1 text-[9px] text-gray-600 line-clamp-3">{a.reasons.join(' · ')}</div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            const fv = p1.finalVerdict;
+                            const bodyAtt = (p1.attempts || []).find(a => a.stage === 'body');
+                            const headAtt = (p1.attempts || []).find(a => a.stage === 'head');
+                            const stepCard = (n: string, title: string, url: string | null | undefined, score: number | null | undefined, chips: React.ReactNode, reasons?: string[]) => (
+                              <div className="border-2 rounded p-1.5 border-gray-200 bg-white w-[200px]">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[10px] font-bold text-gray-700">{n}. {title}</span>
+                                  {score != null && <span className={`text-[9px] px-1 rounded font-bold ${score >= 6 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{score}/10</span>}
+                                </div>
+                                {url
+                                  ? <img src={url} alt={title} className="w-full h-auto rounded cursor-pointer hover:opacity-80" onClick={() => setEnlargedImage({ src: url, title })} />
+                                  : <div className="text-[9px] text-gray-400 py-4 text-center">no image</div>}
+                                {chips && <div className="mt-1 flex flex-wrap gap-1">{chips}</div>}
+                                {reasons && reasons.length > 0 && <div className="mt-1 text-[9px] text-gray-600 line-clamp-3">{reasons.join(' · ')}</div>}
                               </div>
-                            </div>
-                          )}
+                            );
+                            return (
+                              <div>
+                                <div className="font-semibold text-purple-700 mb-2">
+                                  Pass 1: decoupled — full body → face → composite
+                                  {fv?.finalScore != null && <span className="ml-1 text-[10px] font-normal text-purple-600">· composite {fv.finalScore}/10 {fv.valid ? '✓' : '✗'}</span>}
+                                </div>
+                                <div className="flex flex-wrap gap-2 items-start">
+                                  {stepCard('1', 'Full body', p1.bodyRow, bodyAtt?.score, <>{chip('layout', fv?.layout?.layoutScore)}{chip('outfit', fv?.outfit?.outfitScore, 'bg-amber-100 text-amber-700')}</>, bodyAtt?.reasons)}
+                                  <div className="self-center text-purple-300 text-lg">→</div>
+                                  {stepCard('2', 'Face (head-shots)', p1.headRow, headAtt?.score, <>{chip('identity', fv?.identity?.identityScore, 'bg-indigo-100 text-indigo-700')}</>, headAtt?.reasons || (fv?.identity?.reason ? [fv.identity.reason] : undefined))}
+                                  <div className="self-center text-purple-300 text-lg">→</div>
+                                  {stepCard('3', 'Composite (pasted)', p1.imageData, fv?.finalScore, <>{chip('L', fv?.layout?.layoutScore)}{chip('I', fv?.identity?.identityScore, 'bg-indigo-100 text-indigo-700')}{chip('O', fv?.outfit?.outfitScore, 'bg-amber-100 text-amber-700')}{chip('S', fv?.sourceMatch?.sourceMatchScore, 'bg-pink-100 text-pink-700')}</>, fv?.valid === false ? ['composite invalid'] : undefined)}
+                                </div>
+                              </div>
+                            );
+                          })()}
 
                           {entry.passes.pass2 && entry.passes.pass2.attempts && entry.passes.pass2.attempts.length > 0 && (
                             <div>
