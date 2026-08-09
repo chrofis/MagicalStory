@@ -24,17 +24,20 @@ Characters: {CHARACTER_NAMES}
 4. Slot conflicts — name any character wearing two garments in one slot that exclude each other, or any slot written out as empty rather than omitted.
 5. Face — name any garment that covers the face, the eyes, or shadows them with a brim.
 6. Completeness — name any character whose outfit is missing a top, a bottom or footwear.
+7. Style world — only when a world is named below. Name any character wearing nothing from that world, and any character whose whole outfit has been replaced by it rather than accented.
 
 Fixing check 1 outranks fixing check 3: a character in the right costume sharing a colour with someone else is better than a distinct colour on a garment that does not read as the costume. Two characters of different age or sex may wear the same headwear.
 
 A rewrite must not create a fault of its own. Before writing a corrected outfit, check it against every other character's outfit — including the ones you are leaving alone — and against the outfit you are replacing. Swapping two colours between characters leaves them as hard to tell apart as before.
+
+{STYLE_WARDROBE}
 
 # OUTPUT FORMAT
 
 Both blocks, in this order, nothing before or after.
 
 ---ANALYSIS---
-<your answers to checks 1-6>
+<your answers to checks 1-7>
 
 ---CLOTHING---
 ## <CharacterName> / <category>

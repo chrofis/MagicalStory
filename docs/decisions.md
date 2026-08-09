@@ -7461,3 +7461,43 @@ route still fires; 64/64 templates load; `check-settled` OK.
 **Touched:** `server/lib/evalBuckets.js`, `server/lib/scoring.js`, `prompts/image-evaluation.txt`,
 `prompts/image-prompt-compliance.txt`, `prompts/image-semantic.txt`,
 `prompts/feedback-consolidator.txt`.
+
+### Only "world" art styles shape the wardrobe — media never do (2026-08-09)
+
+**Context:**   No text stage knew the art style at all: the story bible wrote
+`clothingRequirements` blind, so a steampunk story dressed its cast exactly like
+a watercolour one. Owner asked whether the style should influence clothing, and
+floated oil-painting as a candidate.
+
+**Decision:** `WORLD_ART_STYLES` (`steampunk` → steampunk, `cyber` → cyberpunk)
+is the registry; `buildStyleWardrobeBlock()` returns an instruction for those and
+`''` for everything else. It reaches the two wardrobe stages only — the bible
+prompt and the clothing review (which gets a matching check 7). Accents, not a
+re-dress: one or two items from that world over clothing the story's own setting
+calls for.
+
+**Rationale:** The fourteen styles are two different kinds of thing. `steampunk`
+and `cyber` name a WORLD; the other twelve name a MEDIUM. Oil is Sargent's
+brushwork, not Sargent's era — letting a medium dress the cast would put a
+present-day family in period costume because someone picked a paint style. That
+is why the answer to "should oil-painting affect clothing too" is no.
+
+This does NOT reverse `ART_STYLES.steampunk`'s "the style changes rendering, not
+garments" — that clause governs the RENDERER and exists so the image model does
+not bolt gears onto faces (steampunk QA, 2026-07-21). Putting the world in the
+CONTRACT means the goggles are drawn because the text names them, not improvised.
+Decide the world in text, renderer obeys text — same shape as the costume-name
+fix above.
+
+The block names no garments, for the reason the costume exemplar lists were
+removed: the model knows what the world looks like, and listing items narrows it
+to the listed ones without binding anything outside them.
+
+Historical periods are deliberately NOT worlds here — those come from the story's
+own setting via `prompts/historical-guides.txt`, and a second source for "what era
+is this" is the kind of split this codebase keeps paying for.
+
+**Touched:**   `server/lib/storyHelpers.js` (`WORLD_ART_STYLES`,
+`buildStyleWardrobeBlock`, both wardrobe builders),
+`prompts/story-bible-from-beats.txt`, `prompts/clothing-review.txt`
+**Status:**    ✅ active

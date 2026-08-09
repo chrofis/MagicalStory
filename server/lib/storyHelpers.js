@@ -2195,45 +2195,69 @@ const ART_STYLES = {
   cartoon: 'A 2D cartoon illustration with bold black outlines and vibrant flat colors in the style of classic Saturday morning animation. Minimal shading, smooth vector quality, and stylized animated characters. Not photorealistic. Faces: bold outlines around features, flat-colored skin, exaggerated expressions, simple dot or oval eyes. Never realistic or 3D-looking. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   anime: 'A modern digital anime illustration in the style of Makoto Shinkai. Stylized animated characters with expressive large eyes and simplified features. Detailed cel-shading, vibrant color palette, and cinematic atmosphere. Not photorealistic. Faces: flat-colored smooth skin, very large eyes (30-40% of face height) with colored irises and highlight dots, tiny triangular nose, pointed chin, minimal shading. All characters must have anime-proportioned faces — never realistic. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   chibi: 'A chibi-style illustration with super deformed proportions — massive head, tiny body, kawaii aesthetic. Adorable, smooth illustration with minimalist detail. Not realistic. Faces: ultra-simplified kawaii features, large stylized eyes, dot nose, tiny mouth. Relative age differences stay visible even in the simplified style — elderly characters have grey/white hair and lined faces, adults have defined jawlines, only young children get classic blush-mark cheeks. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
-  steampunk: {
-    default: 'A steampunk graphic novel illustration with Victorian rendering. Sepia-toned muted color palette with detailed linework and leather and brass textures. Mechanical elements (gears, cogs, pipes, clockwork) appear only on machines, vehicles, and architecture the scene describes — never on people (no gears or mechanisms on skin, hair, faces, or garments) and never added to rooms the scene describes as plain or modern. Characters wear exactly their described clothing — the style changes rendering, not garments. Not photorealistic. Faces: realistic proportions, defined features, natural eyes with warm lighting. Never cartoonish or anime-styled — maintain grounded realism. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
-    grok: 'Steampunk graphic novel illustration in the style of Sean Murphy. Warm brown and muted amber color palette with restrained saturation — earthy tones only. Clean linework with even shading and smooth gradients; visible leather grain and metal patina where the scene contains machines or Victorian architecture. Mechanical elements (gears, cogs, pipes, clockwork) appear only on machines, vehicles, and architecture the scene describes — never on people (no gears or mechanisms on skin, hair, faces, or garments) and never added to rooms the scene describes as plain or modern. Characters wear exactly their described clothing — the style changes rendering, not garments. Realistic human faces with natural proportions, detailed eyes, and subtle expressions. Faces: realistic proportions, defined features, natural eyes with warm lighting. Never cartoonish or anime-styled — maintain grounded realism. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
-    gemini: 'Steampunk graphic novel illustration in the style of Sean Murphy and Travis Charest. Warm brown and amber color palette with clear, rich tones — not dark, moody, or desaturated. Well-lit scene with warm natural lighting, no heavy shadows or dark atmospheric overlay. Sharp focus throughout. Mechanical elements (gears, cogs, pipes, clockwork) appear only on machines, vehicles, and architecture the scene describes — never on people (no gears or mechanisms on skin, hair, faces, or garments) and never added to rooms the scene describes as plain or modern. Characters wear exactly their described clothing — the style changes rendering, not garments. Detailed character faces with defined features and expressions. Smooth linework with tonal gradients, not flat cel-shading. Smooth texture rendering. Polished graphic novel composition. Faces: realistic proportions, defined features, natural eyes with warm lighting. Never cartoonish or anime-styled — maintain grounded realism. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
-  },
+  steampunk: 'A steampunk graphic-novel illustration in the style of Sean Murphy — bold, confident ink linework and graphic ink-and-wash shading, clearly hand-drawn, never photographic and never a photo with a filter (no skin pores, no camera-real skin, no photographic fabric or lighting). Warm sepia-and-amber palette, muted and earthy, with leather and aged-brass tones. Mechanical elements (gears, cogs, pipes, clockwork) appear only on machines, vehicles, and architecture the scene describes — never on people (no gears or mechanisms on skin, hair, faces, or garments) and never added to rooms the scene describes as plain or modern. Characters wear exactly their described clothing — the style changes rendering, not garments. Faces: drawn with clean ink lines and graphic shading, defined but stylised features — an illustrated graphic-novel face, not a photoreal one. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   comic: 'A Franco-Belgian comic book illustration in the ligne claire style of Hergé and Peyo. Bold clean black outlines of uniform weight, flat solid colors, no halftone dots, no CMYK color separation, no crosshatching, no painterly shading. Bright friendly palette, dynamic composition. Not photorealistic. Faces: clean-lined simple features, flat natural skin tones, clear readable expressions — skin and hair always in the character\'s natural colors, never overlaid with colored patches. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   manga: 'A traditional Japanese manga illustration with intricate detailed ink linework. Backgrounds and scenery in monochrome ink + atmospheric screentones with dramatic lighting and composition. Character clothing, hair, and key story objects in their natural specified colors (color-spread / promotional cover style — not pure black-and-white interior panels). Not photorealistic. Faces: clean ink lines, screen tone shading, large but less extreme eyes than anime, defined noses, expressive mouths. Consistent manga rendering. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
-  watercolor: {
-    default: 'A bold, expressive traditional watercolor painting. Prominent visible brushstrokes, strong wet-on-wet color washes bleeding into one another, pigment pooling and granulating, and rough cold-press paper texture showing through. Loose painterly edges that dissolve into the paper — clearly hand-painted watercolor, never photographic and never a photo with a filter: no skin pores, no sharp photoreal rendering. Paint-dominant with soft, dissolving edges and no hard outlines — no inked lines, no pencil linework. Characters are fully opaque — never see-through, never fading into the background. Age-appropriate proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Faces rendered in loose watercolor washes with visible brushstroke texture.',
-    grok: 'A bold, expressive traditional watercolor painting. Prominent visible brushstrokes, strong wet-on-wet color washes bleeding into one another, pigment pooling and granulating, and rough cold-press paper texture showing through. Loose painterly edges that dissolve into the paper — clearly hand-painted watercolor, never photographic and never a photo with a filter: no skin pores, no sharp photoreal rendering. Paint-dominant with soft, dissolving edges and no hard outlines — no inked lines, no pencil linework. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant palette with visible paper texture throughout. Age-appropriate proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Faces rendered in loose watercolor washes with visible brushstroke texture.',
-    gemini: 'A bold, expressive traditional watercolor painting. Prominent visible brushstrokes, strong wet-on-wet color washes bleeding into one another, pigment pooling and granulating, and rough cold-press paper texture showing through. Loose painterly edges that dissolve into the paper — clearly hand-painted watercolor, never photographic and never a photo with a filter: no skin pores, no sharp photoreal rendering. Paint-dominant with soft, dissolving edges and no hard outlines — no inked lines, no pencil linework. Characters are fully opaque — never see-through, never fading into the background. Warm, inviting palette with moderate vibrancy — not washed out or cool-toned. Age-appropriate proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Faces rendered in loose watercolor washes with visible brushstroke texture.',
-  },
+  watercolor: 'A bold, expressive traditional watercolor painting. Prominent visible brushstrokes, strong wet-on-wet color washes bleeding into one another, pigment pooling and granulating, and rough cold-press paper texture showing through. Loose painterly edges that dissolve into the paper — clearly hand-painted watercolor, never photographic and never a photo with a filter: no skin pores, no sharp photoreal rendering. Paint-dominant with soft, dissolving edges and no hard outlines — no inked lines, no pencil linework. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant palette with visible paper texture throughout. Age-appropriate proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Faces rendered in loose watercolor washes with visible brushstroke texture.',
   oil: 'A classic oil painting in the style of John Singer Sargent. Realistic human proportions, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, and canvas texture. Museum quality fine art. Faces: painterly realism with visible brushstrokes, natural proportions, defined bone structure, warm skin tones from impasto technique. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   lowpoly: 'A low-poly 3D illustration in the style of Monument Valley. Geometric characters, isometric perspective, minimalist shapes, vibrant solid colors, and clean edges with a retro video game aesthetic. Not realistic. Faces: geometric faceted surfaces, minimal detail, flat-shaded polygonal features. No smooth skin — everything is angular. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   concept: 'Highly detailed digital concept art in the style of Craig Mullins and Karla Ortiz. Realistic human proportions, dramatic lighting, epic composition, smooth rendering with focus on mood and atmosphere. Matte painting aesthetic. Faces: realistic proportions with painterly rendering, defined bone structure, natural eyes, detailed but not photographic. Consistent matte painting quality across all characters. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   pixel: 'A 16-bit pixel art illustration in the style of Final Fantasy VI. Low resolution, limited color palette, detailed sprite work with a retro video game aesthetic. Not realistic. Faces: pixel-art rendering, limited color palette per face, clear pixel grid visible. No anti-aliasing on features. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   cyber: 'A cyberpunk anime illustration. Every figure is drawn in bold cel-shaded anime style: clean ink outlines, flat shaded skin, stylized features, never photographic. Render the scene at the story\'s own time of day, weather, and location — never switch daytime to night, never add rain. Add cyberpunk elements that read in daylight: glowing neon signs mounted on the scene\'s own fixtures — roadside sign posts, billboards, poles, shopfronts, walls (bright glowing shapes and colour only, no readable text or letters) — plus holographic glows and sleek neon-lit tech and cybernetic details. Neon-accented palette. Faces: cel-shaded anime rendering with crisp outlines and neon rim light. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
-  realistic: {
-    default: 'A photorealistic children\'s book illustration with natural lighting, real-world textures, and cinematic composition. Characters look like real people photographed in a storybook setting. Shallow depth of field, warm natural light, rich detail. Faces: natural human proportions with visible skin texture, pores, and subtle imperfections. Real-sized eyes, natural eyebrows, defined nose and lips. Warm skin tones with natural subsurface scattering. Every character must look like a real person — never stylized, never cartoon. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
-    grok: 'A photorealistic children\'s book illustration. Real people in real settings. Natural lighting, cinematic composition, shallow depth of field. Characters are real humans — natural proportions, real skin texture with pores, natural hair. NOT illustrated, NOT stylized, NOT animated. Think professional children\'s photography with storybook staging. Faces: real human faces with visible skin texture, natural eye size, defined features, warm natural lighting. Never cartoonish or stylized. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
-    gemini: 'A photorealistic children\'s book illustration with cinematic quality. Natural lighting, real-world textures, shallow depth of field. Characters look like real children/adults photographed in carefully staged storybook scenes. Professional photography aesthetic. Faces: photorealistic with natural skin texture, real proportions, subtle shading under cheekbones and jawline. Eyes are naturally sized with visible iris detail. Every face must look like a real person. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.'
-  },
+  realistic: 'A photorealistic children\'s book illustration with natural lighting, real-world textures, and cinematic composition. Characters look like real people photographed in a storybook setting — natural proportions, real skin texture with pores, natural hair, shallow depth of field, warm natural light. NOT illustrated, NOT stylized, NOT animated. Faces: natural human proportions with visible skin texture and subtle imperfections, real-sized eyes with visible iris detail, natural eyebrows, defined nose and lips, warm skin tones with subsurface scattering. Every character must look like a real person. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
 };
 
 /**
- * Resolve art style description, supporting per-backend variants.
- * ART_STYLES entries can be a string (used for all backends) or an object
- * with { default, grok, gemini } keys for per-backend prompts.
+ * Art styles that name a WORLD rather than a medium, and the name that world
+ * goes by in the wardrobe prompt.
+ *
+ * Only these influence what characters wear. Every other ART_STYLES key names a
+ * medium — oil is Sargent's brushwork, not Sargent's era — and a medium changes
+ * how an outfit is painted, never what it is. Letting one dress the cast would
+ * put a present-day family in period costume because someone picked a paint
+ * style. Owner call 2026-08-09: world styles only, accents only.
+ *
+ * Adding a world here is the whole change: the wardrobe stages read this map.
+ * Historical settings do NOT belong here — those come from the story's own
+ * setting via prompts/historical-guides.txt, and a second source for "what era
+ * is this" is exactly the kind of split this codebase keeps paying for.
+ */
+const WORLD_ART_STYLES = {
+  steampunk: 'steampunk',
+  cyber: 'cyberpunk',
+};
+
+/**
+ * Wardrobe instruction for a world art style, or '' for every other style.
+ *
+ * Deliberately names no garments. The costume exemplar lists were removed for
+ * the same reason (owner, 2026-08-09): the model already knows what the world
+ * looks like, and listing items narrows it to the listed ones without binding
+ * anything outside them.
+ */
+function buildStyleWardrobeBlock(artStyle) {
+  const world = WORLD_ART_STYLES[String(artStyle || '').trim().toLowerCase()];
+  if (!world) return '';
+  return `- **The illustration style is ${world}.** Every character wears one or two items that world is known for, over clothing the story's own setting calls for. The story's setting decides the rest of the outfit.`;
+}
+
+/**
+ * Resolve an art-style description. ONE description per style (2026-08-09):
+ * the per-backend { default, grok, gemini } variants were removed — tuning the
+ * prompt per model does not fix model behaviour, and maintaining three copies
+ * only let them drift (e.g. steampunk's grok/gemini variants demanded
+ * "realistic faces / grounded realism / smooth gradients", producing photoreal
+ * people the "graphic novel" label was supposed to prevent). `backend` is kept
+ * in the signature for caller compatibility but no longer selects a variant.
  * @param {string} artStyleId - Style key (e.g., 'steampunk')
- * @param {string} [backend] - Image backend ('grok', 'gemini', 'runware')
+ * @param {string} [_backend] - unused; retained for call-site compatibility
  * @returns {string|null} Style description or null if not found
  */
-function resolveArtStyle(artStyleId, backend) {
+function resolveArtStyle(artStyleId, _backend) {
   const style = ART_STYLES[artStyleId];
   if (!style) return null;
-  if (typeof style === 'string') return style;
-  // Object with per-backend variants
-  if (backend && style[backend]) return style[backend];
-  return style.default || null;
+  // All entries are strings now; tolerate a stray legacy object defensively.
+  return typeof style === 'string' ? style : (style.default || null);
 }
 
 /**
@@ -5920,6 +5944,7 @@ function buildClothingReviewPrompt(inputData, clothingRequirements) {
   if (blocks.length === 0) return null;
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
+    STYLE_WARDROBE: buildStyleWardrobeBlock(inputData.artStyle),
     CURRENT_CLOTHING: blocks.join('\n\n'),
   });
 }
@@ -6117,6 +6142,7 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
+    STYLE_WARDROBE: buildStyleWardrobeBlock(inputData.artStyle),
     MAIN_CHARACTER_NAMES: named(c => mainIds.includes(c.id)),
     PRIMARY_CHARACTER_NAMES: named(c => !mainIds.includes(c.id)),
     CHARACTER_PHYSICAL_BLOCK: chars
@@ -7161,6 +7187,8 @@ module.exports = {
   buildBeatsPrompt,
   buildBeatsReviewPrompt,
   buildClothingReviewPrompt,
+  buildStyleWardrobeBlock,
+  WORLD_ART_STYLES,
   parseClothingReview,
   buildSceneReviewPrompt,
   buildStoryTextFromBeatsPrompt,

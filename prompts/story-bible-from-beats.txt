@@ -41,6 +41,7 @@ Determine which clothing variants each character needs, based on the beats.
   - Plain colour words only: red, blue, green, yellow, orange, purple, brown, black, white, grey.
   - Never distinguish by a print, badge, pin, brooch, embroidery, trim, buckle, laces, feather, earring, watch or buttons, or anything small.
 - **One state per garment slot.** Never two that exclude each other. Omit a slot the character does not wear.
+{STYLE_WARDROBE}
 - Never write `none`, `n/a`, `tbd` or `""` as a value. Omit the field instead. `used: false` carries no `description`.
 
 # VISUAL BIBLE
