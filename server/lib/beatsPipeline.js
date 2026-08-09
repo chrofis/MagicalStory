@@ -113,6 +113,31 @@ function extractBibleSections(raw) {
   return { body, found: BIBLE_MARKERS.filter(m => body.includes(m)) };
 }
 
+/**
+ * Rewrite the ---CLOTHING REQUIREMENTS--- section of a bible transcript from a
+ * (reviewed) clothingRequirements object.
+ *
+ * Mutating the parsed object is NOT enough. `bibleSections` is spliced into
+ * `rawOutline`, and server.js re-parses clothingRequirements out of that text
+ * for every consumer after the pipeline returns — the later avatar passes, the
+ * persisted `stories.data.clothingRequirements`, scene prompts, entity eval.
+ * Leave the transcript alone and the review reaches exactly one caller (the
+ * early avatar kickoff) while everything else silently reads the unreviewed
+ * contract. Section markers and fence match what extractClothingRequirements
+ * expects: marker, then JSON, terminated by the next ---SECTION--- marker.
+ *
+ * @returns {string} the transcript with the section replaced, or unchanged when
+ *   there is no section to replace (the caller keeps shipping either way).
+ */
+function replaceClothingSection(bibleSections, clothingRequirements) {
+  const text = String(bibleSections || '');
+  if (!text || !clothingRequirements) return text;
+  const re = /(---CLOTHING REQUIREMENTS---\s*)([\s\S]*?)(?=---[A-Z\s]+---|$)/i;
+  if (!re.test(text)) return text;
+  const body = '```json\n' + JSON.stringify({ clothingRequirements }, null, 2) + '\n```\n\n';
+  return text.replace(re, (_m, marker) => `${marker}${body}`);
+}
+
 /** Merge a reviewer's partial rewrite onto a base list keyed by pageNumber. */
 function mergeByPage(base, fixes, apply) {
   const byPage = new Map(fixes.map(f => [f.pageNumber, f]));
@@ -343,6 +368,18 @@ SCENE: ${x.scene || ''}`.trim(),
           if (before === fix.description) continue;
           entry.description = fix.description;
           rewrites.push({ name, category: fix.category, before, after: fix.description });
+        }
+        // The transcript is the contract everything after this pipeline reads.
+        // Without this line the object is corrected and the transcript is not,
+        // so the review reaches only the early avatar kickoff and every later
+        // consumer re-parses the unreviewed outfits out of rawOutline.
+        if (rewrites.length > 0 && bibleSections) {
+          const rewritten = replaceClothingSection(bibleSections, clothingRequirements);
+          if (rewritten === bibleSections) {
+            gl.warn('beats_clothing_review_unmerged', `${rewrites.length} outfit(s) rewritten but the transcript has no CLOTHING REQUIREMENTS section to update — downstream will read the unreviewed contract`);
+          } else {
+            bibleSections = rewritten;
+          }
         }
         clothingReviewReport = {
           model: cRes.modelId || reviewModel,
