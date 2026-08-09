@@ -158,6 +158,10 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   const plateBuf = await sharp({ create: { width: cw, height: chh, channels: 3, background: { r: 255, g: 255, b: 255 } } })
     .composite([{ input: lettersPng, left: offX, top: offY }]).jpeg({ quality: 96 }).toBuffer();
   const sceneBuf = await sharp(artBuffer).resize(1024, 1024, { fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
+  // Evidence is attached to EVERY exit from here on. It used to ride only on the
+  // success and eval-rejection paths, so a page-fill rejection — the case you
+  // most want to look at — saved no plate and no model output at all.
+  const dbg = { plate: `data:image/jpeg;base64,${plateBuf.toString('base64')}`, raw: null };
 
   // 4. repaint
   const styleTxt = (() => {
@@ -188,8 +192,9 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
       opts.model || 'gemini-2.5-flash-image',
       [`data:image/jpeg;base64,${sceneBuf.toString('base64')}`], opts.artStyle);
   }
-  if (!result?.imageData) return { ...flat, reason: `${backend} returned no image` };
-  const debugOut = opts.debug ? { plate: `data:image/jpeg;base64,${plateBuf.toString('base64')}`, raw: result.imageData } : undefined;
+  if (!result?.imageData) return { ...flat, debug: dbg, reason: `${backend} returned no image` };
+  dbg.raw = result.imageData;
+  const debugOut = dbg;
 
   // 5. strip the padding back off, then key on INKINESS (dark OR saturated) so
   //    any paper texture the model invents drops out. Straight 1:1 overlay.
@@ -213,7 +218,7 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     rgba[m] = r; rgba[m + 1] = g; rgba[m + 2] = b; rgba[m + 3] = Math.round(a * 255);
     if (a > 0.5) letterPx++;
   }
-  if (letterPx < 200) return { ...flat, reason: 'keyed layer is empty' };
+  if (letterPx < 200) return { ...flat, debug: dbg, reason: 'keyed layer is empty' };
 
   // PAGE-FILL GATE. The band is requested in the prompt but not carved into the
   // pixels: instead we measure how much ink landed far outside it. Slack of 5%
@@ -235,7 +240,7 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     const MAX_OUT_OF_BAND = opts.maxOutOfBand ?? 0.15;
     if (outOfBand > MAX_OUT_OF_BAND) {
       log.warn(`🅰️ [TITLE PAINT] ${Math.round(outOfBand * 100)}% of the ink landed outside the title band — the model painted the page; keeping the flat title`);
-      return { ...flat, outOfBand: +outOfBand.toFixed(2), reason: `page-fill: ${Math.round(outOfBand * 100)}% of ink outside the title band` };
+      return { ...flat, outOfBand: +outOfBand.toFixed(2), debug: dbg, reason: `page-fill: ${Math.round(outOfBand * 100)}% of ink outside the title band` };
     }
   }
 
@@ -340,7 +345,7 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     // The eval itself failing is not evidence the repaint is bad, but we do not
     // ship an unverified title either — fall back, and say why.
     log.warn(`🅰️ [TITLE PAINT] final eval error (${e.message}) — keeping the flat title`);
-    return { ...flat, coverage, spill, reason: `eval-error: ${e.message}` };
+    return { ...flat, coverage, spill, debug: dbg, reason: `eval-error: ${e.message}` };
   }
 }
 
