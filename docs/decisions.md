@@ -7302,3 +7302,63 @@ sweep missed; now logs and marks UNRESOLVED instead.
 **Known limits:** a page Gemini refuses after 3 retries keeps its original (fallback, no crash). The repaint restyles the whole page's style uniformly but only the characters change materially (backgrounds are already in-style).
 
 **Touched:** `server/lib/styleRepair.js` (buildStyleRepairPrompt + geminiStyleRepaint direct call + prompt-only), `server/config/models.js` (re-enable + gemini). **Verified:** modules load; check-settled OK; repairPageStyle reproduces the validated p10 result. **Not verified:** a full fresh story run end-to-end (safe — worst case a refused page keeps its original).
+
+## 2026-08-09 — Left/right mirrors zeroed in code; clothing is a FIGURE REDO
+
+**Context:** owner reviewed all 14 pages of `job_1786277779744_vorw1f7ve` against their scores. The
+eval was found not uniformly harsh but poorly CORRELATED — the two best-looking pages (p10, p12)
+scored worse than a page with a genuine catastrophic defect. Two of the causes are fixed here.
+
+### 1. Left/right mirrors were still deducting — 350 points on one story
+
+`SETTLED.md` has said since May that pose mirrors never deduct, and all three page evaluators carry
+a rule. It leaked anyway: **30 consolidated findings worth 350 points, 12% of the story's entire
+deduction**, 24 of 29 raw ones from compliance. Page 5 alone lost 45 points to three findings of the
+form *"Hans is facing right but must face left"* — one per figure.
+
+**Why the rule did not bind.** Compliance's rule read *"Position: Horizontal half (left vs right) is
+a mirror — never deduct."* That covers where a figure STANDS. It says nothing about which way a
+figure FACES, or which side a worn item sits on — which is exactly what was firing. A coverage gap,
+not disobedience.
+
+**Fix, two layers:**
+- `image-prompt-compliance.txt` — the mirror rule now names all three forms (stands / faces / side a
+  worn item sits on) and states that pairing a mirror with the prompt's own wording ("the prompt
+  requires him facing left") does not make it a finding, because the prompt's left is
+  mirror-equivalent too. Front vs back is explicitly preserved as judgeable.
+- `scoring.js` — `isMirrorOnlyFacing()` zeroes the charge. Scoped deliberately to `camera_facing`,
+  which D-18 DEFINES as front/back only ("Never judge left vs right here"), so a left/right
+  camera_facing finding is out of spec by the pipeline's own definition and zeroing it needs no
+  judgement about the image. Disqualified when the text also says `missing`/`absent` (a real second
+  defect) or names front/back.
+
+**Measured:** −170 points on this story (12 findings). That is HALF the 350: the remainder are
+left/right claims bundled inside `clothing` / `accessory` findings, which are deliberately NOT
+zeroed because they usually carry a real second defect ("missing the eye patch"). Those depend on
+the one-defect-one-code rule landing first. Do not widen the regex to catch them — fix the bundling.
+
+### 2. Clothing is a figure redo, never an inpaint patch or a scene rewrite
+
+**Owner decision:** a wrong outfit is a property of the FIGURE. Repainting a masked region around it
+fights the surrounding pixels, and rewriting the scene throws away a composition that was fine.
+
+Before this, a clothing finding only reached `char-fix` via the ENTITY report; findings from quality
+or compliance fell through to `inpaint`. `repairLogic.js` gains step 2b: a MAJOR+ `clothing` finding
+naming a character routes to `char-fix` with `forceTarget: 'body'`, resolving to
+`{regionSource:'box', treatment:'crosshatch', faceOnly:false}` — the whole figure redrawn.
+
+Scope, deliberate: entity findings keep priority (step 2 runs first, and they carry cross-page
+evidence); MODERATE clothing still inpaints; `accessory` is EXCLUDED because it caps at MODERATE and
+a bandana knot is not worth redrawing a person over; a finding with no character name cannot route.
+
+**Verified:** 6/6 mirror scoring cases (mirror zeroed, front/back preserved, bundled-defect
+preserved, non-camera_facing types untouched) and 4/4 routing cases. 64/64 templates load,
+`check-settled` OK.
+
+**Touched:** `prompts/image-prompt-compliance.txt`, `server/lib/scoring.js`,
+`server/lib/repairLogic.js`.
+
+**Still open from the same review** (not addressed here): false absence claims — "Sarah missing
+glasses" / "Daniel is absent" where both are visibly present — being investigated separately; and
+`image_coherence` under-charging, where p11's ghost figures, headless torso and inverted body were
+scored MINOR −2 as "shadow figures clutter midground".

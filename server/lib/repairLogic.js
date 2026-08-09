@@ -282,6 +282,41 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     }
   }
 
+  // 2b. Clothing is a FIGURE REDO, never an inpaint patch or a scene rewrite.
+  //
+  // Owner decision 2026-08-09, after reviewing a full 14-page story: a wrong
+  // outfit is a property of the FIGURE, so repainting a masked region around it
+  // (inpaint) fights the surrounding pixels, and rewriting the scene (iterate)
+  // throws away a composition that was fine. Redrawing the figure is the only
+  // method that actually owns the defect.
+  //
+  // Only reachable when the entity check (step 2) did not already claim the
+  // page — entity findings carry cross-page evidence and keep priority.
+  // `accessory` is deliberately EXCLUDED: it caps at MODERATE, and a bandana
+  // knot is not worth redrawing a person over.
+  if (pageNumber > 0) {
+    const clothingIssue = severityIssues.find(i =>
+      String(i?.type || '').toLowerCase() === 'clothing'
+      && /^(major|critical|catastrophic)$/i.test(String(i?.severity || ''))
+      && String(i?.character || '').trim());
+    if (clothingIssue) {
+      const charName = String(clothingIssue.character).trim();
+      const issueDescription = clothingIssue.description || clothingIssue.problem || '';
+      const { resolveRepairAxes } = require('./faceRepair');
+      // forceTarget 'body' so this never degrades into a face-only cutout:
+      // the whole figure is redrawn, which is the point of the route.
+      const repairParams = resolveRepairAxes(issueDescription, { hasFaceBbox: true, forceTarget: 'body' });
+      return {
+        method: 'char-fix',
+        reason: `clothing ${String(clothingIssue.severity).toLowerCase()} on ${charName} — figure redo`,
+        charName,
+        severity: String(clothingIssue.severity).toLowerCase(),
+        issueDescription,
+        repairParams,
+      };
+    }
+  }
+
   // 3. Inpaint when there's something inpaintable.
   if (typeof options.chooseRepairStrategy === 'function') {
     return mapStrategyToMethod(options.chooseRepairStrategy(evaluator));

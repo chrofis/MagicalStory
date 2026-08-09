@@ -127,6 +127,34 @@ const ZERO_POINT_TYPES = new Set(['garment_colour', 'garment_color']);
 // CRITICAL, which is where the 57 compliance criticals were landing.
 const MAX_SEVERITY_TYPES = { accessory: 'moderate', accessory_missing: 'major' };
 
+// Left/right is a MIRROR and never deducts — SETTLED.md, and a rule carried by
+// all three page evaluators. It still leaked: measured on one 14-page story,
+// 30 consolidated findings worth 350 points (12% of the story's whole
+// deduction) were left/right claims, 24 of 29 raw ones from the compliance
+// evaluator, which lost 45 points on ONE page for "facing right instead of
+// left" against three separate figures.
+//
+// Scoped deliberately to `camera_facing`, because that code is DEFINED as
+// front/back only (D-18: "Never judge left vs right here"). A left/right
+// camera_facing finding is out of spec by the pipeline's own definition, so
+// zeroing it needs no judgement about the image.
+//
+// NOT applied to clothing/accessory findings that mention a side — those often
+// carry a real second defect ("missing the eye patch") and the one-defect-one-
+// code rule has to land first. `missing` anywhere in the text also disqualifies
+// it here: an absent item is a real finding whichever side it belongs on.
+const MIRROR_FACING = /\b(?:facing|faces|turned|oriented)\b[^.;]{0,40}\b(?:left|right)\b/i;
+const FRONT_BACK = /\b(?:toward|towards)\s+the\s+(?:viewer|camera)|front view|back view|back to (?:the )?(?:camera|viewer)|facing (?:the )?(?:camera|viewer)|away from (?:the )?(?:viewer|camera)|from behind|over (?:his|her|their) shoulder\b/i;
+
+function isMirrorOnlyFacing(d) {
+  if (String(d?.type || '').toLowerCase() !== 'camera_facing') return false;
+  const text = String(d?.description || '');
+  if (!MIRROR_FACING.test(text)) return false;
+  if (FRONT_BACK.test(text)) return false;      // a real front/back call
+  if (/\bmissing\b|\babsent\b/i.test(text)) return false; // carries a second, real defect
+  return true;
+}
+
 const SEVERITY_POINTS = {
   catastrophic: 50,
   critical:     25,
@@ -246,6 +274,7 @@ function sumDeductionPoints(deductions) {
   const points = (d) => {
     const type = String(d?.type || '').toLowerCase();
     if (ZERO_POINT_TYPES.has(type)) return 0;
+    if (isMirrorOnlyFacing(d)) return 0;
     const raw = SEVERITY_POINTS[d.severity] || 0;
     // Ceiling by type — charge the lower of what was claimed and what the type
     // is allowed to cost. Never raises a severity, only bounds it.
