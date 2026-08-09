@@ -109,6 +109,24 @@ const { log } = require('../utils/logger');
 // fixed mechanically, so charging it would trip the redo gate for a hue shift.
 const ZERO_POINT_TYPES = new Set(['garment_colour', 'garment_color']);
 
+// Types with a hard severity CEILING, applied to the SCORE regardless of what
+// the evaluator claimed. Same shape as ZERO_POINT_TYPES: the finding is still
+// reported in full, only its cost is bounded.
+//
+// `accessory` (2026-08-09): the prompts have told the quality evaluator since
+// July that accessory detail is MODERATE and "Never MAJOR". Measured over 8
+// stories: quality respects the CRITICAL ceiling (0 of 110 accessory findings
+// critical) but ignores the MAJOR line 67 times, and the compliance evaluator —
+// which had no such rule at all — rated 131 of 132 above MODERATE, 57 of them
+// CRITICAL. A prompt rule demonstrably lowers the ceiling without holding it, so
+// the ceiling is enforced here. Missing glasses must not cost the same as a
+// missing character.
+// Two accessory types, two ceilings — the distinction the owner asked for:
+// a WRONG version of an accessory is detail; a contract-named accessory that is
+// entirely ABSENT is a real miss and may cost MAJOR. Neither may ever reach
+// CRITICAL, which is where the 57 compliance criticals were landing.
+const MAX_SEVERITY_TYPES = { accessory: 'moderate', accessory_missing: 'major' };
+
 const SEVERITY_POINTS = {
   catastrophic: 50,
   critical:     25,
@@ -225,8 +243,15 @@ function composeDeductions({ evalResult = null, entityResult = null, consolidate
 function sumDeductionPoints(deductions) {
   if (!deductions || typeof deductions !== 'object') return 0;
   let total = 0;
-  const points = (d) => (ZERO_POINT_TYPES.has(String(d?.type || '').toLowerCase())
-    ? 0 : (SEVERITY_POINTS[d.severity] || 0));
+  const points = (d) => {
+    const type = String(d?.type || '').toLowerCase();
+    if (ZERO_POINT_TYPES.has(type)) return 0;
+    const raw = SEVERITY_POINTS[d.severity] || 0;
+    // Ceiling by type — charge the lower of what was claimed and what the type
+    // is allowed to cost. Never raises a severity, only bounds it.
+    const ceiling = MAX_SEVERITY_TYPES[type];
+    return ceiling ? Math.min(raw, SEVERITY_POINTS[ceiling] || raw) : raw;
+  };
   // `consolidated` is the deduped cross-evaluator list (one entry per unique
   // defect) — mutually exclusive with the raw buckets by construction in
   // composeDeductions, so summing all four never double-counts.

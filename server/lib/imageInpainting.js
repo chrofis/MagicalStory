@@ -737,7 +737,11 @@ async function blackoutIssueRegions(imageBase64, fixTargets, padding = 0.05) {
       let box;
       if (target.type === 'face' && target.faceBox) {
         box = target.faceBox;
-      } else if ((target.type === 'clothing' || target.type === 'limb' || target.type === 'hand') && target.bodyBox) {
+      // `accessory` / `accessory_missing` are worn on the body and mask like
+      // clothing — they split off from the clothing TYPE (for score ceilings)
+      // but must keep clothing's box choice.
+      } else if ((target.type === 'clothing' || target.type === 'accessory' || target.type === 'accessory_missing'
+                  || target.type === 'limb' || target.type === 'hand') && target.bodyBox) {
         box = target.bodyBox;
       } else {
         box = target.boundingBox || target.bodyBox || target.faceBox;

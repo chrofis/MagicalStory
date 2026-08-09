@@ -7001,3 +7001,69 @@ another bare-headed).
 
 **Status:** 🟡 shipped, unmeasured. Watch the next costumed story: does the styled avatar come back
 wearing the hat, and do hats stop vanishing mid-book?
+
+## 2026-08-09 — Accessories are their own type with a SCORE CEILING; the parity gap was in compliance
+
+**Context:** the owner asked whether a lone compliance CRITICAL should be capped. Investigated first,
+and **the original hypothesis was wrong** — recorded here so it is not retried.
+
+**Rejected: capping compliance-only CRITICALs.** Compliance never sees the image (it judges a stage-1
+vision inventory against the prompt) and is the harshest judge — 31% CRITICAL+ vs 8% for the quality
+evaluator that DOES look — while driving 43% of all deduction points. That looked like inflation. It
+is not. Of its 96 sole-source CRITICALs, ~81 are legitimate: missing and extra figures (including a
+headless torso confirmed by eye), wholesale costume failure, setting contradictions, a mistitled
+book, 1815-anachronistic neon. Page 13 of `job_1786193650012_7baiaeftb` was pulled and inspected: a
+pirate story rendering the entire cast in work vest, cardigan, suit jacket and cargo shorts, flagged
+by compliance ALONE. A source-based cap would have suppressed the most important finding on the page.
+**Compliance's high CRITICAL rate reflects that it is the only evaluator checking the image against
+the commission.** Do not cap it by source.
+
+**The real defect is by TYPE, not by source.** 15 of the 96 are over-severe and they cluster:
+8 accessories (glasses, bandana, boots, hat trim) and 7 over-precision (which hand grips the
+notebook, palm at knee height).
+
+**Measured — a prompt rule lowers a ceiling without holding it.** `image-evaluation.txt` D-06 has
+said "accessory detail → MODERATE, Never MAJOR" since July:
+
+| evaluator | accessory findings | above MODERATE | CRITICAL |
+|---|---|---|---|
+| quality (has D-06) | 110 | 61% | **0** |
+| compliance (no rule) | 132 | 99% | **57** |
+| semantic (has an ignore-rule) | 17 | 71% | 0 |
+
+Quality honours the CRITICAL ceiling absolutely and ignores the MAJOR line 67 times. So the CRITICAL
+part is worth stating in prompts; the MAJOR part must be enforced in code.
+
+**Decision — three parts:**
+1. **`accessory` and `accessory_missing` are their own types** (`evalBuckets.js`), sharing the
+   `accessory` bucket and clothing's `grok_blended` repair — routing is unchanged. Split so the
+   ceiling below can bind without touching real wardrobe failures, and so "how much of the clothing
+   tax is accessory nitpicking?" becomes a GROUP BY instead of a regex over descriptions.
+2. **`MAX_SEVERITY_TYPES` in `scoring.js`** — `accessory` caps at MODERATE, `accessory_missing` at
+   MAJOR. Same shape as `ZERO_POINT_TYPES`: the finding is reported in full, only its cost is
+   bounded, and the ceiling never RAISES a severity. The detail/absence split is the owner's call:
+   a bicorne drawn for a tricorn is detail; a bare head where the contract names a hat is a real
+   miss. Neither may ever reach CRITICAL.
+3. **Rule parity in `image-prompt-compliance.txt`** — it had no accessory ceiling (only an
+   exemption for *occludable* items, which is why glasses/boots/bandanas sailed through) and no
+   equivalent of N-04's hand-and-limb exclusion, which is why every over-precision case came from
+   it. Semantic already had both rules; its violations are non-compliance, not a gap, so it was
+   left alone.
+
+**Sibling sites fixed in the same commit:** `imageInpainting.js` and `images.js` both branch on
+`type === 'clothing'` to select the BODY box for masking. An accessory finding would have fallen
+through to a different box, so both now include the two new types.
+
+**Verified:** 11/11 scoring cases correct (ceiling binds, never raises, `clothing` /
+`missing_character` / `garment_colour` untouched); all 63 templates load; every new rule present in
+the loaded text.
+
+**Estimated impact −700 points / −2.7%** over 8 stories (85 findings → accessory, 74 →
+accessory_missing). This is a REGEX PROXY over historical findings, not a measurement: the simulation
+mislabels some main-garment findings as accessories, and in production the model does the labelling.
+The honest number needs a Lab run on fresh output. It is well below the ~10% I estimated before
+adding the main-garment guard.
+
+**Touched:** `server/lib/evalBuckets.js`, `server/lib/scoring.js`, `server/lib/imageInpainting.js`,
+`server/lib/images.js`, `prompts/image-evaluation.txt`, `prompts/image-prompt-compliance.txt`,
+`prompts/feedback-consolidator.txt`.

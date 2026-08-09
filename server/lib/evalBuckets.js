@@ -34,6 +34,12 @@ const BUCKETS = {
   character_presence:   { owner: 'quality',  kind: 'binary', repair: 'regen_or_composite' },
   character_identity:   { owner: 'quality',  kind: 'binary', repair: 'grok_face' },
   clothing:             { owner: 'quality',  kind: 'graded', repair: 'grok_blended' },
+  // Small worn items (eyewear, bandana, belt, badge, footwear, jewellery) as
+  // distinct from the MAIN garment. Its own bucket so the ceiling below can be
+  // enforced on it without touching real wardrobe failures, and so "how much of
+  // our clothing tax is accessory nitpicking?" is a GROUP BY instead of a regex
+  // over descriptions. Repair is identical to clothing — routing is unchanged.
+  accessory:            { owner: 'quality',  kind: 'graded', repair: 'grok_blended' },
   anatomy:              { owner: 'quality',  kind: 'graded', repair: 'regen' },
   figure_completeness:  { owner: 'quality',  kind: 'binary', repair: 'regen' },
   camera_facing:        { owner: 'quality',  kind: 'binary', repair: 'regen' },
@@ -99,7 +105,15 @@ const TYPE_TO_BUCKET = {
   face: 'character_identity', facial_hair: 'character_identity',
   appearance: 'character_identity', age_appearance: 'character_identity',
   age: 'character_identity', character_identification: 'character_identity',
-  glasses: 'clothing', accessory: 'clothing', clothing_detail: 'clothing',
+  // Accessory detail is its own bucket (see BUCKETS.accessory) — it carries a
+  // MODERATE ceiling in scoring.js that must NOT apply to main-garment failures.
+  accessory: 'accessory', glasses: 'accessory', eyewear: 'accessory',
+  bandana: 'accessory', jewellery: 'accessory', jewelry: 'accessory',
+  footwear: 'accessory', clothing_detail: 'accessory',
+  // Same bucket (same repair), different TYPE — scoring.js gives the two
+  // different ceilings: wrong-version is MODERATE, contract-named-and-absent
+  // may reach MAJOR.
+  accessory_missing: 'accessory', missing_accessory: 'accessory',
   costume: 'clothing', headwear: 'clothing',
   pose: 'action_interaction', main_action: 'action_interaction',
   gesture: 'action_interaction', holding: 'action_interaction',

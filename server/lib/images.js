@@ -3985,7 +3985,8 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
         || extractCharacterNames(issueDesc + ' ' + issueFix).length > 0;
       if (namesAKnownChar) {
         log.debug(`📦 [BBOX-ENRICH] Issue names a character whose figure wasn't detected — leaving text-only (not mis-assigning to another person): "${(issue.description || '').substring(0, 60)}"`);
-      } else if (issue.type === 'face' || issue.type === 'hand' || issue.type === 'clothing') {
+      } else if (issue.type === 'face' || issue.type === 'hand' || issue.type === 'clothing'
+                 || issue.type === 'accessory' || issue.type === 'accessory_missing') {
         // For character-related issues, prefer identified characters or largest figure
         const identifiedFigures = allDetections.figures.filter(f => f.name && f.name !== 'UNKNOWN');
         if (identifiedFigures.length > 0) {
