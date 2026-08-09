@@ -138,7 +138,6 @@ const {
   callGrokVisionAPI,
   GEMINI_SAFETY_SETTINGS,
   IMAGE_QUALITY_THRESHOLD,
-  compareImageStyles,
   compressImageToJPEG,
   runVisualInventory
 } = require('../lib/images');
@@ -1901,7 +1900,7 @@ router.post('/:id/analyze-style/:pageNum', authenticateToken, async (req, res) =
     }
 
     const start = Date.now();
-    const { analyzeImageStyle } = require('../lib/images');
+    const { analyzeImageStyle } = require('../lib/styleAnalysis');
     const result = await analyzeImageStyle(imageData);
     const elapsed = Date.now() - start;
 
@@ -2088,6 +2087,7 @@ router.post('/:id/style-lab/:pageNum/evaluate', authenticateToken, async (req, r
     // Compress images for comparison — style analysis doesn't need full resolution
     const imgA = await compressImageToJPEG(imageA.image_data, 80, 512);
     const imgB = await compressImageToJPEG(imageB.image_data, 80, 512);
+    const { compareImageStyles } = require('../lib/styleAnalysis');
     const evaluation = await compareImageStyles(imgA, imgB);
 
     // Save evaluation to storyData (storyData and run already loaded above for model ordering)

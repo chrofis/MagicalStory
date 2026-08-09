@@ -185,7 +185,7 @@ async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
   // Default to the production functions; injection keeps the unit tests
   // free of live image/vision API calls.
   const editImage = editFn || require('./images').editImageWithPrompt;
-  const checkStyle = styleMatchFn || require('./images').checkStyleMatch;
+  const checkStyle = styleMatchFn || require('./styleAnalysis').checkStyleMatch;
 
   // BEFORE: how far the outlier is from the target style (baseline for the A/B).
   let beforeStyleMatch = null;

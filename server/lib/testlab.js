@@ -3870,7 +3870,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
       const fww = Math.min(W - fx, Math.round(fw * (1 + 2 * fp) * W));
       const fhh = Math.min(H - fy, Math.round(fh * (1 + 2 * fp) * H));
       const faceCrop = await sharp(baseBuf).extract({ left: fx, top: fy, width: fww, height: fhh }).jpeg({ quality: 92 }).toBuffer();
-      const { describeHeadPose } = require('./images');
+      const { describeHeadPose } = require('./styleAnalysis');
       const p = await describeHeadPose(`data:image/jpeg;base64,${faceCrop.toString('base64')}`);
       poseText = [
         p.facing ? `facing ${p.facing}` : null,
@@ -4068,7 +4068,7 @@ async function runQwenInsertStage(ctx, { experimentId, promptOverride, params = 
   let styleMatch = null;
   if (params.repairMode) {
     try {
-      const { checkStyleMatch } = require('./images');
+      const { checkStyleMatch } = require('./styleAnalysis');
       styleMatch = await checkStyleMatch(
         `data:image/jpeg;base64,${cropBuf.toString('base64')}`,
         `data:image/jpeg;base64,${outBufEarly.toString('base64')}`

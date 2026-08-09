@@ -564,7 +564,7 @@ async function buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, f
 
   if (treatment === 'whiteout' && faceOnly) {
     const sharp = require('sharp');
-    const { describeHeadPose } = require('./images');
+    const { describeHeadPose } = require('./styleAnalysis');
     let poseText = null;
     try {
       const fb = faceBbox;
@@ -615,10 +615,11 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   const sharp = require('sharp');
   const { samUnionBlend, fetchMaskWithRetry } = require('./samBlend');
   const {
-    fetchFigureHeadMaskPng, detectPersonBoxInCrop, checkStyleMatch,
+    fetchFigureHeadMaskPng, detectPersonBoxInCrop,
     measureRegionSharpness, REPAIR_SHARPNESS_MIN_ORIG, REPAIR_SHARPNESS_REJECT_RATIO,
     grokEditSceneExact,
   } = require('./images');
+  const { checkStyleMatch } = require('./styleAnalysis');
 
   // --- Axis normalisation + defaults (reproduce today's dominant path) -------
   const model0 = opts.model || 'grok';
