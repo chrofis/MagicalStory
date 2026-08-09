@@ -165,9 +165,23 @@ function checkPage(page, clothingRequirements, opts = {}) {
           const st = tokens(sentence);
           const hits = t.filter(w => st.has(w)).length;
           if (hits >= 3) {
+            // WORD THE FAULT AS THE FIX. The first version said "the prose puts
+            // Sarah's blouse on Hans" — and Hans was not wearing a blouse, he was
+            // wearing a burgundy COAT. The reviewer looked for a blouse, found
+            // none, and left it (Lab #446: 14 pages rewritten, 0 faults fixed).
+            // What is actually wrong is that words belonging only to another
+            // character's outfit appear on this one, so name those words and
+            // state this character's own outfit as the replacement.
+            const borrowed = t.filter(w => st.has(w));
+            const ownOutfit = outfits.get(other);
+            const ownText = ownOutfit ? ownOutfit.parts.map(x => (x.slot ? `${x.slot}: ` : '') + x.text).join('; ') : null;
             findings.push({
               pageNumber: page.pageNumber, type: 'outfit_misattributed', character: other, slot: part.slot,
-              detail: `The prose puts ${owner}'s ${part.slot || 'garment'} ("${part.text.slice(0, 70)}") on ${other}. Each character wears their own outfit.`,
+              detail: `${other} is described with wording that belongs to ${owner}'s outfit (${borrowed.map(w => `"${w}"`).join(', ')}). `
+                + (ownText
+                  ? `Rewrite ${other}'s description to their own outfit: ${ownText}. `
+                  : `${other} has no outfit of their own in this story — say nothing about their clothing. `)
+                + `Do not reuse any of ${owner}'s garments or colours on ${other}.`,
             });
             break;
           }
