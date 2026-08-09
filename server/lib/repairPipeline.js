@@ -2307,16 +2307,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const results = rawImages.map(img => {
     const pageNumber = img.pageNumber;
     const versions = pageVersions.get(pageNumber) || [];
-    const best = finalBestPerPage.get(pageNumber) || versions[0];
-    // Char-fix used to be a separate Map; the round loop now writes char-fix
-    // versions into pageVersions like every other repair, so we derive the
-    // "was character fixed" flag from the picked version's source.
-    const wasCharFixed = typeof best?.source === 'string'
-      && (best.source.startsWith('char-fix-') || best.source === 'character-fix' || best.source.startsWith('character-fix:'));
-
-    // Final image: best version (which may be original, inpaint, iterate, or character-fix)
-    const finalImageData = best?.imageData || img.imageData;
-    const finalEval = best?.evaluation;
+    // The pick happens BELOW, after stampScores has re-derived every version's
+    // finalScore — see FINAL NUMBERS FIRST. Declarations only here.
+    let best, wasCharFixed, finalImageData, finalEval;
 
     // Build imageVersions array — ALL versions in chronological order
     const imageVersions = [];
@@ -2359,6 +2352,24 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         consolidatedPlan: v.consolidatedPlan || null,
       });
     };
+
+    // FINAL NUMBERS FIRST (task #15). stampScores re-derives finalScore from
+    // the version's consolidated plan, so persisted numbers can differ from
+    // the numbers the round loop picked on. Picking before stamping is how p9
+    // of job_1786277779744 shipped a −77 version beside a stored −65 sibling.
+    // Stamp everything, THEN pick — the shipped image is the max of exactly
+    // the numbers the story stores. Fallbacks cover an all-unscored page.
+    versions.forEach(stampScores);
+    best = selectBestVersion(versions) || finalBestPerPage.get(pageNumber) || versions[0];
+    // Char-fix used to be a separate Map; the round loop now writes char-fix
+    // versions into pageVersions like every other repair, so we derive the
+    // "was character fixed" flag from the picked version's source.
+    wasCharFixed = typeof best?.source === 'string'
+      && (best.source.startsWith('char-fix-') || best.source === 'character-fix' || best.source.startsWith('character-fix:'));
+    // Final image: best version (original, inpaint, iterate, or character-fix)
+    finalImageData = best?.imageData || img.imageData;
+    finalEval = best?.evaluation;
+
     const buildVersionEntry = (v) => {
       stampScores(v);
       return {

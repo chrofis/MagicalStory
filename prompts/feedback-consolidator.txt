@@ -67,6 +67,7 @@ Fill `spec_conflicts[]` before writing any fixes. This is the one exception to r
      `image_coherence` · `character_identity` · `duplicate_character` · `missing_character` · `clothing` · `accessory` · `accessory_missing` · `hair` · `nudity` · `anatomy` · `figure_completeness` · `camera_facing` · `action_interaction` · `object_presence` · `missing_element` · `object_count` · `scale` · `setting` · `style_consistency` · `rendered_text` · `character_marking` · `anachronism` · `garment_colour` · `naturalness`
 
      `clothing` is the MAIN garment. A small worn item — eyewear, hat, bandana, belt, sash, badge, footwear, jewellery — is `accessory` when the wrong version was drawn and `accessory_missing` when a contract-named item is entirely absent. Keep that distinction when merging: they carry different score ceilings, so relabelling an accessory finding as `clothing` silently raises what it costs.
+     `nudity` only when a figure has no torso garment AND no lower-body garment. Bare feet, a missing shoe, hat, or any single absent item is `clothing` or `accessory_missing`, never `nudity`.
      ONE type per entry. Never invent a value and never join two with an underscore, comma or slash.
    - `description`: short, plain English. Reuse the evaluator wording when accurate; tighten when not.
    - `severity`: `CATASTROPHIC` | `CRITICAL` | `MAJOR` | `MODERATE` | `MINOR`. Do NOT pick this yourself and do not take the loudest evaluator — DERIVE it from the `severities` you just wrote down, mechanically:
