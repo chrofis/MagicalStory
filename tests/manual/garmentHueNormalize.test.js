@@ -16,7 +16,7 @@
  */
 const sharp = require('sharp');
 const G = require('../../server/lib/garmentHueNormalize');
-const { _rgbToLab } = require('../../server/lib/images');
+const { _rgbToLab } = require('../../server/lib/imageCompositing');
 
 const DEG = 180 / Math.PI;
 let passed = 0, failed = 0;

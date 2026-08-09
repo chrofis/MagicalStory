@@ -35,7 +35,7 @@
 // garmentHueNormalize's chroma floor.
 
 const sharp = require('sharp');
-const { _rgbToLab, _labToRgb } = require('./images');
+const { _rgbToLab, _labToRgb } = require('./imageCompositing');
 const { sampleGarmentClusters, isGarmentPixel } = require('./garmentHueNormalize');
 
 const DEG = 180 / Math.PI;

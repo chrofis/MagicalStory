@@ -1156,7 +1156,7 @@ async function runEntityStage(ctx, { experimentId }) {
  */
 async function renderGarmentColourSummary(perFigure, stepsByFigure, pageNumber) {
   const sharp = require('sharp');
-  const { _labToRgb } = require('./images');
+  const { _labToRgb } = require('./imageCompositing');
   const ROW_H = 168, PAD = 12, THUMB = 140, CHIP = 38, W = 1260, HEAD_H = 46;
   const rows = perFigure.filter(f => f && f.name);
   if (!rows.length) return null;

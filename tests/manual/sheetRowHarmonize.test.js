@@ -17,7 +17,7 @@
 const assert = require('assert');
 const sharp = require('sharp');
 const H = require('../../server/lib/sheetRowHarmonize');
-const { _rgbToLab } = require('../../server/lib/images');
+const { _rgbToLab } = require('../../server/lib/imageCompositing');
 
 const W = 120, ROW = 80, FULL = ROW * 2;
 
