@@ -99,7 +99,6 @@ const {
   callGeminiAPIForImage,
   editImageWithPrompt,
   generateImageWithQualityRetry,
-  clearImageCache,
   deleteFromImageCache,
   compressImageToJPEG,
   generateReferenceSheet,

@@ -385,7 +385,6 @@ const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) 
 
 // Maximum mask coverage (%) before skipping repair - larger masks degrade quality
 // Inpainting works best for small, targeted fixes. For large areas, regenerate the image instead.
-const MAX_MASK_COVERAGE_PERCENT = 25;
 
 /**
  * Hash image data for comparison/caching
@@ -4627,23 +4626,6 @@ function escapeXml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/**
- * Legacy wrapper for backwards compatibility
- * @deprecated Use detectAllBoundingBoxes instead
- */
-async function detectBoundingBoxesForIssue(imageData, issueDescription) {
-  log.warn('⚠️  [BBOX-DETECT] detectBoundingBoxesForIssue is deprecated, use detectAllBoundingBoxes');
-  const result = await detectAllBoundingBoxes(imageData);
-  if (!result || !result.figures || result.figures.length === 0) return null;
-  // Return first figure for backwards compatibility
-  const fig = result.figures[0];
-  return {
-    faceBox: fig.faceBox,
-    bodyBox: fig.bodyBox,
-    label: fig.label,
-    usage: result.usage
-  };
-}
 
 /**
  * Detect all bounding boxes in image and match to fixable issues
@@ -6548,173 +6530,6 @@ async function evaluateImageBatch(images, options = {}) {
   return results;
 }
 
-/**
- * Classify issues from an evaluation into repair categories.
- * Helper used by callers that want to inspect the issue mix on a page.
- *
- * @param {Object} evaluation - Single page evaluation from evaluateImageBatch
- * @returns {Object} Classified issues: { majorIssues, styleMismatch, characterMismatches, clothingIssues }
- */
-function classifyIssues(evaluation) {
-  const majorIssues = [];
-  const characterMismatches = [];
-  const clothingIssues = [];
-
-  // Parse the quality JSON from reasoning if available
-  let quality = {};
-  if (evaluation.reasoning) {
-    try {
-      quality = typeof evaluation.reasoning === 'string'
-        ? JSON.parse(evaluation.reasoning)
-        : evaluation.reasoning;
-    } catch (e) {
-      // If reasoning isn't JSON, use individual fields
-    }
-  }
-
-  const matches = quality.matches || evaluation.matches || [];
-  const rendering = quality.rendering || {};
-  const scene = quality.scene || {};
-  const spatial = quality.spatial || {};
-  const fixableIssues = quality.fixable_issues || evaluation.fixableIssues || [];
-
-  // Check for major issues requiring full regeneration (iterate)
-  // 1. Missing characters
-  if (scene.all_present === false || (scene.missing && scene.missing.length > 0)) {
-    majorIssues.push({
-      type: 'missing_character',
-      details: scene.missing || ['unknown'],
-      reason: `Missing character(s): ${(scene.missing || ['unknown']).join(', ')}`
-    });
-  }
-
-  // 2. Extra limbs (3+ arms/hands on a figure)
-  if (rendering.extra_limbs === true) {
-    majorIssues.push({
-      type: 'extra_limbs',
-      reason: 'Extra limbs detected (3+ arms/hands)'
-    });
-  }
-
-  // 3. Physics violations (floating people, impossible poses)
-  if (rendering.physics_ok === false) {
-    majorIssues.push({
-      type: 'physics_violation',
-      details: rendering.issues || [],
-      reason: 'Physics violation (floating, impossible poses)'
-    });
-  }
-
-  // 4. Cross eyes (eyes looking different directions)
-  if (rendering.cross_eyes === true) {
-    majorIssues.push({
-      type: 'cross_eyes',
-      reason: 'Cross-eyed character detected'
-    });
-  }
-
-  // 5. Spatial mismatches (wrong pointing/looking direction)
-  if (spatial.issues && spatial.issues.length > 0) {
-    majorIssues.push({
-      type: 'spatial_mismatch',
-      details: spatial.issues,
-      reason: `Spatial issues: ${spatial.issues.join(', ')}`
-    });
-  }
-
-  // 6. Semantic fidelity issues (action direction wrong, relationship reversed)
-  const semanticResult = evaluation.semanticResult;
-  if (semanticResult?.semanticIssues && semanticResult.semanticIssues.length > 0) {
-    for (const issue of semanticResult.semanticIssues) {
-      // CRITICAL and MAJOR semantic issues trigger regeneration
-      if (issue.severity === 'CRITICAL' || issue.severity === 'MAJOR') {
-        majorIssues.push({
-          type: 'semantic_mismatch',
-          severity: issue.severity,
-          details: { action: issue.action, observed: issue.observed, expected: issue.expected },
-          reason: `Semantic: ${issue.problem}`
-        });
-      }
-    }
-  }
-
-  // Check for style mismatch
-  const styleMismatch = scene.style_consistent === false;
-
-  // Check for individual character mismatches (candidates for targeted replacement)
-  for (const match of matches) {
-    const issues = [];
-
-    if (match.hair_match === false) {
-      issues.push('hair mismatch');
-    }
-    if (typeof match.confidence === 'number' && match.confidence < 0.5) {
-      issues.push(`low confidence (${Math.round(match.confidence * 100)}%)`);
-    }
-
-    if (issues.length > 0) {
-      characterMismatches.push({
-        reference: match.reference || `figure_${match.figure}`,
-        figure: match.figure,
-        face_bbox: match.face_bbox,
-        issues,
-        confidence: match.confidence,
-        reason: `${match.reference || 'Unknown'}: ${issues.join(', ')}`
-      });
-    }
-  }
-
-  // Check for clothing/artifact issues (inpaintable)
-  // From fixable_issues array
-  for (const issue of fixableIssues) {
-    // Age-stage mismatch → character repair (whole-figure repaint against the
-    // avatar). Face-only repair can't change body proportions, and a full-page
-    // redo gambles a usable image on the same prompt — so route it like an
-    // identity mismatch, matched to its detected figure for the bbox.
-    if (issue.type === 'age') {
-      const m = matches.find(mm => mm.reference && issue.description &&
-        issue.description.toLowerCase().includes(String(mm.reference).toLowerCase()));
-      characterMismatches.push({
-        reference: m?.reference || issue.character || 'unknown',
-        figure: m?.figure,
-        face_bbox: m?.face_bbox,
-        issues: ['age mismatch'],
-        confidence: m?.confidence,
-        reason: issue.description || 'figure reads the wrong age stage',
-      });
-      continue;
-    }
-    if (issue.type === 'clothing' || issue.type === 'object' ||
-        issue.severity === 'MODERATE' || issue.severity === 'MINOR') {
-      clothingIssues.push({
-        type: issue.type || 'clothing',
-        description: issue.description,
-        severity: issue.severity || 'MODERATE',
-        fix: issue.fix || `Fix: ${issue.description}`
-      });
-    }
-  }
-
-  // Also check matches for clothing mismatches
-  for (const match of matches) {
-    if (match.clothing_match === false) {
-      clothingIssues.push({
-        type: 'clothing',
-        description: `${match.reference || 'Character'} clothing mismatch`,
-        reference: match.reference,
-        figure: match.figure,
-        severity: 'MODERATE'
-      });
-    }
-  }
-
-  return {
-    majorIssues,
-    styleMismatch,
-    characterMismatches,
-    clothingIssues
-  };
-}
 
 
 // ============================================================================
@@ -11267,37 +11082,6 @@ async function grokEditSceneExact(prompt, referenceUris, sceneBuf, sceneW, scene
   return { buffer: out, grokResult, aspectStr };
 }
 
-/**
- * Detect a border that Grok ADDED to its output that wasn't in the input.
- * Compares border of both images — returns content box only when output has
- * significantly more border than input.
- */
-async function detectAddedBorder(inputBuffer, outputBuffer) {
-  const outputBorder = await detectGrokBorder(outputBuffer);
-  if (!outputBorder) return null;
-  const outputLeftFrac = outputBorder.left / outputBorder.imgWidth;
-  const outputRightFrac = (outputBorder.imgWidth - outputBorder.right - 1) / outputBorder.imgWidth;
-  const outputTopFrac = outputBorder.top / outputBorder.imgHeight;
-  const outputBottomFrac = (outputBorder.imgHeight - outputBorder.bottom - 1) / outputBorder.imgHeight;
-
-  const inputBorder = await detectGrokBorder(inputBuffer);
-  let inputLeftFrac = 0, inputRightFrac = 0, inputTopFrac = 0, inputBottomFrac = 0;
-  if (inputBorder) {
-    inputLeftFrac = inputBorder.left / inputBorder.imgWidth;
-    inputRightFrac = (inputBorder.imgWidth - inputBorder.right - 1) / inputBorder.imgWidth;
-    inputTopFrac = inputBorder.top / inputBorder.imgHeight;
-    inputBottomFrac = (inputBorder.imgHeight - inputBorder.bottom - 1) / inputBorder.imgHeight;
-  }
-
-  const TOLERANCE = 0.03;
-  const leftAdded = outputLeftFrac > inputLeftFrac + TOLERANCE;
-  const rightAdded = outputRightFrac > inputRightFrac + TOLERANCE;
-  const topAdded = outputTopFrac > inputTopFrac + TOLERANCE;
-  const bottomAdded = outputBottomFrac > inputBottomFrac + TOLERANCE;
-
-  if (!leftAdded && !rightAdded && !topAdded && !bottomAdded) return null;
-  return outputBorder;
-}
 
 // Build action context from structured interactions[] for the named character.
 // Replaces the prose-name-slicing fallback that leaked the metadata JSON block
@@ -11340,111 +11124,7 @@ function sanitizeIssueForInpaint(text) {
   return out;
 }
 
-/**
- * Estimate the global (dx, dy) translation between two same-sized grayscale
- * rasters by comparing small background patches. Grok redraws pages freehand,
- * so its output often sits a few pixels off the original — and the resize/crop
- * back to scene dims adds its own shift. A composite mask built in original
- * coordinates then blends misregistered content, which reads as a smeared /
- * "blended" figure. Patches that fall inside excludeRects (repaint zones,
- * blur boxes, hatch) or are near-flat are skipped; the shift is only trusted
- * when several independent patches agree.
- *
- * @param {object} orig {data, width, height} grayscale raw (1 channel)
- * @param {object} cand same shape/size as orig
- * @param {Array}  excludeRects [{left, top, width, height}] pixel rects to avoid
- * @returns {{dx: number, dy: number, consensus: number, patches: number} | null}
- */
-function estimateGlobalShift(orig, cand, excludeRects = []) {
-  const MAX_SHIFT = 8;
-  const PATCH = 48;
-  const GRID = 6;
-  const MIN_VARIANCE = 60;      // skip flat sky / walls — ambiguous under SAD
-  const { width, height } = orig;
-  if (cand.width !== width || cand.height !== height) return null;
-  if (width < PATCH + 4 * MAX_SHIFT || height < PATCH + 4 * MAX_SHIFT) return null;
 
-  const margin = MAX_SHIFT + 2;
-  const expanded = excludeRects.map(r => ({
-    left: r.left - margin, top: r.top - margin,
-    right: r.left + r.width + margin, bottom: r.top + r.height + margin,
-  }));
-  const intersectsExcluded = (px, py) => expanded.some(r =>
-    px + PATCH > r.left && px < r.right && py + PATCH > r.top && py < r.bottom);
-
-  const offsets = [];
-  for (let gy = 0; gy < GRID && offsets.length < 10; gy++) {
-    for (let gx = 0; gx < GRID && offsets.length < 10; gx++) {
-      const px = Math.round(margin + (gx / (GRID - 1)) * (width - PATCH - 2 * margin));
-      const py = Math.round(margin + (gy / (GRID - 1)) * (height - PATCH - 2 * margin));
-      if (intersectsExcluded(px, py)) continue;
-
-      // Patch variance — reject textureless patches
-      let sum = 0, sumSq = 0;
-      for (let y = 0; y < PATCH; y++) {
-        const row = (py + y) * width + px;
-        for (let x = 0; x < PATCH; x++) {
-          const v = orig.data[row + x];
-          sum += v; sumSq += v * v;
-        }
-      }
-      const n = PATCH * PATCH;
-      const variance = sumSq / n - (sum / n) ** 2;
-      if (variance < MIN_VARIANCE) continue;
-
-      // Integer SAD search over ±MAX_SHIFT
-      let best = Infinity, bestDx = 0, bestDy = 0;
-      for (let dy = -MAX_SHIFT; dy <= MAX_SHIFT; dy++) {
-        for (let dx = -MAX_SHIFT; dx <= MAX_SHIFT; dx++) {
-          let sad = 0;
-          for (let y = 0; y < PATCH; y += 2) {          // 2px stride: 4× faster, same argmin
-            const oRow = (py + y) * width + px;
-            const cRow = (py + y + dy) * width + px + dx;
-            for (let x = 0; x < PATCH; x += 2) {
-              sad += Math.abs(orig.data[oRow + x] - cand.data[cRow + x]);
-            }
-          }
-          if (sad < best) { best = sad; bestDx = dx; bestDy = dy; }
-        }
-      }
-      offsets.push({ dx: bestDx, dy: bestDy });
-    }
-  }
-  if (offsets.length < 3) return null;
-
-  const median = arr => {
-    const s = [...arr].sort((a, b) => a - b);
-    return s[Math.floor(s.length / 2)];
-  };
-  const dx = median(offsets.map(o => o.dx));
-  const dy = median(offsets.map(o => o.dy));
-  const consensus = offsets.filter(o => Math.abs(o.dx - dx) <= 1 && Math.abs(o.dy - dy) <= 1).length;
-  return { dx, dy, consensus, patches: offsets.length };
-}
-
-/**
- * Shift a raw RGB buffer by (-dx, -dy) so content estimated at offset (dx, dy)
- * lands back in register with the original. Uncovered edge strips are filled
- * from `fallback` (the original region) so the downstream feather blends into
- * true scene pixels instead of black.
- */
-function shiftRawRegion(cand, fallback, width, height, dx, dy) {
-  const out = Buffer.from(fallback);   // start as original, overwrite the overlap
-  for (let y = 0; y < height; y++) {
-    const sy = y + dy;
-    if (sy < 0 || sy >= height) continue;
-    for (let x = 0; x < width; x++) {
-      const sx = x + dx;
-      if (sx < 0 || sx >= width) continue;
-      const oIdx = (y * width + x) * 3;
-      const sIdx = (sy * width + sx) * 3;
-      out[oIdx] = cand[sIdx];
-      out[oIdx + 1] = cand[sIdx + 1];
-      out[oIdx + 2] = cand[sIdx + 2];
-    }
-  }
-  return out;
-}
 
 /**
  * Edge energy (Laplacian variance) of a region — the standard blur metric.
@@ -12609,13 +12289,6 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   };
 }
 
-/**
- * Clear the image cache
- */
-function clearImageCache() {
-  imageCache.clear();
-  log.debug('[IMAGE CACHE] Cache cleared');
-}
 
 /**
  * Delete a specific entry from the image cache
@@ -12630,12 +12303,6 @@ function deleteFromImageCache(cacheKey) {
   return false;
 }
 
-/**
- * Get image cache size
- */
-function getImageCacheSize() {
-  return imageCache.size;
-}
 
 /**
  * Get cache statistics for logging
@@ -12648,26 +12315,7 @@ function getCacheStats() {
   };
 }
 
-/**
- * Log cache efficiency summary
- */
-function logCacheSummary() {
-  const stats = getCacheStats();
-  if (stats.image.total > 0) {
-    log.info(`📊 [CACHE] Image cache: ${stats.image.hits} hits, ${stats.image.misses} misses (${stats.image.hitRate}% hit rate)`);
-  }
-  if (stats.ref.total > 0) {
-    log.info(`📊 [CACHE] Ref cache: ${stats.ref.hits} hits, ${stats.ref.misses} misses (${stats.ref.hitRate}% hit rate)`);
-  }
-}
 
-/**
- * Reset cache statistics (call at start of story generation)
- */
-function resetCacheStats() {
-  imageCache.resetStats();
-  compressedRefCache.resetStats();
-}
 
 // ============================================
 // AUTO-REPAIR (INPAINTING) FUNCTIONS
@@ -12873,36 +12521,6 @@ async function createMaskFromBoundingBox(width, height, boundingBox) {
   return maskBase64;
 }
 
-/**
- * Calculate the percentage of image area covered by bounding boxes
- * Uses union of boxes to avoid counting overlapping areas twice
- * @param {Array<number[]>} boundingBoxes - Array of [ymin, xmin, ymax, xmax] normalized 0.0-1.0 or 0-1000
- * @returns {number} Percentage of image covered (0-100)
- */
-function calculateMaskCoverage(boundingBoxes) {
-  if (!boundingBoxes || boundingBoxes.length === 0) {
-    return 0;
-  }
-
-  // Normalize all boxes to 0.0-1.0 format
-  const normalizedBoxes = boundingBoxes.map(box => {
-    const [ymin, xmin, ymax, xmax] = box;
-    const scale = (ymin <= 1 && xmin <= 1 && ymax <= 1 && xmax <= 1) ? 1 : 1000;
-    return [ymin / scale, xmin / scale, ymax / scale, xmax / scale];
-  });
-
-  // Simple approach: sum areas (may overcount overlaps, but gives upper bound)
-  // For more accuracy, we'd need a sweep line algorithm, but this is good enough
-  let totalArea = 0;
-  for (const [ymin, xmin, ymax, xmax] of normalizedBoxes) {
-    const width = Math.max(0, xmax - xmin);
-    const height = Math.max(0, ymax - ymin);
-    totalArea += width * height;
-  }
-
-  // Cap at 100% (overlaps could theoretically exceed 100%)
-  return Math.min(100, totalArea * 100);
-}
 
 /**
  * Classify issue type from issue description text
@@ -15240,32 +14858,23 @@ module.exports = {
   // Unified repair pipeline (the only active repair pipeline)
   selectBestVersion,
   runUnifiedRepairPipeline,
-  estimateGlobalShift,
-  shiftRawRegion,
   measureRegionSharpness,
   chooseRepairStrategy,
   inpaintPage,
   sanitizeIssueForInpaint,
 
   // Active repair primitives
-  classifyIssues,
   iteratePageCore,
   iteratePage,
   repairCharacterMismatch,
 
   // Cache management
-  clearImageCache,
   deleteFromImageCache,
-  getImageCacheSize,
   getCacheStats,
-  logCacheSummary,
-  resetCacheStats,
 
   // Mask + region helpers (used by inpaint paths)
   createCombinedMask,
   blackoutIssueRegions,
-  calculateMaskCoverage,
-  getGridBasedRepair,  // Lazy-loaded grid-based repair module
 
   // Two-stage bounding box detection
   detectAllBoundingBoxes,
@@ -15287,7 +14896,6 @@ module.exports = {
   // Exported (minimal) rather than duplicated so the merge stays single-source.
   computePresetAlignedExtract,
   grokEditSceneExact,
-  detectAddedBorder,
   buildCharActionContextFromInteractions,
   REPAIR_SHARPNESS_MIN_ORIG,
   REPAIR_SHARPNESS_REJECT_RATIO,
@@ -15299,7 +14907,6 @@ module.exports = {
   FIGURE_COLORS,  // Color palette for bbox overlay (shared with prompt building)
   callGrokVisionAPI,  // Grok vision API for bbox/quality eval
   GEMINI_SAFETY_SETTINGS,  // Safety settings for Gemini API calls
-  detectBoundingBoxesForIssue,  // deprecated, use detectAllBoundingBoxes
   enrichWithBoundingBoxes,
 
   // Incremental consistency checks
@@ -15324,7 +14931,6 @@ module.exports = {
 
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD,
-  MAX_MASK_COVERAGE_PERCENT,
 
   // Pure dispatch helpers (exported for unit tests / reuse)
   resolveOutputAspect,
