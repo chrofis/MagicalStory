@@ -2634,7 +2634,54 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     const storedByPage = new Map((storyData.sceneImages || []).map(s => [s.pageNumber, s.sceneDescription || '']));
 
     const expStart = Date.now();
-    sceneExpansions = await Promise.all(toExpand.map(async b => {
+
+    // ALL-PAGES PATH — what production actually runs (owner, 2026-08-09).
+    // beatsPipeline expands every page in ONE call via buildSceneExpansionAllPrompt
+    // and, since 2026-08-08, hands the Art Director each character's resolved
+    // OUTFIT TEXT. This harness was still calling the PER-PAGE builder with no
+    // clothing at all, so it measured a code path production no longer uses and
+    // would have reproduced the old outfit bug no matter what shipped. Opt out
+    // with params.perPageExpansion for the historical comparison.
+    if (params.perPageExpansion !== true) {
+      const { buildSceneExpansionAllPrompt, parseRefinedText: parseAll } = require('./storyHelpers');
+      const allPrompt = buildSceneExpansionAllPrompt(
+        { ...storyData, characters: storyData.characters || [] },
+        toExpand.map(b => ({ pageNumber: b.pageNumber, beat: b.beat, scene: b.scene })),
+        {
+          visualBible: storyData.visualBible || null,
+          availableAvatars,
+          maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
+          clothingRequirements: storyData.clothingRequirements || null,
+          primaryClothing: storyData.pageClothing?.primaryClothing || null,
+        }
+      );
+      if (allPrompt) {
+        const tAll = Date.now();
+        const res = await callStream(allPrompt, 16000, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
+          usageLabel: 'testlab_beats_scene_expansion_all',
+          ...(params.sceneNoReasoning ? { reasoning: { enabled: false } } : {}),
+        });
+        const parsedAll = parseAll(res.text || '', toExpand.map(b => b.pageNumber), 'SCENES');
+        const byPage = new Map((parsedAll.pages || []).map(x => [x.pageNumber, x.text]));
+        sceneExpansions = toExpand.map(b => ({
+          pageNumber: b.pageNumber,
+          ok: byPage.has(b.pageNumber),
+          elapsedMs: Date.now() - tAll,
+          modelId: res.modelId,
+          provider: res.provider || null,
+          usage: res.usage,
+          cost: costOf(res),
+          promptChars: allPrompt.length,
+          prompt: allPrompt,
+          fromBeats: String(byPage.get(b.pageNumber) || '').slice(0, 20000),
+          storedProduction: (storedByPage.get(b.pageNumber) || '').slice(0, 20000),
+          ...(byPage.has(b.pageNumber) ? {} : { error: 'page missing from the all-pages response' }),
+        }));
+        timeToScenesMs = Date.now() - lockStart;
+      }
+    }
+
+    if (!sceneExpansions) sceneExpansions = await Promise.all(toExpand.map(async b => {
       // BEAT + SCENE stands in for page.text. No rawOutlineContext: in a
       // beats-first run there is no outline block yet, so this measures the
       // Art Director working from the plan alone.
