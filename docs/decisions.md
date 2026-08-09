@@ -6616,21 +6616,26 @@ trip a numeric gate. Of those:
 
 | | count | |
 |---|---|---|
-| no deductions recorded at all | 235 | unjudgeable — see below |
-| deductions WITH a catastrophic/critical finding | 156 | the collapse would cover these |
-| deductions with NO catastrophic/critical finding | **136** | the collapse would MISS these |
+| no deductions recorded at all | 7 | unjudgeable |
+| deductions WITH a catastrophic/critical finding | 439 | the collapse would cover these |
+| deductions with NO catastrophic/critical finding | **81** | the collapse would MISS these |
 
-So 136 of the 292 judgeable cases — 47% — reach `iterate` only because of a
+So 81 of the 520 judgeable cases — 16% — reach `iterate` only because of a
 numeric gate. Collapsing rules 2–4 would silently downgrade all of them to
 inpaint or skip. A page can accumulate enough MAJOR/MODERATE defects to score
 below 50 without any single one being critical, and that page still needs a
 regeneration rather than a repaint.
 
-**Second finding, unresolved:** 235 of the 527 (45%) carry a visual or semantic
-score but no `deductions` array at all. Their score came from somewhere the
-deduction record does not explain. That is worth its own investigation — it also
-means any future analysis of "why did this page score X" is blind on nearly half
-the corpus.
+**Read the `consolidated` bucket.** The first pass at this measurement counted
+only `deductions.quality / .semantic / .compliance / .entity` and reported
+"235 versions with no deductions at all" plus a 47% gate-alone rate. Both were
+wrong. When the feedback consolidator runs — which is the normal path —
+`composeDeductions` puts every issue in a fifth bucket, `consolidated`, and
+leaves the raw three empty by construction (`scoring.js`); `sumDeductionPoints`
+sums all five. A version reading `finalScore: −110` with four empty buckets is
+not a data defect, it is a reader looking in the wrong place. Corrected figures
+above. Any future query over `deductions` must include `consolidated` or it will
+report most of the corpus as unscored.
 
 **Touched:** nothing. This entry exists so the collapse is not re-proposed; the
 next person to notice the apparent redundancy should read this instead of
