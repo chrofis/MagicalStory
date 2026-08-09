@@ -7752,3 +7752,25 @@ false on missing characters and missing scene elements. A genuine absence is sti
 evaluator that can actually see it.
 
 **Touched:** `prompts/image-prompt-compliance.txt`.
+
+## 2026-08-09 (supersedes Decision 2 above): entity punishment is PER IMAGE at creation; final report is ASSEMBLED, never re-evaluated
+
+**Context:** the Step 4b "recompute on picks → re-score → re-pick → recompute again" loop was
+over-engineered (owner: "rethink the final eval — we only need a punishment per image").
+
+**Decision (owner design):**
+- Round 0: full entity check on all originals (one consistent scoring baseline).
+- Round N: entity check ONLY that round's repaired images (minAppearances 1, judged vs the
+  reference sheet). The punishment stamps the version at creation and is never revisited —
+  a worse repair simply loses pick-best on its stamped score and is never used.
+- The working report for next-round repair decisions is a MERGE (mergeEntityIssues): fresh
+  findings replace old ones for repaired pages; untouched pages keep theirs.
+- The final Charakterkonsistenz report is ASSEMBLED, zero eval calls: issue list = the picked
+  versions' stamped entityIssues (exactly what the scores charged — report and scores cannot
+  diverge), grid images = runEntityConsistencyChecks({gridsOnly:true}) crops of the shipped
+  images (pure compositing).
+- Consequence: repaired pages are judged vs the canonical reference sheet, not vs sibling
+  pages — deliberate; the reference IS the canonical source.
+
+**Touched files:** `server/lib/entityConsistency.js` (gridsOnly option),
+`server/lib/repairPipeline.js` (per-round scope, mergeEntityIssues, assembled Step 4b).

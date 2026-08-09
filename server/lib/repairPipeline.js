@@ -295,6 +295,37 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
   return { faceBbox: null, bodyBbox: null, source: null };
 }
 
+/**
+ * Merge a per-round entity report (repaired pages only) into the working
+ * report: issues on repaired pages are replaced by the fresh findings (absence
+ * of a finding on a re-checked page means the new image is clean), untouched
+ * pages keep their evidence. byClothing/garment channels stay from the base —
+ * they are only consumed by the Step-1b garment fix, which runs before any
+ * round. The merged view feeds decideRepairMethod; scores use era stamps.
+ */
+function mergeEntityIssues(base, fresh, repairedPages) {
+  if (!base) return fresh;
+  if (!fresh) return base;
+  const pages = new Set(repairedPages);
+  const merged = { ...base, characters: {}, timestamp: fresh.timestamp || base.timestamp };
+  const names = new Set([...Object.keys(base.characters || {}), ...Object.keys(fresh.characters || {})]);
+  let total = 0;
+  for (const name of names) {
+    const b = base.characters?.[name] || { issues: [] };
+    const f = fresh.characters?.[name];
+    const issues = [
+      ...(b.issues || []).filter(i => !pages.has(i.pageNumber)),
+      ...((f?.issues) || []),
+    ];
+    merged.characters[name] = { ...b, issues, totalIssues: issues.length, overallConsistent: issues.length === 0 };
+    total += issues.length;
+  }
+  merged.totalIssues = total;
+  merged.overallConsistent = total === 0;
+  merged.summary = `${names.size} entities checked: ${total} consistency issue(s) (merged after round update)`;
+  return merged;
+}
+
 async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const {
     characters = [],
@@ -1805,27 +1836,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
       })));
 
-      const latestImages = rawImages.filter(img => img.imageData).map(img => {
-        if (roundImageMap.has(img.pageNumber)) {
-          const re = roundImageMap.get(img.pageNumber);
-          // Carry the round entry's own scene contract (iterate rewrites it)
-          // so the entity check judges the repaired image against what was
-          // actually asked of it — and its detection, so the entity crops use
-          // the same figure names every other consumer of this version sees.
-          return { imageData: re.imageData, pageNumber: img.pageNumber, description: re.description || null, bboxDetection: re.bboxDetection || null };
-        }
-        const versions = pageVersions.get(img.pageNumber) || [];
-        const best = selectBestVersion(versions);
-        // A best version from an earlier round carries the detection stamped
-        // when it was scored; forward it so the entity check never re-detects
-        // (and possibly re-names) bytes that already have a paired detection.
-        return {
-          imageData: best?.imageData || img.imageData,
-          pageNumber: img.pageNumber,
-          bboxDetection: best?.bboxDetection || best?.evaluation?.bboxDetection || null,
-        };
-      });
-      const freshEntityCheckData = buildEntityCheckData(latestImages);
+      // Entity check ONLY the round's repaired images (owner, 2026-08-09):
+      // a version's entity punishment is computed ONCE, on its own bytes, at
+      // creation — judged against the character reference sheet (the
+      // canonical), with single appearances allowed. Untouched pages keep
+      // their existing stamps; no whole-story re-run per round.
+      const repairedEntries = roundSuccess.map(re => ({
+        imageData: re.imageData,
+        pageNumber: re.pageNumber,
+        // The round entry's own scene contract (iterate rewrites it) so the
+        // entity check judges the repaired image against what was actually
+        // asked of it — and its detection, so the entity crops use the same
+        // figure names every other consumer of this version sees.
+        description: re.description || null,
+        bboxDetection: re.bboxDetection || null,
+      }));
+      const freshEntityCheckData = buildEntityCheckData(repairedEntries);
       const roundEvalInputs = buildEvalInputs(roundSuccess);
 
       const evalProgressPct = progressBase + 8;
@@ -1839,6 +1865,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // site above. Per-page presence is the quality/semantic eval's job.
           checkObjects: false,
           saveGrids: false,
+          // Repaired pages are judged alone against the reference sheet — a
+          // single appearance must still be checked (no cross-page minimum).
+          minAppearances: 1,
           onHeartbeat: pingHeartbeat
         }),
         images().evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle }),
@@ -1852,14 +1881,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             output_tokens: freshEntity.tokenUsage.outputTokens || 0
           }, `entity_consistency_r${round}`, freshEntity.tokenUsage.model || 'gemini-2.5-flash');
         }
-        currentEntityReport = freshEntity;
+        // Merge: repaired pages' issues are REPLACED by the fresh (per-image)
+        // findings; untouched pages keep their existing evidence. The merged
+        // view only feeds next-round repair decisions — per-version scores
+        // come from the era-matched stamps below.
+        const repairedPageNums = roundSuccess.map(r => r.pageNumber);
+        currentEntityReport = mergeEntityIssues(currentEntityReport, freshEntity, repairedPageNums);
         entityHistory.push({
           runIndex: round,
           timestamp: freshEntity.timestamp || new Date().toISOString(),
           triggeredBy: `pipeline-round-${round}`,
+          // The per-round report (repaired pages only) — the UI browses these.
           report: freshEntity
         });
-        log.info(`✅ [UNIFIED PIPELINE] Round ${round}: Entity consistency: ${freshEntity.totalIssues} issues`);
+        log.info(`✅ [UNIFIED PIPELINE] Round ${round}: Entity consistency on ${repairedPageNums.length} repaired page(s): ${freshEntity.totalIssues} issue(s) (merged view: ${currentEntityReport.totalIssues})`);
       } else {
         log.warn(`⚠️ [UNIFIED PIPELINE] Round ${round}: Entity consistency failed: ${freshEntityResult.reason?.message || freshEntityResult.reason}`);
       }
@@ -2183,90 +2218,69 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
 
   // =========================================================================
-  // Step 4b: FINAL entity report describes the PICKED versions (owner, 2026-08-09)
+  // Step 4b: FINAL entity report ASSEMBLED from the picked versions' stamps
+  // (owner redesign, 2026-08-09)
   // =========================================================================
-  // The last round's entity report judged the ROUND OUTPUT — but pick-best can
-  // discard those images (observed: "Sarah wears a black hat" reported for an
-  // iterate that lost the pick and never shipped). Sequence, bounded by design:
-  // recompute entity on the picked versions → re-score picked versions whose
-  // entity evidence changed (entity feeds the score) → re-pick → if any pick
-  // flipped, ONE more entity pass on the new picks so the displayed report
-  // matches the shipped images. No third pick.
+  // Every version's entity punishment was computed ONCE, at creation, on its
+  // own bytes (round 0: full check on originals; round N: per-image check of
+  // the repaired pages vs the reference sheet). Scores are therefore final —
+  // no recompute, no re-score, no re-pick. The displayed report is assembled:
+  // issue list = the PICKED versions' stamped entityIssues (exactly what the
+  // scores charged), grid images = a grids-only rebuild of the picked crops
+  // (pure compositing, no model call).
   try {
-    const { applyScore: stampFinal } = require('./scoring');
-    const entityIssueSig = (issues) => JSON.stringify(
-      (issues || []).map(i => `${i.severity}|${i.subType || i.type || ''}|${String(i.description || '').slice(0, 80)}`).sort());
+    await updateProgress(71, 'Assembling final entity report from picked versions...');
+    const pickedEntries = rawImages.filter(img => img.imageData && img.pageNumber != null).map(img => {
+      const best = finalBestPerPage.get(img.pageNumber);
+      if (!best?.imageData) return null;
+      return {
+        imageData: best.imageData,
+        pageNumber: img.pageNumber,
+        description: best.description || null,
+        // The version's own stamped detection — one detection per bytes.
+        bboxDetection: images().detectionForVersion(best),
+      };
+    }).filter(Boolean);
 
-    const runFinalEntity = async (label) => {
-      const pickedEntries = rawImages.filter(img => img.imageData && img.pageNumber != null).map(img => {
-        const best = finalBestPerPage.get(img.pageNumber);
-        if (!best?.imageData) return null;
-        return {
-          imageData: best.imageData,
-          pageNumber: img.pageNumber,
-          description: best.description || null,
-          // The version's own stamped detection — one detection per bytes,
-          // reused; entity must never re-detect what is already paired.
-          bboxDetection: images().detectionForVersion(best),
-        };
-      }).filter(Boolean);
-      if (pickedEntries.length === 0) return null;
-      const report = await runEntityConsistencyChecks(buildEntityCheckData(pickedEntries), characters, {
-        checkCharacters: true, checkObjects: false, saveGrids: false, onHeartbeat: pingHeartbeat,
+    // Grids-only rebuild (no Gemini): crops of the shipped images.
+    let assembled = null;
+    if (pickedEntries.length > 0) {
+      assembled = await runEntityConsistencyChecks(buildEntityCheckData(pickedEntries), characters, {
+        checkCharacters: true, checkObjects: false, saveGrids: false,
+        gridsOnly: true, minAppearances: 1, onHeartbeat: pingHeartbeat,
       });
-      if (report?.tokenUsage && usageTracker) {
-        usageTracker('gemini_quality', {
-          input_tokens: report.tokenUsage.inputTokens || 0,
-          output_tokens: report.tokenUsage.outputTokens || 0,
-        }, `entity_consistency_${label}`, report.tokenUsage.model || 'gemini-2.5-flash');
-      }
-      currentEntityReport = report;
-      entityHistory.push({ runIndex: entityHistory.length, timestamp: report.timestamp || new Date().toISOString(), triggeredBy: label, report });
-      return report;
-    };
+    }
+    if (!assembled) assembled = { characters: {}, grids: [], totalIssues: 0 };
 
-    // Re-score picked versions whose entity evidence changed. Re-consolidation
-    // is required: the deduped issue list embeds the entity issues, so passing
-    // a fresh entityResult with the OLD plan would be silently ignored.
-    const restampPicked = async (report) => {
-      let changed = 0;
-      await Promise.all(rawImages.filter(i => i.imageData && i.pageNumber != null).map(img => consolidateLimit(async () => {
-        const best = finalBestPerPage.get(img.pageNumber);
-        if (!best?.evaluation) return;
-        const entityResult = getEntityPenaltyAndIssues(img.pageNumber, report);
-        if (entityIssueSig(entityResult.issues) === entityIssueSig(best.deductions?.entity)) return;
-        const plan = await consolidatePageEval(best.evaluation, entityResult.issues, img.pageNumber, 'final', best.description || null);
-        stampFinal(best, { evalResult: best.evaluation, entityResult, consolidatedPlan: plan || null });
-        changed++;
-      })));
-      return changed;
-    };
-
-    await updateProgress(71, 'Final entity check on picked versions...');
-    const report1 = await runFinalEntity('final-pick');
-    if (report1) {
-      const changed = await restampPicked(report1);
-      let flips = 0;
-      if (changed > 0) {
-        for (const img of rawImages) {
-          if (!pageVersions.has(img.pageNumber)) continue;
-          const repick = selectBestVersion(pageVersions.get(img.pageNumber));
-          if (repick && repick !== finalBestPerPage.get(img.pageNumber)) {
-            log.info(`🧾 [UNIFIED PIPELINE] Step 4b: page ${img.pageNumber} pick flipped to ${repick.source} after final entity re-score`);
-            finalBestPerPage.set(img.pageNumber, repick);
-            flips++;
-          }
-        }
-      }
-      log.info(`🧾 [UNIFIED PIPELINE] Step 4b: final entity on picked versions — ${report1.totalIssues} issue(s), ${changed} page(s) re-scored, ${flips} pick(s) flipped`);
-      if (flips > 0) {
-        const report2 = await runFinalEntity('final-pick-2');
-        if (report2) await restampPicked(report2); // report + scores true for shipped picks; deliberately no third pick
+    // Issue list from the era-matched stamps of the shipped versions.
+    let total = 0;
+    for (const img of rawImages) {
+      if (!img.imageData || img.pageNumber == null) continue;
+      const best = finalBestPerPage.get(img.pageNumber);
+      for (const iss of (best?.entityIssues || [])) {
+        const name = iss.affectedCharacter || iss.character || 'UNKNOWN';
+        if (!assembled.characters[name]) assembled.characters[name] = { byClothing: {}, issues: [] };
+        if (!Array.isArray(assembled.characters[name].issues)) assembled.characters[name].issues = [];
+        assembled.characters[name].issues.push(iss);
+        total++;
       }
     }
-    finalEntityReport = currentEntityReport;
+    for (const c of Object.values(assembled.characters)) {
+      c.totalIssues = (c.issues || []).length;
+      c.overallConsistent = c.totalIssues === 0;
+    }
+    assembled.totalIssues = total;
+    assembled.overallConsistent = total === 0;
+    assembled.timestamp = new Date().toISOString();
+    assembled.assembledFromPicks = true;
+    assembled.summary = `${Object.keys(assembled.characters).length} entities checked: ${total} consistency issue(s) (assembled from shipped versions)`;
+
+    finalEntityReport = assembled;
+    entityHistory.push({ runIndex: entityHistory.length, timestamp: assembled.timestamp, triggeredBy: 'final-assembled', report: assembled });
+    log.info(`🧾 [UNIFIED PIPELINE] Step 4b: final entity report assembled from picks — ${total} issue(s), ${assembled.grids?.length || 0} grid(s), zero eval calls`);
   } catch (finalEntityErr) {
-    log.warn(`⚠️ [UNIFIED PIPELINE] Step 4b final entity recompute failed: ${finalEntityErr.message} — keeping the round-loop report`);
+    log.warn(`⚠️ [UNIFIED PIPELINE] Step 4b final report assembly failed: ${finalEntityErr.message} — keeping the merged round-loop report`);
+    finalEntityReport = currentEntityReport;
   }
 
   // =========================================================================

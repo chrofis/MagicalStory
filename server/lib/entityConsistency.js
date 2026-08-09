@@ -672,6 +672,10 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     minAppearances = MIN_APPEARANCES,
     saveGrids = false,
     outputDir = null,
+    // gridsOnly: build crops + grid images WITHOUT the Gemini consistency eval
+    // (pure compositing). Used by the pipeline's final assembled report: issues
+    // come from the per-version stamps, the grids just show the picked crops.
+    gridsOnly = false,
     // Heartbeat callback. Called between each entity (character/object) so
     // long object loops on stories with many distinct objects (Wilhelm Tell:
     // crossbow + apple + hat pole + horse + market square + boat + …) don't
@@ -909,12 +913,14 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
               : gridLabel;
 
             const gridResult = await createEntityGrid(batchCrops, batchLabel, refAvatar);
-            const evalResult = await evaluateEntityConsistency(
-              gridResult.buffer, gridResult.manifest,
-              { entityType: 'character', entityName: charName, clothingCategory,
-                expectedClothing,
-                referencePhoto: refAvatar, cellCount: batchCrops.length }
-            );
+            const evalResult = gridsOnly
+              ? { consistent: true, score: null, issues: [], summary: 'grids-only (no eval)' }
+              : await evaluateEntityConsistency(
+                  gridResult.buffer, gridResult.manifest,
+                  { entityType: 'character', entityName: charName, clothingCategory,
+                    expectedClothing,
+                    referencePhoto: refAvatar, cellCount: batchCrops.length }
+                );
 
             gridResults.push({ gridResult, evalResult, batchCrops });
             if (evalResult.issues) {
