@@ -129,8 +129,8 @@ const ENTITY_PENALTY_CAP = 40;
 
 /**
  * Applied entity penalty for a version. Single chokepoint — every writer
- * (setVersionScores, applyScore) and every legacy read-time fallback
- * (computeFinalScore, composeFinalScore) must go through this so the
+ * (applyScore) and the legacy read-time fallback (computeFinalScore) must go
+ * through this so the
  * round-loop scores and the finalize-time recompute can't diverge.
  *
  * @param {number} rawPenalty  uncapped sum of entity issue penalties
@@ -313,7 +313,7 @@ function applyScore(version, { evalResult = null, entityResult = null, consolida
   // evalScore (pre-entity) + entityPenalty kept as separate fields so an
   // entity-only re-run can recompute finalScore without re-running visual.
   // The previous evalScore math (MIN of visual/semantic/threeStage subscores
-  // from composeEvalScore) was the legacy behavior; new model derives
+  // was the legacy behavior; new model derives
   // evalScore from deductions ÷ entity-penalty split.
   const entityRaw = (deductions.entity || []).reduce((s, d) => s + (SEVERITY_POINTS[d.severity] || 0), 0);
   const entityPoints = capEntityPenalty(entityRaw);
@@ -370,27 +370,6 @@ function _buildBreakdownFromEvalResult(evalResult, entityResult) {
   return { visual, semantic, threeStage, entity };
 }
 
-/**
- * Emit a per-story summary of which scoreModel produced each version's
- * finalScore. Call once at story completion so we can see the mix in logs
- * without grepping per-page lines.
- *
- * @param {string} storyId
- * @param {Array<{scoreModel?: string}>} versions  Flat list of all scored versions
- */
-function logScoreModelSummary(storyId, versions) {
-  if (!Array.isArray(versions) || versions.length === 0) return;
-  const counts = { prompt: 0, math: 0, unknown: 0 };
-  for (const v of versions) {
-    const m = v?.scoreModel;
-    if (m === 'prompt') counts.prompt++;
-    else if (m === 'math') counts.math++;
-    else counts.unknown++;
-  }
-  const total = versions.length;
-  const pct = (n) => Math.round((n / total) * 100);
-  log.info(`[SCORE-SUMMARY] story ${storyId}: ${total} versions scored — ${pct(counts.prompt)}% prompt, ${pct(counts.math)}% math${counts.unknown ? `, ${pct(counts.unknown)}% unknown` : ''}`);
-}
 
 
 
@@ -506,112 +485,9 @@ function versionDeductionTotal(version) {
   return clusters.reduce((sum, c) => sum + c.weight, 0) + entityPenalty;
 }
 
-/**
- * Build the canonical scoreBreakdown structure from an evaluator output.
- * Used by evaluateImageQuality + re-evaluate endpoint so the version object
- * has a uniform shape regardless of which path produced it.
- *
- * Inputs are nullable — covers pass null for semantic/threeStage.
- *
- * @param {object} params
- * @param {{score: number, reasoning?: string, issues?: any[]}} params.visual
- * @param {{score: number, issues?: any[]}|null} [params.semantic]
- * @param {{score: number, issues?: any[]}|null} [params.threeStage]
- * @param {{penalty: number, issues?: any[]}|null} [params.entity]
- * @returns {object} scoreBreakdown
- */
-function buildScoreBreakdown({ visual, semantic = null, threeStage = null, entity = null } = {}) {
-  return {
-    visual: visual ? {
-      score: Number(visual.score) || 0,
-      reasoning: visual.reasoning || null,
-      issues: Array.isArray(visual.issues) ? visual.issues : [],
-    } : { score: 0, reasoning: null, issues: [] },
-    semantic: semantic ? {
-      score: Number(semantic.score) || 0,
-      issues: Array.isArray(semantic.issues) ? semantic.issues : [],
-    } : null,
-    threeStage: threeStage ? {
-      score: Number(threeStage.score) || 0,
-      issues: Array.isArray(threeStage.issues) ? threeStage.issues : [],
-    } : null,
-    entity: entity ? {
-      penalty: Number(entity.penalty) || 0,
-      issues: Array.isArray(entity.issues) ? entity.issues : [],
-    } : { penalty: 0, issues: [] },
-  };
-}
 
-/**
- * Compose evalScore from a breakdown. evalScore is the score AFTER visual,
- * semantic, and three-stage penalties — but BEFORE entity penalty.
- *
- * The evaluator functions return penalised numbers directly (semantic eval
- * already subtracts its own penalty internally, etc.), so the canonical
- * "after non-entity penalties" number is the MIN of the three available
- * subscores. This matches what evaluateImageQuality has always returned
- * as `score`: take the worst of the parallel evaluators.
- *
- * @param {object} breakdown
- * @returns {number}
- */
-function composeEvalScore(breakdown) {
-  if (!breakdown) return 0;
-  const candidates = [];
-  if (breakdown.visual && typeof breakdown.visual.score === 'number') candidates.push(breakdown.visual.score);
-  if (breakdown.semantic && typeof breakdown.semantic.score === 'number') candidates.push(breakdown.semantic.score);
-  if (breakdown.threeStage && typeof breakdown.threeStage.score === 'number') candidates.push(breakdown.threeStage.score);
-  if (candidates.length === 0) return 0;
-  return Math.max(0, Math.min(...candidates));
-}
 
-/**
- * Compute the canonical final score from a breakdown. evalScore − entity penalty.
- *
- * @param {object} breakdown
- * @returns {number}
- */
-function composeFinalScore(breakdown) {
-  if (!breakdown) return 0;
-  const evalScore = composeEvalScore(breakdown);
-  const entityPenalty = capEntityPenalty((breakdown.entity && Number(breakdown.entity.penalty)) || 0);
-  return Math.max(0, evalScore - entityPenalty);
-}
 
-/**
- * Stamp the canonical score fields on a version object from a breakdown.
- * Mutates `version` in place. Both the unified pipeline and the
- * re-evaluate endpoint call this — single point where evalScore /
- * entityPenalty / finalScore land on the version.
- *
- * @param {object} version
- * @param {object} breakdown
- */
-/**
- * LEGACY writer (scoring audit 2026-07-10): no production code path calls
- * this anymore — every version writer now goes through applyScore (single
- * scale). Only applyScoreBreakdown (itself dead in prod, tests-only) still
- * calls it. Kept per mark-not-delete. Note its finalScore is the SIGNED
- * merged-eval scale, NOT comparable with applyScore's math finalScore.
- */
-function setVersionScores(version, evalScore, entityPenalty) {
-  if (!version || typeof version !== 'object') return;
-  version.evalScore = evalScore;
-  const rawPenalty = (Number(entityPenalty) || 0);
-  version.entityPenaltyRaw = rawPenalty;
-  version.entityPenalty = capEntityPenalty(rawPenalty);
-  version.finalScore = (typeof evalScore === 'number')
-    ? evalScore - version.entityPenalty
-    : null;
-}
-
-function applyScoreBreakdown(version, breakdown) {
-  if (!version || typeof version !== 'object') return;
-  version.scoreBreakdown = breakdown;
-  const evalScore = composeEvalScore(breakdown);
-  const entityPenalty = (breakdown && breakdown.entity && Number(breakdown.entity.penalty)) || 0;
-  setVersionScores(version, evalScore, entityPenalty);
-}
 
 /**
  * Pick the best version index out of an `imageVersions[]` array.
@@ -781,16 +657,10 @@ module.exports = {
   composeDeductions,
   computeMathFinalScore,
   applyScore,
-  logScoreModelSummary,
   capEntityPenalty,
   // Legacy helpers (still used by some readers/writers — to be migrated)
   computeFinalScore,
   versionDeductionTotal,
-  buildScoreBreakdown,
-  composeEvalScore,
-  composeFinalScore,
-  applyScoreBreakdown,
-  setVersionScores,
   pickBestVersionIndex,
   recomputeActiveVersion,
   recomputeAllActiveVersions,
