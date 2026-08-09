@@ -59,13 +59,30 @@ async function editWithGeminiImage(prompt, refImages, { aspectRatio = '16:9', mo
 // attempt on the configured backend failed (e.g. Gemini IMAGE_OTHER safety
 // refusal on an adult-face sheet). Model IDs never cross providers: each
 // branch resolves its own provider's model.
+// Nearest supported aspect preset for an image, so style transfer OUTPUTS the
+// same shape as its input instead of squeezing it. The decoupled composite is
+// ~square (two stacked 16:9 rows); forcing 16:9 here cropped the heads and
+// compressed the bodies. Gemini/Grok only take preset strings, so the composite
+// is built to an exact preset (1:1, padded — see stackRowsInto2x4) and this
+// returns that preset back.
+async function aspectPresetFor(imageData) {
+  try {
+    const buf = Buffer.from(r2.stripDataUriPrefix(imageData), 'base64');
+    const { width, height } = await sharp(buf).metadata();
+    const r = width / height;
+    const presets = [['1:1', 1], ['3:4', 0.75], ['4:3', 4 / 3], ['9:16', 0.5625], ['16:9', 16 / 9]];
+    return presets.reduce((best, p) => Math.abs(p[1] - r) < Math.abs(best[1] - r) ? p : best)[0];
+  } catch { return '16:9'; }
+}
+
 async function styleTransferGenerate(prompt, pass1ImageData, backendOverride = null) {
   const backend = backendOverride || MODEL_DEFAULTS.avatarStyleTransferBackend;
+  const aspectRatio = await aspectPresetFor(pass1ImageData);
   if (backend === 'gemini') {
-    const r = await editWithGeminiImage(prompt, [pass1ImageData], { aspectRatio: '16:9', model: MODEL_DEFAULTS.avatarStyleTransferModel });
+    const r = await editWithGeminiImage(prompt, [pass1ImageData], { aspectRatio, model: MODEL_DEFAULTS.avatarStyleTransferModel });
     return { ...r, provider: 'gemini_image' };
   }
-  const r = await editWithGrok(prompt, [pass1ImageData], { aspectRatio: '16:9', model: GROK_MODELS.STANDARD });
+  const r = await editWithGrok(prompt, [pass1ImageData], { aspectRatio, model: GROK_MODELS.STANDARD });
   return { ...r, provider: 'grok' };
 }
 
@@ -238,7 +255,7 @@ function buildHeadRowPrompt(character = null) {
   return `Image 1 shows the four camera angles for a head-shot row — use it ONLY for facing direction (cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 back of head); ignore its face and features, and never draw arrows.
 Image 2 is the character's face photo — the identity; match this exact face.
 Image 3 is the character's full-body reference sheet — match the SAME face, hair colour, hairstyle, and skin tone shown there so the heads belong to that body.${hairBlock}
-Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is a HEAD-AND-NECK close-up — head and neck only, no shoulders, no torso, no clothing — of the SAME PERSON. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 back of head. Photographic / lifelike; identity from Image 2; hair and skin tone consistent with Image 3. No text, numbers, labels, arrows, or symbols.`;
+Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is a HEAD-AND-SHOULDERS close-up of the SAME PERSON — the head, neck, and the top of the shoulders wearing the costume; a little of the shoulders and collar showing is good, no bare skin below the neck. Never crop the top of the head. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 back of head. Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3. No text, numbers, labels, arrows, or symbols.`;
 }
 
 // Composite the head row (top) over the body row (bottom) into one 2×4 sheet,
@@ -253,12 +270,21 @@ async function stackRowsInto2x4(headRowData, bodyRowData) {
   const headResized = await sharp(headBuf).resize({ width: W }).toBuffer();
   const hMeta = await sharp(headResized).metadata();
   const SEAM = 4;
-  const splitY = hMeta.height + Math.round(SEAM / 2);
-  const H = hMeta.height + SEAM + bMeta.height;
-  const out = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+  const stackH = hMeta.height + SEAM + bMeta.height;
+  // Pad to an EXACT 1:1 square so Pass-2 style transfer can output the same
+  // aspect. Gemini/Grok take only preset aspect strings; two stacked 16:9 rows
+  // = ~8:9, which has no preset, so forcing 16:9 in Pass 2 cropped the heads
+  // and squeezed the bodies. White L/R margins (matches the sheet background),
+  // a dark thin seam between the rows for the splitter to lock onto.
+  const square = Math.max(W, stackH);
+  const left = Math.round((square - W) / 2);
+  const top = Math.round((square - stackH) / 2);
+  const splitY = top + hMeta.height + Math.round(SEAM / 2);
+  const out = await sharp({ create: { width: square, height: square, channels: 3, background: { r: 255, g: 255, b: 255 } } })
     .composite([
-      { input: headResized, top: 0, left: 0 },
-      { input: bodyBuf, top: hMeta.height + SEAM, left: 0 },
+      { input: headResized, top, left },
+      { input: { create: { width: W, height: SEAM, channels: 3, background: { r: 20, g: 20, b: 20 } } }, top: top + hMeta.height, left },
+      { input: bodyBuf, top: top + hMeta.height + SEAM, left },
     ])
     .jpeg({ quality: 92 })
     .toBuffer();
