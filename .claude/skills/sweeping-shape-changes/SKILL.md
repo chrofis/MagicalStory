@@ -7,17 +7,17 @@ description: Use when renaming a field, changing a data structure or its storage
 
 ## Overview
 
-~150 historical fix commits are one-crash-at-a-time repairs after a data shape changed and its consumers didn't: `[object Object]` in prompts, `storyText` vs `story`, `faceBox` vs `face_box`, the non-existent `updated_at` column queried 4 times, R2-migration leaks for 7 months, DDL written into a dead init path repeatedly. **Core principle: a shape change ships with a complete inventory of its readers and writers, not with the first few you remember.**
+A large share of this repo's historical fix commits are one-crash-at-a-time repairs after a data shape changed and its consumers didn't: `[object Object]` in prompts, `storyText` vs `story`, `faceBox` vs `face_box`, a non-existent column queried repeatedly, R2-migration leaks that lingered for months, DDL written into a dead init path repeatedly. **Core principle: a shape change ships with a complete inventory of its readers and writers, not with the first few you remember.**
 
 ## Schema changes — one live path
 
 DDL goes in a **new `migrations/00N_*.sql` file** (repo root), run by `server/services/migrate.js` at boot. Nothing else runs:
 
-- `server.js` `REMOVED_initializeDatabase_DEAD()` — dead, despite comments claiming otherwise
+- the renamed-dead init function in `server.js` (currently `REMOVED_initializeDatabase_DEAD()`) — dead, despite comments claiming otherwise
 - `server/services/database.js` `initializeDatabase()` — exported, never called at boot
 - `database/migrations/` — legacy system, manual-only
 
-Also: never edit an already-applied migration; make new ones idempotent (`IF NOT EXISTS`, defaults); **query prod data before writing a migration that assumes emptiness** (`SELECT COUNT` first — a "surely empty" version slot had 210 real rows); after deploy, verify `information_schema` in the target environment before shipping dependent code; boot twice to confirm idempotency.
+Also: never edit an already-applied migration; make new ones idempotent (`IF NOT EXISTS`, defaults); **query prod data before writing a migration that assumes emptiness** (`SELECT COUNT` first — a "surely empty" version slot turned out to hold hundreds of real rows); after deploy, verify `information_schema` in the target environment before shipping dependent code; boot twice to confirm idempotency.
 
 ## Field/format changes — inventory before edit
 
@@ -33,7 +33,7 @@ Also: never edit an already-applied migration; make new ones idempotent (`IF NOT
 |---|---|
 | "I updated the writer and the obvious readers" | The non-obvious reader crashes a real story next week. Inventory means all of them. |
 | "I'll put the ALTER TABLE next to the other CREATE statements" | Those statements are dead code. Migration file or it doesn't exist. |
-| "The old rows can be migrated in place" | A blind JSONB rewrite nearly corrupted 210 rows. Read-compat alias first, backfill later if ever. |
+| "The old rows can be migrated in place" | A blind JSONB rewrite nearly corrupted hundreds of rows. Read-compat alias first, backfill later if ever. |
 | "Find-and-replace handles the rename" | `sceneDescription` has 4 unrelated meanings. Context-read every hit. |
 
 ## Red flags — STOP

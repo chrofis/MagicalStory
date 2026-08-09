@@ -7,7 +7,7 @@ description: Use before pushing any server or client code change to staging or m
 
 ## Overview
 
-~50 commits in this repo's history are fixes for `X is not defined` / TDZ / crashloop errors that reached deployment — every one preventable by executing the changed lines once. Server JS has no TypeScript and no lint gate; the deploy pipeline is the only executor. **Core principle: never push a line of code that has never been executed.**
+Dozens of commits in this repo's history are fixes for `X is not defined` / TDZ / crashloop errors that reached deployment — every one preventable by executing the changed lines once. Server JS has no TypeScript and no lint gate; the deploy pipeline is the only executor. **Core principle: never push a line of code that has never been executed.**
 
 ## Gate (run all, in order)
 

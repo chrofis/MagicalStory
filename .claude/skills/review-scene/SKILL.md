@@ -1,13 +1,11 @@
 ---
 name: review-scene
-description: Use when reviewing scene descriptions from generated stories, debugging scene prompt issues, or adding new checks to scene-descriptions.txt
+description: Use when reviewing scene descriptions from generated stories, debugging scene prompt issues, or adding new checks to the scene prompts (scene-expansion.txt / scene-review.txt)
 ---
 
 # Review Scene
 
-## Overview
-
-Interactive workflow for reviewing scene descriptions from generated stories and improving the scene prompt.
+Interactive workflow for reviewing a generated story's scene descriptions and improving the scene prompts.
 
 ## Usage
 
@@ -15,77 +13,38 @@ Interactive workflow for reviewing scene descriptions from generated stories and
 /review-scene <story-id-or-url> <page-number>
 ```
 
-Examples:
-- `/review-scene job_1769251765157_a4qh1nzza 8`
-- `/review-scene https://www.magicalstory.ch/create?storyId=job_1769251765157_a4qh1nzza 6`
-
 ## Workflow
 
-### 1. Fetch Scene Data
+### 1. Fetch the scene data
 
-Query the database for the story job:
+Preferred: `node scripts/analysis/review-page.js <storyId> <pageNum>` — dumps the page's stored scene description, prompts, evals, and versions (see page-review-tool memory). Raw fallback: `stories.data->sceneImages` / `story_jobs.result_data->sceneDescriptions` in the DB.
 
-```javascript
-// Extract job ID from URL if needed
-const jobId = url.includes('storyId=')
-  ? url.split('storyId=')[1].split('&')[0]
-  : storyId;
+### 2. Display key info
 
-// Query result_data for scene descriptions
-SELECT result_data->'sceneDescriptions'->N as scene
-FROM story_jobs WHERE id = $1
-```
+- **Scene summary (input)**: what was requested
+- **Location / characters / objects**: where the model placed things
+- **Critique run**: which checks passed/failed
 
-### 2. Display Key Info
+### 3. User identifies the issue
 
-Show the user:
-- **Scene Summary (input)**: What was requested
-- **Location**: Where the LLM placed the scene
-- **Characters**: Positions and actions
-- **Objects**: What's in the scene
-- **Critique run**: What checks passed/failed
+Wait for the user: wrong location, characters too close/far, missing elements, physics, continuity.
 
-### 3. User Identifies Issue
+### 4. Add a check to the scene prompts
 
-Wait for user to explain what's wrong:
-- Wrong location
-- Characters too close/far
-- Missing elements
-- Physics issues
-- Continuity problems
+The relevant files (which one is live depends on `PIPELINE_MODE` — beats vs unified; check before editing):
 
-### 4. Add Check to Scene Prompt
+- `prompts/scene-expansion.txt` (and `scene-expansion-all.txt`) — Art Director authoring rules
+- `prompts/scene-review.txt` — cross-page critique checks
+- `prompts/scene-iteration.txt` / `scene-repair.txt` — downstream siblings; check them for the same rule (fixing-sibling-paths)
 
-If the issue reveals a missing check:
+Follow the validating-prompt-changes skill before editing: terse rules, archetypal examples only, validate against ≥3 stored pages, and grep for duplicate instruction sites.
 
-1. Add numbered check rule after existing checks in `prompts/scene-descriptions.txt`
-2. Add corresponding field to critique JSON schema
-3. Add to example critique section
+## Quick reference
 
-Check format:
-```markdown
-**N. Check Name:**
-- Bullet points explaining what to verify
-- WRONG: example of failure
-- RIGHT: example of correct behavior
-```
-
-JSON field format:
-```json
-"checkName": "Brief description of what to verify. PASS/FAIL"
-```
-
-## Files
-
-- `prompts/scene-descriptions.txt` - Scene prompt with checks
-- `story_jobs` table - Contains `result_data->'sceneDescriptions'`
-
-## Quick Reference
-
-| Issue Type | Likely Missing Check |
+| Issue type | Likely missing check |
 |------------|---------------------|
-| Wrong location | Location Continuity |
-| Characters too close | Distance & Separation |
-| Teleporting objects | Object Continuity |
-| Weather mismatch | Weather Consistency |
-| Scale problems | Scale Feasibility |
+| Wrong location | Location continuity |
+| Characters too close | Distance & separation |
+| Teleporting objects | Object continuity |
+| Weather mismatch | Weather consistency |
+| Scale problems | Scale feasibility |

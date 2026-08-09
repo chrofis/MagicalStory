@@ -17,12 +17,16 @@ Guide completion of development work by presenting clear options and handling ch
 
 ### Step 1: Verify Tests
 
-**Before presenting options, verify tests pass:**
+**Before presenting options, verify the work:**
 
 ```bash
-# Run project's test suite
-npm test / cargo test / pytest / go test ./...
+node --check server.js                 # server parses
+cd client && npx tsc --noEmit          # client type-checks
+# plus: unit tests for touched areas (tests/unit/), and the
+# smoke-testing-before-push gate for changed server lines
 ```
+
+`npm test` here is the full Playwright browser suite — run it only when the change warrants an E2E pass, not as a reflex gate.
 
 **If tests fail:**
 ```
@@ -193,8 +197,7 @@ git worktree remove <worktree-path>
 ## Integration
 
 **Called by:**
-- **subagent-driven-development** (Step 7) - After all tasks complete
-- **executing-plans** (Step 5) - After all batches complete
+- **executing-plans** - After all tasks/batches complete
 
 **Pairs with:**
 - **using-git-worktrees** - Cleans up worktree created by that skill

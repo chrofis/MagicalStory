@@ -1,76 +1,33 @@
 ---
 name: executing-plans
-description: Use when you have a written implementation plan to execute in a separate session with review checkpoints
+description: Use when you have a written implementation plan to execute - covers direct execution, delegating tasks to subagents, and parallel dispatch of independent work
 ---
 
 # Executing Plans
 
-## Overview
+Load the plan, review it critically, then execute — either directly in batches, or by delegating tasks to subagents. One skill, one decision: delegate or not.
 
-Load plan, review critically, execute tasks in batches, report for review between batches.
+## Step 1: Load and Review
 
-**Core principle:** Batch execution with checkpoints for architect review.
+1. Read the plan file; extract all tasks into a task list.
+2. Review critically — raise concerns with the user before starting.
 
-**Announce at start:** "I'm using the executing-plans skill to implement this plan."
+## Step 2: Choose the execution mode
 
-## The Process
+- **Direct** (default): you implement the tasks yourself, in batches of ~3, reporting between batches for review.
+- **Delegated**: dispatch a fresh subagent per task when tasks are self-contained and context pollution is a risk. Prompt templates in this directory: `implementer-prompt.md`, `spec-reviewer-prompt.md`, `code-quality-reviewer-prompt.md`. After each implementer, run spec-compliance review first, then code-quality review; the implementer fixes findings and the reviewer re-reviews until clean.
+- **Parallel dispatch**: only for genuinely independent tasks — different files/subsystems, no shared state, no ordering. Send the agents in a single message so they run concurrently.
 
-### Step 1: Load and Review Plan
-1. Read plan file
-2. Review critically - identify any questions or concerns about the plan
-3. If concerns: Raise them with your human partner before starting
-4. If no concerns: Create TodoWrite and proceed
+**Independence test before parallelizing:** would fixing one task change your approach to another? Do two tasks touch the same files? Is a shared root cause plausible? Any "yes" → sequential (or a single agent).
 
-### Step 2: Execute Batch
-**Default: First 3 tasks**
+**Subagent prompts must be:** focused (one problem domain), self-contained (all context pasted in — the agent doesn't get the conversation), constrained ("don't change production code" / "fix only X"), and explicit about the expected output. Verify a subagent's work from the diff, not its report.
 
-For each task:
-1. Mark as in_progress
-2. Follow each step exactly (plan has bite-sized steps)
-3. Run verifications as specified
-4. Mark as completed
+## Step 3: Execute and report
 
-### Step 3: Report
-When batch complete:
-- Show what was implemented
-- Show verification output
-- Say: "Ready for feedback."
+Per batch/task: implement, run the verifications the plan specifies, mark complete. Between batches: report what was done, show verification output, wait for feedback.
 
-### Step 4: Continue
-Based on feedback:
-- Apply changes if needed
-- Execute next batch
-- Repeat until complete
+**Stop and ask when:** blocked mid-task, an instruction is unclear, verification fails repeatedly, or the plan has a gap. Don't guess through blockers.
 
-### Step 5: Complete Development
+## Step 4: Finish
 
-After all tasks complete and verified:
-- Announce: "I'm using the finishing-a-development-branch skill to complete this work."
-- **REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch
-- Follow that skill to verify tests, present options, execute choice
-
-## When to Stop and Ask for Help
-
-**STOP executing immediately when:**
-- Hit a blocker mid-batch (missing dependency, test fails, instruction unclear)
-- Plan has critical gaps preventing starting
-- You don't understand an instruction
-- Verification fails repeatedly
-
-**Ask for clarification rather than guessing.**
-
-## When to Revisit Earlier Steps
-
-**Return to Review (Step 1) when:**
-- Partner updates the plan based on your feedback
-- Fundamental approach needs rethinking
-
-**Don't force through blockers** - stop and ask.
-
-## Remember
-- Review plan critically first
-- Follow plan steps exactly
-- Don't skip verifications
-- Reference skills when plan says to
-- Between batches: just report and wait
-- Stop when blocked, don't guess
+After all tasks are complete and verified, use the finishing-a-development-branch skill (verify, present merge/PR options).

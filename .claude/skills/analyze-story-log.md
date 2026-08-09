@@ -90,8 +90,8 @@ Logs are downloaded from Railway dashboard:
 # List recent story IDs from database
 node scripts/list-stories.js
 
-# Check specific story structure
-node scripts/check-story-structure.js <storyId>
+# Inspect one page's stored data (prompts, evals, versions)
+node scripts/analysis/review-page.js <storyId> <pageNum>
 ```
 
 ## Log File Location

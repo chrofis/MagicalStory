@@ -7,9 +7,11 @@ description: Use when adding or modifying any call to Grok, Gemini, or Runware �
 
 ## Overview
 
-Every invariant below was discovered in production and then re-learned at other call sites: the Grok 8k prompt limit was hit **4 separate times**, the Gemini safety sanitizer was re-implemented **6 times**, a Grok model ID was sent to the Gemini API **3 times**. **Core principle: provider quirks are enforced in the wrapper (`server/lib/grok.js`, `server/lib/images.js`, `server/lib/runware.js`), never handled ad hoc at a call site.** Read `docs/image-generation-methods.html` before touching any image-gen path — it is the authoritative inventory and a standing CLAUDE.md rule.
+Every invariant below was discovered in production and then re-learned at other call sites — the prompt limit hit repeatedly, the safety sanitizer re-implemented over and over, model IDs sent to the wrong provider more than once. **Core principle: provider quirks are enforced in the wrapper (`server/lib/grok.js`, `server/lib/images.js`, `server/lib/runware.js`), never handled ad hoc at a call site.** Read `docs/image-generation-methods.html` before touching any image-gen path — it is the authoritative inventory and a standing CLAUDE.md rule.
 
 ## Known invariants (verified the hard way — do not re-derive empirically)
+
+Model IDs and numeric limits below can drift as providers update: `server/config/models.js` and the provider wrappers are the source of truth; if a limit matters to your change, confirm it there rather than trusting this table's snapshot.
 
 | Provider | Invariant |
 |---|---|
@@ -19,7 +21,7 @@ Every invariant below was discovered in production and then re-learned at other 
 | Gemini | Safety-blocks (`PROHIBITED_CONTENT`, `IMAGE_OTHER`) on age/gender/adult-face terms. Use `sanitizeForGemini(text, level)` — never write a new inline sanitizer (the 6 re-implementations were consolidated once already). |
 | Gemini | `gemini-2.5-flash` required for quality eval / bounding boxes; `gemini-2.0-flash` cannot return bboxes. |
 | Runware | 3,000-char prompt limit (vs 30,000 Gemini). ACE++ takes `referenceImages` at root level, not inside `acePlusPlus`. |
-| Cross-provider | Model IDs must never cross providers. Routing decides the ID; a call site never hardcodes one for "the other" path (Grok→Gemini fallback sent Grok IDs 3×). |
+| Cross-provider | Model IDs must never cross providers. Routing decides the ID; a call site never hardcodes one for "the other" path (the Grok→Gemini fallback has shipped Grok IDs repeatedly). |
 | Evals | Temperature 0. Non-zero temperature made eval tuning non-reproducible for months. |
 
 ## Procedure for any provider-call change
@@ -34,6 +36,6 @@ Every invariant below was discovered in production and then re-learned at other 
 
 | Excuse | Reality |
 |---|---|
-| "I'll confirm the prompt cap from xAI docs / empirically" | It's 8,000, it's in the config, and it broke prod 4 times. Check the repo first. |
-| "I'll just handle the quirk at this call site" | That's how 6 sanitizers and 4 length caps accumulated. Wrapper or nothing. |
-| "Padding/cropping choice is a detail" | It flip-flopped 4× because each change ignored why the last one was made. Decisions log first. |
+| "I'll confirm the prompt cap from xAI docs / empirically" | It's in the config (`maxPromptLength`) and it has broken prod repeatedly. Check the repo first. |
+| "I'll just handle the quirk at this call site" | That's exactly how the duplicate sanitizers and length caps accumulated. Wrapper or nothing. |
+| "Padding/cropping choice is a detail" | It flip-flopped repeatedly because each change ignored why the last one was made. Decisions log first. |

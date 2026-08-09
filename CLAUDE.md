@@ -67,6 +67,14 @@ Spaces). Before launching any Python script, consider its memory footprint; cap 
 
 ## Important Rules
 
+- **Confirm the issue is real before fixing anything — and never fix what wasn't asked.** Before touching code for a "problem" you noticed yourself, first verify it actually exists from stored evidence (DB rows, logs, a reproduction) and report it; the deliverable is the finding, not an unrequested fix. If a fix has meaningfully different options (scope, approach, which file), list them and stop — use `AskUserQuestion`, don't pick and ship.
+
+- **Paid API calls need a mandate and a cap.** Every Grok/Gemini/Anthropic/Runware/OpenRouter call and every story generation costs real money. Rules:
+  1. Paid calls are allowed only as part of a task the user actually assigned — never for a side-quest Claude invented.
+  2. Within an assigned task, individual calls under ~CHF 0.50 are fine without asking; anything bigger (showcases, full story runs, batch experiments) needs explicit permission or a spend cap the user stated for THIS task.
+  3. **Burn-loop hard stop:** if two paid attempts at the same thing fail, or you suspect the approach is off track, STOP — no third paid retry. Report what happened, list the options, and wait. Ten repeats of a 50-cent call while off track is exactly the failure mode this rule exists to prevent.
+  4. A spend cap authorizes the task it was given for, nothing else. New idea → new ask.
+
 - **NEVER push to `master` without explicit per-push approval — even for "safe" changes.** Every push to `master` auto-deploys to production. Each prod deploy (a) **kills any in-flight story generation** (real users mid-creation lose their work) AND (b) causes brief downtime. "Functionally safe", "additive", "backward-compatible", "trivial typo fix" are NOT valid reasons to skip the approval step — they all have the same downtime + in-flight-job cost. The mandatory flow for ANY change:
   1. `git push origin master:staging` (or push to your feature branch + PR-merge into staging)
   2. Verify on `https://staging.magicalstory.ch` — page loads, smoke test the affected area
@@ -88,7 +96,6 @@ Spaces). Before launching any Python script, consider its memory footprint; cap 
   and on `master` that means a real user's paid generation. Never disable the hook to get
   a push through. Check status any time with `node scripts/admin/check-push-idle.js`
   (`docs/decisions.md`, 2026-08-04 entry).
-- **Do not automatically deploy.** Always ask before deploying.
 - **Ask if unclear.** If there are different implementation options, ask rather than assuming.
 - **Interview the user with `AskUserQuestion` — never decide direction for them.** When the user surfaces a problem with multiple valid resolutions (different scopes, different trade-offs, different "which file to touch" choices, "revert vs adjust vs leave alone"), STOP and ask via `AskUserQuestion` with 2-4 framed options + their trade-offs. Do NOT pick the option you think makes sense and "just ship it" with a "let me know if you want differently" tail. Do NOT bury the choice in prose ("Want me to do X? Or Y?") — that loses framing, hides trade-offs, and ends up as a slow back-and-forth. Use the actual question tool with explicit options. Exception: the "default to the proper fix" rule above (clean root-cause vs hacky shortcut) — there you don't ask, you ship proper. Every other choice → interview.
 - **Default to the proper fix — never offer "quick workaround vs proper" as a choice.** When a bug has a clean root-cause fix and a hacky shortcut, silently pick proper and ship it. Don't ask which one to do. Workarounds contaminate the codebase (rotation entries get permanently mangled to dodge a spec bug, code paths get one-off skips, etc.) and waste the user's time on a vote whose answer is always "proper". Only mention the shortcut if the proper fix isn't viable for a real reason (would take days, breaks a contract) — and then frame it as a constraint, not a choice.
@@ -113,7 +120,7 @@ When the user says **"run a new showcase story"** (or any short variant: "run a 
 5. If photos for the family don't exist yet on disk, run `node scripts/admin/generate-demo-photos.js --family=<id> --save-to=true --no-upload` first, let the user inspect, then proceed.
 6. Default backend is **production**. For local: `npm run showcase:local`. Always confirm environment with the user before launching.
 
-Full doc: `docs/demo-stories.md`.
+Rotation config: `tests/helpers/demo-rotation.json`; state: `tests/demo-rotation-state.json`; orchestrator source is the doc (`scripts/admin/showcase.js`).
 
 ## Folder Organization Rules
 
@@ -166,7 +173,6 @@ railway logs
 **Branch / deploy flow:**
 - `feature/X` → PR → `staging` → smoke-test on staging.magicalstory.ch → `master` (prod).
 - Hotfixes can push direct to `master` but should be the exception.
-- See `docs/staging-setup.md` for one-time staging environment provisioning.
 
 ### Python Photo Analyzer Service
 
@@ -198,7 +204,7 @@ When user says **"run tests"** or **"test before deploy"**:
 
 1. Start local servers in background
 2. Run `npm run test:local`
-3. Report results (10 tests should pass)
+3. Report results (all tests should pass)
 4. If all pass, ask if user wants to deploy
 
 Tests check: homepage images, character photos, API health, auth, no JS errors, no 404s, wizard navigation.
@@ -220,13 +226,15 @@ Tests check: homepage images, character photos, API health, auth, no JS errors, 
 | Image Generation | Gemini (Google) + Grok (xAI) | Page illustrations, covers, avatars |
 | Character Repair | Grok Imagine (xAI) | Cutout + blended character repair ($0.02/img) |
 | Cheap Images | Runware | Dev mode, inpainting (SDXL $0.002/img) |
-| Avatar Faces | Grok Imagine (xAI) | Clothing avatars (winter/standard/summer) via edit endpoint with face-photo reference. Switched from Gemini after IMAGE_OTHER safety refusals on adult-face photos left avatars stuck pending. Costumed/styled avatars: Pass 1 (identity sheet) = Grok; Pass 2 (style transfer) = **Grok** (default `avatarStyleTransferBackend`, env `AVATAR_STYLE_BACKEND`). Gemini is NOT used by default: it refuses realistic adult faces (IMAGE_OTHER — confirmed even reframed as a fictional character) and is not stronger, so the 2026-07-19 "Gemini stylises better" verdict is reversed. Grok stylises acceptably and handles adults; a one-shot alternate-backend retry + never-zero-avatar backstop remain (see decisions.md avatar-guarantee entry). |
+| Avatar Faces | Grok Imagine (xAI) | Clothing + costumed avatars: both passes (identity sheet + style transfer) default to Grok (env `AVATAR_STYLE_BACKEND`). Gemini is NOT used by default (refuses realistic adult faces). Full history + rationale: `docs/decisions.md` → "Avatar style transfer (pass-2) uses Grok, not Gemini" and the avatar-guarantee entry. |
 | Face Detection | Python service (MediaPipe/Haar) | Cascade face detection for illustrations |
 
 ### Story Generation Pipeline (Unified Mode)
+`PIPELINE_MODE=beats` (staging) is the intended target pipeline — it decides which story prompt file is live; treat it as deliberate, not an open defect.
+
 ```
 POST /api/jobs/create-story → Background Job:
-  1. Generate full story: writer call (outline + visual bible + text + scene hints; arc→scenes→text order) + separate OPUS review call (analysis + fixes; SPLIT_OUTLINE_REVIEW gate)
+  1. Generate full story: writer call (outline + visual bible + text + scene hints; arc→scenes→text order) + separate review call (analysis + fixes; SPLIT_OUTLINE_REVIEW gate; reviewer model set in server/config/models.js — currently DeepSeek V4 Pro, was Opus)
   2. Parse scenes, expand each into Art Director prose (scene-expansion.txt)
      → Each scene gets: character descriptions, interactions, textPosition, emptyScenePrompt
   3. Generate empty scene backgrounds (style anchors for iterative placement)

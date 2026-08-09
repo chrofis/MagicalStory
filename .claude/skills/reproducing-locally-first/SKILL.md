@@ -7,15 +7,15 @@ description: Use when a deployed fix didn't work, a bug reproduces after a fix, 
 
 ## Overview
 
-The worst days in this repo's history (100 commits on 2026-03-08, ~25 stratified fixes on 2026-05-16, 5 reverted diagnostic commits on 2026-01-30) were debugging sessions conducted through the deploy pipeline: hypothesize → push → run a 20-minute real-money story → observe → push again. **Core principle: production is the last verifier, never the debugger.**
+The worst days in this repo's history — hundred-commit days, mass-revert nights — were debugging sessions conducted through the deploy pipeline: hypothesize → push → run a 20-minute real-money story → observe → push again. **Core principle: production is the last verifier, never the debugger.**
 
 ## Rule 1 — before judging any fix "failed", prove it ran
 
 When a "fixed" bug reproduces identically, the most likely cause historically was that the fix never executed:
 
-- Poll `/api/health` and compare the commit SHA to the SHA you pushed. Timed waits (`sleep 360`) race Railway cutover and have burned two full days.
+- Poll `/api/health` and compare the commit SHA to the SHA you pushed. Timed waits (`sleep 360`) race Railway cutover and have burned full days.
 - Compare the validation job's `created_at` to the deploy-complete time — a job started before cutover ran old code.
-- One "prod bug" was simply master not promoted from staging for 13 days. Check `git log origin/master..origin/staging` before diagnosing code.
+- One "prod bug" was simply master not promoted from staging for nearly two weeks. Check `git log origin/master..origin/staging` before diagnosing code.
 
 ## Rule 2 — the two-push rule
 
@@ -34,16 +34,16 @@ The evidence from the failed run is already stored — pull it instead of genera
 
 ## Rule 3 — no diagnostic commits
 
-If the question is "what value did X have?", the answer is in the DB or Railway logs. Five diagnostic-logging commits were pushed and reverted in one night; the actual root cause (a 35MB response) was found by measurement, not logging.
+If the question is "what value did X have?", the answer is in the DB or Railway logs. A whole night of diagnostic-logging commits was once pushed and reverted; the actual root cause (an oversized response) was found by measurement, not logging.
 
 ## Rationalizations
 
 | Excuse | Reality |
 |---|---|
-| "One more small push will confirm it" | That's what pushes 3–40 said on the 100-commit day. |
+| "One more small push will confirm it" | That's what every push said on the hundred-commit day. |
 | "Can't reproduce locally, it only happens in prod" | The failed run's artifacts ARE the repro. Pull them. |
 | "The showcase takes 20 min anyway" | A stage-level rerun takes 2 min and costs cents. |
-| "The fix obviously deployed by now" | `sleep 360` lost two days. Poll the SHA. |
+| "The fix obviously deployed by now" | Timed waits have lost whole days. Poll the SHA. |
 
 ## Red flags — STOP
 

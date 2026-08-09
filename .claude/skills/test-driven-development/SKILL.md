@@ -1,6 +1,6 @@
 ---
 name: test-driven-development
-description: Use when implementing any feature or bugfix, before writing implementation code
+description: Use when implementing features or bugfixes in unit-testable code (pure helpers, scoring/parsing logic, client utilities), before writing implementation code
 ---
 
 # Test-Driven Development (TDD)
@@ -15,18 +15,11 @@ Write the test first. Watch it fail. Write minimal code to pass.
 
 ## When to Use
 
-**Always:**
-- New features
-- Bug fixes
-- Refactoring
-- Behavior changes
+**In this repo, TDD applies where a fast unit test is possible:** pure helpers (`server/lib/scoring.js`-class logic), parsers, prompt builders' pure parts, client utility functions — anything runnable without a browser, an AI provider, or the DB.
 
-**Exceptions (ask your human partner):**
-- Throwaway prototypes
-- Generated code
-- Configuration files
+**It does NOT apply to** pipeline paths whose only executor is a paid AI call or a Playwright run (`npm test` here is a browser suite). For those, the gate is the smoke-testing-before-push skill: execute the changed lines once with stub data before pushing.
 
-Thinking "skip TDD just this once"? Stop. That's rationalization.
+**Exceptions (ask the user):** throwaway prototypes, generated code, configuration files.
 
 ## The Iron Law
 
@@ -343,7 +336,7 @@ Can't check all boxes? You skipped TDD. Start over.
 
 | Problem | Solution |
 |---------|----------|
-| Don't know how to test | Write wished-for API. Write assertion first. Ask your human partner. |
+| Don't know how to test | Write wished-for API. Write assertion first. Ask the user. |
 | Test too complicated | Design too complicated. Simplify interface. |
 | Must mock everything | Code too coupled. Use dependency injection. |
 | Test setup huge | Extract helpers. Still complex? Simplify design. |
@@ -368,4 +361,4 @@ Production code → test exists and failed first
 Otherwise → not TDD
 ```
 
-No exceptions without your human partner's permission.
+No exceptions without the user's permission.

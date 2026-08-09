@@ -73,7 +73,9 @@ You MUST complete each phase before proceeding to the next.
 
    **WHEN system has multiple components (CI → build → signing, API → service → database):**
 
-   **BEFORE proposing fixes, add diagnostic instrumentation:**
+   **LOCAL RUNS ONLY.** In this repo, diagnostic instrumentation belongs in local reproductions (`scripts/test-scene.js`, `npm run showcase:local`, stub scripts) — NEVER in commits pushed to staging/prod to be read in Railway logs. Deployed evidence is already stored (DB, Railway logs); pull it instead — see the reproducing-locally-first skill.
+
+   **BEFORE proposing fixes, add diagnostic instrumentation (locally):**
    ```
    For EACH component boundary:
      - Log what data enters component
@@ -176,7 +178,7 @@ You MUST complete each phase before proceeding to the next.
    - Automated test if possible
    - One-off test script if no framework
    - MUST have before fixing
-   - Use the `superpowers:test-driven-development` skill for writing proper failing tests
+   - Use the test-driven-development skill for writing proper failing tests (where the code is unit-testable; otherwise a stub-execution script per smoke-testing-before-push)
 
 2. **Implement Single Fix**
    - Address the root cause identified
@@ -208,7 +210,7 @@ You MUST complete each phase before proceeding to the next.
    - Are we "sticking with it through sheer inertia"?
    - Should we refactor architecture vs. continue fixing symptoms?
 
-   **Discuss with your human partner before attempting more fixes**
+   **Discuss with the user before attempting more fixes**
 
    This is NOT a failed hypothesis - this is a wrong architecture.
 
@@ -231,7 +233,7 @@ If you catch yourself thinking:
 
 **If 3+ fixes failed:** Question the architecture (see Phase 4.5)
 
-## your human partner's Signals You're Doing It Wrong
+## User Signals You're Doing It Wrong
 
 **Watch for these redirections:**
 - "Is that not happening?" - You assumed without verifying
@@ -273,7 +275,7 @@ If systematic investigation reveals issue is truly environmental, timing-depende
 3. Implement appropriate handling (retry, timeout, error message)
 4. Add monitoring/logging for future investigation
 
-**But:** 95% of "no root cause" cases are incomplete investigation.
+**But:** most "no root cause" conclusions are incomplete investigation — treat that conclusion with suspicion.
 
 ## Supporting Techniques
 
@@ -284,13 +286,6 @@ These techniques are part of systematic debugging and available in this director
 - **`condition-based-waiting.md`** - Replace arbitrary timeouts with condition polling
 
 **Related skills:**
-- **superpowers:test-driven-development** - For creating failing test case (Phase 4, Step 1)
-- **superpowers:verification-before-completion** - Verify fix worked before claiming success
-
-## Real-World Impact
-
-From debugging sessions:
-- Systematic approach: 15-30 minutes to fix
-- Random fixes approach: 2-3 hours of thrashing
-- First-time fix rate: 95% vs 40%
-- New bugs introduced: Near zero vs common
+- **test-driven-development** - For creating failing test case (Phase 4, Step 1)
+- **verification-before-completion** - Verify fix worked before claiming success
+- **reproducing-locally-first** - Where the evidence-gathering happens when the bug was observed on staging/prod

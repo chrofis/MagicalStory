@@ -5,161 +5,40 @@ description: "Analyze CRITICAL ANALYSIS findings and verify fixes were applied t
 
 # Story Outline Review
 
-## Overview
+Compares a story's draft (inside the stored outline) with the final text to see what the review pass changed: issues identified, fixes proposed, and whether they landed.
 
-Analyzes the CRITICAL ANALYSIS section from story generation to see:
-1. All issues identified (by category)
-2. Proposed fixes with before/after text
-3. Whether fixes were applied in the final story
-4. Banned gesture scan on final text
+## Data access
 
-## Quick Usage
+Query the DB directly with an inline `pg` script — connection strings are in `.env` (`DATABASE_URL` / `STAGING_DATABASE_URL`; see db-direct-access memory). Requires `ssl: { rejectUnauthorized: false }`.
 
-```bash
-node scripts/compare-story-draft.js
-```
-
-Or with explicit database URL:
-```bash
-DATABASE_PUBLIC_URL="postgresql://..." node scripts/compare-story-draft.js
-```
-
-## Database Queries
-
-**Fetch draft story (from outline):**
 ```sql
-SELECT data->'outline' as outline FROM stories ORDER BY created_at DESC LIMIT 1
+-- Draft lives inside the outline; final text in originalStory
+SELECT data->'outline' AS outline, data->'originalStory' AS story
+FROM stories WHERE id = 'your-story-id';
 ```
 
-The outline contains a `---STORY DRAFT---` section with the initial text before critique.
+The outline contains a `---STORY DRAFT---` section with the pre-critique text; extract with `/---STORY DRAFT---\n([\s\S]*?)(?=---|$)/`. The raw model output is stored verbatim in `stories.data.outline` (see unified-call memory).
 
-**Fetch final story:**
-```sql
-SELECT data->'originalStory' as story FROM stories ORDER BY created_at DESC LIMIT 1
-```
+## What to compare, per page
 
-**Fetch specific story by ID:**
-```sql
-SELECT data->'outline' as outline, data->'originalStory' as story
-FROM stories WHERE id = 'your-story-id'
-```
-
-## Connection Details
-
-Use the public Railway proxy URL (not internal URL):
-```bash
-# Get the public URL from Railway
-railway variables -s Postgres | grep PUBLIC
-```
-
-Connection string format:
-```
-postgresql://postgres:<password>@turntable.proxy.rlwy.net:26087/railway
-```
-
-Requires SSL: `ssl: { rejectUnauthorized: false }`
-
-## What to Compare
-
-For each page, compare:
-
-| Aspect | Draft Location | Final Location |
+| Aspect | Draft location | Final location |
 |--------|---------------|----------------|
-| **Text** | `outline` → `---STORY DRAFT---` section | `originalStory.pages[n].text` |
-| **Scene Hint** | `outline` → `[Scene Hint]` lines | `originalStory.pages[n].sceneHint` |
-| **Characters** | `outline` → `[Characters]` lines | `originalStory.pages[n].characters` |
-| **Clothing** | `outline` → `[Clothing]` lines | `originalStory.pages[n].clothing` |
+| **Text** | outline → `---STORY DRAFT---` | `originalStory.pages[n].text` |
+| **Scene hint** | outline → `[Scene Hint]` lines | `originalStory.pages[n].sceneHint` |
+| **Characters** | outline → `[Characters]` lines | `originalStory.pages[n].characters` |
+| **Clothing** | outline → `[Clothing]` lines | `originalStory.pages[n].clothing` |
 
-## Key Things to Look For
+## What to look for
 
-### 1. Banned Gesture Fixes
-The prompt includes banned gestures that should be caught and fixed:
-- "hand on shoulder" → should become "fist bump" or similar
-- "arm around shoulders" → should become "fist bump" or similar
-- "ruffling hair" → should be changed
+1. **Banned-gesture fixes** — the prompt bans certain gestures (e.g. hand on shoulder, arm around shoulders, ruffling hair); the review should have replaced them. Verify the final text is clean.
+2. **Formatting** — paragraph splits, dialogue-tag repositioning, Swiss orthography («…» guillemets, ss not ß).
+3. **Scene-hint consistency** — characters mentioned appear in the scene, actions are visible, clothing matches the clothing field.
 
-**Example fix found:**
-```
-Draft:  "Manuel legte einen Arm um seine Schultern."
-Final:  "Manuel gab ihm einen Fist-Bump."
-```
+## Report
 
-### 2. Formatting Improvements
-- Paragraph splits for better readability
-- Dialogue tag repositioning (e.g., "Lass Papa ausreden," sagte Franziska → Franziska sagte: "Lass Papa ausreden.")
-
-### 3. Character/Scene Additions
-- Added details about character powers/abilities
-- Enhanced emotional moments
-- Better explanations of magical elements
-
-### 4. Scene Hint Consistency
-Scene hints should match the final text:
-- Characters mentioned should appear in scene
-- Actions described should be visible
-- Clothing matches the clothing field
-
-## Output Format
-
-Create a comparison table for each page:
-
-```markdown
-## Page N
-
-| Aspect | Draft | Final | Changed? |
-|--------|-------|-------|----------|
-| **Text** | "Original text..." | "Modified text..." | ✅ Description |
-| **Scene Hint** | Original hint | Final hint | ❌ No change |
-| **Characters** | List | List | ❌ No change |
-```
-
-## Example Script
-
-```javascript
-const { Pool } = require('pg');
-
-async function compareStory() {
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_PUBLIC_URL,
-    ssl: { rejectUnauthorized: false }
-  });
-
-  const result = await pool.query(`
-    SELECT
-      data->'outline' as outline,
-      data->'originalStory' as story
-    FROM stories
-    ORDER BY created_at DESC LIMIT 1
-  `);
-
-  const outline = result.rows[0]?.outline;
-  const story = result.rows[0]?.story;
-
-  // Parse draft from outline (between ---STORY DRAFT--- markers)
-  const draftMatch = outline?.match(/---STORY DRAFT---\n([\s\S]*?)(?=---|$)/);
-  const draft = draftMatch?.[1];
-
-  // Compare each page...
-  for (const page of story?.pages || []) {
-    console.log(`Page ${page.pageNumber}:`);
-    console.log(`  Final text: ${page.text?.substring(0, 100)}...`);
-    // Extract corresponding draft text and compare
-  }
-
-  await pool.end();
-}
-```
-
-## Summary Metrics
-
-After comparison, report:
-- **Total pages**: Number of pages in story
-- **Pages modified**: Count of pages with text changes
-- **Banned gesture fixes**: Count of caught forbidden actions
-- **Scene hint changes**: Count of modified scene hints
-- **Critical issues fixed**: List of important corrections
+Per-page table (Draft / Final / Changed?), then summary: total pages, pages modified, banned-gesture fixes caught, scene-hint changes, critical issues fixed vs missed.
 
 ## Related
 
-- `analyze-story-log` - Analyze timing and costs from Railway logs
-- `review-scene` - Review individual scene image generation
+- `analyze-story-log` — timing and costs from Railway logs
+- Test Lab stage `story_bible_replay` — replay costume/bible rules against a shipped story

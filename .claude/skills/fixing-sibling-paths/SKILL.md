@@ -7,7 +7,7 @@ description: Use when fixing any bug or patching existing behavior, before decla
 
 ## Overview
 
-A bug found at one call site is almost never alone in this codebase. The #1 historical failure (60+ repeat-fix commits): logic is duplicated across sibling paths, a fix lands on one, and the bug "returns" because it was never gone elsewhere. The active-version lookup was fixed **15 times** across different endpoints; the data-URI strip was hand-rolled in **56 places**; one week's clothing/cover fixes missed **5 sibling paths** (commit `fix(clothing+covers): finish last week's fixes on their sibling paths`).
+A bug found at one call site is almost never alone in this codebase. The #1 historical failure class: logic is duplicated across sibling paths, a fix lands on one, and the bug "returns" because it was never gone elsewhere. The active-version lookup was fixed over a dozen times across different endpoints; the data-URI strip was hand-rolled in dozens of places before consolidation; whole weeks of clothing/cover fixes have had to be re-done on their missed siblings.
 
 **Core principle: a fix is done when every sibling of the buggy code is fixed or consolidated — not when the reported symptom disappears.**
 
@@ -16,7 +16,7 @@ A bug found at one call site is almost never alone in this codebase. The #1 hist
 1. Root-cause the reported site first (systematic-debugging skill).
 2. **Before writing the fix**, grep repo-wide for the buggy pattern — the literal expression (`version_index = 0`, a field access, an instruction string) AND its paraphrases. List every hit.
 3. Walk the sibling axes below and name each counterpart explicitly ("prod route = X, dev route = Y — checked both").
-4. If ≥3 copies exist, consolidate into one helper/chokepoint instead of patching copies. Consolidation always won historically; it just arrived ~5 months and ~40 fixes late.
+4. If ≥3 copies exist, consolidate into one helper/chokepoint instead of patching copies. Consolidation always won historically; it just always arrived many fixes too late.
 5. Commit message lists the siblings checked, so the next session can see coverage.
 
 ## Sibling axes (every one has shipped a one-sided fix before)
@@ -36,9 +36,9 @@ A bug found at one call site is almost never alone in this codebase. The #1 hist
 
 | Excuse | Reality |
 |---|---|
-| "The user reported this one endpoint" | The other endpoints have the same bug; they're just not reported *yet*. 15 active-version fixes prove it. |
-| "It's a 3-line fix, grep is overkill" | Each of the 15 version fixes was a 3-line fix. The grep takes 60 seconds. |
-| "I'll consolidate later" | "Later" was 56 data-URI copies deep. Consolidate at copy #3. |
+| "The user reported this one endpoint" | The other endpoints have the same bug; they're just not reported *yet*. The version-lookup history proves it. |
+| "It's a 3-line fix, grep is overkill" | Every one of the repeat version fixes was a 3-line fix. The grep takes 60 seconds. |
+| "I'll consolidate later" | "Later" historically meant dozens of copies deep. Consolidate at copy #3. |
 | "I verified the reported symptom is gone" | That proves one path. Done = all paths enumerated. |
 
 ## Red flags — STOP and sweep
