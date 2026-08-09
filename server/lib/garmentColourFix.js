@@ -360,6 +360,12 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
 
   // Apply inside the crop, weighted by the SAM alpha (free feathered edge).
   const out = Buffer.from(cropRaw);
+  // Diagnostic overlay: the crop tinted by the weight each pixel ACTUALLY
+  // received. A bare SAM silhouette is white-on-transparent, which composites
+  // invisibly onto the summary card's white canvas AND says nothing about the
+  // colour gate — so a reviewer could not tell whether a stray arm was inside
+  // the mask or merely gated out. Tinting by the final weight answers both.
+  const overlay = options.collectSteps ? Buffer.from(cropRaw) : null;
   const soft = cfg.applyDeltaESoft, hard = Math.max(cfg.applyDeltaESoft + 1, cfg.applyDeltaEHard);
   let gated = 0;
   for (let i = 0; i < cw * ch; i++) {
@@ -370,11 +376,23 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
     // a slightly generous silhouette sits far out and must not take the offset.
     const d = Math.hypot(l[0] - cur.L, l[1] - cur.a, l[2] - cur.b);
     let wColour = 1;
-    if (d >= hard) { gated++; continue; }
+    if (d >= hard) {
+      gated++;
+      // Inside the mask but rejected on colour — mark it CYAN so an over-eager
+      // silhouette is visibly distinct from a garment that simply moved.
+      if (overlay) { overlay[i * 3] = 0; overlay[i * 3 + 1] = 210; overlay[i * 3 + 2] = 210; }
+      continue;
+    }
     if (d > soft) wColour = (hard - d) / (hard - soft);
     const w = Math.min(1, a8 / 255) * wColour;
     const rgb = _labToRgb(l[0] + w * dL, l[1] + w * da, l[2] + w * db);
     out[i * 3] = rgb[0]; out[i * 3 + 1] = rgb[1]; out[i * 3 + 2] = rgb[2];
+    if (overlay) {
+      // Magenta at full weight, fading to the original where the weight tails off.
+      overlay[i * 3] = Math.round(cropRaw[i * 3] * (1 - w) + 255 * w);
+      overlay[i * 3 + 1] = Math.round(cropRaw[i * 3 + 1] * (1 - w));
+      overlay[i * 3 + 2] = Math.round(cropRaw[i * 3 + 2] * (1 - w) + 255 * w);
+    }
   }
   if (gated) report.colourGated = gated;
   const fixedCrop = await sharp(out, { raw: { width: cw, height: ch, channels: 3 } }).png().toBuffer();
@@ -382,7 +400,11 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
 
   if (options.collectSteps) {
     steps.push({ label: `${report.name} BEFORE (${report.current.hueDeg}°, L ${report.current.L})`, data: toDataUri(cropBuf) });
-    steps.push({ label: `${report.name} MASK (DINO ${report.dinoScore} → SAM, ${cur.count}px)`, data: 'data:image/png;base64,' + seg.pngBuf.toString('base64') });
+    const overlayJpg = await sharp(overlay, { raw: { width: cw, height: ch, channels: 3 } }).jpeg({ quality: 92 }).toBuffer();
+    steps.push({
+      label: `${report.name} MASK — magenta = moved, cyan = gated (DINO ${report.dinoScore} → SAM, ${cur.count}px${gated ? `, ${gated} gated` : ''})`,
+      data: toDataUri(overlayJpg),
+    });
     steps.push({ label: `${report.name} AFTER (→ ${target.hueDeg}°, L ${targetL.toFixed(0)})`, data: toDataUri(await sharp(fixedCrop).jpeg({ quality: 95 }).toBuffer()) });
   }
   report.applied = true;
