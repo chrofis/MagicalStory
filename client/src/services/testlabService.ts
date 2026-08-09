@@ -364,6 +364,10 @@ export const TESTLAB_STAGES = [
   // change is measurable: the clothing findings are deterministic, and the
   // briefs are frozen, so the only variable is the prompt (or the model).
   { id: 'scene_review_replay', label: 'Scene review replay (frozen briefs → does it fix the faults?)', producesImage: false, overridable: true, storyLevel: true },
+  // Re-derives the clothing contract for an existing story and puts the new
+  // costume descriptions next to the ones it shipped with — the way to measure a
+  // change to the costume/distinguishability rules without generating a book.
+  { id: 'story_bible_replay', label: 'Story bible replay (new costume rules vs what shipped)', producesImage: false, overridable: true, storyLevel: true },
   // Both runners existed server-side but were absent from this list, so the
   // dropdown could never select them — unreachable except by hand-posting.
   { id: 'garment_colour_fix', label: 'Garment colour fix (DINO+SAM mask → L*a*b* match)', producesImage: true, overridable: false },

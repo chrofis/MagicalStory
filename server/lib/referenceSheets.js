@@ -15,6 +15,8 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const r2Lib = require('./r2');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { loadVbReferenceBytes } = require('./characterPhotos');
+const { escapeXml } = require('./repairGrid');
 
 const callGeminiAPIForImage = (...args) => require('./images').callGeminiAPIForImage(...args);
 

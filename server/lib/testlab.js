@@ -4725,6 +4725,82 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
   };
 }
 
+
+/**
+ * STORY BIBLE REPLAY — re-derive the clothing contract for an EXISTING story.
+ *
+ * The costume descriptions are written once, in the story-bible stage, and every
+ * later failure inherits them: an outfit whose identity rests on "a small white
+ * feather tucked into the left fold" cannot be drawn consistently no matter how
+ * good the renderer is. Changing those rules is therefore worth measuring on its
+ * own, against a story whose old contract we can read side by side.
+ *
+ * Beats are reconstructed from the stored pages (page text = BEAT, the scene's
+ * imageSummary = SCENE), so this needs nothing the story does not already carry.
+ */
+async function runStoryBibleReplayStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildStoryBibleFromBeatsPrompt, getPageText, extractSceneMetadata } = require('./storyHelpers');
+  const { callTextModelStreaming } = require('./textModels');
+  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { UnifiedStoryParser } = require('./outlineParser/unified');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const fullText = storyData.storyText || storyData.story || '';
+  const beats = (storyData.sceneImages || []).map(s => {
+    const meta = s.sceneMetadata || extractSceneMetadata(s.sceneDescription || '') || {};
+    return {
+      pageNumber: s.pageNumber,
+      beat: (getPageText(fullText, s.pageNumber) || '').slice(0, 600),
+      scene: (meta.sceneIntent || String(s.sceneDescription || '').split('---METADATA---')[0].slice(0, 300)),
+    };
+  });
+  if (beats.length === 0) throw new Error('story has no pages to rebuild beats from');
+
+  const orig = PROMPT_TEMPLATES.storyBibleFromBeats;
+  if (promptOverride) PROMPT_TEMPLATES.storyBibleFromBeats = promptOverride;
+  let prompt;
+  try {
+    prompt = buildStoryBibleFromBeatsPrompt(storyData, beats);
+  } finally {
+    PROMPT_TEMPLATES.storyBibleFromBeats = orig;
+  }
+  if (!prompt) throw new Error('story-bible-from-beats template unavailable');
+
+  const model = params.bibleModel || MODEL_DEFAULTS.outline;
+  if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
+
+  const t = Date.now();
+  const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_story_bible_replay' });
+  if (!String(res.text || '').trim() || res.usage?.output_tokens === 0) {
+    throw new Error(`bible model ${model} returned an empty response — provider failure, not a result`);
+  }
+  const parser = new UnifiedStoryParser(res.text || '');
+  let clothing = null;
+  try { clothing = parser.extractClothingRequirements(); } catch (err) { clothing = { _parseError: err.message }; }
+
+  // Side by side with what the story actually shipped — the whole point.
+  const before = storyData.clothingRequirements || {};
+  const summarise = (reqs) => Object.entries(reqs || {}).map(([name, r]) => {
+    const used = Object.entries(r || {}).filter(([, v]) => v && typeof v === 'object' && v.used);
+    return { name, categories: used.map(([k]) => k), description: (used[0]?.[1]?.description) || null };
+  });
+
+  return {
+    storyId: target.storyId,
+    model, modelId: res.modelId,
+    elapsedMs: Date.now() - t,
+    cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+    usage: res.usage,
+    promptChars: prompt.length,
+    prompt,
+    rawResponse: (res.text || '').slice(0, 40000),
+    clothingBefore: summarise(before),
+    clothingAfter: summarise(clothing),
+  };
+}
+
 const STORY_STAGES = {
   cover: runCoverStage,
   cover_title_paintin: runCoverTitlePaintinStage,
@@ -4734,6 +4810,7 @@ const STORY_STAGES = {
   text_refine: runTextRefineStage,
   beats_scenes: runBeatsScenesStage,
   scene_review_replay: runSceneReviewReplayStage,
+  story_bible_replay: runStoryBibleReplayStage,
 };
 
 // Avatar stages take {storyId, character} targets, not page targets.
