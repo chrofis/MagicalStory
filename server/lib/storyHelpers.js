@@ -5949,14 +5949,20 @@ function parseClothingReview(raw) {
     });
   }
 
-  const entries = [];
+  // Last write wins per character+category. A reviewer that catches itself
+  // mid-outfit emits the flawed one, then a corrected heading for the same
+  // slot; applying both in order happens to land on the right value, but only
+  // because it arrived second. Deduping here makes that deliberate instead of
+  // lucky, and drops the abandoned draft rather than recording it as a change.
+  const byKey = new Map();
   for (let i = 0; i < marks.length; i++) {
     const end = i + 1 < marks.length ? marks[i + 1].headStart : body.length;
     const description = body.slice(marks[i].bodyStart, end).trim();
     if (!marks[i].name || !description) continue;
-    entries.push({ name: marks[i].name, category: marks[i].category, description });
+    const key = `${marks[i].name.toLowerCase()}/${marks[i].category}`;
+    byKey.set(key, { name: marks[i].name, category: marks[i].category, description });
   }
-  return { analysis, entries };
+  return { analysis, entries: [...byKey.values()] };
 }
 
 /**

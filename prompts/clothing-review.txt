@@ -27,6 +27,8 @@ Characters: {CHARACTER_NAMES}
 
 Fixing check 1 outranks fixing check 3: a character in the right costume sharing a colour with someone else is better than a distinct colour on a garment that does not read as the costume. Two characters of different age or sex may wear the same headwear.
 
+A rewrite must not create a fault of its own. Before writing a corrected outfit, check it against every other character's outfit — including the ones you are leaving alone — and against the outfit you are replacing. Swapping two colours between characters leaves them as hard to tell apart as before.
+
 # OUTPUT FORMAT
 
 Both blocks, in this order, nothing before or after.
@@ -37,6 +39,8 @@ Both blocks, in this order, nothing before or after.
 ---CLOTHING---
 ## <CharacterName> / <category>
 <corrected full outfit — every slot the character wears, each with colour and material, as one self-contained description>
+
+Under a heading write the outfit and nothing else: no reasoning, no commentary, no correction of what you just wrote. Rework it before you write it. One heading per character and category.
 
 Include a character and category only if you rewrote it. Use the character's real name and the category exactly as it appears above. When nothing needs rewriting, still output the analysis, then:
 
