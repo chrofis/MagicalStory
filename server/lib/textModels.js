@@ -1087,8 +1087,14 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, opt
     log.debug(`🔧 [TEXT] Using model override: ${modelOverride}`);
   }
 
-  // Cap maxTokens to model limit
-  const effectiveMaxTokens = Math.min(maxTokens, model.maxOutputTokens);
+  // Cap to the model's limit — and treat a null/0 request as "give me the
+  // model's maximum" (owner, 2026-08-09). Hard-coded budgets at the call
+  // sites silently truncated real work: the scene reviewer hit exactly 16000
+  // output tokens, emitted rewritten briefs for pages 1-6 and was cut off
+  // before pages 7, 12 and 13 — the ones it had correctly named as faulted.
+  // The failure looked like the model ignoring instructions.
+  const requested = (maxTokens == null || maxTokens <= 0) ? model.maxOutputTokens : maxTokens;
+  const effectiveMaxTokens = Math.min(requested, model.maxOutputTokens);
 
   log.verbose(`🤖 [TEXT] Calling ${modelName} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
 
@@ -1141,8 +1147,14 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
     log.debug(`🔧 [TEXT STREAM] Using model override: ${modelOverride}`);
   }
 
-  // Cap maxTokens to model limit
-  const effectiveMaxTokens = Math.min(maxTokens, model.maxOutputTokens);
+  // Cap to the model's limit — and treat a null/0 request as "give me the
+  // model's maximum" (owner, 2026-08-09). Hard-coded budgets at the call
+  // sites silently truncated real work: the scene reviewer hit exactly 16000
+  // output tokens, emitted rewritten briefs for pages 1-6 and was cut off
+  // before pages 7, 12 and 13 — the ones it had correctly named as faulted.
+  // The failure looked like the model ignoring instructions.
+  const requested = (maxTokens == null || maxTokens <= 0) ? model.maxOutputTokens : maxTokens;
+  const effectiveMaxTokens = Math.min(requested, model.maxOutputTokens);
 
   log.verbose(`🌊 [TEXT STREAM] Calling ${modelName} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
 

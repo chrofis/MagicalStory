@@ -177,7 +177,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const planPrompt = buildBeatsPrompt(inputData, pageCount);
   if (!planPrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
   let t = Date.now();
-  const planRes = await textModels.callTextModelStreaming(planPrompt, 8000, onChunk, planModel, { usageLabel: 'beats_plan' });
+  const planRes = await textModels.callTextModelStreaming(planPrompt, null, onChunk, planModel, { usageLabel: 'beats_plan' });
   meta.timings.planMs = Date.now() - t;
   const plan = parseBeats(planRes.text || '', expected);
   if (plan.pages.length === 0) throw new Error('Beats planner returned no parseable beats');
@@ -205,7 +205,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   } else {
     t = Date.now();
     try {
-      const revRes = await textModels.callTextModelStreaming(reviewPrompt, 12000, onChunk, reviewModel, { usageLabel: 'beats_review' });
+      const revRes = await textModels.callTextModelStreaming(reviewPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_review' });
       const parsed = parseBeats(revRes.text || '', []);
       beatsReviewAnalysis = parsed.analysis || '';
       // The apply callback is the ONLY point where both the planned and the
@@ -274,7 +274,7 @@ SCENE: ${x.scene || ''}`.trim(),
   } else {
     t = Date.now();
     try {
-      const bibleRes = await textModels.callTextModelStreaming(biblePrompt, 16000, onChunk, bibleModel, { usageLabel: 'beats_story_bible' });
+      const bibleRes = await textModels.callTextModelStreaming(biblePrompt, null, onChunk, bibleModel, { usageLabel: 'beats_story_bible' });
       const sections = extractBibleSections(bibleRes.text || '');
       meta.timings.storyBibleMs = Date.now() - t;
       if (!sections) {
@@ -372,7 +372,7 @@ SCENE: ${x.scene || ''}`.trim(),
     let lastErr = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const res = await textModels.callTextModelStreaming(prompt, 10000, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion' });
+        const res = await textModels.callTextModelStreaming(prompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion' });
         if (!res || !res.text || !res.text.trim()) throw new Error('empty scene brief');
         return { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel };
       } catch (err) {
@@ -404,7 +404,7 @@ SCENE: ${x.scene || ''}`.trim(),
     let allRaw = '';
     let allModelId = sceneModel;
     try {
-      const res = await textModels.callTextModelStreaming(allPrompt, 40000, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion' });
+      const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion' });
       allRaw = res?.text || '';
       allModelId = res?.modelId || sceneModel;
     } catch (err) {
@@ -484,7 +484,7 @@ SCENE: ${x.scene || ''}`.trim(),
       // with nothing to show — exactly the run we needed to inspect
       // (job_1786235099497_ytd5c7eek: 3 faults handed over, 0 briefs rewritten).
       const briefsIn = expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
-      const srRes = await textModels.callTextModelStreaming(srPrompt, 16000, onChunk, reviewModel, { usageLabel: 'beats_scene_review' });
+      const srRes = await textModels.callTextModelStreaming(srPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_scene_review' });
       const parsed = parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES');
       sceneReviewAnalysis = parsed.analysis || '';
       const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
@@ -616,7 +616,7 @@ SCENE: ${x.scene || ''}`.trim(),
     const t0 = Date.now();
     for (let attempt = 1; attempt <= 2 && !parsed; attempt++) {
       try {
-        const res = await textModels.callTextModelStreaming(textPrompt, 24000, onChunk, textModel, { usageLabel: 'beats_story_text' });
+        const res = await textModels.callTextModelStreaming(textPrompt, null, onChunk, textModel, { usageLabel: 'beats_story_text' });
         const candidate = parseRefinedText(res.text || '', beatPages);
         if (candidate.pages.length === 0 || candidate.missing.length > 0) {
           log.warn(`⚠️ [BEATS] Text attempt ${attempt}: ${candidate.pages.length} page(s) parsed, missing ${candidate.missing.join(', ') || 'none'}`);

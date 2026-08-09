@@ -8995,7 +8995,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // sonnet when OPENROUTER_API_KEY is unset; explicit overrides pass through.
   const effectiveSceneModel = modelOverrides?.sceneIterationModel || modelOverrides?.sceneModel || require('../config/models').resolveSceneIterationModel();
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 18 validation checks with ${effectiveSceneModel}...`);
-  let sceneResult = await callClaudeAPI(scenePrompt, 16000, effectiveSceneModel, { usageLabel: 'scene_iterate' });
+  let sceneResult = await callClaudeAPI(scenePrompt, null, effectiveSceneModel, { usageLabel: 'scene_iterate' });
   let newSceneDescription = sceneResult.text;
 
   // Track usage (Claude Haiku scene re-expansion)
@@ -9012,7 +9012,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     log.warn(`⚠️ [ITERATE] Page ${pageNumber}: scene iteration omitted sceneIntent — retrying once`);
     const retry = await callClaudeAPI(
       `${scenePrompt}\n\nYour previous answer omitted the required "sceneIntent" field in the metadata JSON. It is mandatory — include it.`,
-      16000, effectiveSceneModel, { usageLabel: 'scene_iterate_retry' }
+      null, effectiveSceneModel, { usageLabel: 'scene_iterate_retry' }
     );
     if (usageTracker && retry.usage) {
       usageTracker('anthropic', retry.usage, 'scene_iterate', retry.modelId || effectiveSceneModel);

@@ -6678,3 +6678,37 @@ buys the ability to answer "why did it do nothing" without the database.
 **Status:** 🟡 shipped to staging, unproven. The next beats run shows whether a mandatory framing
 makes deepseek act; if it still returns 0 rewrites, the fix path has to stop being a request — either
 a targeted per-page rewrite call for the faulted pages only, or a deterministic repair.
+
+---
+
+## Writers and reviewers get the model's full output ceiling (2026-08-09)
+
+**Context:** Lab experiment #444 (`scene_review_replay`, frozen briefs from
+`job_1786235099497_ytd5c7eek`) answered why the scene review never fixes clothing faults, and the
+answer was not the prompt. Its own analysis named the right pages —
+
+> *"pages 4, 7, 12, and 13 are faulted … I have rewritten all of them below, moving the misattributed
+> garments to their proper owners."*
+
+— and then it emitted rewritten briefs for pages **1-6** and stopped at `output_tokens: 16000`,
+exactly the hard-coded budget. Pages 7, 12 and 13 were never written. A full brief is ~2.5k tokens,
+so a 16k cap can carry six pages, always the earliest, no matter what the prompt says. The reviewer's
+model, `deepseek-v4-pro`, has a **64,000** token ceiling: three quarters of its budget was discarded
+at the call site.
+
+**Decision:** `maxTokens` of `null`/`0` now means "the model's own `maxOutputTokens`" in
+`callTextModel` / `callTextModelStreaming` (the existing `Math.min` clamp still applies, so nothing
+can exceed a provider limit). Every writer and reviewer call site passes `null`: beats plan, beats
+review, story bible, scene expansion (per-page and all-pages), scene review, story text, iterate's
+scene rewrite (+ its retry), the two regeneration expansions, and the matching Lab stages.
+
+**Rationale:** the numbers were invented per call site and never revisited; each one silently
+truncated whatever ran long, and the truncation is invisible — output stops mid-structure and the
+parser simply sees fewer pages. It read as a model ignoring instructions. A ceiling is a safety
+limit, not a target: models stop when finished, so raising it costs nothing on runs that were already
+fitting.
+
+**Touched:** `server/lib/textModels.js`, `server/lib/beatsPipeline.js`, `server/lib/testlab.js`,
+`server/lib/images.js`, `server/routes/regeneration.js`.
+
+**Status:** 🟡 shipped; re-running experiment #444 on identical input is the proof.

@@ -2549,7 +2549,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   if (promptOverride) plannerPrompt = promptOverride;
 
   const t0 = Date.now();
-  const planRes = await callTextModelStreaming(plannerPrompt, 8000, null, beatsModel, { usageLabel: 'testlab_beats' });
+  const planRes = await callTextModelStreaming(plannerPrompt, null, null, beatsModel, { usageLabel: 'testlab_beats' });
   const planMs = Date.now() - t0;
   const planParsed = parseBeats(planRes.text || '', expected);
   if (planParsed.pages.length === 0) throw new Error('Planner returned no parseable beats');
@@ -2576,7 +2576,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     const reviewPrompt = buildBeatsReviewPrompt(storyData, planParsed.pages);
     if (!reviewPrompt) throw new Error('story-beats-review template unavailable');
     const t1 = Date.now();
-    const revRes = await callTextModelStreaming(reviewPrompt, 12000, null, reviewModel, { usageLabel: 'testlab_beats_review' });
+    const revRes = await callTextModelStreaming(reviewPrompt, null, null, reviewModel, { usageLabel: 'testlab_beats_review' });
     const revMs = Date.now() - t1;
     const revParsed = parseBeats(revRes.text || '', []);
 
@@ -2658,7 +2658,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       );
       if (allPrompt) {
         const tAll = Date.now();
-        const res = await callStream(allPrompt, 16000, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
+        const res = await callStream(allPrompt, null, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
           usageLabel: 'testlab_beats_scene_expansion_all',
           ...(params.sceneNoReasoning ? { reasoning: { enabled: false } } : {}),
         });
@@ -2698,7 +2698,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       );
       const t = Date.now();
       try {
-        const res = await callStream(prompt, 10000, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
+        const res = await callStream(prompt, null, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
           usageLabel: 'testlab_beats_scene_expansion',
           // Scene expansion is transcription, not judgement — reasoning is pure
           // waste here (measured 14,867 reasoning tokens for 2,505 of answer).
@@ -4664,7 +4664,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
   const runs = [];
   for (const model of models) {
     const t = Date.now();
-    const res = await callTextModelStreaming(prompt, 16000, null, model, { usageLabel: 'testlab_scene_review_replay' });
+    const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_scene_review_replay' });
     const parsed = parseRefinedText(res.text || '', scenes.map(x => x.pageNumber), 'SCENES');
     const byPage = new Map((parsed.pages || []).map(x => [x.pageNumber, x.text]));
 

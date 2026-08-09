@@ -357,7 +357,7 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
 
     // Generate new scene description (includes Visual Bible recurring elements) — iteration model for regen
     const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars, null, null, { clothingRequirements: storyData.clothingRequirements || null });
-    const sceneResult = await callClaudeAPI(scenePrompt, 10000, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[', usageLabel: 'regen_scene' });
+    const sceneResult = await callClaudeAPI(scenePrompt, null, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[', usageLabel: 'regen_scene' });
     const newSceneDescription = sceneResult.text;
 
     // Update the scene description in story data (sceneDescriptions already loaded above)
@@ -618,7 +618,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       );
 
       try {
-        const expansionResult = await callClaudeAPI(expansionPrompt, 10000, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[', usageLabel: 'regen_expansion' });
+        const expansionResult = await callClaudeAPI(expansionPrompt, null, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[', usageLabel: 'regen_expansion' });
         expandedDescription = expansionResult.text;
         log.debug(`✅ [REGEN] Scene expanded to ${expandedDescription.length} chars`);
         log.debug(`📝 [REGEN] Expanded scene preview: ${expandedDescription.substring(0, 300)}...`);
