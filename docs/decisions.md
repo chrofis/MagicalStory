@@ -7517,3 +7517,61 @@ is this" is the kind of split this codebase keeps paying for.
 **Not verified:** a full fresh story run (descriptor change only affects NEW generations; existing books keep their baked images).
 
 **Touched:** `server/lib/storyHelpers.js` (ART_STYLES steampunk/watercolor/realistic → single strings; resolveArtStyle simplified).
+
+## 2026-08-09 — RULE: classification is the prompt's job; code may only change a severity
+
+**Owner, verbatim:** *"you can not build this into some regex. This must come from the prompt. You can
+change a severity with code. that is it."* And: *"add a rule, ask before coding. Typically it must be
+prompt if it must work for complex stories. A code can change a selection, but to find clothing etc
+will not work with code."*
+
+**The rule.** When a class of finding is mis-handled:
+1. Give it a **type** in the evaluator prompts' closed list — the evaluator, which saw the image,
+   does the classifying.
+2. If it is still mis-scored, give that type a **ceiling** in `scoring.js`
+   (`MAX_SEVERITY_TYPES`) or zero it (`ZERO_POINT_TYPES`).
+3. Never pattern-match a finding's DESCRIPTION in code to infer what it means.
+4. Prompt-vs-code is the owner's call — propose the shape and ask BEFORE building.
+
+**Why:** a regex over prose works on the story you tuned it against and fails on the next book. It
+also puts classification in the wrong place — the evaluator saw the image, the scorer did not.
+
+**Evidence this is right, from the same day.** A left/right mirror guard was built in `scoring.js`
+that regex-matched descriptions. Within hours it had: (a) produced a false positive — *"Hans is
+facing forward instead of RIGHT toward the river below"* names a target and must deduct, but the
+loose pattern zeroed it; (b) broken when `camera_facing` was merged away, because it keyed on a type;
+and (c) become redundant, because the prompt-side fix (orientation judged against the TARGET, never
+an axis) produced **zero** left/right findings on the next story — the guard never fired once.
+Removed the same day. Mirrors are now suppressed by the prompt alone.
+
+**Applied here — sleeve length.** Measured on `job_1786287569165_7f75jspcz`: 46 of compliance's 78
+wardrobe findings were sleeve/collar detail, worth 670 points, three of them CRITICAL for a rolled
+sleeve. Fixed the sanctioned way:
+- `D-05b clothing_detail → MODERATE` added to `image-evaluation.txt`; D-05 `clothing` narrowed to
+  "WHICH garment it is". A matching bullet in `image-prompt-compliance.txt`, and the type added to
+  all three closed lists.
+- `clothing_detail` gets its own bucket (repair unchanged: `grok_blended`) and a MODERATE ceiling in
+  `MAX_SEVERITY_TYPES`.
+
+**Bug caught while verifying:** `clothing_detail` was already aliased to `accessory` by the earlier
+accessory commit, so the duplicate object key silently won and the new type routed to the wrong
+bucket. Duplicate removed. This is the second time today a same-file duplicate has silently
+overridden new work — check for an existing alias before adding one.
+
+**Compliance keeps its costume power.** Measured before shipping, on the same story: of its 1,180
+wardrobe points, wrong-garment-TYPE (incl. CRITICAL for modern clothes where costume was specified),
+wrong colour and object substitution are all UNCHANGED — 44% retained. Only detail is capped. The
+case that caught the pirate-costume failure is untouched.
+
+**Verified:** 8/8 scoring cases; `clothing_detail`/`sleeve`/`collar` route to the new bucket;
+`clothing` CRITICAL still 25; no description text is read anywhere in `scoring.js`; 64/64 templates
+load; `check-settled` OK.
+
+**NOT built, awaiting the owner's call** (per rule 4): the absence-claim rule (compliance may report
+but not charge an absence it cannot see — 604 pts, and 329 of those come from `quality`, which DOES
+see the image, so a prompt rule on compliance only fixes half), and promoting D-27
+`style_consistency` from a buried defect code to a forced STEP-0 gate like `coherence_gate`.
+
+**Touched:** `docs/SETTLED.md`, `CLAUDE.md`, `server/lib/scoring.js`, `server/lib/evalBuckets.js`,
+`prompts/image-evaluation.txt`, `prompts/image-prompt-compliance.txt`, `prompts/image-semantic.txt`,
+`prompts/feedback-consolidator.txt`.

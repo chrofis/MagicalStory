@@ -40,6 +40,12 @@ const BUCKETS = {
   // our clothing tax is accessory nitpicking?" is a GROUP BY instead of a regex
   // over descriptions. Repair is identical to clothing — routing is unchanged.
   accessory:            { owner: 'quality',  kind: 'graded', repair: 'grok_blended' },
+  // Right garment, different cut (sleeve length, collar, cuff, hem). Its own
+  // type so the ceiling in scoring.js can bind to it without touching a
+  // genuinely wrong garment. Measured on job_1786287569165: 46 of compliance's
+  // 78 wardrobe findings were this, worth 670 points, three of them CRITICAL
+  // for a rolled sleeve.
+  clothing_detail:      { owner: 'quality',  kind: 'graded', repair: 'grok_blended' },
   anatomy:              { owner: 'quality',  kind: 'graded', repair: 'regen' },
   figure_completeness:  { owner: 'quality',  kind: 'binary', repair: 'regen' },
   // `camera_facing` was MERGED into action_interaction (2026-08-09). It was an
@@ -117,9 +123,10 @@ const TYPE_TO_BUCKET = {
   age: 'character_identity', character_identification: 'character_identity',
   // Accessory detail is its own bucket (see BUCKETS.accessory) — it carries a
   // MODERATE ceiling in scoring.js that must NOT apply to main-garment failures.
+  clothing_detail: 'clothing_detail', sleeve: 'clothing_detail', collar: 'clothing_detail',
   accessory: 'accessory', glasses: 'accessory', eyewear: 'accessory',
   bandana: 'accessory', jewellery: 'accessory', jewelry: 'accessory',
-  footwear: 'accessory', clothing_detail: 'accessory',
+  footwear: 'accessory',
   // Same bucket (same repair), different TYPE — scoring.js gives the two
   // different ceilings: wrong-version is MODERATE, contract-named-and-absent
   // may reach MAJOR.

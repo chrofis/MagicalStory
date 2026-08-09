@@ -25,6 +25,14 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
 - **Swiss orthography in every German string: ss never ß**; «guillemets» tight, no space before !?:; *(guarded)*
 - **SOLID-GROUND rule: one canonical wording per prompt layer.**
 - **Severity/deduction philosophy changes go to decisions.md** — flip-flops happen because the previous rationale wasn't findable.
+- **Classification is the PROMPT's job; code may only change a severity.** Never pattern-match a finding's
+  description text to decide what it MEANS (is this clothing? a mirror? an accessory?). Recognising "clothing"
+  in prose does not generalise to complex stories — it works on the sample you tuned it against and fails on
+  the next book. The sanctioned shape: the evaluator emits a **type** from the closed list, and code adjusts
+  what that type may **cost** (`ZERO_POINT_TYPES`, `MAX_SEVERITY_TYPES` in `scoring.js`). A left/right regex
+  guard was built and removed the same day, 2026-08-09; the prompt-side fix alone produced zero mirror findings.
+- **Ask before coding an eval rule.** Prompt-vs-code is the owner's call, not an implementation detail —
+  propose the shape first, then build.
 
 ## Pipeline & models
 

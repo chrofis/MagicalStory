@@ -125,46 +125,22 @@ const ZERO_POINT_TYPES = new Set(['garment_colour', 'garment_color']);
 // a WRONG version of an accessory is detail; a contract-named accessory that is
 // entirely ABSENT is a real miss and may cost MAJOR. Neither may ever reach
 // CRITICAL, which is where the 57 compliance criticals were landing.
-const MAX_SEVERITY_TYPES = { accessory: 'moderate', accessory_missing: 'major' };
+const MAX_SEVERITY_TYPES = { accessory: 'moderate', accessory_missing: 'major', clothing_detail: 'moderate' };
 
-// Left/right is a MIRROR and never deducts — SETTLED.md, and a rule carried by
-// all three page evaluators. It still leaked: measured on one 14-page story,
-// 30 consolidated findings worth 350 points (12% of the story's whole
-// deduction) were left/right claims, 24 of 29 raw ones from the compliance
-// evaluator, which lost 45 points on ONE page for "facing right instead of
-// left" against three separate figures.
+// NO TEXT MATCHING IN SCORING. Owner rule, 2026-08-09: "you can not build this
+// into some regex. This must come from the prompt. You can change a severity
+// with code, that is it."
 //
-// TYPE-INDEPENDENT by design. The first version keyed on `camera_facing`, which
-// broke the moment that code was folded into `action_interaction` (2026-08-09) —
-// a guard that depends on a category cannot survive the category being merged.
-// It now recognises the CLAIM, not the label.
+// A left/right mirror guard that regex-matched finding DESCRIPTIONS lived here
+// briefly and was removed the same day. Two reasons it was wrong: reading prose
+// to decide what a finding MEANS is classification, which belongs to the
+// evaluator that saw the image; and it was already redundant — the prompt-side
+// fix (orientation judged against the TARGET, never an axis) produced ZERO
+// left/right findings on the next story, so the guard never fired once.
 //
-// The test is BOTH-SIDES: the finding must contrast one side against the other
-// ("facing right instead of left"). Requiring both `left` AND `right` is what
-// makes this safe inside action_interaction, which legitimately contains
-// one-sided language. Checking the real corpus caught a false positive in the
-// first version: "Hans is facing forward instead of RIGHT toward the river
-// below" names a TARGET (the river) and must still deduct — it mentions only
-// one side, so the both-sides test spares it. Likewise "Emma is facing right
-// instead of the stone carving" and "Hans is facing left instead of the wall".
-//
-// `missing`/`absent` still disqualifies: an absent item is a real finding
-// whichever side it belongs on.
-const FACING_VERB = /\b(?:facing|faces|face|turned|oriented)\b/i;
-const HAS_LEFT = /\bleft\b/i;
-const HAS_RIGHT = /\bright\b/i;
-const FRONT_BACK = /\b(?:toward|towards)\s+the\s+(?:viewer|camera)|front view|back view|back to (?:the )?(?:camera|viewer)|facing (?:the )?(?:camera|viewer)|away from (?:the )?(?:viewer|camera)|from behind|over (?:his|her|their) shoulder\b/i;
-
-function isMirrorOnlyFacing(d) {
-  const text = String(d?.description || '');
-  if (!FACING_VERB.test(text)) return false;
-  // Both sides named = axis-vs-axis = a mirror. One side named = a target claim.
-  if (!HAS_LEFT.test(text) || !HAS_RIGHT.test(text)) return false;
-  if (FRONT_BACK.test(text)) return false;      // a real front/back call
-  if (/\bmissing\b|\babsent\b/i.test(text)) return false; // carries a second, real defect
-  return true;
-}
-
+// The sanctioned shape is above: the evaluator emits a TYPE, and code adjusts
+// what that type may COST. If a class of finding is mis-scored, give it a type
+// in the prompts and a ceiling here — never a pattern over its wording.
 const SEVERITY_POINTS = {
   catastrophic: 50,
   critical:     25,
@@ -284,7 +260,6 @@ function sumDeductionPoints(deductions) {
   const points = (d) => {
     const type = String(d?.type || '').toLowerCase();
     if (ZERO_POINT_TYPES.has(type)) return 0;
-    if (isMirrorOnlyFacing(d)) return 0;
     const raw = SEVERITY_POINTS[d.severity] || 0;
     // Ceiling by type — charge the lower of what was claimed and what the type
     // is allowed to cost. Never raises a severity, only bounds it.
