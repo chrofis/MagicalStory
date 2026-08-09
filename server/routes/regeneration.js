@@ -4921,7 +4921,12 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
     // Update top-level fields so frontend display is consistent
     const legacyIssues = storyData.finalChecksReport.legacy?.totalIssues || 0;
     storyData.finalChecksReport.totalIssues = (report.totalIssues || 0) + legacyIssues;
-    storyData.finalChecksReport.overallConsistent = (report.totalIssues || 0) + legacyIssues === 0;
+    // Respect the producer's verdict — do NOT re-derive it from issue counts.
+    // A check that errored fails closed with overallConsistent:false and ZERO
+    // issues, so a count-derived flag flipped it back to true and the ✓ badge
+    // reported a crashed check as verified-consistent.
+    storyData.finalChecksReport.overallConsistent =
+      report.overallConsistent !== false && (report.totalIssues || 0) + legacyIssues === 0;
 
     // Calculate cost before responding
     const { inputTokens = 0, outputTokens = 0, model: checkModel } = report.tokenUsage || {};

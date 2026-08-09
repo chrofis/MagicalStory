@@ -6868,3 +6868,40 @@ the prompt before sending, so `artStyleForEval` must be resolved from the *unstr
 
 **Rule:** any new eval entry point resolves art style through `resolveEvalArtStyle`, never by
 re-parsing the prompt locally. A Lab result is only evidence if the Lab ran what production runs.
+
+## 2026-08-09 — A failed entity check no longer reports itself as consistent (four sites)
+
+**Context:** closes the item left open by the `isGarmentColour` TDZ entry. That crash threw on
+every grid and the report still announced *"All N entities are consistent across pages"*, which is
+why it was first triaged as a cosmetic oddity (`consistent: false` + `totalIssues: 0`) rather than a
+silent failure of the whole check.
+
+**Root cause was not one line — it was fail-closed logic that stopped one level below every reader.**
+Both error branches already did the right thing at the *entity* level and neither propagated:
+
+| Site | Was | Now |
+|---|---|---|
+| `entityConsistency.js` L973 (character errored) | sets `characters[x].overallConsistent=false`, `evalFailed:true` | **also** `report.overallConsistent = false` |
+| `entityConsistency.js` L1211 (object errored) | sets `objects[x].consistent=false`, `evalFailed:true` | **also** `report.overallConsistent = false` |
+| `entityConsistency.js` L1224 (summary) | derived from `totalIssues` alone | derived from issues **+ failed-check count + the flag** |
+| `regeneration.js` L4924 (top-level recompute) | `overallConsistent = totalIssues + legacy === 0` | respects `report.overallConsistent !== false` first |
+
+The fourth site is the one that made the other three insufficient on their own: it re-derived the
+top-level flag from issue counts and discarded the producer's verdict, and it feeds the ✓ badge in
+`StoryDisplay.tsx`. An errored check contributes ZERO issues, so a count-derived flag flipped a
+crashed check back to "verified consistent".
+
+**The summary now distinguishes five states** (verified by replay):
+`All N entities are consistent` / `N checked: 3 consistency issue(s)` /
+`N checked: 1 check(s) FAILED to run` / `N checked: 2 issue(s); 1 check(s) FAILED to run` /
+`N checked: flagged INCONSISTENT but no issues recorded — an error was likely swallowed upstream`.
+The last is deliberately loud: that combination should be unreachable, so if it ever prints, an
+error is being swallowed somewhere new.
+
+**Deliberate behaviour change:** `useRepairWorkflow.ts` treats `!overallConsistent` as "needs
+attention", so a check that FAILED now surfaces as needing work instead of reading clean. That is
+the intended meaning of failing closed — an unverified page is not a verified-good page — but it
+means a persistently erroring entity check will keep a story flagged rather than quietly passing it.
+Preferred over the alternative, since the silent pass is what cost days on the TDZ.
+
+**Touched:** `server/lib/entityConsistency.js`, `server/routes/regeneration.js`.

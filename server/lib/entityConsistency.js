@@ -972,6 +972,11 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             // overallConsistent:false + evalFailed so it isn't a silent pass.
             report.characters[charName] = { byClothing: {}, issues: [], overallConsistent: false, evalFailed: true, overallScore: 0, totalIssues: 0, error };
           }
+          // ...and the REPORT is not verified either. Setting only the
+          // character-level flag stopped the failure one level below every
+          // reader (summary, the ✓ badge, findBadPages), so an errored check
+          // still presented as a clean pass.
+          report.overallConsistent = false;
           continue;
         }
 
@@ -1215,16 +1220,34 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             score: 10,
             issues: []
           };
+          // Fail closed at the REPORT level too — see the character branch.
+          report.overallConsistent = false;
         }
       }
     }
 
-    // Build summary
-    const checkedCount = Object.keys(report.characters).length + Object.keys(report.objects).length;
-    if (report.totalIssues === 0) {
+    // Build summary. It must reflect ALL THREE facts — issues found, checks
+    // that FAILED TO RUN, and the consistency flag. Deriving it from
+    // totalIssues alone was how the isGarmentColour TDZ crash hid: an errored
+    // check contributes zero issues, so a report that had thrown on every grid
+    // still announced "All N entities are consistent across pages".
+    const entities = [...Object.values(report.characters), ...Object.values(report.objects)];
+    const checkedCount = entities.length;
+    const failedCount = entities.filter(e => e && e.evalFailed).length;
+
+    const parts = [];
+    if (report.totalIssues > 0) parts.push(`${report.totalIssues} consistency issue(s)`);
+    if (failedCount > 0) parts.push(`${failedCount} check(s) FAILED to run`);
+
+    if (parts.length) {
+      report.summary = `${checkedCount} entities checked: ${parts.join('; ')}`;
+    } else if (report.overallConsistent) {
       report.summary = `All ${checkedCount} entities are consistent across pages`;
     } else {
-      report.summary = `Found ${report.totalIssues} consistency issue(s) across ${checkedCount} entities`;
+      // Inconsistent, nothing recorded, nothing reported as failed. This
+      // combination should be unreachable — say so loudly instead of rounding
+      // it down to a pass, because it means an error was swallowed upstream.
+      report.summary = `${checkedCount} entities checked: flagged INCONSISTENT but no issues recorded — an error was likely swallowed upstream`;
     }
 
     log.info(`📋 [ENTITY-CHECK] Complete: ${report.summary}`);
