@@ -97,9 +97,7 @@ function garmentPromptFor(garment, cfg) {
   return { kind, prompt: cfg.garmentPrompts[kind] || cfg.garmentPrompts[cfg.defaultGarment] };
 }
 
-function _photoAnalyzerUrl() {
-  return process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
-}
+const { photoAnalyzerUrl: _photoAnalyzerUrl } = require('./photoAnalyzerClient');
 const bytesOf = (input) => {
   if (Buffer.isBuffer(input)) return input;
   const m = String(input).match(/^data:[^;]+;base64,(.*)$/);
