@@ -38,7 +38,7 @@ BODY TRANSFORMATION:
 - For children: fit and healthy, age-appropriate athletic proportions
 
 IDENTITY PERSISTENCE:
-- Hair and face must be fully visible. Avoid hats and hoods.
+- The face must be fully visible — nothing over the eyes, no brim shadowing them. Headwear the outfit specifies is drawn; hair stays readable around it.
 - Biometric precision: the face must not be averaged or replaced.
 - Focus: Ultra-sharp focus on facial features.
 - Enforce an age-accurate head-to-body ratio to ensure skeletal proportions match the facial age (Reference: Infant=4, Child=6, Teen=7, Adult=8)

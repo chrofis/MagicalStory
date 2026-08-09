@@ -16,7 +16,7 @@ REQUIREMENTS:
 - Same person in all 4 images
 - TOP ROW: Original reference style (exact copy of face)
 - BOTTOM ROW: New style ({ART_STYLE_PROMPT}) with costume
-- No hats or head coverings - {COSTUME_TYPE} must not cover face or hair
+- Headwear the costume calls for (hat, bandana, headscarf, hood) IS included and must be drawn — it is part of the outfit the pages copy from this sheet. It must not cover the FACE: nothing over the eyes, no brim shadowing them, hair still readable at the sides.
 - Face must be visible in all quadrants
 - GLASSES: If the reference person wears glasses, all 4 quadrants must show glasses. If no glasses in reference, no glasses in any quadrant.
 - HAIR COLOR: Must be exactly as in the reference photo. Do not darken or lighten. Blonde stays blonde, brown stays brown, red stays red.

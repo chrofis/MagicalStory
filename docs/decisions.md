@@ -6966,3 +6966,38 @@ a picture.
 
 **Status:** 🟡 shipped, unmeasured. The test is a fresh story: are the costume descriptions shorter
 and blockier, and does the entity check stop reporting missing badges and feathers?
+
+---
+
+## The "no hats" rules are gone (2026-08-09)
+
+**Context:** owner instruction, and it resolves a contradiction that ran right through the pipeline.
+Four places banned headwear while the costume rules handed out tricorns:
+
+- `story-unified.txt` / `story-unified-imagefirst.txt`: *"NEVER include hats, helmets, crowns, masks"*
+  under a "No Face Coverings" heading
+- `styled-costumed-avatar.txt`: *"No hats or head coverings"* — on the COSTUMED AVATAR, the identity
+  sheet every costumed page copies from
+- `avatar-main-prompt.txt` / `avatar-ace-prompt.txt`: *"Avoid hats and hoods"*
+
+The costumed-avatar one is the damaging one. The story spec gave Emma a black tricorn, Noah a brown
+one, Hans a navy one — and the reference sheet those pages copy identity from was generated
+**hatless by instruction**. That is a plausible cause of the hats appearing and disappearing across
+`job_1786235099497_ytd5c7eek`: Emma bare-headed on p14, Daniel on three pages of four, Hans on p14.
+The page prose asks for a hat, the identity reference shows none, and the renderer splits the
+difference differently every page.
+
+**Decision:** headwear is allowed everywhere and drawn on the avatar sheets. What is banned is
+narrowed to what was actually meant: nothing over the FACE — no masks, visors, veils, enclosing
+helmets, or brims pulled down over the eyes; hair stays readable around the headwear.
+
+**Rationale:** the face has to stay visible for identity matching, which is the real constraint.
+Headwear worn clear of the face costs nothing and is one of the strongest ways to tell characters
+apart — the reason the owner wants it available (one character in a tricorn, another in a headscarf,
+another bare-headed).
+
+**Touched:** `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+`prompts/styled-costumed-avatar.txt`, `prompts/avatar-main-prompt.txt`, `prompts/avatar-ace-prompt.txt`.
+
+**Status:** 🟡 shipped, unmeasured. Watch the next costumed story: does the styled avatar come back
+wearing the hat, and do hats stop vanishing mid-book?
