@@ -11,18 +11,39 @@ export interface CoverTextStyle {
 }
 
 // Keep in sync with server/lib/coverTypography.js (FONTS / TITLE_LAYOUTS / WFONTS).
-const TITLE_FONTS: Array<{ id: string; label: string }> = [
-  { id: 'fredoka', label: 'Fredoka' },
-  { id: 'baloo', label: 'Baloo' },
-  { id: 'luckiest', label: 'Luckiest Guy' },
-  { id: 'bungee', label: 'Bungee' },
-  { id: 'titan', label: 'Titan One' },
-  { id: 'lilita', label: 'Lilita One' },
-  { id: 'chewy', label: 'Chewy' },
-  { id: 'shrikhand', label: 'Shrikhand' },
-  { id: 'pacifico', label: 'Pacifico' },
+// css mirrors the server's family/weight/style/uppercase so the preview shows
+// what the baked cover will actually look like.
+interface FontOption { id: string; label: string; family: string; weight: number; italic?: boolean; upper?: boolean }
+const TITLE_FONTS: FontOption[] = [
+  { id: 'fredoka', label: 'Fredoka', family: 'Fredoka', weight: 600 },
+  { id: 'baloo', label: 'Baloo', family: 'Baloo 2', weight: 800 },
+  { id: 'luckiest', label: 'Luckiest Guy', family: 'Luckiest Guy', weight: 400, upper: true },
+  { id: 'bungee', label: 'Bungee', family: 'Bungee', weight: 400, upper: true },
+  { id: 'titan', label: 'Titan One', family: 'Titan One', weight: 400 },
+  { id: 'lilita', label: 'Lilita One', family: 'Lilita One', weight: 400, upper: true },
+  { id: 'chewy', label: 'Chewy', family: 'Chewy', weight: 400 },
+  { id: 'shrikhand', label: 'Shrikhand', family: 'Shrikhand', weight: 400 },
+  { id: 'pacifico', label: 'Pacifico', family: 'Pacifico', weight: 400 },
 ];
-const DEDICATION_FONTS = ['Caveat', 'Kalam', 'Patrick Hand', 'Gochi Hand', 'EB Garamond'];
+const DEDICATION_FONTS: FontOption[] = [
+  { id: 'Caveat', label: 'Caveat', family: 'Caveat', weight: 600 },
+  { id: 'Kalam', label: 'Kalam', family: 'Kalam', weight: 400 },
+  { id: 'Patrick Hand', label: 'Patrick Hand', family: 'Patrick Hand', weight: 400 },
+  { id: 'Gochi Hand', label: 'Gochi Hand', family: 'Gochi Hand', weight: 400 },
+  { id: 'EB Garamond', label: 'EB Garamond', family: 'EB Garamond', weight: 400, italic: true },
+];
+
+// Loaded once, on first panel open — same Google Fonts host the site already uses.
+const PREVIEW_CSS_ID = 'cover-font-preview-css';
+const PREVIEW_CSS_URL = 'https://fonts.googleapis.com/css2?family=Fredoka:wght@600&family=Baloo+2:wght@800&family=Luckiest+Guy&family=Bungee&family=Titan+One&family=Lilita+One&family=Chewy&family=Shrikhand&family=Pacifico&family=Caveat:wght@600&family=Kalam&family=Patrick+Hand&family=Gochi+Hand&family=EB+Garamond:ital@0;1&display=swap';
+function ensurePreviewFonts() {
+  if (document.getElementById(PREVIEW_CSS_ID)) return;
+  const link = document.createElement('link');
+  link.id = PREVIEW_CSS_ID;
+  link.rel = 'stylesheet';
+  link.href = PREVIEW_CSS_URL;
+  document.head.appendChild(link);
+}
 const SWATCHES = ['#e63946', '#f77f00', '#ffd60a', '#2a9d8f', '#1e6fd9', '#7b2cbf', '#d81159', '#ffffff', '#14110d'];
 
 interface CoverTextStylePanelProps {
@@ -31,6 +52,8 @@ interface CoverTextStylePanelProps {
   currentStyle?: CoverTextStyle | null;
   disabled?: boolean;
   onApply: (style: CoverTextStyle | null) => Promise<void>;
+  /** The actual cover text (title / dedication) — each font option renders its first words. */
+  previewText?: string;
 }
 
 /**
@@ -38,7 +61,7 @@ interface CoverTextStylePanelProps {
  * and the dedication text. Each Apply re-composites the cover server-side from
  * the textless art (fast, no AI) — the updated cover IS the preview.
  */
-export function CoverTextStylePanel({ kind, language, currentStyle, disabled, onApply }: CoverTextStylePanelProps) {
+export function CoverTextStylePanel({ kind, language, currentStyle, disabled, onApply, previewText }: CoverTextStylePanelProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +103,7 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
   return (
     <div className="mt-2">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => { if (!open) ensurePreviewFonts(); setOpen(!open); }}
         disabled={disabled}
         className="w-full bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
       >
@@ -97,16 +120,40 @@ export function CoverTextStylePanel({ kind, language, currentStyle, disabled, on
             <label className="block text-xs font-semibold text-gray-600 mb-1">
               {t('Schriftart', 'Police', 'Font')}
             </label>
-            <select
-              value={fontSel}
-              onChange={e => setFontSel(e.target.value)}
-              className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"
-            >
-              <option value="auto">{t('Automatisch', 'Automatique', 'Automatic')}</option>
-              {(kind === 'front' ? TITLE_FONTS : DEDICATION_FONTS.map(f => ({ id: f, label: f }))).map(f => (
-                <option key={f.id} value={f.id}>{f.label}</option>
-              ))}
-            </select>
+            {(() => {
+              const sample = (previewText || '').trim().split(/\s+/).filter(Boolean).slice(0, 10).join(' ');
+              const fonts = kind === 'front' ? TITLE_FONTS : DEDICATION_FONTS;
+              return (
+                <div className="border border-gray-300 rounded-lg bg-white divide-y divide-gray-100 max-h-56 overflow-y-auto">
+                  <button
+                    onClick={() => setFontSel('auto')}
+                    className={`w-full text-left px-3 py-2 text-sm ${fontSel === 'auto' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    {t('Automatisch', 'Automatique', 'Automatic')}
+                  </button>
+                  {fonts.map(f => (
+                    <button
+                      key={f.id}
+                      onClick={() => setFontSel(f.id)}
+                      className={`w-full text-left px-3 py-1.5 ${fontSel === f.id ? 'bg-indigo-50' : 'hover:bg-gray-50'}`}
+                    >
+                      <span
+                        className="block text-lg leading-snug truncate text-gray-800"
+                        style={{
+                          fontFamily: `'${f.family}', sans-serif`,
+                          fontWeight: f.weight,
+                          fontStyle: f.italic ? 'italic' : 'normal',
+                          textTransform: f.upper ? 'uppercase' : 'none',
+                        }}
+                      >
+                        {sample || f.label}
+                      </span>
+                      <span className={`block text-[11px] ${fontSel === f.id ? 'text-indigo-600 font-semibold' : 'text-gray-400'}`}>{f.label}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Effect — front title only */}

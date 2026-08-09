@@ -2271,6 +2271,7 @@ export function StoryDisplay({
                   kind="front"
                   language={language}
                   currentStyle={(coverImages.frontCover as any).typographyStyle || null}
+                  previewText={titleDraft || title}
                   onApply={(style) => onSetCoverTypography('frontCover', style)}
                 />
               </div>
@@ -5291,6 +5292,7 @@ export function StoryDisplay({
                 kind="dedication"
                 language={language}
                 currentStyle={(initialPageObj as any).typographyStyle || null}
+                previewText={dedication}
                 onApply={(style) => onSetCoverTypography('initialPage', style)}
               />
             )}
