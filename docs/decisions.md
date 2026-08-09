@@ -7362,3 +7362,34 @@ preserved, non-camera_facing types untouched) and 4/4 routing cases. 64/64 templ
 glasses" / "Daniel is absent" where both are visibly present — being investigated separately; and
 `image_coherence` under-charging, where p11's ghost figures, headless torso and inverted body were
 scored MINOR −2 as "shadow figures clutter midground".
+
+## 2026-08-09: One figure detection per image bytes — every consumer reuses it
+
+**Context:** job_1786277779744 P8 shipped a phantom "Emma↔Hans flipped" finding in the
+Charakterkonsistenz report while the persisted detection named both correctly. Cause: for a
+round-repaired page, THREE independent full-page detections ran on the same bytes — iterate's
+internal accept-gate detection, the round eval's re-detect, and the entity check's fallback
+re-detect. SoM identity (Gemini letter-badge call) is not deterministic across calls, and the
+internal detection cache misses because each caller builds a slightly different
+expectedCharacters list (the cache key hashes bytes + expected names). Two passes disagreed;
+the entity grid cropped figures under swapped names and reported a flip that never existed.
+
+**Decision:** detection runs ONCE per accepted image bytes and every consumer reuses that one
+result. Concretely:
+- Round results carry the detection made on their bytes (iterate's internal one; inpaint/char-fix
+  get one shared pre-detect — the round-loop mirror of Phase 5b-pre) and it is stamped on the
+  version (`v.bboxDetection`, detectionForVersion-first).
+- `buildEvalInputs` / `buildEntityCheckData` forward the entry's own detection to the eval and the
+  entity check; untouched pages forward their best version's stamped detection.
+- Step 3b rescue evals and the final bbox refresh resolve via `detectionForVersion` before ever
+  re-detecting.
+- Every reuse remains fingerprint-guarded (`bboxPairsWith` / `sourceImageFp`): a mismatched stamp
+  self-drops and a fresh detection runs — reuse is never allowed to apply stale boxes to new bytes.
+
+**Rationale:** identity disagreement between duplicate detections manufactures phantom consistency
+findings (and wastes 1-2 DINO/SoM passes per repaired page per round). A single detection per bytes
+makes the entity grid, the eval, the garment fix and the UI all tell the same story.
+
+**Touched files:** `server/lib/repairPipeline.js` (round pre-detect, builder forwarding, version
+stamp, rescue + final-refresh resolution). Guards already existed in `server/lib/images.js`
+(`bboxPairsWith`) and `server/lib/entityConsistency.js` (`firstPairing`).

@@ -1916,6 +1916,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             // actually sent to Grok, not the stale original page prompt.
             prompt: repairResult.prompt || null,
             description: repairResult.description || null,
+            // Detection is part of every image version (owner decision
+            // 2026-07-31): the ONE detection made on this result's bytes
+            // (iterate's internal or the round pre-detect), stamped directly
+            // so detectionForVersion resolves it even if the eval failed.
+            bboxDetection: repairResult.bboxDetection || null,
             entityIssues: evEntityResult.issues,
             evaluatedAt: new Date().toISOString(),
             // Composite-cover 2-pass debug bundle from executeIterateAction
@@ -1996,7 +2001,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     for (const [pageNumber, versions] of pageVersions) {
       const unscored = versions.find(v => v.imageData && rescueScoreOf(v) == null);
       if (!unscored) continue;
-      rescueEntries.push({ pageNumber, imageData: unscored.imageData, version: unscored });
+      // Forward the version's own stamped detection (iterate stamps one on its
+      // accepted bytes) so the rescue eval reuses it instead of re-detecting.
+      rescueEntries.push({ pageNumber, imageData: unscored.imageData, version: unscored, bboxDetection: images().detectionForVersion(unscored) });
     }
     if (rescueEntries.length > 0) {
       log.info(`📊 [UNIFIED PIPELINE] Step 3b: scoring ${rescueEntries.length} unscored version(s) so every candidate has a score: page(s) ${rescueEntries.map(r => r.pageNumber).join(', ')}`);
@@ -2334,7 +2341,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const pageNumber = img.pageNumber;
     const versions = pageVersions.get(pageNumber) || [];
     const best = finalBestPerPage.get(pageNumber) || versions[0];
-    const bestBbox = best?.evaluation?.bboxDetection;
+    // Canonical version-detection resolution (v.bboxDetection first — the
+    // round loop stamps the shared detection there), not only the eval's copy.
+    const bestBbox = images().detectionForVersion(best);
     // Figures only count when the detection was computed on this version's
     // bytes — a stale stamp means the boxes belong to another version.
     const hasFigures = Array.isArray(bestBbox?.figures) && bestBbox.figures.length > 0
