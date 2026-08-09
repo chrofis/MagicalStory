@@ -670,7 +670,7 @@ export default function SharedStoryViewer() {
                 sessionStorage.setItem('privateStoryBannerDismissed', '1');
                 setBannerDismissed(true);
               }}
-              aria-label={language === 'de' ? 'Schließen' : language === 'fr' ? 'Fermer' : 'Dismiss'}
+              aria-label={language === 'de' ? 'Schliessen' : language === 'fr' ? 'Fermer' : 'Dismiss'}
               className="p-1.5 rounded-md text-amber-700 hover:bg-amber-100 transition-colors"
             >
               <X className="w-4 h-4" />

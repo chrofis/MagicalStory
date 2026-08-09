@@ -13,4 +13,11 @@
 # worktree is on an old branch, the toplevel has no scripts/admin/ yet, but this
 # hook always sits next to the main clone's copy.
 HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+# Gate 1: settled-verdict guard (docs/SETTLED.md) — refuses pushes that
+# reintroduce deliberately-removed patterns (dark text zones, hats rules,
+# test-story names in prompts, eszett in German strings).
+node "$HOOK_DIR/../scripts/admin/check-settled.js" || exit 1
+
+# Gate 2: target environment must be idle (see check-push-idle.js).
 exec node "$HOOK_DIR/../scripts/admin/check-push-idle.js" "$@"
