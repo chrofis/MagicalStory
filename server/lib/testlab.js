@@ -688,7 +688,10 @@ async function runBboxStage(ctx, { experimentId }) {
       skipCache: true,
       pageContext: `testlab-exp${experimentId}-P${ctx.pageNumber}`,
     });
-    if (!wantDino || result?.detectionBackend === 'grounding-dino') break;
+    // 'gemini-second-opinion' is a DELIBERATE arbitration verdict (DINO ran,
+    // undercounted, Gemini found more figures) — not a cold-analyzer fallback.
+    const okBackends = ['grounding-dino', 'gemini-second-opinion'];
+    if (!wantDino || okBackends.includes(result?.detectionBackend)) break;
     if (attempt < ATTEMPTS) {
       log.info(`[TESTLAB] detection fell back to ${result?.detectionBackend || 'gemini'} (DINO cold after deploy?) — retry ${attempt}/${ATTEMPTS - 1} in 45s`);
       await new Promise(r => setTimeout(r, 45000));
@@ -696,7 +699,7 @@ async function runBboxStage(ctx, { experimentId }) {
   }
   const elapsedMs = Date.now() - t0;
   if (!result) throw new Error('Bbox detection returned null');
-  if (wantDino && result.detectionBackend !== 'grounding-dino') {
+  if (wantDino && !['grounding-dino', 'gemini-second-opinion'].includes(result.detectionBackend)) {
     throw new Error(`Detection fell back to ${result.detectionBackend || 'gemini'} on every attempt — GroundingDINO unreachable (cold analyzer after deploy?). Rerun when the service is warm; refusing to chain repairs onto fallback boxes.`);
   }
 

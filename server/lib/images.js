@@ -25,7 +25,7 @@ const { photoAnalyzerUrl: _photoAnalyzerUrl, withAnalyzerSlot } = require('./pho
 // mask/edit cluster; the inpaint prompt builders here still call it.
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const { blackoutIssueRegions } = require('./imageInpainting');
-const { detectFiguresWithGroundingDino, _shortGarmentPhrase } = require('./figureDetection');
+const { detectFiguresWithGroundingDino, attachSamMasksToFigures, _shortGarmentPhrase } = require('./figureDetection');
 const { buildEmptySceneVbGrid, buildPageCompositeRefs } = require('./referenceSheets');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
 
@@ -2611,6 +2611,11 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
   // 2026-07-15). Only super-deformed/abstract styles (chibi, pixel, lowpoly)
   // stay on Gemini. Fails open: any null/error → Gemini below.
   let gdinoDiag = null;  // persisted with whichever backend produces the result
+  // Undercounted-but-complete DINO result awaiting the Gemini second opinion
+  // (owner, 2026-08-09): fewer persons than expected either means the painter
+  // painted fewer (DINO right → keep its boxes+masks) or DINO merged two
+  // overlapping figures (Gemini finds more → its boxes win, SAM-masked below).
+  let dinoUndercountResult = null;
   const eligibleStyles = CONFIG_DEFAULTS.figureDetectionEligibleStyles || ['realistic'];
   const gdinoEligible = CONFIG_DEFAULTS.figureDetectionBackend === 'grounding-dino'
     && !!artStyle && eligibleStyles.includes(String(artStyle).toLowerCase());
@@ -2643,12 +2648,22 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
         // uses them for the cutout strip, JSON persistence (stories.data JSONB)
         // and the raw API response never see them.
         Object.defineProperty(result, '_gdinoMasks', { value: gd.masks || [], enumerable: false });
-        if (!skipCache && cacheKey) _bboxCacheSet(cacheKey, result);
-        log.info(`🦖 [BBOX-DETECT] ${pageLabel}GroundingDINO backend (${gd.figures.length} figures, ${foundObjects.length} objects)`);
-        return result;
+        if (gd.diag?.undercount) {
+          // Don't trust-or-discard yet — stash and fall through to the Gemini
+          // detection below, which acts as the second opinion. Not cached: the
+          // cache stores only the arbitrated final answer.
+          dinoUndercountResult = result;
+          log.info(`🦖 [BBOX-DETECT] ${pageLabel}GroundingDINO undercount (${gd.diag.undercount}) — asking Gemini for a second opinion`);
+        } else {
+          if (!skipCache && cacheKey) _bboxCacheSet(cacheKey, result);
+          log.info(`🦖 [BBOX-DETECT] ${pageLabel}GroundingDINO backend (${gd.figures.length} figures, ${foundObjects.length} objects)`);
+          return result;
+        }
       }
-      log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}GroundingDINO backend returned nothing — falling back to Gemini`);
-      getCurrentLogger()?.warn?.('detection_fallback', `${pageLabel}figure detection fell back to Gemini — GroundingDINO returned nothing (analyzer cold/unhealthy?)`, null, { pageLabel, reason: gdinoDiag?.reason || 'no figures' });
+      if (!dinoUndercountResult) {
+        log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}GroundingDINO backend returned nothing — falling back to Gemini`);
+        getCurrentLogger()?.warn?.('detection_fallback', `${pageLabel}figure detection fell back to Gemini — GroundingDINO returned nothing (analyzer cold/unhealthy?)`, null, { pageLabel, reason: gdinoDiag?.reason || 'no figures' });
+      }
     } catch (gdErr) {
       log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}GroundingDINO backend error (${gdErr.message}) — falling back to Gemini`);
       getCurrentLogger()?.warn?.('detection_fallback', `${pageLabel}figure detection fell back to Gemini — GroundingDINO ERROR: ${gdErr.message} (analyzer down/unhealthy?)`, null, { pageLabel, error: gdErr.message });
@@ -2659,13 +2674,13 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       log.warn('⚠️  [BBOX-DETECT] Gemini API key not configured');
-      return null;
+      return dinoUndercountResult || null;
     }
 
     // Load prompt template
     if (!PROMPT_TEMPLATES.boundingBoxDetection) {
       log.warn('⚠️  [BBOX-DETECT] Bounding box detection prompt template not loaded');
-      return null;
+      return dinoUndercountResult || null;
     }
 
     // Build dynamic prompt with expected characters and objects
@@ -2729,7 +2744,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       const claudeResult = await callTextModel(prompt, 16000, modelId, { images: [imageDataUri], usageLabel: 'bbox_detect' });
       if (!claudeResult?.text) {
         log.warn('⚠️  [BBOX-DETECT] Claude returned no text response');
-        return null;
+        return dinoUndercountResult || null;
       }
       // Wrap in Gemini-compatible format for downstream parsing
       data = {
@@ -2744,7 +2759,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       data = await grokResponse.json();
       if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
         log.warn('⚠️  [BBOX-DETECT] Grok returned no text response');
-        return null;
+        return dinoUndercountResult || null;
       }
       inputTokens = data.usageMetadata?.promptTokenCount || data.usage?.prompt_tokens || 0;
       outputTokens = data.usageMetadata?.candidatesTokenCount || data.usage?.completion_tokens || 0;
@@ -2806,7 +2821,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
               log.warn(`⚠️  [BBOX-DETECT] Grok fallback also failed: ${grokErr.message}`);
             }
           }
-          return null;
+          return dinoUndercountResult || null;
         }
 
         data = await response.json();
@@ -2875,7 +2890,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
             }
           }
           log.warn('🔄 [FALLBACK] No response for bbox detection after retry');
-          return null;
+          return dinoUndercountResult || null;
         }
       }
     }
@@ -2883,7 +2898,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
     // Guard: if all attempts failed (e.g., PROHIBITED_CONTENT block), data has no candidates
     if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
       log.warn('🔄 [FALLBACK] Detection failed, no bounding boxes available');
-      return null;
+      return dinoUndercountResult || null;
     }
 
     const responseText = data.candidates[0].content.parts[0].text.trim();
@@ -2957,7 +2972,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
         }
 
         if (!parsedResult) {
-          return null;
+          return dinoUndercountResult || null;
         }
       }
     }
@@ -2970,7 +2985,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       const head = responseText.slice(0, 400);
       const tail = total > 800 ? responseText.slice(-400) : '';
       log.warn(`⚠️  [BBOX-DETECT] No JSON found in response (${total} chars). HEAD: ${head}${tail ? `\n...TAIL: ${tail}` : ''}`);
-      return null;
+      return dinoUndercountResult || null;
     }
 
     // Normalize coordinates from 0-1000 to 0.0-1.0
@@ -3174,6 +3189,36 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       gdinoDiag: gdinoDiag || undefined,
     };
 
+    // ── Second-opinion arbitration (owner, 2026-08-09) ─────────────────────
+    // A stashed undercounted DINO result means Gemini just ran as the second
+    // opinion. More Gemini figures than DINO persons → DINO merged overlapping
+    // figures (e.g. a child standing in front of an adult) → Gemini's boxes
+    // win, and SAM masks are attached to THEM so cutouts/carve-out still work.
+    // Same-or-fewer → the painter really painted fewer people; DINO's tight
+    // boxes + masks + SoM names stand, and the undercount stays visible to the
+    // evals as genuinely missing characters.
+    if (dinoUndercountResult) {
+      const dinoN = dinoUndercountResult.figures.length;
+      const gemN = (finalResult.figures || []).length;
+      if (gemN > dinoN) {
+        try {
+          const masks = await attachSamMasksToFigures(imageData, finalResult.figures, { pageLabel });
+          Object.defineProperty(finalResult, '_gdinoMasks', { value: masks, enumerable: false });
+        } catch (maskErr) {
+          log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}SAM mask attach on Gemini boxes failed (${maskErr.message}) — boxes stay maskless`);
+        }
+        finalResult.detectionBackend = 'gemini-second-opinion';
+        finalResult.gdinoDiag = { ...(dinoUndercountResult.gdinoDiag || {}), secondOpinion: { dino: dinoN, gemini: gemN, chose: 'gemini' } };
+        log.info(`⚖️ [BBOX-DETECT] ${pageLabel}second opinion: Gemini ${gemN} > DINO ${dinoN} figures — DINO merged; using Gemini boxes + SAM masks`);
+        if (!skipCache) _bboxCacheSet(cacheKey, finalResult);
+        return finalResult;
+      }
+      dinoUndercountResult.gdinoDiag = { ...(dinoUndercountResult.gdinoDiag || {}), secondOpinion: { dino: dinoN, gemini: gemN, chose: 'dino' } };
+      log.info(`⚖️ [BBOX-DETECT] ${pageLabel}second opinion: Gemini ${gemN} ≤ DINO ${dinoN} figures — painter painted fewer; keeping DINO boxes+masks`);
+      if (!skipCache) _bboxCacheSet(cacheKey, dinoUndercountResult);
+      return dinoUndercountResult;
+    }
+
     // Populate the cache so the entity-consistency pass can reuse this on
     // the same image without re-paying the Gemini call.
     if (!skipCache) _bboxCacheSet(cacheKey, finalResult);
@@ -3182,6 +3227,13 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
 
   } catch (error) {
     log.error(`❌ [BBOX-DETECT] Error detecting bounding boxes: ${error.message}`);
+    if (dinoUndercountResult) {
+      // The second opinion failed to materialize — the undercounted DINO
+      // result is still strictly better than nothing (real boxes + masks).
+      log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}Gemini second opinion errored — keeping the undercounted DINO result`);
+      dinoUndercountResult.gdinoDiag = { ...(dinoUndercountResult.gdinoDiag || {}), secondOpinion: { chose: 'dino', error: error.message } };
+      return dinoUndercountResult;
+    }
     return null;
   }
 }

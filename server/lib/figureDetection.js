@@ -747,10 +747,14 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     }
   }
   if (dets.length < expectedCharacters.length) {
-    diag.fellBack = true;
-    diag.reason = `${dets.length} persons < ${expectedCharacters.length} expected`;
-    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${diag.reason} — falling back to Gemini`);
-    return { figures: null, diag };
+    // Undercount is NOT an automatic fallback anymore (owner, 2026-08-09):
+    // fewer persons than expected has two causes with opposite fixes — the
+    // painter really painted fewer (DINO is RIGHT, e.g. a redraw dropped a
+    // character), or DINO merged two overlapping figures into one box. The
+    // orchestrator resolves this with a Gemini second opinion; here we finish
+    // the full pipeline (SAM + SoM) on the persons we DID find and flag it.
+    diag.undercount = `${dets.length} persons < ${expectedCharacters.length} expected`;
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${diag.undercount} — completing detection; orchestrator will get a Gemini second opinion`);
   }
 
   // Stage 3 — face → figure pairing: face center inside a containing person
@@ -889,11 +893,87 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   return { figures, objects, masks, diag };
 }
 
+/**
+ * Attach MobileSAM silhouette masks to figures whose boxes came from a NON-DINO
+ * source (the Gemini bbox path) — SAM is box-prompted, so any box works as a
+ * prompt. Used by the second-opinion arbitration: when Gemini's boxes win over
+ * an undercounted DINO pass, the figures still get masks, so entity-grid crops
+ * are cutouts instead of neighbour-contaminated rectangles.
+ *
+ * Mutates each figure in place (bodyBox refined to the kept mask bounds,
+ * samApplied / maskVerdict / maskCoverage stamped — same fields as the DINO
+ * path) and returns the masks array (pngBuf | null, index-aligned with
+ * figures) for the _gdinoMasks rider. Occlusion carve-out between overlapping
+ * masks matches the DINO path: the smaller (foreground) figure keeps shared
+ * pixels.
+ */
+async function attachSamMasksToFigures(imageData, figures, { pageLabel = '' } = {}) {
+  const imageDataUri = imageData.startsWith('data:')
+    ? imageData
+    : `data:image/jpeg;base64,${r2Lib.stripDataUriPrefix(imageData)}`;
+  const meta = await sharp(Buffer.from(r2Lib.stripDataUriPrefix(imageDataUri), 'base64')).metadata();
+  const W = meta.width, H = meta.height;
+  const entries = [];
+  for (const f of figures) {
+    const bb = f?.bodyBox;
+    if (!Array.isArray(bb) || bb.length !== 4) { entries.push({ f, mask: null }); continue; }
+    const boxPx = [Math.round(bb[1] * W), Math.round(bb[0] * H), Math.round(bb[3] * W), Math.round(bb[2] * H)];
+    const rawMask = await _mobilesamMaskFull(imageDataUri, boxPx, W, H);
+    let mask = null, verdict = 'no-mask', coverage = null;
+    if (rawMask) {
+      const { keptBox, droppedOutside, coverage: cov } = await _cleanMaskAndCheck(rawMask, boxPx);
+      coverage = +cov.toFixed(3);
+      if (keptBox) {
+        mask = rawMask;
+        f.bodyBox = _pxBoxToNorm(keptBox, W, H);
+        f.samApplied = true;
+        verdict = droppedOutside ? 'mask-clipped-outside-box' : 'mask-ok';
+      } else {
+        verdict = cov > 0 ? 'rejected-too-small' : 'rejected-all-outside';
+      }
+    }
+    f.maskVerdict = verdict;
+    f.maskCoverage = coverage;
+    entries.push({ f, mask });
+  }
+  // Occlusion carve-out — identical rule to the DINO path: where two masks
+  // overlap, the smaller (foreground) figure keeps the pixels.
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = 0; j < entries.length; j++) {
+      if (i === j) continue;
+      const big = entries[i].mask, small = entries[j].mask;
+      if (!big || !small || small.area >= big.area) continue;
+      if (_maskOverlapFrac(big, small) < 0.02) continue;
+      let removed = 0;
+      const n = big.width * big.height;
+      for (let k = 0; k < n; k++) if (big.alpha[k] && small.alpha[k]) { big.alpha[k] = 0; removed++; }
+      if (removed === 0) continue;
+      big.area -= removed;
+      let minx = big.width, miny = big.height, maxx = -1, maxy = -1;
+      for (let k = 0; k < n; k++) {
+        if (!big.alpha[k]) continue;
+        const x = k % big.width, y = (k / big.width) | 0;
+        if (x < minx) minx = x; if (x > maxx) maxx = x;
+        if (y < miny) miny = y; if (y > maxy) maxy = y;
+      }
+      if (big.area > 0 && maxx >= 0) {
+        big.bbox = [minx, miny, maxx + 1, maxy + 1];
+        big.pngBuf = await _maskToPng(big);
+        entries[i].f.bodyBox = _pxBoxToNorm(big.bbox, W, H);
+      }
+    }
+  }
+  const masked = entries.filter(e => e.mask).length;
+  log.info(`🎭 [GDINO-DETECT] ${pageLabel}attached SAM masks to ${masked}/${figures.length} non-DINO figure box(es)`);
+  return entries.map(e => e.mask?.pngBuf || null);
+}
+
 module.exports = {
   _shortGarmentPhrase,
   detectFiguresWithGroundingDino,
   detectPersonBoxInCrop,
   recoverFaceBox,
+  attachSamMasksToFigures,
   _cleanMaskAndCheck,
   GDINO_OVERLAP_THRESHOLD,
   GDINO_SAME_FIGURE,

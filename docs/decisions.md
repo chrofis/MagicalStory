@@ -7585,3 +7585,30 @@ The relative grid clustering (one call, "find the odd-one-out") had two proven f
 Verified in the Lab: catches the clear cases reliably — the photographic initial page + back cover as `major` on every run, and a non-steampunk steampunk book as `wrong_medium` (which relative clustering could not). Residual: borderline adult-heavy pages still flip (7/12/7) between runs — benign, since the feature-preserving Gemini repair softens those safely, and −2/−3 are always `major`. Single call, pure text, no reference image, no extra votes.
 
 **Touched:** `server/lib/styleConsistency.js` (prompt → absolute-per-page + tolerant; verdict rule → against the commissioned style).
+
+## 2026-08-09: DINO undercount → Gemini second opinion; final entity report describes the PICKED versions
+
+**Context:** job_1786287569165 P5/P8. Two failure shapes shared one symptom (persons < expected →
+whole-page Gemini fallback → no SAM masks → entity-grid cells become rectangle crops that include
+neighbours): on P5 the redraw genuinely painted 4 of 5 characters (DINO was RIGHT), on P8 DINO
+merged Sarah+Emma (overlapping figures) into one box (DINO was WRONG). Additionally the shipped
+Charakterkonsistenz report was the round-1 report — computed on round OUTPUT images that pick-best
+then discarded ("Sarah black hat" described an iterate that never shipped).
+
+**Decision 1 — second-opinion arbitration (owner design):** DINO undercount no longer auto-falls
+back. The DINO pass completes (SAM + SoM on the persons found, diag.undercount set); the Gemini
+detection then runs as second opinion. Gemini > DINO figures → DINO merged → Gemini boxes win and
+MobileSAM masks are attached to THEM (SAM is box-prompted; backend 'gemini-second-opinion').
+Gemini ≤ DINO → painter painted fewer → DINO's tight boxes/masks/names stand and the missing
+character stays visible to evals. Haar rejected: faces-only (no body boxes for SAM) and DINO
+replaced it deliberately (background faces, no phantoms).
+
+**Decision 2 — final entity report on picked versions (owner):** after pick-best (and calm-zone),
+Step 4b re-runs entity consistency on the PICKED versions (reusing their stamped detections),
+re-consolidates + re-scores picked versions whose entity evidence changed, re-picks (entity feeds
+the score), and if any pick flipped runs ONE more entity pass for the displayed report. No third
+pick — bounded convergence.
+
+**Touched files:** `server/lib/figureDetection.js` (undercount continues; attachSamMasksToFigures),
+`server/lib/images.js` (stash + arbitration + failure-path returns), `server/lib/testlab.js`
+(bbox stage accepts 'gemini-second-opinion'), `server/lib/repairPipeline.js` (Step 4b).

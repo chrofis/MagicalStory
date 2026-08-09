@@ -2056,10 +2056,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     log.warn(`⚠️ [UNIFIED PIPELINE] Step 3b rescue-eval failed: ${rescueErr.message}`);
   }
 
-  // The most recent entity report from the round loop is the FINAL entity
-  // verdict — no separate end-of-flow entity check fires anymore. Aliased
-  // here for the per-page entityReport field built into results below.
-  const finalEntityReport = currentEntityReport;
+  // Provisional final entity verdict — Step 4b below recomputes it on the
+  // PICKED versions and reassigns (the round-loop report judged round output
+  // that pick-best may have discarded).
+  let finalEntityReport = currentEntityReport;
 
   // =========================================================================
   // Step 4: Post-repair calm-zone recovery
@@ -2180,6 +2180,93 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }));
   } catch (postRepairErr) {
     log.warn(`⚠️ [POST-REPAIR-TEXT] Recovery phase failed: ${postRepairErr.message} — keeping pre-recovery best versions`);
+  }
+
+  // =========================================================================
+  // Step 4b: FINAL entity report describes the PICKED versions (owner, 2026-08-09)
+  // =========================================================================
+  // The last round's entity report judged the ROUND OUTPUT — but pick-best can
+  // discard those images (observed: "Sarah wears a black hat" reported for an
+  // iterate that lost the pick and never shipped). Sequence, bounded by design:
+  // recompute entity on the picked versions → re-score picked versions whose
+  // entity evidence changed (entity feeds the score) → re-pick → if any pick
+  // flipped, ONE more entity pass on the new picks so the displayed report
+  // matches the shipped images. No third pick.
+  try {
+    const { applyScore: stampFinal } = require('./scoring');
+    const entityIssueSig = (issues) => JSON.stringify(
+      (issues || []).map(i => `${i.severity}|${i.subType || i.type || ''}|${String(i.description || '').slice(0, 80)}`).sort());
+
+    const runFinalEntity = async (label) => {
+      const pickedEntries = rawImages.filter(img => img.imageData && img.pageNumber != null).map(img => {
+        const best = finalBestPerPage.get(img.pageNumber);
+        if (!best?.imageData) return null;
+        return {
+          imageData: best.imageData,
+          pageNumber: img.pageNumber,
+          description: best.description || null,
+          // The version's own stamped detection — one detection per bytes,
+          // reused; entity must never re-detect what is already paired.
+          bboxDetection: images().detectionForVersion(best),
+        };
+      }).filter(Boolean);
+      if (pickedEntries.length === 0) return null;
+      const report = await runEntityConsistencyChecks(buildEntityCheckData(pickedEntries), characters, {
+        checkCharacters: true, checkObjects: false, saveGrids: false, onHeartbeat: pingHeartbeat,
+      });
+      if (report?.tokenUsage && usageTracker) {
+        usageTracker('gemini_quality', {
+          input_tokens: report.tokenUsage.inputTokens || 0,
+          output_tokens: report.tokenUsage.outputTokens || 0,
+        }, `entity_consistency_${label}`, report.tokenUsage.model || 'gemini-2.5-flash');
+      }
+      currentEntityReport = report;
+      entityHistory.push({ runIndex: entityHistory.length, timestamp: report.timestamp || new Date().toISOString(), triggeredBy: label, report });
+      return report;
+    };
+
+    // Re-score picked versions whose entity evidence changed. Re-consolidation
+    // is required: the deduped issue list embeds the entity issues, so passing
+    // a fresh entityResult with the OLD plan would be silently ignored.
+    const restampPicked = async (report) => {
+      let changed = 0;
+      await Promise.all(rawImages.filter(i => i.imageData && i.pageNumber != null).map(img => consolidateLimit(async () => {
+        const best = finalBestPerPage.get(img.pageNumber);
+        if (!best?.evaluation) return;
+        const entityResult = getEntityPenaltyAndIssues(img.pageNumber, report);
+        if (entityIssueSig(entityResult.issues) === entityIssueSig(best.deductions?.entity)) return;
+        const plan = await consolidatePageEval(best.evaluation, entityResult.issues, img.pageNumber, 'final', best.description || null);
+        stampFinal(best, { evalResult: best.evaluation, entityResult, consolidatedPlan: plan || null });
+        changed++;
+      })));
+      return changed;
+    };
+
+    await updateProgress(71, 'Final entity check on picked versions...');
+    const report1 = await runFinalEntity('final-pick');
+    if (report1) {
+      const changed = await restampPicked(report1);
+      let flips = 0;
+      if (changed > 0) {
+        for (const img of rawImages) {
+          if (!pageVersions.has(img.pageNumber)) continue;
+          const repick = selectBestVersion(pageVersions.get(img.pageNumber));
+          if (repick && repick !== finalBestPerPage.get(img.pageNumber)) {
+            log.info(`🧾 [UNIFIED PIPELINE] Step 4b: page ${img.pageNumber} pick flipped to ${repick.source} after final entity re-score`);
+            finalBestPerPage.set(img.pageNumber, repick);
+            flips++;
+          }
+        }
+      }
+      log.info(`🧾 [UNIFIED PIPELINE] Step 4b: final entity on picked versions — ${report1.totalIssues} issue(s), ${changed} page(s) re-scored, ${flips} pick(s) flipped`);
+      if (flips > 0) {
+        const report2 = await runFinalEntity('final-pick-2');
+        if (report2) await restampPicked(report2); // report + scores true for shipped picks; deliberately no third pick
+      }
+    }
+    finalEntityReport = currentEntityReport;
+  } catch (finalEntityErr) {
+    log.warn(`⚠️ [UNIFIED PIPELINE] Step 4b final entity recompute failed: ${finalEntityErr.message} — keeping the round-loop report`);
   }
 
   // =========================================================================
