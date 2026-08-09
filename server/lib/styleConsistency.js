@@ -178,19 +178,16 @@ ${requestedStyle}
 """
 ` : ''}
 
-Cluster the cells by VISUAL STYLE. Look at:
-- Color palette (warm/cool, saturated/muted, dominant hues)
-- Brushwork or line quality (soft watercolor edges vs crisp inked lines vs cel-shaded blocks)
-- Character rendering (face geometry, eye style, skin shading)
-- Lighting tone (flat illustration vs dimensional shading vs cinematic)
-- Texture (paper grain, brush stroke visibility, smoothness)
+Judge EACH page INDEPENDENTLY against the COMMISSIONED art style above. Do NOT cluster the pages or compare them to each other — a majority rendered in the wrong style is still wrong, so "consistent with the other pages" is NOT the test. The test is: is THIS page rendered in the commissioned MEDIUM?
 
-Identify ONE dominant cluster (the majority of cells that share a style). Pick ONE anchor page from that cluster — the cleanest representative of the dominant style. Then list every cell that does NOT belong to the dominant cluster as an outlier.
+Be TOLERANT. Flag a page ONLY when it is CLEARLY and unmistakably in the WRONG art medium — it looks like a real photograph (or a photo with a light filter over it): camera-real skin with visible pores, real fabric and lighting, photographic eyes — when a painted or illustrated style was commissioned. The mismatch must be obvious at a glance.
 
-For each outlier, name 2-4 SPECIFIC differences (not just "different style"). Severity:
-- "major"    — clearly a different art style (different rendering technique, very different palette, different character look)
-- "moderate" — same family but visibly off (palette shift, line weight different, lighting tone different)
-- "minor"    — subtle inconsistency (slight color cast, small edge-style variation)
+Do NOT flag anything short of that. A page whose people are merely a bit smooth, refined, or realistic-leaning is still the RIGHT medium — leave it. Slightly-too-clean faces, less brushstroke texture than ideal, or one face a touch sharper than the rest are NOT outliers. When in doubt, do NOT flag. Only a clear, obvious, whole-image wrong-medium failure counts — never a degree-of-looseness difference.
+
+For each flagged page, name 2-4 SPECIFIC differences. Severity:
+- "major"    — photographic/photoreal rendering of the people, or a wholly different medium than commissioned
+- "moderate" — the commissioned medium, but a defining property named in the style is clearly absent
+- "minor"    — subtle inconsistency (slight colour cast, small edge-style variation)
 
 ${requestedStyle ? `Separately from the clustering, classify the dominant cluster's RENDERING MEDIUM against the commissioned art style above:
 - "matches" — the same medium as commissioned. Use this even when the execution is imperfect: weaker brushwork, smoother shading, less texture, a missing named-artist mannerism, or any other fidelity shortfall is still "matches".
@@ -201,22 +198,22 @@ Judge only how it is DRAWN, never whether a scene suits its subject. A majority 
 ` : ''}Return ONLY this JSON, no prose:
 {
   "verdict": "consistent" | "mixed" | "fragmented",
-  "dominantCluster": [<page numbers in cluster>],
-  "anchorPage": <page number>,
+  "dominantCluster": [<page numbers that MATCH the commissioned style>],
+  "anchorPage": <a page number that matches the commissioned style>,
   "outliers": [
     { "page": <number>, "severity": "major"|"moderate"|"minor", "differences": ["...", "..."] }
   ],${requestedStyle ? `
   "dominantStyleVerdict": "matches" | "drifted" | "wrong_medium",
-  "requestedStyleDifferences": ["<how the dominant cluster departs from the commissioned medium; empty when it matches>"],` : ''}
-  "reasoning": "<2-3 sentences explaining what unifies the dominant cluster and how the outliers diverge>"
+  "requestedStyleDifferences": ["<how the majority of the pages depart from the commissioned medium; empty when they match>"],` : ''}
+  "reasoning": "<2-3 sentences: is the book in the commissioned style, and which pages depart>"
 }
 
 Use -1 for "Front cover", -2 for "Initial page", -3 for "Back cover" if they appear. Use the page numbers from the labels for everything else.
 
-Verdict rule:
-- "consistent" if ≥90% of cells are in the dominant cluster and outliers are all "minor"
-- "mixed" if 60-90% in dominant cluster, or any "moderate"+ outliers
-- "fragmented" if <60% in any single cluster`;
+Verdict rule (against the COMMISSIONED style, not the majority):
+- "consistent" if ≥90% of pages match the commissioned style and outliers are all "minor"
+- "mixed" if 60-90% match, or any "moderate"+ outliers
+- "fragmented" if <60% match the commissioned style`;
 
   // Clustering is a judgment task, and this call was the only one still on
   // Gemini's default temperature — two identical runs over the same 14 pages

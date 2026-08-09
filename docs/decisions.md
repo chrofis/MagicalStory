@@ -7575,3 +7575,13 @@ see the image, so a prompt rule on compliance only fixes half), and promoting D-
 **Touched:** `docs/SETTLED.md`, `CLAUDE.md`, `server/lib/scoring.js`, `server/lib/evalBuckets.js`,
 `prompts/image-evaluation.txt`, `prompts/image-prompt-compliance.txt`, `prompts/image-semantic.txt`,
 `prompts/feedback-consolidator.txt`.
+
+---
+
+## 2026-08-09 — Style-check: absolute per-page vs commissioned TEXT, with slack (replaces relative clustering)
+
+The relative grid clustering (one call, "find the odd-one-out") had two proven flaws: it was non-deterministic (0/2/7 outliers on identical input) AND it canonised a wrong majority — a steampunk book rendered mostly photoreal had its correct pages flagged as the outliers. Rebuilt `checkStoryStyleConsistency` to judge EACH page INDEPENDENTLY against the commissioned-style TEXT (no reference image — owner: don't load more into the eval; pure text is enough), with SLACK: flag only a CLEAR medium mismatch (photographic when a painted/illustrated style was commissioned), never a mere smoothness/looseness difference. The absolute `styleMatch` (matches/drifted/wrong_medium) rides alongside.
+
+Verified in the Lab: catches the clear cases reliably — the photographic initial page + back cover as `major` on every run, and a non-steampunk steampunk book as `wrong_medium` (which relative clustering could not). Residual: borderline adult-heavy pages still flip (7/12/7) between runs — benign, since the feature-preserving Gemini repair softens those safely, and −2/−3 are always `major`. Single call, pure text, no reference image, no extra votes.
+
+**Touched:** `server/lib/styleConsistency.js` (prompt → absolute-per-page + tolerant; verdict rule → against the commissioned style).
