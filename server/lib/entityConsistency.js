@@ -2179,6 +2179,13 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
       }
 
       // Convert issues to unified format
+      // Declared BEFORE first use: it is referenced by the issues filter just
+      // below AND by the garment-colour split further down. Declaring it at the
+      // later site put it in the temporal dead zone for this line, so every
+      // entity grid that returned the new fixable_issues shape threw
+      // "Cannot access before initialization", was caught, and was recorded as
+      // a FAILED evaluation - consistent:false with zero issues.
+      const isGarmentColour = (i) => /^garment_colou?r$/i.test(String(i && i.type || ""));
       const issues = (Array.isArray(parsed.fixable_issues)
         ? parsed.fixable_issues.filter(i => !isGarmentColour(i))
         : (parsed.issues || [])).map(issue => ({
@@ -2209,7 +2216,6 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
       // (scoring.js ZERO_POINT_TYPES) - only where it travels has changed.
       // The legacy array is still read so stored evaluations keep working.
       const unified = Array.isArray(parsed.fixable_issues) ? parsed.fixable_issues : [];
-      const isGarmentColour = (i) => /^garment_colou?r$/i.test(String(i && i.type || ""));
       const garmentColourMismatches = [
         ...unified.filter(isGarmentColour),
         ...(parsed.garmentColourMismatches || []),
