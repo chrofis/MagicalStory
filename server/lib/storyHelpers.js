@@ -5893,6 +5893,73 @@ function buildBeatsReviewPrompt(inputData, beats) {
 }
 
 /**
+ * Wardrobe review of the bible's clothing contract. Returns null when the
+ * story has no dressed character to review — a bible that produced no usable
+ * outfit has nothing for a reviewer to correct.
+ */
+function buildClothingReviewPrompt(inputData, clothingRequirements) {
+  const template = PROMPT_TEMPLATES.clothingReview;
+  if (!template) {
+    log.error('[PROMPT] clothingReview template not loaded — clothing review unavailable');
+    return null;
+  }
+  const blocks = [];
+  for (const [name, categories] of Object.entries(clothingRequirements || {})) {
+    for (const [category, entry] of Object.entries(categories || {})) {
+      if (!entry || typeof entry !== 'object' || !entry.used || !entry.description) continue;
+      // The costume NAME is what check 1 measures the garments against. Without
+      // it the reviewer can only guess which costume "striped shirt" belongs to.
+      const costume = entry.costume ? ` (costume: ${entry.costume})` : '';
+      blocks.push(`## ${name} / ${category}${costume}\n${entry.description}`);
+    }
+  }
+  if (blocks.length === 0) return null;
+  return fillTemplate(template, {
+    ...buildStoryContextFields(inputData),
+    CURRENT_CLOTHING: blocks.join('\n\n'),
+  });
+}
+
+/**
+ * Parse a ---CLOTHING--- block into {name, category, description}. Same shape
+ * as parseBeats: analysis before the marker, entries after, omission allowed
+ * (the review returns only the outfits it rewrote).
+ */
+function parseClothingReview(raw) {
+  const full = String(raw || '');
+  const marker = full.match(/---\s*CLOTHING\s*---/i);
+  const stripAnalysisMarker = s => s.replace(/^[\s\S]*?---\s*ANALYSIS\s*---/i, '').trim();
+  const analysis = marker
+    ? stripAnalysisMarker(full.slice(0, marker.index))
+    : stripAnalysisMarker(full);
+  const body = marker ? full.slice(marker.index + marker[0].length) : '';
+  if (!body.trim() || /^\s*NONE\s*$/i.test(body.trim())) return { analysis, entries: [] };
+
+  // The heading carries a trailing "(costume: x)" when we echoed one back, so
+  // the category match cannot be anchored to end-of-line.
+  const re = /^[ \t]*#{1,4}[ \t]*\**([^/\n]+?)\**[ \t]*\/[ \t]*\**(standard|winter|summer|costumed)\b[^\n]*$/gim;
+  const marks = [];
+  let m;
+  while ((m = re.exec(body)) !== null) {
+    marks.push({
+      name: m[1].replace(/\*/g, '').trim(),
+      category: m[2].toLowerCase(),
+      headStart: m.index,
+      bodyStart: m.index + m[0].length,
+    });
+  }
+
+  const entries = [];
+  for (let i = 0; i < marks.length; i++) {
+    const end = i + 1 < marks.length ? marks[i + 1].headStart : body.length;
+    const description = body.slice(marks[i].bodyStart, end).trim();
+    if (!marks[i].name || !description) continue;
+    entries.push({ name: marks[i].name, category: marks[i].category, description });
+  }
+  return { analysis, entries };
+}
+
+/**
  * Parse a ---BEATS--- block into {pageNumber, beat, scene}. Same shape as
  * parseRefinedText: analysis before the marker, pages after, omission allowed
  * (the review returns only rewritten pages).
@@ -7074,6 +7141,8 @@ module.exports = {
   parseRefinedText,
   buildBeatsPrompt,
   buildBeatsReviewPrompt,
+  buildClothingReviewPrompt,
+  parseClothingReview,
   buildSceneReviewPrompt,
   buildStoryTextFromBeatsPrompt,
   buildStoryBibleFromBeatsPrompt,

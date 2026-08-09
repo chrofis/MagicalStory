@@ -124,6 +124,10 @@ async function loadPromptTemplates() {
     // HINTS--- in the unified section format, so UnifiedStoryParser reads a
     // beats transcript with no parser change.
     ['storyBibleFromBeats', 'story-bible-from-beats.txt'],
+    // Wardrobe review over the bible's clothing contract (beats-first pipeline,
+    // step 3b). It runs BEFORE the styled-avatar kickoff — an outfit reviewed
+    // after the avatars exist is a rejected avatar, not a corrected outfit.
+    ['clothingReview', 'clothing-review.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
     ['incrementalConsistencyCheck', 'incremental-consistency-check.txt'],

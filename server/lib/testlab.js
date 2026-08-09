@@ -4801,6 +4801,80 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
   };
 }
 
+/**
+ * Wardrobe review replay — runs the clothing review over a stored story's OWN
+ * shipped contract, so the question it answers is exactly the production one:
+ * given this wardrobe, does the reviewer catch what went wrong?
+ *
+ * The bandana that shipped in job_1786277779744_vorw1f7ve is the motivating
+ * case, but the stage is worth running across several stories: a reviewer that
+ * only ever fires on the one outfit that annoyed us is a reviewer tuned to
+ * noise. Both the analysis and the applied rewrites come back, so a run that
+ * "found" something but rewrote nothing is visible as such.
+ */
+async function runClothingReviewStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildClothingReviewPrompt, parseClothingReview } = require('./storyHelpers');
+  const { callTextModelStreaming } = require('./textModels');
+  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const before = JSON.parse(JSON.stringify(storyData.clothingRequirements || {}));
+  if (Object.keys(before).length === 0) throw new Error('story has no clothingRequirements to review');
+
+  const orig = PROMPT_TEMPLATES.clothingReview;
+  if (promptOverride) PROMPT_TEMPLATES.clothingReview = promptOverride;
+  let prompt;
+  try {
+    prompt = buildClothingReviewPrompt(storyData, before);
+  } finally {
+    PROMPT_TEMPLATES.clothingReview = orig;
+  }
+  if (!prompt) throw new Error('clothing-review template unavailable, or no used outfit in this story');
+
+  const model = params.reviewModel || MODEL_DEFAULTS.outlineReview || MODEL_DEFAULTS.outline;
+  if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
+
+  const t = Date.now();
+  const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_clothing_review' });
+  if (!String(res.text || '').trim() || res.usage?.output_tokens === 0) {
+    throw new Error(`review model ${model} returned an empty response — provider failure, not a result`);
+  }
+  const parsed = parseClothingReview(res.text || '');
+
+  // Apply exactly as the pipeline does, so a rewrite that production would drop
+  // (unused category, unknown name) is dropped here too.
+  const after = JSON.parse(JSON.stringify(before));
+  const changed = [], stray = [];
+  for (const fix of parsed.entries) {
+    const name = Object.keys(after).find(n => n.toLowerCase() === fix.name.toLowerCase());
+    const entry = name ? after[name]?.[fix.category] : null;
+    if (!entry || !entry.used) { stray.push(`${fix.name}/${fix.category}`); continue; }
+    if ((entry.description || '') === fix.description) continue;
+    changed.push({ name, category: fix.category, before: entry.description || '', after: fix.description });
+    entry.description = fix.description;
+  }
+
+  return {
+    storyId: target.storyId,
+    model, modelId: res.modelId,
+    elapsedMs: Date.now() - t,
+    cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+    usage: res.usage,
+    promptChars: prompt.length,
+    prompt,
+    analysis: parsed.analysis,
+    rawResponse: (res.text || '').slice(0, 40000),
+    changed,
+    stray,
+    outfitsIn: Object.entries(before).flatMap(([n, cats]) =>
+      Object.entries(cats || {})
+        .filter(([, v]) => v && v.used && v.description)
+        .map(([c, v]) => ({ name: n, category: c, costume: v.costume || null, description: v.description }))),
+  };
+}
+
 const STORY_STAGES = {
   cover: runCoverStage,
   cover_title_paintin: runCoverTitlePaintinStage,
@@ -4811,6 +4885,7 @@ const STORY_STAGES = {
   beats_scenes: runBeatsScenesStage,
   scene_review_replay: runSceneReviewReplayStage,
   story_bible_replay: runStoryBibleReplayStage,
+  clothing_review: runClothingReviewStage,
 };
 
 // Avatar stages take {storyId, character} targets, not page targets.

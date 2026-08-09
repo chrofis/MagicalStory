@@ -368,6 +368,10 @@ export const TESTLAB_STAGES = [
   // costume descriptions next to the ones it shipped with — the way to measure a
   // change to the costume/distinguishability rules without generating a book.
   { id: 'story_bible_replay', label: 'Story bible replay (new costume rules vs what shipped)', producesImage: false, overridable: true, storyLevel: true },
+  // Runs the wardrobe review over a story's OWN shipped contract — does the
+  // reviewer catch the costume fault that reached the page? Text only, no
+  // avatar or image spend, so it can be run across several stories cheaply.
+  { id: 'clothing_review', label: 'Wardrobe review (does it catch the bad costume?)', producesImage: false, overridable: true, storyLevel: true },
   // Both runners existed server-side but were absent from this list, so the
   // dropdown could never select them — unreachable except by hand-posting.
   { id: 'garment_colour_fix', label: 'Garment colour fix (DINO+SAM mask → L*a*b* match)', producesImage: true, overridable: false },

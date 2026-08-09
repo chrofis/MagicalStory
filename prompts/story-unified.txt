@@ -466,16 +466,11 @@ Based on the story draft, determine which clothing variants each character needs
 - **Costumed**: Full outfit. Name every slot the character actually wears — headwear, top, bottom, footwear, belt/waist, outer layer — each with colour AND material. OMIT a slot the character does not wear; never write it out as `none`, `n/a` or empty. CLOTHING ONLY — no pets, companions, carried objects, or bag contents.
 - Only mark `used: true` for variations that actually appear in the story.
 - **Nothing over the face**: no masks, visors, veils, enclosing helmets, or a brim shadowing the eyes. Headwear worn clear of the face is fine.
-- **Characters must be tellable apart in the drawing, not in the description.** Twins in a green shirt and a red shirt are fine; a gold earring against a silver chain is not.
-  - A different dominant colour per character, on their largest garment.
-  - Plain colour words only: red, blue, green, yellow, orange, purple, brown, black, white, grey. Not burgundy, maroon, crimson, sage, coral, teal, ivory, taupe, indigo.
-  - Different garment types where the story allows; the same garment on two characters is fine when their colours differ. A winter story may dress everyone in coats.
-  - Two characters wearing the same garment differ in its colour, not only on their largest one. Two patterned garments differ in pattern, and stripes count as one pattern.
+- **The costume must read as that costume at a glance.** Every garment is one that costume is known for, named with the word that names it there. A garment that only hints at the theme does not count, and neither does one borrowed from a different costume.
+- **Characters are told apart by colour.** A different dominant colour per character, on their largest garment. The same garment on two characters is fine when the colours differ.
+  - Plain colour words only: red, blue, green, yellow, orange, purple, brown, black, white, grey.
   - Never distinguish by a print, badge, pin, brooch, embroidery, trim, buckle, laces, feather, earring, watch or buttons, or anything small.
-- **Each costumed character wears at least one garment that names the costume.** Pirate: striped shirt, sash, tricorn, headscarf, long coat, tall boots, leather vest. Knight: mail, tabard, greaves. Wizard: robe, pointed hood, cloak. Cowboy: fringed vest, chaps, wide-brimmed hat, neckerchief.
 - **One state per garment slot.** Never two that exclude each other. Omit a slot the character does not wear.
-  - WRONG (fails test 1): one "dark blue cloak", another "deep blue robe".
-  - RIGHT (pirate): "top: red-and-white broad-striped linen shirt with rolled sleeves under a brown leather vest; bottom: dark blue trousers tucked into tall cuffed black leather boots; belt/waist: wide red sash" — every element reads at thumbnail size, and no headwear or outer layer, so those slots are simply absent.
 
 **Output format:**
 ```json

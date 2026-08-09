@@ -49,6 +49,8 @@ const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 const {
   buildBeatsPrompt,
   buildBeatsReviewPrompt,
+  buildClothingReviewPrompt,
+  parseClothingReview,
   parseBeats,
   buildSceneExpansionPrompt,
   buildSceneExpansionAllPrompt,
@@ -141,7 +143,7 @@ function mergeByPage(base, fixes, apply) {
  *   generation (the long pole in front of every image) while scene expansion and
  *   page text are still running. Same callback the unified stream's progressive
  *   parser fires; it must be non-blocking and own its own error handling.
- * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, sceneReviewReport}>}
+ * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, clothingReviewReport, sceneReviewReport}>}
  *   pages[]  mirrors UnifiedStoryParser.extractPages() output consumed by server.js
  *   scenes[] mirrors the resolved value of startSceneExpansion() (expandedScenes)
  *   *ReviewReport  {model, durationMs, changedPages[], analysis, pages:[{pageNumber,before,after}]},
@@ -304,6 +306,72 @@ SCENE: ${x.scene || ''}`.trim(),
       meta.timings.storyBibleMs = Date.now() - t;
       log.warn(`🚨 [BEATS] Bible call failed (${err.message}) — story ships with an empty Visual Bible`);
       gl.warn('beats_story_bible_failed', `${bibleModel} failed: ${err.message} — story ships with an empty Visual Bible`);
+    }
+  }
+
+  // ── Step 3b: wardrobe review, BEFORE the avatars are kicked off ───────────
+  // The bible writes clothingRequirements and nothing checked it: a costume
+  // garment the costume is not actually known for (a bandana on a pirate) went
+  // from this call straight into the avatar sheet and then onto every page,
+  // unreviewed. This is the last moment the outfit is still only text — after
+  // the kickoff below, correcting one costs a regenerated avatar.
+  //
+  // Contained exactly like the two sibling reviews: a failure here ships the
+  // unreviewed wardrobe, it never blocks the story.
+  await checkCancellation();
+  let clothingReviewReport = null;
+  if (clothingRequirements && Object.keys(clothingRequirements).length > 0) {
+    const clothingPrompt = buildClothingReviewPrompt(inputData, clothingRequirements);
+    if (!clothingPrompt) {
+      gl.warn('beats_clothing_review_failed', 'Clothing review template unavailable — wardrobe shipped unreviewed');
+    } else {
+      t = Date.now();
+      try {
+        const cRes = await textModels.callTextModelStreaming(clothingPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_clothing_review' });
+        const parsed = parseClothingReview(cRes.text || '');
+        meta.timings.clothingReviewMs = Date.now() - t;
+        const rewrites = [];
+        const stray = [];
+        for (const fix of parsed.entries) {
+          // Match the character case-insensitively — the reviewer echoes the
+          // name back and case drift must not silently drop a correction.
+          const name = Object.keys(clothingRequirements)
+            .find(n => n.toLowerCase() === fix.name.toLowerCase());
+          const entry = name ? clothingRequirements[name]?.[fix.category] : null;
+          if (!entry || !entry.used) { stray.push(`${fix.name}/${fix.category}`); continue; }
+          const before = entry.description || '';
+          if (before === fix.description) continue;
+          entry.description = fix.description;
+          rewrites.push({ name, category: fix.category, before, after: fix.description });
+        }
+        clothingReviewReport = {
+          model: cRes.modelId || reviewModel,
+          durationMs: meta.timings.clothingReviewMs,
+          analysis: parsed.analysis || '',
+          changed: rewrites,
+          // Same dev-mode inspection as the other two reviews: the exact prompt
+          // and every outfit as sent, not only the ones that moved.
+          prompt: clothingPrompt,
+          outfitsIn: Object.entries(clothingRequirements).flatMap(([n, cats]) =>
+            Object.entries(cats || {})
+              .filter(([, v]) => v && v.used && v.description)
+              .map(([c, v]) => ({ name: n, category: c, costume: v.costume || null, description: v.description }))),
+        };
+        if (stray.length > 0) {
+          gl.warn('beats_clothing_review_stray', `Clothing review returned ${stray.join(', ')}, which is not a used outfit in this story — ignored`);
+        }
+        if ((cRes.text || '').trim().length === 0) {
+          gl.warn('beats_clothing_review_empty', 'Clothing review returned nothing — provider failure, wardrobe shipped unreviewed');
+        } else {
+          gl.info('beats_clothing_review', `Wardrobe review by ${cRes.modelId || reviewModel}: ${rewrites.length} outfit(s) rewritten (${(meta.timings.clothingReviewMs / 1000).toFixed(1)}s)`, null, {
+            changed: rewrites.map(r => `${r.name}/${r.category}`), model: cRes.modelId || reviewModel,
+          });
+        }
+      } catch (err) {
+        meta.timings.clothingReviewMs = Date.now() - t;
+        log.warn(`🚨 [BEATS] Clothing review failed (${err.message}) — wardrobe shipped unreviewed`);
+        gl.warn('beats_clothing_review_failed', `Reviewer ${reviewModel} failed: ${err.message} — wardrobe shipped unreviewed`);
+      }
     }
   }
 
@@ -718,7 +786,7 @@ SCENE: ${x.scene || ''}`.trim(),
   meta.textModelId = textModelId;
   log.info(`🪜 [BEATS] job=${jobId} done: ${pages.length} pages in ${(meta.totalMs / 1000).toFixed(1)}s`);
 
-  return { title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, sceneReviewReport };
+  return { title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
 module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES };

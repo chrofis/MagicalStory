@@ -5337,6 +5337,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // captured inside generateStoryViaBeats at each rewrite; null on the
     // unified path, which has no beats or scene review.
     const beatsReviewReport = beatsResult?.beatsReviewReport || null;
+    const clothingReviewReport = beatsResult?.clothingReviewReport || null;
     const sceneReviewReport = beatsResult?.sceneReviewReport || null;
     if (refineEnabled) {
       const { extractRefinablePages, startBackgroundRefine } = require('./server/lib/textRefine');
@@ -7272,6 +7273,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       generationLog: genLog.getEntries(), // Generation log for dev mode
       textRefineReport, // per-page before/after from the parallel refine pass
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
+      clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
       sceneReviewReport, // per-page before/after from the scene review (beats mode)
       finalChecksReport: finalChecksReport || null, // Final consistency checks report (dev mode)
       analytics: {

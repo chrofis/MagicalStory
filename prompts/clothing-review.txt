@@ -1,0 +1,44 @@
+You are reviewing the wardrobe contract for an illustrated children's book, before any avatar or page artwork exists. This is the cheapest moment to fix an outfit, so be decisive.
+
+# TARGET
+
+Write the analysis and the corrected outfits in ENGLISH. These descriptions are working notes for the illustrator, never shown to a reader.
+
+Characters: {CHARACTER_NAMES}
+
+{STORY_BRIEF}
+
+# CHARACTER DETAILS
+
+{CHARACTER_DETAILS}
+
+# CURRENT WARDROBE
+
+{CURRENT_CLOTHING}
+
+# CHECKS
+
+1. Costume recognisability — for each costumed character, name any garment that is not one the costume is known for, or that is named with a word belonging to a different costume. A garment that only hints at the theme fails this check.
+2. Drawability — name any garment whose written form invites the wrong shape: headwear described by how it is knotted or fastened rather than by what it is, a garment described only by its trim or fastening, or any wording an illustrator could read as a different garment.
+3. Colour distinction — name any two characters whose largest garment shares a dominant colour. Name any colour word outside: red, blue, green, yellow, orange, purple, brown, black, white, grey.
+4. Slot conflicts — name any character wearing two garments in one slot that exclude each other, or any slot written out as empty rather than omitted.
+5. Face — name any garment that covers the face, the eyes, or shadows them with a brim.
+6. Completeness — name any character whose outfit is missing a top, a bottom or footwear.
+
+Fixing check 1 outranks fixing check 3: a character in the right costume sharing a colour with someone else is better than a distinct colour on a garment that does not read as the costume. Two characters of different age or sex may wear the same headwear.
+
+# OUTPUT FORMAT
+
+Both blocks, in this order, nothing before or after.
+
+---ANALYSIS---
+<your answers to checks 1-6>
+
+---CLOTHING---
+## <CharacterName> / <category>
+<corrected full outfit — every slot the character wears, each with colour and material, as one self-contained description>
+
+Include a character and category only if you rewrote it. Use the character's real name and the category exactly as it appears above. When nothing needs rewriting, still output the analysis, then:
+
+---CLOTHING---
+NONE
