@@ -8373,3 +8373,51 @@ move a free 3-minute stage ONTO the critical path — tidier structurally, ~10% 
 logically 6b (the text's reviewer) and it belongs where it runs.
 
 **Touched:** `server.js` (join guard only).
+
+## 2026-08-10 — The garment recolour ALWAYS gets its own separately-graded version
+
+**Context:** The mechanical garment recolour (DINO box → SAM mask → L*a*b* match toward the styled
+avatar) runs inside the repair round loop as a method (entry above, same date). Until now a page that
+got recolour + inpaint (or + char-fix) produced exactly ONE version carrying both changes: the
+recolour handed its bytes to the repair via `inputOverride`, and only the repair's output was stamped
+and scored. The recolour therefore had no independent existence — if the recolour was right and the
+inpaint was wrong (or regressed, or failed), the good colour correction went into the bin with it,
+and there was nothing in `pageVersions` for pick-best to fall back to.
+
+**Decision:** A **recolour phase** now sits between the per-page method decision and the repair
+execution. For every page whose method is not `iterate` (and not skip/no-op) and which has flagged
+garment work, `runGarmentRecolour` runs there; if it changed bytes, those bytes are (a) pushed onto
+`pageVersions` as their own version with source `garment-recolour-round-N`, (b) evaluated in the
+phase's **own** `evaluateImageBatch` call, consolidated, and stamped with `applyScore` exactly like a
+round repair, and (c) remembered in a `recolourBytes` map that feeds the repair through the existing
+`inputOverride` argument. The `'recolour'` branch is gone from the repair dispatch — a page whose
+method is `'recolour'` now returns the skip shape (`imageData: null, skipped: true`) because its
+version already exists. The method NAME is kept: it drives the log line, `counts.recolour`, and makes
+a colour-only page count as actionable work.
+
+**Rationale:**
+- *Why its own version:* recolour and inpaint are independent corrections of independent defects.
+  Fusing them into one version makes the weaker one veto the stronger. Graded alone, the recolour
+  competes in pick-best on its own merit and can ship even when the inpaint that followed it lost.
+- *Why `inputOverride` is KEPT rather than letting the repair read the pick-best winner:* garment
+  colour carries **no severity** by design, so the recolour version's score ties with the original;
+  which of the two wins pick-best is then decided by evaluator noise. The repair must see corrected
+  pixels deterministically, so the bytes are handed over directly. Version competition decides what
+  SHIPS; the override decides what the repair READS. Those are deliberately two different mechanisms.
+- *Why its own eval batch:* the round machinery is keyed by `pageNumber` end to end (`roundImageMap`,
+  eval lookups, `pageVersions.get(ev.pageNumber)`). Two entries for one page in the round's batch
+  would collide silently, so the recolour phase runs a separate `evaluateImageBatch`.
+- *COMPETE, DO NOT APPOINT:* the recolour version is never forced to be best. A recolour that made
+  the page worse scores worse and loses.
+- *The `failed(...)` guarantee survives, narrowed:* a failed repair can no longer discard a good
+  recolour because the recolour is already a graded version. The one remaining hole is a page whose
+  recolour EVAL failed (bytes exist, no version) — there `failed()` still returns the recoloured
+  bytes as the round result so the round eval grades them. When a version already exists, returning
+  them again would only duplicate identical bytes and burn a second eval call.
+- `iterate` behaviour is unchanged: still never recoloured, because its pixels are about to be
+  replaced.
+
+**Touched:** `server/lib/repairPipeline.js` (recolour phase in the round loop; dispatch simplified),
+`tests/manual/garmentHueNormalize.test.js` (TEST 5 rewritten for the new shape).
+
+**Status:** ✅ active

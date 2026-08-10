@@ -1374,10 +1374,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // fixing it mechanically can remove the need for that Grok call entirely.
   //
   // It is a repair METHOD, not a side effect: a page whose only fault is colour
-  // gets method 'recolour', its output becomes a version, and that version is
-  // scored by the same round eval as every other repair. COMPETE, DO NOT
-  // APPOINT — a recolour that made the page worse loses pick-best on its own
-  // score. That is also what keeps it checked; nothing recoloured ships unseen.
+  // gets method 'recolour'. Its output ALWAYS becomes its own separately-graded
+  // version (the recolour phase in the round loop below, with its own
+  // evaluateImageBatch), even when an inpaint or char-fix follows on the same
+  // page — otherwise one combined version means a failed inpaint drags the good
+  // recolour down with it. COMPETE, DO NOT APPOINT — a recolour that made the
+  // page worse loses pick-best on its own score. That is also what keeps it
+  // checked; nothing recoloured ships unseen.
   const collectGarmentWork = (report) => {
     const { garmentQueryFor } = require('./garmentColourFix');
     const byPage = new Map();
@@ -1689,6 +1692,116 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       break;
     }
 
+    // ── RECOLOUR PHASE (owner, 2026-08-10) ─────────────────────────────────
+    // The mechanical garment recolour runs BEFORE the repairs and produces its
+    // OWN separately-graded version. Why its own version rather than folding
+    // the corrected pixels into whatever the repair returns: when a page gets
+    // recolour + inpaint, one combined version means a failed or regressing
+    // inpaint takes the good recolour down with it. Graded on its own, the
+    // recolour competes in pick-best by itself and can ship alone.
+    //
+    // It still ALSO feeds the repair through inputOverride. Pick-best cannot be
+    // the transport: garment colour carries no severity, so the recolour
+    // version's score ties with the original and eval noise decides which one
+    // the repair would read. The override guarantees corrected pixels.
+    //
+    // One result per page per batch: the round machinery is keyed by
+    // pageNumber throughout (roundImageMap, eval lookups, pageVersions.get),
+    // so this phase runs its own evaluateImageBatch rather than pushing a
+    // second entry for the same page into the round's batch.
+    //
+    // iterate is never recoloured — the pixels are about to be replaced.
+    const recolourBytes = new Map();      // pageNumber -> corrected bytes (inputOverride)
+    const recolourVersioned = new Set();  // pages that got a graded version here
+    const recolourTargets = pageStrategies.filter(pStrat =>
+      !pStrat.skipped
+      && pStrat.method
+      && pStrat.method !== 'skip'
+      && pStrat.method !== 'iterate'
+      && garmentWork.has(pStrat.img.pageNumber));
+
+    if (recolourTargets.length > 0) {
+      const recolourHeartbeat = setInterval(() => { pingHeartbeat().catch(() => {}); }, 30000);
+      try {
+        const recolourLimit = pLimit(8);
+        const recolourResults = (await Promise.all(recolourTargets.map(({ img }) => recolourLimit(async () => {
+          const pageNumber = img.pageNumber;
+          try {
+            const res = await runGarmentRecolour(img, [...garmentWork.get(pageNumber).values()], round);
+            if (!res?.imageData) return null;
+            return { pageNumber, imageData: res.imageData, bboxDetection: res.detection || null };
+          } catch (err) {
+            log.error(`❌ [GARMENT-COLOUR] Round ${round} p${pageNumber}: recolour failed — ${err.message}`);
+            return null;
+          }
+        })))).filter(Boolean);
+
+        for (const rc of recolourResults) recolourBytes.set(rc.pageNumber, rc.imageData);
+
+        if (recolourResults.length > 0) {
+          log.info(`🎨 [GARMENT-COLOUR] Round ${round}: ${recolourResults.length} page(s) recoloured — evaluating as their own version(s)`);
+          let recolourEvals = [];
+          try {
+            recolourEvals = await images().evaluateImageBatch(
+              buildEvalInputs(recolourResults),
+              { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle }
+            );
+          } catch (err) {
+            // No score → no version. The bytes still go to the repair via
+            // inputOverride, and the failed() path below keeps them as a
+            // round result so they are not lost.
+            log.warn(`⚠️ [GARMENT-COLOUR] Round ${round}: recolour eval failed (${err.message}) — no recolour version this round`);
+            recolourEvals = [];
+          }
+
+          const recolourMap = new Map(recolourResults.map(rc => [rc.pageNumber, rc]));
+          const recolourConsolidated = new Map();
+          await Promise.all(recolourEvals.map(ev => consolidateLimit(async () => {
+            const entityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
+            // No scene rewrite here — the recolour repaints pixels inside an
+            // existing figure, so the page's own contract still applies.
+            const plan = await consolidatePageEval(ev, entityResult.issues, ev.pageNumber, round, null);
+            if (plan) recolourConsolidated.set(ev.pageNumber, plan);
+          })));
+
+          for (const ev of recolourEvals) {
+            if (ev.usage && usageTracker) {
+              usageTracker('gemini_quality', ev.usage, `unified_pipeline_recolour_r${round}`, ev.modelId);
+            }
+            const versions = pageVersions.get(ev.pageNumber);
+            const rc = recolourMap.get(ev.pageNumber);
+            if (!versions || !rc) continue;
+            const evEntityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
+            const { applyScore } = require('./scoring');
+            const recolourVersion = {
+              imageData: rc.imageData,
+              score: ev.score ?? ev.qualityScore ?? null,
+              source: `garment-recolour-round-${round}`,
+              method: 'recolour',
+              evaluation: ev,
+              modelId: ev.modelId || null,
+              prompt: null,
+              bboxDetection: rc.bboxDetection || null,
+              entityIssues: evEntityResult.issues,
+              evaluatedAt: new Date().toISOString(),
+              pageNumber: ev.pageNumber,
+            };
+            // COMPETE, DO NOT APPOINT — the same applyScore stamp every other
+            // version gets, from this version's own evaluation.
+            applyScore(recolourVersion, {
+              evalResult: ev,
+              entityResult: evEntityResult,
+              consolidatedPlan: recolourConsolidated.get(ev.pageNumber) || null,
+            });
+            versions.push(recolourVersion);
+            recolourVersioned.add(ev.pageNumber);
+          }
+        }
+      } finally {
+        clearInterval(recolourHeartbeat);
+      }
+    }
+
     const roundStart = Date.now();
     const repairLimit = pLimit(50);
 
@@ -1714,32 +1827,28 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           return { pageNumber, imageData: null, skipped: true };
         }
         try {
-          // RECOLOUR FIRST for everything except iterate — iterate replaces the
-          // pixels, so correcting them beforehand is wasted work.
-          let recoloured = null;
-          if (method !== 'iterate' && garmentWork.has(pageNumber)) {
-            recoloured = await runGarmentRecolour(img, [...garmentWork.get(pageNumber).values()], round);
-          }
-          // A repair that fails must not also throw away a successful recolour.
-          const failed = (error) => (recoloured?.imageData
-            ? { pageNumber, imageData: recoloured.imageData, method: 'recolour',
-                source: `garment-recolour-round-${round}`,
-                bboxDetection: recoloured.detection || null, repairError: error }
+          // The recolour already ran in the recolour phase above and became its
+          // own scored version. Its bytes are handed to the repair here so the
+          // repair works on corrected pixels — never via pick-best, which
+          // garment colour (no severity) cannot reliably win.
+          const recolourInput = recolourBytes.get(pageNumber) || null;
+
+          // A repair that fails must not throw away a successful recolour. It
+          // normally cannot: the recolour is already a graded version. The one
+          // hole is a page whose recolour eval failed (no version) — there the
+          // corrected bytes are returned as the round result so the round eval
+          // grades them instead.
+          const failed = (error) => ((recolourInput && !recolourVersioned.has(pageNumber))
+            ? { pageNumber, imageData: recolourInput, method: 'recolour',
+                source: `garment-recolour-round-${round}`, repairError: error }
             : { pageNumber, imageData: null, method, error });
 
+          // 'recolour' as a METHOD means the recolour IS the repair for this
+          // page. Phase (c) already produced and graded that version, so the
+          // round dispatch has nothing left to do — one result per page.
           if (method === 'recolour') {
-            if (!recoloured?.imageData) {
-              return { pageNumber, imageData: null, method, skipped: true, error: 'recolour changed nothing' };
-            }
-            return {
-              pageNumber,
-              imageData: recoloured.imageData,
-              method: 'recolour',
-              source: `garment-recolour-round-${round}`,
-              bboxDetection: recoloured.detection || null,
-            };
+            return { pageNumber, imageData: null, skipped: true };
           }
-          const recolourInput = recoloured?.imageData || null;
 
           if (method === 'inpaint') {
             const inpaintResult = await executeInpaintAction(img, latestEval, round, recolourInput);

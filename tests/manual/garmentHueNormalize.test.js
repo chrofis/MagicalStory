@@ -117,9 +117,17 @@ function rect(buf, x0, y0, x1, y1, rgb) {
   //                        mechanically can remove that Grok call entirely;
   //   nothing else wrong → the recolour IS the repair, method 'recolour'.
   //
-  // Its output becomes a version scored by the same round eval as every other
-  // repair, so a recolour that made the page worse loses pick-best. That is what
-  // keeps it checked — nothing recoloured ships unseen.
+  // It ALWAYS produces its OWN separately-graded version (the recolour phase,
+  // with its own evaluateImageBatch), even when an inpaint or char-fix follows
+  // on the same page: one combined version would mean a failed inpaint drags the
+  // good recolour down with it, and the recolour could never ship alone. The
+  // repair still receives the corrected bytes through inputOverride, NOT through
+  // pick-best — garment colour carries no severity, so the recolour version ties
+  // with the original and eval noise would decide what the repair reads.
+  //
+  // The version is scored by applyScore from its own evaluation, so a recolour
+  // that made the page worse loses pick-best. That is what keeps it checked —
+  // nothing recoloured ships unseen.
   //
   // Source-level guards, CRLF-normalised: core.autocrlf=true checks this repo
   // out with CR-LF, so LF-only needles would never match.
@@ -142,8 +150,38 @@ function rect(buf, x0, y0, x1, y1, rgb) {
   check('recolour counts as actionable work',
     /counts\.recolour \|\| 0\)/.test(src));
 
+  // The recolour phase — its own pass over pageStrategies, before the repairs.
+  check('there is a recolour phase keyed off the decided methods',
+    /const recolourTargets = pageStrategies\.filter/.test(src));
   check('NEVER recoloured before an iterate',
-    /method !== 'iterate' && garmentWork\.has\(pageNumber\)/.test(src));
+    /pStrat\.method !== 'iterate'\s*\n\s*&& garmentWork\.has\(pStrat\.img\.pageNumber\)/.test(src));
+  check('skipped and no-op pages are not recoloured either',
+    /!pStrat\.skipped/.test(src) && /pStrat\.method !== 'skip'/.test(src));
+
+  // ONE result per page per batch: the round machinery is keyed by pageNumber
+  // (roundImageMap, eval lookups, pageVersions.get(ev.pageNumber)), so the
+  // recolour cannot share the round's eval call.
+  const phaseFrom = src.indexOf('const recolourBytes = new Map()');
+  const phaseTo = src.indexOf('const roundStart = Date.now();', phaseFrom);
+  check('the recolour phase exists before the repairs', phaseFrom > 0 && phaseTo > phaseFrom);
+  const phase = src.slice(phaseFrom, phaseTo);
+  check('it evaluates in its OWN batch, not the round batch',
+    /await images\(\)\.evaluateImageBatch\(\s*\n?\s*buildEvalInputs\(recolourResults\)/.test(phase));
+  check('it pushes its own version with the garment-recolour source',
+    /source: `garment-recolour-round-\$\{round\}`/.test(phase)
+    && /versions\.push\(recolourVersion\)/.test(phase));
+  check('and that version is SCORED, never appointed',
+    /applyScore\(recolourVersion, \{/.test(phase)
+    && /evalResult: ev/.test(phase)
+    && /entityResult: evEntityResult/.test(phase)
+    && /consolidatedPlan: recolourConsolidated\.get\(ev\.pageNumber\)/.test(phase));
+  check('the corrected bytes are remembered for the repair',
+    /recolourBytes\.set\(rc\.pageNumber, rc\.imageData\)/.test(phase));
+
+  // inputOverride is KEPT: the repair must not depend on the recolour version
+  // winning pick-best (garment colour carries no severity → the scores tie).
+  check('the repair reads the recoloured bytes via the override map',
+    /const recolourInput = recolourBytes\.get\(pageNumber\) \|\| null;/.test(src));
   check('inpaint receives the recoloured bytes',
     /executeInpaintAction\(img, latestEval, round, recolourInput\)/.test(src));
   check('char-fix receives the recoloured bytes',
@@ -152,8 +190,14 @@ function rect(buf, x0, y0, x1, y1, rgb) {
     /executeInpaintAction = async \(img, latestEval, roundNum = null, inputOverride = null\)/.test(src)
     && /executeCharFixAction = async \(img, decision, roundNum, inputOverride = null\)/.test(src));
 
+  // The dispatch no longer produces a recolour image — phase (c) owns that.
+  check('the dispatch has no recolour branch returning imageData',
+    /if \(method === 'recolour'\) \{\s*\n\s*return \{ pageNumber, imageData: null, skipped: true \};/.test(src));
+  check('and never calls runGarmentRecolour itself',
+    src.split('runGarmentRecolour').length - 1 === 2);  // the definition + the phase
+
   check('a failed repair does not discard a good recolour',
-    /const failed = \(error\) => \(recoloured\?\.imageData/.test(src));
+    /const failed = \(error\) => \(\(recolourInput && !recolourVersioned\.has\(pageNumber\)\)/.test(src));
   check('the recolour reads the scored best, not merely the newest',
     /selectBestVersion\(pageVersions\.get\(pageNumber\) \|\| \[\]\)/.test(src));
   check('an already-handled mismatch is not recoloured twice',
