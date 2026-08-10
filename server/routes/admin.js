@@ -508,3 +508,83 @@ router.post('/reset-rate-limits', authenticateToken, requireAdmin, async (req, r
 router.use('/', adminSubroutes);
 
 module.exports = { adminRoutes: router, initAdminRoutes };
+
+// ── Admin drafts ────────────────────────────────────────────────────────────
+// A story generated while impersonating belongs to the target user but stays
+// invisible to them (list, detail and share link all filter it out) until an
+// admin publishes it here. That is what makes one persistent account per family
+// workable: generate, look, regenerate, publish only the good one.
+
+// List every unpublished draft, newest first, across all users.
+router.get('/drafts', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await getPool().query(
+      `SELECT s.id, s.user_id, s.created_at, s.metadata, u.email, u.username
+         FROM stories s LEFT JOIN users u ON u.id = s.user_id
+        WHERE s.admin_draft = true
+        ORDER BY s.created_at DESC LIMIT 100`
+    );
+    res.json({
+      drafts: rows.map(r => {
+        const meta = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.metadata || {});
+        return {
+          id: r.id,
+          title: meta.title || null,
+          createdAt: r.created_at,
+          user: { id: r.user_id, email: r.email, username: r.username },
+        };
+      }),
+    });
+  } catch (err) {
+    log.error('❌ [ADMIN] Failed to list drafts:', err.message);
+    res.status(500).json({ error: 'Failed to list drafts' });
+  }
+});
+
+// Publish one draft — the story becomes visible to its owner from this moment.
+router.post('/stories/:storyId/publish', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { storyId } = req.params;
+    const { rows } = await getPool().query(
+      `UPDATE stories SET admin_draft = false
+        WHERE id = $1 AND admin_draft = true
+        RETURNING id, user_id`,
+      [storyId]
+    );
+    if (rows.length === 0) {
+      // Either it does not exist or it was already published. Say which, so a
+      // double-click reads as a no-op instead of a failure.
+      const exists = await getPool().query('SELECT admin_draft FROM stories WHERE id = $1', [storyId]);
+      if (exists.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+      return res.json({ success: true, alreadyPublished: true, storyId });
+    }
+    log.info(`📖 [ADMIN] ${req.user.username} published draft ${storyId} to user ${rows[0].user_id}`);
+    await logActivity(req.user.id, req.user.username, 'ADMIN_PUBLISH_DRAFT', {
+      storyId, targetUserId: rows[0].user_id,
+    }, req.user);
+    res.json({ success: true, storyId, userId: rows[0].user_id });
+  } catch (err) {
+    log.error('❌ [ADMIN] Failed to publish draft:', err.message);
+    res.status(500).json({ error: 'Failed to publish draft' });
+  }
+});
+
+// Unpublish — pull a story back out of the owner's library.
+router.post('/stories/:storyId/unpublish', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { storyId } = req.params;
+    const { rows } = await getPool().query(
+      `UPDATE stories SET admin_draft = true WHERE id = $1 RETURNING id, user_id`,
+      [storyId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Story not found' });
+    log.info(`📕 [ADMIN] ${req.user.username} unpublished story ${storyId} (user ${rows[0].user_id})`);
+    await logActivity(req.user.id, req.user.username, 'ADMIN_UNPUBLISH_STORY', {
+      storyId, targetUserId: rows[0].user_id,
+    }, req.user);
+    res.json({ success: true, storyId, userId: rows[0].user_id });
+  } catch (err) {
+    log.error('❌ [ADMIN] Failed to unpublish story:', err.message);
+    res.status(500).json({ error: 'Failed to unpublish story' });
+  }
+});

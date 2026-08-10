@@ -8084,3 +8084,60 @@ does not mention is `unverified_absence`.
 **NOT verified** — needs the next run. The 2026-08-09 version also looked correct when shipped.
 
 **Touched:** `prompts/image-prompt-compliance.txt`.
+
+### Character ownership is enforced at story creation (2026-08-10)
+
+**Context:**   `POST /api/jobs/create-story` spread `req.body` into the job
+verbatim; the validation schema's only opinion on characters was
+`{ type: 'array', maxItems: 10 }`. The wizard sends whole character objects from
+client state, `StoryWizard.tsx` persists that state in localStorage, and nothing
+clears it on logout — so a browser that used one account still had its
+characters selected after switching to another. That produced
+`job_1786309527338_4zwhrn08y`: submitted under the smoke account carrying
+`demo-b-hq3sv`'s five character ids.
+
+**Decision:** Every requested character id must exist on the caller's characters
+row, or the request is rejected 403 before credits are reserved. Impersonation
+passes naturally — the impersonation token's `id` IS the target user.
+
+**Rationale:** Not only a wrong-faces bug. Those payloads carry
+`faceThumbnailsUrl` / `bodyThumbnails`, and `characterPhotos.js` reads both as
+fallbacks feeding the avatar guarantee chain, so an unchecked payload is a
+cross-account image leak — another user's child as an identity reference. The
+processing-time hard fail (above) closes it too, because resolved ids replace the
+client payload wholesale, but 403 refuses at the door and costs the user nothing.
+
+**Touched:**   `server/routes/jobs.js`
+**Status:**    ✅ active
+
+### Admin drafts — stories generated FOR a user, invisible until published (2026-08-10)
+
+**Context:**   Validating a change meant a fresh dummy account per attempt;
+staging had dozens. Owner wants one persistent account per family (all Miller
+stories together), the ability to regenerate 2-3 times, and to show the user
+nothing until a run is good.
+
+**Decision:** A story created while an admin is impersonating its owner is an
+admin draft. It belongs to the target user — same account, same characters, same
+library — but is filtered out of their story list, their direct story fetch, and
+the public share resolver until `POST /api/admin/stories/:id/publish` clears the
+flag. `GET /api/admin/drafts` lists them; `/unpublish` reverses it. Drafts are
+free: no credits are checked or reserved, and `credits_reserved` is 0, so
+attempts never touch the customer's balance.
+
+**Rationale:** Impersonation already mints a token whose `id` is the target, so
+jobs, stories and characters land on the right account with no new plumbing —
+only visibility was missing. Hiding from the list alone is not enough:
+`upsertStory` mints a `share_token` on INSERT, so an unpublished draft already
+has a working public link; the share resolver filters `admin_draft` for that
+reason, and `is_shared` cannot override it. The flag is set on INSERT only, so
+re-saving a published story cannot silently unpublish it.
+
+Every story made while impersonating is a draft, rather than an opt-in checkbox
+(owner call): forgetting the tick once puts a bad first attempt in a real
+customer's library, and the default must fail toward invisible.
+
+**Touched:**   `migrations/015_admin_draft_stories.sql`, `server/routes/jobs.js`,
+`server/routes/admin.js`, `server/routes/stories.js`, `server/routes/sharing.js`,
+`server/services/database.js` (`upsertStory`), `server.js` (both save paths)
+**Status:**    ✅ active

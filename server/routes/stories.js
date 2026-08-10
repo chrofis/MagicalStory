@@ -124,17 +124,24 @@ router.get('/', authenticateToken, async (req, res) => {
 
     if (isDatabaseMode()) {
       // Get total count
-      const countResult = await dbQuery('SELECT COUNT(*) as count FROM stories WHERE user_id = $1', [req.user.id]);
+      // Admin drafts belong to this user but are invisible to them until
+      // published. An impersonating admin DOES see them — that is the whole
+      // point: generate, look, regenerate, publish only the good one.
+      const showDrafts = req.user.impersonating === true || req.user.role === 'admin';
+      const draftFilter = showDrafts ? '' : ' AND NOT s.admin_draft';
+      const countResult = await dbQuery(
+        `SELECT COUNT(*) as count FROM stories s WHERE s.user_id = $1${draftFilter}`,
+        [req.user.id]);
       totalCount = parseInt(countResult[0]?.count || 0);
 
       // Get paginated data using metadata column (fast - no image data loaded)
       // Falls back to full data parsing if metadata is null (for stories created before migration)
       // Also check story_images for frontCover (metadata.hasThumbnail can be stale)
       const rows = await dbQuery(
-        `SELECT s.metadata, s.share_token, CASE WHEN s.metadata IS NULL THEN s.data ELSE NULL END as data,
+        `SELECT s.metadata, s.share_token, s.admin_draft, CASE WHEN s.metadata IS NULL THEN s.data ELSE NULL END as data,
          EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'frontCover' AND NOT si.is_test) as has_cover_image,
          EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'scene' AND NOT si.is_test) as has_any_image
-         FROM stories s WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
+         FROM stories s WHERE s.user_id = $1${draftFilter} ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
         [req.user.id, limit, offset]
       );
 
@@ -3106,7 +3113,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
           }
         }
       } else {
-        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+        // A non-admin owner cannot open their own unpublished draft — hiding it
+        // from the list is not enough when the id is guessable from a link.
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2 AND NOT admin_draft', [id, req.user.id]);
       }
 
       if (rows.length > 0) {

@@ -2138,7 +2138,7 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
  * Insert or update story data with metadata.
  * OPTIMIZED: Extracts images to story_images table for faster queries.
  */
-async function upsertStory(storyId, userId, storyData) {
+async function upsertStory(storyId, userId, storyData, options = {}) {
   if (!isDatabaseMode()) {
     throw new Error('Database mode required');
   }
@@ -2151,13 +2151,17 @@ async function upsertStory(storyId, userId, storyData) {
   const crypto = require('crypto');
   const shareToken = crypto.randomBytes(32).toString('hex');
 
+  // adminDraft: generated while an admin impersonated the owner, so it stays
+  // out of their library until published. Only ever set on INSERT — publishing
+  // must not be undone by a later save of the same story.
+  const adminDraft = options.adminDraft === true;
   await dbQuery(
-    `INSERT INTO stories (id, user_id, data, metadata, share_token)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO stories (id, user_id, data, metadata, share_token, admin_draft)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (id) DO UPDATE SET
        user_id = EXCLUDED.user_id,
        share_token = COALESCE(stories.share_token, EXCLUDED.share_token)`,
-    [storyId, userId, JSON.stringify({}), JSON.stringify(metadata), shareToken]
+    [storyId, userId, JSON.stringify({}), JSON.stringify(metadata), shareToken, adminDraft]
   );
 
   // Image extraction + blob write + active-version recompute: single shared

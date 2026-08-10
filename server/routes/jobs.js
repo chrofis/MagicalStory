@@ -119,6 +119,45 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
     // Remove idempotencyKey from input_data as it's stored separately
     delete inputData.idempotencyKey;
 
+    // A story generated while impersonating is an ADMIN DRAFT: it belongs to the
+    // target user (the token's id IS theirs, so it lands in their library with
+    // their characters) but stays invisible to them until an admin publishes it.
+    // That is what lets one persistent account per family be reused — generate,
+    // look, regenerate, publish only the good one — instead of a fresh dummy
+    // account per attempt. Set AFTER the req.body spread so a client cannot
+    // choose its own value.
+    const isAdminDraft = req.user.impersonating === true;
+    inputData.adminDraft = isAdminDraft;
+
+    // Characters must belong to the caller. The wizard sends whole character
+    // objects from client state, and that state survives an account switch, so
+    // `job_1786309527338_4zwhrn08y` was submitted under the smoke account
+    // carrying another account's character ids — the story generated with five
+    // strangers in it. Worse, those payloads carry thumbnail URLs that
+    // characterPhotos.js will happily fetch as identity references, so an
+    // unchecked payload is a cross-account image leak, not just a wrong book.
+    // Refuse here, in the wizard, before credits are reserved and 30 minutes
+    // are spent. Impersonation passes this naturally: req.user.id is the target.
+    const requestedCharacterIds = (req.body.characters || []).map(c => c?.id).filter(v => v !== undefined && v !== null);
+    if (requestedCharacterIds.length > 0 && STORAGE_MODE === 'database') {
+      const ownRow = await getDbPool().query('SELECT data FROM characters WHERE id = $1', [`characters_${userId}`]);
+      const ownData = ownRow.rows[0]?.data;
+      const parsed = typeof ownData === 'string' ? JSON.parse(ownData) : ownData;
+      const ownChars = Array.isArray(parsed) ? parsed : (parsed?.characters || []);
+      // String comparison: a JSON round-trip can turn a numeric id into a
+      // string, and that is type drift, not someone else's character.
+      const ownIds = new Set(ownChars.map(c => String(c.id)));
+      const foreign = requestedCharacterIds.filter(id => !ownIds.has(String(id)));
+      if (foreign.length > 0) {
+        log.warn(`🚫 [CREATE-STORY] ${req.user.username} requested character(s) ${foreign.join(', ')} that are not on their account${isAdminDraft ? ' (impersonating)' : ''}`);
+        return res.status(403).json({
+          error: 'Characters not found on this account',
+          missingCharacterIds: foreign,
+          message: 'Some selected characters do not belong to this account. Reload the page and pick the characters again.'
+        });
+      }
+    }
+
     log.debug(`📝 Creating story job ${jobId} for user ${req.user.username}${idempotencyKey ? ` (idempotency: ${idempotencyKey})` : ''}`);
     log.debug(`📝 [JOB INPUT] pages: ${req.body.pages} → ${inputData.pages}${req.body.pages !== inputData.pages ? ' (clamped!)' : ''}, level: ${inputData.languageLevel}`);
     log.debug(`📝 [JOB INPUT] language: ${req.body.language} → ${inputData.language}`);
@@ -322,8 +361,10 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
         userCredits = req.user.role === 'admin' ? -1 : 1000;
       }
 
-      // Skip credit check if user has unlimited credits (-1) OR is admin
-      if (userCredits !== -1 && req.user.role !== 'admin') {
+      // Skip credit check for unlimited credits (-1), admins, and admin drafts.
+      // A draft is generated FOR the user, not BY them — charging their balance
+      // for attempts they never asked for is exactly what we do not want.
+      if (userCredits !== -1 && req.user.role !== 'admin' && !isAdminDraft) {
         if (userCredits < creditsNeeded) {
           return res.status(402).json({
             error: 'Insufficient credits',
@@ -343,7 +384,7 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
       let insufficientRace = false;
       try {
         await withTransaction(async (txClient) => {
-          if (userCredits !== -1 && req.user.role !== 'admin') {
+          if (userCredits !== -1 && req.user.role !== 'admin' && !isAdminDraft) {
             // The UPDATE only succeeds if credits >= creditsNeeded (no overdraw)
             const updateResult = await txClient.query(
               'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
@@ -365,7 +406,7 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
           await txClient.query(
             `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved, idempotency_key)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', (userCredits === -1 || req.user.role === 'admin') ? 0 : creditsNeeded, idempotencyKey]
+            [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', (userCredits === -1 || req.user.role === 'admin' || isAdminDraft) ? 0 : creditsNeeded, idempotencyKey]
           );
         });
       } catch (txErr) {

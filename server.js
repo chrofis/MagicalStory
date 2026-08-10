@@ -2627,7 +2627,7 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
     };
 
-    await upsertStory(jobId, userId, storyData);
+    await upsertStory(jobId, userId, storyData, { adminDraft: inputData?.adminDraft === true });
     log.info(`📚 [PARTIAL SAVE] Saved partial story ${jobId} with ${sceneImages.length} images, ${sceneDescriptions.length} scene descriptions`);
   } catch (err) {
     log.error(`❌ [PARTIAL SAVE] Failed to save partial story ${jobId}: ${err.message}`);
@@ -7392,7 +7392,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     log.debug(`💾 [UNIFIED] Saving story to database... (generationLog has ${storyData.generationLog?.length || 0} entries)`);
-    await upsertStory(storyId, userId, storyData);
+    await upsertStory(storyId, userId, storyData, { adminDraft: inputData?.adminDraft === true });
     log.debug(`📚 [UNIFIED] Story ${storyId} saved to stories table`);
 
     // Post-persistence cover typography — the RELIABLE title/dedication baker.

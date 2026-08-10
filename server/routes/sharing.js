@@ -135,8 +135,11 @@ async function getSharedStory(shareToken, userId = null, signedLinkOk = false) {
     return null;
   }
   // signedLinkOk effectively grants the same read access is_shared=true would.
+  // NOT admin_draft: a story generated while impersonating gets a share_token
+  // at insert like any other, so an unpublished draft already has a working
+  // link. It must not resolve for anyone until it is published.
   const rows = await dbQuery(
-    'SELECT id, user_id, is_shared, data FROM stories WHERE share_token = $1 AND ($3 = true OR is_shared = true OR user_id = $2)',
+    'SELECT id, user_id, is_shared, data FROM stories WHERE share_token = $1 AND NOT admin_draft AND ($3 = true OR is_shared = true OR user_id = $2)',
     [shareToken, userId, signedLinkOk]
   );
   if (rows.length === 0) {
@@ -155,7 +158,7 @@ async function getSharedStoryId(shareToken, userId = null, signedLinkOk = false)
     return null;
   }
   const rows = await dbQuery(
-    'SELECT id FROM stories WHERE share_token = $1 AND ($3 = true OR is_shared = true OR user_id = $2)',
+    'SELECT id FROM stories WHERE share_token = $1 AND NOT admin_draft AND ($3 = true OR is_shared = true OR user_id = $2)',
     [shareToken, userId, signedLinkOk]
   );
   return rows.length > 0 ? rows[0].id : null;
