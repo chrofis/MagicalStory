@@ -5060,8 +5060,16 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     // so callers that forget to pass one still get the configured page aspect.
     // Callers can override: avatars pass '9:16', covers pass MODEL_DEFAULTS.coverAspect.
     // Flows through to Grok and Gemini image configs.
-    aspectRatio = CONFIG_DEFAULTS.pageAspect
+    aspectRatio = CONFIG_DEFAULTS.pageAspect,
+    // Test Lab prompt-capture label (promptCapture.js). When set, the prompt is
+    // recorded at this shared chokepoint so every provider route is covered by
+    // one line (e.g. 'image_cover', 'image_scene'). No-op outside an experiment.
+    captureLabel = null
   } = options;
+
+  if (captureLabel) {
+    require('./promptCapture').recordPrompt(captureLabel, imageModelOverride, prompt, { kind: 'image' });
+  }
 
   // Check cache first (include previousImage presence and page number in cache key)
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber, sceneBackground ? 'bg' : null);

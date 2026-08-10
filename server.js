@@ -98,7 +98,6 @@ const {
   evaluateImageQuality,
   callGeminiAPIForImage,
   editImageWithPrompt,
-  generateImageWithQualityRetry,
   deleteFromImageCache,
   compressImageToJPEG,
   IMAGE_QUALITY_THRESHOLD,
@@ -3788,8 +3787,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           coverImageModel = MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
           coverImageBackend = IMAGE_MODELS[coverImageModel]?.backend || null;
         }
-        const coverModelOverrides = { imageModel: coverImageModel, qualityModel: modelOverrides.qualityModel };
-
         // Build style description using the routed backend (same as pages at buildImagePrompt time)
         const styleDescription = resolveArtStyle(artStyle, coverImageBackend) || resolveArtStyle('pixar');
 
@@ -3850,12 +3847,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           coverPrompt = sanitizeVbIdsInPrompt(coverPrompt, streamingVisualBible, coverPageNum);
         }
 
-        // Usage tracker for cover images
-        // generateImageWithQualityRetry now emits provider-style usage
-        // (image → cover_images, quality → cover_quality) directly via the
-        // tracker, so pass addUsage straight through.
-        const coverUsageTracker = addUsage;
-
         // Build cover references via the shared helper — same one iterate uses,
         // so v0 / iterate / legacy streaming all share one source of truth.
         const { buildCoverReferences } = require('./server/lib/coverIterate');
@@ -3890,22 +3881,36 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.info(`🌍 [COVER] ${coverLabel} has ${coverLandmarkPhotos.length} landmark(s): ${coverLandmarkPhotos.map(l => `${l.name}${l.variantNumber > 1 ? ` (v${l.variantNumber})` : ''}`).join(', ')}`);
         }
 
-        const coverResult = await generateImageWithQualityRetry(
-          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: charactersForCover, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground, visualBible, clothingRequirements: streamingClothingRequirements || null, artStyle: inputData.artStyle || null }
-        );
-        log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
-        // Track scene rewrite usage if a safety block triggered a rewrite
-        if (coverResult?.rewriteUsage) {
-          addUsage('anthropic', coverResult.rewriteUsage, 'scene_rewrite');
+        // One pipeline: covers generate exactly like pages — generation only,
+        // no gen-time eval/bbox/retry. Scoring + detection happen once for
+        // covers in the shared repair pipeline (Step 1 evaluateImageBatch +
+        // Phase 5b-pre detection), same as every story page.
+        const coverResult = await generateImageOnly(coverPrompt, coverPhotos, {
+          imageModelOverride: coverImageModel,
+          landmarkPhotos: coverLandmarkPhotos,
+          visualBibleGrid: coverVbGrid,
+          sceneBackground: coverSceneBackground,
+          pageNumber: COVER_PAGE_NUMBERS[coverKeyForRefs],
+          artStyle: inputData.artStyle || null,
+          // Explicit aspect — covers must never rely on evaluationType inference.
+          aspectRatio: MODEL_DEFAULTS.coverAspect,
+          captureLabel: 'image_cover'
+        });
+        // Usage: same provider-style bucket the gen-time tracker used (cover_images).
+        if (coverResult?.usage) {
+          const m = coverResult.modelId || '';
+          const provider = m.startsWith('runware:') ? 'runware' : m.startsWith('grok-imagine') ? 'grok' : 'gemini_image';
+          addUsage(provider, coverResult.usage, 'cover_images', coverResult.modelId);
         }
+        log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (model: ${coverResult.modelId})`);
 
-        // Save partial_cover checkpoint for progressive display
+        // Save partial_cover checkpoint for progressive display. Score-less by
+        // design: the score arrives with the pipeline eval, like pages.
         const coverKey = coverType === 'titlePage' ? 'frontCover' : coverType;
         const checkpointData = {
           type: coverKey,
           imageData: coverResult.imageData,
           description: sceneDescription,
-          qualityScore: coverResult.score,
           modelId: coverResult.modelId
         };
         // Include title for frontCover so UI can transition to story display
@@ -3920,12 +3925,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           type: coverType,
           imageData: coverResult.imageData,
           description: sceneDescription,
-          prompt: coverPrompt,
-          qualityScore: coverResult.score,
-          qualityReasoning: coverResult.reasoning,
-          wasRegenerated: coverResult.wasRegenerated,
-          totalAttempts: coverResult.totalAttempts,
-          retryHistory: coverResult.retryHistory,
+          // Exact sent text when the provider reports it (post-truncation /
+          // post-sanitize), falling back to the built prompt — same as pages.
+          prompt: coverResult.prompt || coverPrompt,
           referencePhotos: coverPhotos,
           landmarkPhotos: coverLandmarkPhotos,
           emptySceneImage: coverSceneBackground || null,
