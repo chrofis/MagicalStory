@@ -2257,17 +2257,33 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     if (!assembled) assembled = { characters: {}, grids: [], totalIssues: 0 };
 
     // Issue list from the era-matched stamps of the shipped versions.
-    let total = 0;
+    // Stamped entries are {name, severity, description, source} (see
+    // getEntityPenaltyAndIssues) and a cross-page issue is stamped once PER
+    // page — dedupe on (name, severity, description) and collect the pages,
+    // or the union over 14 pages multiplies one finding many times over
+    // (observed: 39-issue base assembled into 156 under 'UNKNOWN').
+    const dedup = new Map();
     for (const img of rawImages) {
       if (!img.imageData || img.pageNumber == null) continue;
       const best = finalBestPerPage.get(img.pageNumber);
       for (const iss of (best?.entityIssues || [])) {
-        const name = iss.affectedCharacter || iss.character || 'UNKNOWN';
-        if (!assembled.characters[name]) assembled.characters[name] = { byClothing: {}, issues: [] };
-        if (!Array.isArray(assembled.characters[name].issues)) assembled.characters[name].issues = [];
-        assembled.characters[name].issues.push(iss);
-        total++;
+        const name = iss.name || iss.affectedCharacter || iss.character || 'UNKNOWN';
+        const key = `${name}|${iss.severity}|${iss.description}`;
+        let entry = dedup.get(key);
+        if (!entry) {
+          entry = { name, issue: { ...iss, affectedCharacter: name, pageNumbers: [] } };
+          dedup.set(key, entry);
+        }
+        if (!entry.issue.pageNumbers.includes(img.pageNumber)) entry.issue.pageNumbers.push(img.pageNumber);
       }
+    }
+    let total = 0;
+    for (const { name, issue } of dedup.values()) {
+      issue.pageNumber = issue.pageNumbers[0];
+      if (!assembled.characters[name]) assembled.characters[name] = { byClothing: {}, issues: [] };
+      if (!Array.isArray(assembled.characters[name].issues)) assembled.characters[name].issues = [];
+      assembled.characters[name].issues.push(issue);
+      total++;
     }
     for (const c of Object.values(assembled.characters)) {
       c.totalIssues = (c.issues || []).length;
