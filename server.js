@@ -282,67 +282,7 @@ const storyIdeasRoutes = require('./server/routes/storyIdeas');
 const trialRoutes = require('./server/routes/trial');
 const { apiRouter: sharingApiRoutes, htmlRouter: sharingHtmlRoutes, initSharingRoutes } = require('./server/routes/sharing');
 const { initSwissStories, getSwissStoriesResponse } = require('./server/lib/swissStories');
-
-/**
- * Build scene image objects for cover images to include in consistency checks.
- * Covers are assigned page numbers beyond the story pages:
- * - frontCover: totalPages + 1
- * - initialPage: totalPages + 2
- * - backCover: totalPages + 3
- *
- * @param {Object} coverImages - Cover images object with frontCover, initialPage, backCover
- * @param {Array} characters - Array of character objects from the story
- * @param {number} totalStoryPages - Number of story pages (to calculate cover page numbers)
- * @returns {Array} Array of scene image objects for covers
- */
-function buildCoverSceneImages(coverImages, characters, totalStoryPages) {
-  const coverSceneImages = [];
-
-  const coverTypes = [
-    { key: 'frontCover', offset: 1, label: 'Front Cover' },
-    { key: 'initialPage', offset: 2, label: 'Initial Page' },
-    { key: 'backCover', offset: 3, label: 'Back Cover' }
-  ];
-
-  for (const { key, offset, label } of coverTypes) {
-    const cover = coverImages?.[key];
-    if (!cover) continue;
-
-    const imageData = cover.imageData;
-    if (!imageData) continue;
-
-    // Build retryHistory with bboxDetection if available (for entity consistency cropping)
-    const retryHistory = [];
-    if (cover.bboxDetection) {
-      retryHistory.push({
-        type: 'bbox_detection_only',
-        bboxDetection: cover.bboxDetection,
-        bboxOverlayImage: cover.bboxOverlayImage
-      });
-    }
-
-    // Extract character names from the cover's reference photos if available
-    const coverCharacters = cover.referencePhotos?.map(p => p.name).filter(Boolean) ||
-                           characters.map(c => c.name);
-
-    coverSceneImages.push({
-      pageNumber: totalStoryPages + offset,
-      imageData: imageData,
-      characters: coverCharacters,
-      clothing: 'standard',  // Covers use standard or costumed clothing
-      characterClothing: {},  // Could be parsed from cover description if needed
-      sceneSummary: `${label} - group scene with characters`,
-      referenceCharacters: coverCharacters,
-      referenceClothing: cover.referencePhotos?.reduce((acc, p) => {
-        if (p.name && p.clothingCategory) acc[p.name] = p.clothingCategory;
-        return acc;
-      }, {}) || {},
-      retryHistory
-    });
-  }
-
-  return coverSceneImages;
-}
+const { COVER_PAGE_NUMBERS } = require('./server/lib/coverKeys');
 
 /**
  * Run bbox detection on cover images to identify character positions.
@@ -6355,7 +6295,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.info(`✅ [UNIFIED] Phase 5a complete: ${successCount}/${rawImages.length} images generated in ${genDuration}s`);
 
       // Await covers before repair pipeline so covers go through the same quality checks
-      const COVER_PAGE_MAP = { frontCover: -1, initialPage: -2, backCover: -3 };
       if (coverAwaitPromise) {
         if (!timing.coversEnd) {
           log.debug(`⏳ [UNIFIED] Waiting for covers before repair pipeline...`);
@@ -6370,7 +6309,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
         // Add covers to rawImages with negative page numbers
         for (const [coverKey, coverData] of Object.entries(coverImages)) {
-          if (coverData?.imageData && COVER_PAGE_MAP[coverKey] != null) {
+          if (coverData?.imageData && COVER_PAGE_NUMBERS[coverKey] != null) {
             // Include text requirements so cover evaluator knows what text to check.
             // The TITLE comes from `title` (extracted by UnifiedStoryParser from
             // the unified Sonnet pass at line 3889), NOT from inputData. The
@@ -6414,7 +6353,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const coverSceneCharacters = (inputData.characters || [])
               .filter(c => coverCharacterNames.includes(c.name));
             rawImages.push({
-              pageNumber: COVER_PAGE_MAP[coverKey],
+              pageNumber: COVER_PAGE_NUMBERS[coverKey],
               text: '',
               sceneDescription: coverEvalPrompt,
               imageData: coverData.imageData,
@@ -6432,7 +6371,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               scene: { outlineExtract: coverData.description },
               evaluationType: 'cover', // Use cover evaluation (includes text checks)
             });
-            log.info(`📸 [UNIFIED] Added ${coverKey} (page ${COVER_PAGE_MAP[coverKey]}) to repair pipeline`);
+            log.info(`📸 [UNIFIED] Added ${coverKey} (page ${COVER_PAGE_NUMBERS[coverKey]}) to repair pipeline`);
           }
         }
         coverAwaitPromise = null; // Mark as consumed
@@ -7657,7 +7596,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const sceneVersions = (storyData?.sceneImages || []).flatMap(p => Array.isArray(p?.imageVersions) ? p.imageVersions : []);
       const coverVersions = ['frontCover', 'initialPage', 'backCover'].flatMap(k => {
         const c = storyData?.coverImages?.[k];
-        return Array.isArray(c?.versions) ? c.versions : [];
+        return Array.isArray(c?.imageVersions) ? c.imageVersions : [];
       });
       logScoreModelSummary(jobId, [...sceneVersions, ...coverVersions]);
     } catch (err) {

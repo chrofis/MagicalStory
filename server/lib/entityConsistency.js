@@ -19,7 +19,7 @@ const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersIn
 const { getFacePhoto, loadAvatarBytes } = require('./characterPhotos');
 const { detectAllBoundingBoxes, sanitizeForGemini } = require('./images');
 const { getCurrentLogger } = require('./generationLogger');
-const { COVER_HINT_KEY } = require('./coverKeys');
+const { COVER_HINT_KEY, COVER_PAGE_NUMBERS } = require('./coverKeys');
 const r2 = require('./r2');
 const geminiPad = require('./geminiPad');
 
@@ -711,7 +711,6 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
     // Include covers in entity checks (covers often show multiple characters)
     const coverEntries = [];
-    const COVER_PAGE_MAP = { frontCover: -1, initialPage: -2, backCover: -3 };
     if (storyData.coverImages) {
       for (const [coverType, cover] of Object.entries(storyData.coverImages)) {
         if (cover && (cover.imageData || cover.hasImage)) {
@@ -748,7 +747,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
               ? coverHint.characterClothing
               : null;
             coverEntries.push({
-              pageNumber: COVER_PAGE_MAP[coverType],
+              pageNumber: COVER_PAGE_NUMBERS[coverType],
               imageData,
               description: cover.description || cover.translatedDescription || '',
               text: '',

@@ -149,7 +149,7 @@ function resolveStyleRepairModelId(model) {
  *   targets: Array<{page,image,targetRefPage,targetRefImage,severity,differences}>,
  *   skipped: Array<{page,reason}> }}
  */
-const COVER_PAGE_BY_KEY = Object.freeze({ frontCover: -1, initialPage: -2, backCover: -3 });
+const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 
 function planStyleRepair(detection, storyData) {
   const det = detection || {};
@@ -160,7 +160,7 @@ function planStyleRepair(detection, storyData) {
     }
   }
   // Covers join the repairable set at their negative page numbers.
-  for (const [coverKey, coverPage] of Object.entries(COVER_PAGE_BY_KEY)) {
+  for (const [coverKey, coverPage] of Object.entries(COVER_PAGE_NUMBERS)) {
     const img = storyData?.coverImages?.[coverKey]?.imageData;
     if (img) pagesByNum.set(coverPage, img);
   }
@@ -305,5 +305,4 @@ module.exports = {
   STYLE_REPAIR_MODEL_IDS,
   buildStyleRepairPrompt,
   geminiStyleRepaint,
-  COVER_PAGE_BY_KEY,
 };

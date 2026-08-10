@@ -2317,7 +2317,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   let styleConsistency = null;
   try {
     const { checkStoryStyleConsistency } = require('./styleConsistency');
-    const { COVER_PAGE_BY_KEY } = require('./styleRepair');
+    const { COVER_PAGE_NUMBERS } = require('./coverKeys');
     // Build a minimal storyData-shaped object from finalBestPerPage so we
     // never accidentally feed pre-repair pixels to the audit.
     const stylePages = [...finalBestPerPage.entries()]
@@ -2329,7 +2329,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // (covers run through the repair rounds as pages -1/-2/-3); fall back to
     // the input storyData covers for any cover not in this pipeline run.
     const styleCovers = {};
-    for (const [coverKey, coverPage] of Object.entries(COVER_PAGE_BY_KEY)) {
+    for (const [coverKey, coverPage] of Object.entries(COVER_PAGE_NUMBERS)) {
       const pipelineBest = finalBestPerPage.get(coverPage);
       const imageData = pipelineBest?.imageData
         || storyData?.coverImages?.[coverKey]?.imageData
