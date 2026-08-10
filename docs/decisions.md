@@ -8325,3 +8325,51 @@ alternative is a tail recolour that nothing evaluates, which is the rejected des
 **Touched:** `server/lib/repairPipeline.js`, `tests/manual/garmentHueNormalize.test.js`.
 
 **Status:** ✅ active
+
+## 2026-08-10 — The text-refinement join is BOUNDED; and the flow refactor was rejected on measurement
+
+**Owner:** *"you will guard it, if text returns late, the rest of pipeline waits till it arrives."*
+Correct — it did.
+
+**The gap.** The 2026-08-05 entry guarantees refinement never blocks a story *on failure*
+(`startBackgroundRefine` resolves `null`, the original text stays). It said nothing about being
+SLOW, and the join was open-ended:
+
+```js
+const refined = await textRefinePromise;   // comment: "on a normal run it finished long ago"
+```
+
+That comment is an assumption, not a guarantee. A stalled provider or a retrying round holds the
+whole story at this point — *after every image is finished* — with a user waiting.
+
+**Fix:** the join races a 90s timer (`TEXT_REFINE_JOIN_TIMEOUT_MS`). On timeout the original text
+ships, with a WARN and a `text_refine_join_timeout` generation-log entry. Measured normal cost is
+~184s against a ~25-min image phase, so anything still running at the join is anomalous; refinement
+is a polish pass, and shipping unrefined text always beats not shipping.
+
+**Subtlety worth keeping:** the timer is deliberately NOT `unref()`'d. An unref'd timer does not hold
+the event loop, so in any context where the loop could drain the race would never settle —
+`clearTimeout` in the `finally` is what prevents the leak, and it runs on both branches. Verified:
+a hanging refine returns TIMEOUT in ~300ms without blocking, a fast one applies, a failed one keeps
+the original.
+
+### Rejected: moving the text branch off the critical path
+
+Investigated at the owner's direction and **abandoned on measurement** — recorded so it is not
+re-attempted blind.
+
+The plan was to return scenes early and defer `title` / `storyPages` so text ran fully parallel with
+images. Two findings killed it:
+
+1. **The saving is ~1 minute, not ~4.** Text REVIEW (184s) already runs parallel with images and is
+   already free. Only the text WRITE (~1 min) sits ahead of images, on a ~32-min run.
+2. **`storyPages` feeds image PREP, not just bookkeeping.** It is passed to
+   `detectAndPatchPhantomCharacters` and `detectAndPatchOrphanObjectIds`, which patch the Visual
+   Bible the images are generated from. Deferring it past image start is not a reordering — it splits
+   page assembly in two, in the main generation path.
+
+**Consequence:** do NOT make text refinement a physical step 6b inside `beatsPipeline`. That would
+move a free 3-minute stage ONTO the critical path — tidier structurally, ~10% slower. It is
+logically 6b (the text's reviewer) and it belongs where it runs.
+
+**Touched:** `server.js` (join guard only).
