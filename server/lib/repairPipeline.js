@@ -2734,6 +2734,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // on the fly from the version's detection + bytes).
       bboxDetection: images().detectionForVersion(v),
       hasBboxOverlay: !!images().detectionForVersion(v),
+      // The quality eval's own identification of every figure in the image
+      // (figures[] = what it sees, matches[] = figure → reference character +
+      // confidence + face_bbox). This is a SECOND, INDEPENDENT opinion on who
+      // is who, separate from the Set-of-Mark naming in figureDetection.js
+      // that labels the detection boxes above — the two demonstrably disagree,
+      // and until now the eval's opinion was logged to stdout and dropped, so
+      // the disagreement rate was unmeasurable. Stored per VERSION (not per
+      // page) because, exactly like bboxDetection, it describes one specific
+      // set of image bytes. Text/numbers/bbox arrays only — never image bytes.
+      // null (not []) when the eval produced none: absent evidence is not
+      // "zero figures".
+      figures: v.evaluation?.figures ?? null,
+      matches: v.evaluation?.matches ?? null,
+      objectMatches: v.evaluation?.objectMatches ?? null,
       // Prefer per-version prompt/description (iterate stores its own
       // feedback-augmented prompt + new scene). Original generations and
       // inpaints fall back to the page's prompt/description. sceneMetadata /

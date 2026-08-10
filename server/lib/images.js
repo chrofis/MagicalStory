@@ -5682,6 +5682,15 @@ async function evaluateImageBatch(images, options = {}) {
         figures: qualityResult?.figures || [],
         matches: qualityResult?.matches || [],
         objectMatches: qualityResult?.object_matches || [],
+        // evaluateImageQuality returns these three, but this batch wrapper
+        // rebuilds a whitelisted eval object and used to drop them — which is
+        // why every stored scene had qualityRawOutput/evalTemplateHash null
+        // even though repairPipeline maps finalEval.rawOutput into the scene
+        // (O7) and buildVersionEntry reads evaluation.coherenceGate. The
+        // whitelist, not the mapping, was the leak.
+        rawOutput: qualityResult?.rawOutput ?? null,
+        evalTemplateHash: qualityResult?.evalTemplateHash ?? null,
+        coherenceGate: qualityResult?.coherenceGate ?? null,
         bboxDetection,
         bboxOverlayImage,
         usage: qualityResult?.usage || null,

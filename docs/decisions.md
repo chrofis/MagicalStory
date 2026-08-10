@@ -8462,3 +8462,67 @@ output — unproven, and the containment above holds either way.
 **Touched:**   `server/lib/character2x4Sheet.js` (`parseJudgeJson`,
 `generateComposited2x4` body/head review calls, `_internal` export for tests)
 **Status:**    ✅ active
+
+---
+
+## 2026-08-10 — The eval's figure identification is a second opinion; persist it per VERSION (and the qualityRawOutput leak was the batch whitelist)
+
+**Context:** Every quality eval independently identifies the people in the image
+it is scoring — `figures[]` (`{id, zone, hair, clothing, action, view,
+items_held}`) plus `matches[]` (`{figure, reference, confidence, face_bbox}`).
+That is a SECOND, INDEPENDENT opinion on who is who, arrived at from the pixels
+alone, entirely separate from the Set-of-Mark naming in
+`server/lib/figureDetection.js` that labels the detection boxes. The two
+demonstrably disagree: staging `job_1786287569165_7f75jspcz` page 8 version 1 —
+the detection named the girl in the red bandana "Sarah", the woman in purple
+"Emma", and put "Hans" on a bearded man in a black tricorn, every one of them
+stamped `confidence: high`. How OFTEN that happens was unmeasurable: the eval's
+identification was computed, logged to stdout (`📊 [EVAL P1] Matches: Fig 1 →
+Emma (85%)`), consumed in-process by the compliance stage, and then dropped —
+zero occurrences of `"reference"` in any stored story.
+
+Separately, `sceneImages[*].qualityRawOutput` was null on every story ever
+generated, despite the O7 mapping `qualityRawOutput: finalEval?.rawOutput ??
+null` existing in `repairPipeline.js` and `evaluateImageQuality` returning
+`rawOutput`.
+
+**Decision:**
+1. `evaluateImageBatch` no longer drops `rawOutput`, `evalTemplateHash` and
+   `coherenceGate` from the eval object it hands back.
+2. `buildVersionEntry` carries `figures` / `matches` / `objectMatches` from the
+   version's own evaluation onto the persisted version entry, beside
+   `bboxDetection`. Absent → `null`, never `[]`.
+
+**Rationale:** The `qualityRawOutput` leak was never the mapping — it was that
+`evaluateImageBatch` rebuilds a WHITELISTED result object around
+`evaluateImageQuality`'s return, and the whitelist omitted those three fields.
+Every eval in the pipeline flows through that one function, so one line each
+fixes the page-level O7 mapping, the eval-template hash (a stored score is
+re-derivable again after a prompt-file edit) and `coherenceGate`, which
+`buildVersionEntry` had been reading as null all along.
+
+The VERSION is the correct home for the identification, not the page:
+`figures[]` describes one specific set of image bytes — exactly like
+`bboxDetection`, which sits on the version for the same reason and is the very
+thing it must be compared against. A page-level copy would describe whichever
+version happened to be picked and would silently mis-describe the others. It is
+also what makes the comparison possible at all: with both opinions stamped on
+the same version, the SoM-vs-eval disagreement rate becomes a query over stored
+stories instead of an anecdote from one page. Text, numbers and bbox arrays
+only — the IRON RULE (no image bytes in JSONB) is untouched.
+
+Deliberately NOT done: `rawOutput` stays page-level (one blob per picked eval),
+not per version — carrying the full verbatim model output on every version of
+every page multiplies the blob for no extra audit value. `server.js`'s scene
+whitelist still drops the page-level `figures`/`matches` that
+`repairPipeline.js` computes; that copy stays dead on purpose, because the
+version is the source of truth. Manual repair versions built in
+`server/routes/regeneration.js` come from `generateImage*` results, not from
+`evaluateImageBatch`, and are unchanged.
+
+**Touched:**
+- `server/lib/images.js` (`evaluateImageBatch` → `evalResult`)
+- `server/lib/repairPipeline.js` (`buildVersionEntry`)
+- `tests/manual/evalFigureIdentityPersist.test.js` (new, 18 assertions)
+
+**Status:**    ✅ active
