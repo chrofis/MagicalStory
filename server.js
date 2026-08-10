@@ -8020,10 +8020,22 @@ async function _processStoryJobImpl(jobId) {
 
     // Fetch full character data from database (job stores stripped metadata)
     // This ensures processing has access to photos and avatar images
+    // The job row carries STRIPPED characters — thumbnails and metadata, no face
+    // photo, no body cutout, no avatar. Those bytes live on the characters row
+    // and must be loaded here or every character in the book is drawn from its
+    // text description alone.
+    //
+    // This is a HARD FAIL on any unresolved id (owner, 2026-08-10). It used to
+    // skip quietly: `job_1786309527338_4zwhrn08y` was submitted under the smoke
+    // account while the client still held ANOTHER account's character ids, none
+    // of them resolved, and the story completed at 100% with five strangers in
+    // it. A book with the wrong faces is worse than no book, and the only
+    // symptom was an avatar warning pointing at the wrong subsystem.
     const requestedCharacterIds = (inputData.characters || []).map(c => c.id);
     if (requestedCharacterIds.length > 0 && job.user_id) {
+      const characterRowId = `characters_${job.user_id}`;
+      let allChars = null;
       try {
-        const characterRowId = `characters_${job.user_id}`;
         const charResult = await dbPool.query(
           'SELECT data FROM characters WHERE id = $1',
           [characterRowId]
@@ -8032,27 +8044,46 @@ async function _processStoryJobImpl(jobId) {
           const fullCharData = typeof charResult.rows[0].data === 'string'
             ? JSON.parse(charResult.rows[0].data)
             : charResult.rows[0].data;
-          const allChars = Array.isArray(fullCharData) ? fullCharData : (fullCharData.characters || []);
-
-          // Replace stripped characters with full data (preserving request order)
-          const fullCharacters = requestedCharacterIds
-            .map(id => allChars.find(c => c.id === id))
-            .filter(Boolean);
-
-          if (fullCharacters.length > 0) {
-            log.debug(`📸 [PROCESS] Loaded full character data for ${fullCharacters.length} characters`);
-            // Clear styledAvatars - regenerate fresh per story for consistency
-            for (const char of fullCharacters) {
-              if (char.avatars) {
-                char.avatars.styledAvatars = {};
-              }
-            }
-            inputData.characters = fullCharacters;
-          }
+          allChars = Array.isArray(fullCharData) ? fullCharData : (fullCharData.characters || []);
         }
       } catch (dbErr) {
-        log.warn(`📸 [PROCESS] Failed to load character data from DB: ${dbErr.message}`);
+        throw new Error(`[PROCESS] Could not read ${characterRowId}: ${dbErr.message} — refusing to generate a story whose characters have no reference photos`);
       }
+      if (!allChars) {
+        throw new Error(`[PROCESS] No characters row ${characterRowId} for this user, but the job requests ${requestedCharacterIds.length} character(s) — refusing to generate a story whose characters have no reference photos`);
+      }
+
+      // Compare ids as strings: a JSON round-trip can turn a numeric id into a
+      // string, and that is type drift, not a different character. Failing the
+      // job over it would be a false alarm.
+      const byId = new Map(allChars.map(c => [String(c.id), c]));
+      const missing = requestedCharacterIds.filter(id => !byId.has(String(id)));
+      if (missing.length > 0) {
+        // Name where they DID come from. The one real occurrence of this was a
+        // cross-account reference, and without this line the error reads as
+        // "characters vanished" instead of "wrong account".
+        let owner = '';
+        try {
+          const found = await dbPool.query(
+            `SELECT user_id FROM characters WHERE data::text LIKE $1 LIMIT 1`,
+            [`%${String(missing[0])}%`]
+          );
+          if (found.rows.length > 0 && found.rows[0].user_id !== job.user_id) {
+            owner = ` Character ${missing[0]} belongs to user ${found.rows[0].user_id}, not to this job's user ${job.user_id} — the request was made with another account's characters.`;
+          }
+        } catch { /* diagnostic only — never mask the real error */ }
+        throw new Error(`[PROCESS] ${missing.length}/${requestedCharacterIds.length} requested character(s) are not in ${characterRowId}: ${missing.join(', ')}.${owner} Refusing to generate a story whose characters have no reference photos.`);
+      }
+
+      const fullCharacters = requestedCharacterIds.map(id => byId.get(String(id)));
+      log.debug(`📸 [PROCESS] Loaded full character data for ${fullCharacters.length} characters`);
+      // Clear styledAvatars - regenerate fresh per story for consistency
+      for (const char of fullCharacters) {
+        if (char.avatars) {
+          char.avatars.styledAvatars = {};
+        }
+      }
+      inputData.characters = fullCharacters;
     }
 
     // For swiss-stories, ALWAYS use the story's city for landmarks (not user's home city)

@@ -8016,3 +8016,33 @@ module they need instead of a 7k-line god file.
 **Touched files:** server/lib/storyHelpers.js, server/lib/promptBuilders.js,
 server/lib/sceneMetadata.js, server/lib/clothingResolve.js, docs/plans/storyhelpers-split.md,
 CLAUDE.md.
+
+### Unresolved character ids hard-fail the job (2026-08-10)
+
+**Context:**   `job_1786309527338_4zwhrn08y` completed at 100% with five
+strangers in it. The job row carries STRIPPED characters — thumbnails and
+metadata, no face photo, no body cutout, no avatar — and the real bytes are
+loaded from the characters row at processing time. That lookup matches on id and
+quietly skipped when nothing matched, so the story generated with
+thumbnail-only characters and every person was drawn from their text
+description alone.
+
+Root cause was not data loss: the job was submitted under the smoke account
+(`demo-b-hnecf`, 680c30fd) while the client still held the character ids of a
+different account (`demo-b-hq3sv`, 82fc84ae, created 30 minutes earlier). None
+of the five ids existed in the job user's row. The only symptom was
+`avatar_guarantee_exhausted`, which points at the avatar subsystem rather than
+at the cross-account request that caused it.
+
+**Decision:** Any unresolved id now throws and fails the job — missing row,
+unreadable row, or ANY requested id absent (a partial cast is refused too). The
+error names the missing ids and, when they exist under another user, says so.
+
+**Rationale:** A book with the wrong faces is worse than no book, and it is
+worse than a failed job: the failure is invisible, the story looks complete, and
+the credits are spent. Ids are compared as strings — a JSON round-trip can turn
+a numeric id into a string, and failing a job over type drift would be a false
+alarm.
+
+**Touched:**   `server.js` (job processing, character rehydrate block)
+**Status:**    ✅ active
