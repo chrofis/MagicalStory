@@ -105,31 +105,61 @@ function rect(buf, x0, y0, x1, y1, rgb) {
     `got ${(bandCl[0].hueRad * DEG).toFixed(1)}deg, garment ${hueOf(RED).toFixed(1)}deg, hair ${hueOf(HAIR).toFixed(1)}deg`);
 
   // ── TEST 5 ───────────────────────────────────────────────────────────────
-  // Step 1b consumes the entity channel and needs a body box per flagged page.
-  // On a fresh generation `imagesWithData[].bboxDetection` is unset — the
-  // detection for those exact bytes lives on the evaluation produced by the
-  // other half of Step 1. Reading only the image skipped 10/10 flagged fixes on
-  // job_1786277779744_vorw1f7ve ("no detected figure") while the stored
-  // detections held every figure. Source-level guard: the block must consult
-  // `evaluations`, and must invalidate the detection it actually used once the
-  // bytes change. (CRLF-normalized: core.autocrlf=true checks this repo out
-  // with \r\n, so \n needles would never match.)
-  console.log('\nTEST 5 — Step 1b resolves the figure box from the evaluation, not just the image');
+  // The recolour is a REPAIR METHOD inside the round loop, not a pass bolted on
+  // before it or after it (owner, 2026-08-10). The rule:
+  //   iterate            → no recolour; the pixels are about to be replaced, so
+  //                        correcting them first is wasted work (proved on
+  //                        job_1786287569165_7f75jspcz p8: recoloured, then
+  //                        iterated, and the recolour died with v0);
+  //   inpaint / char-fix → recolour FIRST so the repair works on corrected
+  //                        pixels — and a wrong garment colour is one of the
+  //                        things that triggers char-fix, so fixing it
+  //                        mechanically can remove that Grok call entirely;
+  //   nothing else wrong → the recolour IS the repair, method 'recolour'.
+  //
+  // Its output becomes a version scored by the same round eval as every other
+  // repair, so a recolour that made the page worse loses pick-best. That is what
+  // keeps it checked — nothing recoloured ships unseen.
+  //
+  // Source-level guards, CRLF-normalised: core.autocrlf=true checks this repo
+  // out with CR-LF, so LF-only needles would never match.
+  console.log('\nTEST 5 — the recolour is a scored repair method in the round loop');
   const fs = require('fs');
   const src = fs.readFileSync(require.resolve('../../server/lib/repairPipeline.js'), 'utf8')
     .replace(/\r\n/g, '\n');
-  const from = src.indexOf('if (MODEL_DEFAULTS.garmentColourFix) {');
-  const to = src.indexOf('[GARMENT-COLOUR] Step 1b failed');
-  check('the Step 1b block is locatable', from > 0 && to > from, `from=${from} to=${to}`);
-  const step1b = src.slice(from, to);
-  check('it looks the figure up through a page-level detection resolver',
-    /detectionForPage\s*\(\s*pageNumber\s*\)\s*\?\.figures/.test(step1b));
-  check('that resolver reads the evaluation for the page',
-    /const detectionForPage[\s\S]*?evaluations\.find\(e => e\.pageNumber === pageNumber\)/.test(step1b));
-  check('it does NOT take the figure box off the image alone',
-    !/const fig = \(img\.bboxDetection\?\.figures/.test(step1b));
-  check('a recolour invalidates the fingerprint on the detection it used',
-    /const stale = detectionForPage\(pageNumber\);[\s\S]{0,80}stale\.sourceImageFp = null/.test(step1b));
+
+  // Neither of the two rejected placements survives.
+  check('it no longer runs before the repair loop (old "Step 1b")',
+    !/Step 1b — mechanical/.test(src));
+  check('and not after pick-best either (rejected "Step 4a")',
+    !/Step 4a — mechanical/.test(src));
+
+  // A colour-only page scores fine, so findBadPages never returns it.
+  check('a colour-only page is pulled into the round',
+    /const colourOnlyNums = \[\.\.\.garmentWork\.keys\(\)\]\.filter/.test(src));
+  check('and is given the recolour method',
+    /\(method === 'skip' \|\| method == null\) && garmentWork\.has/.test(src));
+  check('recolour counts as actionable work',
+    /counts\.recolour \|\| 0\)/.test(src));
+
+  check('NEVER recoloured before an iterate',
+    /method !== 'iterate' && garmentWork\.has\(pageNumber\)/.test(src));
+  check('inpaint receives the recoloured bytes',
+    /executeInpaintAction\(img, latestEval, round, recolourInput\)/.test(src));
+  check('char-fix receives the recoloured bytes',
+    /executeCharFixAction\(img, decision, round, recolourInput\)/.test(src));
+  check('both default the override to null, so nothing else changes',
+    /executeInpaintAction = async \(img, latestEval, roundNum = null, inputOverride = null\)/.test(src)
+    && /executeCharFixAction = async \(img, decision, roundNum, inputOverride = null\)/.test(src));
+
+  check('a failed repair does not discard a good recolour',
+    /const failed = \(error\) => \(recoloured\?\.imageData/.test(src));
+  check('the recolour reads the scored best, not merely the newest',
+    /selectBestVersion\(pageVersions\.get\(pageNumber\) \|\| \[\]\)/.test(src));
+  check('an already-handled mismatch is not recoloured twice',
+    /if \(m\.fixOutcome\) continue;/.test(src));
+  check('changed bytes invalidate the stamped detection',
+    /if \(detection\) detection\.sourceImageFp = null;/.test(src));
 
   // ── TEST 6 ───────────────────────────────────────────────────────────────
   // The low-chroma blind spot, which is WHY the reference now gets a SAM mask.
@@ -217,8 +247,10 @@ function rect(buf, x0, y0, x1, y1, rgb) {
   const pipe = require('fs')
     .readFileSync(require.resolve('../../server/lib/repairPipeline.js'), 'utf8')
     .replace(/\r\n/g, '\n');
-  check('the pipeline dedupes on the garment word',
-    /\$\{charName\.toLowerCase\(\)\}\|\$\{pageNumber\}\|\$\{garmentKey\}/.test(pipe));
+  check('the pipeline dedupes on character + garment word per page',
+    // collectGarmentWork keys a per-page Map by character+garment, so two
+    // different garments on one page can never collapse into one entry.
+    /const k = `\$\{charName\.toLowerCase\(\)\}\|\$\{garmentKey\}`/.test(pipe));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);

@@ -8279,3 +8279,49 @@ evaluators. Worth adding when that section is next touched.
 **NOT verified** — needs a run. Watch whether refined pages still contradict their briefs.
 
 **Touched:** `server/lib/textRefine.js`, `server/lib/promptBuilders.js`, `prompts/text-refine.txt`.
+
+---
+
+## 2026-08-10 — Garment recolour is a repair METHOD inside the round loop (not a pass before or after it)
+
+**Context:** the mechanical garment-colour repair ran once, before the repair loop, against the
+first entity report. Two failures followed from the placement, both observed on staging:
+- **its work could be destroyed.** `job_1786287569165_7f75jspcz` p8 was recoloured and then
+  iterated — v0 is photoreal, v2 is the shipped illustration, and the recolour went in the bin
+  with the rest of v0;
+- **it only ever saw the FIRST report.** The per-round entity check found further drift that
+  nothing consumed: on `job_1786309527338_4zwhrn08y` its 8 mismatches carry no `fixOutcome` at all
+  — not applied, not skipped, no reason.
+
+An intermediate attempt moved it to *after* pick-best. The owner rejected it: nothing evaluates
+the result there, so a bad recolour ships unseen. (That version briefly reached staging when a
+concurrent session swept an uncommitted working tree into `5302ca25e`.)
+
+**Decision (owner design):** the recolour is a repair method, executed inside the round loop.
+- `iterate` → **no recolour.** The pixels are about to be replaced, so correcting them first is
+  wasted work.
+- `inpaint` / `char-fix` → **recolour FIRST**, and the corrected bytes are the repair's input
+  (`inputOverride` on both actions, defaulting to null). A wrong garment colour is one of the
+  things that *triggers* char-fix, so fixing it mechanically can remove that Grok call entirely.
+- nothing else wrong → the recolour **is** the repair, `method: 'recolour'`, and its output
+  becomes a version.
+- a page whose only fault is colour is pulled into the round explicitly: colour carries no
+  severity by design, so `findBadPages` never returns it and it would otherwise never be touched.
+- a repair that fails does not discard a successful recolour — the recolour result is returned
+  instead.
+- `m.fixOutcome` already set → skip, so a mismatch is never recoloured twice across rounds.
+
+**Rationale:** this is the only placement that satisfies all three constraints at once. Never
+wasted (nothing rewrites those pixels afterwards), always **checked** (the round eval scores the
+recoloured image like any other repair, and a recolour that made the page worse loses pick-best —
+COMPETE, DO NOT APPOINT), and the round's entity check sees the corrected colours so it stops
+re-reporting drift that is already fixed. No bolt-on verification is needed because the existing
+eval is the verification.
+
+**Known gap:** a page that iterates on the FINAL round has its fresh drift found by that round's
+entity check with no round left to act on it, so it ships uncorrected. Deliberate — the
+alternative is a tail recolour that nothing evaluates, which is the rejected design.
+
+**Touched:** `server/lib/repairPipeline.js`, `tests/manual/garmentHueNormalize.test.js`.
+
+**Status:** ✅ active

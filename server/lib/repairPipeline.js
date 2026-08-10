@@ -981,10 +981,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   };
 
   // Helper: execute an inpaint action for a page
-  const executeInpaintAction = async (img, latestEval, roundNum = null) => {
+  const executeInpaintAction = async (img, latestEval, roundNum = null, inputOverride = null) => {
     const versions = pageVersions.get(img.pageNumber) || [];
     const bestSoFar = selectBestVersion(versions);
-    let inputImage = bestSoFar?.imageData || img.imageData;
+    // inputOverride carries the garment recolour applied moments ago — the
+    // repair must work on the corrected pixels, not the drifted ones.
+    let inputImage = inputOverride || bestSoFar?.imageData || img.imageData;
     // Parse per-character clothing for this page so the avatar lookup picks the
     // styled+costumed variant matching what's actually drawn on this page.
     // Without this, inpaint attaches unstyled base photos and Grok has no visual
@@ -1085,7 +1087,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // Body extracted from the (deleted) Step 5 character-repair pass; bbox
   // tier-search + avatar lookup logic preserved verbatim. Char-fix is
   // scene-only — covers fall through to iterate via decideRepairMethod.
-  const executeCharFixAction = async (img, decision, roundNum) => {
+  const executeCharFixAction = async (img, decision, roundNum, inputOverride = null) => {
     const pageNumber = img.pageNumber;
     if (pageNumber <= 0) {
       return { pageNumber, imageData: null, error: 'char-fix not applicable to covers' };
@@ -1097,7 +1099,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     const versions = pageVersions.get(pageNumber) || [];
     const best = selectBestVersion(versions);
-    const currentImageData = best?.imageData || img.imageData;
+    // See executeInpaintAction: the recolour runs first, this consumes it.
+    const currentImageData = inputOverride || best?.imageData || img.imageData;
     const bestEval = best?.evaluation;
 
     // Single bbox source-of-truth — same helper feeds target + protection
@@ -1348,6 +1351,146 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     });
   }
 
+  // ── Garment colour as a repair action ────────────────────────────────────
+  // The entity grid reports a garment of the right shape in the wrong colour on
+  // its own channel, carrying no severity and triggering no redraw, because the
+  // fix is deterministic: DINO garment box → SAM mask → L*a*b* match toward the
+  // styled avatar, scaled by a skin-probed lighting factor.
+  //
+  // WHERE IT RUNS (owner, 2026-08-10). It used to run once, before the repair
+  // loop, against the first entity report. That was wrong twice over:
+  //   - its work could be destroyed. On job_1786287569165_7f75jspcz p8 the hat
+  //     and breeches were recoloured and the page was then iterated — v0 is
+  //     photoreal, v2 is the shipped illustration, and the recolour went in the
+  //     bin with the rest of v0;
+  //   - it only ever saw the FIRST report. The per-round check found further
+  //     drift that nothing consumed: on job_1786309527338_4zwhrn08y its 8
+  //     mismatches carry no fixOutcome at all.
+  //
+  // The rule, in the owner's words: if we iterate there is no point recolouring
+  // first, because the pixels are about to be replaced; if we inpaint or fix a
+  // character we should recolour FIRST, so the repair works on corrected pixels
+  // — and a wrong garment colour is one of the things that triggers char-fix, so
+  // fixing it mechanically can remove the need for that Grok call entirely.
+  //
+  // It is a repair METHOD, not a side effect: a page whose only fault is colour
+  // gets method 'recolour', its output becomes a version, and that version is
+  // scored by the same round eval as every other repair. COMPETE, DO NOT
+  // APPOINT — a recolour that made the page worse loses pick-best on its own
+  // score. That is also what keeps it checked; nothing recoloured ships unseen.
+  const collectGarmentWork = (report) => {
+    const { garmentQueryFor } = require('./garmentColourFix');
+    const byPage = new Map();
+    for (const [charName, charData] of Object.entries(report?.characters || {})) {
+      for (const m of (charData.garmentColourMismatches || [])) {
+        // Already handled in an earlier round — do not recolour twice.
+        if (m.fixOutcome) continue;
+        for (const pageNumber of (m.pagesToFix || [])) {
+          if (!byPage.has(pageNumber)) byPage.set(pageNumber, new Map());
+          // Dedupe on the garment WORD: two entries naming the same garment on
+          // the same page would otherwise segment and recolour it twice, the
+          // second pass measuring bytes the first already changed.
+          const garmentKey = garmentQueryFor(m.garment).key || '(unnamed)';
+          const k = `${charName.toLowerCase()}|${garmentKey}`;
+          if (!byPage.get(pageNumber).has(k)) byPage.get(pageNumber).set(k, { charName, garmentKey, m });
+        }
+      }
+    }
+    return byPage;
+  };
+
+  /**
+   * Recolour every flagged garment on one page. Returns the new bytes, or null
+   * when nothing was changed. Every attempt writes its outcome onto the
+   * mismatch entry so the record survives a container restart.
+   */
+  const runGarmentRecolour = async (img, entries, roundNum) => {
+    const { fixFigureGarmentColour } = require('./garmentColourFix');
+    const { getNextVersionIndex, saveStoryImage } = require('../services/database');
+    const gcStoryId = storyData?.id || jobId || null;
+    const pageNumber = img.pageNumber;
+    // Same source and same selection the other repair actions use — the
+    // highest-scoring version so far, not merely the newest.
+    const bestSoFar = selectBestVersion(pageVersions.get(pageNumber) || []);
+    let current = bestSoFar?.imageData || img.imageData;
+    if (!current) return null;
+
+    // One detection per bytes: prefer the version's own stamped detection.
+    const detection = (bestSoFar && images().detectionForVersion(bestSoFar))
+      || img.bboxDetection
+      || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.bboxDetection
+      || null;
+
+    let changed = 0, attempted = 0;
+    for (const { charName, garmentKey, m } of entries) {
+      const audit = { garment: garmentKey, round: roundNum, at: new Date().toISOString() };
+      m.fixOutcome = audit;
+
+      const fig = (detection?.figures || [])
+        .find(f => (f?.name || '').toLowerCase() === charName.toLowerCase());
+      if (!fig?.bodyBox) {
+        audit.skipped = 'no detected figure on the page';
+        log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber} ${garmentKey}: no detected figure — skipped`);
+        continue;
+      }
+      const character = characters.find(c => (c.name || '').toLowerCase() === charName.toLowerCase());
+      if (!character) { audit.skipped = 'character not in the story'; continue; }
+      // NO DEFAULT (owner, 2026-08-07): the avatar is the colour target.
+      if (!m.clothingCategory) {
+        audit.skipped = 'mismatch carries no clothing category';
+        log.error(`❌ [GARMENT-COLOUR] ${charName} p${pageNumber}: no clothing category — refusing to recolour toward a guessed outfit.`);
+        continue;
+      }
+      // EXACT category only: the avatar's pixels ARE the target, so a
+      // cross-category substitute repaints toward a different outfit's colour
+      // while looking like a confident correction.
+      const avatarUri = await getStyledAvatarForClothing(character, artStyle, m.clothingCategory, { exactCategory: true });
+      if (!avatarUri) {
+        audit.skipped = `no styled avatar for category ${m.clothingCategory}`;
+        log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: no styled avatar for category ${m.clothingCategory} — skipped (refusing a cross-category colour target)`);
+        continue;
+      }
+
+      attempted++;
+      const before = current;
+      const res = await fixFigureGarmentColour(before, fig, avatarUri, { garment: m.garment });
+      Object.assign(audit, {
+        applied: !!res.changed,
+        reason: res.report?.reason || null,
+        dinoScore: res.report?.dinoScore ?? null,
+        current: res.report?.current ?? null,
+        target: res.report?.target ?? null,
+        delta: res.report?.delta ?? null,
+      });
+      if (!res.changed) {
+        log.info(`🎨 [GARMENT-COLOUR] ${charName} p${pageNumber} ${garmentKey}: no-op (${res.report?.reason || 'unknown'})`);
+        continue;
+      }
+      if (changed === 0) {
+        // Store the page as it was before ANY recolour this round.
+        try {
+          if (!gcStoryId) throw new Error('no story id in context');
+          const v = await getNextVersionIndex(gcStoryId, 'garment_before', pageNumber);
+          await saveStoryImage(gcStoryId, 'garment_before', pageNumber, before, {
+            versionIndex: v, generatedAt: new Date().toISOString(),
+          });
+          audit.beforeVersion = v;
+        } catch (e) {
+          // The audit image is a debugging aid — never fail the repair for it.
+          audit.beforeSaveError = e.message;
+          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: before-image not stored (${e.message})`);
+        }
+      }
+      current = res.imageData;
+      changed++;
+    }
+    if (!changed) return null;
+    // Bytes changed → a detection stamped against the old bytes is stale.
+    if (detection) detection.sourceImageFp = null;
+    log.info(`🎨 [GARMENT-COLOUR] p${pageNumber} round ${roundNum}: ${changed}/${attempted} garment(s) recoloured`);
+    return { imageData: current, detection, changed };
+  };
+
   const { decideRepairMethod } = require('./repairLogic');
 
   for (let round = 1; round <= maxRegenAttempts; round++) {
@@ -1428,7 +1571,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
 
     const badPageNums = findBadPages(roundEvalPages, { scoreThreshold: regenThreshold });
-    const badPages = rawImages.filter(img => badPageNums.includes(img.pageNumber));
+    // A page whose ONLY fault is garment colour scores fine — colour carries no
+    // severity by design — so findBadPages never returns it and it would never
+    // be touched. A flagged garment is a reason to work on a page.
+    const garmentWork = MODEL_DEFAULTS.garmentColourFix
+      ? collectGarmentWork(currentEntityReport) : new Map();
+    const colourOnlyNums = [...garmentWork.keys()].filter(pn => !badPageNums.includes(pn));
+    const badPages = rawImages.filter(img =>
+      badPageNums.includes(img.pageNumber) || colourOnlyNums.includes(img.pageNumber));
+    if (colourOnlyNums.length) {
+      log.info(`🎨 [GARMENT-COLOUR] Round ${round}: ${colourOnlyNums.length} colour-only page(s) pulled in: ${colourOnlyNums.join(', ')}`);
+    }
 
     if (badPages.length === 0) {
       log.info(`✅ [UNIFIED PIPELINE] Round ${round}: No bad pages, stopping repair loop`);
@@ -1512,6 +1665,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
       }
 
+      // Nothing else wrong with the page, but a garment drifted → the recolour
+      // IS the repair for this round rather than a no-op.
+      if ((method === 'skip' || method == null) && garmentWork.has(img.pageNumber)) {
+        method = 'recolour';
+        reason = `garment colour drift (${[...garmentWork.get(img.pageNumber).values()].map(e => `${e.charName} ${e.garmentKey}`).join(', ')})`;
+      }
+
       log.info(`  📋 [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: ${method} (${reason})${decision.charName ? ` [${decision.charName}]` : ''}`);
       return { img, method, latestEval, decision };
     });
@@ -1521,9 +1681,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       acc[k] = (acc[k] || 0) + 1;
       return acc;
     }, {});
-    log.info(`🔄 [UNIFIED PIPELINE] Round ${round}: ${badPages.length} bad pages → ${counts.iterate || 0} iterate, ${counts.inpaint || 0} inpaint, ${counts['char-fix'] || 0} char-fix${counts.skipped ? `, ${counts.skipped} skipped` : ''}${counts.skip ? `, ${counts.skip} no-op` : ''}`);
+    log.info(`🔄 [UNIFIED PIPELINE] Round ${round}: ${badPages.length} bad pages → ${counts.iterate || 0} iterate, ${counts.inpaint || 0} inpaint, ${counts['char-fix'] || 0} char-fix, ${counts.recolour || 0} recolour${counts.skipped ? `, ${counts.skipped} skipped` : ''}${counts.skip ? `, ${counts.skip} no-op` : ''}`);
 
-    const repairableCount = (counts.iterate || 0) + (counts.inpaint || 0) + (counts['char-fix'] || 0);
+    const repairableCount = (counts.iterate || 0) + (counts.inpaint || 0) + (counts['char-fix'] || 0) + (counts.recolour || 0);
     if (repairableCount === 0) {
       log.info(`✅ [UNIFIED PIPELINE] Round ${round}: nothing actionable, stopping repair loop`);
       break;
@@ -1554,8 +1714,35 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           return { pageNumber, imageData: null, skipped: true };
         }
         try {
+          // RECOLOUR FIRST for everything except iterate — iterate replaces the
+          // pixels, so correcting them beforehand is wasted work.
+          let recoloured = null;
+          if (method !== 'iterate' && garmentWork.has(pageNumber)) {
+            recoloured = await runGarmentRecolour(img, [...garmentWork.get(pageNumber).values()], round);
+          }
+          // A repair that fails must not also throw away a successful recolour.
+          const failed = (error) => (recoloured?.imageData
+            ? { pageNumber, imageData: recoloured.imageData, method: 'recolour',
+                source: `garment-recolour-round-${round}`,
+                bboxDetection: recoloured.detection || null, repairError: error }
+            : { pageNumber, imageData: null, method, error });
+
+          if (method === 'recolour') {
+            if (!recoloured?.imageData) {
+              return { pageNumber, imageData: null, method, skipped: true, error: 'recolour changed nothing' };
+            }
+            return {
+              pageNumber,
+              imageData: recoloured.imageData,
+              method: 'recolour',
+              source: `garment-recolour-round-${round}`,
+              bboxDetection: recoloured.detection || null,
+            };
+          }
+          const recolourInput = recoloured?.imageData || null;
+
           if (method === 'inpaint') {
-            const inpaintResult = await executeInpaintAction(img, latestEval, round);
+            const inpaintResult = await executeInpaintAction(img, latestEval, round, recolourInput);
             if (inpaintResult.repaired && inpaintResult.imageData) {
               return {
                 pageNumber,
@@ -1569,7 +1756,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 grokRefImages: null,
               };
             }
-            return { pageNumber, imageData: null, method, error: 'inpaint produced no result' };
+            return failed('inpaint produced no result');
           }
           if (method === 'iterate') {
             const result = await executeIterateAction(img, latestEval);
@@ -1628,11 +1815,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             return { pageNumber, imageData: null, method, error: 'iterate produced no result' };
           }
           if (method === 'char-fix') {
-            const result = await executeCharFixAction(img, decision, round);
+            const result = await executeCharFixAction(img, decision, round, recolourInput);
             if (result?.imageData) {
               return result;
             }
-            return { pageNumber, imageData: null, method, error: result?.error || 'char-fix produced no result' };
+            return failed(result?.error || 'char-fix produced no result');
           }
           return { pageNumber, imageData: null, method, error: `unknown method ${method}` };
         } catch (err) {
@@ -2087,149 +2274,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     log.warn(`⚠️ [POST-REPAIR-TEXT] Recovery phase failed: ${postRepairErr.message} — keeping pre-recovery best versions`);
   }
 
-  // =========================================================================
-  // Step 4a — mechanical garment-colour repair, ON THE PICKED VERSIONS
-  // =========================================================================
-  // The entity grid reports a garment of the right shape in the wrong colour on
-  // its own channel, carrying no severity and triggering no redraw, because the
-  // fix is deterministic: DINO garment box → SAM mask → L*a*b* match toward the
-  // styled avatar, scaled by a skin-probed lighting factor.
-  //
-  // WHY HERE AND NOT BEFORE THE REPAIR LOOP (owner, 2026-08-10). This used to
-  // run as "Step 1b", against the pre-repair entity check. Two things were wrong
-  // with that:
-  //   1. Its work could be thrown away. On job_1786287569165_7f75jspcz p8 the
-  //      hat and breeches were recoloured and the page was then fully
-  //      regenerated in the repair round — v0 is photoreal, v2 is the shipped
-  //      illustration. The recolour went in the bin with the rest of v0.
-  //   2. It only ever saw the FIRST report. The per-round check (round N,
-  //      repaired pages only) found further drift that nothing consumed: on
-  //      job_1786309527338_4zwhrn08y its 8 mismatches carry no fixOutcome at
-  //      all — not applied, not skipped, no reason.
-  // Running early bought nothing in return, because garment colour deliberately
-  // carries no severity and triggers no redraw (decisions.md 2026-08-06) — there
-  // was no regeneration to save by going first.
-  //
-  // So it runs on the PICKED versions, after pick-best and after the calm-zone
-  // recovery has finished re-pointing them, and reads `currentEntityReport` —
-  // the merged view where repaired pages carry fresh findings and untouched
-  // pages keep their originals. Note it cannot read the Step 4b report below:
-  // that one is ASSEMBLED from stamps with zero eval calls, so it carries no
-  // garmentColourMismatches at all.
-  //
-  // Scores are untouched by design. A colour offset changes no entity
-  // punishment, so recolouring after the pick cannot invalidate the pick.
-  //
-  // AUDITABLE (owner requirement, 2026-08-08): every attempt writes its outcome
-  // back onto the mismatch entry, and a change also stores the BEFORE bytes as a
-  // `garment_before` image — a developer-only image type that never enters the
-  // user-facing version cycle.
-  if (MODEL_DEFAULTS.garmentColourFix) {
-    const tGarment = Date.now();
-    let fixedPages = 0, attempted = 0, skipped = 0;
-    try {
-      const { fixFigureGarmentColour, garmentQueryFor } = require('./garmentColourFix');
-      const { getNextVersionIndex, saveStoryImage } = require('../services/database');
-      const gcStoryId = storyData?.id || jobId || null;
-
-      // DEDUPE on character|page|garment WORD. The channel reports one entry per
-      // garment, so a character with two drifted items on the same page yields
-      // two entries naming the same page — without this the figure is segmented
-      // and recoloured twice, the second pass measuring bytes the first changed.
-      const work = new Map();
-      for (const [charName, charData] of Object.entries(currentEntityReport?.characters || {})) {
-        for (const m of (charData.garmentColourMismatches || [])) {
-          for (const pageNumber of (m.pagesToFix || [])) {
-            const garmentKey = garmentQueryFor(m.garment).key || '(unnamed)';
-            const key = `${charName.toLowerCase()}|${pageNumber}|${garmentKey}`;
-            if (!work.has(key)) work.set(key, { charName, pageNumber, garmentKey, m });
-          }
-        }
-      }
-
-      for (const { charName, pageNumber, garmentKey, m } of work.values()) {
-        // Outcome is recorded on the entry itself, whatever happens.
-        const audit = { garment: garmentKey, at: new Date().toISOString() };
-        m.fixOutcome = audit;
-
-        // The PICKED version is the one that ships — recolour that, not the
-        // pre-repair bytes.
-        const best = finalBestPerPage.get(pageNumber);
-        if (!best?.imageData) { audit.skipped = 'page has no picked version'; skipped++; continue; }
-
-        // Each version carries its own stamped detection — one detection per
-        // bytes — so the figure box always matches the pixels being recoloured.
-        const detection = images().detectionForVersion(best)
-          || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.bboxDetection
-          || null;
-        const fig = (detection?.figures || [])
-          .find(f => (f?.name || '').toLowerCase() === charName.toLowerCase());
-        if (!fig?.bodyBox) {
-          audit.skipped = 'no detected figure on the page';
-          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber} ${garmentKey}: no detected figure — skipped`);
-          skipped++; continue;
-        }
-
-        const character = characters.find(c => (c.name || '').toLowerCase() === charName.toLowerCase());
-        if (!character) { audit.skipped = 'character not in the story'; skipped++; continue; }
-        // NO DEFAULT (owner, 2026-08-07): the avatar is the colour target.
-        if (!m.clothingCategory) {
-          audit.skipped = 'mismatch carries no clothing category';
-          log.error(`❌ [GARMENT-COLOUR] ${charName} p${pageNumber}: no clothing category — refusing to recolour toward a guessed outfit.`);
-          skipped++; continue;
-        }
-        // EXACT category only. The avatar's pixels ARE the colour target, so a
-        // cross-category substitute repaints the garment toward a different
-        // outfit's colour while looking like a confident correction.
-        const avatarUri = await getStyledAvatarForClothing(character, artStyle, m.clothingCategory, { exactCategory: true });
-        if (!avatarUri) {
-          audit.skipped = `no styled avatar for category ${m.clothingCategory}`;
-          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: no styled avatar for category ${m.clothingCategory} — skipped (refusing a cross-category colour target)`);
-          skipped++; continue;
-        }
-
-        attempted++;
-        const before = best.imageData;
-        const res = await fixFigureGarmentColour(before, fig, avatarUri, { garment: m.garment });
-        Object.assign(audit, {
-          applied: !!res.changed,
-          reason: res.report?.reason || null,
-          dinoScore: res.report?.dinoScore ?? null,
-          current: res.report?.current ?? null,
-          target: res.report?.target ?? null,
-          delta: res.report?.delta ?? null,
-          maskPx: res.report?.current?.px ?? null,
-        });
-
-        if (res.changed) {
-          try {
-            if (!gcStoryId) throw new Error('no story id in context');
-            const v = await getNextVersionIndex(gcStoryId, 'garment_before', pageNumber);
-            await saveStoryImage(gcStoryId, 'garment_before', pageNumber, before, {
-              versionIndex: v, generatedAt: new Date().toISOString(),
-            });
-            audit.beforeVersion = v;
-          } catch (e) {
-            // The audit image is a debugging aid — never fail the repair for it.
-            audit.beforeSaveError = e.message;
-            log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: before-image not stored (${e.message})`);
-          }
-          best.imageData = res.imageData;
-          fixedPages++;
-          // Bytes changed → a detection stamped against the old bytes is stale.
-          if (detection) detection.sourceImageFp = null;
-        } else {
-          log.info(`🎨 [GARMENT-COLOUR] ${charName} p${pageNumber} ${garmentKey}: no-op (${res.report?.reason || 'unknown'})`);
-        }
-      }
-      if (work.size) {
-        log.info(`🎨 [GARMENT-COLOUR] Step 4a: ${fixedPages} recoloured, ${attempted - fixedPages} no-op, ${skipped} skipped of ${work.size} flagged in ${((Date.now() - tGarment) / 1000).toFixed(1)}s`);
-      }
-    } catch (err) {
-      // Never let a colour repair sink the pipeline — the page ships uncorrected.
-      log.error(`❌ [GARMENT-COLOUR] Step 4a failed: ${err.message} — pages ship uncorrected`);
-    }
-  }
   // =========================================================================
   // Step 4b: FINAL entity report ASSEMBLED from the picked versions' stamps
   // (owner redesign, 2026-08-09)
