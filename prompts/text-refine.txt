@@ -22,7 +22,11 @@ Characters: {CHARACTER_NAMES}
 
 # SCENE OUTLINES — read-only
 
-What each page's illustration shows. The text must stay consistent with these. Never describe something the picture contradicts.
+What each page's illustration shows. The picture is already drawn from this and cannot change.
+
+**You may rewrite how a page READS. You may never change what HAPPENS on it.** Do not add, remove, reorder or reverse an event, an action or an outcome. If a page's illustration shows a character helping to work a cork free, the cork comes free — you may not write it as still sealed. If a character is doing something in the outline, the prose may name it, describe it differently, or leave it unsaid, but it must never state the opposite. A reader sees the words and the picture together on one page.
+
+These outlines describe rendering as well as events — appearance, clothing, position in frame, expression, camera. **None of that is the prose's business.** Take the EVENTS from here and ignore the staging; never narrate where someone stands, what they are wearing or how they are framed.
 
 {SCENE_OUTLINES}
 

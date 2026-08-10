@@ -3489,8 +3489,12 @@ function buildTextRefinePrompt(inputData, pages = []) {
     return null;
   }
 
+  // Prefer the full brief (METADATA already stripped by extractRefinablePages)
+  // over the one-line intent: the refiner must not change events, and it cannot
+  // avoid changing what it cannot see. Falls back to the intent for stored
+  // stories that predate the brief being carried.
   const sceneOutlines = pages
-    .map(p => `## Page ${p.pageNumber}\n${p.sceneIntent || '(no scene outline recorded)'}`)
+    .map(p => `## Page ${p.pageNumber}\n${p.sceneBrief || p.sceneIntent || '(no scene outline recorded)'}`)
     .join('\n\n');
   const currentText = pages
     .map(p => `## Page ${p.pageNumber}\n${p.text || '(empty)'}`)

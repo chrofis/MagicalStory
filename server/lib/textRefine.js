@@ -134,7 +134,21 @@ function extractRefinablePages(sceneLike = []) {
       let sceneIntent = '';
       try { sceneIntent = JSON.parse(s.outlineExtract || '{}').sceneIntent || ''; } catch { /* not JSON */ }
       if (!sceneIntent) sceneIntent = (s.sceneDescription || s.description || '').slice(0, 600);
-      return { pageNumber: s.pageNumber, text: String(s.text).trim(), sceneIntent };
+      // The BRIEF as well as the one-line intent (2026-08-10). The compact
+      // intent alone was chosen to avoid steering the prose with rendering
+      // detail — a good instinct that produced a worse failure: the refiner
+      // could not see the page's EVENTS, so it rewrote them. Measured on
+      // job_1786309527338 p6, where the brief has Daniel easing the cork free
+      // and Sarah unrolling the map, and refinement produced text in which the
+      // cork is still stuck and neither happens.
+      //
+      // The stage's founding invariant (decisions.md 2026-08-05) is "rewrites
+      // page prose only, never events" — it cannot honour that while blind to
+      // what the events are. METADATA is stripped here and the template is
+      // explicit that appearance and staging are not the prose's business.
+      const briefRaw = String(s.sceneDescription || s.description || '');
+      const sceneBrief = briefRaw.split(/---\s*METADATA/i)[0].trim();
+      return { pageNumber: s.pageNumber, text: String(s.text).trim(), sceneIntent, sceneBrief };
     })
     .sort((a, b) => a.pageNumber - b.pageNumber);
 }

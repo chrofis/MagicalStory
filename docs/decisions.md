@@ -8240,3 +8240,42 @@ stamp), exactly one eval per version instead of two, and ~1.1k lines of dead mac
 (single cover-page map), `docs/image-routing.md`, `docs/image-generation-methods.html`.
 
 **Status:** ✅ active
+
+## 2026-08-10 — Text refinement gets the EVENTS: its founding invariant was unenforceable
+
+**Owner:** *"why do we need this."* Answer, from the 2026-08-05 entry: it is a free prose polish.
+Images are ~66% of a run, so refinement (~2-4 min) starts when scenes lock and overlaps the ~25-min
+image phase — placed after images it would cost its full duration; overlapped it costs nothing.
+
+**Its safety was one explicit promise:** *"the refiner receives scene outlines READ-ONLY and rewrites
+page prose only, never events … This is the property the stage was designed around."*
+
+**That promise is broken, and the reason is the input.** `extractRefinablePages` deliberately passed
+the COMPACT `sceneIntent`, with a documented rationale: *"The full sceneDescription is Art Director
+prose — ~10x longer and mostly rendering instructions the writer must not be steered by."* The
+instinct was sound; the consequence was worse than the problem it avoided. A one-line intent cannot
+carry a page's events, so the refiner rewrote events it could not see. On
+`job_1786309527338_4zwhrn08y` p6 the brief has Daniel easing the cork free and Sarah unrolling the
+map; refinement produced text in which the cork is still stuck and neither happens. It rewrote 8 of
+14 pages on that run.
+
+**A stage cannot honour "never change events" while blind to what the events are.**
+
+**Decision:** refinement now receives the full brief (METADATA stripped, same treatment as step 6),
+falling back to `sceneIntent` for stored stories that predate it. The template gains the invariant in
+words — *you may rewrite how a page READS, you may never change what HAPPENS on it* — plus the guard
+that motivated the original compact input: appearance, clothing, frame position, expression and
+camera are rendering, not the prose's business; take the EVENTS and ignore the staging.
+
+**This is the second of the two drift sources** found on that story. The first (brief and text written
+in PARALLEL as siblings) was fixed in the same session by reordering step 6 after the scene review.
+Both had to be fixed together: step 6 can now author text that matches the art, and step 7 would
+otherwise have been free to un-match it afterwards.
+
+**Undocumented stage.** `CLAUDE.md`'s pipeline section lists 10 steps and does not mention text
+refinement at all — which is why it went unexamined while its output was being blamed on the
+evaluators. Worth adding when that section is next touched.
+
+**NOT verified** — needs a run. Watch whether refined pages still contradict their briefs.
+
+**Touched:** `server/lib/textRefine.js`, `server/lib/promptBuilders.js`, `prompts/text-refine.txt`.
