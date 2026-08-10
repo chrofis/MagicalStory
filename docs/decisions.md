@@ -8046,3 +8046,41 @@ alarm.
 
 **Touched:**   `server.js` (job processing, character rehydrate block)
 **Status:**    ✅ active
+
+## 2026-08-10 — The absence rule was in the wrong place; hoisted above STEP 1
+
+**Measured failure of the 2026-08-09 version.** On `job_1786309527338_4zwhrn08y` — the first full run
+with that rule live — compliance's absence findings came back:
+
+| type | count |
+|---|---|
+| `missing_element` | 11 |
+| `missing_character` | 10 |
+| `unverified_absence` | **1** |
+
+The rule bound on almost nothing. **Cause is placement, not wording.** It was written inside STEP 2's
+*Accessories* bullet, so it reads as scoped to accessories — while compliance's absences are actually
+generated in STEP 1 (`missing_character`) and STEP 1b (missing objects, animals, landmarks,
+supporting figures). The rule never covered the sites that produce the findings.
+
+This is the third instance of the same mistake in two days: a rule added where I happened to be
+reading rather than where the behaviour originates (the closed type list that made the accessory
+ceilings unreachable; STEP 4's one-entry rule contradicting STEP 2's accessory bundling). **When
+adding an eval rule, find the step that EMITS the finding first.**
+
+**Fix:** the ABSENCE RULE is now a top-level block immediately before STEP 1, stating that it governs
+STEP 1, STEP 1b and STEP 2 alike, and STEP 1b now names `unverified_absence` at both of its absence
+sites. STEP 2's copy collapsed to a one-line pointer — `SETTLED.md` requires one canonical wording
+per prompt layer, and three copies is how the earlier contradictions happened.
+
+**One exception kept, on principle:** `missing_character` in STEP 1. Its test is not "absent from the
+inventory" but "absent from `QUALITY_FIGURES.matches[]` AND no plausibly-matching inventory figure" —
+a comparison of two inputs rather than an inference from silence. Still capped at MAJOR.
+
+**Framing that carries the rule:** wrongness is a finding, absence is a guess. An item the inventory
+NAMES and describes differently is a real comparison, reported at its own type; an item it simply
+does not mention is `unverified_absence`.
+
+**NOT verified** — needs the next run. The 2026-08-09 version also looked correct when shipped.
+
+**Touched:** `prompts/image-prompt-compliance.txt`.
