@@ -6194,6 +6194,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const genDuration = ((Date.now() - genStartTime) / 1000).toFixed(1);
       const successCount = rawImages.filter(r => r.imageData).length;
       log.info(`✅ [UNIFIED] Phase 5a complete: ${successCount}/${rawImages.length} images generated in ${genDuration}s`);
+      // PURE generation ends here (owner, 2026-08-10): everything below —
+      // covers await, text region, detection, evals, entity, repair rounds —
+      // is the repair phase. Stamping pagesEnd after the pipeline made
+      // "Generated 14/14 page images in 1155s" span the whole repair phase
+      // and hid where the time actually went.
+      timing.pagesEnd = Date.now();
+      genLog.info('generation_complete', `Generated ${successCount}/${rawImages.length} page images in ${genDuration}s (pure generation)`);
+      genLog.setStage('repair');
 
       // Await covers before repair pipeline so covers go through the same quality checks
       if (coverAwaitPromise) {
@@ -6726,19 +6734,45 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     }
 
-    timing.pagesEnd = Date.now();
+    // pagesEnd was stamped at Phase 5a completion (pure generation); this is
+    // the REPAIR phase boundary. Fall back for paths that skipped Phase 5a.
+    if (!timing.pagesEnd) timing.pagesEnd = Date.now();
+    timing.repairEnd = Date.now();
     const imgSuccess = allImages.filter(p => p.imageData).length;
+    const repairSecs = ((timing.repairEnd - timing.pagesEnd) / 1000).toFixed(1);
     log.debug(`📖 [UNIFIED] Generated ${imgSuccess}/${allImages.length} page images`);
-    log.debug(`⏱️ [UNIFIED] Page images: ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s`);
-    genLog.info('images_complete', `Generated ${imgSuccess}/${allImages.length} page images in ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s`);
+    log.debug(`⏱️ [UNIFIED] Page images: ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s, repair phase: ${repairSecs}s`);
+    genLog.info('images_complete', `${imgSuccess}/${allImages.length} pages: generation ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s, repair phase (detection/evals/entity/rounds/covers) ${repairSecs}s`);
 
     // ── JOIN THE PARALLEL TEXT REFINEMENT ─────────────────────────────────
     // Started back at pagesStart; on a normal run it finished long ago and this
     // await returns immediately. Resolves to null on any failure — the original
     // text simply stays.
+    //
+    // BOUNDED (2026-08-10). This await used to be open-ended, resting on
+    // "on a normal run it finished long ago" — an assumption, not a guarantee.
+    // The stage already fails safe (null → original text kept) but had no guard
+    // against being SLOW: a stalled provider or a retrying round would hold the
+    // whole story here, after every image is finished, with a user waiting.
+    // Measured normal cost is ~184s against a ~25-min image phase, so anything
+    // still running at this point is anomalous. Refinement is a polish pass —
+    // shipping the unrefined text is always better than not shipping.
     if (textRefinePromise) {
-      const refined = await textRefinePromise;
-      if (refined?.changed?.length) {
+      const JOIN_TIMEOUT_MS = Number(process.env.TEXT_REFINE_JOIN_TIMEOUT_MS) || 90000;
+      const TIMED_OUT = Symbol('text-refine-join-timeout');
+      let joinTimer = null;
+      const refined = await Promise.race([
+        textRefinePromise,
+        // NOT unref'd on purpose: an unref'd timer does not keep the loop
+        // alive, so if this ever ran somewhere the loop could drain, the race
+        // would never settle. `clearTimeout` in the finally below is what stops
+        // it leaking, and that runs on both branches.
+        new Promise((resolve) => { joinTimer = setTimeout(() => resolve(TIMED_OUT), JOIN_TIMEOUT_MS); }),
+      ]).finally(() => { if (joinTimer) clearTimeout(joinTimer); });
+      if (refined === TIMED_OUT) {
+        log.warn(`⚠️ [TEXT-REFINE] still running ${(JOIN_TIMEOUT_MS / 1000).toFixed(0)}s after images completed — shipping the ORIGINAL text`);
+        genLog.warn('text_refine_join_timeout', `Text refinement did not finish within ${(JOIN_TIMEOUT_MS / 1000).toFixed(0)}s of images completing — original text kept`);
+      } else if (refined?.changed?.length) {
         // Capture the pre-refine prose BEFORE the overwrite below — it is the
         // only moment both versions exist. Without it the refiner's work is
         // invisible: the story ships the rewritten text with no record of what
@@ -7146,6 +7180,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         totalDurationMs: timing.end - timing.start,
         storyGenDurationMs: timing.storyGenEnd - timing.storyGenStart,
         imagesDurationMs: timing.pagesEnd - timing.pagesStart,
+        // Repair phase = pagesEnd (pure generation done) → repairEnd (pipeline
+        // done): detection, evals, entity checks, repair rounds, cover checks.
+        repairDurationMs: timing.repairEnd ? timing.repairEnd - timing.pagesEnd : null,
         coversDurationMs: timing.coversEnd ? timing.coversEnd - (timing.coversStart || timing.storyGenEnd) : null,
         // Quality
         avgQualityScore,
