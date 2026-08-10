@@ -188,6 +188,7 @@ async function _cleanMaskAndCheck(mask, gdinoBoxPx) {
 
 // GroundingDINO text→box for a set of prompts.
 async function _gdinoDetect(imageDataUri, prompts) {
+  const _t0 = Date.now();
   try {
     const res = await withAnalyzerSlot(() => fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -204,10 +205,17 @@ async function _gdinoDetect(imageDataUri, prompts) {
     if (!j?.success) { log.warn(`⚠️ [GDINO-DETECT] endpoint error: ${j?.error}`); return null; }
     return j;
   } catch (e) { log.warn(`⚠️ [GDINO-DETECT] detect failed: ${e.message}`); require('./runMetrics').forJob(_metricsJobId()).count('dino_detect_fail'); return null; }
+  finally {
+    // Reliable wall-clock split DINO vs SAM (owner, 2026-08-10): counters per
+    // story run, readable from runMetrics after any generation.
+    const m = require('./runMetrics').forJob(_metricsJobId());
+    m.count('dino_calls'); m.add('dino_ms', Date.now() - _t0);
+  }
 }
 
 // MobileSAM box→mask on the full page (box in full-page pixel coords).
 async function _mobilesamMaskFull(imageDataUri, boxPx, W, H) {
+  const _t0 = Date.now();
   try {
     // Through withAnalyzerSlot like every other analyzer call (gdinoDetect, the
     // repair-side figure-mask). This one had used a raw fetch, so a story's
@@ -231,6 +239,10 @@ async function _mobilesamMaskFull(imageDataUri, boxPx, W, H) {
     if (mask) mask.pngBuf = pngBuf; // kept for the overlay's cutout strip (never persisted)
     return mask;
   } catch (e) { log.warn(`⚠️ [GDINO-DETECT] mask failed: ${e.message}`); require('./runMetrics').forJob(_metricsJobId()).count('dino_mask_fail'); return null; }
+  finally {
+    const m = require('./runMetrics').forJob(_metricsJobId());
+    m.count('sam_calls'); m.add('sam_ms', Date.now() - _t0);
+  }
 }
 
 /**
@@ -639,17 +651,20 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   }
   diag.faces = faces.map(f => ({ box: f.box.map(Math.round), score: +f.score.toFixed(3) }));
 
-  // Stage 1c — femaleness per person box, from a generic "woman . girl" pass.
-  // Two adults with identical position prose (the common midground pair) are
-  // indistinguishable to layout matching — gender breaks the tie.
+  // Stage 1c — femaleness pass is LAZY (owner, 2026-08-10): it only feeds the
+  // layout-fallback tiebreaker, and SoM identity succeeds on virtually every
+  // page — running "woman . girl" up front wasted a full DINO forward pass per
+  // page. It now runs inside the fallback branch, only when SoM failed.
   let femaleBoxes = [];
-  const gdet = await _gdinoDetect(imageDataUri, [{ name: 'female', text: 'woman . girl' }]);
-  if (gdet?.figures?.[0]) femaleBoxes = _collectNmsBoxes(gdet.figures[0], GDINO_PERSON_NMS_IOU);
+  const loadFemaleBoxes = async () => {
+    const gdet = await _gdinoDetect(imageDataUri, [{ name: 'female', text: 'woman . girl' }]);
+    if (gdet?.figures?.[0]) femaleBoxes = _collectNmsBoxes(gdet.figures[0], GDINO_PERSON_NMS_IOU);
+    diag.femaleBoxes = femaleBoxes.map(f => ({ box: f.box.map(Math.round), score: +f.score.toFixed(3) }));
+  };
   const femaleNormFor = (personBox) => {
     const s = Math.max(0, ...femaleBoxes.filter(f => _boxIouXyxy(f.box, personBox) > 0.6).map(f => f.score));
     return Math.min(1, s / 0.45);
   };
-  diag.femaleBoxes = femaleBoxes.map(f => ({ box: f.box.map(Math.round), score: +f.score.toFixed(3) }));
 
   // Stage 2 — MobileSAM silhouette per person box, VALIDATED against the DINO
   // box. The DINO box is tight/accurate; SAM only refines it to a silhouette.
@@ -790,6 +805,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   }
   if (!nameByDet) {
     require('./runMetrics').forJob(_metricsJobId()).count('som_identity_fallback');
+    await loadFemaleBoxes(); // gender tiebreaker only needed here (lazy)
     const sh = getStoryHelpers();
     const chars = expectedCharacters.map(c => {
       const lcr = c.position ? sh.normalizePositionToLCR(c.position) : null;
@@ -862,9 +878,18 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   // (miss ≠ absent — see docs/decisions.md); unfound objects only appear in
   // the diag.
   const objects = [];
+  // Object grounding gated OFF (owner, 2026-08-10): the object boxes are not
+  // consumed anywhere right now (entity objects check is off, a DINO miss is
+  // never reported as missing), yet each expected object cost a full DINO
+  // forward pass per page. Re-enable via GDINO_GROUND_OBJECTS=true when a
+  // consumer exists.
+  const groundObjects = process.env.GDINO_GROUND_OBJECTS === 'true';
+  if (!groundObjects && expectedObjects.length > 0) {
+    diag.objects.push({ skipped: 'object grounding disabled', count: expectedObjects.length });
+  }
   const iouWithFigure = (bodyBox) => Math.max(0, ...figures.map(f =>
     _boxIouXyxy([bodyBox[1], bodyBox[0], bodyBox[3], bodyBox[2]], [f.bodyBox[1], f.bodyBox[0], f.bodyBox[3], f.bodyBox[2]])));
-  for (const raw of expectedObjects) {
+  for (const raw of (groundObjects ? expectedObjects : [])) {
     const cleaned = String(raw || '').trim();
     if (!cleaned || /^[A-Z]{3}\d{3}(\.\d+)?$/.test(cleaned)) continue; // opaque VB id — nothing to ground
     const hint = objectGroundingHints?.[cleaned.toLowerCase()];
