@@ -366,8 +366,17 @@ async function detectBboxOnCovers(coverImages, characters, artStyle = null) {
     const imageData = cover.imageData;
     if (!imageData) return;
 
-    // Skip if already has bbox detection
-    if (cover.bboxDetection) return;
+    // Skip only if the existing detection is a REAL one. Cover generation
+    // stamps a Gemini detection made with ZERO expected characters (the
+    // quality-retry eval has no character list at that point) — DINO+SAM
+    // never ran, figures have no masks, and this guard used to accept it,
+    // so covers shipped maskless (observed job_1786309527338: all three
+    // covers detectionBackend null, expectedCharacters 0). A detection
+    // counts when it names its backend or was made with expected characters.
+    const existing = cover.bboxDetection;
+    if (existing && (existing.detectionBackend === 'grounding-dino'
+      || existing.detectionBackend === 'gemini-second-opinion'
+      || (existing.expectedCharacters?.length || 0) > 0)) return;
 
     // Use cover's referencePhotos (only the characters that appear on THIS cover)
     // Fall back to all characters if referencePhotos not available
