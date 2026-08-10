@@ -1022,7 +1022,7 @@ const ART_STYLES = {
   cartoon: 'A 2D cartoon illustration with bold black outlines and vibrant flat colors in the style of classic Saturday morning animation. Minimal shading, smooth vector quality, and stylized animated characters. Not photorealistic. Faces: bold outlines around features, flat-colored skin, exaggerated expressions, simple dot or oval eyes. Never realistic or 3D-looking. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   anime: 'A modern digital anime illustration in the style of Makoto Shinkai. Stylized animated characters with expressive large eyes and simplified features. Detailed cel-shading, vibrant color palette, and cinematic atmosphere. Not photorealistic. Faces: flat-colored smooth skin, very large eyes (30-40% of face height) with colored irises and highlight dots, tiny triangular nose, pointed chin, minimal shading. All characters must have anime-proportioned faces — never realistic. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   chibi: 'A chibi-style illustration with super deformed proportions — massive head, tiny body, kawaii aesthetic. Adorable, smooth illustration with minimalist detail. Not realistic. Faces: ultra-simplified kawaii features, large stylized eyes, dot nose, tiny mouth. Relative age differences stay visible even in the simplified style — elderly characters have grey/white hair and lined faces, adults have defined jawlines, only young children get classic blush-mark cheeks. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
-  steampunk: 'A steampunk graphic-novel illustration in the style of Sean Murphy — bold, confident ink linework and graphic ink-and-wash shading, clearly hand-drawn, never photographic and never a photo with a filter (no skin pores, no camera-real skin, no photographic fabric or lighting). Warm sepia-and-amber palette, muted and earthy, with leather and aged-brass tones. Mechanical elements (gears, cogs, pipes, clockwork) appear only on machines, vehicles, and architecture the scene describes — never on people (no gears or mechanisms on skin, hair, faces, or garments) and never added to rooms the scene describes as plain or modern. Characters wear exactly their described clothing — the style changes rendering, not garments. Faces: drawn with clean ink lines and graphic shading, defined but stylised features — an illustrated graphic-novel face, not a photoreal one. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
+  steampunk: 'A steampunk graphic-novel illustration in the style of Sean Murphy — bold, confident ink linework and graphic ink-and-wash shading, clearly hand-drawn, never photographic and never a photo with a filter (no skin pores, no camera-real skin, no photographic fabric or lighting). Warm sepia-and-amber palette, muted and earthy, with leather and aged-brass tones. Steampunk-ify the WORLD: weave Victorian-industrial machinery into the environment and architecture — exposed brass gears and cogs, riveted copper pipes, clockwork mechanisms, pressure gauges, valves, rivets and steam fittings on walls, ceilings, furniture, fixtures, and in the background — even when the room would otherwise be plain. This is a steampunk world, so every setting carries some of that machinery. Keep the mechanisms OFF people, though — never gears or mechanisms on skin, hair, faces, or garments. Characters wear exactly their described clothing — the style changes rendering, not garments. Faces: drawn with clean ink lines and graphic shading, defined but stylised features — an illustrated graphic-novel face, not a photoreal one. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   comic: 'A Franco-Belgian comic book illustration in the ligne claire style of Hergé and Peyo. Bold clean black outlines of uniform weight, flat solid colors, no halftone dots, no CMYK color separation, no crosshatching, no painterly shading. Bright friendly palette, dynamic composition. Not photorealistic. Faces: clean-lined simple features, flat natural skin tones, clear readable expressions — skin and hair always in the character\'s natural colors, never overlaid with colored patches. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   manga: 'A traditional Japanese manga illustration with intricate detailed ink linework. Backgrounds and scenery in monochrome ink + atmospheric screentones with dramatic lighting and composition. Character clothing, hair, and key story objects in their natural specified colors (color-spread / promotional cover style — not pure black-and-white interior panels). Not photorealistic. Faces: clean ink lines, screen tone shading, large but less extreme eyes than anime, defined noses, expressive mouths. Consistent manga rendering. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   watercolor: 'A bold, expressive traditional watercolor painting. Prominent visible brushstrokes, strong wet-on-wet color washes bleeding into one another, pigment pooling and granulating, and rough cold-press paper texture showing through. Loose painterly edges that dissolve into the paper — clearly hand-painted watercolor, never photographic and never a photo with a filter: no skin pores, no sharp photoreal rendering. Paint-dominant with soft, dissolving edges and no hard outlines — no inked lines, no pencil linework. Characters are fully opaque — never see-through, never fading into the background. Warm but not overly vibrant palette with visible paper texture throughout. Age-appropriate proportions across all ages — children look like children, teenagers look visibly older than children, adults look like adults. Faces rendered in loose watercolor washes with visible brushstroke texture.',
@@ -3873,14 +3873,33 @@ function buildDoNotWriteSection(inputData = {}) {
  * parseRefinedText() reads it with no new parser. A ---TITLE--- block precedes
  * both: in a beats run no other call produces a title.
  */
-function buildStoryTextFromBeatsPrompt(inputData, beats = []) {
+/**
+ * @param {Object} inputData
+ * @param {Array<{pageNumber:number, beat:string, scene:string}>} beats
+ * @param {Array<{pageNumber:number, brief:string}>} [expansions] - the FINAL
+ *   scene briefs, post scene-review. Text is written to match the picture that
+ *   will actually be drawn; see the ordering note in beatsPipeline.
+ */
+function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = []) {
   const template = PROMPT_TEMPLATES.storyTextFromBeats;
   if (!template) {
     log.error('[PROMPT] storyTextFromBeats template not loaded — beats text writing unavailable');
     return null;
   }
+  // Brief per page, trimmed to the prose the writer needs. The METADATA block
+  // is machine data for the image call (zones, depths, bbox hints) — it would
+  // only invite the writer to narrate staging.
+  const briefByPage = new Map(
+    (expansions || [])
+      .filter(x => x && x.pageNumber != null)
+      .map(x => [x.pageNumber, String(x.brief || '').split(/---\s*METADATA/i)[0].trim()])
+  );
   const blocks = beats
-    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`)
+    .map(b => {
+      const brief = briefByPage.get(b.pageNumber);
+      return `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`
+        + (brief ? `\nILLUSTRATION (already locked — what the reader will SEE on this page):\n${brief}` : '');
+    })
     .join('\n\n');
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),

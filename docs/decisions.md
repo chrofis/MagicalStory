@@ -8141,3 +8141,50 @@ customer's library, and the default must fail toward invisible.
 `server/routes/admin.js`, `server/routes/stories.js`, `server/routes/sharing.js`,
 `server/services/database.js` (`upsertStory`), `server.js` (both save paths)
 **Status:**    ✅ active
+
+## 2026-08-10 — Scenes come first, text follows: page text is written FROM the locked briefs
+
+**Owner:** *"We will write the text, and pass not only the beats, but the scenes as input. The scenes
+come first, the text must follow."*
+
+**The defect.** In the beats pipeline, step 6 (page text) was deliberately kicked off BEFORE step 4
+(scene expansion) — the code said so: *"It reads the locked beats only — never the briefs — so it
+overlaps the scene work instead of adding wall clock."* That made the brief and the text **siblings**:
+both derived from the same beats, neither reading the other, and no stage reconciling them.
+
+They drift, and the drift is reader-visible. On `job_1786309527338_4zwhrn08y` p6 the brief has Daniel
+helping pull the cork free and Sarah unrolling the map; the page text says the cork *"sass noch immer
+fest"* and neither action happens. Picture and words on the same page disagree about what occurred.
+
+**Two separate drift sources were confirmed on this story, and only one is fixed here:**
+1. **Authoring** (fixed): brief and text written in parallel from the beats.
+2. **Refinement** (still open): step 7 `text-refine` runs post-image and rewrote **8 of 14 pages**,
+   changing events rather than prose — an unstuck cork became stuck, two characters lost their
+   actions. Not addressed by this change.
+
+**Decision:** step 6 now runs AFTER the scene review and receives the FINAL briefs. The template
+tells the writer the illustration is already locked and the words must fit the picture — never
+contradict it — and that where ILLUSTRATION and BEAT disagree, the ILLUSTRATION wins. The METADATA
+block is stripped from each brief before it reaches the writer: zones, depths and bbox hints are
+image machinery and would only invite the prose to narrate staging.
+
+**Cost, accepted:** the text call no longer overlaps scene expansion, so a run is slower by roughly
+that call's wall clock. The parallelism was the whole reason for the old ordering; the two agreeing
+is worth more than the seconds.
+
+**Fails loudly, not silently:** if step 6 is ever reached with no briefs, it logs a WARN and a
+`beats_text_without_briefs` generation-log entry — that state is the old sibling behaviour and must
+never pass unnoticed.
+
+**Also corrected here, for the record.** Two claims I made while diagnosing p6 were WRONG, both from
+reading a finding instead of the source: (a) I said scale-repair broke Daniel's costume — his
+contract is a GREEN pirate shirt, so changing white → green was a CORRECTION, and the evaluator
+charged it against Hans's white-shirt spec; (b) I said the brief contradicted the beat by staging
+Emma and Daniel in the background looking at a cave — the ORIGINAL page text has Hans pointing above
+the bridge at a dark entrance, so the brief was faithful and the *refined* text dropped it.
+
+**NOT verified** — needs a run. Check that page text stops contradicting the briefs, and watch the
+wall-clock delta.
+
+**Touched:** `server/lib/beatsPipeline.js`, `server/lib/promptBuilders.js`,
+`prompts/story-text-from-beats.txt`.

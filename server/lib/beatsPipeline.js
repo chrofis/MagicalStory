@@ -435,13 +435,21 @@ SCENE: ${x.scene || ''}`.trim(),
     gl.warn('beats_avatars_kickoff_skipped', 'No clothing requirements — styled avatars deferred to the post-pipeline pass');
   }
 
-  // ── Step 6 (page text) is kicked off here, awaited after the scene review ──
-  // It reads the locked beats only — never the briefs — so it overlaps the
-  // scene work instead of adding wall clock. The rejection is captured, not
-  // left floating: a scene-expansion throw must not surface as an unhandled
-  // rejection from this promise.
-  let textError = null;
-  const textPromise = runStoryText().catch(err => { textError = err; return null; });
+  // ── Step 6 (page text) NO LONGER RUNS HERE ────────────────────────────────
+  // It used to be kicked off at this point, reading the locked beats only, so
+  // it overlapped scene expansion and cost no wall clock. That parallelism made
+  // the brief and the text SIBLINGS: both derived from the same beats, neither
+  // reading the other, and nothing reconciling them afterwards. They drifted.
+  //
+  // Measured on job_1786309527338 p6: the brief had Daniel helping pull the
+  // cork and Sarah unrolling the map; the page text describes a cork that is
+  // still stuck and neither action happening. Reader-visible — the picture and
+  // the words on the same page disagree about what occurred.
+  //
+  // Owner decision 2026-08-10: "the scenes come first, the text must follow."
+  // Step 6 now runs AFTER the scene review and receives the FINAL briefs, so
+  // the words describe the picture that will actually be drawn. This costs the
+  // text call's wall clock, which is the price of the two agreeing.
 
   // ── Step 4: scene expansion — ALL pages in ONE call ───────────────────────
   // The fan-out this replaced expanded each page blind to its neighbours, so
@@ -702,9 +710,8 @@ SCENE: ${x.scene || ''}`.trim(),
     }
   }
 
-  // ── Step 6: page text (kicked off before scene expansion) ─────────────────
-  const textResult = await textPromise;
-  if (textError) throw textError;
+  // ── Step 6: page text — runs HERE, after the scene review, with the briefs ─
+  const textResult = await runStoryText(expansions);
   const { textRaw, textModelId, parsedText } = textResult;
 
   if (parsedText.missing.length > 0) {
@@ -727,9 +734,17 @@ SCENE: ${x.scene || ''}`.trim(),
    * review. Uses its own timer — the shared `t` belongs to the stage the
    * caller is running concurrently.
    */
-  async function runStoryText() {
+  async function runStoryText(finalExpansions = []) {
     await checkCancellation();
-    const textPrompt = buildStoryTextFromBeatsPrompt(inputData, beats);
+    const withBrief = (finalExpansions || []).filter(x => x && x.brief).length;
+    log.info(`🪜 [BEATS] Step 6 page text: ${withBrief}/${beats.length} page(s) carry a locked scene brief`);
+    if (!withBrief) {
+      // Never silent: without briefs this is the OLD sibling behaviour, and the
+      // text can contradict the art again.
+      log.warn('⚠️ [BEATS] Step 6 has NO scene briefs — text is being written blind to the illustrations');
+      gl.warn('beats_text_without_briefs', 'Page text written without scene briefs — text and art may disagree');
+    }
+    const textPrompt = buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions);
     if (!textPrompt) throw new Error('story-text-from-beats template unavailable — beats pipeline cannot run');
     const beatPages = beats.map(b => b.pageNumber);
     let raw = '';

@@ -20,9 +20,13 @@ Characters: {CHARACTER_NAMES}
 
 {CHARACTER_DETAILS}
 
-# LOCKED BEATS
+# LOCKED BEATS AND ILLUSTRATIONS
 
-One block per page. BEAT is what happens on that page. SCENE is what the illustration shows. Both are fixed.
+One block per page. BEAT is what happens on that page. SCENE is a one-line summary. ILLUSTRATION is the finished brief the artist is drawing from — it is already locked and the picture will match it.
+
+**The illustration is drawn before this text exists, so the words must fit the picture.** Write only events the ILLUSTRATION supports: if it shows a character helping to pull a cork free, the cork comes free on that page; if it shows one still sealed, it stays sealed. If the brief has a character doing something, the text may name it or stay silent, but it must never contradict it — a reader sees both on the same page. Where ILLUSTRATION and BEAT disagree, follow the ILLUSTRATION.
+
+Do not narrate staging. Zones, depths, camera angles, who stands where and what they wear are the picture's business, not the prose's.
 
 {BEATS}
 
