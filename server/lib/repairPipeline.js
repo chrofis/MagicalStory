@@ -562,153 +562,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }, 'entity_consistency_check', entityReport.tokenUsage.model || 'gemini-2.5-flash');
   }
 
-  // ── Step 1b — mechanical garment-colour repair ────────────────────────────
-  // The entity grid reports a garment of the right shape in the wrong colour on
-  // its own channel, carrying no severity and triggering no redraw, because the
-  // fix is deterministic: DINO garment box → SAM mask → L*a*b* match toward the
-  // styled avatar, scaled by a skin-probed lighting factor. Consume it here, on
-  // exactly the pages it names — no detection sweep, no extra model call for
-  // pages it did not flag. Guarded by MODEL_DEFAULTS.garmentColourFix.
-  //
-  // AUDITABLE (owner requirement, 2026-08-08): every attempt writes its outcome
-  // back onto the mismatch entry, and a change also stores the BEFORE bytes as a
-  // `garment_before` image. Both persist with the story, so after a container
-  // restart — which erases stdout and is exactly how the first production run
-  // became undiagnosable — the record is still there. `garment_before` is a
-  // developer-only image type: it is not `scene`, so it never enters the
-  // user-facing version cycle.
-  if (MODEL_DEFAULTS.garmentColourFix) {
-    const t1b = Date.now();
-    let fixedPages = 0, attempted = 0, skipped = 0;
-    try {
-      const { fixFigureGarmentColour, garmentQueryFor } = require('./garmentColourFix');
-      const { getNextVersionIndex, saveStoryImage } = require('../services/database');
-      // Same identity this file uses everywhere else for storage.
-      const gcStoryId = storyData?.id || jobId || null;
-
-      // DEDUPE first. The channel reports one entry per garment, so a character
-      // with two drifted items on the same page yields two entries naming the
-      // same pages — without this the figure is segmented and recoloured twice,
-      // the second pass measuring bytes the first already changed.
-      const work = new Map();
-      for (const [charName, charData] of Object.entries(entityReport?.characters || {})) {
-        for (const m of (charData.garmentColourMismatches || [])) {
-          for (const pageNumber of (m.pagesToFix || [])) {
-            // Dedupe on the GARMENT WORD, not a coarse kind. Under the old kind
-            // table "breeches" and "sash" both collapsed to `top`, so the second
-            // of the two was dropped before it could even record a skip — no
-            // fix, no reason, indistinguishable from never having been flagged.
-            const garmentKey = garmentQueryFor(m.garment).key || '(unnamed)';
-            const key = `${charName.toLowerCase()}|${pageNumber}|${garmentKey}`;
-            if (!work.has(key)) work.set(key, { charName, pageNumber, garmentKey, m });
-          }
-        }
-      }
-
-      // WHERE THE DETECTION LIVES (2026-08-09): `imagesWithData` entries only
-      // carry `bboxDetection` when the caller happened to attach one; on a fresh
-      // generation they do not. The detection for these exact bytes was produced
-      // moments ago by the `evaluateImageBatch` half of this same Step 1 — it
-      // sits on the evaluation, and `evalMap` is not built until after the
-      // regen loop below. Reading `img.bboxDetection` alone therefore skipped
-      // EVERY page: job_1786277779744_vorw1f7ve logged 10/10 "no detected
-      // figure" while the stored detections held the figures all along.
-      // Alignment is structural, not hopeful: `buildEvalInputs(imagesWithData)`
-      // evaluated the very `entry.imageData` we are about to recolour.
-      const detectionForPage = (pageNumber) => {
-        const ev = evaluations.find(e => e.pageNumber === pageNumber);
-        return ev?.bboxDetection
-          || imagesWithData.find(i => i.pageNumber === pageNumber)?.bboxDetection
-          || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.bboxDetection
-          || null;
-      };
-
-      for (const { charName, pageNumber, garmentKey, m } of work.values()) {
-        // Outcome is recorded on the entry itself, whatever happens.
-        const audit = { garment: garmentKey, at: new Date().toISOString() };
-        m.fixOutcome = audit;
-        const img = imagesWithData.find(i => i.pageNumber === pageNumber);
-        if (!img?.imageData) { audit.skipped = 'page has no image'; skipped++; continue; }
-        const fig = (detectionForPage(pageNumber)?.figures || [])
-          .find(f => (f?.name || '').toLowerCase() === charName.toLowerCase());
-        if (!fig?.bodyBox) {
-          audit.skipped = 'no detected figure on the page';
-          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber} ${garmentKey}: no detected figure — skipped`);
-          skipped++; continue;
-        }
-        const character = characters.find(c => (c.name || '').toLowerCase() === charName.toLowerCase());
-        if (!character) { audit.skipped = 'character not in the story'; skipped++; continue; }
-        // NO DEFAULT (owner, 2026-08-07): the avatar is the colour target.
-        if (!m.clothingCategory) {
-          audit.skipped = 'mismatch carries no clothing category';
-          log.error(`❌ [GARMENT-COLOUR] ${charName} p${pageNumber}: no clothing category — refusing to recolour toward a guessed outfit.`);
-          skipped++; continue;
-        }
-        // EXACT category only. The avatar's pixels ARE the colour target, so a
-        // cross-category substitute repaints the garment toward a different
-        // outfit's colour while looking like a confident correction. Observed:
-        // a character whose only watercolour sheet was `costumed` had a
-        // `standard` page silently resolved to the pirate sheet.
-        const avatarUri = await getStyledAvatarForClothing(character, artStyle, m.clothingCategory, { exactCategory: true });
-        if (!avatarUri) {
-          audit.skipped = `no styled avatar for category ${m.clothingCategory}`;
-          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: no styled avatar for category ${m.clothingCategory} — skipped (refusing a cross-category colour target)`);
-          skipped++; continue;
-        }
-
-        attempted++;
-        const before = img.imageData;
-        const res = await fixFigureGarmentColour(before, fig, avatarUri, { garment: m.garment });
-        Object.assign(audit, {
-          applied: !!res.changed,
-          reason: res.report?.reason || null,
-          dinoScore: res.report?.dinoScore ?? null,
-          current: res.report?.current ?? null,
-          target: res.report?.target ?? null,
-          delta: res.report?.delta ?? null,
-          lighting: res.report?.lighting ?? null,
-          lightingSource: res.report?.lightingSource ?? null,
-          maskPx: res.report?.current?.px ?? null,
-          maskDilated: res.report?.maskDilated ?? 0,
-          colourGated: res.report?.colourGated ?? 0,
-          elapsedMs: res.report?.elapsedMs ?? null,
-        });
-
-        if (res.changed) {
-          try {
-            if (!gcStoryId) throw new Error('no story id in context');
-            const v = await getNextVersionIndex(gcStoryId, 'garment_before', pageNumber);
-            await saveStoryImage(gcStoryId, 'garment_before', pageNumber, before, {
-              versionIndex: v, generatedAt: new Date().toISOString(),
-            });
-            audit.beforeVersion = v;
-          } catch (e) {
-            // The audit image is a debugging aid — never fail the repair for it.
-            audit.beforeSaveError = e.message;
-            log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: before-image not stored (${e.message})`);
-          }
-          img.imageData = res.imageData;
-          fixedPages++;
-          // Bytes changed → a detection stamped against the old bytes is stale.
-          // Invalidate EVERY copy, not just the one on the image: the detection
-          // we read now normally comes off the evaluation, and that is the copy
-          // downstream forwards as `sharedBboxDetection`.
-          const stale = detectionForPage(pageNumber);
-          if (stale) stale.sourceImageFp = null;
-          if (img.bboxDetection) img.bboxDetection.sourceImageFp = null;
-        } else {
-          log.info(`🎨 [GARMENT-COLOUR] ${charName} p${pageNumber} ${kind}: no-op (${res.report?.reason || 'unknown'})`);
-        }
-      }
-      if (work.size) {
-        log.info(`🎨 [GARMENT-COLOUR] Step 1b: ${fixedPages} recoloured, ${attempted - fixedPages} no-op, ${skipped} skipped of ${work.size} flagged in ${((Date.now() - t1b) / 1000).toFixed(1)}s`);
-      }
-    } catch (err) {
-      // Never let a colour repair sink the pipeline — the page ships uncorrected.
-      log.error(`❌ [GARMENT-COLOUR] Step 1b failed: ${err.message} — pages ship uncorrected`);
-    }
-  }
-
   const step1Duration = ((Date.now() - step1Start) / 1000).toFixed(1);
   const avgScore = evaluations.reduce((sum, e) => sum + (e.qualityScore || 0), 0) / Math.max(1, evaluations.length);
   log.info(`✅ [UNIFIED PIPELINE] Step 1 complete in ${step1Duration}s: avg score ${avgScore.toFixed(0)}%, entity issues: ${entityReport.totalIssues}`);
@@ -1091,6 +944,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           imageModel: modelOverrides?.imageModel,
           evaluationFeedback: coverFeedback,
           usageTracker,
+          // The round loop scores + detects this result itself (round detect
+          // + batch eval) — skip the in-iterate eval so covers are evaluated
+          // exactly once per version.
+          skipEval: true,
         });
       } else if (ck) {
         log.debug(`⏭️  [UNIFIED PIPELINE] Skipping cover ${ck} iterate — no image data available yet`);
@@ -2226,6 +2083,149 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     log.warn(`⚠️ [POST-REPAIR-TEXT] Recovery phase failed: ${postRepairErr.message} — keeping pre-recovery best versions`);
   }
 
+  // =========================================================================
+  // Step 4a — mechanical garment-colour repair, ON THE PICKED VERSIONS
+  // =========================================================================
+  // The entity grid reports a garment of the right shape in the wrong colour on
+  // its own channel, carrying no severity and triggering no redraw, because the
+  // fix is deterministic: DINO garment box → SAM mask → L*a*b* match toward the
+  // styled avatar, scaled by a skin-probed lighting factor.
+  //
+  // WHY HERE AND NOT BEFORE THE REPAIR LOOP (owner, 2026-08-10). This used to
+  // run as "Step 1b", against the pre-repair entity check. Two things were wrong
+  // with that:
+  //   1. Its work could be thrown away. On job_1786287569165_7f75jspcz p8 the
+  //      hat and breeches were recoloured and the page was then fully
+  //      regenerated in the repair round — v0 is photoreal, v2 is the shipped
+  //      illustration. The recolour went in the bin with the rest of v0.
+  //   2. It only ever saw the FIRST report. The per-round check (round N,
+  //      repaired pages only) found further drift that nothing consumed: on
+  //      job_1786309527338_4zwhrn08y its 8 mismatches carry no fixOutcome at
+  //      all — not applied, not skipped, no reason.
+  // Running early bought nothing in return, because garment colour deliberately
+  // carries no severity and triggers no redraw (decisions.md 2026-08-06) — there
+  // was no regeneration to save by going first.
+  //
+  // So it runs on the PICKED versions, after pick-best and after the calm-zone
+  // recovery has finished re-pointing them, and reads `currentEntityReport` —
+  // the merged view where repaired pages carry fresh findings and untouched
+  // pages keep their originals. Note it cannot read the Step 4b report below:
+  // that one is ASSEMBLED from stamps with zero eval calls, so it carries no
+  // garmentColourMismatches at all.
+  //
+  // Scores are untouched by design. A colour offset changes no entity
+  // punishment, so recolouring after the pick cannot invalidate the pick.
+  //
+  // AUDITABLE (owner requirement, 2026-08-08): every attempt writes its outcome
+  // back onto the mismatch entry, and a change also stores the BEFORE bytes as a
+  // `garment_before` image — a developer-only image type that never enters the
+  // user-facing version cycle.
+  if (MODEL_DEFAULTS.garmentColourFix) {
+    const tGarment = Date.now();
+    let fixedPages = 0, attempted = 0, skipped = 0;
+    try {
+      const { fixFigureGarmentColour, garmentQueryFor } = require('./garmentColourFix');
+      const { getNextVersionIndex, saveStoryImage } = require('../services/database');
+      const gcStoryId = storyData?.id || jobId || null;
+
+      // DEDUPE on character|page|garment WORD. The channel reports one entry per
+      // garment, so a character with two drifted items on the same page yields
+      // two entries naming the same page — without this the figure is segmented
+      // and recoloured twice, the second pass measuring bytes the first changed.
+      const work = new Map();
+      for (const [charName, charData] of Object.entries(currentEntityReport?.characters || {})) {
+        for (const m of (charData.garmentColourMismatches || [])) {
+          for (const pageNumber of (m.pagesToFix || [])) {
+            const garmentKey = garmentQueryFor(m.garment).key || '(unnamed)';
+            const key = `${charName.toLowerCase()}|${pageNumber}|${garmentKey}`;
+            if (!work.has(key)) work.set(key, { charName, pageNumber, garmentKey, m });
+          }
+        }
+      }
+
+      for (const { charName, pageNumber, garmentKey, m } of work.values()) {
+        // Outcome is recorded on the entry itself, whatever happens.
+        const audit = { garment: garmentKey, at: new Date().toISOString() };
+        m.fixOutcome = audit;
+
+        // The PICKED version is the one that ships — recolour that, not the
+        // pre-repair bytes.
+        const best = finalBestPerPage.get(pageNumber);
+        if (!best?.imageData) { audit.skipped = 'page has no picked version'; skipped++; continue; }
+
+        // Each version carries its own stamped detection — one detection per
+        // bytes — so the figure box always matches the pixels being recoloured.
+        const detection = images().detectionForVersion(best)
+          || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.bboxDetection
+          || null;
+        const fig = (detection?.figures || [])
+          .find(f => (f?.name || '').toLowerCase() === charName.toLowerCase());
+        if (!fig?.bodyBox) {
+          audit.skipped = 'no detected figure on the page';
+          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber} ${garmentKey}: no detected figure — skipped`);
+          skipped++; continue;
+        }
+
+        const character = characters.find(c => (c.name || '').toLowerCase() === charName.toLowerCase());
+        if (!character) { audit.skipped = 'character not in the story'; skipped++; continue; }
+        // NO DEFAULT (owner, 2026-08-07): the avatar is the colour target.
+        if (!m.clothingCategory) {
+          audit.skipped = 'mismatch carries no clothing category';
+          log.error(`❌ [GARMENT-COLOUR] ${charName} p${pageNumber}: no clothing category — refusing to recolour toward a guessed outfit.`);
+          skipped++; continue;
+        }
+        // EXACT category only. The avatar's pixels ARE the colour target, so a
+        // cross-category substitute repaints the garment toward a different
+        // outfit's colour while looking like a confident correction.
+        const avatarUri = await getStyledAvatarForClothing(character, artStyle, m.clothingCategory, { exactCategory: true });
+        if (!avatarUri) {
+          audit.skipped = `no styled avatar for category ${m.clothingCategory}`;
+          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: no styled avatar for category ${m.clothingCategory} — skipped (refusing a cross-category colour target)`);
+          skipped++; continue;
+        }
+
+        attempted++;
+        const before = best.imageData;
+        const res = await fixFigureGarmentColour(before, fig, avatarUri, { garment: m.garment });
+        Object.assign(audit, {
+          applied: !!res.changed,
+          reason: res.report?.reason || null,
+          dinoScore: res.report?.dinoScore ?? null,
+          current: res.report?.current ?? null,
+          target: res.report?.target ?? null,
+          delta: res.report?.delta ?? null,
+          maskPx: res.report?.current?.px ?? null,
+        });
+
+        if (res.changed) {
+          try {
+            if (!gcStoryId) throw new Error('no story id in context');
+            const v = await getNextVersionIndex(gcStoryId, 'garment_before', pageNumber);
+            await saveStoryImage(gcStoryId, 'garment_before', pageNumber, before, {
+              versionIndex: v, generatedAt: new Date().toISOString(),
+            });
+            audit.beforeVersion = v;
+          } catch (e) {
+            // The audit image is a debugging aid — never fail the repair for it.
+            audit.beforeSaveError = e.message;
+            log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: before-image not stored (${e.message})`);
+          }
+          best.imageData = res.imageData;
+          fixedPages++;
+          // Bytes changed → a detection stamped against the old bytes is stale.
+          if (detection) detection.sourceImageFp = null;
+        } else {
+          log.info(`🎨 [GARMENT-COLOUR] ${charName} p${pageNumber} ${garmentKey}: no-op (${res.report?.reason || 'unknown'})`);
+        }
+      }
+      if (work.size) {
+        log.info(`🎨 [GARMENT-COLOUR] Step 4a: ${fixedPages} recoloured, ${attempted - fixedPages} no-op, ${skipped} skipped of ${work.size} flagged in ${((Date.now() - tGarment) / 1000).toFixed(1)}s`);
+      }
+    } catch (err) {
+      // Never let a colour repair sink the pipeline — the page ships uncorrected.
+      log.error(`❌ [GARMENT-COLOUR] Step 4a failed: ${err.message} — pages ship uncorrected`);
+    }
+  }
   // =========================================================================
   // Step 4b: FINAL entity report ASSEMBLED from the picked versions' stamps
   // (owner redesign, 2026-08-09)

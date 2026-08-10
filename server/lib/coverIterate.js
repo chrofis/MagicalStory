@@ -377,6 +377,11 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // returned artImageData gets persisted by the caller, upgrading the old
     // story to editable cover text from that version on.
     forceRestampWhenUnbaked = false,
+    // Pipeline callers (executeIterateAction) score round results themselves
+    // (round detect + batch eval), so they pass skipEval to keep covers
+    // evaluated exactly once. External callers (cover regen routes, Test Lab)
+    // keep the scored contract: eval + detection run here.
+    skipEval = false,
   } = options;
 
   const {
@@ -388,7 +393,11 @@ async function iterateCover(coverKey, storyData, options = {}) {
   } = getStoryHelpers();
 
   const {
-    generateImageWithQualityRetry,
+    generateImageOnly,
+    _maybeGenerateComposite,
+    evaluateImageQuality,
+    detectAllBoundingBoxes,
+    createBboxOverlayImage,
     generateImageCacheKey,
     deleteFromImageCache,
   } = require('./images');
@@ -781,13 +790,11 @@ async function iterateCover(coverKey, storyData, options = {}) {
   }
 
   // --- Composite-vs-direct decision (unchanged gate) ────────────────────
-  // `composite` is now an OPTION on the shared generateImageWithQualityRetry
-  // path — NOT a cover-only fork. We decide compositeOn exactly as before and
-  // hand it + the composite inputs to the single image call below; the shared
-  // function routes to the composite generator internally when composite is on
-  // AND a landmark buffer is present, and renders direct otherwise (the
-  // no-landmark fallback and the composite-throws fallback both live inside the
-  // shared function now — see _maybeGenerateComposite in images.js).
+  // Composite dispatch is the standalone `_maybeGenerateComposite` route
+  // helper (images.js). We decide compositeOn exactly as before and call the
+  // helper directly; it returns null when the landmark-buffer prerequisite is
+  // missing or the composite generator throws, and the direct render below
+  // runs instead.
   //
   // options.compositeCovers === false is an explicit opt-out: the user-facing
   // "Überarbeiten" (regenerate-from-scratch) endpoint passes it so a from-scratch
@@ -850,13 +857,95 @@ async function iterateCover(coverKey, storyData, options = {}) {
     };
   }
 
-  // --- Generate image (single shared path; composite is just an option) ──
-  const imageResult = await generateImageWithQualityRetry(
-    coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, usageTracker, null,
-    { imageModel: imageModel || null },
-    `${coverLabelStr} ITERATE`,
-    { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid, sceneCharacters: selectedCoverCharacters, sceneMetadata: coverSceneMetadata, sceneBackground: coverSceneBackground, clothingRequirements: storyData.clothingRequirements || null, artStyle: artStyleId, composite: compositeOn, compositeInputs, ...(coverAspectOverride ? { aspectRatio: coverAspectOverride } : {}) }
-  );
+  // --- Generate image (shared page generation; composite via route helper) ──
+  const iterateLabel = `${coverLabelStr} ITERATE`;
+  let imageResult = compositeOn
+    ? await _maybeGenerateComposite({ composite: true, compositeInputs }, usageTracker, `[${iterateLabel}] `)
+    : null;
+  if (!imageResult) {
+    // Direct render — the same generation entry pages use. Aspect is explicit:
+    // the measured source aspect for edits of an existing cover, else the
+    // configured cover aspect (never inferred from an evaluationType).
+    const genResult = await generateImageOnly(coverPrompt, coverCharacterPhotos, {
+      previousImage,
+      imageModelOverride: imageModel || null,
+      landmarkPhotos: coverLandmarkPhotos,
+      visualBibleGrid: coverVbGrid,
+      sceneBackground: coverSceneBackground,
+      pageNumber: COVER_PAGE_NUMBERS[coverKey] ?? -1,
+      artStyle: artStyleId,
+      skipCache: true,
+      aspectRatio: coverAspectOverride || MODEL_DEFAULTS.coverAspect,
+      captureLabel: 'image_cover',
+    });
+    // Usage: same provider-style cover_images bucket quality-retry emitted.
+    if (usageTracker && genResult?.usage) {
+      const m = genResult.modelId || '';
+      const genProvider = m.startsWith('runware:') ? 'runware' : m.startsWith('grok-imagine') ? 'grok' : 'gemini_image';
+      usageTracker(genProvider, genResult.usage, 'cover_images', genResult.modelId);
+    }
+
+    // Shared eval + detection — the same primitives the pipeline's Step 1 /
+    // round loop use, run once here for callers that consume the scored
+    // contract (regen routes, Test Lab). Pipeline callers pass skipEval and
+    // score the version in their round eval instead.
+    let evalScore = null;
+    let evalReasoning = skipEval ? 'no gen-time eval (pipeline scores versions)' : null;
+    let coverBboxDetection = null;
+    let coverBboxOverlay = null;
+    if (!skipEval && genResult?.imageData) {
+      try {
+        // evalOptions empty on purpose: the cover prompt carries the full ART
+        // STYLE block, which the evaluator extracts itself (same as the old
+        // gen-time eval did).
+        const qualityResult = await evaluateImageQuality(
+          genResult.imageData, coverPrompt, coverCharacterPhotos, 'cover', null,
+          iterateLabel, null, sceneDescription, selectedCoverCharacters, {}
+        );
+        if (qualityResult) {
+          evalScore = qualityResult.score ?? null;
+          evalReasoning = qualityResult.reasoning || null;
+          if (usageTracker && qualityResult.usage) {
+            usageTracker('gemini_quality', qualityResult.usage, 'cover_quality', qualityResult.modelId);
+          }
+        }
+      } catch (evalErr) {
+        log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: eval failed (${evalErr.message}) — serving unscored render`);
+      }
+      try {
+        coverBboxDetection = await detectAllBoundingBoxes(genResult.imageData, {
+          expectedCharacters: (selectedCoverCharacters || []).map(c => ({
+            name: c.name || c,
+            description: typeof c === 'object' ? (c.description || '') : '',
+          })),
+          expectedObjects: Array.isArray(coverSceneMetadata?.objects)
+            ? coverSceneMetadata.objects.filter(o => typeof o === 'string')
+            : [],
+          sceneContext: sceneDescription,
+          pageContext: iterateLabel,
+          artStyle: artStyleId,
+        });
+        if (coverBboxDetection) {
+          coverBboxOverlay = await createBboxOverlayImage(genResult.imageData, coverBboxDetection);
+        }
+      } catch (bboxErr) {
+        log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: detection failed (${bboxErr.message})`);
+      }
+    }
+
+    imageResult = {
+      imageData: genResult.imageData,
+      score: evalScore,
+      reasoning: evalReasoning,
+      modelId: genResult.modelId,
+      totalAttempts: 1,
+      prompt: genResult.prompt || coverPrompt,
+      grokRefImages: genResult.grokRefImages || null,
+      usage: genResult.usage || null,
+      bboxDetection: coverBboxDetection,
+      bboxOverlayImage: coverBboxOverlay,
+    };
+  }
 
   // Composite path skips quality eval AND the app-side restamp (title/dedication
   // are baked in by the composite passes) — return its result directly, exactly
@@ -939,11 +1028,9 @@ async function iterateCover(coverKey, storyData, options = {}) {
     usage: imageResult.usage,
     previousImage: rehydratedCoverBytes,
     previousScore: existingCover.qualityScore || null,
-    // Detection is part of every image version (owner decision 2026-07-31):
-    // generateImageWithQualityRetry computed these at eval time, but this
-    // return previously dropped them — so the cover regen route's
-    // `iterResult.bboxDetection` read was ALWAYS undefined and cover
-    // versions never carried per-version detection data.
+    // Detection is part of every image version (owner decision 2026-07-31).
+    // Computed by the shared detection above (skipEval callers get theirs
+    // from the pipeline's round detect instead).
     bboxDetection: imageResult.bboxDetection || null,
     bboxOverlayImage: imageResult.bboxOverlayImage || null,
   };
