@@ -103,11 +103,7 @@ const {
   IMAGE_QUALITY_THRESHOLD,
   // Separated evaluation pipeline functions
   generateImageOnly,
-  evaluateImageBatch,
-  // Unified repair pipeline
-  // Bbox detection for covers
-  detectAllBoundingBoxes,
-  createBboxOverlayImage
+  evaluateImageBatch
 } = require('./server/lib/images');
 const { generateReferenceSheet, buildVisualBibleGrid, buildEmptySceneVbGrid } = require('./server/lib/referenceSheets');
 const { runUnifiedRepairPipeline } = require('./server/lib/repairPipeline');
@@ -283,106 +279,9 @@ const { apiRouter: sharingApiRoutes, htmlRouter: sharingHtmlRoutes, initSharingR
 const { initSwissStories, getSwissStoriesResponse } = require('./server/lib/swissStories');
 const { COVER_PAGE_NUMBERS } = require('./server/lib/coverKeys');
 
-/**
- * Run bbox detection on cover images to identify character positions.
- * This enables entity consistency checks to include covers.
- *
- * @param {Object} coverImages - Cover images object with frontCover, initialPage, backCover
- * @param {Array} characters - Array of character objects from the story
- * @returns {Promise<Object>} Updated coverImages with bboxDetection and bboxOverlayImage
- */
-async function detectBboxOnCovers(coverImages, characters, artStyle = null) {
-  if (!coverImages) return coverImages;
-
-  const coverTypes = ['frontCover', 'initialPage', 'backCover'];
-
-  // SPD-5: the three covers are independent (each writes only its own object),
-  // so detect them concurrently instead of sequentially (~25-45s → ~8-15s).
-  await Promise.all(coverTypes.map(async (coverType) => {
-    const cover = coverImages[coverType];
-    if (!cover) return;
-
-    const imageData = cover.imageData;
-    if (!imageData) return;
-
-    // Skip only if the existing detection is a REAL one. Cover generation
-    // stamps a Gemini detection made with ZERO expected characters (the
-    // quality-retry eval has no character list at that point) — DINO+SAM
-    // never ran, figures have no masks, and this guard used to accept it,
-    // so covers shipped maskless (observed job_1786309527338: all three
-    // covers detectionBackend null, expectedCharacters 0). A detection
-    // counts when it names its backend or was made with expected characters.
-    const existing = cover.bboxDetection;
-    if (existing && (existing.detectionBackend === 'grounding-dino'
-      || existing.detectionBackend === 'gemini-second-opinion'
-      || (existing.expectedCharacters?.length || 0) > 0)) return;
-
-    // Use cover's referencePhotos (only the characters that appear on THIS cover)
-    // Fall back to all characters if referencePhotos not available
-    const coverCharacterNames = cover.referencePhotos
-      ? cover.referencePhotos.map(p => p.name)
-      : (characters || []).map(c => c.name);
-    // Build detailed descriptions using full character physical info for better bbox matching
-    const charLookup = new Map((characters || []).map(c => [c.name.toLowerCase(), c]));
-    const expectedCharacters = coverCharacterNames.map(name => {
-      const char = charLookup.get(name.toLowerCase());
-      return {
-        name,
-        description: char ? buildCharacterPhysicalDescription(char) : 'character',
-        position: null  // Covers don't have expected positions
-      };
-    });
-
-    log.debug(`📦 [COVER BBOX] ${coverType}: expecting ${expectedCharacters.length} characters: ${expectedCharacters.map(c => c.name).join(', ')}`);
-
-    try {
-      log.debug(`📦 [COVER BBOX] Running bbox detection on ${coverType}...`);
-
-      const bboxDetection = await detectAllBoundingBoxes(imageData, {
-        expectedCharacters,
-        expectedObjects: [],
-        artStyle
-      });
-
-      if (bboxDetection) {
-        const bboxOverlayImage = await createBboxOverlayImage(imageData, bboxDetection);
-
-        // Calculate missing characters (expected but not identified)
-        const foundNames = new Set(
-          (bboxDetection.figures || [])
-            .map(f => f.name?.toLowerCase())
-            .filter(n => n && n !== 'unknown')
-        );
-        const missingCharacters = expectedCharacters
-          .filter(c => !foundNames.has(c.name.toLowerCase()))
-          .map(c => c.name);
-
-        // Add missing info to detection result
-        bboxDetection.missingCharacters = missingCharacters;
-
-        // Log results with warnings for missing characters
-        const figCount = bboxDetection.figures?.length || 0;
-        const identifiedCount = bboxDetection.figures?.filter(f => f.name && f.name !== 'UNKNOWN').length || 0;
-        log.debug(`📦 [COVER BBOX] ${coverType}: detected ${figCount} figures, ${identifiedCount} identified`);
-
-        if (missingCharacters.length > 0) {
-          log.warn(`🚨 [ISSUE] [COVER BBOX] ${coverType}: MISSING CHARACTERS - ${missingCharacters.join(', ')}`);
-        }
-
-        // Update cover with bbox data
-        cover.bboxDetection = bboxDetection;
-        cover.bboxOverlayImage = bboxOverlayImage;
-      }
-    } catch (err) {
-      log.warn(`⚠️ [COVER BBOX] Failed to detect bbox on ${coverType}: ${err.message}`);
-    }
-  }));
-
-  return coverImages;
-}
-
-// App-side cover typography (MODEL_DEFAULTS.appSideCoverType). Runs AFTER detectBboxOnCovers so the
-// figure boxes are available for placement. Bakes the title / dedication / "magicalstory.ch" onto the
+// App-side cover typography (MODEL_DEFAULTS.appSideCoverType). Figure boxes for placement come
+// from the shared Phase 5b-pre detection (covers are pipeline pages -1/-2/-3), copied back onto
+// coverImages[key].bboxDetection. Bakes the title / dedication / "magicalstory.ch" onto the
 // textless art AND every version (so the served imageVersions[active] row carries the text everywhere
 // — viewer, share, PDF, print), keeping the textless source in artImageData for no-AI title edits.
 // Implementation lives in server/lib/coverTypography.js (single source of truth, unit-testable).
@@ -6310,39 +6209,52 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.error(`❌ [UNIFIED] Cover await failed: ${coverErr.message}`);
         }
         // Add covers to rawImages with negative page numbers
+        const { COVER_HINT_KEY } = require('./server/lib/coverKeys');
         for (const [coverKey, coverData] of Object.entries(coverImages)) {
           if (coverData?.imageData && COVER_PAGE_NUMBERS[coverKey] != null) {
-            // Include text requirements so cover evaluator knows what text to check.
-            // The TITLE comes from `title` (extracted by UnifiedStoryParser from
-            // the unified Sonnet pass at line 3889), NOT from inputData. The
-            // user never types a title — the model invents one. Reading
-            // inputData.title here yields '' on every unified-pipeline run, so
-            // the gate-text becomes `MUST include this exact title text: ""`,
-            // and Gemini correctly flags the rendered title as "unrequested
-            // text" (observed: job_1778525478433_fkl0f12x4 frontCover scored
-            // -20 because of its OWN title). Same fix possibility for
-            // dedication: it lives on coverData / storyData if it's been set.
-            let coverEvalPrompt = coverData.description || coverData.prompt || '';
-            // Title / dedication / branding text is handled in one of two modes.
-            // Mode A (appSideCoverType=false): the image model PAINTS the text into
-            // the art, so the eval must verify it is rendered. Mode B (appSideCoverType
-            // =true, the default): the art is generated TEXTLESS and the title /
-            // dedication / "magicalstory.ch" are composited by the app afterward
-            // (server/lib/coverTypography.js) — so the text is NOT in the image the
-            // evaluator sees. Requiring it in Mode B makes the evaluator flag the
-            // intentionally-textless cover as "missing title text" and tanks a good
-            // cover to 0, which then triggers a destructive composite re-iteration.
-            if (MODEL_DEFAULTS.appSideCoverType) {
-              coverEvalPrompt += '\n\nTEXT NOTE: The title, dedication, and "magicalstory.ch" branding on this cover are handled by the app as a typographic overlay, not painted by the image model. Never flag missing/absent title/dedication/branding text as a defect, and if such text IS present treat it as the intended app-composited overlay — never flag it as unrequested rendered text.';
-            } else if (coverKey === 'frontCover') {
-              const titleForEval = title || inputData.title || inputData.storyTitle || '';
-              if (titleForEval) coverEvalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact title text: "${titleForEval}"`;
-            } else if (coverKey === 'initialPage') {
-              const dedication = coverData.dedication || inputData.dedication || '';
-              if (dedication) coverEvalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact dedication text: "${dedication}"`;
-            } else if (coverKey === 'backCover') {
-              coverEvalPrompt += '\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact text: "magicalstory.ch" in the bottom left corner.';
+            // Text requirements travel as STRUCTURED fields (expectedText /
+            // textMode) on the pseudo-page — never as sentences appended to
+            // sceneDescription (the old string surgery leaked eval-only notes
+            // into the entity check and semantic reference).
+            // Mode A (appSideCoverType=false, textMode 'painted'): the image
+            // model PAINTS the text, so the eval verifies it (expectedText).
+            // The TITLE comes from `title` (extracted by UnifiedStoryParser),
+            // NOT from inputData — the user never types one, the model invents
+            // it. Reading inputData.title first yields '' on every unified run
+            // and the evaluator then flags the cover's OWN title as unrequested
+            // text (observed job_1778525478433_fkl0f12x4: frontCover -20).
+            // Mode B (appSideCoverType=true, default, textMode 'appOverlay'):
+            // art is TEXTLESS, typography composited post-persist
+            // (server/lib/coverTypography.js) — the evaluator must never flag
+            // missing/present title text (a good textless cover otherwise
+            // tanks to 0 and triggers a destructive re-iteration).
+            const textMode = MODEL_DEFAULTS.appSideCoverType ? 'appOverlay' : 'painted';
+            let expectedText = null;
+            if (textMode === 'painted') {
+              if (coverKey === 'frontCover') {
+                expectedText = title || inputData.title || inputData.storyTitle || null;
+              } else if (coverKey === 'initialPage') {
+                expectedText = coverData.dedication || inputData.dedication || null;
+              } else if (coverKey === 'backCover') {
+                expectedText = 'magicalstory.ch';
+              }
             }
+            // Synthetic sceneMetadata from the outline's structured cover hint,
+            // so the shared Phase 5b-pre detection and eval enrich see expected
+            // character positions + objects exactly like pages do.
+            const coverHint = coverHints?.[COVER_HINT_KEY[coverKey]] || null;
+            const hintCharacterPositions = {};
+            if (coverHint?.characterDetails && typeof coverHint.characterDetails === 'object') {
+              for (const d of Object.values(coverHint.characterDetails)) {
+                if (d?.name) hintCharacterPositions[d.name] = d.position || 'center';
+              }
+            }
+            const coverSceneMetadata = {
+              characterPositions: hintCharacterPositions,
+              objects: Array.isArray(coverHint?.objects)
+                ? coverHint.objects.filter(o => typeof o === 'string')
+                : [],
+            };
             // Resolve full character objects for the figures appearing on this
             // cover so downstream eval/enrich/char-repair can identify them by
             // name. Without this, covers reach BBOX-ENRICH with 0 expected
@@ -6357,7 +6269,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             rawImages.push({
               pageNumber: COVER_PAGE_NUMBERS[coverKey],
               text: '',
-              sceneDescription: coverEvalPrompt,
+              sceneDescription: coverData.description || coverData.prompt || '',
+              sceneMetadata: coverSceneMetadata,
+              expectedText,
+              textMode,
               imageData: coverData.imageData,
               prompt: coverData.prompt,
               characterPhotos: coverData.referencePhotos || [],
@@ -6882,15 +6797,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           new Promise((_, reject) => setTimeout(() => reject(new Error('Cover generation timed out after 3 minutes')), COVER_TIMEOUT_MS))
         ]);
 
-        // Run bbox detection on covers for entity consistency checks
-        // Skip when quality evaluation is disabled (trial mode) — bbox data won't be used
-        if (!inputData.skipQualityEval) {
-          try {
-            await detectBboxOnCovers(coverImages, inputData.characters, artStyle);
-          } catch (bboxErr) {
-            log.warn(`⚠️ [UNIFIED] Cover bbox detection failed: ${bboxErr.message}`);
-          }
-        }
+        // Cover bbox detection happens in the shared Phase 5b-pre pass (covers
+        // are pipeline pages -1/-2/-3, detected WITH expected characters). On
+        // this fallback path (pipeline didn't consume the covers) there is no
+        // stored detection — downstream consumers (entity consistency,
+        // typography placement) re-detect or degrade gracefully.
 
         // App-side cover typography is baked ONCE, post-persistence, by
         // bakeCoverTypographyPostPersist (after upsertStory below). The old

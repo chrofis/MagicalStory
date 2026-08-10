@@ -432,6 +432,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       pageText: orig.text,
       sceneHint: orig.scene?.outlineExtract || orig.scene?.sceneHint || null,
       evaluationType: orig.evaluationType,
+      // Structured cover text contract (replaces the old prompt-string surgery):
+      // 'appOverlay' → evaluator must never flag missing/present title text;
+      // 'painted' + expectedText → evaluator letter-checks the painted text.
+      expectedText: orig.expectedText ?? null,
+      textMode: orig.textMode ?? null,
       // Detection reuse, in pairing order: the entry's OWN detection first —
       // a round-result entry carries the detection made on its accepted new
       // bytes (iterate's internal re-detect, or the round pre-detect step) —

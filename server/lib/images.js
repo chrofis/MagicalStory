@@ -1416,19 +1416,21 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     // For cover evaluations: strip art style noise and prepend expected text prominently
     if (evaluationType === 'cover' && promptForEval) {
-      // Extract expected text. Two phrasings exist: the repair pipeline
-      // appends `MUST include this exact … text: "…"`, but the cover
-      // GENERATION templates say `Paint "{STORY_TITLE}" in the upper third`
-      // (front), `Paint "…" as small hand-lettered` (back), `Paint
-      // "<user_input>…</user_input>" in the lower third` (dedication). The
-      // initial-generation eval only sees the template wording — without the
-      // Paint pattern it never letter-checked the title and a misspelled
-      // painted title ("gelhen") sailed through at score 85.
-      const titleMatch = promptForEval.match(/MUST include this exact (?:title |dedication )?text:\s*"([^"]+)"/i);
-      const magicalMatch = promptForEval.match(/MUST include this exact text:\s*"(magicalstory\.ch)"/i);
-      const paintMatch = promptForEval.match(/Paint\s+"([^"]+)"\s+(?:in|as)\b/i);
-      let expectedText = titleMatch?.[1] || magicalMatch?.[1] || paintMatch?.[1];
-      if (expectedText) expectedText = expectedText.replace(/<\/?user_input>/g, '').trim();
+      // Expected text arrives STRUCTURED (evalOptions.expectedText / textMode)
+      // from the pipeline's cover pseudo-page record. Prompt-regex extraction
+      // remains as fallback for callers that evaluate against the raw
+      // generation prompt (the templates say `Paint "{STORY_TITLE}" in the
+      // upper third` etc.) — without the Paint pattern a misspelled painted
+      // title ("gelhen") once sailed through at score 85.
+      const textMode = evalOptions.textMode || null;
+      let expectedText = evalOptions.expectedText || null;
+      if (!expectedText && textMode !== 'appOverlay') {
+        const titleMatch = promptForEval.match(/MUST include this exact (?:title |dedication )?text:\s*"([^"]+)"/i);
+        const magicalMatch = promptForEval.match(/MUST include this exact text:\s*"(magicalstory\.ch)"/i);
+        const paintMatch = promptForEval.match(/Paint\s+"([^"]+)"\s+(?:in|as)\b/i);
+        expectedText = titleMatch?.[1] || magicalMatch?.[1] || paintMatch?.[1];
+        if (expectedText) expectedText = expectedText.replace(/<\/?user_input>/g, '').trim();
+      }
 
       // Strip art style description (noise for evaluator)
       promptForEval = promptForEval.replace(/\*\*ART STYLE[^*]*\*\*[^*]*(?=\*\*|$)/s, '');
@@ -1436,7 +1438,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // Cover portraits: viewer-gaze and a flat title are intended, not defects.
       promptForEval = `COVER NOTE: a book-cover portrait. Do not deduct for characters facing or looking at the viewer, or for the title being flat 2D rather than three-dimensional.\n\n${promptForEval}`;
 
-      if (expectedText) {
+      if (textMode === 'appOverlay') {
+        // Mode B: art is textless; title/dedication/branding composited by the
+        // app after persistence. Was previously appended to the pseudo-page's
+        // sceneDescription as string surgery (server.js pipeline entry).
+        promptForEval = `TEXT NOTE: The title, dedication, and "magicalstory.ch" branding on this cover are handled by the app as a typographic overlay, not painted by the image model. Never flag missing/absent title/dedication/branding text as a defect, and if such text IS present treat it as the intended app-composited overlay — never flag it as unrequested rendered text.\n\n${promptForEval}`;
+      } else if (expectedText) {
         promptForEval = `⚠️ TEXT RULES FOR THIS IMAGE:\nAllowed text: "${expectedText}" — and nothing else prominent.\nSeverities for text issues:\n- Allowed text missing or misspelled (any character difference) → severity: CATASTROPHIC.\n- Other prominent unrequested text on the cover (labels, captions, watermarks, extra words) → severity: MAJOR.\n- Small incidental in-world signage in the background → do not flag; if garbled → severity: MINOR.\nIf the only text on the image is exactly the allowed text, evaluate normally.\n\nBefore reporting a title misspelling, RE-READ the rendered text letter-by-letter against the allowed text above. Report a mismatch ONLY if you can quote the exact rendered string and it differs from the allowed text. If you are uncertain whether the rendering matches, do NOT flag it.\n\n${promptForEval}`;
       }
     }
@@ -5595,6 +5602,10 @@ async function evaluateImageBatch(images, options = {}) {
         // stats to eval_findings (best-effort; no behaviour change).
         {
           artStyle: require('../services/prompts').resolveEvalArtStyle(artStyle, img.prompt || null),
+          // Structured cover text contract from the pseudo-page record
+          // (expectedText / textMode) — see evaluateImageQuality's cover branch.
+          expectedText: img.expectedText ?? null,
+          textMode: img.textMode ?? null,
           storyMeta: {
           storyId, pageNumber: img.pageNumber, artStyle, genre, language,
           charCount: Array.isArray(img.sceneCharacters) ? img.sceneCharacters.length : null,

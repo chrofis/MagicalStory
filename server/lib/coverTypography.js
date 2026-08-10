@@ -3,7 +3,7 @@
 // Ported from the approved prototype (scratchpad titletest/render2.cjs). Rendering is done with
 // @resvg/resvg-js (loads the bundled OFL fonts explicitly, works on Windows dev + Linux prod), then
 // sharp composites the transparent overlay onto the art. Figure placement uses the per-cover
-// bboxDetection.figures[].bodyBox that detectBboxOnCovers already computes — no SAM/YOLO needed.
+// bboxDetection.figures[].bodyBox from the shared pipeline detection (Phase 5b-pre) — no SAM/YOLO needed.
 //
 // Entry point: composeCover({ artBuffer, kind, title, dedication, seed, figures }) -> { buffer, spec }.
 
