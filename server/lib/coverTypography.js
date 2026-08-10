@@ -263,9 +263,10 @@ function bottomRect(occ, gw, gh, W, H, C, adv, Nwant, hcap) {
   if (!best) best = { fs: H * 0.03, N: Nwant, x0: 0.10, x1: 0.90, y0: 0.93 - 0.055 * Nwant, y1: 0.955 };
   return best;
 }
-const BRAND_INSET = 0.08;                                       // brand stays ≥8% from every page border
+const BRAND_INSET = 0.08;                                       // brand stays ≥8% from the side borders
+const BRAND_INSET_Y = 0.05;                                     // but only 5% from the bottom (owner request 2026-08-10)
 function brandSlot(grid, gw, gh, boxW, boxH) {
-  const yb = 1 - BRAND_INSET, yt = yb - boxH;
+  const yb = 1 - BRAND_INSET_Y, yt = yb - boxH;
   let best = null;
   for (const cx of [BRAND_INSET + boxW / 2, 1 - BRAND_INSET - boxW / 2]) { // left / right corner, 8% inset
     const x0 = cx - boxW / 2, x1 = cx + boxW / 2;
