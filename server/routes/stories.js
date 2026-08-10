@@ -3474,7 +3474,7 @@ router.put('/:id/text', authenticateToken, async (req, res) => {
     // If admin is impersonating, allow access to the impersonated user's stories
     // The impersonation token has req.user.id set to the impersonated user's ID
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       // Admin impersonating - try with impersonated user's ID first, then allow any story
       rows = await dbQuery(
         'SELECT data, user_id FROM stories WHERE id = $1 AND user_id = $2',
@@ -3546,7 +3546,7 @@ router.put('/:id/title', authenticateToken, async (req, res) => {
 
     // Handle impersonation similar to text endpoint
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery(
         'SELECT data, user_id FROM stories WHERE id = $1 AND user_id = $2',
         [id, req.user.id]
@@ -3633,7 +3633,7 @@ router.post('/:id/repaint-title', authenticateToken, async (req, res) => {
     }
 
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
       if (!rows.length) rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
     } else {
@@ -3691,7 +3691,7 @@ router.put('/:id/dedication', authenticateToken, async (req, res) => {
     }
 
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
       if (rows.length === 0) rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
     } else {
@@ -3743,7 +3743,7 @@ router.put('/:id/cover-typography', authenticateToken, async (req, res) => {
     }
 
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
       if (rows.length === 0) rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
     } else {
@@ -4142,7 +4142,7 @@ router.post('/:id/text-overlay/:pageNum', authenticateToken, async (req, res) =>
 
     // Verify ownership
     let rows;
-    if (req.user.impersonating && req.user.originalAdminId) {
+    if (canReadAnyStory(req)) {
       rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
     } else {
       rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
