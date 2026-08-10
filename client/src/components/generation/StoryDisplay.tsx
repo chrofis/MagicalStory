@@ -44,7 +44,9 @@ interface StyledAvatarGenerationEntry {
   innerOutfitScore?: number | null;
   innerFinalScore?: number | null;
   combinedScore?: number | null;
-  inputs: {
+  // Guarantee-path warning entries carry only { warning, success:false } — no inputs.
+  warning?: string;
+  inputs?: {
     facePhoto?: { identifier?: string; sizeKB?: number; imageData?: string } | null;
     originalAvatar?: { identifier?: string; sizeKB?: number; imageData?: string };
     styleSample?: { identifier?: string; sizeKB?: number; imageData?: string } | null;
@@ -862,27 +864,29 @@ export function StoryDisplay({
       return loaded[field] as string;
     }
 
-    // Check entry data
+    // Check entry data. Guarantee-path warning entries have no inputs object.
     if (field === 'output' && entry.output?.imageData) {
       return entry.output.imageData;
     }
-    if (field === 'facePhoto' && entry.inputs.facePhoto?.imageData) {
-      return entry.inputs.facePhoto.imageData;
+    const inputs = entry.inputs;
+    if (!inputs) return null;
+    if (field === 'facePhoto' && inputs.facePhoto?.imageData) {
+      return inputs.facePhoto.imageData;
     }
-    if (field === 'originalAvatar' && 'originalAvatar' in entry.inputs && entry.inputs.originalAvatar?.imageData) {
-      return entry.inputs.originalAvatar.imageData;
+    if (field === 'originalAvatar' && 'originalAvatar' in inputs && inputs.originalAvatar?.imageData) {
+      return inputs.originalAvatar.imageData;
     }
-    if (field === 'styleSample' && 'styleSample' in entry.inputs && entry.inputs.styleSample?.imageData) {
-      return entry.inputs.styleSample.imageData;
+    if (field === 'styleSample' && 'styleSample' in inputs && inputs.styleSample?.imageData) {
+      return inputs.styleSample.imageData;
     }
-    if (field === 'standardAvatar' && 'standardAvatar' in entry.inputs && entry.inputs.standardAvatar?.imageData) {
-      return (entry.inputs.standardAvatar as { imageData?: string }).imageData || null;
+    if (field === 'standardAvatar' && 'standardAvatar' in inputs && inputs.standardAvatar?.imageData) {
+      return (inputs.standardAvatar as { imageData?: string }).imageData || null;
     }
-    if (field === 'referenceAvatar' && 'referenceAvatar' in entry.inputs && entry.inputs.referenceAvatar?.imageData) {
-      return (entry.inputs.referenceAvatar as { imageData?: string }).imageData || null;
+    if (field === 'referenceAvatar' && 'referenceAvatar' in inputs && inputs.referenceAvatar?.imageData) {
+      return (inputs.referenceAvatar as { imageData?: string }).imageData || null;
     }
-    if (field === 'phantom' && 'phantom' in entry.inputs && (entry.inputs as { phantom?: { imageData?: string } }).phantom?.imageData) {
-      return (entry.inputs as { phantom?: { imageData?: string } }).phantom?.imageData || null;
+    if (field === 'phantom' && 'phantom' in inputs && (inputs as { phantom?: { imageData?: string } }).phantom?.imageData) {
+      return (inputs as { phantom?: { imageData?: string } }).phantom?.imageData || null;
     }
 
     return null;
@@ -3700,11 +3704,18 @@ export function StoryDisplay({
                         </span>
                       )}
                       <span className="text-xs text-gray-500 ml-auto">
-                        {(entry.durationMs / 1000).toFixed(1)}s
+                        {entry.durationMs != null ? `${(entry.durationMs / 1000).toFixed(1)}s` : ''}
                       </span>
                     </summary>
                     <div className="mt-3 space-y-3">
+                      {/* Warning-only entries (guarantee path) carry no inputs */}
+                      {entry.warning && (
+                        <div className="bg-red-50 border border-red-200 p-2 rounded text-xs text-red-700">
+                          {entry.warning}
+                        </div>
+                      )}
                       {/* Inputs */}
+                      {entry.inputs && (
                       <div className="bg-blue-50 p-2 rounded text-xs">
                         <span className="font-semibold text-blue-700">
                           Inputs{entry.sheetFormat ? ` (${entry.sheetFormat})` : ''}:
@@ -3725,6 +3736,7 @@ export function StoryDisplay({
                           )}
                         </div>
                       </div>
+                      )}
 
                       {/* Prompt */}
                       {entry.prompt && (
