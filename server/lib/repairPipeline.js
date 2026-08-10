@@ -928,6 +928,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // Reuse the saved empty-scene plate via the explicit sceneBackground
         // above; never regenerate a fresh plate during repair.
         singlePassScene: !img.emptySceneImage,
+        // The round loop scores + detects this result itself (round detect
+        // + batch eval) — skip the in-iterate eval so pages are evaluated
+        // exactly once per version.
+        skipEval: true,
       });
       // iteratePage tracks its own usage internally; nothing to add here
     } else if (img.pageNumber < 0 && storyData) {

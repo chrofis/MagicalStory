@@ -35,7 +35,7 @@ const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
 // in-flight consumers; saveStoryData/saveStoryImage and the frontend now
 // read canonical only.
 //
-// imageResult shape from generateImageWithQualityRetry / iterate:
+// imageResult shape from the shared gen + eval path (generateImageOnly + evaluateImageQuality) / iterate:
 //   { score, qualityReasoning, fixableIssues, fixTargets, semanticResult,
 //     threeStageResult, modelId, ... }
 // SINGLE SCALE (2026-07-10): finalScore is the math model computed from the
@@ -119,7 +119,6 @@ const {
   generateImageOnly,
   generateWithIterativePlacement,
   applyStyleTransfer,
-  generateImageWithQualityRetry,
   evaluateImageQuality,
   editImageWithPrompt,
   deleteFromImageCache,
@@ -748,12 +747,58 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     // without this, regen falls through to the global 3:4 default and crops
     // square pages to portrait.
     const sceneAspect = currentImage?.imageAspect || null;
-    const imageResult = await generateImageWithQualityRetry(
-      imagePrompt, referencePhotos, null, 'scene', null, null, null,
-      { imageModel: imageModelId },
-      `PAGE ${pageNumber}`,
-      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata, aspectRatio: sceneAspect, clothingRequirements: storyData.clothingRequirements || null, artStyle: storyData.artStyle || null }
-    );
+    const genResult = await generateImageOnly(imagePrompt, referencePhotos, {
+      imageModelOverride: imageModelId,
+      landmarkPhotos: pageLandmarkPhotos,
+      visualBibleGrid,
+      pageNumber,
+      artStyle: storyData.artStyle || null,
+      skipCache: true,
+      aspectRatio: sceneAspect || MODEL_DEFAULTS.pageAspect,
+      captureLabel: 'image_scene',
+    });
+
+    // Shared eval + detection — the same primitives the unified pipeline uses
+    // (Step 1 batch eval / Phase 5b-pre detection), run once for this version.
+    let regenQuality = null;
+    try {
+      regenQuality = await evaluateImageQuality(
+        genResult.imageData, imagePrompt, referencePhotos, 'scene', null,
+        `PAGE ${pageNumber}`, null, null, sceneCharacters, {}
+      );
+    } catch (evalErr) {
+      log.warn(`⚠️ [REGEN] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored version`);
+    }
+    let regenDetection = null;
+    try {
+      regenDetection = await detectAllBoundingBoxes(genResult.imageData, {
+        expectedCharacters: (sceneCharacters || []).map(c => ({
+          name: c.name || c,
+          description: typeof c === 'object' ? (c.description || '') : '',
+        })),
+        expectedObjects: Array.isArray(sceneMetadata?.objects)
+          ? sceneMetadata.objects.filter(o => typeof o === 'string')
+          : [],
+        sceneContext: expandedDescription,
+        pageContext: `PAGE ${pageNumber}`,
+        artStyle: storyData.artStyle || null,
+      });
+    } catch (bboxErr) {
+      log.warn(`⚠️ [REGEN] Page ${pageNumber}: detection failed (${bboxErr.message})`);
+    }
+    // Same contract shape the old gen+eval bundle returned: eval fields
+    // (score, reasoning, fixTargets, fixableIssues, semanticResult,
+    // threeStageResult) + generation fields on top.
+    const imageResult = {
+      ...(regenQuality || {}),
+      imageData: genResult.imageData,
+      modelId: genResult.modelId,
+      qualityModelId: regenQuality?.modelId || null,
+      grokRefImages: genResult.grokRefImages || null,
+      totalAttempts: 1,
+      retryHistory: [],
+      bboxDetection: regenDetection,
+    };
 
     // Log API costs for this regeneration
     const imageCost = calculateImageCost(imageModelId, imageResult.totalAttempts || 1);
@@ -837,7 +882,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
       })),
       // Detection is part of every image version (owner decision): the
-      // eval-time detection computed by generateImageWithQualityRetry rides
+      // detection computed by the shared detection pass above rides
       // on the version so the viewer never shows another version's boxes.
       bboxDetection: imageResult.bboxDetection || null,
       hasBboxOverlay: !!imageResult.bboxDetection,

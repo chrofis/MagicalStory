@@ -6309,6 +6309,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // at the scene-expansion-prescribed pose. Falls through silently when
     // the story has no sheet for the character yet (legacy stories pre-Phase-1).
     useStorySheetCells = true,
+    // Pipeline callers (executeIterateAction) score round results themselves
+    // (round detect + batch eval) — they pass skipEval so pages are evaluated
+    // exactly once per version. External callers (regen/iterate routes) keep
+    // the scored contract: eval + detection run here.
+    skipEval = false,
   } = options;
   const effectiveReferenceMode = referenceMode || CONFIG_DEFAULTS.referenceMode || 'strict';
   // Explicit boolean from caller wins over the run-level default.
@@ -7028,12 +7033,69 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       sceneBackground: refApplied.sceneBackground,
     });
   } else {
-    imageResult = await generateImageWithQualityRetry(
-      imagePrompt, refApplied.characterPhotos, previousImage, 'scene', null, usageTracker, null,
-      { imageModel: imageModelOverride },
-      `PAGE ${pageNumber} ITERATE`,
-      { landmarkPhotos: refApplied.landmarkPhotos, visualBibleGrid: refApplied.visualBibleGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata, aspectRatio: sceneAspect, sceneBackground: refApplied.sceneBackground, visualBible: storyData?.visualBible || null, clothingRequirements, artStyle }
-    );
+    // Shared page generation — same entry Phase 5a uses. Eval + detection run
+    // via the shared primitives below (skipped for pipeline callers, which
+    // score round results themselves).
+    const iterLabel = `PAGE ${pageNumber} ITERATE`;
+    const genResult = await generateImageOnly(imagePrompt, refApplied.characterPhotos, {
+      previousImage,
+      imageModelOverride,
+      landmarkPhotos: refApplied.landmarkPhotos,
+      visualBibleGrid: refApplied.visualBibleGrid,
+      sceneBackground: refApplied.sceneBackground,
+      pageNumber,
+      artStyle,
+      skipCache: true,
+      aspectRatio: sceneAspect,
+      captureLabel: 'image_scene',
+    });
+    if (usageTracker && genResult?.usage) {
+      const m = genResult.modelId || '';
+      const genProvider = m.startsWith('runware:') ? 'runware' : m.startsWith('grok-imagine') ? 'grok' : 'gemini_image';
+      usageTracker(genProvider, genResult.usage, 'page_images', genResult.modelId);
+    }
+    let iterQuality = null;
+    let iterDetection = null;
+    if (!skipEval && genResult?.imageData) {
+      try {
+        iterQuality = await evaluateImageQuality(
+          genResult.imageData, imagePrompt, refApplied.characterPhotos, 'scene', null,
+          iterLabel, null, null, sceneCharacters, {}
+        );
+        if (usageTracker && iterQuality?.usage) {
+          usageTracker('gemini_quality', iterQuality.usage, 'page_quality', iterQuality.modelId);
+        }
+      } catch (evalErr) {
+        log.warn(`⚠️ [ITERATE] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored render`);
+      }
+      try {
+        iterDetection = await detectAllBoundingBoxes(genResult.imageData, {
+          expectedCharacters: (sceneCharacters || []).map(c => ({
+            name: c.name || c,
+            description: typeof c === 'object' ? (c.description || '') : '',
+          })),
+          expectedObjects: Array.isArray(iterateSceneMetadata?.objects)
+            ? iterateSceneMetadata.objects.filter(o => typeof o === 'string')
+            : [],
+          sceneContext: newSceneDescription,
+          pageContext: iterLabel,
+          artStyle,
+        });
+      } catch (bboxErr) {
+        log.warn(`⚠️ [ITERATE] Page ${pageNumber}: detection failed (${bboxErr.message})`);
+      }
+    }
+    imageResult = {
+      ...(iterQuality || {}),
+      imageData: genResult.imageData,
+      modelId: genResult.modelId,
+      qualityModelId: iterQuality?.modelId || null,
+      grokRefImages: genResult.grokRefImages || null,
+      totalAttempts: 1,
+      bboxDetection: iterDetection,
+    };
+    if (imageResult.score === undefined) imageResult.score = null;
+    if (skipEval) imageResult.reasoning = 'no gen-time eval (pipeline scores versions)';
   }
 
   log.info(`🔄 [ITERATE] Page ${pageNumber}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
