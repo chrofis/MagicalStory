@@ -29,6 +29,7 @@ Requirements:
 - Every beat is visible: something happens that a picture can show. A page of pure reflection cannot be illustrated.
 - No more than {MAX_CHARACTERS_PER_SCENE} named characters in any one scene.
 - Any character who forces or blocks something must be present in the scene where it happens.
+- Vary the cast page to page. Prefer pages with at most three named characters. The main character appears on most pages; the others come and go in different combinations, not the whole group on every page. Include some pages that break the pattern — an establishing view with no named characters, a page with the characters small and distant, and a page with one character in close-up. Bring the whole cast together only when the beat needs it, and plan those as wide or distant views.
 
 # OUTPUT FORMAT
 
