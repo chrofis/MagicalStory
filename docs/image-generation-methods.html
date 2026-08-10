@@ -153,11 +153,11 @@
 </tr>
 
 <tr>
-  <td><code>generateImageWithQualityRetry(prompt, charPhotos, …)</code></td>
-  <td><code>server/lib/images.js:10585</code></td>
-  <td><strong>Dispatcher + retry loop</strong> → Grok / Gemini</td>
-  <td>Same as <code>generateImageOnly</code> + quality eval callback.</td>
-  <td>Loops up to <code>maxPasses</code>: generate → eval → redo on low score / many issues. Returns best version. Primary entry point for scenes, covers, empty backgrounds.</td>
+  <td><code>generateImageWithQualityRetry</code> <strong>🗑 DELETED 2026-08-10</strong></td>
+  <td>—</td>
+  <td>—</td>
+  <td>—</td>
+  <td>The gen+eval+bbox+retry bundle was removed (see <code>docs/decisions.md</code> "One image pipeline — generateImageWithQualityRetry eliminated"). Generation is <code>generateImageOnly</code> everywhere; eval/detection happen once in the unified pipeline (Step 1 / Phase 5b-pre) or explicitly in <code>iterateCover</code>/<code>iteratePageCore</code>/regen routes for scored callers; composite dispatch is the standalone <code>_maybeGenerateComposite</code> route helper.</td>
 </tr>
 
 <tr>
@@ -181,7 +181,7 @@
   <td><code>server/lib/images.js:11530–12450</code></td>
   <td>—</td>
   <td>Seed image + bounding boxes + mask + fix prompt.</td>
-  <td><strong>ZERO live callers</strong> (audit 2026-07-09; DEAD CODE banners in source). Left over from an unshipped mask-based inpaint plan. This dispatcher is the only reader of <code>MODEL_DEFAULTS.inpaintBackend</code> — changing that config value changes nothing. <code>MODEL_DEFAULTS.enableAutoRepair</code> is likewise dead: nothing reads it, and the <code>generateImageWithQualityRetry</code> option it mirrors defaults to false with no caller flipping it. Kept marked-not-deleted per user decision.</td>
+  <td><strong>ZERO live callers</strong> (audit 2026-07-09; DEAD CODE banners in source). Left over from an unshipped mask-based inpaint plan. This dispatcher is the only reader of <code>MODEL_DEFAULTS.inpaintBackend</code> — changing that config value changes nothing. <code>MODEL_DEFAULTS.enableAutoRepair</code> is likewise dead: nothing reads it (the quality-retry option it once mirrored was deleted with that function on 2026-08-10). Kept marked-not-deleted per user decision.</td>
 </tr>
 
 <tr>
@@ -261,28 +261,28 @@
 
 <tr>
   <td>Generate a story page image (initial)</td>
-  <td><code>generateImageWithQualityRetry</code></td>
+  <td><code>generateImageOnly</code> (Phase 5a, via <code>decidePageRoute</code>)</td>
   <td>Grok edit (default) → composite path if <code>enableSceneComposite</code></td>
   <td>Routed by <code>simplePageImage</code> / <code>complexPageImage</code> defaults (both Grok). Iterate-page uses the same function.</td>
 </tr>
 
 <tr>
   <td>Iterate / redo a page (user-triggered or auto-repair)</td>
-  <td><code>POST /api/stories/:id/iterate/:pageNumber</code> → <code>generateImageWithQualityRetry</code></td>
+  <td><code>POST /api/stories/:id/iterate/:pageNumber</code> → <code>iteratePageCore</code> → <code>generateImageOnly</code> + shared eval/detection (<code>skipEval</code> for pipeline rounds)</td>
   <td>Same as initial</td>
   <td>Re-expands scene description, regenerates, replaces active version.</td>
 </tr>
 
 <tr>
   <td>Generate front cover / initial page / back cover</td>
-  <td><code>server/lib/coverIterate.js</code> → <code>generateImageWithQualityRetry(..., { composite, compositeInputs })</code></td>
+  <td><code>server.js</code> streaming cover / <code>server/lib/coverIterate.js</code> → <code>generateImageOnly</code>; composite via the <code>_maybeGenerateComposite</code> route helper</td>
   <td>Grok edit</td>
-  <td><strong>Composite is now an OPTION on the shared image path, not a fork.</strong> <code>iterateCover</code> computes <code>compositeOn</code> (figure-count gate, explicit-flag override) and passes <code>composite: compositeOn</code> + <code>compositeInputs</code> into the SAME <code>generateImageWithQualityRetry</code> call every page uses. Inside, <code>_maybeGenerateComposite</code> routes to <code>generateCoverViaComposite</code> when <code>composite===true</code> AND a landmark buffer is present, else runs the direct generate+eval path (also the no-landmark / composite-throws fallback). Pages pass no option → default off → direct. Different DEFAULTS (covers on for &gt;5 figures, pages off), one CODE path.</td>
+  <td><strong>Composite is a route helper on the shared image path, not a fork.</strong> <code>iterateCover</code> computes <code>compositeOn</code> (figure-count gate, explicit-flag override) and calls <code>_maybeGenerateComposite</code> directly; it routes to <code>generateCoverViaComposite</code> when <code>composite===true</code> AND a landmark buffer is present, else runs the direct generate+eval path (also the no-landmark / composite-throws fallback). Pages pass no option → default off → direct. Different DEFAULTS (covers on for &gt;5 figures, pages off), one CODE path.</td>
 </tr>
 
 <tr>
   <td>Generate empty scene background</td>
-  <td><code>generateImageWithQualityRetry</code> with <code>emptyScenePrompt</code></td>
+  <td><code>generateImageOnly</code> with <code>emptyScenePrompt</code></td>
   <td>Grok edit (no character refs)</td>
   <td>Skipped entirely when <code>singlePassScene</code> is true and scene-composite is off.</td>
 </tr>

@@ -2,7 +2,7 @@
  * COMPOSITE render method for cover images.
  *
  * One of two render methods available. The other is the DIRECT method
- * (single-pass prompt → image via generateImageWithQualityRetry), defined
+ * (single-pass prompt → image via generateImageOnly), defined
  * in server/lib/images.js. Routing between methods happens in
  * server/lib/coverIterate.js based on MODEL_DEFAULTS.compositeCovers and
  * per-call options.

@@ -1055,7 +1055,7 @@ async function loadLandmarkBytes(lm) {
  * Build the cover-specific reference set (landmark photos, optional empty-scene
  * background plate, VB grid) so initial-gen and iterate can both use the same
  * anchors. Returns the same shape both call sites pass into
- * generateImageWithQualityRetry's options bag.
+ * the shared generation call (generateImageOnly + composite route helper).
  *
  * @param {Object} args
  * @param {string} args.coverKey - 'frontCover' | 'initialPage' | 'backCover'

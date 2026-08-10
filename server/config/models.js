@@ -446,7 +446,7 @@ const MODEL_DEFAULTS = {
 
   // ─── Composite Cover mode ────────────────────────────────────────────
   // When true, cover pages (frontCover, initialPage, backCover) skip the
-  // normal generateImageWithQualityRetry path and instead use a manual
+  // normal direct render path and instead use a manual
   // composite + 2-pass Grok edit:
   //   1. Pull the story's costumed avatars for each character.
   //   2. Background-remove via Python rembg service.

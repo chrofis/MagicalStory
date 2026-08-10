@@ -8327,7 +8327,7 @@ async function _processStoryJobImpl(jobId) {
 // NOTE: Image generation functions moved to server/lib/images.js
 // Includes: generateImageCacheKey, cropImageForSequential, compressImageToJPEG,
 //           evaluateImageQuality, rewriteBlockedScene, callGeminiAPIForImage,
-//           editImageWithPrompt, generateImageWithQualityRetry
+//           editImageWithPrompt, generateImageOnly
 // =============================================================================
 
 

@@ -1,8 +1,8 @@
 /**
  * Faithfulness unit test for `_maybeGenerateComposite` — the composite-vs-direct
- * router that makes `composite` a first-class OPTION on the shared image path
- * (generateImageWithQualityRetry). See docs/decisions.md "Covers = images;
- * composite is a shared-path option".
+ * route helper on the shared image path (called directly by iterateCover; the
+ * former generateImageWithQualityRetry wrapper is deleted). See
+ * docs/decisions.md "Covers = images; composite is a shared-path option".
  *
  * Proves the OWNER PRINCIPLE mechanically:
  *   • composite absent / false  → returns null (→ shared path runs the DIRECT

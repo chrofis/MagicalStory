@@ -3285,7 +3285,7 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
 /**
  * Grid-based artifact repair. Contract (gridBasedRepair.js):
  * (imageDataUri, pageNumber, {quality, incremental, final}, {outputDir, ...})
- * — same call shape as images.js generateImageWithQualityRetry.
+ * (gridBasedRepair's own contract; the former quality-retry wrapper is gone).
  */
 async function runArtifactRepairStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');

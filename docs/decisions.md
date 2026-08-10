@@ -8188,3 +8188,55 @@ wall-clock delta.
 
 **Touched:** `server/lib/beatsPipeline.js`, `server/lib/promptBuilders.js`,
 `prompts/story-text-from-beats.txt`.
+
+## 2026-08-10 — One image pipeline: generateImageWithQualityRetry eliminated; covers are pages with flags
+
+**Context:** Covers and story pages ran through two divergent code paths. Covers used
+`generateImageWithQualityRetry` — a gen + inline eval + characterless bbox + vestigial retry
+loop bundle — got evaluated twice (gen-time AND pipeline Step 1), shipped maskless detections
+that `detectBboxOnCovers` patched post-hoc, and forked repair (`iterateCover` through the same
+bundle). Page iterate and the regen route also flowed through the bundle. The owner demanded
+(repeatedly) ONE pipeline and ONE generation function. Full inventory:
+`docs/plans/2026-08-10-cover-page-unification-review.md`; plan executed over 6 commits
+(`refactor(unify): step 1..6`).
+
+**Decision:**
+- `generateImageOnly` is the ONLY generation entry — initial covers (server.js streaming
+  block), `iterateCover`, `iteratePageCore`, and the page regen route all call it. Aspect is
+  always explicit (`MODEL_DEFAULTS.coverAspect` for covers, per-scene aspect for pages) —
+  never inferred from an evaluationType.
+- Eval + detection happen ONCE per version: pipeline images (pages AND cover pseudo-pages
+  -1/-2/-3) in Step 1 `evaluateImageBatch` + Phase 5b-pre shared detection; iterate/regen
+  callers that need a scored return run `evaluateImageQuality` + `detectAllBoundingBoxes`
+  explicitly, and pipeline round callers pass `skipEval` (the round loop scores its own
+  results).
+- Cover text requirements travel as structured `expectedText` / `textMode`
+  ('painted'|'appOverlay') fields on the pseudo-page record, consumed by
+  `evaluateImageQuality`'s cover branch — no more prompt-string surgery at pipeline entry.
+- Cover pseudo-pages carry a synthetic `sceneMetadata` (characterPositions + objects from the
+  outline cover hint), so shared detection runs WITH named expected characters.
+  `detectBboxOnCovers` deleted — its only purpose was patching the characterless gen-time stamp.
+- Composite dispatch is the standalone `_maybeGenerateComposite` route helper, called directly
+  by `iterateCover`.
+- Deleted as dead with the bundle: the retry loop (MAX_ATTEMPTS was 1 for every production
+  caller), the safety-block scene rewrite (`callTextModel` always null; `generateImageOnly`
+  has its own sanitize loop), the incremental-consistency block (never enabled), the internal
+  auto-repair hook, `buildBboxSceneContext`, and the `getGridBasedRepair` lazy loader
+  (`gridBasedRepair` itself stays — the regen route uses it).
+- `partial_cover` checkpoints are score-less by design; the score arrives with the pipeline
+  eval, like pages. Usage buckets unchanged (`cover_images`/`cover_quality`/`page_images`/
+  `page_quality`). Trial mode unchanged: pipeline skipped → covers get no eval and no detection.
+- TITLE_ERROR routing: a misspelled/missing painted title is a CATASTROPHIC eval finding, and
+  `decideRepairMethod`'s severity gate routes CATASTROPHIC to iterate — the old in-gen regen
+  gate is not needed.
+
+**Rationale:** One code path means cover fixes can't drift from page fixes again; covers get
+strictly better detection (DINO+SAM with named characters instead of a characterless Gemini
+stamp), exactly one eval per version instead of two, and ~1.1k lines of dead machinery are gone.
+
+**Touched:** `server.js`, `server/lib/images.js`, `server/lib/coverIterate.js`,
+`server/lib/repairPipeline.js`, `server/lib/styleRepair.js`, `server/lib/entityConsistency.js`,
+`server/lib/coverTypography.js`, `server/routes/regeneration.js`, `server/lib/coverKeys.js`
+(single cover-page map), `docs/image-routing.md`, `docs/image-generation-methods.html`.
+
+**Status:** ✅ active
