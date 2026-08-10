@@ -8421,3 +8421,44 @@ a colour-only page count as actionable work.
 `tests/manual/garmentHueNormalize.test.js` (TEST 5 rewritten for the new shape).
 
 **Status:** ✅ active
+
+### A judge that cannot punctuate must not delete a good image (2026-08-10)
+
+**Context:**   Attempt 1 of the German/pirate/steampunk showcase
+(`job_1786395764032_0qa6x9nsp`) lost 3 of 5 costumed avatars to
+`[CHARACTER 2×4] pass-1 generation failed for Hans: Expected ',' or '}' after
+property value in JSON at position 310`. The sheets themselves were fine — the
+bodies-row judge returned malformed JSON, `parseJudgeJson` threw, the throw
+propagated out of `generateComposited2x4`, and the character lost its reference
+sheet entirely. Those characters then render from text on every page, which is
+exactly the "five strangers" failure this codebase already paid for once.
+
+The blast radius came from severity inversion: an eval is a QUALITY GATE, and a
+gate failing open costs one unscored sheet, while a gate failing closed costs
+the character its face in the whole book.
+
+**Decision:** Three changes, in `server/lib/character2x4Sheet.js`:
+1. `reviewBodyRow` / `reviewHeadRow` calls are wrapped — a judge failure keeps
+   the image, scores it 0, records `evalFailed` in `attemptHistory`, and logs
+   loudly. Generation never dies because scoring did.
+2. `parseJudgeJson` repairs a trailing comma before `}` / `]`, the one
+   unambiguous malformation. Reached only after a real parse failure, so it can
+   help and cannot hurt.
+3. Its error now includes the payload. The old message was JSON.parse's own
+   ("Expected ',' or '}' at position 310"), which says nothing about what the
+   judge wrote — three avatars were lost with no way to see the cause.
+
+**Rationale:** Comment-stripping was written and then deliberately dropped: a
+regex removing `//` mangles any string containing a URL, and with the caller now
+surviving parse failures the extra cleverness buys nothing. Repair the
+unambiguous case, survive the rest, and always print what arrived.
+
+Not yet known: WHY the judge produced malformed JSON on exactly those three
+sheets. The payload is now in the log, so the next occurrence is diagnosable
+rather than a guess. Possible contributor: the `costumeReads` sub-object added
+to `sheet-row-bodies-eval.txt` earlier the same day lengthened the required
+output — unproven, and the containment above holds either way.
+
+**Touched:**   `server/lib/character2x4Sheet.js` (`parseJudgeJson`,
+`generateComposited2x4` body/head review calls, `_internal` export for tests)
+**Status:**    ✅ active

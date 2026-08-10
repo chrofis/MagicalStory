@@ -395,7 +395,17 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     if (!res?.imageData) { attemptHistory.push({ stage: 'body', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_body_row', res.modelId);
     let review = { valid: true, score: 10, bodies: null };
-    if (!skipReview) review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker });
+    if (!skipReview) {
+      try {
+        review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker });
+      } catch (err) {
+        // Keep the sheet. Losing the eval costs a quality gate; losing the
+        // sheet costs the character its face on every page of the book, which
+        // is strictly worse. Loud, and visible in attemptHistory.
+        log.error(`[CHARACTER 2×4] ${character?.name} body eval FAILED (${err.message}) — keeping the unscored sheet`);
+        review = { valid: true, score: 0, bodies: null, evalFailed: err.message };
+      }
+    }
     attemptHistory.push({ stage: 'body', try: t, score: review.score, valid: review.valid, reasons: review.bodies?.failureReasons || [] });
     if (!bestBody || review.score > bestBody.review.score) bestBody = { row: res.imageData, review };
     if (review.valid) break;
@@ -415,7 +425,14 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     if (!res?.imageData) { attemptHistory.push({ stage: 'head', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_head_row', res.modelId);
     let review = { valid: true, score: 10, heads: null, identity: null };
-    if (!skipReview) review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker });
+    if (!skipReview) {
+      try {
+        review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker });
+      } catch (err) {
+        log.error(`[CHARACTER 2×4] ${character?.name} head eval FAILED (${err.message}) — keeping the unscored row`);
+        review = { valid: true, score: 0, heads: null, identity: null, evalFailed: err.message };
+      }
+    }
     attemptHistory.push({ stage: 'head', try: t, score: review.score, valid: review.valid });
     if (!bestHead || review.score > bestHead.review.score) bestHead = { row: res.imageData, review };
     if (review.valid) break;
@@ -717,8 +734,22 @@ function parseJudgeJson(text) {
   const fenced = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced) { try { return JSON.parse(fenced[1].trim()); } catch { /* fall through */ } }
   const first = s.indexOf('{'), last = s.lastIndexOf('}');
-  if (first >= 0 && last > first) return JSON.parse(s.slice(first, last + 1));
-  throw new Error(`judge returned non-JSON: ${s.slice(0, 160)}`);
+  if (first >= 0 && last > first) {
+    const body = s.slice(first, last + 1);
+    try { return JSON.parse(body); } catch { /* fall through to repair */ }
+    // Repair only what is unambiguous: a trailing comma before } or ]. Reached
+    // ONLY after a real parse failure, so it can help and cannot hurt. Anything
+    // cleverer (stripping // comments) risks mangling a string that merely
+    // contains "//" — and the caller now survives a parse failure anyway.
+    const repaired = body.replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(repaired); } catch (err) {
+      // Include the payload. The previous version threw JSON.parse's own
+      // message ("Expected ',' or '}' at position 310"), which says nothing
+      // about WHAT the judge wrote — three avatars were lost to that blind spot.
+      throw new Error(`judge returned unparseable JSON (${err.message}): ${body.slice(0, 400)}`);
+    }
+  }
+  throw new Error(`judge returned non-JSON: ${s.slice(0, 400)}`);
 }
 
 async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiKey, sourcePhoto = null, usageTracker = null, opts = {}) {
@@ -1435,5 +1466,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet },
+  _internal: { parseJudgeJson, buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet },
 };
