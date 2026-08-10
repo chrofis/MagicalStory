@@ -4,18 +4,30 @@
  *
  * For each run:
  *   1. Pick a rotation entry (default: next from rotation state file)
- *   2. Create a fresh, timestamped demo account (demo-{family}-{YYYYMMDD-HHmm}@magicalstory.ch)
- *   3. Upload characters + curated photos from tests/fixtures/demo-photos/{family}/
- *   4. Trigger the Playwright spec against that account → server begins generation
+ *   2. Resolve the family's PERSISTENT account (demo-{family}@magicalstory.ch),
+ *      creating it on first use — every Miller story then lives together
+ *   3. Upload characters only if that account does not already have them
+ *   4. Enter the account by admin impersonation, so the story is an ADMIN DRAFT
+ *   5. Trigger the Playwright spec against that session → server begins generation
  *
- * Each run is fully isolated — old stories stay accessible on their original accounts,
- * new run starts from a clean slate.
+ * A draft is invisible to the family account and costs it no credits, so a run
+ * can be repeated until it is good and only the chosen one published:
+ *   GET  /api/admin/drafts
+ *   POST /api/admin/stories/<storyId>/publish
+ *
+ * `--fresh-account` restores the old behaviour (a new timestamped account per
+ * run, visible immediately). Staging had 49 demo accounts before this changed.
  *
  * Usage:
  *   node scripts/admin/showcase.js                         # next rotation entry, prod
  *   node scripts/admin/showcase.js --entry=7               # specific rotation index (Miller/EN/Space)
- *   node scripts/admin/showcase.js --upload-only           # create account + upload, skip Playwright
+ *   node scripts/admin/showcase.js --upload-only           # provision only, skip Playwright
+ *   node scripts/admin/showcase.js --fresh-account         # old per-run throwaway account
+ *
  *   TEST_BASE_URL=http://localhost:5173 node scripts/admin/showcase.js  # local backend
+ *
+ * Admin used for impersonation: SHOWCASE_ADMIN_EMAIL / SHOWCASE_ADMIN_PASSWORD
+ * (defaults to the smoke-test admin). It must NOT be the family account itself.
  *
  * Prereqs:
  *   - Photos exist in tests/fixtures/demo-photos/{family}/{Name}.jpg
@@ -69,6 +81,86 @@ function showcaseEmail(family) {
   return `demo-${family.id[0]}-${shortTimeId()}@magicalstory.ch`;
 }
 
+/**
+ * ONE persistent account per family — every Miller story lives together, and
+ * reruns stop minting a dummy account each time. All three current ids fit the
+ * 30-char cap ("demo-miller@magicalstory.ch" = 27).
+ */
+function persistentEmail(family) {
+  const email = `demo-${family.id}@magicalstory.ch`;
+  if (email.length > 30) {
+    throw new Error(`Persistent email exceeds the 30-char auth cap: ${email} (${email.length})`);
+  }
+  return email;
+}
+
+/**
+ * Impersonation token for the family account, via the REAL endpoint.
+ *
+ * Not a locally-minted JWT: every environment signs with its own secret, and
+ * the .env one does not match staging — a forged token is simply rejected 403.
+ * Logging in as an admin and calling POST /api/admin/impersonate/:userId is
+ * also the exact flow a human admin uses, so the showcase exercises the
+ * shipped path rather than a back door.
+ *
+ * `impersonating: true` in that token is what makes the story an admin draft
+ * and skips the credit reservation, server-side.
+ */
+async function impersonateFamilyAccount(apiBase, targetUserId) {
+  const adminEmail = process.env.SHOWCASE_ADMIN_EMAIL || 'demo-b-hnecf@magicalstory.ch';
+  const adminPassword = process.env.SHOWCASE_ADMIN_PASSWORD || DEMO_PASSWORD;
+
+  const loginRes = await fetch(`${apiBase}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: adminEmail, password: adminPassword }),
+  });
+  if (!loginRes.ok) {
+    throw new Error(
+      `Admin login failed for ${adminEmail} (${loginRes.status}). ` +
+      `Set SHOWCASE_ADMIN_EMAIL / SHOWCASE_ADMIN_PASSWORD for this environment.`
+    );
+  }
+  const admin = await loginRes.json();
+  if (admin.user?.role !== 'admin') {
+    throw new Error(`${adminEmail} is not an admin on this environment — cannot create drafts.`);
+  }
+  if (String(admin.user.id) === String(targetUserId)) {
+    throw new Error(
+      `The showcase admin (${adminEmail}) IS the family account, and nobody can impersonate themselves. ` +
+      `Use a different SHOWCASE_ADMIN_EMAIL, or pass --fresh-account.`
+    );
+  }
+
+  const impRes = await fetch(`${apiBase}/api/admin/impersonate/${targetUserId}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${admin.token}` },
+  });
+  if (!impRes.ok) {
+    throw new Error(`Impersonation failed (${impRes.status}): ${(await impRes.text()).slice(0, 200)}`);
+  }
+  const { token } = await impRes.json();
+  if (!token) throw new Error('Impersonation returned no token');
+  return token;
+}
+
+/**
+ * Does this account already hold the family? If so the wizard skips character
+ * creation — which is also what stops each run minting a NEW character-id set,
+ * the condition behind the cross-account incident of 2026-08-09.
+ */
+async function accountHasFamily(apiBase, token, family) {
+  try {
+    const res = await fetch(`${apiBase}/api/characters`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return false;
+    const body = await res.json();
+    const existing = (body.characters || body || []).map(c => String(c.name || '').trim().toLowerCase());
+    return family.characters.every(c => existing.includes(c.name.trim().toLowerCase()));
+  } catch {
+    return false;
+  }
+}
+
 function loadEntries() {
   return JSON.parse(fs.readFileSync(ROTATION_PATH, 'utf-8')).entries;
 }
@@ -116,6 +208,46 @@ function verifyPhotosOnDisk(family) {
     }
   }
   console.log(`Verified ${family.characters.length} photos on disk at ${path.relative(process.cwd(), dir)}`);
+}
+
+/**
+ * Log in if the account exists, register it first if it does not. Persistent
+ * accounts are provisioned once and reused forever after.
+ */
+async function loginOrRegister(apiBase, email, family) {
+  const login = async () => {
+    const res = await fetch(`${apiBase}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: email, password: DEMO_PASSWORD }),
+    });
+    return res.ok ? res.json() : null;
+  };
+
+  let session = await login();
+  if (session) {
+    console.log(`   Existing account — id=${session.user.id}, credits=${session.user.credits}`);
+    return { ...session, isNew: false };
+  }
+
+  console.log('   No account yet — registering...');
+  verifyPhotosOnDisk(family);
+  const registerRes = await fetch(`${apiBase}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: email, email, password: DEMO_PASSWORD,
+      _formStartTime: Date.now() - 30000,
+    }),
+  });
+  if (!registerRes.ok) {
+    const err = await registerRes.json().catch(() => ({}));
+    throw new Error(`Registration failed: ${registerRes.status} ${JSON.stringify(err)}`);
+  }
+  session = await login();
+  if (!session) throw new Error(`Registered ${email} but cannot log in`);
+  console.log(`   Created — id=${session.user.id}`);
+  return { ...session, isNew: true };
 }
 
 async function provisionAccount(apiBase, email, family) {
@@ -188,7 +320,28 @@ async function main() {
   // createFamilyViaWizard step (chars already exist on the account).
   const reuseEmail = args['reuse-email'] || process.env.DEMO_REUSE_EMAIL || null;
   let email;
-  if (reuseEmail) {
+  let impersonationToken = null;
+  let reuseCharacters = false;
+
+  // DEFAULT PATH (2026-08-10): one persistent account per family, entered by
+  // impersonation so the story is an admin draft — invisible to that account
+  // until published, and free. Generate, look, regenerate, publish the good one.
+  // `--fresh-account` restores the old per-run timestamped account.
+  if (!reuseEmail && !args['fresh-account']) {
+    email = persistentEmail(family);
+    console.log(`\n── Persistent family account ─────────────────────────────`);
+    console.log(`  Email:    ${email}`);
+    const session = await loginOrRegister(apiBase, email, family);
+    reuseCharacters = !session.isNew && await accountHasFamily(apiBase, session.token, family);
+    console.log(`  Characters: ${reuseCharacters ? 'already on the account — skipping upload' : 'will be created via the wizard'}`);
+    // A brand-new account already had its photos verified before registering.
+    if (!reuseCharacters && !session.isNew) verifyPhotosOnDisk(family);
+
+    // Throws rather than silently producing a chargeable, immediately-visible
+    // story on a real account.
+    impersonationToken = await impersonateFamilyAccount(apiBase, session.user.id);
+    console.log(`  Mode:     ADMIN DRAFT — hidden from this account until published, no credits charged`);
+  } else if (reuseEmail) {
     email = String(reuseEmail).trim();
     console.log(`\n── Reusing existing account ──────────────────────────────`);
     console.log(`  Email:    ${email}`);
@@ -219,7 +372,10 @@ async function main() {
     DEMO_PASSWORD,
     DEMO_ENTRY_INDEX: String(entry.index),
     DEMO_DEDICATION: dedication,
-    ...(reuseEmail ? { DEMO_REUSE_ACCOUNT: '1' } : {}),
+    // Skip character creation whenever the account already holds the family —
+    // re-uploading every run is what mints a fresh character-id set each time.
+    ...((reuseEmail || reuseCharacters) ? { DEMO_REUSE_ACCOUNT: '1' } : {}),
+    ...(impersonationToken ? { DEMO_IMPERSONATION_TOKEN: impersonationToken } : {}),
   };
   const headed = process.env.HEADED === '1' || args.headed === 'true';
   const playwrightArgs = ['playwright', 'test', 'tests/demo-story.spec.ts', '--project=demo-story', '--workers=1'];
@@ -240,6 +396,11 @@ async function main() {
 
   console.log('\nShowcase complete. Story is generating server-side (5–10 min).');
   console.log(`Check progress on the demo account: ${email}`);
+  if (impersonationToken) {
+    console.log('\nThis run is an ADMIN DRAFT — invisible to that account until you publish it.');
+    console.log('  List drafts:  GET  /api/admin/drafts');
+    console.log('  Publish:      POST /api/admin/stories/<storyId>/publish');
+  }
 }
 
 main().catch(err => {

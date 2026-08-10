@@ -979,7 +979,12 @@ test.describe('Demo Story Generation', () => {
     // DEMO_EMAIL env var overrides the family's default account — used by the
     // showcase orchestrator to log in as the freshly-provisioned per-run account.
     const loginEmail = process.env.DEMO_EMAIL || family.email;
-    console.log(`Step 0: Setting language + logging in as ${loginEmail}...`);
+    // DEMO_IMPERSONATION_TOKEN (set by showcase.js) is an admin-impersonation
+    // JWT for this account. Injecting it instead of logging in makes the run an
+    // ADMIN DRAFT: the story lands on the family's persistent account but stays
+    // invisible there until published, and costs the account no credits.
+    const impersonationToken = process.env.DEMO_IMPERSONATION_TOKEN || '';
+    console.log(`Step 0: Setting language + ${impersonationToken ? 'impersonating' : 'logging in as'} ${loginEmail}...`);
     // Page counts below the public minimum (10) exist only in developer mode
     // (WizardStep3BookSettings: minPages = developerMode ? 4 : 10) — the
     // slider rejects fill("4") otherwise. Requires an admin account (e.g. the
@@ -989,7 +994,15 @@ test.describe('Demo Story Generation', () => {
       await page.addInitScript(() => window.localStorage.setItem('developer_mode', 'true'));
     }
     await preSeedLanguage(page, entry.language, baseURL || 'https://magicalstory.ch');
-    await loginAs(page, loginEmail, DEMO_PASSWORD);
+    if (impersonationToken) {
+      // Seed the token before any app code runs, so the first render is already
+      // authenticated and no login modal appears.
+      await page.addInitScript(t => window.localStorage.setItem('auth_token', t), impersonationToken);
+      await page.goto('/');
+      await page.waitForLoadState('domcontentloaded');
+    } else {
+      await loginAs(page, loginEmail, DEMO_PASSWORD);
+    }
 
     // ── Step 0b: Create the full family via the wizard UI — photo upload, name,
     //            traits, characteristics, relationships, save — exactly like a real user.
