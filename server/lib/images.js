@@ -4216,6 +4216,112 @@ function truncatePromptForModel(prompt, maxPromptLength, logLabel, modelName = n
   return prompt.substring(0, maxPromptLength - 3) + '...';
 }
 
+// Over-budget prompts are SHRUNK, never blind-cut: the blunt substring cut
+// dropped whole tail sections — a page whose 9.4k prompt was cut at 7.5k lost
+// its entire ART STYLE block and rendered photographic on every roll (3/3
+// measured), and lost its object specs (map drawn with a ship instead of the
+// described bridge). Order: deterministic dedupe → LLM compression → a
+// section-aware cut that always preserves the tail sections as the final
+// guarantee. truncatePromptForModel above remains only as the last-resort
+// fallback inside that guarantee.
+function dedupeIdenticalBullets(prompt) {
+  // Merge "- Name: body" bullet lines whose body text is identical (sibling
+  // characters often share verbatim proportion boilerplate) into one line:
+  // "- Name1, Name2: body".
+  const lines = prompt.split('\n');
+  const seen = new Map(); // body -> first line index
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^- ([^:]{1,40}): (.{40,})$/);
+    if (!m) continue;
+    const body = m[2];
+    if (seen.has(body)) {
+      const j = seen.get(body);
+      lines[j] = lines[j].replace(/^- ([^:]{1,40}):/, (_, names) => `- ${names}, ${m[1]}:`);
+      lines[i] = null;
+    } else {
+      seen.set(body, i);
+    }
+  }
+  return lines.filter(l => l !== null).join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
+function sectionAwareCut(prompt, maxLen, logLabel) {
+  // Keep the tail sections (REQUIRED OBJECTS + ART STYLE) whole; cut the
+  // excess from the end of the head prose instead.
+  const objIdx = prompt.indexOf('**REQUIRED OBJECTS');
+  const styleIdx = prompt.indexOf('**ART STYLE');
+  const tailStart = objIdx >= 0 ? objIdx : styleIdx;
+  if (tailStart < 0) return truncatePromptForModel(prompt, maxLen, logLabel);
+  const tail = prompt.slice(tailStart);
+  const headBudget = maxLen - tail.length - 5;
+  if (headBudget < 500) return truncatePromptForModel(prompt, maxLen, logLabel); // tail alone ~fills the budget
+  log.warn(`✂️ [${logLabel}] Section-aware cut: head ${tailStart}→${headBudget} chars, tail sections kept whole`);
+  return prompt.slice(0, headBudget) + '\n...\n' + tail;
+}
+
+async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName = null) {
+  if (!prompt || prompt.length <= maxPromptLength) return prompt;
+
+  // 1. Deterministic: merge duplicated bullet bodies, collapse blank runs.
+  let out = dedupeIdenticalBullets(prompt);
+  if (out.length <= maxPromptLength) {
+    log.info(`✂️ [${logLabel}] Prompt ${prompt.length}→${out.length} chars via dedupe (budget ${maxPromptLength})`);
+    return out;
+  }
+
+  // 2. LLM compression — of the HEAD ONLY. The protected tail (REQUIRED
+  // OBJECTS + ART STYLE) is held back and reattached verbatim, so style and
+  // object specs survive by construction, not by model obedience. Full-prompt
+  // rewrites were measured failing every way: qwen ignores budgets (asked
+  // 800 words, returned 8.9k chars), flash overshoots (asked 4.5k, wrote
+  // 8.1k) or — given a threatening budget line — collapses to a 0.7k stub.
+  // Compressing 7k of prose to ~5k is the modest ask a model actually does.
+  const tailStart = (() => {
+    const o = out.indexOf('**REQUIRED OBJECTS');
+    return o >= 0 ? o : out.indexOf('**ART STYLE');
+  })();
+  if (tailStart > 0) {
+    const tail = out.slice(tailStart);
+    let head = out.slice(0, tailStart);
+    // The frame-colour map binds the baked card frames to characters — its
+    // exact "<COLOUR> frame = <Name>" pairs must survive verbatim (the
+    // compressor was measured silently dropping the whole block). Pull the
+    // paragraph out before compression, reattach after.
+    let frameBlock = '';
+    const fm = head.match(/^REFERENCE CARD COLOURS[\s\S]*?scene\.\s*$/m);
+    if (fm) {
+      frameBlock = fm[0];
+      head = head.replace(fm[0], '');
+    }
+    const headBudget = maxPromptLength - tail.length - frameBlock.length - 30;
+    if (headBudget >= 1500) {
+      try {
+        const { callTextModel } = require('./textModels');
+        const words = Math.floor((headBudget * 0.9) / 6.5);
+        const instruction = `Rewrite the scene description below to at most ${words} words, keeping every fact — `
+          + `every character with their outfit, position and expression; every object; the composition. `
+          + `State every character's age band and body proportions explicitly (e.g. kindergarten-age about 5 heads tall, adult about 7.5-8 heads tall). `
+          + `Remove only repetition and filler. Same format, same section headers. Output ONLY the rewritten description.\n\n${head}`;
+        // 12k budget: flash 2.5 spends ~4k tokens THINKING before it writes —
+        // at 4k total the answer came back as a 158-token stub cut mid-sentence.
+        const res = await callTextModel(instruction, 12000, 'gemini-2.5-flash', { usageLabel: 'prompt_compress', temperature: 0 });
+        const newHead = (res?.text || '').trim();
+        if (newHead.length > 500 && newHead.length <= headBudget) {
+          const assembled = newHead + (frameBlock ? '\n\n' + frameBlock : '') + '\n\n' + tail;
+          log.info(`✂️ [${logLabel}] Prompt ${prompt.length}→${assembled.length} chars via head compression (budget ${maxPromptLength}, tail ${tail.length} + frame map kept verbatim)`);
+          return assembled;
+        }
+        log.warn(`✂️ [${logLabel}] Head compression unusable (${newHead.length} chars vs budget ${headBudget}) — falling back to section-aware cut`);
+      } catch (err) {
+        log.warn(`✂️ [${logLabel}] Head compression failed (${err.message}) — falling back to section-aware cut`);
+      }
+    }
+  }
+
+  // 3. Guarantee: section-aware cut that never drops the tail sections.
+  return sectionAwareCut(out, maxPromptLength, logLabel);
+}
+
 /**
  * Collect the data:image reference URLs from a characterPhotos array (each
  * entry is either a raw data-URI string or an object with a `photoUrl`).
@@ -4335,7 +4441,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
     // Truncate to Grok's prompt-length cap BEFORE the API call.
     const grokMaxPrompt = IMAGE_MODELS[grokPrimaryModelKey]?.maxPromptLength || 7500;
-    const grokPrompt = truncatePromptForModel(prompt, grokMaxPrompt, logLabel, grokModel);
+    const grokPrompt = await shrinkPromptForModel(prompt, grokMaxPrompt, logLabel, grokModel);
 
     try {
       const refImages = await packReferences(
@@ -4527,7 +4633,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
   const modelConfig = IMAGE_MODELS[modelId];
   const maxPromptLength = modelConfig?.maxPromptLength || 30000;
-  const effectivePrompt = truncatePromptForModel(prompt, maxPromptLength, logLabel, verbose ? modelId : null);
+  const effectivePrompt = await shrinkPromptForModel(prompt, maxPromptLength, logLabel, verbose ? modelId : null);
   if (effectivePrompt !== prompt) {
     parts[0] = { text: effectivePrompt };
   }
@@ -7875,5 +7981,6 @@ module.exports = {
   // Pure dispatch helpers (exported for unit tests / reuse)
   resolveOutputAspect,
   truncatePromptForModel,
+  shrinkPromptForModel,
   extractDataImageUrls
 };

@@ -9,14 +9,18 @@
 // sides (the baked card in packReferences AND the prompt text in
 // buildImagePrompt). Both derive the colour from the SAME per-page set of
 // character names via frameColorForName(), so the assignment is identical
-// regardless of array order. A page never has more than ~3 named characters, so
-// a tiny high-contrast palette is plenty.
+// regardless of array order. Six colours: 5-character pages are real (family
+// stories routinely stage all five) — with only four, the alphabetically-last
+// character got no frame and no prompt mapping, leaving one figure unbound on
+// every 5-cast page.
 
 const FRAME_COLORS = [
   { label: 'RED',    rgb: { r: 222, g: 36,  b: 36  } },
   { label: 'BLUE',   rgb: { r: 33,  g: 90,  b: 222 } },
   { label: 'GREEN',  rgb: { r: 34,  g: 158, b: 66  } },
-  { label: 'PURPLE', rgb: { r: 150, g: 48,  b: 200 } }, // 4th — rarely reached
+  { label: 'PURPLE', rgb: { r: 150, g: 48,  b: 200 } },
+  { label: 'ORANGE', rgb: { r: 240, g: 130, b: 20  } },
+  { label: 'CYAN',   rgb: { r: 26,  g: 188, b: 210 } },
 ];
 
 // Deterministic, order-independent colour for `name` within the page's set of
