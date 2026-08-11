@@ -447,8 +447,12 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   const identity = bestHead.review.identity;
   const idScore = identity?.identityScore ?? 10;
   const finalScore = skipReview ? 10 : Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0, idScore);
+  // When a row judge threw, its sub-report is null and the ?? defaults below
+  // read as a perfect 10. Carry the failure so consumers show "unscored", not
+  // a fake pass — the sheet still ships, it just wasn't judged.
+  const evalFailed = bestBody.review.evalFailed || bestHead.review.evalFailed || null;
   const verdict = {
-    split: true, splitY, finalScore, valid: finalScore >= 6,
+    split: true, splitY, finalScore, valid: finalScore >= 6, evalFailed,
     failureReasons: [...(heads?.failureReasons || []), ...(bodies?.failureReasons || [])],
     layout: { layoutScore: bodies?.fullBody?.fullBodyScore ?? 10 },
     identity: { identityScore: idScore, reason: identity?.reason },
@@ -698,7 +702,11 @@ async function callSheetJudge(model, parts, maxOutputTokens, geminiApiKey) {
   if (provider === 'google') {
     const body = {
       contents: [{ parts }],
-      generationConfig: { temperature: 0, maxOutputTokens, responseMimeType: 'application/json' },
+      // thinkingBudget: 0 — these are structured scoring judges at temp 0, not
+      // open reasoning. Thinking tokens counted against maxOutputTokens and
+      // truncated the JSON; disabling them removes that failure mode at the
+      // source (and is faster/cheaper). maxOutputTokens stays high as headroom.
+      generationConfig: { temperature: 0, maxOutputTokens, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       safetySettings: SHEET_JUDGE_SAFETY,
     };
     const resp = await fetch(
@@ -707,7 +715,15 @@ async function callSheetJudge(model, parts, maxOutputTokens, geminiApiKey) {
     );
     if (!resp.ok) throw new Error(`Gemini eval HTTP ${resp.status}`);
     const j = await resp.json();
-    return { text: j?.candidates?.[0]?.content?.parts?.[0]?.text, usageMetadata: j?.usageMetadata };
+    const cand = j?.candidates?.[0];
+    // gemini-2.5 thinking tokens count toward maxOutputTokens; when the budget
+    // runs out the JSON is cut off mid-string and parseJudgeJson chokes with a
+    // cryptic "Expected ',' or '}' at position N". Name the real cause instead —
+    // the retry loop then re-runs, and the caller's fail-open keeps the sheet.
+    if (cand?.finishReason === 'MAX_TOKENS') {
+      throw new Error(`Gemini eval truncated (finishReason=MAX_TOKENS at ${maxOutputTokens}-tok cap) — raise maxOutputTokens`);
+    }
+    return { text: cand?.content?.parts?.[0]?.text, usageMetadata: j?.usageMetadata };
   }
   if (provider === 'xai') {
     const { callGrokVisionAPI } = require('./images');
@@ -1013,7 +1029,10 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
     });
   }
   const parts = [inlinePartOf(rowImageData), { text: prompt }];
-  const { text, usageMetadata } = await callSheetJudge(model, parts, 4000, process.env.GEMINI_API_KEY);
+  // 8000 not 4000: gemini-2.5 thinking counts toward maxOutputTokens, and the
+  // costumeReads enumeration lengthened the bodies JSON — a 4000 cap truncated
+  // it mid-string, and the throw cost three characters their whole ref sheet.
+  const { text, usageMetadata } = await callSheetJudge(model, parts, 8000, process.env.GEMINI_API_KEY);
   if (!text) throw new Error(`row eval (${which}, ${model}) returned no text`);
   if (usageTracker && usageMetadata) {
     usageTracker('gemini_quality', { input_tokens: usageMetadata.promptTokenCount || 0, output_tokens: usageMetadata.candidatesTokenCount || 0 }, `character_2x4_${which}_eval`, model);
@@ -1033,7 +1052,9 @@ async function evaluateIdentity(headsCrop, opts = {}) {
   if (avatarFaces) parts.push(inlinePartOf(avatarFaces));
   parts.push(inlinePartOf(headsCrop));
   parts.push({ text: prompt });
-  const { text, usageMetadata } = await callSheetJudge(model, parts, 2000, process.env.GEMINI_API_KEY);
+  // 8000: same gemini-2.5 thinking-token trap as the row/style evals — a low
+  // cap truncates the JSON. maxOutputTokens is a ceiling, not a charge.
+  const { text, usageMetadata } = await callSheetJudge(model, parts, 8000, process.env.GEMINI_API_KEY);
   if (!text) throw new Error(`identity eval (${model}) returned no text`);
   if (usageTracker && usageMetadata) {
     usageTracker('gemini_quality', { input_tokens: usageMetadata.promptTokenCount || 0, output_tokens: usageMetadata.candidatesTokenCount || 0 }, 'character_2x4_identity_eval', model);

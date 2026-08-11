@@ -342,8 +342,13 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     // (costume item-by-item match against REQUESTED_OUTFIT — newly strict per
     // the prompt change in this commit).
     const pass1Verdict = result.passes?.pass1?.finalVerdict;
-    const faceMatchScore = pass1Verdict?.sourceMatch?.sourceMatchScore ?? pass1Verdict?.sourceMatchScore ?? null;
-    const clothingMatchScore = pass1Verdict?.outfit?.outfitScore ?? pass1Verdict?.outfitScore ?? null;
+    // When the row judge threw, its sub-scores default to 10 — an unjudged
+    // sheet would read as a perfect pass. Null them out so the log shows
+    // "unscored" and the gate treats the dimension as unknown (null → passes,
+    // so the sheet still ships, which is the intended fail-open).
+    const evalFailed = pass1Verdict?.evalFailed || null;
+    const faceMatchScore = evalFailed ? null : (pass1Verdict?.sourceMatch?.sourceMatchScore ?? pass1Verdict?.sourceMatchScore ?? null);
+    const clothingMatchScore = evalFailed ? null : (pass1Verdict?.outfit?.outfitScore ?? pass1Verdict?.outfitScore ?? null);
     const innerFinal = typeof result.finalScore === 'number' ? result.finalScore : 0;
     const passed = (faceMatchScore == null || faceMatchScore >= MIN_FACE_MATCH_SCORE)
                 && (clothingMatchScore == null || clothingMatchScore >= MIN_CLOTHING_MATCH_SCORE);
@@ -363,6 +368,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       innerOutfitScore: pass1Verdict?.outfit?.outfitScore ?? null,
       innerFinalScore: innerFinal,
       combinedScore: innerFinal,
+      evalFailed,
       innerAttemptHistory: result.attemptHistory || null,
       passes: result.passes || null,
       realisticImageData: result.realisticImageData || null,
@@ -389,7 +395,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       }
     }
 
-    if (passed) {
+    if (evalFailed) {
+      log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} shipped UNSCORED — row eval failed (${evalFailed}); sheet kept but not judged`);
+    } else if (passed) {
       log.info(`✅ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} passed (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10)`);
     } else {
       log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} below threshold (face=${faceMatchScore}, clothing=${clothingMatchScore}, inner=${innerFinal}) — shipping anyway`);
