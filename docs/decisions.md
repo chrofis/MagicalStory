@@ -8526,3 +8526,84 @@ version is the source of truth. Manual repair versions built in
 - `tests/manual/evalFigureIdentityPersist.test.js` (new, 18 assertions)
 
 **Status:**    ✅ active
+
+### Root cause of the malformed judge JSON: truncation, not bad output (2026-08-11)
+
+**Context:**   Follow-up to "A judge that cannot punctuate must not delete a
+good image" (2026-08-10). That entry contained the loss but left the cause open
+("Not yet known: WHY the judge produced malformed JSON"). Now confirmed.
+
+The sheet-row judges call Gemini with `responseMimeType: 'application/json'`, so
+the model is already in JSON mode — the output was not badly formed, it was
+**cut off**. `evaluateSheetRow` capped the bodies/heads judge at
+`maxOutputTokens: 4000` and `evaluateIdentity` at 2000. `gemini-2.5-flash`
+counts its internal thinking tokens toward that cap, and the `costumeReads`
+enumeration added to `sheet-row-bodies-eval.txt` the same day lengthened the
+required JSON. Thinking + output crossed 4000 → Gemini stopped at
+`finishReason: MAX_TOKENS` → the JSON ended mid-property ("Expected ',' or '}'
+at position 310"). `callSheetJudge` never inspected `finishReason`, so it
+returned the truncated text and `parseJudgeJson` threw.
+
+This is the SAME trap `evaluateStyledSheetWithGemini` already documented and
+fixed (8000 not 2500, comment at that call site); the row/identity evals never
+got the upgrade.
+
+**Decision:** In `server/lib/character2x4Sheet.js`:
+1. Bodies/heads and identity judge budgets raised to `maxOutputTokens: 8000`
+   (a ceiling, not a charge) — matches the style-eval's proven value.
+2. `callSheetJudge` now throws on `finishReason: MAX_TOKENS` naming the cap, so
+   a future truncation is a clear error (which the retry loop + the 2026-08-10
+   fail-open then handle) instead of a cryptic parse failure.
+
+Also fixed the telemetry smell from the 2026-08-10 fix: on a judge failure the
+verdict's sub-scores defaulted to 10, so an UNSCORED sheet logged as a perfect
+face=10/clothing=10 pass. `generateComposited2x4` now stamps `evalFailed` on the
+verdict and `styledAvatars` nulls the headline scores + logs "shipped UNSCORED"
+(the sheet still ships — null dimensions pass the advisory gate).
+
+**Rationale:** The 2026-08-10 change was correct containment (a quality gate
+failing must not destroy the asset it judges) but treated the symptom. Removing
+the truncation removes the failure at its source; the fail-open stays as the
+safety net for any other judge error.
+
+**Touched:**   `server/lib/character2x4Sheet.js` (`callSheetJudge`,
+`evaluateSheetRow`, `evaluateIdentity`, `generateComposited2x4` verdict),
+`server/lib/styledAvatars.js` (eval-failed telemetry)
+**Status:**    ✅ active
+
+## 2026-08-11 — Style + clothing contract are inputs to EVERY evaluator (compliance stripped a commissioned costume)
+
+**Context:** On `job_1786397108357_q1fjbdzbx` (steampunk pirate) the back cover's
+round-1 eval flagged "all characters wear unrequested steampunk attire with
+goggles/belts – MAJOR/CRITICAL" although the cover prompt's CLOTHING block
+requested exactly those garments. The triggered inpaint repainted the costume
+into modern clothes and wiped the style machinery off the wall (v0 score 15 →
+v1 −15; best-version selection kept v0, so no user-visible damage). Two causes:
+(1) the compliance stage receives `ORIGINAL_PROMPT.substring(0, 3000)` and the
+CLOTHING block can sit across/past that cut (here Hans's outfit was truncated
+away) — the same truncation class that once hid the ART STYLE block, fixed then
+by passing ART_STYLE separately; (2) the compliance style rule enumerated
+element kinds (glow, signage, tech/ornament, palette, medium) and did not cover
+attire, so style-mandated costume read as clothing, not style. Owner directive:
+"All evaluators must get the clothing and style as input. We can not ask for
+steampunk and then grade it low if it does this."
+
+**Decision:** `evaluateImageQuality` resolves `artStyleForEval` and builds the
+`clothingContractBlock` ONCE, before the parallel evals start, and passes both
+to all three evaluators: quality (already had them), three-stage compliance
+(new `CLOTHING_CONTRACT` input + clothing judged against the contract with
+prompt fallback + style rule extended to "costume and worn gear"), and semantic
+(new `ART_STYLE` + `CLOTHING_CONTRACT` inputs; clothing-category check anchored
+to the contract). Both templates skip the new rules when the inputs are empty,
+so callers that pass nothing behave as before. A prose-level alternative
+(stating outfits inside `buildCoverSceneFromHint`) was built and reverted the
+same day at the owner's direction — the contract belongs in the evaluator
+inputs, not restated per prose builder.
+
+**Rationale:** The commissioned style and the per-page outfit are spec, not
+defects. A judge that sees only part of the spec invents violations; every
+evaluator must receive the full contract through the same variables.
+
+**Touched files:** `server/lib/images.js`, `server/lib/sceneValidator.js`,
+`prompts/image-prompt-compliance.txt`, `prompts/image-semantic.txt`
+(commit 201cc0cc8; revert of prose alternative: 18540e644).
