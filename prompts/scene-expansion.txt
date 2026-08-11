@@ -124,7 +124,7 @@ Then a single-line JSON object:
 - String array of Visual Bible IDs only (`LOC001`, `ART002.2`, `CHR001`).
 - Secondary characters visible in the scene go here by CHR id. Write their full appearance and their COMPLETE outfit into the prose on every page they appear on, copied from their Visual Bible entry — that entry is what their reference image is drawn from, so prose that disagrees with it fights the reference.
 - Include every recurring visual element visible in the scene.
-- Real-landmark LOCs use the dotted vantage form (`LOC003.2`). Pick the variant matching the scene's perspective; default to `.1` if unsure.
+- Real-landmark LOCs use the dotted vantage form (`LOC003.2`). Pick the variant matching the scene's perspective — when the action is inside, under, or on the landmark, an interior/inside variant is required, never an exterior one. If no variant matches the scene's vantage, use `.0` (no photo attached; your prose carries the setting). Default to `.1` only for exterior scenes.
 - Invented LOCs (`isRealLandmark: false`) use the bare id `LOC001` — no dotted form, they have no vantages.
 
 **`depth` and `expression`** — required for every character. When the outline context already gives them, carry those values through unchanged; the outline is the source of truth and re-deciding them breaks continuity with the other pages. Only when the context does not supply them, write them yourself from the scene: `depth` is `foreground`, `midground` or `background`; `expression` is 3-8 words naming brows, eyes and mouth ("brows pulled tight, eyes narrowed, jaw set"). Never write a bare mood word — "happy" and "sad" cannot be drawn.
@@ -157,6 +157,7 @@ Distance rule: when the verb implies action across a gap ('shoots', 'aims at', '
 
 **`emptyScenePrompt`**
 - 2-3 sentences describing only the background.
+- Same camera framing as the scene itself: a close-up scene gets a close-up stage (the wall, the doorway, the table corner), a wide scene gets the wide setting. Never an establishing wide shot for a close-up scene.
 - No named characters, no tracked animals, no carried or handheld artifacts (swords, books, apples, crossbows — those get composited later with the character).
 - Scene-anchor artifacts are allowed and, when the page text centers on them, must be described as the focal point — "prominent at the centre, dominating the foreground composition, readable and sharply defined," not "a pole stands somewhere." This covers stationary anchors (pole-with-banner, throne, monument, pedestal, altar, signpost) AND the vehicle or vessel when the scene takes place in or on one (boat, raft, wagon, carriage, cart, train compartment, sled). Name the key visual marker (the hat on top, the inscription, the crown, the boat's stern) so the model doesn't substitute a generic building.
 - Never write hypothetical references like "where children would stand" — image models render those literally.

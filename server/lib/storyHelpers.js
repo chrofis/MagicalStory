@@ -155,7 +155,16 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
     // Check if this location has photo variants (Swiss pre-indexed)
     if (loc.photoVariants && loc.photoVariants.length > 0) {
       // Load the selected variant on-demand (per-landmark variant from [LOC003.2] format)
-      const requestedVariant = perLandmarkVariants[loc.id] || 1;
+      // Variant 0 = "no photo matches this scene's vantage" (owner, 2026-08-11):
+      // the Art Director writes `.0` when the action is inside/under a landmark
+      // and no interior variant exists — attaching an exterior photo to an
+      // interior scene anchors the model to the wrong view (P6-P8 bridge:
+      // exterior photo, walkway action). Prose carries the setting instead.
+      const requestedVariant = perLandmarkVariants[loc.id] ?? 1;
+      if (requestedVariant === 0) {
+        log.info(`📍 [LANDMARK-SCENE] ${loc.name}: variant .0 — no photo attached (no variant matches the scene's vantage)`);
+        continue;
+      }
       const variant = await loadLandmarkPhotoVariant(visualBible, loc.id, requestedVariant);
       if (variant) {
         results.push({
