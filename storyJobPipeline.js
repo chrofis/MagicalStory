@@ -2108,6 +2108,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // so kick them off there instead of after the whole pipeline. Same
         // trigger the unified stream uses; the awaits downstream are unchanged.
         onClothingRequirements: onClothingRequirementsReady,
+        // Per-stage progress (2-7%): without it the bar sits at 1% for the
+        // whole ~10-minute text phase; heartbeat never moves the percent.
+        onStage: async (pct, msg) => {
+          try {
+            await dbPool.query(
+              'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+              [pct, msg, jobId]
+            );
+          } catch { /* progress only */ }
+        },
       });
       // The beats transcript stands in for the raw writer response: it is what
       // data.outline stores and what the dev outline view renders.

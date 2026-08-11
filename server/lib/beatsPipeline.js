@@ -183,9 +183,14 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     modelOverrides = {},
     heartbeat = null,
     onClothingRequirements = null,
+    // Per-stage progress reporter (percent, message). Without it the job sits
+    // at 1% "Starting story generation..." for the entire ~10-minute text
+    // phase — heartbeat only bumps updated_at, never the visible bar.
+    onStage = null,
   } = opts;
   const gl = genLog || NOOP_LOG;
   const onChunk = heartbeat ? () => heartbeat() : null;
+  const stage = async (pct, msg) => { if (onStage) { try { await onStage(pct, msg); } catch { /* progress only */ } } };
 
   const pageCount = parseInt(opts.pageCount, 10) || parseInt(inputData?.pages, 10) || 10;
   const expected = Array.from({ length: pageCount }, (_, i) => i + 1);
@@ -204,6 +209,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const planPrompt = buildBeatsPrompt(inputData, pageCount);
   if (!planPrompt) throw new Error('story-beats template unavailable — beats pipeline cannot run');
   let t = Date.now();
+  await stage(2, 'Planning the story beats...');
   const planRes = await textModels.callTextModelStreaming(planPrompt, null, onChunk, planModel, { usageLabel: 'beats_plan' });
   meta.timings.planMs = Date.now() - t;
   const plan = parseBeats(planRes.text || '', expected);
@@ -232,6 +238,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   } else {
     t = Date.now();
     try {
+      await stage(3, 'Reviewing the story beats...');
       const revRes = await textModels.callTextModelStreaming(reviewPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_review' });
       const parsed = parseBeats(revRes.text || '', []);
       beatsReviewAnalysis = parsed.analysis || '';
@@ -301,6 +308,7 @@ SCENE: ${x.scene || ''}`.trim(),
   } else {
     t = Date.now();
     try {
+      await stage(4, 'Building the visual contract...');
       const bibleRes = await textModels.callTextModelStreaming(biblePrompt, null, onChunk, bibleModel, { usageLabel: 'beats_story_bible' });
       const sections = extractBibleSections(bibleRes.text || '');
       meta.timings.storyBibleMs = Date.now() - t;
@@ -517,6 +525,7 @@ SCENE: ${x.scene || ''}`.trim(),
     let allRaw = '';
     let allModelId = sceneModel;
     try {
+      await stage(5, 'Writing scene briefs...');
       const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion' });
       allRaw = res?.text || '';
       allModelId = res?.modelId || sceneModel;
@@ -625,6 +634,7 @@ SCENE: ${x.scene || ''}`.trim(),
       // with nothing to show — exactly the run we needed to inspect
       // (job_1786235099497_ytd5c7eek: 3 faults handed over, 0 briefs rewritten).
       const briefsIn = expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
+      await stage(6, 'Reviewing scene briefs...');
       const srRes = await textModels.callTextModelStreaming(srPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_scene_review' });
       // "0 briefs rewritten" has meant three different things: a reviewer that
       // genuinely found nothing, a reviewer TRUNCATED at its token cap (this
@@ -739,6 +749,7 @@ SCENE: ${x.scene || ''}`.trim(),
   }
 
   // ── Step 6: page text — runs HERE, after the scene review, with the briefs ─
+  await stage(7, 'Writing the page text...');
   const textResult = await runStoryText(expansions);
   const { textRaw, textModelId, parsedText } = textResult;
 
