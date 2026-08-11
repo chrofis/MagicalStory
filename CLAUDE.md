@@ -148,7 +148,7 @@ Rotation config: `tests/helpers/demo-rotation.json`; state: `tests/demo-rotation
 - Temp files (tmpclaude-*, temp_photos/)
 - Large data files (*.tflite, baden-landmarks/)
 
-**Core files that stay in root:** server.js, email.js, photo_analyzer.py, package.json, README.md, CLAUDE.md
+**Core files that stay in root:** server.js, storyJobPipeline.js, email.js, photo_analyzer.py, package.json, README.md, CLAUDE.md
 
 ## Build & Development Commands
 
@@ -272,7 +272,8 @@ before touching that code:
 - **Image Model Comparison (Grok vs Gemini)** — strengths, when-to-use, Grok prompting tips
 
 ### Key Backend Files
-- `server.js` - Main Express app, unified pipeline, Stripe webhook
+- `server.js` - Main Express app bootstrap, routes wiring, Stripe webhook, boot/stall recovery
+- `storyJobPipeline.js` - Story-generation pipeline (processStoryJob, processUnifiedStoryJob, checkpoints). Root-level on purpose: its inline `require('./server/lib/...')` paths must stay verbatim-valid
 - `server/config/models.js` - AI model configuration, aspect ratios, repair defaults
 - `server/config/credits.js` - Credit costs, packages, referral config
 - `server/lib/images.js` - Image generation, quality eval, cutout repair, VB grid

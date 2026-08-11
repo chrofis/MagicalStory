@@ -8729,3 +8729,42 @@ the wrong version produced a confident, wrong conclusion that it had failed. Alw
 active version before comparing an eval result to an image.
 
 **Touched:** `server/lib/images.js`, `server/lib/repairPipeline.js`, `prompts/image-evaluation.txt`.
+
+## 2026-08-11 — server.js pipeline extracted to root-level storyJobPipeline.js (phase 2 of the god-file program)
+
+**Context:** server.js was 8,671 lines: the Express bootstrap AND the entire
+story-generation pipeline (`processUnifiedStoryJob` / `processStoryJob` /
+`_processStoryJobImpl` plus the checkpoint system) in one file. Phase 1
+(storyHelpers facade split, 2026-08-09 entry above) had already shipped.
+
+**Decision:**
+- The checkpoint block and the 5,805-line pipeline region moved **verbatim**
+  (byte-identical against the pre-move committed blob) into a new module at the
+  repo ROOT: `storyJobPipeline.js`. **D1 — root placement is load-bearing:** the
+  moved bodies contain ~60 inline `require('./server/lib/...')` call sites, many
+  in rarely-executed branches (refund, trial, Swiss stories); same-dir placement
+  makes required-path rewrites zero, so a missed-rewrite class of
+  production-only bugs cannot exist. Do NOT move this file without rewriting
+  those paths.
+- **D3 — `log` extracted to `server/lib/serverLog.js`, NOT unified with
+  `server/utils/logger.js`:** the utils logger forwards to registered listeners
+  (Test Lab capture); switching ~320 call sites onto it would be a behavior
+  change, not a move.
+- **D4 — injection seam:** `initStoryJobPipeline({ dbPool, STORAGE_MODE,
+  userLandmarkCache, LANDMARK_CACHE_TTL })` called in server.js right after
+  `initModularPool()`. The landmark cache Map + its cleanup interval STAY in
+  server.js (also used by admin routes + the landmarks route).
+- **D5 — DI seam unchanged in shape:** jobs/trial/auth/admin routes still get
+  `processStoryJob` + checkpoint fns injected from server.js; the identifiers
+  now come from the module's destructure. **Zero route files changed.**
+- server.js's now-surplus imports were deliberately NOT pruned, stale comments
+  left as-is (pure-move discipline; cleanup is a separate future commit).
+
+**Rationale:** zero behavior change, zero importer churn; server.js drops to
+~2,650 lines of server wiring. Completeness was gated by ESLint `no-undef`
+over both files (zero errors proves every free variable in the moved ~6,000
+lines is imported/injected/global — including branches no smoke test reaches).
+
+**Touched files:** `server.js`, `storyJobPipeline.js` (new),
+`server/lib/serverLog.js` (new), `docs/plans/serverjs-pipeline-extraction.md`
+(executed plan + deviations), `CLAUDE.md` (key-files + root-files lists).
