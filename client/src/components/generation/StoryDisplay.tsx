@@ -204,7 +204,7 @@ interface StoryDisplayProps {
   /** Per-page before/after from the scene review (beats pipeline, dev mode). */
   sceneReviewReport?: ReviewDiffReport | null;
   /** Per-function model/token/cost/time ledger (tokenUsage.byFunction). */
-  tokenUsage?: { byFunction?: Record<string, { models?: string[]; provider?: string | null; calls?: number; input_tokens?: number; output_tokens?: number; thinking_tokens?: number; direct_cost?: number; elapsed_ms?: number }> } | null;
+  tokenUsage?: { byFunction?: Record<string, { models?: string[]; provider?: string | null; calls?: number; input_tokens?: number; output_tokens?: number; thinking_tokens?: number; direct_cost?: number; cost?: number; elapsed_ms?: number }> } | null;
   storyTextPrompts?: StoryTextPrompt[];
   visualBible?: VisualBible;
   sceneImages: SceneImage[];

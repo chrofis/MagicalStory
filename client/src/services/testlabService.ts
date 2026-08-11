@@ -353,6 +353,7 @@ export const TESTLAB_STAGES = [
   { id: 'scene_description', label: 'Scene description (iterate)', producesImage: false, overridable: true },
   { id: 'rewrite_blocked', label: 'Rewrite blocked scene', producesImage: false, overridable: true },
   { id: 'repair_verify', label: 'Repair verification (diff)', producesImage: true, overridable: false },
+  { id: 'empty_scene_adherence', label: 'Empty-scene adherence (bg survives? action space? landmark fidelity?)', producesImage: false, overridable: false, noTemplate: true },
   { id: 'qwen_insert', label: 'Qwen insert (crop-bounded)', producesImage: true, overridable: true, noTemplate: true },
   { id: 'cover', label: 'Cover render', producesImage: true, overridable: true, storyLevel: true },
   { id: 'cover_title_paintin', label: 'Cover title paint-in (glyph-masked Qwen + OCR gate)', producesImage: true, overridable: true, storyLevel: true, noTemplate: true },

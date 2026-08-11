@@ -4613,7 +4613,80 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
   };
 }
 
+/**
+ * EMPTY-SCENE ADHERENCE — measures what the empty-scene stage actually buys us.
+ *
+ * Per page, three questions (owner, 2026-08-11):
+ *   1. background_correspondence 0-10 — how much of the empty scene's
+ *      composition/background survives in the FINAL active image (0 = the
+ *      empty scene was useless, final is a different place; 10 = same scene
+ *      with figures added).
+ *   2. action_space 0-10 — does the EMPTY scene leave usable ground/space for
+ *      the story action (figures), or is it composition-blocked (e.g. the
+ *      subject fills the frame, no stage for actors)?
+ *   3. landmark_fidelity 0-10|null — when a landmark reference photo exists:
+ *      is the landmark recognizable in the final image (structure/geometry;
+ *      style elements added onto it are fine)?
+ * Plus a $0 objective proxy: 32×32 grayscale correlation empty↔final.
+ */
+async function runEmptySceneAdherenceStage(ctx, { experimentId }) {
+  const sharp = require('sharp');
+  const r2Lib = require('./r2');
+  const emptyScene = await loadEmptyScene(ctx.storyId, ctx.pageNumber);
+  if (!emptyScene) throw new Error('no empty scene stored for this page');
+  const finalImage = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  const landmark = (ctx.landmarkPhotos || [])[0] || null;
+
+  const toBuf = (d) => Buffer.from(r2Lib.stripDataUriPrefix(d), 'base64');
+  // Objective proxy: normalized cross-correlation of 32×32 grayscale.
+  const gray = async (d) => Array.from(await sharp(toBuf(d)).resize(32, 32, { fit: 'fill' }).grayscale().raw().toBuffer());
+  const [a, b] = await Promise.all([gray(emptyScene), gray(finalImage)]);
+  const mean = (v) => v.reduce((s, x) => s + x, 0) / v.length;
+  const ma = mean(a), mb = mean(b);
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < a.length; i++) { const x = a[i] - ma, y = b[i] - mb; num += x * y; da += x * x; db += y * y; }
+  const pixelCorrelation = +(num / Math.sqrt(Math.max(1, da * db))).toFixed(3);
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
+  const parts = [
+    { text: 'IMAGE 1 — empty scene (background generated before the figures):' },
+    { inlineData: { mimeType: 'image/jpeg', data: toBuf(emptyScene).toString('base64') } },
+    { text: 'IMAGE 2 — final page (the shipped illustration):' },
+    { inlineData: { mimeType: 'image/jpeg', data: toBuf(finalImage).toString('base64') } },
+  ];
+  if (landmark?.photoData) {
+    parts.push({ text: `IMAGE 3 — reference photo of the real landmark (${landmark.name || 'landmark'}):` });
+    parts.push({ inlineData: { mimeType: 'image/jpeg', data: toBuf(landmark.photoData).toString('base64') } });
+  }
+  parts.push({ text: `Answer JSON only:
+{"background_correspondence": 0-10, "action_space": 0-10, "landmark_fidelity": ${landmark ? '0-10' : 'null'}, "notes": "<one sentence per score>"}
+- background_correspondence: how much of IMAGE 1's setting/composition survives in IMAGE 2 (0 = different place entirely, IMAGE 1 was useless; 10 = same scene with figures added).
+- action_space: judge IMAGE 1 alone — does it leave usable ground/space where story figures could act, or is it blocked (subject fills the frame, no stage)?
+- landmark_fidelity${landmark ? ': is the landmark from IMAGE 3 structurally recognizable in IMAGE 2? Style elements or art-style rendering added onto it do NOT reduce this score — judge geometry/identity only.' : ': null (no landmark input).'}` });
+
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } } }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) throw new Error(`Gemini judge HTTP ${res.status}`);
+  const j = await res.json();
+  const text = (j?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+  let judged;
+  try { judged = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || text); } catch { throw new Error(`judge answer not JSON: ${text.slice(0, 120)}`); }
+
+  return {
+    hadLandmarkInput: !!landmark,
+    landmarkName: landmark?.name || null,
+    pixelCorrelation,
+    ...judged,
+    usage: j.usageMetadata ? { input_tokens: j.usageMetadata.promptTokenCount, output_tokens: j.usageMetadata.candidatesTokenCount } : null,
+  };
+}
+
 const STAGE_RUNNERS = {
+  empty_scene_adherence: runEmptySceneAdherenceStage,
   image: runImageStage,
   empty_scene: runEmptySceneStage,
   quality_eval: runQualityEvalStage,
