@@ -1065,7 +1065,8 @@ const WORLD_ART_STYLES = {
 function buildStyleWardrobeBlock(artStyle) {
   const world = WORLD_ART_STYLES[String(artStyle || '').trim().toLowerCase()];
   if (!world) return '';
-  return `- **The illustration style is ${world}.** Every character wears one or two items that world is known for, over clothing the story's own setting calls for. The story's setting decides the rest of the outfit.`;
+  return `- **The illustration style is ${world}.** Every character wears one or two items that world is known for, over clothing the story's own setting calls for. The story's setting decides the rest of the outfit.
+- Recurring story objects and props are described in that world's idiom too (materials, fittings, ornament) in their Visual Bible entry — the object is defined once, so every page renders the same object.`;
 }
 
 /**
