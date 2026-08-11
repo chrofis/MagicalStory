@@ -291,9 +291,15 @@ export function ReferencePhotosDisplay({
           </div>
           {(hasLandmarkPhotos || emptySceneVbGrid || textAreaMask) && (
             <div className="flex gap-2 flex-wrap">
-              {displayLandmarkPhotos?.map((lm, i) => lm.photoData && (
-                <img key={`lm-${i}`} src={lm.photoData} alt={lm.name} className="h-16 rounded border border-emerald-200 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(lm.photoData!)} title={`📍 ${lm.name}`} />
-              ))}
+              {displayLandmarkPhotos?.map((lm, i) => {
+                // Post-R2 entries carry photoUrl only; pre-R2 carried inline
+                // photoData. Render either — photoUrl-only entries were being
+                // silently skipped, hiding the landmark inputs for new stories.
+                const src = lm.photoData || lm.photoUrl;
+                return src ? (
+                  <img key={`lm-${i}`} src={src} alt={lm.name} className="h-16 rounded border border-emerald-200 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(src)} title={`📍 ${lm.name}`} />
+                ) : null;
+              })}
               {emptySceneVbGrid && (
                 <img src={emptySceneVbGrid} alt="Empty-scene VB Grid (filtered)" className="h-16 rounded border border-emerald-200 cursor-pointer hover:opacity-80" onClick={() => setLightboxImage(emptySceneVbGrid)} title={language === 'de' ? '🔲 VB Grid für leere Szene (nur Fahrzeuge + Nicht-Wahrzeichen-Orte)' : '🔲 Empty-scene VB grid (vehicles + non-landmark locations only)'} />
               )}
