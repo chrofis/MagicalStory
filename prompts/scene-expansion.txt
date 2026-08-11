@@ -96,6 +96,7 @@ Then a single-line JSON object:
     {"name": "CharacterA", "clothing": "standard", "position": "left foreground", "depth": "foreground", "expression": "wide-eyed, mouth half open, brows lifted"},
     {"name": "CharacterB", "clothing": "costumed", "position": "center background", "perspective": "back view", "depth": "background", "expression": "calm, faint smile"}
   ],
+  "shot": "medium",
   "objects": ["LOC001", "ART002"],
   "interactions": [
     {"character": "CharacterA", "object": "an item", "where": "carries the item in a pocket", "storyRelevant": false, "priority": "low"},
@@ -118,6 +119,7 @@ Then a single-line JSON object:
 - `clothing` is one of `standard | winter | summer | costumed`. Use exactly what the outline says — if the outline marks a character as `costumed`, write `costumed` (one costume per character per story; the specific costume description is on the visual bible). Also describe the costume in the prose.
 - `position` is a short phrase matching the prose ("right foreground", "center", "left background", "behind the desk") — the bbox detector reads it structurally.
 - Only add `perspective` for back view or side profile.
+- `shot` is the page's camera framing: `close-up`, `medium`, or `wide`. Decide it once — the scene prose, the emptyScenePrompt, and the metadata all use this same framing. Omitting it makes the empty scene default to a wide shot.
 - Only add `depth` when the character is in the background (default is foreground/midground).
 
 **`objects[]`**
