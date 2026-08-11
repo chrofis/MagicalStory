@@ -1042,6 +1042,48 @@ function extractSceneMetadata(sceneDescription) {
   return null;
 }
 
+/**
+ * Cast members the scene PROSE describes but the metadata `characters` list
+ * omits. The Art Director emits prose plus a metadata block; the image model
+ * renders the prose, while figure naming, the entity grid, clothing validation
+ * and garment repair all supervise `characters`. A character described in the
+ * prose but absent from that list is drawn and never checked. Staging
+ * `job_1786397108357_q1fjbdzbx` p14: the prose describes five people, the
+ * metadata lists three.
+ *
+ * A bare mention is required. An occurrence followed by an apostrophe is a
+ * possessive naming a place or a prop ("<Name>'s attic", "<Name>'s torch") and
+ * does not put the person in the picture — 4 of the 6 pages the original sweep
+ * flagged were exactly that. Boundaries are letter/number based, so a cast
+ * member "Ann" never matches "Anna".
+ *
+ * @param {string} sceneDescription - Prose + ---METADATA--- block
+ * @param {string[]} castNames - Story cast names
+ * @param {Object|null} [sceneMetadata] - Already-parsed metadata, when the caller has it
+ * @returns {string[]} Cast names described in the prose but not listed (cast order)
+ */
+function findCastMissingFromMetadata(sceneDescription, castNames, sceneMetadata = null) {
+  if (!sceneDescription || typeof sceneDescription !== 'string') return [];
+  if (!Array.isArray(castNames) || castNames.length === 0) return [];
+  const metadata = sceneMetadata || extractSceneMetadata(sceneDescription);
+  if (!metadata || !Array.isArray(metadata.characters)) return [];
+
+  const prose = sceneDescription.split('---METADATA---')[0];
+  const listed = new Set(metadata.characters
+    .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim().toLowerCase())
+    .filter(Boolean));
+
+  const missing = [];
+  for (const rawName of castNames) {
+    const name = String(rawName || '').trim();
+    if (!name || listed.has(name.toLowerCase())) continue;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const bare = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}'’])`, 'u');
+    if (bare.test(prose)) missing.push(name);
+  }
+  return missing;
+}
+
 // ============================================================================
 // AGE CATEGORY MAPPING - Maps numeric age to category for image generation
 // ============================================================================
@@ -1529,6 +1571,7 @@ module.exports = {
   enforceSpreadTextPosition,
   mirrorLeftRight,
   extractSceneMetadata,
+  findCastMissingFromMetadata,
   getCharactersInScene,
   parseSceneHintMetadata,
   parseStoryPages,

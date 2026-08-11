@@ -8893,3 +8893,94 @@ added later cannot go unreported.
 **Touched:**   `storyJobPipeline.js`, `scripts/admin/cost-report.js`,
 `client/src/components/generation/StoryDisplay.tsx`
 **Status:**    ✅ active
+
+---
+
+## 2026-08-11 — The Art Director contradicts itself: prose describes a character the metadata `characters` list omits (prompt rule + warn-only detector)
+
+**Context:** Scene expansion (`prompts/scene-expansion.txt`, and the beats
+pipeline's `prompts/scene-expansion-all.txt`) emits one page brief as prose
+followed by a `---METADATA---` JSON block. The image model renders the **prose**.
+Everything that supervises the result — Set-of-Mark figure naming, the entity
+consistency grid, clothing validation, garment repair — reads metadata
+`characters[]`. When the two disagree, a character is painted and then never
+named, never crop-checked, never clothing-validated, never eligible for repair.
+
+Staging `job_1786397108357_q1fjbdzbx` page 14 is the confirmed case. One
+scene-expansion response contains all three of:
+- prose describing five people in full detail, including two who "stand as
+  smaller figures in the background on the left and right respectively",
+- `sceneIntent` naming all five as present,
+- `"characters": [Emma, Noah, Hans]` — three.
+
+The two omitted characters are main cast with avatars; they were filed in
+`objects[]` as `CHR003`/`CHR004`, the slot the prompt reserves for **secondary**
+characters ("they have no avatar, so no clothing category can apply to them").
+The story's `visualBible.secondaryCharacters` is empty — all five are
+`mainCharacters`. So the model mis-routed two main cast members into the
+secondary slot. Downstream, figure naming had one name (`Hans`) for two older
+men in frame; `Hans` landed on Daniel and a garment recolour went to the wrong
+man — the symptom 3e2bfe063 (now reverted, see the superseded entry above)
+tried to fix at the naming step.
+
+**The parser is innocent — verified, not assumed.** `parseProseMetadataFormat()`
+on the stored `sceneDescription` returns exactly `["Emma","Noah","Hans"]`, which
+is byte-identical to the `characters` array in the emitted text and to the
+persisted `sceneImages[13].sceneMetadata.characters`. Emitted == parsed ==
+stored. The omission is the model's.
+
+**The original sweep was mostly false positives — this changed the design.** A
+whole-word name sweep over three staging stories flagged 6 pages. Re-checked
+against the stored prose, only p14 is real. The other four are possessives that
+name a place or a prop while the person is absent from the frame:
+`"…the dusty wooden floorboards of Hans's attic…"` (three pages, Hans is not in
+the picture) and `"…Daniel's phone torch — a flat rectangular black-faced…"`
+(the torch is on the ground; Daniel is not in the shot). One flagged page was a
+location name, `"Hans's Farm — Adlikon"`. A repairing check would have invented
+four figures out of five findings — precisely the "characters do not just
+appear like that" failure the owner had just rejected.
+
+**Decision:**
+1. **Prompt (both templates, they share their rule set):** one bullet added
+   under the `characters[]` field rules — *"Every character from CHARACTER
+   DETAILS the prose describes as present gets an entry here, including a figure
+   standing in the background or named only in passing. Never route one of them
+   to `objects[]` instead."*
+2. **Code — warn only, never repair.** `findCastMissingFromMetadata(sceneDescription,
+   castNames, sceneMetadata?)` in `server/lib/sceneMetadata.js` (pure, exported,
+   re-exported from `storyHelpers`) returns cast members whose name appears as a
+   **bare** whole word in the prose (metadata block excluded) but not in
+   `characters[]`. An occurrence followed by an apostrophe is skipped —
+   possessives name places and props. Word boundaries are `\p{L}\p{N}`-based, so
+   a cast member "Ann" never matches "Anna". Called in
+   `storyJobPipeline.js` → `preparePageData`, right where the page's
+   `sceneMetadata` is parsed for image generation, next to the existing
+   `[CLOTHING MISMATCH]` warn block.
+3. **The warning persists queryably.** On a hit it logs
+   `⚠️ [SCENE CAST] P<n>: prose describes … but metadata characters[] lists …`
+   AND stamps `sceneMetadata.castMissingFromMetadata = [names]`, which rides
+   into `stories.data.sceneImages[].sceneMetadata` — greppable across stories in
+   JSONB, not only in a Railway log that ages out.
+
+**Rationale for warn-only:** a name in prose does not prove the person is in the
+picture, and appending a minimal entry would inject a supervised figure the
+image may not contain — the entity grid would then hunt a crop that does not
+exist and repair could paint one in. The evidence is 1 true positive against 4
+possessive false positives before filtering; even with the apostrophe rule, a
+name can still appear incidentally ("they missed Grandpa"). A warning costs
+nothing and is queryable; a wrong repair costs a page. Revisit only with a body
+of stamped `castMissingFromMetadata` findings showing the described-character
+case dominating.
+
+**Scope note (deliberate):** the check runs on the generation path only. The
+regeneration re-expansion endpoints (`server/routes/regeneration.js`) parse the
+same metadata but are user-driven single-page edits; wiring them needs its own
+evidence and would change endpoint responses.
+
+**Touched:** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`,
+`server/lib/sceneMetadata.js` (new `findCastMissingFromMetadata` + export),
+`server/lib/storyHelpers.js` (re-export), `storyJobPipeline.js`
+(`preparePageData` check + warn + stamp),
+`tests/manual/sceneCastConsistency.test.js` (new, 25 checks).
+
+**Status:** ✅ active

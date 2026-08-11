@@ -73,6 +73,7 @@ const {
   buildAvailableAvatarsForPrompt,
   getLandmarkPhotosForScene,
   extractSceneMetadata,
+  findCastMissingFromMetadata,
   getHistoricalLocations,
   convertClothingToCurrentFormat,
   resolveArtStyle,
@@ -3086,8 +3087,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // applyStyledAvatars now skips costumed-* entries internally (see
         // styledAvatars.js), so it's safe to call on a mixed-clothing scene.
         pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
-        // Phase 7: cell-crop refs from story-scoped 2×4 sheets when present.
         let sceneMetadata = extractSceneMetadata(scene.sceneDescription);
+        // The Art Director must not describe a cast member in the prose and
+        // leave them out of metadata `characters` — the image model renders
+        // the prose, every supervisor (figure naming, entity grid, clothing
+        // validation, garment repair) reads the list, so an unlisted character
+        // is drawn and never checked. Warn only, never repair: a name can be
+        // present without the person being in the frame, and appending a figure
+        // the picture may not contain is the worse failure.
+        const castMissing = findCastMissingFromMetadata(
+          scene.sceneDescription,
+          (inputData.characters || []).map(c => c.name),
+          sceneMetadata
+        );
+        if (castMissing.length > 0) {
+          const listed = (sceneMetadata?.characters || []).join(', ') || 'none';
+          log.warn(`⚠️ [SCENE CAST] P${pageNum}: prose describes ${castMissing.join(', ')} but metadata characters[] lists ${listed} — unlisted characters are rendered and never supervised`);
+          if (sceneMetadata) sceneMetadata.castMissingFromMetadata = castMissing;
+        }
+        // Phase 7: cell-crop refs from story-scoped 2×4 sheets when present.
         {
           const sav = require('./server/lib/storyAvatars');
           const storyAvatars = sav.projectStoryCharacterAvatars(inputData.characters || [], inputData.artStyle || 'pixar');
