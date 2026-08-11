@@ -9252,3 +9252,20 @@ of evidence, not because one unverified reading is trusted.
 `tests/manual/garmentPanelAgreement.test.js` (new, 51 assertions).
 
 **Status:** ✅ active (single-panel acceptance 🟡 provisional, pending measurement).
+
+## 2026-08-11: Scene-metadata migration orphans — era restored, setting{} deliberately superseded
+
+**Context:** the scene-expansion format migration silently dropped fields the code still consumed.
+Audit found: `shot` (restored b6e5c25ac — every empty scene had defaulted to 'wide shot' for
+months, masked by prompts.js injecting '**SHOT:** wide'), `era` (buildEraGuard(null) = NO
+anachronism guard on any beats page), `setting{}` (camera fallback dead), `action`/`holding`
+(superseded by interactions[]), `framingPattern`/`pose`/`flip` (OTS niche / killed composite).
+
+**Decision:** restore `shot` + `era` (templates emit them again; parser passthroughs live).
+`setting{}` stays dead ON PURPOSE — `shot` covers the camera, prose covers lighting/weather;
+do not re-emit it. `action`/`holding` stay superseded by interactions[] (comment fixed);
+dead `time`/`weather` passthroughs deleted. `framingPattern`/`pose`/`flip` not restored.
+
+**Touched:** prompts/scene-expansion-all.txt, prompts/scene-expansion.txt,
+server/lib/sceneMetadata.js. Audit details in the 2026-08-11 session; consumers:
+storyJobPipeline.js:3407 (SHOT prefix), promptBuilders.js:2993 (era guard).

@@ -336,12 +336,10 @@ function buildTextFromJson(scene) {
       if (position) parts.push(position);
       if (char.action) parts.push(stripEntityIds(char.action));
       if (char.expression) parts.push(stripEntityIds(char.expression));
-      // Holding info: merge both hands' values without specifying which hand,
-      // so the image model picks the natural placement itself. Previously the
-      // holding field was scene-expansion-only (validation) and never reached
-      // the image model — which meant held/carried items like "toy elephant
-      // in pocket" or "hands cupped to mouth" were completely invisible to
-      // Gemini/Grok unless the action text happened to mention them.
+      // Holding info: merge both hands' values without specifying which hand.
+      // NOTE (2026-08-11 audit): current scene-expansion templates no longer
+      // emit `holding` — superseded by interactions[]. This branch only fires
+      // for old stories whose stored metadata still carries the field.
       const heldText = formatHoldingForPrompt(char.holding);
       if (heldText) parts.push('holding: ' + heldText);
       lines.push('- ' + parts.join(', '));
@@ -783,12 +781,15 @@ function extractSceneMetadata(sceneDescription) {
         imageSummary: prose,
         shot: metadata.shot || null,
         setting: metadata.setting || null,
-        time: metadata.time || null,
-        weather: metadata.weather || null,
+        // time/weather passthroughs removed 2026-08-11: written for months,
+        // read by nothing (metadata-migration audit).
         background: metadata.background || null,
       },
       thinking: null,
       translatedSummary: metadata.translatedSummary || null,
+      // Story era for buildEraGuard (anachronism guard) — restored 2026-08-11;
+      // lost in the metadata-format migration like `shot`.
+      era: metadata.era || null,
       imageSummary: prose,
       landmarkVariants: Object.keys(landmarkVariants).length > 0 ? landmarkVariants : null,
       setting: null, // Setting details are in the prose, not structured
