@@ -2770,6 +2770,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // STEP 0 verdict, persisted so "why was this page redone / not redone"
       // is answerable from the stored story instead of only from live logs.
       coherenceGate: v.evaluation?.coherenceGate || null,
+      styleGate: v.evaluation?.styleGate || null,
       source: v.source,
       type: typeFor(v.source),
       modelId: v.modelId,

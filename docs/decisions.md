@@ -8549,8 +8549,13 @@ fixed (8000 not 2500, comment at that call site); the row/identity evals never
 got the upgrade.
 
 **Decision:** In `server/lib/character2x4Sheet.js`:
+0. PRIMARY: `callSheetJudge` now sends `thinkingConfig: { thinkingBudget: 0 }`
+   for the google provider. These are structured scoring judges at temperature
+   0, not open reasoning — thinking was the only thing competing with the JSON
+   for the token budget, so disabling it removes the truncation at its source
+   (and is faster/cheaper). One chokepoint covers bodies/heads/identity/style.
 1. Bodies/heads and identity judge budgets raised to `maxOutputTokens: 8000`
-   (a ceiling, not a charge) — matches the style-eval's proven value.
+   (a ceiling, not a charge) — headroom behind the thinking-off fix.
 2. `callSheetJudge` now throws on `finishReason: MAX_TOKENS` naming the cap, so
    a future truncation is a clear error (which the retry loop + the 2026-08-10
    fail-open then handle) instead of a cryptic parse failure.
@@ -8683,3 +8688,44 @@ boxes are `[ymin,xmin,ymax,xmax]`, eval `face_bbox` is `[x1,y1,x2,y2]`, both 0-1
 `tests/manual/figureIdentityCheck.test.js` (new).
 
 **Status:** shipped (cross-check + skip active); tiebreaker stubbed and off.
+
+## 2026-08-11 — Style gate: made observable, extended to linework + faces, VERIFIED firing
+
+**It was never broken — it was invisible.** `styleGate` was a local variable in `evaluateImageQuality`:
+computed, used to push a finding, logged, and never added to the returned object. `coherenceGate`
+sits two lines away in that same return and is persisted properly; the style gate was not on the
+whitelist. Across two full stories its answer was thrown away every time, so there was no way to
+tell "the model answered correctly" from "the model never answered".
+
+Compounding it, the MATCHES case logged at `debug`, which the Test Lab does not capture — so silence
+was ambiguous in exactly the way the gate exists to prevent. This cost two inconclusive
+investigations in which absence of evidence was twice reported as evidence.
+
+**Fixed:** returned from the evaluator, persisted at both version sites (`images.js`,
+`repairPipeline.js`), the matching case logged at INFO, and a new WARN when the gate answers without
+naming a medium.
+
+**Extended (owner):** medium alone catches only a PHOTOGRAPH in a drawn book. Watercolour, comic and
+anime are all "illustration" — what separates them is linework and, above all, how a FACE is
+rendered, which is why every `ART_STYLES` descriptor already carries a "Faces:" clause. The gate now
+reports `observed` (medium), `linework` and `faces`, and a mismatch in any of them fails it. Palette
+was deliberately excluded at the owner's direction.
+
+**Verified — Test Lab exp #502**, three pages of `job_1786397108357_q1fjbdzbx`:
+
+| page | gate said | correct |
+|---|---|---|
+| p5 (ACTIVE version) | FAILED — `photographic / no outlines / smooth 3D shading` | ✅ it is a photograph |
+| p10 | matches — `ink illustration / bold uniform outlines / ink lines with graphic shading` | ✅ |
+| p13 | matches | ✅ (owner confirmed the page is fine) |
+
+On p5 it also found agreement rather than manufacturing a finding: STEP 4 had already reported
+`style_consistency`, so the gate deferred to it.
+
+**Method note worth keeping.** The Lab evaluates the ACTIVE version; a download script taking the
+highest `version_index` fetches a DIFFERENT image on any repaired page. p5 active is v0 (a
+photograph, score −22) while v1 is the repaired illustration (−137). Judging a gate's answer against
+the wrong version produced a confident, wrong conclusion that it had failed. Always resolve the
+active version before comparing an eval result to an image.
+
+**Touched:** `server/lib/images.js`, `server/lib/repairPipeline.js`, `prompts/image-evaluation.txt`.

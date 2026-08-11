@@ -1947,7 +1947,17 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // what you see is harder to skip than judging against a spec.
       const styleGate = parsedJson.style_gate || null;
       if (styleGate) {
+        // Medium alone was too coarse: it catches a PHOTOGRAPH in a drawn book
+        // and nothing else. Watercolour, comic and anime are all "illustration"
+        // — what separates them is linework and, above all, how a FACE is
+        // rendered, which is why every ART_STYLES descriptor carries a "Faces:"
+        // clause. A flat-vector page with simple outlined faces in a book
+        // commissioned for ink linework passed the medium-only gate.
         const observed = String(styleGate.observed || '').trim();
+        const linework = String(styleGate.linework || '').trim();
+        const faces = String(styleGate.faces || '').trim();
+        const seen = [observed, linework && `linework: ${linework}`, faces && `faces: ${faces}`]
+          .filter(Boolean).join(' | ');
         if (styleGate.matches_style === false) {
           // Gate wins over a mis-severitied STEP 4 finding — same precedence as
           // the coherence gate, and the same failure it exists to prevent.
@@ -1962,16 +1972,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
               character: null,
               fix: 'Regenerate the page in the commissioned art style — match the medium, not just the subject.',
             });
-            log.warn(`🎨 [EVAL] style gate FAILED (observed "${observed}") → style_consistency MAJOR: ${reason}`);
+            log.warn(`🎨 [EVAL] style gate FAILED — saw [${seen}] → style_consistency MAJOR: ${reason}`);
           } else {
-            log.warn(`🎨 [EVAL] style gate FAILED (observed "${observed}") — STEP 4 already reported it`);
+            log.warn(`🎨 [EVAL] style gate FAILED — saw [${seen}] — STEP 4 already reported it`);
           }
         } else if (observed) {
           // INFO, not debug. The whole point of a gate is that its answer is
           // observable; logging the normal case at debug made "the model said
           // it matches" indistinguishable from "the model never answered",
           // which cost two inconclusive investigations.
-          log.info(`🎨 [EVAL] style gate: observed "${observed}" — matches the commissioned style`);
+          log.info(`🎨 [EVAL] style gate: saw [${seen}] — matches the commissioned style`);
         } else {
           log.warn('🎨 [EVAL] style gate returned no `observed` value — medium was not actually named');
         }

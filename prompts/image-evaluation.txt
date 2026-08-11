@@ -16,12 +16,17 @@ Report only defects a reader would notice. Rule codes (N-xx, D-xx) exist so a fi
 
 # STYLE GATE — answer this BEFORE you read anything below
 
-Before judging a single defect, look at the page and answer two things in `style_gate`:
+Before judging a single defect, look at the page and describe how it is DRAWN — three observations, in your own words, BEFORE you look at what was commissioned:
 
-1. **`observed`** — what medium is this image actually drawn in? Name it plainly from what you see, in your own words, BEFORE you look at what was commissioned: `photographic`, `3D render`, `ink illustration`, `watercolour painting`, `flat vector cartoon`, `oil painting`, `pencil sketch`, and so on. Judge the RENDERING of skin, fabric and surfaces — not the subject matter. Real skin pores, camera-real fabric, photographic depth of field and lighting mean `photographic`, whatever the costumes depict.
-2. **`matches_style`** — now compare that to the ART STYLE this book was commissioned in (input 6 above). Does your `observed` medium match the medium that style names? `true` or `false`.
+1. **`observed`** — the medium. `photographic`, `3D render`, `ink illustration`, `watercolour painting`, `flat vector cartoon`, `oil painting`, `pencil sketch`, and so on. Judge the rendering of skin, fabric and surfaces, not the subject matter. Real skin pores, camera-real fabric and photographic lighting mean `photographic`, whatever the costumes depict.
+2. **`linework`** — how are edges made? Bold uniform black outlines; fine varied ink with hatching; no outlines at all, forms defined by paint edges; soft pencil; clean flat vector edges.
+3. **`faces`** — how is a FACE rendered? This is what separates styles that share a medium, so be specific: outlined with flat fill and simple features; ink lines with graphic shading; loose paint washes with no outline; large stylised eyes with screentone; soft blended rendering; smooth 3D shading.
 
-Answer `observed` first and independently. Do not read the ART STYLE, decide the page is fine, and back-fill a matching label.
+Then **`matches_style`** — compare all three against the ART STYLE (input 6). That style names its medium AND how faces should look; a mismatch in EITHER is a mismatch. `true` or `false`.
+
+Answer the three observations first and independently. Do not read the ART STYLE, decide the page is fine, and back-fill labels that agree with it.
+
+**A page can be the right medium and still the wrong style.** Watercolour, comic and anime are all "illustration" — they differ in exactly the two things above. Flat vector edges and simple outlined faces in a book commissioned for ink linework and graphic shading is a mismatch, even though both are drawings. Judge the style you were given, not the broad category.
 
 When `matches_style` is false, ALSO emit one `fixable_issues` entry with `type: "style_consistency"`, severity MAJOR, describing both mediums ("page is photographic; the commissioned style is a graphic-novel illustration"). When no ART STYLE was supplied, set `matches_style: true` and `reason: "no art style supplied"`.
 
@@ -186,7 +191,7 @@ Return JSON only, no other text. Emit exactly these keys.
   ],
   "rendering": { "extra_limbs": false, "physics_ok": true, "issues": [] },
   "coherence_gate": { "applied": false, "reason": null },
-  "style_gate": { "observed": "ink illustration", "matches_style": true, "reason": null },
+  "style_gate": { "observed": "ink illustration", "linework": "fine varied ink with hatching", "faces": "ink lines with graphic shading, stylised features", "matches_style": true, "reason": null },
   "verdict": "PASS",
   "issues_summary": "One-sentence summary of what is wrong, or empty when nothing is.",
   "fixable_issues": [
