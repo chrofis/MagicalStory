@@ -4673,7 +4673,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const runwareDirectCost = tokenUsage.runware?.direct_cost || 0;
     // Authoritative total = sum of every per-function cost (== sum of the
     // api_usage events emitted below).
-    const totalCost = Object.entries(byFunc).reduce((sum, [fn, fd]) => sum + functionCost(fn, fd), 0);
+    //
+    // Stamp each function's own cost back onto the ledger as `cost`. Without
+    // this the value is computed, summed into the headline, and thrown away:
+    // `direct_cost` is only set by providers that return a price (Grok,
+    // OpenRouter), so every Anthropic and Gemini row persisted as $0 and the
+    // "Models used" panel under-reported a 14-page story by $1.10 of $2.60 —
+    // Gemini's 740k eval input tokens showed as free. Kept separate from
+    // `direct_cost` so "the provider billed us" stays distinguishable from
+    // "we computed it from tokens".
+    const totalCost = Object.entries(byFunc).reduce((sum, [fn, fd]) => {
+      const c = functionCost(fn, fd);
+      if (fd && fd.calls > 0) fd.cost = c;
+      return sum + c;
+    }, 0);
 
     log.debug(`📊 [UNIFIED] Token usage & cost summary:`);
     log.debug(`   BY PROVIDER:`);
@@ -4983,12 +4996,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           enableFullRepair,
         },
         // Models used
-        models: {
-          text: unifiedModelId,
-          image: byFunc.page_images?.models ? Array.from(byFunc.page_images.models) : [],
-          quality: byFunc.page_quality?.models ? Array.from(byFunc.page_quality.models) : [],
-          sceneExpansion: byFunc.scene_expansion?.models ? Array.from(byFunc.scene_expansion.models) : [],
-        },
+        models: (() => {
+          const of = (fn) => (byFunc[fn]?.models ? Array.from(byFunc[fn].models) : []);
+          const uniq = (a) => [...new Set(a.filter(Boolean))].sort();
+          // `all` is derived from the usage ledger, not hand-picked. The four
+          // buckets below name one stage each and between them missed the
+          // reviewer (DeepSeek ran beat, wardrobe, scene review AND text
+          // refine), both Qwen models (iterate, consolidation, semantic) and
+          // grok-imagine (inpaint) — 5 of the 9 models a beats story uses.
+          const all = uniq(Object.values(byFunc).flatMap(f => (f?.calls > 0 && f.models) ? Array.from(f.models) : []));
+          return {
+            text: unifiedModelId,
+            image: of('page_images'),
+            quality: of('page_quality'),
+            // beats labels this stage beats_scene_expansion; reading only the
+            // unified label reported an empty list on every beats run.
+            sceneExpansion: uniq([...of('scene_expansion'), ...of('beats_scene_expansion')]),
+            all,
+          };
+        })(),
       },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

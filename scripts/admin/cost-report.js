@@ -86,34 +86,56 @@ async function main() {
   const report = await buildCostReport({ token: getToken(), projectId: PROJECT_ID, days });
   print(report);
 
-  // AI API spend — the other half of the bill. Needs the database, so it is
-  // skipped (with a note, never silently) when no connection string is set.
-  const dbUrl = process.env.DATABASE_URL;
-  if (dbUrl) {
-    const { Pool } = require('pg');
-    const pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
-    try {
-      const { buildApiCostReport } = require('../../server/lib/apiCost');
-      const api = await buildApiCostReport({ pool, days });
-      report.api = api;
-      console.log(`AI API spend — last ${days} days (${api.stories} stories, ${api.totals.calls} calls)\n`);
-      for (const p of api.providers) {
-        console.log('  ' + p.name.padEnd(16) + String(p.calls).padStart(6) + ' calls' + usd(p.total).padStart(10));
-      }
-      console.log('  ' + 'TOTAL'.padEnd(16) + String(api.totals.calls).padStart(6) + ' calls' + usd(api.totals.total).padStart(10));
-      console.log(`  ${usd(api.perStory)} per story · projected ${usd(api.projectedMonthly)}/month`);
-      if (api.unpricedTokens) console.log(`  WARNING: ${api.unpricedTokens.toLocaleString()} tokens had no model recorded and are NOT priced`);
-      if (api.estimatedTokens) console.log(`  note: ${api.estimatedTokens.toLocaleString()} tokens priced via the configured default model`);
-      console.log(`\n  GRAND TOTAL ${usd(report.current.totals.total + api.totals.total)}` +
-        `  (Railway ${usd(report.current.totals.total)} + API ${usd(api.totals.total)})` +
-        `  -> ${usd(report.projectedMonthly + api.projectedMonthly)}/month\n`);
-    } catch (e) {
-      console.log(`AI API spend: unavailable (${e.message})\n`);
-    } finally {
-      await pool.end();
-    }
+  // AI API spend — the other half of the bill. Reported per ENVIRONMENT, and
+  // summed, because the Railway table above already covers staging AND
+  // production: reading only DATABASE_URL compared both-env infrastructure
+  // against production-only API spend. On 2026-08-11 that printed
+  // "0 stories, 0 calls" on a day two staging stories had cost $2.60, and the
+  // GRAND TOTAL silently understated the real spend.
+  const { Pool } = require('pg');
+  const { buildApiCostReport } = require('../../server/lib/apiCost');
+  const envs = [
+    { name: 'production', url: process.env.DATABASE_URL },
+    { name: 'staging', url: process.env.STAGING_DATABASE_URL },
+  ].filter(e => e.url);
+
+  if (envs.length === 0) {
+    console.log('AI API spend: skipped — no DATABASE_URL or STAGING_DATABASE_URL set.\n');
   } else {
-    console.log('AI API spend: skipped — DATABASE_URL not set.\n');
+    const apis = [];
+    for (const env of envs) {
+      const pool = new Pool({ connectionString: env.url, ssl: { rejectUnauthorized: false } });
+      try {
+        const api = await buildApiCostReport({ pool, days });
+        apis.push({ env: env.name, api });
+        console.log(`AI API spend — ${env.name} — last ${days} days (${api.stories} stories, ${api.totals.calls} calls)\n`);
+        for (const p of api.providers) {
+          console.log('  ' + p.name.padEnd(16) + String(p.calls).padStart(6) + ' calls' + usd(p.total).padStart(10));
+        }
+        console.log('  ' + 'TOTAL'.padEnd(16) + String(api.totals.calls).padStart(6) + ' calls' + usd(api.totals.total).padStart(10));
+        console.log(`  ${usd(api.perStory)} per story · projected ${usd(api.projectedMonthly)}/month`);
+        if (api.unpricedTokens) console.log(`  WARNING: ${api.unpricedTokens.toLocaleString()} tokens had no model recorded and are NOT priced`);
+        if (api.estimatedTokens) console.log(`  note: ${api.estimatedTokens.toLocaleString()} tokens priced via the configured default model`);
+        console.log('');
+      } catch (e) {
+        // Never silent: an environment we could not read is stated, so the
+        // grand total is known to be partial rather than assumed complete.
+        console.log(`AI API spend — ${env.name}: unavailable (${e.message})\n`);
+      } finally {
+        await pool.end();
+      }
+    }
+
+    if (apis.length > 0) {
+      const apiTotal = apis.reduce((s, a) => s + a.api.totals.total, 0);
+      const apiMonthly = apis.reduce((s, a) => s + a.api.projectedMonthly, 0);
+      report.api = apis.length === 1 ? apis[0].api : { perEnv: apis, total: apiTotal };
+      const split = apis.map(a => `${a.env} ${usd(a.api.totals.total)}`).join(' + ');
+      console.log(`  API total ${usd(apiTotal)}  (${split})`);
+      console.log(`  GRAND TOTAL ${usd(report.current.totals.total + apiTotal)}` +
+        `  (Railway ${usd(report.current.totals.total)} + API ${usd(apiTotal)})` +
+        `  -> ${usd(report.projectedMonthly + apiMonthly)}/month\n`);
+    }
   }
 
   if (process.argv.includes('--email')) {

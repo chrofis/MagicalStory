@@ -2813,7 +2813,12 @@ export function StoryDisplay({
                 calls: v.calls || 0,
                 inTok: v.input_tokens || 0,
                 outTok: v.output_tokens || 0,
-                cost: v.direct_cost || 0,
+                // `cost` is the authoritative per-function figure the pipeline
+                // stamps (tokens x rate for Anthropic/Gemini, provider price
+                // for Grok/OpenRouter). `direct_cost` alone only ever covered
+                // the providers that return a price, so this table used to
+                // under-report a story by ~40%. Older stories have no `cost`.
+                cost: v.cost ?? v.direct_cost ?? 0,
                 ms: v.elapsed_ms || 0,
               }))
               .sort((a, b) => (b.cost - a.cost) || (b.outTok - a.outTok));

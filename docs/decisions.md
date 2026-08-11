@@ -8832,3 +8832,48 @@ behaviour and needs its own evidence.
 `tests/manual/somFigureNaming.test.js` (new, 45 checks).
 
 **Status:** ✅ active
+
+### Cost reporting: attribute every call, and read every environment (2026-08-11)
+
+**Context:**   Two independent under-reports found while reviewing the
+steampunk showcase (`job_1786397108357_q1fjbdzbx`, $2.60, 14 pages).
+
+1. The story's "Verwendete Modelle" panel showed **$1.50 of a $2.60 run**. It
+   reads `tokenUsage.byFunction[fn].direct_cost`, and `direct_cost` is only set
+   by providers that return a price in their response (Grok, OpenRouter). Every
+   Anthropic and Gemini row persisted as $0 — Gemini's 740k eval input tokens
+   read as free. The correct per-function figure was already being computed by
+   `functionCost()` and summed into `analytics.totalCost`; it was simply never
+   written back.
+2. `scripts/admin/cost-report.js` read only `DATABASE_URL`, so it compared
+   Railway costs for BOTH environments against API spend for production only.
+   On a day when two staging stories cost $2.60 it printed "0 stories, 0 calls"
+   and a GRAND TOTAL of $4.89 / $48.88 per month. Reading both environments
+   gives $24.00 / **$239.97 per month** — the report was hiding 80% of the bill.
+
+Separately, `analytics.models` named four hand-picked buckets and so omitted the
+reviewer (DeepSeek: beat, wardrobe and scene review plus text refine), both Qwen
+models (iterate, consolidation, semantic) and grok-imagine (inpaint) — half the
+8 models a beats story actually uses. `sceneExpansion` was empty on every beats
+run because it read the unified label only.
+
+**Decision:**
+- `storyJobPipeline.js` stamps `byFunc[fn].cost` inside the same reduce that
+  computes `totalCost`, so the panel total equals the headline by construction.
+  `direct_cost` is left untouched, keeping "the provider billed us" separate
+  from "we computed it from tokens".
+- `StoryDisplay.tsx` reads `v.cost ?? v.direct_cost ?? 0`, so stories written
+  before this change still render.
+- `analytics.models` gains `all`, derived from the usage ledger, and
+  `sceneExpansion` unions the unified and beats labels.
+- The cost report enumerates production AND staging, prints each, sums them,
+  and names any environment it could not read rather than skipping it silently.
+
+**Rationale:** A cost report that silently omits a provider is worse than no
+report — it was used to conclude spend was ~$49/month when it was ~$240.
+Deriving the model list from the ledger instead of naming buckets means a stage
+added later cannot go unreported.
+
+**Touched:**   `storyJobPipeline.js`, `scripts/admin/cost-report.js`,
+`client/src/components/generation/StoryDisplay.tsx`
+**Status:**    ✅ active
