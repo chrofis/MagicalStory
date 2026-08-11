@@ -26,6 +26,8 @@ One line per page — the story beat each brief must depict.
 
 {CLOTHING_FINDINGS}
 
+{BRIEF_FINDINGS}
+
 # YOUR TASK
 
 Answer each check, naming pages. Then rewrite only the pages a check faulted.

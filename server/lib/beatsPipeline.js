@@ -581,11 +581,38 @@ SCENE: ${x.scene || ''}`.trim(),
     log.warn(`⚠️ [BEATS] clothing check failed (${ccErr.message}) — review runs without findings`);
   }
 
+  // Brief contradictions — prose vs the brief's own metadata. Same place, same
+  // deal as the clothing faults above: deterministic, free, and handed to the
+  // review rather than auto-repaired (owner decision 2026-08-11 — the reviewer
+  // authored both halves; we must not invent a figure nobody wrote).
+  let briefFindings = '';
+  try {
+    const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
+    const castNames = (inputData.characters || []).map(c => c && c.name).filter(Boolean);
+    const res = checkBriefs(
+      expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+      castNames,
+      visualBible
+    );
+    briefFindings = renderBriefBlock(res.byPage);
+    if (briefFindings) {
+      // Count only what the block actually carries — diagnostic-only types stay
+      // out of the log line, or it claims to have sent what it withheld.
+      const { REVIEWABLE } = require('./sceneBriefCheck');
+      const sent = res.findings.filter(fd => REVIEWABLE.has(fd.type));
+      const pages = [...new Set(sent.map(fd => fd.pageNumber))].sort((x, y) => x - y).join(', ');
+      log.info(`🧩 [BEATS] brief check: ${sent.length} contradiction(s) on page(s) ${pages} — sent to the scene review`);
+      gl.info('beats_brief_check', `Brief check found ${sent.length} contradiction(s) on page(s) ${pages}`, null, { findings: sent });
+    }
+  } catch (bcErr) {
+    log.warn(`⚠️ [BEATS] brief check failed (${bcErr.message}) — review runs without brief findings`);
+  }
+
   const srPrompt = buildSceneReviewPrompt(
     inputData,
     expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
     // Locked beats feed the review's check 5 (character in beat vs brief).
-    { clothingFindings, beats }
+    { clothingFindings, briefFindings, beats }
   );
   if (!srPrompt) {
     log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
@@ -699,6 +726,7 @@ SCENE: ${x.scene || ''}`.trim(),
         prompt: srPrompt,
         briefsIn,
         clothingFindings: clothingFindings || null,
+        briefFindings: briefFindings || null,
         clothingUnfixed: clothingUnfixedList,
       };
       gl.info('beats_scene_review', `Scene review by ${srRes.modelId || reviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {

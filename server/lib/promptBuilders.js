@@ -3848,6 +3848,11 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // 2026-08-08). Empty string when nothing was found, so fillTemplate drops
     // the placeholder and the prompt is unchanged for a clean story.
     CLOTHING_FINDINGS: options.clothingFindings || '',
+    // Brief contradictions (server/lib/sceneBriefCheck.js) — prose vs the
+    // brief's own metadata, same deal: free to compute, fixed here or nowhere.
+    // Stated as contradictions, not orders: the reviewer wrote both halves and
+    // may legitimately decline one.
+    BRIEF_FINDINGS: options.briefFindings || '',
   });
 }
 

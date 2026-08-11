@@ -9062,3 +9062,79 @@ inpaint templates marked DEAD CHAIN and the live path named).
 
 **Not renamed.** `inpaint` is a stored value in repair history, `evalBuckets` repair labels,
 `repairLogic` method strings and the dev panel; renaming is a data-shape change, not a doc fix.
+
+---
+
+## 2026-08-11 — Two deterministic brief contradictions go to the scene review, before any image exists
+
+**Context:** A scene brief has two halves written by one call: prose the image
+model renders, and a `---METADATA---` JSON block every downstream supervisor
+reads (figure naming, the entity grid, clothing validation, avatar reference
+selection). Nothing reconciles them, so a disagreement ships. Staging
+`job_1786397108357_q1fjbdzbx` p14 is the confirmed case, and it carries both
+faults at once: the prose describes five people in full detail and
+`sceneIntent` names Daniel and Sarah, while `characters[]` lists only
+Emma/Noah/Hans; and `objects[]` holds `["LOC006","ART012","ART013","ART014","ART015","CHR003","CHR004"]`
+while `visualBible.mainCharacters` entries carry numeric ids
+(`1786395553134`…) and `secondaryCharacters` is empty — so `CHR003`/`CHR004`
+reference nothing. Daniel and Sarah were rendered with no avatar reference at
+all, and the figure-naming call then stamped "Hans" on Daniel.
+
+**Decision:** Two pure checks in `server/lib/sceneBriefCheck.js`, computed at
+the same chokepoint as the clothing faults (`beatsPipeline` Step 4) and handed
+to the ONE scene review as a `{BRIEF_FINDINGS}` block:
+- `cast_unlisted` — a cast member the prose describes is absent from
+  `characters[]`. Reuses `findCastMissingFromMetadata()`, which is
+  possessive-aware; that behaviour is load-bearing (`Hans's attic`,
+  `Daniel's phone torch` are a place and a prop, and counting them produced 4
+  false positives out of 5 across three stories).
+- `cast_id_unresolved` — a `CHR###` id in `objects[]` that resolves to no
+  visual-bible entry.
+A third type, `object_id_unresolved` (dangling `ART###`/`LOC###`/…), is
+computed and **withheld** — same mechanism as `clothingCheck`'s
+`outfit_missing`. Each type is one entry in `REVIEWABLE` away from being
+dropped or sent, independently.
+
+**The id scheme is real — established from the data, not assumed.** Over the
+three staging stories, `ART###`/`LOC###` in `objects[]` resolve against
+`visualBible.artifacts`/`.locations` (including the `LOC003.1` landmark-variant
+suffix, which resolves to its base id). `CHR###` never resolves: main
+characters carry numeric ids and are referred to by name, and
+`secondaryCharacters` was empty in all three. So the model is inventing CHR ids
+for main cast — on p14 `CHR003`/`CHR004` are exactly Daniel and Sarah by
+main-character order, the same two `cast_unlisted` reports.
+
+**Rationale:** These findings are REPORTED, never auto-repaired. The reviewer
+authored both halves and has the prose in front of it; adding a
+`characters[]` entry or a visual-bible figure here would put a person in the
+book that nobody wrote. The block therefore states each contradiction as a fact
+and explicitly leaves the reviewer free to decline — a name can be mentioned
+without the person being in the frame (`7f75jspcz` p11: "Daniel and Hans remain
+a few steps back, out of the tight frame, their presence felt"). No
+`MUST`/`CRITICAL` banner, unlike the clothing block's check 0. Free by
+construction: pure functions over data already in memory, no API call, no image.
+
+**Measured over the three stories the checks were built from (42 pages), stored
+data only, no generation:**
+
+| type | findings | pages | sent |
+|---|---|---|---|
+| `cast_unlisted` | 2 | 2 (q1fjbdzbx p14; 7f75jspcz p11) | yes |
+| `cast_id_unresolved` | 11 | 11 | yes |
+| `object_id_unresolved` | 12 | 12 | no — diagnostic |
+
+`cast_unlisted` fired on 2 pages, not the 1 predicted; the extra
+(`7f75jspcz` p11) is a true positive of a second kind — prose that names two
+characters as present-but-out-of-frame, which is a drawability defect the
+reviewer should see. `object_id_unresolved` is withheld because every hit is an
+`ART` id the brief invents for a prop it introduces itself: no entry means no
+reference image either way, and there is no measured link to a defect.
+
+**Touched:**
+- `server/lib/sceneBriefCheck.js` (new — `checkPage`/`checkScenes`/`renderFindingsBlock`/`REVIEWABLE`)
+- `server/lib/beatsPipeline.js` — Step 4, alongside the clothing check
+- `server/lib/promptBuilders.js` — `BRIEF_FINDINGS` fill
+- `prompts/scene-review.txt` — `{BRIEF_FINDINGS}` placeholder
+- `tests/manual/sceneBriefCheck.test.js` (new, 45 assertions)
+
+**Status:** ✅ active.
