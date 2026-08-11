@@ -72,6 +72,15 @@ const DEFAULTS = {
   // one panel's hat or shoe is a small silhouette, and it is still a valid
   // sample as long as it is genuinely that garment's pixels.
   minAvatarMaskPx: 400,
+  // CROSS-PANEL AGREEMENT on the avatar side (see avatarGarmentLab). The styled
+  // sheet shows the SAME character up to 8 times, so the same garment is present
+  // several times over — measure it in more than one panel and require the
+  // readings to match before believing any of them.
+  avatarPanels: 3,
+  avatarAgreeDeltaE: 10,
+  // Two DINO candidates that overlap this much are the same panel, not a second
+  // opinion — a duplicate box would "agree" with itself and prove nothing.
+  avatarPanelIoU: 0.3,
 };
 
 /**
@@ -122,8 +131,56 @@ const bytesOf = (input) => {
 };
 const toDataUri = (buf) => 'data:image/jpeg;base64,' + buf.toString('base64');
 
-/** GroundingDINO: garment box inside a crop. Returns pixel box in crop coords. */
-async function detectGarmentBox(cropUri, opts = {}) {
+/** Intersection-over-union of two pixel boxes [x1,y1,x2,y2]. */
+function boxIoU(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== 4 || b.length !== 4) return 0;
+  const ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0]));
+  const iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const inter = ix * iy;
+  if (inter <= 0) return 0;
+  const areaA = Math.max(0, a[2] - a[0]) * Math.max(0, a[3] - a[1]);
+  const areaB = Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
+  const uni = areaA + areaB - inter;
+  return uni > 0 ? inter / uni : 0;
+}
+
+/**
+ * Highest-scoring candidates that are NOT the same region.
+ *
+ * GroundingDINO happily returns several boxes over one object. Taking the top-N
+ * raw would hand the agreement check two views of the same panel, which always
+ * agree and therefore verify nothing. Overlapping candidates are suppressed so
+ * the boxes that survive are, as far as geometry can tell, different panels.
+ *
+ * Pure — no I/O, unit-testable.
+ * @param {Array<{box:number[],score:number}>} candidates any order
+ * @returns {Array<{box:number[],score:number}>} highest score first
+ */
+function selectDistinctBoxes(candidates, opts = {}) {
+  const cfg = { ...DEFAULTS, ...opts };
+  const maxBoxes = Math.max(1, cfg.avatarPanels | 0);
+  const sorted = (Array.isArray(candidates) ? candidates : [])
+    .filter(c => Array.isArray(c?.box) && c.box.length === 4)
+    .slice()
+    .sort((p, q) => (q.score ?? 0) - (p.score ?? 0));
+  const out = [];
+  for (const c of sorted) {
+    if (out.length >= maxBoxes) break;
+    if (out.some(o => boxIoU(o.box, c.box) > cfg.avatarPanelIoU)) continue;
+    out.push({ box: c.box, score: c.score == null ? null : Number(c.score) });
+  }
+  return out;
+}
+
+/**
+ * GroundingDINO: garment boxes inside a crop, pixel coords, best score first.
+ *
+ * The endpoint already returns every candidate for the query (photo_analyzer.py
+ * /detect-figures-text -> figures[0].candidates, sorted by score); this used to
+ * read only the best one and throw the rest away. No extra detector call is made
+ * to get more than one box.
+ */
+async function detectGarmentBoxes(cropUri, opts = {}) {
   const cfg = { ...DEFAULTS, ...opts };
   const res = await fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -138,8 +195,125 @@ async function detectGarmentBox(cropUri, opts = {}) {
   const j = await res.json();
   if (!j?.success) throw new Error(`detect-figures-text: ${j?.error}`);
   const g = (j.figures || [])[0];
-  if (!g?.box) return null;
-  return { box: g.box, score: g.score };
+  if (!g?.box) return [];
+  // Older analyzer builds answer without `candidates`; the best box is still there.
+  const cands = Array.isArray(g.candidates) && g.candidates.length
+    ? g.candidates : [{ box: g.box, score: g.score }];
+  return selectDistinctBoxes(cands, cfg);
+}
+
+/** The single best garment box, or null — the page side's contract, unchanged. */
+async function detectGarmentBox(cropUri, opts = {}) {
+  const boxes = await detectGarmentBoxes(cropUri, { ...opts, avatarPanels: 1 });
+  return boxes[0] || null;
+}
+
+/** Straight L*a*b* distance between two measurements. */
+function labDeltaE(p, q) {
+  return Math.hypot(p.L - q.L, p.a - q.a, p.b - q.b);
+}
+
+/**
+ * The agreement decision for the avatar side — pure, so it is testable without
+ * a detector, a segmenter or a network.
+ *
+ * Given the mean L*a*b* read off several panels of ONE styled sheet, return the
+ * largest set of panels that all agree with each other within
+ * `avatarAgreeDeltaE`, and their mean. Nothing else on this module can tell a
+ * confidently WRONG measurement from a right one: exp 489 asked for a hat, the
+ * box landed on brown boots, and a 0.35-confidence reading repainted a cream hat
+ * brown without a single objection. A second panel would have said cream.
+ *
+ * A confidence floor is deliberately NOT the mechanism (decisions.md 2026-08-11):
+ * a shoe or a hat is legitimately a small mask and DINO scores small objects
+ * lower, so a floor refuses footwear and headwear disproportionately; the garment
+ * "kind" table that could have made a floor size-aware was deleted on purpose;
+ * and confidence has been measured unreliable here — every wrong figure naming on
+ * staging page 14 was marked `high`.
+ *
+ * ONE panel is accepted and merely MARKED (`agreement: 'single'`), not refused.
+ * This is deliberately provisional: refusing would regress every page where the
+ * garment really is visible in one panel only, and we have no measurement of how
+ * often that happens. The marker is what makes it measurable — tighten once the
+ * runs say how common it is.
+ *
+ * The agreeing panels are averaged UNWEIGHTED: each panel is one vote on the
+ * character's canonical colour, and a panel whose silhouette happens to be large
+ * is not a better witness to the pigment.
+ *
+ * @param {Array<{L:number,a:number,b:number,count?:number}>} means one per panel
+ * @returns {{mean:object|null, panelsMeasured:number, panelsAgreed:number,
+ *            maxPairDeltaE:number|null, agreement:'none'|'single'|'agreed'|'disagree',
+ *            reason:string|null}}
+ */
+function pickAgreeingPanels(means, opts = {}) {
+  const cfg = { ...DEFAULTS, ...opts };
+  const T = cfg.avatarAgreeDeltaE;
+  const list = (Array.isArray(means) ? means : [])
+    .filter(m => m && Number.isFinite(m.L) && Number.isFinite(m.a) && Number.isFinite(m.b))
+    // Subset enumeration below is 2^n; the caller never asks for more than
+    // `avatarPanels` anyway, so this bound is a guard, not a policy.
+    .slice(0, 10);
+  const n = list.length;
+  const describe = (m) => `L ${m.L.toFixed(0)}/hue ${(Math.atan2(m.b, m.a) * DEG).toFixed(0)}deg`;
+
+  if (!n) {
+    return {
+      mean: null, panelsMeasured: 0, panelsAgreed: 0, maxPairDeltaE: null,
+      agreement: 'none', reason: 'no avatar garment sample — no panel yielded a usable mask',
+    };
+  }
+  if (n === 1) {
+    return {
+      mean: { ...list[0] }, panelsMeasured: 1, panelsAgreed: 1, maxPairDeltaE: null,
+      agreement: 'single', reason: null,
+    };
+  }
+
+  let best = null, worst = 0;
+  for (let mask = 1; mask < (1 << n); mask++) {
+    const idx = [];
+    for (let i = 0; i < n; i++) if (mask & (1 << i)) idx.push(i);
+    if (idx.length < 2) continue;
+    let mx = 0, ok = true;
+    for (let i = 0; i < idx.length && ok; i++) {
+      for (let j = i + 1; j < idx.length; j++) {
+        const d = labDeltaE(list[idx[i]], list[idx[j]]);
+        if (idx.length === 2) worst = Math.max(worst, d);
+        if (d > T) { ok = false; break; }
+        if (d > mx) mx = d;
+      }
+    }
+    if (!ok) continue;
+    if (!best || idx.length > best.idx.length || (idx.length === best.idx.length && mx < best.mx)) {
+      best = { idx, mx };
+    }
+  }
+
+  if (!best) {
+    return {
+      mean: null, panelsMeasured: n, panelsAgreed: 0, maxPairDeltaE: +worst.toFixed(1),
+      agreement: 'disagree',
+      reason: `avatar panels disagree (max pair deltaE ${worst.toFixed(1)} > ${T}): ${list.map(describe).join(' vs ')}`,
+    };
+  }
+
+  const k = best.idx.length;
+  // `score` is carried through as the best of the AGREEING panels — reporting
+  // the top candidate's score would credit the target to a panel that may have
+  // been the one voted out.
+  const scores = best.idx.map(i => list[i].score).filter(Number.isFinite);
+  const mean = {
+    L: best.idx.reduce((s, i) => s + list[i].L, 0) / k,
+    a: best.idx.reduce((s, i) => s + list[i].a, 0) / k,
+    b: best.idx.reduce((s, i) => s + list[i].b, 0) / k,
+    count: best.idx.reduce((s, i) => s + (list[i].count || 0), 0),
+    score: scores.length ? Math.max(...scores) : null,
+  };
+  return {
+    mean, panelsMeasured: n, panelsAgreed: k, maxPairDeltaE: +best.mx.toFixed(1),
+    agreement: 'agreed', reason: null,
+  };
 }
 
 /** MobileSAM: box -> silhouette, as a 0/255 mask at the crop's size. */
@@ -237,9 +411,12 @@ function medianSkinL(raw, W, H, box01) {
 
 /**
  * The canonical colour of ONE garment for a character, measured off the styled
- * avatar: DINO box -> SAM silhouette -> mean L*a*b* of the masked pixels.
- * @returns {{L,a,b,chroma,hueDeg,source,maskPx,dinoScore}|null} null when the
- *   garment could not be located on the sheet — never a guessed region.
+ * avatar: DINO boxes -> SAM silhouettes -> mean L*a*b* of the masked pixels,
+ * SEVERAL panels of the sheet, cross-checked against each other.
+ * @returns {{target: object|null, reason: string|null}} target is null when the
+ *   garment could not be located on the sheet, or when the panels that were
+ *   located contradict each other — never a guessed region, never one
+ *   unverifiable reading when the sheet offered a second opinion.
  */
 async function avatarGarmentLab(avatarUri, opts = {}) {
   const cfg = { ...DEFAULTS, ...opts };
@@ -269,35 +446,69 @@ async function avatarGarmentLab(avatarUri, opts = {}) {
   // mean measuring a shoe against a chest. It also carried the very low-chroma
   // blind spot described above. Refuse and record instead: every wrong recolour
   // seen so far came from a confident wrong target, never from a missing one.
+  //
+  // SELF-VERIFYING BY CROSS-PANEL AGREEMENT (owner, 2026-08-11). One box, one
+  // mask, one mean is a measurement with nothing to check it against, and it can
+  // be confidently wrong: exp 489 asked for the hat, the box landed on brown
+  // boots, and the correct cream hat was repainted brown at DINO 0.35 with no
+  // objection anywhere. The sheet is 2x4 panels of the SAME character, so the
+  // garment is on it several times — take up to `avatarPanels` distinct boxes
+  // from the candidates the detector ALREADY returned (no second DINO call), mask
+  // each with SAM (local, free), and require the readings to agree. See
+  // pickAgreeingPanels for why this is agreement and not a confidence floor.
   const prompt = opts.prompt;
-  if (!prompt) return null;
+  if (!prompt) return { target: null, reason: 'no garment query for the avatar side' };
   try {
     const sheetUri = toDataUri(await sharp(buf).jpeg({ quality: 95 }).toBuffer());
-    const det = await detectGarmentBox(sheetUri, { ...cfg, prompt });
-    if (det?.box) {
-      // Box is in sheet coords and segmentGarment returns the mask at sheet
-      // size, so no extract/offset juggling — same call shape as the page side.
-      const seg = await segmentGarment(sheetUri, det.box, meta.width, meta.height);
-      const { data } = await sharp(buf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-      const m = meanLabMasked(data, seg.alpha);
-      if (m && m.count >= cfg.minAvatarMaskPx) {
-        return {
-          L: m.L, a: m.a, b: m.b,
-          chroma: Math.hypot(m.a, m.b),
-          hueDeg: +(Math.atan2(m.b, m.a) * DEG).toFixed(1),
-          source: `sam:${opts.garmentKey || 'garment'}`,
-          maskPx: m.count,
-          dinoScore: det.score == null ? null : +Number(det.score).toFixed(2),
-        };
-      }
-      log.warn(`[GARMENT-COLOUR] avatar "${opts.garmentKey}": SAM mask too small (${m?.count || 0}px < ${cfg.minAvatarMaskPx}) — no target`);
-    } else {
-      log.warn(`[GARMENT-COLOUR] avatar "${opts.garmentKey}": DINO found no such garment on the sheet — no target`);
+    const dets = await detectGarmentBoxes(sheetUri, { ...cfg, prompt });
+    if (!dets.length) {
+      const reason = 'DINO found no such garment on the sheet — no target';
+      log.warn(`[GARMENT-COLOUR] avatar "${opts.garmentKey}": ${reason}`);
+      return { target: null, reason };
     }
+    // Boxes are in sheet coords and segmentGarment returns the mask at sheet
+    // size, so no extract/offset juggling — same call shape as the page side.
+    const { data } = await sharp(buf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const panels = [];
+    let tooSmall = 0;
+    for (const det of dets) {
+      const seg = await segmentGarment(sheetUri, det.box, meta.width, meta.height);
+      const m = meanLabMasked(data, seg.alpha);
+      // minAvatarMaskPx is per panel, unchanged: a panel below it is not a
+      // sample, and a bad sample must not get a vote.
+      if (m && m.count >= cfg.minAvatarMaskPx) panels.push({ ...m, score: det.score });
+      else tooSmall++;
+    }
+    const pick = pickAgreeingPanels(panels, cfg);
+    if (!pick.mean) {
+      const reason = pick.reason + (tooSmall ? ` (${tooSmall} panel(s) below ${cfg.minAvatarMaskPx}px)` : '');
+      log.warn(`[GARMENT-COLOUR] avatar "${opts.garmentKey}": ${reason}`);
+      return { target: null, reason };
+    }
+    const m = pick.mean;
+    if (pick.agreement === 'single') {
+      log.info(`[GARMENT-COLOUR] avatar "${opts.garmentKey}": only one panel located — accepted unverified (provisional)`);
+    }
+    return {
+      target: {
+        L: m.L, a: m.a, b: m.b,
+        chroma: Math.hypot(m.a, m.b),
+        hueDeg: +(Math.atan2(m.b, m.a) * DEG).toFixed(1),
+        source: `sam:${opts.garmentKey || 'garment'}`,
+        maskPx: m.count,
+        dinoScore: m.score == null ? null : +Number(m.score).toFixed(2),
+        panelsMeasured: pick.panelsMeasured,
+        panelsAgreed: pick.panelsAgreed,
+        maxPairDeltaE: pick.maxPairDeltaE,
+        agreement: pick.agreement,
+      },
+      reason: null,
+    };
   } catch (e) {
-    log.warn(`[GARMENT-COLOUR] avatar "${opts.garmentKey}" segmentation failed (${e.message}) — no target`);
+    const reason = `segmentation failed: ${e.message}`;
+    log.warn(`[GARMENT-COLOUR] avatar "${opts.garmentKey}" ${reason} — no target`);
+    return { target: null, reason };
   }
-  return null;
 }
 
 
@@ -325,8 +536,8 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
   const W = meta.width, H = meta.height;
   const steps = [];
 
-  const target = await avatarGarmentLab(avatarUri, { ...cfg, garmentKey, prompt });
-  if (!target) { report.reason = 'no avatar garment sample'; return { changed: false, imageData: pageImageData, report, steps }; }
+  const { target, reason: targetReason } = await avatarGarmentLab(avatarUri, { ...cfg, garmentKey, prompt });
+  if (!target) { report.reason = targetReason || 'no avatar garment sample'; return { changed: false, imageData: pageImageData, report, steps }; }
   // maskPx/dinoScore are the AVATAR side's own confidence. Without them a
   // mislocated target is invisible: `dinoScore` on the report is the PAGE box,
   // and exp 485 passed every page-side check while the target was measured off
@@ -336,6 +547,12 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
     source: target.source,
     maskPx: target.maskPx ?? null,
     dinoScore: target.dinoScore ?? null,
+    // How many panels of the sheet backed this target, and how far apart they
+    // were. A 'single' here is an unverified reading, deliberately allowed.
+    panelsMeasured: target.panelsMeasured ?? null,
+    panelsAgreed: target.panelsAgreed ?? null,
+    maxPairDeltaE: target.maxPairDeltaE ?? null,
+    agreement: target.agreement ?? null,
   };
 
   // Crop to the figure so the garment query has one unambiguous referent — a
@@ -469,6 +686,11 @@ module.exports = {
   garmentQueryFor,
   avatarGarmentLab,
   detectGarmentBox,
+  detectGarmentBoxes,
+  selectDistinctBoxes,
+  pickAgreeingPanels,
+  boxIoU,
+  labDeltaE,
   segmentGarment,
   medianSkinL,
   meanLabMasked,

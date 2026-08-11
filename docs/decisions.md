@@ -9185,3 +9185,70 @@ p4/p14 were Grok) — noted for follow-up.
 (`generateImageOnly` stripBorder), `server/lib/coverIterate.js` + `server/routes/trial.js`
 (opt-outs), `prompts/image-evaluation.txt` (D-01 inset clause)
 **Status:**    ✅ active
+
+---
+
+## 2026-08-11: The avatar-side garment target self-verifies by CROSS-PANEL AGREEMENT — not by a confidence floor
+
+**Context:** `avatarGarmentLab()` measured a character's canonical garment colour with
+exactly one reading: one `detectGarmentBox()` on the styled avatar sheet, one
+`segmentGarment()`, one `meanLabMasked()`. Nothing could tell a right reading from a
+confidently wrong one. Lab exp 489: the query asked for the hat, the box landed on brown
+boots (or a smeared ghost figure on the sheet), a brown target came back, and a correct
+cream hat was repainted brown. No stage objected. The page side had already been made
+symmetric (DINO → SAM → mean on both sides), so every remaining wrong recolour seen so far
+came from a confident wrong TARGET, never from a missing one.
+
+**Decision:** Use the sheet's own redundancy. The styled avatar is 2×4 panels of the SAME
+character, so the garment is on it several times.
+
+1. `detectGarmentBoxes()` returns up to `avatarPanels` (3) boxes from the candidates the
+   detector already returns (`/detect-figures-text` → `figures[0].candidates`, sorted by
+   score). **No extra DINO call** — the old code fetched them and discarded all but the
+   first. `detectGarmentBox()` remains as the single-box page-side contract, unchanged.
+2. `selectDistinctBoxes()` suppresses candidates overlapping an accepted box by IoU >
+   `avatarPanelIoU` (0.3): two boxes over one panel would "agree" with themselves and
+   verify nothing.
+3. Each surviving box is masked with SAM (local, free) and averaged; a panel below
+   `minAvatarMaskPx` (unchanged at 400) gets no vote.
+4. `pickAgreeingPanels(means, cfg)` — **pure and exported**, so the decision is unit-testable
+   with no network — returns the LARGEST mutually-agreeing subset within `avatarAgreeDeltaE`
+   (10) and its unweighted mean. An outlier is excluded, not averaged in. Disagreement
+   returns no target and a reason naming the conflicting readings.
+5. `panelsMeasured` / `panelsAgreed` / `maxPairDeltaE` / `agreement` ride on the target into
+   `report.target` and onto the Test Lab summary card.
+6. `avatarGarmentLab()` now returns `{ target, reason }` so the caller records the SPECIFIC
+   refusal instead of a flat "no avatar garment sample".
+
+**Rationale — why NOT a confidence threshold** (the obvious alternative; it is rejected, do
+not reintroduce it):
+
+- **Small garments legitimately score low.** A shoe or a hat is a small mask and DINO scores
+  small objects lower. A floor would refuse footwear and headwear disproportionately —
+  exactly the garments the entity channel flags most.
+- **The size-aware version cannot be built.** Making a floor size-aware needs a garment
+  "kind" table, and that table was deliberately DELETED (2026-08-09, see the NO TRANSLATION
+  TABLE comment in `garmentQueryFor`) because it aimed repairs at the wrong body part.
+- **Confidence is measured unreliable here.** On staging page 14 every WRONG figure naming
+  was marked `high`; exp 489's wrong target came from a box scoring 0.35 and nothing
+  complained. A number that is wrong in both directions is not a gate.
+
+Agreement is orthogonal to all three: it does not care how big the garment is or how sure
+the detector claims to be, only whether two independent looks at the same sheet say the same
+colour. Averaging the agreeing panels also removes per-panel noise for free.
+
+**Provisional — a SINGLE panel is accepted, only marked.** When just one box is found, the
+reading is returned with `agreement: 'single'` rather than refused. Refusing would regress
+every page where the garment genuinely appears in one panel only (a hat worn in one pose, a
+back view), and we have **no measurement** of how often that happens. The marker exists so it
+becomes measurable — revisit and tighten once the runs say how common single-panel targets
+are and how often they are wrong. This is deliberately the weaker guarantee, chosen for lack
+of evidence, not because one unverified reading is trusted.
+
+**Touched:** `server/lib/garmentColourFix.js` (`avatarPanels` / `avatarAgreeDeltaE` /
+`avatarPanelIoU` constants, `boxIoU`, `selectDistinctBoxes`, `detectGarmentBoxes`,
+`labDeltaE`, `pickAgreeingPanels`, `avatarGarmentLab`, `fixFigureGarmentColour`),
+`server/lib/testlab.js` (`renderGarmentColourSummary` target line),
+`tests/manual/garmentPanelAgreement.test.js` (new, 51 assertions).
+
+**Status:** ✅ active (single-panel acceptance 🟡 provisional, pending measurement).
