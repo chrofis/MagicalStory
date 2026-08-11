@@ -1419,6 +1419,12 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
     const holds = String(d.holds || '').trim();
     const parts = [];
     if (pos) parts.push(`stands ${pos}`);
+    // Outfit inline, like page prose: the scene description doubles as the
+    // eval's fidelity reference, and an outfit stated only in the prompt's
+    // CLOTHING block reads as "unrequested attire" to the compliance stage
+    // (a steampunk cover got its costume repair-stripped this way).
+    const outfit = opts.clothingByName?.[String(d.name || '').trim().toLowerCase()];
+    if (outfit) parts.push(`wearing ${outfit}`);
     if (holds && holds.toLowerCase() !== 'nothing') {
       const m = holds.match(/^((?:ART|ANI|VEH|CLO)\d+)/i);
       const name = m ? (resolveHoldable(m[1]) || holds) : holds;

@@ -3654,7 +3654,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const initialCoverModel = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
         const initialCoverBackend = IMAGE_MODELS[initialCoverModel]?.backend || null;
         const { buildCoverSceneFromHint } = require('./server/lib/coverIterate');
-        sceneDescription = buildCoverSceneFromHint(hint, streamingVisualBible, charactersForCover, { language: inputData.language || 'en' });
+        sceneDescription = buildCoverSceneFromHint(hint, streamingVisualBible, charactersForCover, {
+          language: inputData.language || 'en',
+          // Per-character outfit (post worn-vs-held dedupe) so the scene prose
+          // names what each figure wears — the eval judges against this string.
+          clothingByName: Object.fromEntries((clothingDedupedPhotos || [])
+            .filter(p => p?.name && p.clothingDescription)
+            .map(p => [String(p.name).trim().toLowerCase(), p.clothingDescription])),
+        });
         const coverExpandedMetadata = null; // No metadata block — structured hint IS the metadata.
 
         const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
