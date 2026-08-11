@@ -395,16 +395,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const step1Start = Date.now();
 
   // Build ALL character photos for evaluation (matches re-evaluate endpoint behavior)
-  // `character` rides along with the reference photo: the eval batch needs the
-  // full cast objects (physical description + clothing) to describe the story
-  // characters the scene plan did not list for a page. Photo consumers read
-  // name/photoUrl only and ignore it.
   const allCharacterPhotos = characters
     .filter(c => c.photoUrl || c.avatars?.styled)
     .map(c => ({
       name: c.name,
-      photoUrl: c.avatars?.styled || c.photoUrl,
-      character: c
+      photoUrl: c.avatars?.styled || c.photoUrl
     }));
 
   // Reusable helper: build eval inputs for an array of image entries

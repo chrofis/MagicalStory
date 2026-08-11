@@ -390,7 +390,7 @@ async function recoverFaceBox(imageDataUri, bodyBoxNorm, pageLabel = '') {
  * Returns { nameByDet: Map(detIdx → name), answers } or null (caller falls
  * back to layout+gender matching). Answers with duplicate names are invalid.
  */
-async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel = '', otherCharacters = []) {
+async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel = '') {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || dets.length === 0) return null;
   const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -427,7 +427,7 @@ async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H,
   const sceneBuf = Buffer.from(r2Lib.stripDataUriPrefix(imageDataUri), 'base64');
   const marked = await sharp(sceneBuf).composite([{ input: Buffer.from(svg) }]).jpeg({ quality: 88 }).toBuffer();
 
-  const describeChar = (c) => {
+  const charLines = expectedCharacters.map(c => {
     // gdinoPrompt already ends in "wearing <garment>" (built via
     // _shortGarmentPhrase); only add clothing when it isn't there yet.
     const identity = c.gdinoPrompt || c.description || c.name;
@@ -439,24 +439,15 @@ async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H,
     // spot, so identity cues stay primary.
     const posHint = c.position ? ` Expected position/action (hint from the scene plan; the image may differ): ${c.position}.` : '';
     return `- ${c.name}: ${identity}.${garment ? ` Wearing: ${garment}.` : ''}${posHint}`;
-  };
-  const charLines = expectedCharacters.map(describeChar).join('\n');
-  // The rest of the story cast. The renderer regularly draws characters the
-  // scene plan never listed; without them the model has no correct answer for
-  // those figures and spends a planned name on one of them. They are offered,
-  // never demanded — the elimination clause below counts planned characters
-  // only.
-  const otherLines = otherCharacters.length > 0
-    ? `\nOther characters in this story — they may appear even though the scene plan did not list them:\n${otherCharacters.map(describeChar).join('\n')}`
-    : '';
+  }).join('\n');
   const nBadges = badges.length;
   const nChars = expectedCharacters.length;
   const elimHint = nBadges === nChars
-    ? `\nThere are exactly ${nBadges} badges and ${nChars} scene-plan characters — assign each scene-plan character to one badge, by elimination if needed. Only use "unknown" for a badge that is clearly an extra/background figure, not for a scene-plan character you are merely less sure about (a preschooler among adults, an occluded figure — assign the best remaining match).`
-    : `\nUse "unknown" only for a badge that matches none of the characters listed above. If a badge is plausibly one of them (right age band and gender) assign it rather than "unknown".`;
+    ? `\nThere are exactly ${nBadges} badges and ${nChars} expected characters — assign each character to one badge, by elimination if needed. Only use "unknown" for a badge that is clearly an extra/background figure, not for an expected character you are merely less sure about (a preschooler among adults, an occluded figure — assign the best remaining match).`
+    : `\nUse "unknown" only for a badge that is an extra/background figure matching none of the expected characters. If a badge is plausibly an expected character (right age band and gender) assign it rather than "unknown".`;
   const prompt = `Figures in this illustration are marked with black letter badges (${badges.map(b => b.letter).join(', ')}).
 Match each letter to one of these characters by age, gender, hair, and clothing; use the expected position/action as a supporting hint only:
-${charLines}${otherLines}${elimHint}
+${charLines}${elimHint}
 Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
 
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
@@ -480,7 +471,7 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
   try { answers = JSON.parse(jsonMatch ? jsonMatch[0] : text); } catch { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM answer not JSON: ${text.slice(0, 120)}`); return null; }
   if (!answers || typeof answers !== 'object') return null;
 
-  const validNames = new Set([...expectedCharacters, ...otherCharacters].map(c => c.name));
+  const validNames = new Set(expectedCharacters.map(c => c.name));
   const nameByDet = new Map();
   const claimed = new Set();
   for (const b of badges) {
@@ -625,9 +616,7 @@ function _assignFiguresByLayout(chars, dets) {
 }
 
 async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opts = {}) {
-  // otherCharacters: story cast the scene plan did not list for this page.
-  // Naming input only — never counted as expected, never grounded for.
-  const { pageLabel = '', expectedObjects = [], objectGroundingHints = null, otherCharacters = [] } = opts;
+  const { pageLabel = '', expectedObjects = [], objectGroundingHints = null } = opts;
   if (!Array.isArray(expectedCharacters) || expectedCharacters.length === 0) return null;
 
   // The endpoints need base64 bytes — resolve http(s)/data/base64 to a data URI.
@@ -812,7 +801,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   // girls, hence SoM first.
   let nameByDet = null; // detIdx → character name
   try {
-    const som = await _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel, otherCharacters);
+    const som = await _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel);
     if (som) { nameByDet = som.nameByDet; diag.identity = { method: 'som-gemini', answers: som.answers }; }
   } catch (e) {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM identity failed (${e.message}) — layout fallback`);
@@ -855,7 +844,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   const masks = [];
   dets.forEach((d, j) => {
     const name = nameByDet.get(j) || 'UNKNOWN';
-    const ec = name !== 'UNKNOWN' ? [...expectedCharacters, ...otherCharacters].find(c => c.name === name) : null;
+    const ec = name !== 'UNKNOWN' ? expectedCharacters.find(c => c.name === name) : null;
     figures.push({
       name,
       label: ec ? (ec.description || '').slice(0, 120) : 'unmatched person',

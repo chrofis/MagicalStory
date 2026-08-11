@@ -8771,7 +8771,7 @@ lines is imported/injected/global — including branches no smoke test reaches).
 
 ---
 
-## 2026-08-11 — Figure naming gets the WHOLE story cast, flagged planned vs not (a widened flat list would misname the other way)
+## 🗄 2026-08-11 — Figure naming gets the WHOLE story cast, flagged planned vs not (a widened flat list would misname the other way) (REVERTED same day)
 
 **Context:** Detection boxes get their character names from the Set-of-Mark
 call in `server/lib/figureDetection.js`: letter badges are composited onto the
@@ -8831,7 +8831,23 @@ behaviour and needs its own evidence.
 (`allCharacterPhotos` carries the character object),
 `tests/manual/somFigureNaming.test.js` (new, 45 checks).
 
-**Status:** ✅ active
+**Status:** 🗄 **superseded 2026-08-11 (same day) — see "The Art Director
+contradicts itself: prose describes a character the metadata `characters`
+list omits" below.** The cast-widening mechanism was reverted on owner
+instruction: *"Characters do not just appear like that. Totally wrong. Must be
+some other bug."* Correct — p14 was not a naming-input gap. The renderer drew
+Daniel and Sarah because the PROSE describes both in full detail; the Art
+Director then left them out of metadata `characters` and filed them in
+`objects[]` as `CHR003`/`CHR004`, i.e. as secondary characters, although
+both are main cast with avatars. Teaching the namer the whole cast treated the
+symptom and would have offered names for people who genuinely are not on a
+page. Reverted: the `otherCharacters` split in `enrichWithBoundingBoxes`,
+the `expectedOnPage` flag in `buildExpectedCharactersForBbox`, the non-scene
+cast entries in `evaluateImageBatch`, the `character: c` attachment on
+`allCharacterPhotos`, the widened bbox cache key, and the prompt's
+"Other characters in this story…" section. **KEPT:** the badge placement move
+from `0.6 ×` to `0.2 ×` face height (owner-requested, independent of the
+cast question) and its geometry test coverage.
 
 ### Cost reporting: attribute every call, and read every environment (2026-08-11)
 
