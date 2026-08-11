@@ -761,7 +761,10 @@ async function validateAndRepairScene(sceneJson, options = {}) {
  * @param {string} sceneHint - Direct statement of what image should show (most authoritative)
  * @returns {Promise<{score: number, verdict: string, semanticIssues: Array, usage: Object}>}
  */
-async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, sceneHint = null, templateOverride = null) {
+async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, sceneHint = null, templateOverride = null, evalContext = {}) {
+  // evalContext.artStyle / .clothingContract: the same resolved values every
+  // other evaluator gets — commissioned style and per-character outfits are
+  // spec, not defects, and each judge receives them explicitly.
   if (!storyText || !imageData) {
     log.debug('[SEMANTIC] Skipping semantic evaluation - missing storyText or imageData');
     return null;
@@ -817,6 +820,8 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
       SCENE_HINT: clean(sceneHint) || 'Not provided',
       IMAGE_PROMPT: clean(imagePrompt) || 'No prompt provided',
       INTERACTIONS_BLOCK: interactionsBlock,
+      ART_STYLE: evalContext.artStyle || '',
+      CLOTHING_CONTRACT: evalContext.clothingContract || '',
     });
   };
 

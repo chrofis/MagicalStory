@@ -4,6 +4,8 @@ Check whether this illustration shows the right STORY BEAT. You are not grading 
 **IMAGE_PROMPT (the expanded scene sent to the image model — second authority):** "{IMAGE_PROMPT}"
 **STORY_TEXT (narrative context only — do NOT treat as a checklist):** "{STORY_TEXT}"
 **DECLARED INTERACTIONS (character-to-object placements the scene requires):** {INTERACTIONS_BLOCK}
+**ART STYLE (the commissioned medium — empty if not supplied):** {ART_STYLE}
+**CLOTHING CONTRACT (the outfit each character wears on this page — empty if not supplied):** {CLOTHING_CONTRACT}
 
 **⚠️ CHARACTER AUTHORITY RULE — CRITICAL, READ ONCE, APPLY THROUGHOUT:**
 
@@ -35,7 +37,7 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 - Correct number of named characters? — **[CRITICAL]** if a named character is missing; **[MAJOR]** if a stand-in figure is rendered in their place
 - Correct setting/location? — **[CRITICAL]** if completely wrong location; **[MAJOR]** if wrong sub-area within the right location
 - Correct surface? (on island, not in water; on path, not in river) — **[MAJOR]**
-- Correct broad clothing category? (medieval ≠ modern, winter coat ≠ t-shirt, costume ≠ casual) — **[MAJOR]**
+- Correct broad clothing category? (medieval ≠ modern, winter coat ≠ t-shirt, costume ≠ casual) Judge against the CLOTHING CONTRACT when present — an outfit matching its contract line is never a finding, whatever the era or theme suggests, and attire the ART STYLE calls for is never a finding. — **[MAJOR]**
 - Correct proportions / age band? When the SCENE_HINT or IMAGE_PROMPT explicitly names a band — "grade-school", "teenage", "adult", "senior" — or describes proportions ("clearly taller and leaner than grade-schoolers", "rounded grade-school proportions", "adult bone structure"), flag if the rendered figure's proportions clearly belong to a different band (e.g. prose says "teenage" but figure has grade-school proportions, or "adult" but figure has teenage proportions). This is a narrative-consistency check on body proportions only — within-band variation does not count, and you are NOT judging the character's own attributes, just whether the prose-named band matches the rendered band. — **[MAJOR]**
 - Key objects present? (an object named in DECLARED INTERACTIONS, or named ≥ 2 times in SCENE_HINT/IMAGE_PROMPT prose, is "key") — **[MAJOR]** per missing key object
 - Character-object plausibility? (character "at a table" must be beside it, not merged/sunk into the surface; character "on a bridge" must stand on it, not clip through it) — **[MAJOR]**

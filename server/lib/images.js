@@ -1002,6 +1002,8 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     qualityFiguresPromise = null,
     complianceModelOverride = null,   // Stage-2 model A/B (default evalModel = qwen-plus)
     compliancePromptOverride = null,  // Stage-2 template A/B
+    artStyle = null,                  // resolved style — same value the quality eval gets
+    clothingContract = null,          // per-character outfit block — same value the quality eval gets
   } = options;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
@@ -1134,10 +1136,11 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     const complianceInput = fillTemplate(complianceTemplate, {
       ORIGINAL_PROMPT: (imagePrompt || '').substring(0, 3000),
       // Passed separately: ORIGINAL_PROMPT is truncated at 3000 chars and the
-      // ART STYLE block sits at the end of the page prompt, so the compliance
-      // judge never saw the style and treated required style elements as
-      // unrequested additions.
-      ART_STYLE: require('../services/prompts').extractArtStyle(imagePrompt),
+      // ART STYLE and CLOTHING blocks can sit past the cut, so the compliance
+      // judge never saw them and treated required style/costume elements as
+      // unrequested additions (a steampunk cover's goggles drew a CRITICAL).
+      ART_STYLE: artStyle || require('../services/prompts').extractArtStyle(imagePrompt),
+      CLOTHING_CONTRACT: clothingContract || '',
       VISUAL_INVENTORY: visionText,
       QUALITY_FIGURES: qualityFiguresBlock,
       INTERACTIONS_BLOCK: interactionsBlock,
@@ -1340,11 +1343,52 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     const fidelityRef = storyText || (isCover && sceneHint ? sceneHint + coverEvalNote : null);
     const runFidelity = !!fidelityRef && (evaluationType === 'scene' || isCover);
 
+    // Art style + clothing contract are inputs to EVERY evaluator (quality,
+    // semantic, compliance) — built once, up front, before the parallel evals
+    // start. A contract that only some evaluators see is how a steampunk
+    // cover's commissioned costume got repair-stripped as "unrequested attire".
+    // evalOptions.artStyle lets a caller supply the style when originalPrompt is
+    // not the full page prompt (Test Lab passes the scene description).
+    const artStyleForEval = evalOptions.artStyle
+      || require('../services/prompts').extractArtStyle(originalPrompt);
+    // Two sources, one block. The reference photos already carry the resolved
+    // per-page outfit (`clothingDescription`, set by the prompt builder) and
+    // that is what every call site has in scope; evalOptions.clothingRequirements
+    // is the explicit override for callers that resolved it themselves.
+    let clothingContractBlock = '';
+    try {
+      const lines = [];
+      const reqs = evalOptions.clothingRequirements || null;
+      if (reqs) {
+        const { buildClothingDescription } = require('./entityConsistency');
+        for (const c of (sceneCharacters || [])) {
+          if (!c?.name) continue;
+          const category = reqs[c.name]?._currentClothing;
+          if (!category) continue;
+          const outfit = buildClothingDescription(c, category, artStyleForEval, reqs);
+          if (outfit && String(outfit).trim()) lines.push(`- ${c.name}: ${String(outfit).trim()}`);
+        }
+      }
+      if (lines.length === 0) {
+        for (const p of (referenceImages || [])) {
+          if (p?.name && p?.clothingDescription) lines.push(`- ${p.name}: ${String(p.clothingDescription).trim()}`);
+        }
+      }
+      clothingContractBlock = lines.join('\n');
+      if (!clothingContractBlock && evaluationType === 'scene') {
+        // Loud, because an empty contract is what let the judge invent one.
+        log.warn(`👕 [EVAL] ${pageContext || 'page'}: no clothing contract available — clothing findings suppressed (N-16)`);
+      }
+    } catch (err) { log.debug(`[EVAL] clothing contract block skipped: ${err.message}`); }
+
     // Start semantic evaluation in parallel when we have a reference (page prose
     // or cover brief).
     if (runFidelity) {
       const { evaluateSemanticFidelity } = require('./sceneValidator');
-      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null);
+      semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null, {
+        artStyle: artStyleForEval,
+        clothingContract: clothingContractBlock,
+      });
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
 
@@ -1361,6 +1405,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         qualityFiguresPromise,
         complianceModelOverride: evalOptions.complianceModelOverride || null,
         compliancePromptOverride: evalOptions.compliancePromptOverride || null,
+        artStyle: artStyleForEval,
+        clothingContract: clothingContractBlock,
       });
       log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
     }
@@ -1397,13 +1443,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     let promptForEval = modelId.includes('2.5') ? sanitizeForGemini(originalPrompt, 'light') : originalPrompt;
     // Resolved from the UNSTRIPPED prompt: the cover branch below deletes the
     // ART STYLE block from promptForEval as evaluator noise, which would leave
-    // covers with no style to judge style elements against.
-    // evalOptions.artStyle lets a caller supply the style when originalPrompt is
-    // not the full page prompt — the Test Lab passes the scene DESCRIPTION, which
-    // has no ART STYLE block, so without this the style rule silently skipped and
-    // Lab runs could not reproduce production behaviour for style-dependent rules.
-    const artStyleForEval = evalOptions.artStyle
-      || require('../services/prompts').extractArtStyle(originalPrompt);
+    // artStyleForEval / clothingContractBlock: built above, before the
+    // parallel evals started, so all three evaluators receive them.
 
     // For cover evaluations: strip art style noise and prepend expected text prominently
     if (evaluationType === 'cover' && promptForEval) {
@@ -1487,38 +1528,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // as its own input so the judge compares against the contract, not against
     // its prior of what a pirate looks like. Empty when unknown — the template
     // then tells it not to judge clothing at all, which is the honest default.
-    // Two sources, one block. The reference photos already carry the resolved
-    // per-page outfit (`clothingDescription`, set by the prompt builder) and
-    // that is what every call site has in scope; evalOptions.clothingRequirements
-    // is the explicit override for callers that resolved it themselves. Built
-    // HERE rather than at each call site so all of them are covered without
-    // threading a new argument through callGeminiAPIForImage's 17 parameters.
-    let clothingContractBlock = '';
-    try {
-      const lines = [];
-      const reqs = evalOptions.clothingRequirements || null;
-      if (reqs) {
-        const { buildClothingDescription } = require('./entityConsistency');
-        for (const c of (sceneCharacters || [])) {
-          if (!c?.name) continue;
-          const category = reqs[c.name]?._currentClothing;
-          if (!category) continue;
-          const outfit = buildClothingDescription(c, category, artStyleForEval, reqs);
-          if (outfit && String(outfit).trim()) lines.push(`- ${c.name}: ${String(outfit).trim()}`);
-        }
-      }
-      if (lines.length === 0) {
-        for (const p of (referenceImages || [])) {
-          if (p?.name && p?.clothingDescription) lines.push(`- ${p.name}: ${String(p.clothingDescription).trim()}`);
-        }
-      }
-      clothingContractBlock = lines.join('\n');
-      if (!clothingContractBlock && evaluationType === 'scene') {
-        // Loud, because an empty contract is what let the judge invent one.
-        log.warn(`👕 [EVAL] ${pageContext || 'page'}: no clothing contract available — clothing findings suppressed (N-16)`);
-      }
-    } catch (err) { log.debug(`[EVAL] clothing contract block skipped: ${err.message}`); }
-
     const { buildEvaluationPrompt } = require('../services/prompts');
     const evaluationPrompt = evaluationTemplate
       ? buildEvaluationPrompt({
@@ -1958,7 +1967,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             log.warn(`🎨 [EVAL] style gate FAILED (observed "${observed}") — STEP 4 already reported it`);
           }
         } else if (observed) {
-          log.debug(`🎨 [EVAL] style gate ok — observed "${observed}"`);
+          // INFO, not debug. The whole point of a gate is that its answer is
+          // observable; logging the normal case at debug made "the model said
+          // it matches" indistinguishable from "the model never answered",
+          // which cost two inconclusive investigations.
+          log.info(`🎨 [EVAL] style gate: observed "${observed}" — matches the commissioned style`);
+        } else {
+          log.warn('🎨 [EVAL] style gate returned no `observed` value — medium was not actually named');
         }
       } else {
         // Absence is itself the signal: the field is mandatory, so a missing
@@ -2254,6 +2269,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         figures,                          // Detected figures with descriptions
         matches,                          // Character name → figure mapping with face_bbox
         coherenceGate,                    // STEP 0 gate {applied, reason} — drives the forced redo above
+        // STYLE GATE {observed, matches_style, reason}. Returned so it is
+        // auditable: without this the gate was a local variable that pushed a
+        // finding and vanished, so across two full stories there was no way to
+        // tell whether the model had answered it, answered it wrongly, or never
+        // emitted the field at all. A gate you cannot inspect is not a gate.
+        styleGate,
         semanticResult,                   // Full semantic evaluation result (if available)
         threeStageResult,                 // Full three-stage evaluation result (if available)
         usage: totalUsage,
@@ -5691,6 +5712,10 @@ async function evaluateImageBatch(images, options = {}) {
         rawOutput: qualityResult?.rawOutput ?? null,
         evalTemplateHash: qualityResult?.evalTemplateHash ?? null,
         coherenceGate: qualityResult?.coherenceGate ?? null,
+        // Same whitelist lesson as rawOutput/coherenceGate above: a field not
+        // listed here never reaches the stored version, however faithfully the
+        // evaluator produced it.
+        styleGate: qualityResult?.styleGate ?? null,
         bboxDetection,
         bboxOverlayImage,
         usage: qualityResult?.usage || null,
