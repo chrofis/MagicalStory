@@ -873,6 +873,8 @@ async function iterateCover(coverKey, storyData, options = {}) {
       visualBibleGrid: coverVbGrid,
       sceneBackground: coverSceneBackground,
       pageNumber: COVER_PAGE_NUMBERS[coverKey] ?? -1,
+      // Covers keep their full frame — title paint depends on exact bounds.
+      stripBorder: false,
       artStyle: artStyleId,
       skipCache: true,
       aspectRatio: coverAspectOverride || MODEL_DEFAULTS.coverAspect,
@@ -1221,6 +1223,7 @@ async function buildCoverReferences({
       };
       if (imageModel) emptyOptions.imageModelOverride = imageModel;
       if (imageBackend) emptyOptions.imageBackendOverride = imageBackend;
+      emptyOptions.stripBorder = false; // cover asset — keep full frame
       const emptyResult = await generateImageOnly(emptyPrompt, [], emptyOptions);
       if (emptyResult?.imageData) {
         sceneBackground = emptyResult.imageData;

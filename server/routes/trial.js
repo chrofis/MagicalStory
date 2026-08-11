@@ -690,7 +690,8 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
             imageModelOverride: 'grok-imagine',
             imageBackendOverride: 'grok',
             aspectRatio: '9:16',
-            skipCache: true
+            skipCache: true,
+            stripBorder: false // avatar face — never crop
           });
           if (grokResult?.imageData) {
             avatarImage = grokResult.imageData;

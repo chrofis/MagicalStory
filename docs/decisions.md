@@ -9138,3 +9138,50 @@ reference image either way, and there is no measured link to a defect.
 - `tests/manual/sceneBriefCheck.test.js` (new, 45 assertions)
 
 **Status:** ✅ active.
+
+### Stray frame + reference-inset leaks: pixel crop + D-01 inset rule (2026-08-11)
+
+**Context:**   ~20% of pages on job_1786397108357 shipped a render defect the
+generation prompt already forbids: p14 a black frame, p4 a blue frame, p3 and p4
+a filmstrip of Visual-Bible reference thumbnails (chest, map) baked along the
+bottom. The evaluators missed them: `image-evaluation.txt` D-01 already lists a
+"border … frames the artwork on all sides" as CATASTROPHIC, but the vision judge
+did not report it on p4/p14 (they scored on clothing instead); the inset strip
+had no D-01 clause at all (the semantic judge *described* "three small inset
+images" on p4 but raised no fix). So the existing coherence_gate → regenerate
+route never fired — it depends on the judge naming the defect.
+
+**Decision:** Two levers (the words are already in the gen prompt and ignored, so
+detection, not more prompt text):
+1. Deterministic pixel crop — new `server/lib/borderCrop.js` `stripUniformBorder()`.
+   Fires only for a genuine four-sided, thin, uniform frame (corners must agree
+   on one colour; every side present; no side runs past 12% without hitting art).
+   Crops and rescales to original dimensions. Wired into `generateImageOnly`
+   (opt-in `stripBorder`, default true; covers and trial avatars pass false).
+   A frame line counts at ≥95% frame-colour (NOT 100% — JPEG noise on a coloured
+   frame leaves stray pixels; the original all-pixels test cropped pure-black p14
+   but not noisy-blue p4), and the crop extends through the anti-aliased blend +
+   a 2px margin so no coloured fringe survives the rescale. Validated on the real
+   renders: p14 black frame AND p4 blue frame both cropped clean with all art
+   intact; zero false positives on 6 clean/inset pages (corners disagree → bail).
+2. `image-evaluation.txt` D-01 — a duplicate-object clause: "the same object
+   appears twice — once in the scene and again as a small boxed copy on a plain/
+   different background, often a row along the bottom edge." First phrasing
+   ("inset/thumbnail/filmstrip") was TESTED and never fired (coherence_gate=no,
+   2 runs × 3 pages); the duplicate-object phrasing fires reliably (coherence_gate
+   APPLIED → CATASTROPHIC on p3 and p4, 2/2 runs each; no false positive on p14).
+
+**Rationale:** The two classes need different tools. Frames → crop (before eval,
+so eval never sees them); the judge misses a bare border even with the pre-existing
+rule, but a deterministic pixel pass is reliable. Insets → eval → regenerate: they
+sit inside the art so a crop would cut real content, and the vision judge only
+reports them when the rule is framed as a DUPLICATED object, not as an abstract
+"inset/thumbnail" (measured — the abstract phrasing was a no-op). Order in the
+pipeline: generate → strip frame → eval (sees any surviving insets) → regenerate.
+Gemini-fallback gen path in `generateImageOnly` is not yet crop-covered (rare;
+p4/p14 were Grok) — noted for follow-up.
+
+**Touched:**   `server/lib/borderCrop.js` (new), `server/lib/images.js`
+(`generateImageOnly` stripBorder), `server/lib/coverIterate.js` + `server/routes/trial.js`
+(opt-outs), `prompts/image-evaluation.txt` (D-01 inset clause)
+**Status:**    ✅ active

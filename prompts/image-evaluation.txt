@@ -101,6 +101,7 @@ Only these are defects. The code in the first column is the `type` value.
 - a large unrequested geometric shape (white wedge, blank panel, diagonal slash) covers a significant part of the frame;
 - prominent or garbled unrequested text dominates;
 - a border, keyline, coloured band, or blank margin frames the artwork on all sides. Any colour, thickness or shape. Never downgrade this to a composition nitpick.
+- the same object appears twice — once as part of the scene and again as a small separate copy sitting in its own box on a plain or different background, often a row of two or three such boxed miniatures along the bottom edge (reference pictures leaking into the art). Never downgrade this to a composition nitpick.
 
 Do NOT fire D-01 for anything a single repaint can fix — wrong position, scale, absence, identity, a wrong object, a missing background detail. Those have their own codes below. D-01 is "cannot be published", not a way to stack deductions.
 

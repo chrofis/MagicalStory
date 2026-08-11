@@ -5178,7 +5178,11 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     // Test Lab prompt-capture label (promptCapture.js). When set, the prompt is
     // recorded at this shared chokepoint so every provider route is covered by
     // one line (e.g. 'image_cover', 'image_scene'). No-op outside an experiment.
-    captureLabel = null
+    captureLabel = null,
+    // Post-gen crop of a stray uniform frame the model paints despite the D-01
+    // prompt ban (a blue/black keyline framing the art). Page scenes want it;
+    // covers (title paint) and avatars opt out by passing stripBorder: false.
+    stripBorder = true
   } = options;
 
   if (captureLabel) {
@@ -5230,6 +5234,24 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     defaultModel: MODEL_DEFAULTS.pageImage,
     includeSceneBackgroundPart: true,
   });
+
+  // Strip a stray uniform frame the model painted despite the D-01 prompt ban
+  // (a blue/black keyline framing the art — observed ~20% of pages). Deterministic
+  // + conservative: server/lib/borderCrop.js only fires for a genuine four-sided
+  // thin uniform frame. Covers the Grok/Runware branches (raw.imageData is set
+  // here); the rare Gemini fallback below is not yet covered.
+  if (stripBorder && raw?.imageData) {
+    try {
+      const { stripUniformBorder } = require('./borderCrop');
+      const cropRes = await stripUniformBorder(Buffer.from(r2Lib.stripDataUriPrefix(raw.imageData), 'base64'));
+      if (cropRes.cropped) {
+        raw.imageData = `data:image/jpeg;base64,${cropRes.buffer.toString('base64')}`;
+        log.info(`✂️ [IMAGE GEN-ONLY]${pageNumber != null ? ` p${pageNumber}` : ''} stripped uniform frame ${JSON.stringify(cropRes.frameColor)} (sides ${JSON.stringify(cropRes.sides)})`);
+      }
+    } catch (e) {
+      log.warn(`⚠️ [IMAGE GEN-ONLY] border strip failed (keeping original): ${e.message}`);
+    }
+  }
 
   // ── Shape raw result per provider (gen-only: no eval, minimal shape) + cache ─
   if (raw.provider === 'runware-primary') {
