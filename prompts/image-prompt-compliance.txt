@@ -30,7 +30,7 @@ A named character's garment counts only when rendered as a different TYPE or a d
 
 **ABSENCE RULE — governs STEP 1, STEP 1b and STEP 2 alike. Read it before any of them.**
 
-You have not seen the image. You are reading a written inventory of it, and that inventory reports what it happened to notice — so **its silence is never proof that a thing is not in the picture.** Measured across two stories: 55% of the absences reported from this prompt were wrong, the item plainly visible.
+You have not seen the image. You are reading a written inventory of it, and that inventory reports what it happened to notice — so **its silence is never proof that a thing is not in the picture.**
 
 So: **anything you believe is MISSING is `unverified_absence`,** whether it is a prop, a landmark, an animal, a garment, an accessory or a facial feature. That type exists to keep the observation on the record without letting a claim you cannot check carry a full deduction. Never file an absence as `missing_element`, `clothing`, `character_identity` or `accessory_missing` — those say "I confirmed this is gone", and you cannot.
 

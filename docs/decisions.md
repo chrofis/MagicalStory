@@ -8984,3 +8984,36 @@ evidence and would change endpoint responses.
 `tests/manual/sceneCastConsistency.test.js` (new, 25 checks).
 
 **Status:** ✅ active
+
+## 2026-08-11 — "Eval prompts are too long" retired: the cost is CALLS, not characters
+
+**The standing defect** (2026-08-08) was that the eval templates had grown into incident logs and a
+10-page story spent **862,221 input tokens across 109 eval calls — ~86k per page**. Attacked it and
+found the premise no longer holds.
+
+**Nothing left to cut.** Measured across four stories, **29 of 32 defect codes fire**. The only three
+that never do — `image_coherence`, `duplicate_character`, `nudity` — are deliberate safety nets that
+SHOULD almost never fire; `nudity`'s own rule says so. Rationale prose was ~1,055 chars, 10% of what
+a day of eval work had added. The prompts are long because they encode 32 defect codes and 16
+never-deduct exclusions, nearly all live. **That length is earned.**
+
+**The cost is the multiplier, not the term.** ~109 calls for 10 pages is ~4 calls per VERSION (vision
+inventory + quality + semantic + compliance), so versions drive it:
+
+| | versions/page | ~eval calls |
+|---|---|---|
+| before the repair-gate work | 2.07 | ~116 |
+| after gates | 2.14 | ~120 |
+| latest | **1.86** | **~104** |
+
+Trimming prompt text 20% saves 20% of ONE call; removing one version per page saves FOUR, plus an
+image generation. The repair-gate work (salvage floor + wired iterate thresholds, regenerations
+13 → 4-6) already moved the real lever without touching a prompt.
+
+**Superseded by:** "reduce eval calls per page" — fewer versions, and not re-running all four
+evaluators on a version that differs from its parent only inside a repair mask.
+
+**Done here:** removed the four justification sentences added during the day (616 chars). Not for
+tokens — the project's prompt-writing rule is that prompts carry rules, not justifications, and I
+broke it in four places while fixing other things. Every RULE verified intact; only the
+"Measured 2026-08-09 …" prose went.
