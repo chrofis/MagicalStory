@@ -9269,3 +9269,55 @@ dead `time`/`weather` passthroughs deleted. `framingPattern`/`pose`/`flip` not r
 **Touched:** prompts/scene-expansion-all.txt, prompts/scene-expansion.txt,
 server/lib/sceneMetadata.js. Audit details in the 2026-08-11 session; consumers:
 storyJobPipeline.js:3407 (SHOT prefix), promptBuilders.js:2993 (era guard).
+
+## 2026-08-11 — Bbox-detection cluster extracted to server/lib/bboxDetection.js (phase 3 of the god-file program)
+
+**Context:** After phase 1 (storyHelpers) and phase 2 (storyJobPipeline),
+`server/lib/images.js` was 8,018 lines and still contained a self-contained
+1,730-line detection slab: VB-object grounding, the content-hashed bbox cache,
+the fingerprint/pairing invariants, `detectAllBoundingBoxes`, `detectSubRegion`,
+`buildExpectedCharactersForBbox`, overlay rendering, `enrichWithBoundingBoxes`.
+
+**Decision:**
+- The slab moved **verbatim** (byte-identical against the pre-move committed
+  blob) into a NEW sibling `server/lib/bboxDetection.js`, together with
+  `FIGURE_COLORS` and the `bbox-refine-overlay.txt` local template load.
+  **D1 — sibling, NOT merged into `figureDetection.js`:** the cluster lazily
+  requires `entityConsistency`, which top-level requires `./images`; folding it
+  into figureDetection would invert figureDetection's deliberately
+  bottom-of-graph position (its own header says so) and create a load-time
+  cycle. bboxDetection requires `./figureDetection` one-way — DAG preserved.
+- **D2 — images.js is a re-export facade** for every moved name (16 functions +
+  `FIGURE_COLORS`). Zero consumer edits — `storyJobPipeline.js`,
+  `entityConsistency.js`, `regeneration.js`, Test Lab, scripts and tests keep
+  importing from `./images`; V2 asserts the facade exports are `===` the module
+  exports (one implementation, never a duplicate — the sourceImageFp stamping
+  predicate stays single-source per the 2026-07-19 entry).
+- **D3 — back-edges into images.js are lazy `require('./images')` at the call
+  sites** (the pattern the cluster already used for storyHelpers and
+  entityConsistency): `callGrokVisionAPI` ×4, `sanitizeForGemini` ×1,
+  `GEMINI_SAFETY_SETTINGS` ×3, `modelSupportsThinking` ×1. The plan had
+  inventoried only the first five; ESLint `no-undef` over the assembled module
+  (the completeness gate from phase 2) surfaced the other four — all
+  pre-existing uses (Jan–Apr 2026), not concurrent-session additions. These
+  nine one-line edits are the ONLY non-verbatim changes to the moved code.
+- `_detectAllBoundingBoxesImpl` is deliberately NOT exported — the stamping
+  wrapper `detectAllBoundingBoxes` is the only entry point.
+
+**Rationale:** zero behavior change, zero importer churn; images.js drops to
+6,304 lines and the detection domain sits next to its sibling
+`figureDetection.js`. Behavior was pinned by pre/post baselines on a stored
+staging detection (`job_1786397108357_q1fjbdzbx` p1): fingerprint round-trip,
+overlay PNG byte-identity, `enrichWithBoundingBoxes` deep-equal, and
+`_gdinoMasks` non-enumerability through the shared-detection path.
+
+**Known inherited defect (documented, not fixed — pure-move discipline):**
+`finishReason` at `bboxDetection.js:681` (pre-move `images.js:3026`) is
+referenced outside the scope that declares it — a latent `no-undef` on the
+truncated-JSON repair success-log path, confirmed identical on the pre-move
+blob. Fix belongs to a separate free-identifier sweep (same class as commit
+67509406f).
+
+**Touched files:** `server/lib/images.js` (facade), `server/lib/bboxDetection.js`
+(new), `docs/plans/bbox-detection-extraction.md` (executed plan + deviations),
+`CLAUDE.md` (key-files list). Move commit: 67b31e8f1.
