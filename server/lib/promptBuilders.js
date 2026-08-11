@@ -2754,11 +2754,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // rendered as a toddler/preschooler. Worse, a freely-edited story idea
     // ("a 1-year-old who dives off a bridge") gives the model action cues that
     // imply an older child. This explicit proportion anchor counters that.
-    const ageCueLines = [];
+    // Characters in the same age bucket share identical marker text — emit
+    // one merged line ("- Emma, Noah: kindergarten-age …") instead of a
+    // verbatim copy per child (~230 chars saved per duplicate on prompts
+    // that fight an 8k model cap).
+    const ageCueGroups = new Map(); // markers text -> [names]
     for (const c of sceneCharacters) {
       const ageMarkers = extractCharacterVisualProfile(c).ageMarkers;
-      if (ageMarkers) ageCueLines.push(`- ${c.name}: ${ageMarkers}`);
+      if (!ageMarkers) continue;
+      if (!ageCueGroups.has(ageMarkers)) ageCueGroups.set(ageMarkers, []);
+      ageCueGroups.get(ageMarkers).push(c.name);
     }
+    const ageCueLines = [...ageCueGroups.entries()].map(([markers, names]) => `- ${names.join(', ')}: ${markers}`);
     if (ageCueLines.length > 0) {
       characterReferenceList += `\nAGE & PROPORTIONS (render each character at their real age, regardless of the action described):\n${ageCueLines.join('\n')}\n`;
       log.debug(`[IMAGE PROMPT] Added age proportions for ${ageCueLines.length} character(s)`);
@@ -2933,9 +2940,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // built from the STATE-AWARE description so a stripped attachment
         // clause can't sneak back in via the lead.
         const refEntry = placedElsewhere ? { description } : obj.entry;
+        // The lead is a LABEL — the full description follows on the same line,
+        // so the 12-word englishEntityRef default just duplicates the
+        // description's own opening (~60 wasted chars per object on prompts
+        // that fight an 8k model cap). First comma clause, max 6 words.
+        const shortRef = (r) => r.split(',')[0].split(/\s+/).slice(0, 6).join(' ');
         const lead = (obj.type === 'animal' && obj.name)
           ? `**${obj.name}** (animal)`
-          : `**${englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object')}** (${obj.type})`;
+          : `**${shortRef(englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object'))}** (${obj.type})`;
         requiredObjectsSection += `* ${lead}: ${description}${wornSuffix}\n`;
       }
       if (promptObjects.length === 0) {
