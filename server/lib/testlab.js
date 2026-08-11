@@ -1229,7 +1229,7 @@ async function renderGarmentColourSummary(perFigure, stepsByFigure, pageNumber) 
       <text x="${nx}" y="${chipY + 14}" font-family="sans-serif" font-size="13" fill="#333">hue ${f.current?.hueDeg ?? '–'}° → ${f.target?.hueDeg ?? '–'}°   ·   L ${f.current?.L ?? '–'} → ${f.target?.L != null && f.lighting != null ? (f.target.L * f.lighting).toFixed(0) : '–'}</text>
       <text x="${nx}" y="${chipY + 32}" font-family="sans-serif" font-size="12" fill="#666">DINO ${f.dinoScore ?? '–'}${f.dinoScore != null && f.dinoScore < 0.6 ? ' (low)' : ''}   ·   ${f.current?.px ?? 0} px   ·   dilated +${f.maskDilated || 0}   ·   gated −${f.colourGated || 0}</text>
       <text x="${nx}" y="${chipY + 50}" font-family="sans-serif" font-size="12" fill="#666">lighting ×${f.lighting ?? '–'} (${esc(f.lightingSource || '–')})</text>
-      <text x="${nx}" y="${chipY + 68}" font-family="sans-serif" font-size="12" fill="${f.target?.source?.startsWith('sam:') ? '#666' : '#a15c00'}">target from ${esc(f.target?.source || '–')}${f.target?.maskPx != null ? ` · ${f.target.maskPx} px` : ''}${f.target?.dinoScore != null ? ` · DINO ${f.target.dinoScore}` : ''}${f.target?.source && !f.target.source.startsWith('sam:') ? '  ← fallback, low-chroma blind spot' : ''}</text>
+      <text x="${nx}" y="${chipY + 68}" font-family="sans-serif" font-size="12" fill="${f.target?.source?.startsWith('sam:') ? '#666' : '#a15c00'}">target from ${esc(f.target?.source || '–')}${f.target?.maskPx != null ? ` · ${f.target.maskPx} px` : ''}${f.target?.dinoScore != null ? ` · DINO ${f.target.dinoScore}` : ''}${f.target?.agreement ? ` · ${f.target.agreement === 'agreed' ? `${f.target.panelsAgreed}/${f.target.panelsMeasured} panels agree (max pair ΔE ${f.target.maxPairDeltaE})` : f.target.agreement === 'single' ? '1 panel only — unverified' : f.target.agreement}` : ''}${f.target?.source && !f.target.source.startsWith('sam:') ? '  ← fallback, low-chroma blind spot' : ''}</text>
       <text x="${tx}" y="${y + ROW_H - 14}" font-family="sans-serif" font-size="12" fill="#555">${esc(f.reason || '')}</text>`;
   }
   svg += '</svg>';
@@ -5001,6 +5001,193 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
   };
 }
 
+/**
+ * Page-text replay — the last untested Sonnet stage.
+ *
+ * beats_scenes covers plan + scene expansion and story_bible_replay covers the
+ * bible, but nothing replayed beats_story_text, so ~19% of the writer spend
+ * could not be A/B'd against a cheaper model. Beats are reconstructed from the
+ * stored pages exactly as the bible replay does, so the two stages compare
+ * like for like.
+ *
+ * params.textModel : writer under test (default MODEL_DEFAULTS.outline)
+ */
+async function runStoryTextReplayStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildStoryTextFromBeatsPrompt, parseRefinedText, getPageText, extractSceneMetadata } = require('./storyHelpers');
+  const { callTextModelStreaming } = require('./textModels');
+  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const fullText = storyData.storyText || storyData.story || '';
+  const beats = (storyData.sceneImages || []).map(s => {
+    const meta = s.sceneMetadata || extractSceneMetadata(s.sceneDescription || '') || {};
+    return {
+      pageNumber: s.pageNumber,
+      beat: (getPageText(fullText, s.pageNumber) || '').slice(0, 600),
+      scene: (meta.sceneIntent || String(s.sceneDescription || '').split('---METADATA---')[0].slice(0, 300)),
+    };
+  });
+  if (beats.length === 0) throw new Error('story has no pages to rebuild beats from');
+
+  const orig = PROMPT_TEMPLATES.storyTextFromBeats;
+  if (promptOverride) PROMPT_TEMPLATES.storyTextFromBeats = promptOverride;
+  let prompt;
+  try { prompt = buildStoryTextFromBeatsPrompt(storyData, beats); }
+  finally { PROMPT_TEMPLATES.storyTextFromBeats = orig; }
+  if (!prompt) throw new Error('story-text-from-beats template unavailable');
+
+  const model = params.textModel || MODEL_DEFAULTS.outline;
+  if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
+
+  const t = Date.now();
+  const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_story_text_replay' });
+  if (!String(res.text || '').trim() || res.usage?.output_tokens === 0) {
+    throw new Error(`writer ${model} returned an empty response — provider failure, not a result`);
+  }
+  const parsed = parseRefinedText(res.text || '');
+
+  return {
+    storyId: target.storyId,
+    model, modelId: res.modelId,
+    elapsedMs: Date.now() - t,
+    cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+    usage: res.usage,
+    promptChars: prompt.length,
+    prompt,
+    title: parsed.title || null,
+    analysis: parsed.analysis || '',
+    rawResponse: (res.text || '').slice(0, 40000),
+    // Side by side with the text that shipped — the whole point.
+    pages: (parsed.pages || []).map(p => ({
+      pageNumber: p.pageNumber,
+      text: p.text,
+      shipped: getPageText(fullText, p.pageNumber) || '',
+    })),
+    pageCount: (parsed.pages || []).length,
+    expectedPages: beats.length,
+  };
+}
+
+/**
+ * writer_compare — every writer model x every writer stage, one experiment.
+ * See server/lib/testlabWriterCompare.js for why this is a stage, not a script.
+ */
+async function runWriterCompareStage(target, { params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const SH = require('./storyHelpers');
+  const { callTextModelStreaming } = require('./textModels');
+  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { UnifiedStoryParser } = require('./outlineParser/unified');
+  const WC = require('./testlabWriterCompare');
+
+  const models = Array.isArray(params.models) && params.models.length
+    ? params.models : ['deepseek-v4-pro', 'deepseek-v4-flash'];
+  const stages = Array.isArray(params.stages) && params.stages.length
+    ? params.stages.filter(s => WC.ALL_STAGES.includes(s)) : WC.ALL_STAGES;
+  for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const fullText = storyData.storyText || storyData.story || '';
+  const shippedScenes = storyData.sceneImages || [];
+  const expectedPages = shippedScenes.length;
+  if (expectedPages === 0) throw new Error('story has no pages');
+  const expectedChars = (storyData.characters || []).length || Object.keys(storyData.clothingRequirements || {}).length;
+
+  // Beats reconstructed from the stored pages — identical to the bible/text
+  // replays, so every arm is fed the same input.
+  const beats = shippedScenes.map(s => {
+    const meta = s.sceneMetadata || SH.extractSceneMetadata(s.sceneDescription || '') || {};
+    return {
+      pageNumber: s.pageNumber,
+      beat: (SH.getPageText(fullText, s.pageNumber) || '').slice(0, 600),
+      scene: (meta.sceneIntent || String(s.sceneDescription || '').split('---METADATA---')[0].slice(0, 300)),
+    };
+  });
+
+  const call = async (prompt, model, label) => {
+    const t = Date.now();
+    const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: `testlab_writer_${label}` });
+    const text = String(res.text || '');
+    if (!text.trim() || res.usage?.output_tokens === 0) throw new Error(`${model} returned nothing for ${label}`);
+    return {
+      text, elapsedMs: Date.now() - t,
+      cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+      usage: res.usage, modelId: res.modelId,
+    };
+  };
+
+  const arms = [];
+
+  // The free baseline: what the story already shipped with. Never re-run.
+  if (params.baseline !== false) {
+    const b = { model: 'shipped (Sonnet)', free: true, stages: {} };
+    if (stages.includes('plan')) b.stages.plan = { ...WC.scorePlan(beats, expectedPages), cost: 0, elapsedMs: 0 };
+    if (stages.includes('bible')) {
+      b.stages.bible = { ...WC.scoreBible(storyData.clothingRequirements, storyData.visualBible, expectedChars), cost: 0, elapsedMs: 0 };
+    }
+    if (stages.includes('scenes')) {
+      b.stages.scenes = { ...WC.scoreScenes(shippedScenes.map(s => s.sceneDescription || '')), cost: 0, elapsedMs: 0 };
+    }
+    if (stages.includes('text')) {
+      const pages = shippedScenes.map(s => ({ pageNumber: s.pageNumber, text: SH.getPageText(fullText, s.pageNumber) || '' }));
+      b.stages.text = { ...WC.scoreText(pages, expectedPages, storyData.language), cost: 0, elapsedMs: 0 };
+    }
+    arms.push(b);
+  }
+
+  for (const model of models) {
+    const arm = { model, free: false, stages: {} };
+    for (const stage of stages) {
+      try {
+        if (stage === 'plan') {
+          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages), model, 'plan');
+          const parsed = SH.parseBeats(r.text, []);
+          arm.stages.plan = { ...WC.scorePlan(parsed.pages || [], expectedPages), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
+        } else if (stage === 'bible') {
+          const r = await call(SH.buildStoryBibleFromBeatsPrompt(storyData, beats), model, 'bible');
+          const p = new UnifiedStoryParser(r.text);
+          arm.stages.bible = { ...WC.scoreBible(p.extractClothingRequirements(), p.extractVisualBible(), expectedChars), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
+        } else if (stage === 'scenes') {
+          const r = await call(SH.buildSceneExpansionAllPrompt(storyData, beats, {}), model, 'scenes');
+          const briefs = String(r.text).split(/^##\s*(?:Page|Seite)\s*\d+/im).slice(1);
+          arm.stages.scenes = { ...WC.scoreScenes(briefs), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
+        } else if (stage === 'text') {
+          const r = await call(SH.buildStoryTextFromBeatsPrompt(storyData, beats), model, 'text');
+          const parsed = SH.parseRefinedText(r.text);
+          arm.stages.text = { ...WC.scoreText(parsed.pages || [], expectedPages, storyData.language), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
+        }
+      } catch (err) {
+        // A failed arm is a RESULT, not a crash: "this model cannot do this
+        // stage" is exactly what the comparison is for.
+        arm.stages[stage] = { score: 0, error: err.message, cost: 0, elapsedMs: 0 };
+      }
+    }
+    arms.push(arm);
+  }
+
+  for (const a of arms) {
+    const ss = Object.values(a.stages).map(s => s.score || 0);
+    a.overall = WC.avg(ss);
+    a.totalCost = Object.values(a.stages).reduce((s, x) => s + (x.cost || 0), 0);
+    a.totalMs = Object.values(a.stages).reduce((s, x) => s + (x.elapsedMs || 0), 0);
+  }
+
+  return {
+    storyId: target.storyId,
+    title: storyData.title || null,
+    language: storyData.language || null,
+    expectedPages, expectedChars,
+    stages, models,
+    arms,
+    // Ranked once here so the UI and any later reader agree on the order.
+    ranking: [...arms].sort((a, b) => (b.overall - a.overall) || (a.totalCost - b.totalCost))
+      .map(a => ({ model: a.model, overall: a.overall, cost: Number(a.totalCost.toFixed(4)), secs: Math.round(a.totalMs / 1000) })),
+  };
+}
+
 const STORY_STAGES = {
   cover: runCoverStage,
   cover_title_paintin: runCoverTitlePaintinStage,
@@ -5011,6 +5198,8 @@ const STORY_STAGES = {
   beats_scenes: runBeatsScenesStage,
   scene_review_replay: runSceneReviewReplayStage,
   story_bible_replay: runStoryBibleReplayStage,
+  story_text_replay: runStoryTextReplayStage,
+  writer_compare: runWriterCompareStage,
   clothing_review: runClothingReviewStage,
 };
 

@@ -369,6 +369,13 @@ export const TESTLAB_STAGES = [
   // costume descriptions next to the ones it shipped with — the way to measure a
   // change to the costume/distinguishability rules without generating a book.
   { id: 'story_bible_replay', label: 'Story bible replay (new costume rules vs what shipped)', producesImage: false, overridable: true, storyLevel: true },
+  // The last untested writer stage: page text. Without it ~19% of the Sonnet
+  // writer spend could not be compared against a cheaper model.
+  { id: 'story_text_replay', label: 'Story text replay (writer A/B vs shipped text)', producesImage: false, overridable: true, storyLevel: true },
+  // Every writer model x every writer stage in ONE experiment, scored. Add a
+  // model via params.models, add a story via a testlab_sets member — the
+  // comparison is re-run, never re-invented.
+  { id: 'writer_compare', label: 'Writer compare (models x plan/bible/scenes/text, scored)', producesImage: false, overridable: false, storyLevel: true },
   // Runs the wardrobe review over a story's OWN shipped contract — does the
   // reviewer catch the costume fault that reached the page? Text only, no
   // avatar or image spend, so it can be run across several stories cheaply.
