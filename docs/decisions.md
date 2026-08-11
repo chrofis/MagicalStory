@@ -8768,3 +8768,67 @@ lines is imported/injected/global — including branches no smoke test reaches).
 **Touched files:** `server.js`, `storyJobPipeline.js` (new),
 `server/lib/serverLog.js` (new), `docs/plans/serverjs-pipeline-extraction.md`
 (executed plan + deviations), `CLAUDE.md` (key-files + root-files lists).
+
+---
+
+## 2026-08-11 — Figure naming gets the WHOLE story cast, flagged planned vs not (a widened flat list would misname the other way)
+
+**Context:** Detection boxes get their character names from the Set-of-Mark
+call in `server/lib/figureDetection.js`: letter badges are composited onto the
+scene and gemini-2.5-flash answers which letter is which character. Its
+candidate list was whatever the scene plan listed for that page. Staging story
+`job_1786397108357_q1fjbdzbx` page 14, from the stored `bboxDetection`:
+`expectedCharacters` = `["Emma","Noah","Hans"]`, five figures detected. The
+cast is Emma, Noah, Hans, **Sarah, Daniel** — all five were drawn. With two
+older moustached men in frame and only Hans offered, the model had no correct
+answer: `Hans` landed on the far-left man (x 0.075–0.370, green coat, dark
+hair — Daniel), and the real white-haired Hans in the centre (x 0.475–0.739)
+came back UNKNOWN. A garment recolour then went to the wrong man.
+
+**Decision:** The eval batch now describes **every** character in the story,
+not just the scene plan's, and stamps each description with
+`expectedOnPage: true|false`. `buildExpectedCharactersForBbox` carries the flag
+through; `enrichWithBoundingBoxes` splits the result into `expectedCharacters`
+(planned — unchanged meaning for every existing consumer) and
+`otherCharacters`, which travels via `detectAllBoundingBoxes` →
+`detectFiguresWithGroundingDino` → the SoM prompt **and nowhere else**. In the
+prompt the planned characters are listed first, the rest under
+"Other characters in this story — they may appear even though the scene plan
+did not list them"; both groups are valid answers, and the elimination clause
+("exactly N badges and N scene-plan characters — assign each…") counts the
+**planned** characters only. Missing/undefined flag = planned, so every other
+caller (regeneration re-detect, Test Lab, cover paths) is byte-identical.
+The badge also moved from `0.6 ×` face height below the face to `0.2 ×` —
+0.6 put it mid-torso (measured 56% down the body box on the p14 figures).
+
+**Rationale:** A flat widened list would have traded one misattribution for
+another. The elimination clause fires when badge count equals character count
+and forces a complete assignment — widen the list and it starts forcing
+ABSENT characters onto background extras. The planned/unplanned distinction is
+what makes the extra names an *offer* rather than a *demand*. Keeping
+`expectedCharacters` untouched for every other consumer (DINO undercount
+check, Gemini detection prompt, layout fallback, the stored
+`bboxDetection.expectedCharacters`, the cascade-face merge) means no
+"expected but missing" rule can fire on a character who was never supposed to
+be on the page; the whole change is confined to the naming step. The full cast
+rides on the existing `allCharacterPhotos` entries (`character: c` alongside
+`name`/`photoUrl`) rather than a new parameter — photo consumers read
+name/photoUrl and ignore it. Both groups are described through the same
+`describeCharacter` resolver (`buildClothingDescription` /
+`resolveCharacterReqs`), so the added entries are not second-class.
+
+**Known gap (not changed here):** `buildCharacterDescriptionsForBbox`
+(`server/lib/promptBuilders.js`, used by the regeneration re-detect endpoints)
+already emits the full cast with no flag, i.e. all-planned — the reverse of
+this bug. Left alone deliberately: flagging there would change regeneration
+behaviour and needs its own evidence.
+
+**Touched:** `server/lib/images.js` (cast build in `evaluateImageBatch`,
+`buildExpectedCharactersForBbox`, `enrichWithBoundingBoxes`,
+`_detectAllBoundingBoxesImpl` + cache key), `server/lib/figureDetection.js`
+(`_somIdentifyFigures` prompt + badge placement,
+`detectFiguresWithGroundingDino` opts), `server/lib/repairPipeline.js`
+(`allCharacterPhotos` carries the character object),
+`tests/manual/somFigureNaming.test.js` (new, 45 checks).
+
+**Status:** ✅ active

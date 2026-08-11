@@ -2606,7 +2606,8 @@ function getBboxCacheStats() {
  *
  * @param {string} imageData - Base64 image data
  * @param {Object} options - Detection options
- * @param {Array<{name: string, description: string, position: string}>} options.expectedCharacters - Characters to identify
+ * @param {Array<{name: string, description: string, position: string}>} options.expectedCharacters - Characters the scene plan put on this page
+ * @param {Array<{name: string, description: string, position: string}>} [options.otherCharacters] - Rest of the story cast; figure naming only, never "expected"
  * @param {string[]} options.expectedObjects - Objects to check for
  * @param {boolean} [options.skipCache] - Bypass the bbox cache (force fresh detection)
  * @returns {Promise<{figures: Array, objects: Array, usage: Object}|null>}
@@ -2664,12 +2665,14 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
 }
 
 async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
-  const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '', skipCache = false, artStyle = null, objectGroundingHints = null } = options;
+  const { expectedCharacters = [], otherCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '', skipCache = false, artStyle = null, objectGroundingHints = null } = options;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
   // Cache check — content-hashed by image bytes + expected names. Hits skip
   // the full Gemini round-trip; misses fall through to the API and populate.
-  const cacheKey = _hashBboxKey(imageData, expectedCharacters, expectedObjects);
+  // Both lists go into the key: the other-characters list changes the naming
+  // answer, so a run with a different cast must not hit a stale entry.
+  const cacheKey = _hashBboxKey(imageData, [...expectedCharacters, ...otherCharacters], expectedObjects);
   if (!skipCache && cacheKey) {
     const cached = _bboxCacheGet(cacheKey);
     if (cached) {
@@ -2699,7 +2702,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
     && !!artStyle && eligibleStyles.includes(String(artStyle).toLowerCase());
   if (gdinoEligible && expectedCharacters.length > 0) {
     try {
-      const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, { pageLabel, expectedObjects, objectGroundingHints });
+      const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, { pageLabel, expectedObjects, objectGroundingHints, otherCharacters });
       gdinoDiag = gd?.diag || null;
       if (gd && Array.isArray(gd.figures) && gd.figures.length > 0) {
         // No Haar cascade merge here — faceBoxes come from DINO "face" boxes
@@ -3591,6 +3594,10 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
       clothing: clothing || '',
       // Concise prompt for GroundingDINO (null → detector falls back to `description`).
       gdinoPrompt,
+      // false = a story cast member the scene plan did NOT put on this page.
+      // Callers that mean "who must be here" filter these out; only figure
+      // naming reads them. Absent/undefined = planned (every legacy caller).
+      expectedOnPage: desc.expectedOnPage !== false,
     });
     addedNames.add(name.toLowerCase());
   }
@@ -3610,7 +3617,8 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
       name,
       description: clothing || 'character',
       position,
-      clothing: clothing || ''
+      clothing: clothing || '',
+      expectedOnPage: true,
     });
     addedNames.add(name.toLowerCase());
     log.debug(`📦 [BBOX-BUILD] Added character "${name}" from expectedPositions (clothing: ${clothing || 'none'})`);
@@ -3845,7 +3853,15 @@ function escapeXml(str) {
  */
 async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null, bboxModelOverride = null, pageContext = '', sharedBboxDetection = null, artStyle = null, objectGroundingHints = null) {
   // Build expected characters for bbox detection (AI will identify by name)
-  const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing);
+  const allCharactersForBbox = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing);
+  // `expectedCharacters` keeps its existing meaning for every consumer —
+  // the characters the scene plan put on this page (undercount check, Gemini
+  // detection prompt, layout fallback, stored bboxDetection). Story cast the
+  // plan did not list travels separately as `otherCharacters` and is read
+  // only by the figure-naming step, so no "expected but missing" rule can
+  // fire on a character who was never supposed to be there.
+  const expectedCharacters = allCharactersForBbox.filter(c => c.expectedOnPage !== false);
+  const otherCharacters = allCharactersForBbox.filter(c => c.expectedOnPage === false);
 
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
@@ -3859,9 +3875,10 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     log.info(`♻️  [BBOX-ENRICH] ${pageLabel}Reusing shared bbox detection (${sharedBboxDetection.figures?.length || 0} figures, ${sharedBboxDetection.objects?.length || 0} objects)`);
     allDetections = sharedBboxDetection;
   } else {
-    log.info(`📦 [BBOX-ENRICH] ${pageLabel}Detecting figures/objects with ${expectedCharacters.length} expected characters, ${expectedObjects.length} expected objects${sceneContext ? ', with scene context' : ''}${bboxModelOverride ? `, model: ${bboxModelOverride}` : ''}...`);
+    log.info(`📦 [BBOX-ENRICH] ${pageLabel}Detecting figures/objects with ${expectedCharacters.length} expected characters${otherCharacters.length ? ` (+${otherCharacters.length} other story cast, naming only)` : ''}, ${expectedObjects.length} expected objects${sceneContext ? ', with scene context' : ''}${bboxModelOverride ? `, model: ${bboxModelOverride}` : ''}...`);
     allDetections = await detectAllBoundingBoxes(imageData, {
       expectedCharacters,
+      otherCharacters,
       expectedObjects,
       sceneContext,
       bboxModelOverride,
@@ -5613,31 +5630,48 @@ async function evaluateImageBatch(images, options = {}) {
 
       // Use rich character descriptions from full character objects when available
       let characterDescriptions;
+      // Resolve each category through the story's clothingRequirements
+      // (signature → description → avatars.clothing fallback) — raw
+      // avatars.clothing is character-level metadata that can be stale
+      // across stories, so the evaluator judged against the wrong outfit.
+      const describeCharacter = (char) => {
+        let clothingDescriptions = char.avatars?.clothing || {};
+        if (clothingRequirements) {
+          const { buildClothingDescription } = require('./entityConsistency');
+          const { resolveCharacterReqs } = require('./clothingCategories');
+          const categories = new Set([
+            ...Object.keys(char.avatars?.clothing || {}),
+            ...Object.keys(resolveCharacterReqs(clothingRequirements, char.name) || {}),
+          ]);
+          const resolved = {};
+          for (const cat of categories) {
+            resolved[cat] = buildClothingDescription(char, cat, artStyle, clothingRequirements);
+          }
+          clothingDescriptions = resolved;
+        }
+        return {
+          richDescription: getStoryHelpers().buildCharacterPhysicalDescription(char),
+          clothingDescriptions
+        };
+      };
       if (img.sceneCharacters && img.sceneCharacters.length > 0) {
         characterDescriptions = {};
         for (const char of img.sceneCharacters) {
-          // Resolve each category through the story's clothingRequirements
-          // (signature → description → avatars.clothing fallback) — raw
-          // avatars.clothing is character-level metadata that can be stale
-          // across stories, so the evaluator judged against the wrong outfit.
-          let clothingDescriptions = char.avatars?.clothing || {};
-          if (clothingRequirements) {
-            const { buildClothingDescription } = require('./entityConsistency');
-            const { resolveCharacterReqs } = require('./clothingCategories');
-            const categories = new Set([
-              ...Object.keys(char.avatars?.clothing || {}),
-              ...Object.keys(resolveCharacterReqs(clothingRequirements, char.name) || {}),
-            ]);
-            const resolved = {};
-            for (const cat of categories) {
-              resolved[cat] = buildClothingDescription(char, cat, artStyle, clothingRequirements);
-            }
-            clothingDescriptions = resolved;
-          }
-          characterDescriptions[char.name] = {
-            richDescription: getStoryHelpers().buildCharacterPhysicalDescription(char),
-            clothingDescriptions
-          };
+          characterDescriptions[char.name] = { ...describeCharacter(char), expectedOnPage: true };
+        }
+        // The rest of the story's cast, described exactly the same way but
+        // flagged expectedOnPage:false. Figure naming has to know every
+        // character the illustrator could have drawn, not just the ones the
+        // scene plan listed: staging job_1786397108357_q1fjbdzbx p14 planned
+        // 3 characters, rendered 5 people, and with two older moustached men
+        // in frame and only one of them named the namer had no correct answer
+        // — it spent the planned name on the unplanned man. The flag keeps
+        // these entries out of every "must be present" rule; only the naming
+        // step reads them.
+        for (const entry of (img.allCharacterPhotos || [])) {
+          const char = entry?.character;
+          if (!char?.name || characterDescriptions[char.name]) continue;
+          characterDescriptions[char.name] = { ...describeCharacter(char), expectedOnPage: false };
         }
       } else {
         // Fallback: parse minimal descriptions from prompt
