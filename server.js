@@ -2241,6 +2241,76 @@ async function writeJSON(filePath, data) {
 
 // logActivity imported from ./server/services/database
 
+// Trigger landmark discovery early (called when user enters wizard or gets location)
+// This runs in background so landmarks are ready when story generation starts
+app.post('/api/landmarks/discover', async (req, res) => {
+  try {
+    const { city, country } = req.body;
+
+    if (!city) {
+      return res.json({ status: 'skipped', reason: 'no city provided' });
+    }
+
+    const cacheKey = `${city}_${country || ''}`.toLowerCase().replace(/\s+/g, '_');
+
+    // Check if we already have landmarks in landmark_index
+    try {
+      const indexedLandmarks = await getIndexedLandmarks(city, 1);  // Just check if any exist
+      if (indexedLandmarks.length > 0) {
+        // Count total landmarks for this city
+        const countResult = await dbPool.query(
+          "SELECT COUNT(*) as count FROM landmark_index WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñ', 'uuaaaooeeeeiicn')) = LOWER(translate($1, 'üùäàâöôéèêëîïçñ', 'uuaaaooeeeeiicn'))",
+          [city]
+        );
+        const landmarkCount = parseInt(countResult.rows[0].count);
+        log.debug(`[LANDMARK] Already have ${landmarkCount} indexed landmarks for ${city}`);
+        return res.json({
+          status: 'indexed',
+          landmarkCount,
+          source: 'landmark_index'
+        });
+      }
+    } catch (dbErr) {
+      log.debug(`[LANDMARK] Index check failed: ${dbErr.message}`);
+    }
+
+    // Check in-memory cache
+    const cachedLandmarks = userLandmarkCache.get(cacheKey);
+    if (cachedLandmarks && Date.now() - cachedLandmarks.timestamp < LANDMARK_CACHE_TTL) {
+      log.debug(`[LANDMARK] Already have ${cachedLandmarks.landmarks.length} cached landmarks for ${city}`);
+      return res.json({
+        status: 'cached',
+        landmarkCount: cachedLandmarks.landmarks.length,
+        source: 'memory_cache'
+      });
+    }
+
+    // Trigger discovery in background (don't await)
+    log.info(`[LANDMARK] 🔍 Early discovery triggered for ${city}, ${country || ''}`);
+
+    discoverLandmarksForLocation(city, country || '')
+      .then(async landmarks => {
+        // Update in-memory cache
+        userLandmarkCache.set(cacheKey, {
+          landmarks,
+          city,
+          country: country || '',
+          timestamp: Date.now()
+        });
+        log.info(`[LANDMARK] ✅ Early discovery: found ${landmarks.length} landmarks for ${city}`);
+      })
+      .catch(err => {
+        log.error(`[LANDMARK] Early discovery failed for ${city}: ${err.message}`);
+      });
+
+    // Return immediately - discovery runs in background
+    res.json({ status: 'discovering', city, country: country || '' });
+
+  } catch (err) {
+    log.error('Landmark discovery trigger error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 // =============================================================================
 // CHECKPOINT SYSTEM - Save intermediate pipeline state for fault tolerance
 // =============================================================================
@@ -2461,76 +2531,6 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
   }
 }
 
-// Trigger landmark discovery early (called when user enters wizard or gets location)
-// This runs in background so landmarks are ready when story generation starts
-app.post('/api/landmarks/discover', async (req, res) => {
-  try {
-    const { city, country } = req.body;
-
-    if (!city) {
-      return res.json({ status: 'skipped', reason: 'no city provided' });
-    }
-
-    const cacheKey = `${city}_${country || ''}`.toLowerCase().replace(/\s+/g, '_');
-
-    // Check if we already have landmarks in landmark_index
-    try {
-      const indexedLandmarks = await getIndexedLandmarks(city, 1);  // Just check if any exist
-      if (indexedLandmarks.length > 0) {
-        // Count total landmarks for this city
-        const countResult = await dbPool.query(
-          "SELECT COUNT(*) as count FROM landmark_index WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñ', 'uuaaaooeeeeiicn')) = LOWER(translate($1, 'üùäàâöôéèêëîïçñ', 'uuaaaooeeeeiicn'))",
-          [city]
-        );
-        const landmarkCount = parseInt(countResult.rows[0].count);
-        log.debug(`[LANDMARK] Already have ${landmarkCount} indexed landmarks for ${city}`);
-        return res.json({
-          status: 'indexed',
-          landmarkCount,
-          source: 'landmark_index'
-        });
-      }
-    } catch (dbErr) {
-      log.debug(`[LANDMARK] Index check failed: ${dbErr.message}`);
-    }
-
-    // Check in-memory cache
-    const cachedLandmarks = userLandmarkCache.get(cacheKey);
-    if (cachedLandmarks && Date.now() - cachedLandmarks.timestamp < LANDMARK_CACHE_TTL) {
-      log.debug(`[LANDMARK] Already have ${cachedLandmarks.landmarks.length} cached landmarks for ${city}`);
-      return res.json({
-        status: 'cached',
-        landmarkCount: cachedLandmarks.landmarks.length,
-        source: 'memory_cache'
-      });
-    }
-
-    // Trigger discovery in background (don't await)
-    log.info(`[LANDMARK] 🔍 Early discovery triggered for ${city}, ${country || ''}`);
-
-    discoverLandmarksForLocation(city, country || '')
-      .then(async landmarks => {
-        // Update in-memory cache
-        userLandmarkCache.set(cacheKey, {
-          landmarks,
-          city,
-          country: country || '',
-          timestamp: Date.now()
-        });
-        log.info(`[LANDMARK] ✅ Early discovery: found ${landmarks.length} landmarks for ${city}`);
-      })
-      .catch(err => {
-        log.error(`[LANDMARK] Early discovery failed for ${city}: ${err.message}`);
-      });
-
-    // Return immediately - discovery runs in background
-    res.json({ status: 'discovering', city, country: country || '' });
-
-  } catch (err) {
-    log.error('Landmark discovery trigger error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
 // ===================================
 // BACKGROUND STORY GENERATION JOBS
 // ===================================
