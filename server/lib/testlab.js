@@ -2837,6 +2837,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     sceneReviews,
     timeToScenesMs,
     storyId: target.storyId,
+    beatsSource,
     title: storyData.title || null,
     language: storyData.language || null,
     pageCount,
@@ -2870,6 +2871,7 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
   return {
     stageKind: 'text_refine',
     storyId: target.storyId,
+    beatsSource,
     title: storyData.title || null,
     language: storyData.language || null,
     pageCount: pages.length,
@@ -4864,6 +4866,43 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
  * Beats are reconstructed from the stored pages (page text = BEAT, the scene's
  * imageSummary = SCENE), so this needs nothing the story does not already carry.
  */
+/**
+ * The beats a story was ACTUALLY written from.
+ *
+ * Prefer beatsReviewReport.briefsIn — the one-line BEAT + SCENE pairs the beats
+ * pipeline locked and fed to the bible, scene and text stages. Reconstructing
+ * beats from the finished page text instead puts the answer in the question:
+ * a text-replay arm handed the shipped prose as its "beat" simply copies it,
+ * and three different models returned byte-identical pages (2026-08-11), which
+ * measured transcription rather than writing.
+ *
+ * The prose fallback stays for pre-beats stories that have no briefsIn, but it
+ * is flagged so a caller can tell a real comparison from a contaminated one.
+ */
+function resolveStoryBeats(storyData, helpers) {
+  const { getPageText, extractSceneMetadata } = helpers;
+  const briefs = storyData?.beatsReviewReport?.briefsIn;
+  if (Array.isArray(briefs) && briefs.length > 0) {
+    const parsed = briefs.map((b) => {
+      const t = String(b.brief || '');
+      const beat = (t.match(/BEAT:\s*([\s\S]*?)(?=\nSCENE:|$)/i) || [])[1] || '';
+      const scene = (t.match(/SCENE:\s*([\s\S]*)$/i) || [])[1] || '';
+      return { pageNumber: b.pageNumber, beat: beat.trim(), scene: scene.trim() };
+    }).filter(b => b.beat || b.scene);
+    if (parsed.length > 0) return { beats: parsed, source: 'briefsIn' };
+  }
+  const fullText = storyData.storyText || storyData.story || '';
+  const beats = (storyData.sceneImages || []).map((sc) => {
+    const meta = sc.sceneMetadata || extractSceneMetadata(sc.sceneDescription || '') || {};
+    return {
+      pageNumber: sc.pageNumber,
+      beat: (getPageText(fullText, sc.pageNumber) || '').slice(0, 600),
+      scene: (meta.sceneIntent || String(sc.sceneDescription || '').split('---METADATA---')[0].slice(0, 300)),
+    };
+  });
+  return { beats, source: 'reconstructed-from-prose' };
+}
+
 async function runStoryBibleReplayStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
@@ -4874,15 +4913,8 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
   const fullText = storyData.storyText || storyData.story || '';
-  const beats = (storyData.sceneImages || []).map(s => {
-    const meta = s.sceneMetadata || extractSceneMetadata(s.sceneDescription || '') || {};
-    return {
-      pageNumber: s.pageNumber,
-      beat: (getPageText(fullText, s.pageNumber) || '').slice(0, 600),
-      scene: (meta.sceneIntent || String(s.sceneDescription || '').split('---METADATA---')[0].slice(0, 300)),
-    };
-  });
-  if (beats.length === 0) throw new Error('story has no pages to rebuild beats from');
+  const { beats, source: beatsSource } = resolveStoryBeats(storyData, { getPageText, extractSceneMetadata });
+  if (beats.length === 0) throw new Error('story has no beats and no pages to rebuild them from');
 
   const orig = PROMPT_TEMPLATES.storyBibleFromBeats;
   if (promptOverride) PROMPT_TEMPLATES.storyBibleFromBeats = promptOverride;
@@ -4915,6 +4947,7 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
 
   return {
     storyId: target.storyId,
+    beatsSource,
     model, modelId: res.modelId,
     elapsedMs: Date.now() - t,
     cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
@@ -4984,6 +5017,7 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
 
   return {
     storyId: target.storyId,
+    beatsSource,
     model, modelId: res.modelId,
     elapsedMs: Date.now() - t,
     cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
@@ -5021,15 +5055,8 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
   const fullText = storyData.storyText || storyData.story || '';
-  const beats = (storyData.sceneImages || []).map(s => {
-    const meta = s.sceneMetadata || extractSceneMetadata(s.sceneDescription || '') || {};
-    return {
-      pageNumber: s.pageNumber,
-      beat: (getPageText(fullText, s.pageNumber) || '').slice(0, 600),
-      scene: (meta.sceneIntent || String(s.sceneDescription || '').split('---METADATA---')[0].slice(0, 300)),
-    };
-  });
-  if (beats.length === 0) throw new Error('story has no pages to rebuild beats from');
+  const { beats, source: beatsSource } = resolveStoryBeats(storyData, { getPageText, extractSceneMetadata });
+  if (beats.length === 0) throw new Error('story has no beats and no pages to rebuild them from');
 
   const orig = PROMPT_TEMPLATES.storyTextFromBeats;
   if (promptOverride) PROMPT_TEMPLATES.storyTextFromBeats = promptOverride;
@@ -5050,6 +5077,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
 
   return {
     storyId: target.storyId,
+    beatsSource,
     model, modelId: res.modelId,
     elapsedMs: Date.now() - t,
     cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
@@ -5098,13 +5126,8 @@ async function runWriterCompareStage(target, { params = {} }) {
 
   // Beats reconstructed from the stored pages — identical to the bible/text
   // replays, so every arm is fed the same input.
-  const beats = shippedScenes.map(s => {
-    const meta = s.sceneMetadata || SH.extractSceneMetadata(s.sceneDescription || '') || {};
-    return {
-      pageNumber: s.pageNumber,
-      beat: (SH.getPageText(fullText, s.pageNumber) || '').slice(0, 600),
-      scene: (meta.sceneIntent || String(s.sceneDescription || '').split('---METADATA---')[0].slice(0, 300)),
-    };
+  const { beats, source: beatsSource } = resolveStoryBeats(storyData, {
+    getPageText: SH.getPageText, extractSceneMetadata: SH.extractSceneMetadata,
   });
 
   const call = async (prompt, model, label) => {
@@ -5177,6 +5200,7 @@ async function runWriterCompareStage(target, { params = {} }) {
 
   return {
     storyId: target.storyId,
+    beatsSource,
     title: storyData.title || null,
     language: storyData.language || null,
     expectedPages, expectedChars,
