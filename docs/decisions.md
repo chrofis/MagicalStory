@@ -8623,3 +8623,63 @@ generic clothing ("casual", "age-appropriate") — story wardrobe only.
 **Touched:** prompts/image-prompt-compliance.txt (setting rule), prompts/image-semantic.txt
 (setting rule), prompts/feedback-consolidator.txt (rule 2b). image-evaluation.txt N-01a already
 had the rule — the gap was the other two evaluators + the consolidator.
+
+## 2026-08-11: Figure identity is cross-checked against the eval before a garment recolour; the tiebreaker is stubbed and OFF
+
+**Context:** the names on detection boxes come from the Set-of-Mark call in
+`server/lib/figureDetection.js` (`_somIdentifyFigures`): badges A,B,C… are composited onto the
+scene and `gemini-2.5-flash` is asked which letter is which character. The prompt forces a
+complete assignment ("assign each character to one badge, by elimination if needed"), so the call
+structurally cannot express uncertainty — it is either right or confidently wrong. On staging story
+`job_1786397108357_q1fjbdzbx` page 14 the stored detection names the far-left man (x 0.075-0.370)
+"Hans" — he is Daniel, in a green coat — and leaves the real, white-haired Hans in the centre
+(x 0.475-0.739) as UNKNOWN. The garment recolour then repainted the wrong man's coat. That version
+scored -80 and lost pick-best, so nothing shipped, but only because the damage happened to be
+visible. A second, independent opinion existed and was ignored: the quality eval's `matches[]`
+(`{figure, reference, confidence, face_bbox}`) called the far-left figure UNMATCHED (0%) and named
+the centre figure Hans (80%) — right, and willing to abstain. Since commit `898e4f2f2` those
+`figures`/`matches` are persisted per image version by `buildVersionEntry`.
+
+**Decision:** new pure module `server/lib/figureIdentityCheck.js` joins the two opinions and
+classifies every detection figure as `agree` / `disputed` / `unverified` / `adopted`.
+`runGarmentRecolour` (repairPipeline.js) runs it once per page and REFUSES to recolour a character
+whose identity is `disputed`, recording `audit.skipped = 'identity disputed: …'` plus the full
+verdict list on the existing mismatch audit object, so the skip persists with the story like every
+other outcome. `unverified` proceeds exactly as before. The follow-up tiebreaker is DELIBERATELY
+NOT IMPLEMENTED: `resolveIdentityTiebreak()` is a stub returning null behind
+`MODEL_DEFAULTS.identityTiebreak` (env `IDENTITY_TIEBREAK`, default **false**), so behaviour is
+identical with the flag on or off. Intended design, recorded in the stub so it is not lost: send
+the SAM cutout of the disputed figure plus the candidate styled avatars and ask which avatar it is;
+if it genuinely cannot be distinguished, assign one arbitrarily but STABLY (left-to-right) and flag
+the page for character repair — if a reader cannot tell them apart either, who becomes who is
+irrelevant, what matters is that each figure consistently matches SOME character and character
+repair then enforces it.
+
+One non-obvious rule earns its place: a `disputed` verdict is NOT only "the two opinions name the
+same figure differently". The real p14 signature is a CROSS-BOX conflict — the eval abstained on
+the box the detection called Hans (`unverified`) and confidently named a different, UNKNOWN box
+Hans (`adopted`). Neither row is disputed on its own, yet the two opinions place Hans on different
+figures and recolouring "Hans" would still repaint Daniel. So an adopted name that the detection
+has already spent on another figure promotes BOTH rows to `disputed`. Without that promotion the
+cross-check would have passed page 14 clean.
+
+**Rationale:** (a) A forced-assignment prompt produces confident errors that no confidence
+threshold can filter, so the correction has to come from a second, independently-produced opinion,
+not from tuning the first. (b) Skipping a disputed recolour costs one uncorrected garment; acting
+on a disputed identity repaints a real person's clothes with a wrong colour and looks like a
+confident correction. (c) `unverified` must never block: the eval's matches are absent on every
+story generated before `898e4f2f2` and on any page whose eval failed, and a missing second opinion
+is not evidence of a problem. (d) Two deliberate join decisions: the join is GEOMETRIC on
+`face_bbox`, never through `match.figure` ids, because the persisted `figures`/`matches` come from
+`runVisualInventory` (P1) when it produced any and from `evaluateImageQuality`'s own parse
+otherwise (images.js ~2138-2160) and the two number figures differently (5 vs 3 on that same page);
+and the geometric test is CENTRE-CONTAINMENT rather than IoU, because the eval's face box is a
+loose LLM estimate while the detection box is a tight DINO/SAM box — true joins routinely score IoU
+under 0.3, while the centre point stays reliable. Note the coordinate systems differ: detection
+boxes are `[ymin,xmin,ymax,xmax]`, eval `face_bbox` is `[x1,y1,x2,y2]`, both 0-1.
+
+**Touched:** `server/lib/figureIdentityCheck.js` (new), `server/lib/repairPipeline.js`
+(`runGarmentRecolour`), `server/config/models.js` (`identityTiebreak`),
+`tests/manual/figureIdentityCheck.test.js` (new).
+
+**Status:** shipped (cross-check + skip active); tiebreaker stubbed and off.

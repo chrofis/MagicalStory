@@ -1409,6 +1409,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
    */
   const runGarmentRecolour = async (img, entries, roundNum) => {
     const { fixFigureGarmentColour } = require('./garmentColourFix');
+    const { crossCheckFigureIdentity, isIdentityDisputed, resolveIdentityTiebreak } = require('./figureIdentityCheck');
     const { getNextVersionIndex, saveStoryImage } = require('../services/database');
     const gcStoryId = storyData?.id || jobId || null;
     const pageNumber = img.pageNumber;
@@ -1424,6 +1425,29 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       || (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.bboxDetection
       || null;
 
+    // SECOND OPINION before repainting anyone's clothes. The names on the
+    // detection boxes come from the Set-of-Mark call in figureDetection.js,
+    // whose prompt forces a complete assignment — it cannot answer "I don't
+    // know", only right or confidently wrong. The quality eval identified the
+    // same pixels independently (matches[] on the version, persisted since
+    // 898e4f2f2). On staging job_1786397108357_q1fjbdzbx p14 the two disagreed:
+    // SoM put "Hans" on the far-left man (actually Daniel), the eval called
+    // that figure UNMATCHED and named the centre figure Hans at 80% — and the
+    // recolour repainted the wrong man's coat (that version scored -80 and lost
+    // pick-best, so the damage was caught only because it was visible).
+    // Disputed → skip. A MISSING second opinion (verdict `unverified`) proceeds
+    // exactly as before: an absent second opinion must never block the pipeline.
+    const bestEvalObj = bestSoFar?.evaluation || bestSoFar || null;
+    const identityCheck = crossCheckFigureIdentity(
+      detection?.figures || [],
+      bestEvalObj?.matches ?? bestSoFar?.matches ?? [],
+      bestEvalObj?.figures ?? bestSoFar?.figures ?? [],
+    );
+    if (identityCheck.disputed.length) {
+      const why = identityCheck.perFigure.filter(f => f.verdict === 'disputed').map(f => f.reason).join('; ');
+      log.warn(`⚠️ [GARMENT-COLOUR] p${pageNumber}: identity disputed for ${identityCheck.disputed.join(', ')} — ${why}`);
+    }
+
     let changed = 0, attempted = 0;
     for (const { charName, garmentKey, m } of entries) {
       const audit = { garment: garmentKey, round: roundNum, at: new Date().toISOString() };
@@ -1435,6 +1459,31 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         audit.skipped = 'no detected figure on the page';
         log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber} ${garmentKey}: no detected figure — skipped`);
         continue;
+      }
+      if (isIdentityDisputed(identityCheck, charName)) {
+        const row = identityCheck.perFigure.find(f => f.verdict === 'disputed'
+          && ((f.name || '').toLowerCase() === charName.toLowerCase() || (f.evalName || '').toLowerCase() === charName.toLowerCase()));
+        // TIEBREAKER, DEFAULT OFF (MODEL_DEFAULTS.identityTiebreak, env
+        // IDENTITY_TIEBREAK=true) and NOT IMPLEMENTED — resolveIdentityTiebreak
+        // is a stub that returns null, so behaviour here is identical whether
+        // the flag is on or off. TODO, the intended design:
+        //   send the SAM cutout of the disputed figure plus the candidate
+        //   styled avatars and ask which avatar it is. If it genuinely cannot
+        //   be distinguished, assign one arbitrarily but STABLY (e.g.
+        //   left-to-right order) and flag the page for character repair —
+        //   because if a reader cannot tell them apart either, who becomes who
+        //   is irrelevant; what matters is that each figure consistently
+        //   matches some character, and character repair then enforces it.
+        let resolved = null;
+        if (MODEL_DEFAULTS.identityTiebreak) {
+          resolved = await resolveIdentityTiebreak({ imageData: current, figure: fig, charName, artStyle, pageLabel: `p${pageNumber}` });
+        }
+        if (!resolved) {
+          audit.skipped = `identity disputed: ${row?.reason || `detection and quality eval disagree about who ${charName} is`}`;
+          audit.identityVerdicts = identityCheck.perFigure;
+          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber} ${garmentKey}: ${audit.skipped} — not recolouring`);
+          continue;
+        }
       }
       const character = characters.find(c => (c.name || '').toLowerCase() === charName.toLowerCase());
       if (!character) { audit.skipped = 'character not in the story'; continue; }

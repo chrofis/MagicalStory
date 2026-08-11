@@ -369,6 +369,18 @@ const MODEL_DEFAULTS = {
     ? process.env.GARMENT_COLOUR_FIX !== 'false'
     : true,
 
+  // Identity TIEBREAKER — DEFAULT OFF, deliberately, and NOT IMPLEMENTED yet.
+  // The cross-check itself (server/lib/figureIdentityCheck.js) always runs and
+  // is free: it compares the Set-of-Mark naming on the detection boxes against
+  // the quality eval's independent matches[] and blocks a garment recolour on a
+  // `disputed` figure. This flag governs only the follow-up MODEL CALL that
+  // would RESOLVE a dispute (SAM cutout of the figure + candidate styled
+  // avatars → "which avatar is this?"), which costs money per disputed figure
+  // and does not exist yet — resolveIdentityTiebreak() is a stub returning
+  // null. Turning this on today changes nothing except an extra no-op branch.
+  // Env: IDENTITY_TIEBREAK=true.
+  identityTiebreak: process.env.IDENTITY_TIEBREAK === 'true',
+
   // Pixel-level backstop that repaints the washed-out row of a 2×4 avatar sheet
   // onto the stylised row's garment colour (server/lib/sheetRowHarmonize.js).
   // DEFAULT OFF, deliberately. The DETECTION half runs unconditionally and is
