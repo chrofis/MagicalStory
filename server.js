@@ -18,19 +18,8 @@ const pLimit = require('p-limit');
 const crypto = require('crypto');
 
 // LOG_LEVEL controls verbosity: error < warn < info < debug < trace
-// Defined early so it can be used throughout initialization
-const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3, trace: 4 };
-const LOG_LEVEL = (process.env.LOG_LEVEL || 'info').toLowerCase();
-const CURRENT_LOG_LEVEL = LOG_LEVELS[LOG_LEVEL] !== undefined ? LOG_LEVELS[LOG_LEVEL] : LOG_LEVELS.info;
-
-const log = {
-  error: (msg, ...args) => console.error(`[ERROR] ${msg}`, ...args),
-  warn: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.warn && console.warn(`[WARN] ${msg}`, ...args),
-  info: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.info && console.log(msg, ...args),
-  debug: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && console.log(`[DEBUG] ${msg}`, ...args),
-  trace: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.trace && console.log(`[TRACE] ${msg}`, ...args),
-  verbose: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && console.log(`[DEBUG] ${msg}`, ...args)
-};
+// (extracted to server/lib/serverLog.js — pipeline split)
+const { log, LOG_LEVEL } = require('./server/lib/serverLog');
 
 // Credit costs and pricing configuration (shared across route modules)
 const { CREDIT_CONFIG, CREDIT_COSTS } = require('./server/config/credits');
