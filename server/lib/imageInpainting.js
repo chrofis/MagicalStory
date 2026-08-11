@@ -1,5 +1,22 @@
 /**
- * Inpainting — masked region repair, and the two backends that perform it.
+ * "Inpainting" — MOSTLY DEAD. Read this before trusting the name.
+ *
+ * ⚠ THE LIVE REPAIR METHOD CALLED `inpaint` DOES NOT INPAINT. `inpaintPage()`
+ * (in images.js) builds a text instruction from the quality + semantic findings
+ * and hands the WHOLE IMAGE to `editImageWithPrompt()` → Grok/Gemini, which
+ * returns a WHOLE NEW IMAGE. There is no mask and nothing is preserved:
+ * composition, other characters, background and style can all drift, and
+ * measured they do — 2 of 8 attempts improved the page, average −11.1 points.
+ *
+ * True masked inpainting — where everything outside the mask survives
+ * byte-for-byte — lives in THIS file and is NOT WIRED IN. The mask dispatcher
+ * and the Runware pixel backend were built (2026-03-25 plan) and never given a
+ * live caller; they are marked as dead code and kept per owner decision.
+ *
+ * So: "inpaint" in repairLogic, evalBuckets and the dev panel means
+ * "whole-image text edit", not "local repair". Anything reasoning about blast
+ * radius — "only the mask changed, so we can skip a re-eval" — is WRONG for the
+ * live path. Every repaired version needs a full re-evaluation.
  *
  * Split out of images.js 2026-08-09. Self-contained apart from image
  * compression: mask construction, target grouping, before/after verification

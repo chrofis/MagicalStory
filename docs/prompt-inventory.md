@@ -134,8 +134,8 @@ Sizes measured 2026-08-09.
 | character-repair-inpaint.txt | images.js `repairCharacterMismatchWithGrok` | Char repair via inpaint |
 | character-repair-grok-fullscene.txt | images.js `repairCharacterMismatchWithGrok` (LOCAL_PROMPTS) | Full-scene Grok repair |
 | character-repair-gemini.txt | images.js `repairCharacterMismatch` (LOCAL_PROMPTS) | Gemini-backend char repair |
-| inpainting.txt | images.js `inpaintWithMask` | Mask inpainting (Runware) |
-| inpaint-grok-regions.txt | images.js `inpaintWithGrokBackend` (LOCAL_PROMPTS) | Grok region inpainting |
+| inpainting.txt | images.js `inpaintWithMask` | Mask inpainting (Runware) — **DEAD CHAIN**, no live caller |
+| inpaint-grok-regions.txt | images.js `inpaintWithGrokBackend` (LOCAL_PROMPTS) | Grok region inpainting — **DEAD CHAIN**. The LIVE `inpaint` repair method is `inpaintPage` → `editImageWithPrompt` (whole-image edit, no mask) |
 | grid-repair.txt | repairGrid.js | Grid-based repair (legacy) |
 | text-space-repair.txt | textSpaceRepair.js `ensureCalmZone` | Text calm-zone repair |
 | style-transfer.txt | images.js `applyStyleTransfer` (LOCAL_PROMPTS) | Style transfer repair |

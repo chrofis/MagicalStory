@@ -118,6 +118,30 @@ do this inside the prompt all failed — see the 2026-08-09 decision entry befor
 
 <h2 id="workflow">4. Repair workflow loop</h2>
 
+<p style="border-left:4px solid #c00;padding:0.6em 1em;background:#fff5f5">
+<strong>⚠ The repair method called <code>inpaint</code> does not inpaint.</strong>
+<code>inpaintPage()</code> builds a text instruction from the findings and sends the
+<strong>whole image</strong> to <code>editImageWithPrompt()</code> → Grok/Gemini, which returns a
+<strong>whole new image</strong>. There is no mask and nothing is preserved — composition, other
+characters, background and style can all drift. True masked inpainting (unmasked pixels survive
+byte-for-byte) lives in <code>server/lib/imageInpainting.js</code> and was <strong>never wired
+in</strong>; it is marked dead code. Do not reason about "blast radius" or skip a re-evaluation on
+the assumption that only a region changed.</p>
+
+<p><strong>Measured repair outcomes</strong> (56 attempts, 4 stories, 2026-08-11) — every method is
+net-negative, and 55% of attempts produce a version <code>pick-best</code> discards:</p>
+<table>
+<thead><tr><th>method</th><th>attempts</th><th>better</th><th>worse</th><th>avg pts</th></tr></thead>
+<tbody>
+<tr><td>iterate</td><td>35</td><td>18</td><td>16</td><td>−7.9</td></tr>
+<tr><td>scale-repair</td><td>10</td><td>3</td><td>6</td><td>−18.0</td></tr>
+<tr><td>inpaint (whole-image edit)</td><td>8</td><td>2</td><td>6</td><td>−11.1</td></tr>
+<tr><td>recolour</td><td>3</td><td>2</td><td>1</td><td>−28.7</td></tr>
+</tbody>
+</table>
+<p>Caveat: the score itself has variance (identical input has returned −70 four times and −20 once),
+so small deltas are noise. The −18 average on scale-repair is not.</p>
+
 <p>Triggered by <code>RepairWorkflowPanel</code> → <code>useRepairWorkflow.runFullWorkflow()</code>. Up to <code>maxPasses = 3</code> global passes:</p>
 
 <pre><code>Pass 1:

@@ -9017,3 +9017,48 @@ evaluators on a version that differs from its parent only inside a repair mask.
 tokens — the project's prompt-writing rule is that prompts carry rules, not justifications, and I
 broke it in four places while fixing other things. Every RULE verified intact; only the
 "Measured 2026-08-09 …" prose went.
+
+## 2026-08-11 — The repair method called `inpaint` does not inpaint. Documented everywhere it is named.
+
+**Owner:** *"it is not a true inpaint. Update the docs so this is not confusing anymore."* Correct,
+and the confusion had already produced a wrong design proposal in this session.
+
+**What actually runs.** `inpaintPage()` (images.js) builds a text instruction from the quality +
+semantic findings and passes the **whole image** to `editImageWithPrompt()` → Grok/Gemini, which
+returns a **whole new image**. No mask, nothing preserved: composition, other characters, background
+and style can all drift. The header of `inpaintPage` says so plainly — *"Inpaint a page using Grok
+text edit"* — but every consumer-facing name says "inpaint".
+
+**True masked inpainting exists and is NOT wired in.** The mask dispatcher and the Runware pixel
+backend (from the 2026-03-25 grok-inpaint-repair plan) were built, never given a live caller, and are
+marked dead code, kept per an earlier owner decision. `image-generation-methods.html` already
+described `inpaintWithRunware` as a DEAD CHAIN that "preserves unmasked region byte-for-byte" — the
+accurate note sat next to a live method borrowing its name.
+
+**Why it matters beyond naming.** Earlier today I proposed reducing eval cost by *"not
+re-evaluating what didn't change — a char-fix that repaints one figure doesn't need a fresh semantic
+beat check."* That reasoning is **invalid** for the live path: nothing is guaranteed unchanged. The
+owner rejected it on instinct (*"rather have one eval too much"*) before the cause was known. Any
+future blast-radius argument about `inpaint` is wrong for the same reason.
+
+**Measured, 56 repair attempts across 4 stories** — every method is net-negative and 55% of attempts
+produce a version `pick-best` discards:
+
+| method | attempts | better | worse | avg pts |
+|---|---|---|---|---|
+| iterate | 35 | 18 | 16 | −7.9 |
+| scale-repair | 10 | 3 | 6 | **−18.0** |
+| inpaint (whole-image edit) | 8 | 2 | 6 | −11.1 |
+| recolour | 3 | 2 | 1 | −28.7 |
+
+Caveat: the score has variance (identical input returned −70 four times and −20 once), so small
+deltas are noise; −18 is not. **Repair is currently value-destroying and `pick-best` is what saves
+the book.**
+
+**Documented in:** `server/lib/imageInpainting.js` (file header — the misleading "masked region
+repair" line replaced with the warning), `docs/codebase-guide.md` (round-loop method list),
+`docs/image-quality.html` (§4 warning box + the outcome table), `docs/prompt-inventory.md` (both
+inpaint templates marked DEAD CHAIN and the live path named).
+
+**Not renamed.** `inpaint` is a stored value in repair history, `evalBuckets` repair labels,
+`repairLogic` method strings and the dev panel; renaming is a data-shape change, not a doc fix.

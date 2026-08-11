@@ -53,8 +53,11 @@ Step 2  ROUND LOOP (round 1..maxPasses):
         ├─ findBadPages (server/lib/repairLogic.js) on best-version scores:
         │    finalScore < 60 OR fixableIssues >= 5 OR eval failed (evaluated:false)
         ├─ decideRepairMethod (repairLogic.js:179) per bad page, EVERY round:
-        │    1. visualScore < 50 OR semanticScore < 30 (hardcoded inline) → iterate
+        │    1. visualScore/semanticScore below REPAIR_DEFAULTS floors → iterate
+        │       (values wired from config 2026-08-09; a page still scoring
+        │        >= iterateSalvageFloor is NOT regenerated — see salvage floor)
         │    2. major/critical entity issue on this page (scene pages only) → char-fix
+        │    2b. MAJOR+ clothing naming a character → char-fix (figure redo)
         │    3. anything inpaintable (fixableIssues/fixTargets/semantic)   → inpaint
         │    4. otherwise → skip
         ├─ flip logic: inpaint↔iterate flips when the last repair regressed or the
@@ -64,6 +67,11 @@ Step 2  ROUND LOOP (round 1..maxPasses):
         │    iterate  → iteratePage (scene re-expansion, styled-only refs, saved
         │               plate reused) / iterateCover for covers / generateImageOnly
         │    inpaint  → inpaintPage (consolidated instruction → editImageWithPrompt)
+        │               ⚠ NOT A TRUE INPAINT. No mask: the WHOLE image goes to
+        │               Grok/Gemini and a WHOLE NEW image comes back, so anything
+        │               can drift. True masked inpainting exists in
+        │               imageInpainting.js but was never wired in (dead code).
+        │               Never assume "only the masked region changed".
         │    char-fix → repairCharacterMismatch (Grok; see modes below)
         └─ re-evaluate repaired pages + fresh entity check in parallel; append
            versions; failed attempts persist to retryHistory (round_repair_failed)
