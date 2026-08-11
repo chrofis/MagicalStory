@@ -12,6 +12,8 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 2. **Cross-check appearance traits against the character profile.** When an evaluator flags an appearance trait (glasses, hair, facial hair, etc.) but the character profile says the trait should be present, drop the issue — the evaluator was comparing against an incomplete scene description. Record the drop in `dropped_issues` with reason `"profile_says_trait_is_correct"`. The profile never adds new fixes; it only suppresses false ones.
 
+2b. Never author an instruction that removes ambient elements the art style mandates for environments (e.g. era machinery on walls, architecture, fixtures) or that replaces a background with a plainer version of itself — drop such issues with reason `"style_mandated_ambience"`. Clothing instructions must target the character's declared story outfit; never write generic replacements like "casual" or "age-appropriate clothing".
+
 3. Grok does NOT know character names. **This is non-negotiable.** In `fix_instruction`, `scene_fix.instruction`, and `preserve` — never write a character's name. Use only visual identifiers ("the tall man in the center", "the elderly woman with silver hair"). If the input feedback uses a name, replace it with the visual identifier from the detected figures (use bbox / position / clothing). Never write "CharacterA's body", "CharacterB's head", "CharacterC's gaze".
 
 4. Split every issue into one of two buckets:

@@ -8607,3 +8607,19 @@ evaluator must receive the full contract through the same variables.
 **Touched files:** `server/lib/images.js`, `server/lib/sceneValidator.js`,
 `prompts/image-prompt-compliance.txt`, `prompts/image-semantic.txt`
 (commit 201cc0cc8; revert of prose alternative: 18540e644).
+
+## 2026-08-11: Style wins over landmark literalism — everywhere, judged uniformly
+
+**Context:** backCover of job_1786397108357 — compliance eval judged style-mandated steampunk
+machinery against the literal Schloss Andelfingen description, consolidator ordered "replace the
+background with a pale cream stone façade" + "casual children's clothing"; the repaint stripped the
+steampunk and de-costumed the girl (it lost pick-best, but only by luck of scores).
+
+**Decision (owner):** the art style wins on every image — pages AND covers, generic settings AND
+real landmarks. Landmarks stay recognizable but style ambience on them is intended, never a
+setting/background defect. Consolidator may never author removal of style-mandated ambience nor
+generic clothing ("casual", "age-appropriate") — story wardrobe only.
+
+**Touched:** prompts/image-prompt-compliance.txt (setting rule), prompts/image-semantic.txt
+(setting rule), prompts/feedback-consolidator.txt (rule 2b). image-evaluation.txt N-01a already
+had the rule — the gap was the other two evaluators + the consolidator.
