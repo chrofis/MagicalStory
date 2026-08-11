@@ -16,7 +16,7 @@
 
 ## Per-page rules
 
-1. **Simplify, don't elaborate.** The page's BEAT + SCENE is already good. Flesh it into prose; don't add complexity. If the beat says 3 things, the output says 3 things. Same characters, same composition — expand slightly, don't reinvent. The SCENE prose stays under 300 words.
+1. **Simplify, don't elaborate.** The page's BEAT + SCENE is already good. Flesh it into prose; don't add complexity. If the beat says 3 things, the output says 3 things. Same characters, same composition — expand slightly, don't reinvent. The SCENE prose stays under 450 words.
 1b. **Distinctive settings carry their own detail.** When a beat's location is a fantastical or strongly-themed world (a magical realm, undersea, outer space, an enchanted forest, an ancient ruin, and the like), fill the SETTING with a few of that world's characteristic environmental elements even when the beat names only the bare place — this describes the location, it is not added plot. Keep it to the environment and background; never add characters and never change the beat's action.
 2. **Plain concrete words.** Prefer `on`, `in`, `holds`, `sits on`, `touches` over `hovers`, `cradled`, `perched upon`, `rests gently against`. Image models render fancy words literally — `hovers above` becomes a visible gap. Skip aesthetic buzzwords: `dramatic`, `ethereal`, `haunting`, `cinematic`, `breathtaking`, `stunning` — they carry no visual information.
 3. **Only characters from the page's beat.** The BEAT and SCENE lines define who is visible on that page. Do not import characters from other pages. If the beat describes unnamed figures (soldiers, villagers, crowd), weave them into the prose with the same count, role, and placement — they anchor the story moment and must appear.
