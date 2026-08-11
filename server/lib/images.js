@@ -4293,7 +4293,17 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
       frameBlock = fm[0];
       head = head.replace(fm[0], '');
     }
-    const headBudget = maxPromptLength - tail.length - frameBlock.length - 30;
+    // Same for the static rendering rules (single edge-to-edge illustration /
+    // no panel borders / no written characters on surfaces) — the compressor
+    // was measured dropping them, and border-injection + text-leakage are
+    // exactly the failure modes those paragraphs exist to prevent.
+    let rulesBlock = '';
+    const rm = head.match(/^Generate a SINGLE illustration[\s\S]*?(?:\n\n|$)(?:All surfaces in the scene[\s\S]*?(?:\n\n|$))?/m);
+    if (rm) {
+      rulesBlock = rm[0].trim();
+      head = head.replace(rm[0], '\n\n');
+    }
+    const headBudget = maxPromptLength - tail.length - frameBlock.length - rulesBlock.length - 40;
     if (headBudget >= 1500) {
       try {
         const { callTextModel } = require('./textModels');
@@ -4307,8 +4317,8 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
         const res = await callTextModel(instruction, 12000, 'gemini-2.5-flash', { usageLabel: 'prompt_compress', temperature: 0 });
         const newHead = (res?.text || '').trim();
         if (newHead.length > 500 && newHead.length <= headBudget) {
-          const assembled = newHead + (frameBlock ? '\n\n' + frameBlock : '') + '\n\n' + tail;
-          log.info(`✂️ [${logLabel}] Prompt ${prompt.length}→${assembled.length} chars via head compression (budget ${maxPromptLength}, tail ${tail.length} + frame map kept verbatim)`);
+          const assembled = newHead + (rulesBlock ? '\n\n' + rulesBlock : '') + (frameBlock ? '\n\n' + frameBlock : '') + '\n\n' + tail;
+          log.info(`✂️ [${logLabel}] Prompt ${prompt.length}→${assembled.length} chars via head compression (budget ${maxPromptLength}, tail ${tail.length} + rules + frame map kept verbatim)`);
           return assembled;
         }
         log.warn(`✂️ [${logLabel}] Head compression unusable (${newHead.length} chars vs budget ${headBudget}) — falling back to section-aware cut`);
