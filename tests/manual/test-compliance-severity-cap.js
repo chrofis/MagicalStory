@@ -19,11 +19,11 @@ const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
 
-const SRC = fs.readFileSync(path.join(__dirname, '../../server/lib/images.js'), 'utf8');
+const SRC = fs.readFileSync(path.join(__dirname, '../../server/lib/evalPipeline.js'), 'utf8');
 
 function extractFunction(src, name) {
   const start = src.indexOf(`function ${name}(`);
-  assert(start !== -1, `could not find function ${name} in images.js`);
+  assert(start !== -1, `could not find function ${name} in evalPipeline.js`);
   let i = src.indexOf('{', start);
   let depth = 0;
   for (; i < src.length; i++) {

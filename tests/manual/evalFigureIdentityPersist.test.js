@@ -49,15 +49,18 @@ const check = (d, c, extra) => c
 
 const read = (rel) => fs.readFileSync(require.resolve(rel), 'utf8').replace(/\r\n/g, '\n');
 const images = read('../../server/lib/images.js');
+// evaluateImageQuality moved verbatim to evalPipeline.js (god-file split);
+// evaluateImageBatch and its whitelist stayed in images.js — read both.
+const evalSrc = read('../../server/lib/evalPipeline.js');
 const pipeline = read('../../server/lib/repairPipeline.js');
 
 // ── The eval's own return still carries the identification ──────────────────
 console.log('\nevaluateImageQuality still returns the raw material');
 check('figures + matches are returned by the JSON branch',
-  /\n\s*figures,\s*\n\s*\/\/ Detected figures/.test(images)
-  || /\n\s*figures,\s*\n\s*matches,\s*\n/.test(images));
+  /\n\s*figures,\s*\n\s*\/\/ Detected figures/.test(evalSrc)
+  || /\n\s*figures,\s*\n\s*matches,\s*\n/.test(evalSrc));
 check('so is the verbatim model output',
-  /rawOutput: responseText,/.test(images));
+  /rawOutput: responseText,/.test(evalSrc));
 
 // ── Leak 1: the batch whitelist ─────────────────────────────────────────────
 console.log('\nevaluateImageBatch no longer drops the audit fields');
