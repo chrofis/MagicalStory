@@ -724,17 +724,30 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
         const { callTextModel } = require('./textModels');
         const { resolvePromptCompressModel } = require('../config/models');
         const compressModel = resolvePromptCompressModel();
-        // Budget the model in CHARACTERS, which is the unit that actually binds
-        // (the backend limit is a char limit), and state the cut it has to make.
-        // A word target was measured missing in both directions: flash returned
-        // 39% of its allowance (deleting four characters' hats), deepseek 126%.
-        const buildInstruction = (cap, over) => (over
-          ? `Your previous version was ${over} characters — ${cap} is a hard limit, not a goal. Rewrite it shorter. `
+        // TWO targets, both computed from this page (owner, 2026-08-12): the
+        // RELATIVE cut, which tells the model how hard to squeeze, and the
+        // ABSOLUTE cap in characters, which is the unit that actually binds
+        // (the backend limit is a char limit). A word target alone was measured
+        // missing in both directions — flash returned 39% of its allowance and
+        // deleted four characters' hats, deepseek 126% and then 139%. A model
+        // asked to "shorten by 26%" has a size to aim at; "at most N chars"
+        // alone reads as advice.
+        // WHAT to cut, in order — not just how much. "Keep every fact" plus
+        // "cut 26%" has no solution on a five-character page: the text is a list
+        // of people, garments, positions and props with almost no filler, so
+        // flash resolved the contradiction by deleting four hats and deepseek by
+        // returning a near-copy (7,374 of 7,410 chars — a 0.5% cut — even when
+        // given the percentage, the input size, the cap and a word count).
+        // Ranking the material makes the task decidable.
+        const cutPct = Math.max(5, Math.round((1 - headBudget / head.length) * 100));
+        const capWords = Math.floor(headBudget / 6.5);
+        const buildInstruction = (over) => (over
+          ? `Your previous version was ${over} characters — still over the ${headBudget} limit. Cut deeper this time. `
           : '')
-          + `Rewrite the scene description below to at most ${cap} characters, keeping every fact — `
-          + `every character with their outfit, position and expression; every object; the composition. `
-          + `State every character's age band and body proportions explicitly (e.g. kindergarten-age about 5 heads tall, adult about 7.5-8 heads tall). `
-          + `Remove only repetition and filler — never a garment, a character or an object. `
+          + `Shorten the scene description below to at most ${headBudget} characters (roughly ${capWords} words). It is ${head.length} characters now, so about ${cutPct}% has to go. `
+          + `Cut in this order, and stop as soon as it fits: 1. mood, atmosphere and lighting adjectives; 2. background and setting detail; 3. repeated wording. `
+          + `Never shorten or remove: a character, a garment or its colour, an object, a position, an expression, or a stated age band and body proportion `
+          + `(e.g. kindergarten-age about 5 heads tall, adult about 7.5-8 heads tall). `
           + `Same format, same section headers. Output ONLY the rewritten description.\n\n${head}`;
         // reasoning:{enabled:false} is REQUIRED, not an optimisation. With it on,
         // deepseek-v4-pro spent all 12,001 output tokens thinking and returned an
@@ -745,7 +758,7 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
         let newHead = '';
         for (let attempt = 1; attempt <= 2; attempt++) {
           const over = attempt === 1 ? 0 : newHead.length;
-          const res = await callTextModel(buildInstruction(headBudget, over), 12000, compressModel, callOpts);
+          const res = await callTextModel(buildInstruction(over), 12000, compressModel, callOpts);
           newHead = (res?.text || '').trim();
           if (newHead.length > 500 && newHead.length <= headBudget) break;
           log.warn(`✂️ [${logLabel}] Compression attempt ${attempt} by ${compressModel}: ${newHead.length} chars vs ${headBudget} allowed`);

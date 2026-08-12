@@ -588,14 +588,24 @@ const IMAGE_MODELS = {
     modelId: 'grok-imagine-image',
     description: 'Grok Imagine Standard - Good quality ($0.02/image), ref image support',
     backend: 'grok',
-    maxPromptLength: 7500,
+    // Grok's API limit is 8000 chars. The 500-char margin was costing more than
+    // it protected: page 9 of job_1786484554633 built to 7534 — 34 over this
+    // budget, 466 UNDER what Grok accepts — and that 34 triggered an LLM
+    // compression pass that deleted four characters' hats. 100 chars of margin
+    // is enough for the assembly slack; the compressor is the expensive guard.
+    maxPromptLength: 7900,
     maxCharactersPerScene: 5
   },
   'grok-imagine-pro': {
     modelId: 'grok-imagine-image-pro',
     description: 'Grok Imagine Pro - Higher quality ($0.07/image), ref image support',
     backend: 'grok',
-    maxPromptLength: 7500,
+    // Grok's API limit is 8000 chars. The 500-char margin was costing more than
+    // it protected: page 9 of job_1786484554633 built to 7534 — 34 over this
+    // budget, 466 UNDER what Grok accepts — and that 34 triggered an LLM
+    // compression pass that deleted four characters' hats. 100 chars of margin
+    // is enough for the assembly slack; the compressor is the expensive guard.
+    maxPromptLength: 7900,
     maxCharactersPerScene: 5
   }
 };

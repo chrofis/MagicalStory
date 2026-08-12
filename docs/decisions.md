@@ -9619,3 +9619,37 @@ production head-crop NOT shipped yet for these two reasons.
 **Touched:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt` (one rule
 line each). Test Lab knobs `params.noBackground` / `params.refCrop` (testlab.js, already
 committed) reproduce every experiment.
+
+### Addendum, same day — the budget was the lever, not the model
+
+Two more measurements on the same p9 head (7,410 chars), deepseek-v4-pro, reasoning off:
+
+| instruction | returned | cut achieved | asked for |
+|---|---|---|---|
+| percentage + input size + char cap + word count | 7,374 | **0.5%** | 26% |
+| + WHAT to cut, ranked (mood/lighting → setting → repetition), never a character/garment/object | 7,229 | **2.4%** | 21% |
+
+Both kept all five pointed hats and all three sashes — the model is faithful, it simply will
+not shorten this text. "Keep every fact" and "cut a quarter" have no solution on a
+five-character page: the prose is a list of people, garments, positions and props with
+almost no filler. Flash resolved the contradiction by deleting facts, DeepSeek by ignoring
+the length. Neither is a model defect, and no further prompt wording is worth trying.
+
+**Decision (owner, 2026-08-12): raise the Grok budget 7,500 → 7,900** (API limit is 8,000;
+100 chars of assembly slack). The 500-char margin was costing more than it protected — p9
+built to 7,534, i.e. 34 over our budget and 466 UNDER what Grok accepts, and those 34 chars
+triggered the compression pass that deleted four hats. The structural instruction is kept
+for the pages that still overflow: it is strictly better than a bare length target.
+
+**Corpus, 38 pages / 3 stories, over budget:** 24 before the trim → 17 after the trim → **10
+after the raised budget**. Every 1- and 2-character page (18 of 38) now fits with no
+compression at all. What remains is 8 five-character pages and 2 three-character ones,
+7,942–9,477 chars.
+
+**Known gap:** for those pages compression will fail (the model won't cut) and the
+deterministic `sectionAwareCut` truncates the END of the head — where the last-described
+characters' garments sit. Making that fallback wardrobe-aware is the open follow-up, along
+with the colour-mismatch check in `clothingCheck`.
+
+**Touched:** `server/config/models.js` (grok-imagine + pro maxPromptLength),
+`server/lib/images.js` (ranked cut instruction).
