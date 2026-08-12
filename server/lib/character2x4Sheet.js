@@ -851,17 +851,19 @@ function resolveStyleLineForSheet(artStyle) {
 // "Image 2 is the style reference" line only when styleTransferGenerate passes one.
 function buildStyleTransferPrompt(artStyle, { hasAnchor = false } = {}) {
   const styleLine = resolveStyleLineForSheet(artStyle);
-  // "match its technique" alone made the model paste Image 2's PEOPLE into the
-  // sheet (the anchor family's woman/boy/old-man leaked into every character —
-  // staging job_1786277779744, 2026-08-09). Say explicitly that Image 2 is a
-  // technique sample of unrelated people whose figures must not be copied.
+  // Image 2's PEOPLE keep bleeding into the sheet (job_1786277779744 2026-08-09;
+  // again job_1786484554633 2026-08-12 — the anchor family ghosted across Noah's
+  // cells despite the "unrelated people, don't copy" wording). Second-generation
+  // wording: never mention that Image 2 contains people at all — call it a
+  // swatch, and state the single-subject rule as a property of the OUTPUT
+  // ("alone in every cell") rather than a negation about Image 2.
   const anchorLine = hasAnchor
-    ? ' Image 2 is only a style sample showing unrelated people — copy its technique, palette and texture, not its figures, faces, clothing, or composition. None of Image 2\'s people appear in the output; the only character is the one in Image 1.'
+    ? '\nImage 2 is a swatch of the painting technique, palette, and paper texture only. Take nothing else from it: no figure, face, garment, or composition — every painted element in the output comes from Image 1.'
     : '';
   return `Change the art style of Image 1 — a 2×4 character reference sheet (8 cells) — to: ${styleLine}
-${anchorLine} Render all 8 cells uniformly in this style — no cell left photographic.
+Render all 8 cells uniformly in this style — no cell left photographic.
 
-Keep the content of Image 1 unchanged; only the art style changes.`;
+Keep the content of Image 1 unchanged; only the art style changes. Every cell shows the same single character as Image 1, alone — no other person or figure anywhere on the sheet.${anchorLine}`;
 }
 
 // Optional per-art-style STYLE ANCHOR asset (server/assets/style-anchor-<style>.jpg|png)
@@ -918,15 +920,42 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
     toInlinePart(styledSheet),
     { text: prompt },
   ];
-  const { text, usageMetadata } = await callSheetJudge(model, parts, 8000, geminiApiKey);
-  if (!text) throw new Error(`style-eval (${model}) returned no text`);
-  if (usageTracker && usageMetadata) {
-    usageTracker('gemini_quality', {
-      input_tokens: usageMetadata.promptTokenCount || 0,
-      output_tokens: usageMetadata.candidatesTokenCount || 0,
-    }, 'character_2x4_style_eval', model);
+  // Degenerate-judge guard: the model sometimes returns the prompt's example
+  // JSON verbatim instead of judging (Noah, job_1786484554633 — a sheet full of
+  // ghost anchor-figures shipped with all-9s whose outfit reason was the
+  // example's "Navy shirt + tan pants"). The template's example now uses
+  // <placeholder> reasons, so an echoed verdict is detectable; re-ask once,
+  // then fail the eval so the retry loop treats the attempt as unjudged.
+  for (let evalTry = 1; evalTry <= 2; evalTry++) {
+    const { text, usageMetadata } = await callSheetJudge(model, parts, 8000, geminiApiKey);
+    if (!text) throw new Error(`style-eval (${model}) returned no text`);
+    if (usageTracker && usageMetadata) {
+      usageTracker('gemini_quality', {
+        input_tokens: usageMetadata.promptTokenCount || 0,
+        output_tokens: usageMetadata.candidatesTokenCount || 0,
+      }, 'character_2x4_style_eval', model);
+    }
+    const verdict = parseJudgeJson(text);
+    if (!isEchoedStyleVerdict(verdict)) return verdict;
+    log.warn(`[CHARACTER 2×4] style-eval returned the template example verbatim (try ${evalTry}/2) — ${evalTry < 2 ? 're-asking' : 'failing the eval'}`);
   }
-  return parseJudgeJson(text);
+  throw new Error('style-eval echoed the template example twice — degenerate judge response');
+}
+
+// A verdict whose reasons are the template's own example/placeholder strings was
+// never judged. Two signatures: an unfilled "<placeholder>" (current template)
+// or the pre-2026-08-12 worked example's distinctive reason strings.
+const LEGACY_EXAMPLE_REASONS = [
+  'Navy shirt + tan pants + brown loafers preserved across cells 5-8',
+  'Same 4×2 grid as Image 2, no figure crosses gutters',
+  'Only the target character appears; no other or extra people in any cell',
+];
+function isEchoedStyleVerdict(verdict) {
+  const reasons = ['layout', 'identity', 'style', 'outfit', 'clean', 'bodyFace', 'age', 'solo']
+    .map(k => verdict?.[k]?.reason)
+    .filter(r => typeof r === 'string');
+  if (reasons.length === 0) return false;
+  return reasons.some(r => r.includes('<') || LEGACY_EXAMPLE_REASONS.some(ex => r.trim() === ex));
 }
 
 // Split a 2×4 sheet into its top (4 heads) and bottom (4 bodies) rows. The head

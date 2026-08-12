@@ -9405,3 +9405,38 @@ is the open follow-up.
 
 **Touched:** `server/lib/clothingResolve.js`, `server/lib/promptBuilders.js`,
 `server/lib/beatsPipeline.js`, `server/lib/testlab.js`.
+
+## 2026-08-12 — Style-anchor people bleed: swatch wording + de-echoed style eval
+
+**Context:** Pass 2 of the styled-avatar 2×4 pipeline passes a per-style anchor
+painting (server/assets/style-anchor-*.jpg — deliberately a three-person family,
+so the style is demonstrated on faces of different ages) as Image 2. Grok
+stochastically composites that family into the output sheet as ghost figures
+(job_1786277779744 on 2026-08-09, again job_1786484554633 Noah on 2026-08-12 —
+~1/3 reproduction in a controlled replay). The pass-2 evaluator (TASK 8
+soloScore) should force a retry, but on the contaminated sheet Gemini returned
+the eval prompt's worked EXAMPLE JSON verbatim ("Navy shirt + tan pants") — an
+unjudged all-9s verdict — and the sheet shipped.
+
+**Decision:** (1) `buildStyleTransferPrompt` second-generation wording: Image 2
+is "a swatch of the painting technique, palette, and paper texture only" —
+never say it contains people; the single-subject rule is stated as a property
+of the output ("every cell shows the same single character as Image 1,
+alone"). (2) `sheet-2x4-style-eval.txt`: worked example replaced with
+<placeholder> reasons (nothing to echo); TASK 8 extended to faint/ghosted/
+semi-transparent figures. (3) `evaluateStyledSheetWithGemini`: deterministic
+echo guard — a verdict whose reasons contain a placeholder or the legacy
+example strings is re-asked once, then the eval fails so the attempt counts
+as unjudged (score 5 path) instead of valid.
+
+**Evidence:** A/B replay on Noah's pass-1 sheet + watercolor anchor, 3× each:
+current prompt 1/3 catastrophic bleed, new prompt 0/3. Fixed evaluator on the
+shipped contaminated sheet: solo 1 / final 1 / valid false (forces retry);
+5/5 clean sheets pass 9/valid; 0 echoes in 7 eval calls.
+
+**Rationale:** Prompt-only guards on this failure were already tried once
+(2026-08-09) and failed; the eval is the backstop, and an eval that can echo
+its own example is no backstop. Anchors keep their family figures on purpose —
+faces across ages are what the anchor must demonstrate.
+
+**Touched:** `server/lib/character2x4Sheet.js`, `prompts/sheet-2x4-style-eval.txt`.

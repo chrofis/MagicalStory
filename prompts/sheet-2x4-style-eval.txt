@@ -52,33 +52,34 @@ TASK 7: AGE MATCH
 
 TASK 8: SINGLE SUBJECT — NO OTHER PEOPLE
 - Every cell of Image 3 shows the SAME one person as Image 2. No other or additional people may appear anywhere in the sheet — no second face, no extra figure, no background person, not even partial.
-- Score 1-10. Any extra or different person anywhere in Image 3 (a second face, an added body, a crowd) scores 1-3. Only the single target character across all 8 cells = 9-10.
+- This includes faint, ghosted, semi-transparent, or sketchy figures blended into the background or margins — a washed-out extra face or body counts the same as a solid one. Compare against Image 2: any human shape in Image 3 that is not in Image 2 is a defect.
+- Score 1-10. Any extra or different person anywhere in Image 3 (a second face, an added body, a ghosted figure, a crowd) scores 1-3. Only the single target character across all 8 cells = 9-10.
 - `soloScore` is the score.
 
 `finalScore` MUST equal the LOWEST of layoutScore, identityScore, styleScore, outfitScore, cleanScore, bodyFaceScore, ageScore, soloScore.
 `valid` is `true` only when finalScore ≥ 6.
 
-Return EXACTLY this JSON shape:
+Return EXACTLY this JSON shape. Every score and reason must come from what you see in Image 3 — never return this template's placeholders:
 
 {
-  "layout":   {"score": 9, "reason": "Same 4×2 grid as Image 2, no figure crosses gutters"},
-  "identity": {"score": 9, "reason": "Same person — beard, hair, eyes, skin tone all match the source photo"},
-  "style":    {"score": 9, "reason": "Clean watercolour wash with simple outlines, distinctly illustrated (not photographic)"},
-  "outfit":   {"score": 9, "reason": "Navy shirt + tan pants + brown loafers preserved across cells 5-8"},
-  "clean":    {"score": 9, "reason": "No stray marks or colour patches on skin, face, or hair in any cell"},
-  "bodyFace":  {"score": 9, "reason": "Cells 5-7 each show a clear face matching the identity; cell 8 is back-of-head"},
-  "age":      {"score": 9, "reason": "Reads as a school-age child of the declared age — head-to-body ratio and height impression match"},
-  "solo":     {"score": 9, "reason": "Only the target character appears; no other or extra people in any cell"},
-  "layoutScore": 9,
-  "identityScore": 9,
-  "styleScore": 9,
-  "outfitScore": 9,
-  "cleanScore": 9,
-  "bodyFaceScore": 9,
-  "ageScore": 9,
-  "soloScore": 9,
-  "finalScore": 9,
-  "valid": true,
+  "layout":   {"score": <1-10>, "reason": "<what you observed>"},
+  "identity": {"score": <1-10>, "reason": "<what you observed>"},
+  "style":    {"score": <1-10>, "reason": "<what you observed>"},
+  "outfit":   {"score": <1-10>, "reason": "<the actual garments you see and whether they match Image 2>"},
+  "clean":    {"score": <1-10>, "reason": "<per-cell colour regions and verdict>"},
+  "bodyFace":  {"score": <1-10>, "reason": "<what you observed in cells 5-7>"},
+  "age":      {"score": <1-10>, "reason": "<what you observed>"},
+  "solo":     {"score": <1-10>, "reason": "<what you observed — name any extra figure and where>"},
+  "layoutScore": <1-10>,
+  "identityScore": <1-10>,
+  "styleScore": <1-10>,
+  "outfitScore": <1-10>,
+  "cleanScore": <1-10>,
+  "bodyFaceScore": <1-10>,
+  "ageScore": <1-10>,
+  "soloScore": <1-10>,
+  "finalScore": <1-10>,
+  "valid": <true|false>,
   "failureReasons": []
 }
 
