@@ -732,22 +732,23 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
         // deleted four characters' hats, deepseek 126% and then 139%. A model
         // asked to "shorten by 26%" has a size to aim at; "at most N chars"
         // alone reads as advice.
-        // WHAT to cut, in order — not just how much. "Keep every fact" plus
-        // "cut 26%" has no solution on a five-character page: the text is a list
-        // of people, garments, positions and props with almost no filler, so
-        // flash resolved the contradiction by deleting four hats and deepseek by
-        // returning a near-copy (7,374 of 7,410 chars — a 0.5% cut — even when
-        // given the percentage, the input size, the cap and a word count).
-        // Ranking the material makes the task decidable.
+        // WHAT to cut, in order — not just how much. And the preservation rule
+        // asks for the MAIN POINTS, not every fact (owner, 2026-08-12): "keep
+        // every fact" plus "cut 26%" has no solution on a five-character page —
+        // the text is a list of people, garments, positions and props with
+        // almost no filler — so flash resolved the contradiction by deleting
+        // four hats and deepseek by returning a near-copy (7,374 of 7,410
+        // chars, a 0.5% cut, even given the percentage, size, cap and word
+        // count). Naming the main points and ranking the rest lets the model
+        // shorten wording instead of choosing between silence and disobedience.
         const cutPct = Math.max(5, Math.round((1 - headBudget / head.length) * 100));
         const capWords = Math.floor(headBudget / 6.5);
         const buildInstruction = (over) => (over
           ? `Your previous version was ${over} characters — still over the ${headBudget} limit. Cut deeper this time. `
           : '')
           + `Shorten the scene description below to at most ${headBudget} characters (roughly ${capWords} words). It is ${head.length} characters now, so about ${cutPct}% has to go. `
+          + `Keep all the main points: every character with their age band and body proportions (e.g. kindergarten-age about 5 heads tall, adult about 7.5-8 heads tall), what each one wears down to the colour of each garment, where each one is, what each one is doing, and every object named. Say them in fewer words. `
           + `Cut in this order, and stop as soon as it fits: 1. mood, atmosphere and lighting adjectives; 2. background and setting detail; 3. repeated wording. `
-          + `Never shorten or remove: a character, a garment or its colour, an object, a position, an expression, or a stated age band and body proportion `
-          + `(e.g. kindergarten-age about 5 heads tall, adult about 7.5-8 heads tall). `
           + `Same format, same section headers. Output ONLY the rewritten description.\n\n${head}`;
         // reasoning:{enabled:false} is REQUIRED, not an optimisation. With it on,
         // deepseek-v4-pro spent all 12,001 output tokens thinking and returned an

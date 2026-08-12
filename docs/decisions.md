@@ -9653,3 +9653,102 @@ with the colour-mismatch check in `clothingCheck`.
 
 **Touched:** `server/config/models.js` (grok-imagine + pro maxPromptLength),
 `server/lib/images.js` (ranked cut instruction).
+
+## 2026-08-12 — `garment` is a closed enum filled by the evaluator (supersedes "pass the word through verbatim", 2026-08-09)
+
+**Context:** staging `job_1786484554633_crojok432` p3. Noah is drawn holding a large
+parchment map across his chest. The entity check flagged five garments on him — robe,
+sash, shoes, hat, hatband — and the recolour ran all five in sequence, 23:57:03→23:58:38 CH,
+each on the previous one's output. Measured v0 against the shipped v1: **597,128 px changed,
+56.9% of the page**. The map, the wall and the edges of his hair went blue. That version
+scored 43 against the original's 13 and won pick-best, so it is the live image.
+
+**Attribution (Lab 533-537, each replayed against v0 with `versionIndex: 0`; DINO and SAM
+are deterministic, so the replay reproduces the original boxes):**
+
+| garment | DINO box | box % of crop | mask % of crop | score |
+|---|---|---|---|---|
+| robe | [9, 276, 865, 940] | 62% | 39% | 0.55 |
+| sash | [258, 65, 502, 156] | 2% | 1% | 0.52 |
+| shoes | [5, 7, 865, 1010] | **94%** | 68% | 0.55 |
+| hat | [176, 3, 614, 270] | 13% | 5% | 0.71 |
+| hatband | [177, 2, 615, 270] | 13% | 5% | 0.50 |
+
+**SAM is not at fault.** Every mask is a strict subset of the box it was given (39<62,
+1<2, 68<94, 5<13, 5<13) — it never escaped once. The failure is entirely GroundingDINO
+returning a confident, wrong box:
+- `hatband` returned the **hat's box to within one pixel**, so the hat was repainted twice;
+- `robe` returned a box over the map (the robe's own pixels are largely outside it);
+- `shoes` returned 94% of the crop, i.e. the entire picture.
+
+Confidence does not separate them: 0.55 fails, 0.52 works, 0.55 fails, 0.71 works. Nor does
+mask size: 7,677 px is fine and 42,633 px is fine. The failing masks are distinguished only
+by **colour** — each reads pale and warm (L 66–77, hue +68…+82°) where the target is blue,
+because the mask is the cream map, not a garment.
+
+**Decision:** the evaluator fills `garment` from a closed set of whole garments —
+`hat · top · jacket · dress · pants · skirt · shoes` — declared once as `GARMENT_ENUM` in
+`garmentColourFix.js`, rendered into `entity-consistency-check.txt` via `{GARMENT_ENUM}`,
+and validated by `garmentQueryFor`. Each value carries its own detector phrase, so the
+label the finding reads (`pants`) and the phrase that grounds best in an image ("the
+trousers worn by the person") are chosen independently. Sub-parts fold into their parent:
+a band, cuff, collar, trim, buckle or lining is reported as the garment it belongs to.
+An off-enum word is **dropped with an error-level log** — never folded onto a neighbour.
+
+**No `belt`/`sash`** (owner's call): a waist item is small and frequently occluded. A
+wrong-coloured sash is therefore left wrong rather than repainted from a guess — the same
+trade as the no-default clothing category.
+
+**Rationale, and what the superseded rule got right:** the 2026-08-09 entry deleted a
+word→prompt table because it folded unrecognised words onto `top`, which selected the
+TORSO — "breeches" aimed a legwear repair at the chest and "sash" collided with it on the
+dedupe key and vanished (`job_1786287569165_7f75jspcz`). That reasoning is preserved: there
+is still no fallback and no code guessing what a word means. What it got wrong was assuming
+an open vocabulary is safe because GroundingDINO accepts any phrase. It accepts any phrase
+*and always answers* — it cannot say "not visible" — so an ungroundable word yields a
+confident wrong box rather than a refusal. Constraining the SOURCE removes the arbitrary
+word instead of translating it.
+
+**Also fixed here:** the audit was stored on the mismatch, not the page, and one mismatch
+covers up to five pages (`pagesToFix: [2,3,4,5,6]`), so each page overwrote the previous
+one's record and only the last survived — page 3's own numbers were unrecoverable. The
+DINO box is now persisted (`report.dinoBox`/`dinoBoxPx`/`cropPx`) and drawn as a Lab step,
+so "wrong box" and "mask escaped a good box" are distinguishable from stored evidence.
+The per-page audit overwrite is **not** fixed and remains open.
+
+**Still open:** the per-pixel colour gate scores each pixel against the mask's OWN mean, so
+once the wrong object dominates the mask the gate defends the wrong object and rejects the
+garment — on the `shoes` run the actual black shoes were gated out while the map was
+repainted. Tracked as the source-colour gate; the enum removes the queries that cannot be
+grounded, not the consequence of a bad mask from a query that can.
+
+**Touched:** `server/lib/garmentColourFix.js`, `server/lib/repairPipeline.js`,
+`server/lib/entityConsistency.js`, `prompts/entity-consistency-check.txt`,
+`tests/manual/garmentEnum.test.js`, `tests/manual/garmentHueNormalize.test.js`.
+**Status:** ✅ active — supersedes the 2026-08-09 "no translation table" entry.
+
+### Addendum 2 — "keep all the main points", not "keep every fact" (owner wording)
+
+The preservation clause was the jam, not the length target. Same head (7,410 chars), same
+model, reasoning off, only that clause changed:
+
+| preservation clause | cut achieved | fits the cap? |
+|---|---|---|
+| "keep every fact" | 0.5% | no |
+| + ranked cut order, "never remove a character/garment/object" | 2.4% | no |
+| **"Keep all the main points … Say them in fewer words."** | **33%** | **yes** |
+
+16/16 main points survived the 33% cut — five robes, three sashes, five pointed hats, the
+pedestal, the wand, the parchment. Asking the model to preserve MEANING lets it compress
+wording; asking it to preserve TEXT leaves it choosing between deleting content (flash) and
+disobeying the length (deepseek). The clause now names what the main points are — each
+character with age band and proportions, every garment with its colour, positions, actions,
+objects — and adds "say them in fewer words".
+
+**Verified end to end** (Lab #540, p9 of `job_1786484554633_crojok432`, the five-character
+page this thread started on): `Prompt 8898→7546 via head compression by deepseek-v4-pro
+(head 7027→5667 of 5987 allowed = 95%)`. The render has all five characters in their
+contract colours AND all five hats — the first one in this series with nothing deleted.
+Score −90, against −200 / −180 / −130 for the earlier attempts. Style gate passed.
+
+**Touched:** `server/lib/images.js`.
