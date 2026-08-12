@@ -576,6 +576,15 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
     return { changed: false, imageData: pageImageData, report, steps };
   }
   report.dinoScore = +Number(det.score).toFixed(2);
+  // PERSIST THE BOX, not just its score. Without it a bad result is
+  // unattributable: a mask covering the wrong object can mean DINO returned the
+  // wrong box, or that SAM escaped a correct one, and the mask overlay alone
+  // cannot tell those apart. Crop pixel coords, the same ones handed to SAM.
+  report.dinoBox = Array.isArray(det.box) ? det.box.map(v => Math.round(v)) : null;
+  report.dinoBoxPx = report.dinoBox
+    ? Math.max(0, (report.dinoBox[2] - report.dinoBox[0])) * Math.max(0, (report.dinoBox[3] - report.dinoBox[1]))
+    : null;
+  report.cropPx = cw * ch;
 
   const { data: cropRaw } = await sharp(cropBuf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   let cur = meanLabMasked(cropRaw, seg.alpha);
@@ -668,6 +677,19 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
 
   if (options.collectSteps) {
     steps.push({ label: `${report.name} BEFORE (${report.current.hueDeg}°, L ${report.current.L})`, data: toDataUri(cropBuf) });
+    // The DINO box SAM was prompted with, drawn on the same crop — so "wrong box"
+    // and "mask escaped a good box" are distinguishable at a glance.
+    if (report.dinoBox) {
+      const [bx1, by1, bx2, by2] = report.dinoBox;
+      const boxSvg = Buffer.from(
+        `<svg width="${cw}" height="${ch}"><rect x="${bx1}" y="${by1}" width="${Math.max(1, bx2 - bx1)}" `
+        + `height="${Math.max(1, by2 - by1)}" fill="none" stroke="#00e5ff" stroke-width="5"/></svg>`);
+      steps.push({
+        label: `${report.name} DINO BOX for "${garmentKey}" — score ${report.dinoScore}, `
+          + `${Math.round(100 * report.dinoBoxPx / report.cropPx)}% of the crop`,
+        data: toDataUri(await sharp(cropBuf).composite([{ input: boxSvg }]).jpeg({ quality: 92 }).toBuffer()),
+      });
+    }
     const overlayJpg = await sharp(overlay, { raw: { width: cw, height: ch, channels: 3 } }).jpeg({ quality: 92 }).toBuffer();
     steps.push({
       label: `${report.name} MASK — magenta = moved, cyan = gated (DINO ${report.dinoScore} → SAM, ${cur.count}px${gated ? `, ${gated} gated` : ''})`,
