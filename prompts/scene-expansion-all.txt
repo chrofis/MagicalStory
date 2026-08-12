@@ -141,6 +141,7 @@ Then a single-line JSON object:
 - Only add `perspective` for back view or side profile.
 - `era` is the story's time period in 2-4 words (medieval, 1920s, present day). It feeds the anachronism guard — omit only if the story has no defined era.
 - `shot` is the page's camera framing: `close-up`, `medium`, or `wide`. Decide it once — the scene prose, the emptyScenePrompt, and the metadata all use this same framing. Omitting it makes the empty scene default to a wide shot.
+- A `close-up` frame ends at the waist. The prose, poses, and interactions describe only what is above it — no legs, feet, footwear, kneeling, crouching, or floor contact, and nothing placed behind the character. A beat that needs any of those is a `medium` shot, not a close-up.
 - Only add `depth` when the character is in the background (default is foreground/midground).
 
 **`objects[]`**

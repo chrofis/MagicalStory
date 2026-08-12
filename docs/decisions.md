@@ -9592,3 +9592,30 @@ were left alone.
 
 **Touched:** `prompts/image-generation.txt`, `server/config/models.js`,
 `server/lib/images.js`.
+
+## 2026-08-12: Close-up framing is the scene creator's job, not the image prompt's
+
+**Context:** Declared close-up pages consistently rendered as full figures — feet in
+frame, object turned to the camera, gaze at the viewer (Zauberer-Ruedi P3, Baden P2,
+Piratenprüfung P2/P9). Test Lab experiments #515–#539 isolated the causes.
+
+**Decision:** The close-up constraint lives in the Art Director templates
+(`scene-expansion-all.txt` / `scene-expansion.txt`): a `close-up` frame ends at the
+waist; prose, poses and interactions may only describe what is above it; a beat needing
+kneeling/floor contact is `medium`, not close-up. No image-prompt framing rule shipped.
+
+**Rationale (measured):** An image-prompt rule alone loses to a contradicting brief —
+three strengths were A/B'd (#523 soft, #524 hard waist-cut, #538 top SHOT-header) and
+the prose's "kneels…ankle boots…chest behind him" won every time; the aggressive #524
+wording additionally made Grok reproduce the reference sheet (-140). With a compliant
+waist-up brief (#539) the close-up renders correctly with no image-prompt rule at all.
+Supporting findings: a wide empty-scene plate anchors wide framing (#531) — solved for
+new stories by the 2026-08-11 shot-inheritance fix; head-only character refs stop the
+full-body pull (#518/#520) but the crop must come from the costumed panel (top panel of
+the cell stack is hatless — Daniel's tricorn lived only in the body panel) and needs
+prose that fully dresses the character (Emma rendered a hallucinated sundress twice) —
+production head-crop NOT shipped yet for these two reasons.
+
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt` (one rule
+line each). Test Lab knobs `params.noBackground` / `params.refCrop` (testlab.js, already
+committed) reproduce every experiment.
