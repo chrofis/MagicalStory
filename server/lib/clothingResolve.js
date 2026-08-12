@@ -828,6 +828,41 @@ function resolveClothingForPage(char, clothingLabel, clothingRequirements = null
 
 
 /**
+ * Every outfit a character actually wears in this story, as TEXT.
+ *
+ * The per-page category is unknown at scene-expansion time — `pageClothing` is
+ * DERIVED from the scene metadata that stage produces (storyJobPipeline.js) —
+ * so a resolver keyed on one category cannot run there. This one is keyed on
+ * the contract instead: every `used: true` entry, labelled with the key the
+ * Art Director must write into its metadata.
+ *
+ * One used category → the description alone (the common case: no label noise).
+ * Several → `label — description` joined, so the brief can pick per page.
+ *
+ * @param {Object} char
+ * @param {Object|null} clothingRequirements
+ * @returns {string|null} null when the character has no usable outfit
+ */
+function buildUsedClothingText(char, clothingRequirements) {
+  if (!char?.name || !clothingRequirements) return null;
+  const { resolveCharacterReqs } = require('./clothingCategories');
+  const reqs = resolveCharacterReqs(clothingRequirements, char.name);
+  if (!reqs) return null;
+
+  const parts = [];
+  for (const [category, entry] of Object.entries(reqs)) {
+    if (!entry || typeof entry !== 'object' || !entry.used) continue;
+    const text = (entry.signature && entry.signature !== 'none') ? entry.signature : entry.description;
+    if (!text || !String(text).trim()) continue;
+    const label = (category === 'costumed' && entry.costume) ? `costumed:${entry.costume}` : category;
+    parts.push({ label, text: String(text).trim() });
+  }
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return parts[0].text;
+  return parts.map(p => `${p.label} — ${p.text}`).join(' | ');
+}
+
+/**
  * Build available avatars list for scene expansion prompt
  * @param {Array} characters - Character array with avatars
  * @param {Object} clothingRequirements - Optional: only show categories with used=true
@@ -947,6 +982,7 @@ module.exports = {
   getCharacterPhotoDetails,
   buildSceneClothingRequirements,
   resolveClothingForPage,
+  buildUsedClothingText,
   buildAvailableAvatarsForPrompt,
   convertClothingToCurrentFormat
 };

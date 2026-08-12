@@ -9321,3 +9321,87 @@ blob. Fix belongs to a separate free-identifier sweep (same class as commit
 **Touched files:** `server/lib/images.js` (facade), `server/lib/bboxDetection.js`
 (new), `docs/plans/bbox-detection-extraction.md` (executed plan + deviations),
 `CLAUDE.md` (key-files list). Move commit: 67b31e8f1.
+
+---
+
+## 2026-08-12 — The all-pages Art Director never received the outfit text (the 08-08 fix was gated on a value that cannot exist there)
+
+**Context:** staging `job_1786484554633_crojok432` (wizard story, 5 characters).
+The wardrobe contract was perfect — the clothing review rewrote all five outfits into
+robe + pointed hat with one distinct dominant colour each (Emma purple, Noah blue,
+Sarah green, Daniel red, Hans grey) — and the covers, which read `clothingRequirements`
+directly, render exactly that. But pages 4/5/6/7/9 shipped **every character in the same
+deep purple robe**. Page 9's image prompt says, verbatim, for Noah, Hans, Sarah and
+Daniel: `in his purple pointed wizard hat, deep purple robe over white collared shirt,
+and black buckled shoes`.
+
+**Root cause:** `buildSceneExpansionAllPrompt` resolved the outfit behind
+`(clothingReqs && primaryCategory)`, where
+`primaryCategory = options.primaryClothing || inputData.pageClothing?.primaryClothing`.
+`beatsPipeline` passes no `primaryClothing`, and `pageClothing` **cannot exist at that
+point** — `storyJobPipeline.js:2800-2820` derives it by counting the `characterClothing`
+values that come out of this very stage. So the gate was never satisfiable in the beats
+pipeline: every run passed `null` as the clothing override, the `CHARACTER DETAILS` block
+carried no `Wearing:` line, and the template still demands "name the TOP, the BOTTOM and
+the FOOTWEAR for every character on every page". The only concrete wizard garment left in
+context was the Visual Bible object `Wizard Hat` ("deep purple felt … faded gold band …
+crescent moons") — so the Art Director copied that onto the whole cast.
+
+This shipped in commit `15f58673c` (2026-08-08), the very commit titled *"pass the outfit
+text, not just the clothing category key"*. That commit did fix the iterate/regeneration
+path (`buildSceneDescriptionPrompt`); the all-pages path was dark from then until now.
+Verified across every beats story on staging (08-08 through 08-11): garment words in the
+`CHARACTER DETAILS` input block, **0 of 6 runs**. It stayed silent because the warning
+only fired on a missing `clothingRequirements`, which was always populated.
+
+**Why the Lab never caught it:** the lab's beats stage passed
+`primaryClothing: storyData.pageClothing?.primaryClothing` — a *finished* story has that
+value, so the lab resolved outfits down a branch production can never take.
+
+**Downstream damage — the evaluator was inverted.** The quality eval does receive the true
+contract as its own input (`clothingContractBlock`, `images.js:1367-1391`, built from
+`clothingRequirements` with `_currentClothing` stamped per page; verified for p4: *Noah
+[costumed:wizard]: blue short-sleeved linen robe …*). But it also receives ORIGINAL_PROMPT
+carrying the invented prose, and it anchored on the prose — the same failure mode as the
+08-08 entry, now reversed. P4 findings, verbatim: *"Noah's wizard robe and hat are blue
+instead of deep purple" → fix: "Change Noah's wizard robe and hat to deep purple"*, plus a
+demand for a white collared shirt that exists in no contract. The repair loop obeyed
+(`unified_pipeline_recolour_r1`, 3 calls); P4 ran −45 → −80 → −120 over three retries.
+Entity consistency, which scores against the contract, was the only honest signal —
+29 issues, every deviation named correctly.
+
+**Decision:**
+1. The category is resolved from the CONTRACT, never from `pageClothing`. New
+   `buildUsedClothingText(char, clothingRequirements)` (`clothingResolve.js`) returns every
+   `used: true` outfit as text — the description alone when one category is used, or
+   `label — description` joined when several, so the brief can still pick per page.
+   `buildSceneExpansionAllPrompt` uses `primaryClothing` when a caller has it and falls
+   back to the contract otherwise, so it can no longer resolve to nothing.
+2. The warning fires on a **partial** resolve, at error level, naming the count. One silent
+   character is one invented outfit.
+3. Same fallback in the per-page sibling `buildSceneExpansionPrompt` (it read outfits only
+   from `options.referencePhotos`, which the beats fallback path does not pass), and
+   `beatsPipeline.expandOnePage` now passes `clothingRequirements`.
+4. The lab's beats stage no longer passes `primaryClothing` and nulls `pageClothing`, so it
+   exercises the production resolution path.
+
+**Rationale:** for pages the prose IS the wardrobe statement — `buildCharacterReferenceList`
+deliberately omits the CLOTHING block for pages ("each character is already named with
+their physical description in the SCENE prose") and adds it only for covers. So an outfit
+the Art Director cannot see is an outfit that exists nowhere in the image prompt, and the
+evaluator then scores the render against whatever the writer invented.
+
+**Verified:** rebuilt the prompt for the broken story with production's exact inputs — all
+five characters now carry their own `Wearing:` line. Then ran the real all-pages call on
+that story's stored beats (pages 4/7/9, the multi-character ones): P4 → purple + blue,
+P7 → red + green, P9 → grey + purple + blue. Every character distinct, every garment
+matching the contract, on the exact page that shipped five identical purple robes.
+
+**Not fixed here:** `clothingCheck` still cannot see a colour deviation — `outfit_missing`
+needs total silence and `outfit_misattributed` needs ≥3 tokens distinctive to one owner
+plus a garment noun, so five characters sharing "robe"/"hat"/"shoes" with one wrong colour
+word produce no finding. It reported 1 contradiction on this run. A colour-mismatch check
+is the open follow-up.
+
+**Touched:** `server/lib/clothingResolve.js`, `server/lib/promptBuilders.js`,
+`server/lib/beatsPipeline.js`, `server/lib/testlab.js`.

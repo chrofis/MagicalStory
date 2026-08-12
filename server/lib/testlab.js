@@ -398,8 +398,12 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
 
   // backgroundRef: use a specific (test) empty-scene version as the background
   // anchor — style-matrix runs chain empty_scene(style) → image(style, that bg).
+  // noBackground: render WITHOUT the Pass-1 plate — A/B what the empty scene
+  // actually contributes to the final page (VB grid then carries locations).
   let emptyScene;
-  if (params.backgroundRef?.versionIndex !== undefined) {
+  if (params.noBackground) {
+    emptyScene = null;
+  } else if (params.backgroundRef?.versionIndex !== undefined) {
     const bg = await loadTestImage(ctx.storyId, params.backgroundRef.imageType || 'empty_scene', ctx.pageNumber, params.backgroundRef.versionIndex);
     emptyScene = bg?.imageData || null;
     if (!emptyScene) throw new Error(`backgroundRef v${params.backgroundRef.versionIndex} not found`);
@@ -2682,22 +2686,26 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
 
     // ALL-PAGES PATH — what production actually runs (owner, 2026-08-09).
     // beatsPipeline expands every page in ONE call via buildSceneExpansionAllPrompt
-    // and, since 2026-08-08, hands the Art Director each character's resolved
-    // OUTFIT TEXT. This harness was still calling the PER-PAGE builder with no
-    // clothing at all, so it measured a code path production no longer uses and
-    // would have reproduced the old outfit bug no matter what shipped. Opt out
-    // with params.perPageExpansion for the historical comparison.
+    // and hands the Art Director each character's resolved OUTFIT TEXT. This
+    // harness was still calling the PER-PAGE builder with no clothing at all, so
+    // it measured a code path production no longer uses and would have
+    // reproduced the old outfit bug no matter what shipped. Opt out with
+    // params.perPageExpansion for the historical comparison.
+    //
+    // `primaryClothing` is deliberately NOT passed: production cannot have it
+    // here (pageClothing is derived from THIS stage's output), and a finished
+    // story does, so passing it made the lab resolve outfits down a branch
+    // production never takes — masking exactly the bug that shipped.
     if (params.perPageExpansion !== true) {
       const { buildSceneExpansionAllPrompt, parseRefinedText: parseAll } = require('./storyHelpers');
       const allPrompt = buildSceneExpansionAllPrompt(
-        { ...storyData, characters: storyData.characters || [] },
+        { ...storyData, characters: storyData.characters || [], pageClothing: null },
         toExpand.map(b => ({ pageNumber: b.pageNumber, beat: b.beat, scene: b.scene })),
         {
           visualBible: storyData.visualBible || null,
           availableAvatars,
           maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
           clothingRequirements: storyData.clothingRequirements || null,
-          primaryClothing: storyData.pageClothing?.primaryClothing || null,
         }
       );
       if (allPrompt) {

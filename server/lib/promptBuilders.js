@@ -18,7 +18,7 @@ const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = requ
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, enforceSpreadTextPosition, parseSceneHintMetadata } = require('./sceneMetadata');
-const { resolveClothingForPage, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
+const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 
 /**
  * Wrap user-provided text in XML boundary markers to mitigate prompt injection.
@@ -1840,17 +1840,30 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
   // Story-level requirements are the source; the per-page category picks which
   // entry, defaulting to the story's primary when the beat doesn't say.
   const clothingReqs = options.clothingRequirements || inputData.clothingRequirements || null;
+  // The category is resolved from the CONTRACT, never from pageClothing: that
+  // blob is derived from the metadata THIS stage emits, so it is always absent
+  // here. The old `(clothingReqs && primaryCategory)` gate could therefore never
+  // be satisfied in the beats pipeline and every run fell through to no outfit
+  // at all — for four days, silently, because the warning below only checked
+  // clothingReqs. The Art Director then invented one outfit and painted the
+  // whole cast in it (job_1786484554633_crojok432: five characters, five
+  // contract colours, one purple robe on all of them).
   const primaryCategory = options.primaryClothing || inputData.pageClothing?.primaryClothing || null;
+  let resolvedOutfits = 0;
   const characterDescriptions = characters
     .map((char, idx) => {
-      const outfit = (clothingReqs && primaryCategory)
-        ? resolveClothingForPage(char, primaryCategory, clothingReqs)
-        : null;
+      const outfit = (primaryCategory ? resolveClothingForPage(char, primaryCategory, clothingReqs) : null)
+        || buildUsedClothingText(char, clothingReqs);
+      if (outfit) resolvedOutfits++;
       return buildCharacterDescriptionForExpansion(char, outfit || null, idx + 1);
     })
     .join('\n');
   if (!clothingReqs) {
     log.warn('[PROMPT] all-pages scene expansion has no clothingRequirements — the Art Director sees no outfit text and may write category keys into the prose');
+  } else if (resolvedOutfits < characters.length) {
+    // Loud on a PARTIAL resolve too: one silent character is one invented
+    // outfit, and the quality evaluator then judges the render against it.
+    log.error(`👕 [PROMPT] all-pages scene expansion resolved an outfit for only ${resolvedOutfits}/${characters.length} character(s) — the rest have no outfit text and the Art Director will invent one`);
   }
 
   const allBeats = beats
@@ -1904,7 +1917,11 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
   // the same logic the legacy buildImagePrompt uses for CHARACTER REFERENCE PHOTOS.
   const characterDescriptions = characters
     .map((char, idx) => {
-      const clothingDesc = clothingMap[char.name?.toLowerCase()] || null;
+      // Sibling of the all-pages builder: when no referencePhotos were passed
+      // (the beats per-page fallback passes none) the contract is the only
+      // outfit source. Without it the Art Director invents one.
+      const clothingDesc = clothingMap[char.name?.toLowerCase()]
+        || buildUsedClothingText(char, options.clothingRequirements || null);
       return buildCharacterDescriptionForExpansion(char, clothingDesc, idx + 1);
     })
     .join('\n');

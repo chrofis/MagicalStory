@@ -488,6 +488,9 @@ SCENE: ${x.scene || ''}`.trim(),
         maxCharactersPerScene,
         artStyleId: inputData.artStyle,
         imageBackend: imgModelConfig?.backend,
+        // No referencePhotos exist at this stage, so the contract is the only
+        // outfit source — same reason the all-pages builder needs it.
+        clothingRequirements,
       }
     );
     let lastErr = null;
