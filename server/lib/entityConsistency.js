@@ -2218,6 +2218,10 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
   // Fill template — fillTemplate is global + $-safe (entityName is
   // user-derived; a chained string .replace would interpret $-sequences
   // and only hit the first occurrence).
+  // The garment vocabulary is rendered from the SAME constant the repair
+  // validates against (garmentColourFix.GARMENT_ENUM), so the words the
+  // evaluator is taught and the words the detector can be asked cannot drift.
+  const { garmentEnumForPrompt } = require('./garmentColourFix');
   const prompt = fillTemplate(promptTemplate, {
     ENTITY_TYPE: entityType,
     ENTITY_NAME: entityName,
@@ -2225,6 +2229,7 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
     CLOTHING_CONTEXT: clothingContextInfo,
     CELL_INFO: JSON.stringify(cellInfo, null, 2),
     CELL_COUNT: cellCount.toString(),
+    GARMENT_ENUM: garmentEnumForPrompt(),
   });
 
   const model = genAI.getGenerativeModel({

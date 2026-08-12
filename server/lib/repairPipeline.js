@@ -1382,20 +1382,32 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // page worse loses pick-best on its own score. That is also what keeps it
   // checked; nothing recoloured ships unseen.
   const collectGarmentWork = (report) => {
-    const { garmentQueryFor } = require('./garmentColourFix');
+    const { garmentQueryFor, GARMENT_VALUES } = require('./garmentColourFix');
     const byPage = new Map();
     for (const [charName, charData] of Object.entries(report?.characters || {})) {
       for (const m of (charData.garmentColourMismatches || [])) {
         // Already handled in an earlier round — do not recolour twice.
         if (m.fixOutcome) continue;
+        // OFF-ENUM IS DROPPED, LOUDLY (owner, 2026-08-12). `garment` is a closed
+        // vocabulary the evaluator fills; anything else is a word the detector
+        // cannot ground, and asking anyway is how "hatband" repainted the whole
+        // hat a second time and "robe" repainted the map on
+        // job_1786484554633_crojok432 p3. Stamping fixOutcome retires it: the
+        // word will not become valid on a later round.
+        const q = garmentQueryFor(m.garment);
+        if (!q.key) {
+          const what = q.offEnum ? `"${q.raw}" is not in the garment enum` : 'no garment word at all';
+          log.error(`❌ [GARMENT-COLOUR] ${charName}: ${what} (allowed: ${GARMENT_VALUES.join(', ')}) — dropping this mismatch rather than searching for something the detector cannot ground.`);
+          m.fixOutcome = { garment: q.raw || null, skipped: `off-enum garment: ${what}`, at: new Date().toISOString() };
+          continue;
+        }
         for (const pageNumber of (m.pagesToFix || [])) {
           if (!byPage.has(pageNumber)) byPage.set(pageNumber, new Map());
           // Dedupe on the garment WORD: two entries naming the same garment on
           // the same page would otherwise segment and recolour it twice, the
           // second pass measuring bytes the first already changed.
-          const garmentKey = garmentQueryFor(m.garment).key || '(unnamed)';
-          const k = `${charName.toLowerCase()}|${garmentKey}`;
-          if (!byPage.get(pageNumber).has(k)) byPage.get(pageNumber).set(k, { charName, garmentKey, m });
+          const k = `${charName.toLowerCase()}|${q.key}`;
+          if (!byPage.get(pageNumber).has(k)) byPage.get(pageNumber).set(k, { charName, garmentKey: q.key, m });
         }
       }
     }

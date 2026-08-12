@@ -99,6 +99,12 @@ A garment of the right shape in the wrong colour is `type: "garment_colour"` —
 
 Report it whenever the garment's colour differs from the expected clothing description, including neighbouring hues such as orange against yellow, teal against sky-blue, or white against sage-green.
 
+`garment` must be one of these values exactly, and nothing else:
+
+{GARMENT_ENUM}
+
+Name the whole garment, never a part of one. A band, cuff, collar, trim, buckle or lining is reported as the garment it belongs to. A garment with no value on the list is not reported at all.
+
 Judge hue only. Scene lighting legitimately changes brightness and saturation, so a garment that is darker or duller in a dim scene is the same colour.
 
 A garment of the wrong kind, cut or category still belongs in `fixable_issues` as `clothing_inconsistent`. When one cell has both, report each in its own place.

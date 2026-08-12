@@ -84,43 +84,83 @@ const DEFAULTS = {
 };
 
 /**
- * The GroundingDINO query for a garment, plus the key that identifies it.
+ * SUPERSEDES "NO TRANSLATION TABLE" (2026-08-09 → 2026-08-12). That rule deleted
+ * a word→prompt table and passed the entity channel's word through verbatim,
+ * because the table mapped unrecognised words onto an unconditional `'top'` —
+ * and `top` selected the TORSO, so "breeches" aimed a legwear repair at the
+ * chest and "sash" collided with it on the dedupe key and vanished
+ * (job_1786287569165_7f75jspcz).
  *
- * NO TRANSLATION TABLE (owner, 2026-08-09). This used to map the entity
- * channel's word onto one of six canned prompts with an unconditional `'top'`
- * at the end of the chain — and `top` selected the avatar's TORSO, so an
- * unrecognised word did not merely pick a wrong prompt, it aimed the repair at
- * the wrong part of the body. Both failure modes hit one page of
- * job_1786287569165_7f75jspcz: "breeches" became `top` and legwear was matched
- * to the chest; "sash" became `top` as well, colliding with breeches on the
- * caller's dedupe key, so the sash vanished with NO outcome recorded at all.
+ * What that rule got right is kept: there is still no fallback, and no code
+ * guesses what an unknown word means. What it got wrong was the premise that an
+ * open vocabulary is safe because GroundingDINO accepts any phrase. It accepts
+ * any phrase and always answers — it cannot say "not visible" — so an
+ * ungroundable word yields a confident, wrong box rather than a refusal
+ * (evidence in GARMENT_ENUM below).
  *
- * The table is deleted rather than extended. GroundingDINO is open-vocabulary,
- * so "the breeches worn by the person" is already a valid query — mapping it to
- * "the trousers or shorts worn by the person" was not just unnecessary, it threw
- * away the specific word the entity check handed us and substituted a wrong one.
- * Breeches never failed because DINO cannot find breeches; they failed because
- * we replaced the word "breeches" with the word "shirt".
+ * The fix is therefore at the SOURCE, not in a translation layer: the evaluator
+ * now fills `garment` from a closed set, so there is no arbitrary word left to
+ * translate. Each value carries its own query and off-enum is dropped loudly by
+ * the caller — never folded onto a neighbour, which is the mistake that made the
+ * old table dangerous.
  *
- * (The deleted table also carried a latent defect: a stray 0x08 byte had been
- * written into the headwear pattern where `\b` was intended, so "hood" never
- * matched headwear either and fell through to `top` like the rest.)
- *
- * Passing the word through also makes the two sides symmetric by construction:
- * page and avatar are asked the SAME question, the property the SAM change
- * established for segmentation.
- *
- * `key` is the normalised word and is what the caller dedupes on, so two
- * distinct garments can never collapse into one entry and disappear.
- *
- * @returns {{key: string|null, prompt: string|null}} key is null when there is
- *   no garment word at all; the caller records that refusal.
+ * @returns {{key: string|null, prompt: string|null, offEnum: boolean, raw: string}}
+ *   key is null both when there is no garment word and when the word is off-enum;
+ *   `offEnum` distinguishes them so the caller can log the right refusal.
  */
+
+/**
+ * The CLOSED garment vocabulary (owner, 2026-08-12). The evaluator fills
+ * `garment` from these values only, and this object is rendered into
+ * entity-consistency-check.txt so the prompt and the detector cannot drift.
+ *
+ * WHY A CLOSED SET. The word is handed to an open-vocabulary detector, which
+ * cannot answer "that is not visible" — it always returns its best box. A word
+ * naming a SUB-PART therefore returns the parent, and a word naming something
+ * occluded returns whatever is biggest. Measured on staging
+ * job_1786484554633_crojok432 p3 (Lab 533-537), replayed against v0:
+ *   - "hatband" → box [177,2,615,270], the HAT box to within one pixel
+ *     ([176,3,614,270]) — the hat was repainted twice;
+ *   - "robe"    → box covering 62% of the crop, i.e. the map the child holds;
+ *   - "shoes"   → box covering 94% of the crop, i.e. the whole picture.
+ * In every case SAM's mask was a strict subset of the box it was given, so the
+ * detector is the failure, not the segmenter. A closed vocabulary of whole
+ * garments removes the class of queries that cannot be grounded.
+ *
+ * The value maps to the phrase the detector is asked, so the eval's label and
+ * the detector's query are chosen independently: `pants` reads well in a
+ * finding, "the trousers worn by the person" grounds better in an image.
+ *
+ * NO `belt`/`sash` (owner's call): a waist item is small and frequently
+ * occluded. A wrong-coloured sash is therefore left wrong rather than repainted
+ * from a guess — the same trade as the no-default clothing category.
+ */
+const GARMENT_ENUM = Object.freeze({
+  hat: { query: 'the hat worn by the person', covers: 'any headwear — hat, cap, hood, headscarf, and its band or trim' },
+  top: { query: 'the shirt worn by the person', covers: 'shirt, blouse, t-shirt, sweater, tunic, and its collar or cuffs' },
+  jacket: { query: 'the jacket worn by the person', covers: 'jacket, coat, cardigan, cloak, cape' },
+  dress: { query: 'the dress worn by the person', covers: 'dress, robe, gown — a single garment covering torso and legs' },
+  pants: { query: 'the trousers worn by the person', covers: 'trousers, jeans, shorts, leggings' },
+  skirt: { query: 'the skirt worn by the person', covers: 'skirt' },
+  shoes: { query: 'the shoes worn by the person', covers: 'shoes, boots, sandals, slippers' },
+});
+const GARMENT_VALUES = Object.freeze(Object.keys(GARMENT_ENUM));
+
+/** The enum as prompt text — the only place the evaluator learns the vocabulary. */
+function garmentEnumForPrompt() {
+  return GARMENT_VALUES.map(v => `- \`${v}\` — ${GARMENT_ENUM[v].covers}`).join('\n');
+}
+
 function garmentQueryFor(garment) {
   const key = String(garment == null ? '' : garment)
     .toLowerCase().replace(/[^a-z0-9 -]/g, ' ').replace(/\s+/g, ' ').trim();
-  if (!key) return { key: null, prompt: null };
-  return { key, prompt: `the ${key} worn by the person` };
+  if (!key) return { key: null, prompt: null, offEnum: false, raw: '' };
+  // NO SYNONYM TABLE. Folding an unknown word onto a "nearest" enum value would
+  // be code deciding what a description means, which is exactly what the eval
+  // rules forbid. Off-enum is reported and dropped; the prompt is where the
+  // vocabulary is taught.
+  if (!GARMENT_ENUM[key]) return { key: null, prompt: null, offEnum: true, raw: key };
+  return { key, prompt: GARMENT_ENUM[key].query, offEnum: false, raw: key };
 }
 
 const { photoAnalyzerUrl: _photoAnalyzerUrl } = require('./photoAnalyzerClient');
@@ -706,6 +746,9 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
 module.exports = {
   fixFigureGarmentColour,
   garmentQueryFor,
+  GARMENT_ENUM,
+  GARMENT_VALUES,
+  garmentEnumForPrompt,
   avatarGarmentLab,
   detectGarmentBox,
   detectGarmentBoxes,

@@ -251,36 +251,49 @@ function rect(buf, x0, y0, x1, y1, rgb) {
     !/sampleGarmentClusters\(/.test(avatarFn));
 
   // ── TEST 7 ───────────────────────────────────────────────────────────────
-  // The garment word goes to GroundingDINO verbatim. The old table mapped it
-  // onto one of six canned prompts with an unconditional `'top'` fallback, and
-  // `top` selected the avatar's TORSO — so an unrecognised word aimed the repair
-  // at the wrong part of the body. On job_1786287569165_7f75jspcz "breeches"
-  // became `top` (legwear matched to the chest) and "sash" became `top` too,
-  // colliding with breeches on the caller's dedupe key so the sash vanished with
-  // no outcome recorded at all.
-  console.log('\nTEST 7 — the garment word is passed through, not translated');
+  // The garment word is a CLOSED ENUM (owner, 2026-08-12), superseding the
+  // 2026-08-09 pass-it-through rule. That rule was right that no code may guess
+  // what an unknown word means — the old table folded unrecognised words onto
+  // `top`, which selected the TORSO, so "breeches" aimed a legwear repair at the
+  // chest and "sash" collided with it on the dedupe key and vanished
+  // (job_1786287569165_7f75jspcz). It was wrong that an open vocabulary is safe:
+  // GroundingDINO always answers and can never say "not visible", so an
+  // ungroundable word yields a confident WRONG box. Measured on
+  // job_1786484554633_crojok432 p3 (Lab 533-537, replayed against v0): "hatband"
+  // returned the hat's box to within 1px, "robe" a box over 62% of the crop (the
+  // map the child holds), "shoes" 94% (the whole picture).
+  //
+  // The fix is at the source: the evaluator fills `garment` from the enum, so
+  // there is no arbitrary word left to translate, and off-enum is DROPPED — never
+  // folded onto a neighbour, which is what made the old table dangerous.
+  // Full enum coverage lives in tests/manual/garmentEnum.test.js.
+  console.log('\nTEST 7 — the garment word is a closed enum, never translated');
   const { garmentQueryFor } = require('../../server/lib/garmentColourFix');
   const q = (g) => garmentQueryFor(g);
 
-  check('breeches stay breeches', q('breeches').prompt === 'the breeches worn by the person',
-    q('breeches').prompt);
-  check('sash stays sash', q('sash').prompt === 'the sash worn by the person', q('sash').prompt);
-  // "hood" fell through too: a stray 0x08 byte had been written into the
-  // headwear pattern where \b was intended, so the alternative required a
-  // literal backspace after "hood" and never matched.
-  check('hood stays hood', q('hood').prompt === 'the hood worn by the person', q('hood').prompt);
-  check('multi-word garments survive', q('tricorn hat').key === 'tricorn hat', q('tricorn hat').key);
-  check('the key is normalised for dedupe', q('  Waistcoat! ').key === 'waistcoat', q('  Waistcoat! ').key);
+  check('each enum value keeps its own query', q('pants').prompt === 'the trousers worn by the person', q('pants').prompt);
+  check('hat is not confused with its band', q('hat').key === 'hat' && q('hatband').key === null);
+  check('the key is normalised for dedupe', q('  Shoes! ').key === 'shoes', q('  Shoes! ').key);
+
+  // The original incident words are now refused outright rather than mistranslated.
+  check('breeches is refused, not folded onto top', q('breeches').key === null && q('breeches').prompt === null);
+  check('sash is refused, not folded onto top', q('sash').key === null && q('sash').prompt === null);
+  check('an off-enum word is flagged as such', q('breeches').offEnum === true);
 
   check('no garment word REFUSES rather than defaulting', q('').key === null && q(null).key === null);
   check('and offers no prompt to fall back on', q('').prompt === null);
+  check('absent is distinguishable from off-enum', q('').offEnum === false && q('sash').offEnum === true);
 
-  // Distinct garments must not collide on the caller's dedupe key.
+  // Distinct garments must still never collide on the caller's dedupe key.
   const dedupeKey = (name, page, garment) => `${name.toLowerCase()}|${page}|${garmentQueryFor(garment).key || '(unnamed)'}`;
-  check('breeches and sash no longer share a dedupe key',
-    dedupeKey('Hans', 8, 'breeches') !== dedupeKey('Hans', 8, 'sash'),
-    `${dedupeKey('Hans', 8, 'breeches')} vs ${dedupeKey('Hans', 8, 'sash')}`);
-  check('the same garment still dedupes', dedupeKey('Hans', 8, 'Sash') === dedupeKey('Hans', 8, 'sash'));
+  check('two enum garments never share a dedupe key',
+    dedupeKey('Hans', 8, 'pants') !== dedupeKey('Hans', 8, 'shoes'),
+    `${dedupeKey('Hans', 8, 'pants')} vs ${dedupeKey('Hans', 8, 'shoes')}`);
+  check('the same garment still dedupes', dedupeKey('Hans', 8, 'Shoes') === dedupeKey('Hans', 8, 'shoes'));
+  // Off-enum words WOULD collide on '(unnamed)' — which is exactly why
+  // collectGarmentWork drops them before they ever reach the dedupe key.
+  check('off-enum never reaches the dedupe key',
+    /off-enum garment/.test(require('fs').readFileSync(require.resolve('../../server/lib/repairPipeline.js'), 'utf8')));
 
   const gfix = require('fs')
     .readFileSync(require.resolve('../../server/lib/garmentColourFix.js'), 'utf8')
@@ -294,7 +307,7 @@ function rect(buf, x0, y0, x1, y1, rgb) {
   check('the pipeline dedupes on character + garment word per page',
     // collectGarmentWork keys a per-page Map by character+garment, so two
     // different garments on one page can never collapse into one entry.
-    /const k = `\$\{charName\.toLowerCase\(\)\}\|\$\{garmentKey\}`/.test(pipe));
+    /const k = `\$\{charName\.toLowerCase\(\)\}\|\$\{q\.key\}`/.test(pipe));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
