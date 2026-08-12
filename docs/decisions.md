@@ -9440,3 +9440,97 @@ its own example is no backstop. Anchors keep their family figures on purpose —
 faces across ages are what the anchor must demonstrate.
 
 **Touched:** `server/lib/character2x4Sheet.js`, `prompts/sheet-2x4-style-eval.txt`.
+
+## 2026-08-12 — Reframe fixes route to iterate, not inpaint (new `scene_fix.requires_regeneration` flag)
+
+**Context:** On `job_1786484554633_crojok432` p3, an auto-repair inpaint drifted the page to
+photorealism. The eval wanted an overhead close-up ("not eye-level medium shot"); the fix
+*"Change to overhead close-up view looking straight down at the parchment"* was routed to inpaint,
+which passes no style anchor (images.js: *"No artStyle here"*) and cannot move the camera without
+regenerating the frame — so with no surrounding pixels to match and no style descriptor, Grok
+free-ran to a photograph. The candidate scored −10 and lost pick-best, so the book never showed it,
+but the pipeline burned a repair round producing an unusable image. The consolidator's OWN round-0
+`fix_critique` already diagnosed it: *"This is a full regeneration request — not an inpaint
+instruction … Grok cannot change camera angle or framing via inpaint."* — but there was no
+structured field to carry that verdict to the router, and Rule 7 only covers face/head swaps, so by
+round 1 it caved and wrote the reframe as an inpaint instruction.
+
+**Decision:** The consolidator (rule 7b in `feedback-consolidator.txt`) sets
+`scene_fix.requires_regeneration: true` for any camera-angle / viewpoint / shot-distance / reframing
+change. `decideRepairMethod` gains a gate (step 1d, after the CATASTROPHIC gate, before entity) that
+routes that flag to **iterate**, overriding the salvage floor (no local repair can fix framing).
+`inpaintPage` passes `artStyle` to Grok **only** when a reframe reaches it anyway (the round-loop
+flip after an iterate regression), so it at least keeps the medium; cosmetic edits still pass no
+style (that regressed quality, unchanged).
+
+**Rationale:** ADDITIVE to `SETTLED.md` "Grok inpaint handles structural changes (pose, gaze,
+body-rotation)" — those are the FIGURE's orientation inside a fixed frame; a camera reframe is a
+different case that verdict never covered, so this is a gap-fill, not a reversal. Classification
+lives in the PROMPT (rule 7b); code only routes on the strict boolean — no prose-sniffing, per
+`SETTLED.md` line 28. Owner signed off (AskUserQuestion, "build it now as additive"). Validated: the
+new template, replayed on p3's stored round-0 input, emits `requires_regeneration: true` on both
+runs (eval model qwen-plus, temp 0); unit tests in `tests/unit/repair-method.test.js` cover the gate
+(true → iterate even above the salvage floor; false and a truthy-string → inpaint).
+
+**Touched:** `prompts/feedback-consolidator.txt`, `server/lib/feedbackConsolidator.js`,
+`server/lib/repairLogic.js`, `server/lib/images.js`, `tests/unit/repair-method.test.js`.
+**Status:** ✅ active.
+
+---
+
+## 2026-08-12 — Eval cluster extracted to server/lib/evalPipeline.js (phase 4 of the god-file program)
+
+**Context:** After the bbox extraction, `server/lib/images.js` was 6,309 lines
+and still contained the fully contiguous evaluation slab (lines 571–2434):
+`runVisualInventory` (P1 prompt-blind inventory), `validateEmptyScene`
+(text-zone QC), `capComplianceIdentitySeverity`, `evaluateThreeStage`,
+`sanitizeForGemini`, `isBlockedResponse` (private), and the 1,133-line
+`evaluateImageQuality` core. Zero bbox dependencies, zero local prompt-template
+loads, quiet since the last `fix(eval)` commits — a clean move window.
+
+**Decision:**
+- The slab moved **verbatim** (byte-identical vs the pre-move committed blob,
+  including a deliberately-preserved orphaned JSDoc block that sits above
+  `sanitizeForGemini`) into NEW `server/lib/evalPipeline.js`, together with
+  `EVAL_TEMPERATURE` / `EVAL_THINKING_BUDGET` (with the variance-test rationale
+  comment) and `IMAGE_QUALITY_THRESHOLD`. images.js is a re-export facade for
+  all 7 public names; V2 asserts facade === module for each.
+- **D5 — `compressedRefCache` is a SINGLE-INSTANCE shared LRU and stays in
+  images.js.** Eval and generation both read/write it (compression cost +
+  hit-rate halve if duplicated). It is now exported; evalPipeline reaches the
+  live instance lazily via `require('./images').compressedRefCache` at call
+  time. Hoisting it (plus `hashImageData`/`compressImageToJPEG`) to a
+  `refCache.js` module is the eventual clean home when the generation cluster
+  is split — deliberately out of scope here.
+- **D7 — cycle law:** evalPipeline may top-level require leaves only
+  (`textModels`, `../config/models`, `../services/prompts`, `r2`, loggers,
+  sharp/path/crypto). `./sceneValidator` and `./entityConsistency` MUST stay
+  lazy at their call sites — both reach `entityConsistency`, which
+  top-level-requires `./images`, which top-level-requires evalPipeline.
+  `./scoring`, `./figureDetection`, `./bboxDetection` are not required at all
+  (zero uses — the settled scoring invariant holds: eval produces findings,
+  severity policy lives in scoring.js).
+- **D8 — deliberate stays:** `evaluateImageBatch` and `collectAllIssuesForPage`
+  remain in images.js — they are the eval↔bbox seam (call
+  `enrichWithBoundingBoxes`, `parseVisualBibleObjects`, overlay), not
+  eval-pure. `shrinkPromptForModel` + helpers are generation-side (Grok
+  prompt budget inside `_dispatchImageGeneration`) — untouched.
+- The only non-verbatim edits are 14 documented lazy back-edges
+  (6× `callGrokVisionAPI`, 4× `GEMINI_SAFETY_SETTINGS`, 4× refCache trio) and
+  a locally-duplicated stateless `getStoryHelpers` accessor.
+- **Source-scraping tests re-pointed:** `test-compliance-severity-cap.js` reads
+  evalPipeline.js; `evalFigureIdentityPersist.test.js` reads BOTH files
+  (evaluateImageQuality needles from evalPipeline.js, batch-whitelist needles
+  still from images.js).
+
+**Rationale:** zero behavior change, zero importer churn (server.js,
+regeneration.js, entityConsistency.js top-level destructures keep resolving via
+the facade); images.js drops to 4,449 lines and is now genuinely the
+image-generation module.
+
+**Touched files:** `server/lib/images.js` (facade), `server/lib/evalPipeline.js`
+(new), `tests/manual/test-compliance-severity-cap.js`,
+`tests/manual/evalFigureIdentityPersist.test.js`,
+`server/lib/figureIdentityCheck.js` (stale line-range comment),
+`docs/plans/evalpipeline-extraction.md` (executed plan), `CLAUDE.md`
+(key-files list). Move commit: 26d25c636.

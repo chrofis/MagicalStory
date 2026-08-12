@@ -278,6 +278,7 @@ before touching that code:
 - `server/config/credits.js` - Credit costs, packages, referral config
 - `server/lib/images.js` - Image generation, quality eval, cutout repair, VB grid
 - `server/lib/bboxDetection.js` - Bbox detection cluster (VB-object grounding, bbox cache, fingerprint pairing, overlay, enrichment) — moved verbatim from images.js, which re-exports every name (facade)
+- `server/lib/evalPipeline.js` - Image evaluation cluster (visual inventory P1, empty-scene QC, three-stage compliance, evaluateImageQuality core, sanitizeForGemini) — moved verbatim from images.js, which re-exports every name (facade)
 - `server/lib/textRegion.js` - Text region detection + white wash compositing
 - `server/lib/entityConsistency.js` - Entity consistency, cascade face merge, object canonicalization
 - `server/lib/referral.js` - Referral code generation

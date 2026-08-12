@@ -26,7 +26,8 @@
  * WHICH `matches[]` THIS JOINS ON
  * -------------------------------
  * The version's `matches` come from `evaluateImageQuality`'s return, which
- * merges two producers (images.js ~2138-2160): when `runVisualInventory` (P1)
+ * merges two producers (evalPipeline.js, figures/matches merge in
+ * evaluateImageQuality): when `runVisualInventory` (P1)
  * produced a non-empty `figures` / `matches`, P1's win; otherwise the quality
  * evaluator's own parse of its response is kept. The two number figures
  * DIFFERENTLY (P1 saw 5 figures on p14, the quality parse 3), and in the edge
