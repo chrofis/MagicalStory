@@ -230,6 +230,14 @@ const MODEL_DEFAULTS = {
   qualityEval: 'gemini-2.5-flash',          // Image quality evaluation. Lite missed small distant targets (e.g. paper-on-bench) and produced confused "X pointing at Y" reads — the resulting bad fix-targets triggered repair loops that cost more than the eval-tier upgrade.
   bboxDetection: 'gemini-2.5-flash',        // Bounding box detection — kept on the same tier as qualityEval so missing-object detection lines up with the eval that uses it.
 
+  // Image-prompt compression — the head rewrite in shrinkPromptForModel when a
+  // page prompt exceeds the backend's char budget. NOT a utility call: what it
+  // deletes never reaches the image model. Flash was measured returning 2,130
+  // chars against a 5,452 allowance on p9 of job_1786484554633 (39% of what it
+  // was given, a 71% cut of the prose when 26% would have fit) — four of five
+  // characters lost their hats. Owner decision 2026-08-12: DeepSeek V4 Pro.
+  promptCompress: process.env.PROMPT_COMPRESS_MODEL || 'deepseek-v4-pro',
+
   // Utility models (inspection, visual bible, etc.)
   utility: 'gemini-2.5-flash',         // Fast utility tasks. 2.0-flash RETIRED by Google
                                        // (404 "no longer available", found 2026-07-18 when the
@@ -837,6 +845,7 @@ function resolveComplianceModel() { return guardModel(MODEL_DEFAULTS.complianceM
 function resolveSceneIterationModel() { return guardModel(MODEL_DEFAULTS.sceneIteration, 'SCENE ITERATE MODEL'); }
 function resolveSceneValidationModel() { return guardModel(MODEL_DEFAULTS.sceneValidationRepair, 'SCENE VALIDATION MODEL'); }
 function resolveSceneRewriteModel() { return guardModel(MODEL_DEFAULTS.sceneRewrite, 'SCENE REWRITE MODEL'); }
+function resolvePromptCompressModel() { return guardModel(MODEL_DEFAULTS.promptCompress, 'PROMPT COMPRESS MODEL'); }
 
 module.exports = {
   EVAL_TEMPERATURE,
@@ -847,6 +856,7 @@ module.exports = {
   resolveSceneIterationModel,
   resolveSceneValidationModel,
   resolveSceneRewriteModel,
+  resolvePromptCompressModel,
   IMAGE_MODELS,
   IMAGE_BACKENDS,
   IMAGE_ASPECTS,

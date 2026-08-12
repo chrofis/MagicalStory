@@ -9534,3 +9534,61 @@ image-generation module.
 `server/lib/figureIdentityCheck.js` (stale line-range comment),
 `docs/plans/evalpipeline-extraction.md` (executed plan), `CLAUDE.md`
 (key-files list). Move commit: 26d25c636.
+
+---
+
+## 2026-08-12 — Image-prompt boilerplate trimmed 24%; prompt compression moved off Gemini Flash
+
+**Context:** the wardrobe fix (previous entry) made scene briefs complete, and page 9 of
+`job_1786484554633_crojok432` immediately hit the Grok prompt budget: 9,416 chars against
+7,500. `shrinkPromptForModel` handed the head to Gemini Flash, which returned 2,130 chars
+against a 5,452 allowance (39%) — deleting four of five characters' pointed hats. The
+render matched the mutilated prompt exactly: only Emma wore a hat.
+
+**Measured, three configurations (Lab #522/#530/#532):**
+
+| model | returned | vs allowance | outcome |
+|---|---|---|---|
+| gemini-2.5-flash | 2,130 | 39% | accepted — deleted four hats |
+| deepseek-v4-pro, reasoning ON | **0** | — | spent all 12,001 output tokens thinking, empty answer |
+| deepseek-v4-pro, reasoning OFF | 6,839 | 125% | rejected — over budget |
+| ↑ same, retry restating the cap | 7,577 | 139% | rejected — it wrote MORE |
+
+Neither model hits a length target: Flash undershoots by deleting facts, DeepSeek refuses
+to delete facts and overshoots. The ask was impossible as posed — compress 7,410 chars of
+scene prose to 5,452 while "keeping every fact". A five-character page has more facts than
+the budget holds.
+
+**Decision (owner, 2026-08-12): attack the boilerplate, not the model.** Of the 9,416
+chars, ~3,650 were per-page-identical text. Three blocks in `image-generation.txt`
+condensed by **24% (2,185 → 1,671, −514/page)**, keeping every rule and dropping only
+restatement, examples and intensifiers: `never duplicated` after `exactly one of each`;
+`or lines of text` after `captions`; `shutters`/`boards` from a surface list that already
+says walls/garments/paper/signs; the trailing illustration `never one facing the camera
+while the others walk away` after the rule that states it; `explicitly`/`entirely`.
+
+**AGE & PROPORTIONS (926 chars) deliberately NOT trimmed.** Its comparative phrasing
+("clearly taller than X, not yet Y") is the settled 2026-08-05 age-marker ladder — every
+bucket names both neighbours so one legal step of drift cannot become a two-bucket error.
+It reads as padding and is load-bearing.
+
+**Also:** `prompt_compress` moved to `MODEL_DEFAULTS.promptCompress` (deepseek-v4-pro, env
+`PROMPT_COMPRESS_MODEL`, guarded to sonnet without an OpenRouter key). `reasoning:
+{enabled:false}` is REQUIRED on that call, not an optimisation — with reasoning on the
+model returns an empty string and compression silently degrades to blunt truncation. One
+corrective retry was added, and the log now prints the head/allowance ratio, which is the
+number that reveals a model quietly deleting scene facts.
+
+**Verified on a corpus, not the motivating page** — 38 pages across three stored stories,
+prompts rebuilt with the current template: **24/38 over budget before, 17/38 after**. Seven
+pages no longer need compression at all. Five-character pages (8,000–9,500 chars) still
+exceed it; the remaining lever is the scene prose itself, not the boilerplate.
+
+Parser check: the compressor's `^Generate a SINGLE illustration…` head regex and the
+`**REQUIRED OBJECTS` / `**ART STYLE` section markers all still match. Sibling files
+carrying their own variants of the no-borders rule (`empty-scene.txt`,
+`image-system-instruction.txt`, `iterative-placement-pass1.txt`) are separate consumers and
+were left alone.
+
+**Touched:** `prompts/image-generation.txt`, `server/config/models.js`,
+`server/lib/images.js`.

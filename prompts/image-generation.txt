@@ -1,16 +1,16 @@
 {SCENE_INTENT}
 
-Generate a SINGLE illustration filling the entire canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. Every surface — walls, shutters, vehicles, garments, paper, screens, boards, shopfronts — carries no letters, numbers, or symbols unless the scene description names the text to show. Maps, letters, books, and paper props show only pictorial marks (routes, arrows, a compass rose, small drawings) — never handwriting, captions, or lines of text. Bracketed character names like `[CharacterA]` and object names are identifiers only — never paint them onto clothing, signs, or any surface. Draw exactly one of each named object, never duplicated.
+Generate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No surface carries letters, numbers, or symbols — walls, garments, paper, signs, screens — unless the scene description names the text to show. Paper props — maps, letters, books — show only pictorial marks (routes, arrows, a compass rose), never handwriting or captions. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.
 
-When the FIRST reference photo shows a real location (architecture, landscape, no characters in it), render the scene IN that location — copy its setting, architecture, geography, and light direction. Take its layout, not its rendering: if that reference looks photographic, do not follow it into photorealism — the ART STYLE below governs how everything is drawn. All OTHER reference photos define each character's IDENTITY only — face, hair, skin tone, build, and clothing — never their pose, framing, or composition. Characters' positions, actions, body direction, and size come entirely from the scene description and the COMPOSITION rules below.
+When the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting, geography and light direction, not its rendering: if it looks photographic, the ART STYLE below still governs. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.
 
 {CHARACTER_REFERENCE_LIST}
 
 {SCENE_DESCRIPTION}
 
 **Composition:**
-- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that action target — not the camera, UNLESS the scene description explicitly declares a facing for that character (facing the camera, back view, facing left/right) — the scene's declared facing always wins over this default. When the target is in the background and no facing is declared, the character faces away from camera with back or side visible. Companions sharing the same movement or destination all face the same way — never one facing the camera while the others walk away.
-- Depth: `foreground` characters are large and dominate the lower half. `midground` characters occupy the middle band, smaller and further back. `background` characters are small and distant. Foreground > midground > background in size.
+- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.
+- Depth: `foreground` is large and dominates the lower half; `midground` sits in the middle band, smaller and further back; `background` is small and distant. Foreground > midground > background in size.
 
 {REQUIRED_OBJECTS}
 

@@ -722,21 +722,43 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
     if (headBudget >= 1500) {
       try {
         const { callTextModel } = require('./textModels');
-        const words = Math.floor((headBudget * 0.9) / 6.5);
-        const instruction = `Rewrite the scene description below to at most ${words} words, keeping every fact — `
+        const { resolvePromptCompressModel } = require('../config/models');
+        const compressModel = resolvePromptCompressModel();
+        // Budget the model in CHARACTERS, which is the unit that actually binds
+        // (the backend limit is a char limit), and state the cut it has to make.
+        // A word target was measured missing in both directions: flash returned
+        // 39% of its allowance (deleting four characters' hats), deepseek 126%.
+        const buildInstruction = (cap, over) => (over
+          ? `Your previous version was ${over} characters — ${cap} is a hard limit, not a goal. Rewrite it shorter. `
+          : '')
+          + `Rewrite the scene description below to at most ${cap} characters, keeping every fact — `
           + `every character with their outfit, position and expression; every object; the composition. `
           + `State every character's age band and body proportions explicitly (e.g. kindergarten-age about 5 heads tall, adult about 7.5-8 heads tall). `
-          + `Remove only repetition and filler. Same format, same section headers. Output ONLY the rewritten description.\n\n${head}`;
-        // 12k budget: flash 2.5 spends ~4k tokens THINKING before it writes —
-        // at 4k total the answer came back as a 158-token stub cut mid-sentence.
-        const res = await callTextModel(instruction, 12000, 'gemini-2.5-flash', { usageLabel: 'prompt_compress', temperature: 0 });
-        const newHead = (res?.text || '').trim();
+          + `Remove only repetition and filler — never a garment, a character or an object. `
+          + `Same format, same section headers. Output ONLY the rewritten description.\n\n${head}`;
+        // reasoning:{enabled:false} is REQUIRED, not an optimisation. With it on,
+        // deepseek-v4-pro spent all 12,001 output tokens thinking and returned an
+        // EMPTY string, so compression silently fell back to blunt truncation
+        // (job_1786484554633 p9, Lab #530). Off: 6,847 chars in 9.7s for $0.008.
+        // The 12k budget stays for models that ignore the flag.
+        const callOpts = { usageLabel: 'prompt_compress', temperature: 0, reasoning: { enabled: false } };
+        let newHead = '';
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          const over = attempt === 1 ? 0 : newHead.length;
+          const res = await callTextModel(buildInstruction(headBudget, over), 12000, compressModel, callOpts);
+          newHead = (res?.text || '').trim();
+          if (newHead.length > 500 && newHead.length <= headBudget) break;
+          log.warn(`✂️ [${logLabel}] Compression attempt ${attempt} by ${compressModel}: ${newHead.length} chars vs ${headBudget} allowed`);
+        }
         if (newHead.length > 500 && newHead.length <= headBudget) {
           const assembled = newHead + (rulesBlock ? '\n\n' + rulesBlock : '') + (frameBlock ? '\n\n' + frameBlock : '') + '\n\n' + tail;
-          log.info(`✂️ [${logLabel}] Prompt ${prompt.length}→${assembled.length} chars via head compression (budget ${maxPromptLength}, tail ${tail.length} + rules + frame map kept verbatim)`);
+          // The head/allowance ratio is the number that matters: a model that
+          // writes far under its allowance silently deletes scene facts, and
+          // nothing downstream can tell that from a legitimately terse rewrite.
+          log.info(`✂️ [${logLabel}] Prompt ${prompt.length}→${assembled.length} chars via head compression by ${compressModel} (head ${head.length}→${newHead.length} of ${headBudget} allowed = ${Math.round((newHead.length / headBudget) * 100)}%, budget ${maxPromptLength}, tail ${tail.length} + rules + frame map kept verbatim)`);
           return assembled;
         }
-        log.warn(`✂️ [${logLabel}] Head compression unusable (${newHead.length} chars vs budget ${headBudget}) — falling back to section-aware cut`);
+        log.warn(`✂️ [${logLabel}] Head compression unusable after 2 attempts (${newHead.length} chars vs budget ${headBudget}) — falling back to section-aware cut`);
       } catch (err) {
         log.warn(`✂️ [${logLabel}] Head compression failed (${err.message}) — falling back to section-aware cut`);
       }
