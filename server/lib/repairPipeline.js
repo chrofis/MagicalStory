@@ -1517,14 +1517,23 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
       attempted++;
       const before = current;
-      const res = await fixFigureGarmentColour(before, fig, avatarUri, { garment: m.garment });
+      // observedColour is what the evaluator says the garment IS right now. It
+      // steers SAM's point prompts and gates the mask: a mask that is not that
+      // colour is not that garment, so nothing is repainted.
+      const res = await fixFigureGarmentColour(before, fig, avatarUri, {
+        garment: m.garment, observedColour: m.observedColour || null,
+      });
       Object.assign(audit, {
         applied: !!res.changed,
         reason: res.report?.reason || null,
         dinoScore: res.report?.dinoScore ?? null,
+        dinoBox: res.report?.dinoBox ?? null,
         current: res.report?.current ?? null,
         target: res.report?.target ?? null,
         delta: res.report?.delta ?? null,
+        observedColour: res.report?.observedColour ?? null,
+        observedMatch: res.report?.observedMatch ?? null,
+        colourPoints: res.report?.colourPoints ?? null,
       });
       if (!res.changed) {
         log.info(`🎨 [GARMENT-COLOUR] ${charName} p${pageNumber} ${garmentKey}: no-op (${res.report?.reason || 'unknown'})`);

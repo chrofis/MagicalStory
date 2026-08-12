@@ -65,6 +65,22 @@ const DEFAULTS = {
   // to zero at `applyDeltaEHard`, so folds survive and skin fades out.
   applyDeltaESoft: 26,
   applyDeltaEHard: 40,
+  // VERIFICATION GATE + COLOUR POINTS, both keyed on the evaluator's
+  // `observedColour` (see maskMatchesObservedColour / deriveColourPoints).
+  // Hue tolerance is generous: it must pass a purple hat measured at -28.6°
+  // against a purple reference at -49° (21° apart, art-style shading) while
+  // rejecting the cream map at +82° (131° apart).
+  observedMaxHueDeg: 50,
+  observedMinChroma: 12,      // a chromatic garment cannot read as neutral
+  achromaticChroma: 10,       // reference below this has no usable hue
+  observedMaxChromaForNeutral: 22,
+  observedMaxDeltaL: 32,
+  observedLightnessMargin: 10,
+  pointGrid: 9,               // 81 samples inside the box
+  pointFgDeltaE: 28,
+  pointBgDeltaE: 45,
+  maxFgPoints: 8,
+  maxBgPoints: 8,
   // Below this the garment is already right; skip rather than churn bytes.
   minDeltaE: 6,
   minMaskPx: 200,
@@ -161,6 +177,187 @@ function garmentQueryFor(garment) {
   // vocabulary is taught.
   if (!GARMENT_ENUM[key]) return { key: null, prompt: null, offEnum: true, raw: key };
   return { key, prompt: GARMENT_ENUM[key].query, offEnum: false, raw: key };
+}
+
+/**
+ * Colour NAMES → reference sRGB. The entity check already emits `observedColour`
+ * ("purple") and `expectedColour` ("blue") alongside every garment_colour
+ * finding, so the colour the garment currently IS is known before any pixel is
+ * touched. That is the missing input: the repair knew where it was going and
+ * never checked where it was starting from.
+ *
+ * This is a lookup of colour words to colour values — objective, unlike reading
+ * meaning out of a description, which the eval rules forbid. It never decides
+ * what a finding means; it only turns a colour word into a colour.
+ */
+const COLOUR_REFS = Object.freeze({
+  black: [26, 26, 26], white: [245, 245, 245], grey: [128, 128, 128], gray: [128, 128, 128],
+  silver: [176, 176, 176], cream: [238, 226, 198], beige: [222, 205, 172], ivory: [240, 234, 214],
+  red: [190, 40, 40], maroon: [110, 30, 40], crimson: [180, 30, 60], pink: [225, 130, 165],
+  orange: [225, 125, 40], gold: [200, 160, 60], yellow: [225, 200, 60], olive: [120, 115, 50],
+  green: [60, 130, 70], teal: [50, 130, 130], turquoise: [70, 175, 175], mint: [150, 205, 175],
+  blue: [55, 90, 165], navy: [35, 50, 95], cyan: [90, 180, 200], indigo: [70, 60, 140],
+  purple: [110, 70, 150], violet: [130, 85, 165], lavender: [180, 160, 205], magenta: [180, 60, 150],
+  brown: [110, 75, 50], tan: [190, 160, 120], khaki: [175, 165, 120], rust: [160, 80, 45],
+});
+
+// Modifiers carry no hue of their own; they qualify the colour word after them.
+const COLOUR_MODIFIERS = new Set(['dark', 'light', 'deep', 'pale', 'bright', 'medium',
+  'muted', 'dull', 'soft', 'rich', 'faded', 'washed', 'off', 'very']);
+
+/**
+ * Resolve a colour word to a reference L*a*b*, tolerantly.
+ *
+ * The evaluator writes compounds — "dark brown/black", "yellow/gold" — so split
+ * on separators and take the first term that names a colour we know. REFUSES
+ * (null) when nothing resolves: a repair that cannot tell what colour it is
+ * starting from must not proceed, exactly as it refuses without a target.
+ *
+ * @returns {{name:string, lab:number[], chroma:number, hueDeg:number}|null}
+ */
+function resolveColourName(word) {
+  const terms = String(word == null ? '' : word)
+    .toLowerCase().replace(/[^a-z/ -]/g, ' ').split(/[/,\s-]+/).filter(Boolean);
+  for (const term of terms) {
+    if (COLOUR_MODIFIERS.has(term)) continue;
+    const rgb = COLOUR_REFS[term];
+    if (!rgb) continue;
+    const lab = _rgbToLab(rgb[0], rgb[1], rgb[2]);
+    return {
+      name: term, lab,
+      chroma: Math.hypot(lab[1], lab[2]),
+      hueDeg: Math.atan2(lab[2], lab[1]) * DEG,
+    };
+  }
+  return null;
+}
+
+/**
+ * Does a measured mask colour actually look like the colour the evaluator said
+ * the garment is? THE VERIFICATION GATE (owner, 2026-08-12).
+ *
+ * The per-pixel gate inside the apply loop cannot answer this: it scores every
+ * pixel against the MASK'S OWN MEAN, so once the wrong object dominates the mask
+ * that object defines the mean and the gate defends it. On
+ * job_1786484554633_crojok432 p3 the `shoes` mask was 68% of the crop and the
+ * child's actual black shoes were gated OUT while the cream map was repainted.
+ *
+ * This gate asks a question the mask cannot answer about itself: the evaluator
+ * said the robe is PURPLE, the mask measures L 77 / chroma 16 / hue +82° — pale
+ * cream. That is not purple, so the mask is not the robe, and nothing is
+ * repainted. It catches a bad mask whatever produced it — a wrong DINO box, or
+ * SAM choosing the wrong object inside a fair one.
+ *
+ * Achromatic references (black, white, grey) carry no meaningful hue, so they
+ * are judged on lightness and on the mask being unsaturated; chromatic ones are
+ * judged on hue, which is what survives scene lighting.
+ *
+ * @returns {{ok:boolean, reason:string|null, hueDelta:number|null}}
+ */
+function maskMatchesObservedColour(cur, ref, cfg) {
+  if (!ref) return { ok: true, reason: null, hueDelta: null };   // nothing to check against
+  const chroma = Math.hypot(cur.a, cur.b);
+  if (ref.chroma < cfg.achromaticChroma) {
+    if (chroma > cfg.observedMaxChromaForNeutral) {
+      return {
+        ok: false, hueDelta: null,
+        reason: `mask is saturated (chroma ${chroma.toFixed(1)}) but the garment was reported as ${ref.name}`,
+      };
+    }
+    const dL = Math.abs(cur.L - ref.lab[0]);
+    if (dL > cfg.observedMaxDeltaL) {
+      return {
+        ok: false, hueDelta: null,
+        reason: `mask lightness L ${cur.L.toFixed(1)} is ${dL.toFixed(0)} from ${ref.name} (L ${ref.lab[0].toFixed(0)})`,
+      };
+    }
+    return { ok: true, reason: null, hueDelta: null };
+  }
+  // Chromatic reference: a near-neutral mask is not that colour at all.
+  if (chroma < cfg.observedMinChroma) {
+    return {
+      ok: false, hueDelta: null,
+      reason: `mask is near-neutral (chroma ${chroma.toFixed(1)}) but the garment was reported as ${ref.name}`,
+    };
+  }
+  const hue = Math.atan2(cur.b, cur.a) * DEG;
+  let d = Math.abs(hue - ref.hueDeg) % 360;
+  if (d > 180) d = 360 - d;
+  if (d > cfg.observedMaxHueDeg) {
+    return {
+      ok: false, hueDelta: +d.toFixed(1),
+      reason: `mask hue ${hue.toFixed(1)}° is ${d.toFixed(0)}° from ${ref.name} (${ref.hueDeg.toFixed(0)}°) — this is not the garment`,
+    };
+  }
+  // HUE IS NOT ENOUGH on its own. Cream and brown share a hue — they differ in
+  // LIGHTNESS — so the p3 `shoes` mask (the cream map, L 66.6, hue +68°) sits
+  // 9° from brown and would pass a hue-only test. Lightness cannot be a fixed
+  // threshold either, because scene lighting legitimately moves it; but it
+  // cannot move it arbitrarily far, and this module already bounds that with
+  // the lighting factor it trusts elsewhere (lightingMin/lightingMax). Anything
+  // outside even the most generous lighting is a different colour, not a lit
+  // version of this one.
+  const loL = ref.lab[0] * cfg.lightingMin - cfg.observedLightnessMargin;
+  const hiL = ref.lab[0] * cfg.lightingMax + cfg.observedLightnessMargin;
+  if (cur.L < loL || cur.L > hiL) {
+    return {
+      ok: false, hueDelta: +d.toFixed(1),
+      reason: `mask lightness L ${cur.L.toFixed(1)} is outside anything lighting could make ${ref.name} `
+        + `(L ${ref.lab[0].toFixed(0)} → ${loL.toFixed(0)}–${hiL.toFixed(0)})`,
+    };
+  }
+  return { ok: true, reason: null, hueDelta: +d.toFixed(1) };
+}
+
+/**
+ * Foreground/background POINT PROMPTS for SAM, derived from the colour the
+ * evaluator says the garment is.
+ *
+ * A box alone cannot express "the robe, not the map": on p3 the robe is occluded
+ * by a map the child holds across his chest, so EVERY box containing the robe
+ * also contains the map, and SAM picks the larger, more salient object. DINO
+ * cannot help — it emits boxes, not points. But /figure-mask already accepts
+ * `points` + `point_labels` (1 = foreground, 0 = background) nested to share the
+ * box's batch dimension; the garment path simply never used them.
+ *
+ * Points are sampled on a grid inside the box: those close to the observed
+ * colour become foreground, those far from it become background. Spreading them
+ * over the grid rather than taking the N best avoids stacking every point on one
+ * bright fold.
+ */
+function deriveColourPoints(cropRaw, cw, ch, box, ref, cfg) {
+  if (!ref || !Array.isArray(box)) return { points: null, labels: null, fg: 0, bg: 0 };
+  const [x0, y0, x1, y1] = box.map(Number);
+  const bw = x1 - x0, bh = y1 - y0;
+  if (!(bw > 8 && bh > 8)) return { points: null, labels: null, fg: 0, bg: 0 };
+  const N = cfg.pointGrid;
+  const fg = [], bg = [];
+  for (let gy = 0; gy < N; gy++) {
+    for (let gx = 0; gx < N; gx++) {
+      const px = Math.round(x0 + bw * (gx + 0.5) / N);
+      const py = Math.round(y0 + bh * (gy + 0.5) / N);
+      if (px < 0 || py < 0 || px >= cw || py >= ch) continue;
+      const i = (py * cw + px) * 3;
+      const lab = _rgbToLab(cropRaw[i], cropRaw[i + 1], cropRaw[i + 2]);
+      const d = labDeltaE({ L: lab[0], a: lab[1], b: lab[2] },
+        { L: ref.lab[0], a: ref.lab[1], b: ref.lab[2] });
+      if (d <= cfg.pointFgDeltaE) fg.push({ p: [px, py], d });
+      else if (d >= cfg.pointBgDeltaE) bg.push({ p: [px, py], d });
+    }
+  }
+  // No foreground anywhere in the box means the garment colour simply is not
+  // there — say nothing rather than steering SAM with background points alone.
+  if (fg.length === 0) return { points: null, labels: null, fg: 0, bg: 0 };
+  const take = (arr, n, best) => arr
+    .slice().sort((u, v) => (best ? u.d - v.d : v.d - u.d))
+    .slice(0, n).map(o => o.p);
+  const fgPts = take(fg, cfg.maxFgPoints, true);
+  const bgPts = take(bg, cfg.maxBgPoints, false);
+  return {
+    points: [...fgPts, ...bgPts],
+    labels: [...fgPts.map(() => 1), ...bgPts.map(() => 0)],
+    fg: fgPts.length, bg: bgPts.length,
+  };
 }
 
 const { photoAnalyzerUrl: _photoAnalyzerUrl } = require('./photoAnalyzerClient');
@@ -357,10 +554,16 @@ function pickAgreeingPanels(means, opts = {}) {
 }
 
 /** MobileSAM: box -> silhouette, as a 0/255 mask at the crop's size. */
-async function segmentGarment(cropUri, box, w, h) {
+async function segmentGarment(cropUri, box, w, h, prompts = null) {
+  // `prompts` carries colour-derived point hints (1 = foreground, 0 =
+  // background). A box alone cannot say "the robe, not the map it is behind";
+  // points can. The endpoint has always accepted them — the garment path just
+  // never sent any.
+  const body = { image: cropUri, box };
+  if (prompts?.points?.length) { body.points = prompts.points; body.point_labels = prompts.labels; }
   const res = await fetch(`${_photoAnalyzerUrl()}/figure-mask`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: cropUri, box }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(150_000),
   });
   if (!res.ok) throw new Error(`figure-mask HTTP ${res.status}`);
@@ -566,6 +769,12 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
   const cfg = { ...DEFAULTS, ...(options.opts || {}) };
   const t0 = Date.now();
   const { key: garmentKey, prompt } = garmentQueryFor(options.garment);
+  // The colour the evaluator says the garment currently IS. Drives both the
+  // point prompts and the verification gate below.
+  const observedRef = resolveColourName(options.observedColour);
+  if (options.observedColour && !observedRef) {
+    log.warn(`[GARMENT-COLOUR] observedColour "${options.observedColour}" resolves to no known colour — proceeding without the colour gate`);
+  }
   const report = { name: figure?.name || 'figure', garment: options.garment || null, garmentKey, applied: false, reason: null };
   if (!garmentKey) {
     report.reason = 'no garment named — refusing to guess which garment to recolour';
@@ -610,7 +819,12 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
   try {
     det = await detectGarmentBox(cropUri, { ...cfg, prompt });
     if (!det) { report.reason = `DINO found no "${garmentKey}" on the page`; return { changed: false, imageData: pageImageData, report, steps }; }
-    seg = await segmentGarment(cropUri, det.box, cw, ch);
+    // Colour-derived point prompts need the crop's pixels, so decode before
+    // segmenting rather than after. Same buffer the measurement below uses.
+    const { data: preRaw } = await sharp(cropBuf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const pts = deriveColourPoints(preRaw, cw, ch, det.box, observedRef, cfg);
+    report.colourPoints = { fg: pts.fg, bg: pts.bg, from: observedRef?.name || null };
+    seg = await segmentGarment(cropUri, det.box, cw, ch, pts);
   } catch (e) {
     report.reason = `segmentation failed: ${e.message}`;
     return { changed: false, imageData: pageImageData, report, steps };
@@ -640,6 +854,21 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
   }
   if (!cur || cur.count < cfg.minMaskPx) { report.reason = `garment mask too small (${cur?.count || 0}px)`; return { changed: false, imageData: pageImageData, report, steps }; }
   report.current = { L: +cur.L.toFixed(1), hueDeg: +(Math.atan2(cur.b, cur.a) * DEG).toFixed(1), chroma: +Math.hypot(cur.a, cur.b).toFixed(1), px: cur.count };
+
+  // VERIFICATION GATE. The evaluator said what colour this garment IS; if the
+  // mask is not that colour, the mask is not the garment. Refuse before moving
+  // a single pixel — this is the check that catches a mask the per-pixel gate
+  // cannot, because that one scores pixels against the mask's own mean and so
+  // defends whatever object dominates it.
+  const verdict = maskMatchesObservedColour(cur, observedRef, cfg);
+  report.observedColour = options.observedColour || null;
+  report.observedMatch = verdict.ok;
+  report.observedHueDelta = verdict.hueDelta;
+  if (!verdict.ok) {
+    report.reason = `mask does not match the reported colour: ${verdict.reason}`;
+    log.warn(`⚠️ [GARMENT-COLOUR] ${report.name} ${garmentKey}: ${report.reason} — refusing to repaint`);
+    return { changed: false, imageData: pageImageData, report, steps };
+  }
 
   // Lighting factor from skin: page face vs avatar face, same material.
   let lighting = 1, lightingSource = 'default';
@@ -748,6 +977,11 @@ module.exports = {
   garmentQueryFor,
   GARMENT_ENUM,
   GARMENT_VALUES,
+  COLOUR_REFS,
+  resolveColourName,
+  maskMatchesObservedColour,
+  deriveColourPoints,
+  DEFAULTS,
   garmentEnumForPrompt,
   avatarGarmentLab,
   detectGarmentBox,

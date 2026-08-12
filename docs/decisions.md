@@ -9752,3 +9752,63 @@ contract colours AND all five hats — the first one in this series with nothing
 Score −90, against −200 / −180 / −130 for the earlier attempts. Style gate passed.
 
 **Touched:** `server/lib/images.js`.
+
+## 2026-08-12 — `observedColour` becomes an input: colour point prompts for SAM, plus a mask verification gate
+
+**Context:** on `job_1786484554633_crojok432` p3 the recolour repainted the map the child
+holds. Attribution from Lab 533-537 (replayed against v0; DINO and SAM are deterministic):
+
+- `robe` — DINO's box `[9,276,865,940]` is the lower two-thirds of the figure, which is
+  **where the robe actually is**. The robe is occluded by the map, so *every* box containing
+  the robe contains the map. DINO could not do better; **SAM** picked the larger, more
+  salient object inside a fair box, because a box prompt cannot say which object is meant.
+- `shoes` — DINO's box is 94% of the crop. That one is the detector.
+- `hatband` — DINO returns the hat's box ±1px. Vocabulary; fixed by the garment enum.
+
+The entity check has always emitted `observedColour` next to `expectedColour` on every
+finding ("purple" → "blue"), and it is filled reliably across this story's 23 mismatches.
+The repair knew where it was going and never looked at where it was starting from.
+
+**Decision — two consumers of that field:**
+
+1. **Point prompts.** `/figure-mask` already accepts `points` + `point_labels`
+   (1 = foreground, 0 = background), nested to share the box's batch dimension — built for
+   the face-anchored figure mask, never used by the garment path, which sent `{image, box}`.
+   `deriveColourPoints` samples a 9×9 grid inside DINO's box: pixels near `observedColour`
+   become foreground, pixels far from it background, capped at 8 each and spread over the
+   grid. SAM is then told *"this purple thing, not that sheet of paper"* — the only way to
+   express that, since DINO emits boxes and cannot emit points. With no foreground anywhere
+   in the box, NO points are sent rather than background-only steering.
+2. **A verification gate.** `maskMatchesObservedColour` checks the finished mask against the
+   reported colour before a pixel moves. This answers a question the per-pixel gate
+   structurally cannot: that one scores each pixel against the MASK'S OWN MEAN, so once the
+   wrong object dominates, the mean *is* that object and the gate defends it — on p3 the
+   `shoes` mask gated OUT the child's actual black shoes and repainted the map.
+
+**Hue is not sufficient on its own.** Cream and brown share a hue and differ in lightness,
+so the p3 `shoes` mask (L 66.6, hue +68°) sits 9° from brown and passes a hue-only test. But
+lightness cannot be a fixed threshold either — scene lighting moves it, and the entity prompt
+explicitly says to judge hue only. Resolution: bound lightness by the lighting factor this
+module already trusts (`lightingMin` 0.55 … `lightingMax` 1.35, ±10 margin). Brown's L 35 →
+an admissible band of 9–57; the mask at 66.6 is outside anything lighting could produce, so
+it is refused. Purple's band is 11–61, which passes both the real hat (L 41.7) and Noah's
+robe (L 29.2). Achromatic references (black, white, grey) have no usable hue and are judged
+on lightness and on the mask being unsaturated — so Hans's genuinely grey robe is not
+rejected for lacking chroma, which is why the "most saturated cluster" heuristic was not used.
+
+**Colour words:** `COLOUR_REFS` maps names to reference sRGB, `resolveColourName` splits
+compounds ("dark brown/black" → brown, "yellow/gold" → yellow) and skips modifiers
+(dark, pale, deep …). Unresolvable → the gate is inert and a warning is logged, rather than
+guessing. This is a lookup of colour words to colour values — objective — and never decides
+what a finding *means*, which the eval rules forbid.
+
+**Verified:** 24 unit tests over the measured p3 masks — robe (cream map, "purple") REFUSED,
+shoes (map + background, "dark brown/black") REFUSED, hat (the real hat, "purple") PASSES,
+Noah's rendered purple robe PASSES. Point derivation checked on a synthetic purple/cream
+crop: foreground points land only on the purple half, background only on the cream half.
+**Not yet verified end to end** — the Lab run against the real p3 is pending, staging was
+busy with a live story.
+
+**Touched:** `server/lib/garmentColourFix.js`, `server/lib/repairPipeline.js`,
+`server/lib/testlab.js`, `tests/manual/garmentObservedColour.test.js`.
+**Status:** 🟡 conditional — unit-verified, awaiting the Lab run on p3.

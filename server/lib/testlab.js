@@ -1350,7 +1350,10 @@ async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
     // params.garment lets the Lab exercise the garment ROUTING (top vs footwear
     // vs headwear...) the way production does from the entity channel's word.
     const res = await fixFigureGarmentColour(imageData, fig, avatarUri, {
+      // params.observedColour exercises the colour points + verification gate
+      // the way production does from the entity channel's own field.
       opts: params.opts || {}, garment: params.garment, collectSteps: true,
+      observedColour: params.observedColour,
     });
     perFigure.push(res.report);
     const slot = {};
