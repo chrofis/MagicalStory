@@ -161,10 +161,28 @@ async function loadEmptyScene(storyId, pageNumber) {
   return rows.length > 0 ? bytesFor(rows[0]) : null;
 }
 
-/** Active (user-visible) page image as a data URI. Covers via -1/-2/-3. */
-async function loadActivePageImage(storyId, pageNumber) {
+/**
+ * Active (user-visible) page image as a data URI. Covers via -1/-2/-3.
+ *
+ * `versionIndex` pins an EXACT version instead of the active one. Without it a
+ * stage always reads whatever won pick-best, which silently re-runs a repair on
+ * an already-repaired image: on job_1786484554633_crojok432 p3 the active
+ * version IS the garment recolour, so a replay measured the leftover distance
+ * to blue rather than the original purple→blue correction. Pinning fails loudly
+ * when the version is missing — a silent fall back to v0 would answer a
+ * different question than the one asked.
+ */
+async function loadActivePageImage(storyId, pageNumber, versionIndex = null) {
   const { getActiveVersion, getStoryImage } = require('../services/database');
   const coverKey = pageNumber < 0 ? COVER_KEY_BY_PAGE[String(pageNumber)] : null;
+  const pinned = Number.isFinite(Number(versionIndex)) ? Number(versionIndex) : null;
+  if (pinned !== null) {
+    const row = await getStoryImage(storyId, coverKey || 'scene', coverKey ? null : pageNumber, pinned);
+    if (!row) throw new Error(`No version ${pinned} for ${storyId} page ${pageNumber}`);
+    const bytes = await bytesFor(row);
+    if (!bytes) throw new Error(`Bytes unavailable for ${storyId} page ${pageNumber} v${pinned}`);
+    return bytes;
+  }
   // Cover rows live in story_images as image_type=<coverKey> with NULL
   // page_number; active-version meta is keyed by the cover key string.
   const activeIdx = await getActiveVersion(storyId, coverKey || pageNumber);
@@ -394,6 +412,26 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     }
     const { applyStoryCellRefs } = require('./storyAvatars');
     await applyStoryCellRefs(ctx.referencePhotos, storyCharacterAvatars, ctx.scene.sceneCharacters || []);
+  }
+
+  // refCrop: 'head' | 'upperBody' — crop each character reference to its top
+  // fraction before generation. A/B how much reference body the model needs:
+  // a full-body ref pulls the render toward full-figure present-to-camera
+  // poses even when the brief asks for a hands-only/close-up framing.
+  if (params.refCrop) {
+    const fraction = params.refCrop === 'head' ? 0.35 : 0.55;
+    const sharp = require('sharp');
+    for (const p of ctx.referencePhotos) {
+      const src = p.photoUrl || p.photoData;
+      if (!src) continue;
+      const buf = Buffer.from(String(src).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      const meta = await sharp(buf).metadata();
+      const cropped = await sharp(buf)
+        .extract({ left: 0, top: 0, width: meta.width, height: Math.round(meta.height * fraction) })
+        .jpeg({ quality: 92 }).toBuffer();
+      p.photoUrl = 'data:image/jpeg;base64,' + cropped.toString('base64');
+      p.photoData = undefined;
+    }
   }
 
   // backgroundRef: use a specific (test) empty-scene version as the background
@@ -1256,7 +1294,10 @@ async function runGarmentColourFixStage(ctx, { experimentId, params = {} }) {
   const { detectAllBoundingBoxes } = require('./images');
   const { getStyledAvatarForClothing, normalizeClothingCategory } = require('./entityConsistency');
 
-  let imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  // params.versionIndex replays against an EXACT version — needed to reproduce
+  // what a production repair did, because the active version is often that
+  // repair's own output.
+  let imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, params.versionIndex);
   const t0 = Date.now();
   // Reuse the STORED detection. Production Step 1b resolves the same box from
   // the evaluation it just produced for those bytes, falling back to the image
