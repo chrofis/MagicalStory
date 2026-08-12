@@ -279,6 +279,20 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
     return { method: 'iterate', reason: `CATASTROPHIC issue — ${desc || 'full regen required'}` };
   }
 
+  // 1d. Composition/viewpoint change — a new camera angle, shot distance, or
+  // reframing. Inpaint edits bounded regions and cannot move the camera; sent
+  // there it regenerates part of the frame with no style anchor and drifts the
+  // medium (photoreal). The consolidator (rule 7b) owns the classification and
+  // sets this flag — code only routes on the boolean, never sniffs prose.
+  // ADDITIVE to SETTLED "Grok inpaint handles pose/gaze/body-rotation": those
+  // are the FIGURE's orientation inside a fixed frame; this is the CAMERA, a
+  // case that verdict never covered. Overrides the salvage floor deliberately —
+  // no local repair can fix framing, so a decent finalScore is no reason to
+  // keep a wrongly-framed page in inpaint.
+  if (evaluator.consolidatedPlan?.scene_fix?.requires_regeneration === true) {
+    return { method: 'iterate', reason: 'scene fix requires reframing (camera/composition) — full regen' };
+  }
+
   // 2. Entity issue — char-fix wins. Scene-only (covers fall through).
   if (pageNumber > 0 && entityReport?.characters) {
     let worst = null; // {severity, charName, issue}

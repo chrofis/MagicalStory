@@ -357,8 +357,12 @@ async function consolidateFeedback({
     // Normalize shape
     if (!Array.isArray(plan.per_character_fixes)) plan.per_character_fixes = [];
     if (!plan.scene_fix || typeof plan.scene_fix !== 'object') {
-      plan.scene_fix = { severity: 'NONE', instruction: '', preserve: [] };
+      plan.scene_fix = { severity: 'NONE', instruction: '', requires_regeneration: false, preserve: [] };
     }
+    // Routing flag (rule 7b): a camera/viewpoint/framing change inpaint cannot
+    // honor. Coerce to a strict boolean so decideRepairMethod can gate on it
+    // without truthiness surprises from a stray string.
+    plan.scene_fix.requires_regeneration = plan.scene_fix.requires_regeneration === true;
     if (!Array.isArray(plan.dropped_issues)) plan.dropped_issues = [];
 
     // Final score (0-100) — the consolidator's deduplicated, tolerant judgment.

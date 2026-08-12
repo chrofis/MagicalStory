@@ -66,5 +66,32 @@ test('no issues at all → skip', () => {
   assert.strictEqual(decision.method, 'skip');
 });
 
+console.log('\ndecideRepairMethod — reframe (requires_regeneration) routing');
+test('reframe flag with survivable subscores → iterate, NOT inpaint (overrides salvage floor)', () => {
+  const decision = decideRepairMethod(3, {
+    scoreBreakdown: { visual: { score: 60 }, semantic: { score: 60 } },
+    finalScore: 13, // above the salvage floor — would normally stay in local repair
+    fixableIssues: [{ description: 'wrong camera angle', severity: 'CRITICAL' }],
+    consolidatedPlan: { scene_fix: { requires_regeneration: true, instruction: 'Change to overhead close-up view.' } },
+  }, null);
+  assert.strictEqual(decision.method, 'iterate', `expected iterate, got ${decision.method} (${decision.reason})`);
+});
+test('reframe flag false → keeps default inpaint route', () => {
+  const decision = decideRepairMethod(3, {
+    scoreBreakdown: { visual: { score: 70 }, semantic: { score: 80 } },
+    fixableIssues: [{ description: 'add glow to the lantern', severity: 'MODERATE' }],
+    consolidatedPlan: { scene_fix: { requires_regeneration: false, instruction: 'Add glow to the lantern.' } },
+  }, null);
+  assert.strictEqual(decision.method, 'inpaint');
+});
+test('reframe gate is strict === true — a truthy string does not force iterate', () => {
+  const decision = decideRepairMethod(3, {
+    scoreBreakdown: { visual: { score: 70 }, semantic: { score: 80 } },
+    fixableIssues: [{ description: 'add glow to the lantern', severity: 'MODERATE' }],
+    consolidatedPlan: { scene_fix: { requires_regeneration: 'yes', instruction: 'Add glow.' } },
+  }, null);
+  assert.strictEqual(decision.method, 'inpaint');
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);
