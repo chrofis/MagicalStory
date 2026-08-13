@@ -9911,3 +9911,31 @@ moderation passed, valid pixar sheet, finalScore 9.
 
 **Touched:** `server/lib/styledAvatars.js`, `prompts/story-bible-from-beats.txt`,
 `prompts/clothing-review.txt`.
+
+## 2026-08-13 — Beats coherence: reviewer gains a logic-closure check, writer a matching rule
+
+**Context:** A hand + LLM-judge review of the mermaid showcase (`job_1786571353564_0sgrd0f4g`)
+rated the story's LOGIC ~7.5: it asked "wer hat ihn weggenommen?" and never answered it, produced a
+sea-glass trail and a sunken chest with no stated origin, and made Lira a "waited-for" helper with no
+reason. A three-story systemic check found the class recurs in the quest/treasure format — Dachboden
+(`job_1786309527338_4zwhrn08y`) failed all four hole types, the pirate story one, the wizard story
+zero (it pre-empted with a legend frame). The beats reviewer's seven checks
+(causality/arc/stakes/illustratable/repetition/cast/pacing) had NO logic-closure check, so these
+holes shipped unflagged.
+
+**Decision:** The reviewer (`story-beats-review.txt`) gains **check 8 — Loose threads & unearned
+turns**: flag any raised question no later beat answers, any object/clue/ally/rescue with no stated
+origin or in-world licence (a rule, a legend, an earlier setup), and any unmotivated
+"only one / waited-for / chosen"; rewrite the fewest beats to close each. The writer
+(`story-beats.txt`) gains a matching preventive requirement so beats are born closed.
+
+**Rationale:** Prevent-at-writer + catch-at-reviewer (owner chose "both"). **Proven** by an A/B replay
+on the mermaid beats (deepseek-v4-pro, temp 0): the current 7-check reviewer never raises the origin
+holes and rewrote only for framing/repetition; the 8-check reviewer produced a "Loose threads"
+section naming the unexplained trail / necklace / chest and rewrote page 4 to close them. The
+"in-world licence" wording generalises the wizard story's clean pattern. Additive — adds a rule, does
+not split the writer call (SETTLED: writer not overloaded) and does not touch the beats-is-target
+verdict.
+
+**Touched:** `prompts/story-beats-review.txt`, `prompts/story-beats.txt`.
+**Status:** ✅ active.

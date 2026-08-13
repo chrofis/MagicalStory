@@ -32,13 +32,14 @@ Answer each check, naming pages. Then rewrite only the pages that a check found 
 5. Repetition — name any two pages whose scenes would produce near-identical pictures (same place, same grouping, same action).
 6. Cast & variety — name any scene with more than {MAX_CHARACTERS_PER_SCENE} named characters, or any page where someone forces or blocks something without being in the scene. Do most pages keep to three or fewer named characters, and does the cast vary page to page — the main character on most pages, the others in changing combinations? When the whole cast appears, is it a wide or distant view rather than a close full-cast line-up? Does the book include some framing variety — a characterless establishing view, a distant-small-figures page, a single-character close-up? A close-up beat's moment must work waist-up (holding, reading, reacting) — flag one built on kneeling or floor action. Name what's missing.
 7. Pacing — name the page carrying the most beats and the one carrying the least.
+8. Loose threads & unearned turns — name any question a beat explicitly raises about the plot (who took it, why, where it came from) that no later beat answers. Name any object, clue, ally, or rescue that resolves the conflict but appears with no stated origin or in-world licence — a rule, a legend, or an earlier setup. Name any character singled out ("the only one who can", "was waited for", "chosen") with no reason given. Rewrite the fewest beats needed to close each — add the answering line, the origin, or the reason.
 
 # OUTPUT FORMAT
 
 Both blocks, in this order, nothing before or after.
 
 ---ANALYSIS---
-<your answers to checks 1-7>
+<your answers to checks 1-8>
 
 ---BEATS---
 ## Page <number>
