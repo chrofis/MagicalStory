@@ -23,6 +23,7 @@ const arg = (n, d) => {
 const BASE = arg('base', 'https://staging.magicalstory.ch');
 const MODES = arg('modes', 'dino-sam,dino-sam-points,colour,intersect').split(',');
 const VERIFY = arg('verify', 'off');
+const QUERY = arg('query', 'single');   // 'single' | 'multi' (multi-phrase garment queries)
 const EMAIL = process.env.TESTLAB_USER || 'demo-b-hnecf@magicalstory.ch';
 const PASSWORD = process.env.TESTLAB_PASSWORD || 'DemoStory2026!';
 
@@ -58,14 +59,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const rows = [];
   for (const c of CASES) {
     for (const mode of MODES) {
-      const label = `${c.label} · ${mode}${VERIFY === 'model' ? ' +ask' : ''}`;
+      const label = `${c.label} · ${mode}${QUERY === 'multi' ? ' +multiq' : ''}${VERIFY === 'model' ? ' +ask' : ''}`;
       const body = {
         stage: 'garment_colour_fix', label,
         targets: [{ storyId: c.storyId, pageNumber: c.pageNumber }],
         params: {
           garment: c.garment, versionIndex: c.versionIndex, characterName: c.characterName,
           observedColour: c.observedColour,
-          opts: { maskMode: mode, verifyMask: VERIFY },
+          opts: { maskMode: mode, verifyMask: VERIFY, queryMode: QUERY },
         },
       };
       const res = await fetch(`${BASE}/api/admin/testlab/experiments`, { method: 'POST', headers: H, body: JSON.stringify(body) });
@@ -95,6 +96,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         boxPct: (fig.dinoBoxPx && fig.cropPx) ? Math.round(100 * fig.dinoBoxPx / fig.cropPx) : null,
         selectPx: fig.colourSelect?.px ?? null,
         ask: fig.maskAsk ? (fig.maskAsk.asked ? (fig.maskAsk.isGarment ? 'YES' : `NO (${fig.maskAsk.whatItIs})`) : `n/a`) : '',
+        tried: (fig.queriesTried || []).map(t => `${t.frac ?? '-'}@${t.score ?? '-'}`).join(' '),
+        picked: fig.queryPicked || '',
         reason: fig.reason || '',
       });
     }
@@ -109,6 +112,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       + `${String(r.maskPx ?? '-').padStart(7)} ${String(r.pct ?? '-').padStart(5)}% ${String(r.boxPct ?? '-').padStart(4)}% `
       + `${String(r.curL ?? '-').padStart(5)} ${String(r.curHue ?? '-').padStart(7)} ${String(r.deltaE ?? '-').padStart(5)}  `
       + `${String(r.ask).padEnd(10)} ${String(r.reason).slice(0, 34)}`);
+    if (r.tried) console.log(`${''.padEnd(22)}   phrasings (frac@score): ${r.tried}${r.picked ? `  → picked "${r.picked}"` : ''}`);
   }
   console.log('='.repeat(118));
   for (const c of CASES) console.log(`${c.label}: expect ${c.expect}`);
