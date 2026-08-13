@@ -1112,6 +1112,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (skippedCount > 0) {
         log.warn(`⚠️ [EVAL] ${skippedCount}/${referenceImages.length} reference photos unusable — figure-identity matching will be degraded${addedCount === 0 ? ' (NO references: matches[] will be empty)' : ''}`);
       }
+      // References requested but NONE attached → the eval is identity-blind and
+      // its score is not countable. On job_1786571353564 p4/p9 the recolour
+      // versions were graded exactly like this (the model wrote "no reference
+      // photos provided for matching") and a character repainted entirely red
+      // passed 100/PASS. Fail the eval instead: callers already treat a null
+      // eval as "no score → no version" (recolour) / re-eval (batch retry).
+      if (referenceImages.length > 0 && addedCount === 0) {
+        log.error(`❌ [EVAL] ${pageContext}: ${referenceImages.length} reference photo(s) supplied, 0 attached — refusing to grade identity-blind; eval fails instead of returning an unanchored score`);
+        return null;
+      }
     }
 
     // === LAUNCH P1 VISUAL INVENTORY IN PARALLEL (age/figure detection) ===
