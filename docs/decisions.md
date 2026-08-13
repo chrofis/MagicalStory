@@ -9476,6 +9476,18 @@ runs (eval model qwen-plus, temp 0); unit tests in `tests/unit/repair-method.tes
 `server/lib/repairLogic.js`, `server/lib/images.js`, `tests/unit/repair-method.test.js`.
 **Status:** ✅ active.
 
+**Follow-up (2026-08-13) — rule 7b tightened to camera-only.** The first live run (mermaid showcase
+`job_1786571353564_0sgrd0f4g`) showed the consolidator over-applying the flag: P8 flagged a figure
+RESTAGE and P10 flagged a pure POSE change (*"rotate arms forward instead of upward"*) as
+`requires_regeneration: true` — the P10 case being exactly the pose/rotation that `SETTLED` line 44
+reserves for inpaint. No output harm (iterate regressed, pick-best kept the originals), but the
+routing was broader than intended. 7b now reads camera-only ("a change to the camera angle,
+viewpoint, or shot distance — the whole frame is re-shot") and explicitly excludes moving/restaging a
+figure, changing a pose/gesture/body orientation, and adding/removing/repositioning an object.
+Replayed the stored inputs against the tightened template (qwen-plus, temp 0): P10 pose flipped
+`true → false`; a genuine "overhead close-up" reframe stayed `true`; P8 stayed `true` because the
+model tied the restaging to a "wide shot" — a legitimate shot-distance change. Owner-requested.
+
 ---
 
 ## 2026-08-12 — Eval cluster extracted to server/lib/evalPipeline.js (phase 4 of the god-file program)

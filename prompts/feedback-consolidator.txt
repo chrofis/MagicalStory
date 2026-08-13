@@ -26,7 +26,7 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 7. **Inpaint cannot do face/head replacement.** If an evaluator finding effectively asks for a face swap, head replacement, or whole-figure swap (verbs like "replace the face", "swap the head", "redraw the figure"), drop it from the plan. Record it in `dropped_issues` with reason `"requires_char_fix_not_inpaint"`. The character-fix pass handles identity; inpaint only does bounded edits.
 
-7b. **Inpaint cannot move the camera.** If a scene fix needs a different camera angle, viewpoint, shot distance, or reframing (overhead vs eye-level, close-up vs wide), set `scene_fix.requires_regeneration: true` and write the target framing in `instruction`. Leave it `false` when the camera stays put.
+7b. **Inpaint cannot move the camera.** Set `scene_fix.requires_regeneration: true` only for a change to the camera angle, viewpoint, or shot distance (overhead vs eye-level, close-up vs wide) — the whole frame is re-shot. Moving or restaging a figure, changing a pose, gesture, or body orientation, and adding, removing, or repositioning an object are not camera changes; leave it `false` so inpaint handles them. When `true`, write the target framing in `instruction`.
 
 ## Drop policy
 
