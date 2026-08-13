@@ -10052,3 +10052,72 @@ is deferred to Phase 2 — every rerun still reads a stored story for now.
 **Touched:** `server/lib/storyScorecard.js`, `server/lib/testlab.js`, `prompts/story-scorecard-judge.txt`,
 `client/src/services/testlabService.ts`, `client/src/pages/TestLab.tsx`, `scripts/analysis/score-story.js`.
 **Status:** ✅ active (Phase 1). Phase 2 = injected input.
+
+## 2026-08-13 — Garment mask: multi-phrase queries + colour points make the DINO box work again (Lab 583-586)
+
+**Context:** the page-side mask was the only failing part of the garment recolour. Two
+production failures: `job_1786484554633_crojok432` p3 repainted the cream map a child holds
+(shipped, 56.9% of the page changed), and `job_1786571353564_0sgrd0f4g` p4 repainted a
+mermaid's face, hair, arms and tail red (shipped, 91,197 px). Six strategies were compared
+head-to-head in the Lab on the same four cases, every run pinned to `versionIndex: 0` so all
+modes start from identical bytes.
+
+**Attribution first (Lab 533-537, 559-576).** SAM's mask was ALWAYS a strict subset of the box
+it was given — it never escaped once. The detector is what fails, in two distinct ways:
+- **the box is garbage**: "the shoes worn by the person" → 94% of the crop, "the shirt worn by
+  the person" on a mermaid → 82%. There is no shirt, so it returns the biggest person-shaped
+  thing;
+- **the box is fair but the wrong object is inside it**: the robe is occluded by a map the
+  child holds, so EVERY box containing the robe contains the map, and SAM picks the larger,
+  more salient one. No wording can separate those two — all three phrasings returned ~62%.
+
+**Decision — the DINO box stays the primary method (owner's rule), fixed on both axes:**
+
+1. **Multi-phrase queries with a size guard** (`queryMode: 'multi'`). Three phrasings per enum
+   value — a bare noun, the plain form, and one anchored to a BODY PART — asked as three
+   SEPARATE prompts, never one concatenated string (photo_analyzer.py runs a pass per prompt
+   and its own comment records that batching phrasings collapsed scores). Boxes above
+   `maxBoxFrac` 0.75 of the figure crop are discarded as being the figure itself, then the
+   best score among the survivors wins.
+2. **Colour point prompts** (`maskMode: 'dino-sam-points'`) steer SAM inside that box: fg
+   points on pixels matching `observedColour`, bg points on everything far from it.
+
+**Measured, all four cases (Lab 583-586), each verified by eye:**
+
+| case | mask | measured hue | what it is |
+|---|---|---|---|
+| mermaid p4 `top` | 4,144 px | 89.5° | the yellow shell top, nothing else |
+| mermaid p4 `skirt` | 31,437 px | 91.3° | the tail; face, hair, skin, shell top clean |
+| wizard p3 `dress` | 72,170 px | −43.9° | the robe; the map untouched |
+| wizard p3 `hat` | 29,776 px | −41.8° | the hat (control, already worked) |
+
+Every measured colour matches the colour the evaluator reported, which is what proves the
+mask is on the garment rather than merely small.
+
+**What the wording experiment actually showed (Lab 578, 580), and it is counter-intuitive:**
+broadening the CATEGORY made things worse — "the upper body clothing worn by the person"
+returned **83%** of the crop, worse than plain "shirt" at 82%. What worked was anatomical
+anchoring: "the top worn on the chest" → 3%, "the garment covering the legs" → 32%. On the
+shell top the winning phrase also had the LOWEST score (0.42 vs 0.47), so picking by
+confidence would have chosen the whole mermaid — **the size guard is doing half the work**,
+and multi-phrase without it would have made things worse, not better.
+
+**Rejected as the default, kept as selectable modes:** `colour` (select pixels that ARE the
+reported bad colour) and `colour-box-sam` solve the mermaid but throw away a working detector
+on the robe; `intersect` collapsed to 1% of the crop on the robe; `highlight-dino` (paint the
+bad pixels magenta, box THAT, then SAM the original) is implemented and untested — it exists
+for the case where every phrasing fails. All remain available via `opts.maskMode`.
+
+**Also landed:** connected-component filtering (`minComponentPx` 150, `keepComponents` 2,
+8-connected) — colour selection alone caught eye glints and arm specks, and a bounding box
+across those spans the whole face; and the verification gate, which independently REFUSED the
+old robe mask ("mask hue 82.5° is 131° from purple") before any of this was switched on.
+
+**Not fixed by any of this:** mermaid p4 recoloured the WRONG GIRL. The detection named the
+left figure "Noah" — three mermaids in frame, two names in `sceneCharacters`, and Lira absent
+from `characters[]` entirely, so names shifted one figure left. A perfect mask on the wrong
+character is still wrong. Tracked separately.
+
+**Touched:** `server/lib/garmentColourFix.js`, `tests/manual/garmentMaskModes.test.js`,
+`scripts/analysis/compare-garment-mask-modes.js`.
+**Status:** ✅ active — defaults changed; awaiting the push the owner deferred while a story ran.

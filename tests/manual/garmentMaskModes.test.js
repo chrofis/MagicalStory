@@ -140,9 +140,13 @@ t('regions are ordered and inside [0,1]', () => {
   }
 });
 
-t('production default is unchanged — dino-sam, no paid verification', () => {
-  assert.strictEqual(DEFAULTS.maskMode, 'dino-sam');
-  assert.strictEqual(DEFAULTS.verifyMask, 'off');
+t('production default is the measured winner — box-first, no paid verification', () => {
+  // Lab 583-586: multi-phrase queries find a usable box, colour points stop SAM
+  // picking the wrong object inside it. All four known-bad cases land on the
+  // garment. The DINO box stays the primary method, per the owner's rule.
+  assert.strictEqual(DEFAULTS.maskMode, 'dino-sam-points');
+  assert.strictEqual(DEFAULTS.queryMode, 'multi');
+  assert.strictEqual(DEFAULTS.verifyMask, 'off', 'the paid vision check stays opt-in');
 });
 
 t('all four modes are documented in the config comment', () => {

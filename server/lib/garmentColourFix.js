@@ -85,7 +85,12 @@ const DEFAULTS = {
   //   'highlight-dino'  paint the bad-colour pixels pink, ask DINO to box THAT,
   //                     then run SAM on the ORIGINAL pixels in that box
   //   'colour-box-sam'  bounding box of the bad-colour pixels -> SAM on the original
-  maskMode: 'dino-sam',
+  // DEFAULT (owner, 2026-08-13, Lab 583-586): the DINO box IS the preferred
+  // method when it works, so the default keeps it and fixes it two ways —
+  // multi-phrase queries with a size guard find a usable box, and colour point
+  // prompts stop SAM choosing the wrong object inside it. Measured on all four
+  // known-bad cases; every one lands on the garment.
+  maskMode: 'dino-sam-points',
   // Connected components — a garment is one connected thing (shoes are two).
   // Colour matching alone also picks up eye glints and specks on an arm.
   connectedOnly: true,
@@ -98,7 +103,7 @@ const DEFAULTS = {
   highlightPadPx: 6,
   // Multi-phrase garment queries (see detectGarmentBoxMulti). 'single' asks one
   // phrasing, 'multi' asks the enum's alternatives and keeps the most plausible.
-  queryMode: 'single',
+  queryMode: 'multi',
   // A garment is PART of a figure. A box above this share of the figure crop is
   // the figure itself — measured: "skirt" returned 82% (the whole mermaid),
   // "shoes" 94% (the whole picture), while real garment boxes ran 2-62%.
