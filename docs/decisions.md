@@ -9812,3 +9812,35 @@ busy with a live story.
 **Touched:** `server/lib/garmentColourFix.js`, `server/lib/repairPipeline.js`,
 `server/lib/testlab.js`, `tests/manual/garmentObservedColour.test.js`.
 **Status:** 🟡 conditional — unit-verified, awaiting the Lab run on p3.
+
+---
+
+## 2026-08-13 — Persist-time active-version recompute uses tieBreak 'earliest' (a tied repair may not overturn the original)
+
+**Context:** `job_1786571353564_0sgrd0f4g` p4: the garment-colour fix dyed the
+character's entire body red; the re-eval tied it 60/60 with the clean original.
+The repair pipeline's Step-3 pick (`selectBestVersion`, tieBreak 'earliest')
+correctly kept the original (`bestSource: "original"` in the blob), but
+`recomputeActiveVersion` — called on every persist — re-picked with the default
+tieBreak 'latest' and pinned `image_version_meta["4"].activeVersion = 1`.
+Readers resolve ONLY from image_version_meta, so every viewer got the red
+version while the blob label claimed original.
+
+**Decision:** `recomputeActiveVersion` passes `{ tieBreak: 'earliest' }`.
+Both tie-break directions in `pickBestVersionIndex` remain deliberate:
+'latest' is for interactive flows — but every interactive flow (manual pick,
+iterate, regen, style-transfer) PINS its choice and the recompute skips pinned
+entries, so the only versions the recompute ever re-picks are unpinned pipeline
+ones, where the pipeline's own 'earliest' ruling must not be overturned at
+persist time. This closes the tie side-door in COMPETE, DO NOT APPOINT
+(2026-08-09).
+
+**Open findings from the same story (not fixed here):** (a) the quality eval
+scored a full-body skin-recolour equal to the clean original — no
+character-identity punishment (prompt-side, owner call); (b) the garment
+recolour mask bled far beyond the garment (method bug, twice in one story:
+p4 and p9 — both rejected by the picker).
+
+**Touched files:** `server/lib/scoring.js` (recomputeActiveVersion). Fix
+commit: f80262ead. The mis-pinned p4 pointer of the observed story was
+manually reset to v0.
