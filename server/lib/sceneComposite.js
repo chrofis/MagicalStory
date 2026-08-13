@@ -983,6 +983,23 @@ function buildPopulatedPlatePrompt(scene, cast, cleanBackgroundPrompt) {
   const settingBlock = (cleanBackgroundPrompt && cleanBackgroundPrompt.trim())
     || (scene?.description && String(scene.description).trim())
     || 'an outdoor scene';
+  // Grok rejects anything over 8000 chars outright, and the setting block is
+  // the only part that varies enough to blow it — a five-character page with
+  // a full empty-scene prompt measured over the limit and 400'd the whole run.
+  // Trim the SETTING to fit rather than truncating blind: keep the opening of
+  // the art-style block (the style has to survive or the plate renders
+  // photorealistic) plus as much as possible from **SHOT/LOCATION** onward
+  // (the place has to survive or the plate renders somewhere else entirely).
+  const fitSetting = (text) => {
+    const overhead = 1400 + lines.length + String(scene?.intent || '').length;
+    const budget = 7800 - overhead;
+    if (text.length <= budget || budget < 800) return text.slice(0, Math.max(600, budget));
+    const m = text.match(/\*\*(SHOT|LOCATION|SETTING)\b/);
+    if (!m) return text.slice(0, budget);
+    const styleKeep = Math.min(m.index, Math.round(budget * 0.35));
+    return `${text.slice(0, styleKeep)}\n\n${text.slice(m.index, m.index + (budget - styleKeep))}`;
+  };
+  const fittedSetting = fitSetting(settingBlock);
   const sceneIntentBlock = scene?.intent
     ? `\nScene intent: ${String(scene.intent).trim()}\n`
     : '';
@@ -992,7 +1009,7 @@ function buildPopulatedPlatePrompt(scene, cast, cleanBackgroundPrompt) {
 PRIORITY 1 — The setting, props, and lighting must read exactly as described. Render every named environment element, prop, and required object below in its correct position. Do NOT invent new props that are not described. This image is the canonical world plate — the silhouettes will be lifted out in a later step, so the setting must be self-consistent with or without people in it.
 
 SETTING DESCRIPTION:
-${settingBlock}
+${fittedSetting}
 ${sceneIntentBlock}
 PRIORITY 2 — Place ${cast.length} flat-colour silhouette figures naturally so the scene makes physical sense. Use the cast entries below for size, depth and per-character action. Figures must stand on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). NEVER position a silhouette with its feet on water or empty sky. Figures MAY overlap each other when the scene calls for it — partial occlusion is fine and natural.
 
