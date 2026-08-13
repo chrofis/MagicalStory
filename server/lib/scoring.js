@@ -352,6 +352,11 @@ function applyScore(version, { evalResult = null, entityResult = null, consolida
   // Canonical fields written by the single writer.
   version.deductions = deductions;
   version.finalScore = finalScore;
+  // Fingerprint of the bytes the eval actually scored (stamped by
+  // evaluateImageBatch). pickBestVersionIndex refuses the score when the
+  // version's bytes no longer hash to it — a score may never describe
+  // different pixels than the ones it would ship.
+  if (evalResult?.evalImageFp) version.evalImageFp = evalResult.evalImageFp;
   // Which issue set fed the math: 'consolidated' (deduped) or 'raw'.
   version.scoreSource = dedupedIssues ? 'consolidated' : 'raw';
   // Persist the consolidator output on the version (same shape/field the
@@ -568,6 +573,19 @@ function pickBestVersionIndex(versions, { tieBreak = 'latest' } = {}) {
     // outcome by absence.
     if (s == null) {
       log.error(`[SCORE] ${versions[i]?.source || 'version'} ${versions[i]?.pageNumber != null ? 'p' + versions[i].pageNumber : ''} has NO score — score every version before selecting`);
+      continue;
+    }
+    // Eval↔bytes integrity: a score whose fingerprint no longer matches the
+    // version's bytes describes DIFFERENT pixels than the ones that would ship
+    // (job_1786571353564 p4: red recoloured bytes carried the eval of their
+    // yellow predecessor and tied their way to active). Verifiable only while
+    // the bytes are still inline; URL-only versions (post-R2-strip) pass
+    // through — the pairing was checked when the bytes were last in hand.
+    const fp = versions[i]?.evalImageFp;
+    const bytes = versions[i]?.imageData;
+    if (fp && typeof bytes === 'string' && bytes.startsWith('data:')
+        && require('./images').hashImageData(bytes) !== fp) {
+      log.error(`[SCORE] ${versions[i]?.source || 'version'} ${versions[i]?.pageNumber != null ? 'p' + versions[i].pageNumber : ''}: bytes do not match the evaluated fingerprint (${fp}) — score refused, version cannot win`);
       continue;
     }
     const ded = versionDeductionTotal(versions[i]);

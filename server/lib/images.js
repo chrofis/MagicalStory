@@ -2290,6 +2290,12 @@ async function evaluateImageBatch(images, options = {}) {
       const evalResult = {
         pageNumber: img.pageNumber,
         evaluated: true,
+        // Fingerprint of the EXACT bytes this eval scored. applyScore copies it
+        // onto the version; pickBestVersionIndex refuses a score whose version
+        // bytes no longer hash to it. Guards the eval↔bytes pairing the same way
+        // sourceImageFp guards detections (job_1786571353564 p4: a version
+        // shipped red bytes carrying the eval of its yellow predecessor).
+        evalImageFp: hashImageData(img.imageData),
         score: qualityResult?.score ?? null,                    // Combined final score
         qualityScore: qualityResult?.qualityScore ?? qualityResult?.score ?? null,  // Visual quality only
         semanticScore: qualityResult?.semanticScore ?? null,    // Semantic fidelity only
