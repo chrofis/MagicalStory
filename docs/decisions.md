@@ -9856,3 +9856,30 @@ p4 and p9 — both rejected by the picker).
 **Touched files:** `server/lib/scoring.js` (recomputeActiveVersion). Fix
 commit: f80262ead. The mis-pinned p4 pointer of the observed story was
 manually reset to v0.
+
+---
+
+## 2026-08-13 — Eval-bytes fingerprint: a version's score is bound to the exact bytes it graded
+
+**Context:** `job_1786571353564_0sgrd0f4g` p4 follow-up. The garment-recolour
+version persisted RED bytes (detector misnamed Emma "Noah", whole-figure SAM
+mask, repainted toward Noah's red avatar) while carrying the eval of its
+yellow predecessor (its stored inventory describes a yellow tail, 0 issues,
+eval 22:06Z vs persist 22:11Z). Fresh 3× evals of the red bytes through the
+production path score 0–50 with explicit "red instead of yellow" findings —
+the evaluator is not blind; the score and the bytes were decoupled somewhere
+in the recolour rounds (exact line unpinned).
+
+**Decision:** bind them cryptographically instead of trusting the plumbing:
+`evaluateImageBatch` stamps `evalImageFp = hashImageData(bytes evaluated)` on
+its result; `applyScore` copies it onto the version; `pickBestVersionIndex`
+refuses (loud error + ranked as unscored) any inline-bytes version whose bytes
+don't hash to the stamp. URL-only versions pass through — verified while
+inline. Mirrors `sourceImageFp` for detections (2026-07-19).
+
+**Open (backlog):** (a) recolour identity guard — block recolour on
+UNKNOWN/disputed figures and garment-implausible mask sizes (91k px = a whole
+child); (b) pin the exact byte-swap line in the recolour rounds.
+
+**Touched files:** `server/lib/images.js` (batch whitelist),
+`server/lib/scoring.js` (applyScore, pickBestVersionIndex). Commit 38426ee26.
