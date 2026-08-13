@@ -9990,3 +9990,35 @@ metadata shapes; back-cell crop verified against a stored sheet.
 
 **Touched:** `server/lib/storyAvatars.js`, `prompts/scene-expansion-all.txt`,
 `prompts/scene-expansion.txt`, `prompts/scene-review.txt`.
+
+---
+
+## 2026-08-13 — Daily remote story-doctor routine (scheduled claude.ai session) + health-report email endpoint
+
+**Context:** stories can finish "clean" (job completed, error_message null) while
+carrying real degradations that lived only in stdout warnings — the
+job_1786571353564 red-Emma case surfaced this: refs-attach failure, identity-blind
+eval, all invisible in the daily admin email (which only lists job_failed).
+
+**Decision:**
+- A claude.ai routine ("MagicalStory daily story-health doctor",
+  trig_013aywEJcu3NJhZxGXDU3VFd, environment env_01WeHRBy2Z1Zc9WZ6WYTvtcy,
+  daily 05:19 UTC = 07:19 CH) runs a remote cloud session that clones the repo
+  (staging branch), gets admin tokens via scripts/admin/get-admin-token.js,
+  pulls /api/admin/story-metrics from staging AND prod, flags unhealthy stories
+  (failed job, min<40, mean<60, *_failed counters, repair_rate>=0.75,
+  3+ versions still <50), diagnoses them against the pipeline code, and emails
+  the report. Hard rules in the prompt: read-only, no paid calls, no pushes.
+- **Delivery:** POST /api/admin/health-report (admin-authed) → 
+  sendAdminHealthReport (email.js) → ADMIN_EMAIL via Resend. The doctor holds
+  an admin Bearer token but no email secrets — the server does the sending.
+- **Prod access:** the smoke account (demo-b-hnecf@magicalstory.ch) now exists
+  on production with role=admin (same bcrypt hash as staging) — closes the
+  open TODO in docs/production-todo-admin-drafts.md. NOTE: prod still 404s on
+  /api/admin/story-metrics until the stats framework is promoted to master.
+- Environment constraints learned: claude.ai cloud environments are UI-only
+  (no API to create/list); network egress must allowlist magicalstory.ch,
+  staging.magicalstory.ch, images.magicalstory.ch, images-staging.magicalstory.ch.
+
+**Touched files:** email.js (sendAdminHealthReport), server/routes/admin.js
+(/health-report route). Endpoint commit: 74c439023.
