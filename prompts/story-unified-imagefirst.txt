@@ -483,6 +483,7 @@ exist first.
 - Only mark `used: true` for variations that actually appear in the story.
 - **Nothing over the face**: no masks, visors, veils, enclosing helmets, or a brim shadowing the eyes. Headwear worn clear of the face is fine.
 - **The costume must read as that costume at a glance.** Every garment is one that costume is known for, named with the word that names it there. A garment that only hints at the theme does not count, and neither does one borrowed from a different costume.
+- **Every garment matches the character's sex.** A male character wears garments made for boys or men, a female character garments made for girls or women. When a costume has a male and a female form, each character wears the form matching theirs.
 - **Characters are told apart by colour.** A different dominant colour per character, on their largest garment. The same garment on two characters is fine when the colours differ.
   - Plain colour words only: red, blue, green, yellow, orange, purple, brown, black, white, grey.
   - Never distinguish by a print, badge, pin, brooch, embroidery, trim, buckle, laces, feather, earring, watch or buttons, or anything small.

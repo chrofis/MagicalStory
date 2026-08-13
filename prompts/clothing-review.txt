@@ -25,6 +25,7 @@ Characters: {CHARACTER_NAMES}
 5. Face — name any garment that covers the face, the eyes, or shadows them with a brim.
 6. Completeness — name any character whose outfit is missing a top, a bottom or footwear.
 7. Style world — only when a world is named below. Name any character wearing nothing from that world, and any character whose whole outfit has been replaced by it rather than accented.
+8. Sex — name any character wearing a garment made for the other sex. A costume with a male and a female form uses the form matching that character; replace the garment with that character's form of it, never by removing the slot.
 
 Fixing check 1 outranks fixing check 3: a character in the right costume sharing a colour with someone else is better than a distinct colour on a garment that does not read as the costume. Two characters of different age or sex may wear the same headwear.
 
@@ -37,7 +38,7 @@ A rewrite must not create a fault of its own. Before writing a corrected outfit,
 Both blocks, in this order, nothing before or after.
 
 ---ANALYSIS---
-<your answers to checks 1-7>
+<your answers to checks 1-8>
 
 ---CLOTHING---
 ## <CharacterName> / <category>
