@@ -405,6 +405,26 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     return downsizedSheet;
   } catch (err) {
     log.error(`[STYLED AVATAR] 2×4 generation threw for ${characterName}/${clothingCategory}/${artStyle}: ${err.message}`);
+    // Audit entry BEFORE rethrowing — a thrown generation previously left no
+    // trace in the dev panel at all (a costumed sheet failed twice on Grok
+    // content moderation and the only evidence was a Railway log line; the
+    // audit showed a puzzling 'standard' fallback with no failed attempt).
+    {
+      const scope = cacheContext.getStore() || _STYLED_LOG_UNSCOPED;
+      let bucket = styledAvatarGenerationLogs.get(scope);
+      if (!bucket) { bucket = []; styledAvatarGenerationLogs.set(scope, bucket); }
+      bucket.push({
+        timestamp: new Date().toISOString(),
+        characterName, artStyle, clothingCategory,
+        durationMs: Date.now() - startTime,
+        success: false,
+        error: err.message,
+        warning: `generation threw: ${err.message}`,
+      });
+      if (bucket.length > MAX_GENERATION_LOG_ENTRIES) {
+        bucket.splice(0, bucket.length - MAX_GENERATION_LOG_ENTRIES);
+      }
+    }
     throw err;
   }
 }
@@ -947,7 +967,39 @@ async function ensureStyledAvatarCoverage(characters, artStyle, pageRequirements
     // Realistic: only a required costume implies a sheet must exist.
     if (isRealistic && !required.has('costumed')) continue;
     const hasAny = STYLED_AVATAR_BUCKETS.some(b => styledAvatarCache.has(getAvatarCacheKey(char.name, b, artStyle)));
-    if (hasAny) continue;
+    // Per-category gap check: a character with SOME avatar used to pass the
+    // guarantee silently even when a REQUIRED category was missing (a failed
+    // costumed sheet fell back to 'standard', hasAny was true, and the costume
+    // rendered from prompt text only with zero trace). Bucket substitution
+    // still serves pages, so no seeding — but the gap must be loud.
+    if (hasAny) {
+      const missing = [...required].filter(cat => {
+        if (isRealistic && cat !== 'costumed') return false;
+        const key = getAvatarCacheKey(char.name, cat, artStyle);
+        return !styledAvatarCache.has(key) || guaranteeSeededKeys.has(key);
+      });
+      if (missing.length > 0) {
+        log.error(`[AVATAR] ❌ ${char.name} is missing required styled avatar categor${missing.length === 1 ? 'y' : 'ies'} ${missing.join(', ')} — pages will substitute another bucket's sheet and render the outfit from prompt text only`);
+        getCurrentLogger()?.error('avatar_category_missing',
+          `Required styled avatar categor${missing.length === 1 ? 'y' : 'ies'} missing after all retries: ${missing.join(', ')} — another bucket's sheet substitutes`,
+          char.name, { artStyle, missing, cached: STYLED_AVATAR_BUCKETS.filter(b => styledAvatarCache.has(getAvatarCacheKey(char.name, b, artStyle))) });
+        const scope = cacheContext.getStore() || _STYLED_LOG_UNSCOPED;
+        let bucket = styledAvatarGenerationLogs.get(scope);
+        if (!bucket) { bucket = []; styledAvatarGenerationLogs.set(scope, bucket); }
+        bucket.push({
+          timestamp: new Date().toISOString(),
+          characterName: char.name,
+          artStyle,
+          clothingCategory: missing.join(', '),
+          success: false,
+          warning: `required categor${missing.length === 1 ? 'y' : 'ies'} never generated — another bucket's sheet substitutes as reference`,
+        });
+        if (bucket.length > MAX_GENERATION_LOG_ENTRIES) {
+          bucket.splice(0, bucket.length - MAX_GENERATION_LOG_ENTRIES);
+        }
+      }
+      continue;
+    }
 
     const avatars = char.avatars || char.clothingAvatars;
     const { imageData, source, warnings } = await resolveGuaranteedReference({

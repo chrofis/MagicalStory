@@ -9883,3 +9883,31 @@ child); (b) pin the exact byte-swap line in the recolour rounds.
 
 **Touched files:** `server/lib/images.js` (batch whitelist),
 `server/lib/scoring.js` (applyScore, pickBestVersionIndex). Commit 38426ee26.
+
+## 2026-08-13 — Child-costume moderation failures: safe wording + loud avatar gaps
+
+**Context:** A costumed sheet for a 5-year-old ("yellow shell-shaped bikini top",
+mermaid story job_1786571353564) failed BOTH generation waves on Grok
+`imagine:content-moderated` — deterministically (reproduced locally with the
+exact inputs). The failure was invisible three ways: a thrown generation left no
+styled-avatar audit entry; the failed costume fell back to a 'standard' sheet so
+the zero-avatar guarantee (any-bucket check) never fired; pages rendered the
+costume from prompt text only, with zero trace.
+
+**Decision:** (1) `story-bible-from-beats.txt` + `clothing-review.txt` (check 9):
+a child's swimwear/costume top is a modest full-coverage garment (`swim shirt`,
+one-piece) — never `bikini`, bare chest, or bare midriff. (2)
+`convertAvatarToStyle` pushes an audit entry (success:false + error) before
+rethrowing. (3) `ensureStyledAvatarCoverage` also flags per-REQUIRED-category
+gaps for characters that have some avatar (log.error + generationLog
+`avatar_category_missing` + audit entry; no seeding — bucket substitution
+already serves pages).
+
+**Evidence:** Repro with original wording → Grok 400 content-moderated on
+attempt 1. Wardrobe review replay with check 9 → rewrote the child's top to a
+"short-sleeved swim shirt with two shell-shaped panels" (also caught the boy's
+shell-cup top via checks 8+9). Regeneration with the rewritten wording →
+moderation passed, valid pixar sheet, finalScore 9.
+
+**Touched:** `server/lib/styledAvatars.js`, `prompts/story-bible-from-beats.txt`,
+`prompts/clothing-review.txt`.
