@@ -2889,7 +2889,6 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     sceneReviews,
     timeToScenesMs,
     storyId: target.storyId,
-    beatsSource,
     title: storyData.title || null,
     language: storyData.language || null,
     pageCount,
@@ -2923,7 +2922,6 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
   return {
     stageKind: 'text_refine',
     storyId: target.storyId,
-    beatsSource,
     title: storyData.title || null,
     language: storyData.language || null,
     pageCount: pages.length,
@@ -5201,7 +5199,6 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
 
   return {
     storyId: target.storyId,
-    beatsSource,
     model, modelId: res.modelId,
     elapsedMs: Date.now() - t,
     cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
