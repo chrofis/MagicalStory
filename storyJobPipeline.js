@@ -3895,16 +3895,48 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       fgRefs.push({ name: c.name, photoUrl: avatarUrl });
                     }
                   }
-                  scaleRepairResult = await runScaleRepair(genResult.imageData, pageData.sceneMetadata, {
-                    pageNumber: pageData.pageNumber,
-                    sceneBackground: sceneBackgrounds[pageData.pageNumber]?.imageData || null,
-                    backgroundCharacterRefs: [],  // intentionally empty — see comment above
-                    foregroundCharacterRefs: fgRefs,
-                    backgroundCharacterDescriptions: bgDescriptions,
-                    artStyleDescription: helpers.resolveArtStyle(inputData.artStyle, 'grok') || null,
+                  // ── Scale repair replaced by the scene composite ──────────
+                  // runScaleRepair edits the rendered page and asks Grok to
+                  // shrink the background figure. Measured 2026-08-13: it
+                  // triggers on 42 pages in 30 days and leaves no artefact on
+                  // any of them — no stored prompt, no pre-repair image, and
+                  // the oversized figures ship unchanged.
+                  //
+                  // The composite instead rebuilds the page from a silhouette
+                  // plate whose figure heights come from a ground plane fitted
+                  // to the adults actually painted, then blends once. On the
+                  // same pages it produced correct depth where scale repair
+                  // produced none. Three Grok calls (~$0.06) against one.
+                  //
+                  // The trigger is unchanged, so this fires exactly where
+                  // scale repair fired. A throw leaves genResult untouched and
+                  // the page ships as rendered.
+                  const { buildCompositeCast, splitCastByStratum } = require('./server/lib/compositeCastBuilder');
+                  const { generateSceneComposite } = require('./server/lib/sceneComposite');
+                  const compositeCast = await buildCompositeCast(pageData, inputData, {
+                    userId, log, storyCharacterAvatars,
+                  });
+                  if (!compositeCast || !compositeCast.length) {
+                    throw new Error('composite cast empty — falling back to the rendered page');
+                  }
+                  const { backCast, frontCast } = splitCastByStratum(compositeCast);
+                  const fdMeta = pageData.sceneMetadata?.fullData || pageData.sceneMetadata || {};
+                  const compRes = await generateSceneComposite({
+                    compositeStrategy: 'uniform',
+                    cast: compositeCast, frontCast, backCast,
+                    scene: {
+                      description: String(fdMeta.description || pageData.sceneDescription || ''),
+                      artStyle: inputData.artStyle || 'watercolor',
+                      pageBrief: String(fdMeta.pageBrief || pageData.sceneDescription || ''),
+                      interactions: fdMeta.interactions || [],
+                    },
+                    cleanBackgroundPrompt: String(pageData.emptyScenePrompt || fdMeta.emptyScenePrompt || ''),
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                     usageTracker: addUsage,
                   });
+                  scaleRepairResult = compRes?.imageData
+                    ? { imageData: compRes.imageData, modelId: 'scene-composite', prompt: compRes.debug?.populatedPlatePrompt || null, grokRefImages: null, debug: compRes.debug || null }
+                    : null;
                 }
               } catch (e) {
                 log.warn(`⚠️ [SCALE-REPAIR] Page ${pageData.pageNumber} failed: ${e.message}`);
