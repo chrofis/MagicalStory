@@ -3191,6 +3191,137 @@ async function runInpaintStage(ctx, { experimentId, params = {} }) {
   };
 }
 
+/**
+ * Rebuild one page through the SCENE COMPOSITE instead of a direct render:
+ * plate with colour silhouettes → depopulate → detect → paste real avatar
+ * cut-outs at corrected stature → blend.
+ *
+ * Deliberately 1:1 with what the page already has — same stored
+ * emptyScenePrompt, same scene description, same per-page clothing, same cast
+ * and aspect ratio — so a run is directly comparable against the page's
+ * existing versions rather than against a differently-prompted scene.
+ *
+ * NOTE this reaches generateSceneComposite directly. The composite is disabled
+ * for production generation (kill-switch, server.js) and this stage does not
+ * change that: it is the Lab harness for deciding whether the path is worth
+ * re-enabling, and nothing here writes an active page version.
+ *
+ * params:
+ *   strategy 'uniform' (default) | 'stratified'
+ *   facing   'threeQuarter' (default, identical to production) | 'derive'
+ *   blend    true (default) — false stops after the paste, which is the step
+ *            the stature work actually controls, and saves a Grok call
+ */
+async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildCompositeCast, splitCastByStratum } = require('./compositeCastBuilder');
+  const { generateSceneComposite, generateStratifiedComposite, POSE_CELL } = require('./sceneComposite');
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const { storyData, userId } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
+
+  const scene = ctx.scene || {};
+  const fd = scene.sceneMetadata?.fullData || scene.sceneMetadata || {};
+  const strategy = params.strategy === 'stratified' ? 'stratified' : 'uniform';
+  const facing = params.facing === 'derive' ? 'derive' : 'threeQuarter';
+  const wantBlend = params.blend !== false;
+
+  const cast = await buildCompositeCast({
+    sceneMetadata: scene.sceneMetadata,
+    sceneCharacters: fd.characters || scene.sceneCharacters,
+    perCharClothing: scene.sceneCharacterClothing || {},
+    scene: fd,
+  }, {
+    artStyle: ctx.artStyle || storyData.artStyle,
+    characters: storyData.characters || [],
+    clothingRequirements: storyData.clothingRequirements || storyData.outline?.clothingRequirements || {},
+  }, { userId, log, storyCharacterAvatars: storyData.characterAvatars || null });
+
+  if (!cast || !cast.length) throw new Error('composite cast is empty — page has no scene characters, or no story avatar sheets');
+
+  // Facing. Scene-expansion emits no `pose` today (verified: 0 of 23 scene
+  // characters on a real story), so production — the composite AND normal page
+  // rendering, which share cropAvatarCell — lands on threeQuarter for every
+  // figure. 'derive' is the A/B arm: turn the declared position into a facing
+  // so side figures look toward the middle of the frame.
+  for (const c of cast) {
+    if (facing !== 'derive') continue;
+    const s = String(c.position || '').toLowerCase();
+    if (s.includes('left') && !s.includes('center')) { c.pose = 'threeQuarter'; c.flip = false; }
+    else if (s.includes('right') && !s.includes('center')) { c.pose = 'threeQuarter'; c.flip = true; }
+    else { c.pose = 'front'; c.flip = false; }
+  }
+
+  const { backCast, frontCast } = splitCastByStratum(cast);
+  const compositeScene = {
+    description: String(fd.description || scene.sceneDescription || '').slice(0, 900),
+    artStyle: ctx.artStyle || storyData.artStyle || 'watercolor',
+    pageBrief: String(scene.compositeBrief || fd.pageBrief || scene.sceneDescription || '').slice(0, 1200),
+    interactions: fd.interactions || [],
+  };
+  const cleanBackgroundPrompt = String(scene.emptyScenePrompt || fd.emptyScenePrompt || scene.sceneDescription || '').slice(0, 900);
+
+  const usage = [];
+  const t0 = Date.now();
+  const fn = strategy === 'stratified' ? generateStratifiedComposite : generateSceneComposite;
+  const res = await fn({
+    compositeStrategy: strategy,
+    cast, frontCast, backCast,
+    scene: compositeScene,
+    cleanBackgroundPrompt,
+    aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+    skipBlend: !wantBlend,
+    usageTracker: (provider, u, fnName, modelId) => usage.push({ provider, fn: fnName, modelId, cost: u?.cost || 0 }),
+  });
+  const elapsedMs = Date.now() - t0;
+
+  // Every intermediate goes into the Lab as a step image. The whole point of
+  // the stage is to see WHERE it breaks, not just the final frame.
+  const dbg = res.debug || {};
+  const steps = [];
+  const STEP_LABELS = [
+    ['populatedPlate', '1 · plate with colour silhouettes'],
+    ['cleanBackground', '2 · depopulated (silhouettes removed)'],
+    ['composited', '3 · avatar cut-outs pasted (raw, pre-blend)'],
+  ];
+  for (const [key, label] of STEP_LABELS) {
+    const uri = dbg[key];
+    if (typeof uri !== 'string' || !uri.startsWith('data:image')) continue;
+    try {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, uri, experimentId);
+      steps.push({ label, imageType: 'tl_step', versionIndex: v });
+    } catch (err) {
+      log.warn(`[TESTLAB] composite step "${key}" not saved: ${err.message}`);
+    }
+  }
+
+  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, res.imageData, experimentId);
+
+  return {
+    imageType: 'scene',
+    versionIndex,
+    elapsedMs,
+    steps: steps.length ? steps : undefined,
+    strategy,
+    facing,
+    blended: wantBlend,
+    modelCalls: usage.length,
+    cost: usage.reduce((a, u) => a + (u.cost || 0), 0),
+    cast: cast.map(c => ({
+      name: c.name, age: c.age, depth: c.depth, position: c.position,
+      pose: c.pose, flip: !!c.flip, cell: POSE_CELL[c.pose], color: c.color,
+    })),
+    // The measurements the stature work turns on — box as painted, head band,
+    // what the figure was scaled to, and which rule decided it.
+    placements: dbg.placements || null,
+    bboxes: dbg.bboxes || null,
+    plateHeadRatio: dbg.plateHeadRatio || null,
+    statureModel: dbg.statureModel || null,
+    promptUsed: dbg.populatedPlatePrompt || null,
+    cleanBackgroundPrompt,
+  };
+}
+
 /** Full page re-render via the iterate path (iteratePageCore). */
 async function runIterateStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
@@ -4761,6 +4892,7 @@ const STAGE_RUNNERS = {
   scene_expansion: runSceneExpansionStage,
   scene_expansion_ab: runSceneExpansionAbStage,
   scene_variant: runSceneVariantStage,
+  scene_composite: runSceneCompositeStage,
   scene_description: runSceneDescriptionStage,
   rewrite_blocked: runRewriteBlockedStage,
   repair_verify: runRepairVerifyStage,

@@ -341,6 +341,7 @@ export const TESTLAB_STAGES = [
   { id: 'consolidate', label: 'Feedback consolidator', producesImage: false, overridable: true },
   { id: 'inpaint', label: 'Inpaint repair', producesImage: true, overridable: false },
   { id: 'iterate', label: 'Iterate (full regen)', producesImage: true, overridable: false },
+  { id: 'scene_composite', label: 'Scene composite (silhouette → paste avatars)', producesImage: true, overridable: false },
   { id: 'repair_round', label: 'Auto repair round', producesImage: true, overridable: false },
   { id: 'edit_image', label: 'Edit image (freeform)', producesImage: true, overridable: true, noTemplate: true },
   { id: 'artifact_repair', label: 'Artifact repair (grid)', producesImage: true, overridable: false },

@@ -77,6 +77,41 @@ const DEFAULT_PALETTE_NAMES = {
   '#8B00B0': 'purple',
   '#00B0B0': 'cyan',
 };
+// Head tint per body colour — same hue, mixed ~50% with white. The head+neck
+// of every placeholder is painted in this instead of the body colour, which
+// makes head height directly MEASURABLE rather than inferred.
+//
+// Why: head height × canonical heads-per-body gives a figure's full height
+// from the silhouette alone — no horizon estimate, no second figure needed —
+// which is the only way to know how much of a frame-clipped figure is cut off.
+// Deriving the head from the silhouette's shape instead does not work: it
+// needs a neck notch in the row-width profile, and that notch disappears
+// whenever a hand is raised to the head or hair covers the neck. Measured
+// 2026-08-12 on two plates: no notch on 3 of 3 clipped foreground figures.
+//
+// Same hue keeps character separation intact (hue is what tells red from
+// blue); the split from the body is by BRIGHTNESS — every base palette colour
+// has a zero min-channel, the tints sit near 128, so the threshold is wide.
+const HEAD_TINTS = {
+  '#E60000': '#F38080',
+  '#0050D0': '#80A8E8',
+  '#00B050': '#80D8A8',
+  '#F0C000': '#F8E080',
+  '#8B00B0': '#C580D8',
+  '#00B0B0': '#80D8D8',
+};
+// A pixel is head-tint rather than body colour when its darkest channel is
+// bright. Measured on a real two-tone plate (2026-08-12): faces land at
+// min-channel 173-185, bodies at 35-71 — so 120 sits in the middle of a wide
+// gap. Note the body figure is NOT always near zero: a mid-green body measured
+// 71, which is why the threshold is not just "above black".
+const HEAD_TINT_MIN_CHANNEL = 120;
+// Saturation floor separating a silhouette BODY from both the pale head tint
+// and from scenery. 0.55 was too strict once Grok renders in watercolor — a
+// mid-green body measures 0.59 at its best and fragments below the floor,
+// which shattered a figure into a 27x55 scrap. Sunlit path and dirt, the
+// scenery that shares a red hue, measure ~0.23, so 0.45 clears both.
+const BODY_SAT_FLOOR = 0.45;
 
 // ─── Grok aspect preset picker ────────────────────────────────────────────
 //
@@ -316,24 +351,48 @@ async function findSilhouettesByDiff(populatedBuf, cleanBgBuf, cast, opts = {}) 
     const tb = parseInt(c.color.slice(5, 7), 16);
     const targetHue = rgbToHue(tr, tg, tb);
 
+    // TWO masks, deliberately different saturation floors.
+    //
+    // colourMask (0.55) is the BODY and it defines the bbox. The floor has to
+    // stay strict: the depopulate call repaints the whole image, so the diff
+    // mask carries noise everywhere, and saturation is the only thing keeping
+    // warm scenery out of a red figure. Relaxing this floor to catch heads put
+    // 68 px of sunlit path into Emma's silhouette on staging story
+    // job_1786484554633_crojok432 p7, which dragged her box to the frame edge
+    // and made a fully visible figure look clipped.
+    //
+    // paleMask (0.15) is the HEAD TINT only, and it is searched near the top of
+    // the body box, never across the canvas. Grok paints the tint paler than
+    // specified — measured 0.22-0.29 where the spec asks 0.47 — so this floor
+    // must sit low, and it can afford to because of where it is applied.
     const colourMask = new Uint8Array(W * H);
+    const paleMask = new Uint8Array(W * H);
     for (let p = 0; p < W * H; p++) {
       if (!diffMask[p]) continue;
       const i = p * 4;
       const r = popD[i], g = popD[i + 1], b = popD[i + 2];
       const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      if (mx < 80) continue;
       const sat = (mx - mn) / (mx || 1);
-      if (sat < 0.55 || mx < 80) continue;
+      if (sat < 0.15) continue;
       let dh = Math.abs(rgbToHue(r, g, b) - targetHue);
       if (dh > 180) dh = 360 - dh;
-      if (dh <= HUE_THRESHOLD) colourMask[p] = 1;
+      if (dh > HUE_THRESHOLD) continue;
+      if (sat >= BODY_SAT_FLOOR) colourMask[p] = 1;
+      else if (mn > HEAD_TINT_MIN_CHANNEL) paleMask[p] = 1;
     }
 
-    // Flood fill — track the biggest blob and remember its pixels.
+    // Flood fill — collect EVERY blob of this colour, not just the biggest.
+    // A silhouette is routinely split into disconnected fragments: anything
+    // the character holds in front of themselves (a map, a letter, a lantern)
+    // cuts the coloured region in two. Keeping only the largest fragment
+    // measures a fraction of the figure — on staging story
+    // job_1786277779744_vorw1f7ve p4 the green adult was split by the map he
+    // holds and came back as 60×121 where the silhouette is 85×230, i.e. 47%
+    // short. Because that adult was the page's only stature anchor, every
+    // figure on the page was then pasted at roughly half its correct size.
     visited.fill(0);
-    let bestCount = 0;
-    let bestPixels = null;
-    let bestMinX = 0, bestMinY = 0, bestMaxX = 0, bestMaxY = 0;
+    const blobs = [];
     for (let p = 0; p < W * H; p++) {
       if (!colourMask[p] || visited[p]) continue;
       let top = 0;
@@ -351,28 +410,102 @@ async function findSilhouettesByDiff(populatedBuf, cleanBgBuf, cast, opts = {}) 
         if (y > 0)     { const n=q-W; if (colourMask[n]&&!visited[n]) { visited[n]=1; stack[top++]=n; } }
         if (y < H - 1) { const n=q+W; if (colourMask[n]&&!visited[n]) { visited[n]=1; stack[top++]=n; } }
       }
-      if (count > bestCount) {
-        bestCount = count; bestPixels = pixels;
-        bestMinX = minX; bestMinY = minY; bestMaxX = maxX; bestMaxY = maxY;
-      }
+      blobs.push({ count, minX, minY, maxX, maxY, pixels });
     }
+    blobs.sort((a, b) => b.count - a.count);
+    if (!blobs.length || blobs[0].count < MIN_BLOB_PIXELS) { results[c.name] = null; continue; }
 
-    if (bestCount < MIN_BLOB_PIXELS) { results[c.name] = null; continue; }
+    // Merge fragments that belong to the same figure. A human silhouette is
+    // one vertical stack, so a fragment joins when it shares the anchor's
+    // column (≥50% horizontal overlap of the narrower box) and sits within
+    // one anchor-height above or below it — enough to bridge a held object,
+    // not enough to swallow an unrelated patch elsewhere in the scene.
+    //
+    // The gap is measured against the FROZEN anchor height, never the running
+    // merged height: a running height ratchets upward with each merge and
+    // lets arbitrarily distant patches chain in (the oversized-cutout bug on
+    // staging story 9s2poh79f page 3).
+    const anchor = blobs[0];
+    const anchorH = anchor.maxY - anchor.minY + 1;
+    let minX = anchor.minX, minY = anchor.minY, maxX = anchor.maxX, maxY = anchor.maxY;
+    let mergedCount = anchor.count;
+    const mergedPixels = [anchor.pixels];
+    for (let i = 1; i < blobs.length; i++) {
+      const b = blobs[i];
+      if (b.count < MIN_BLOB_PIXELS / 4) continue;
+      const bW = b.maxX - b.minX + 1;
+      const aW = maxX - minX + 1;
+      const overlapW = Math.max(0, Math.min(maxX, b.maxX) - Math.max(minX, b.minX) + 1);
+      if (overlapW / Math.min(aW, bW) < 0.5) continue;
+      const vGap = Math.max(0, Math.max(minY, b.minY) - Math.min(maxY, b.maxY));
+      if (vGap > anchorH) continue;
+      minX = Math.min(minX, b.minX); minY = Math.min(minY, b.minY);
+      maxX = Math.max(maxX, b.maxX); maxY = Math.max(maxY, b.maxY);
+      mergedCount += b.count;
+      mergedPixels.push(b.pixels);
+    }
 
     // Full-canvas silhouette mask: downstream needs absolute coordinates so
     // cropPhantom can build a context window of arbitrary padding and still
     // know which pixels belong to this character.
     const sMask = new Uint8Array(W * H);
-    for (const q of bestPixels) sMask[q] = 1;
+    for (const px of mergedPixels) for (const q of px) sMask[q] = 1;
+
+    // Head band — the pale-tint rows. Same hue as the body (so it is already
+    // inside sMask), separated by brightness. Measuring it beats inferring a
+    // neck from the silhouette's outline, which fails whenever a raised hand
+    // or hair fills the neck.
+    //
+    // Take the LONGEST run of pale rows, not the first: a stray pale pixel in a
+    // highlight opens a one-row band near the crown and a first-run rule then
+    // discards the real face below it.
+    //
+    // Search only the top of the figure — the head cannot be below it — and a
+    // little above the body box, because when hair does not overhang, the face
+    // itself is the topmost part and sits outside the saturated body mask.
+    const bodyH = maxY - minY + 1;
+    const padX = Math.round((maxX - minX + 1) * 0.15);
+    const scanTop = Math.max(0, minY - Math.round(bodyH * 0.35));
+    const scanBot = Math.min(H - 1, minY + Math.round(bodyH * 0.5));
+    const paleRow = new Array(scanBot - scanTop + 1).fill(0);
+    for (let y = scanTop; y <= scanBot; y++) {
+      let n = 0;
+      for (let x = Math.max(0, minX - padX); x <= Math.min(W - 1, maxX + padX); x++) {
+        if (paleMask[y * W + x]) n++;
+      }
+      paleRow[y - scanTop] = n;
+    }
+    let bestFrom = -1, bestTo = -1, bestPx = 0, from = -1, px = 0;
+    for (let i = 0; i <= paleRow.length; i++) {
+      const on = i < paleRow.length && paleRow[i] >= 3;
+      if (on) { if (from < 0) { from = i; px = 0; } px += paleRow[i]; }
+      else if (from >= 0) {
+        if (px > bestPx) { bestPx = px; bestFrom = from; bestTo = i - 1; }
+        from = -1;
+      }
+    }
+    // The head unit in heads-per-body runs crown to chin. The band's bottom is
+    // the chin; its top is the hairline, because hair stays in the body colour.
+    // So the crown is whichever is higher — the body mask's top (hair) or the
+    // pale band's own top (a face with no hair above it).
+    const faceTop = scanTop + bestFrom, faceBot = scanTop + bestTo;
+    const crownY = Math.min(minY, faceTop);
+    const head = bestFrom >= 0 && bestPx >= 30 && faceBot > crownY
+      ? { y: crownY, height: faceBot - crownY + 1, faceY: faceTop, pixels: bestPx }
+      : null;
+    // The pale head is outside the saturated body mask, so the figure's real
+    // extent starts at the crown, not at the shoulders.
+    if (head && head.y < minY) minY = head.y;
 
     results[c.name] = {
       bbox: {
-        x: bestMinX,
-        y: bestMinY,
-        width: bestMaxX - bestMinX + 1,
-        height: bestMaxY - bestMinY + 1,
-        pixels: bestCount,
+        x: minX,
+        y: minY,
+        width: maxX - minX + 1,
+        height: maxY - minY + 1,
+        pixels: mergedCount,
       },
+      head,
       mask: sMask,
     };
   }
@@ -702,7 +835,9 @@ function buildCastLines(cast) {
       }
     })();
     const markerLine = markerSpec ? `\n    Eye markers (inside the head area): ${markerSpec}.` : '';
-    return `- ONE ${c.colorName || ''} silhouette (${c.color}): ${c.name}, ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}.${markerLine}`;
+    const tint = HEAD_TINTS[c.color];
+    const headLine = tint ? `\n    Head and neck (crown down to where the neck meets the shoulders): pale ${c.colorName || ''} ${tint}. Body below the neck: ${c.color}.` : '';
+    return `- ONE ${c.colorName || ''} silhouette (${c.color}): ${c.name}, ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}.${headLine}${markerLine}`;
   }).join('\n');
 }
 
@@ -864,7 +999,8 @@ PRIORITY 2 — Place ${cast.length} flat-colour silhouette figures naturally so 
 ${lines}
 
 SILHOUETTE RENDERING DETAILS:
-- Each silhouette is filled with FULLY SATURATED solid colour at the exact hex above — no gradient, no transparency, no watercolor wash, no shading on the silhouette itself.
+- Each silhouette is filled with flat solid colour at the exact hexes above — no gradient, no transparency, no watercolor wash, no shading on the silhouette itself.
+- TWO TONES per figure: the head and neck use the pale hex, the body below the neck uses the saturated hex. The boundary sits where the neck meets the shoulders and must be a hard edge, never a blend. Hair, hats and raised hands that overlap the head stay in the BODY colour — only the head and neck themselves are pale.
 - Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.
 - Size scales with depth: foreground largest, midground medium, background small.
 
@@ -884,7 +1020,7 @@ function buildDepopulatePrompt(cast) {
     .join(', ');
   return `Remove every flat-colour silhouette figure from this image and paint over each region with the surrounding scenery, so the result reads as the same scene empty of people.
 
-The silhouettes to remove are these solid saturated colours: ${colorList}. Each one is a flat human-shaped block of solid colour with small black eye dots — painted on top of the scene.
+The silhouettes to remove are these solid saturated colours: ${colorList}. Each one is a flat human-shaped block of solid colour — a paler tone of the same colour on the head and neck, the saturated tone on the body, with small black eye dots — painted on top of the scene. Remove the pale head area as well as the saturated body.
 
 DO:
 - Replace each coloured silhouette area with the terrain visible around it — extend the floor, ground, dock, path, wall, water, foliage, sky, or interior background behind it so the patch blends naturally.
@@ -1251,7 +1387,7 @@ function buildFrontDepopulatePrompt(frontCast) {
     .join(', ');
   return `Remove every flat-colour silhouette figure from this image and paint over each region with the surrounding scenery, so the result reads as the same scene with the silhouettes erased.
 
-The silhouettes to remove are these solid saturated colours: ${colorList}. Each one is a flat human-shaped block of solid colour with small black eye dots — painted on top of the scene.
+The silhouettes to remove are these solid saturated colours: ${colorList}. Each one is a flat human-shaped block of solid colour — a paler tone of the same colour on the head and neck, the saturated tone on the body, with small black eye dots — painted on top of the scene. Remove the pale head area as well as the saturated body.
 
 DO:
 - Replace each coloured silhouette area with the terrain visible around it — extend the floor, ground, dock, path, wall, water, foliage, sky, or interior background behind it so the patch blends naturally.
@@ -1376,6 +1512,11 @@ async function generateSceneComposite(opts) {
     // instead of cutting a static standing cell from the 2×4 sheet.
     // Default reads from MODEL_DEFAULTS.phantomPoseRender (false).
     phantomPoseRender = false,
+    // Stop after the paste and return the raw composited canvas. The blend is
+    // a third Grok call that repaints the frame, and it has been observed to
+    // resize the pasted figures — so when the question is what the paste step
+    // produced, skipping it is both cheaper and the honest comparison.
+    skipBlend = false,
   } = opts;
 
   if (!cleanBackgroundPrompt && !scene?.description) {
@@ -1475,9 +1616,28 @@ async function generateSceneComposite(opts) {
   debug.bboxes = bboxes;
   log.info(`[SCENE COMPOSITE]   diff mask: ${detection.diffMaskCount} px (${(100 * detection.diffMaskCount / (detection.canvasWidth * detection.canvasHeight)).toFixed(1)}% of canvas)`);
 
+  // ── Stature correction ──────────────────────────────────────────────────
+  // Grok places figures at the right DEPTH but not reliably at the right
+  // STATURE, so scaling a cutout to bbox.height reproduces its error. The
+  // model (see buildStatureModel) reads the box as a depth probe instead and
+  // derives each figure's height from its own real-world height.
+  const statureModel = buildStatureModel(cast, bboxes, detection.canvasWidth, detection.canvasHeight);
+  const plate = buildPlateHeadRatio(cast, detection.results, detection.canvasHeight);
+  if (plate.ratio) log.info(`[SCENE COMPOSITE]   plate proportions: ${plate.ratio.toFixed(2)} heads per body (from ${plate.n} whole figure${plate.n === 1 ? '' : 's'})`);
+  debug.plateHeadRatio = plate.ratio ? { ratio: Number(plate.ratio.toFixed(3)), fromFigures: plate.n } : null;
+  debug.statureModel = { kind: statureModel.kind, anchors: statureModel.n, skippedAsClipped: statureModel.skipped || [] };
+  debug.heads = Object.fromEntries(cast
+    .map(c => [c.name, detection.results[c.name]?.head || null])
+    .filter(([, h]) => h));
+  log.info(`[SCENE COMPOSITE]   stature model: ${statureModel.kind} (from ${statureModel.n} unclipped adult box${statureModel.n === 1 ? '' : 'es'})`);
+  if (statureModel.skipped?.length) {
+    log.info(`[SCENE COMPOSITE]   not usable as anchors (clipped by the frame): ${statureModel.skipped.join(', ')}`);
+  }
+
   // ── Step 4/5: composite character cutouts onto the derived clean BG
   log.info(`[SCENE COMPOSITE] step 4/5 — composite cutouts${phantomPoseRender ? ' (phantom-pose render ON)' : ''}`);
   const placements = [];
+  const placementLog = [];
   const phantomPoseRenders = {};
   for (const c of cast) {
     const bbox = bboxes[c.name];
@@ -1531,19 +1691,59 @@ async function generateSceneComposite(opts) {
       cutBuf = await trimTransparent(cutBuf);
       if (c.flip) cutBuf = await flipHorizontal(cutBuf);
     }
-    const scaled = await scaleToHeight(cutBuf, bbox.height);
+    // Height + vertical anchor from the stature model. The box still supplies
+    // the horizontal position; whether its BOTTOM is a ground line or just the
+    // edge of the frame is decided by statureTargetFor.
+    const { targetH, anchor, clip, via, paintedFull } = statureTargetFor(
+      c, bbox, statureModel, detection.canvasWidth, detection.canvasHeight,
+      detection.results[c.name]?.head, plate.ratio);
+    if (targetH !== bbox.height) {
+      log.info(`[SCENE COMPOSITE]   ${c.name} (age ${c.age}): box h=${bbox.height}${clip.bottom ? ' (clipped)' : ''} → ${targetH} (${((targetH / bbox.height - 1) * 100).toFixed(0)}%), anchored by ${anchor}, via ${via}`);
+    }
+    let scaled = await scaleToHeight(cutBuf, Math.max(20, targetH));
 
-    const sMeta = await sharp(scaled).metadata();
+    let sMeta = await sharp(scaled).metadata();
     const cx = bbox.x + Math.floor(bbox.width / 2);
     const bottomY = bbox.y + bbox.height;
-    const left = Math.max(0, cx - Math.floor(sMeta.width / 2));
-    const top = Math.max(0, bottomY - sMeta.height);
+    const canvasH = detection.canvasHeight;
+    // 'head': the box bottom is the frame edge, so pin the head where Grok
+    // painted it and let the legs run off-canvas — that is the framing the
+    // plate asked for. 'feet': pin the soles to the painted ground line.
+    let top = anchor === 'head' ? bbox.y : bottomY - sMeta.height;
+    // sharp refuses an overlay that falls outside the base, so trim whatever
+    // leaves the canvas rather than shoving the figure back into frame (which
+    // would move it off its mark).
+    if (top < 0) {
+      scaled = await sharp(scaled).extract({ left: 0, top: -top, width: sMeta.width, height: sMeta.height + top }).png().toBuffer();
+      sMeta = await sharp(scaled).metadata();
+      top = 0;
+    }
+    if (top + sMeta.height > canvasH) {
+      scaled = await sharp(scaled).extract({ left: 0, top: 0, width: sMeta.width, height: canvasH - top }).png().toBuffer();
+      sMeta = await sharp(scaled).metadata();
+    }
+    const left = Math.max(0, Math.min(detection.canvasWidth - sMeta.width, cx - Math.floor(sMeta.width / 2)));
     placements.push({
       input: scaled, left, top,
       _footY: bottomY, _name: c.name, _color: c.color, _bbox: bbox,
     });
+    // Per-figure record of what was measured and what decided the size — the
+    // Lab card shows this, so a run can be judged without re-deriving it.
+    placementLog.push({
+      name: c.name,
+      age: c.age,
+      paintedBox: { w: bbox.width, h: bbox.height, x: bbox.x, y: bbox.y },
+      clipped: clip.bottom ? 'bottom' : (clip.top ? 'top' : null),
+      head: detection.results[c.name]?.head?.height || null,
+      paintedFull: paintedFull || null,
+      targetH,
+      anchor,
+      via,
+      left, top,
+    });
   }
   if (Object.keys(phantomPoseRenders).length > 0) debug.phantomPoseRenders = phantomPoseRenders;
+  debug.placements = placementLog;
 
   if (placements.length === 0) {
     throw new Error('[SCENE COMPOSITE] no characters placed — bbox detection failed for every cast entry');
@@ -1569,6 +1769,15 @@ async function generateSceneComposite(opts) {
   const composited = await sharp(bgBuf).composite(compositeInputs).png().toBuffer();
   const compositedData = `data:image/png;base64,${composited.toString('base64')}`;
   debug.composited = compositedData;
+
+  if (skipBlend) {
+    log.info(`[SCENE COMPOSITE] blend skipped — returning the raw pasted canvas. Total cost $${totalCost.toFixed(4)}, ${placements.length}/${cast.length} characters placed`);
+    return {
+      imageData: compositedData,
+      usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite-noblend' },
+      debug,
+    };
+  }
 
   // ── Step 5/5: Grok edit blend pass
   log.info('[SCENE COMPOSITE] step 5/5 — blend pass');
@@ -1712,6 +1921,210 @@ function _heightCm(age) {
   if (n <= 17) return 172;
   if (n <= 60) return 175;
   return 168;
+}
+
+/**
+ * A silhouette that runs off the edge of the canvas is CLIPPED — its box
+ * height is the visible part of the figure, not the figure. Grok frames
+ * foreground characters knee-up routinely, so this is the common case, not an
+ * edge case. A clipped box may not be used as a stature reference (its height
+ * means nothing) and may not be anchored by its feet (its bottom edge is the
+ * frame, not the ground).
+ */
+function _boxClipping(bbox, canvasW, canvasH, tol = 2) {
+  return {
+    top: bbox.y <= tol,
+    bottom: bbox.y + bbox.height >= canvasH - tol,
+    left: bbox.x <= tol,
+    right: bbox.x + bbox.width >= canvasW - tol,
+  };
+}
+
+/**
+ * Stature model — converts a figure's foot Y into pixels-per-cm at that depth.
+ *
+ * The detected bbox is Grok's painted silhouette. Treat it as a DEPTH probe,
+ * not a height: s = boxHeight / realHeightCm is the pixels-per-cm where that
+ * figure stands. Adults are the reference (their proportions are what Grok
+ * draws most reliably), so fit s as a linear function of foot Y — a ground
+ * plane recedes linearly in screen space — and give every figure
+ * height = s(footY) × its own real height.
+ *
+ * Only UNCLIPPED adult boxes may anchor the fit. Clipped ones measure a
+ * fraction of a body and would drag the whole page down with them.
+ */
+function buildStatureModel(cast, bboxes, canvasW, canvasH, ADULT_AGE = 18) {
+  const pts = [];
+  const skipped = [];
+  for (const c of cast) {
+    const b = bboxes[c.name];
+    if (!b) continue;
+    const age = parseInt(c.age, 10);
+    if (!Number.isFinite(age) || age < ADULT_AGE) continue;
+    const clip = _boxClipping(b, canvasW, canvasH);
+    if (clip.top || clip.bottom) { skipped.push(c.name); continue; }
+    pts.push({ y: b.y + b.height, s: b.height / _heightCm(age) });
+  }
+  if (pts.length >= 2) {
+    const n = pts.length;
+    const sy = pts.reduce((a, p) => a + p.y, 0) / n;
+    const ss = pts.reduce((a, p) => a + p.s, 0) / n;
+    let num = 0, den = 0;
+    for (const p of pts) { num += (p.y - sy) * (p.s - ss); den += (p.y - sy) ** 2; }
+    if (den > 0) {
+      const b1 = num / den, b0 = ss - b1 * sy;
+      return { kind: 'fitted', at: (y) => b0 + b1 * y, n, skipped };
+    }
+  }
+  // One adult only: their s is measured at THEIR depth, so it cannot be
+  // applied unchanged to a figure standing nearer or further away. The
+  // declared depth tier is NOT a usable substitute — measured on p4, the
+  // scene called the children "foreground" and the adult "midground" while
+  // Grok painted all three feet on nearly the same floor line, so a
+  // tier-ratio correction inflated both children by a third for a depth
+  // difference that did not exist.
+  //
+  // Use the geometry instead: on a ground plane apparent size grows linearly
+  // with distance below the horizon, so
+  //   s(y) = s_adult × (y − yHorizon) / (yAdult − yHorizon).
+  // One figure cannot locate the horizon, so assume mid-canvas. This is the
+  // weakest branch in the model and it shows: on an ultra-wide exterior whose
+  // true horizon sat near 0.55·H the assumption alone produced a spurious
+  // 40% shrink. Two unclipped adults remove the guess entirely.
+  if (pts.length === 1) {
+    const yH = 0.45 * (canvasH || 720);
+    const p0 = pts[0];
+    const base = p0.y - yH;
+    if (base <= 1) return { kind: 'constant', at: () => p0.s, n: 1, skipped };
+    return { kind: 'horizon', at: (y) => p0.s * Math.max(0.2, (y - yH) / base), n: 1, skipped };
+  }
+  return { kind: 'none', at: () => null, n: 0, skipped };
+}
+
+/**
+ * Target paste height + vertical anchor for one figure.
+ *
+ * Returns { targetH, anchor } where anchor is 'feet' (align the cutout's
+ * bottom to the box bottom) or 'head' (align its top to the box top, letting
+ * the legs run off-canvas — the correct behaviour for a figure Grok framed
+ * knee-up, where the box bottom is the frame edge and not a ground line).
+ */
+/**
+ * Heads per full body height — the standard artist's scale. A newborn is about
+ * 4 heads tall, an adult about 7.5; children fall between. Combined with a
+ * measured head this gives a figure's full height with no horizon, no ground
+ * plane, and no second figure to compare against.
+ */
+function _headsPerBody(age) {
+  const n = parseInt(age, 10);
+  if (!Number.isFinite(n)) return 7.5;
+  if (n <= 1) return 4.0;
+  if (n <= 3) return 5.0;
+  if (n <= 5) return 5.5;
+  if (n <= 7) return 6.0;
+  if (n <= 10) return 6.5;
+  if (n <= 12) return 7.0;
+  if (n <= 15) return 7.25;
+  return 7.5;
+}
+
+/**
+ * Heads-per-body as THIS plate actually draws it, measured from the figures
+ * whose full height is known (unclipped, with a head band).
+ *
+ * The canonical table is the wrong yardstick for a drawing: Grok renders
+ * children's-book proportions, measured at 3.75–4.29 heads across three plates
+ * for ages 5, 36, 38 and 68 alike, where the anatomical figures are 5.5–7.5.
+ * Feeding canonical numbers in over-estimated a clipped figure by ~2×.
+ * Both sides of the ratio must come from the same drawing convention, so take
+ * it off the plate and fall back to anatomy only when nothing is measurable.
+ */
+function buildPlateHeadRatio(cast, results, canvasH) {
+  const rs = [];
+  for (const c of cast) {
+    const r = results?.[c.name];
+    if (!r || !r.head || r.head.height < 8) continue;
+    if (r.bbox.y + r.bbox.height >= canvasH - 2) continue; // clipped: height unknown
+    rs.push(r.bbox.height / r.head.height);
+  }
+  if (!rs.length) return { ratio: null, n: 0 };
+  rs.sort((a, b) => a - b);
+  return { ratio: rs[Math.floor(rs.length / 2)], n: rs.length };
+}
+
+function statureTargetFor(c, bbox, statureModel, canvasW, canvasH, head = null, plateRatio = null) {
+  const clip = _boxClipping(bbox, canvasW, canvasH);
+  const anchor = clip.bottom && !clip.top ? 'head' : 'feet';
+
+  // A clipped figure hides its own foot line, which is the one input the
+  // ground plane needs. The head band recovers it: head × the plate's own
+  // heads-per-body gives the height Grok PAINTED, so footY follows, and the
+  // stature correction can then run exactly as it does for a whole figure.
+  if (anchor === 'head' && head && head.height >= 8) {
+    const visible = canvasH - bbox.y;
+    const ratio = plateRatio || _headsPerBody(c.age);
+    const paintedFull = Math.round(head.height * ratio);
+    // Sanity band: the painted figure cannot be shorter than what is already
+    // visible, and Grok does not crop above the chest.
+    if (paintedFull >= visible && paintedFull <= visible / 0.35) {
+      const s = statureModel.at(bbox.y + paintedFull);
+      const corrected = Number.isFinite(s) && s > 0
+        ? Math.round(s * _heightCm(c.age))
+        : paintedFull;
+      // Keep the same 0.4–1.6× guard a whole figure gets, now against the
+      // recovered painted height rather than the visible fragment.
+      const targetH = Math.max(Math.round(paintedFull * 0.4), Math.min(Math.round(paintedFull * 1.6), corrected));
+      return { targetH, anchor, clip, corrected: true, visible, paintedFull, ratio, via: 'head+ground-plane' };
+    }
+  }
+  const s = statureModel.at(bbox.y + bbox.height);
+  if (!Number.isFinite(s) || s <= 0) return { targetH: bbox.height, anchor, clip, corrected: false, via: 'painted-box' };
+  const wanted = Math.round(s * _heightCm(c.age));
+  if (anchor === 'head') {
+    // A bottom-clipped silhouette shows only the TOP of the body — Grok frames
+    // foreground characters knee-up as a matter of course. Two things follow:
+    // the head position pins the figure, and the visible span is a fraction of
+    // the body, not the body. Scaling a whole head-to-feet avatar into that
+    // span makes the character too small and fully visible; the legs have to
+    // run off the canvas and be cut instead.
+    //
+    // The feet are below the frame, so solve for them: on a ground plane the
+    // figure's height in pixels is s(footY) × its real height, giving
+    //   footY − headY = s(footY) × heightCm
+    // one equation in one unknown. s() is monotone increasing in y, so bisect.
+    const headY = bbox.y;
+    const visible = canvasH - headY;
+    const cm = _heightCm(c.age);
+    const f = (y) => y - headY - (statureModel.at(y) || 0) * cm;
+    // f can run either way: its slope is (1 − a·heightCm), so a steep ground
+    // plane (or a tall character) flips it negative. Bisect on the sign change
+    // rather than assuming a direction.
+    let lo = headY + visible, hi = headY + visible * 4, footY = null;
+    const fLo = f(lo), fHi = f(hi);
+    if (fLo === 0) footY = lo;
+    else if (fLo * fHi < 0) {
+      const rising = fLo < 0;
+      for (let i = 0; i < 50; i++) {
+        const mid = (lo + hi) / 2;
+        if ((f(mid) < 0) === rising) lo = mid; else hi = mid;
+      }
+      footY = (lo + hi) / 2;
+    }
+    // No crossing means the ground plane is too shallow to seat this figure
+    // (a·heightCm ≥ 1) — the horizon estimate has broken down. Fall back to the
+    // painted span rather than extrapolating off a bad gradient.
+    // Cap the extrapolation either way: Grok crops at the knees or the hips,
+    // never above the chest, so at least 55% of the body stays in frame.
+    const solved = footY ? Math.round(footY - headY) : visible;
+    const targetH = Math.min(Math.round(visible / 0.55), Math.max(visible, solved));
+    return { targetH, anchor, clip, corrected: true, visible, solved, via: footY ? 'ground-plane' : 'painted-span' };
+  }
+  // Whole figure: clamp to 0.4–1.6× the painted box so a bad fit can never
+  // produce an absurd result.
+  const targetH = clip.top
+    ? Math.max(20, wanted)
+    : Math.max(Math.round(bbox.height * 0.4), Math.min(Math.round(bbox.height * 1.6), wanted));
+  return { targetH, anchor, clip, corrected: true, via: 'ground-plane' };
 }
 
 // Parse a position phrase ("left foreground", "right midground", "in the
@@ -2413,6 +2826,9 @@ module.exports = {
   _internal: {
     findColorBbox,
     findSilhouettesByDiff,
+    buildStatureModel,
+    buildPlateHeadRatio,
+    statureTargetFor,
     cropSheetCell,
     removeBackground,
     trimTransparent,
