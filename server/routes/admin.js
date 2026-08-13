@@ -44,6 +44,32 @@ const adminSubroutes = require('./admin/index');
 // requireAdmin is now imported from ../middleware/auth
 
 // =============================================
+// HEALTH REPORT (remote story-doctor routine)
+// =============================================
+
+// POST /api/admin/health-report { subject, report }
+// Emails a plain-text/markdown diagnostic report to ADMIN_EMAIL via Resend.
+// Used by the scheduled remote story-doctor session (docs/decisions.md,
+// 2026-08-13) — it holds an admin Bearer token but no email credentials.
+router.post('/health-report', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { subject, report } = req.body || {};
+    if (!subject || !report || typeof subject !== 'string' || typeof report !== 'string') {
+      return res.status(400).json({ error: 'subject and report (strings) are required' });
+    }
+    if (subject.length > 200 || report.length > 100000) {
+      return res.status(400).json({ error: 'subject max 200 chars, report max 100k chars' });
+    }
+    const { sendAdminHealthReport } = require('../../email');
+    const result = await sendAdminHealthReport(subject, report);
+    res.json({ sent: !!result });
+  } catch (error) {
+    log.error('Health report email failed:', error.message);
+    res.status(500).json({ error: 'Failed to send health report' });
+  }
+});
+
+// =============================================
 // IMPERSONATION
 // =============================================
 

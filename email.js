@@ -1238,6 +1238,41 @@ async function sendAdminWeeklyCostReport(report) {
   }
 }
 
+/**
+ * Generic admin health/diagnostic report (used by the remote story-doctor
+ * routine via POST /api/admin/health-report). The report arrives as plain
+ * text/markdown and is rendered preformatted — no HTML from the caller.
+ */
+async function sendAdminHealthReport(subject, reportText) {
+  if (!resend) {
+    console.log('📧 Email not configured - skipping health report');
+    return null;
+  }
+  const esc = (t) => String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: ADMIN_EMAIL,
+      subject: `[MagicalStory] ${subject}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 760px; margin: 0 auto;">
+          <h2 style="color:#4f46e5;">${esc(subject)}</h2>
+          <pre style="font-family: ui-monospace, Consolas, monospace; font-size: 13px; white-space: pre-wrap; background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">${esc(reportText)}</pre>
+        </div>`,
+    });
+    if (error) {
+      console.error('📧 Health report email error:', error);
+      return null;
+    }
+    console.log(`📧 Health report sent to ${ADMIN_EMAIL}: ${subject}`);
+    return data;
+  } catch (err) {
+    console.error('📧 Health report email failed:', err.message);
+    return null;
+  }
+}
+
 module.exports = {
   // Error handling utilities
   EmailErrorCode,
@@ -1261,4 +1296,5 @@ module.exports = {
   sendAdminOrderFailureAlert,
   sendAdminDailySummary,
   sendAdminWeeklyCostReport,
+  sendAdminHealthReport,
 };
