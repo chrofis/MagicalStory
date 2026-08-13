@@ -3252,12 +3252,23 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
 
   const { backCast, frontCast } = splitCastByStratum(cast);
   const compositeScene = {
-    description: String(fd.description || scene.sceneDescription || '').slice(0, 900),
+    description: String(fd.description || scene.sceneDescription || '').slice(0, 2500),
     artStyle: ctx.artStyle || storyData.artStyle || 'watercolor',
-    pageBrief: String(scene.compositeBrief || fd.pageBrief || scene.sceneDescription || '').slice(0, 1200),
+    pageBrief: String(scene.compositeBrief || fd.pageBrief || scene.sceneDescription || '').slice(0, 2000),
     interactions: fd.interactions || [],
   };
-  const cleanBackgroundPrompt = String(scene.emptyScenePrompt || fd.emptyScenePrompt || scene.sceneDescription || '').slice(0, 900);
+  // The stored emptyScenePrompt opens with a long ART STYLE block and only
+  // reaches **LOCATION:** around char 1350. Blind truncation therefore feeds
+  // the plate nothing but style boilerplate and no setting at all — measured
+  // on job_1786567053374_8ktpkfhec p2, where a Living Room came back as a
+  // lakeside boathouse. Drop the style preamble (artStyle is passed separately
+  // anyway) and keep the part that actually describes the place.
+  const rawBg = String(scene.emptyScenePrompt || fd.emptyScenePrompt || scene.sceneDescription || '');
+  const settingStart = (() => {
+    const m = rawBg.match(/\*\*(SHOT|LOCATION|SETTING)\b/);
+    return m ? m.index : 0;
+  })();
+  const cleanBackgroundPrompt = rawBg.slice(settingStart, settingStart + 3000);
 
   const usage = [];
   const t0 = Date.now();
