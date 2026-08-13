@@ -9939,3 +9939,26 @@ verdict.
 
 **Touched:** `prompts/story-beats-review.txt`, `prompts/story-beats.txt`.
 **Status:** ✅ active.
+
+## 2026-08-13: Themed-world settings must be dressed, and a premise-transformed real place counts
+
+**Context:** A themed story rendered its fantastical-world pages as bare environments
+(empty murky water, one pillar) because the world was a real location and the Art
+Director treated it as documentary. Rule 1b's trigger ("fantastical world") never fired
+and its "a few elements" wording under-delivered even when it did.
+
+**Decision:** Rule 1b in both scene-expansion templates: "a lot of" characteristic
+elements (was "a few"), trigger extended to "a real place the story's premise has
+transformed into one". The per-page template gained rule 1b entirely (its header
+mandates a shared rule set with the all-pages variant, but 1b was missing). Reviewer
+check 7c in scene-review.txt mechanically catches bare themed-world pages and rewrites
+them, adding elements to environment/background only. Validated: exp #577 faulted the
+bare page and dressed it; plot-mandated bleakness was respected, surface pages untouched.
+
+**Also:** PostToolUse hook (`.claude/settings.json` → `scripts/admin/prompt-rules-hook.js`)
+injects the prompt-writing rules (generic / terse / no banners / no justification) after
+every Edit/Write on `prompts/*.txt` — the mechanical counterpart of the pre-edit
+SETTLED hook, added after a story-specific example nearly shipped into a shared template.
+
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`,
+`prompts/scene-review.txt`, `.claude/settings.json`, `scripts/admin/prompt-rules-hook.js`.
