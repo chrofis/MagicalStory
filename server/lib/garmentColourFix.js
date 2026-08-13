@@ -76,6 +76,23 @@ const DEFAULTS = {
   observedMaxChromaForNeutral: 22,
   observedMaxDeltaL: 32,
   observedLightnessMargin: 10,
+  // MASK MODE — how the page-side pixels are chosen. Compared head-to-head in
+  // the Lab; see decisions.md 2026-08-13.
+  //   'dino-sam'        text->box->silhouette (the original)
+  //   'dino-sam-points' the same, steered by colour point prompts
+  //   'colour'          pixels that ARE the reported bad colour, no detector
+  //   'intersect'       dino-sam AND colour
+  maskMode: 'dino-sam',
+  // Colour selection (see selectBadColourPixels).
+  selectHueDeg: 40,
+  selectMinChroma: 10,
+  selectSkinMargin: 18,
+  headGrowSide: 0.45,
+  headGrowUp: 0.55,
+  // Ask a vision model whether the marked pixels really are that garment.
+  // 'off' | 'model'. A paid call (~$0.0005), so it is opt-in.
+  verifyMask: 'off',
+  verifyModel: 'gemini-2.5-flash',
   pointGrid: 9,               // 81 samples inside the box
   pointFgDeltaE: 28,
   pointBgDeltaE: 45,
@@ -358,6 +375,158 @@ function deriveColourPoints(cropRaw, cw, ch, box, ref, cfg) {
     labels: [...fgPts.map(() => 1), ...bgPts.map(() => 0)],
     fg: fgPts.length, bg: bgPts.length,
   };
+}
+
+/**
+ * Body region each enum value occupies, as a fraction of the FIGURE crop's
+ * height. This is what the enum buys on the page side: a garment word no
+ * detector can ground still tells us roughly WHERE on a body to look.
+ * Deliberately generous — it is a prior, not a mask.
+ */
+const GARMENT_REGION = Object.freeze({
+  hat: [0, 0.30], top: [0.05, 0.75], jacket: [0.05, 0.80], dress: [0.05, 1.0],
+  pants: [0.40, 1.0], skirt: [0.35, 1.0], shoes: [0.78, 1.0],
+});
+
+/**
+ * Median L*a*b* of THIS figure's skin, sampled from the middle of its own face
+ * box. A global skin rule cannot do this job: `isGarmentPixel` rejects HSL hue
+ * 7-50 as skin, which also rejects tan, gold and cream GARMENTS — measured on
+ * job_1786571353564_0sgrd0f4g p4, where the golden scales of a mermaid tail
+ * were discarded as skin. A per-figure sample separates that character's skin
+ * from a garment that merely looks warm.
+ */
+function figureSkinLab(cropRaw, cw, ch, faceBoxCrop) {
+  if (!faceBoxCrop) return null;
+  const [fx0, fy0, fx1, fy1] = faceBoxCrop;
+  const Ls = [], as = [], bs = [];
+  const y0 = Math.max(0, Math.round(fy0 + (fy1 - fy0) * 0.45));
+  const y1 = Math.min(ch, Math.round(fy0 + (fy1 - fy0) * 0.80));
+  const x0 = Math.max(0, Math.round(fx0 + (fx1 - fx0) * 0.30));
+  const x1 = Math.min(cw, Math.round(fx0 + (fx1 - fx0) * 0.70));
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const i = (y * cw + x) * 3;
+      const l = _rgbToLab(cropRaw[i], cropRaw[i + 1], cropRaw[i + 2]);
+      Ls.push(l[0]); as.push(l[1]); bs.push(l[2]);
+    }
+  }
+  if (Ls.length < 40) return null;
+  const med = arr => arr.slice().sort((u, v) => u - v)[arr.length >> 1];
+  return { L: med(Ls), a: med(as), b: med(bs), samples: Ls.length };
+}
+
+/**
+ * Select the pixels that ARE the reported bad colour — the alternative to
+ * asking a detector where the garment is (owner, 2026-08-13).
+ *
+ * Five conditions, each answering a specific failure measured on
+ * job_1786571353564_0sgrd0f4g p4:
+ *   - inside the enum's body region  → a `top` query cannot repaint a tail;
+ *   - outside the HEAD zone          → sunlit hair is yellow-hued and was being
+ *                                      selected. The zone grows up and sideways
+ *                                      but NEVER below the chin, which is what
+ *                                      swallowed a shell top when it did;
+ *   - chroma above a floor           → excludes water, shadow, white;
+ *   - hue near the reported colour   → the actual selection criterion;
+ *   - far from THIS figure's skin    → per-figure, so a gold garment survives.
+ *
+ * @returns {{alpha:Buffer, count:number, skin:object|null, reason:string|null}}
+ */
+function selectBadColourPixels(cropRaw, cw, ch, opts) {
+  const { ref, cfg, garmentKey, faceBoxCrop } = opts;
+  const alpha = Buffer.alloc(cw * ch);
+  if (!ref) return { alpha, count: 0, skin: null, reason: 'no resolvable observed colour to select on' };
+  const skin = figureSkinLab(cropRaw, cw, ch, faceBoxCrop);
+  const region = GARMENT_REGION[garmentKey] || [0, 1];
+  const ry0 = Math.round(region[0] * ch), ry1 = Math.round(region[1] * ch);
+  let head = null;
+  if (faceBoxCrop) {
+    const [fx0, fy0, fx1, fy1] = faceBoxCrop;
+    const hw = fx1 - fx0, hh = fy1 - fy0;
+    head = {
+      x0: fx0 - hw * cfg.headGrowSide, x1: fx1 + hw * cfg.headGrowSide,
+      y0: fy0 - hh * cfg.headGrowUp, y1: fy1,
+    };
+  }
+  const isHat = garmentKey === 'hat';
+  let count = 0;
+  for (let y = 0; y < ch; y++) {
+    if (y < ry0 || y >= ry1) continue;
+    for (let x = 0; x < cw; x++) {
+      if (head) {
+        const inHead = x >= head.x0 && x < head.x1 && y >= head.y0 && y < head.y1;
+        // Headwear lives IN the head zone; everything else never does.
+        if (isHat ? !inHead : inHead) continue;
+      } else if (isHat) {
+        continue;   // no face box → no way to find the head → select nothing
+      }
+      const i = (y * cw + x) * 3;
+      const lab = _rgbToLab(cropRaw[i], cropRaw[i + 1], cropRaw[i + 2]);
+      const chroma = Math.hypot(lab[1], lab[2]);
+      if (chroma < cfg.selectMinChroma) continue;
+      let d = Math.abs(Math.atan2(lab[2], lab[1]) * DEG - ref.hueDeg) % 360;
+      if (d > 180) d = 360 - d;
+      if (d > cfg.selectHueDeg) continue;
+      if (skin && Math.hypot(lab[0] - skin.L, lab[1] - skin.a, lab[2] - skin.b) < cfg.selectSkinMargin) continue;
+      alpha[y * cw + x] = 255;
+      count++;
+    }
+  }
+  return { alpha, count, skin, reason: null };
+}
+
+/**
+ * Ask a vision model whether the marked pixels are actually that garment
+ * (owner's idea, 2026-08-13). Every other check reasons about colour or
+ * geometry and can be fooled by a mask that is self-consistently wrong — the
+ * per-pixel gate defends whatever dominates the mask, and the colour gate
+ * passes when the evaluator misread the same figure. A model looking at the
+ * marked pixels answers a question none of them can: is this a hat, or is it
+ * a map?
+ *
+ * The overlay tints selected pixels rather than cutting them out, so the model
+ * still sees the surrounding body and can judge the region in context.
+ */
+async function askIsThisTheGarment(cropBuf, alpha, cw, ch, garmentKey, cfg) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return { asked: false, reason: 'no GEMINI_API_KEY' };
+  const { data: raw } = await sharp(cropBuf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const out = Buffer.from(raw);
+  for (let i = 0; i < cw * ch; i++) {
+    if (!alpha[i]) continue;
+    out[i * 3] = Math.round(out[i * 3] * 0.35 + 255 * 0.65);
+    out[i * 3 + 1] = Math.round(out[i * 3 + 1] * 0.35);
+    out[i * 3 + 2] = Math.round(out[i * 3 + 2] * 0.35 + 255 * 0.65);
+  }
+  const overlay = await sharp(out, { raw: { width: cw, height: ch, channels: 3 } })
+    .jpeg({ quality: 88 }).toBuffer();
+  const prompt = `The magenta highlight marks a region of this illustration.
+Answer only about the highlighted region.
+Is the highlighted region the ${garmentKey} worn by the person?
+Reply as JSON: {"isGarment": true|false, "whatItIs": "<what the highlighted region actually is, 5 words max>"}`;
+  const body = {
+    contents: [{ parts: [
+      { inline_data: { mime_type: 'image/jpeg', data: overlay.toString('base64') } },
+      { text: prompt },
+    ] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 200, thinkingConfig: { thinkingBudget: 0 } },
+  };
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${cfg.verifyModel}:generateContent?key=${apiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body), signal: AbortSignal.timeout(60000) });
+    if (!res.ok) return { asked: false, reason: `HTTP ${res.status}`, overlay };
+    const j = await res.json();
+    const text = j?.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('') || '';
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return { asked: false, reason: `unparseable: ${text.slice(0, 80)}`, overlay };
+    const parsed = JSON.parse(m[0]);
+    return { asked: true, isGarment: parsed.isGarment === true, whatItIs: parsed.whatItIs || null, overlay };
+  } catch (e) {
+    return { asked: false, reason: e.message, overlay };
+  }
 }
 
 const { photoAnalyzerUrl: _photoAnalyzerUrl } = require('./photoAnalyzerClient');
@@ -815,36 +984,75 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
   const cropBuf = await sharp(pageBuf).extract({ left: x0, top: y0, width: cw, height: ch }).jpeg({ quality: 95 }).toBuffer();
   const cropUri = toDataUri(cropBuf);
 
-  let det = null, seg = null;
+  // The figure's face box in CROP coordinates — the colour selector needs it to
+  // find this character's own skin and to fence off the hair.
+  const faceBoxCrop = Array.isArray(figure?.faceBox) ? [
+    Math.round(figure.faceBox[1] * W) - x0, Math.round(figure.faceBox[0] * H) - y0,
+    Math.round(figure.faceBox[3] * W) - x0, Math.round(figure.faceBox[2] * H) - y0,
+  ] : null;
+  const { data: cropRawEarly } = await sharp(cropBuf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const mode = cfg.maskMode;
+  report.maskMode = mode;
+
+  let det = null, seg = null, colourSel = null;
+  const needsDetector = mode !== 'colour';
   try {
-    det = await detectGarmentBox(cropUri, { ...cfg, prompt });
-    if (!det) { report.reason = `DINO found no "${garmentKey}" on the page`; return { changed: false, imageData: pageImageData, report, steps }; }
-    // Colour-derived point prompts need the crop's pixels, so decode before
-    // segmenting rather than after. Same buffer the measurement below uses.
-    const { data: preRaw } = await sharp(cropBuf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-    const pts = deriveColourPoints(preRaw, cw, ch, det.box, observedRef, cfg);
-    report.colourPoints = { fg: pts.fg, bg: pts.bg, from: observedRef?.name || null };
-    seg = await segmentGarment(cropUri, det.box, cw, ch, pts);
+    if (needsDetector) {
+      det = await detectGarmentBox(cropUri, { ...cfg, prompt });
+      if (!det) { report.reason = `DINO found no "${garmentKey}" on the page`; return { changed: false, imageData: pageImageData, report, steps }; }
+      const pts = mode === 'dino-sam-points'
+        ? deriveColourPoints(cropRawEarly, cw, ch, det.box, observedRef, cfg)
+        : { points: null, labels: null, fg: 0, bg: 0 };
+      report.colourPoints = { fg: pts.fg, bg: pts.bg, from: observedRef?.name || null };
+      seg = await segmentGarment(cropUri, det.box, cw, ch, pts);
+      report.dinoScore = +Number(det.score).toFixed(2);
+      report.dinoBox = Array.isArray(det.box) ? det.box.map(v => Math.round(v)) : null;
+      report.dinoBoxPx = report.dinoBox
+        ? Math.max(0, (report.dinoBox[2] - report.dinoBox[0])) * Math.max(0, (report.dinoBox[3] - report.dinoBox[1]))
+        : null;
+    }
+    if (mode === 'colour' || mode === 'intersect') {
+      colourSel = selectBadColourPixels(cropRawEarly, cw, ch,
+        { ref: observedRef, cfg, garmentKey, faceBoxCrop });
+      report.colourSelect = {
+        px: colourSel.count, from: observedRef?.name || null,
+        skin: colourSel.skin ? {
+          L: +colourSel.skin.L.toFixed(1), a: +colourSel.skin.a.toFixed(1), b: +colourSel.skin.b.toFixed(1),
+        } : null,
+        reason: colourSel.reason,
+      };
+      if (!colourSel.count) {
+        report.reason = colourSel.reason || `no pixel in the ${garmentKey} region is ${observedRef?.name || 'the reported colour'}`;
+        return { changed: false, imageData: pageImageData, report, steps };
+      }
+      if (mode === 'colour') {
+        seg = { alpha: colourSel.alpha };
+      } else {
+        // INTERSECT: the detector says where, the colour says which pixels.
+        const a = Buffer.alloc(cw * ch);
+        let n = 0;
+        for (let i = 0; i < cw * ch; i++) {
+          if (seg.alpha[i] > 8 && colourSel.alpha[i]) { a[i] = seg.alpha[i]; n++; }
+        }
+        report.intersectPx = n;
+        if (!n) {
+          report.reason = 'detector mask and bad-colour selection do not overlap';
+          return { changed: false, imageData: pageImageData, report, steps };
+        }
+        seg = { alpha: a };
+      }
+    }
   } catch (e) {
     report.reason = `segmentation failed: ${e.message}`;
     return { changed: false, imageData: pageImageData, report, steps };
   }
-  report.dinoScore = +Number(det.score).toFixed(2);
-  // PERSIST THE BOX, not just its score. Without it a bad result is
-  // unattributable: a mask covering the wrong object can mean DINO returned the
-  // wrong box, or that SAM escaped a correct one, and the mask overlay alone
-  // cannot tell those apart. Crop pixel coords, the same ones handed to SAM.
-  report.dinoBox = Array.isArray(det.box) ? det.box.map(v => Math.round(v)) : null;
-  report.dinoBoxPx = report.dinoBox
-    ? Math.max(0, (report.dinoBox[2] - report.dinoBox[0])) * Math.max(0, (report.dinoBox[3] - report.dinoBox[1]))
-    : null;
   report.cropPx = cw * ch;
 
   const { data: cropRaw } = await sharp(cropBuf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   let cur = meanLabMasked(cropRaw, seg.alpha);
   // Grow the mask onto the rim SAM left behind, then re-measure from the full
   // garment so the target offset is computed against every pixel it will touch.
-  if (cur && cur.count >= cfg.minMaskPx && cfg.dilateRadius > 0) {
+  if (mode !== 'colour' && cur && cur.count >= cfg.minMaskPx && cfg.dilateRadius > 0) {
     const grown = dilateMaskByColour(seg.alpha, cropRaw, cw, ch, cur, cfg);
     if (grown.added) {
       seg.alpha = grown.alpha;
@@ -860,6 +1068,26 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
   // a single pixel — this is the check that catches a mask the per-pixel gate
   // cannot, because that one scores pixels against the mask's own mean and so
   // defends whatever object dominates it.
+  // OPTIONAL SECOND OPINION FROM A VISION MODEL. Every other check reasons about
+  // colour or geometry and can be fooled by a self-consistently wrong mask.
+  if (cfg.verifyMask === 'model') {
+    const ask = await askIsThisTheGarment(cropBuf, seg.alpha, cw, ch, garmentKey, cfg);
+    report.maskAsk = { asked: ask.asked, isGarment: ask.isGarment ?? null, whatItIs: ask.whatItIs || null, reason: ask.reason || null };
+    if (options.collectSteps && ask.overlay) {
+      steps.push({
+        label: `${report.name} ASKED THE MODEL — "is the highlighted region the ${garmentKey}?" → `
+          + (ask.asked ? `${ask.isGarment ? 'YES' : 'NO'}${ask.whatItIs ? ` (it is: ${ask.whatItIs})` : ''}` : `not asked (${ask.reason})`),
+        data: toDataUri(ask.overlay),
+      });
+    }
+    if (ask.asked && ask.isGarment === false) {
+      report.reason = `a vision model says the marked pixels are not the ${garmentKey}`
+        + (ask.whatItIs ? ` — it sees ${ask.whatItIs}` : '');
+      log.warn(`⚠️ [GARMENT-COLOUR] ${report.name} ${garmentKey}: ${report.reason} — refusing to repaint`);
+      return { changed: false, imageData: pageImageData, report, steps };
+    }
+  }
+
   const verdict = maskMatchesObservedColour(cur, observedRef, cfg);
   report.observedColour = options.observedColour || null;
   report.observedMatch = verdict.ok;
@@ -977,6 +1205,9 @@ module.exports = {
   garmentQueryFor,
   GARMENT_ENUM,
   GARMENT_VALUES,
+  GARMENT_REGION,
+  selectBadColourPixels,
+  figureSkinLab,
   COLOUR_REFS,
   resolveColourName,
   maskMatchesObservedColour,
