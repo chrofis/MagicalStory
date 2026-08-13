@@ -1120,6 +1120,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // eval as "no score → no version" (recolour) / re-eval (batch retry).
       if (referenceImages.length > 0 && addedCount === 0) {
         log.error(`❌ [EVAL] ${pageContext}: ${referenceImages.length} reference photo(s) supplied, 0 attached — refusing to grade identity-blind; eval fails instead of returning an unanchored score`);
+        // Countable, not just scrollback: shows up in story_metrics counters.
+        try {
+          const sid = evalOptions?.storyMeta?.storyId;
+          if (sid) require('./runMetrics').forJob(sid).count('eval_refs_attach_failed');
+        } catch { /* metrics are best-effort */ }
         return null;
       }
     }
