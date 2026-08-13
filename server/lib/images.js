@@ -3411,20 +3411,15 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       || newSceneMetadata?.characters
       || sceneCharacters
       || [];
+    // Pose + depth resolution is shared with applyStoryCellRefs — beats
+    // metadata carries `perspective` prose, not `pose`, and the inline copy
+    // here served threeQuarter to every declared back-view figure.
+    const { resolveCellPose } = require('./storyAvatars');
     const poseByName = new Map();
     for (const sc of metaChars) {
       const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
       if (!nm) continue;
-      const pose = (sc?.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
-        ? sc.pose : 'threeQuarter';
-      // Depth drives whether we include the head cell alongside the body
-      // cell. Foreground (close-up canvas-large faces) gets head+body
-      // stacked; midground / background get body only — the face inside
-      // the body cell is enough at that scale, and a separate head ref
-      // would just add noise for a small-on-canvas figure.
-      const depth = (sc?.depth && ['foreground', 'midground', 'background'].includes(sc.depth))
-        ? sc.depth : 'foreground';
-      poseByName.set(nm.toLowerCase(), { pose, depth });
+      poseByName.set(nm.toLowerCase(), resolveCellPose(sc));
     }
     for (const ref of referencePhotos) {
       const charName = ref.name;

@@ -142,6 +142,33 @@ function projectStoryCostumeDescriptions(clothingRequirements) {
  * @returns {Promise<Array<Object>>} the same array, with photoUrl swapped
  *   to data-URI cell crops where applicable.
  */
+/**
+ * SINGLE resolver for which 2×4 sheet cell a scene character should get.
+ * Beats metadata never carries `pose` — it declares `perspective` in natural
+ * language ("back view", "profile"). Every cell-picker that read only `pose`
+ * served the threeQuarter cell to ALL beats characters, including declared
+ * back-view figures (job_1786571353564 p10: three back-view adults, all sent
+ * threeQuarter refs). Used by applyStoryCellRefs, the iterate path
+ * (images.js) and the regeneration route — never inline a copy.
+ *
+ * @param {Object|string} sc - scene-metadata character ({name, pose?, perspective?, depth?, flip?})
+ * @returns {{pose: string, depth: string, flip: boolean}}
+ */
+function resolveCellPose(sc) {
+  let pose = (sc?.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
+    ? sc.pose : null;
+  if (!pose && sc?.perspective) {
+    const persp = String(sc.perspective).toLowerCase();
+    if (/\bback\b|behind/.test(persp)) pose = 'back';
+    else if (/profile|side/.test(persp)) pose = 'profile';
+    else if (/front|camera/.test(persp)) pose = 'front';
+  }
+  if (!pose) pose = 'threeQuarter';
+  const depth = (sc?.depth && ['foreground', 'midground', 'background'].includes(sc.depth))
+    ? sc.depth : 'foreground';
+  return { pose, depth, flip: sc?.flip === true };
+}
+
 async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneCharacters) {
   if (!Array.isArray(referencePhotos) || referencePhotos.length === 0) return referencePhotos;
   if (!storyCharacterAvatars || typeof storyCharacterAvatars !== 'object') return referencePhotos;
@@ -151,22 +178,7 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
   for (const sc of (Array.isArray(sceneCharacters) ? sceneCharacters : [])) {
     const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
     if (!nm) continue;
-    let pose = (sc?.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
-      ? sc.pose : null;
-    // Beats metadata never carries `pose` — it declares `perspective` in natural
-    // language ("back view", "profile"). Reading only `pose` meant EVERY beats
-    // character got the threeQuarter cell, including declared back-view figures
-    // (job_1786571353564 p10: three back-view adults, all sent threeQuarter refs).
-    if (!pose && sc?.perspective) {
-      const persp = String(sc.perspective).toLowerCase();
-      if (/\bback\b|behind/.test(persp)) pose = 'back';
-      else if (/profile|side/.test(persp)) pose = 'profile';
-      else if (/front|camera/.test(persp)) pose = 'front';
-    }
-    if (!pose) pose = 'threeQuarter';
-    const depth = (sc?.depth && ['foreground', 'midground', 'background'].includes(sc.depth))
-      ? sc.depth : 'foreground';
-    poseByName.set(nm.toLowerCase(), { pose, depth });
+    poseByName.set(nm.toLowerCase(), resolveCellPose(sc));
   }
 
   for (const ref of referencePhotos) {
@@ -331,6 +343,7 @@ module.exports = {
   projectStoryCharacterAvatars,
   projectStoryCostumeDescriptions,
   applyStoryCellRefs,
+  resolveCellPose,
   appendStoryHistory,
   extractUrl,
 };

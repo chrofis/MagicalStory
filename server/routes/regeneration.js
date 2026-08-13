@@ -1192,16 +1192,15 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
     if (useStorySheetCells && storyData?.characterAvatars && Array.isArray(refApplied.characterPhotos)) {
       const { cropAvatarCell } = require('../lib/sceneComposite');
       const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || [];
+      // Shared resolver — beats metadata carries `perspective` prose, not
+      // `pose`; the inline copy here served threeQuarter to every declared
+      // back-view figure.
+      const { resolveCellPose } = require('../lib/storyAvatars');
       const poseByName = new Map();
       for (const sc of metaChars) {
         const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
         if (!nm) continue;
-        const pose = (sc?.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
-          ? sc.pose : 'threeQuarter';
-        const flip = sc?.flip === true;
-        const depth = (sc?.depth && ['foreground', 'midground', 'background'].includes(sc.depth))
-          ? sc.depth : 'foreground';
-        poseByName.set(nm.toLowerCase(), { pose, flip, depth });
+        poseByName.set(nm.toLowerCase(), resolveCellPose(sc));
       }
       for (const ref of refApplied.characterPhotos) {
         const charName = ref.name;
