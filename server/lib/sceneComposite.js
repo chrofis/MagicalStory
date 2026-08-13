@@ -1712,6 +1712,19 @@ async function generateSceneComposite(opts) {
           sceneDescription: scene?.description || '',
           whiteoutTarget: 'body',
           includeDebug: true,
+          // The repair gates exist to stop a repair DRIFTING a character that
+          // was already drawn correctly. Here the source region is a flat
+          // colour placeholder that we painted ourselves, so their premise is
+          // false and they fire on every figure:
+          //   styleMatch — a flat blob vs a painted person always reads as
+          //     style drift, so the repair is thrown away.
+          //   sharpness  — a flat blob has near-zero detail, so the ratio the
+          //     blur guard compares against is meaningless.
+          // Measured: 1 of 5 figures skipped on one page, 3 of 5 on another,
+          // and every skipped figure leaves its raw silhouette in the finished
+          // page. The geometry gates (iou, whiteCard, coverage, mobilesam) stay
+          // ON — those check placement, not appearance, and are still valid.
+          gates: { styleMatch: false, sharpness: false },
         });
         if (res?.imageData) {
           current = res.imageData;
@@ -1719,8 +1732,11 @@ async function generateSceneComposite(opts) {
           repairLog.push({ name: c.name, bbox: nb.map(v => +v.toFixed(3)), method: res.method || 'grok' });
           log.info(`[SCENE COMPOSITE]   ${c.name}: repaired in place (${res.method || 'grok'})`);
         } else {
-          repairLog.push({ name: c.name, skipped: res?.error || 'repair returned nothing' });
-          log.warn(`[SCENE COMPOSITE]   ${c.name}: repair produced nothing (${res?.error || 'no reason given'})`);
+          // Carry the rejection REASON, not just "nothing" — a silent skip is
+          // what let a raw silhouette ship in the first place.
+          const why = res?.rejectedReason || res?.gateMessage || res?.error || 'repair returned nothing';
+          repairLog.push({ name: c.name, skipped: why });
+          log.warn(`[SCENE COMPOSITE]   ${c.name}: repair produced nothing — ${why}`);
         }
       } catch (err) {
         repairLog.push({ name: c.name, skipped: err.message });
@@ -1744,6 +1760,7 @@ async function generateSceneComposite(opts) {
   log.info(`[SCENE COMPOSITE] step 4/5 — composite cutouts${phantomPoseRender ? ' (phantom-pose render ON)' : ''}`);
   const placements = [];
   const placementLog = [];
+  const cutoutDebug = {};
   const phantomPoseRenders = {};
   for (const c of cast) {
     const bbox = bboxes[c.name];
@@ -1833,6 +1850,10 @@ async function generateSceneComposite(opts) {
       input: scaled, left, top,
       _footY: bottomY, _name: c.name, _color: c.color, _bbox: bbox,
     });
+    // Keep the exact cut-out that was pasted — the figure's own frame is where
+    // a shredded alpha or a wrong sheet cell shows up, and it is invisible in
+    // the flattened canvas.
+    try { cutoutDebug[c.name] = `data:image/png;base64,${scaled.toString('base64')}`; } catch { /* debug only */ }
     // Per-figure record of what was measured and what decided the size — the
     // Lab card shows this, so a run can be judged without re-deriving it.
     placementLog.push({
@@ -1850,6 +1871,7 @@ async function generateSceneComposite(opts) {
   }
   if (Object.keys(phantomPoseRenders).length > 0) debug.phantomPoseRenders = phantomPoseRenders;
   debug.placements = placementLog;
+  debug.cutouts = cutoutDebug;
 
   if (placements.length === 0) {
     throw new Error('[SCENE COMPOSITE] no characters placed — bbox detection failed for every cast entry');

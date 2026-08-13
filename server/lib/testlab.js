@@ -3290,20 +3290,40 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   // the stage is to see WHERE it breaks, not just the final frame.
   const dbg = res.debug || {};
   const steps = [];
+  // EVERY intermediate is stored, not a chosen three. When a run looks wrong
+  // the answer is almost always in a middle frame — the plate that placed a
+  // figure on water, the depopulate that erased a prop, the per-character
+  // repair that got skipped — and a step that was never saved cannot be
+  // inspected after the fact.
   const STEP_LABELS = [
     ['populatedPlate', '1 · plate with colour silhouettes'],
     ['cleanBackground', '2 · depopulated (silhouettes removed)'],
-    ['composited', '3 · avatar cut-outs pasted (raw, pre-blend)'],
+    ['composited', figureMethod === 'charRepair'
+      ? '3 · after character repair (all figures)'
+      : '3 · avatar cut-outs pasted (raw, pre-blend)'],
   ];
-  for (const [key, label] of STEP_LABELS) {
-    const uri = dbg[key];
-    if (typeof uri !== 'string' || !uri.startsWith('data:image')) continue;
+  const saveStep = async (uri, label) => {
+    if (typeof uri !== 'string' || !uri.startsWith('data:image')) return;
     try {
       const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, uri, experimentId);
       steps.push({ label, imageType: 'tl_step', versionIndex: v });
     } catch (err) {
-      log.warn(`[TESTLAB] composite step "${key}" not saved: ${err.message}`);
+      log.warn(`[TESTLAB] composite step "${label}" not saved: ${err.message}`);
     }
+  };
+  for (const [key, label] of STEP_LABELS) await saveStep(dbg[key], label);
+  // Per-character frames: one image after each figure is repaired, so a bad
+  // figure can be traced to the call that produced it.
+  for (const [name, uri] of Object.entries(dbg.charRepairSteps || {})) {
+    await saveStep(uri, `· after repairing ${name}`);
+  }
+  // Each pasted cut-out, exactly as it went onto the canvas.
+  for (const [name, uri] of Object.entries(dbg.cutouts || {})) {
+    await saveStep(uri, `· cut-out used for ${name}`);
+  }
+  // Phantom-pose renders when that path is on.
+  for (const [name, v] of Object.entries(dbg.phantomPoseRenders || {})) {
+    await saveStep(v?.output, `· phantom-pose render for ${name}`);
   }
 
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, res.imageData, experimentId);
