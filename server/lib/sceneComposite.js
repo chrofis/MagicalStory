@@ -1000,6 +1000,7 @@ ${lines}
 
 SILHOUETTE RENDERING DETAILS:
 - Each silhouette is filled with flat solid colour at the exact hexes above — no gradient, no transparency, no watercolor wash, no shading on the silhouette itself.
+- ONLY the human figures are flat colour. Every prop, object and piece of scenery keeps its own natural colours and full rendering, including anything a figure holds, opens, sits on or leans against. Never extend a figure's flat colour onto an object.
 - TWO TONES per figure: the head and neck use the pale hex, the body below the neck uses the saturated hex. The boundary sits where the neck meets the shoulders and must be a hard edge, never a blend. Hair, hats and raised hands that overlap the head stay in the BODY colour — only the head and neck themselves are pale.
 - Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.
 - Size scales with depth: foreground largest, midground medium, background small.
