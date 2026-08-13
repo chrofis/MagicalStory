@@ -1546,7 +1546,16 @@ async function generateSceneComposite(opts) {
     // a third Grok call that repaints the frame, and it has been observed to
     // resize the pasted figures — so when the question is what the paste step
     // produced, skipping it is both cheaper and the honest comparison.
+    // NOT a shippable output on its own: the pasted figures read as stickers.
     skipBlend = false,
+    // How each detected silhouette becomes the real character:
+    //   'paste'      — cut the pose cell out of the 2×4 sheet, scale it by the
+    //                  stature model, paste it, then blend the whole frame.
+    //   'charRepair' — hand the silhouette's box to the SAME character-repair
+    //                  Grok call production already uses for identity fixes,
+    //                  once per figure, so the model paints the character into
+    //                  the scene instead of us compositing pixels into it.
+    figureMethod = 'paste',
   } = opts;
 
   if (!cleanBackgroundPrompt && !scene?.description) {
@@ -1662,6 +1671,73 @@ async function generateSceneComposite(opts) {
   log.info(`[SCENE COMPOSITE]   stature model: ${statureModel.kind} (from ${statureModel.n} unclipped adult box${statureModel.n === 1 ? '' : 'es'})`);
   if (statureModel.skipped?.length) {
     log.info(`[SCENE COMPOSITE]   not usable as anchors (clipped by the frame): ${statureModel.skipped.join(', ')}`);
+  }
+
+  // ── Step 4 alternative: hand each silhouette to character repair.
+  // Instead of compositing pixels into the plate, ask Grok to paint the real
+  // character over the coloured figure — the same call production already uses
+  // for identity fixes. The plate keeps its pose, its contact with the ground
+  // and its occlusion, because the model repaints in place rather than us
+  // pasting a standing cell on top. Costs one Grok call per figure.
+  if (figureMethod === 'charRepair') {
+    const { repairCharacterMismatch } = require('./images');
+    log.info(`[SCENE COMPOSITE] step 4/4 — character repair over the plate (${Object.keys(bboxes).length} figures)`);
+    let current = populated.imageData;
+    const repairLog = [];
+    const repairSteps = {};
+    for (const c of cast) {
+      const bbox = bboxes[c.name];
+      if (!bbox) { repairLog.push({ name: c.name, skipped: 'no silhouette detected' }); continue; }
+      // Char repair takes NORMALISED [ymin, xmin, ymax, xmax].
+      const nb = [
+        bbox.y / detection.canvasHeight,
+        bbox.x / detection.canvasWidth,
+        (bbox.y + bbox.height) / detection.canvasHeight,
+        (bbox.x + bbox.width) / detection.canvasWidth,
+      ];
+      let avatarUri = null;
+      try {
+        const cell = await cropAvatarCell(c.sheetBuf, { pose: c.pose });
+        const buf = cell.body || cell.stacked || cell.face;
+        if (buf) avatarUri = `data:image/png;base64,${buf.toString('base64')}`;
+      } catch (err) {
+        log.warn(`[SCENE COMPOSITE] avatar cell for ${c.name} failed: ${err.message}`);
+      }
+      if (!avatarUri) { repairLog.push({ name: c.name, skipped: 'no avatar cell' }); continue; }
+      try {
+        const res = await repairCharacterMismatch(current, avatarUri, nb, c.name, {
+          imageBackend: 'grok',
+          issueDescription: `The figure is a flat ${c.colorName || ''} placeholder silhouette, not the character. Replace it with ${c.name}.`,
+          clothingDescription: c.clothing || null,
+          sceneDescription: scene?.description || '',
+          whiteoutTarget: 'body',
+          includeDebug: true,
+        });
+        if (res?.imageData) {
+          current = res.imageData;
+          repairSteps[c.name] = res.imageData;
+          repairLog.push({ name: c.name, bbox: nb.map(v => +v.toFixed(3)), method: res.method || 'grok' });
+          log.info(`[SCENE COMPOSITE]   ${c.name}: repaired in place (${res.method || 'grok'})`);
+        } else {
+          repairLog.push({ name: c.name, skipped: res?.error || 'repair returned nothing' });
+          log.warn(`[SCENE COMPOSITE]   ${c.name}: repair produced nothing (${res?.error || 'no reason given'})`);
+        }
+      } catch (err) {
+        repairLog.push({ name: c.name, skipped: err.message });
+        log.warn(`[SCENE COMPOSITE]   ${c.name}: repair threw — ${err.message}`);
+      }
+      if (usageTracker) usageTracker('grok', { cost: 0.02 }, 'scene_composite_char_repair', GROK_MODELS.STANDARD);
+      totalCost += 0.02;
+    }
+    debug.charRepairLog = repairLog;
+    debug.charRepairSteps = repairSteps;
+    debug.composited = current;
+    log.info(`[SCENE COMPOSITE] complete (charRepair) — total cost $${totalCost.toFixed(4)}`);
+    return {
+      imageData: current,
+      usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite-charrepair' },
+      debug,
+    };
   }
 
   // ── Step 4/5: composite character cutouts onto the derived clean BG

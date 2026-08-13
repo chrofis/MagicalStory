@@ -3223,6 +3223,9 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   const strategy = params.strategy === 'stratified' ? 'stratified' : 'uniform';
   const facing = params.facing === 'derive' ? 'derive' : 'threeQuarter';
   const wantBlend = params.blend !== false;
+  // 'paste' composites cut-outs and blends; 'charRepair' hands each silhouette
+  // to the production character-repair call instead.
+  const figureMethod = params.figureMethod === 'charRepair' ? 'charRepair' : 'paste';
 
   const cast = await buildCompositeCast({
     sceneMetadata: scene.sceneMetadata,
@@ -3278,6 +3281,7 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     cleanBackgroundPrompt,
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
     skipBlend: !wantBlend,
+    figureMethod,
     usageTracker: (provider, u, fnName, modelId) => usage.push({ provider, fn: fnName, modelId, cost: u?.cost || 0 }),
   });
   const elapsedMs = Date.now() - t0;
@@ -3311,7 +3315,9 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     steps: steps.length ? steps : undefined,
     strategy,
     facing,
-    blended: wantBlend,
+    figureMethod,
+    blended: figureMethod === 'charRepair' ? false : wantBlend,
+    charRepairLog: (res.debug || {}).charRepairLog || null,
     modelCalls: usage.length,
     cost: usage.reduce((a, u) => a + (u.cost || 0), 0),
     cast: cast.map(c => ({
@@ -5046,6 +5052,59 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
 
 
 /**
+ * STORY SCORECARD — an LLM judge rates the four FINAL text artifacts (beats,
+ * scene briefs, story text, visual bible) on a 4×5 dimension rubric so
+ * different generation models can be compared. Reviewer-judged, final outputs
+ * only; the rubric + extraction + math live in server/lib/storyScorecard.js so
+ * the CLI (scripts/analysis/score-story.js) and this stage never diverge.
+ *
+ * params.model : a TEXT_MODELS key for the judge (default: outlineReviewModel).
+ * promptOverride: swap the judge rubric prompt for an A/B.
+ */
+async function runStoryScorecardStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { callTextModelStreaming } = require('./textModels');
+  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const sc = require('./storyScorecard');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  if (!(storyData.sceneDescriptions || []).length && !storyData.storyText) {
+    throw new Error('story has no final artifacts to score (no sceneDescriptions / storyText)');
+  }
+
+  const model = String(params.model || MODEL_DEFAULTS.outlineReviewModel).trim();
+  if (!TEXT_MODELS[model]) throw new Error(`Unknown judge model "${model}"`);
+
+  const template = promptOverride || PROMPT_TEMPLATES.storyScorecardJudge;
+  if (!template) throw new Error('story-scorecard-judge template unavailable');
+  const prompt = `${template}\n\n---\n\n${sc.buildJudgeInput(storyData)}`;
+
+  const t = Date.now();
+  const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_story_scorecard', temperature: 0 });
+  if (!res || !res.text || !res.text.trim()) throw new Error(`judge returned empty response (model ${model})`);
+
+  const scored = sc.scoreFromDims(sc.parseJudgeJson(res.text)); // throws loudly on a malformed rubric
+
+  return {
+    storyId: target.storyId,
+    scorecard: {
+      ...scored,
+      title: storyData.title || null,
+      language: storyData.language || null,
+      artStyle: storyData.artStyle || null,
+      models: sc.provenanceOf(storyData),
+      judgeModel: model,
+    },
+    modelId: res.modelId,
+    elapsedMs: Date.now() - t,
+    cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+    usage: res.usage,
+  };
+}
+
+
+/**
  * STORY BIBLE REPLAY — re-derive the clothing contract for an EXISTING story.
  *
  * The costume descriptions are written once, in the story-bible stage, and every
@@ -5415,6 +5474,7 @@ const STORY_STAGES = {
   story_text_replay: runStoryTextReplayStage,
   writer_compare: runWriterCompareStage,
   clothing_review: runClothingReviewStage,
+  story_scorecard: runStoryScorecardStage,
 };
 
 // Avatar stages take {storyId, character} targets, not page targets.
