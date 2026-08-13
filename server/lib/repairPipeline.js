@@ -2784,6 +2784,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       consolidatedPlan: v.consolidatedPlan || null,
       scoreSource: v.scoreSource || null,
       evalScore: v.evalScore ?? null,
+      // Eval↔bytes fingerprint (applyScore stamp). Without this whitelist line
+      // the guard exists only in-memory — post-persist re-picks (regeneration
+      // routes) would silently lose the integrity check.
+      evalImageFp: v.evalImageFp ?? null,
       entityPenalty: v.entityPenalty ?? 0,
       // entityPenaltyRaw says how much entity penalty was capped away.
       entityPenaltyRaw: v.entityPenaltyRaw ?? null,
