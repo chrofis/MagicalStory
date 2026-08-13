@@ -82,7 +82,20 @@ const DEFAULTS = {
   //   'dino-sam-points' the same, steered by colour point prompts
   //   'colour'          pixels that ARE the reported bad colour, no detector
   //   'intersect'       dino-sam AND colour
+  //   'highlight-dino'  paint the bad-colour pixels pink, ask DINO to box THAT,
+  //                     then run SAM on the ORIGINAL pixels in that box
+  //   'colour-box-sam'  bounding box of the bad-colour pixels -> SAM on the original
   maskMode: 'dino-sam',
+  // Connected components — a garment is one connected thing (shoes are two).
+  // Colour matching alone also picks up eye glints and specks on an arm.
+  connectedOnly: true,
+  minComponentPx: 150,
+  keepComponents: 2,
+  // The colour the bad pixels are painted for 'highlight-dino'. Magenta because
+  // no garment in a children's illustration is naturally this saturated, so the
+  // highlight cannot be confused with the art.
+  highlightRGB: [255, 0, 255],
+  highlightPadPx: 6,
   // Multi-phrase garment queries (see detectGarmentBoxMulti). 'single' asks one
   // phrasing, 'multi' asks the enum's alternatives and keeps the most plausible.
   queryMode: 'single',
@@ -176,20 +189,27 @@ const DEFAULTS = {
  * from a guess — the same trade as the no-default clothing category.
  */
 const GARMENT_ENUM = Object.freeze({
+  // QUERIES: one bare noun, one "worn by the person", one anchored to a BODY
+  // PART. Measured on job_1786571353564_0sgrd0f4g p4 (Lab 578): "the shirt worn
+  // by the person" gave 82% of the crop and "the upper body clothing worn by the
+  // person" 83% — both the whole figure — while "the top worn on the chest" gave
+  // 3% and was the shell top. Broader CATEGORY wording made it worse; anatomical
+  // anchoring made it work. The bare noun is included because short prompts and
+  // long prompts fail differently and this is cheap to ask.
   hat: { query: 'the hat worn by the person', covers: 'any headwear — hat, cap, hood, headscarf, and its band or trim',
-    queries: ['the hat worn by the person', 'the headwear worn by the person', 'the hat on the head'] },
+    queries: ['hat', 'the hat worn by the person', 'the hat on the head'] },
   top: { query: 'the shirt worn by the person', covers: 'shirt, blouse, t-shirt, sweater, tunic, and its collar or cuffs',
-    queries: ['the shirt worn by the person', 'the upper body clothing worn by the person', 'the top worn on the chest'] },
+    queries: ['shirt', 'the shirt worn by the person', 'the top worn on the chest'] },
   jacket: { query: 'the jacket worn by the person', covers: 'jacket, coat, cardigan, cloak, cape',
-    queries: ['the jacket worn by the person', 'the coat worn by the person', 'the outer layer worn over the shirt'] },
+    queries: ['jacket', 'the jacket worn by the person', 'the jacket over the chest and arms'] },
   dress: { query: 'the dress worn by the person', covers: 'dress, robe, gown — a single garment covering torso and legs',
-    queries: ['the dress worn by the person', 'the robe worn by the person', 'the long garment covering the body'] },
+    queries: ['dress', 'the dress worn by the person', 'the fabric covering the torso'] },
   pants: { query: 'the trousers worn by the person', covers: 'trousers, jeans, shorts, leggings',
-    queries: ['the trousers worn by the person', 'the lower body clothing worn by the person', 'the garment covering the legs'] },
+    queries: ['trousers', 'the trousers worn by the person', 'the fabric covering the legs'] },
   skirt: { query: 'the skirt worn by the person', covers: 'skirt',
-    queries: ['the skirt worn by the person', 'the lower body clothing worn by the person', 'the garment covering the legs'] },
+    queries: ['skirt', 'the skirt worn by the person', 'the fabric below the waist'] },
   shoes: { query: 'the shoes worn by the person', covers: 'shoes, boots, sandals, slippers',
-    queries: ['the shoes worn by the person', 'the footwear worn by the person', 'the shoes on the feet'] },
+    queries: ['shoes', 'the shoes worn by the person', 'the shoes on the feet'] },
 });
 const GARMENT_VALUES = Object.freeze(Object.keys(GARMENT_ENUM));
 
@@ -431,6 +451,79 @@ function figureSkinLab(cropRaw, cw, ch, faceBoxCrop) {
 }
 
 /**
+ * Keep only CONNECTED regions of a mask (owner, 2026-08-13).
+ *
+ * Colour matching alone is scattershot: on the mermaid page it selected the
+ * tail, the shell top, a few specks on an arm and a glint in each eye. A
+ * garment is one connected thing (or a small number of them — a pair of shoes
+ * is two), so components below `minComponentPx` are speckle and are dropped,
+ * and at most `keepComponents` of the largest survive.
+ *
+ * Iterative flood fill, not recursion: a 900x1000 crop overflows the stack.
+ *
+ * @returns {{alpha:Buffer, count:number, components:number, kept:number, sizes:number[]}}
+ */
+function keepConnectedComponents(alpha, cw, ch, cfg) {
+  const labels = new Int32Array(cw * ch).fill(-1);
+  const sizes = [];
+  const stack = new Int32Array(cw * ch);
+  let next = 0;
+  for (let i = 0; i < cw * ch; i++) {
+    if (!alpha[i] || labels[i] !== -1) continue;
+    let sp = 0, size = 0;
+    stack[sp++] = i;
+    labels[i] = next;
+    while (sp > 0) {
+      const cur = stack[--sp];
+      size++;
+      const x = cur % cw, y = (cur - x) / cw;
+      // 8-connected: a diagonal seam of scales is still one garment.
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= cw || ny >= ch) continue;
+          const ni = ny * cw + nx;
+          if (!alpha[ni] || labels[ni] !== -1) continue;
+          labels[ni] = next;
+          stack[sp++] = ni;
+        }
+      }
+    }
+    sizes.push(size);
+    next++;
+  }
+  const ranked = sizes.map((n, id) => ({ id, n }))
+    .filter(c => c.n >= cfg.minComponentPx)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, cfg.keepComponents);
+  const keep = new Set(ranked.map(c => c.id));
+  const out = Buffer.alloc(cw * ch);
+  let count = 0;
+  for (let i = 0; i < cw * ch; i++) {
+    if (alpha[i] && keep.has(labels[i])) { out[i] = 255; count++; }
+  }
+  return { alpha: out, count, components: next, kept: keep.size, sizes: ranked.map(c => c.n) };
+}
+
+/** Tight bounding box of a mask, in crop pixel coords, or null when empty. */
+function maskBoundingBox(alpha, cw, ch, padPx = 0) {
+  let x0 = cw, y0 = ch, x1 = -1, y1 = -1;
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      if (!alpha[y * cw + x]) continue;
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+  }
+  if (x1 < 0) return null;
+  return [
+    Math.max(0, x0 - padPx), Math.max(0, y0 - padPx),
+    Math.min(cw, x1 + 1 + padPx), Math.min(ch, y1 + 1 + padPx),
+  ];
+}
+
+/**
  * Select the pixels that ARE the reported bad colour — the alternative to
  * asking a detector where the garment is (owner, 2026-08-13).
  *
@@ -541,6 +634,39 @@ Reply as JSON: {"isGarment": true|false, "whatItIs": "<what the highlighted regi
   } catch (e) {
     return { asked: false, reason: e.message, overlay };
   }
+}
+
+/**
+ * HIGHLIGHT-THEN-DETECT (owner's idea, 2026-08-13).
+ *
+ * The detector's whole problem is salience: asked for "the shirt" on a mermaid
+ * it returns the biggest person-shaped thing, because no shirt is there to be
+ * salient. So make the candidate salient FIRST — paint every bad-colour pixel
+ * magenta — and ask the detector to box that. The box then comes back around
+ * the garment, and SAM runs on the ORIGINAL pixels inside it, so the mask is
+ * built from real image content and never from the paint.
+ *
+ * Both a bare and a colour-anchored phrasing are asked, because the highlight
+ * changes what the right question is.
+ */
+async function detectOnHighlighted(cropBuf, alpha, cw, ch, garmentKey, cfg) {
+  const { data: raw } = await sharp(cropBuf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const painted = Buffer.from(raw);
+  const [hr, hg, hb] = cfg.highlightRGB;
+  for (let i = 0; i < cw * ch; i++) {
+    if (!alpha[i]) continue;
+    painted[i * 3] = hr; painted[i * 3 + 1] = hg; painted[i * 3 + 2] = hb;
+  }
+  const paintedBuf = await sharp(painted, { raw: { width: cw, height: ch, channels: 3 } })
+    .jpeg({ quality: 92 }).toBuffer();
+  const paintedUri = toDataUri(paintedBuf);
+  const queries = [
+    `the magenta ${garmentKey} worn by the person`,
+    `the magenta region`,
+    ...(GARMENT_ENUM[garmentKey]?.queries || []),
+  ];
+  const multi = await detectGarmentBoxMulti(paintedUri, { ...cfg, queries, cropW: cw, cropH: ch });
+  return { pick: multi.pick, tried: multi.tried, paintedBuf };
 }
 
 const { photoAnalyzerUrl: _photoAnalyzerUrl } = require('./photoAnalyzerClient');
@@ -1057,7 +1183,7 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
   report.maskMode = mode;
 
   let det = null, seg = null, colourSel = null;
-  const needsDetector = mode !== 'colour';
+  const needsDetector = mode === 'dino-sam' || mode === 'dino-sam-points' || mode === 'intersect';
   try {
     if (needsDetector) {
       if (cfg.queryMode === 'multi') {
@@ -1087,7 +1213,54 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
         ? Math.max(0, (report.dinoBox[2] - report.dinoBox[0])) * Math.max(0, (report.dinoBox[3] - report.dinoBox[1]))
         : null;
     }
-    if (mode === 'colour' || mode === 'intersect') {
+    if (mode === 'highlight-dino' || mode === 'colour-box-sam') {
+      // Both start from the same colour selection, cleaned to whole connected
+      // regions: a speckle of eye-glint would drag a bounding box across the
+      // whole face, and a highlight made of confetti is not something a
+      // detector can box.
+      const sel0 = selectBadColourPixels(cropRawEarly, cw, ch,
+        { ref: observedRef, cfg, garmentKey, faceBoxCrop });
+      if (!sel0.count) {
+        report.reason = sel0.reason || `no pixel in the ${garmentKey} region is ${observedRef?.name || 'the reported colour'}`;
+        return { changed: false, imageData: pageImageData, report, steps };
+      }
+      const cc = cfg.connectedOnly ? keepConnectedComponents(sel0.alpha, cw, ch, cfg)
+        : { alpha: sel0.alpha, count: sel0.count, components: null, kept: null, sizes: [] };
+      report.colourSelect = {
+        px: sel0.count, connectedPx: cc.count, components: cc.components,
+        kept: cc.kept, sizes: cc.sizes, from: observedRef?.name || null,
+      };
+      if (!cc.count) {
+        report.reason = `every bad-colour region is smaller than ${cfg.minComponentPx}px — speckle, not a garment`;
+        return { changed: false, imageData: pageImageData, report, steps };
+      }
+      if (mode === 'colour-box-sam') {
+        const box = maskBoundingBox(cc.alpha, cw, ch, cfg.highlightPadPx);
+        report.dinoBox = box;
+        report.dinoBoxPx = box ? (box[2] - box[0]) * (box[3] - box[1]) : null;
+        report.boxFrom = 'bad-colour pixels';
+        seg = await segmentGarment(cropUri, box, cw, ch);
+      } else {
+        const hi = await detectOnHighlighted(cropBuf, cc.alpha, cw, ch, garmentKey, cfg);
+        report.queriesTried = hi.tried;
+        report.queryPicked = hi.pick?.query || null;
+        report.boxFrom = 'DINO on the highlighted image';
+        if (options.collectSteps) {
+          steps.push({ label: `${report.name} HIGHLIGHTED — bad-colour pixels painted magenta, then sent to DINO`,
+            data: toDataUri(hi.paintedBuf) });
+        }
+        if (!hi.pick) {
+          report.reason = `DINO found no boxable region even after highlighting `
+            + `(${hi.tried.map(t => t.frac ?? '-').join(', ')} of the crop)`;
+          return { changed: false, imageData: pageImageData, report, steps };
+        }
+        report.dinoBox = hi.pick.box.map(v => Math.round(v));
+        report.dinoBoxPx = (hi.pick.box[2] - hi.pick.box[0]) * (hi.pick.box[3] - hi.pick.box[1]);
+        report.dinoScore = hi.pick.score;
+        // SAM runs on the ORIGINAL crop — the paint is only how the box was found.
+        seg = await segmentGarment(cropUri, hi.pick.box, cw, ch);
+      }
+    } else if (mode === 'colour' || mode === 'intersect') {
       colourSel = selectBadColourPixels(cropRawEarly, cw, ch,
         { ref: observedRef, cfg, garmentKey, faceBoxCrop });
       report.colourSelect = {
@@ -1102,7 +1275,16 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
         return { changed: false, imageData: pageImageData, report, steps };
       }
       if (mode === 'colour') {
-        seg = { alpha: colourSel.alpha };
+        const cc = cfg.connectedOnly ? keepConnectedComponents(colourSel.alpha, cw, ch, cfg)
+          : { alpha: colourSel.alpha, count: colourSel.count, components: null, kept: null, sizes: [] };
+        report.colourSelect.connectedPx = cc.count;
+        report.colourSelect.components = cc.components;
+        report.colourSelect.sizes = cc.sizes;
+        if (!cc.count) {
+          report.reason = `every bad-colour region is smaller than ${cfg.minComponentPx}px — speckle, not a garment`;
+          return { changed: false, imageData: pageImageData, report, steps };
+        }
+        seg = { alpha: cc.alpha };
       } else {
         // INTERSECT: the detector says where, the colour says which pixels.
         const a = Buffer.alloc(cw * ch);
@@ -1284,6 +1466,9 @@ module.exports = {
   GARMENT_REGION,
   selectBadColourPixels,
   figureSkinLab,
+  keepConnectedComponents,
+  maskBoundingBox,
+  detectOnHighlighted,
   COLOUR_REFS,
   resolveColourName,
   maskMatchesObservedColour,

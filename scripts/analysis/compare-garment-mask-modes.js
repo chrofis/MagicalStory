@@ -21,7 +21,7 @@ const arg = (n, d) => {
   return hit ? hit.slice(n.length + 3) : d;
 };
 const BASE = arg('base', 'https://staging.magicalstory.ch');
-const MODES = arg('modes', 'dino-sam,dino-sam-points,colour,intersect').split(',');
+const MODES = arg('modes', 'dino-sam,dino-sam-points,colour,intersect,highlight-dino,colour-box-sam').split(',');
 const VERIFY = arg('verify', 'off');
 const QUERY = arg('query', 'single');   // 'single' | 'multi' (multi-phrase garment queries)
 const EMAIL = process.env.TESTLAB_USER || 'demo-b-hnecf@magicalstory.ch';
@@ -69,6 +69,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
           opts: { maskMode: mode, verifyMask: VERIFY, queryMode: QUERY },
         },
       };
+      // The Lab allows ONE experiment at a time; a busy staging (or another
+      // session's run) 409s the POST. Wait it out instead of losing the case.
+      for (let w = 0; w < 180; w++) {
+        const b = await (await fetch(`${BASE}/api/health/busy`)).json().catch(() => ({ busy: true }));
+        if (!b.busy) break;
+        await sleep(10000);
+      }
       const res = await fetch(`${BASE}/api/admin/testlab/experiments`, { method: 'POST', headers: H, body: JSON.stringify(body) });
       const j = await res.json();
       if (!res.ok) { console.error(`${label}: ${res.status} ${JSON.stringify(j)}`); continue; }
@@ -98,6 +105,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         ask: fig.maskAsk ? (fig.maskAsk.asked ? (fig.maskAsk.isGarment ? 'YES' : `NO (${fig.maskAsk.whatItIs})`) : `n/a`) : '',
         tried: (fig.queriesTried || []).map(t => `${t.frac ?? '-'}@${t.score ?? '-'}`).join(' '),
         picked: fig.queryPicked || '',
+        connected: fig.colourSelect ? `${fig.colourSelect.px}→${fig.colourSelect.connectedPx ?? '?'} (${fig.colourSelect.components ?? '?'} regions)` : '',
+        boxFrom: fig.boxFrom || '',
         reason: fig.reason || '',
       });
     }
@@ -113,6 +122,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       + `${String(r.curL ?? '-').padStart(5)} ${String(r.curHue ?? '-').padStart(7)} ${String(r.deltaE ?? '-').padStart(5)}  `
       + `${String(r.ask).padEnd(10)} ${String(r.reason).slice(0, 34)}`);
     if (r.tried) console.log(`${''.padEnd(22)}   phrasings (frac@score): ${r.tried}${r.picked ? `  → picked "${r.picked}"` : ''}`);
+    if (r.connected) console.log(`${''.padEnd(22)}   colour px ${r.connected}${r.boxFrom ? ` · box from ${r.boxFrom}` : ''}`);
   }
   console.log('='.repeat(118));
   for (const c of CASES) console.log(`${c.label}: expect ${c.expect}`);

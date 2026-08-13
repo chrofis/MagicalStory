@@ -154,4 +154,85 @@ t('all four modes are documented in the config comment', () => {
   assert.ok(/askIsThisTheGarment/.test(src), 'the vision check must exist');
 });
 
-console.log(`${pass} passed`);
+// ── Connected components + derived boxes (owner, 2026-08-13) ───────────────
+const { keepConnectedComponents, maskBoundingBox } = require('../../server/lib/garmentColourFix');
+
+t('speckle is dropped, the garment survives', () => {
+  // One 40x40 blob (1600 px) plus four 2x2 specks, like the eye glints and
+  // arm flecks the colour match picked up on the mermaid.
+  const a = Buffer.alloc(CW * CH);
+  for (let y = 100; y < 140; y++) for (let x = 30; x < 70; x++) a[y * CW + x] = 255;
+  for (const [sx, sy] of [[5, 5], [90, 5], [5, 190], [90, 190]]) {
+    for (let y = sy; y < sy + 2; y++) for (let x = sx; x < sx + 2; x++) a[y * CW + x] = 255;
+  }
+  const r = keepConnectedComponents(a, CW, CH, cfg);
+  assert.strictEqual(r.components, 5, 'five regions before filtering');
+  assert.strictEqual(r.count, 1600, 'only the blob survives');
+  assert.strictEqual(r.kept, 1);
+});
+
+t('a pair of shoes (two blobs) both survive', () => {
+  const a = Buffer.alloc(CW * CH);
+  for (let y = 150; y < 180; y++) {
+    for (let x = 20; x < 45; x++) a[y * CW + x] = 255;
+    for (let x = 55; x < 80; x++) a[y * CW + x] = 255;
+  }
+  const r = keepConnectedComponents(a, CW, CH, cfg);
+  assert.strictEqual(r.kept, 2, 'keepComponents allows a pair');
+  assert.strictEqual(r.count, 30 * 25 * 2);
+});
+
+t('diagonal neighbours count as connected', () => {
+  const a = Buffer.alloc(CW * CH);
+  // A true 1px-wide diagonal: each pixel touches the next only at a corner, so
+  // 4-connectivity would split it into 60 pieces and 8-connectivity keeps it whole.
+  for (let k = 0; k < 60; k++) a[(20 + k) * CW + (10 + k)] = 255;
+  const r = keepConnectedComponents(a, CW, CH, { ...cfg, minComponentPx: 10 });
+  assert.strictEqual(r.components, 1, `a diagonal streak split into ${r.components} pieces`);
+  assert.strictEqual(r.count, 60);
+});
+
+t('everything-is-speckle returns nothing rather than a bad mask', () => {
+  const a = Buffer.alloc(CW * CH);
+  for (const [sx, sy] of [[5, 5], [90, 5], [50, 100]]) {
+    for (let y = sy; y < sy + 3; y++) for (let x = sx; x < sx + 3; x++) a[y * CW + x] = 255;
+  }
+  assert.strictEqual(keepConnectedComponents(a, CW, CH, cfg).count, 0);
+});
+
+t('bounding box is tight, and padding stays in bounds', () => {
+  const a = Buffer.alloc(CW * CH);
+  for (let y = 50; y < 60; y++) for (let x = 20; x < 30; x++) a[y * CW + x] = 255;
+  assert.deepStrictEqual(maskBoundingBox(a, CW, CH, 0), [20, 50, 30, 60]);
+  // Padding clamps at the crop edge: x0/y0 floor at 0, x1 caps at CW, and y1 is
+  // 60+1+100 = 161 -> under CH, so it is NOT stretched to the full height.
+  assert.deepStrictEqual(maskBoundingBox(a, CW, CH, 100), [0, 0, CW, 160]);
+});
+
+t('an empty mask has no bounding box', () => {
+  assert.strictEqual(maskBoundingBox(Buffer.alloc(CW * CH), CW, CH, 0), null);
+});
+
+t('the two new modes are wired and do not need the detector for selection', () => {
+  const fs = require('fs');
+  const src = fs.readFileSync(require.resolve('../../server/lib/garmentColourFix.js'), 'utf8');
+  assert.ok(src.includes("'highlight-dino'"), 'highlight-dino missing');
+  assert.ok(src.includes("'colour-box-sam'"), 'colour-box-sam missing');
+  assert.ok(/needsDetector = mode === 'dino-sam' \|\| mode === 'dino-sam-points' \|\| mode === 'intersect'/.test(src),
+    'the new modes must not run the plain detector path');
+  // SAM must run on the ORIGINAL crop, never on the painted one.
+  assert.ok(/SAM runs on the ORIGINAL crop/.test(src), 'the highlight must not reach SAM');
+});
+
+t('every enum value offers a short, a plain and an anatomical phrasing', () => {
+  const { GARMENT_ENUM, GARMENT_VALUES } = require('../../server/lib/garmentColourFix');
+  for (const v of GARMENT_VALUES) {
+    const q = GARMENT_ENUM[v].queries;
+    assert.strictEqual(q.length, 3, `${v} should offer 3 phrasings`);
+    assert.ok(!q[0].includes(' '), `${v}: the first phrasing should be a bare noun, got "${q[0]}"`);
+    assert.ok(/worn by the person/.test(q[1]), `${v}: the second should be the plain form`);
+    assert.ok(q[2] !== q[1], `${v}: the third must differ from the second`);
+  }
+});
+
+console.log(`${pass} passed (incl. connected components)`);
