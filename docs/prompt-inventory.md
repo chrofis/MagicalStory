@@ -103,6 +103,7 @@ Sizes measured 2026-08-09.
 | feedback-consolidator.txt | 17,739 | 167 | feedbackConsolidator.js `consolidateFeedback` | Merges all four evaluators into `deduped_issues[]` — **this list is what scoring charges** |
 | repair-verification.txt | 1,799 | 48 | repairVerification.js `verifyRepairWithGemini` | Verifies a repair changed the target region |
 | story-text-quality-judge.txt | 2,880 | 48 | textQualityJudge.js `judgeStoryText` | Test Lab text-only harness: scores story TEXT on 5 criteria (cross-model judge) |
+| story-scorecard-judge.txt | 2,398 | 50 | testlab.js `runStoryScorecardStage` / storyScorecard.js | Test Lab `story_scorecard` stage: LLM judge rates 4 final artifacts (beats/scene/text/VB) on a 4×5 rubric for model comparison |
 
 ## Bounding boxes
 

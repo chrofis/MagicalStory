@@ -21,52 +21,14 @@ const { Pool } = require('pg');
 const STORE = path.join(__dirname, '..', '..', 'docs', 'model-comparison', 'scores.jsonl');
 const REVIEWER = 'claude-opus-4-8';
 
-// The rubric: artifact -> ordered dimension keys. Save-time validation and the
-// report both read this, so the rubric has exactly one definition.
-const RUBRIC = {
-  beats:       ['arc', 'pacing', 'emotion', 'causality', 'themeFit'],
-  scene:       ['clarity', 'variety', 'grounding', 'setting', 'composition'],
-  storyText:   ['language', 'readability', 'voice', 'alignment', 'dialogue'],
-  visualBible: ['completeness', 'wardrobe', 'world', 'anchors', 'consistency'],
-};
-
-const mean = (nums) => nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : 0;
+// Rubric, artifact extraction, and dim→score math come from the shared lib so
+// this CLI and the Test Lab `story_scorecard` stage never diverge.
+const { RUBRIC, finalBeats, finalScenes, provenanceOf, scoreFromDims } = require('../../server/lib/storyScorecard');
 
 function getPool(prod) {
   const cs = prod ? process.env.DATABASE_URL : process.env.STAGING_DATABASE_URL;
   if (!cs) throw new Error(`No connection string (${prod ? 'DATABASE_URL' : 'STAGING_DATABASE_URL'})`);
   return new Pool({ connectionString: cs, ssl: { rejectUnauthorized: false } });
-}
-
-function provenanceOf(d) {
-  return {
-    writer: d.outlineModelId || null,
-    beatsReview: d.beatsReviewReport?.model || null,
-    sceneReview: d.sceneReviewReport?.model || null,
-    textRefine: d.textRefineReport?.model || null,
-  };
-}
-
-// Final beats = the per-page outlineExtract that actually fed scene expansion
-// (this is the complete, post-review set). beatsReviewReport only stores the
-// pages the reviewer CHANGED, so it is not the full artifact. Falls back to the
-// ---BEATS--- section of the raw outline.
-function finalBeats(d) {
-  const scenes = (d.sceneDescriptions || []).filter(s => s && s.outlineExtract);
-  if (scenes.length) {
-    return scenes
-      .sort((a, b) => (a.pageNumber || 0) - (b.pageNumber || 0))
-      .map(s => `--- Page ${s.pageNumber} ---\n${String(s.outlineExtract).trim()}`)
-      .join('\n\n');
-  }
-  const m = (d.outline || '').match(/---\s*BEATS\s*---([\s\S]*?)(?:\n---|$)/i);
-  return m ? m[1].trim() : (d.outline || '(no beats found)');
-}
-
-function finalScenes(d) {
-  return (d.sceneDescriptions || [])
-    .map(s => `--- Page ${s.pageNumber} ---\n${s.description || s.scenePrompt || ''}`)
-    .join('\n\n');
 }
 
 async function fetchStory(pool, storyId) {
@@ -104,23 +66,7 @@ async function cmdSave(storyId, scoresJson, prod) {
   const d = await fetchStory(pool, storyId);
   await pool.end();
 
-  const artifacts = {};
-  const artScores = [];
-  for (const [artifact, dims] of Object.entries(RUBRIC)) {
-    const given = input[artifact];
-    if (!given || !given.dims) throw new Error(`missing scores for artifact "${artifact}"`);
-    const vals = [];
-    for (const dim of dims) {
-      const v = given.dims[dim];
-      if (typeof v !== 'number' || v < 1 || v > 10) throw new Error(`${artifact}.${dim} must be 1-10, got ${v}`);
-      vals.push(v);
-    }
-    const extra = Object.keys(given.dims).filter(k => !dims.includes(k));
-    if (extra.length) throw new Error(`${artifact} has unknown dims: ${extra.join(', ')}`);
-    const score = mean(vals);
-    artScores.push(score);
-    artifacts[artifact] = { dims: given.dims, score, notes: given.notes || '' };
-  }
+  const { artifacts, overall } = scoreFromDims(input); // shared validation + math
   const record = {
     storyId,
     title: d.title || null,
@@ -132,12 +78,12 @@ async function cmdSave(storyId, scoresJson, prod) {
     reviewer: REVIEWER,
     models: provenanceOf(d),
     artifacts,
-    overall: mean(artScores),
+    overall,
   };
   fs.mkdirSync(path.dirname(STORE), { recursive: true });
   fs.appendFileSync(STORE, JSON.stringify(record) + '\n');
   console.log(`Saved record for ${storyId} → ${path.relative(process.cwd(), STORE)}`);
-  console.log(`  beats=${artifacts.beats.score}  scene=${artifacts.scene.score}  storyText=${artifacts.storyText.score}  visualBible=${artifacts.visualBible.score}  → overall=${record.overall}`);
+  console.log(`  beats=${artifacts.beats.score}  scene=${artifacts.scene.score}  storyText=${artifacts.storyText.score}  visualBible=${artifacts.visualBible.score}  → overall=${overall}`);
 }
 
 function cmdReport() {

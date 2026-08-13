@@ -2588,6 +2588,34 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
             </div>
           )}
 
+          {result.scorecard && (
+            <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-xs text-gray-800">
+              <div className="font-semibold mb-1">
+                Story scorecard — overall {result.scorecard.overall}/10
+                <span className="opacity-70 font-normal"> · judge {result.scorecard.judgeModel} · writer {result.scorecard.models?.writer || '?'}</span>
+              </div>
+              <table className="w-full mt-1">
+                <thead><tr className="text-left opacity-70"><th>artifact</th><th className="w-16 text-right">score</th><th className="pl-3">dimensions</th></tr></thead>
+                <tbody>
+                  {Object.entries(result.scorecard.artifacts).map(([name, a]) => (
+                    <tr key={name} className="align-top border-t border-indigo-100">
+                      <td className="font-medium py-1">{name}</td>
+                      <td className="text-right py-1 font-mono">{a.score}</td>
+                      <td className="pl-3 py-1 font-mono opacity-80">{Object.entries(a.dims).map(([d, v]) => `${d} ${v}`).join(' · ')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {Object.entries(result.scorecard.artifacts).some(([, a]) => a.notes) && (
+                <div className="mt-2 space-y-0.5 opacity-80">
+                  {Object.entries(result.scorecard.artifacts).filter(([, a]) => a.notes).map(([name, a]) => (
+                    <div key={name}><span className="font-medium">{name}:</span> {a.notes}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* The prompt the model actually received — top level, not buried
               under "Show details": for a repair it IS the experiment (owner,
               exp #302). Collapsed so it never pushes the images down. */}

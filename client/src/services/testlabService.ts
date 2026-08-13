@@ -63,12 +63,23 @@ export interface ExperimentSummary {
   completedAt: string | null;
 }
 
+export interface StoryScorecard {
+  artifacts: Record<string, { dims: Record<string, number>; score: number; notes: string }>;
+  overall: number;
+  title?: string | null;
+  language?: string | null;
+  artStyle?: string | null;
+  models?: Record<string, string | null>;
+  judgeModel?: string;
+}
+
 export interface ExperimentResult {
   storyId: string;
   pageNumber: number;
   character?: string;
   realisticVersionIndex?: number | null;
   finalScore?: number | null;
+  scorecard?: StoryScorecard | null;
   ok: boolean;
   error?: string;
   imageType?: string;
@@ -381,6 +392,10 @@ export const TESTLAB_STAGES = [
   // reviewer catch the costume fault that reached the page? Text only, no
   // avatar or image spend, so it can be run across several stories cheaply.
   { id: 'clothing_review', label: 'Wardrobe review (does it catch the bad costume?)', producesImage: false, overridable: true, storyLevel: true },
+  // LLM judge rates the four final artifacts (beats / scene briefs / story text /
+  // visual bible) on a 4×5 dimension rubric — one scorecard per story, comparable
+  // across generation models. params.model picks the judge (default reviewer model).
+  { id: 'story_scorecard', label: 'Story scorecard (LLM judge → beats/scene/text/VB scores)', producesImage: false, overridable: true, storyLevel: true },
   // Both runners existed server-side but were absent from this list, so the
   // dropdown could never select them — unreachable except by hand-posting.
   { id: 'garment_colour_fix', label: 'Garment colour fix (DINO+SAM mask → L*a*b* match)', producesImage: true, overridable: false },
