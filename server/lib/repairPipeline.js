@@ -1863,6 +1863,14 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               entityResult: evEntityResult,
               consolidatedPlan: recolourConsolidated.get(ev.pageNumber) || null,
             });
+            // Creation-time integrity tripwire: the bytes this version stores
+            // must be the bytes its eval graded (job_1786571353564 p4 shipped
+            // red bytes carrying the eval of their yellow predecessor; the
+            // decoupling point was never pinned). pickBestVersionIndex refuses
+            // the score later regardless — this log names the spot at creation.
+            if (ev.evalImageFp && images().hashImageData(rc.imageData) !== ev.evalImageFp) {
+              log.error(`❌ [GARMENT-COLOUR] p${ev.pageNumber} round ${round}: version bytes do not match the bytes the eval graded (eval fp ${ev.evalImageFp}) — eval/bytes decoupled at creation`);
+            }
             versions.push(recolourVersion);
             recolourVersioned.add(ev.pageNumber);
           }
