@@ -10022,3 +10022,33 @@ eval, all invisible in the daily admin email (which only lists job_failed).
 
 **Touched files:** email.js (sendAdminHealthReport), server/routes/admin.js
 (/health-report route). Endpoint commit: 74c439023.
+
+## 2026-08-13 — One versioned evaluator scores every stage rerun (Test Lab)
+
+**Context:** The Lab already had per-artifact rerun stages (`story_bible_replay`, `story_text_replay`,
+`scene_review_replay`, `beats_scenes`, `writer_compare`) but scoring was fragmented — `writer_compare`
+scored mechanically (regex), `story_scorecard` scored only an already-stored story's final artifacts,
+and the other replays didn't score at all. So you couldn't rerun a stage across models/prompts and get
+one comparable score, and nothing recorded WHICH evaluator produced a score.
+
+**Decision:** `server/lib/storyScorecard.js` is THE one evaluator, now versioned and partial-capable:
+- `EVALUATOR_VERSION` ("1.0") + `evaluatorStamp(judgePrompt)` → `{evaluatorVersion, evaluatorHash}`
+  (hash folds in the rubric AND the judge-prompt text). Bump the semver on any rubric/prompt change;
+  the hash is tamper-evidence for a forgotten bump. Every score record carries both.
+- `scoreFromDims(input, {partial})` + `buildJudgeInputFromArtifacts(partial)` score ANY subset of the
+  four artifacts, so a single-stage rerun scores just its own artifact.
+- Test Lab: shared `scoreArtifactsWithJudge()` helper; `story_scorecard` stamped; new
+  `beats_review_replay` stage (reviewer prompt A/B via promptOverride, model list via
+  `params.reviewModel`, `params.passes` multi-pass folding rewrites forward, `params.scoreOutput`
+  scores the beats after each pass); `params.scoreOutput` added to `story_text_replay`,
+  `story_bible_replay`, `scene_review_replay` so each rerun's fresh output gets the one evaluator's
+  score. Client shows the scorecard + a per-pass beats table. CLI `score-story.js --report` groups by
+  evaluator version and warns on cross-version comparison.
+
+**Rationale:** One rubric + one judge = one yardstick; the version stamp makes "why did scores change"
+always resolvable (story changed vs evaluator bumped). Injected non-stored input (custom idea/beats)
+is deferred to Phase 2 — every rerun still reads a stored story for now.
+
+**Touched:** `server/lib/storyScorecard.js`, `server/lib/testlab.js`, `prompts/story-scorecard-judge.txt`,
+`client/src/services/testlabService.ts`, `client/src/pages/TestLab.tsx`, `scripts/analysis/score-story.js`.
+**Status:** ✅ active (Phase 1). Phase 2 = injected input.

@@ -5040,6 +5040,13 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     const sentBefore = before.findings.filter(f => REVIEWABLE.has(f.type));
     const leftAfter = after.findings.filter(f => REVIEWABLE.has(f.type));
 
+    // scoreOutput: the ONE evaluator grades this model's reviewed briefs (scene only).
+    let scorecard = null;
+    if (params.scoreOutput === true || params.scoreOutput === 'true') {
+      const sceneText = merged.map(m => `--- Page ${m.pageNumber} ---\n${m.brief}`).join('\n\n');
+      if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel })).scorecard;
+    }
+
     runs.push({
       model,
       modelId: res.modelId,
@@ -5049,6 +5056,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
       analysis: parsed.analysis || '',
       changedPages: diffs.map(d => d.pageNumber),
       pages: diffs,
+      scorecard,
       // The headline: faults in, faults out. Anything but 0 out means the
       // reviewer was handed a fact and declined to act on it.
       faultsBefore: sentBefore.length,
@@ -5081,46 +5089,134 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
  * params.model : a TEXT_MODELS key for the judge (default: outlineReviewModel).
  * promptOverride: swap the judge rubric prompt for an A/B.
  */
-async function runStoryScorecardStage(target, { params = {}, promptOverride = null }) {
+/**
+ * THE ONE EVALUATOR. Scores a partial artifacts object ({beats?, scene?,
+ * storyText?, visualBible?} of strings) with the versioned storyScorecard judge.
+ * Used by story_scorecard (all four) AND every replay stage's scoreOutput (one
+ * artifact), so a rerun's fresh output and a stored story are graded the same
+ * way. The returned scorecard carries evaluatorVersion + evaluatorHash — scores
+ * are only ever comparable within one evaluator.
+ */
+async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null } = {}) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
   const { callTextModelStreaming } = require('./textModels');
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
   const sc = require('./storyScorecard');
 
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
-  if (!(storyData.sceneDescriptions || []).length && !storyData.storyText) {
-    throw new Error('story has no final artifacts to score (no sceneDescriptions / storyText)');
-  }
-
-  const model = String(params.model || MODEL_DEFAULTS.outlineReviewModel).trim();
-  if (!TEXT_MODELS[model]) throw new Error(`Unknown judge model "${model}"`);
-
+  const judge = String(model || MODEL_DEFAULTS.outlineReviewModel).trim();
+  if (!TEXT_MODELS[judge]) throw new Error(`Unknown judge model "${judge}"`);
   const template = promptOverride || PROMPT_TEMPLATES.storyScorecardJudge;
   if (!template) throw new Error('story-scorecard-judge template unavailable');
-  const prompt = `${template}\n\n---\n\n${sc.buildJudgeInput(storyData)}`;
+  const input = sc.buildJudgeInputFromArtifacts(artifacts);
+  if (!input.trim()) throw new Error('no artifacts to score');
+  // partial when any rubric artifact is absent from the input
+  const partial = Object.keys(sc.RUBRIC).some(k => !(artifacts[k] != null && String(artifacts[k]).trim()));
 
   const t = Date.now();
-  const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_story_scorecard', temperature: 0 });
-  if (!res || !res.text || !res.text.trim()) throw new Error(`judge returned empty response (model ${model})`);
-
-  const scored = sc.scoreFromDims(sc.parseJudgeJson(res.text)); // throws loudly on a malformed rubric
-
+  const res = await callTextModelStreaming(`${template}\n\n---\n\n${input}`, null, null, judge, { usageLabel: 'testlab_story_scorecard', temperature: 0 });
+  if (!res || !res.text || !res.text.trim()) throw new Error(`judge returned empty response (model ${judge})`);
+  const scored = sc.scoreFromDims(sc.parseJudgeJson(res.text), { partial });
   return {
-    storyId: target.storyId,
-    scorecard: {
-      ...scored,
-      title: storyData.title || null,
-      language: storyData.language || null,
-      artStyle: storyData.artStyle || null,
-      models: sc.provenanceOf(storyData),
-      judgeModel: model,
-    },
+    scorecard: { ...scored, ...sc.evaluatorStamp(template), judgeModel: judge },
     modelId: res.modelId,
     elapsedMs: Date.now() - t,
     cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
     usage: res.usage,
   };
+}
+
+async function runStoryScorecardStage(target, { params = {}, promptOverride = null }) {
+  const sc = require('./storyScorecard');
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  if (!(storyData.sceneDescriptions || []).length && !storyData.storyText) {
+    throw new Error('story has no final artifacts to score (no sceneDescriptions / storyText)');
+  }
+  const r = await scoreArtifactsWithJudge(sc.extractArtifacts(storyData), { model: params.model, promptOverride });
+  return {
+    storyId: target.storyId,
+    scorecard: {
+      ...r.scorecard,
+      title: storyData.title || null,
+      language: storyData.language || null,
+      artStyle: storyData.artStyle || null,
+      models: sc.provenanceOf(storyData),
+    },
+    modelId: r.modelId,
+    elapsedMs: r.elapsedMs,
+    cost: r.cost,
+    usage: r.usage,
+  };
+}
+
+/**
+ * BEATS REVIEW REPLAY — re-run the beats review on a story's frozen beats, to
+ * A/B the reviewer prompt (promptOverride) and models (params.reviewModel, CSV)
+ * and measure how many PASSES it takes to converge (params.passes). Each pass
+ * reviews the beats the previous pass rewrote. With params.scoreOutput, the ONE
+ * evaluator scores the beats after each pass, so the coherence score is visible
+ * pass-to-pass and comparable across models/prompts.
+ */
+async function runBeatsReviewReplayStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { callTextModelStreaming } = require('./textModels');
+  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { buildBeatsReviewPrompt, parseBeats } = require('./storyHelpers');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const beatsSection = (String(storyData.outline || '').match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
+  const beats0 = parseBeats(beatsSection).pages;
+  if (!beats0.length) throw new Error('story has no beats to replay');
+
+  const models = String(params.reviewModel || params.model || MODEL_DEFAULTS.outlineReviewModel)
+    .split(',').map(x => x.trim()).filter(Boolean);
+  for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+  const passCount = Math.min(Math.max(parseInt(params.passes, 10) || 1, 1), 3);
+  const scoreOutput = params.scoreOutput === true || params.scoreOutput === 'true';
+
+  const beatsToText = (bs) => bs.map(b => `--- Page ${b.pageNumber} ---\nBEAT: ${b.beat}\nSCENE: ${b.scene}`).join('\n\n');
+  const orig = PROMPT_TEMPLATES.storyBeatsReview;
+  if (promptOverride) PROMPT_TEMPLATES.storyBeatsReview = promptOverride;
+  const arms = [];
+  try {
+    for (const model of models) {
+      let beats = beats0;
+      const passes = [];
+      let convergedAtPass = null;
+      for (let p = 1; p <= passCount; p++) {
+        const prompt = buildBeatsReviewPrompt(storyData, beats);
+        const t = Date.now();
+        const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_beats_review_replay', temperature: 0 });
+        const out = res.text || '';
+        const marker = out.match(/---\s*BEATS\s*---/i);
+        const analysis = (marker ? out.slice(0, marker.index) : out).trim();
+        const rewritten = marker ? parseBeats(out.slice(marker.index)).pages : [];
+        const rewrittenPages = rewritten.map(r => r.pageNumber);
+        const entry = {
+          pass: p,
+          rewrittenPages,
+          converged: rewrittenPages.length === 0,
+          check8: (analysis.match(/8\.\s*Loose threads[\s\S]*$/i) || [''])[0].trim().slice(0, 800),
+          cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+          elapsedMs: Date.now() - t,
+        };
+        const byPage = new Map(rewritten.map(r => [r.pageNumber, r]));
+        beats = beats.map(b => byPage.get(b.pageNumber) || b); // fold rewrites forward
+        if (scoreOutput) {
+          const sr = await scoreArtifactsWithJudge({ beats: beatsToText(beats) }, { model: params.judgeModel });
+          entry.scorecard = sr.scorecard;
+          entry.cost += sr.cost;
+        }
+        passes.push(entry);
+        if (entry.converged) { convergedAtPass = p; break; }
+      }
+      arms.push({ model, passes, convergedAtPass });
+    }
+  } finally {
+    PROMPT_TEMPLATES.storyBeatsReview = orig;
+  }
+  return { storyId: target.storyId, beatCount: beats0.length, passesRequested: passCount, arms };
 }
 
 
@@ -5215,6 +5311,13 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
     return { name, categories: used.map(([k]) => k), description: (used[0]?.[1]?.description) || null };
   });
 
+  // scoreOutput: the ONE evaluator grades the regenerated bible (visualBible only).
+  let scorecard = null;
+  if (params.scoreOutput === true || params.scoreOutput === 'true') {
+    const visualBible = String(res.text || '').slice(0, 20000);
+    if (visualBible.trim()) scorecard = (await scoreArtifactsWithJudge({ visualBible }, { model: params.judgeModel })).scorecard;
+  }
+
   return {
     storyId: target.storyId,
     beatsSource,
@@ -5225,6 +5328,7 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
     promptChars: prompt.length,
     prompt,
     rawResponse: (res.text || '').slice(0, 40000),
+    scorecard,
     clothingBefore: summarise(before),
     clothingAfter: summarise(clothing),
   };
@@ -5344,6 +5448,13 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   }
   const parsed = parseRefinedText(res.text || '');
 
+  // scoreOutput: the ONE evaluator grades the regenerated text (storyText only).
+  let scorecard = null;
+  if (params.scoreOutput === true || params.scoreOutput === 'true') {
+    const storyText = (parsed.pages || []).map(p => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n\n');
+    if (storyText.trim()) scorecard = (await scoreArtifactsWithJudge({ storyText }, { model: params.judgeModel })).scorecard;
+  }
+
   return {
     storyId: target.storyId,
     beatsSource,
@@ -5356,6 +5467,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
     title: parsed.title || null,
     analysis: parsed.analysis || '',
     rawResponse: (res.text || '').slice(0, 40000),
+    scorecard,
     // Side by side with the text that shipped — the whole point.
     pages: (parsed.pages || []).map(p => ({
       pageNumber: p.pageNumber,
@@ -5495,6 +5607,7 @@ const STORY_STAGES = {
   writer_compare: runWriterCompareStage,
   clothing_review: runClothingReviewStage,
   story_scorecard: runStoryScorecardStage,
+  beats_review_replay: runBeatsReviewReplayStage,
 };
 
 // Avatar stages take {storyId, character} targets, not page targets.

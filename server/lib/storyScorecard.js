@@ -7,6 +7,8 @@
  * Reviewer-judged, final outputs only. See docs/model-comparison/README.md.
  */
 
+const crypto = require('crypto');
+
 // artifact -> ordered dimension keys. The judge prompt
 // (prompts/story-scorecard-judge.txt) mirrors these exactly.
 const RUBRIC = {
@@ -15,6 +17,20 @@ const RUBRIC = {
   storyText:   ['language', 'readability', 'voice', 'alignment', 'dialogue'],
   visualBible: ['completeness', 'wardrobe', 'world', 'anchors', 'consistency'],
 };
+
+// Evaluator version — BUMP when the rubric dims or the judge prompt change so
+// scores from different evaluators never get silently compared. The semver is
+// for humans ("why did scores move"); the hash is tamper-evidence — it folds in
+// the rubric AND the judge-prompt text, so a silent prompt edit that forgot to
+// bump the semver still shows a changed hash. Every score record carries both.
+const EVALUATOR_VERSION = '1.0';
+function evaluatorStamp(judgePromptText) {
+  const basis = JSON.stringify(RUBRIC) + '\n' + (judgePromptText || '');
+  return {
+    evaluatorVersion: EVALUATOR_VERSION,
+    evaluatorHash: crypto.createHash('sha256').update(basis).digest('hex').slice(0, 12),
+  };
+}
 
 const mean = (nums) => (nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : 0);
 
@@ -49,15 +65,27 @@ function extractArtifacts(d) {
   };
 }
 
-// The single-message input handed to the judge (the four final artifacts).
+const SECTION_TITLES = {
+  beats: '# BEATS (narrative skeleton)',
+  scene: '# SCENE BRIEFS (illustration descriptions)',
+  storyText: '# STORY TEXT (child-facing prose)',
+  visualBible: '# VISUAL BIBLE (entity / consistency spec)',
+};
+
+// Build the judge input from an artifacts object, including only the artifacts
+// actually present. A full-story score passes all four; a single-stage rerun
+// (e.g. just the beats, just the text) passes one — the judge then scores only
+// that subset, and scoreFromDims({partial:true}) grades whatever came back.
+function buildJudgeInputFromArtifacts(artifacts) {
+  return Object.keys(RUBRIC)
+    .filter(k => artifacts[k] != null && String(artifacts[k]).trim())
+    .map(k => `${SECTION_TITLES[k]}\n${artifacts[k]}`)
+    .join('\n\n===\n\n');
+}
+
+// The single-message input handed to the judge for a full stored story.
 function buildJudgeInput(d) {
-  const a = extractArtifacts(d);
-  return [
-    `# BEATS (narrative skeleton)\n${a.beats}`,
-    `# SCENE BRIEFS (illustration descriptions)\n${a.scene}`,
-    `# STORY TEXT (child-facing prose)\n${a.storyText}`,
-    `# VISUAL BIBLE (entity / consistency spec)\n${a.visualBible}`,
-  ].join('\n\n===\n\n');
+  return buildJudgeInputFromArtifacts(extractArtifacts(d));
 }
 
 // Which model made each artifact — so a record answers "which model, how good".
@@ -78,13 +106,16 @@ function provenanceOf(d) {
  * @param {Object} input {beats:{dims:{...},notes?}, scene:{...}, ...}
  * @returns {{artifacts: Object, overall: number}}
  */
-function scoreFromDims(input) {
+function scoreFromDims(input, { partial = false } = {}) {
   if (!input || typeof input !== 'object') throw new Error('scorecard input is not an object');
   const artifacts = {};
   const artScores = [];
   for (const [artifact, dims] of Object.entries(RUBRIC)) {
     const given = input[artifact];
-    if (!given || typeof given.dims !== 'object') throw new Error(`missing scores for artifact "${artifact}"`);
+    if (!given || typeof given.dims !== 'object') {
+      if (partial) continue; // partial: score only the artifacts the judge returned
+      throw new Error(`missing scores for artifact "${artifact}"`);
+    }
     const vals = [];
     for (const dim of dims) {
       const v = given.dims[dim];
@@ -97,6 +128,7 @@ function scoreFromDims(input) {
     artScores.push(score);
     artifacts[artifact] = { dims: given.dims, score, notes: typeof given.notes === 'string' ? given.notes : '' };
   }
+  if (partial && artScores.length === 0) throw new Error('partial scorecard scored no artifacts');
   return { artifacts, overall: mean(artScores) };
 }
 
@@ -111,5 +143,7 @@ function parseJudgeJson(text) {
 
 module.exports = {
   RUBRIC, mean, finalBeats, finalScenes, extractArtifacts,
-  buildJudgeInput, provenanceOf, scoreFromDims, parseJudgeJson,
+  buildJudgeInput, buildJudgeInputFromArtifacts, provenanceOf,
+  scoreFromDims, parseJudgeJson,
+  EVALUATOR_VERSION, evaluatorStamp,
 };

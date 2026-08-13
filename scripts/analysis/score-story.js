@@ -23,7 +23,13 @@ const REVIEWER = 'claude-opus-4-8';
 
 // Rubric, artifact extraction, and dim→score math come from the shared lib so
 // this CLI and the Test Lab `story_scorecard` stage never diverge.
-const { RUBRIC, finalBeats, finalScenes, provenanceOf, scoreFromDims } = require('../../server/lib/storyScorecard');
+const { RUBRIC, finalBeats, finalScenes, provenanceOf, scoreFromDims, evaluatorStamp } = require('../../server/lib/storyScorecard');
+// Every record is stamped with the evaluator identity (version + hash of
+// rubric + judge prompt) so scores are only ever compared within one evaluator.
+const JUDGE_PROMPT = (() => {
+  try { return fs.readFileSync(path.join(__dirname, '..', '..', 'prompts', 'story-scorecard-judge.txt'), 'utf8'); }
+  catch { return ''; }
+})();
 
 function getPool(prod) {
   const cs = prod ? process.env.DATABASE_URL : process.env.STAGING_DATABASE_URL;
@@ -76,6 +82,7 @@ async function cmdSave(storyId, scoresJson, prod) {
     pipelineMode: d.layout?.pipelineMode || process.env.PIPELINE_MODE || 'beats',
     reviewedAt: new Date().toISOString().slice(0, 10),
     reviewer: REVIEWER,
+    ...evaluatorStamp(JUDGE_PROMPT),
     models: provenanceOf(d),
     artifacts,
     overall,
@@ -89,18 +96,26 @@ async function cmdSave(storyId, scoresJson, prod) {
 function cmdReport() {
   if (!fs.existsSync(STORE)) { console.log('No records yet.'); return; }
   const recs = fs.readFileSync(STORE, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
+  // Group by evaluator version — scores are only comparable within one.
+  const byVer = new Map();
+  for (const r of recs) { const v = r.evaluatorVersion || '(unversioned)'; (byVer.get(v) || byVer.set(v, []).get(v)).push(r); }
   const H = ['story / model', 'beats', 'scene', 'text', 'VB', 'OVERALL'];
-  console.log(H[0].padEnd(42) + H.slice(1).map(h => h.padStart(9)).join(''));
-  console.log('-'.repeat(42 + 9 * 5));
-  for (const r of recs) {
-    const label = `${(r.title || r.storyId).slice(0, 26)} [${r.models?.writer || '?'}]`.slice(0, 41);
-    const a = r.artifacts;
-    console.log(label.padEnd(42)
-      + String(a.beats.score).padStart(9) + String(a.scene.score).padStart(9)
-      + String(a.storyText.score).padStart(9) + String(a.visualBible.score).padStart(9)
-      + String(r.overall).padStart(9));
+  for (const [ver, group] of byVer) {
+    const hash = group[0].evaluatorHash ? ` hash ${group[0].evaluatorHash}` : '';
+    console.log(`\n=== evaluator ${ver}${hash} — ${group.length} record(s) ===`);
+    console.log(H[0].padEnd(42) + H.slice(1).map(h => h.padStart(9)).join(''));
+    console.log('-'.repeat(42 + 9 * 5));
+    for (const r of group) {
+      const label = `${(r.title || r.storyId).slice(0, 26)} [${r.models?.writer || '?'}]`.slice(0, 41);
+      const a = r.artifacts;
+      console.log(label.padEnd(42)
+        + String(a.beats.score).padStart(9) + String(a.scene.score).padStart(9)
+        + String(a.storyText.score).padStart(9) + String(a.visualBible.score).padStart(9)
+        + String(r.overall).padStart(9));
+    }
   }
-  console.log(`\n${recs.length} record(s). Writer model in [brackets]; dimension detail in ${path.relative(process.cwd(), STORE)}.`);
+  if (byVer.size > 1) console.log('\n⚠️  Multiple evaluator versions present — scores across versions are NOT comparable.');
+  console.log(`\n${recs.length} record(s). Writer in [brackets]; grouped by evaluator version; detail in ${path.relative(process.cwd(), STORE)}.`);
 }
 
 (async () => {

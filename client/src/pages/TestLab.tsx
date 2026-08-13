@@ -2616,6 +2616,30 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
             </div>
           )}
 
+          {result.arms && result.arms.length > 0 && (
+            <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-xs text-gray-800">
+              <div className="font-semibold mb-1">Beats review replay — {result.beatCount} beats, up to {result.passesRequested} pass(es)</div>
+              {result.arms.map((arm) => (
+                <div key={arm.model} className="mt-2">
+                  <div className="font-medium">{arm.model}{arm.convergedAtPass ? ` — converged at pass ${arm.convergedAtPass}` : ' — not converged'}</div>
+                  <table className="w-full mt-1">
+                    <thead><tr className="text-left opacity-70"><th className="w-14">pass</th><th>rewrote pages</th><th className="w-20 text-right">beats score</th><th className="w-24 text-right">converged?</th></tr></thead>
+                    <tbody>
+                      {arm.passes.map((p) => (
+                        <tr key={p.pass} className="border-t border-indigo-100 align-top">
+                          <td className="py-1">{p.pass}</td>
+                          <td className="py-1 font-mono">[{p.rewrittenPages.join(', ')}]</td>
+                          <td className="py-1 text-right font-mono">{p.scorecard?.artifacts?.beats?.score ?? '—'}{p.scorecard ? ` (v${p.scorecard.evaluatorVersion})` : ''}</td>
+                          <td className="py-1 text-right">{p.converged ? 'yes ✓' : 'no'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* The prompt the model actually received — top level, not buried
               under "Show details": for a repair it IS the experiment (owner,
               exp #302). Collapsed so it never pushes the images down. */}

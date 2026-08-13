@@ -71,6 +71,8 @@ export interface StoryScorecard {
   artStyle?: string | null;
   models?: Record<string, string | null>;
   judgeModel?: string;
+  evaluatorVersion?: string;
+  evaluatorHash?: string;
 }
 
 export interface ExperimentResult {
@@ -80,6 +82,14 @@ export interface ExperimentResult {
   realisticVersionIndex?: number | null;
   finalScore?: number | null;
   scorecard?: StoryScorecard | null;
+  // beats_review_replay: one arm per reviewer model, each with per-pass results
+  arms?: Array<{
+    model: string;
+    convergedAtPass: number | null;
+    passes: Array<{ pass: number; rewrittenPages: number[]; converged: boolean; check8?: string; scorecard?: StoryScorecard | null }>;
+  }> | null;
+  beatCount?: number;
+  passesRequested?: number;
   ok: boolean;
   error?: string;
   imageType?: string;
@@ -396,6 +406,10 @@ export const TESTLAB_STAGES = [
   // visual bible) on a 4×5 dimension rubric — one scorecard per story, comparable
   // across generation models. params.model picks the judge (default reviewer model).
   { id: 'story_scorecard', label: 'Story scorecard (LLM judge → beats/scene/text/VB scores)', producesImage: false, overridable: true, storyLevel: true },
+  // Re-run the beats review on frozen beats: A/B the reviewer prompt (override) and
+  // models (params.reviewModel CSV), iterate params.passes times, and with
+  // params.scoreOutput the one evaluator scores the beats after each pass.
+  { id: 'beats_review_replay', label: 'Beats review replay (prompt/model A/B, multi-pass, scored)', producesImage: false, overridable: true, storyLevel: true },
   // Both runners existed server-side but were absent from this list, so the
   // dropdown could never select them — unreachable except by hand-posting.
   { id: 'garment_colour_fix', label: 'Garment colour fix (DINO+SAM mask → L*a*b* match)', producesImage: true, overridable: false },

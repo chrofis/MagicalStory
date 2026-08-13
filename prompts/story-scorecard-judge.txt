@@ -30,6 +30,8 @@ Score each dimension 1-10, where 10 is excellent, 5 is mixed, 1 is broken. Add o
 - anchors: descriptions concrete enough to keep renders consistent
 - consistency: internally non-contradictory
 
+Some runs include only a subset of the four artifacts below. Score only those present and omit any artifact you were not given from your JSON.
+
 Output strict JSON only, no text around it:
 {
   "beats": {"dims": {"arc": 0, "pacing": 0, "emotion": 0, "causality": 0, "themeFit": 0}, "notes": ""},
