@@ -48,6 +48,7 @@ its rightful owner, or state the outfit the fault says is missing — and change
 6. Character fields — every character needs depth and a drawable expression naming brows, eyes or mouth. Name any that is missing one, or that uses a bare mood word.
 6b. Scene intent — every page needs a `sceneIntent`. Name any that is missing, that covers more than one moment, or that names a character absent from `characters[]`.
 7. Drawability — name any instruction an illustrator could not execute: a character facing one way while looking at someone behind them, an impossible viewpoint, a described detail too small to read at page size.
+7b. Close-up framing — a `close-up` frame ends at the waist. Name any page with `shot: close-up` whose prose, poses, or interactions stage below-waist action — kneeling, crouching, sitting, stepping, or feet-on-ground contact. A garment list naming footwear does not count. Rewrite that page's `shot` to `medium` and change nothing else.
 
 # OUTPUT FORMAT
 
