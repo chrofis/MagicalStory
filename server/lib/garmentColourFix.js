@@ -83,6 +83,13 @@ const DEFAULTS = {
   //   'colour'          pixels that ARE the reported bad colour, no detector
   //   'intersect'       dino-sam AND colour
   maskMode: 'dino-sam',
+  // Multi-phrase garment queries (see detectGarmentBoxMulti). 'single' asks one
+  // phrasing, 'multi' asks the enum's alternatives and keeps the most plausible.
+  queryMode: 'single',
+  // A garment is PART of a figure. A box above this share of the figure crop is
+  // the figure itself — measured: "skirt" returned 82% (the whole mermaid),
+  // "shoes" 94% (the whole picture), while real garment boxes ran 2-62%.
+  maxBoxFrac: 0.75,
   // Colour selection (see selectBadColourPixels).
   selectHueDeg: 40,
   selectMinChroma: 10,
@@ -169,13 +176,20 @@ const DEFAULTS = {
  * from a guess — the same trade as the no-default clothing category.
  */
 const GARMENT_ENUM = Object.freeze({
-  hat: { query: 'the hat worn by the person', covers: 'any headwear — hat, cap, hood, headscarf, and its band or trim' },
-  top: { query: 'the shirt worn by the person', covers: 'shirt, blouse, t-shirt, sweater, tunic, and its collar or cuffs' },
-  jacket: { query: 'the jacket worn by the person', covers: 'jacket, coat, cardigan, cloak, cape' },
-  dress: { query: 'the dress worn by the person', covers: 'dress, robe, gown — a single garment covering torso and legs' },
-  pants: { query: 'the trousers worn by the person', covers: 'trousers, jeans, shorts, leggings' },
-  skirt: { query: 'the skirt worn by the person', covers: 'skirt' },
-  shoes: { query: 'the shoes worn by the person', covers: 'shoes, boots, sandals, slippers' },
+  hat: { query: 'the hat worn by the person', covers: 'any headwear — hat, cap, hood, headscarf, and its band or trim',
+    queries: ['the hat worn by the person', 'the headwear worn by the person', 'the hat on the head'] },
+  top: { query: 'the shirt worn by the person', covers: 'shirt, blouse, t-shirt, sweater, tunic, and its collar or cuffs',
+    queries: ['the shirt worn by the person', 'the upper body clothing worn by the person', 'the top worn on the chest'] },
+  jacket: { query: 'the jacket worn by the person', covers: 'jacket, coat, cardigan, cloak, cape',
+    queries: ['the jacket worn by the person', 'the coat worn by the person', 'the outer layer worn over the shirt'] },
+  dress: { query: 'the dress worn by the person', covers: 'dress, robe, gown — a single garment covering torso and legs',
+    queries: ['the dress worn by the person', 'the robe worn by the person', 'the long garment covering the body'] },
+  pants: { query: 'the trousers worn by the person', covers: 'trousers, jeans, shorts, leggings',
+    queries: ['the trousers worn by the person', 'the lower body clothing worn by the person', 'the garment covering the legs'] },
+  skirt: { query: 'the skirt worn by the person', covers: 'skirt',
+    queries: ['the skirt worn by the person', 'the lower body clothing worn by the person', 'the garment covering the legs'] },
+  shoes: { query: 'the shoes worn by the person', covers: 'shoes, boots, sandals, slippers',
+    queries: ['the shoes worn by the person', 'the footwear worn by the person', 'the shoes on the feet'] },
 });
 const GARMENT_VALUES = Object.freeze(Object.keys(GARMENT_ENUM));
 
@@ -609,6 +623,54 @@ async function detectGarmentBoxes(cropUri, opts = {}) {
 }
 
 /** The single best garment box, or null — the page side's contract, unchanged. */
+/**
+ * Ask SEVERAL phrasings for the same garment and keep the most plausible box
+ * (owner's idea, 2026-08-13).
+ *
+ * ONE PROMPT PER PASS, never one concatenated string. photo_analyzer.py runs a
+ * separate forward pass per prompt entry, and its own comment records that
+ * batching phrasings into a single text was tried and REVERTED — "multi-phrase
+ * attention dilution collapsed scores and missed figures on non-photographic
+ * styles". So `skirt / pants / lower body clothing` as one phrase is a known
+ * failure; as three prompts it is three independent opinions.
+ *
+ * Selection is NOT by score. On job_1786571353564_0sgrd0f4g p4 the phrase
+ * "the skirt worn by the person" returned the ENTIRE mermaid at score 0.51 —
+ * a confident box around the wrong thing. A garment is a PART of a figure, so
+ * any box covering more than `maxBoxFrac` of the figure crop is the figure
+ * itself; those are discarded first, and the best score among what remains
+ * wins. If every phrasing returns a figure-sized box, the detector has nothing
+ * to say and the caller is told so.
+ */
+async function detectGarmentBoxMulti(cropUri, opts = {}) {
+  const cfg = { ...DEFAULTS, ...opts };
+  const queries = opts.queries && opts.queries.length ? opts.queries : [opts.prompt];
+  const cropArea = Math.max(1, (opts.cropW || 0) * (opts.cropH || 0));
+  const res = await fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      image: cropUri,
+      prompts: queries.map((text, i) => ({ name: `q${i}`, text })),
+      box_threshold: cfg.boxThreshold, text_threshold: cfg.textThreshold,
+    }),
+    signal: AbortSignal.timeout(300_000),
+  });
+  if (!res.ok) throw new Error(`detect-figures-text HTTP ${res.status}`);
+  const j = await res.json();
+  if (!j?.success) throw new Error(`detect-figures-text: ${j?.error}`);
+  const tried = (j.figures || []).map((f, i) => {
+    const box = f?.box || null;
+    const area = box ? Math.max(0, box[2] - box[0]) * Math.max(0, box[3] - box[1]) : null;
+    return {
+      query: queries[i], box, score: f?.score == null ? null : +Number(f.score).toFixed(2),
+      frac: area ? +(area / cropArea).toFixed(2) : null,
+    };
+  });
+  const usable = tried.filter(t => t.box && t.frac != null && t.frac <= cfg.maxBoxFrac);
+  usable.sort((a, b) => (b.score || 0) - (a.score || 0));
+  return { pick: usable[0] || null, tried };
+}
+
 async function detectGarmentBox(cropUri, opts = {}) {
   const boxes = await detectGarmentBoxes(cropUri, { ...opts, avatarPanels: 1 });
   return boxes[0] || null;
@@ -998,7 +1060,21 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
   const needsDetector = mode !== 'colour';
   try {
     if (needsDetector) {
-      det = await detectGarmentBox(cropUri, { ...cfg, prompt });
+      if (cfg.queryMode === 'multi') {
+        const multi = await detectGarmentBoxMulti(cropUri, {
+          ...cfg, prompt, queries: GARMENT_ENUM[garmentKey]?.queries, cropW: cw, cropH: ch,
+        });
+        report.queriesTried = multi.tried;
+        det = multi.pick ? { box: multi.pick.box, score: multi.pick.score } : null;
+        report.queryPicked = multi.pick?.query || null;
+        if (!det) {
+          report.reason = `every phrasing for "${garmentKey}" returned a figure-sized box `
+            + `(${multi.tried.map(t => `${t.frac ?? '-'}`).join(', ')} of the crop) — the detector cannot locate this garment`;
+          return { changed: false, imageData: pageImageData, report, steps };
+        }
+      } else {
+        det = await detectGarmentBox(cropUri, { ...cfg, prompt });
+      }
       if (!det) { report.reason = `DINO found no "${garmentKey}" on the page`; return { changed: false, imageData: pageImageData, report, steps }; }
       const pts = mode === 'dino-sam-points'
         ? deriveColourPoints(cropRawEarly, cw, ch, det.box, observedRef, cfg)
@@ -1216,6 +1292,7 @@ module.exports = {
   garmentEnumForPrompt,
   avatarGarmentLab,
   detectGarmentBox,
+  detectGarmentBoxMulti,
   detectGarmentBoxes,
   selectDistinctBoxes,
   pickAgreeingPanels,
