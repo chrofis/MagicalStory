@@ -1724,7 +1724,15 @@ async function generateSceneComposite(opts) {
           // and every skipped figure leaves its raw silhouette in the finished
           // page. The geometry gates (iou, whiteCard, coverage, mobilesam) stay
           // ON — those check placement, not appearance, and are still valid.
-          gates: { styleMatch: false, sharpness: false },
+          // iou joins them: the blend gate compares the repainted figure's SAM
+          // silhouette against the ORIGINAL figure's, and a flat placeholder has
+          // no figure shape to match. Evidence: with styleMatch+sharpness off,
+          // every SMALL background figure passed (crops 60x165 to 101x347) and
+          // every LARGE foreground figure was rejected as blend_gate — the
+          // bigger the repaint, the further the new silhouette from the blob.
+          // whiteCard and coverage stay ON: they catch a blank or empty model
+          // response, which is a real failure regardless of the source region.
+          gates: { styleMatch: false, sharpness: false, iou: false },
         });
         if (res?.imageData) {
           current = res.imageData;
@@ -1734,7 +1742,8 @@ async function generateSceneComposite(opts) {
         } else {
           // Carry the rejection REASON, not just "nothing" — a silent skip is
           // what let a raw silhouette ship in the first place.
-          const why = res?.rejectedReason || res?.gateMessage || res?.error || 'repair returned nothing';
+          const why = [res?.rejectedReason, res?.gateMessage, res?.error]
+            .filter(Boolean).join(' — ') || 'repair returned nothing';
           repairLog.push({ name: c.name, skipped: why });
           log.warn(`[SCENE COMPOSITE]   ${c.name}: repair produced nothing — ${why}`);
         }
