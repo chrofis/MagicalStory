@@ -620,7 +620,15 @@ async function recomputeActiveVersion(storyId, key, versions, type = 'scene', { 
     ? metaEntry
     : (await getActiveVersionMeta(storyId))[String(key)];
   if (meta?.pinned) return null;
-  const idx = pickBestVersionIndex(versions || []);
+  // 'earliest', not the 'latest' default: every interactive flow (manual pick,
+  // iterate, regen, style-transfer) PINS its choice and returns above, so the
+  // only versions this recompute ever re-picks are unpinned pipeline ones —
+  // where the repair pipeline's own Step-3 pick already ruled that on a full
+  // tie the least-mangled original wins (selectBestVersion, repairPipeline.js).
+  // With 'latest' this recompute overturned that pick at persist time: a
+  // garment-recolour that dyed a character's skin red tied the original 60/60
+  // and shipped (job_1786571353564 p4).
+  const idx = pickBestVersionIndex(versions || [], { tieBreak: 'earliest' });
   if (idx < 0) return null;
   const dbIdx = dbIndexFor(versions[idx], idx, type);
   await setActiveVersion(storyId, key, dbIdx);
