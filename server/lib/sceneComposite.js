@@ -990,26 +990,30 @@ function buildPopulatedPlatePrompt(scene, cast, cleanBackgroundPrompt) {
   // the art-style block (the style has to survive or the plate renders
   // photorealistic) plus as much as possible from **SHOT/LOCATION** onward
   // (the place has to survive or the plate renders somewhere else entirely).
-  const fitSetting = (text) => {
-    const overhead = 1400 + lines.length + String(scene?.intent || '').length;
-    const budget = 7800 - overhead;
-    if (text.length <= budget || budget < 800) return text.slice(0, Math.max(600, budget));
+  // Budget by MEASURING the assembled prompt, never by estimating the fixed
+  // overhead — an estimate was wrong twice and Grok 400s the entire run when
+  // it is. Assemble once with the full setting, then trim the setting by the
+  // exact excess and assemble again.
+  const shrinkSetting = (text, excess) => {
+    const budget = Math.max(600, text.length - excess);
     const m = text.match(/\*\*(SHOT|LOCATION|SETTING)\b/);
     if (!m) return text.slice(0, budget);
+    // Keep the opening of the art-style block (drop it and the plate renders
+    // photorealistic) plus as much as fits from the location onward (drop that
+    // and the plate renders somewhere else). Both were measured failures.
     const styleKeep = Math.min(m.index, Math.round(budget * 0.35));
     return `${text.slice(0, styleKeep)}\n\n${text.slice(m.index, m.index + (budget - styleKeep))}`;
   };
-  const fittedSetting = fitSetting(settingBlock);
   const sceneIntentBlock = scene?.intent
     ? `\nScene intent: ${String(scene.intent).trim()}\n`
     : '';
 
-  return `Paint a single illustrated scene that contains ${cast.length} flat-colour silhouette figures placed inside it. Two priorities IN ORDER — when they conflict, the lower-numbered priority wins.
+  const assemble = (setting) => `Paint a single illustrated scene that contains ${cast.length} flat-colour silhouette figures placed inside it. Two priorities IN ORDER — when they conflict, the lower-numbered priority wins.
 
 PRIORITY 1 — The setting, props, and lighting must read exactly as described. Render every named environment element, prop, and required object below in its correct position. Do NOT invent new props that are not described. This image is the canonical world plate — the silhouettes will be lifted out in a later step, so the setting must be self-consistent with or without people in it.
 
 SETTING DESCRIPTION:
-${fittedSetting}
+${setting}
 ${sceneIntentBlock}
 PRIORITY 2 — Place ${cast.length} flat-colour silhouette figures naturally so the scene makes physical sense. Use the cast entries below for size, depth and per-character action. Figures must stand on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). NEVER position a silhouette with its feet on water or empty sky. Figures MAY overlap each other when the scene calls for it — partial occlusion is fine and natural.
 
@@ -1023,6 +1027,14 @@ SILHOUETTE RENDERING DETAILS:
 - Size scales with depth: foreground largest, midground medium, background small.
 
 NO TEXT in the output.`;
+
+  const MAX = 8000;
+  let out = assemble(settingBlock);
+  if (out.length > MAX) {
+    const excess = out.length - MAX + 200; // 200 char safety margin
+    out = assemble(shrinkSetting(settingBlock, excess));
+  }
+  return out;
 }
 
 /**
