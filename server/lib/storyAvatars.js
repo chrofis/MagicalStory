@@ -151,8 +151,19 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
   for (const sc of (Array.isArray(sceneCharacters) ? sceneCharacters : [])) {
     const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
     if (!nm) continue;
-    const pose = (sc?.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
-      ? sc.pose : 'threeQuarter';
+    let pose = (sc?.pose && ['front', 'threeQuarter', 'profile', 'back'].includes(sc.pose))
+      ? sc.pose : null;
+    // Beats metadata never carries `pose` — it declares `perspective` in natural
+    // language ("back view", "profile"). Reading only `pose` meant EVERY beats
+    // character got the threeQuarter cell, including declared back-view figures
+    // (job_1786571353564 p10: three back-view adults, all sent threeQuarter refs).
+    if (!pose && sc?.perspective) {
+      const persp = String(sc.perspective).toLowerCase();
+      if (/\bback\b|behind/.test(persp)) pose = 'back';
+      else if (/profile|side/.test(persp)) pose = 'profile';
+      else if (/front|camera/.test(persp)) pose = 'front';
+    }
+    if (!pose) pose = 'threeQuarter';
     const depth = (sc?.depth && ['foreground', 'midground', 'background'].includes(sc.depth))
       ? sc.depth : 'foreground';
     poseByName.set(nm.toLowerCase(), { pose, depth });

@@ -9962,3 +9962,31 @@ SETTLED hook, added after a story-specific example nearly shipped into a shared 
 
 **Touched:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`,
 `prompts/scene-review.txt`, `.claude/settings.json`, `scripts/admin/prompt-rules-hook.js`.
+
+## 2026-08-13 — Back-view refs never fired in beats mode + facing-vs-target geometry rule
+
+**Context:** A reunion page (job_1786571353564 p10) rendered three adults
+running AWAY from the children they rush toward. Two stacked defects: (1) the
+scene brief declared `back view` for characters whose action target (the
+children) sits in the FOREGROUND — geometrically impossible, so the model
+resolved it by sending the adults toward the background; the reviewer's
+drawability check names "facing one way while looking at someone behind them"
+but did not fire. (2) `applyStoryCellRefs` reads only `sc.pose`, while beats
+metadata declares `perspective: "back view"` — so EVERY beats-pipeline
+character has always received the threeQuarter sheet cell, back-view or not;
+the back-cell machinery existed but never ran.
+
+**Decision:** (1) `applyStoryCellRefs` maps `perspective` prose to a cell pose
+(back/behind → back, profile/side → profile, front/camera → front) when `pose`
+is absent. (2) Both scene-expansion templates: `back view` is only valid when
+the target sits deeper in the frame than the character; moving toward a
+foreground target means facing the camera; thin crowds by depth, never by
+turning characters away from their target. (3) scene-review check 7 names the
+back-view-toward-foreground contradiction explicitly.
+
+**Evidence:** p10 referencePhotos: all five characters `cellPose:
+threeQuarter` despite three declared back views. Mapping verified on the
+metadata shapes; back-cell crop verified against a stored sheet.
+
+**Touched:** `server/lib/storyAvatars.js`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `prompts/scene-review.txt`.
