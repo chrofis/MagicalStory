@@ -193,10 +193,16 @@ function resolveRegion({ regionSource, faceOnly, faceBbox, bodyBbox, sceneWidth,
 
 // WHITEOUT — SAM head/figure silhouette → binarized → whited out over the crop.
 // FAITHFULNESS-CHECK: images.js:11205-11220 (grokFaceInsertRepair head whiteout).
-async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, requireMobilesam, gateCoverage }) {
+async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, requireMobilesam, gateCoverage, providedMaskPng = null }) {
   const sharp = require('sharp');
   const { fetchFigureHeadMaskPng } = require('./imageCompositing');
-  const rawMask = await fetchFigureHeadMaskPng(cropBuf, bodyBoxInCrop, boxInCrop, crop.w, crop.h, maskFetch, { clipMode: 'bottom', hairBox });
+  // A caller that already KNOWS the figure's exact silhouette passes it in and
+  // SAM is not consulted. The scene composite is that caller: it painted the
+  // placeholder itself, so its colour mask is pixel-exact, while asking a
+  // segmenter to re-find a flat blob is both wasteful and a failure point —
+  // /figure-mask 503 makes an otherwise valid repair impossible.
+  const rawMask = providedMaskPng
+    || await fetchFigureHeadMaskPng(cropBuf, bodyBoxInCrop, boxInCrop, crop.w, crop.h, maskFetch, { clipMode: 'bottom', hairBox });
   if (!rawMask) throw new Error('SAM head mask unavailable for whiteout (MobileSAM down?)');
   const a = await sharp(rawMask).resize(crop.w, crop.h, { fit: 'fill' }).ensureAlpha().extractChannel(3).raw().toBuffer();
   const stride = Math.max(1, Math.round(a.length / (crop.w * crop.h)));
@@ -218,7 +224,7 @@ async function buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop,
 // CROSSHATCH — magenta SVG crosshatch clipped to the figure silhouette (dest-in).
 // FAITHFULNESS-CHECK: images.js:12163-12172 (grok_cutout hatch SVG) +
 //                     images.js:12483-12496 / 12689-12695 (grok_inpaint hatch + silhouette clip).
-async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage, sceneBuffer, sceneWidth, sceneHeight, protectedBodies, bodyBbox, faceBoxInCrop = null, blurFace = true, blurStrength = 'slight' }) {
+async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage, sceneBuffer, sceneWidth, sceneHeight, protectedBodies, bodyBbox, faceBoxInCrop = null, blurFace = true, blurStrength = 'slight', providedMaskPng = null, blurFigure = false }) {
   const sharp = require('sharp');
   const { fetchFigureMaskPng } = require('./imageCompositing');
   const figureLeft = boxInCrop[0], figureTop = boxInCrop[1];
@@ -275,7 +281,13 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
       log.info(`[FACE REPAIR] round-1 head seed from the DINO face box at (${fx},${fy}) in hatch coords`);
       return { points: [[fx, fy]] };
     })();
-    sil = maskFetch ? await maskFetch(hatchCrop, boxInHatch, r1Points) : await fetchFigureMaskPng(hatchCrop, boxInHatch, r1Points);
+    // A caller holding the exact silhouette supplies it and SAM is skipped. This
+    // is the difference between the real recipe and the degraded one: without a
+    // silhouette the hatch stays RECTANGULAR and the face blur is skipped
+    // entirely, which is a different treatment wearing the same name.
+    sil = providedMaskPng
+      ? await sharp(providedMaskPng).extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight }).png().toBuffer()
+      : (maskFetch ? await maskFetch(hatchCrop, boxInHatch, r1Points) : await fetchFigureMaskPng(hatchCrop, boxInHatch, r1Points));
     if (!sil) log.warn('[FACE REPAIR] crosshatch: no figure silhouette after retries — RECTANGULAR hatch, face blur skipped');
     if (sil) {
       // Occluder-subtract: rembg/SAM in the target crop returns ALL foreground
@@ -361,6 +373,29 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
   //    identity underneath it.
   const blurLayers = [];
   let faceBlurInfo = { applied: false, reason: blurFace ? 'no face box for this figure' : 'blurFace disabled' };
+  // FULL-FIGURE blur under the hatch. The template tells the model to infer
+  // pose, hands and gaze from "the figure still faintly visible through the
+  // crosshatch" — blurring the whole silhouette leaves exactly that: shape,
+  // stance and tone survive, identity does not. Clipped to the silhouette, so
+  // the background and neighbouring figures are untouched.
+  if (blurFigure && sil) {
+    try {
+      const hatchCropBuf = await sharp(cropBuf)
+        .extract({ left: hatchLeft, top: hatchTop, width: hatchWidth, height: hatchHeight })
+        .jpeg({ quality: 90 }).toBuffer();
+      const factor = blurStrength === 'slight' ? 0.045 : 0.12;
+      const radius = Math.max(6, Math.round(Math.min(figureWidth, figureHeight) * factor));
+      const blurredFig = await sharp(hatchCropBuf).blur(radius).png().toBuffer();
+      const silHatch = await sharp(sil).resize(hatchWidth, hatchHeight, { fit: 'fill' }).png().toBuffer();
+      const clippedFig = await sharp(blurredFig).ensureAlpha()
+        .composite([{ input: silHatch, blend: 'dest-in' }]).png().toBuffer();
+      blurLayers.push({ input: clippedFig, top: hatchTop, left: hatchLeft });
+      log.info(`[FACE REPAIR] crosshatch: FULL-FIGURE blur (${blurStrength}, r=${radius}) clipped to the silhouette, hatch on top`);
+    } catch (err) {
+      log.warn(`[FACE REPAIR] full-figure blur failed (${err.message}) — hatch only`);
+    }
+  }
+
   if (blurFace && Array.isArray(faceBoxInCrop) && faceBoxInCrop.length === 4) {
     try {
       const fl = Math.max(0, Math.round(faceBoxInCrop[0])), ft = Math.max(0, Math.round(faceBoxInCrop[1]));
@@ -413,7 +448,7 @@ async function buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, g
 
 // BLUR — shape-aware silhouette-clipped blur over the figure.
 // FAITHFULNESS-CHECK: images.js:11535-11582 (blurFace shapeAware branch).
-async function buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCoverage }) {
+async function buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCoverage, providedMaskPng = null }) {
   const sharp = require('sharp');
   const { fetchFaceHeadMaskPng, fetchSilhouettePng, fetchFigureMaskPng } = require('./imageCompositing');
   const fLeft = boxInCrop[0], fTop = boxInCrop[1];
@@ -433,9 +468,14 @@ async function buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCove
   // "SAM round 1" downstream (exp #304: red zone 51864px under blur vs 5032px
   // under crosshatch on the SAME box, because round 1 covered only part of the
   // figure). Body blur now uses the plain figure mask, like every other path.
-  const silhouettePng = (faceOnly
-    ? (await fetchFaceHeadMaskPng(cropJpeg, innerFaceBox, fWidth, fHeight) || await fetchSilhouettePng(cropJpeg))
-    : (await fetchFigureMaskPng(cropJpeg, innerFaceBox, {}) || await fetchSilhouettePng(cropJpeg)));
+  // Same rule as whiteout: a caller holding the exact silhouette supplies it
+  // and no segmenter runs. Without it a body blur falls back to blurring the
+  // whole BOX, which smears the neighbouring figures too.
+  const silhouettePng = providedMaskPng
+    ? await sharp(providedMaskPng).extract({ left: fLeft, top: fTop, width: fWidth, height: fHeight }).png().toBuffer()
+    : (faceOnly
+      ? (await fetchFaceHeadMaskPng(cropJpeg, innerFaceBox, fWidth, fHeight) || await fetchSilhouettePng(cropJpeg))
+      : (await fetchFigureMaskPng(cropJpeg, innerFaceBox, {}) || await fetchSilhouettePng(cropJpeg)));
   if (silhouettePng) {
     const blurredWithAlpha = await sharp(blurred).ensureAlpha().composite([{ input: silhouettePng, blend: 'dest-in' }]).png().toBuffer();
     composite = { input: blurredWithAlpha, left: fLeft, top: fTop };
@@ -596,7 +636,22 @@ async function buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, f
   }
 
   // Body / crosshatch / blur — use the matching character-repair template.
-  const artStyleContext = opts.artStyle ? `\n\nArt style: ${opts.artStyle}` : '';
+  // Carry the FULL style description, not the bare id. The face path already
+  // does this; the body path passed "Art style: watercolor" and nothing more,
+  // which is too thin to hold the model to a medium — with a flat placeholder
+  // as the target region it leans entirely on the avatar and repaints a
+  // photographic face into a painted scene, which the style gate then
+  // (correctly) rejects as drift.
+  const artStyleContext = (() => {
+    if (!opts.artStyle) return '';
+    try {
+      const { ART_STYLES } = require('./storyHelpers');
+      const raw = ART_STYLES[opts.artStyle];
+      const txt = typeof raw === 'string' ? raw : (raw && raw.default) || '';
+      if (txt) return `\n\nArt style — match this medium and rendering exactly: ${txt}`;
+    } catch { /* fall through to the bare id */ }
+    return `\n\nArt style: ${opts.artStyle}`;
+  })();
   if (treatment === 'blur') {
     const tpl = !faceOnly && PROMPT_TEMPLATES.characterRepairBodyBlended ? PROMPT_TEMPLATES.characterRepairBodyBlended : PROMPT_TEMPLATES.characterRepairBlended;
     if (tpl) return fillTemplate(tpl, { charName: identityName, identityName, appearanceContext, clothingContext, actionContext, issueContext, textPositionContext });
@@ -667,7 +722,16 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
   // --- Treatment -------------------------------------------------------------
   let treated;
   if (treatment === 'whiteout') {
-    treated = await buildWhiteoutTreatment({ cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, requireMobilesam, gateCoverage: gates.coverage });
+    treated = await buildWhiteoutTreatment({
+      cropBuf, crop, bodyBoxInCrop, boxInCrop, faceClip, hairBox, maskFetch, requireMobilesam,
+      gateCoverage: gates.coverage,
+      // Caller-supplied exact silhouette, cropped to this repair's crop window.
+      providedMaskPng: opts.figureMaskPng
+        ? await sharp(opts.figureMaskPng)
+          .extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h })
+          .png().toBuffer()
+        : null,
+    });
   } else if (treatment === 'crosshatch') {
     // Face box mapped into crop pixels so the hatch can carry a blurred head.
     const fbForBlur = (!faceOnly && Array.isArray(faceBbox) && faceBbox.length === 4) ? [
@@ -676,9 +740,25 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       Math.min(crop.w, Math.round(faceBbox[3] * W) - crop.x),
       Math.min(crop.h, Math.round(faceBbox[2] * H) - crop.y),
     ] : null;
-    treated = await buildCrosshatchTreatment({ cropBuf, crop, boxInCrop, maskFetch, gateCoverage: gates.coverage, sceneBuffer, sceneWidth: W, sceneHeight: H, protectedBodies: opts.protectedBodies, bodyBbox, faceBoxInCrop: fbForBlur, blurFace: opts.blurFace !== false, blurStrength: opts.blurStrength || 'slight' });
+    treated = await buildCrosshatchTreatment({
+      cropBuf, crop, boxInCrop, maskFetch, gateCoverage: gates.coverage, sceneBuffer,
+      sceneWidth: W, sceneHeight: H, protectedBodies: opts.protectedBodies, bodyBbox,
+      faceBoxInCrop: fbForBlur, blurFace: opts.blurFace !== false, blurStrength: opts.blurStrength || 'slight',
+      blurFigure: opts.blurFigure === true,
+      // Caller-supplied exact silhouette, cropped to this repair's crop window.
+      // Without a silhouette the hatch stays RECTANGULAR and the face blur is
+      // skipped — a different treatment wearing the same name.
+      providedMaskPng: opts.figureMaskPng
+        ? await sharp(opts.figureMaskPng).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer()
+        : null,
+    });
   } else if (treatment === 'blur') {
-    treated = await buildBlurTreatment({ cropBuf, crop, boxInCrop, faceOnly, gateCoverage: gates.coverage });
+    treated = await buildBlurTreatment({
+      cropBuf, crop, boxInCrop, faceOnly, gateCoverage: gates.coverage,
+      providedMaskPng: opts.figureMaskPng
+        ? await sharp(opts.figureMaskPng).extract({ left: crop.x, top: crop.y, width: crop.w, height: crop.h }).png().toBuffer()
+        : null,
+    });
   } else {
     throw new Error(`${descriptor}: unknown treatment "${treatment}"`);
   }
@@ -748,7 +828,18 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       );
       if (sm && sm.sameStyle === false) {
         log.warn(`🚫 [FACE REPAIR] ${descriptor} for ${charName} REJECTED: style drift (${sm.styleB} vs ${sm.styleA})`);
-        return { imageData: null, character: charName, method: legacyMethod, descriptor, rejectedReason: 'style_drift', usage };
+        // Carry the images, same as the blend gate does — a rejected run is
+        // exactly the one you need to look at, and a style verdict with no
+        // picture behind it cannot be judged or argued with.
+        return {
+          imageData: null, character: charName, method: legacyMethod, descriptor,
+          rejectedReason: 'style_drift',
+          gateMessage: `${sm.styleB} vs ${sm.styleA}`,
+          grokRawResult,
+          blackoutImage: sentToModelUri || `data:image/png;base64,${treatedBuf.toString('base64')}`,
+          promptSent: prompt,
+          usage,
+        };
       }
     } catch (e) { log.warn(`[FACE REPAIR] style gate unavailable (${e.message}) — continuing without`); }
   }

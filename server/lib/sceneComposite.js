@@ -511,6 +511,42 @@ async function findSilhouettesByDiff(populatedBuf, cleanBgBuf, cast, opts = {}) 
         if (paleMask[q]) sMask[q] = 1;
       }
     }
+    // Then FILL THE HOLES. The face is painted in a skin tone and the eyes in
+    // black, so neither matches the character's palette hue and no colour key
+    // can reach them — they are enclosed gaps inside the outline. Flood the
+    // background inward from the box border; whatever the flood cannot reach is
+    // interior and belongs to the figure. Without this the crosshatch clips
+    // around the face, the model keeps the placeholder's painted face, and the
+    // repair silently preserves the very thing it was asked to replace.
+    {
+      const bw = maxX - minX + 1, bh = maxY - minY + 1;
+      const outside = new Uint8Array(bw * bh);
+      const stack = [];
+      const push = (lx, ly) => {
+        const li = ly * bw + lx;
+        if (outside[li]) return;
+        if (sMask[(minY + ly) * W + (minX + lx)]) return;
+        outside[li] = 1; stack.push(li);
+      };
+      for (let lx = 0; lx < bw; lx++) { push(lx, 0); push(lx, bh - 1); }
+      for (let ly = 0; ly < bh; ly++) { push(0, ly); push(bw - 1, ly); }
+      while (stack.length) {
+        const li = stack.pop();
+        const lx = li % bw, ly = (li / bw) | 0;
+        if (lx > 0) push(lx - 1, ly);
+        if (lx < bw - 1) push(lx + 1, ly);
+        if (ly > 0) push(lx, ly - 1);
+        if (ly < bh - 1) push(lx, ly + 1);
+      }
+      let filled = 0;
+      for (let ly = 0; ly < bh; ly++) {
+        for (let lx = 0; lx < bw; lx++) {
+          const q = (minY + ly) * W + (minX + lx);
+          if (!sMask[q] && !outside[ly * bw + lx]) { sMask[q] = 1; filled++; }
+        }
+      }
+      if (filled) log.debug(`[SCENE COMPOSITE]   ${c.name}: filled ${filled}px of interior holes (face, eyes) into the silhouette`);
+    }
 
     results[c.name] = {
       bbox: {
@@ -1705,7 +1741,7 @@ async function generateSceneComposite(opts) {
   // and its occlusion, because the model repaints in place rather than us
   // pasting a standing cell on top. Costs one Grok call per figure.
   if (figureMethod === 'charRepair') {
-    const { repairCharacterMismatch } = require('./images');
+    const { repairCharacterFace } = require('./faceRepair');
     log.info(`[SCENE COMPOSITE] step 4/4 — character repair over the plate (${Object.keys(bboxes).length} figures)`);
     let current = populated.imageData;
     const repairLog = [];
@@ -1730,34 +1766,40 @@ async function generateSceneComposite(opts) {
       }
       if (!avatarUri) { repairLog.push({ name: c.name, skipped: 'no avatar cell' }); continue; }
       try {
-        const res = await repairCharacterMismatch(current, avatarUri, nb, c.name, {
-          imageBackend: 'grok',
-          issueDescription: `The figure is a flat ${c.colorName || ''} placeholder silhouette, not the character. Replace it with ${c.name}.`,
+        // Winning configuration, measured over 20 single-figure runs:
+        //   cutout  — the model receives ONLY the padded crop. In box mode it
+        //             "sees the full scene" (resolveRegion) and composes for the
+        //             page, painting a figure that spills far outside its box.
+        //   crosshatch + FULL-FIGURE strong blur — the blur removes identity
+        //             while stance survives, so the character comes from the
+        //             avatar rather than from the ghost; the hatch marks what to
+        //             repaint. The template already expects this ("infer pose
+        //             from the figure still faintly visible through the
+        //             crosshatch").
+        //   styleMatch OFF — its premise is inverted here. It guards a character
+        //             already drawn in the page's medium; we are deliberately
+        //             inserting the avatar, and matching the avatar IS the goal.
+        //             iou / whiteCard / coverage stay ON: those catch real
+        //             garbage, as a run with iou off demonstrated.
+        // The figure mask comes from SAM, not from a hand-rolled colour mask —
+        // colour keys miss hands and faces (skin tones match no palette hue) and
+        // patching that by hand bled into neighbouring figures.
+        const res = await repairCharacterFace(current, avatarUri, {
+          model: 'grok',
+          regionSource: 'cutout',
+          treatment: 'crosshatch',
+          faceOnly: false,
+          bodyBbox: nb,
+          bbox: nb,
+          charName: c.name,
+          issueDescription: `The figure is a flat ${c.colorName || 'coloured'} placeholder silhouette. Paint ${c.name} there instead.`,
           clothingDescription: c.clothing || null,
           sceneDescription: scene?.description || '',
-          whiteoutTarget: 'body',
+          artStyle: scene?.artStyle || null,
+          blurFigure: true,
+          blurStrength: 'strong',
+          gates: { styleMatch: false },
           includeDebug: true,
-          // The repair gates exist to stop a repair DRIFTING a character that
-          // was already drawn correctly. Here the source region is a flat
-          // colour placeholder that we painted ourselves, so their premise is
-          // false and they fire on every figure:
-          //   styleMatch — a flat blob vs a painted person always reads as
-          //     style drift, so the repair is thrown away.
-          //   sharpness  — a flat blob has near-zero detail, so the ratio the
-          //     blur guard compares against is meaningless.
-          // Measured: 1 of 5 figures skipped on one page, 3 of 5 on another,
-          // and every skipped figure leaves its raw silhouette in the finished
-          // page. The geometry gates (iou, whiteCard, coverage, mobilesam) stay
-          // ON — those check placement, not appearance, and are still valid.
-          // iou joins them: the blend gate compares the repainted figure's SAM
-          // silhouette against the ORIGINAL figure's, and a flat placeholder has
-          // no figure shape to match. Evidence: with styleMatch+sharpness off,
-          // every SMALL background figure passed (crops 60x165 to 101x347) and
-          // every LARGE foreground figure was rejected as blend_gate — the
-          // bigger the repaint, the further the new silhouette from the blob.
-          // whiteCard and coverage stay ON: they catch a blank or empty model
-          // response, which is a real failure regardless of the source region.
-          gates: { styleMatch: false, sharpness: false, iou: false },
         });
         if (res?.imageData) {
           current = res.imageData;
