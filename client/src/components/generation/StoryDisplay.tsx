@@ -571,6 +571,8 @@ export function StoryDisplay({
     outliers: Array<{ page: number; severity: 'major' | 'moderate' | 'minor'; differences: string[] }>;
     reasoning: string;
     gridImage: string;
+    gridImages?: string[];
+    styleMatch?: { requestedStyle: string; verdict: string; differences: string[] } | null;
   } | null>(null);
 
   // Auto-pipeline now runs Step 8 (style audit) on every story generation;
@@ -587,6 +589,8 @@ export function StoryDisplay({
         outliers: auto.outliers || [],
         reasoning: auto.reasoning || '',
         gridImage: auto.gridImage || '',
+        gridImages: auto.gridImages || undefined,
+        styleMatch: auto.styleMatch || null,
       });
     }
   }, [finalChecksReport, styleCheckResult]);
@@ -2504,6 +2508,7 @@ export function StoryDisplay({
                   setStyleCheckResult({
                     verdict: r.verdict, dominantCluster: r.dominantCluster, anchorPage: r.anchorPage,
                     outliers: r.outliers, reasoning: r.reasoning, gridImage: r.gridImage,
+                    gridImages: (r as any).gridImages, styleMatch: (r as any).styleMatch || null,
                   });
                 } catch (err) {
                   console.error('Style check failed:', err);
@@ -2545,7 +2550,15 @@ export function StoryDisplay({
               className="p-1 hover:bg-purple-200 rounded text-gray-500"
             ><X size={16} /></button>
           </summary>
-          <p className="text-xs text-gray-700 mb-3">{styleCheckResult.reasoning}</p>
+          {/* Absolute style-match verdict — the header's CONSISTENT/MIXED badge is
+              only the RELATIVE clustering; a book can be consistently in the WRONG
+              medium. Showing both ends the header-contradicts-reasoning confusion. */}
+          {styleCheckResult.styleMatch && (
+            <p className={`text-xs font-semibold mb-1 ${styleCheckResult.styleMatch.verdict === 'matches' ? 'text-green-800' : 'text-red-800'}`}>
+              Commissioned style: {styleCheckResult.styleMatch.verdict === 'matches' ? 'matches' : `${styleCheckResult.styleMatch.verdict.replace('_', ' ')} — ${styleCheckResult.styleMatch.differences.join('; ')}`}
+            </p>
+          )}
+          <p className="text-xs text-gray-700 mb-3 whitespace-pre-line">{styleCheckResult.reasoning}</p>
           {styleCheckResult.outliers.length > 0 && (
             <div className="space-y-2 mb-3">
               {styleCheckResult.outliers.map((o, i) => (
@@ -2566,8 +2579,10 @@ export function StoryDisplay({
             </div>
           )}
           <details>
-            <summary className="text-xs text-purple-700 cursor-pointer">Show grid sent to model</summary>
-            <img src={styleCheckResult.gridImage} alt="Style grid" className="mt-2 max-w-full border rounded" />
+            <summary className="text-xs text-purple-700 cursor-pointer">Show grid{(styleCheckResult.gridImages?.length ?? 1) > 1 ? 's' : ''} sent to model</summary>
+            {(styleCheckResult.gridImages?.length ? styleCheckResult.gridImages : [styleCheckResult.gridImage]).map((g, i) => (
+              <img key={i} src={g} alt={`Style grid ${i + 1}`} className="mt-2 max-w-full border rounded" />
+            ))}
           </details>
         </details>
       )}

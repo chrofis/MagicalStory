@@ -288,8 +288,14 @@ Verdict rule (against the COMMISSIONED style, not the majority):
     dominantCluster,
     anchorPage,
     outliers,
-    reasoning: results.map(r => r.reasoning).filter(Boolean)[0] || '',
+    // ALL batches' reasonings, not just the first — with 2 grids the second
+    // batch (pages 7+) was analyzed but its assessment never shown anywhere.
+    reasoning: results.map(r => r.reasoning).filter(Boolean).join('\n'),
     gridImage: `data:image/jpeg;base64,${results[0].gridBuffer.toString('base64')}`,
+    // EVERY batch's grid, not just the first: a 10-page book + 3 covers spans
+    // two grids (covers + p1-6, then p7-10) — showing only results[0] made the
+    // UI look like pages 7+ were never checked.
+    gridImages: results.map(r => `data:image/jpeg;base64,${r.gridBuffer.toString('base64')}`),
     styleMatch: requestedStyle
       ? { requestedStyle, verdict: medium, differences: medium === 'matches' ? [] : mediumDiffs.slice(0, 4) }
       : null,
