@@ -10434,3 +10434,26 @@ landmark" via consolidator). Measurement stays in the Test Lab's empty_scene_adh
 stage, run on demand.
 
 **Touched:** none (documentation only).
+
+## 2026-08-14 — The visual bible knows the art style
+
+**Context:** The visual contract was written style-blind — its only style input
+(STYLE_WARDROBE) fills for steampunk/cyber and is empty for every other style.
+On a realistic-style story (job_1786737619634) the bible wrote a mermaid with
+"luminous green eyes" and "iridescent shimmer" — unrenderable as photography —
+and omitted the children's mermaid costume entries entirely; the underwater
+pages drifted to 3D-render (flagged by the style gate, scores 11-40, repair
+could not out-pull the model prior).
+
+**Decision:** story-bible-from-beats.txt gets `Illustration style: {ART_STYLE}`
+(the resolved style prose) plus one rule: every description must render in the
+named style — photorealistic styles get physically plausible beings/materials.
+Builder fills it via resolveArtStyle.
+
+**Evidence:** Replay on the same beats: Lira became photoreal-plausible (grey
+eyes, fabric scale-panel tail) AND the children's costumed:mermaid entries
+appeared, phrased as real wearable costumes. Category-selection variance
+(summer flipped off in the replay) remains open — belongs to a wardrobe-review
+completeness check, not this input.
+
+**Touched:** `prompts/story-bible-from-beats.txt`, `server/lib/promptBuilders.js`.

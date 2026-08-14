@@ -7,6 +7,7 @@ Do not rewrite, extend or comment on the story. Only the three output sections b
 Reading level: {READING_LEVEL}
 Pages: {PAGE_COUNT}
 Story language: {LANGUAGE}
+Illustration style: {ART_STYLE}
 Characters: {CHARACTER_NAMES}
 Main characters: {MAIN_CHARACTER_NAMES}
 Primary characters: {PRIMARY_CHARACTER_NAMES}
@@ -59,6 +60,8 @@ Scan the beats and list every element that must stay consistent across illustrat
 - One entry per secondary character, no matter how the beats refer to them; a person named both by relation and by attribute is one entry. Never reuse an id.
 
 Every entry needs specific colours, one signature element, and a description that works without seeing the other scenes.
+
+Every description — characters, creatures, clothing, objects — must render in the named illustration style. A photorealistic style gets physically plausible beings, materials and colours (no glowing, luminous, or iridescent features, no impossible anatomy); a stylised style may use its idiom.
 
 The `description` is copied verbatim into image prompts, so write it as image-prompt text:
 - Describe the SHAPE for objects the model confuses — name the parts and how they connect (`perpendicular`, `parallel`, `spans across`, `forms a T from above`, `mounted at right angles to`). No analogies, no negations; both mislead the model.

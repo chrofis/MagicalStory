@@ -3958,6 +3958,11 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
+    // The contract's descriptions are copied verbatim into image prompts, so
+    // the bible must know the rendering style — a style-blind contract wrote
+    // luminous/iridescent fantasy specs into a photorealistic book
+    // (job_1786737619634: 3D-render drift on every page that used them).
+    ART_STYLE: resolveArtStyle(inputData.artStyle) || inputData.artStyle || 'not specified',
     STYLE_WARDROBE: buildStyleWardrobeBlock(inputData.artStyle),
     MAIN_CHARACTER_NAMES: named(c => mainIds.includes(c.id)),
     PRIMARY_CHARACTER_NAMES: named(c => !mainIds.includes(c.id)),
