@@ -10511,3 +10511,27 @@ which is always, on a normal generation.
 `storyJobPipeline.js`, `tests/manual/secondaryCharacterDetection.test.js`.
 
 **Status:** ✅ committed, NOT pushed (owner reviews first).
+
+## 2026-08-14 — Realistic style is photography-first; oil gets the anti-photo guard
+
+**Context:** On a realistic-style story, drift-prone pages rendered as 3D/
+illustration with the full style block verifiably delivered (production shrink
+replayed on the exact stored prompt — ART STYLE intact; 3/3 photoreal rerolls
+of the same prompt proved the shipped 3D version was a chance roll). The
+descriptor itself named the wrong mode: "children's book ILLUSTRATION ...
+STORYBOOK setting" with only a trailing "NOT illustrated" negation — positive
+tokens outweigh negations. Style audit of all 14: oil was the only painterly
+style WITHOUT the "never photographic" clause (its cover rendered photographic
+figures on a painted background).
+
+**Decision:** realistic rewritten photography-first ("A photograph. Real
+people captured by a camera... Never illustrated, stylized, animated, or
+3D-rendered"); oil gains the watercolor/steampunk-style anti-photo guard.
+Other 12 styles audited clean.
+
+**Evidence:** Hardest content (child mermaids underwater, shipped as 3D,
+score 11): new wording 1/2 photographic vs 0 before; normal content already
+3/3 photo with either wording. Wording shifts the odds on no-photo-prior
+content; eval + repair stay the backstop.
+
+**Touched:** `server/lib/promptBuilders.js` (ART_STYLES.realistic, ART_STYLES.oil).
