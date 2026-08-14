@@ -1006,6 +1006,7 @@ async function extractInlineImagesToR2(storyId, data) {
             const g = s.entityReport.grids[k];
             if (!g) continue;
             upload(g.gridImage, r2.keyForEntityGrid(storyId, pageNum, k), (url) => { g.gridImage = url; });
+            if (g.headGridImage) upload(g.headGridImage, r2.keyForEntityGrid(storyId, pageNum, `${k}-heads`), (url) => { g.headGridImage = url; });
           }
         }
         if (s.entityReport.characters && typeof s.entityReport.characters === 'object') {
@@ -1180,6 +1181,7 @@ async function extractInlineImagesToR2(storyId, data) {
         const g = fcr.entity.grids[k];
         if (!g) continue;
         upload(g.gridImage, `stories/${storyId}/debug/final-checks/entity-grid-${k}.jpg`, (url) => { g.gridImage = url; });
+        if (g.headGridImage) upload(g.headGridImage, `stories/${storyId}/debug/final-checks/entity-grid-${k}-heads.jpg`, (url) => { g.headGridImage = url; });
       }
     }
     if (fcr.entity?.characters && typeof fcr.entity.characters === 'object') {

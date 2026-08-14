@@ -923,7 +923,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
                   headGrid?.buffer || null
                 );
 
-            gridResults.push({ gridResult, evalResult, batchCrops });
+            gridResults.push({ gridResult, headGrid, evalResult, batchCrops });
             if (evalResult.issues) {
               // Stamp each issue with THIS grid's letter→page map, taken from the
               // manifest the model actually saw. Multi-grid batches each restart
@@ -946,6 +946,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           return {
             charName, clothingCategory, groupAppearances, crops,
             gridResult: gridResults[0].gridResult,
+            headGrid: gridResults[0].headGrid || null,
             evalResult: {
               ...gridResults[0].evalResult,
               issues: allIssues,
@@ -957,6 +958,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             },
             additionalGrids: gridResults.slice(1).map(g => ({
               gridImage: `data:image/jpeg;base64,${g.gridResult.buffer.toString('base64')}`,
+              headGridImage: g.headGrid ? `data:image/jpeg;base64,${g.headGrid.buffer.toString('base64')}` : null,
               manifest: g.gridResult.manifest,
               cellCount: g.batchCrops.length,
               evalResult: g.evalResult
@@ -989,10 +991,12 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
         const { groupAppearances, gridResult, evalResult, crops } = result;
 
-        // Store grid(s) for dev panel
+        // Store grid(s) for dev panel — headGridImage is what the judge reads
+        // faces from, shown next to the body grid.
         report.grids.push({
           entityName: charName, entityType: 'character', clothingCategory,
           gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
+          headGridImage: result.headGrid ? `data:image/jpeg;base64,${result.headGrid.buffer.toString('base64')}` : null,
           manifest: gridResult.manifest, cellCount: crops.length
         });
         // Store additional grids (multi-grid for stories with many pages)
@@ -1001,6 +1005,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             report.grids.push({
               entityName: charName, entityType: 'character', clothingCategory,
               gridImage: addGrid.gridImage,
+              headGridImage: addGrid.headGridImage || null,
               manifest: addGrid.manifest, cellCount: addGrid.cellCount
             });
           }

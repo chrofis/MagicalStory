@@ -1535,6 +1535,7 @@ router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
       entityName: grid.entityName,
       clothingCategory: grid.clothingCategory,
       gridImage: grid.gridImage,
+      headGridImage: grid.headGridImage || null,
       manifest: grid.manifest,
       runIndex: sourceReport?.runIndex
     });

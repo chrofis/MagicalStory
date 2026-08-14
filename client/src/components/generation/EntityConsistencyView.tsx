@@ -155,16 +155,17 @@ export function EntityConsistencyView({
     const results = await Promise.all(toFetch.map(async ({ gridIndex, key }) => {
       try {
         const result = await storyService.getEntityGridImageByIndex(storyId, gridIndex, runIdxForFetch);
-        return { key, gridImage: result?.gridImage };
+        return { key, gridImage: result?.gridImage, headGridImage: (result as any)?.headGridImage };
       } catch (err) {
         console.error(`Failed to load entity grid image for ${key}:`, err);
-        return { key, gridImage: undefined };
+        return { key, gridImage: undefined, headGridImage: undefined };
       }
     }));
     setLoadedGrids(prev => {
       const next = { ...prev };
       for (const r of results) {
         if (r.gridImage) next[r.key] = r.gridImage;
+        if (r.headGridImage) next[r.key + ':head'] = r.headGridImage;
       }
       return next;
     });
@@ -178,7 +179,8 @@ export function EntityConsistencyView({
   // Resolve grid images for a (charName, clothing) cell.
   // Prefers inline bytes; falls back to lazy-loaded cache for the active round.
   const resolveGridImages = (charName: string, clothing: string, clothingResult: any): string[] => {
-    // Always prefer inline if present
+    // Always prefer inline if present. The head grid (what the judge reads
+    // faces from) follows its body grid when available.
     if (clothingResult.gridImages && clothingResult.gridImages.length > 0) return clothingResult.gridImages;
     if (clothingResult.gridImage) return [clothingResult.gridImage];
     // Look up via grids[] manifest
@@ -191,8 +193,10 @@ export function EntityConsistencyView({
       if (g.clothingCategory !== undefined && g.clothingCategory !== clothing) continue;
       const gridIndex = g.gridIndex ?? i;
       const key = `${cacheKeyPrefix}:${gridIndex}`;
-      const img = loadedGrids[key];
+      const img = g.gridImage || loadedGrids[key];
       if (img) out.push(img);
+      const headImg = g.headGridImage || loadedGrids[key + ':head'];
+      if (headImg) out.push(headImg);
     }
     return out;
   };
