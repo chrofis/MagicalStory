@@ -5072,7 +5072,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     let scorecard = null;
     if (params.scoreOutput === true || params.scoreOutput === 'true') {
       const sceneText = merged.map(m => `--- Page ${m.pageNumber} ---\n${m.brief}`).join('\n\n');
-      if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'scene_review_replay', model } })).scorecard;
+      if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'scene_review_replay', model, genCost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}), genMs: Date.now() - t } })).scorecard;
     }
 
     runs.push({
@@ -5149,6 +5149,8 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   if (!res || !res.text || !res.text.trim()) throw new Error(`judge returned empty response (model ${judge})`);
   const scored = sc.scoreFromDims(sc.parseJudgeJson(res.text), { partial });
   const scorecard = { ...scored, ...sc.evaluatorStamp(template, version), judgeModel: judge };
+  const judgeMs = Date.now() - t;
+  const judgeCost = res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {});
 
   // Persist to story_scores so this lands on the live scores page. `persist`
   // carries the story context + the GENERATING model (the comparison axis) +
@@ -5162,6 +5164,9 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
       evalVersion: scorecard.evaluatorVersion, evalHash: scorecard.evaluatorHash,
       source: persist.source || null, label: persist.label || null,
       round: typeof persist.round === 'number' ? persist.round : null,
+      genCost: typeof persist.genCost === 'number' ? persist.genCost : null, // the model that produced/reviewed this artifact
+      genMs: typeof persist.genMs === 'number' ? persist.genMs : null,
+      judgeCost, judgeMs, // the scoring call
     };
     for (const [artifact, a] of Object.entries(scorecard.artifacts)) {
       // freeze the exact text the judge read for this part (click a part → this)
@@ -5176,8 +5181,8 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   return {
     scorecard,
     modelId: res.modelId,
-    elapsedMs: Date.now() - t,
-    cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
+    elapsedMs: judgeMs,
+    cost: judgeCost,
     usage: res.usage,
   };
 }
@@ -5238,6 +5243,18 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
   const orig = PROMPT_TEMPLATES.storyBeatsReview;
   if (promptOverride) PROMPT_TEMPLATES.storyBeatsReview = promptOverride;
   const arms = [];
+  // round 1 = the RAW beats (as generated, before any review), scored once.
+  // Model-agnostic, so it's the shared baseline every reviewer arm builds on.
+  let rawScorecard = null;
+  if (scoreOutput) {
+    try {
+      rawScorecard = (await scoreArtifactsWithJudge({ beats: beatsToText(beats0) }, {
+        model: params.judgeModel, evalVersion: params.evalVersion,
+        persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model: 'raw', label: 'raw (as generated)', round: 1 },
+      })).scorecard;
+    } catch (e) { require('../utils/logger').log.warn(`[beats replay] round-1 raw score failed: ${e.message}`); }
+  }
+
   try {
     for (const model of models) {
       let beats = beats0;
@@ -5265,7 +5282,8 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
         if (scoreOutput) {
           const sr = await scoreArtifactsWithJudge({ beats: beatsToText(beats) }, {
             model: params.judgeModel, evalVersion: params.evalVersion,
-            persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `pass ${p}`, round: p },
+            // round p+1: round 1 is the raw beats (scored below), so pass p → round p+1
+            persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `review pass ${p}`, round: p + 1, genCost: entry.cost, genMs: entry.elapsedMs },
           });
           entry.scorecard = sr.scorecard;
           entry.cost += sr.cost;
@@ -5278,7 +5296,7 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
   } finally {
     PROMPT_TEMPLATES.storyBeatsReview = orig;
   }
-  return { storyId: target.storyId, beatCount: beats0.length, passesRequested: passCount, arms };
+  return { storyId: target.storyId, beatCount: beats0.length, passesRequested: passCount, rawScore: rawScorecard?.artifacts?.beats?.score ?? null, arms };
 }
 
 
@@ -5377,7 +5395,7 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
   let scorecard = null;
   if (params.scoreOutput === true || params.scoreOutput === 'true') {
     const visualBible = String(res.text || '').slice(0, 20000);
-    if (visualBible.trim()) scorecard = (await scoreArtifactsWithJudge({ visualBible }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_bible_replay', model } })).scorecard;
+    if (visualBible.trim()) scorecard = (await scoreArtifactsWithJudge({ visualBible }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_bible_replay', model, genCost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}), genMs: Date.now() - t } })).scorecard;
   }
 
   return {
@@ -5514,7 +5532,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   let scorecard = null;
   if (params.scoreOutput === true || params.scoreOutput === 'true') {
     const storyText = (parsed.pages || []).map(p => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n\n');
-    if (storyText.trim()) scorecard = (await scoreArtifactsWithJudge({ storyText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_text_replay', model } })).scorecard;
+    if (storyText.trim()) scorecard = (await scoreArtifactsWithJudge({ storyText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_text_replay', model, genCost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}), genMs: Date.now() - t } })).scorecard;
   }
 
   return {

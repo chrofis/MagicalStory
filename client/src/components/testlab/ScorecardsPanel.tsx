@@ -14,6 +14,9 @@ const PART_STAGE: Record<string, string> = {
 
 type CellModal = { kind: 'cell'; row: ScoreRow } | { kind: 'prompt'; version: string; prompt: string } | null;
 
+const fmt = (n: number | null | undefined) => (n == null ? '—' : Number(n).toFixed(4));
+const secs = (ms: number | null | undefined) => (ms == null ? '—' : `${(ms / 1000).toFixed(1)}s`);
+
 export default function ScorecardsPanel() {
   const [rows, setRows] = useState<ScoreRow[]>([]);
   const [models, setModels] = useState<TextModelInfo[]>([]);
@@ -24,6 +27,7 @@ export default function ScorecardsPanel() {
   const [rerun, setRerun] = useState<{ storyId: string; part: string } | null>(null);
   const [rerunModel, setRerunModel] = useState('');
   const [rerunMsg, setRerunMsg] = useState<string | null>(null);
+  const [running, setRunning] = useState<string | null>(null); // spinner label while a round runs
 
   const load = async () => {
     setLoading(true);
@@ -68,7 +72,8 @@ export default function ScorecardsPanel() {
         params: { model: rerunModel, reviewModel: rerunModel, scoreOutput: true, evalVersion: evalSel === 'all' ? '1.1' : evalSel, ...(rerun.part === 'beats' ? { passes: 2 } : {}) },
         targets: [{ storyId: rerun.storyId }],
       });
-      setRerunMsg('running — new round will appear on refresh'); setRerun(null); setTimeout(load, 4000);
+      setRerunMsg(null); setRunning(`${PART_LABEL[rerun.part]} · ${rerunModel}`); setRerun(null);
+      setTimeout(load, 5000); setTimeout(() => setRunning(null), 100000);
     } catch (e) { setRerunMsg(`failed: ${e instanceof Error ? e.message : e}`); }
   };
 
@@ -82,6 +87,7 @@ export default function ScorecardsPanel() {
               <button key={v} className={`px-2 py-1 ${evalSel === v ? 'bg-indigo-600 text-white' : 'bg-white'}`} onClick={() => setEvalSel(v)}>{v === 'all' ? 'all evals' : `v${v}`}</button>
             ))}
           </div>
+          {running && <span className="inline-flex items-center gap-1 text-indigo-600 font-medium"><span className="inline-block w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" /> running {running}…</span>}
           {allVersions.length > 1 && evalSel === 'all' && <span className="text-amber-600">⚠ mixing evaluator versions — compare within one</span>}
           <button className="text-indigo-600 hover:underline" onClick={load} disabled={loading}>{loading ? 'refreshing…' : 'refresh'}</button>
           <span className="opacity-60">auto 20s</span>
@@ -95,7 +101,7 @@ export default function ScorecardsPanel() {
           <div className="text-sm font-semibold text-indigo-900 border-b border-indigo-200 pb-1 mb-1">{PART_LABEL[sec.part]}</div>
           <div className="overflow-x-auto">
             <table className="text-xs w-full">
-              <thead><tr className="text-left text-gray-500"><th className="py-1 pr-3">story</th><th className="pr-3">model</th><th className="pr-3">rounds (score per pass · final ✱)</th><th className="pr-3">eval</th><th></th></tr></thead>
+              <thead><tr className="text-left text-gray-500"><th className="py-1 pr-3">story</th><th className="pr-3">model</th><th className="pr-3">rounds (score per pass · final ✱)</th><th className="pr-3">Σ cost · time</th><th className="pr-3">eval</th><th></th></tr></thead>
               <tbody>
                 {sec.lines.map((ln, i) => (
                   <tr key={i} className="border-t border-gray-100 align-top">
@@ -104,11 +110,12 @@ export default function ScorecardsPanel() {
                     <td className="pr-3">
                       {ln.rounds.map(r => (
                         <button key={r.id} className="mr-1 mb-1 inline-block px-1.5 py-0.5 rounded bg-gray-100 hover:bg-indigo-100 font-mono"
-                          title={`round ${r.round} · ${r.source}${r.label ? ' · ' + r.label : ''} · click for feedback + evaluated text`} onClick={() => setModal({ kind: 'cell', row: r })}>
+                          title={`round ${r.round} · ${r.label || r.source} · gen $${fmt(r.gen_cost_usd)}/${r.gen_ms ?? '—'}ms · judge $${fmt(r.judge_cost_usd)}/${r.judge_ms ?? '—'}ms · click for feedback + text`} onClick={() => setModal({ kind: 'cell', row: r })}>
                           {r.round}:{r.score}{r.round === ln.maxRound ? '✱' : ''}
                         </button>
                       ))}
                     </td>
+                    <td className="pr-3 font-mono opacity-70">${fmt(ln.rounds.reduce((s, r) => s + (Number(r.gen_cost_usd) || 0) + (Number(r.judge_cost_usd) || 0), 0))} · {secs(ln.rounds.reduce((s, r) => s + (Number(r.gen_ms) || 0) + (Number(r.judge_ms) || 0), 0))}</td>
                     <td className="pr-3"><button className="text-indigo-600 hover:underline font-mono" onClick={() => openPrompt(ln.version)}>v{ln.version}</button></td>
                     <td><button className="text-indigo-600 hover:underline" onClick={() => { setRerun({ storyId: ln.storyId, part: sec.part }); setRerunMsg(null); }}>rerun ▾</button></td>
                   </tr>
@@ -140,7 +147,8 @@ export default function ScorecardsPanel() {
             </>)}
             {modal.kind === 'cell' && (<>
               <div className="font-semibold mb-1">{PART_LABEL[modal.row.artifact] || modal.row.artifact} · round {modal.row.round} · {modal.row.model} · v{modal.row.eval_version}</div>
-              <div className="mb-2">score <b>{modal.row.score}</b> · judge <span className="font-mono">{modal.row.judge_model}</span> · {modal.row.source}</div>
+              <div className="mb-1">score <b>{modal.row.score}</b> · judge <span className="font-mono">{modal.row.judge_model}</span> · {modal.row.source}</div>
+              <div className="mb-2 opacity-70">generation: ${fmt(modal.row.gen_cost_usd)} · {secs(modal.row.gen_ms)} &nbsp;|&nbsp; judge: ${fmt(modal.row.judge_cost_usd)} · {secs(modal.row.judge_ms)}</div>
               <div className="font-semibold">Dimensions</div>
               <pre className="whitespace-pre-wrap bg-gray-50 p-2 rounded mb-2">{JSON.stringify(modal.row.dims, null, 1)}</pre>
               <div className="font-semibold">Judge feedback</div>

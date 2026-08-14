@@ -10304,3 +10304,23 @@ never silent cross-vantage); beats prompt builds with and without landmarks.
 **Touched:** prompts/story-beats.txt, server/lib/promptBuilders.js, landmarkPhotos.js,
 coverIterate.js, storyHelpers.js, visualBible.js, evalPipeline.js, server.js,
 server/routes/storyIdeas.js.
+
+## 2026-08-14 — Scores: round 1 = raw, cost+time per round, spinner
+
+**Context:** Owner: round 1 should be the raw (un-reviewed) artifact, 2 = first review, 3 = second;
+and each round must show cost + time (generation vs judge, separate) to compare "3 flash rounds vs 1
+expensive round"; plus a spinner while a round runs.
+
+**Decision:** beats_review_replay now scores the raw beats as round 1 (model='raw'), review pass p →
+round p+1. Migration 018 adds gen_cost_usd/gen_ms/judge_cost_usd/judge_ms; the generating stage passes
+its cost/elapsed as genCost/genMs, scoreArtifactsWithJudge adds the judge cost/elapsed, persistScore
+stores all four. ScorecardsPanel shows cost/time in the round tooltip, a Σ cost·time column, and the
+gen/judge breakdown in the drill-down modal; a spinner shows while a rerun is in flight. Grok
+(grok-3-mini/3/4-fast) and OpenAI-via-OpenRouter (gpt-4o-mini) are already in the model picker.
+
+**Deferred:** branch a new round off a SPECIFIC selected mid-series round with a chosen model
+(injected-input review); single-shot scene/text/VB still round-per-rerun, not true multi-pass.
+
+**Touched:** migrations/018_story_scores_cost_time.sql, server/lib/{scoreStore,testlab}.js,
+client/src/services/testlabService.ts, client/src/components/testlab/ScorecardsPanel.tsx.
+**Status:** ✅ active.

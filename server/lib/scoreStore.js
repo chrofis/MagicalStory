@@ -35,8 +35,8 @@ async function persistScore(row) {
     }
     await dbQuery(
       `INSERT INTO story_scores
-         (story_id, title, language, art_style, artifact, model, judge_model, eval_version, eval_hash, score, dims, notes, artifact_text, source, label, round)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+         (story_id, title, language, art_style, artifact, model, judge_model, eval_version, eval_hash, score, dims, notes, artifact_text, source, label, round, gen_cost_usd, gen_ms, judge_cost_usd, judge_ms)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
       [
         row.storyId,
         row.title ?? null,
@@ -54,6 +54,10 @@ async function persistScore(row) {
         row.source ?? null,
         row.label ?? null,
         round,
+        typeof row.genCost === 'number' ? row.genCost : null,
+        typeof row.genMs === 'number' ? row.genMs : null,
+        typeof row.judgeCost === 'number' ? row.judgeCost : null,
+        typeof row.judgeMs === 'number' ? row.judgeMs : null,
       ]
     );
     return true;
@@ -85,7 +89,8 @@ async function queryScores({ storyId = null, limit = 2000 } = {}) {
   const params = storyId ? [storyId, limit] : [limit];
   const rows = await dbQuery(
     `SELECT id, story_id, title, language, art_style, artifact, model, judge_model,
-            eval_version, eval_hash, score, dims, notes, artifact_text, round, source, label, created_at
+            eval_version, eval_hash, score, dims, notes, artifact_text, round, source, label,
+            gen_cost_usd, gen_ms, judge_cost_usd, judge_ms, created_at
      FROM story_scores ${where} ORDER BY created_at DESC LIMIT $${storyId ? 2 : 1}`,
     params
   );

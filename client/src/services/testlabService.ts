@@ -81,6 +81,10 @@ export interface ScoreRow {
   round: number;
   source: string | null;
   label: string | null;
+  gen_cost_usd: number | null;
+  gen_ms: number | null;
+  judge_cost_usd: number | null;
+  judge_ms: number | null;
   created_at: string;
 }
 
