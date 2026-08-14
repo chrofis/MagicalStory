@@ -10348,3 +10348,41 @@ Adlikon village: 5 nearby Andelfingen landmarks via proximity fallback; null loc
 
 **Touched:** server/lib/landmarkPhotos.js, server/routes/storyIdeas.js,
 storyJobPipeline.js, server.js.
+
+### Addendum 2026-08-14 (2) — the phrasing list is an escalation ladder, anatomical first
+
+**Why:** the fan-out asked all three phrasings every time — 3 detector passes per garment per
+figure. Measured cost: ~11.0s single-phrase vs ~15.2s three-phrase per figure-garment (warm),
+i.e. ~2s per extra pass. On a page with 4 figures × 4 garments that is 48 passes and ~+64s.
+(The 40-65s outliers in the raw timings are all FIRST runs after a container restart —
+GroundingDINO and MobileSAM are lazy-loaded ~570MB and unloaded after 900s idle. Cold start
+per container, not per call. There is no API fee: the detector runs on our own analyzer.)
+
+**The data said the fan-out is unnecessary.** The anatomical phrasing passed the size guard on
+every measured case: `top` 3%, `skirt` 32%, `dress` 58%, `hat` 13%.
+
+**Decision:** ask ONE phrasing at a time and stop at the first box that passes the size guard,
+with the list ordered anatomical → plain → bare noun. Common path is one detector pass — the
+same cost as the original single-phrase code, with the recovery of the three-phrase one.
+
+Why anatomical leads: a phrase naming a garment TYPE has no referent when that type is not in
+the picture (a mermaid has no shirt), and the detector cannot answer "not present" — it returns
+the most person-like region, 82% of the crop. A phrase naming a BODY LOCATION always has a
+referent, because every figure has a chest, a waist, legs, feet and a head whatever it is
+wearing. Same crop, one word changed: "the shirt worn by the person" 82% → "the top worn on the
+chest" 3%.
+
+Measured worth of each form (Lab 595/596):
+```
+top    "shirt" 81%@0.23 | "the shirt worn by the person" 82%@0.47 | "the top worn on the chest"  3%@0.42
+skirt  "skirt" 32%@0.47 | "the skirt worn by the person" 82%@0.51 | "the fabric below the waist" 32%@0.58
+```
+The PLAIN form — the only form the original code had — is the worst on costumes: 82% on both.
+
+**Implementation note:** one prompt per HTTP request now, since batching all three makes early
+exit impossible. That is also the only form the analyzer supports well (its own comment records
+that concatenating phrasings collapsed scores).
+
+**Caveat carried forward:** on `dress` the escalation will now stop at the anatomical box (58%)
+where the validated run used the plain form's box (62%). Both are under the guard and both feed
+the same colour points, but the 58% box has NOT been validated end to end. Verify next run.

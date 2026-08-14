@@ -201,20 +201,30 @@ const GARMENT_ENUM = Object.freeze({
   // 3% and was the shell top. Broader CATEGORY wording made it worse; anatomical
   // anchoring made it work. The bare noun is included because short prompts and
   // long prompts fail differently and this is cheap to ask.
+  // ANATOMICAL PHRASING FIRST, and the list is an ESCALATION LADDER, not a fan-out
+  // (owner, 2026-08-14). A phrase naming a garment TYPE has no referent when that
+  // type is not in the picture — a mermaid has no shirt, so the detector returns
+  // the most person-like region it can find (82% of the crop). A phrase naming a
+  // BODY LOCATION always has a referent: every figure has a chest, a waist, legs,
+  // feet, a head, whatever it happens to be wearing. Measured on the same crop,
+  // one word changed: "the shirt worn by the person" 82%, "the top worn on the
+  // chest" 3%. The anatomical form passed the size guard on all four measured
+  // cases (3%, 32%, 58%, 13%), so it is asked FIRST and the rest are reached only
+  // when it fails — ONE detector pass in the common case instead of three.
   hat: { query: 'the hat worn by the person', covers: 'any headwear — hat, cap, hood, headscarf, and its band or trim',
-    queries: ['hat', 'the hat worn by the person', 'the hat on the head'] },
+    queries: ['the hat on the head', 'the hat worn by the person', 'hat'] },
   top: { query: 'the shirt worn by the person', covers: 'shirt, blouse, t-shirt, sweater, tunic, and its collar or cuffs',
-    queries: ['shirt', 'the shirt worn by the person', 'the top worn on the chest'] },
+    queries: ['the top worn on the chest', 'the shirt worn by the person', 'shirt'] },
   jacket: { query: 'the jacket worn by the person', covers: 'jacket, coat, cardigan, cloak, cape',
-    queries: ['jacket', 'the jacket worn by the person', 'the jacket over the chest and arms'] },
+    queries: ['the jacket over the chest and arms', 'the jacket worn by the person', 'jacket'] },
   dress: { query: 'the dress worn by the person', covers: 'dress, robe, gown — a single garment covering torso and legs',
-    queries: ['dress', 'the dress worn by the person', 'the fabric covering the torso'] },
+    queries: ['the fabric covering the torso', 'the dress worn by the person', 'dress'] },
   pants: { query: 'the trousers worn by the person', covers: 'trousers, jeans, shorts, leggings',
-    queries: ['trousers', 'the trousers worn by the person', 'the fabric covering the legs'] },
+    queries: ['the fabric covering the legs', 'the trousers worn by the person', 'trousers'] },
   skirt: { query: 'the skirt worn by the person', covers: 'skirt',
-    queries: ['skirt', 'the skirt worn by the person', 'the fabric below the waist'] },
+    queries: ['the fabric below the waist', 'the skirt worn by the person', 'skirt'] },
   shoes: { query: 'the shoes worn by the person', covers: 'shoes, boots, sandals, slippers',
-    queries: ['shoes', 'the shoes worn by the person', 'the shoes on the feet'] },
+    queries: ['the shoes on the feet', 'the shoes worn by the person', 'shoes'] },
 });
 const GARMENT_VALUES = Object.freeze(Object.keys(GARMENT_ENUM));
 
@@ -777,29 +787,40 @@ async function detectGarmentBoxMulti(cropUri, opts = {}) {
   const cfg = { ...DEFAULTS, ...opts };
   const queries = opts.queries && opts.queries.length ? opts.queries : [opts.prompt];
   const cropArea = Math.max(1, (opts.cropW || 0) * (opts.cropH || 0));
-  const res = await fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      image: cropUri,
-      prompts: queries.map((text, i) => ({ name: `q${i}`, text })),
-      box_threshold: cfg.boxThreshold, text_threshold: cfg.textThreshold,
-    }),
-    signal: AbortSignal.timeout(300_000),
-  });
-  if (!res.ok) throw new Error(`detect-figures-text HTTP ${res.status}`);
-  const j = await res.json();
-  if (!j?.success) throw new Error(`detect-figures-text: ${j?.error}`);
-  const tried = (j.figures || []).map((f, i) => {
+  const askOne = async (text) => {
+    const res = await fetch(`${_photoAnalyzerUrl()}/detect-figures-text`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: cropUri,
+        prompts: [{ name: 'q', text }],
+        box_threshold: cfg.boxThreshold, text_threshold: cfg.textThreshold,
+      }),
+      signal: AbortSignal.timeout(300_000),
+    });
+    if (!res.ok) throw new Error(`detect-figures-text HTTP ${res.status}`);
+    const j = await res.json();
+    if (!j?.success) throw new Error(`detect-figures-text: ${j?.error}`);
+    const f = (j.figures || [])[0];
     const box = f?.box || null;
     const area = box ? Math.max(0, box[2] - box[0]) * Math.max(0, box[3] - box[1]) : null;
     return {
-      query: queries[i], box, score: f?.score == null ? null : +Number(f.score).toFixed(2),
+      query: text, box, score: f?.score == null ? null : +Number(f.score).toFixed(2),
       frac: area ? +(area / cropArea).toFixed(2) : null,
     };
-  });
-  const usable = tried.filter(t => t.box && t.frac != null && t.frac <= cfg.maxBoxFrac);
-  usable.sort((a, b) => (b.score || 0) - (a.score || 0));
-  return { pick: usable[0] || null, tried };
+  };
+  // ESCALATION, not fan-out: ask one phrasing at a time and stop at the first box
+  // that is plausibly a garment rather than the whole figure. Ordered
+  // anatomical-first, so the common path costs ONE detector pass — the same as
+  // the old single-phrase code — while keeping the recovery of asking three.
+  const tried = [];
+  for (const text of queries) {
+    const t = await askOne(text);
+    tried.push(t);
+    if (t.box && t.frac != null && t.frac <= cfg.maxBoxFrac) {
+      return { pick: t, tried, escalations: tried.length - 1 };
+    }
+  }
+  return { pick: null, tried, escalations: tried.length - 1 };
 }
 
 async function detectGarmentBox(cropUri, opts = {}) {
@@ -1196,6 +1217,7 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
           ...cfg, prompt, queries: GARMENT_ENUM[garmentKey]?.queries, cropW: cw, cropH: ch,
         });
         report.queriesTried = multi.tried;
+        report.queryEscalations = multi.escalations;
         det = multi.pick ? { box: multi.pick.box, score: multi.pick.score } : null;
         report.queryPicked = multi.pick?.query || null;
         if (!det) {

@@ -17,6 +17,7 @@
  * Run: node tests/manual/garmentMaskModes.test.js
  */
 const assert = require('assert');
+const BODY_WORDS = ['head', 'chest', 'arms', 'torso', 'legs', 'waist', 'feet'];
 const {
   selectBadColourPixels, figureSkinLab, GARMENT_REGION, resolveColourName, DEFAULTS,
 } = require('../../server/lib/garmentColourFix');
@@ -228,15 +229,52 @@ t('the two new modes are wired and do not need the detector for selection', () =
   assert.ok(/SAM runs on the ORIGINAL crop/.test(src), 'the highlight must not reach SAM');
 });
 
-t('every enum value offers a short, a plain and an anatomical phrasing', () => {
+t('every enum value offers the three phrasing forms, in ladder order', () => {
   const { GARMENT_ENUM, GARMENT_VALUES } = require('../../server/lib/garmentColourFix');
+  // Order IS the design: anatomical leads because it passed the size guard on
+  // every measured case, so escalation usually stops after one detector pass.
   for (const v of GARMENT_VALUES) {
     const q = GARMENT_ENUM[v].queries;
     assert.strictEqual(q.length, 3, `${v} should offer 3 phrasings`);
-    assert.ok(!q[0].includes(' '), `${v}: the first phrasing should be a bare noun, got "${q[0]}"`);
+    assert.ok(BODY_WORDS.some(w => q[0].includes(w)),
+      `${v}: the first should be anatomical, got "${q[0]}"`);
     assert.ok(/worn by the person/.test(q[1]), `${v}: the second should be the plain form`);
-    assert.ok(q[2] !== q[1], `${v}: the third must differ from the second`);
+    assert.ok(!q[2].includes(' '), `${v}: the third should be the bare noun, got "${q[2]}"`);
+    assert.strictEqual(new Set(q).size, 3, `${v}: phrasings must be distinct`);
   }
 });
 
-console.log(`${pass} passed (incl. connected components)`);
+// ── Escalation ladder (owner, 2026-08-14) ─────────────────────────────────
+t('the anatomical phrasing is asked FIRST for every value', () => {
+  const { GARMENT_ENUM, GARMENT_VALUES } = require('../../server/lib/garmentColourFix');
+  // A garment NOUN has no referent when that garment is not in the picture; a
+  // BODY LOCATION always does. Measured: "the shirt worn by the person" 82% of
+  // the crop, "the top worn on the chest" 3%. So the body-anchored form leads.
+  for (const v of GARMENT_VALUES) {
+    const first = GARMENT_ENUM[v].queries[0];
+    assert.ok(BODY_WORDS.some(w => first.includes(w)),
+      `${v}: first phrasing "${first}" names no body part`);
+  }
+});
+
+t('the bare noun is last, not first', () => {
+  const { GARMENT_ENUM, GARMENT_VALUES } = require('../../server/lib/garmentColourFix');
+  for (const v of GARMENT_VALUES) {
+    const q = GARMENT_ENUM[v].queries;
+    assert.ok(!q[q.length - 1].includes(' '), `${v}: last phrasing should be the bare noun`);
+  }
+});
+
+t('detection escalates one phrasing at a time and stops at the first hit', () => {
+  const fs = require('fs');
+  const src = fs.readFileSync(require.resolve('../../server/lib/garmentColourFix.js'), 'utf8');
+  // One prompt per request — escalation is impossible if all three are batched.
+  assert.ok(/prompts: \[\{ name: 'q', text \}\]/.test(src), 'must ask one phrasing per request');
+  assert.ok(/for \(const text of queries\)/.test(src), 'must loop the phrasings in order');
+  assert.ok(/return \{ pick: t, tried, escalations: tried\.length - 1 \}/.test(src),
+    'must return as soon as a plausible box is found');
+  assert.ok(!/queries\.map\(\(text, i\) => \(\{ name: `q\$\{i\}`/.test(src),
+    'the old fan-out form must be gone');
+});
+
+console.log(`${pass} passed (incl. escalation)`);
