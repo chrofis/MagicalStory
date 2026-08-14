@@ -3120,7 +3120,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const sav = require('./server/lib/storyAvatars');
           const storyAvatars = sav.projectStoryCharacterAvatars(inputData.characters || [], inputData.artStyle || 'pixar');
           const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || sceneCharacters || [];
-          await sav.applyStoryCellRefs(pagePhotos, storyAvatars, metaChars);
+          await sav.applyStoryCellRefs(pagePhotos, storyAvatars, metaChars, {
+            closeUp: sceneMetadata?.fullData?.shot === 'close-up',
+          });
         }
         // over-the-shoulder: drop refs ONLY for background-depth characters.
         // Original rule dropped ALL non-actor refs on the assumption "the target

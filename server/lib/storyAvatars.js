@@ -169,9 +169,13 @@ function resolveCellPose(sc) {
   return { pose, depth, flip: sc?.flip === true };
 }
 
-async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneCharacters) {
+async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneCharacters, opts = {}) {
   if (!Array.isArray(referencePhotos) || referencePhotos.length === 0) return referencePhotos;
   if (!storyCharacterAvatars || typeof storyCharacterAvatars !== 'object') return referencePhotos;
+  // opts.closeUp: the page's shot is a close-up — send face cell + head of the
+  // costumed body cell (headwear survives) instead of the full-body stack. A
+  // full-body ref pulls the render toward full-figure poses on close-up pages.
+  const closeUp = opts.closeUp === true;
   const { cropAvatarCell } = require('./sceneComposite');
 
   const poseByName = new Map();
@@ -198,10 +202,11 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
     // a tight head anchor). Midground / background → body cell only.
     const includeFace = pf.depth === 'foreground';
     try {
-      const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, includeFace, stack: includeFace });
+      const headOnly = closeUp && includeFace;
+      const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, includeFace, stack: includeFace, headOnly });
       const buf = stacked || body;
       ref.photoUrl = `data:image/png;base64,${buf.toString('base64')}`;
-      ref.photoType = `cell-${pf.pose}${includeFace ? '-headbody' : ''}`;
+      ref.photoType = `cell-${pf.pose}${headOnly ? '-costumedHead' : (includeFace ? '-headbody' : '')}`;
       ref.cellPose = pf.pose;
       ref.cellDepth = pf.depth;
       ref.cellIncludesFace = includeFace;

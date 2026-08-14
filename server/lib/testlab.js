@@ -431,7 +431,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   // (identity) + the head region of the costumed body cell (headwear), so
   // hats and bandanas survive the crop.
   if (params.refCrop === 'costumedHead') {
-    const sharp = require('sharp');
+    // Same code path as production close-up pages (cropAvatarCell headOnly).
     const { cropAvatarCell } = require('./sceneComposite');
     const { resolveCellPose } = require('./storyAvatars');
     const sheets = ctx.characterAvatars || {};
@@ -440,23 +440,8 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
       if (!sheetUri) { log.warn(`[TESTLAB] costumedHead: no costumed sheet for ${p.name} — full ref kept`); continue; }
       const sc = (ctx.scene.sceneCharacters || []).find(c => ((typeof c === 'string' ? c : c?.name) || '').toLowerCase() === String(p.name).toLowerCase());
       const pf = resolveCellPose(typeof sc === 'string' ? { name: sc } : (sc || {}));
-      const { body, face } = await cropAvatarCell(sheetUri, { pose: pf.pose, includeFace: true });
-      const bodyMeta = await sharp(body).metadata();
-      const bodyHead = await sharp(body)
-        .extract({ left: 0, top: 0, width: bodyMeta.width, height: Math.round(bodyMeta.height * 0.4) })
-        .png().toBuffer();
-      const parts = face ? [face, bodyHead] : [bodyHead];
-      const metas = await Promise.all(parts.map(b => sharp(b).metadata()));
-      const W = Math.max(...metas.map(m => m.width || 0));
-      const resized = await Promise.all(parts.map(async (b, i) => (metas[i].width !== W)
-        ? sharp(b).resize(W, null, { fit: 'contain', background: { r: 255, g: 255, b: 255 } }).png().toBuffer()
-        : b));
-      const rMetas = await Promise.all(resized.map(b => sharp(b).metadata()));
-      const totalH = rMetas.reduce((s, m) => s + (m.height || 0), 0);
-      let top = 0;
-      const composites = resized.map((b, i) => { const c = { input: b, left: 0, top }; top += rMetas[i].height || 0; return c; });
-      const out = await sharp({ create: { width: W, height: totalH, channels: 3, background: { r: 255, g: 255, b: 255 } } })
-        .composite(composites).png().toBuffer();
+      const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, includeFace: true, stack: true, headOnly: true });
+      const out = stacked || body;
       p.photoUrl = 'data:image/png;base64,' + out.toString('base64');
       p.photoData = undefined;
       p.photoType = `cell-${pf.pose}-costumedHead`;

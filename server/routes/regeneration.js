@@ -678,7 +678,9 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     {
       const sav = require('../lib/storyAvatars');
       const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || sceneCharacters || [];
-      await sav.applyStoryCellRefs(referencePhotos, storyData.characterAvatars || null, metaChars);
+      await sav.applyStoryCellRefs(referencePhotos, storyData.characterAvatars || null, metaChars, {
+        closeUp: sceneMetadata?.fullData?.shot === 'close-up',
+      });
     }
     const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
     if (pageLandmarkPhotos.length > 0) {
@@ -2010,7 +2012,9 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       {
         const sav = require('../lib/storyAvatars');
         const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || chars || [];
-        await sav.applyStoryCellRefs(characterPhotos, storyData.characterAvatars || null, metaChars);
+        await sav.applyStoryCellRefs(characterPhotos, storyData.characterAvatars || null, metaChars, {
+          closeUp: sceneMetadata?.fullData?.shot === 'close-up',
+        });
       }
       landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
       if (visualBible) {

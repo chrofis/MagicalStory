@@ -496,6 +496,21 @@ async function findSilhouettesByDiff(populatedBuf, cleanBgBuf, cast, opts = {}) 
     // The pale head is outside the saturated body mask, so the figure's real
     // extent starts at the crown, not at the shoulders.
     if (head && head.y < minY) minY = head.y;
+    // …and the head must be IN the mask, not merely bound by it. The mask is
+    // the figure's silhouette for every consumer downstream — the crosshatch
+    // clips to it, the whiteout punches it out, the blend gate measures it.
+    // Built from the body blobs alone it stops at the neck, so a repair leaves
+    // the placeholder's painted face untouched and the model keeps it.
+    // Union every pale pixel inside the figure's box, not just a confidently
+    // measured head band — the band is often missed (it was null for the very
+    // figure that exposed this) while the face is plainly there. Same hue
+    // inside the same box is the same character.
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const q = y * W + x;
+        if (paleMask[q]) sMask[q] = 1;
+      }
+    }
 
     results[c.name] = {
       bbox: {
@@ -645,7 +660,11 @@ const FACE_CELL = {
  * @returns {Promise<{ body: Buffer, face: Buffer|null }>} PNG buffers.
  */
 async function cropAvatarCell(sheet, opts = {}) {
-  const { pose = 'threeQuarter', includeFace = false, stack = false } = opts;
+  // headOnly: close-up pages send only the head — the body cell is cropped to
+  // its top 40% (head + headwear + shoulders) before stacking. The face cell
+  // alone cannot serve: it is rendered hatless, so a naive face-only ref
+  // loses hats and bandanas.
+  const { pose = 'threeQuarter', includeFace = false, stack = false, headOnly = false } = opts;
   // bytesFromAnyImage handles Buffer / data-URI / raw base64 / http(s) URL.
   // Pre-R2-migration this was a bare base64 decode, which turned stored R2
   // URLs into ~80 bytes of garbage and silently broke cell refs for every
@@ -658,6 +677,12 @@ async function cropAvatarCell(sheet, opts = {}) {
 
   const bodyIdx = POSE_CELL[pose] || POSE_CELL.threeQuarter;
   let body = await cropSheetCell(sheetBuf, bodyIdx);
+  if (headOnly) {
+    const bMeta = await sharp(body).metadata();
+    body = await sharp(body)
+      .extract({ left: 0, top: 0, width: bMeta.width, height: Math.round((bMeta.height || 0) * 0.4) })
+      .png().toBuffer();
+  }
 
   let face = null;
   if (includeFace) {
