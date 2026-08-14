@@ -169,6 +169,22 @@ function findSceneOrCover(sData, pageNum) {
 
 function getDbPool() { return getPool(); }
 
+// Story lookup for every repair/edit/redo endpoint: owner-scoped, with the
+// same admin fallthrough as stories.js canReadAnyStory (fixed there for the
+// six save endpoints on 2026-08-11). Without it, a story opened from the
+// Test Lab (owned by the smoke account) 404s on ALL regeneration actions for
+// an admin — character repair, Bearbeiten, Nochmal all dead. Returns the pg
+// result shape so existing .rows[0] call sites work unchanged.
+async function fetchStoryRowForUser(id, req, columns = '*') {
+  let result = await getDbPool().query(
+    'SELECT ' + columns + ' FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+  if (result.rows.length === 0
+      && (req.user?.role === 'admin' || (req.user?.impersonating && req.user?.originalAdminId))) {
+    result = await getDbPool().query('SELECT ' + columns + ' FROM stories WHERE id = $1', [id]);
+  }
+  return result;
+}
+
 // SPD-2: byte-exact replica of database.js `imgBytesAsync` — returns the inline
 // bytes when present, otherwise fetches from R2 and wraps as a data URI with the
 // same mime sniffing. Kept local because imgBytesAsync isn't exported; must stay
@@ -283,10 +299,7 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
     log.debug(`🔄 Regenerating scene description for story ${id}, page ${pageNumber}`);
 
     // Get the story
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
 
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
@@ -437,10 +450,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     }
 
     // Get the story
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
 
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
@@ -1104,7 +1114,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       if (unknown.length > 0) return res.status(400).json({ error: `Unknown models: ${unknown.join(', ')}` });
     }
     // Load story
-    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    const storyResult = await fetchStoryRowForUser(id, req);
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
     const story = storyResult.rows[0];
     const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
@@ -1598,10 +1608,7 @@ router.post('/:id/style-check', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Admin only' });
     }
     // Load + rehydrate story (images live in story_images, not in data)
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
     const story = storyResult.rows[0];
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
@@ -1634,10 +1641,7 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
       return res.status(403).json({ error: 'Admin only' });
     }
     // Load story + rehydrate
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
     const story = storyResult.rows[0];
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
@@ -1767,7 +1771,7 @@ router.post('/:id/style-transfer/:pageNum', authenticateToken, async (req, res) 
     if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
 
     // Load story
-    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    const storyResult = await fetchStoryRowForUser(id, req);
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
     const story = storyResult.rows[0];
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
@@ -1919,7 +1923,7 @@ router.post('/:id/analyze-style/:pageNum', authenticateToken, async (req, res) =
     if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
 
-    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    const storyResult = await fetchStoryRowForUser(id, req);
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
     let storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
     // SPD-2: scene pages load only their own image; covers keep the full
@@ -1978,7 +1982,7 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
     if (unknown.length > 0) return res.status(400).json({ error: `Unknown models: ${unknown.join(', ')}` });
 
     // Load story
-    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    const storyResult = await fetchStoryRowForUser(id, req);
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
     const story = storyResult.rows[0];
     const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
@@ -2114,7 +2118,7 @@ router.post('/:id/style-lab/:pageNum/evaluate', authenticateToken, async (req, r
     if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
 
     // Verify story ownership before loading images
-    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    const storyResult = await fetchStoryRowForUser(id, req);
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
 
     // Load images for this run, ordered to match A/B from run metadata
@@ -2161,7 +2165,7 @@ router.get('/:id/style-lab/:pageNum/history', authenticateToken, async (req, res
     if (userResult.rows[0].role !== 'admin' && !req.user.impersonating) return res.status(403).json({ error: 'Admin only' });
 
     // Load run metadata from storyData
-    const storyResult = await getDbPool().query('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    const storyResult = await fetchStoryRowForUser(id, req, 'data');
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
     const storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
     const allRuns = (storyData.styleLabHistory || []).filter(r => r.pageNumber === pageNumber);
@@ -2259,10 +2263,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     }
 
     // Get the story
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
 
     if (storyResult.rows.length === 0) {
       log.warn(`🔄 [ITERATE] Story not found: ${id} for user ${req.user.id}`);
@@ -2985,10 +2986,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     }
 
     // Get the story
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
 
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
@@ -3337,10 +3335,7 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
     log.debug(`✏️ Edit instruction: "${editPrompt}"`);
 
     // Get the story
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
 
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
@@ -3506,10 +3501,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
     log.info(`🔧 [REPAIR] Starting manual auto-repair for story ${id}, page ${pageNumber} (max ${maxPasses} passes)`);
 
     // Get the story
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
 
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
@@ -3862,10 +3854,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     log.info(`📊 [REPAIR-WORKFLOW] Re-evaluating pages ${pageNumbers.join(', ')} in story ${id}`);
 
     // Get story data
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
 
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
@@ -4184,10 +4173,7 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
     log.info(`🔬 [EVAL-SINGLE] ${evalType} eval for story ${id}, page ${pageNumber}${model ? ` (model: ${model})` : ''}`);
 
     // Load story data with rehydrated images
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
@@ -4444,10 +4430,7 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
     log.info(`📦 [REFRESH-BBOX] Starting bbox detection for story ${id}, page ${pageNumber}`);
 
     // Load story data with rehydrated images
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
@@ -4799,7 +4782,7 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
     const refinedDetection = { figures, objects, iterated: true };
 
     // Load story to get the original image for overlay
-    const storyResult = await getDbPool().query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    const storyResult = await fetchStoryRowForUser(id, req);
     if (storyResult.rows.length === 0) return res.status(404).json({ error: 'Story not found' });
     let storyData = typeof storyResult.rows[0].data === 'string' ? JSON.parse(storyResult.rows[0].data) : storyResult.rows[0].data;
     // SPD-2: scene pages load only their own image; covers keep the full
@@ -4861,10 +4844,7 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
     log.info(`🔍 [REPAIR-WORKFLOW] Running consistency check for story ${id}`);
 
     // Get story data
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
 
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
@@ -5008,10 +4988,7 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
 
     log.info(`🏆 [REPAIR-WORKFLOW] Picking best versions for ${pageNumbers.length} pages`);
 
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
@@ -5120,10 +5097,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     let repairs;
 
     // Load story data once upfront (shared by autoSelect and repair phases)
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
@@ -5699,10 +5673,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
     // Phase 2: Apply results to DB sequentially (avoids race conditions on storyData blob)
     // Re-read storyData fresh before applying
-    const freshResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const freshResult = await fetchStoryRowForUser(id, req);
     if (freshResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found during Phase 2 write-back' });
     }
@@ -5985,10 +5956,7 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
     log.info(`🔧 [REPAIR-WORKFLOW] Starting artifact repair for pages ${pageNumbers.join(', ')} in story ${id}`);
 
     // Get story data
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
 
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
@@ -6112,10 +6080,7 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     log.debug(`✏️ Edit instruction: "${editPrompt}"`);
 
     // Get the story
-    const storyResult = await getDbPool().query(
-      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+    const storyResult = await fetchStoryRowForUser(id, req);
 
     if (storyResult.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });

@@ -10386,3 +10386,21 @@ that concatenating phrasings collapsed scores).
 **Caveat carried forward:** on `dress` the escalation will now stop at the anatomical box (58%)
 where the validated run used the plain form's box (62%). Both are under the guard and both feed
 the same colour points, but the 58% box has NOT been validated end to end. Verify next run.
+
+## 2026-08-14 — Admin can repair/edit/redo any story (regeneration routes unblocked)
+
+**Context:** Opening a Test Lab story (owned by the smoke account) as admin,
+EVERY regeneration action was dead — character repair, Bearbeiten, Nochmal —
+because all 24 endpoints in server/routes/regeneration.js gated the story
+lookup with `WHERE id = $1 AND user_id = $2`. Same hole class as the six
+stories.js save endpoints fixed on 2026-08-11 (canReadAnyStory); this is the
+sibling sweep of the repair/edit routes. The UPDATE statements were already
+id-scoped, so only the SELECT gates blocked.
+
+**Decision:** one helper, `fetchStoryRowForUser(id, req, columns)` — owner-
+scoped first, admin/impersonating-admin fallthrough to an unscoped lookup —
+substituted at all 24 sites (codemod, pg result shape unchanged).
+print.js's four owner-scoped sites are deliberately untouched: checkout/book
+orders should stay owner-only.
+
+**Touched:** `server/routes/regeneration.js`.
