@@ -17,7 +17,7 @@
  * Run: node tests/manual/garmentMaskModes.test.js
  */
 const assert = require('assert');
-const BODY_WORDS = ['head', 'chest', 'arms', 'torso', 'legs', 'waist', 'feet'];
+const BODY_WORDS = ['head', 'chest', 'arms', 'torso', 'legs', 'waist', 'feet', 'shoulders', 'ankles'];
 const {
   selectBadColourPixels, figureSkinLab, GARMENT_REGION, resolveColourName, DEFAULTS,
 } = require('../../server/lib/garmentColourFix');
@@ -277,4 +277,17 @@ t('detection escalates one phrasing at a time and stops at the first hit', () =>
     'the old fan-out form must be gone');
 });
 
-console.log(`${pass} passed (incl. escalation)`);
+t('an anatomical phrase spans the garment\'s FULL extent, not a sub-region', () => {
+  const { GARMENT_ENUM } = require('../../server/lib/garmentColourFix');
+  // Measured: "the fabric covering the torso" for `dress` returned a 58% box
+  // holding only the upper robe (48,329px vs the 72,170px the plain form
+  // reached), so the lower robe would keep its old colour. A dress runs
+  // shoulders to ankles and the phrase has to say so.
+  const dress = GARMENT_ENUM.dress.queries[0];
+  assert.ok(/shoulders/.test(dress) && /ankles/.test(dress),
+    `dress must span its full extent, got "${dress}"`);
+  // A full-length garment cannot be described by a single body landmark.
+  assert.ok(!/^the fabric covering the torso$/.test(dress));
+});
+
+console.log(`${pass} passed (incl. escalation + extent)`);

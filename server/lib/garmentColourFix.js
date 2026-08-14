@@ -211,6 +211,12 @@ const GARMENT_ENUM = Object.freeze({
   // chest" 3%. The anatomical form passed the size guard on all four measured
   // cases (3%, 32%, 58%, 13%), so it is asked FIRST and the rest are reached only
   // when it fails — ONE detector pass in the common case instead of three.
+  // NOTE: an anatomical phrase must describe the garment's FULL EXTENT, not a
+  // sub-region of it. "the fabric covering the torso" returned a 58% box that
+  // held only the upper robe — 48,329px against the 72,170px the plain form
+  // reached — so the lower robe would have kept its old colour while the top
+  // changed. Small garments (hat, top, shoes) are unaffected because their
+  // anatomical phrase already spans the whole item.
   hat: { query: 'the hat worn by the person', covers: 'any headwear — hat, cap, hood, headscarf, and its band or trim',
     queries: ['the hat on the head', 'the hat worn by the person', 'hat'] },
   top: { query: 'the shirt worn by the person', covers: 'shirt, blouse, t-shirt, sweater, tunic, and its collar or cuffs',
@@ -218,7 +224,7 @@ const GARMENT_ENUM = Object.freeze({
   jacket: { query: 'the jacket worn by the person', covers: 'jacket, coat, cardigan, cloak, cape',
     queries: ['the jacket over the chest and arms', 'the jacket worn by the person', 'jacket'] },
   dress: { query: 'the dress worn by the person', covers: 'dress, robe, gown — a single garment covering torso and legs',
-    queries: ['the fabric covering the torso', 'the dress worn by the person', 'dress'] },
+    queries: ['the fabric covering the body from shoulders to ankles', 'the dress worn by the person', 'dress'] },
   pants: { query: 'the trousers worn by the person', covers: 'trousers, jeans, shorts, leggings',
     queries: ['the fabric covering the legs', 'the trousers worn by the person', 'trousers'] },
   skirt: { query: 'the skirt worn by the person', covers: 'skirt',
