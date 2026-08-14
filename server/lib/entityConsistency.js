@@ -1897,31 +1897,44 @@ async function extractEntityCrops(appearances, options = {}) {
         }
       );
 
-      // HEAD crop for the consistency judge (owner, 2026-08-14): the face box
-      // with a hair margin above and the cut just below the face-box bottom,
-      // SAM-masked like the body crop. A geometric top-of-body slice caught
-      // walls and torsos; the detection already stores faceBox per figure.
-      let headBuffer = null;
-      if (!isObject && Array.isArray(app.faceBox) && app.faceBox.length === 4) {
-        try {
-          const [fy1, fx1, fy2, fx2] = app.faceBox;
-          const fh = fy2 - fy1, fw = fx2 - fx1;
-          if (fh > 0.005 && fw > 0.005) {
-            const headBox = [
-              Math.max(0, fy1 - fh * 0.35),   // hair above the face box
-              Math.max(0, fx1 - fw * 0.25),
-              Math.min(1, fy2 + fh * 0.10),   // cut just below the face box
-              Math.min(1, fx2 + fw * 0.25),
-            ];
-            const headResult = await extractCropFromImage(app.imageData, headBox, null, 0, { mask: app.mask || null });
-            if (headResult?.buffer) headBuffer = headResult.buffer;
-          }
-        } catch (err) { log.debug(`[ENTITY-CROP] head crop failed p${app.pageNumber}: ${err.message}`); }
-      }
-
       if (cropResult && cropResult.buffer) {
         // Get original crop dimensions for proper resizing after repair
         const cropMeta = await sharp(cropResult.buffer).metadata();
+
+        // HEAD crop for the consistency judge (owner, 2026-08-14): the face
+        // box intersected with the body crop — cut OUT OF the body-crop buffer,
+        // which already carries the SAM silhouette, so neighbours and
+        // background are gone for free. Never a second read of the page image.
+        let headBuffer = null;
+        if (!isObject && Array.isArray(app.faceBox) && app.faceBox.length === 4 && cropResult.paddedBox) {
+          try {
+            const [fy1, fx1, fy2, fx2] = app.faceBox;
+            const fh = fy2 - fy1, fw = fx2 - fx1;
+            const [py1, px1, py2, px2] = cropResult.paddedBox; // page-normalized
+            const pw = px2 - px1, ph = py2 - py1;
+            if (fh > 0.005 && fw > 0.005 && pw > 0 && ph > 0) {
+              // Head box in page coords (hair margin above, cut below the box),
+              // then mapped into body-crop pixel coords and clamped to it.
+              const hb = {
+                y1: Math.max(py1, fy1 - fh * 0.35),
+                x1: Math.max(px1, fx1 - fw * 0.25),
+                y2: Math.min(py2, fy2 + fh * 0.10),
+                x2: Math.min(px2, fx2 + fw * 0.25),
+              };
+              const left = Math.round(((hb.x1 - px1) / pw) * cropMeta.width);
+              const top = Math.round(((hb.y1 - py1) / ph) * cropMeta.height);
+              const w = Math.round(((hb.x2 - hb.x1) / pw) * cropMeta.width);
+              const h = Math.round(((hb.y2 - hb.y1) / ph) * cropMeta.height);
+              if (w >= 32 && h >= 32) {
+                headBuffer = await sharp(cropResult.buffer)
+                  .extract({ left: Math.max(0, left), top: Math.max(0, top),
+                             width: Math.min(w, cropMeta.width - Math.max(0, left)),
+                             height: Math.min(h, cropMeta.height - Math.max(0, top)) })
+                  .toBuffer();
+              }
+            }
+          } catch (err) { log.debug(`[ENTITY-CROP] head crop failed p${app.pageNumber}: ${err.message}`); }
+        }
 
         const cropData = {
           buffer: cropResult.buffer,
