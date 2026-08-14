@@ -224,7 +224,7 @@ const GARMENT_ENUM = Object.freeze({
   jacket: { query: 'the jacket worn by the person', covers: 'jacket, coat, cardigan, cloak, cape',
     queries: ['the jacket over the chest and arms', 'the jacket worn by the person', 'jacket'] },
   dress: { query: 'the dress worn by the person', covers: 'dress, robe, gown — a single garment covering torso and legs',
-    queries: ['the fabric covering the body from shoulders to ankles', 'the dress worn by the person', 'dress'] },
+    queries: ['the dress worn by the person', 'the fabric covering the body from shoulders to ankles', 'dress'] },
   pants: { query: 'the trousers worn by the person', covers: 'trousers, jeans, shorts, leggings',
     queries: ['the fabric covering the legs', 'the trousers worn by the person', 'trousers'] },
   skirt: { query: 'the skirt worn by the person', covers: 'skirt',

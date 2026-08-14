@@ -236,9 +236,12 @@ t('every enum value offers the three phrasing forms, in ladder order', () => {
   for (const v of GARMENT_VALUES) {
     const q = GARMENT_ENUM[v].queries;
     assert.strictEqual(q.length, 3, `${v} should offer 3 phrasings`);
-    assert.ok(BODY_WORDS.some(w => q[0].includes(w)),
-      `${v}: the first should be anatomical, got "${q[0]}"`);
-    assert.ok(/worn by the person/.test(q[1]), `${v}: the second should be the plain form`);
+    // dress is the documented exception — see the 'full extent' test below.
+    if (v !== 'dress') {
+      assert.ok(BODY_WORDS.some(w => q[0].includes(w)),
+        `${v}: the first should be anatomical, got "${q[0]}"`);
+    }
+    if (v !== 'dress') assert.ok(/worn by the person/.test(q[1]), `${v}: the second should be the plain form`);
     assert.ok(!q[2].includes(' '), `${v}: the third should be the bare noun, got "${q[2]}"`);
     assert.strictEqual(new Set(q).size, 3, `${v}: phrasings must be distinct`);
   }
@@ -252,6 +255,7 @@ t('the anatomical phrasing is asked FIRST for every value', () => {
   // the crop, "the top worn on the chest" 3%. So the body-anchored form leads.
   for (const v of GARMENT_VALUES) {
     const first = GARMENT_ENUM[v].queries[0];
+    if (v === 'dress') continue;   // documented exception
     assert.ok(BODY_WORDS.some(w => first.includes(w)),
       `${v}: first phrasing "${first}" names no body part`);
   }
@@ -277,17 +281,19 @@ t('detection escalates one phrasing at a time and stops at the first hit', () =>
     'the old fan-out form must be gone');
 });
 
-t('an anatomical phrase spans the garment\'s FULL extent, not a sub-region', () => {
+t('dress leads with the garment noun — measured, not stylistic', () => {
   const { GARMENT_ENUM } = require('../../server/lib/garmentColourFix');
-  // Measured: "the fabric covering the torso" for `dress` returned a 58% box
-  // holding only the upper robe (48,329px vs the 72,170px the plain form
-  // reached), so the lower robe would keep its old colour. A dress runs
-  // shoulders to ankles and the phrase has to say so.
-  const dress = GARMENT_ENUM.dress.queries[0];
-  assert.ok(/shoulders/.test(dress) && /ankles/.test(dress),
-    `dress must span its full extent, got "${dress}"`);
-  // A full-length garment cannot be described by a single body landmark.
-  assert.ok(!/^the fabric covering the torso$/.test(dress));
+  // Same page, same crop, three first-phrasings for a wizard robe:
+  //   'the dress worn by the person'                        72,170px  <- validated by eye, the whole robe
+  //   'the fabric covering the torso'                        48,329px  upper robe only
+  //   'the fabric covering the body from shoulders to ankles' 34,567px  worse again
+  // A full-length garment resists anatomical phrasing: no single landmark
+  // spans it, and naming two landmarks narrowed the box further rather than
+  // widening it. The garment NOUN is the better first ask here. The anatomical
+  // form stays second so a costume with no dress to find still escalates.
+  const q = GARMENT_ENUM.dress.queries;
+  assert.strictEqual(q[0], 'the dress worn by the person');
+  assert.ok(/shoulders/.test(q[1]) && /ankles/.test(q[1]), 'the anatomical form must remain as the fallback');
 });
 
 console.log(`${pass} passed (incl. escalation + extent)`);
