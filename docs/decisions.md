@@ -10457,3 +10457,57 @@ appeared, phrased as real wearable costumes. Category-selection variance
 completeness check, not this input.
 
 **Touched:** `prompts/story-bible-from-beats.txt`, `server/lib/promptBuilders.js`.
+
+## 2026-08-14 — Story-invented characters reach figure detection (detection boundary only)
+
+**Context:** The expected-character list handed to figure detection was built from the
+photo-backed cast alone (`sceneCharacters` / `stories.data.characters[]`). Story-invented
+("secondary") characters live only in `visualBible.secondaryCharacters`, so they were
+never listed — the identity call got N names for N+1 figures. Measured on staging
+`job_1786737619634_d66c7bg9g` p4 (Emma, Noah + Lira, an invented mermaid):
+`bboxDetection.expectedCharacters` = `[Emma, Noah]` while `sceneMetadata.characters`,
+`characterClothing` and `outlineCharacters` all named Lira; `missingCharacters: ["Lira"]`,
+`unknownFigures: 1` — the pipeline knew and shipped anyway. With 3 badges and 2 names,
+`_somIdentifyFigures` takes its LENIENT branch ("assign rather than unknown") and answered
+`{A:"Emma", B:"unknown", C:"Noah"}` — badge A was the mermaid, so a green-eyed teal-haired
+adult got the preschooler's name and the real Emma came back unknown. Reproduced
+independently on `job_1786571353564_0sgrd0f4g` p4 (also Lira).
+
+**Decision:** Resolve the secondary characters a SCENE references (union of
+`sceneMetadata.characters` / `characterPositions` / `characterClothing` / the page's
+`outlineCharacters`) against `visualBible.secondaryCharacters` + `animals`, and append them
+to the expected-character list **with their description** (age band, build, hair, face,
+signature look). Two shared builders: `buildSecondaryCharacterDescriptions()` (map, also now
+backing the existing `buildCharacterDescriptionsForBbox` VB enrichment) and
+`buildSecondaryExpectedCharacters()` (detector entries) — wired into all four sites that
+feed detection: the shared pre-detection (storyJobPipeline Phase 5b-pre — the one whose list
+actually reaches SoM on a normal page), the repair-round re-detect, the iterate path, and
+the batch-eval `characterDescriptions` map.
+
+**Rationale:** They are NOT added to `stories.data.characters[]` — that array is the user's
+real cast, every entry has uploaded photos and a generated avatar; an invented character has
+neither, and adding her would send the avatar/reference pipeline hunting a sheet that does
+not exist. The fix belongs at the detection boundary only. A name alone would not help the
+model separate figures, hence the description. Only scene-referenced names are resolved (a
+secondary appearing on p9 is never sent for p4), and a referenced name with no Visual Bible
+entry is logged, not swallowed — `missingCharacters` stays an honest signal.
+
+**Evidence:** Replay of the exact stored page data through the new builder:
+`job_1786737619634_d66c7bg9g` p4/p9 `[Emma,Noah]` → `[Emma,Noah,Lira]` (748-char
+description) against 3 detected figures — nBadges === nChars, so SoM now takes the strict
+elimination branch; p10 (no secondaries, 5 cast, 5 figures) unchanged. Same on
+`job_1786571353564_0sgrd0f4g`.
+
+**Known separate defect (NOT fixed here, owner is handling it):** every persisted
+`expectedCharacters` on those stories has a 0-char description for the photo-backed cast,
+because the three direct call sites read `c.description` off `sceneCharacters` objects,
+which have no such field (keys: id, age, name, gender, photos, traits, avatars, physical,
+ageCategory, structuredClothing). The rich list `buildExpectedCharactersForBbox()` produces
+inside `enrichWithBoundingBoxes` is discarded whenever `sharedBboxDetection` is supplied —
+which is always, on a normal generation.
+
+**Touched files:** `server/lib/promptBuilders.js`, `server/lib/sceneMetadata.js`,
+`server/lib/storyHelpers.js` (facade), `server/lib/images.js`, `server/lib/repairPipeline.js`,
+`storyJobPipeline.js`, `tests/manual/secondaryCharacterDetection.test.js`.
+
+**Status:** ✅ committed, NOT pushed (owner reviews first).

@@ -2252,12 +2252,21 @@ async function evaluateImageBatch(images, options = {}) {
           : {};
       }
 
-      // Log character/position data for debugging bbox expected list
-      if (Object.keys(expectedCharacterPositions).length > Object.keys(characterDescriptions).length) {
-        const sceneOnly = Object.keys(expectedCharacterPositions).filter(n => !characterDescriptions[n]);
-        if (sceneOnly.length > 0) {
-          log.debug(`📦 [BATCH EVAL] PAGE ${img.pageNumber}: ${sceneOnly.length} secondary character(s) from scene metadata: ${sceneOnly.join(', ')}`);
-        }
+      // Story-invented characters are in the Visual Bible, never in
+      // sceneCharacters (that array is the photo-backed cast). Resolve the ones
+      // this scene references so they reach the detector WITH a description —
+      // a name-only entry can't tell figures apart. Same evidence as the shared
+      // pre-detection in storyJobPipeline.js (job_1786737619634_d66c7bg9g p4:
+      // Lira the mermaid missing → SoM answered A=Emma on the mermaid's badge).
+      const sceneOnly = getStoryHelpers().buildSecondaryCharacterDescriptions(
+        visualBible,
+        getStoryHelpers().collectSceneCharacterNames(sceneMetadata, img.outlineCharacters || img.scene?.outlineCharacters || []),
+        Object.keys(characterDescriptions),
+        `PAGE ${img.pageNumber} `
+      );
+      if (Object.keys(sceneOnly).length > 0) {
+        Object.assign(characterDescriptions, sceneOnly);
+        log.debug(`📦 [BATCH EVAL] PAGE ${img.pageNumber}: ${Object.keys(sceneOnly).length} secondary character(s) from the Visual Bible: ${Object.keys(sceneOnly).join(', ')}`);
       }
 
       // Parse Visual Bible objects from prompt
@@ -3685,11 +3694,20 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         log.warn(`⚠️ [ITERATE] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored render`);
       }
       try {
+        // sceneCharacters is the photo-backed cast; story-invented characters
+        // live only in the Visual Bible and must be appended, or the identity
+        // call assigns a cast name to the invented figure
+        // (job_1786737619634_d66c7bg9g p4).
+        const iterExpectedCharacters = (sceneCharacters || []).map(c => ({
+          name: c.name || c,
+          description: typeof c === 'object' ? (c.description || '') : '',
+        }));
+        iterExpectedCharacters.push(...getStoryHelpers().buildSecondaryExpectedCharacters(
+          visualBible, iterateSceneMetadata, iterExpectedCharacters.map(c => c.name),
+          { pageLabel: `${iterLabel} ` }
+        ));
         iterDetection = await detectAllBoundingBoxes(genResult.imageData, {
-          expectedCharacters: (sceneCharacters || []).map(c => ({
-            name: c.name || c,
-            description: typeof c === 'object' ? (c.description || '') : '',
-          })),
+          expectedCharacters: iterExpectedCharacters,
           expectedObjects: Array.isArray(iterateSceneMetadata?.objects)
             ? iterateSceneMetadata.objects.filter(o => typeof o === 'string')
             : [],

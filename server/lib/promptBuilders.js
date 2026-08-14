@@ -17,7 +17,7 @@ const { frameColorForName } = require('./characterFrames');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
-const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, enforceSpreadTextPosition, parseSceneHintMetadata } = require('./sceneMetadata');
+const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 
 /**
@@ -417,6 +417,11 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
     }
     const e = matched.entry;
     const parts = [];
+    // Age band and build lead: they are what the identity call separates
+    // figures by first (a young adult vs a preschooler), and a VB entry
+    // without a prose `description` used to omit both.
+    if (e.age) parts.push(`Age: ${e.age}`);
+    if (e.build) parts.push(`Build: ${e.build}`);
     if (e.species) parts.push(`Species: ${e.species}`);
     if (e.size) parts.push(`Size: ${e.size}`);
     if (e.coloring) parts.push(`Coloring: ${e.coloring}`);
@@ -433,6 +438,32 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
     out[name] = { richDescription: rich };
   }
   return out;
+}
+
+/**
+ * The detector-ready `expectedCharacters` ENTRIES for the story-invented
+ * characters a scene references — the array companion to
+ * buildSecondaryCharacterDescriptions, for the call sites that build the
+ * expected list straight from `sceneCharacters` (the photo-backed cast) and
+ * pass it to detectAllBoundingBoxes: the shared pre-detection in
+ * storyJobPipeline.js, the repair round re-detect, and the iterate path.
+ * Append-only — the cast entries stay first and untouched.
+ *
+ * @param {object} visualBible - story.data.visualBible
+ * @param {object} sceneMetadata - extractSceneMetadata() result for the page
+ * @param {string[]} knownNames - names already in the expected list
+ * @param {{pageLabel?: string, extraNames?: string[]}} [opts]
+ * @returns {Array<{name: string, description: string}>}
+ */
+function buildSecondaryExpectedCharacters(visualBible, sceneMetadata, knownNames = [], opts = {}) {
+  const { pageLabel = '', extraNames = [] } = opts;
+  const resolved = buildSecondaryCharacterDescriptions(
+    visualBible,
+    collectSceneCharacterNames(sceneMetadata, extraNames),
+    knownNames,
+    pageLabel
+  );
+  return Object.entries(resolved).map(([name, d]) => ({ name, description: d.richDescription }));
 }
 
 /**
@@ -4622,6 +4653,7 @@ module.exports = {
   buildHairDescription,
   buildCharacterDescriptionsForBbox,
   buildSecondaryCharacterDescriptions,
+  buildSecondaryExpectedCharacters,
   buildTextZoneInstruction,
   buildEraGuard,
   buildLandmarkFidelityBlock,

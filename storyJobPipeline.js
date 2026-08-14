@@ -4320,16 +4320,30 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Phase 5b-pre: Shared bbox detection — runs ONCE per image before quality eval
         // and entity consistency. Both consume the same result, avoiding redundant API calls.
         const { detectAllBoundingBoxes } = require('./server/lib/images');
+        const { buildSecondaryExpectedCharacters } = require('./server/lib/storyHelpers');
         const bboxLimit = pLimit(500); // match quality-eval concurrency; existing retry logic handles 503s
         const bboxStartTime = Date.now();
         log.info(`🔍 [UNIFIED] Phase 5b-pre: Shared bbox detection for ${rawImages.length} images...`);
         await Promise.all(rawImages.filter(img => img.imageData).map(img => bboxLimit(async () => {
           try {
+            const sceneMetadata = img.sceneMetadata || {};
             const expectedCharacters = (img.sceneCharacters || []).map(c => ({
               name: c.name || c,
               description: typeof c === 'object' ? (c.description || '') : '',
             }));
-            const sceneMetadata = img.sceneMetadata || {};
+            // Story-invented characters live ONLY in the Visual Bible — never in
+            // sceneCharacters, which is the user's photo-backed cast. Without them
+            // the identity call gets N names for N+1 figures and the SoM prompt's
+            // lenient branch assigns a cast name to the invented figure: staging
+            // job_1786737619634_d66c7bg9g p4 answered {A:"Emma", B:"unknown",
+            // C:"Noah"} where badge A was Lira the mermaid, so Emma's name landed
+            // on her and the real Emma came back unknown (same on
+            // job_1786571353564_0sgrd0f4g p4). Detection boundary only — they are
+            // never added to storyData.characters, which needs photos + avatars.
+            expectedCharacters.push(...buildSecondaryExpectedCharacters(
+              visualBible, sceneMetadata, expectedCharacters.map(c => c.name),
+              { pageLabel: `PAGE ${img.pageNumber} `, extraNames: img.scene?.outlineCharacters || [] }
+            ));
             const expectedObjects = Array.isArray(sceneMetadata.objects)
               ? sceneMetadata.objects.filter(o => typeof o === 'string')
               : [];

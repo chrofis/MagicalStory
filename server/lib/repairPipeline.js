@@ -2064,11 +2064,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         try {
           const sceneChars = r.sceneCharacters || orig?.sceneCharacters || [];
           const meta = r.sceneMetadata || orig?.sceneMetadata || {};
+          const expectedCharacters = sceneChars.map(c => ({
+            name: c.name || c,
+            description: typeof c === 'object' ? (c.description || '') : '',
+          }));
+          // Story-invented characters are in the Visual Bible, never in
+          // sceneCharacters (the photo-backed cast) — without them the identity
+          // call gets N names for N+1 figures and hands a cast name to the
+          // invented figure (job_1786737619634_d66c7bg9g p4).
+          expectedCharacters.push(...getStoryHelpers().buildSecondaryExpectedCharacters(
+            visualBible, meta, expectedCharacters.map(c => c.name),
+            { pageLabel: `PAGE ${r.pageNumber} r${round} `, extraNames: r.outlineCharacters || orig?.outlineCharacters || [] }
+          ));
           r.bboxDetection = await images().detectAllBoundingBoxes(r.imageData, {
-            expectedCharacters: sceneChars.map(c => ({
-              name: c.name || c,
-              description: typeof c === 'object' ? (c.description || '') : '',
-            })),
+            expectedCharacters,
             expectedObjects: Array.isArray(meta.objects) ? meta.objects.filter(o => typeof o === 'string') : [],
             sceneContext: r.description || orig?.sceneDescription || null,
             pageContext: `PAGE ${r.pageNumber} r${round}`,

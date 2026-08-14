@@ -1044,6 +1044,42 @@ function extractSceneMetadata(sceneDescription) {
 }
 
 /**
+ * Every character name a scene references, from all three metadata carriers:
+ * `characters` (the cast list), `characterPositions` and `characterClothing`
+ * (whose keys are the same cast, but any one of the three can be null on a
+ * given page). Deduplicated case-insensitively, first spelling wins.
+ *
+ * Used to decide which Visual Bible secondary characters belong on a page's
+ * expected-character list for figure detection — the scene must actually
+ * reference the name, so a secondary that appears on page 9 is never sent to
+ * the detector for page 4.
+ *
+ * @param {Object|null} sceneMetadata - extractSceneMetadata() result
+ * @param {string[]} [extraNames] - additional page-scoped names (e.g. scene.outlineCharacters)
+ * @returns {string[]} Referenced names
+ */
+function collectSceneCharacterNames(sceneMetadata, extraNames = []) {
+  const m = sceneMetadata || {};
+  const raw = [
+    ...(Array.isArray(m.characters) ? m.characters : []),
+    ...Object.keys(m.characterPositions || {}),
+    ...Object.keys(m.characterClothing || {}),
+    ...(Array.isArray(extraNames) ? extraNames : []),
+  ];
+  const seen = new Set();
+  const out = [];
+  for (const entry of raw) {
+    const name = String(typeof entry === 'string' ? entry : (entry && entry.name) || '').trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+
+/**
  * Cast members the scene PROSE describes but the metadata `characters` list
  * omits. The Art Director emits prose plus a metadata block; the image model
  * renders the prose, while figure naming, the entity grid, clothing validation
@@ -1572,6 +1608,7 @@ module.exports = {
   enforceSpreadTextPosition,
   mirrorLeftRight,
   extractSceneMetadata,
+  collectSceneCharacterNames,
   findCastMissingFromMetadata,
   getCharactersInScene,
   parseSceneHintMetadata,
