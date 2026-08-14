@@ -1750,7 +1750,7 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
       for (const sc of visualBible.secondaryCharacters) {
         if (!isRelevant(sc)) continue;
         const description = sc.extractedDescription || sc.description;
-        recurringElements += `* **${sc.name}** (secondary character): ${description}\n`;
+        recurringElements += `* **${sc.name}** [${sc.id}] (secondary character): ${description}\n`;
       }
     }
     if (visualBible.locations && visualBible.locations.length > 0) {
@@ -1758,7 +1758,7 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
         if (!isRelevant(loc)) continue;
         const description = loc.extractedDescription || loc.description;
         if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
-          recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
+          recurringElements += `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`;
           const variantStrs = loc.photoVariants.map(v => {
             const desc = v.description || `Photo ${v.variantNumber}`;
             return `[${loc.id}.${v.variantNumber}] ${desc}`;
@@ -1767,12 +1767,12 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
         } else if (loc.isRealLandmark && (loc.photoVariants?.length === 1 || loc.referencePhotoUrl || loc.referencePhotoData)) {
           // Single-photo landmark: without a listed id the Art Director cannot
           // cite it in objects[], so the photo never attaches.
-          recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
+          recurringElements += `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`;
           const v1desc = loc.photoVariants?.[0]?.description || 'reference photo';
           recurringElements += `  Photo variants: [${loc.id}.1] ${v1desc}\n`;
         } else {
           const locType = loc.isRealLandmark ? 'real landmark' : 'location';
-          recurringElements += `* **${loc.name}** (${locType}): ${description}\n`;
+          recurringElements += `* **${loc.name}** [${loc.id}] (${locType}): ${description}\n`;
         }
       }
     }
@@ -1780,21 +1780,21 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
       for (const veh of visualBible.vehicles) {
         if (!isRelevant(veh)) continue;
         const description = veh.extractedDescription || veh.description;
-        recurringElements += `* **${veh.name}** (vehicle): ${description}\n`;
+        recurringElements += `* **${veh.name}** [${veh.id}] (vehicle): ${description}\n`;
       }
     }
     if (visualBible.animals && visualBible.animals.length > 0) {
       for (const animal of visualBible.animals) {
         if (!isRelevant(animal)) continue;
         const description = animal.extractedDescription || animal.description;
-        recurringElements += `* **${animal.name}** (animal): ${description}\n`;
+        recurringElements += `* **${animal.name}** [${animal.id}] (animal): ${description}\n`;
       }
     }
     if (visualBible.artifacts && visualBible.artifacts.length > 0) {
       for (const artifact of visualBible.artifacts) {
         if (!isRelevant(artifact)) continue;
         const description = artifact.extractedDescription || artifact.description;
-        recurringElements += `* **${artifact.name}** (object): ${description}\n`;
+        recurringElements += `* **${artifact.name}** [${artifact.id}] (object): ${description}\n`;
       }
     }
     if (visualBible.clothing && visualBible.clothing.length > 0) {
@@ -1802,7 +1802,7 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
         if (!isRelevant(item)) continue;
         const description = item.extractedDescription || item.description;
         const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
-        recurringElements += `* **${item.name}**${wornBy} (clothing): ${description}\n`;
+        recurringElements += `* **${item.name}** [${item.id}]${wornBy} (clothing): ${description}\n`;
       }
     }
   }
@@ -2168,7 +2168,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
       for (const sc of visualBible.secondaryCharacters) {
         const description = sc.extractedDescription || sc.description;
-        recurringElements += `* **${sc.name}** (secondary character): ${description}\n`;
+        recurringElements += `* **${sc.name}** [${sc.id}] (secondary character): ${description}\n`;
       }
     }
     // Add ALL locations - with photo variants for real landmarks
@@ -2179,7 +2179,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         // Check if this is a real landmark with photo variants
         if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
           // Show photo variant options for scene description to select from
-          recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
+          recurringElements += `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`;
           const variantStrs = loc.photoVariants.map(v => {
             const desc = v.description || `Photo ${v.variantNumber}`;
             return `[${loc.id}.${v.variantNumber}] ${desc}`;
@@ -2189,7 +2189,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         } else if (loc.isRealLandmark && (loc.photoVariants?.length === 1 || loc.referencePhotoUrl || loc.referencePhotoData)) {
           // Single-photo landmark: without a listed id the Art Director cannot
           // cite it in objects[], so the photo never attaches.
-          recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
+          recurringElements += `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`;
           const v1desc = loc.photoVariants?.[0]?.description || 'reference photo';
           recurringElements += `  Photo variants: [${loc.id}.1] ${v1desc}\n`;
           log.info(`[SCENE PROMPT] Added single-photo variant id for "${loc.name}"`);
@@ -2200,7 +2200,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
           }
           // Regular location without photo variants
           const locType = loc.isRealLandmark ? 'real landmark' : 'location';
-          recurringElements += `* **${loc.name}** (${locType}): ${description}\n`;
+          recurringElements += `* **${loc.name}** [${loc.id}] (${locType}): ${description}\n`;
         }
       }
     }
@@ -2208,21 +2208,21 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     if (visualBible.vehicles && visualBible.vehicles.length > 0) {
       for (const veh of visualBible.vehicles) {
         const description = veh.extractedDescription || veh.description;
-        recurringElements += `* **${veh.name}** (vehicle): ${description}\n`;
+        recurringElements += `* **${veh.name}** [${veh.id}] (vehicle): ${description}\n`;
       }
     }
     // Add ALL animals
     if (visualBible.animals && visualBible.animals.length > 0) {
       for (const animal of visualBible.animals) {
         const description = animal.extractedDescription || animal.description;
-        recurringElements += `* **${animal.name}** (animal): ${description}\n`;
+        recurringElements += `* **${animal.name}** [${animal.id}] (animal): ${description}\n`;
       }
     }
     // Add ALL artifacts
     if (visualBible.artifacts && visualBible.artifacts.length > 0) {
       for (const artifact of visualBible.artifacts) {
         const description = artifact.extractedDescription || artifact.description;
-        recurringElements += `* **${artifact.name}** (object): ${description}\n`;
+        recurringElements += `* **${artifact.name}** [${artifact.id}] (object): ${description}\n`;
       }
     }
     // Add ALL clothing/costumes
@@ -2230,7 +2230,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       for (const item of visualBible.clothing) {
         const description = item.extractedDescription || item.description;
         const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
-        recurringElements += `* **${item.name}**${wornBy} (clothing): ${description}\n`;
+        recurringElements += `* **${item.name}** [${item.id}]${wornBy} (clothing): ${description}\n`;
       }
     }
   }
