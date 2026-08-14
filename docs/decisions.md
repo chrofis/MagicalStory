@@ -10121,3 +10121,18 @@ character is still wrong. Tracked separately.
 **Touched:** `server/lib/garmentColourFix.js`, `tests/manual/garmentMaskModes.test.js`,
 `scripts/analysis/compare-garment-mask-modes.js`.
 **Status:** ✅ active — defaults changed; awaiting the push the owner deferred while a story ran.
+
+## 2026-08-14: Close-up waist-cut backstop shipped to the image prompt (supersedes the 2026-08-12 "no image-prompt rule" note)
+
+**Context:** With the brief-side chain fully compliant (oil rerun job_1786653013328: the
+close-up page's brief staged a waist-up moment, checks 7b/7c clean), the painter still
+rendered the close-up as a full figure with footwear. A compliant brief alone does not
+bind the image model.
+
+**Decision:** One Composition line in `image-generation.txt`: a declared close-up is cut
+at the waist by the bottom frame edge; never widened to a full figure. This is the #523
+wording that produced the target render — NOT #524's "faces large / subject fills the
+frame" phrasing, which made the model reproduce the reference sheet (-140). Head-crop
+character references remain unshipped (need costumed-panel cropping + prose-dressing gate).
+
+**Touched:** `prompts/image-generation.txt`.
