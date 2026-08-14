@@ -66,7 +66,8 @@ async function loadSceneContext(storyId, pageNumber) {
               data->'layout' AS layout,
               (data->'visualBible')::text AS visual_bible,
               (data->'clothingRequirements')::text AS clothing_reqs,
-              (data->'characters')::text AS characters_json
+              (data->'characters')::text AS characters_json,
+              (data->'characterAvatars')::text AS character_avatars
        FROM stories WHERE stories.id = $1`,
       [storyId, coverKey]
     )
@@ -80,7 +81,8 @@ async function loadSceneContext(storyId, pageNumber) {
               data->'layout' AS layout,
               (data->'visualBible')::text AS visual_bible,
               (data->'clothingRequirements')::text AS clothing_reqs,
-              (data->'characters')::text AS characters_json
+              (data->'characters')::text AS characters_json,
+              (data->'characterAvatars')::text AS character_avatars
        FROM stories, jsonb_array_elements(data->'sceneImages') scene
        WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
       [storyId, pageNumber]
@@ -107,6 +109,10 @@ async function loadSceneContext(storyId, pageNumber) {
   try {
     characters = rows[0].characters_json ? JSON.parse(rows[0].characters_json) : [];
   } catch { /* run without full character objects */ }
+  let characterAvatars = null;
+  try {
+    characterAvatars = rows[0].character_avatars ? JSON.parse(rows[0].character_avatars) : null;
+  } catch { /* run without — refCrop:'costumedHead' falls back to full refs */ }
 
   const referencePhotos = [];
   for (const p of (scene.referencePhotos || [])) {
@@ -132,6 +138,7 @@ async function loadSceneContext(storyId, pageNumber) {
     title: rows[0].title || null,
     clothingRequirements,
     characters,
+    characterAvatars,
     referencePhotos,
     landmarkPhotos,
     // null when the story renders text below the image (layout square-below) —
@@ -414,11 +421,47 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     await applyStoryCellRefs(ctx.referencePhotos, storyCharacterAvatars, ctx.scene.sceneCharacters || []);
   }
 
-  // refCrop: 'head' | 'upperBody' — crop each character reference to its top
-  // fraction before generation. A/B how much reference body the model needs:
+  // refCrop: 'head' | 'upperBody' | 'costumedHead' — shrink each character
+  // reference before generation. A/B how much reference body the model needs:
   // a full-body ref pulls the render toward full-figure present-to-camera
   // poses even when the brief asks for a hands-only/close-up framing.
-  if (params.refCrop) {
+  // 'head'/'upperBody' crop the stored (stacked) ref's top fraction — cheap,
+  // but the stack's top panel is the HATLESS face cell, so headwear is lost.
+  // 'costumedHead' rebuilds from the costumed avatar sheet: face cell
+  // (identity) + the head region of the costumed body cell (headwear), so
+  // hats and bandanas survive the crop.
+  if (params.refCrop === 'costumedHead') {
+    const sharp = require('sharp');
+    const { cropAvatarCell } = require('./sceneComposite');
+    const { resolveCellPose } = require('./storyAvatars');
+    const sheets = ctx.characterAvatars || {};
+    for (const p of ctx.referencePhotos) {
+      const sheetUri = sheets[p.name]?.costumed;
+      if (!sheetUri) { log.warn(`[TESTLAB] costumedHead: no costumed sheet for ${p.name} — full ref kept`); continue; }
+      const sc = (ctx.scene.sceneCharacters || []).find(c => ((typeof c === 'string' ? c : c?.name) || '').toLowerCase() === String(p.name).toLowerCase());
+      const pf = resolveCellPose(typeof sc === 'string' ? { name: sc } : (sc || {}));
+      const { body, face } = await cropAvatarCell(sheetUri, { pose: pf.pose, includeFace: true });
+      const bodyMeta = await sharp(body).metadata();
+      const bodyHead = await sharp(body)
+        .extract({ left: 0, top: 0, width: bodyMeta.width, height: Math.round(bodyMeta.height * 0.4) })
+        .png().toBuffer();
+      const parts = face ? [face, bodyHead] : [bodyHead];
+      const metas = await Promise.all(parts.map(b => sharp(b).metadata()));
+      const W = Math.max(...metas.map(m => m.width || 0));
+      const resized = await Promise.all(parts.map(async (b, i) => (metas[i].width !== W)
+        ? sharp(b).resize(W, null, { fit: 'contain', background: { r: 255, g: 255, b: 255 } }).png().toBuffer()
+        : b));
+      const rMetas = await Promise.all(resized.map(b => sharp(b).metadata()));
+      const totalH = rMetas.reduce((s, m) => s + (m.height || 0), 0);
+      let top = 0;
+      const composites = resized.map((b, i) => { const c = { input: b, left: 0, top }; top += rMetas[i].height || 0; return c; });
+      const out = await sharp({ create: { width: W, height: totalH, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+        .composite(composites).png().toBuffer();
+      p.photoUrl = 'data:image/png;base64,' + out.toString('base64');
+      p.photoData = undefined;
+      p.photoType = `cell-${pf.pose}-costumedHead`;
+    }
+  } else if (params.refCrop) {
     const fraction = params.refCrop === 'head' ? 0.35 : 0.55;
     const sharp = require('sharp');
     for (const p of ctx.referencePhotos) {
@@ -5044,7 +5087,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     let scorecard = null;
     if (params.scoreOutput === true || params.scoreOutput === 'true') {
       const sceneText = merged.map(m => `--- Page ${m.pageNumber} ---\n${m.brief}`).join('\n\n');
-      if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel })).scorecard;
+      if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'scene_review_replay', model } })).scorecard;
     }
 
     runs.push({
@@ -5097,7 +5140,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
  * way. The returned scorecard carries evaluatorVersion + evaluatorHash — scores
  * are only ever comparable within one evaluator.
  */
-async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null } = {}) {
+async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null, persist = null } = {}) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
   const { callTextModelStreaming } = require('./textModels');
@@ -5117,8 +5160,30 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   const res = await callTextModelStreaming(`${template}\n\n---\n\n${input}`, null, null, judge, { usageLabel: 'testlab_story_scorecard', temperature: 0 });
   if (!res || !res.text || !res.text.trim()) throw new Error(`judge returned empty response (model ${judge})`);
   const scored = sc.scoreFromDims(sc.parseJudgeJson(res.text), { partial });
+  const scorecard = { ...scored, ...sc.evaluatorStamp(template), judgeModel: judge };
+
+  // Persist to story_scores so this lands on the live /admin/scorecards page.
+  // `persist` carries the story context + the GENERATING model (what you compare
+  // across) + source/label. Fire-and-forget inside persistScore.
+  if (persist && persist.storyId) {
+    const { persistScore } = require('./scoreStore');
+    const base = {
+      storyId: persist.storyId, title: persist.title, language: persist.language, artStyle: persist.artStyle,
+      model: persist.model || null, judgeModel: judge,
+      evalVersion: scorecard.evaluatorVersion, evalHash: scorecard.evaluatorHash,
+      source: persist.source || null, label: persist.label || null,
+    };
+    for (const [artifact, a] of Object.entries(scorecard.artifacts)) {
+      await persistScore({ ...base, artifact, score: a.score, dims: a.dims });
+    }
+    // a 'full' row only when all four artifacts were scored together
+    if (Object.keys(scorecard.artifacts).length === Object.keys(sc.RUBRIC).length) {
+      await persistScore({ ...base, artifact: 'full', score: scorecard.overall, dims: scorecard.artifacts });
+    }
+  }
+
   return {
-    scorecard: { ...scored, ...sc.evaluatorStamp(template), judgeModel: judge },
+    scorecard,
     modelId: res.modelId,
     elapsedMs: Date.now() - t,
     cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
@@ -5132,7 +5197,10 @@ async function runStoryScorecardStage(target, { params = {}, promptOverride = nu
   if (!(storyData.sceneDescriptions || []).length && !storyData.storyText) {
     throw new Error('story has no final artifacts to score (no sceneDescriptions / storyText)');
   }
-  const r = await scoreArtifactsWithJudge(sc.extractArtifacts(storyData), { model: params.model, promptOverride });
+  const r = await scoreArtifactsWithJudge(sc.extractArtifacts(storyData), {
+    model: params.model, promptOverride,
+    persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_scorecard', model: sc.provenanceOf(storyData).writer },
+  });
   return {
     storyId: target.storyId,
     scorecard: {
@@ -5204,7 +5272,10 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
         const byPage = new Map(rewritten.map(r => [r.pageNumber, r]));
         beats = beats.map(b => byPage.get(b.pageNumber) || b); // fold rewrites forward
         if (scoreOutput) {
-          const sr = await scoreArtifactsWithJudge({ beats: beatsToText(beats) }, { model: params.judgeModel });
+          const sr = await scoreArtifactsWithJudge({ beats: beatsToText(beats) }, {
+            model: params.judgeModel,
+            persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `pass ${p}` },
+          });
           entry.scorecard = sr.scorecard;
           entry.cost += sr.cost;
         }
@@ -5315,7 +5386,7 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
   let scorecard = null;
   if (params.scoreOutput === true || params.scoreOutput === 'true') {
     const visualBible = String(res.text || '').slice(0, 20000);
-    if (visualBible.trim()) scorecard = (await scoreArtifactsWithJudge({ visualBible }, { model: params.judgeModel })).scorecard;
+    if (visualBible.trim()) scorecard = (await scoreArtifactsWithJudge({ visualBible }, { model: params.judgeModel, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_bible_replay', model } })).scorecard;
   }
 
   return {
@@ -5452,7 +5523,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   let scorecard = null;
   if (params.scoreOutput === true || params.scoreOutput === 'true') {
     const storyText = (parsed.pages || []).map(p => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n\n');
-    if (storyText.trim()) scorecard = (await scoreArtifactsWithJudge({ storyText }, { model: params.judgeModel })).scorecard;
+    if (storyText.trim()) scorecard = (await scoreArtifactsWithJudge({ storyText }, { model: params.judgeModel, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_text_replay', model } })).scorecard;
   }
 
   return {
