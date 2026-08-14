@@ -301,14 +301,32 @@ export function EntityConsistencyView({
                 charResult.overallConsistent ? 'bg-green-50' : 'bg-amber-50'
               }`}>
                 <span>{charName}</span>
+                {/* The 0-10 score was vestigial (null on current runs, used by
+                    nothing downstream). What the pipeline actually charges is a
+                    per-page deduction from each issue's severity — show that. */}
                 <span className={`text-xs px-2 py-0.5 rounded ${
                   charResult.overallConsistent
                     ? 'bg-green-200 text-green-800'
                     : 'bg-amber-200 text-amber-800'
                 }`}>
-                  Score: {charResult.overallScore ?? charResult.score ?? '?'}/10
-                  {(charResult.totalIssues ?? charResult.issues?.length ?? 0) > 0 &&
-                    ` - ${charResult.totalIssues ?? charResult.issues?.length} issues`}
+                  {(() => {
+                    const pts: Record<string, number> = { catastrophic: 50, critical: 25, major: 15, moderate: 5, minor: 2 };
+                    const all: any[] = [
+                      ...(charResult.issues || []),
+                      ...Object.values(charResult.byClothing || {}).flatMap((c: any) => c.issues || []),
+                    ];
+                    const perPage: Record<string, number> = {};
+                    for (const iss of all) {
+                      const pages = iss.pageNumbers || iss.pagesToFix || (iss.pageNumber != null ? [iss.pageNumber] : []);
+                      for (const pg of pages) {
+                        if (pg < 0) continue; // reference-cell finding, not a story page
+                        perPage[pg] = (perPage[pg] || 0) + (pts[String(iss.severity || '').toLowerCase()] || 0);
+                      }
+                    }
+                    const entries = Object.entries(perPage).sort((a, b) => Number(a[0]) - Number(b[0]));
+                    if (entries.length === 0) return all.length > 0 ? `${all.length} issue(s)` : 'OK';
+                    return entries.map(([pg, pen]) => `P${pg}: −${pen}`).join('  ');
+                  })()}
                 </span>
               </div>
               <div className="p-3 bg-white space-y-2 text-sm">
@@ -326,9 +344,11 @@ export function EntityConsistencyView({
                     <div key={clothing} className="border-l-2 border-gray-200 pl-3">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-gray-700">{clothing}</span>
-                        <span className={`text-xs ${clothingResult.score >= 7 ? 'text-green-600' : 'text-amber-600'}`}>
-                          {clothingResult.score}/10
-                        </span>
+                        {typeof clothingResult.score === 'number' && (
+                          <span className={`text-xs ${clothingResult.score >= 7 ? 'text-green-600' : 'text-amber-600'}`}>
+                            {clothingResult.score}/10
+                          </span>
+                        )}
                       </div>
                       {gridImages.length === 0 && isLoading && (
                         <div className="mt-2 mb-2 h-24 flex items-center justify-center text-xs text-gray-400 bg-gray-50 rounded border border-gray-200">
@@ -368,6 +388,27 @@ export function EntityConsistencyView({
                     </div>
                   );
                 })}
+                {/* Top-level issues — current runs store issues here while
+                    byClothing groups exist but are empty; render them always
+                    (this list is what went invisible). */}
+                {charResult.byClothing && charResult.issues && charResult.issues.length > 0 && (
+                  <ul className="space-y-1 border-l-2 border-amber-200 pl-3">
+                    {charResult.issues.map((issue, i) => (
+                      <li key={i} className="text-xs text-gray-600 flex items-start gap-1">
+                        <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
+                          issue.severity?.toLowerCase() === 'critical' ? 'bg-red-400' :
+                          issue.severity?.toLowerCase() === 'major' ? 'bg-amber-400' : 'bg-gray-400'
+                        }`} />
+                        <span>
+                          {issue.description}
+                          {(issue as any).pageNumbers && (issue as any).pageNumbers.filter((n: number) => n > 0).length > 0 && (
+                            <span className="text-gray-400 ml-1">(pages {(issue as any).pageNumbers.filter((n: number) => n > 0).join(', ')})</span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {/* Legacy flat issues (backward compat) */}
                 {!charResult.byClothing && (
                   <>

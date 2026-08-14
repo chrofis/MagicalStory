@@ -811,12 +811,18 @@ export function StoryDisplay({
     // Character issues
     for (const [charName, cr] of Object.entries(entity.characters || {}) as any[]) {
       const allIssues: any[] = [];
-      if (cr.byClothing && Object.keys(cr.byClothing).length > 0) {
+      // Issues live BOTH per-clothing and top-level (current runs store them
+      // top-level while byClothing groups exist but are empty) — collect both
+      // and dedupe, or a populated byClothing hides every top-level finding.
+      if (cr.byClothing) {
         for (const clothingResult of Object.values(cr.byClothing) as any[]) {
           if (clothingResult.issues) allIssues.push(...clothingResult.issues);
         }
-      } else if (cr.issues) {
-        allIssues.push(...cr.issues);
+      }
+      if (cr.issues) {
+        for (const iss of cr.issues) {
+          if (!allIssues.some(x => x.description === iss.description)) allIssues.push(iss);
+        }
       }
       for (const iss of allIssues) {
         // Entity issues store the array as `pageNumbers` (set in
@@ -830,12 +836,18 @@ export function StoryDisplay({
     // Object issues
     for (const [objName, or] of Object.entries(entity.objects || {}) as any[]) {
       const allIssues: any[] = [];
-      if (or.byClothing && Object.keys(or.byClothing).length > 0) {
+      // Issues live BOTH per-clothing and top-level (current runs store them
+      // top-level while byClothing groups exist but are empty) — collect both
+      // and dedupe, or a populated byClothing hides every top-level finding.
+      if (or.byClothing) {
         for (const clothingResult of Object.values(or.byClothing) as any[]) {
           if (clothingResult.issues) allIssues.push(...clothingResult.issues);
         }
-      } else if (or.issues) {
-        allIssues.push(...or.issues);
+      }
+      if (or.issues) {
+        for (const iss of or.issues) {
+          if (!allIssues.some(x => x.description === iss.description)) allIssues.push(iss);
+        }
       }
       for (const iss of allIssues) {
         // Entity issues store the array as `pageNumbers` (set in
@@ -4899,7 +4911,7 @@ export function StoryDisplay({
         const frontCoverImageData = getCoverImageData(coverImages.frontCover);
         const isCoverLazyLoading = !frontCoverImageData && frontCoverObj?.hasImage;
         return (
-          <div className="mt-6 max-w-2xl mx-auto">
+          <div className="mt-6 max-w-5xl mx-auto">
             <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">
               {storyLang === 'de' ? 'Titelseite' : storyLang === 'fr' ? 'Couverture' : 'Front Cover'}
             </h4>
@@ -5155,7 +5167,7 @@ export function StoryDisplay({
       {coverImages && getCoverImageData(coverImages.initialPage) && (() => {
         const initialPageObj = coverImages.initialPage;
         return (
-          <div className="mt-6 max-w-2xl mx-auto">
+          <div className="mt-6 max-w-5xl mx-auto">
             <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">
               {storyLang === 'de' ? 'Widmungsseite' : storyLang === 'fr' ? 'Page de dédicace' : 'Dedication Page'}
             </h4>
@@ -5433,7 +5445,7 @@ export function StoryDisplay({
 
                 {/* Picture Book Layout: Image on top, text below */}
                 {isPictureBook ? (
-                  <div className="flex flex-col items-center max-w-2xl mx-auto">
+                  <div className="flex flex-col items-center max-w-5xl mx-auto">
                     {/* Image on top - show placeholder if waiting for image or lazy loading */}
                     {(isWaitingForImage || isLazyLoading) ? (
                       <div className="w-full mb-4 aspect-[4/3] bg-gradient-to-br from-indigo-100 to-indigo-100 rounded-lg shadow-md flex flex-col items-center justify-center">
@@ -6623,7 +6635,7 @@ export function StoryDisplay({
       {coverImages && getCoverImageData(coverImages.backCover) && (() => {
         const backCoverObj = coverImages.backCover;
         return (
-          <div className="mt-8 max-w-2xl mx-auto">
+          <div className="mt-8 max-w-5xl mx-auto">
             <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">
               {storyLang === 'de' ? 'Rückseite' : storyLang === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
             </h4>
