@@ -24,11 +24,10 @@ export default function ScorecardsPanel() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [modal, setModal] = useState<CellModal>(null);
-  const [rerun, setRerun] = useState<{ storyId: string; part: string } | null>(null);
-  const [rerunModel, setRerunModel] = useState('');
-  const [rerunMsg, setRerunMsg] = useState<string | null>(null);
+  const [nr, setNr] = useState<{ storyId: string; part: string; version: string; row: ScoreRow } | null>(null);
+  const [nrModel, setNrModel] = useState('');
+  const [nrMsg, setNrMsg] = useState<string | null>(null);
   const [running, setRunning] = useState<string | null>(null); // spinner label while a round runs
-  const [modalModel, setModalModel] = useState(''); // branch-from-round model picker
 
   const load = async () => {
     setLoading(true);
@@ -64,34 +63,30 @@ export default function ScorecardsPanel() {
     catch (e) { setModal({ kind: 'prompt', version, prompt: `error: ${e instanceof Error ? e.message : e}` }); }
   };
 
-  // Branch a NEW round off a selected round: review that round's stored text with
-  // a chosen model → next round. Beats only (the part with review rounds + text).
-  const doBranch = async (row: ScoreRow) => {
-    if (!modalModel || !row.artifact_text) return;
-    setRunning(`branch r${row.round}→r${row.round + 1} · ${modalModel}`);
-    setModal(null);
+  // "＋ next round": continue a line's FINAL round → run one more review/refine
+  // pass with a chosen model, persisted as round+1. Works for every part via the
+  // part→stage map; each stage reads the model under its own param name, so all
+  // four are passed. The prior round's frozen text (artifact_text) is the input.
+  const doNextRound = async () => {
+    if (!nr || !nrModel) return;
+    const row = nr.row;
+    if (!row.artifact_text) { setNrMsg('this round has no stored text to continue from'); return; }
+    setNrMsg('starting…');
     try {
       await testlabService.createExperiment({
-        stage: 'beats_review_replay',
-        params: { fromText: row.artifact_text, fromRound: row.round, reviewModel: modalModel, model: modalModel, scoreOutput: true, evalVersion: row.eval_version },
-        targets: [{ storyId: row.story_id }],
+        stage: PART_STAGE[nr.part],
+        params: {
+          fromText: row.artifact_text, fromRound: row.round,
+          model: nrModel, reviewModel: nrModel, textModel: nrModel, bibleModel: nrModel,
+          scoreOutput: true, evalVersion: nr.version,
+        },
+        targets: [{ storyId: nr.storyId }],
       });
+      setNrMsg(null);
+      setRunning(`${PART_LABEL[nr.part]} r${row.round}→r${row.round + 1} · ${nrModel}`);
+      setNr(null);
       setTimeout(load, 5000); setTimeout(() => setRunning(null), 100000);
-    } catch (e) { setRunning(null); setErr(e instanceof Error ? e.message : String(e)); }
-  };
-
-  const doRerun = async () => {
-    if (!rerun || !rerunModel) return;
-    setRerunMsg('starting…');
-    try {
-      await testlabService.createExperiment({
-        stage: PART_STAGE[rerun.part],
-        params: { model: rerunModel, reviewModel: rerunModel, scoreOutput: true, evalVersion: evalSel === 'all' ? '1.1' : evalSel, ...(rerun.part === 'beats' ? { passes: 2 } : {}) },
-        targets: [{ storyId: rerun.storyId }],
-      });
-      setRerunMsg(null); setRunning(`${PART_LABEL[rerun.part]} · ${rerunModel}`); setRerun(null);
-      setTimeout(load, 5000); setTimeout(() => setRunning(null), 100000);
-    } catch (e) { setRerunMsg(`failed: ${e instanceof Error ? e.message : e}`); }
+    } catch (e) { setNrMsg(`failed: ${e instanceof Error ? e.message : e}`); }
   };
 
   return (
@@ -135,22 +130,24 @@ export default function ScorecardsPanel() {
                     <td className="pr-3 font-mono opacity-70">${fmt(ln.rounds.reduce((s, r) => s + (Number(r.gen_cost_usd) || 0) + (Number(r.judge_cost_usd) || 0), 0))} · {secs(ln.rounds.reduce((s, r) => s + (Number(r.gen_ms) || 0) + (Number(r.judge_ms) || 0), 0))}</td>
                     <td className="pr-3 font-mono opacity-70">{[...new Set(ln.rounds.map(r => r.judge_model).filter(Boolean))].join(', ') || '—'}</td>
                     <td className="pr-3"><button className="text-indigo-600 hover:underline font-mono" onClick={() => openPrompt(ln.version)}>v{ln.version}</button></td>
-                    <td><button className="text-indigo-600 hover:underline" onClick={() => { setRerun({ storyId: ln.storyId, part: sec.part }); setRerunMsg(null); }}>rerun ▾</button></td>
+                    <td><button className="text-indigo-600 hover:underline whitespace-nowrap" title={`continue from round ${ln.maxRound} → round ${ln.maxRound + 1} with a model you pick`}
+                      onClick={() => { const fin = ln.rounds.find(r => r.round === ln.maxRound)!; setNr({ storyId: ln.storyId, part: sec.part, version: ln.version, row: fin }); setNrModel(''); setNrMsg(null); }}>＋ next round ▾</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {rerun && rerun.part === sec.part && (
-            <div className="mt-1 flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded p-2">
-              <span>Rerun <b>{PART_LABEL[sec.part]}</b> for <span className="font-mono">{rerun.storyId.slice(0, 24)}</span> with model:</span>
-              <select className="border rounded px-1 py-0.5" value={rerunModel} onChange={e => setRerunModel(e.target.value)}>
+          {nr && nr.part === sec.part && (
+            <div className="mt-1 flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded p-2 flex-wrap">
+              <span>Continue <b>{PART_LABEL[sec.part]}</b> from <span className="font-mono">round {nr.row.round}</span> of <span className="font-mono">{nr.row.model}</span> (v{nr.version}) → <b>round {nr.row.round + 1}</b>, with model:</span>
+              <select className="border rounded px-1 py-0.5" value={nrModel} onChange={e => setNrModel(e.target.value)}>
                 <option value="">— pick model —</option>
                 {models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
               </select>
-              <button className="px-2 py-0.5 bg-indigo-600 text-white rounded disabled:opacity-40" disabled={!rerunModel} onClick={doRerun}>run</button>
-              <button className="text-gray-500" onClick={() => setRerun(null)}>cancel</button>
-              {rerunMsg && <span className="text-gray-600">{rerunMsg}</span>}
+              <button className="px-2 py-0.5 bg-indigo-600 text-white rounded disabled:opacity-40" disabled={!nrModel} onClick={doNextRound}>run →</button>
+              <button className="text-gray-500" onClick={() => setNr(null)}>cancel</button>
+              {sec.part === 'visualBible' && <span className="text-amber-600">bible has no critique step yet — this re-generates from beats (labeled)</span>}
+              {nrMsg && <span className="text-gray-600">{nrMsg}</span>}
             </div>
           )}
         </div>
@@ -173,16 +170,7 @@ export default function ScorecardsPanel() {
               <div className="bg-gray-50 p-2 rounded mb-2">{modal.row.notes || '(no note stored)'}</div>
               <div className="font-semibold">Evaluated text</div>
               <pre className="whitespace-pre-wrap bg-gray-50 p-2 rounded max-h-64 overflow-auto">{modal.row.artifact_text || '(not captured for this row)'}</pre>
-              {modal.row.artifact === 'beats' && modal.row.artifact_text && (
-                <div className="mt-3 flex items-center gap-2 border-t pt-2">
-                  <span className="font-semibold">Continue this round (→ round {modal.row.round + 1}) with model:</span>
-                  <select className="border rounded px-1 py-0.5" value={modalModel} onChange={e => setModalModel(e.target.value)}>
-                    <option value="">— pick model —</option>
-                    {models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
-                  </select>
-                  <button className="px-2 py-0.5 bg-indigo-600 text-white rounded disabled:opacity-40" disabled={!modalModel} onClick={() => doBranch(modal.row)}>run →</button>
-                </div>
-              )}
+              <div className="mt-2 text-gray-500">To run another round, close this and use <b>＋ next round</b> on the row.</div>
             </>)}
             <div className="mt-3 text-right"><button className="px-3 py-1 bg-gray-200 rounded" onClick={() => setModal(null)}>close</button></div>
           </div>

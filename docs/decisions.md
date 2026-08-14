@@ -10564,3 +10564,28 @@ over-firing, no fin-footwear false faults).
 
 **Touched:** storyJobPipeline.js, prompts/scene-expansion-all.txt, scene-expansion.txt,
 scene-review.txt, story-beats.txt, story-beats-review.txt.
+
+## 2026-08-14 — Scores page "＋ next round" chains all four parts
+
+**Context:** The Test Lab Scores page had a per-line "rerun" that only regenerated a
+part from scratch, and a hidden beats-only "continue round" buried in the drill-down
+modal. The owner wanted a visible per-line button to launch the NEXT review round on
+any line, for every part.
+
+**Decision:** Added branch mode (`params.fromText` + `params.fromRound`) to the scene,
+story-text, and bible replay stages, mirroring the existing beats branch, so a stored
+round's frozen `artifact_text` feeds the next round and persists as `round+1`. The
+client's per-line control is now "＋ next round" (continues that line's final round with
+a picked model). Beats/scene/text are TRUE chains reusing existing prompts
+(`buildBeatsReviewPrompt`, `buildSceneReviewPrompt`, `refineStoryText`). The **visual
+bible has no general critique prompt** — only the wardrobe-scoped `clothingReview` — so
+its "＋ next round" RE-GENERATES from beats with the chosen model, slotted as round+1 and
+labeled `regen (no critique)`. A full bible-critique prompt is deferred (needs owner
+sign-off per the prompt-authorship rule) before the bible can chain like the other three.
+
+**Rationale:** One visible control across all parts answers the owner's ask; reusing the
+production refine/review steps keeps a Lab round identical to a shipped pass; the bible is
+labeled honestly rather than faking a critique step that doesn't exist.
+
+**Touched:** server/lib/testlab.js (parsePageBlocks + branch mode in scene/text/bible
+stages), client/src/components/testlab/ScorecardsPanel.tsx.

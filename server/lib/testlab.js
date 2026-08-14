@@ -4986,6 +4986,19 @@ const STAGE_RUNNERS = {
  * params.reviewModel   — override the reviewer (comma-separated fans out)
  * promptOverride       — full replacement template, the usual Lab A/B lever
  */
+// Parse a persisted "--- Page N ---\n<body>" artifact_text back into ordered
+// page blocks, so a stored round's text can be fed as the next round's input
+// (scene briefs and story text both persist in this shape — see the scoreOutput
+// blocks below). This is what makes "＋ next round" chain: round N+1's input is
+// round N's frozen output, not the story's original artifact.
+function parsePageBlocks(text) {
+  const out = [];
+  const re = /---\s*Page\s+(\d+)\s*---\s*\n?([\s\S]*?)(?=\n---\s*Page\s+\d+\s*---|$)/gi;
+  let m;
+  while ((m = re.exec(String(text || ''))) !== null) out.push({ pageNumber: parseInt(m[1], 10), text: m[2].trim() });
+  return out.sort((a, b) => a.pageNumber - b.pageNumber);
+}
+
 async function runSceneReviewReplayStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
@@ -4995,7 +5008,16 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
-  const scenes = (storyData.sceneImages || [])
+  // BRANCH MODE — "＋ next round": review a SELECTED round's stored briefs
+  // (params.fromText) instead of the story's original ones, and persist as the
+  // next round. Everything downstream (findings, prompt, review, score) is
+  // unchanged; only the input briefs and the persisted round/label differ.
+  const branchScenes = params.fromText
+    ? parsePageBlocks(params.fromText).map(b => ({ pageNumber: b.pageNumber, brief: b.text }))
+    : null;
+  if (params.fromText && (!branchScenes || !branchScenes.length)) throw new Error('fromText has no parseable scene briefs');
+  const fromRound = params.fromText ? (parseInt(params.fromRound, 10) || 1) : null;
+  const scenes = branchScenes || (storyData.sceneImages || [])
     .filter(s => s.sceneDescription)
     .map(s => ({ pageNumber: s.pageNumber, brief: s.sceneDescription }));
   if (scenes.length === 0) throw new Error('story has no stored scene briefs to replay');
@@ -5077,7 +5099,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     let scorecard = null;
     if (params.scoreOutput === true || params.scoreOutput === 'true') {
       const sceneText = merged.map(m => `--- Page ${m.pageNumber} ---\n${m.brief}`).join('\n\n');
-      if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'scene_review_replay', model, genCost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}), genMs: Date.now() - t } })).scorecard;
+      if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'scene_review_replay', model, ...(fromRound != null ? { round: fromRound + 1, label: `from r${fromRound} · ${model}` } : {}), genCost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}), genMs: Date.now() - t } })).scorecard;
     }
 
     runs.push({
@@ -5413,8 +5435,13 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
   }
   if (!prompt) throw new Error('story-bible-from-beats template unavailable');
 
-  const model = params.bibleModel || MODEL_DEFAULTS.outline;
+  const model = params.bibleModel || params.model || MODEL_DEFAULTS.outline;
   if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
+  // "＋ next round" on the bible is a RE-GENERATION from beats with the chosen
+  // model, not a critique-of-prior — the repo has no general bible-critique
+  // prompt (only the wardrobe-scoped clothingReview). The round is still
+  // slotted so different models sit side by side; the label says what it is.
+  const fromRound = params.fromText != null ? (parseInt(params.fromRound, 10) || 1) : null;
 
   const t = Date.now();
   const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_story_bible_replay' });
@@ -5436,7 +5463,7 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
   let scorecard = null;
   if (params.scoreOutput === true || params.scoreOutput === 'true') {
     const visualBible = String(res.text || '').slice(0, 20000);
-    if (visualBible.trim()) scorecard = (await scoreArtifactsWithJudge({ visualBible }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_bible_replay', model, genCost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}), genMs: Date.now() - t } })).scorecard;
+    if (visualBible.trim()) scorecard = (await scoreArtifactsWithJudge({ visualBible }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_bible_replay', model, ...(fromRound != null ? { round: fromRound + 1, label: `regen (no critique) · ${model}` } : {}), genCost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}), genMs: Date.now() - t } })).scorecard;
   }
 
   return {
@@ -5556,6 +5583,35 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
   const fullText = storyData.storyText || storyData.story || '';
+
+  // BRANCH MODE — "＋ next round": refine a SELECTED round's stored text
+  // (params.fromText) one more pass with the chosen model, persisting as the
+  // next round. Uses the production refine loop (textRefine.js) so a Lab round
+  // and a shipped refine pass are the same operation. Scene intent/brief come
+  // from the story (read-only guardrails); the prose refined is the prior round.
+  if (params.fromText) {
+    const { refineStoryText, extractRefinablePages } = require('./textRefine');
+    const model = params.textModel || params.model || params.reviewModel || MODEL_DEFAULTS.outlineReviewModel;
+    if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
+    const fromRound = parseInt(params.fromRound, 10) || 1;
+    const prior = parsePageBlocks(params.fromText);
+    if (!prior.length) throw new Error('fromText has no parseable pages');
+    const priorBy = new Map(prior.map(p => [p.pageNumber, p.text]));
+    const basePages = extractRefinablePages(storyData.sceneImages || []);
+    const pages = (basePages.length ? basePages : prior.map(p => ({ pageNumber: p.pageNumber, text: p.text, sceneIntent: '', sceneBrief: '' })))
+      .map(p => ({ ...p, text: priorBy.get(p.pageNumber) || p.text }));
+    const t = Date.now();
+    const rr = await refineStoryText(storyData, pages, { rounds: 1, model, usageLabel: 'testlab_text_branch' });
+    const genMs = Date.now() - t;
+    const genCost = (rr.rounds || []).reduce((s, r) => s + (r.cost || 0), 0);
+    const storyText = rr.pages.map(p => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n\n');
+    let scorecard = null;
+    if (params.scoreOutput === true || params.scoreOutput === 'true') {
+      scorecard = (await scoreArtifactsWithJudge({ storyText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_text_replay', model, label: `from r${fromRound} · ${model}`, round: fromRound + 1, genCost, genMs } })).scorecard;
+    }
+    return { storyId: target.storyId, branch: { fromRound, toRound: fromRound + 1, model, changedPages: rr.changed, score: scorecard?.artifacts?.storyText?.score ?? null } };
+  }
+
   const { beats, source: beatsSource } = resolveStoryBeats(storyData, { getPageText, extractSceneMetadata });
   if (beats.length === 0) throw new Error('story has no beats and no pages to rebuild them from');
 
