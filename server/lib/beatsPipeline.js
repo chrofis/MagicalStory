@@ -354,7 +354,7 @@ SCENE: ${x.scene || ''}`.trim(),
   await checkCancellation();
   let clothingReviewReport = null;
   if (clothingRequirements && Object.keys(clothingRequirements).length > 0) {
-    const clothingPrompt = buildClothingReviewPrompt(inputData, clothingRequirements);
+    const clothingPrompt = buildClothingReviewPrompt(inputData, clothingRequirements, beats);
     if (!clothingPrompt) {
       gl.warn('beats_clothing_review_failed', 'Clothing review template unavailable — wardrobe shipped unreviewed');
     } else {
@@ -370,12 +370,23 @@ SCENE: ${x.scene || ''}`.trim(),
           // name back and case drift must not silently drop a correction.
           const name = Object.keys(clothingRequirements)
             .find(n => n.toLowerCase() === fix.name.toLowerCase());
-          const entry = name ? clothingRequirements[name]?.[fix.category] : null;
+          let entry = name ? clothingRequirements[name]?.[fix.category] : null;
+          // Check 9 (coverage) ADDS a category the bible missed: a beat that
+          // transforms or costumes a character whose wardrobe has no entry for
+          // it. Accepted only in the explicit `costumed:<name>` form — a plain
+          // rewrite of an unused category is still stray (hallucination guard).
+          if (name && fix.category === 'costumed' && fix.costume && (!entry || !entry.used)) {
+            entry = clothingRequirements[name].costumed = {
+              ...(clothingRequirements[name].costumed || {}),
+              used: true,
+              costume: fix.costume,
+            };
+          }
           if (!entry || !entry.used) { stray.push(`${fix.name}/${fix.category}`); continue; }
           const before = entry.description || '';
           if (before === fix.description) continue;
           entry.description = fix.description;
-          rewrites.push({ name, category: fix.category, before, after: fix.description });
+          rewrites.push({ name, category: fix.costume ? `costumed:${fix.costume}` : fix.category, before, after: fix.description });
         }
         // The transcript is the contract everything after this pipeline reads.
         // Without this line the object is corrected and the transcript is not,

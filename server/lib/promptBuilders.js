@@ -351,23 +351,70 @@ function buildCharacterDescriptionsForBbox(storyData, expectedPositions) {
   }
   // Enrich with Visual Bible secondaries / animals whose name or VB-id is in
   // the page's expected positions but not yet covered by a primary entry.
-  const vb = storyData?.visualBible;
-  if (!vb || !expectedPositions) return out;
-  const known = new Set(Object.keys(out).map(n => n.toLowerCase()));
+  if (!storyData?.visualBible || !expectedPositions) return out;
+  Object.assign(out, buildSecondaryCharacterDescriptions(
+    storyData.visualBible, Object.keys(expectedPositions), Object.keys(out)));
+  return out;
+}
+
+/**
+ * Resolve the STORY-INVENTED characters a scene references (Visual Bible
+ * secondaryCharacters / animals) into detector-ready description entries.
+ *
+ * Story-invented characters never appear in `stories.data.characters[]` — that
+ * array is the user's photo-backed cast (uploaded photos + generated avatars),
+ * and an invented character has neither. Any detection path that builds its
+ * expected-character list from the cast alone therefore drops them, and the
+ * identity call is asked to place N names onto N+1 figures.
+ *
+ * Measured (staging story job_1786737619634_d66c7bg9g, page 4 — Emma and Noah
+ * plus Lira, an invented mermaid): bboxDetection.expectedCharacters was
+ * [Emma, Noah] while the scene's clothing map and outlineCharacters both named
+ * Lira. With 3 badges and 2 names, _somIdentifyFigures takes its LENIENT
+ * branch ("assign rather than unknown") and answered {A:"Emma", B:"unknown",
+ * C:"Noah"} — badge A was the mermaid, so a green-eyed teal-haired adult got
+ * the preschooler's name and the real Emma came back unknown. Reproduced
+ * independently on job_1786571353564_0sgrd0f4g page 4.
+ *
+ * Only names the SCENE references are resolved (never the whole Visual Bible),
+ * and a referenced name with no resolvable entry is logged rather than
+ * silently dropped — it stays an honest `missingCharacters` signal downstream.
+ *
+ * @param {object} visualBible - story.data.visualBible (may be null/malformed)
+ * @param {string[]} sceneNames - names/VB-ids this scene references
+ * @param {string[]} knownNames - names already covered (photo-backed cast)
+ * @param {string} pageLabel - e.g. "PAGE 4 " for logs
+ * @returns {{[name: string]: { richDescription: string }}}
+ */
+function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames = [], pageLabel = '') {
+  const out = {};
+  const vb = visualBible || {};
   const lists = [
     { list: vb.secondaryCharacters, kind: 'secondary character' },
     { list: vb.animals, kind: 'creature' },
   ];
-  for (const name of Object.keys(expectedPositions)) {
-    if (known.has(name.toLowerCase())) continue;
+  // A malformed Visual Bible (object instead of array, missing entirely) must
+  // not throw — the page still renders, it just has no secondary to add.
+  if (!lists.some(l => Array.isArray(l.list) && l.list.length > 0)) return out;
+  const known = new Set((knownNames || []).map(n => String(n).toLowerCase()));
+  const seen = new Set();
+  for (const raw of (sceneNames || [])) {
+    if (typeof raw !== 'string' || !raw.trim()) continue;
+    const name = raw.trim();
+    const key = name.toLowerCase();
+    if (known.has(key) || seen.has(key)) continue;
+    seen.add(key);
     let matched = null;
     for (const { list, kind } of lists) {
       if (!Array.isArray(list)) continue;
-      const entry = list.find(e => (e?.name && e.name.toLowerCase() === name.toLowerCase())
-        || (e?.id && e.id.toLowerCase() === name.toLowerCase()));
+      const entry = list.find(e => (e?.name && e.name.toLowerCase() === key)
+        || (e?.id && e.id.toLowerCase() === key));
       if (entry) { matched = { entry, kind }; break; }
     }
-    if (!matched) continue;
+    if (!matched) {
+      log.warn(`⚠️ [BBOX-BUILD] ${pageLabel}Scene references "${name}" but no Visual Bible entry resolves it — the detector will report it as missing`);
+      continue;
+    }
     const e = matched.entry;
     const parts = [];
     if (e.species) parts.push(`Species: ${e.species}`);
@@ -379,7 +426,8 @@ function buildCharacterDescriptionsForBbox(storyData, expectedPositions) {
     if (e.signatureLook) parts.push(`Distinctive: ${e.signatureLook}`);
     if (e.clothing) parts.push(`Wearing: ${e.clothing}`);
     const baseDesc = e.description || parts.join('. ');
-    const rich = baseDesc ? `${e.name} (${matched.kind}). ${baseDesc}` : `${e.name} (${matched.kind})`;
+    const label = e.name || name;
+    const rich = baseDesc ? `${label} (${matched.kind}). ${baseDesc}` : `${label} (${matched.kind})`;
     // Key by the metadata name (may be a VB id placeholder like "CHR001")
     // so buildExpectedCharactersForBbox finds it via the same key.
     out[name] = { richDescription: rich };
@@ -3717,7 +3765,7 @@ function buildBeatsReviewPrompt(inputData, beats) {
  * story has no dressed character to review — a bible that produced no usable
  * outfit has nothing for a reviewer to correct.
  */
-function buildClothingReviewPrompt(inputData, clothingRequirements) {
+function buildClothingReviewPrompt(inputData, clothingRequirements, beats = []) {
   const template = PROMPT_TEMPLATES.clothingReview;
   if (!template) {
     log.error('[PROMPT] clothingReview template not loaded — clothing review unavailable');
@@ -3734,10 +3782,17 @@ function buildClothingReviewPrompt(inputData, clothingRequirements) {
     }
   }
   if (blocks.length === 0) return null;
+  // The beats are what check 9 (coverage) reads: a transformation or costume a
+  // beat gives a character is invisible from the wardrobe text alone — the
+  // bible writer missed one from the same inputs, so the review must see them.
+  const beatBlocks = (beats || [])
+    .map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`)
+    .join('\n\n') || '(beats not available)';
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     STYLE_WARDROBE: buildStyleWardrobeBlock(inputData.artStyle),
     CURRENT_CLOTHING: blocks.join('\n\n'),
+    BEATS: beatBlocks,
   });
 }
 
@@ -3758,13 +3813,18 @@ function parseClothingReview(raw) {
 
   // The heading carries a trailing "(costume: x)" when we echoed one back, so
   // the category match cannot be anchored to end-of-line.
-  const re = /^[ \t]*#{1,4}[ \t]*\**([^/\n]+?)\**[ \t]*\/[ \t]*\**(standard|winter|summer|costumed)\b[^\n]*$/gim;
+  // `costumed:<name>` is how check 9 ADDS a category the bible missed — the
+  // costume name rides in the heading and the merge needs it to mark the
+  // category used.
+  const re = /^[ \t]*#{1,4}[ \t]*\**([^/\n]+?)\**[ \t]*\/[ \t]*\**(standard|winter|summer|costumed(?::[\w-]+)?)\b[^\n]*$/gim;
   const marks = [];
   let m;
   while ((m = re.exec(body)) !== null) {
+    const [cat, costume] = m[2].toLowerCase().split(':');
     marks.push({
       name: m[1].replace(/\*/g, '').trim(),
-      category: m[2].toLowerCase(),
+      category: cat,
+      costume: costume || null,
       headStart: m.index,
       bodyStart: m.index + m[0].length,
     });
@@ -3781,7 +3841,7 @@ function parseClothingReview(raw) {
     const description = body.slice(marks[i].bodyStart, end).trim();
     if (!marks[i].name || !description) continue;
     const key = `${marks[i].name.toLowerCase()}/${marks[i].category}`;
-    byKey.set(key, { name: marks[i].name, category: marks[i].category, description });
+    byKey.set(key, { name: marks[i].name, category: marks[i].category, costume: marks[i].costume || null, description });
   }
   return { analysis, entries: [...byKey.values()] };
 }
@@ -4561,6 +4621,7 @@ module.exports = {
   getGenderTerm,
   buildHairDescription,
   buildCharacterDescriptionsForBbox,
+  buildSecondaryCharacterDescriptions,
   buildTextZoneInstruction,
   buildEraGuard,
   buildLandmarkFidelityBlock,

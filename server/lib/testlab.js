@@ -5464,7 +5464,7 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
 async function runClothingReviewStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildClothingReviewPrompt, parseClothingReview } = require('./storyHelpers');
+  const { buildClothingReviewPrompt, parseClothingReview, getPageText, extractSceneMetadata } = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
 
@@ -5476,7 +5476,9 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
   if (promptOverride) PROMPT_TEMPLATES.clothingReview = promptOverride;
   let prompt;
   try {
-    prompt = buildClothingReviewPrompt(storyData, before);
+    // Same beats production sees — check 9 (coverage) is unanswerable without them.
+    const { beats: reviewBeats } = resolveStoryBeats(storyData, { getPageText, extractSceneMetadata });
+    prompt = buildClothingReviewPrompt(storyData, before, reviewBeats);
   } finally {
     PROMPT_TEMPLATES.clothingReview = orig;
   }
@@ -5498,10 +5500,15 @@ async function runClothingReviewStage(target, { params = {}, promptOverride = nu
   const changed = [], stray = [];
   for (const fix of parsed.entries) {
     const name = Object.keys(after).find(n => n.toLowerCase() === fix.name.toLowerCase());
-    const entry = name ? after[name]?.[fix.category] : null;
+    let entry = name ? after[name]?.[fix.category] : null;
+    // Mirror production: check 9 may ADD costumed:<name> for a beat-driven
+    // transformation the bible missed.
+    if (name && fix.category === 'costumed' && fix.costume && (!entry || !entry.used)) {
+      entry = after[name].costumed = { ...(after[name].costumed || {}), used: true, costume: fix.costume };
+    }
     if (!entry || !entry.used) { stray.push(`${fix.name}/${fix.category}`); continue; }
     if ((entry.description || '') === fix.description) continue;
-    changed.push({ name, category: fix.category, before: entry.description || '', after: fix.description });
+    changed.push({ name, category: fix.costume ? `costumed:${fix.costume}` : fix.category, before: entry.description || '', after: fix.description });
     entry.description = fix.description;
   }
 
