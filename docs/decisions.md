@@ -10419,3 +10419,18 @@ SCORECARD_JUDGE), used by `scoreArtifactsWithJudge` instead of the pipeline's `o
 **Touched:** server/config/models.js, server/lib/testlab.js,
 client/src/components/testlab/ScorecardsPanel.tsx.
 **Status:** ✅ active (committed, NOT pushed per owner).
+
+## 2026-08-15: No production landmark-fidelity eval — deliberate omission
+
+**Context:** After the landmark-attachment rebuild, the Luzern validation run scored
+landmark fidelity 9-10 on all five landmark pages (exp #621; baseline before the fixes
+was 0). A production evaluator comparing renders against the reference photo was
+considered as the remaining gap.
+
+**Decision (owner):** Not needed. With the photo attached, fidelity is high by
+construction; a per-page production judge would add cost for a failure mode that is not
+occurring. Presence-level checks stay (missing named landmark = missing element; "wrong
+landmark" via consolidator). Measurement stays in the Test Lab's empty_scene_adherence
+stage, run on demand.
+
+**Touched:** none (documentation only).
