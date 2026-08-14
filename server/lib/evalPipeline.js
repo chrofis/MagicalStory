@@ -220,7 +220,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
  * Validate an empty scene (background-only) image.
  * Two-phase check:
  * Phase 1 (pixel): calmness heatmap — white boxes, too dark, text area readiness (<50ms, free)
- * Phase 2 (vision): Gemini Flash-lite — people/figures, landmark accuracy, content issues (~2s, cheap)
+ * Phase 2 (vision): Gemini Flash-lite — people/figures, setting/geometry/anachronism issues (no landmark-identity check) (~2s, cheap)
  *
  * @param {string} imageData - base64 data URI
  * @param {string} textPosition - e.g. 'top-right'
@@ -332,7 +332,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
     }
 
     // ── Phase 2: Gemini Flash-lite vision check ──
-    // Catches things pixels can't: people/figures, wrong landmark, content errors.
+    // Catches things pixels can't: people/figures, setting mismatch, content errors.
     let visionFeedback = null;
     if (!skipVision && issues.length === 0) {
       try {

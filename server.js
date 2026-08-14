@@ -234,7 +234,6 @@ const {
   buildTrialStoryPrompt,
   buildPreviousScenesContext,
   buildAvailableAvatarsForPrompt,
-  getLandmarkPhotosForPage,
   getLandmarkPhotosForScene,
   extractSceneMetadata,
   stripSceneMetadata,

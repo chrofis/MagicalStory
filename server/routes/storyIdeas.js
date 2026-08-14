@@ -315,7 +315,7 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
 
       // Check landmark_index table first (works for any city worldwide)
       try {
-        const indexedLandmarks = await getIndexedLandmarks(effectiveLocation.city, 20);
+        const indexedLandmarks = await getIndexedLandmarks(effectiveLocation, 20);
         if (indexedLandmarks.length > 0) {
           // Collect every populated photo variant so downstream prompts can
           // surface per-angle descriptions and let Claude pick the right one
@@ -331,7 +331,7 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
               const urlKey = n === 1 ? 'photo_url' : `photo_url_${n}`;
               const descKey = n === 1 ? 'photo_description' : `photo_description_${n}`;
               if (l[urlKey] && l[descKey]) {
-                photoVariants.push({ n, description: l[descKey] });
+                photoVariants.push({ variantNumber: n, vantage: n >= 4 ? 'interior' : 'exterior', description: l[descKey] });
               }
             }
             return {
@@ -555,7 +555,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
 
       // Check landmark_index table first (works for any city worldwide)
       try {
-        const indexedLandmarks = await getIndexedLandmarks(effectiveLocation.city, 20);
+        const indexedLandmarks = await getIndexedLandmarks(effectiveLocation, 20);
         if (indexedLandmarks.length > 0) {
           // Collect every populated photo variant so downstream prompts can
           // surface per-angle descriptions and let Claude pick the right one
@@ -571,7 +571,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
               const urlKey = n === 1 ? 'photo_url' : `photo_url_${n}`;
               const descKey = n === 1 ? 'photo_description' : `photo_description_${n}`;
               if (l[urlKey] && l[descKey]) {
-                photoVariants.push({ n, description: l[descKey] });
+                photoVariants.push({ variantNumber: n, vantage: n >= 4 ? 'interior' : 'exterior', description: l[descKey] });
               }
             }
             return {

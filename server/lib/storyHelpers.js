@@ -43,32 +43,6 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
 // ============================================================================
 
 /**
- * Get landmark reference photos for a specific page
- * Returns photos for real-world landmarks that appear on the given page
- * @param {Object} visualBible - Visual Bible object with locations
- * @param {number} pageNumber - The page number to get landmarks for
- * @returns {Array<{name: string, photoData: string, attribution: string}>} Landmark photos
- */
-function getLandmarkPhotosForPage(visualBible, pageNumber) {
-  if (!visualBible?.locations) return [];
-
-  return visualBible.locations
-    .filter(loc =>
-      loc.isRealLandmark &&
-      (loc.referencePhotoUrl || loc.referencePhotoData) &&
-      loc.photoFetchStatus === 'success' &&
-      loc.appearsInPages?.includes(pageNumber)
-    )
-    .map(loc => ({
-      name: loc.name,
-      photoUrl: loc.referencePhotoUrl || null,
-      photoData: loc.referencePhotoData || null,
-      attribution: loc.photoAttribution,
-      source: loc.photoSource
-    }));
-}
-
-/**
  * Get landmark reference photos for a scene based on LOC IDs in scene metadata
  * Parses objects like "Burgruine Stein [LOC002]" to extract LOC IDs
  * Also checks setting.location for landmark references
@@ -319,7 +293,6 @@ module.exports = {
   getHistoricalObjects,
 
   // Landmark helpers
-  getLandmarkPhotosForPage,
   getLandmarkPhotosForScene,
   buildAvailableLandmarksSection,
 

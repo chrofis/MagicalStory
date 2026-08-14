@@ -2004,7 +2004,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) 
   checkEntries(visualBible.artifacts, 'artifact', 3);
   checkEntries(visualBible.vehicles, 'vehicle', 4);
 
-  // Add non-landmark locations (landmarks use real photos via getLandmarkPhotosForPage instead)
+  // Add non-landmark locations (landmarks use real photos via getLandmarkPhotosForScene instead)
   for (const entry of visualBible.locations || []) {
     // Skip landmarks - they use real photos, not generated reference images
     if (entry.isRealLandmark) continue;

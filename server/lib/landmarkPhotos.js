@@ -2908,6 +2908,8 @@ async function loadLandmarkPhotoDescriptions(visualBible) {
         if (cfg.url) {
           variants.push({
             variantNumber: cfg.num,
+            // Slot convention: 1-3 exterior, 4-6 interior (indexLandmarksForCities).
+            vantage: cfg.num >= 4 ? 'interior' : 'exterior',
             url: cfg.url,
             description: cfg.desc || null,
             attribution: cfg.attr || null
@@ -2989,32 +2991,38 @@ async function loadLandmarkPhotoVariant(visualBible, locId, variantNumber = 1) {
     return null;
   }
 
-  // Clamp variant number to available range
-  const maxVariant = location.photoVariants.length;
-  const safeVariantNumber = Math.min(Math.max(1, variantNumber), maxVariant);
-
-  if (variantNumber !== safeVariantNumber) {
-    log.debug(`[LANDMARK-VARIANT] Requested variant ${variantNumber} but only ${maxVariant} available, using ${safeVariantNumber}`);
+  // Look up by variantNumber (the slot id), never by array position — slots
+  // compact (e.g. slots 1,2,4 present), so position indexing serves the wrong
+  // photo. Missing slot: fall back to a variant of the SAME vantage (1-3
+  // exterior, 4-6 interior) before crossing vantages.
+  let variant = location.photoVariants.find(v => v.variantNumber === variantNumber);
+  if (!variant) {
+    const wantInterior = variantNumber >= 4;
+    variant = location.photoVariants.find(v => (v.vantage ? v.vantage === (wantInterior ? 'interior' : 'exterior') : (v.variantNumber >= 4) === wantInterior));
+    if (variant) {
+      log.warn(`[LANDMARK-VARIANT] "${location.name}": variant ${variantNumber} missing — using same-vantage variant ${variant.variantNumber}`);
+    } else {
+      variant = location.photoVariants[0];
+      log.warn(`[LANDMARK-VARIANT] "${location.name}": no ${wantInterior ? 'interior' : 'exterior'} variant — falling back to variant ${variant.variantNumber} (different vantage)`);
+    }
   }
-
-  const variant = location.photoVariants[safeVariantNumber - 1];
   if (!variant?.url) {
-    log.debug(`[LANDMARK-VARIANT] No URL for variant ${safeVariantNumber} of "${location.name}"`);
+    log.debug(`[LANDMARK-VARIANT] No URL for variant ${variant.variantNumber} of "${location.name}"`);
     return null;
   }
 
   // Check if already cached on the variant object
   if (variant.cachedPhotoData) {
-    log.debug(`[LANDMARK-VARIANT] Cache hit for "${location.name}" variant ${safeVariantNumber}`);
+    log.debug(`[LANDMARK-VARIANT] Cache hit for "${location.name}" variant ${variant.variantNumber}`);
     return {
       photoData: variant.cachedPhotoData,
       attribution: variant.attribution || 'Wikimedia Commons',
-      variantNumber: safeVariantNumber
+      variantNumber: variant.variantNumber
     };
   }
 
   // Fetch and compress the image
-  log.info(`[LANDMARK-VARIANT] Loading "${location.name}" variant ${safeVariantNumber}...`);
+  log.info(`[LANDMARK-VARIANT] Loading "${location.name}" variant ${variant.variantNumber}...`);
 
   try {
     const response = await fetch(variant.url, {
@@ -3023,7 +3031,7 @@ async function loadLandmarkPhotoVariant(visualBible, locId, variantNumber = 1) {
     });
 
     if (!response.ok) {
-      log.warn(`[LANDMARK-VARIANT] Failed to fetch variant ${safeVariantNumber}: HTTP ${response.status}`);
+      log.warn(`[LANDMARK-VARIANT] Failed to fetch variant ${variant.variantNumber}: HTTP ${response.status}`);
       return null;
     }
 
@@ -3039,16 +3047,16 @@ async function loadLandmarkPhotoVariant(visualBible, locId, variantNumber = 1) {
     variant.cachedPhotoData = photoData;
 
     const sizeKB = Math.round(photoData.length * 0.75 / 1024);
-    log.info(`[LANDMARK-VARIANT] ✅ Loaded "${location.name}" variant ${safeVariantNumber} (${sizeKB}KB)`);
+    log.info(`[LANDMARK-VARIANT] ✅ Loaded "${location.name}" variant ${variant.variantNumber} (${sizeKB}KB)`);
 
     return {
       photoData,
       attribution: variant.attribution || 'Wikimedia Commons',
-      variantNumber: safeVariantNumber
+      variantNumber: variant.variantNumber
     };
 
   } catch (err) {
-    log.error(`[LANDMARK-VARIANT] Error loading variant ${safeVariantNumber} for "${location.name}": ${err.message}`);
+    log.error(`[LANDMARK-VARIANT] Error loading variant ${variant.variantNumber} for "${location.name}": ${err.message}`);
     return null;
   }
 }

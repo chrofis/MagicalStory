@@ -10267,3 +10267,40 @@ skirt  "skirt"                          32% @ 0.47
 This also settles the costume question empirically: "the fabric below the waist" located a
 MERMAID TAIL. The phrase never mentions a skirt, so the enum labelling a tail as `skirt` costs
 nothing — an anatomical phrasing is garment-agnostic. No `tail`/`wings` enum value is needed.
+
+## 2026-08-14: Landmark architecture defect batch (L1-L7) + beats know landmarks
+
+**Context:** Full architecture review surfaced seven defects beyond the citable-id fix.
+Highest-value: the beats planner never saw the landmark list — landmarks arrived at the
+story-bible stage after the plot was locked, so they became backdrops instead of stages.
+
+**Decisions:**
+- L1: `story-beats.txt` gets `{AVAILABLE_LANDMARKS_SECTION}` + a rule to set key scenes
+  AT landmarks; `buildBeatsPrompt` threads `inputData.availableLandmarks` (resolved
+  before beats run).
+- L2: variants carry `vantage: exterior|interior` (slots 1-3/4-6);
+  `loadLandmarkPhotoVariant` looks up by `variantNumber` (slots compact — position
+  indexing served the wrong photo) with a same-vantage fallback, logged loudly. AD
+  listing labels each variant `(exterior)`/`(interior)`.
+- L3: one `photoVariants` shape — `{variantNumber, vantage, description}` everywhere;
+  the trial/ideas `{n}` shape is gone.
+- L4: the ideas route passes the full location object to `getIndexedLandmarks` so the
+  20/50/100 km proximity fallback works (trial already did).
+- L5: `buildVbLocationLines()` is the single source for the AD's location listing
+  (was copy-pasted in both builders). The 3x discovery-block duplication
+  (storyIdeas x2 + storyJobPipeline) stays as documented backlog — three call shapes,
+  refactor risk exceeds the payoff right now.
+- L6: covers accept both photo field families (referencePhoto* + referenceImage*).
+- L7: dead `getLandmarkPhotosForPage` deleted (zero callers, read a stale field name);
+  evalPipeline comments no longer claim a landmark-accuracy check that never existed.
+- NOT done deliberately: renaming isSwissPreIndexed/swissLandmarkId (stored-data shape
+  change, no behavior gain); production landmark-fidelity eval (feature, not defect —
+  the Lab judge in empty_scene_adherence remains the only measurement).
+
+**Validated:** exp #599 (listing after dedupe emits `[LOC001.1] (exterior) …`, AD cites
+it); local unit test of vantage-safe selection (.3→same-vantage exterior, .5→interior,
+never silent cross-vantage); beats prompt builds with and without landmarks.
+
+**Touched:** prompts/story-beats.txt, server/lib/promptBuilders.js, landmarkPhotos.js,
+coverIterate.js, storyHelpers.js, visualBible.js, evalPipeline.js, server.js,
+server/routes/storyIdeas.js.

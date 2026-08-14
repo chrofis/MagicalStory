@@ -1756,24 +1756,7 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
     if (visualBible.locations && visualBible.locations.length > 0) {
       for (const loc of visualBible.locations) {
         if (!isRelevant(loc)) continue;
-        const description = loc.extractedDescription || loc.description;
-        if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
-          recurringElements += `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`;
-          const variantStrs = loc.photoVariants.map(v => {
-            const desc = v.description || `Photo ${v.variantNumber}`;
-            return `[${loc.id}.${v.variantNumber}] ${desc}`;
-          });
-          recurringElements += `  Photo variants: ${variantStrs.join(', ')}\n`;
-        } else if (loc.isRealLandmark && (loc.photoVariants?.length === 1 || loc.referencePhotoUrl || loc.referencePhotoData)) {
-          // Single-photo landmark: without a listed id the Art Director cannot
-          // cite it in objects[], so the photo never attaches.
-          recurringElements += `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`;
-          const v1desc = loc.photoVariants?.[0]?.description || 'reference photo';
-          recurringElements += `  Photo variants: [${loc.id}.1] ${v1desc}\n`;
-        } else {
-          const locType = loc.isRealLandmark ? 'real landmark' : 'location';
-          recurringElements += `* **${loc.name}** [${loc.id}] (${locType}): ${description}\n`;
-        }
+        recurringElements += buildVbLocationLines(loc);
       }
     }
     if (visualBible.vehicles && visualBible.vehicles.length > 0) {
@@ -2174,34 +2157,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     // Add ALL locations - with photo variants for real landmarks
     if (visualBible.locations && visualBible.locations.length > 0) {
       for (const loc of visualBible.locations) {
-        const description = loc.extractedDescription || loc.description;
-
-        // Check if this is a real landmark with photo variants
-        if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
-          // Show photo variant options for scene description to select from
-          recurringElements += `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`;
-          const variantStrs = loc.photoVariants.map(v => {
-            const desc = v.description || `Photo ${v.variantNumber}`;
-            return `[${loc.id}.${v.variantNumber}] ${desc}`;
-          });
-          recurringElements += `  Photo variants: ${variantStrs.join(', ')}\n`;
-          log.info(`[SCENE PROMPT] Added photo variants for "${loc.name}" with ${loc.photoVariants.length} variants`);
-        } else if (loc.isRealLandmark && (loc.photoVariants?.length === 1 || loc.referencePhotoUrl || loc.referencePhotoData)) {
-          // Single-photo landmark: without a listed id the Art Director cannot
-          // cite it in objects[], so the photo never attaches.
-          recurringElements += `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`;
-          const v1desc = loc.photoVariants?.[0]?.description || 'reference photo';
-          recurringElements += `  Photo variants: [${loc.id}.1] ${v1desc}\n`;
-          log.info(`[SCENE PROMPT] Added single-photo variant id for "${loc.name}"`);
-        } else {
-          // Debug: why wasn't PHOTO OPTIONS added?
-          if (loc.isRealLandmark) {
-            log.debug(`[SCENE PROMPT] Landmark "${loc.name}": photoVariants=${loc.photoVariants?.length || 0} (need >1 for PHOTO OPTIONS)`);
-          }
-          // Regular location without photo variants
-          const locType = loc.isRealLandmark ? 'real landmark' : 'location';
-          recurringElements += `* **${loc.name}** [${loc.id}] (${locType}): ${description}\n`;
-        }
+        recurringElements += buildVbLocationLines(loc);
       }
     }
     // Add ALL vehicles
@@ -3732,7 +3688,11 @@ function buildBeatsPrompt(inputData, pageCount) {
     log.error('[PROMPT] storyBeats template not loaded — beats planning unavailable');
     return null;
   }
-  return fillTemplate(template, { ...buildStoryContextFields(inputData), PAGE_COUNT: pageCount });
+  return fillTemplate(template, {
+    ...buildStoryContextFields(inputData),
+    PAGE_COUNT: pageCount,
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
+  });
 }
 
 /** Fast structural review of a beat plan. Returns analysis + rewritten pages. */
@@ -4442,7 +4402,7 @@ The main character has two avatar styles available:
         let entry = `- ${l.name}`;
         const variants = l.photoVariants || [];
         if (variants.length >= 2) {
-          const angles = variants.map(v => `    ${v.n}: ${v.description}`).join('\n');
+          const angles = variants.map(v => `    ${v.variantNumber}: ${v.description}`).join('\n');
           entry += `\n  PHOTO ANGLES (pick the variant whose description matches your scene framing):\n${angles}`;
         }
         return entry;
@@ -4492,6 +4452,30 @@ Output: Title, then each page with story text and a scene hint for illustration.
  * @param {Array} landmarks - Pre-discovered landmarks from userLandmarkCache
  * @returns {string} - Prompt section with available landmarks, or empty string if none
  */
+/**
+ * One VB location as prompt lines — SINGLE source for both Art Director
+ * builders (all-pages + per-page). Real landmarks with any photo list their
+ * dotted variant ids (vantage-labelled) so the AD can cite them in objects[];
+ * without a listed id the photo never attaches.
+ */
+function buildVbLocationLines(loc) {
+  const description = loc.extractedDescription || loc.description;
+  const vantageTag = (v) => v.vantage ? `(${v.vantage}) ` : (v.variantNumber >= 4 ? '(interior) ' : '(exterior) ');
+  if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
+    const variantStrs = loc.photoVariants.map(v =>
+      `[${loc.id}.${v.variantNumber}] ${vantageTag(v)}${v.description || `Photo ${v.variantNumber}`}`);
+    return `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`
+      + `  Photo variants: ${variantStrs.join(', ')}\n`;
+  }
+  if (loc.isRealLandmark && (loc.photoVariants?.length === 1 || loc.referencePhotoUrl || loc.referencePhotoData)) {
+    const v1 = loc.photoVariants?.[0];
+    return `* **${loc.name}** [${loc.id}] (real landmark): ${description}\n`
+      + `  Photo variants: [${loc.id}.1] ${v1 ? vantageTag(v1) : '(exterior) '}${v1?.description || 'reference photo'}\n`;
+  }
+  const locType = loc.isRealLandmark ? 'real landmark' : 'location';
+  return `* **${loc.name}** [${loc.id}] (${locType}): ${description}\n`;
+}
+
 function buildAvailableLandmarksSection(landmarks) {
   if (!landmarks || landmarks.length === 0) {
     return '';

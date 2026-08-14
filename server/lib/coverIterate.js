@@ -1129,20 +1129,23 @@ async function buildCoverReferences({
       if (typeof id !== 'string' || !/^LOC\d+/i.test(id)) continue;
       const loc = visualBible.locations.find(l => l.id && l.id.toUpperCase() === id.toUpperCase());
       if (!loc) continue;
-      const hasPhoto = !!(loc.referenceImageUrl || loc.referenceImageData);
+      // Locations carry photos under two field families (referencePhoto* is
+      // the landmark path's, referenceImage* the older curated one) — accept both.
+      const photoUrl = loc.referencePhotoUrl || loc.referenceImageUrl || null;
+      const photoData = loc.referencePhotoData || loc.referenceImageData || null;
       if (loc.isRealLandmark) {
         matchedLocs.push(`${loc.name} [${loc.id}]`);
-      } else if (hasPhoto) {
+      } else if (photoUrl || photoData) {
         // Curated photo location — usable as a cover backdrop even though it's
         // not a real Wikidata-sourced landmark. Don't go through
         // getLandmarkPhotosForScene (which gates on isRealLandmark); load
         // directly and append to landmarkPhotos.
         photoOnlyLocs.push({
           name: loc.name,
-          photoUrl: loc.referenceImageUrl || null,
-          photoData: loc.referenceImageData || null,
+          photoUrl,
+          photoData,
           source: 'curated-non-landmark',
-          attribution: loc.attribution || null,
+          attribution: loc.attribution || loc.photoAttribution || null,
         });
         log.info(`🔗 [COVER-REFS] ${label}: using curated photo from ${loc.id} (${loc.name}) — not a real landmark but has a usable photo`);
       } else {
