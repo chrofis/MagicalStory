@@ -5132,7 +5132,9 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
   const sc = require('./storyScorecard');
 
-  const judge = String(model || MODEL_DEFAULTS.outlineReviewModel).trim();
+  // Default judge is at-least-Sonnet-level (scorecardJudge), not the pipeline's
+  // cheap reviewer — a weak judge scores too loosely to compare generators.
+  const judge = String(model || MODEL_DEFAULTS.scorecardJudge || MODEL_DEFAULTS.outlineReviewModel).trim();
   if (!TEXT_MODELS[judge]) throw new Error(`Unknown judge model "${judge}"`);
   // Pick the evaluator version's prompt (v1.0 default; v1.1 = harsher). An
   // explicit promptOverride still wins (Test Lab A/B of the rubric itself).

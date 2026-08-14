@@ -118,7 +118,7 @@ export default function ScorecardsPanel() {
           <div className="text-sm font-semibold text-indigo-900 border-b border-indigo-200 pb-1 mb-1">{PART_LABEL[sec.part]}</div>
           <div className="overflow-x-auto">
             <table className="text-xs w-full">
-              <thead><tr className="text-left text-gray-500"><th className="py-1 pr-3">story</th><th className="pr-3">model</th><th className="pr-3">rounds (score per pass · final ✱)</th><th className="pr-3">Σ cost · time</th><th className="pr-3">eval</th><th></th></tr></thead>
+              <thead><tr className="text-left text-gray-500"><th className="py-1 pr-3">story</th><th className="pr-3">model</th><th className="pr-3">rounds (score per pass · final ✱)</th><th className="pr-3">Σ cost · time</th><th className="pr-3">judge</th><th className="pr-3">eval</th><th></th></tr></thead>
               <tbody>
                 {sec.lines.map((ln, i) => (
                   <tr key={i} className="border-t border-gray-100 align-top">
@@ -133,6 +133,7 @@ export default function ScorecardsPanel() {
                       ))}
                     </td>
                     <td className="pr-3 font-mono opacity-70">${fmt(ln.rounds.reduce((s, r) => s + (Number(r.gen_cost_usd) || 0) + (Number(r.judge_cost_usd) || 0), 0))} · {secs(ln.rounds.reduce((s, r) => s + (Number(r.gen_ms) || 0) + (Number(r.judge_ms) || 0), 0))}</td>
+                    <td className="pr-3 font-mono opacity-70">{[...new Set(ln.rounds.map(r => r.judge_model).filter(Boolean))].join(', ') || '—'}</td>
                     <td className="pr-3"><button className="text-indigo-600 hover:underline font-mono" onClick={() => openPrompt(ln.version)}>v{ln.version}</button></td>
                     <td><button className="text-indigo-600 hover:underline" onClick={() => { setRerun({ storyId: ln.storyId, part: sec.part }); setRerunMsg(null); }}>rerun ▾</button></td>
                   </tr>

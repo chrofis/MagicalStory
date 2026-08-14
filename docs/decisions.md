@@ -10404,3 +10404,18 @@ print.js's four owner-scoped sites are deliberately untouched: checkout/book
 orders should stay owner-only.
 
 **Touched:** `server/routes/regeneration.js`.
+
+## 2026-08-14 — Scores: judge column + default judge = Sonnet-level (not cheap)
+
+**Context:** Owner: surface the judge model on the scores page (it was hidden in the drill-down), and
+stop defaulting the scorecard judge to a cheap model (Luna/flash score too loosely to compare
+generators fairly) — use at least Sonnet level.
+
+**Decision:** New `MODEL_DEFAULTS.scorecardJudge` (default `claude-sonnet` = Sonnet 4.6, env
+SCORECARD_JUDGE), used by `scoreArtifactsWithJudge` instead of the pipeline's `outlineReviewModel`
+(deepseek). The scores table gains a `judge` column showing the judge model(s) per row. Cheap models
+(Luna, flash, grok-4-fast) stay selectable as GENERATING/reviewer models, just not the default judge.
+
+**Touched:** server/config/models.js, server/lib/testlab.js,
+client/src/components/testlab/ScorecardsPanel.tsx.
+**Status:** ✅ active (committed, NOT pushed per owner).

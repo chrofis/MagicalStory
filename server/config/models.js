@@ -194,6 +194,9 @@ const MODEL_DEFAULTS = {
   // is already non-fatal, so a bad route degrades to the unpatched draft rather
   // than blocking a story.
   outlineReviewModel: process.env.OUTLINE_REVIEW_MODEL || 'deepseek-v4-pro',
+  // Judge for the model-comparison scorecard. At-least-Sonnet-level on purpose —
+  // a cheap judge (Luna, flash) scores too loosely to compare generators fairly.
+  scorecardJudge: process.env.SCORECARD_JUDGE || 'claude-sonnet',
   splitOutlineReview: process.env.SPLIT_OUTLINE_REVIEW
     ? process.env.SPLIT_OUTLINE_REVIEW !== 'false'
     : true,
