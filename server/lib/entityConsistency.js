@@ -1897,12 +1897,35 @@ async function extractEntityCrops(appearances, options = {}) {
         }
       );
 
+      // HEAD crop for the consistency judge (owner, 2026-08-14): the face box
+      // with a hair margin above and the cut just below the face-box bottom,
+      // SAM-masked like the body crop. A geometric top-of-body slice caught
+      // walls and torsos; the detection already stores faceBox per figure.
+      let headBuffer = null;
+      if (!isObject && Array.isArray(app.faceBox) && app.faceBox.length === 4) {
+        try {
+          const [fy1, fx1, fy2, fx2] = app.faceBox;
+          const fh = fy2 - fy1, fw = fx2 - fx1;
+          if (fh > 0.005 && fw > 0.005) {
+            const headBox = [
+              Math.max(0, fy1 - fh * 0.35),   // hair above the face box
+              Math.max(0, fx1 - fw * 0.25),
+              Math.min(1, fy2 + fh * 0.10),   // cut just below the face box
+              Math.min(1, fx2 + fw * 0.25),
+            ];
+            const headResult = await extractCropFromImage(app.imageData, headBox, null, 0, { mask: app.mask || null });
+            if (headResult?.buffer) headBuffer = headResult.buffer;
+          }
+        } catch (err) { log.debug(`[ENTITY-CROP] head crop failed p${app.pageNumber}: ${err.message}`); }
+      }
+
       if (cropResult && cropResult.buffer) {
         // Get original crop dimensions for proper resizing after repair
         const cropMeta = await sharp(cropResult.buffer).metadata();
 
         const cropData = {
           buffer: cropResult.buffer,
+          headBuffer,
           pageNumber: app.pageNumber,
           versionIndex: app.versionIndex ?? null,
           cropType,
@@ -2158,16 +2181,19 @@ async function createEntityHeadGrid(crops, entityName) {
   for (let i = 0; i < cropsToUse.length; i++) {
     const crop = cropsToUse[i];
     try {
-      const meta = await sharp(crop.buffer).metadata();
-      if (!meta.width || !meta.height || meta.height < 96) continue;
-      // Top ~32% of the body crop, middle 70% width — the head band. The crop
-      // was cut with 10% upward padding, so the head starts at the top edge.
-      const headH = Math.max(64, Math.round(meta.height * 0.32));
-      const headW = Math.max(64, Math.round(meta.width * 0.7));
-      const left = Math.round((meta.width - headW) / 2);
-      const buffer = await sharp(crop.buffer)
-        .extract({ left, top: 0, width: headW, height: Math.min(headH, meta.height) })
-        .toBuffer();
+      let buffer = crop.headBuffer || null;
+      if (!buffer) {
+        // Fallback for appearances without a faceBox (reloaded detections):
+        // top band of the body crop. Coarse, but keeps the cell present.
+        const meta = await sharp(crop.buffer).metadata();
+        if (!meta.width || !meta.height || meta.height < 96) continue;
+        const headH = Math.max(64, Math.round(meta.height * 0.32));
+        const headW = Math.max(64, Math.round(meta.width * 0.7));
+        const left = Math.round((meta.width - headW) / 2);
+        buffer = await sharp(crop.buffer)
+          .extract({ left, top: 0, width: headW, height: Math.min(headH, meta.height) })
+          .toBuffer();
+      }
       cells.push({
         buffer,
         letter: String.fromCharCode(65 + i),
@@ -2977,6 +3003,7 @@ module.exports = {
   extractEntityCrops,
   extractCropFromImage,
   createEntityGrid,
+  createEntityHeadGrid,
   evaluateEntityConsistency,
   getStyledAvatarForClothing,
   saveEntityGrid,

@@ -542,3 +542,19 @@ removal, not addition. Adding text to a prompt this size measurably buys nothing
 the next person's rule less likely to be read. Before editing any eval prompt, check its size
 in `docs/prompt-inventory.md` (Evaluation section carries char/line counts) and prefer
 deleting or merging over appending.
+
+## 2026-08-13: "Get ready" is not "run it"
+Prepared a full-story rerun (dry-run, deploy check, payload) and then LAUNCHED it
+without a final explicit go. "Get ready", "prepare", "set up" end at the ready-to-fire
+state: show the exact command + cost, then wait. A paid run launches only on an
+explicit "run/go/launch" for THAT run — answering setup questions (env, style) is
+configuration, not authorization.
+
+## 2026-08-14 — A new evaluator input must be traced to EVERY caller's data shape
+Added CLOTHING_CONTRACT reading `clothingDescription` off the refs array and validated it on the
+generation-time eval path — but the repair-round batch eval passes a DIFFERENT refs array
+(`allCharacterPhotos`, `{name, photoUrl}` only, predating the feature), so the contract was silently
+empty on every batch eval; a correct costumed cover was HARD_FAILed and repair-stripped. The warning
+I added even fired in logs, unnoticed. Rule: when adding an input that a shared function derives
+from its arguments, grep every call site and verify each caller's argument SHAPE actually carries
+the field — and make empty-input warnings fire for every evaluation type, not just the one I tested.
