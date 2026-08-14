@@ -2168,10 +2168,27 @@ async function evaluateImageBatch(images, options = {}) {
       // path and the Test Lab quality_eval stage use. ORIGINAL_PROMPT here is the
       // scene DESCRIPTION (no ART STYLE block), so without this every
       // style-dependent evaluator rule skipped silently in production too.
+      //
+      // allCharacterPhotos (batch-global identity list, {name, photoUrl} only)
+      // wins the refs slot, and the eval's clothing-contract builder reads
+      // clothingDescription off THESE refs — so the contract was empty for
+      // every batch eval. Pages hid it (scene prose weaves the outfits into
+      // ORIGINAL_PROMPT); a cover's description has no clothing text, so the
+      // judge ruled the requested costume "unrequested" and the repair
+      // stripped it (verified: identical cover + prompt scores 0 without
+      // clothingDescription on refs, 100 with). Merge the per-page outfit in.
+      const richClothingByName = new Map((img.characterPhotos || [])
+        .filter(p => p?.name && p?.clothingDescription)
+        .map(p => [String(p.name).toLowerCase(), p.clothingDescription]));
+      const refsForEval = (img.allCharacterPhotos || img.characterPhotos || []).map(p =>
+        p?.clothingDescription ? p : {
+          ...p,
+          clothingDescription: richClothingByName.get(String(p?.name || '').toLowerCase()) || null,
+        });
       const qualityResult = await evaluateImageQuality(
         img.imageData,
         sceneDescWithClothing,
-        img.allCharacterPhotos || img.characterPhotos || [],
+        refsForEval,
         img.evaluationType || 'scene',
         qualityModelOverride,
         pageLabel,

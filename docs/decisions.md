@@ -10180,3 +10180,26 @@ Validated exp #594: the AD's rewritten brief cites `[LOC001.1]` for the Thurbrü
 the stored brief cited a different location and junk ids.
 
 **Touched:** `server/lib/promptBuilders.js` (2 sites), `server/lib/landmarkPhotos.js`.
+
+## 2026-08-14 — Batch eval lost the clothing contract (cover costume stripped by repair)
+
+**Context:** Cover v0 of job_1786653013328 rendered the REQUESTED mermaid
+costumes; the three-stage eval ruled them "unrequested" (HARD_FAIL 25) and the
+repair repainted the children into summer clothes. Mechanism, fully reproduced:
+evaluateImageBatch passes `img.allCharacterPhotos` (batch-global identity list,
+{name, photoUrl} ONLY, built in repairPipeline.js) in preference to the rich
+per-page `characterPhotos`, and the eval's clothing-contract builder reads
+`clothingDescription` off those refs — so the contract was EMPTY for every
+image in every repair-round batch eval. Pages hid it because scene prose weaves
+outfits into ORIGINAL_PROMPT; a cover's description has no clothing text. The
+empty-contract warning was gated to evaluationType 'scene', so covers failed
+silently. Verified: identical cover + prompt scores 0 with stripped refs, 100
+with clothingDescription present.
+
+**Decision:** evaluateImageBatch merges each character's per-page
+`clothingDescription` (from `img.characterPhotos`) into the refs array it hands
+the evaluator — one chokepoint, fixes every batch caller; the empty-contract
+warning fires for 'cover' too.
+
+**Touched:** `server/lib/images.js` (evaluateImageBatch),
+`server/lib/evalPipeline.js` (warning gate).

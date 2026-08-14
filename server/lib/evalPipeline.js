@@ -874,8 +874,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
       clothingContractBlock = lines.join('\n');
-      if (!clothingContractBlock && evaluationType === 'scene') {
+      if (!clothingContractBlock && (evaluationType === 'scene' || evaluationType === 'cover')) {
         // Loud, because an empty contract is what let the judge invent one.
+        // Covers included: the 'scene'-only gate hid exactly the cover case
+        // where an empty contract let the judge strip a requested costume.
         log.warn(`👕 [EVAL] ${pageContext || 'page'}: no clothing contract available — clothing findings suppressed (N-16)`);
       }
     } catch (err) { log.debug(`[EVAL] clothing contract block skipped: ${err.message}`); }
