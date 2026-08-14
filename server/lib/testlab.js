@@ -5284,7 +5284,7 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
     try {
       rawScorecard = (await scoreArtifactsWithJudge({ beats: beatsToText(beats0) }, {
         model: params.judgeModel, evalVersion: params.evalVersion,
-        persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model: 'raw', label: 'raw (as generated)', round: 1 },
+        persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model: storyData.outlineModelId || 'writer', label: 'raw (as generated)', round: 1 },
       })).scorecard;
     } catch (e) { require('../utils/logger').log.warn(`[beats replay] round-1 raw score failed: ${e.message}`); }
   }

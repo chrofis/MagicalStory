@@ -83,6 +83,14 @@ const TEXT_MODELS = {
     maxOutputTokens: 65536,
     description: 'Grok 4 Fast - Very cheap, 2M context ($0.20/$0.50 per 1M tokens)'
   },
+  // Latest Grok (2026-08-12) via OpenRouter. No separate 4.x "flash" exists —
+  // grok-4-fast above is the cheap tier. Pricing from the OpenRouter catalogue.
+  'grok-4.6': {
+    provider: 'openrouter',
+    modelId: 'x-ai/grok-4.6',
+    maxOutputTokens: 32768,
+    description: 'Grok 4.6 (xAI, latest) via OpenRouter (~$2.00/$6.00 per 1M)'
+  },
   // OpenRouter-hosted models (OpenAI-compatible) for A/B testing cheap
   // alternatives on eval/consolidation. Needs OPENROUTER_API_KEY. Use via
   // model override (dev panel / MODEL_DEFAULTS), never the default for German
@@ -132,6 +140,12 @@ const TEXT_MODELS = {
     maxOutputTokens: 8192,
     description: 'GPT-4o mini (vision) via OpenRouter - cheap image-eval A/B (~$0.15/$0.60 per 1M)'
   },
+  // GPT-5.6 family (2026-07-09) via OpenRouter. Luna = cheap tier, Sol = strong
+  // tier. Pricing from the OpenRouter catalogue. For scoring/writer A/B in the Lab.
+  'gpt-5.6-luna': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna', maxOutputTokens: 16384, description: 'GPT-5.6 Luna (OpenAI) via OpenRouter - cheap tier (~$0.10/$0.60 per 1M)' },
+  'gpt-5.6-luna-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna-pro', maxOutputTokens: 16384, description: 'GPT-5.6 Luna Pro (OpenAI) via OpenRouter (~$0.10/$0.60 per 1M)' },
+  'gpt-5.6-sol': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol', maxOutputTokens: 16384, description: 'GPT-5.6 Sol (OpenAI) via OpenRouter - strong tier (~$5.00/$30.00 per 1M)' },
+  'gpt-5.6-sol-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol-pro', maxOutputTokens: 16384, description: 'GPT-5.6 Sol Pro (OpenAI) via OpenRouter (~$5.00/$30.00 per 1M)' },
   'deepseek-v3': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-chat',
