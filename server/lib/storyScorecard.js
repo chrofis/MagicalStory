@@ -26,7 +26,7 @@ const RUBRIC = {
 // version → PROMPT_TEMPLATES key. Add a row + a prompts/*.txt file to ship a new
 // evaluator; RUBRIC (the dimensions) stays fixed so versions stay comparable.
 const EVALUATOR_PROMPT_KEYS = { '1.0': 'storyScorecardJudge', '1.1': 'storyScorecardJudgeV1_1' };
-const DEFAULT_EVALUATOR_VERSION = '1.0';
+const DEFAULT_EVALUATOR_VERSION = '1.1'; // harsher calibration is the default; 1.0 still selectable
 const EVALUATOR_VERSION = DEFAULT_EVALUATOR_VERSION; // back-compat export
 
 function resolveEvaluator(version) {
