@@ -10231,3 +10231,39 @@ server/lib/{storyScorecard,scoreStore,testlab}.js, server/routes/admin/testlab.j
 server/services/prompts.js, client/src/services/testlabService.ts,
 client/src/components/testlab/ScorecardsPanel.tsx.
 **Status:** ✅ active (Phase: rounds+versioning+drill-downs+per-part UI).
+
+### Addendum 2026-08-14 — re-verified against the deployed phrasings, and what each phrasing type is worth
+
+The mermaid results above were measured with an earlier phrasing list (`skirt`'s anatomical
+form was "the garment covering the legs"); the list was then rewritten before the push. Both
+cases were re-run against the LIVE code with no `opts` at all (Lab 595, 596), so this is the
+default path with the deployed phrasings:
+
+| case | mask | hue | box | vs. the earlier run |
+|---|---|---|---|---|
+| p4 `top` | 4,144 px | 89.5° | 3% | identical |
+| p4 `skirt` | 31,394 px | 91.3° | 32% | 31,437 px — 43 px apart |
+
+Also confirmed separately (Lab 589): p3 `dress` through the default path with no `opts` gives
+72,170 px at hue −43.9°, byte-identical to the explicit-mode run.
+
+**What each of the three phrasing types is actually worth**, measured:
+
+```
+top    "shirt"                          81% @ 0.23
+       "the shirt worn by the person"   82% @ 0.47
+       "the top worn on the chest"       3% @ 0.42   <- picked
+skirt  "skirt"                          32% @ 0.47
+       "the skirt worn by the person"   82% @ 0.51
+       "the fabric below the waist"     32% @ 0.58   <- picked
+```
+
+- The PLAIN form — which used to be the only form — is the WORST on costumes: 82% on both,
+  i.e. the whole figure. That single phrasing is what shipped the red mermaid and the blue map.
+- The ANATOMICAL form is the only consistently good one (3%, 32%) and won on score for `skirt`.
+- The BARE NOUN is erratic: "skirt" found the right region, "shirt" gave 81% at 0.23. Kept
+  because it fails differently from the other two, not because it is reliable.
+
+This also settles the costume question empirically: "the fabric below the waist" located a
+MERMAID TAIL. The phrase never mentions a skirt, so the enum labelling a tail as `skirt` costs
+nothing — an anatomical phrasing is garment-agnostic. No `tail`/`wings` enum value is needed.
