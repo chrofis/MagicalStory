@@ -5239,7 +5239,41 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
   const passCount = Math.min(Math.max(parseInt(params.passes, 10) || 1, 1), 3);
   const scoreOutput = params.scoreOutput === true || params.scoreOutput === 'true';
 
-  const beatsToText = (bs) => bs.map(b => `--- Page ${b.pageNumber} ---\nBEAT: ${b.beat}\nSCENE: ${b.scene}`).join('\n\n');
+  // "## Page N" so a stored round's artifact_text round-trips back through parseBeats
+  // (needed to branch a new round off a selected round — params.fromText below).
+  const beatsToText = (bs) => bs.map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`).join('\n\n');
+
+  // BRANCH MODE — continue a SPECIFIC round: review the selected round's stored
+  // beats text (params.fromText) once with the chosen model, scoring it as the
+  // next round. This is how "take DeepSeek round 2, rerun with Grok → round 3"
+  // works from the page.
+  if (params.fromText) {
+    const model = models[0];
+    const fromRound = parseInt(params.fromRound, 10) || 1;
+    const inBeats = parseBeats(String(params.fromText)).pages;
+    if (!inBeats.length) throw new Error('fromText has no parseable beats');
+    const orig = PROMPT_TEMPLATES.storyBeatsReview;
+    if (promptOverride) PROMPT_TEMPLATES.storyBeatsReview = promptOverride;
+    const t = Date.now();
+    let res;
+    try { res = await callTextModelStreaming(buildBeatsReviewPrompt(storyData, inBeats), null, null, model, { usageLabel: 'testlab_beats_branch', temperature: 0 }); }
+    finally { PROMPT_TEMPLATES.storyBeatsReview = orig; }
+    const out = res.text || '';
+    const marker = out.match(/---\s*BEATS\s*---/i);
+    const rewritten = marker ? parseBeats(out.slice(marker.index)).pages : [];
+    const byPage = new Map(rewritten.map(r => [r.pageNumber, r]));
+    const nextBeats = inBeats.map(b => byPage.get(b.pageNumber) || b);
+    const genCost = res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {});
+    const genMs = Date.now() - t;
+    let scorecard = null;
+    if (scoreOutput) {
+      scorecard = (await scoreArtifactsWithJudge({ beats: beatsToText(nextBeats) }, {
+        model: params.judgeModel, evalVersion: params.evalVersion,
+        persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `from r${fromRound} · ${model}`, round: fromRound + 1, genCost, genMs },
+      })).scorecard;
+    }
+    return { storyId: target.storyId, branch: { fromRound, toRound: fromRound + 1, model, rewrittenPages: [...byPage.keys()], score: scorecard?.artifacts?.beats?.score ?? null } };
+  }
   const orig = PROMPT_TEMPLATES.storyBeatsReview;
   if (promptOverride) PROMPT_TEMPLATES.storyBeatsReview = promptOverride;
   const arms = [];

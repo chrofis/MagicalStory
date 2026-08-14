@@ -28,6 +28,7 @@ export default function ScorecardsPanel() {
   const [rerunModel, setRerunModel] = useState('');
   const [rerunMsg, setRerunMsg] = useState<string | null>(null);
   const [running, setRunning] = useState<string | null>(null); // spinner label while a round runs
+  const [modalModel, setModalModel] = useState(''); // branch-from-round model picker
 
   const load = async () => {
     setLoading(true);
@@ -61,6 +62,22 @@ export default function ScorecardsPanel() {
   const openPrompt = async (version: string) => {
     try { const r = await testlabService.getEvalVersionPrompt(version); setModal({ kind: 'prompt', version, prompt: r.prompt }); }
     catch (e) { setModal({ kind: 'prompt', version, prompt: `error: ${e instanceof Error ? e.message : e}` }); }
+  };
+
+  // Branch a NEW round off a selected round: review that round's stored text with
+  // a chosen model → next round. Beats only (the part with review rounds + text).
+  const doBranch = async (row: ScoreRow) => {
+    if (!modalModel || !row.artifact_text) return;
+    setRunning(`branch r${row.round}→r${row.round + 1} · ${modalModel}`);
+    setModal(null);
+    try {
+      await testlabService.createExperiment({
+        stage: 'beats_review_replay',
+        params: { fromText: row.artifact_text, fromRound: row.round, reviewModel: modalModel, model: modalModel, scoreOutput: true, evalVersion: row.eval_version },
+        targets: [{ storyId: row.story_id }],
+      });
+      setTimeout(load, 5000); setTimeout(() => setRunning(null), 100000);
+    } catch (e) { setRunning(null); setErr(e instanceof Error ? e.message : String(e)); }
   };
 
   const doRerun = async () => {
@@ -155,6 +172,16 @@ export default function ScorecardsPanel() {
               <div className="bg-gray-50 p-2 rounded mb-2">{modal.row.notes || '(no note stored)'}</div>
               <div className="font-semibold">Evaluated text</div>
               <pre className="whitespace-pre-wrap bg-gray-50 p-2 rounded max-h-64 overflow-auto">{modal.row.artifact_text || '(not captured for this row)'}</pre>
+              {modal.row.artifact === 'beats' && modal.row.artifact_text && (
+                <div className="mt-3 flex items-center gap-2 border-t pt-2">
+                  <span className="font-semibold">Continue this round (→ round {modal.row.round + 1}) with model:</span>
+                  <select className="border rounded px-1 py-0.5" value={modalModel} onChange={e => setModalModel(e.target.value)}>
+                    <option value="">— pick model —</option>
+                    {models.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
+                  </select>
+                  <button className="px-2 py-0.5 bg-indigo-600 text-white rounded disabled:opacity-40" disabled={!modalModel} onClick={() => doBranch(modal.row)}>run →</button>
+                </div>
+              )}
             </>)}
             <div className="mt-3 text-right"><button className="px-3 py-1 bg-gray-200 rounded" onClick={() => setModal(null)}>close</button></div>
           </div>
