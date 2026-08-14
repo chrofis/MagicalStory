@@ -801,7 +801,60 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   //   and two people invisible to identity and to every repair keyed on it.
   const facePairing = opts.facePairing || process.env.FACE_PAIRING || 'greedy';
   diag.facePairing = facePairing;
-  if (facePairing === 'global') {
+  if (facePairing === 'mask') {
+    // MASK-FIRST ASSOCIATION (owner, 2026-08-14). The order was: boxes → guess
+    // which face belongs to which box → badge → segment. But SAM has ALREADY
+    // run by this point (Stage 2), and a MASK is one person where a BOX may be
+    // two. Measured on job_1786737619634_d66c7bg9g p10: three of the five
+    // person boxes each swallow a neighbour, yet all five SAM cutouts are clean
+    // single people. So the separation problem is already solved — it was just
+    // being ignored by the step that needed it most.
+    //
+    // A face belongs to the figure whose SILHOUETTE it sits in. Sample a 3x3
+    // grid inside the face box rather than the centre alone: the centre can
+    // land on a gap in the mask (an eye, a hair parting), and the grid also
+    // breaks ties by how much of the face the mask actually covers.
+    const hitsIn = (det, f) => {
+      if (!det.mask || !det.mask.alpha) return 0;
+      const { alpha, width: mw, height: mh } = det.mask;
+      let hits = 0;
+      for (let gy = 1; gy <= 3; gy++) {
+        for (let gx = 1; gx <= 3; gx++) {
+          const x = Math.round(f.box[0] + (f.box[2] - f.box[0]) * gx / 4);
+          const y = Math.round(f.box[1] + (f.box[3] - f.box[1]) * gy / 4);
+          if (x < 0 || y < 0 || x >= mw || y >= mh) continue;
+          if (alpha[y * mw + x]) hits++;
+        }
+      }
+      return hits;
+    };
+    const claimed = new Set();
+    const unplaced = [];
+    for (const f of faces) {
+      const scored = dets
+        .map(d => ({ d, hits: hitsIn(d, f) }))
+        .filter(x => x.hits > 0 && !claimed.has(x.d))
+        .sort((a, b) => b.hits - a.hits);
+      if (scored.length && !scored[0].d.face) {
+        scored[0].d.face = f;
+        claimed.add(scored[0].d);
+      } else {
+        unplaced.push(f);
+      }
+    }
+    // A face inside no mask at all — a silhouette clipped at the chin, or a
+    // figure SAM never masked. Fall back to box containment for those only, so
+    // one odd figure cannot cost the whole page its associations.
+    for (const f of unplaced) {
+      const cx = (f.box[0] + f.box[2]) / 2, cy = (f.box[1] + f.box[3]) / 2;
+      const holder = dets
+        .filter(d => !d.face && cx >= d.box[0] && cx <= d.box[2] && cy >= d.box[1] && cy <= d.box[3])
+        .sort((a, b) => (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]) - (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]))[0];
+      if (holder) { holder.face = f; log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}face at x${Math.round(cx)} sits in no SAM mask — fell back to box containment`); }
+      else log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}face at x${Math.round(cx)} matched no mask and no box — left unassigned`);
+    }
+    diag.maskPairing = { faces: faces.length, placedByMask: claimed.size, fellBackToBox: unplaced.length };
+  } else if (facePairing === 'global') {
     // A head sits at the TOP-CENTRE of its body, so cost = horizontal offset
     // from the box centre (weighted heaviest) + how far below the box top the
     // face starts. Global ordering means one marginal pair can no longer poison
