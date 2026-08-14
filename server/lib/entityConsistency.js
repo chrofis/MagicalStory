@@ -912,13 +912,15 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
               : gridLabel;
 
             const gridResult = await createEntityGrid(batchCrops, batchLabel, refAvatar);
+            const headGrid = gridsOnly ? null : await createEntityHeadGrid(batchCrops, batchLabel);
             const evalResult = gridsOnly
               ? { consistent: true, score: null, issues: [], summary: 'grids-only (no eval)' }
               : await evaluateEntityConsistency(
                   gridResult.buffer, gridResult.manifest,
                   { entityType: 'character', entityName: charName, clothingCategory,
                     expectedClothing,
-                    referencePhoto: refAvatar, cellCount: batchCrops.length }
+                    referencePhoto: refAvatar, cellCount: batchCrops.length },
+                  headGrid?.buffer || null
                 );
 
             gridResults.push({ gridResult, evalResult, batchCrops });
@@ -2136,6 +2138,55 @@ async function createEntityGrid(crops, entityName, referencePhoto = null) {
 }
 
 /**
+ * Head grid — the same cells as the body grid, cropped to the head region, so
+ * the judge sees each face at cell size instead of ~40px inside a body crop.
+ *
+ * Body-only grids made hair and face comparison a thumbnail guess: a
+ * different-haired child sat next to the blonde reference and the judge
+ * reported nothing (P4, job_1786653013328). Face DETECTION was deliberately
+ * dropped as unreliable (extractEntityCrops: cropType 'body' always), so this
+ * does not bring it back — the head is cut geometrically from the top of the
+ * body crop, which the asymmetric top padding already keeps in frame.
+ *
+ * Same letters as the body grid. Returns null when no cell yields a head crop
+ * (objects, or crops too small to slice).
+ */
+async function createEntityHeadGrid(crops, entityName) {
+  const sortedCrops = [...crops].sort((a, b) => a.pageNumber - b.pageNumber);
+  const cropsToUse = sortedCrops.slice(0, MAX_GRID_CELLS - 1);
+  const cells = [];
+  for (let i = 0; i < cropsToUse.length; i++) {
+    const crop = cropsToUse[i];
+    try {
+      const meta = await sharp(crop.buffer).metadata();
+      if (!meta.width || !meta.height || meta.height < 96) continue;
+      // Top ~32% of the body crop, middle 70% width — the head band. The crop
+      // was cut with 10% upward padding, so the head starts at the top edge.
+      const headH = Math.max(64, Math.round(meta.height * 0.32));
+      const headW = Math.max(64, Math.round(meta.width * 0.7));
+      const left = Math.round((meta.width - headW) / 2);
+      const buffer = await sharp(crop.buffer)
+        .extract({ left, top: 0, width: headW, height: Math.min(headH, meta.height) })
+        .toBuffer();
+      cells.push({
+        buffer,
+        letter: String.fromCharCode(65 + i),
+        pageInfo: `P${crop.pageNumber}`,
+        metadata: { pageNumber: crop.pageNumber, cropType: 'head' },
+      });
+    } catch { /* cell skipped — body grid still carries it */ }
+  }
+  if (cells.length === 0) return null;
+  return createLabeledGrid(cells, {
+    title: `${entityName} - Heads`,
+    cellSize: FACE_CROP_SIZE,
+    showPageInfo: true,
+    maxCols: 3,
+    maxRows: 3
+  });
+}
+
+/**
  * Evaluate entity consistency using Gemini
  *
  * @param {Buffer} gridBuffer - Grid image buffer
@@ -2143,7 +2194,7 @@ async function createEntityGrid(crops, entityName, referencePhoto = null) {
  * @param {Object} entityInfo - Entity information
  * @returns {Promise<Object>} Evaluation result
  */
-async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
+async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headGridBuffer = null) {
   const { entityType, entityName, referencePhoto, cellCount, clothingCategory, expectedClothing } = entityInfo;
 
   // Build prompt from template
@@ -2226,6 +2277,9 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
     ENTITY_TYPE: entityType,
     ENTITY_NAME: entityName,
     REFERENCE_PHOTO_INFO: refPhotoInfo,
+    HEAD_GRID_INFO: headGridBuffer
+      ? 'A second image shows the same cells cropped to the head only, with the same letters. Judge facial features, hair colour and hair style on the second image; it shows each face at full size.'
+      : '',
     CLOTHING_CONTEXT: clothingContextInfo,
     CELL_INFO: JSON.stringify(cellInfo, null, 2),
     CELL_COUNT: cellCount.toString(),
@@ -2252,7 +2306,8 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
     try {
       const result = await model.generateContent([
         prompt,
-        { inlineData: { mimeType: 'image/jpeg', data: gridBuffer.toString('base64') } }
+        { inlineData: { mimeType: 'image/jpeg', data: gridBuffer.toString('base64') } },
+        ...(headGridBuffer ? [{ inlineData: { mimeType: 'image/jpeg', data: headGridBuffer.toString('base64') } }] : []),
       ]);
       const response = result.response;
       const text = response.text();
