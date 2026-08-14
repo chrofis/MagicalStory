@@ -3090,8 +3090,136 @@ async function getLandmarkIndexStats() {
   }
 }
 
+// ============================================================================
+// AVAILABLE-LANDMARK RESOLUTION (single entry point for ideas + pipeline)
+// ============================================================================
+
+/**
+ * ONE in-memory cache for discovered (non-indexed) landmarks, shared by every
+ * caller. Replaces three per-file Maps — storyIdeas.js kept a private one, so
+ * landmarks it discovered were invisible to the story pipeline.
+ */
+const availableLandmarkCache = new Map();
+const AVAILABLE_LANDMARK_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
+
+function availableLandmarkCacheKey(location) {
+  return `${location.city}_${location.country || ''}`.toLowerCase().replace(/\s+/g, '_');
+}
+
+/**
+ * Resolve the availableLandmarks list for a location — SINGLE source for the
+ * ideas route (both variants) and the story pipeline. Order: landmark_index
+ * (with proximity fallback via getIndexedLandmarks) → shared in-memory cache
+ * → optional live discovery (15s timeout, result cached).
+ *
+ * @param {Object} location - { city, country?, latitude?, longitude? }
+ * @param {Object} opts
+ *   limit           max indexed landmarks (default 30)
+ *   discoverOnMiss  run live discovery when index+cache are empty (default false —
+ *                   job start must never block on a 15s discovery)
+ *   language        story language: swaps names to the matching Wikidata variant
+ *   shuffle         Fisher-Yates the result (pipeline: stops the model reaching
+ *                   for the same top-scored entries on every story)
+ *   onStatus        callback(message) fired before a live discovery starts
+ * @returns {Promise<Array>} landmark objects (superset shape: name, query, type,
+ *   score, wikipediaExtract, photoDescription, photoUrl, attribution, lat, lon,
+ *   photoVariants, isIndexed/landmarkIndexId + legacy isSwissPreIndexed/swissLandmarkId)
+ */
+async function resolveAvailableLandmarks(location, opts = {}) {
+  const { limit = 30, discoverOnMiss = false, language = null, shuffle = false, onStatus = null } = opts;
+  if (!location?.city) return [];
+  let landmarks = [];
+
+  try {
+    const indexed = await getIndexedLandmarks(location, limit);
+    landmarks = indexed.map(l => {
+      const photoVariants = [];
+      for (let n = 1; n <= 6; n++) {
+        const urlKey = n === 1 ? 'photo_url' : `photo_url_${n}`;
+        const descKey = n === 1 ? 'photo_description' : `photo_description_${n}`;
+        if (l[urlKey] && l[descKey]) {
+          photoVariants.push({ variantNumber: n, vantage: n >= 4 ? 'interior' : 'exterior', description: l[descKey] });
+        }
+      }
+      return {
+        name: l.name,
+        query: l.name,
+        type: l.type,
+        score: l.score,
+        lat: parseFloat(l.latitude),
+        lon: parseFloat(l.longitude),
+        photoUrl: l.photo_url,
+        photoDescription: l.photo_description,
+        attribution: l.photo_attribution,
+        wikipediaExtract: l.wikipedia_extract,
+        photoVariants,
+        isIndexed: true,
+        landmarkIndexId: l.id,
+        isSwissPreIndexed: true, // legacy field names, still read downstream
+        swissLandmarkId: l.id,
+      };
+    });
+    if (landmarks.length > 0) log.info(`[LANDMARK] 📍 ${landmarks.length} indexed landmarks for ${location.city}`);
+  } catch (err) {
+    log.debug(`[LANDMARK] Indexed landmarks lookup failed: ${err.message}`);
+  }
+
+  if (landmarks.length === 0) {
+    const cached = availableLandmarkCache.get(availableLandmarkCacheKey(location));
+    if (cached && Date.now() - cached.timestamp < AVAILABLE_LANDMARK_CACHE_TTL) {
+      landmarks = cached.landmarks;
+      log.info(`[LANDMARK] 📍 ${landmarks.length} cached landmarks for ${location.city}`);
+    }
+  }
+
+  if (landmarks.length === 0 && discoverOnMiss) {
+    if (onStatus) onStatus('Discovering local landmarks...');
+    log.info(`[LANDMARK] 🔍 Discovering landmarks for ${location.city}, ${location.country || ''}...`);
+    try {
+      const discovered = await Promise.race([
+        discoverLandmarksForLocation(location.city, location.country || '', 10),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)),
+      ]);
+      if (discovered?.length > 0) {
+        landmarks = discovered;
+        availableLandmarkCache.set(availableLandmarkCacheKey(location), {
+          landmarks, city: location.city, country: location.country || '', timestamp: Date.now(),
+        });
+        log.info(`[LANDMARK] ✅ Discovered ${landmarks.length} landmarks for ${location.city}`);
+      }
+    } catch (err) {
+      log.warn(`[LANDMARK] Discovery failed or timed out for ${location.city}: ${err.message}`);
+      landmarks = [];
+    }
+  }
+
+  if (landmarks.length > 0 && language) {
+    const baseLang = language.split('-')[0].toLowerCase();
+    for (const landmark of landmarks) {
+      const match = landmark.variants?.find(v => v.lang === baseLang);
+      if (match && match.name !== landmark.name) {
+        log.debug(`[LANDMARK] Using ${baseLang} name: "${match.name}" (was: "${landmark.name}")`);
+        landmark.originalName = landmark.name;
+        landmark.name = match.name;
+        landmark.query = match.name;
+      }
+    }
+  }
+
+  if (shuffle) {
+    for (let i = landmarks.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [landmarks[i], landmarks[j]] = [landmarks[j], landmarks[i]];
+    }
+  }
+  return landmarks;
+}
+
 module.exports = {
   fetchLandmarkPhoto,
+  resolveAvailableLandmarks,
+  availableLandmarkCache,
+  AVAILABLE_LANDMARK_CACHE_TTL,
   prefetchLandmarkPhotos,
   discoverLandmarksForLocation,
   searchLandmarksByText,

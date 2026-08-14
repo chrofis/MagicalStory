@@ -190,8 +190,9 @@ const {
 
 // Landmark discovery cache - stores pre-discovered landmarks per user location
 // Key: `${city}_${country}` (normalized), Value: { landmarks: [], timestamp }
-const userLandmarkCache = new Map();
-const LANDMARK_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
+// ONE process-wide cache, owned by landmarkPhotos.js — the discover endpoint,
+// the ideas route, and the pipeline resolver all read/write the same Map.
+const { availableLandmarkCache: userLandmarkCache, AVAILABLE_LANDMARK_CACHE_TTL: LANDMARK_CACHE_TTL } = require('./server/lib/landmarkPhotos');
 
 // Clean up expired landmark cache entries every hour
 setInterval(() => {

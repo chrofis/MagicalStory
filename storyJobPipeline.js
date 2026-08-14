@@ -96,14 +96,12 @@ const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'parallel';
 // --- checkpoint guards early-return safely if init never runs (file mode).
 let dbPool = null;
 let STORAGE_MODE = 'file';
-let userLandmarkCache = new Map();
-let LANDMARK_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week (overridden by init)
+// Landmark cache: no longer injected — the pipeline uses the shared resolver
+// (resolveAvailableLandmarks) whose cache lives in landmarkPhotos.js.
 
 function initStoryJobPipeline(deps) {
   dbPool = deps.dbPool;
   STORAGE_MODE = deps.STORAGE_MODE;
-  userLandmarkCache = deps.userLandmarkCache;
-  LANDMARK_CACHE_TTL = deps.LANDMARK_CACHE_TTL;
 }
 
 // =============================================================================
@@ -5883,77 +5881,17 @@ async function _processStoryJobImpl(jobId) {
       }
     }
 
-    // Inject pre-discovered landmarks if available for this user's location
-    // Check landmark_index first (works for any city worldwide), then fall back to in-memory cache
+    // Inject pre-discovered landmarks if available for this user's location.
+    // Shared resolver: landmark_index (proximity fallback) -> shared in-memory
+    // cache. No live discovery at job start (would block 15s); shuffled so the
+    // writer doesn't keep reaching for the same top-scored entries.
     // Skip for historical stories - they use historically accurate locations, not local landmarks
     if (inputData.userLocation?.city && inputData.storyCategory !== 'historical') {
-      const cacheKey = `${inputData.userLocation.city}_${inputData.userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
-      let landmarks = null;
-
-      // Check landmark_index table first (works for any city worldwide)
-      try {
-        const indexedLandmarks = await getIndexedLandmarks(inputData.userLocation, 30);
-        if (indexedLandmarks.length > 0) {
-          // Convert indexed landmarks to the format expected by linkPreDiscoveredLandmarks
-          landmarks = indexedLandmarks.map(l => ({
-            name: l.name,
-            query: l.name,
-            type: l.type,
-            lat: parseFloat(l.latitude),
-            lon: parseFloat(l.longitude),
-            score: l.score,
-            // Indexed landmarks don't have photoData - they have photoUrl for lazy loading
-            photoUrl: l.photo_url,
-            photoDescription: l.photo_description,
-            attribution: l.photo_attribution,
-            wikipediaExtract: l.wikipedia_extract,
-            // Flag for lazy photo loading (support both old and new field names)
-            isIndexed: true,
-            isSwissPreIndexed: true,  // For backward compatibility
-            landmarkIndexId: l.id,
-            swissLandmarkId: l.id  // For backward compatibility
-          }));
-          log.info(`[LANDMARK] 📍 Injecting ${landmarks.length} indexed landmarks for ${inputData.userLocation.city}`);
-        }
-      } catch (indexErr) {
-        log.debug(`[LANDMARK] Indexed landmarks lookup failed: ${indexErr.message}`);
-      }
-
-      // Fall back to in-memory cache if index didn't have it
-      if (!landmarks) {
-        const cachedLandmarks = userLandmarkCache.get(cacheKey);
-        if (cachedLandmarks && Date.now() - cachedLandmarks.timestamp < LANDMARK_CACHE_TTL) {
-          landmarks = cachedLandmarks.landmarks;
-          log.info(`[LANDMARK] 📍 Injecting ${landmarks.length} in-memory cached landmarks for ${inputData.userLocation.city}`);
-        }
-      }
-
-      if (landmarks && landmarks.length > 0) {
-        // Select landmark names in story language (using Wikidata variants)
-        // Each landmark has variants: [{name: "Ruine Stein", lang: "de"}, {name: "Stein Castle", lang: "en"}]
-        if (inputData.language) {
-          const baseLang = inputData.language.split('-')[0].toLowerCase();
-          for (const landmark of landmarks) {
-            if (landmark.variants && landmark.variants.length > 0) {
-              // Find variant matching story language
-              const match = landmark.variants.find(v => v.lang === baseLang);
-              if (match && match.name !== landmark.name) {
-                log.debug(`[LANDMARK] Using ${baseLang} name: "${match.name}" (was: "${landmark.name}")`);
-                landmark.originalName = landmark.name;
-                landmark.name = match.name;
-                landmark.query = match.name;
-              }
-            }
-          }
-        }
-        // Shuffle so Sonnet doesn't keep reaching for the top score-sorted
-        // entries on every story (same Baden gives the same Stadtturm /
-        // Holzbrücke / Ruine Stein pick across every run). Trust Sonnet to
-        // pick fitness-by-description from a randomized order.
-        for (let i = landmarks.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [landmarks[i], landmarks[j]] = [landmarks[j], landmarks[i]];
-        }
+      const { resolveAvailableLandmarks } = require('./server/lib/landmarkPhotos');
+      const landmarks = await resolveAvailableLandmarks(inputData.userLocation, {
+        limit: 30, discoverOnMiss: false, language: inputData.language, shuffle: true,
+      });
+      if (landmarks.length > 0) {
         inputData.availableLandmarks = landmarks;
       } else {
         log.debug(`[LANDMARK] No cached landmarks available for ${inputData.userLocation.city}`);

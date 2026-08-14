@@ -10324,3 +10324,27 @@ gen/judge breakdown in the drill-down modal; a spinner shows while a rerun is in
 **Touched:** migrations/018_story_scores_cost_time.sql, server/lib/{scoreStore,testlab}.js,
 client/src/services/testlabService.ts, client/src/components/testlab/ScorecardsPanel.tsx.
 **Status:** ✅ active.
+
+## 2026-08-14: Landmark discovery consolidated — resolveAvailableLandmarks() (closes the L5 backlog)
+
+**Context:** The "given a city, resolve the availableLandmarks list" logic existed three
+times (storyIdeas.js x2, storyJobPipeline.js) with drifted details — and the review of
+the copies surfaced a real bug: storyIdeas kept a PRIVATE in-memory cache, so landmarks
+it discovered for a new city were invisible to the story pipeline (ideas saw them, the
+generated story didn't).
+
+**Decision:** One `resolveAvailableLandmarks(location, opts)` in landmarkPhotos.js:
+index lookup (proximity fallback) → ONE shared process-wide cache → optional live
+discovery (15s timeout; ideas routes only — job start never blocks on discovery) →
+language-variant name swap → optional shuffle (pipeline). Row mapping is the superset
+of the three shapes (photoVariants + photoUrl/geo/attribution + legacy flags — extra
+fields are inert for each consumer). server.js's /api/landmarks/discover endpoint and
+admin cache-clear now operate on the same shared Map; the initStoryJobPipeline cache
+plumbing is gone.
+
+**Validated:** live resolver test (Baden: 5 landmarks, vantage-stamped variants;
+Adlikon village: 5 nearby Andelfingen landmarks via proximity fallback; null location
+→ []); unit suite green except the 3 documented pre-existing failures.
+
+**Touched:** server/lib/landmarkPhotos.js, server/routes/storyIdeas.js,
+storyJobPipeline.js, server.js.

@@ -18,22 +18,10 @@ const { storyIdeasLimiter } = require('../middleware/rateLimit');
 const { log } = require('../utils/logger');
 const { fillTemplate } = require('../services/prompts');
 
-// Landmark functions
-const { discoverLandmarksForLocation, getIndexedLandmarks } = require('../lib/landmarkPhotos');
-
-// Landmark discovery cache (module-level, same as was in server.js)
-const userLandmarkCache = new Map();
-const LANDMARK_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
-
-// Clean up expired landmark cache entries every hour
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of userLandmarkCache.entries()) {
-    if (now - (entry.timestamp || 0) > LANDMARK_CACHE_TTL) {
-      userLandmarkCache.delete(key);
-    }
-  }
-}, 60 * 60 * 1000);
+// Landmark resolution — one shared resolver + cache in landmarkPhotos.js.
+// This route once kept a PRIVATE cache here, so landmarks it discovered were
+// invisible to the story pipeline.
+const { resolveAvailableLandmarks } = require('../lib/landmarkPhotos');
 
 /**
  * Build the shared prompt context for story idea generation.
@@ -305,99 +293,15 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
       }
     }
 
-    // Discover landmarks for story location (await to include in ideas prompt)
-    // Skip for historical stories - they use historically accurate locations, not local landmarks
+    // Discover landmarks for story location (await to include in ideas prompt).
+    // Skip for historical stories - they use historically accurate locations, not local landmarks.
+    // Shared resolver: landmark_index (proximity fallback) -> shared cache -> live discovery.
     let availableLandmarks = [];
     if (effectiveLocation?.city && storyCategory !== 'historical') {
       log.debug(`  📍 Story location: ${effectiveLocation.city}, ${effectiveLocation.country || ''}`);
-
-      const cacheKey = `${effectiveLocation.city}_${effectiveLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
-
-      // Check landmark_index table first (works for any city worldwide)
-      try {
-        const indexedLandmarks = await getIndexedLandmarks(effectiveLocation, 20);
-        if (indexedLandmarks.length > 0) {
-          // Collect every populated photo variant so downstream prompts can
-          // surface per-angle descriptions and let Claude pick the right one
-          // (e.g. interior vs exterior of a covered bridge). Without this,
-          // trial mode — which has no scene-expansion second pass — only ever
-          // sees variant 1's description and writes plain [LOC###], which
-          // falls back to variant 1 every time. Holzbrücke (Baden) is the
-          // canonical example: 2 interior shots (variants 4 and 5) never get
-          // picked because Claude never knew they existed.
-          availableLandmarks = indexedLandmarks.map(l => {
-            const photoVariants = [];
-            for (let n = 1; n <= 6; n++) {
-              const urlKey = n === 1 ? 'photo_url' : `photo_url_${n}`;
-              const descKey = n === 1 ? 'photo_description' : `photo_description_${n}`;
-              if (l[urlKey] && l[descKey]) {
-                photoVariants.push({ variantNumber: n, vantage: n >= 4 ? 'interior' : 'exterior', description: l[descKey] });
-              }
-            }
-            return {
-              name: l.name,
-              query: l.name,
-              type: l.type,
-              score: l.score,
-              wikipediaExtract: l.wikipedia_extract,
-              photoDescription: l.photo_description,
-              photoVariants,
-              isIndexed: true,
-              landmarkIndexId: l.id
-            };
-          });
-          log.info(`[LANDMARK] 📍 Using ${availableLandmarks.length} indexed landmarks for ${effectiveLocation.city}`);
-        }
-      } catch (indexErr) {
-        log.debug(`[LANDMARK] Indexed landmarks lookup failed: ${indexErr.message}`);
-      }
-
-      // If not in index, discover on-demand (with timeout)
-      if (!availableLandmarks || availableLandmarks.length === 0) {
-        log.info(`[LANDMARK] 🔍 Discovering landmarks for ${effectiveLocation.city}, ${effectiveLocation.country || ''}...`);
-
-        try {
-          // Use Promise.race to timeout after 15 seconds
-          const discoveryPromise = discoverLandmarksForLocation(effectiveLocation.city, effectiveLocation.country || '', 10);
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
-          );
-
-          availableLandmarks = await Promise.race([discoveryPromise, timeoutPromise]);
-
-          // Also update in-memory cache
-          if (availableLandmarks && availableLandmarks.length > 0) {
-            userLandmarkCache.set(cacheKey, {
-              landmarks: availableLandmarks,
-              city: effectiveLocation.city,
-              country: effectiveLocation.country || '',
-              timestamp: Date.now()
-            });
-            log.info(`[LANDMARK] ✅ Discovered ${availableLandmarks.length} landmarks for ${effectiveLocation.city}`);
-          }
-        } catch (err) {
-          log.warn(`[LANDMARK] Discovery failed or timed out for ${effectiveLocation.city}: ${err.message}`);
-          availableLandmarks = [];
-        }
-      }
-
-      // Select landmark names in story language (using Wikidata variants)
-      // Each landmark has variants: [{name: "Ruine Stein", lang: "de"}, {name: "Stein Castle", lang: "en"}]
-      if (availableLandmarks.length > 0 && language) {
-        const baseLang = language.split('-')[0].toLowerCase();
-        for (const landmark of availableLandmarks) {
-          if (landmark.variants && landmark.variants.length > 0) {
-            // Find variant matching story language
-            const match = landmark.variants.find(v => v.lang === baseLang);
-            if (match && match.name !== landmark.name) {
-              log.debug(`[LANDMARK] Using ${baseLang} name: "${match.name}" (was: "${landmark.name}")`);
-              landmark.originalName = landmark.name; // Keep original for reference
-              landmark.name = match.name;
-              landmark.query = match.name;
-            }
-          }
-        }
-      }
+      availableLandmarks = await resolveAvailableLandmarks(effectiveLocation, {
+        limit: 20, discoverOnMiss: true, language,
+      });
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
 
@@ -545,102 +449,16 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
       }
     }
 
-    // Discover landmarks for story location (await to include in ideas prompt)
-    // Skip for historical stories - they use historically accurate locations, not local landmarks
+    // Discover landmarks for story location (await to include in ideas prompt).
+    // Skip for historical stories - they use historically accurate locations, not local landmarks.
+    // Shared resolver: landmark_index (proximity fallback) -> shared cache -> live discovery.
     let availableLandmarks = [];
     if (effectiveLocation?.city && storyCategory !== 'historical') {
       log.debug(`  📍 Story location: ${effectiveLocation.city}, ${effectiveLocation.country || ''}`);
-
-      const cacheKey = `${effectiveLocation.city}_${effectiveLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
-
-      // Check landmark_index table first (works for any city worldwide)
-      try {
-        const indexedLandmarks = await getIndexedLandmarks(effectiveLocation, 20);
-        if (indexedLandmarks.length > 0) {
-          // Collect every populated photo variant so downstream prompts can
-          // surface per-angle descriptions and let Claude pick the right one
-          // (e.g. interior vs exterior of a covered bridge). Without this,
-          // trial mode — which has no scene-expansion second pass — only ever
-          // sees variant 1's description and writes plain [LOC###], which
-          // falls back to variant 1 every time. Holzbrücke (Baden) is the
-          // canonical example: 2 interior shots (variants 4 and 5) never get
-          // picked because Claude never knew they existed.
-          availableLandmarks = indexedLandmarks.map(l => {
-            const photoVariants = [];
-            for (let n = 1; n <= 6; n++) {
-              const urlKey = n === 1 ? 'photo_url' : `photo_url_${n}`;
-              const descKey = n === 1 ? 'photo_description' : `photo_description_${n}`;
-              if (l[urlKey] && l[descKey]) {
-                photoVariants.push({ variantNumber: n, vantage: n >= 4 ? 'interior' : 'exterior', description: l[descKey] });
-              }
-            }
-            return {
-              name: l.name,
-              query: l.name,
-              type: l.type,
-              score: l.score,
-              wikipediaExtract: l.wikipedia_extract,
-              photoDescription: l.photo_description,
-              photoVariants,
-              isIndexed: true,
-              landmarkIndexId: l.id
-            };
-          });
-          log.info(`[LANDMARK] 📍 [STREAM] Using ${availableLandmarks.length} indexed landmarks for ${effectiveLocation.city}`);
-        }
-      } catch (indexErr) {
-        log.debug(`[LANDMARK] Indexed landmarks lookup failed: ${indexErr.message}`);
-      }
-
-      // If not in index, discover on-demand (with timeout)
-      if (!availableLandmarks || availableLandmarks.length === 0) {
-        log.info(`[LANDMARK] 🔍 [STREAM] Discovering landmarks for ${effectiveLocation.city}, ${effectiveLocation.country || ''}...`);
-
-        // Send SSE event to inform user about landmark discovery
-        res.write(`data: ${JSON.stringify({ type: 'status', message: 'Discovering local landmarks...' })}\n\n`);
-
-        try {
-          // Use Promise.race to timeout after 15 seconds
-          const discoveryPromise = discoverLandmarksForLocation(effectiveLocation.city, effectiveLocation.country || '', 10);
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
-          );
-
-          availableLandmarks = await Promise.race([discoveryPromise, timeoutPromise]);
-
-          // Also update in-memory cache
-          if (availableLandmarks && availableLandmarks.length > 0) {
-            userLandmarkCache.set(cacheKey, {
-              landmarks: availableLandmarks,
-              city: effectiveLocation.city,
-              country: effectiveLocation.country || '',
-              timestamp: Date.now()
-            });
-            log.info(`[LANDMARK] ✅ [STREAM] Discovered ${availableLandmarks.length} landmarks for ${effectiveLocation.city}`);
-          }
-        } catch (err) {
-          log.warn(`[LANDMARK] [STREAM] Discovery failed or timed out for ${effectiveLocation.city}: ${err.message}`);
-          availableLandmarks = [];
-        }
-      }
-
-      // Select landmark names in story language (using Wikidata variants)
-      // Each landmark has variants: [{name: "Ruine Stein", lang: "de"}, {name: "Stein Castle", lang: "en"}]
-      if (availableLandmarks.length > 0 && language) {
-        const baseLang = language.split('-')[0].toLowerCase();
-        for (const landmark of availableLandmarks) {
-          if (landmark.variants && landmark.variants.length > 0) {
-            // Find variant matching story language
-            const match = landmark.variants.find(v => v.lang === baseLang);
-            if (match && match.name !== landmark.name) {
-              log.debug(`[LANDMARK] [STREAM] Using ${baseLang} name: "${match.name}" (was: "${landmark.name}")`);
-              landmark.originalName = landmark.name;
-              landmark.name = match.name;
-              landmark.query = match.name;
-            }
-          }
-        }
-      }
+      availableLandmarks = await resolveAvailableLandmarks(effectiveLocation, {
+        limit: 20, discoverOnMiss: true, language,
+        onStatus: (message) => res.write(`data: ${JSON.stringify({ type: 'status', message })}\n\n`),
+      });
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
 
