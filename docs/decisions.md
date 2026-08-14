@@ -10162,3 +10162,21 @@ on) is the remaining piece — deferred because it touches the generation pipeli
 `server/routes/admin/testlab.js`, `client/src/services/testlabService.ts`,
 `client/src/components/testlab/ScorecardsPanel.tsx`, `client/src/pages/TestLab.tsx`.
 **Status:** ✅ active (store + page). Pending: auto-score toggle on story completion.
+
+## 2026-08-14: Single-photo landmarks get a citable dotted id (photos finally attach)
+
+**Context:** Photo attachment matches only LOC ids cited in scene metadata `objects[]`,
+but the Art Director prompt listed dotted ids ONLY for landmarks with ≥2 photo variants.
+A landmark with one photo was shown name-only — uncitable, so its photo never attached
+(the covered wooden Thurbrücke rendered as a generic stone bridge in two full runs; the
+Kirche Andelfingen photo sat fetched and unused). Landmark-fidelity scored 0 on every
+landmark page measured (exp #507).
+
+**Decision:** Both AD prompt-builder sites emit `Photo variants: [LOCxxx.1] …` for real
+landmarks with any photo (1 variant OR referencePhotoUrl/Data). `loadLandmarkPhotoVariant`
+falls back to fetching `referencePhotoUrl` when no variants exist (post-R2 rows have no
+inline data). No fuzzy name matching — id citation stays the only attachment mechanism.
+Validated exp #594: the AD's rewritten brief cites `[LOC001.1]` for the Thurbrücke where
+the stored brief cited a different location and junk ids.
+
+**Touched:** `server/lib/promptBuilders.js` (2 sites), `server/lib/landmarkPhotos.js`.

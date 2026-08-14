@@ -1764,6 +1764,12 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
             return `[${loc.id}.${v.variantNumber}] ${desc}`;
           });
           recurringElements += `  Photo variants: ${variantStrs.join(', ')}\n`;
+        } else if (loc.isRealLandmark && (loc.photoVariants?.length === 1 || loc.referencePhotoUrl || loc.referencePhotoData)) {
+          // Single-photo landmark: without a listed id the Art Director cannot
+          // cite it in objects[], so the photo never attaches.
+          recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
+          const v1desc = loc.photoVariants?.[0]?.description || 'reference photo';
+          recurringElements += `  Photo variants: [${loc.id}.1] ${v1desc}\n`;
         } else {
           const locType = loc.isRealLandmark ? 'real landmark' : 'location';
           recurringElements += `* **${loc.name}** (${locType}): ${description}\n`;
@@ -2180,6 +2186,13 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
           });
           recurringElements += `  Photo variants: ${variantStrs.join(', ')}\n`;
           log.info(`[SCENE PROMPT] Added photo variants for "${loc.name}" with ${loc.photoVariants.length} variants`);
+        } else if (loc.isRealLandmark && (loc.photoVariants?.length === 1 || loc.referencePhotoUrl || loc.referencePhotoData)) {
+          // Single-photo landmark: without a listed id the Art Director cannot
+          // cite it in objects[], so the photo never attaches.
+          recurringElements += `* **${loc.name}** (real landmark): ${description}\n`;
+          const v1desc = loc.photoVariants?.[0]?.description || 'reference photo';
+          recurringElements += `  Photo variants: [${loc.id}.1] ${v1desc}\n`;
+          log.info(`[SCENE PROMPT] Added single-photo variant id for "${loc.name}"`);
         } else {
           // Debug: why wasn't PHOTO OPTIONS added?
           if (loc.isRealLandmark) {

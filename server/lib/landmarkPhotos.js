@@ -2966,6 +2966,25 @@ async function loadLandmarkPhotoVariant(visualBible, locId, variantNumber = 1) {
         variantNumber: 1
       };
     }
+    // Post-R2 rows carry referencePhotoUrl with no inline data — fetch it, or
+    // the single-photo landmark's photo is unreachable even when cited.
+    if (location.referencePhotoUrl) {
+      try {
+        const res = await fetch(location.referencePhotoUrl);
+        if (res.ok) {
+          const buf = Buffer.from(await res.arrayBuffer());
+          const mime = res.headers.get('content-type') || 'image/jpeg';
+          return {
+            photoData: `data:${mime};base64,${buf.toString('base64')}`,
+            attribution: location.photoAttribution || 'Unknown',
+            variantNumber: 1
+          };
+        }
+        log.warn(`[LANDMARK-VARIANT] referencePhotoUrl fetch failed for "${location.name}": HTTP ${res.status}`);
+      } catch (err) {
+        log.warn(`[LANDMARK-VARIANT] referencePhotoUrl fetch failed for "${location.name}": ${err.message}`);
+      }
+    }
     log.debug(`[LANDMARK-VARIANT] No variants for "${location.name}"`);
     return null;
   }
