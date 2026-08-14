@@ -10136,3 +10136,29 @@ frame" phrasing, which made the model reproduce the reference sheet (-140). Head
 character references remain unshipped (need costumed-panel cropping + prose-dressing gate).
 
 **Touched:** `prompts/image-generation.txt`.
+
+## 2026-08-14 — Live model-comparison scores page (persistent store + pivot)
+
+**Context:** Scores lived only inside one-off Test Lab experiments — a rerun with a different model
+became a separate experiment (588 vs 587), with no place that put model-A next to model-B, and no
+page that accumulated stories. The owner wants a live page pivoting story × part × model, updating as
+reruns/new stories are scored, and the ability to score ANY single part (beats/scene/text/VB) alone.
+
+**Decision:** New `story_scores` table (migration 016) — one row per (story × part × generating-model ×
+evaluator-version). Every scoring path writes a row via `server/lib/scoreStore.js`: the shared
+`scoreArtifactsWithJudge` helper persists when given a `persist` context, so `story_scorecard` (full →
+'full' + 4 part rows), the replay stages' `scoreOutput` (one part row, model = the rerun model), and
+`beats_review_replay` (per-pass, label `pass N`) all land in one table. `GET /api/admin/testlab/scores`
+serves them; a new **Scores tab** in Test Lab (`ScorecardsPanel.tsx`) pivots per story (rows = part,
+cols = model, cell = newest score + eval version), auto-refreshing every 20s and flagging mixed
+evaluator versions. A rerun with a new model appears as a new column; a new scored story appears as a
+new block.
+
+**Rationale:** One durable store + one pivot = the single place to compare models/prompts/parts, and
+the evaluator-version stamp keeps comparisons honest. Auto-scoring finished stories (a toggle, default
+on) is the remaining piece — deferred because it touches the generation pipeline.
+
+**Touched:** `migrations/016_story_scores.sql`, `server/lib/scoreStore.js`, `server/lib/testlab.js`,
+`server/routes/admin/testlab.js`, `client/src/services/testlabService.ts`,
+`client/src/components/testlab/ScorecardsPanel.tsx`, `client/src/pages/TestLab.tsx`.
+**Status:** ✅ active (store + page). Pending: auto-score toggle on story completion.

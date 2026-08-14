@@ -63,6 +63,24 @@ export interface ExperimentSummary {
   completedAt: string | null;
 }
 
+export interface ScoreRow {
+  id: number;
+  story_id: string;
+  title: string | null;
+  language: string | null;
+  art_style: string | null;
+  artifact: string;              // 'full' | 'beats' | 'scene' | 'storyText' | 'visualBible'
+  model: string | null;          // generating model — the comparison axis
+  judge_model: string | null;
+  eval_version: string;
+  eval_hash: string | null;
+  score: number | null;
+  dims: unknown;
+  source: string | null;
+  label: string | null;
+  created_at: string;
+}
+
 export interface StoryScorecard {
   artifacts: Record<string, { dims: Record<string, number>; score: number; notes: string }>;
   overall: number;
@@ -470,6 +488,11 @@ export const testlabService = {
 
   getExperiment(id: number) {
     return api.get<ExperimentDetail>(`/api/admin/testlab/experiments/${id}`);
+  },
+
+  getScores(storyId?: string) {
+    const qs = storyId ? `?storyId=${encodeURIComponent(storyId)}` : '';
+    return api.get<{ scores: ScoreRow[] }>(`/api/admin/testlab/scores${qs}`);
   },
 
   redo(experimentId: number, resultIndex: number, promptOverride?: string | null, useCurrentTemplates?: boolean, extraRule?: string | null) {

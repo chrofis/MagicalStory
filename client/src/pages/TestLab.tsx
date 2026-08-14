@@ -30,6 +30,7 @@ import {
   type TestLabSet,
   type TestLabSetMember,
 } from '@/services/testlabService';
+import ScorecardsPanel from '@/components/testlab/ScorecardsPanel';
 
 /**
  * Blend-replay A/B set: the blend/colour knobs, run against ONE stored model
@@ -77,7 +78,7 @@ function ReviewRunView({ run, title }: { run: ReviewRun; title?: string }) {
   );
 }
 
-type Tab = 'stories' | 'benchmark' | 'sheetsets' | 'experiments' | 'findings';
+type Tab = 'stories' | 'benchmark' | 'sheetsets' | 'experiments' | 'findings' | 'scores';
 
 const tabBtn = (active: boolean) =>
   `px-4 py-2 rounded-lg font-medium transition-colors ${active ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`;
@@ -141,6 +142,7 @@ export default function TestLab() {
           <button className={tabBtn(tab === 'sheetsets')} onClick={() => setTab('sheetsets')}>Sets</button>
           <button className={tabBtn(tab === 'experiments')} onClick={() => setTab('experiments')}>Experiments</button>
           <button className={tabBtn(tab === 'findings')} onClick={() => setTab('findings')}>Findings</button>
+          <button className={tabBtn(tab === 'scores')} onClick={() => setTab('scores')}>Scores</button>
         </div>
 
         {tab === 'stories' && <StoriesTab onReviewStory={useStoryForReview} />}
@@ -148,6 +150,7 @@ export default function TestLab() {
         {tab === 'sheetsets' && <SetsTab />}
         {tab === 'experiments' && <ExperimentsTab preset={preset} onPresetApplied={() => setPreset(null)} />}
         {tab === 'findings' && <FindingsTab />}
+        {tab === 'scores' && <ScorecardsPanel />}
       </div>
     </div>
   );

@@ -613,6 +613,19 @@ router.post('/experiments', async (req, res) => {
 });
 
 // GET /api/admin/testlab/experiments
+// Live model-comparison scores — the store behind the Scorecards panel. One
+// row per (story × part × generating-model × evaluator-version); the client
+// pivots them. Optional ?storyId= filter.
+router.get('/scores', async (req, res) => {
+  try {
+    const { queryScores } = require('../../lib/scoreStore');
+    const rows = await queryScores({ storyId: req.query.storyId || null });
+    res.json({ scores: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/experiments', async (req, res) => {
   try {
     // Reap zombies: 'running' rows survive a server restart forever (the
