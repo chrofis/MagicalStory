@@ -20,14 +20,23 @@ const { log } = require('../utils/logger');
 async function persistScore(row) {
   try {
     if (!row || !row.storyId || !row.artifact) throw new Error('storyId + artifact required');
-    // round: explicit if the caller knows it (a review pass), else auto-increment
-    // per (story, part, model, version) so a rerun becomes the next round.
+    // round: explicit if the caller knows it (a review pass), else the next
+    // number for this (story, part, model, version). Computed in a SEPARATE
+    // query, then inserted as a plain value — reusing params across the INSERT
+    // values and a subquery makes Postgres deduce inconsistent parameter types.
+    let round = typeof row.round === 'number' ? row.round : null;
+    if (round == null) {
+      const nx = await dbQuery(
+        `SELECT COALESCE(MAX(round),0)+1 AS n FROM story_scores
+         WHERE story_id=$1 AND artifact=$2 AND model IS NOT DISTINCT FROM $3 AND eval_version=$4`,
+        [row.storyId, row.artifact, row.model ?? null, row.evalVersion ?? '?']
+      );
+      round = Number(nx[0]?.n) || 1;
+    }
     await dbQuery(
       `INSERT INTO story_scores
          (story_id, title, language, art_style, artifact, model, judge_model, eval_version, eval_hash, score, dims, notes, artifact_text, source, label, round)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-         COALESCE($16, (SELECT COALESCE(MAX(round),0)+1 FROM story_scores
-                        WHERE story_id=$1 AND artifact=$5 AND model IS NOT DISTINCT FROM $6 AND eval_version=$8), 1))`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
       [
         row.storyId,
         row.title ?? null,
@@ -44,7 +53,7 @@ async function persistScore(row) {
         row.artifactText ?? null,
         row.source ?? null,
         row.label ?? null,
-        typeof row.round === 'number' ? row.round : null,
+        round,
       ]
     );
     return true;
