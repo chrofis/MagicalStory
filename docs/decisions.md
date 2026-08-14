@@ -10535,3 +10535,32 @@ score 11): new wording 1/2 photographic vs 0 before; normal content already
 content; eval + repair stay the backstop.
 
 **Touched:** `server/lib/promptBuilders.js` (ART_STYLES.realistic, ART_STYLES.oil).
+
+## 2026-08-15: Figures get footing, pages get one focal point (P7 "levitating figure" class)
+
+**Context:** A riverside page rendered a background figure floating over open water. The
+plate instruction asked for the "natural ground surface" in figure bands — on a river
+panorama that IS water, so the plate complied and the composited figure stood on it. The
+same page also split three characters across three unrelated simultaneous actions.
+
+**Decisions:**
+- Plate instruction (storyJobPipeline characterSpace): figure bands must offer FOOTING —
+  a standable surface (ground, path, bank, deck, walkway, jetty); open water/air in a
+  figure band only when the scene's figures are in the water or airborne.
+- AD rule (both scene-expansion templates): scene geography gives every standing
+  character footing at their declared position; a beat that puts a figure where nothing
+  standable exists moves the figure or the camera.
+- Reviewer: 7d faults a standing figure over water/air with a bare grid position
+  (tuned across exp #628→#631: the strict field-level version over-fired on every
+  waterside page); check 4 now requires one focal point visible in the frame — separate
+  activities are a fault even when they share a cause; 3b exempts characters whose body
+  has no feet in the scene (tails, fins) from footwear.
+- Beats: multiple characters share the one moment (watch or react to the same action);
+  beats-review flags parallel unrelated actions as a hard tableau.
+
+**Validated:** exp #631 — faults exactly the two defective pages (parallel-action page
+restructured around one focal event, all positions carrying their surface; no
+over-firing, no fin-footwear false faults).
+
+**Touched:** storyJobPipeline.js, prompts/scene-expansion-all.txt, scene-expansion.txt,
+scene-review.txt, story-beats.txt, story-beats-review.txt.

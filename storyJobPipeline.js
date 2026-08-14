@@ -3458,9 +3458,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // "open space" or "leave room", which Grok reads as render-less and
               // resolves with blank patches or half-finished building fragments.
               // The figure will be composited on top later; until then the band must
-              // render as the scene's natural ground (cobblestones, grass, road,
-              // floor, sand — whichever the setting calls for).
-              characterSpace = `${parts.join(' and ').replace(/^./, c => c.toUpperCase())} will be composited into this scene later. Render those bands as the scene's natural ground surface (cobblestones, grass, road, floor, sand — whatever the setting calls for) continuing through unbroken. Lighting and ground texture must continue across them. They hold no props, signage, vehicles, or extra structures, but they ARE part of the scene — never blank, white, or unfinished patches, never abrupt building cutoffs.`;
+              // give it FOOTING. "Natural surface" was the old wording — on a river
+              // panorama the natural surface at a background band is open water, the
+              // plate complied, and the composited figure floated on it.
+              characterSpace = `${parts.join(' and ').replace(/^./, c => c.toUpperCase())} will be composited into this scene later. Each of those bands must give its figures FOOTING — a standable surface at that depth (ground, path, bank, floor, deck, walkway, jetty — whatever structure the setting offers) rendered continuing through unbroken. Open water, air, or a drop may fill a figure band only when the scene's figures are in the water or airborne. Lighting and surface texture must continue across the bands. They hold no props, signage, vehicles, or extra structures, but they ARE part of the scene — never blank, white, or unfinished patches, never abrupt building cutoffs.`;
 
               // If any depth band needs both-sides placement, spell it out so Grok doesn't
               // wall the frame with buildings on left and right.
