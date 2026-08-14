@@ -10203,3 +10203,31 @@ warning fires for 'cover' too.
 
 **Touched:** `server/lib/images.js` (evaluateImageBatch),
 `server/lib/evalPipeline.js` (warning gate).
+
+## 2026-08-14 — Scores page redesign: rounds, versioned/harsher evaluator, drill-downs, per-part sections
+
+**Context:** The scores page scored too generously, had no round tracking, no way to see why a score
+was given, didn't compare stories per part, and couldn't rerun a part with a different model. Owner
+approved a redesign (plan: jolly-zooming-adleman).
+
+**Decision:**
+- Migration 017 adds `notes`, `artifact_text`, `round` to `story_scores` + an `eval_versions(version,
+  hash, prompt_text)` archive. `round` auto-increments per (story, part, model, version) unless the
+  caller passes one (beats passes → round=p). `is_final` = max(round), computed at display.
+- Versioned evaluator: `storyScorecard.js` gains a version→promptKey map + `resolveEvaluator`;
+  `evaluatorStamp(prompt, version)`. New **v1.1** judge prompt is harsher (competent=5-6, 8+ reserved),
+  dims/JSON identical to v1.0 so they stay comparable. `scoreArtifactsWithJudge` takes `evalVersion`
+  (default 1.0), archives the prompt to `eval_versions`, and persists notes + frozen `artifact_text`.
+- API: `GET /testlab/eval-version/:version` returns a version's prompt. Reruns reuse `createExperiment`.
+- UI: `ScorecardsPanel` rebuilt as per-part sections (rows = story×model, round chips with final ✱),
+  a v1.0|v1.1|both selector, a rerun control (model picker → createExperiment), and a drill-down modal
+  (version→prompt; cell→dims+notes+evaluated text).
+
+**Deferred:** true multi-pass review for scene/text/VB (they get rounds via reruns; beats has real
+passes); the auto-score-on-completion toggle.
+
+**Touched:** migrations/017_story_scores_rounds.sql, prompts/story-scorecard-judge-v1_1.txt,
+server/lib/{storyScorecard,scoreStore,testlab}.js, server/routes/admin/testlab.js,
+server/services/prompts.js, client/src/services/testlabService.ts,
+client/src/components/testlab/ScorecardsPanel.tsx.
+**Status:** ✅ active (Phase: rounds+versioning+drill-downs+per-part UI).

@@ -626,6 +626,23 @@ router.get('/scores', async (req, res) => {
   }
 });
 
+// The archived judge prompt for an evaluator version (click a version → its prompt).
+// Falls back to the live template file when the version hasn't been archived yet.
+router.get('/eval-version/:version', async (req, res) => {
+  try {
+    const { getEvalVersion } = require('../../lib/scoreStore');
+    const sc = require('../../lib/storyScorecard');
+    const row = await getEvalVersion(req.params.version);
+    if (row && row.prompt_text) return res.json({ version: row.version, hash: row.hash, prompt: row.prompt_text });
+    const { promptKey } = sc.resolveEvaluator(req.params.version);
+    const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../../services/prompts');
+    await loadPromptTemplates();
+    res.json({ version: req.params.version, hash: null, prompt: PROMPT_TEMPLATES[promptKey] || '(prompt not found)' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/experiments', async (req, res) => {
   try {
     // Reap zombies: 'running' rows survive a server restart forever (the

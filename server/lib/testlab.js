@@ -5072,7 +5072,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     let scorecard = null;
     if (params.scoreOutput === true || params.scoreOutput === 'true') {
       const sceneText = merged.map(m => `--- Page ${m.pageNumber} ---\n${m.brief}`).join('\n\n');
-      if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'scene_review_replay', model } })).scorecard;
+      if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'scene_review_replay', model } })).scorecard;
     }
 
     runs.push({
@@ -5125,7 +5125,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
  * way. The returned scorecard carries evaluatorVersion + evaluatorHash — scores
  * are only ever comparable within one evaluator.
  */
-async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null, persist = null } = {}) {
+async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null, persist = null, evalVersion = null } = {}) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
   const { callTextModelStreaming } = require('./textModels');
@@ -5134,8 +5134,11 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
 
   const judge = String(model || MODEL_DEFAULTS.outlineReviewModel).trim();
   if (!TEXT_MODELS[judge]) throw new Error(`Unknown judge model "${judge}"`);
-  const template = promptOverride || PROMPT_TEMPLATES.storyScorecardJudge;
-  if (!template) throw new Error('story-scorecard-judge template unavailable');
+  // Pick the evaluator version's prompt (v1.0 default; v1.1 = harsher). An
+  // explicit promptOverride still wins (Test Lab A/B of the rubric itself).
+  const { version, promptKey } = sc.resolveEvaluator(evalVersion);
+  const template = promptOverride || PROMPT_TEMPLATES[promptKey];
+  if (!template) throw new Error(`story-scorecard judge template unavailable for evaluator ${version}`);
   const input = sc.buildJudgeInputFromArtifacts(artifacts);
   if (!input.trim()) throw new Error('no artifacts to score');
   // partial when any rubric artifact is absent from the input
@@ -5145,25 +5148,28 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   const res = await callTextModelStreaming(`${template}\n\n---\n\n${input}`, null, null, judge, { usageLabel: 'testlab_story_scorecard', temperature: 0 });
   if (!res || !res.text || !res.text.trim()) throw new Error(`judge returned empty response (model ${judge})`);
   const scored = sc.scoreFromDims(sc.parseJudgeJson(res.text), { partial });
-  const scorecard = { ...scored, ...sc.evaluatorStamp(template), judgeModel: judge };
+  const scorecard = { ...scored, ...sc.evaluatorStamp(template, version), judgeModel: judge };
 
-  // Persist to story_scores so this lands on the live /admin/scorecards page.
-  // `persist` carries the story context + the GENERATING model (what you compare
-  // across) + source/label. Fire-and-forget inside persistScore.
+  // Persist to story_scores so this lands on the live scores page. `persist`
+  // carries the story context + the GENERATING model (the comparison axis) +
+  // source/label + an optional round (review pass). Fire-and-forget.
   if (persist && persist.storyId) {
-    const { persistScore } = require('./scoreStore');
+    const { persistScore, upsertEvalVersion } = require('./scoreStore');
+    upsertEvalVersion(version, scorecard.evaluatorHash, template); // archive the prompt for the drill-down
     const base = {
       storyId: persist.storyId, title: persist.title, language: persist.language, artStyle: persist.artStyle,
       model: persist.model || null, judgeModel: judge,
       evalVersion: scorecard.evaluatorVersion, evalHash: scorecard.evaluatorHash,
       source: persist.source || null, label: persist.label || null,
+      round: typeof persist.round === 'number' ? persist.round : null,
     };
     for (const [artifact, a] of Object.entries(scorecard.artifacts)) {
-      await persistScore({ ...base, artifact, score: a.score, dims: a.dims });
+      // freeze the exact text the judge read for this part (click a part → this)
+      await persistScore({ ...base, artifact, score: a.score, dims: a.dims, notes: a.notes, artifactText: (artifacts[artifact] != null ? String(artifacts[artifact]).slice(0, 20000) : null) });
     }
     // a 'full' row only when all four artifacts were scored together
     if (Object.keys(scorecard.artifacts).length === Object.keys(sc.RUBRIC).length) {
-      await persistScore({ ...base, artifact: 'full', score: scorecard.overall, dims: scorecard.artifacts });
+      await persistScore({ ...base, artifact: 'full', score: scorecard.overall, dims: scorecard.artifacts, artifactText: input.slice(0, 20000) });
     }
   }
 
@@ -5183,7 +5189,7 @@ async function runStoryScorecardStage(target, { params = {}, promptOverride = nu
     throw new Error('story has no final artifacts to score (no sceneDescriptions / storyText)');
   }
   const r = await scoreArtifactsWithJudge(sc.extractArtifacts(storyData), {
-    model: params.model, promptOverride,
+    model: params.model, promptOverride, evalVersion: params.evalVersion,
     persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_scorecard', model: sc.provenanceOf(storyData).writer },
   });
   return {
@@ -5258,8 +5264,8 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
         beats = beats.map(b => byPage.get(b.pageNumber) || b); // fold rewrites forward
         if (scoreOutput) {
           const sr = await scoreArtifactsWithJudge({ beats: beatsToText(beats) }, {
-            model: params.judgeModel,
-            persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `pass ${p}` },
+            model: params.judgeModel, evalVersion: params.evalVersion,
+            persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `pass ${p}`, round: p },
           });
           entry.scorecard = sr.scorecard;
           entry.cost += sr.cost;
@@ -5371,7 +5377,7 @@ async function runStoryBibleReplayStage(target, { params = {}, promptOverride = 
   let scorecard = null;
   if (params.scoreOutput === true || params.scoreOutput === 'true') {
     const visualBible = String(res.text || '').slice(0, 20000);
-    if (visualBible.trim()) scorecard = (await scoreArtifactsWithJudge({ visualBible }, { model: params.judgeModel, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_bible_replay', model } })).scorecard;
+    if (visualBible.trim()) scorecard = (await scoreArtifactsWithJudge({ visualBible }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_bible_replay', model } })).scorecard;
   }
 
   return {
@@ -5508,7 +5514,7 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   let scorecard = null;
   if (params.scoreOutput === true || params.scoreOutput === 'true') {
     const storyText = (parsed.pages || []).map(p => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n\n');
-    if (storyText.trim()) scorecard = (await scoreArtifactsWithJudge({ storyText }, { model: params.judgeModel, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_text_replay', model } })).scorecard;
+    if (storyText.trim()) scorecard = (await scoreArtifactsWithJudge({ storyText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_text_replay', model } })).scorecard;
   }
 
   return {

@@ -20,10 +20,14 @@ const { log } = require('../utils/logger');
 async function persistScore(row) {
   try {
     if (!row || !row.storyId || !row.artifact) throw new Error('storyId + artifact required');
+    // round: explicit if the caller knows it (a review pass), else auto-increment
+    // per (story, part, model, version) so a rerun becomes the next round.
     await dbQuery(
       `INSERT INTO story_scores
-         (story_id, title, language, art_style, artifact, model, judge_model, eval_version, eval_hash, score, dims, source, label)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+         (story_id, title, language, art_style, artifact, model, judge_model, eval_version, eval_hash, score, dims, notes, artifact_text, source, label, round)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
+         COALESCE($16, (SELECT COALESCE(MAX(round),0)+1 FROM story_scores
+                        WHERE story_id=$1 AND artifact=$5 AND model IS NOT DISTINCT FROM $6 AND eval_version=$8), 1))`,
       [
         row.storyId,
         row.title ?? null,
@@ -36,8 +40,11 @@ async function persistScore(row) {
         row.evalHash ?? null,
         typeof row.score === 'number' ? row.score : null,
         row.dims ? JSON.stringify(row.dims) : null,
+        row.notes ?? null,
+        row.artifactText ?? null,
         row.source ?? null,
         row.label ?? null,
+        typeof row.round === 'number' ? row.round : null,
       ]
     );
     return true;
@@ -56,9 +63,10 @@ async function persistScorecard(storyId, meta, scorecard, { source, model, label
     evalVersion: scorecard.evaluatorVersion, evalHash: scorecard.evaluatorHash,
     source, label,
   };
-  await persistScore({ ...stamp, artifact: 'full', model: model ?? scorecard.models?.writer ?? null, score: scorecard.overall, dims: scorecard.artifacts });
+  const m = model ?? scorecard.models?.writer ?? null;
+  await persistScore({ ...stamp, artifact: 'full', model: m, score: scorecard.overall, dims: scorecard.artifacts });
   for (const [artifact, a] of Object.entries(scorecard.artifacts || {})) {
-    await persistScore({ ...stamp, artifact, model: model ?? scorecard.models?.writer ?? null, score: a.score, dims: a.dims, });
+    await persistScore({ ...stamp, artifact, model: m, score: a.score, dims: a.dims, notes: a.notes });
   }
 }
 
@@ -68,11 +76,33 @@ async function queryScores({ storyId = null, limit = 2000 } = {}) {
   const params = storyId ? [storyId, limit] : [limit];
   const rows = await dbQuery(
     `SELECT id, story_id, title, language, art_style, artifact, model, judge_model,
-            eval_version, eval_hash, score, dims, source, label, created_at
+            eval_version, eval_hash, score, dims, notes, artifact_text, round, source, label, created_at
      FROM story_scores ${where} ORDER BY created_at DESC LIMIT $${storyId ? 2 : 1}`,
     params
   );
   return rows;
 }
 
-module.exports = { persistScore, persistScorecard, queryScores };
+/** Archive a judge prompt for a version so the page can show it (click a version). */
+async function upsertEvalVersion(version, hash, promptText) {
+  try {
+    if (!version) return null;
+    await dbQuery(
+      `INSERT INTO eval_versions (version, hash, prompt_text) VALUES ($1,$2,$3)
+       ON CONFLICT (version) DO UPDATE SET hash = EXCLUDED.hash, prompt_text = EXCLUDED.prompt_text`,
+      [version, hash ?? null, promptText ?? null]
+    );
+    return true;
+  } catch (err) {
+    log.warn(`⚠️ [SCORE-STORE] eval_versions upsert failed (non-fatal): ${err.message}`);
+    return null;
+  }
+}
+
+/** The archived prompt for a version (for the drill-down). */
+async function getEvalVersion(version) {
+  const rows = await dbQuery('SELECT version, hash, prompt_text, created_at FROM eval_versions WHERE version = $1', [version]);
+  return rows[0] || null;
+}
+
+module.exports = { persistScore, persistScorecard, queryScores, upsertEvalVersion, getEvalVersion };

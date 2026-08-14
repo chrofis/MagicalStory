@@ -144,6 +144,7 @@ async function loadPromptTemplates() {
     ['feedbackConsolidator', 'feedback-consolidator.txt'],
     ['storyTextQualityJudge', 'story-text-quality-judge.txt'],
     ['storyScorecardJudge', 'story-scorecard-judge.txt'],
+    ['storyScorecardJudgeV1_1', 'story-scorecard-judge-v1_1.txt'],
   ];
 
   await Promise.all(FILES.map(([k, f]) => load(k, f)));

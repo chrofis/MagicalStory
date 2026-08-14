@@ -23,11 +23,24 @@ const RUBRIC = {
 // for humans ("why did scores move"); the hash is tamper-evidence — it folds in
 // the rubric AND the judge-prompt text, so a silent prompt edit that forgot to
 // bump the semver still shows a changed hash. Every score record carries both.
-const EVALUATOR_VERSION = '1.0';
-function evaluatorStamp(judgePromptText) {
+// version → PROMPT_TEMPLATES key. Add a row + a prompts/*.txt file to ship a new
+// evaluator; RUBRIC (the dimensions) stays fixed so versions stay comparable.
+const EVALUATOR_PROMPT_KEYS = { '1.0': 'storyScorecardJudge', '1.1': 'storyScorecardJudgeV1_1' };
+const DEFAULT_EVALUATOR_VERSION = '1.0';
+const EVALUATOR_VERSION = DEFAULT_EVALUATOR_VERSION; // back-compat export
+
+function resolveEvaluator(version) {
+  const v = version || DEFAULT_EVALUATOR_VERSION;
+  const promptKey = EVALUATOR_PROMPT_KEYS[v];
+  if (!promptKey) throw new Error(`Unknown evaluator version "${v}" (have ${Object.keys(EVALUATOR_PROMPT_KEYS).join(', ')})`);
+  return { version: v, promptKey };
+}
+
+function evaluatorStamp(judgePromptText, version) {
+  const v = version || DEFAULT_EVALUATOR_VERSION;
   const basis = JSON.stringify(RUBRIC) + '\n' + (judgePromptText || '');
   return {
-    evaluatorVersion: EVALUATOR_VERSION,
+    evaluatorVersion: v,
     evaluatorHash: crypto.createHash('sha256').update(basis).digest('hex').slice(0, 12),
   };
 }
@@ -145,5 +158,6 @@ module.exports = {
   RUBRIC, mean, finalBeats, finalScenes, extractArtifacts,
   buildJudgeInput, buildJudgeInputFromArtifacts, provenanceOf,
   scoreFromDims, parseJudgeJson,
-  EVALUATOR_VERSION, evaluatorStamp,
+  EVALUATOR_VERSION, DEFAULT_EVALUATOR_VERSION, EVALUATOR_PROMPT_KEYS,
+  resolveEvaluator, evaluatorStamp,
 };

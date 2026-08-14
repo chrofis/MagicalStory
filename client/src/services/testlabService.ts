@@ -76,6 +76,9 @@ export interface ScoreRow {
   eval_hash: string | null;
   score: number | null;
   dims: unknown;
+  notes: string | null;
+  artifact_text: string | null;
+  round: number;
   source: string | null;
   label: string | null;
   created_at: string;
@@ -493,6 +496,10 @@ export const testlabService = {
   getScores(storyId?: string) {
     const qs = storyId ? `?storyId=${encodeURIComponent(storyId)}` : '';
     return api.get<{ scores: ScoreRow[] }>(`/api/admin/testlab/scores${qs}`);
+  },
+
+  getEvalVersionPrompt(version: string) {
+    return api.get<{ version: string; hash: string | null; prompt: string }>(`/api/admin/testlab/eval-version/${encodeURIComponent(version)}`);
   },
 
   redo(experimentId: number, resultIndex: number, promptOverride?: string | null, useCurrentTemplates?: boolean, extraRule?: string | null) {
