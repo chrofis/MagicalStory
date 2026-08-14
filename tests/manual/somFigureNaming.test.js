@@ -105,8 +105,11 @@ console.log('\n── Badge placement sits just below the face ──');
 
 console.log('\n── figureDetection wiring: the candidate list stays the scene plan ──');
 {
+  // The CAST argument must stay `expectedCharacters` — that is what this guards
+  // (the reverted otherCharacters widening, 2026-08-11). Trailing RENDERING
+  // knobs such as badgeAnchor are not a widening and must not trip it.
   check('the namer takes the scene-plan characters and nothing wider',
-    /async function _somIdentifyFigures\(imageDataUri, dets, expectedCharacters, W, H, pageLabel = ''\)/.test(figureDetectionSrc));
+    /async function _somIdentifyFigures\(imageDataUri, dets, expectedCharacters, W, H, pageLabel = ''/.test(figureDetectionSrc));
   check('only expected names are valid answers',
     /const validNames = new Set\(expectedCharacters\.map\(c => c\.name\)\);/.test(figureDetectionSrc));
   check('the duplicate-name guard is untouched',

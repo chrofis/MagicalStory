@@ -350,7 +350,11 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
     && !!artStyle && eligibleStyles.includes(String(artStyle).toLowerCase());
   if (gdinoEligible && expectedCharacters.length > 0) {
     try {
-      const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, { pageLabel, expectedObjects, objectGroundingHints });
+      const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, {
+        pageLabel, expectedObjects, objectGroundingHints,
+        // Lab knobs — see figureDetection Stage 3 / badge anchor.
+        facePairing: options.facePairing, badgeAnchor: options.badgeAnchor,
+      });
       gdinoDiag = gd?.diag || null;
       if (gd && Array.isArray(gd.figures) && gd.figures.length > 0) {
         // No Haar cascade merge here — faceBoxes come from DINO "face" boxes

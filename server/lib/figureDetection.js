@@ -390,7 +390,7 @@ async function recoverFaceBox(imageDataUri, bodyBoxNorm, pageLabel = '') {
  * Returns { nameByDet: Map(detIdx → name), answers } or null (caller falls
  * back to layout+gender matching). Answers with duplicate names are invalid.
  */
-async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel = '') {
+async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel = '', badgeAnchor = 'box') {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || dets.length === 0) return null;
   const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -413,7 +413,14 @@ async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H,
   const badges = badgeIdx.map((detIdx, i) => {
     const d = dets[detIdx];
     const [x1, y1, x2, y2] = d.box;
-    const cx = (x1 + x2) / 2;
+    // BADGE ANCHOR (opts.badgeAnchor / BADGE_ANCHOR env, default 'box' = today).
+    // 'face' takes the X from the paired face. The badge's job is to point at
+    // ONE person, and a person box spanning two people has its centre in the GAP
+    // between them: on job_1786737619634_d66c7bg9g p10 badge C sat between the
+    // two children and badge E between the boy and the old man, and the model
+    // duly swapped Emma and Noah. The paired face is the only part of the
+    // detection that is reliably one person.
+    const cx = (badgeAnchor === 'face' && d.face) ? (d.face.box[0] + d.face.box[2]) / 2 : (x1 + x2) / 2;
     // 0.2 x face height below the face box — just under the chin. 0.6 landed
     // mid-torso (measured at 56% down the body box on the p14 figures), far
     // enough from the face that the badge read as belonging to no one.
@@ -775,18 +782,84 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${diag.undercount} — completing detection; orchestrator will get a Gemini second opinion`);
   }
 
-  // Stage 3 — face → figure pairing: face center inside a containing person
-  // box, smallest first; when overlapping figures compete for the same box,
-  // the face falls through to the next containing box that still has none
-  // (faces iterate score-desc, so each figure keeps its best face).
-  for (const f of faces) {
-    const cx = (f.box[0] + f.box[2]) / 2, cy = (f.box[1] + f.box[3]) / 2;
-    const holders = dets
-      .filter(d => cx >= d.box[0] && cx <= d.box[2] && cy >= d.box[1] && cy <= d.box[3])
-      .sort((a, b) => (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]) - (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]));
-    const holder = holders.find(h => !h.face);
-    if (holder) holder.face = f;
+  // Stage 3 — face → figure pairing. Two strategies, selectable so the Lab can
+  // run them against the same page (opts.facePairing / FACE_PAIRING env).
+  //
+  //   'greedy' (default, unchanged): for each face in SCORE order, take the
+  //     SMALLEST containing person box that has no face yet.
+  //   'global': score every geometrically possible (face, box) pair and take
+  //     the best pairs best-first, then give any left-over face a body box
+  //     synthesised from the face.
+  //
+  // Why 'global' exists — measured on job_1786737619634_d66c7bg9g p10 (5 people,
+  // 5 faces, 5 person boxes, three of which each span two people):
+  //   Daniel's face (cx 794) sits 6px inside the RIGHT EDGE of Hans's box
+  //   (573-800), and that box is SMALLER (177,968) than Daniel's own body box
+  //   (202,300) — so "smallest containing box" gave Daniel's face to Hans's
+  //   body. Hans's face then found no free box and was DROPPED, and the girl's
+  //   face was dropped the same way. 5 faces in, 3 pairings out, 2 of them wrong,
+  //   and two people invisible to identity and to every repair keyed on it.
+  const facePairing = opts.facePairing || process.env.FACE_PAIRING || 'greedy';
+  diag.facePairing = facePairing;
+  if (facePairing === 'global') {
+    // A head sits at the TOP-CENTRE of its body, so cost = horizontal offset
+    // from the box centre (weighted heaviest) + how far below the box top the
+    // face starts. Global ordering means one marginal pair can no longer poison
+    // a better pair that would only have been considered later.
+    const pairCost = (f, d) => {
+      const fcx = (f.box[0] + f.box[2]) / 2;
+      const bw = Math.max(1, d.box[2] - d.box[0]), bh = Math.max(1, d.box[3] - d.box[1]);
+      const dx = Math.abs(fcx - (d.box[0] + d.box[2]) / 2) / bw;
+      const dy = Math.max(0, f.box[1] - d.box[1]) / bh;
+      return dx * 2 + dy;
+    };
+    const candidates = [];
+    for (const f of faces) {
+      const cx = (f.box[0] + f.box[2]) / 2, cy = (f.box[1] + f.box[3]) / 2;
+      for (const d of dets) {
+        if (cx < d.box[0] || cx > d.box[2] || cy < d.box[1] || cy > d.box[3]) continue;
+        candidates.push({ f, d, cost: pairCost(f, d) });
+      }
+    }
+    candidates.sort((a, b) => a.cost - b.cost);
+    const takenFaces = new Set();
+    for (const c of candidates) {
+      if (c.d.face || takenFaces.has(c.f)) continue;
+      c.d.face = c.f; takenFaces.add(c.f);
+    }
+    // ONE FIGURE PER FACE. A left-over face has no body box that is plausibly
+    // its own; dropping it is what made two people invisible above. Synthesise
+    // a body from the face (a head is ~1/7 of a standing figure, a body ~3 face
+    // widths across) and mark it so downstream knows it was derived.
+    const orphans = faces.filter(f => !takenFaces.has(f));
+    for (const f of orphans) {
+      const fw = f.box[2] - f.box[0], fh = f.box[3] - f.box[1];
+      const fcx = (f.box[0] + f.box[2]) / 2;
+      const box = [
+        Math.max(0, Math.round(fcx - fw * 1.5)),
+        Math.max(0, Math.round(f.box[1] - fh * 0.3)),
+        Math.min(W, Math.round(fcx + fw * 1.5)),
+        Math.min(H, Math.round(f.box[1] + fh * 7)),
+      ];
+      dets.push({ box, score: f.score, face: f, synthesizedFromFace: true, bodyBox: _pxBoxToNorm(box, W, H) });
+      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}face at x${Math.round(fcx)} had no body box of its own — synthesised one from the face`);
+    }
+    if (orphans.length) diag.synthesizedFigures = orphans.length;
+  } else {
+    for (const f of faces) {
+      const cx = (f.box[0] + f.box[2]) / 2, cy = (f.box[1] + f.box[3]) / 2;
+      const holders = dets
+        .filter(d => cx >= d.box[0] && cx <= d.box[2] && cy >= d.box[1] && cy <= d.box[3])
+        .sort((a, b) => (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]) - (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]));
+      const holder = holders.find(h => !h.face);
+      if (holder) holder.face = f;
+    }
   }
+  diag.assignment = dets.map((d, i) => ({
+    det: i, box: d.box.map(Math.round),
+    face: d.face ? d.face.box.map(Math.round) : null,
+    synthesized: !!d.synthesizedFromFace,
+  }));
 
   // NOTE: blow-out handling moved UPSTREAM to Stage 2 (_cleanMaskAndCheck) —
   // a SAM mask that is disconnected or >10% larger than its DINO box is rejected
@@ -801,7 +874,9 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   // girls, hence SoM first.
   let nameByDet = null; // detIdx → character name
   try {
-    const som = await _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel);
+    const badgeAnchor = opts.badgeAnchor || process.env.BADGE_ANCHOR || 'box';
+    diag.badgeAnchor = badgeAnchor;
+    const som = await _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel, badgeAnchor);
     if (som) { nameByDet = som.nameByDet; diag.identity = { method: 'som-gemini', answers: som.answers }; }
   } catch (e) {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM identity failed (${e.message}) — layout fallback`);

@@ -729,13 +729,15 @@ function buildExpectedCharacters(ctx) {
   })).filter(c => c.name);
 }
 
-async function runBboxStage(ctx, { experimentId }) {
+async function runBboxStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { detectAllBoundingBoxes } = require('./images');
   const { MODEL_DEFAULTS } = require('../config/models');
 
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  // params.versionIndex pins the exact bytes so an A/B of the detection knobs
+  // compares the same picture, not whatever won pick-best in between.
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, params.versionIndex);
   const expectedCharacters = buildExpectedCharacters(ctx);
 
   // When grounding-dino is the configured backend, a cold analyzer (every
@@ -757,6 +759,9 @@ async function runBboxStage(ctx, { experimentId }) {
       artStyle: ctx.artStyle,
       skipCache: true,
       pageContext: `testlab-exp${experimentId}-P${ctx.pageNumber}`,
+      // Detection knobs under test: 'greedy'|'global' pairing, 'box'|'face' badge.
+      facePairing: params.facePairing,
+      badgeAnchor: params.badgeAnchor,
     });
     // 'gemini-second-opinion' is a DELIBERATE arbitration verdict (DINO ran,
     // undercounted, Gemini found more figures) — not a cold-analyzer fallback.
