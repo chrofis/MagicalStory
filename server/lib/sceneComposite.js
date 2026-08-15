@@ -2048,8 +2048,10 @@ async function generateSceneComposite(opts) {
     //                  once per figure, so the model paints the character into
     //                  the scene instead of us compositing pixels into it.
     figureMethod = 'paste',
-    // 'diff' (default) or 'dino' — see the detection step.
-    figureDetect = 'diff',
+    // 'dino' (default) or 'diff' — see the detection step. The diff is kept
+    // only so a Lab run can reproduce a pre-2026-08-15 result; it is the
+    // detector that mistook lawn for a character.
+    figureDetect = 'dino',
   } = opts;
 
   if (!cleanBackgroundPrompt && !scene?.description) {
@@ -2132,7 +2134,7 @@ async function generateSceneComposite(opts) {
   // 'dino' asks GroundingDINO where the people are and uses the palette only to
   // say WHICH person each box is — scenery cannot impersonate a figure that
   // way. 'diff' is the original: subtract the clean background, then match hue.
-  const detector = figureDetect === 'dino' ? 'dino' : 'diff';
+  const detector = figureDetect === 'diff' ? 'diff' : 'dino';
   log.info(`[SCENE COMPOSITE] step 3/5 — bbox detect (${detector})`);
   const detection = detector === 'dino'
     ? await findSilhouettesWithDino(populatedBuf, cast)

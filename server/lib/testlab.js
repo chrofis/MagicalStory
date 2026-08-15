@@ -3478,7 +3478,7 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
     skipBlend: !wantBlend,
     figureMethod,
-    figureDetect: params.figureDetect === 'dino' ? 'dino' : 'diff',
+    figureDetect: params.figureDetect === 'diff' ? 'diff' : 'dino',
     usageTracker: (provider, u, fnName, modelId) => usage.push({ provider, fn: fnName, modelId, cost: u?.cost || 0 }),
   });
   const elapsedMs = Date.now() - t0;
