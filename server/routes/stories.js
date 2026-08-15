@@ -2500,6 +2500,11 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         target.entityPenalty = source.entityPenalty || 0;
         target.evaluatedAt = source.evaluatedAt || null;
         target.issuesSummary = source.issuesSummary || null;
+        // Per-version detection (figures/objects JSON, no image bytes). Without
+        // this the Object Detection panel had nothing for any cover version:
+        // the wizard's base state (slim result_data) carries no bbox, and this
+        // whitelist was the only remaining path for version-level boxes.
+        target.bboxDetection = source.bboxDetection || null;
         // grokRefImages / inpaintReferenceImages: only real URLs cross the wire, never base64.
         // After Phase 2 migration these always carry R2 URLs; for now data: URIs get filtered out.
         target.grokRefImages = Array.isArray(source.grokRefImages)

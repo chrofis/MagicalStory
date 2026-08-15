@@ -660,6 +660,10 @@ export default function StoryWizard() {
               landmarkPhotos: devCover.landmarkPhotos ?? currentCover.landmarkPhotos,
               grokRefImages: devCover.grokRefImages ?? currentCover.grokRefImages,
               hasVisualBibleGrid: devCover.hasVisualBibleGrid ?? currentCover.hasVisualBibleGrid,
+              // Cover-level detection — the slim result_data base state carries
+              // none, so dropping this here blanked the Object Detection panel
+              // for every cover (the "finds figures first" symptom's UI half).
+              bboxDetection: devCover.bboxDetection ?? (currentCover as any).bboxDetection,
             };
           }
         }

@@ -69,6 +69,8 @@ interface CoverDevMeta {
   grokRefImages?: string[] | null;
   /** True if the server has a visual-bible grid image stashed for this cover (lazy-loaded) */
   hasVisualBibleGrid?: boolean;
+  /** Cover-level figure/object detection (figures/objects JSON, no image bytes) */
+  bboxDetection?: unknown | null;
 }
 
 interface StoryDraft {
