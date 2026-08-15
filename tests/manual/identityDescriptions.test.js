@@ -141,10 +141,36 @@ t('page numbers match across string/number types', () => {
 // ── Wiring ──────────────────────────────────────────────────────────────────
 t('the pipeline no longer sends a bare `c.description || \'\'`', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', 'storyJobPipeline.js'), 'utf8');
-  assert.ok(/buildCastIdentityDescription\(c, clothingByName\[name\]/.test(src),
+  assert.ok(/buildCastIdentityDescription\(c, clothingText\)/.test(src),
     'Phase 5b-pre must fall back to a built identity line');
   assert.ok(/buildSecondaryExpectedForPage\(/.test(src),
     'Phase 5b-pre must include page-declared secondaries');
 });
 
-console.log(`${pass} passed`);
+// ── Clothing is the page's, and never a metadata tag ────────────────────────
+t('a CATEGORY LABEL never reaches the prompt as clothing', () => {
+  // sceneCharacterClothing holds 'costumed:mermaid' / 'summer' — tags, not
+  // garments. Sending "Wearing: costumed:mermaid" is the same leak
+  // buildExpectedCharactersForBbox guards with isCategoryLabel().
+  for (const tag of ['costumed:mermaid', 'costumed', 'summer', 'winter', 'standard', ' Summer ']) {
+    const d = buildCastIdentityDescription(EMMA, tag);
+    assert.ok(!/Wearing:/.test(d), `"${tag}" leaked: ${d}`);
+    assert.ok(d.length > 20, 'the identity half must survive');
+  }
+});
+
+t('resolved prose IS kept', () => {
+  const d = buildCastIdentityDescription(EMMA, 'A yellow short-sleeve swim shirt, and a silver mermaid tail');
+  assert.ok(/Wearing: A yellow short-sleeve swim shirt/.test(d), d);
+});
+
+t('the call site resolves the category through the canonical source', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', '..', 'storyJobPipeline.js'), 'utf8');
+  // clothingRequirements first — the settled canonical-source rule.
+  assert.ok(/buildClothingDescription\(c, category, artStyle, clothingRequirements/.test(src),
+    'must resolve via buildClothingDescription with clothingRequirements');
+  assert.ok(!/buildCastIdentityDescription\(c, clothingByName\[name\]/.test(src),
+    'must NOT pass the raw category through');
+});
+
+console.log(`${pass} passed (incl. clothing resolution)`);

@@ -489,7 +489,16 @@ function buildCastIdentityDescription(char, clothingText = '') {
   if (Array.isArray(char.traits) && char.traits.length) parts.push(char.traits.filter(t => typeof t === 'string').join(', '));
   const base = parts.filter(Boolean).join(', ');
   if (!base) return '';
-  return clothingText ? `${base}. Wearing: ${clothingText}` : base;
+  // NEVER emit a CATEGORY LABEL as clothing. sceneCharacterClothing holds
+  // 'costumed:mermaid' / 'summer' — metadata tags, not garments — and sending
+  // "Wearing: costumed:mermaid" to the detector is the same class of leak
+  // buildExpectedCharactersForBbox guards with isCategoryLabel(). The caller is
+  // expected to resolve the category to prose (buildClothingDescription); this
+  // is the backstop for when it cannot.
+  const tag = String(clothingText || '').trim().toLowerCase();
+  const isCategory = ['standard', 'winter', 'summer', 'costumed'].includes(tag) || tag.startsWith('costumed:');
+  const wearable = isCategory ? '' : clothingText;
+  return wearable ? `${base}. Wearing: ${wearable}` : base;
 }
 
 /**

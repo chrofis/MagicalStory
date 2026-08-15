@@ -4331,15 +4331,29 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // sceneCharacters entries have NO `description` key, so the old
             // `c.description || ''` sent the identity call bare names — see
             // buildCastIdentityDescription for the measured consequence.
+            // CLOTHING COMES FROM THE PAGE, IDENTITY FROM THE CHARACTER.
+            // sceneCharacterClothing holds a CATEGORY ('costumed:mermaid'), not a
+            // garment, so it is resolved through buildClothingDescription —
+            // clothingRequirements first, per the settled canonical-source rule.
+            // This matters both ways: a bare tag would leak into the prompt, and
+            // a STALE outfit is worse than none — bboxDetection records a page
+            // where the detector was told to look for "Lukas wearing striped
+            // hoodie" on a cowboy page and tagged every figure UNKNOWN.
             const clothingByName = img.sceneCharacterClothing || sceneMetadata.characterClothing || {};
+            const { buildClothingDescription } = require('./server/lib/entityConsistency');
             const expectedCharacters = (img.sceneCharacters || []).map(c => {
               const name = c.name || c;
-              return {
-                name,
-                description: typeof c === 'object'
-                  ? (c.description || buildCastIdentityDescription(c, clothingByName[name] || ''))
-                  : '',
-              };
+              if (typeof c !== 'object') return { name, description: '' };
+              let clothingText = '';
+              const category = clothingByName[name];
+              if (category) {
+                try {
+                  clothingText = buildClothingDescription(c, category, artStyle, clothingRequirements || null) || '';
+                } catch (e) {
+                  log.warn(`⚠️ [BBOX-SHARED] P${img.pageNumber} ${name}: clothing "${category}" did not resolve (${e.message}) — identity line goes without it`);
+                }
+              }
+              return { name, description: c.description || buildCastIdentityDescription(c, clothingText) };
             });
             // Story-invented characters live ONLY in the Visual Bible — never in
             // sceneCharacters, which is the user's photo-backed cast. Without them
