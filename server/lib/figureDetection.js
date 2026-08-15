@@ -249,7 +249,20 @@ const getGarmentColour = () => require('./garmentColourFix');
 //   w2.5 h4.0 t0.20 -> [212,393,392, 934] -> 13,159 px   cuts him off
 // For reference the Gemini second-opinion box gave 30,464 px, so the
 // synthesised box reproduces it to within 2.4%.
-const FACE_TO_BODY_W = 3.0;    // shoulders+arms, in face widths
+// Measured on the RAW DINO face box that production actually feeds in (75px
+// wide for Daniel, half the size of the padded one). The second yellow shirt
+// piece, at x 120-185, is simply outside a narrow box, so no seed can be placed
+// on it:
+//   w=3.0 -> box x173..399  1 seed
+//   w=4.0 -> box x136..436  2 seeds, second blob 1,212px
+//   w=4.5 -> box x117..455  2 seeds, second blob 1,690px
+//   w=5.0 -> box x 98..474  2 seeds, second blob 1,703px   <- plateau starts
+//   w=6.0 -> box x 61..511  2 seeds, identical to 5.0
+// 5.0 is the start of the plateau rather than the 4.43 threshold this one man
+// needs, so a slightly different face box on another page still clears it. A
+// wider box lets more of the neighbours in, which is what the face negatives
+// and the depth pass are for.
+const FACE_TO_BODY_W = 5.0;    // shoulders+arms, in face widths
 const FACE_TO_BODY_H = 6.5;    // body below the chin, in face heights
 const FACE_TO_BODY_TOP = 0.25; // headroom above the face box
 
@@ -407,17 +420,40 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
   // --- 3. winner-take-all: a pixel belongs to the FRONTMOST claimant ---------
   // This replaces pairwise dilated subtraction. Nothing is dilated, so no seam
   // fringe is created and no speckle filter is needed to clean one up.
+  // A FIGURE'S OWN FACE IS RESERVED (owner, 2026-08-15). Depth alone lets the
+  // figure in front eat into the head of the figure behind, and of every pixel
+  // on the page that is the one that actually costs something: the face is what
+  // identifies the figure, anchors its SAM prompt and drives the identity pass.
+  // Losing a shoulder is cosmetic; losing a cheek is not. So a pixel inside
+  // exactly one figure's face box is reserved for that figure — nobody in front
+  // may claim it. Where two face boxes overlap there is no clear owner, so the
+  // normal depth rule decides.
+  const reserved = new Int32Array(W * H);   // 0 none, i+1 owner, -1 contested
+  for (let i = 0; i < n; i++) {
+    const f = faces[i];
+    if (!f || !raw[i]) continue;
+    for (let y = Math.max(0, f[1]); y < Math.min(H, f[3]); y++) {
+      for (let x = Math.max(0, f[0]); x < Math.min(W, f[2]); x++) {
+        const k = y * W + x;
+        reserved[k] = reserved[k] === 0 ? i + 1 : -1;
+      }
+    }
+  }
+
   const owner = new Int32Array(W * H);   // 0 = unclaimed, else figureIndex + 1
   for (const i of depth) {
     const alpha = raw[i].mask.alpha;
     const lost = new Map();              // ownerIdx -> px taken from this figure
-    let kept = 0;
+    let kept = 0, protectedPx = 0;
     for (let k = 0; k < W * H; k++) {
       if (!alpha[k]) continue;
+      const r = reserved[k];
+      if (r > 0 && r !== i + 1) { alpha[k] = 0; protectedPx++; continue; }  // someone's face
       const o = owner[k];
       if (o) { alpha[k] = 0; lost.set(o - 1, (lost.get(o - 1) || 0) + 1); }
       else { owner[k] = i + 1; kept++; }
     }
+    if (protectedPx) log.debug(`[SAM] ${pageLabel}figure ${i}: ${protectedPx}px left to another figure's face box`);
     raw[i].kept = kept;
     raw[i].lost = lost;
   }

@@ -327,7 +327,7 @@ t('the unpaired face scored HIGHEST of all five', () => {
 
 t('the synthesised person box reproduces the Gemini box result', () => {
   const box = _personBoxFromFace([266, 414, 338, 518], 864, 1222);
-  assert.deepStrictEqual(box, [194, 388, 410, 1194]);
+  assert.deepStrictEqual(box, [122, 388, 482, 1194]);   // w=5.0
   // Measured with SAM: this box + face points -> 29,744px, against 30,464px
   // from the Gemini second-opinion box. Within 2.4%.
   const gemini = [124, 344, 396, 1169];
@@ -346,7 +346,7 @@ t('it CONTAINS the figure rather than hugging it', () => {
   // Tighter variants measured far worse: w4.0/h5.0 -> 12,304px, w2.5/h4.0 -> 13,159px.
   const box = _personBoxFromFace([266, 414, 338, 518], 864, 1222);
   assert.ok(box[3] - box[1] > 700, 'must reach down to the feet');
-  assert.ok(box[2] - box[0] >= 3 * 72 - 2, 'must be about three face widths wide');
+  assert.ok(box[2] - box[0] >= 5 * 72 - 2, 'must be five face widths wide — narrower loses the occluded garment');
 });
 
 t('a face box is clamped to the page and junk yields null', () => {
@@ -401,6 +401,25 @@ t('the flag is the PRIMARY depth key, ahead of the ground rule', () => {
 t('two recovered figures are ordered by face height in frame', () => {
   // Higher face = further away, for figures standing on a common ground plane.
   assert.ok(/return yb - ya;/.test(SRC), 'tie-break among recovered figures');
+});
+
+// -- A figure's own face box is reserved -------------------------------------
+t("a pixel in exactly one figure's face box is reserved for it", () => {
+  // Depth alone lets the figure in front eat into the head of the figure
+  // behind, and the face is the one loss that actually costs something: it
+  // identifies the figure, anchors its SAM prompt and drives the identity pass.
+  assert.ok(/const reserved = new Int32Array\(W \* H\)/.test(SRC));
+  assert.ok(/reserved\[k\] = reserved\[k\] === 0 \? i \+ 1 : -1/.test(SRC),
+    'a pixel in two face boxes is contested (-1), not owned');
+  assert.ok(/if \(r > 0 && r !== i \+ 1\) \{ alpha\[k\] = 0; protectedPx\+\+; continue; \}/.test(SRC),
+    'a figure in front must not claim another figure\u2019s face pixels');
+});
+
+t('contested face pixels fall back to the depth rule', () => {
+  // Where two face boxes overlap there is no clear owner, so -1 means "no
+  // reservation" and the normal front-most-wins comparison decides.
+  assert.ok(/const r = reserved\[k\];/.test(SRC));
+  assert.ok(/r > 0 &&/.test(SRC), 'only a POSITIVE reservation blocks a claim; -1 does not');
 });
 
 console.log(pass + ' passed');
