@@ -11292,3 +11292,31 @@ are unchanged. Expected trial wall clock after this: ~140s (production baseline
 is 123s).
 
 **Touched files:** `storyJobPipeline.js`.
+
+---
+
+## 2026-08-15 — Every person named in a trial scene must be declared in that scene's cast
+
+**Context:** trial showcase `job_1786818831439_kfyyu4vrh` page 3 rendered the
+main character TWICE, side by side. Not a rendering fluke: the page's
+`imageSummary` named two boys ("… hands <second child> the shard, <second
+child> turns it over"), but the scene's `characters` array declared only the
+main character, and the second child was absent from
+`visualBible.secondaryCharacters` — despite appearing 79 times in the story
+data and in the page text of three pages. The renderer received prose naming
+two people plus exactly one person's reference crops (face + body, the normal
+character slot) and painted that person twice. The existing rule
+("only include characters that you invent as `secondaryCharacters`") was
+obeyed for one invented character and skipped for the other; nothing required
+the scene's cast to match its own prose.
+
+**Decision:** `prompts/story-trial.txt` gains one rule beside the
+`characters.id` convention: every person named in `imageSummary` also appears
+in that scene's `characters`, referenced by their visual bible `CHR` id; a
+person not in the visual bible belongs there first, with a visual spec. The
+visual bible is emitted BEFORE the pages (output order: TITLE → VISUAL BIBLE →
+COVER SCENE → STORY PAGES), so the cast is planned up front and pages only
+reference it — a spec is needed only for someone the bible does not already
+carry.
+
+**Touched files:** `prompts/story-trial.txt`.

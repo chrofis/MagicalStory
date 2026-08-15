@@ -65,6 +65,7 @@ It must be detailed enough to illustrate without additional context.
 
 - MAX 3 characters per scene — the main character plus at most two others — and keep the cast minimal: add a secondary character only when the story needs one. Use character names, not descriptions.
 - `characters.id`: use visual bible `CHR` IDs for secondary characters (e.g., `"CHR001"`). Use `null` for the main character (who has reference photos).
+- Every person named in `imageSummary` also appears in that scene's `characters`, referenced by their visual bible `CHR` id. A person who is not in the visual bible belongs there first, with a visual spec.
 - `characters.depth` (optional, default `foreground`): how far from camera. Use `background` for tiny/distant figures.
 - `characters.perspective` (optional, default `front`): camera angle on this character.
 - `setting.location`: use `"Name [LOC001]"` for the default photo. When the landmark in the LANDMARKS section lists PHOTO ANGLES, use `"Name [LOC001.N]"` where N is the variant whose description fits the scene framing (interior shots for "on/in the landmark" scenes, exterior shots for distant/establishing views).
