@@ -41,10 +41,16 @@ const DEFAULT_BASE = 'https://staging.magicalstory.ch';
 const POLL_TIMEOUT_MS = 20 * 60 * 1000;
 
 function parseArgs() {
-  const out = { base: DEFAULT_BASE, entry: null, dryRun: false, wait: true };
+  const out = { base: DEFAULT_BASE, entry: null, dryRun: false, wait: true, over: {} };
   for (const a of process.argv.slice(2)) {
     if (a.startsWith('--entry=')) out.entry = Number(a.split('=')[1]);
     else if (a.startsWith('--base=')) out.base = a.split('=')[1].replace(/\/$/, '');
+    // Per-run overrides of the rotation entry — e.g. --theme=wizard picks the
+    // wizard costume (adventure topics in server/config/trialCostumes.js).
+    else if (a.startsWith('--category=')) out.over.storyCategory = a.split('=')[1];
+    else if (a.startsWith('--topic=')) out.over.storyTopic = a.split('=')[1];
+    else if (a.startsWith('--theme=')) out.over.storyTheme = a.split('=')[1];
+    else if (a.startsWith('--details=')) out.over.storyDetails = a.slice('--details='.length);
     else if (a === '--dry-run') out.dryRun = true;
     else if (a === '--no-wait') out.wait = false;
     else if (a === '--help' || a === '-h') { console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0]); process.exit(0); }
@@ -104,7 +110,9 @@ function faceDataUri(entry) {
 
 (async () => {
   const args = parseArgs();
-  const { entry, entries } = pickEntry(args.entry);
+  const picked = pickEntry(args.entry);
+  const entries = picked.entries;
+  const entry = { ...picked.entry, ...args.over };
   const envLabel = /staging\./.test(args.base) ? 'STAGING' : 'PRODUCTION';
 
   console.log('─'.repeat(72));

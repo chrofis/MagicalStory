@@ -11320,3 +11320,35 @@ reference it — a spec is needed only for someone the bible does not already
 carry.
 
 **Touched files:** `prompts/story-trial.txt`.
+
+---
+
+## 2026-08-15 — Trial: 6 pages, back cover, no avatar sheet evals
+
+**Context:** measured trial cost/time breakdown (`job_1786818831439`):
+17 image generations for a 5-page trial — 7 page calls (5 + 2 retries), 1 cover,
+5 `trial_empty_scene` plates, and 4 for the character 2×4 avatar sheet
+(2 body-row incl. a retry, 1 head-row, 1 style transfer) plus 4 Gemini sheet
+evals. Marginal cost of a page is ~11–12.5s (the text-streaming rate: each
+page's image renders while the next page streams, so images add no wall clock),
+and covers are started concurrently under `pLimit(3)`.
+
+**Decisions (owner):**
+1. **6 pages** instead of 5 (`server/routes/trial.js`, `const pages`). Adds
+   ~12s.
+2. **Back cover** added (title page + back cover; still no dedication page —
+   trials store no dedication). `inputData.coverTypes` is now the explicit
+   list, resolved by ONE helper (`coverTypesFor`) used by both the start-guard
+   and the start-loop so they cannot disagree; the legacy `titlePageOnly`
+   boolean remains the fallback for every other caller. The trial writer emits
+   only a front COVER SCENE, so the back cover uses a code-built closing-scene
+   hint, mirroring the existing front-cover fallback. Concurrent with the other
+   covers → one Grok call, ~no wall clock.
+3. **No avatar sheet evals in trial**: `prepareStyledAvatars(..., {
+   skipQualityEval: true })`, which reaches `generateComposited2x4` as
+   `skipReview` (1 try per row, no bodies/heads/identity/style eval). The trial
+   has no repair stage, so it could not act on a failed sheet eval anyway.
+
+**Touched files:** `server/routes/trial.js`, `storyJobPipeline.js`,
+`scripts/admin/trial-showcase.js` (--category/--topic/--theme/--details
+overrides).

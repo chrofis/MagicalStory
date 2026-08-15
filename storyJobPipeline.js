@@ -88,6 +88,21 @@ const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./se
 const { stripDataUriPrefix } = require('./server/lib/r2');
 const { COVER_PAGE_NUMBERS } = require('./server/lib/coverKeys');
 
+/**
+ * Which covers a job renders. `inputData.coverTypes` is the explicit list
+ * (trial: title page + back cover, no dedication page — trials store no
+ * dedication); otherwise the legacy `titlePageOnly` boolean decides. One
+ * resolver so the start-guard and the start-loop can never disagree.
+ */
+function coverTypesFor(inputData = {}) {
+  if (Array.isArray(inputData.coverTypes) && inputData.coverTypes.length > 0) {
+    return inputData.coverTypes;
+  }
+  return inputData.titlePageOnly
+    ? ['titlePage']
+    : ['titlePage', 'initialPage', 'backCover'];
+}
+
 // Image generation mode: 'parallel' (fast) or 'sequential' (consistent - passes previous image)
 const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'parallel';
 
@@ -648,7 +663,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.info(`🎨 [TRIAL] Starting immediate avatar styling (${trialAvatarRequirements.length} variants)...`);
       streamingAvatarStylingPromise = (async () => {
         try {
-          await prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null);
+          // Trial skips the sheet reviews (owner 2026-08-15): skipQualityEval
+          // reaches generateComposited2x4 as skipReview — 1 try per row, no
+          // bodies/heads/identity/style eval. Measured on job_1786818831439:
+          // 4 Gemini evals plus a body-row retry the trial cannot act on
+          // anyway (no repair stage).
+          await prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: true });
           earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
           log.info(`✅ [TRIAL] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
@@ -1146,7 +1166,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Helper: Start cover generation
     const startCoverGeneration = (coverType, hint) => {
       if (streamingCoverPromises.has(coverType) || skipImages) return;
-      if (inputData.titlePageOnly && coverType !== 'titlePage') return;
+      if (!coverTypesFor(inputData).includes(coverType)) return;
       if (skipCovers) return;
 
       const coverPromise = streamCoverLimit(async () => {
@@ -2641,9 +2661,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // Start cover generation NOW that avatars are ready (covers need avatars as reference photos)
     if (!skipImages && !skipCovers) {
-      const coverTypes = inputData.titlePageOnly
-        ? ['titlePage']
-        : ['titlePage', 'initialPage', 'backCover'];
+      const coverTypes = coverTypesFor(inputData);
       for (const coverType of coverTypes) {
         if (streamingCoverPromises.has(coverType)) continue;
         const hint = coverHints?.[coverType];
@@ -2666,6 +2684,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
           }
           startCoverGeneration(coverType, defaultHint);
+        } else if (coverType === 'backCover') {
+          // Same fallback as the front cover above: the trial writer emits one
+          // COVER SCENE (the front), so the back cover has no hint. A closing
+          // scene at the story's location, main character only — covers run
+          // concurrently (streamCoverLimit = 3), so this adds no wall clock.
+          const mainCharNames = inputData.characters
+            ?.filter(c => c.isMainCharacter)
+            .map(c => c.name)
+            .join(', ') || inputData.characters?.map(c => c.name).slice(0, 3).join(', ') || 'the main character';
+          const backHint = {
+            hint: `A calm closing back-cover scene featuring ${mainCharNames} at the story's main location, warm end-of-day light, content and relaxed after the adventure. Simple composition with open space, no text.`,
+            characterClothing: {}
+          };
+          if (inputData._trialCostumeType) {
+            for (const char of (inputData.characters || [])) {
+              backHint.characterClothing[char.name] = 'costumed';
+            }
+          }
+          startCoverGeneration(coverType, backHint);
         }
       }
       log.debug(`⚡ [UNIFIED] Started ${streamingCoverPromises.size} cover generations (avatars ready)`);

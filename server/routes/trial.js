@@ -2302,7 +2302,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
   // Trial generates 5 scenes (= 5 pages in picture-book layout). Previously
   // this was pages=10 with the implicit pages/2 conversion for non-1st-grade,
   // which is gone now — set the explicit scene count directly.
-  const pages = 5;
+  const pages = 6;
 
   const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -2339,7 +2339,11 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     characters: [trialCharacter],
     mainCharacters: [trialCharacter.id],
     skipCovers: false,
-    titlePageOnly: true, // Only generate title page, skip initialPage and backCover
+    // Title page + back cover, no dedication page (trials store no dedication).
+    // Covers render concurrently (streamCoverLimit = 3), so the back cover
+    // costs one Grok call and ~no wall clock.
+    coverTypes: ['titlePage', 'backCover'],
+    titlePageOnly: true, // legacy flag — coverTypes above is what decides
     enableFullRepair: false, // No repair workflow for trial stories
     skipQualityEval: true, // Skip quality evaluation to save cost
     trialMode: true, // Trial prompt with visual bible backgrounds for early empty scene streaming
