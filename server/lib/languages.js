@@ -58,14 +58,10 @@ const LANGUAGES = {
     note: '(South Tyrolean: Austrian base + Italian influence. "Bub", "Jänner", "Ciao". CORRECT: "der Bub", "im Jänner" | WRONG: "der Junge", "grösser")'
   },
 
-  // Legacy 'de' maps to Standard German for backwards compatibility
-  'de': {
-    code: 'de-de',
-    name: 'Deutsch (Standard)',
-    nameEnglish: 'German (Standard)',
-    instruction: 'You MUST write your response in German. Use standard German spelling (Hochdeutsch). CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs, "ss" after short vowels. (3) Standard vocabulary throughout. CORRECT: "größer", "süß", "der Junge", "die Mütze", "der Eimer", "im Januar", "die Tomate", "gucken", "die Treppe" | WRONG: "groesser", "grösser", "der Bub", "die Kappe", "der Kübel".',
-    note: '(Standard German: ß after long vowels, ss after short. CORRECT: "größer", "süß" | WRONG: "grösser", "der Bub")'
-  },
+  // Legacy base 'de' is Swiss — this is a Swiss product, so bare German means
+  // Swiss orthography (never ß, always ss) and Swiss vocabulary. Aliased to the
+  // de-ch entry after the object below so there is exactly ONE source of truth.
+  // de-de / de-at / de-it stay distinct for Germany / Austria / South-Tyrol.
 
   // ============================================================================
   // SWISS GERMAN DIALECTS (Schweizerdeutsch / Mundart)
@@ -302,6 +298,13 @@ const LANGUAGES = {
     note: '(Standard Italian: passato prossimo/remoto. "cellulare", "anguria". CORRECT: "il cellulare", "sono andato" | WRONG: "il natel", "tengo fame")'
   }
 };
+
+// Bare 'de' IS Swiss German (see note above). One object, not a copy, so the
+// two can never drift. Any story/UI tagged with the base 'de' code resolves to
+// the de-ch instruction (never ß). NOTE: the resolvers fall back to English for
+// an unknown code, so this alias must exist — a missing 'de' would silently
+// write German stories in English.
+LANGUAGES['de'] = LANGUAGES['de-ch'];
 
 /**
  * Get full language instruction for a language code

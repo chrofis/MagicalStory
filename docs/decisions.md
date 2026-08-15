@@ -10589,3 +10589,22 @@ labeled honestly rather than faking a critique step that doesn't exist.
 
 **Touched:** server/lib/testlab.js (parsePageBlocks + branch mode in scene/text/bible
 stages), client/src/components/testlab/ScorecardsPanel.tsx.
+
+## 2026-08-14 — Bare `de` is Swiss German (never ß)
+
+**Context:** Recent German stories (all tagged with the base `de` code) were full of `ß`
+— weiß, Großvater, stieß — on the rendered page text (21–61 occurrences each), while the
+one `de-ch` story had zero. Root cause: `server/lib/languages.js` mapped legacy `de` to
+Standard German (`de-de`), whose instruction explicitly says *Use "ß" after long vowels*.
+The writer was being told to use ß. (The scorecard judge also wrongly reported "ss
+throughout" — LLM judges are unreliable on orthography.)
+
+**Decision:** Removed the separate `de` entry and aliased `LANGUAGES['de'] =
+LANGUAGES['de-ch']`. This is a Swiss product, so bare German = Swiss orthography (never ß,
+always ss) + Swiss vocabulary. One object, so de and de-ch can never drift. The alias is
+mandatory, not cosmetic: the resolvers fall back to English for an unknown code, so a
+missing `de` would silently write German stories in English. `de-de` / `de-at` / `de-it`
+stay distinct (Germany/Austria/South-Tyrol users legitimately use ß). No mechanical
+ß→ss guard was added (owner chose remap-only); existing stories were NOT backfilled.
+
+**Touched files:** server/lib/languages.js.
