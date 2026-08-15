@@ -179,12 +179,16 @@ async function loadEmptyScene(storyId, pageNumber) {
  * when the version is missing — a silent fall back to v0 would answer a
  * different question than the one asked.
  */
-async function loadActivePageImage(storyId, pageNumber, versionIndex = null) {
+// imageType lets a stage target an intermediate instead of the page itself —
+// 'tl_step' holds the composite's plate, depopulated background and pasted
+// canvas, so detection can be run on the ghosts rather than on the finished
+// illustration. Only meaningful together with a pinned versionIndex.
+async function loadActivePageImage(storyId, pageNumber, versionIndex = null, imageType = null) {
   const { getActiveVersion, getStoryImage } = require('../services/database');
   const coverKey = pageNumber < 0 ? COVER_KEY_BY_PAGE[String(pageNumber)] : null;
   const pinned = Number.isFinite(Number(versionIndex)) ? Number(versionIndex) : null;
   if (pinned !== null) {
-    const row = await getStoryImage(storyId, coverKey || 'scene', coverKey ? null : pageNumber, pinned);
+    const row = await getStoryImage(storyId, imageType || coverKey || 'scene', coverKey && !imageType ? null : pageNumber, pinned);
     if (!row) throw new Error(`No version ${pinned} for ${storyId} page ${pageNumber}`);
     const bytes = await bytesFor(row);
     if (!bytes) throw new Error(`Bytes unavailable for ${storyId} page ${pageNumber} v${pinned}`);
@@ -762,7 +766,7 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
 
   // params.versionIndex pins the exact bytes so an A/B of the detection knobs
   // compares the same picture, not whatever won pick-best in between.
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, params.versionIndex);
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, params.versionIndex, params.imageType);
   const expectedCharacters = buildExpectedCharacters(ctx);
 
   // When grounding-dino is the configured backend, a cold analyzer (every
