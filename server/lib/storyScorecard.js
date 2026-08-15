@@ -9,13 +9,26 @@
 
 const crypto = require('crypto');
 
-// artifact -> ordered dimension keys. The judge prompt
-// (prompts/story-scorecard-judge.txt) mirrors these exactly.
+// artifact -> ordered dimension keys. The active judge prompt mirrors these
+// exactly. v1.2 grew the beats rubric to a strict SUPERSET of the beats
+// reviewer's checks (stakes, illustratable, repetition, castVariety,
+// looseThreads) so a review fix always has a dimension that can reward it —
+// before that, the reviewer closed loose threads the judge never scored, and
+// scores sat flat across passes while real fixes landed.
 const RUBRIC = {
-  beats:       ['arc', 'pacing', 'emotion', 'causality', 'themeFit'],
+  beats:       ['arc', 'pacing', 'emotion', 'causality', 'themeFit',
+                'stakes', 'illustratable', 'repetition', 'castVariety', 'looseThreads'],
   scene:       ['clarity', 'variety', 'grounding', 'setting', 'composition'],
   storyText:   ['language', 'readability', 'voice', 'alignment', 'dialogue'],
   visualBible: ['completeness', 'wardrobe', 'world', 'anchors', 'consistency'],
+};
+
+// The rubric each evaluator VERSION scores against. Dims are per-version so old
+// persisted rows (5-dim beats) remain interpretable next to new 10-dim rows;
+// cross-version comparison is already flagged in the UI.
+const RUBRIC_V1 = {
+  ...RUBRIC,
+  beats: ['arc', 'pacing', 'emotion', 'causality', 'themeFit'],
 };
 
 // Evaluator version — BUMP when the rubric dims or the judge prompt change so
@@ -25,20 +38,21 @@ const RUBRIC = {
 // bump the semver still shows a changed hash. Every score record carries both.
 // version → PROMPT_TEMPLATES key. Add a row + a prompts/*.txt file to ship a new
 // evaluator; RUBRIC (the dimensions) stays fixed so versions stay comparable.
-const EVALUATOR_PROMPT_KEYS = { '1.0': 'storyScorecardJudge', '1.1': 'storyScorecardJudgeV1_1' };
-const DEFAULT_EVALUATOR_VERSION = '1.1'; // harsher calibration is the default; 1.0 still selectable
+const EVALUATOR_PROMPT_KEYS = { '1.0': 'storyScorecardJudge', '1.1': 'storyScorecardJudgeV1_1', '1.2': 'storyScorecardJudgeV1_2' };
+const EVALUATOR_RUBRICS = { '1.0': RUBRIC_V1, '1.1': RUBRIC_V1, '1.2': RUBRIC };
+const DEFAULT_EVALUATOR_VERSION = '1.2'; // 10-dim beats (superset of the reviewer) + harsh calibration
 const EVALUATOR_VERSION = DEFAULT_EVALUATOR_VERSION; // back-compat export
 
 function resolveEvaluator(version) {
   const v = version || DEFAULT_EVALUATOR_VERSION;
   const promptKey = EVALUATOR_PROMPT_KEYS[v];
   if (!promptKey) throw new Error(`Unknown evaluator version "${v}" (have ${Object.keys(EVALUATOR_PROMPT_KEYS).join(', ')})`);
-  return { version: v, promptKey };
+  return { version: v, promptKey, rubric: EVALUATOR_RUBRICS[v] || RUBRIC };
 }
 
 function evaluatorStamp(judgePromptText, version) {
   const v = version || DEFAULT_EVALUATOR_VERSION;
-  const basis = JSON.stringify(RUBRIC) + '\n' + (judgePromptText || '');
+  const basis = JSON.stringify(EVALUATOR_RUBRICS[v] || RUBRIC) + '\n' + (judgePromptText || '');
   return {
     evaluatorVersion: v,
     evaluatorHash: crypto.createHash('sha256').update(basis).digest('hex').slice(0, 12),
@@ -119,11 +133,11 @@ function provenanceOf(d) {
  * @param {Object} input {beats:{dims:{...},notes?}, scene:{...}, ...}
  * @returns {{artifacts: Object, overall: number}}
  */
-function scoreFromDims(input, { partial = false, only = null } = {}) {
+function scoreFromDims(input, { partial = false, only = null, rubric = null } = {}) {
   if (!input || typeof input !== 'object') throw new Error('scorecard input is not an object');
   const artifacts = {};
   const artScores = [];
-  for (const [artifact, dims] of Object.entries(RUBRIC)) {
+  for (const [artifact, dims] of Object.entries(rubric || RUBRIC)) {
     // Grade ONLY the artifacts actually sent to the judge. A judge handed just
     // `beats` often echoes the full JSON skeleton with 0s for the artifacts it
     // was not given; those must be ignored, not validated (0 is out of 1-10 and
@@ -160,7 +174,7 @@ function parseJudgeJson(text) {
 }
 
 module.exports = {
-  RUBRIC, mean, finalBeats, finalScenes, extractArtifacts,
+  RUBRIC, RUBRIC_V1, EVALUATOR_RUBRICS, mean, finalBeats, finalScenes, extractArtifacts,
   buildJudgeInput, buildJudgeInputFromArtifacts, provenanceOf,
   scoreFromDims, parseJudgeJson,
   EVALUATOR_VERSION, DEFAULT_EVALUATOR_VERSION, EVALUATOR_PROMPT_KEYS,

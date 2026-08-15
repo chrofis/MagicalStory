@@ -10854,3 +10854,28 @@ the tight plate the exact-position gates pass on their own.
 at the designed position; with feather → 0.47/0.29 PASS, no boundary seam.
 
 **Touched:** `server/lib/coverTitlePaint.js`.
+
+## 2026-08-15 — Judge v1.2 mirrors the beats reviewer; full review chain persisted
+
+**Context:** Beats replay on a fresh story scored flat 6.6 → 6.6 → 6.6 across raw and two
+review passes. Pass 1 closed a real loose thread (an object resolving the plot had no
+stated origin), but the judge had no dimension that rewards that; meanwhile the judge's
+actual deductions (thin emotion, unearned lesson) were things the reviewer never checks.
+Reviewer and judge were grading different exams. Separately, the reviewer's full analysis
+and its per-page rewrites were not persisted — only one check's text and page numbers —
+so "what did the reviewer find and do each round?" was unanswerable from stored data.
+
+**Decision:** (1) Evaluator v1.2 (new default): beats rubric = 10 dims — the original 5
+(arc, pacing, emotion, causality, themeFit) + the 5 reviewer checks (stakes,
+illustratable, repetition, castVariety, looseThreads). Rubrics are now versioned
+(EVALUATOR_RUBRICS) so old 5-dim rows stay interpretable. (2) The beats reviewer prompt
+gains checks 9 (emotion — a felt, drawable reaction) and 10 (theme — the lesson visibly
+acted on), making reviewer and judge grade the same 10 things in both directions.
+(3) story_scores.chain (migration 019) stores the full chain per scored round: reviewer
+model, complete analysis, exact per-page before→after rewrites. Populated by the beats
+replay (pass + branch), scene replay, and text branch; shown in the Scores drill-down.
+
+**Touched:** server/lib/storyScorecard.js, server/lib/testlab.js, server/lib/scoreStore.js,
+prompts/story-scorecard-judge-v1_2.txt, prompts/story-beats-review.txt,
+server/services/prompts.js, migrations/019_story_scores_chain.sql,
+client/src/services/testlabService.ts, client/src/components/testlab/ScorecardsPanel.tsx.

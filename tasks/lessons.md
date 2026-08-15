@@ -558,3 +558,11 @@ empty on every batch eval; a correct costumed cover was HARD_FAILed and repair-s
 I added even fired in logs, unnoticed. Rule: when adding an input that a shared function derives
 from its arguments, grep every call site and verify each caller's argument SHAPE actually carries
 the field — and make empty-input warnings fire for every evaluation type, not just the one I tested.
+
+## 2026-08-15 — from the wardrobe/consistency/title sessions
+- **Use the stored boxes before inventing geometry.** I cut head crops as a blind top-of-body band while every figure carried `faceBox` + a SAM mask ("we have face boxes not?"). Before deriving any region, grep the detection payload for what's already there.
+- **A prompt rule proves the writer CAN comply, not that it WILL.** Bible set costumed:mermaid one day, false the next, from near-identical inputs. Fixes that must hold need an enforcement point (reviewer with the evidence + a merge that can apply the correction), not another writer sentence.
+- **When a reviewer's output is dropped, suspect the parser before the model.** DeepSeek's `costumed (costume: mermaid)` heading was valid — mirrored our own echo format — and my parser binned it. Accept every notation we ourselves print.
+- **Tolerant parsers hide producer drift until one strict consumer meets one odd form.** Audit contracts producer-side (the notation each prompt prescribes), not just parser-side. Found: era lost on iterate, UPPERCASE severities charging 0, wornAs missing in beats mode.
+- **"Keep every fact" + "cut 25%" is unsolvable; models pick a side.** Flash deleted facts, DeepSeek refused to shorten. Name the MAIN POINTS to keep and say them in fewer words — 0.5% → 33% compression with nothing lost.
+- **The beat states the action, not the aftermath, and never composes the frame** — scale/framing words in beats get overridden by the reference photo anyway; put the story in the pose.

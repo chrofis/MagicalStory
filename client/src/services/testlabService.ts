@@ -85,6 +85,9 @@ export interface ScoreRow {
   gen_ms: number | null;
   judge_cost_usd: number | null;
   judge_ms: number | null;
+  // full review chain that produced this round's artifact (null for raw rounds
+  // and pre-chain rows): reviewer analysis + exact per-page before→after.
+  chain: { reviewModel?: string; pass?: number; fromRound?: number; analysis?: string; rewrites?: { page: number; before: string; after: string }[] } | null;
   created_at: string;
 }
 

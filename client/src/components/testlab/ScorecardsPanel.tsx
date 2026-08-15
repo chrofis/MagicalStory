@@ -20,7 +20,7 @@ const secs = (ms: number | null | undefined) => (ms == null ? '—' : `${(ms / 1
 export default function ScorecardsPanel() {
   const [rows, setRows] = useState<ScoreRow[]>([]);
   const [models, setModels] = useState<TextModelInfo[]>([]);
-  const [evalSel, setEvalSel] = useState<'all' | '1.0' | '1.1'>('all');
+  const [evalSel, setEvalSel] = useState<'all' | '1.0' | '1.1' | '1.2'>('all');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [modal, setModal] = useState<CellModal>(null);
@@ -95,7 +95,7 @@ export default function ScorecardsPanel() {
         <div className="text-sm font-semibold">Model-comparison scorecards</div>
         <div className="flex items-center gap-3 text-xs text-gray-600">
           <div className="flex rounded overflow-hidden border border-gray-300">
-            {(['all', '1.0', '1.1'] as const).map(v => (
+            {(['all', '1.0', '1.1', '1.2'] as const).map(v => (
               <button key={v} className={`px-2 py-1 ${evalSel === v ? 'bg-indigo-600 text-white' : 'bg-white'}`} onClick={() => setEvalSel(v)}>{v === 'all' ? 'all evals' : `v${v}`}</button>
             ))}
           </div>
@@ -155,7 +155,7 @@ export default function ScorecardsPanel() {
 
       {modal && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setModal(null)}>
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-auto p-4 text-xs" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[85vh] overflow-auto p-4 text-xs" onClick={e => e.stopPropagation()}>
             {modal.kind === 'prompt' && (<>
               <div className="font-semibold mb-2">Evaluator v{modal.version} — judge prompt</div>
               <pre className="whitespace-pre-wrap bg-gray-50 p-3 rounded">{modal.prompt}</pre>
@@ -168,6 +168,27 @@ export default function ScorecardsPanel() {
               <pre className="whitespace-pre-wrap bg-gray-50 p-2 rounded mb-2">{JSON.stringify(modal.row.dims, null, 1)}</pre>
               <div className="font-semibold">Judge feedback</div>
               <div className="bg-gray-50 p-2 rounded mb-2">{modal.row.notes || '(no note stored)'}</div>
+              {modal.row.chain && (<>
+                <div className="font-semibold">Review chain — what produced this round{modal.row.chain.reviewModel ? <span className="font-mono font-normal"> ({modal.row.chain.reviewModel})</span> : null}</div>
+                {modal.row.chain.analysis && (<>
+                  <div className="mt-1 text-gray-600">Reviewer analysis (all checks):</div>
+                  <pre className="whitespace-pre-wrap bg-amber-50 p-2 rounded max-h-64 overflow-auto mb-2">{modal.row.chain.analysis}</pre>
+                </>)}
+                {(modal.row.chain.rewrites?.length ?? 0) > 0 ? (
+                  <div className="mb-2">
+                    <div className="text-gray-600">Rewrites ({modal.row.chain.rewrites!.length} page{modal.row.chain.rewrites!.length > 1 ? 's' : ''}):</div>
+                    {modal.row.chain.rewrites!.map(rw => (
+                      <div key={rw.page} className="border border-gray-200 rounded mt-1">
+                        <div className="px-2 py-0.5 bg-gray-100 font-semibold">Page {rw.page}</div>
+                        <div className="grid grid-cols-2 gap-0 divide-x divide-gray-200">
+                          <pre className="whitespace-pre-wrap p-2 bg-red-50/50 overflow-auto max-h-48">{rw.before}</pre>
+                          <pre className="whitespace-pre-wrap p-2 bg-green-50/50 overflow-auto max-h-48">{rw.after}</pre>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <div className="text-gray-500 mb-2">(reviewer rewrote nothing this pass)</div>}
+              </>)}
               <div className="font-semibold">Evaluated text</div>
               <pre className="whitespace-pre-wrap bg-gray-50 p-2 rounded max-h-64 overflow-auto">{modal.row.artifact_text || '(not captured for this row)'}</pre>
               <div className="mt-2 text-gray-500">To run another round, close this and use <b>＋ next round</b> on the row.</div>
