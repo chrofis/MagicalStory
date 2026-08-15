@@ -1554,6 +1554,15 @@ async function attachSamMasksToFigures(imageData, figures, { pageLabel = '' } = 
 module.exports = {
   _shortGarmentPhrase,
   detectFiguresWithGroundingDino,
+  // Raw DINO access for callers that supply their own identity signal instead
+  // of the SOM naming pass. The scene composite is one: its figures are painted
+  // in known palette colours, so the dominant hue inside a box names it
+  // deterministically and for free, where SOM returned UNKNOWN for 4 of 5
+  // ghosts on a plate (Lab exp 723).
+  _gdinoDetect,
+  _collectNmsBoxes,
+  GDINO_PERSON_NMS_IOU,
+  GDINO_FACE_NMS_IOU,
   detectPersonBoxInCrop,
   recoverFaceBox,
   attachSamMasksToFigures,

@@ -317,6 +317,148 @@ async function findColorBbox(buf, hex) {
  *   - minBlobPixels 500 : drops noise specks. Real silhouettes are >5k px on
  *                       a 1024×1024 canvas.
  */
+/**
+ * Locate the ghosts with GroundingDINO instead of a colour diff.
+ *
+ * The split of labour, and why it is this way round (owner, 2026-08-15):
+ *   - DINO answers "where are the people" — it looks for figures, so scenery
+ *     cannot impersonate one. The colour diff could: on p4 sunlit lawn (hue 78,
+ *     sat 0.59) matched the yellow palette entry closely enough to return a
+ *     177x39 strip of grass as a character, which then anchored the ground
+ *     plane, inverted it, and shrank two children to 40% of their painted size.
+ *   - The PALETTE answers "which person is this" — each ghost is painted in a
+ *     known hue, so the dominant palette colour inside a DINO box names it
+ *     deterministically and for nothing. DINO itself cannot name anyone; the
+ *     SOM pass that normally does returned UNKNOWN for 4 of 5 ghosts on a
+ *     plate (Lab exp 723), because a flat cartoon figure gives a VLM nothing
+ *     to recognise.
+ *   - DINO's FACE boxes give the head, paired to the person box that contains
+ *     them. No head-tint band needed, and no risk of picking a hand.
+ *
+ * Returns the same shape as findSilhouettesByDiff so every consumer downstream
+ * — stature model, plate ratio, z-order, figure-figure occlusion — is
+ * unchanged. Needs no depopulated background, so it can run on the plate alone.
+ */
+async function findSilhouettesWithDino(populatedBuf, cast, opts = {}) {
+  const {
+    _gdinoDetect, _collectNmsBoxes, GDINO_PERSON_NMS_IOU, GDINO_FACE_NMS_IOU,
+  } = require('./figureDetection');
+  const MIN_COLOUR_FRACTION = opts.minColourFraction ?? 0.04;  // of the box's area
+  const HUE_THRESHOLD = opts.hueThreshold ?? 30;
+
+  const meta = await sharp(populatedBuf).metadata();
+  const W = meta.width, H = meta.height;
+  const uri = `data:image/png;base64,${populatedBuf.toString('base64')}`;
+
+  const det = await _gdinoDetect(uri, [{ name: 'person', text: 'person' }]);
+  if (!det || !Array.isArray(det.figures) || !det.figures[0]) {
+    throw new Error('[SCENE COMPOSITE] DINO returned no person boxes on the plate');
+  }
+  const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU);
+  const fdet = await _gdinoDetect(uri, [{ name: 'face', text: 'face' }]);
+  const faces = fdet?.figures?.[0] ? _collectNmsBoxes(fdet.figures[0], GDINO_FACE_NMS_IOU) : [];
+  log.info(`[SCENE COMPOSITE]   DINO: ${persons.length} person box(es), ${faces.length} face box(es)`);
+
+  const { data, info } = await sharp(populatedBuf).raw().toBuffer({ resolveWithObject: true });
+  const ch = info.channels;
+  const hueOf = (hex) => rgbToHue(
+    parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16));
+
+  // Score every (box, character) pair by how many of that character's palette
+  // pixels the box contains, then take the best pairs greedily. Greedy rather
+  // than per-box argmax so two boxes cannot both claim the same character.
+  const scored = [];
+  for (let i = 0; i < persons.length; i++) {
+    const [bx0, by0, bx1, by1] = persons[i].box.map(Math.round);
+    const x0 = Math.max(0, bx0), y0 = Math.max(0, by0);
+    const x1 = Math.min(W - 1, bx1), y1 = Math.min(H - 1, by1);
+    if (x1 <= x0 || y1 <= y0) continue;
+    const area = (x1 - x0 + 1) * (y1 - y0 + 1);
+    for (const c of cast) {
+      const bodyHue = hueOf(c.color);
+      const tint = HEAD_TINTS[c.color];
+      const tintHue = tint ? hueOf(tint) : null;
+      let n = 0;
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const k = (y * W + x) * ch;
+          const r = data[k], g = data[k + 1], b = data[k + 2];
+          const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+          if ((mx - mn) / (mx || 1) < BODY_SAT_FLOOR * 0.6 || mx < 80) continue;
+          const h = rgbToHue(r, g, b);
+          let dh = Math.abs(h - bodyHue); if (dh > 180) dh = 360 - dh;
+          let dt = tintHue == null ? 999 : Math.abs(h - tintHue); if (dt > 180) dt = 360 - dt;
+          if (dh <= HUE_THRESHOLD || dt <= HUE_THRESHOLD) n++;
+        }
+      }
+      if (n / area >= MIN_COLOUR_FRACTION) scored.push({ boxIdx: i, name: c.name, n, area, box: [x0, y0, x1, y1] });
+    }
+  }
+  scored.sort((a, b) => b.n - a.n);
+
+  const results = {};
+  const usedBox = new Set();
+  for (const s of scored) {
+    if (results[s.name] || usedBox.has(s.boxIdx)) continue;
+    usedBox.add(s.boxIdx);
+    const [x0, y0, x1, y1] = s.box;
+
+    // Tighten to the character's own pixels inside the box, and build the mask
+    // the occlusion step needs. The box is DINO's; the outline is ours.
+    const mask = new Uint8Array(W * H);
+    const c = cast.find(cc => cc.name === s.name);
+    const bodyHue = hueOf(c.color);
+    const tint = HEAD_TINTS[c.color];
+    const tintHue = tint ? hueOf(tint) : null;
+    let minX = W, minY = H, maxX = -1, maxY = -1, count = 0;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const k = (y * W + x) * ch;
+        const r = data[k], g = data[k + 1], b = data[k + 2];
+        const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+        if ((mx - mn) / (mx || 1) < BODY_SAT_FLOOR * 0.6 || mx < 80) continue;
+        const h = rgbToHue(r, g, b);
+        let dh = Math.abs(h - bodyHue); if (dh > 180) dh = 360 - dh;
+        let dt = tintHue == null ? 999 : Math.abs(h - tintHue); if (dt > 180) dt = 360 - dt;
+        if (dh > HUE_THRESHOLD && dt > HUE_THRESHOLD) continue;
+        mask[y * W + x] = 1; count++;
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+    }
+    if (maxX < 0) continue;
+
+    // The face box belonging to this figure: most contained, and highest up.
+    let head = null;
+    let best = null;
+    for (const f of faces) {
+      const [fx0, fy0, fx1, fy1] = f.box.map(Math.round);
+      const ix0 = Math.max(fx0, x0), iy0 = Math.max(fy0, y0);
+      const ix1 = Math.min(fx1, x1), iy1 = Math.min(fy1, y1);
+      if (ix1 <= ix0 || iy1 <= iy0) continue;
+      const inter = (ix1 - ix0) * (iy1 - iy0);
+      const fArea = Math.max(1, (fx1 - fx0) * (fy1 - fy0));
+      const containment = inter / fArea;
+      if (containment < 0.6) continue;
+      if (!best || fy0 < best.top) best = { top: fy0, height: fy1 - fy0, containment };
+    }
+    if (best && best.height >= 8) head = { y: best.top, height: best.height, source: 'dino-face' };
+
+    results[s.name] = {
+      bbox: { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1, pixels: count },
+      head,
+      mask,
+      dinoBox: { x: x0, y: y0, width: x1 - x0 + 1, height: y1 - y0 + 1, score: +persons[s.boxIdx].score.toFixed(3) },
+    };
+    log.info(`[SCENE COMPOSITE]   ${s.name}: DINO box ${x1 - x0 + 1}x${y1 - y0 + 1} (${s.n}px of its colour), `
+      + `outline ${maxX - minX + 1}x${maxY - minY + 1}${head ? `, face ${head.height}px` : ', no face'}`);
+  }
+
+  const missing = cast.filter(c => !results[c.name]).map(c => c.name);
+  if (missing.length) log.warn(`[SCENE COMPOSITE]   DINO+colour found no box for: ${missing.join(', ')}`);
+  return { canvasWidth: W, canvasHeight: H, diffMaskCount: null, results };
+}
+
 async function findSilhouettesByDiff(populatedBuf, cleanBgBuf, cast, opts = {}) {
   const DIFF_THRESHOLD = opts.diffThreshold ?? 40;
   const HUE_THRESHOLD = opts.hueThreshold ?? 35;
@@ -1900,6 +2042,8 @@ async function generateSceneComposite(opts) {
     //                  once per figure, so the model paints the character into
     //                  the scene instead of us compositing pixels into it.
     figureMethod = 'paste',
+    // 'diff' (default) or 'dino' — see the detection step.
+    figureDetect = 'diff',
   } = opts;
 
   if (!cleanBackgroundPrompt && !scene?.description) {
@@ -1979,8 +2123,15 @@ async function generateSceneComposite(opts) {
   // Hue matching alone fails on palette collisions (e.g. yellow silhouette
   // on a yellow lawn — see story job_1778865205295_c2n86mdmn p4). The diff
   // mask removes the background palette entirely before hue runs.
-  log.info('[SCENE COMPOSITE] step 3/5 — diff-based bbox detect');
-  const detection = await findSilhouettesByDiff(populatedBuf, bgBuf, cast);
+  // 'dino' asks GroundingDINO where the people are and uses the palette only to
+  // say WHICH person each box is — scenery cannot impersonate a figure that
+  // way. 'diff' is the original: subtract the clean background, then match hue.
+  const detector = figureDetect === 'dino' ? 'dino' : 'diff';
+  log.info(`[SCENE COMPOSITE] step 3/5 — bbox detect (${detector})`);
+  const detection = detector === 'dino'
+    ? await findSilhouettesWithDino(populatedBuf, cast)
+    : await findSilhouettesByDiff(populatedBuf, bgBuf, cast);
+  debug.detector = detector;
   const bboxes = {};
   const silhouetteMasks = {};
   for (const c of cast) {
@@ -1997,7 +2148,9 @@ async function generateSceneComposite(opts) {
     throw new Error('[SCENE COMPOSITE] no silhouettes detected — diff+hue found nothing for any cast entry');
   }
   debug.bboxes = bboxes;
-  log.info(`[SCENE COMPOSITE]   diff mask: ${detection.diffMaskCount} px (${(100 * detection.diffMaskCount / (detection.canvasWidth * detection.canvasHeight)).toFixed(1)}% of canvas)`);
+  if (detection.diffMaskCount != null) {
+    log.info(`[SCENE COMPOSITE]   diff mask: ${detection.diffMaskCount} px (${(100 * detection.diffMaskCount / (detection.canvasWidth * detection.canvasHeight)).toFixed(1)}% of canvas)`);
+  }
 
   // ── Two aborts, before a single figure is scaled ────────────────────────
   //
