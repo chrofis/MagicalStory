@@ -1,0 +1,83 @@
+{
+  "_comment": "Trial-showcase rotation. A trial has EXACTLY ONE character (one photo, one avatar), so each entry names a single curated demo face from tests/fixtures/demo-photos/{family}/. Categories/topics mirror what the /try wizard offers. Used by scripts/admin/trial-showcase.js; state in tests/trial-showcase-state.json.",
+  "entries": [
+    {
+      "index": 0,
+      "family": "berger",
+      "face": "Emma.jpg",
+      "name": "Emma",
+      "age": "5",
+      "gender": "female",
+      "language": "de",
+      "storyCategory": "adventure",
+      "storyTopic": "",
+      "storyDetails": "",
+      "description": "Berger/DE — Emma (5), Abenteuer, freies Thema"
+    },
+    {
+      "index": 1,
+      "family": "berger",
+      "face": "Noah.jpg",
+      "name": "Noah",
+      "age": "4",
+      "gender": "male",
+      "language": "de",
+      "storyCategory": "life-challenge",
+      "storyTopic": "first-kindergarten",
+      "storyDetails": "",
+      "description": "Berger/DE — Noah (4), Lebensthema: erster Kindergartentag"
+    },
+    {
+      "index": 2,
+      "family": "dubois",
+      "face": "Léa.jpg",
+      "name": "Léa",
+      "age": "6",
+      "gender": "female",
+      "language": "fr",
+      "storyCategory": "adventure",
+      "storyTopic": "",
+      "storyDetails": "",
+      "description": "Dubois/FR — Léa (6), aventure"
+    },
+    {
+      "index": 3,
+      "family": "miller",
+      "face": "Lily.jpg",
+      "name": "Lily",
+      "age": "7",
+      "gender": "female",
+      "language": "en",
+      "storyCategory": "adventure",
+      "storyTopic": "",
+      "storyDetails": "",
+      "description": "Miller/EN — Lily (7), adventure"
+    },
+    {
+      "index": 4,
+      "family": "miller",
+      "face": "Ethan.jpg",
+      "name": "Ethan",
+      "age": "5",
+      "gender": "male",
+      "language": "en",
+      "storyCategory": "life-challenge",
+      "storyTopic": "",
+      "storyDetails": "",
+      "description": "Miller/EN — Ethan (5), life skill"
+    },
+    {
+      "index": 5,
+      "family": "dubois",
+      "face": "Jules.jpg",
+      "name": "Jules",
+      "age": "6",
+      "gender": "male",
+      "language": "fr",
+      "storyCategory": "life-challenge",
+      "storyTopic": "",
+      "storyDetails": "",
+      "description": "Dubois/FR — Jules (6), thème de vie"
+    }
+  ]
+}
