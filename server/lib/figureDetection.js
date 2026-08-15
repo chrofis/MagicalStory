@@ -474,7 +474,7 @@ async function detectPersonBoxInCrop(cropJpegBuffer, faceBoxInCrop = null, pageL
     const uri = `data:image/jpeg;base64,${cropJpegBuffer.toString('base64')}`;
     const det = await _gdinoDetect(uri, [{ name: 'person', text: 'person' }]);
     if (!det?.figures?.[0]) return null;
-    const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU);
+    const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU, { keepOccluded: true });
     if (!persons.length) return null;
     // The crop often contains OTHER people (neighbours in the scene). Pick the
     // person whose box overlaps the FACE box (the target head) the most — NOT
@@ -756,13 +756,45 @@ function _boxIouXyxy(a, b) {
 }
 
 // Best box + candidates from one _gdinoDetect figure, NMS-deduped, score-desc.
-function _collectNmsBoxes(fig, nmsIou) {
+// A figure standing BEHIND another must survive NMS (owner, 2026-08-15).
+//
+// NMS assumes high overlap means "the same person detected twice". That is false
+// when one person stands behind another: the rear figure's box CONTAINS the
+// front one, so the pair scores a high IoU while being two different people, and
+// the rear figure — always the lower-scoring one, because it is half hidden —
+// gets deleted.
+//
+// Measured on job_1786780194082_s980g4s9a p-2: Daniel (crouching behind Emma)
+// vs Emma is IoU 0.653 against a 0.5 threshold, and it is the ONLY pair on that
+// page above the threshold. DINO returned 4 persons for 5 expected, the
+// undercount handed the page to Gemini's boxes, and Gemini's box for Daniel is
+// the oversized one that started the whole Emma-repaint failure.
+//
+// Two detections of ONE person are also similar in SIZE, so that is the
+// discriminator: suppress only when the boxes overlap AND are comparable in
+// area. A box that swallows another is a different figure, one behind the other.
+const GDINO_NMS_SIZE_RATIO = 0.70;
+
+function _sameFigureSize(a, b) {
+  const aa = _boxAreaPx(a), ab = _boxAreaPx(b);
+  if (aa <= 0 || ab <= 0) return true;
+  return Math.min(aa, ab) / Math.max(aa, ab) >= GDINO_NMS_SIZE_RATIO;
+}
+
+function _collectNmsBoxes(fig, nmsIou, opts = {}) {
+  // Faces keep plain IoU NMS: two face boxes of very different sizes on the same
+  // spot ARE a duplicate, not one face behind another.
+  const keepOccluded = opts.keepOccluded === true;
   const all = [];
   if (fig?.box) all.push({ box: fig.box, score: fig.score });
   for (const c of (fig?.candidates || [])) if (c.box) all.push({ box: c.box, score: c.score });
   all.sort((a, b) => b.score - a.score);
   const out = [];
-  for (const p of all) if (!out.some(k => _boxIouXyxy(k.box, p.box) > nmsIou)) out.push(p);
+  for (const p of all) {
+    const dup = out.some(k => _boxIouXyxy(k.box, p.box) > nmsIou
+      && (!keepOccluded || _sameFigureSize(k.box, p.box)));
+    if (!dup) out.push(p);
+  }
   return out;
 }
 
@@ -859,7 +891,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   const det = await _gdinoDetect(imageDataUri, [{ name: 'person', text: 'person' }]);
   if (!det || !Array.isArray(det.figures)) return null;
   const W = det.width, H = det.height;
-  const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU);
+  const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU, { keepOccluded: true });
   diag.persons = persons.map(p => ({ box: p.box.map(Math.round), score: +p.score.toFixed(3) }));
   if (persons.length === 0) {
     diag.fellBack = true; diag.reason = 'no person boxes';

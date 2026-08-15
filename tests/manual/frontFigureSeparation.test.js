@@ -287,4 +287,42 @@ t('the floors cannot eat a real occluded remainder', () => {
   assert.ok(SAM_FACE_CONTAINMENT > 0.5 && SAM_FACE_CONTAINMENT <= 1);
 });
 
+// -- NMS must not delete the figure standing behind ---------------------------
+t('the occluded figure survives NMS on the real page', () => {
+  // Daniel vs Emma is IoU 0.653 against a 0.5 threshold, and the ONLY pair on
+  // that page over it. Plain NMS deletes whichever scored lower - always the
+  // half-hidden one - which is why DINO returned 4 persons for 5 expected, the
+  // undercount handed the page to Gemini, and Gemini's oversized Daniel box
+  // started the Emma-repaint failure.
+  const iou = (a, b) => {
+    const ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0]));
+    const iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+    const i = ix * iy;
+    return i / (_boxAreaPx(a) + _boxAreaPx(b) - i);
+  };
+  const v = iou(BOX.Daniel, BOX.Emma);
+  assert.ok(v > 0.5, `plain NMS would suppress: IoU ${v.toFixed(3)}`);
+  const ratio = Math.min(_boxAreaPx(BOX.Emma), _boxAreaPx(BOX.Daniel))
+    / Math.max(_boxAreaPx(BOX.Emma), _boxAreaPx(BOX.Daniel));
+  assert.ok(ratio < 0.70, `but the sizes differ too much to be one person: ${ratio.toFixed(2)}`);
+});
+
+t('NMS keeps a genuinely duplicated detection suppressed', () => {
+  // Same person twice: high IoU AND similar size -> still one figure.
+  const a = [100, 100, 300, 800];
+  const b = [104, 106, 296, 792];
+  const ratio = Math.min(_boxAreaPx(a), _boxAreaPx(b)) / Math.max(_boxAreaPx(a), _boxAreaPx(b));
+  assert.ok(ratio >= 0.70, `a duplicate must stay a duplicate, ratio ${ratio.toFixed(2)}`);
+});
+
+t('the size guard is wired for PERSONS and not for faces', () => {
+  assert.ok(/const GDINO_NMS_SIZE_RATIO = 0\.70/.test(SRC));
+  assert.ok(/_collectNmsBoxes\(det\.figures\[0\], GDINO_PERSON_NMS_IOU, \{ keepOccluded: true \}\)/.test(SRC),
+    'person NMS must keep the occluded figure');
+  assert.ok(/_collectNmsBoxes\(fdet\.figures\[0\], GDINO_FACE_NMS_IOU\)/.test(SRC),
+    'face NMS keeps plain IoU - two face boxes of different sizes on one spot ARE a duplicate');
+  assert.ok(/keepOccluded \? _sameFigureSize|!keepOccluded \|\| _sameFigureSize/.test(SRC),
+    'the guard must only apply when opted in');
+});
+
 console.log(pass + ' passed');

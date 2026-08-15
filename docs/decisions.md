@@ -10942,3 +10942,44 @@ separated; Noah, Sarah and Hans are unchanged.
 `tests/manual/frontFigureSeparation.test.js` (31 assertions on the real page-−2 boxes).
 
 **Status:** ✅ active.
+
+
+## 2026-08-15 — NMS must not delete the figure standing behind another
+
+**Context:** Chasing why `job_1786780194082_s980g4s9a` p−2 used a Gemini box for Daniel at all.
+Its `bboxDetection` reads `detectionBackend: gemini-second-opinion`, `undercount: 4 persons < 5
+expected`, `secondOpinion: {dino:4, gemini:5, chose:"gemini"}` — and matching DINO's four boxes
+against the five final figures shows **Daniel has no DINO box**: his best IoU is 0.55 against
+dino2, which is Emma's box (already hers at 0.82). DINO never produced a usable box for the
+crouching, half-hidden man.
+
+**Why:** `_collectNmsBoxes` suppressed it. NMS assumes high overlap means "one person detected
+twice", which is false when one person stands *behind* another — the rear figure's box **contains**
+the front one, scoring a high IoU while being a different person, and the rear figure is always the
+lower-scoring candidate because it is half hidden. Measured: **Daniel vs Emma IoU = 0.653** against
+`GDINO_PERSON_NMS_IOU = 0.5`, and it is the **only** pair on that page above the threshold. The
+score floor is not the cause: `box_threshold` is 0.25 while the four surviving boxes scored 0.591 /
+0.54 / 0.534 / 0.42, leaving a wide band where an occluded figure plausibly lands.
+
+This is the same containment blind spot as the mask bug, one stage earlier: box→mask assumed the
+enclosing box's dominant subject was its own figure; box→NMS assumes an enclosing box is a duplicate.
+
+**Decision:** person NMS suppresses a candidate only when the boxes overlap **and** are comparable
+in area (`GDINO_NMS_SIZE_RATIO` 0.70, min/max). Two detections of one person are similar in size; a
+box that swallows another is a different figure standing behind it. Opt-in via
+`_collectNmsBoxes(..., { keepOccluded: true })` — **face** NMS deliberately keeps plain IoU, because
+two face boxes of very different sizes on the same spot really are a duplicate.
+
+**Rationale:** the alternative — lowering the NMS threshold or the score floor — trades this bug for
+phantom duplicate people on every page. The size test discriminates the two cases directly instead
+of loosening a threshold that is doing its job everywhere else.
+
+**Not yet confirmed by a run.** The arithmetic proves NMS *would* suppress a Daniel candidate; it
+does not prove DINO produced one (the raw candidate list is not persisted). A Test Lab detection
+re-run of that page is required to confirm Daniel now survives and that no page gains a phantom
+figure.
+
+**Touched:** `server/lib/figureDetection.js` (`GDINO_NMS_SIZE_RATIO`, `_sameFigureSize`,
+`_collectNmsBoxes` opts, person call sites), `tests/manual/frontFigureSeparation.test.js`.
+
+**Status:** 🟡 conditional — merged, awaiting the Lab detection re-run.
