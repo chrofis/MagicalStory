@@ -25,9 +25,8 @@
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 
-const PLATE_PROMPT = (styleTxt, strictEmptyPage = true, _bandPct = 30) => `The image is a book title on a strip of white paper. Repaint the lettering so it looks hand-painted: visible brush and paper texture in every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours. You may change the lettering colour and refine the letterforms and weight.
-The second image is a colour and style reference only - take the palette and the medium from it; the outlined rectangle on it marks where this strip sits on the cover. Nothing from it may appear in the output.
-Keep the same words, letters, line breaks and positions.${strictEmptyPage ? ' The background stays plain white; add nothing else - no scenery, no border, no frame, no second copy of the title.' : ''}${styleTxt ? ` Medium to imitate: ${styleTxt}` : ''}`;
+const PLATE_PROMPT = (styleTxt, strictEmptyPage = true, _bandPct = 30) => `The image is a book title on a strip of white paper. Repaint each letter IN PLACE - same position, same size, same words, same line breaks - so the lettering looks hand-painted: visible brush and paper texture in every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours. You may change the lettering colour and refine the letterforms and weight; never move, rescale or re-arrange the letters, and never re-set the title in a layout of your own.${strictEmptyPage ? '\nThe output is this same strip and nothing more: white paper and the repainted lettering. No photograph, no people, no scenery, no border, no frame, no second copy of the title.' : ''}
+The second image is a colour and style reference only - take the palette and the medium from it; the outlined rectangle on it marks where this strip sits on the cover. Do not copy, include or reproduce any part of the second image in the output.${styleTxt ? ` Medium to imitate: ${styleTxt}` : ''}`;
 
 
 /**
