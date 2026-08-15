@@ -11352,3 +11352,35 @@ and covers are started concurrently under `pLimit(3)`.
 **Touched files:** `server/routes/trial.js`, `storyJobPipeline.js`,
 `scripts/admin/trial-showcase.js` (--category/--topic/--theme/--details
 overrides).
+
+
+## 2026-08-15 - Test Lab set "Hard to segment" (bbox), and a deep link per experiment
+
+**Context:** the occlusion work was verified by running the `bbox` stage on one page over and
+over, then reading the cut-out strip by eye. Two things made that harder than it needed to be:
+there was no way to re-run the same hard page as a named set, and no way to link to a finished
+experiment.
+
+**Decision:**
+
+1. **Set #12 "Hard to segment"** (stage `bbox`, `params: {versionIndex: 0}`) collects pages whose
+   figures are genuinely hard to separate, so a segmentation change can be re-run over all of them
+   at once. First member is `job_1786780194082_s980g4s9a` p-2, the page this whole thread came
+   from: 5 figures, an adult crouching behind a child, DINO returns **5 faces but only 4 persons**
+   (no person box for him at all), Emma's own mask covers **97% of his head zone**, and his grey
+   shorts are **134 px** visible against a **33,578 px** grey pavement blob. Add pages as they turn
+   up rather than rediscovering hard cases each time.
+
+2. **`/admin/test-lab?exp=<id>`** opens an experiment directly, and the URL tracks whichever one is
+   open (`history.replaceState`, so no extra history entries). An id that is gone or not visible
+   falls through to the list.
+
+**Rationale:** a hard-case set turns "does this change break the tricky pages" into one run instead
+of remembering which story and page to type in; the deep link means a result can be handed over as a
+URL instead of being rebuilt as a local HTML page each time, which is what happened repeatedly
+during this work.
+
+**Touched:** `client/src/pages/TestLab.tsx`; set #12 created via `POST /api/admin/testlab/sets`
+(data, not code).
+
+**Status:** active.
