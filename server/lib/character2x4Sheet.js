@@ -1285,6 +1285,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
         characterName: character?.name,
         characterAge: character?.age,
         usageTracker,
+        skipQualityEval,
       });
     } catch (err) {
       log.error(`[CHARACTER 2×4] ${character?.name} Pass 2 threw unexpectedly: ${err.message} — shipping realistic Pass 1 sheet unstyled`);
@@ -1325,7 +1326,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
  * style match + costume preserved. Returns the same shape as Pass 1's
  * collected fields so the dev panel can render both passes uniformly.
  */
-async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, usageTracker, promptOverride = null, backendOverride = null }) {
+async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, usageTracker, promptOverride = null, backendOverride = null, skipQualityEval = false }) {
   // Optional per-style anchor image (Image 2). The prompt references it only
   // when present; styleTransferGenerate passes it as the 2nd reference.
   const styleAnchor = loadStyleAnchor(artStyle);

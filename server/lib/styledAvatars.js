@@ -326,6 +326,10 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       artStyle,
       usageTracker: addUsage,
       redress,
+      // The end of the chain: every caller above threads skipQualityEval, and
+      // it died here — the sheet builder kept running its row reviews for
+      // trials no matter what the pipeline asked for (job_1786826686448).
+      skipQualityEval,
     });
     if (!result?.imageData) {
       throw new Error(`[STYLED AVATAR] 2×4 produced no image for ${characterName}/${clothingCategory}/${artStyle}`);
