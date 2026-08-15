@@ -27,7 +27,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const {
-  _boxAreaPx, _boxContainment, _assignFacesToBoxes,
+  _boxAreaPx, _boxContainment, _assignFacesToBoxes, _garmentColourWords, NEUTRAL_COLOURS,
   SAM_FACE_CONTAINMENT, SAM_FACE_IN_MASK, SAM_FRONT_CONTAINMENT, SAM_GROUND_TIE_PX,
 } = require('../../server/lib/figureDetection');
 
@@ -154,7 +154,7 @@ t('there is exactly ONE box->mask loop, shared by both paths', () => {
     'one definition + one call site');
   assert.strictEqual((SRC.match(/_maskBoxesFrontFirst\(/g) || []).length, 3,
     'one definition + two call sites');
-  assert.ok(/_maskBoxesFrontFirst\(imageDataUri, boxesPx, W, H, pageLabel, faceBoxesPx\)/.test(SRC),
+  assert.ok(/_maskBoxesFrontFirst\(imageDataUri, boxesPx, W, H, pageLabel, faceBoxesPx,/.test(SRC),
     'the Gemini path must pass faceBoxes — without them there are no points');
 });
 
@@ -218,4 +218,62 @@ t('the size guard is wired for PERSONS and not for faces', () => {
     'two face boxes of different sizes on one spot ARE a duplicate');
 });
 
-console.log(`${pass} passed`);
+// -- Garment seed points ------------------------------------------------------
+// A single face point UNDER-SEGMENTS a multi-garment figure: SAM reads blouse,
+// skirt and skin as separate objects. Measured on this page:
+//   Sarah  face only 38,107px -> + blouse dot 73,828px  (+94%)
+//   Noah   face only 73,113px -> + garment dots 80,761px
+// For scale, Emma (a small child) masks at 91,886px, so Sarah the adult at 38k
+// was missing half of herself. The "striping" in her cut-out was these holes.
+t('the top and bottom colour are read from the identity line', () => {
+  const cases = [
+    ['Wearing: A red short-sleeve swim shirt, orange swim shorts, white sandals', 'red', 'orange'],
+    ['Wearing: yellow short-sleeve linen shirt, grey chino shorts, brown sandals', 'yellow', 'grey'],
+    ['Wearing: white short-sleeve cotton blouse, purple linen shorts', 'white', 'purple'],
+    ['Wearing: blue short-sleeve swim shirt, green swim shorts, blue sandals', 'blue', 'green'],
+    ['Wearing: light-grey short-sleeve polo shirt, beige linen trousers', 'grey', 'beige'],
+  ];
+  for (const [text, top, bottom] of cases) {
+    assert.deepStrictEqual(_garmentColourWords(text), { top, bottom }, text);
+  }
+});
+
+t('no clothing info yields no seeds, never a guess', () => {
+  assert.deepStrictEqual(_garmentColourWords('preschooler girl, brown wavy hair'), { top: null, bottom: null });
+  assert.deepStrictEqual(_garmentColourWords(''), { top: null, bottom: null });
+  assert.deepStrictEqual(_garmentColourWords(null), { top: null, bottom: null });
+});
+
+t('shoes and sandals are never mistaken for a garment', () => {
+  // "white sandals" must not become the top colour.
+  assert.strictEqual(_garmentColourWords('Wearing: red shirt, white sandals').top, 'red');
+  assert.strictEqual(_garmentColourWords('Wearing: red shirt, white sandals').bottom, null);
+});
+
+t('a neutral BOTTOM is skipped - it is the colour of the ground', () => {
+  // Daniel's grey shorts are 134px visible; the grey pavement blob below him is
+  // 33,578px and wins every ranking. Tops are exempt: Sarah's WHITE blouse is
+  // the single biggest win of this feature.
+  for (const c of ['grey', 'gray', 'white', 'black', 'beige', 'khaki', 'tan', 'cream', 'ivory', 'silver']) {
+    assert.ok(NEUTRAL_COLOURS.has(c), `${c} must count as neutral`);
+  }
+  for (const c of ['red', 'orange', 'purple', 'green', 'blue', 'yellow']) {
+    assert.ok(!NEUTRAL_COLOURS.has(c), `${c} must NOT be treated as neutral`);
+  }
+});
+
+t('the seeds are wired into the masker and both call sites', () => {
+  assert.ok(/_garmentColourWords\(descriptions\[i\]\)/.test(SRC), 'the masker must read the identity line');
+  assert.ok(/if \(bottom && topY !== null && !NEUTRAL_COLOURS\.has\(bottom\)\)/.test(SRC),
+    'a bottom seed needs a top to order against, and must not be neutral');
+  assert.ok(/_colourSeedPoints\(rgb, W, H, box, top, headRef\)/.test(SRC),
+    'the top is searched BELOW the head reference');
+  assert.ok(/_colourSeedPoints\(rgb, W, H, box, bottom, topY\)/.test(SRC),
+    'the bottom is searched BELOW the top - a constraint, not a filter');
+  assert.ok(/expectedCharacters\.map\(c => \(typeof c === 'object' \? c\.description : ''\)/.test(SRC),
+    'the DINO path must pass descriptions');
+  assert.ok(/figures\.map\(f => f\.description \|\| f\.clothing \|\| ''\)/.test(SRC),
+    'the Gemini path must pass descriptions');
+});
+
+console.log(pass + ' passed');

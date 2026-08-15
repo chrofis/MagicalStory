@@ -120,6 +120,117 @@ const SAM_GROUND_TIE_PX = 12;         // bottoms within this are "the same heigh
 const SAM_FACE_IN_MASK = 0.10;        // a mask must cover this much of its OWN face box
 const SAM_FACE_CONTAINMENT = 0.70;    // a face this far inside a person box belongs to it
 
+// Garment-colour seed points (owner, 2026-08-15).
+//
+// A single positive point on the face UNDER-SEGMENTS a figure wearing several
+// garments: SAM reads blouse, skirt and skin as separate objects and returns
+// only some of them. Measured on p-2 of job_1786780194082_s980g4s9a:
+//
+//   Sarah  face only 38,107 px -> + one dot on her white blouse  73,828 px  (+94%)
+//   Noah   face only 73,113 px -> + shirt and shorts dots        80,761 px  (+10%)
+//
+// (For scale, Emma - a small child - masks at 91,886 px, so Sarah the adult at
+// 38k was missing half of herself.)
+//
+// We already know what each character wears, so the colour words come from the
+// identity line the detection call is given, and the dots are placed on pixels
+// that actually match. Ordering rules, from the owner:
+//   - the top dot must be BELOW the head
+//   - the bottom dot must be BELOW the top dot
+// Both are SEARCH CONSTRAINTS, not filters applied afterwards: grey is a
+// background colour, and the largest grey blob in a whole figure box is river
+// water, not the garment.
+const GARMENT_TOP = /\b(shirt|t-?shirt|top|blouse|polo|sweater|jumper|pullover|hoodie|dress|tunic|vest|jacket|coat)\b/;
+const GARMENT_BOTTOM = /\b(shorts|trousers|pants|skirt|jeans|chinos|leggings|dungarees)\b/;
+// Neutral colours are the colour of pavement, stone, water and sky, so a
+// BOTTOM-garment dot on one lands on the ground far more often than on the
+// garment: Daniel's grey shorts are 134 px visible here, while the grey
+// pavement blob below him is 33,578 px and wins on every ranking. Tops sit
+// higher up where this does not happen (Sarah's white blouse is the single
+// biggest win of this whole feature), so the guard applies to bottoms only.
+const NEUTRAL_COLOURS = new Set(['grey', 'gray', 'white', 'black', 'beige', 'cream',
+  'ivory', 'silver', 'khaki', 'tan']);
+const DOT_MIN_PX = 400;          // smaller than this is not a garment
+const DOT_DELTA_E = 30;          // how close a pixel must be to the named colour
+const DOT_MAX_PER_GARMENT = 3;   // a garment split by an occluder still resolves
+const DOT_BAND = 0.20;           // an extra piece must be in the main piece's band
+const DOT_MIN_FRAC = 0.20;       // ...and be a real piece, not a speck
+
+/** Colour word for the top and the bottom garment, from an identity line. */
+function _garmentColourWords(description) {
+  const text = String(description || '').toLowerCase();
+  const wearing = text.includes('wearing:') ? text.split('wearing:')[1] : text;
+  const out = { top: null, bottom: null };
+  for (const clause of wearing.split(/[,;.]| and /)) {
+    const isTop = GARMENT_TOP.test(clause), isBottom = GARMENT_BOTTOM.test(clause);
+    if (!isTop && !isBottom) continue;
+    for (const word of clause.split(/[\s/-]+/)) {
+      const c = getGarmentColour().resolveColourName(word);
+      if (!c) continue;
+      if (isBottom && !out.bottom) out.bottom = c.name;
+      else if (isTop && !out.top) out.top = c.name;
+      break;
+    }
+  }
+  return out;
+}
+
+/**
+ * Centroids of the blobs inside `box`, below `yMin`, matching colour `name`.
+ * Largest first, capped, and every extra piece must belong to the same garment
+ * as the first (same horizontal band, comparable size) - without that, Sarah's
+ * white SHOES and Noah's blue SANDAL were seeded as "shirt".
+ */
+function _colourSeedPoints(rgb, W, H, box, name, yMin) {
+  const ref = getGarmentColour().resolveColourName(name);
+  if (!ref) return [];
+  const x0 = box[0], x1 = box[2], y1 = box[3];
+  const y0 = Math.max(box[1], Math.round(yMin ?? box[1]));
+  if (y0 >= y1) return [];
+  const hit = new Uint8Array(W * H);
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const o = (y * W + x) * 3;
+      if (_deltaE(_rgbToLabPx(rgb[o], rgb[o + 1], rgb[o + 2]), ref.lab) <= DOT_DELTA_E) hit[y * W + x] = 1;
+    }
+  }
+  const lab = new Int32Array(W * H); let n = 0; const blobs = [];
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const i = y * W + x;
+    if (!hit[i] || lab[i]) continue;
+    n++; let a = 0, sx = 0, sy = 0; const st = [i]; lab[i] = n;
+    while (st.length) {
+      const k = st.pop(); a++; const kx = k % W, ky = (k / W) | 0; sx += kx; sy += ky;
+      if (kx > x0 && hit[k - 1] && !lab[k - 1]) { lab[k - 1] = n; st.push(k - 1); }
+      if (kx < x1 - 1 && hit[k + 1] && !lab[k + 1]) { lab[k + 1] = n; st.push(k + 1); }
+      if (ky > y0 && hit[k - W] && !lab[k - W]) { lab[k - W] = n; st.push(k - W); }
+      if (ky < y1 - 1 && hit[k + W] && !lab[k + W]) { lab[k + W] = n; st.push(k + W); }
+    }
+    if (a >= DOT_MIN_PX) blobs.push({ a, cx: Math.round(sx / a), cy: Math.round(sy / a) });
+  }
+  blobs.sort((p, q) => q.a - p.a);
+  const bandPx = Math.round(DOT_BAND * (box[3] - box[1]));
+  return blobs
+    .filter((b, i) => i === 0 || (Math.abs(b.cy - blobs[0].cy) <= bandPx && b.a >= DOT_MIN_FRAC * blobs[0].a))
+    .slice(0, DOT_MAX_PER_GARMENT);
+}
+
+// Local Lab conversion (the garment module's is not exported).
+function _rgbToLabPx(r, g, b) {
+  let R = r / 255, G = g / 255, B = b / 255;
+  R = R > 0.04045 ? ((R + 0.055) / 1.055) ** 2.4 : R / 12.92;
+  G = G > 0.04045 ? ((G + 0.055) / 1.055) ** 2.4 : G / 12.92;
+  B = B > 0.04045 ? ((B + 0.055) / 1.055) ** 2.4 : B / 12.92;
+  let X = (R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047;
+  let Y = (R * 0.2126 + G * 0.7152 + B * 0.0722);
+  let Z = (R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883;
+  const f = (v) => v > 0.008856 ? Math.cbrt(v) : (7.787 * v + 16 / 116);
+  X = f(X); Y = f(Y); Z = f(Z);
+  return [116 * Y - 16, 500 * (X - Y), 200 * (Y - Z)];
+}
+const _deltaE = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+const getGarmentColour = () => require('./garmentColourFix');
+
 function _boxAreaPx(b) { return Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]); }
 
 // Fraction of `inner` that lies inside `outer` (both [x1,y1,x2,y2] px).
@@ -164,10 +275,18 @@ const _boxCentre = (b) => [Math.round((b[0] + b[2]) / 2), Math.round((b[1] + b[3
  * Each entry: {box, mask, keptBox, coverage, verdict, occluded, occludedByIdx,
  *              pxLostToFront, maskPx}
  */
-async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '', faceBoxesPx = null) {
+async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '', faceBoxesPx = null, descriptions = null) {
   const faces = _assignFacesToBoxes(boxesPx, faceBoxesPx);
   const n = boxesPx.length;
   const out = new Array(n);
+  // Raw pixels once, for the garment-colour seed points.
+  let rgb = null;
+  if (descriptions) {
+    try {
+      const buf = Buffer.from(r2Lib.stripDataUriPrefix(imageDataUri), 'base64');
+      rgb = (await sharp(buf).removeAlpha().raw().toBuffer({ resolveWithObject: true })).data;
+    } catch (e) { log.warn(`⚠️ [SAM] ${pageLabel}garment seeds unavailable (${e.message})`); }
+  }
 
   // --- 1. one SAM call per figure, told WHICH figure it is looking at --------
   // Order does not matter here: conflicts are settled in step 3, so no figure
@@ -178,8 +297,29 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
     if (!Array.isArray(box) || box.length !== 4) continue;
     const own = faces[i];
     const points = [], labels = [];
+    let seeds = 0;
     if (own) {
       points.push(_boxCentre(own)); labels.push(1);
+      // Garment seeds. The stored faceBox is NOT a tight face - it runs to the
+      // chest - so its CENTRE is the usable "the head is here" reference; its
+      // bottom edge would reject every real top dot.
+      if (rgb && descriptions && descriptions[i]) {
+        const { top, bottom } = _garmentColourWords(descriptions[i]);
+        const headRef = Math.round((own[1] + own[3]) / 2);
+        let topY = null;
+        if (top) {
+          for (const b of _colourSeedPoints(rgb, W, H, box, top, headRef)) {
+            points.push([b.cx, b.cy]); labels.push(1); seeds++;
+            if (topY === null) topY = b.cy;   // order against the MAIN piece
+          }
+        }
+        // Bottoms only when the colour is not the colour of the ground.
+        if (bottom && topY !== null && !NEUTRAL_COLOURS.has(bottom)) {
+          for (const b of _colourSeedPoints(rgb, W, H, box, bottom, topY)) {
+            points.push([b.cx, b.cy]); labels.push(1); seeds++;
+          }
+        }
+      }
       for (let j = 0; j < n; j++) {
         if (j === i || !faces[j]) continue;
         const c = _boxCentre(faces[j]);
@@ -188,6 +328,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
         }
       }
     }
+    if (seeds) log.debug(`[SAM] ${pageLabel}figure ${i}: ${seeds} garment seed point(s)`);
     const m = await _mobilesamMaskFull(imageDataUri, box, W, H,
       points.length ? points : null, points.length ? labels : null);
     if (!m) continue;
@@ -195,7 +336,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
     // garbage). No coverage floor here: an occluded figure is legitimately
     // small, and step 4 judges it on its FACE instead.
     const r = await _cleanMaskAndCheck(m, box, { minCoverage: 0 });
-    if (r.keptBox) raw[i] = { mask: m, separated: points.length > 1 };
+    if (r.keptBox) raw[i] = { mask: m, separated: points.length > 1, seeds };
   }
 
   // --- 2. depth order: lower box bottom = nearer the camera ------------------
@@ -241,7 +382,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
       occluded: false, occludedByIdx: [], pxLostToFront: 0, maskPx: 0,
     };
     if (!raw[i]) { out[i] = base; continue; }
-    const { mask, separated, kept, lost } = raw[i];
+    const { mask, separated, kept, lost, seeds } = raw[i];
     const pxLost = [...lost.values()].reduce((a, b) => a + b, 0);
     const occludedByIdx = [...lost.keys()].filter(k => lost.get(k) > 0);
 
@@ -275,7 +416,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
       verdict: occludedByIdx.length ? 'mask-ok-occluded'
         : separated ? 'mask-ok-face-separated' : 'mask-ok',
       occluded: occludedByIdx.length > 0,
-      occludedByIdx, pxLostToFront: pxLost, maskPx: kept,
+      occludedByIdx, pxLostToFront: pxLost, maskPx: kept, garmentSeeds: seeds || 0,
     };
   }
   return out;
@@ -923,7 +1064,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   // resolved before the figure it occludes, and its pixels can be erased from
   // the image the occluded figure's SAM call sees (see SAM_FRONT_* above).
   const dets = (await _maskBoxesFrontFirst(imageDataUri, persons.map(p => p.box), W, H, pageLabel,
-    faces.map(f => f.box)))
+    faces.map(f => f.box), expectedCharacters.map(c => (typeof c === 'object' ? c.description : '') || '')))
     .map((m, i) => ({
       box: persons[i].box,
       score: persons[i].score,
@@ -940,6 +1081,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       occludedByIdx: m.occludedByIdx,
       pxLostToFront: m.pxLostToFront,
       maskPx: m.maskPx,
+      garmentSeeds: m.garmentSeeds,
     }));
   // Persist any SAM mask leak to the STORY log (not just Railway), so a blow-out
   // is always findable later per-story instead of vanishing into container logs.
@@ -1285,7 +1427,8 @@ async function attachSamMasksToFigures(imageData, figures, { pageLabel = '' } = 
       ? [Math.round(fb[1] * W), Math.round(fb[0] * H), Math.round(fb[3] * W), Math.round(fb[2] * H)]
       : null;
   }).filter(Boolean);
-  const maskResults = await _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel, faceBoxesPx);
+  const maskResults = await _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel, faceBoxesPx,
+    figures.map(f => f.description || f.clothing || ''));
   const entries = figures.map((f, i) => {
     const m = maskResults[i];
     if (m.keptBox) { f.bodyBox = _pxBoxToNorm(m.keptBox, W, H); f.samApplied = true; }
@@ -1297,6 +1440,7 @@ async function attachSamMasksToFigures(imageData, figures, { pageLabel = '' } = 
     f.occludedBy = (m.occludedByIdx || []).map(k => figures[k]?.name).filter(Boolean);
     f.pxLostToFront = m.pxLostToFront;
     f.maskPx = m.maskPx;
+    f.garmentSeeds = m.garmentSeeds;
     return { f, mask: m.mask };
   });
   const masked = entries.filter(e => e.mask).length;
@@ -1314,6 +1458,10 @@ module.exports = {
   _boxAreaPx,
   _boxContainment,
   _assignFacesToBoxes,
+  _garmentColourWords,
+  _colourSeedPoints,
+  NEUTRAL_COLOURS,
+  DOT_MIN_PX,
   SAM_FACE_CONTAINMENT,
   SAM_FACE_IN_MASK,
   SAM_FRONT_CONTAINMENT,
