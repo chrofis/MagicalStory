@@ -2095,13 +2095,22 @@ async function generateSceneComposite(opts) {
     // Scenery hides the rest of this figure, so paste only the part that shows.
     // Drawing the whole body would paint over the very thing doing the hiding,
     // and the scene interaction the brief asked for disappears with it.
+    // Clip at the OCCLUDER LINE, not at a fraction. The thing hiding this
+    // figure sits at a fixed place on the canvas — the silhouette's own bottom
+    // edge — so the visible height is bbox.height no matter what the figure's
+    // full height works out to. Scaling him does not move the railing.
+    //
+    // Clipping by fraction was wrong twice over: the fraction was measured
+    // against the height Grok PAINTED and then applied to a differently scaled
+    // figure, so two rulers were mixed. On p6 that pasted 50px of a man whose
+    // visible silhouette was 85px.
     if (visibleFraction && visibleFraction < 1) {
       const m0 = await sharp(scaled).metadata();
-      const keep = Math.max(8, Math.round(m0.height * visibleFraction));
+      const keep = Math.max(8, Math.min(m0.height, bbox.height));
       if (keep < m0.height) {
         scaled = await sharp(scaled)
           .extract({ left: 0, top: 0, width: m0.width, height: keep }).png().toBuffer();
-        log.info(`[SCENE COMPOSITE]   ${c.name}: clipped to the visible ${Math.round(visibleFraction * 100)}% (${m0.height}px → ${keep}px) so the occluder survives`);
+        log.info(`[SCENE COMPOSITE]   ${c.name}: clipped at the occluder line (${m0.height}px → ${keep}px, matching the ${bbox.height}px visible silhouette)`);
       }
     }
 
