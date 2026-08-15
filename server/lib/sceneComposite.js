@@ -106,6 +106,13 @@ const HEAD_TINTS = {
 // which shattered a figure into a 27x55 scrap. Sunlit path and dirt, the
 // scenery that shares a red hue, measure ~0.23, so 0.45 clears both.
 const BODY_SAT_FLOOR = 0.45;
+// How much of a figure has to be missing before we believe scenery is hiding
+// it. Everything feeding this judgement is a measurement — the head band, the
+// plate's heads-per-body, the box — so a few percent either way is noise, not
+// a railing. At 0.95 that noise cost a woman standing in the open her feet:
+// she read as "94% on show" and was clipped 25px (Lab exp 684). Below this
+// bar the figure is simply whole; a cut that small is never worth making.
+const MAX_SHOWN_TO_COUNT_AS_OCCLUDED = 0.85;
 
 // ─── Grok aspect preset picker ────────────────────────────────────────────
 //
@@ -2091,7 +2098,12 @@ async function generateSceneComposite(opts) {
     if (visibleFraction && visibleFraction < 1) {
       const m0 = await sharp(scaled).metadata();
       const keep = Math.max(8, Math.min(m0.height, bbox.height));
-      if (keep < m0.height) {
+      // Second guard, in the same spirit as MAX_SHOWN_TO_COUNT_AS_OCCLUDED and
+      // deliberately not folded into it: whatever the branch above concluded,
+      // a cut of a few percent is measurement slop and takes a character's
+      // feet off for nothing. Either scenery hides a real part of this figure
+      // or it does not.
+      if (keep < m0.height * MAX_SHOWN_TO_COUNT_AS_OCCLUDED) {
         scaled = await sharp(scaled)
           .extract({ left: 0, top: 0, width: m0.width, height: keep }).png().toBuffer();
         log.info(`[SCENE COMPOSITE]   ${c.name}: clipped at the occluder line (${m0.height}px → ${keep}px, matching the ${bbox.height}px visible silhouette)`);
@@ -2611,7 +2623,7 @@ function statureTargetFor(c, bbox, statureModel, canvasW, canvasH, head = null, 
     if (head && head.height >= 8 && plateRatio) {
       const paintedFull = Math.round(head.height * plateRatio);
       const shown = bbox.height / paintedFull;
-      if (shown < 0.95 && shown > 0.15) {
+      if (shown < MAX_SHOWN_TO_COUNT_AS_OCCLUDED && shown > 0.15) {
         // Scale to the height Grok PAINTED, and show only the visible slice.
         //
         // No ground-plane correction here, deliberately. The plane is fitted
@@ -2643,7 +2655,7 @@ function statureTargetFor(c, bbox, statureModel, canvasW, canvasH, head = null, 
       // figure showing less than a quarter of itself is a mismeasured box, not
       // a person behind a railing. footY must also stay on-canvas, otherwise
       // this is frame clipping and the branch above owns it.
-      if (ratio > 1.15 && ratio <= 4 && footY < canvasH) {
+      if (ratio > 1 / MAX_SHOWN_TO_COUNT_AS_OCCLUDED && ratio <= 4 && footY < canvasH) {
         return {
           targetH: Math.max(20, solvedFull),
           anchor: 'head',
