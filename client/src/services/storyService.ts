@@ -71,6 +71,8 @@ interface CoverDevMeta {
   hasVisualBibleGrid?: boolean;
   /** Cover-level figure/object detection (figures/objects JSON, no image bytes) */
   bboxDetection?: unknown | null;
+  /** Per-version dev metadata — same shape scenes get (versionMetaList on the server) */
+  imageVersionsMeta?: Array<Record<string, unknown> & { versionIndex: number }>;
 }
 
 interface StoryDraft {

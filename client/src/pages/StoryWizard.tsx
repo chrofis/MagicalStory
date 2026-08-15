@@ -664,6 +664,38 @@ export default function StoryWizard() {
               // none, so dropping this here blanked the Object Detection panel
               // for every cover (the "finds figures first" symptom's UI half).
               bboxDetection: devCover.bboxDetection ?? (currentCover as any).bboxDetection,
+              // Per-version dev metadata — the SAME merge scenes get above
+              // (owner order 2026-08-15: cover and page dev display are the
+              // same). Matched by versionIndex, not array position.
+              imageVersions: (currentCover as any).imageVersions?.map((v: any) => {
+                const vIdx = v.versionIndex ?? 0;
+                const meta: any = (devCover as any).imageVersionsMeta?.find((m: any) => m.versionIndex === vIdx);
+                if (!meta) return v;
+                return {
+                  ...v,
+                  qualityScore: meta.qualityScore ?? v.qualityScore,
+                  rawQualityScore: meta.rawQualityScore ?? v.rawQualityScore,
+                  semanticScore: meta.semanticScore ?? v.semanticScore,
+                  semanticResult: meta.semanticResult ?? v.semanticResult,
+                  entityPenalty: meta.entityPenalty ?? v.entityPenalty,
+                  evaluatedAt: meta.evaluatedAt ?? v.evaluatedAt,
+                  issuesSummary: meta.issuesSummary ?? v.issuesSummary,
+                  fixableIssues: meta.fixableIssues?.length ? meta.fixableIssues : v.fixableIssues,
+                  qualityReasoning: meta.qualityReasoning ?? v.qualityReasoning,
+                  fixTargets: meta.fixTargets?.length ? meta.fixTargets : v.fixTargets,
+                  totalAttempts: meta.totalAttempts ?? v.totalAttempts,
+                  referencePhotoNames: meta.referencePhotoNames?.length ? meta.referencePhotoNames : v.referencePhotoNames,
+                  prompt: meta.prompt ?? v.prompt,
+                  description: meta.description ?? v.description,
+                  type: (meta.type ?? v.type),
+                  grokRefImages: meta.grokRefImages ?? v.grokRefImages,
+                  bboxDetection: meta.bboxDetection ?? v.bboxDetection,
+                  inpaintInstruction: meta.inpaintInstruction ?? v.inpaintInstruction,
+                  charRepairGrokRaw: meta.charRepairGrokRaw ?? v.charRepairGrokRaw,
+                  charRepairBlendMask: meta.charRepairBlendMask ?? v.charRepairBlendMask,
+                  charRepairWhiteout: meta.charRepairWhiteout ?? v.charRepairWhiteout,
+                };
+              }) ?? (currentCover as any).imageVersions,
             };
           }
         }

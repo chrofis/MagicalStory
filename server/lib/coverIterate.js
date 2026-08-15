@@ -949,15 +949,57 @@ async function iterateCover(coverKey, storyData, options = {}) {
     };
   }
 
-  // Composite path skips quality eval AND the app-side restamp (title/dedication
-  // are baked in by the composite passes) — return its result directly, exactly
-  // as before composite became a shared-path option. Same return shape so all
-  // callers stay agnostic.
+  // Composite path skips the app-side restamp (title/dedication are baked in by
+  // the composite passes) but is NOT exempt from scoring or detection any more
+  // (owner order 2026-08-15: covers and pages the same — an unscored version is
+  // invisible to pickBestVersionIndex and previously shipped on a hard pin,
+  // the docs/scoring-review.md divergence). Same eval + detection primitives as
+  // the direct path above; skipEval callers still score in their round eval.
   if (imageResult.composite) {
+    let compScore = null;
+    let compReasoning = skipEval ? 'no gen-time eval (pipeline scores versions)' : 'composite-cover (eval failed)';
+    let compBbox = null;
+    let compOverlay = null;
+    if (!skipEval && imageResult.imageData) {
+      try {
+        const qualityResult = await evaluateImageQuality(
+          imageResult.imageData, coverPrompt, coverCharacterPhotos, 'cover', null,
+          iterateLabel, null, sceneDescription, selectedCoverCharacters, {}
+        );
+        if (qualityResult) {
+          compScore = qualityResult.score ?? null;
+          compReasoning = qualityResult.reasoning || null;
+          if (usageTracker && qualityResult.usage) {
+            usageTracker('gemini_quality', qualityResult.usage, 'cover_quality', qualityResult.modelId);
+          }
+        }
+      } catch (evalErr) {
+        log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: composite eval failed (${evalErr.message}) — serving unscored render`);
+      }
+      try {
+        compBbox = await detectAllBoundingBoxes(imageResult.imageData, {
+          expectedCharacters: (selectedCoverCharacters || []).map(c => ({
+            name: c.name || c,
+            description: typeof c === 'object' ? (c.description || '') : '',
+          })),
+          expectedObjects: Array.isArray(coverSceneMetadata?.objects)
+            ? coverSceneMetadata.objects.filter(o => typeof o === 'string')
+            : [],
+          sceneContext: sceneDescription,
+          pageContext: iterateLabel,
+          artStyle: artStyleId,
+        });
+        if (compBbox) {
+          compOverlay = await createBboxOverlayImage(imageResult.imageData, compBbox);
+        }
+      } catch (bboxErr) {
+        log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: composite detection failed (${bboxErr.message})`);
+      }
+    }
     return {
       imageData: imageResult.imageData,
-      score: null, // composite path skips quality eval — returns immediately
-      reasoning: 'composite-cover (no quality eval)',
+      score: compScore,
+      reasoning: compReasoning,
       modelId: imageResult.modelId,
       totalAttempts: imageResult.totalAttempts || 1,
       prompt: imageResult.prompt,
@@ -969,10 +1011,8 @@ async function iterateCover(coverKey, storyData, options = {}) {
       previousImage: rehydratedCoverBytes,
       previousScore: existingCover.qualityScore || null,
       compositeDebug: imageResult.compositeDebug,
-      // Composite path skips quality eval, so no detection was computed —
-      // honest null (the dev endpoint's refresh re-detects on demand).
-      bboxDetection: null,
-      bboxOverlayImage: null,
+      bboxDetection: compBbox,
+      bboxOverlayImage: compOverlay,
     };
   }
 

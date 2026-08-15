@@ -793,6 +793,45 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
+    // Per-version dev metadata (no image bytes) — ONE builder for scenes AND
+    // covers (owner order 2026-08-15: cover and page dev display are the same;
+    // covers previously had no imageVersionsMeta at all, so the version viewer
+    // showed pages' repair thumbnails/eval detail but nothing for covers).
+    const versionMetaList = (versions) => (versions || []).map((v, idx) => ({
+      versionIndex: idx,
+      description: v.description || null,
+      prompt: v.prompt || null,
+      userInput: v.userInput || null,
+      modelId: v.modelId || null,
+      createdAt: v.createdAt || null,
+      type: v.type || v.source || null,
+      qualityScore: v.qualityScore ?? null,
+      // Canonical reader — one fallback chain for every legacy shape.
+      finalScore: require('../lib/scoring').computeFinalScore(v),
+      rawQualityScore: v.rawQualityScore ?? null,
+      semanticScore: v.semanticScore ?? null,
+      semanticResult: v.semanticResult || null,
+      entityPenalty: v.entityPenalty ?? 0,
+      evaluatedAt: v.evaluatedAt || null,
+      issuesSummary: v.issuesSummary || null,
+      fixableIssues: v.fixableIssues || [],
+      qualityReasoning: v.qualityReasoning || null,
+      fixTargets: v.fixTargets || [],
+      totalAttempts: v.totalAttempts || null,
+      referencePhotoNames: v.referencePhotoNames || [],
+      hasGrokRefImages: Array.isArray(v.grokRefImages) && v.grokRefImages.length > 0,
+      hasInpaintReferenceImages: Array.isArray(v.inpaintReferenceImages) && v.inpaintReferenceImages.length > 0,
+      bboxDetection: v.bboxDetection || null,
+      // Char-repair pipeline intermediate stages — the dev modal renders
+      // these as thumbnails ("Whiteout (Eingabe) / Grok-Rohausgabe /
+      // Blend-Maske") so the user can see WHERE in the pipeline a bad
+      // result entered.
+      charRepairGrokRaw: v.charRepairGrokRaw || null,
+      charRepairBlendMask: v.charRepairBlendMask || null,
+      charRepairWhiteout: v.charRepairWhiteout || null,
+      inpaintInstruction: v.inpaintInstruction || null,
+    }));
+
     // Verify access — extract only the JSONB fields we need instead of loading the entire blob
     const devFields = `data->'outline' as outline, data->'originalStory' as "originalStory",
       data->'sceneImages' as "sceneImages", data->'coverImages' as "coverImages",
@@ -955,46 +994,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         sceneCharacterNames: (img.sceneCharacters || []).map(c => c.name || c.label || 'Unknown'),
         // Per-version metadata for dev mode (no image data)
         // versionIndex = array index = DB version_index (unified mapping)
-        imageVersionsMeta: (() => {
-          const versions = img.imageVersions || [];
-          return versions.map((v, idx) => ({
-            versionIndex: idx,
-            description: v.description || null,
-            prompt: v.prompt || null,
-            userInput: v.userInput || null,
-            modelId: v.modelId || null,
-            createdAt: v.createdAt || null,
-            type: v.type || v.source || null,
-            qualityScore: v.qualityScore ?? null,
-            // Canonical reader — one fallback chain for every legacy shape.
-            finalScore: require('../lib/scoring').computeFinalScore(v),
-            rawQualityScore: v.rawQualityScore ?? null,
-            semanticScore: v.semanticScore ?? null,
-            semanticResult: v.semanticResult || null,
-            entityPenalty: v.entityPenalty ?? 0,
-            evaluatedAt: v.evaluatedAt || null,
-            issuesSummary: v.issuesSummary || null,
-            fixableIssues: v.fixableIssues || [],
-            qualityReasoning: v.qualityReasoning || null,
-            fixTargets: v.fixTargets || [],
-            totalAttempts: v.totalAttempts || null,
-            referencePhotoNames: v.referencePhotoNames || [],
-            hasGrokRefImages: Array.isArray(v.grokRefImages) && v.grokRefImages.length > 0,
-            hasInpaintReferenceImages: Array.isArray(v.inpaintReferenceImages) && v.inpaintReferenceImages.length > 0,
-            bboxDetection: v.bboxDetection || null,
-            // Char-repair pipeline intermediate stages — the dev modal renders
-            // these as thumbnails ("Whiteout (Eingabe) / Grok-Rohausgabe /
-            // Blend-Maske") so the user can see WHERE in the pipeline a bad
-            // result entered. Persisted on the version row by char-fix and
-            // already stored as R2 URLs (or data URIs). Without surfacing
-            // them here the modal renders the thumbnails block as null
-            // because `detailVersion.charRepair* === undefined`.
-            charRepairGrokRaw: v.charRepairGrokRaw || null,
-            charRepairBlendMask: v.charRepairBlendMask || null,
-            charRepairWhiteout: v.charRepairWhiteout || null,
-            inpaintInstruction: v.inpaintInstruction || null,
-          }));
-        })(),
+        imageVersionsMeta: versionMetaList(img.imageVersions),
       })) || [],
       // Cover images dev data - expose full retryHistory like page images (for bbox/repair display)
       coverImages: story.coverImages ? {
@@ -1002,6 +1002,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           prompt: story.coverImages.frontCover.prompt || null,
           qualityReasoning: story.coverImages.frontCover.qualityReasoning || null,
           totalAttempts: story.coverImages.frontCover.totalAttempts || null,
+          bboxDetection: story.coverImages.frontCover.bboxDetection || null,
+          imageVersionsMeta: versionMetaList(story.coverImages.frontCover.imageVersions),
           referencePhotos: (story.coverImages.frontCover.referencePhotos || []).map(p => ({
             name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
             clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData),
@@ -1046,6 +1048,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           prompt: story.coverImages.initialPage.prompt || null,
           qualityReasoning: story.coverImages.initialPage.qualityReasoning || null,
           totalAttempts: story.coverImages.initialPage.totalAttempts || null,
+          bboxDetection: story.coverImages.initialPage.bboxDetection || null,
+          imageVersionsMeta: versionMetaList(story.coverImages.initialPage.imageVersions),
           referencePhotos: (story.coverImages.initialPage.referencePhotos || []).map(p => ({
             name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
             clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData),
@@ -1089,6 +1093,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           prompt: story.coverImages.backCover.prompt || null,
           qualityReasoning: story.coverImages.backCover.qualityReasoning || null,
           totalAttempts: story.coverImages.backCover.totalAttempts || null,
+          bboxDetection: story.coverImages.backCover.bboxDetection || null,
+          imageVersionsMeta: versionMetaList(story.coverImages.backCover.imageVersions),
           referencePhotos: (story.coverImages.backCover.referencePhotos || []).map(p => ({
             name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
             clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData),
