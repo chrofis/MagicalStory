@@ -365,10 +365,11 @@ function maskMatchesObservedColour(cur, ref, cfg) {
   // LIGHTNESS — so the p3 `shoes` mask (the cream map, L 66.6, hue +68°) sits
   // 9° from brown and would pass a hue-only test. Lightness cannot be a fixed
   // threshold either, because scene lighting legitimately moves it; but it
-  // cannot move it arbitrarily far, and this module already bounds that with
-  // the lighting factor it trusts elsewhere (lightingMin/lightingMax). Anything
-  // outside even the most generous lighting is a different colour, not a lit
-  // version of this one.
+  // cannot move it arbitrarily far, so lightingMin/lightingMax bound the widest
+  // range any illumination could plausibly produce. Anything outside even that
+  // is a different colour, not a lit version of this one. (These two constants
+  // are ONLY this gate's bounds — the lighting factor that once scaled the
+  // target was removed; see the note at the repaint step.)
   const loL = ref.lab[0] * cfg.lightingMin - cfg.observedLightnessMargin;
   const hiL = ref.lab[0] * cfg.lightingMax + cfg.observedLightnessMargin;
   if (cur.L < loL || cur.L > hiL) {
@@ -1022,24 +1023,6 @@ function meanLabMasked(raw, alpha, thr = 128) {
 }
 
 /** Median L* of skin-looking pixels in a box — the illumination probe. */
-function medianSkinL(raw, W, H, box01) {
-  if (!Array.isArray(box01) || box01.length !== 4) return null;
-  const y0 = Math.max(0, Math.round(box01[0] * H)), x0 = Math.max(0, Math.round(box01[1] * W));
-  const y1 = Math.min(H, Math.round(box01[2] * H)), x1 = Math.min(W, Math.round(box01[3] * W));
-  const Ls = [];
-  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
-    const i = y * W + x;
-    const r = raw[i * 3], g = raw[i * 3 + 1], b = raw[i * 3 + 2];
-    // Skin is exactly what isGarmentPixel REJECTS in the warm band — invert it.
-    if (isGarmentPixel(r, g, b)) continue;
-    const l = _rgbToLab(r, g, b);
-    if (l[0] < 15 || l[0] > 96) continue; // crushed black / blown white carry no signal
-    Ls.push(l[0]);
-  }
-  if (Ls.length < 50) return null;
-  Ls.sort((p, q) => p - q);
-  return Ls[Math.floor(Ls.length / 2)];
-}
 
 /**
  * The canonical colour of ONE garment for a character, measured off the styled
@@ -1389,25 +1372,34 @@ async function fixFigureGarmentColour(pageImageData, figure, avatarUri, options 
     return { changed: false, imageData: pageImageData, report, steps };
   }
 
-  // Lighting factor from skin: page face vs avatar face, same material.
-  let lighting = 1, lightingSource = 'default';
-  try {
-    const { data: pageRaw } = await sharp(pageBuf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-    const pageSkinL = medianSkinL(pageRaw, W, H, figure.faceBox);
-    const abuf = bytesOf(avatarUri);
-    const am = await sharp(abuf).metadata();
-    const { data: avRaw } = await sharp(abuf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-    // Avatar head cells occupy the top band of the sheet.
-    const avSkinL = medianSkinL(avRaw, am.width, am.height, [0, 0, 0.45, 1]);
-    if (pageSkinL && avSkinL) {
-      const f = pageSkinL / avSkinL;
-      if (f >= cfg.lightingMin && f <= cfg.lightingMax) { lighting = f; lightingSource = 'skin'; }
-      else { lightingSource = `skin out of range (${f.toFixed(2)})`; }
-      report.skin = { page: +pageSkinL.toFixed(1), avatar: +avSkinL.toFixed(1) };
-    }
-  } catch { /* lighting probe is advisory; 1.0 is a safe default */ }
-  report.lighting = +lighting.toFixed(2);
-  report.lightingSource = lightingSource;
+  // NO LIGHTING FACTOR (owner, 2026-08-15). This used to scale the target L* by
+  // page-skin-L / avatar-skin-L, and that ratio measured at least four things
+  // at once while being reported as illumination:
+  //   1. actual scene lighting  — the only one intended
+  //   2. the character's skin tone as rendered on that page
+  //   3. hair, collar, glasses, shadow and background inside the face box —
+  //      "skin" was never detected, it was every pixel the GARMENT test rejects,
+  //      inside a face box that is padded down to the chest
+  //   4. ART STYLE. On the watercolour pirate page (Test Lab #432) it measured
+  //      0.73 from page skin L 60.9 vs avatar sheet L 83.7 — a painted page
+  //      against a bright studio sheet, no illumination difference at all — and
+  //      dragged Emma's top from L 73 to L 60, muddy.
+  //
+  // A page-level probe has the same disease in a new place: a night scene and a
+  // dark watercolour both read "dark", so median page L cannot separate
+  // illumination from medium either. The only signal that could is a DECLARED
+  // one, and no such field exists — sceneMetadata has 25 keys and not one about
+  // lighting or time of day, and the Art Director's prose mentions it only in
+  // passing, if at all. Adding `timeOfDay` to the scene-expansion schema is a
+  // prompt-and-schema decision, not something to bolt on here.
+  //
+  // So the factor is gone rather than retuned. The target already comes from the
+  // character's own styled avatar, maxDeltaL still bounds how far a repaint may
+  // move, and maskMatchesObservedColour still refuses outright when the mask is
+  // not the colour the report claims.
+  const lighting = 1;
+  report.lighting = 1;
+  report.lightingSource = 'none (see garmentColourFix: no lighting factor)';
 
   // Target scaled by lighting: only L* is illumination-dependent this way; the
   // hue and chroma of the pigment do not change with light level.
@@ -1517,7 +1509,6 @@ module.exports = {
   boxIoU,
   labDeltaE,
   segmentGarment,
-  medianSkinL,
   meanLabMasked,
   dilateMaskByColour,
   DEFAULTS,

@@ -11416,3 +11416,46 @@ WORDS still runs after the gate.
 
 **Touched files:** `storyJobPipeline.js` (cover clothing requirements),
 `server/lib/coverTitlePaint.js` (shape gate).
+
+
+## 2026-08-15 - The garment fix has no lighting factor (removed, not retuned)
+
+**Context:** `garmentColourFix` scaled the avatar's target L* by a factor probed from "skin":
+`page face median L / avatar face median L`. On photoreal pages it measured 0.92-1.14, which looks
+sensible. On the watercolour pirate page (Test Lab #432) it measured **0.73** - page skin L 60.9 vs
+avatar sheet L 83.7 - and pulled Emma's top from L 73 to L 60, muddy.
+
+**Why it was wrong in principle, not just mistuned.** The ratio measured at least four things at once
+and reported the result as illumination:
+
+1. actual scene lighting - the only one intended
+2. the character's skin tone as rendered on that page
+3. hair, collar, glasses, shadow and background - **"skin" was never detected**. `medianSkinL` kept
+   every pixel that the GARMENT test rejects, inside a face box that is padded down to the chest.
+4. **art style** - a painted page against a bright studio avatar sheet, with no illumination
+   difference whatsoever. This is the #432 case.
+
+A single median over that set cannot say which of the four moved it.
+
+**Decision:** the factor is removed, not clamped or style-gated. `lighting` is a constant 1;
+`report.lighting` and `report.lightingSource` remain so a Lab run shows `1 / none` rather than the
+field vanishing. `medianSkinL` is deleted.
+
+**Rejected: a page-level probe** ("look at the whole page and judge day or night"). It has the same
+disease in a new place - a night scene and a dark watercolour both read "dark", so median page L
+cannot separate illumination from medium either.
+
+**Rejected for now: a declared time-of-day.** That is the only signal that could work, and no such
+field exists: `sceneMetadata` carries 25 keys and not one about lighting or time of day, and the
+scene-expansion prompt asks for lighting only as free prose (on the page checked, the prose contains
+no lighting words at all). Adding `timeOfDay` to the schema is a prompt-and-schema decision and needs
+its own sign-off plus measured cases of genuine night scenes being mis-corrected.
+
+**What still bounds a repaint:** the target comes from the character's own styled avatar, `maxDeltaL`
+clamps how far L* may move, and `maskMatchesObservedColour` refuses outright when the mask is not the
+colour the report claims. `cfg.lightingMin` / `cfg.lightingMax` SURVIVE - they are not the removed
+factor, they bound the observed-colour gate so a cream mask cannot pass as a lit brown.
+
+**Touched:** `server/lib/garmentColourFix.js`, `tests/manual/garmentNoLighting.test.js`.
+
+**Status:** active. Closes task #3.
