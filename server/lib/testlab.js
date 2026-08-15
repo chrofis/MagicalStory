@@ -842,6 +842,16 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
       // coverage floor is judged against, so a 'rejected-too-small' verdict
       // can be checked here instead of re-deriving it from the boxes.
       maskCoverage: f.maskCoverage ?? null,
+      // Occlusion facts from the joint depth pass (2026-08-15). Without these a
+      // Lab run can only be judged by eye off the cut-out strip: it cannot say
+      // how much of a figure survived, how much a figure in front took from it,
+      // who took it, or whether the garment seed points fired at all. That
+      // blocked three separate conclusions the day they were added.
+      maskPx: f.maskPx ?? null,
+      pxLostToFront: f.pxLostToFront ?? null,
+      occluded: f.occluded ?? null,
+      occludedBy: f.occludedBy || null,
+      garmentSeeds: f.garmentSeeds ?? null,
     })),
     objects: (result.objects || []).map(o => ({ name: o.name, bbox: o.bodyBox || o.bbox || o.box_2d })),
   };
