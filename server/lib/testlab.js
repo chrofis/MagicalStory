@@ -348,8 +348,12 @@ async function saveTestVersion(storyId, imageType, pageNumber, imageData, experi
  * referencePhotos carry no clothing, fall back to the expected characters so
  * the contract is still populated.
  */
-function evalSceneDescription(ctx) {
-  return `${ctx.scene.sceneDescription || ''}`;
+function evalSceneDescription(ctx, params = null) {
+  // A/B runs with sceneDescriptionOverride generate FROM the override — the
+  // eval contract must be the same override, or the judge deducts for lacking
+  // exactly the defects the override removed (observed: three P6 A/B renders
+  // scored sem=0 against the stored brief's "gap in the railing"/"ankle-deep").
+  return `${params?.sceneDescriptionOverride || ctx.scene.sceneDescription || ''}`;
 }
 
 /** Reference photos for eval, guaranteed to carry clothingDescription. */
@@ -518,7 +522,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     try {
       const { evaluateImageQuality } = require('./images');
       const evalRes = await evaluateImageQuality(
-        result.imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), 'scene',
+        result.imageData, evalSceneDescription(ctx, params), evalReferencePhotos(ctx), 'scene',
         null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
         ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null
       );
@@ -5099,7 +5103,13 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     let scorecard = null;
     if (params.scoreOutput === true || params.scoreOutput === 'true') {
       const sceneText = merged.map(m => `--- Page ${m.pageNumber} ---\n${m.brief}`).join('\n\n');
-      if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'scene_review_replay', model, ...(fromRound != null ? { round: fromRound + 1, label: `from r${fromRound} · ${model}` } : {}), genCost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}), genMs: Date.now() - t } })).scorecard;
+      const chain = {
+        reviewModel: model,
+        ...(fromRound != null ? { fromRound } : {}),
+        analysis: String(parsed.analysis || '').slice(0, 15000),
+        rewrites: diffs.map(dd => ({ page: dd.pageNumber, before: String(dd.before).slice(0, 2000), after: String(dd.after).slice(0, 2000) })),
+      };
+      if (sceneText.trim()) scorecard = (await scoreArtifactsWithJudge({ scene: sceneText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'scene_review_replay', model, ...(fromRound != null ? { round: fromRound + 1, label: `from r${fromRound} · ${model}` } : {}), genCost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}), genMs: Date.now() - t, chain } })).scorecard;
     }
 
     runs.push({
@@ -5165,20 +5175,20 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   if (!TEXT_MODELS[judge]) throw new Error(`Unknown judge model "${judge}"`);
   // Pick the evaluator version's prompt (v1.0 default; v1.1 = harsher). An
   // explicit promptOverride still wins (Test Lab A/B of the rubric itself).
-  const { version, promptKey } = sc.resolveEvaluator(evalVersion);
+  const { version, promptKey, rubric } = sc.resolveEvaluator(evalVersion);
   const template = promptOverride || PROMPT_TEMPLATES[promptKey];
   if (!template) throw new Error(`story-scorecard judge template unavailable for evaluator ${version}`);
   const input = sc.buildJudgeInputFromArtifacts(artifacts);
   if (!input.trim()) throw new Error('no artifacts to score');
   // The artifacts actually sent — the judge is graded on exactly these, never on
   // any zero-skeleton it echoes back for the ones it wasn't given.
-  const requested = Object.keys(sc.RUBRIC).filter(k => artifacts[k] != null && String(artifacts[k]).trim());
-  const partial = requested.length < Object.keys(sc.RUBRIC).length;
+  const requested = Object.keys(rubric).filter(k => artifacts[k] != null && String(artifacts[k]).trim());
+  const partial = requested.length < Object.keys(rubric).length;
 
   const t = Date.now();
   const res = await callTextModelStreaming(`${template}\n\n---\n\n${input}`, null, null, judge, { usageLabel: 'testlab_story_scorecard', temperature: 0 });
   if (!res || !res.text || !res.text.trim()) throw new Error(`judge returned empty response (model ${judge})`);
-  const scored = sc.scoreFromDims(sc.parseJudgeJson(res.text), { partial, only: requested });
+  const scored = sc.scoreFromDims(sc.parseJudgeJson(res.text), { partial, only: requested, rubric });
   const scorecard = { ...scored, ...sc.evaluatorStamp(template, version), judgeModel: judge };
   const judgeMs = Date.now() - t;
   const judgeCost = res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {});
@@ -5198,6 +5208,7 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
       genCost: typeof persist.genCost === 'number' ? persist.genCost : null, // the model that produced/reviewed this artifact
       genMs: typeof persist.genMs === 'number' ? persist.genMs : null,
       judgeCost, judgeMs, // the scoring call
+      chain: persist.chain || null, // full review chain (analysis + rewrites) that produced this round
     };
     for (const [artifact, a] of Object.entries(scorecard.artifacts)) {
       // freeze the exact text the judge read for this part (click a part → this)
@@ -5291,16 +5302,26 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
     finally { PROMPT_TEMPLATES.storyBeatsReview = orig; }
     const out = res.text || '';
     const marker = out.match(/---\s*BEATS\s*---/i);
+    const branchAnalysis = (marker ? out.slice(0, marker.index) : out).trim();
     const rewritten = marker ? parseBeats(out.slice(marker.index)).pages : [];
     const byPage = new Map(rewritten.map(r => [r.pageNumber, r]));
     const nextBeats = inBeats.map(b => byPage.get(b.pageNumber) || b);
     const genCost = res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {});
     const genMs = Date.now() - t;
+    const chain = {
+      reviewModel: model,
+      fromRound,
+      analysis: branchAnalysis.slice(0, 15000),
+      rewrites: inBeats.filter(b => byPage.has(b.pageNumber)).map(b => {
+        const r = byPage.get(b.pageNumber);
+        return { page: b.pageNumber, before: `BEAT: ${b.beat}\nSCENE: ${b.scene}`.slice(0, 2000), after: `BEAT: ${r.beat}\nSCENE: ${r.scene}`.slice(0, 2000) };
+      }),
+    };
     let scorecard = null;
     if (scoreOutput) {
       scorecard = (await scoreArtifactsWithJudge({ beats: beatsToText(nextBeats) }, {
         model: params.judgeModel, evalVersion: params.evalVersion,
-        persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `from r${fromRound} · ${model}`, round: fromRound + 1, genCost, genMs },
+        persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `from r${fromRound} · ${model}`, round: fromRound + 1, genCost, genMs, chain },
       })).scorecard;
     }
     return { storyId: target.storyId, branch: { fromRound, toRound: fromRound + 1, model, rewrittenPages: [...byPage.keys()], score: scorecard?.artifacts?.beats?.score ?? null } };
@@ -5334,21 +5355,34 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
         const analysis = (marker ? out.slice(0, marker.index) : out).trim();
         const rewritten = marker ? parseBeats(out.slice(marker.index)).pages : [];
         const rewrittenPages = rewritten.map(r => r.pageNumber);
+        const byPage = new Map(rewritten.map(r => [r.pageNumber, r]));
+        // Full chain for this pass: the reviewer's complete analysis (all
+        // checks) + exact before→after per rewritten page. This is what the
+        // score row persists — a round must explain what produced it.
+        const chain = {
+          reviewModel: model,
+          pass: p,
+          analysis: analysis.slice(0, 15000),
+          rewrites: beats.filter(b => byPage.has(b.pageNumber)).map(b => {
+            const r = byPage.get(b.pageNumber);
+            return { page: b.pageNumber, before: `BEAT: ${b.beat}\nSCENE: ${b.scene}`.slice(0, 2000), after: `BEAT: ${r.beat}\nSCENE: ${r.scene}`.slice(0, 2000) };
+          }),
+        };
         const entry = {
           pass: p,
           rewrittenPages,
           converged: rewrittenPages.length === 0,
-          check8: (analysis.match(/8\.\s*Loose threads[\s\S]*$/i) || [''])[0].trim().slice(0, 800),
+          analysis: analysis.slice(0, 15000),
+          check8: (analysis.match(/8\.\s*Loose threads[\s\S]*?(?=\n\d{1,2}\.\s|$)/i) || [''])[0].trim().slice(0, 800),
           cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
           elapsedMs: Date.now() - t,
         };
-        const byPage = new Map(rewritten.map(r => [r.pageNumber, r]));
         beats = beats.map(b => byPage.get(b.pageNumber) || b); // fold rewrites forward
         if (scoreOutput) {
           const sr = await scoreArtifactsWithJudge({ beats: beatsToText(beats) }, {
             model: params.judgeModel, evalVersion: params.evalVersion,
             // round p+1: round 1 is the raw beats (scored below), so pass p → round p+1
-            persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `review pass ${p}`, round: p + 1, genCost: entry.cost, genMs: entry.elapsedMs },
+            persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'beats_review_replay', model, label: `review pass ${p}`, round: p + 1, genCost: entry.cost, genMs: entry.elapsedMs, chain },
           });
           entry.scorecard = sr.scorecard;
           entry.cost += sr.cost;
@@ -5609,7 +5643,14 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
     const storyText = rr.pages.map(p => `--- Page ${p.pageNumber} ---\n${p.text}`).join('\n\n');
     let scorecard = null;
     if (params.scoreOutput === true || params.scoreOutput === 'true') {
-      scorecard = (await scoreArtifactsWithJudge({ storyText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_text_replay', model, label: `from r${fromRound} · ${model}`, round: fromRound + 1, genCost, genMs } })).scorecard;
+      const round0 = (rr.rounds || [])[0] || {};
+      const chain = {
+        reviewModel: model,
+        fromRound,
+        analysis: String(round0.analysis || '').slice(0, 15000),
+        rewrites: (round0.pages || []).filter(p => p.before !== p.after).map(p => ({ page: p.pageNumber, before: String(p.before).slice(0, 2000), after: String(p.after).slice(0, 2000) })),
+      };
+      scorecard = (await scoreArtifactsWithJudge({ storyText }, { model: params.judgeModel, evalVersion: params.evalVersion, persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_text_replay', model, label: `from r${fromRound} · ${model}`, round: fromRound + 1, genCost, genMs, chain } })).scorecard;
     }
     return { storyId: target.storyId, branch: { fromRound, toRound: fromRound + 1, model, changedPages: rr.changed, score: scorecard?.artifacts?.storyText?.score ?? null } };
   }
