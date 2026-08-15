@@ -3482,7 +3482,17 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
 
   // Determine image model and backend (needed before empty scene generation)
   let imageModelOverride = modelOverrides?.imageModel || null;
-  const iterateSceneMetadata = newSceneMetadata;
+  // The rewrite's metadata is the working copy, but scene-iteration.txt does
+  // not emit `era` or `textZoneDescription` — context fields iterate has no
+  // business re-deciding. Read them from the rewrite when present, else from
+  // the saved scene, or the anachronism guard and text-zone hint go dark on
+  // every repaired page (same disease 6738d7dca fixed for beats pages).
+  const savedMeta = savedScene?.sceneMetadata || {};
+  const iterateSceneMetadata = {
+    ...newSceneMetadata,
+    era: newSceneMetadata?.era || savedMeta.era || savedMeta.fullData?.era || null,
+    textZoneDescription: newSceneMetadata?.textZoneDescription || savedMeta.textZoneDescription || null,
+  };
 
   // Route by scene complexity when no explicit model override
   if (!imageModelOverride) {

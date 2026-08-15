@@ -54,7 +54,7 @@ Scan the beats and list every element that must stay consistent across illustrat
 - All locations, all objects, all vehicles, all animals, all worn costumes and garments.
 - Secondary characters you invented only. Never {CHARACTER_NAMES} — they have reference photos.
 - English `name` and `description` for artifacts, locations, vehicles and clothing, even for a non-English story; those strings are copied into English image prompts. Characters and animals keep their given names.
-- Every item in exactly one category. A worn garment belongs to `clothing` only, never also to `artifacts`.
+- Every item in exactly one category. A worn garment belongs to `clothing` only, never also to `artifacts`. Exception: a prop the story turns into costume (a hat found in a chest, a cloak handed over) is ONE `artifacts` entry with `wornAs`: `"<CharacterName>.<slot>"` (`headwear`, `top`, `bottom`, `footwear`, `belt/waist`, `outer layer`); the wearer's clothing requirement describes the same item in that slot, in the same words.
 - At least {PAGE_COUNT} entries. Include an element even if it appears once.
 - Empty categories are `[]`.
 - One entry per secondary character, no matter how the beats refer to them; a person named both by relation and by attribute is one entry. Never reuse an id.

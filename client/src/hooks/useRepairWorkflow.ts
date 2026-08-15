@@ -505,13 +505,13 @@ export function useRepairWorkflow({
         // Compute entity penalty (same model as backend re-evaluate)
         let entityPenalty = 0;
         for (const ei of feedback.entityIssues) {
-          entityPenalty += ENTITY_PENALTIES[ei.severity as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
+          entityPenalty += ENTITY_PENALTIES[String(ei.severity || '').toLowerCase() as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
         }
         for (const oi of feedback.objectIssues) {
-          entityPenalty += ENTITY_PENALTIES[oi.severity as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
+          entityPenalty += ENTITY_PENALTIES[String(oi.severity || '').toLowerCase() as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
         }
         for (const si of feedback.semanticIssues) {
-          entityPenalty += ENTITY_PENALTIES[si.severity as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
+          entityPenalty += ENTITY_PENALTIES[String(si.severity || '').toLowerCase() as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
         }
         feedback.entityPenalty = capEntityPenalty(entityPenalty);
         // Score convention: qualityScore = raw visual (Gemini), score = final after penalties.
@@ -592,7 +592,7 @@ export function useRepairWorkflow({
           // Compute entity penalty (covers typically have no entity issues, but handle uniformly)
           let entityPenalty = 0;
           for (const ei of feedback.entityIssues) {
-            entityPenalty += ENTITY_PENALTIES[ei.severity as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
+            entityPenalty += ENTITY_PENALTIES[String(ei.severity || '').toLowerCase() as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
           }
           feedback.entityPenalty = capEntityPenalty(entityPenalty);
           const baseScore = feedback.qualityScore ?? 100;

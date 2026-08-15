@@ -633,7 +633,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const charIssues = charData.issues || [];
       for (const issue of charIssues) {
         if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          out.penalty += ENTITY_PENALTIES[issue.severity] || 0;
+          out.penalty += ENTITY_PENALTIES[String(issue.severity || '').toLowerCase()] || 0;
           out.issues.push({
             name: charName,
             severity: issue.severity,
@@ -648,7 +648,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const objIssues = objData.issues || [];
       for (const issue of objIssues) {
         if (issue.pages?.includes(pageNumber) || issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
-          out.penalty += ENTITY_PENALTIES[issue.severity] || 0;
+          out.penalty += ENTITY_PENALTIES[String(issue.severity || '').toLowerCase()] || 0;
           out.issues.push({
             name: objName,
             severity: issue.severity,

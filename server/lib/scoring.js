@@ -272,7 +272,7 @@ function sumDeductionPoints(deductions) {
   const points = (d) => {
     const type = String(d?.type || '').toLowerCase();
     if (ZERO_POINT_TYPES.has(type)) return 0;
-    const raw = SEVERITY_POINTS[d.severity] || 0;
+    const raw = SEVERITY_POINTS[String(d.severity || '').toLowerCase()] || 0;
     // Ceiling by type — charge the lower of what was claimed and what the type
     // is allowed to cost. Never raises a severity, only bounds it.
     const ceiling = MAX_SEVERITY_TYPES[type];
@@ -373,7 +373,7 @@ function applyScore(version, { evalResult = null, entityResult = null, consolida
   // The previous evalScore math (MIN of visual/semantic/threeStage subscores
   // was the legacy behavior; new model derives
   // evalScore from deductions ÷ entity-penalty split.
-  const entityRaw = (deductions.entity || []).reduce((s, d) => s + (SEVERITY_POINTS[d.severity] || 0), 0);
+  const entityRaw = (deductions.entity || []).reduce((s, d) => s + (SEVERITY_POINTS[String(d.severity || '').toLowerCase()] || 0), 0);
   const entityPoints = capEntityPenalty(entityRaw);
   version.entityPenaltyRaw = entityRaw;
   version.entityPenalty = entityPoints;
