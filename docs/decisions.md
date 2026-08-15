@@ -11704,3 +11704,38 @@ the requirement but whether the reference actually matches the declared
 category on that page.
 
 **Touched files:** `server/lib/coverTitlePaint.js`, `storyJobPipeline.js`.
+
+---
+
+## 2026-08-15 — Trial: the preview avatar IS the standard reference (and no standard sheet is built)
+
+**Context:** trial page 1 was declared `clothing: "standard"` by the writer, its
+reference was labelled `standard` — and the image sent to Grok was the COSTUMED
+avatar, so the page rendered the costume (job_1786826686448). Two causes, both
+mechanical:
+
+1. `storyAvatars.projectStoryCharacterAvatars` exposes a standard sheet as
+   `styled-standard`, read from `avatars.styledAvatars[artStyle].standard`. The
+   trial never fills that key — by documented decision it builds ONLY the
+   costumed 2×4 sheet and treats the cheap preview avatar as the standard
+   reference — but the preview avatar lives at `avatars.standard`, which the
+   projection does not read. `applyStoryCellRefs` then hits
+   `story[slotKey] || story.costumed` and silently substitutes the costume while
+   keeping the `standard` label.
+2. The standard sheet was nevertheless generated later: page 1's `standard`
+   clothing produced an avatar requirement in `collectAvatarRequirements`, so
+   the "skip the standard sheet" saving was lost — and it completed after page 1
+   had already rendered, so nothing ever used it.
+
+**Decision:** seed `styledAvatars[artStyle].standard` from the preview avatar at
+trial start, so a standard page gets the standard look under a truthful label;
+and filter non-costumed requirements out of the trial's later avatar
+requirements when a costume exists, so the standard sheet is never built.
+A page may still legitimately be standard — the outline decides — it simply
+renders from the preview avatar instead of a second sheet.
+
+**Still open:** the `|| story.costumed` fallback in `applyStoryCellRefs` remains
+silent. It should log when it substitutes, so a missing sheet is visible instead
+of surfacing as a mislabelled reference.
+
+**Touched files:** `storyJobPipeline.js`.

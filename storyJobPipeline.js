@@ -660,6 +660,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (seeded > 0) log.info(`♻️ [TRIAL] Seeded ${seeded} styled avatars from prepare-title cache`);
       }
 
+      // The trial deliberately builds NO standard 2×4 sheet (see the costumed-
+      // only requirements below): the cheap preview avatar is the standard
+      // reference. It has to be projectable as one, though — storyAvatars reads
+      // `styledAvatars[artStyle].standard` and applyStoryCellRefs falls back to
+      // the COSTUMED sheet when that key is missing, silently, while still
+      // labelling the ref `standard`. That is how a page the outline marked
+      // standard was sent the costume (job_1786826686448 p1). Seed the key from
+      // the preview avatar so a standard page gets the standard look.
+      for (const char of (inputData.characters || [])) {
+        const preview = char?.avatars?.standard;
+        if (typeof preview !== 'string' || !preview) continue;
+        const styled = char.avatars?.styledAvatars?.[artStyle];
+        if (styled && styled.standard) continue;
+        setStyledAvatar(char.name, 'standard', artStyle, preview);
+        log.info(`♻️ [TRIAL] ${char.name}: standard styled reference seeded from the preview avatar (no standard sheet is generated)`);
+      }
+
       log.info(`🎨 [TRIAL] Starting immediate avatar styling (${trialAvatarRequirements.length} variants)...`);
       streamingAvatarStylingPromise = (async () => {
         try {
@@ -2648,13 +2665,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
     });
 
-    const avatarRequirements = collectAvatarRequirements(
+    let avatarRequirements = collectAvatarRequirements(
       sceneDescriptions,
       inputData.characters || [],
       pageClothing,
       'standard',
       clothingRequirements
     );
+
+    // TRIAL: never build the standard 2×4 sheet. The costumed-only decision
+    // above is the whole point (saves ~30-40s and a Grok call), but a page the
+    // writer marked `standard` re-introduced the requirement here and the sheet
+    // got built anyway — after page 1 had already rendered, so it cost the time
+    // without ever being used. The preview avatar seeded as `styled-standard`
+    // is the standard reference.
+    if (inputData.trialMode && inputData._trialCostumeType) {
+      const before = avatarRequirements.length;
+      avatarRequirements = avatarRequirements.filter(r =>
+        String(r.clothingCategory || '').toLowerCase().startsWith('costumed'));
+      if (before !== avatarRequirements.length) {
+        log.info(`🎭 [TRIAL] Dropped ${before - avatarRequirements.length} non-costumed avatar requirement(s) — the preview avatar is the standard reference`);
+      }
+    }
 
     // NOTE: Avatar generation removed from story processing.
     // Base avatars should already exist from character creation.
