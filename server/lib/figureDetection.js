@@ -87,44 +87,37 @@ function _pxBoxToNorm(box, W, H) {
   ];
 }
 
-// A figure standing IN FRONT of another (owner, 2026-08-15).
+// Occlusion is resolved JOINTLY, not per figure (owner, 2026-08-15).
 //
-// When one person box is (nearly) enclosed by another, the enclosed figure is
-// standing in front: a crouching adult behind a child produces a box around the
-// adult that contains the whole child. SAM, prompted with that box and nothing
-// else, returns the dominant subject inside it — the child. Every Stage-2 gate
-// passes (inside the box, connected, fills most of it), so the adult's cutout
-// ships as the child's body with the adult's head on top. Measured on
-// job_1786780194082_s980g4s9a p-2: Daniel's cutout was Emma's red top and
-// orange shorts, the entity judge correctly called it "red, should be yellow",
-// and the garment recolour repainted 20,972 px of Emma's CORRECT red shirt.
+// Measured on job_1786780194082_s980g4s9a p-2 with a local MobileSAM replay ($0):
 //
-// The front figure's own box is tight and its silhouette trustworthy, so it is
-// resolved first and its pixels are erased from the image before SAM is asked
-// for the figure behind — SAM cannot return what is not there.
-// Measured on that page with a local MobileSAM replay (all figures, $0):
-//
-//   Emma's box-only mask                 94,121 px — and it covers 97% of
+//   Emma's box-only mask                 94,121 px - and it covers 97% of
 //                                        DANIEL'S head zone: her silhouette
 //                                        swallowed the man behind her.
-//   → carve-out (subtract her from him)  deletes HIS OWN head — the head-shaped
-//                                        void visible in the shipped cutout.
-//   → erasing her pixels white first     SAM then segments the white hole; his
-//                                        face is gone (10,871 px of fringe).
+//   -> subtracting her from him          deletes HIS OWN head.
+//   -> erasing her to white first        SAM segments the white hole; face gone.
 //
 //   box + POSITIVE on own face
-//       + NEGATIVE on each other face    Emma's leak into his head: 97% → 5.6%
-//   → then subtract the front figure's   Daniel: 25,524 px — head, beard, yellow
-//     dilated mask, drop speckles        collar, chest, sandal. No Emma, no red.
+//       + NEGATIVE on each other face    leak into his head: 97% -> 5.6%
 //
-// The negative point alone is NOT enough (her legs survive in his mask) and the
-// subtraction alone is NOT enough (it eats his head). Both are required.
-// SAM is deterministic here: the identical call run 3× differed by 0 px.
-const SAM_FRONT_CONTAINMENT = 0.80;   // inner box this much inside the outer → in front of it
-const SAM_FRONT_MAX_AREA = 0.90;      // and strictly smaller, else it is the same figure twice
-const SAM_FRONT_DILATE_PX = 3;        // subtract a small rim too — the two masks disagree by a few px
-const SAM_FRONT_MIN_REMAINDER = 0.02; // what is left of an occluded figure is legitimately small
-const SAM_SPECKLE_MIN_PX = 200;       // fringe left at the seam by that few-px disagreement
+// Solving N figures independently and patching the conflicts afterwards is what
+// produced every one of those failures, so the page is now solved as ONE
+// assignment: each pixel belongs to at most one person.
+//
+// DEPTH comes from geometry. People stand on a ground plane, so the LOWER a
+// figure's box ends, the nearer it is. On that page:
+//   Noah 1191 > Emma 1178 > Daniel 1169 > Sarah 1122 > Hans 1117
+// which correctly puts BOTH Emma and Noah in front of Daniel - the old
+// containment test caught only Emma (Noah overlaps him ~50%), which is exactly
+// why Noah's sandal leaked into Daniel's cut-out, and the old mask-AREA rule got
+// it backwards (Daniel's mask is smaller than Noah's, yet he is behind).
+//
+// Caveat: this assumes a common ground plane. Right for standing/crouching
+// figures in story illustrations; a figure sitting on a wall or shot from above
+// can invert it, so near-equal bottoms fall back to box containment.
+const SAM_FRONT_CONTAINMENT = 0.80;   // tie-break when two boxes end at the same height
+const SAM_GROUND_TIE_PX = 12;         // bottoms within this are "the same height"
+const SAM_FACE_IN_MASK = 0.10;        // a mask must cover this much of its OWN face box
 const SAM_FACE_CONTAINMENT = 0.70;    // a face this far inside a person box belongs to it
 
 function _boxAreaPx(b) { return Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]); }
@@ -135,56 +128,6 @@ function _boxContainment(inner, outer) {
   const iy = Math.max(0, Math.min(inner[3], outer[3]) - Math.max(inner[1], outer[1]));
   const a = _boxAreaPx(inner);
   return a > 0 ? (ix * iy) / a : 0;
-}
-
-// Union of masks, dilated by r px (separable: horizontal then vertical).
-function _unionDilated(masks, W, H, r) {
-  const u = new Uint8Array(W * H);
-  for (const m of masks) {
-    const a = m.alpha;
-    for (let k = 0; k < u.length; k++) if (a[k]) u[k] = 1;
-  }
-  if (r <= 0) return u;
-  const tmp = new Uint8Array(W * H);
-  for (let y = 0; y < H; y++) {
-    const row = y * W;
-    for (let x = 0; x < W; x++) {
-      if (!u[row + x]) continue;
-      for (let d = -r; d <= r; d++) { const nx = x + d; if (nx >= 0 && nx < W) tmp[row + nx] = 1; }
-    }
-  }
-  const out = new Uint8Array(W * H);
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      if (!tmp[y * W + x]) continue;
-      for (let d = -r; d <= r; d++) { const ny = y + d; if (ny >= 0 && ny < H) out[ny * W + x] = 1; }
-    }
-  }
-  return out;
-}
-
-// Drop connected components smaller than minPx (8-connected, iterative — a
-// recursive fill overflows the stack on a full page). Returns pixels kept.
-function _dropSmallComponents(alpha, W, H, minPx) {
-  const lab = new Int32Array(W * H); const areas = [0]; let n = 0;
-  for (let i = 0; i < W * H; i++) {
-    if (!alpha[i] || lab[i]) continue;
-    n++; let area = 0; const st = [i]; lab[i] = n;
-    while (st.length) {
-      const k = st.pop(); area++; const x = k % W, y = (k / W) | 0;
-      if (x > 0 && alpha[k - 1] && !lab[k - 1]) { lab[k - 1] = n; st.push(k - 1); }
-      if (x < W - 1 && alpha[k + 1] && !lab[k + 1]) { lab[k + 1] = n; st.push(k + 1); }
-      if (y > 0 && alpha[k - W] && !lab[k - W]) { lab[k - W] = n; st.push(k - W); }
-      if (y < H - 1 && alpha[k + W] && !lab[k + W]) { lab[k + W] = n; st.push(k + W); }
-    }
-    areas[n] = area;
-  }
-  let kept = 0;
-  for (let i = 0; i < W * H; i++) {
-    if (!alpha[i]) continue;
-    if (areas[lab[i]] < minPx) alpha[i] = 0; else kept++;
-  }
-  return kept;
 }
 
 // Which face box belongs to which person box: the SMALLEST person box that
@@ -211,86 +154,129 @@ function _assignFacesToBoxes(boxesPx, faceBoxesPx) {
 const _boxCentre = (b) => [Math.round((b[0] + b[2]) / 2), Math.round((b[1] + b[3]) / 2)];
 
 /**
- * Box → silhouette for a whole page, front figure first.
+ * Box -> silhouette for a WHOLE PAGE, as one joint assignment.
  *
  * The ONE place boxes become masks, shared by the DINO path (Stage 2) and the
- * Gemini second-opinion path (attachSamMasksToFigures) — the page that exposed
+ * Gemini second-opinion path (attachSamMasksToFigures) - the page that exposed
  * this bug ran through the SECOND one, so a fix in either alone is no fix.
  *
  * Boxes are px [x1,y1,x2,y2]; the result is index-aligned with the input.
+ * Each entry: {box, mask, keptBox, coverage, verdict, occluded, occludedByIdx,
+ *              pxLostToFront, maskPx}
  */
 async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '', faceBoxesPx = null) {
-  const out = new Array(boxesPx.length);
   const faces = _assignFacesToBoxes(boxesPx, faceBoxesPx);
-  const order = boxesPx.map((_, i) => i).sort((a, b) => _boxAreaPx(boxesPx[a]) - _boxAreaPx(boxesPx[b]));
-  for (const bi of order) {
-    const box = boxesPx[bi];
-    if (!Array.isArray(box) || box.length !== 4) {
-      out[bi] = { box, mask: null, keptBox: null, coverage: null, verdict: 'no-mask', separated: false };
-      continue;
-    }
-    // Tell SAM which figure in this box is the target: positive on its own
-    // face, negative on every OTHER face that falls inside the same box.
-    // Without this a box that encloses a second person returns that person.
-    const own = faces[bi];
+  const n = boxesPx.length;
+  const out = new Array(n);
+
+  // --- 1. one SAM call per figure, told WHICH figure it is looking at --------
+  // Order does not matter here: conflicts are settled in step 3, so no figure
+  // depends on another having been masked first.
+  const raw = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const box = boxesPx[i];
+    if (!Array.isArray(box) || box.length !== 4) continue;
+    const own = faces[i];
     const points = [], labels = [];
     if (own) {
       points.push(_boxCentre(own)); labels.push(1);
-      for (let j = 0; j < boxesPx.length; j++) {
-        if (j === bi || !faces[j]) continue;
+      for (let j = 0; j < n; j++) {
+        if (j === i || !faces[j]) continue;
         const c = _boxCentre(faces[j]);
-        if (c[0] >= box[0] && c[0] <= box[2] && c[1] >= box[1] && c[1] <= box[3]) { points.push(c); labels.push(0); }
+        if (c[0] >= box[0] && c[0] <= box[2] && c[1] >= box[1] && c[1] <= box[3]) {
+          points.push(c); labels.push(0);
+        }
       }
     }
-    const separated = points.length > 1;
-    if (separated) log.debug(`[SAM] ${pageLabel}box ${bi}: 1 positive + ${points.length - 1} negative face point(s)`);
-
-    let rawMask = await _mobilesamMaskFull(imageDataUri, box, W, H,
+    const m = await _mobilesamMaskFull(imageDataUri, box, W, H,
       points.length ? points : null, points.length ? labels : null);
+    if (!m) continue;
+    // Drop components outside the box (neighbour-grab / degraded-analyzer
+    // garbage). No coverage floor here: an occluded figure is legitimately
+    // small, and step 4 judges it on its FACE instead.
+    const r = await _cleanMaskAndCheck(m, box, { minCoverage: 0 });
+    if (r.keptBox) raw[i] = { mask: m, separated: points.length > 1 };
+  }
 
-    // Already-resolved figures standing in front of this one: subtract their
-    // silhouette (dilated — the two masks disagree by a few px at the seam) and
-    // drop the speckle fringe that disagreement leaves behind. The negative
-    // point alone does not do this: it recovers the right face, but the front
-    // figure's legs still survive inside the box.
-    const inFront = out.filter(d => d && d.mask
-      && _boxAreaPx(d.box) < SAM_FRONT_MAX_AREA * _boxAreaPx(box)
-      && _boxContainment(d.box, box) >= SAM_FRONT_CONTAINMENT);
-    let carved = false;
-    if (rawMask && inFront.length) {
-      const front = _unionDilated(inFront.map(d => d.mask), W, H, SAM_FRONT_DILATE_PX);
-      for (let k = 0; k < front.length; k++) if (front[k]) rawMask.alpha[k] = 0;
-      const kept = _dropSmallComponents(rawMask.alpha, W, H, SAM_SPECKLE_MIN_PX);
-      log.debug(`[SAM] ${pageLabel}box ${bi}: subtracted ${inFront.length} figure(s) in front → ${kept}px left`);
-      rawMask.area = kept;
-      carved = true;
-      if (!kept) rawMask = null;           // nothing of this figure is visible
-      else rawMask.pngBuf = await _maskToPng(rawMask);  // the cutout strip reads this
+  // --- 2. depth order: lower box bottom = nearer the camera ------------------
+  const depth = [];
+  for (let i = 0; i < n; i++) if (raw[i]) depth.push(i);
+  depth.sort((a, b) => {
+    const ba = boxesPx[a][3], bb = boxesPx[b][3];
+    if (Math.abs(ba - bb) > SAM_GROUND_TIE_PX) return bb - ba;      // lower bottom first
+    // Same height: the box CONTAINED by the other is the one in front.
+    const aInB = _boxContainment(boxesPx[a], boxesPx[b]);
+    const bInA = _boxContainment(boxesPx[b], boxesPx[a]);
+    if (aInB >= SAM_FRONT_CONTAINMENT && aInB > bInA) return -1;
+    if (bInA >= SAM_FRONT_CONTAINMENT && bInA > aInB) return 1;
+    return _boxAreaPx(a) - _boxAreaPx(b);
+  });
+
+  // --- 3. winner-take-all: a pixel belongs to the FRONTMOST claimant ---------
+  // This replaces pairwise dilated subtraction. Nothing is dilated, so no seam
+  // fringe is created and no speckle filter is needed to clean one up.
+  const owner = new Int32Array(W * H);   // 0 = unclaimed, else figureIndex + 1
+  for (const i of depth) {
+    const alpha = raw[i].mask.alpha;
+    const lost = new Map();              // ownerIdx -> px taken from this figure
+    let kept = 0;
+    for (let k = 0; k < W * H; k++) {
+      if (!alpha[k]) continue;
+      const o = owner[k];
+      if (o) { alpha[k] = 0; lost.set(o - 1, (lost.get(o - 1) || 0) + 1); }
+      else { owner[k] = i + 1; kept++; }
     }
-    let mask = null, keptBox = null, coverage = null, verdict = 'no-mask';
-    if (rawMask) {
-      // Keep mask parts INSIDE the box (occlusion is fine); drop parts outside
-      // it (neighbour-grab / degraded-analyzer garbage). What is left of a
-      // figure standing behind another is legitimately small and legitimately
-      // disconnected (a head above the child, an arm each side), so the
-      // fragment floor does not apply once we carved one out deliberately.
-      const r = await _cleanMaskAndCheck(rawMask, box, carved ? { minCoverage: SAM_FRONT_MIN_REMAINDER } : {});
-      coverage = +r.coverage.toFixed(3);
-      if (r.keptBox) {
-        mask = rawMask; keptBox = r.keptBox;
-        verdict = carved ? 'mask-ok-front-figure-removed'
-          : separated ? 'mask-ok-face-separated'
-          : r.droppedOutside ? 'mask-clipped-outside-box' : 'mask-ok';
-        if (r.droppedOutside) log.debug(`[SAM] ${pageLabel}dropped ${r.droppedOutside} mask component(s) outside the box`);
-      } else if (r.coverage > 0) {
-        verdict = 'rejected-too-small';
-        log.debug(`[SAM] ${pageLabel}mask fills only ${(r.coverage * 100).toFixed(1)}% of the box — keeping the box`);
-      } else {
-        verdict = 'rejected-all-outside';
-        log.debug(`[SAM] ${pageLabel}mask entirely outside the box — keeping the box`);
+    raw[i].kept = kept;
+    raw[i].lost = lost;
+  }
+
+  // --- 4. accept on the FACE, not on how much of the box is filled -----------
+  // The old coverage floor threw away Daniel's real mask at 0.228 and left him
+  // with no cut-out at all. "Does this silhouette contain its own face?" is the
+  // question that actually identifies a figure, however little of it shows.
+  for (let i = 0; i < n; i++) {
+    const box = boxesPx[i];
+    const base = {
+      box, mask: null, keptBox: null, coverage: null, verdict: 'no-mask',
+      occluded: false, occludedByIdx: [], pxLostToFront: 0, maskPx: 0,
+    };
+    if (!raw[i]) { out[i] = base; continue; }
+    const { mask, separated, kept, lost } = raw[i];
+    const pxLost = [...lost.values()].reduce((a, b) => a + b, 0);
+    const occludedByIdx = [...lost.keys()].filter(k => lost.get(k) > 0);
+
+    if (!kept) {
+      out[i] = { ...base, verdict: 'rejected-fully-occluded', pxLostToFront: pxLost, occludedByIdx, occluded: true };
+      continue;
+    }
+    // recompute bounds after the assignment
+    const r = await _cleanMaskAndCheck(mask, box, { minCoverage: 0 });
+    const face = faces[i];
+    let faceCover = null;
+    if (face) {
+      let inFace = 0, tot = 0;
+      for (let y = Math.max(0, face[1]); y < Math.min(H, face[3]); y++) {
+        for (let x = Math.max(0, face[0]); x < Math.min(W, face[2]); x++) {
+          tot++; if (mask.alpha[y * W + x]) inFace++;
+        }
       }
+      faceCover = tot ? inFace / tot : 0;
     }
-    out[bi] = { box, mask, keptBox, coverage, verdict, separated, carved };
+    const ok = face ? faceCover >= SAM_FACE_IN_MASK : !!r.keptBox;
+    if (!ok || !r.keptBox) {
+      log.debug(`[SAM] ${pageLabel}figure ${i}: mask covers only ${((faceCover ?? 0) * 100).toFixed(1)}% of its own face — keeping the box`);
+      out[i] = { ...base, verdict: 'rejected-not-its-face', pxLostToFront: pxLost, occludedByIdx, occluded: occludedByIdx.length > 0 };
+      continue;
+    }
+    mask.pngBuf = await _maskToPng(mask);   // the cutout strip reads this
+    out[i] = {
+      box, mask, keptBox: r.keptBox,
+      coverage: +r.coverage.toFixed(3),
+      verdict: occludedByIdx.length ? 'mask-ok-occluded'
+        : separated ? 'mask-ok-face-separated' : 'mask-ok',
+      occluded: occludedByIdx.length > 0,
+      occludedByIdx, pxLostToFront: pxLost, maskPx: kept,
+    };
   }
   return out;
 }
@@ -947,6 +933,13 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       samApplied: !!m.mask,
       maskVerdict: m.verdict,
       maskCoverage: m.coverage,
+      // Free from the joint depth pass — no anatomy, no thresholds: who took
+      // pixels from this figure, and how many. Downstream can tell a partial
+      // view from a complete one instead of judging a fragment as a whole.
+      occluded: m.occluded,
+      occludedByIdx: m.occludedByIdx,
+      pxLostToFront: m.pxLostToFront,
+      maskPx: m.maskPx,
     }));
   // Persist any SAM mask leak to the STORY log (not just Railway), so a blow-out
   // is always findable later per-story instead of vanishing into container logs.
@@ -974,39 +967,11 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       }
     }
   }
-  // Occlusion carve-out: a figure standing in front of another sits inside the
-  // background figure's box, so SAM includes its pixels in BOTH masks. Where
-  // two masks overlap, the smaller (foreground) figure keeps the pixels and
-  // they are subtracted from the bigger (background) figure's mask; its
-  // bodyBox is recomputed from the cleaned mask.
-  for (let i = 0; i < dets.length; i++) {
-    for (let j = 0; j < dets.length; j++) {
-      if (i === j) continue;
-      const big = dets[i].mask, small = dets[j].mask;
-      if (!big || !small || small.area >= big.area) continue;
-      const ov = _maskOverlapFrac(big, small); // intersect / smaller area
-      if (ov < 0.02) continue;
-      let removed = 0;
-      const n = big.width * big.height;
-      for (let k = 0; k < n; k++) if (big.alpha[k] && small.alpha[k]) { big.alpha[k] = 0; removed++; }
-      if (removed === 0) continue;
-      big.area -= removed;
-      // Recompute bbox + png of the carved mask.
-      let minx = big.width, miny = big.height, maxx = -1, maxy = -1;
-      for (let k = 0; k < n; k++) {
-        if (!big.alpha[k]) continue;
-        const x = k % big.width, y = (k / big.width) | 0;
-        if (x < minx) minx = x; if (x > maxx) maxx = x;
-        if (y < miny) miny = y; if (y > maxy) maxy = y;
-      }
-      if (big.area > 0 && maxx >= 0) {
-        big.bbox = [minx, miny, maxx + 1, maxy + 1];
-        big.pngBuf = await _maskToPng(big);
-        dets[i].bodyBox = _pxBoxToNorm(big.bbox, W, H);
-        log.debug(`[GDINO-DETECT] ${pageLabel}carved ${removed}px of a foreground figure out of an occluded figure's mask (${Math.round(ov * 100)}% of the smaller mask overlapped)`);
-      }
-    }
-  }
+  // The occlusion carve-out that used to live here is GONE: _maskBoxesFrontFirst
+  // now settles every contested pixel in one winner-take-all pass ordered by
+  // depth. The old rule gave shared pixels to the SMALLER mask, which is
+  // backwards for an occluded figure — Daniel's mask is smaller than Noah's, yet
+  // Daniel stands behind him, so Noah's sandal ended up in Daniel's cut-out.
   if (dets.length < expectedCharacters.length) {
     // Undercount is NOT an automatic fallback anymore (owner, 2026-08-09):
     // fewer persons than expected has two causes with opposite fixes — the
@@ -1295,9 +1260,8 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
  * Mutates each figure in place (bodyBox refined to the kept mask bounds,
  * samApplied / maskVerdict / maskCoverage stamped — same fields as the DINO
  * path) and returns the masks array (pngBuf | null, index-aligned with
- * figures) for the _gdinoMasks rider. Occlusion carve-out between overlapping
- * masks matches the DINO path: the smaller (foreground) figure keeps shared
- * pixels.
+ * figures) for the _gdinoMasks rider. Overlap between figures is resolved by
+ * the shared masker's depth pass, not here.
  */
 async function attachSamMasksToFigures(imageData, figures, { pageLabel = '' } = {}) {
   const imageDataUri = imageData.startsWith('data:')
@@ -1327,35 +1291,14 @@ async function attachSamMasksToFigures(imageData, figures, { pageLabel = '' } = 
     if (m.keptBox) { f.bodyBox = _pxBoxToNorm(m.keptBox, W, H); f.samApplied = true; }
     f.maskVerdict = m.verdict;
     f.maskCoverage = m.coverage;
+    // Occlusion facts, free from the joint depth pass. Names here because this
+    // path already knows them.
+    f.occluded = m.occluded;
+    f.occludedBy = (m.occludedByIdx || []).map(k => figures[k]?.name).filter(Boolean);
+    f.pxLostToFront = m.pxLostToFront;
+    f.maskPx = m.maskPx;
     return { f, mask: m.mask };
   });
-  // Occlusion carve-out — identical rule to the DINO path: where two masks
-  // overlap, the smaller (foreground) figure keeps the pixels.
-  for (let i = 0; i < entries.length; i++) {
-    for (let j = 0; j < entries.length; j++) {
-      if (i === j) continue;
-      const big = entries[i].mask, small = entries[j].mask;
-      if (!big || !small || small.area >= big.area) continue;
-      if (_maskOverlapFrac(big, small) < 0.02) continue;
-      let removed = 0;
-      const n = big.width * big.height;
-      for (let k = 0; k < n; k++) if (big.alpha[k] && small.alpha[k]) { big.alpha[k] = 0; removed++; }
-      if (removed === 0) continue;
-      big.area -= removed;
-      let minx = big.width, miny = big.height, maxx = -1, maxy = -1;
-      for (let k = 0; k < n; k++) {
-        if (!big.alpha[k]) continue;
-        const x = k % big.width, y = (k / big.width) | 0;
-        if (x < minx) minx = x; if (x > maxx) maxx = x;
-        if (y < miny) miny = y; if (y > maxy) maxy = y;
-      }
-      if (big.area > 0 && maxx >= 0) {
-        big.bbox = [minx, miny, maxx + 1, maxy + 1];
-        big.pngBuf = await _maskToPng(big);
-        entries[i].f.bodyBox = _pxBoxToNorm(big.bbox, W, H);
-      }
-    }
-  }
   const masked = entries.filter(e => e.mask).length;
   log.info(`🎭 [GDINO-DETECT] ${pageLabel}attached SAM masks to ${masked}/${figures.length} non-DINO figure box(es)`);
   return entries.map(e => e.mask?.pngBuf || null);
@@ -1370,15 +1313,11 @@ module.exports = {
   _cleanMaskAndCheck,
   _boxAreaPx,
   _boxContainment,
-  _unionDilated,
-  _dropSmallComponents,
   _assignFacesToBoxes,
-  SAM_SPECKLE_MIN_PX,
   SAM_FACE_CONTAINMENT,
+  SAM_FACE_IN_MASK,
   SAM_FRONT_CONTAINMENT,
-  SAM_FRONT_MAX_AREA,
-  SAM_FRONT_DILATE_PX,
-  SAM_FRONT_MIN_REMAINDER,
+  SAM_GROUND_TIE_PX,
   GDINO_OVERLAP_THRESHOLD,
   GDINO_SAME_FIGURE,
   GDINO_LOW_CONFIDENCE,
