@@ -11018,3 +11018,31 @@ empty reviewer response ships beats unreviewed with no warning, which matters mo
 that the reviewer is a slower model.
 
 **Touched:** server/config/models.js, server/lib/testlab.js.
+
+## 2026-08-15 — Beats / scene / wardrobe reviewers are three separate keys
+
+**Context:** `beatsPipeline.js` used ONE `reviewModel` (= `MODEL_DEFAULTS.outlineReviewModel`)
+for three different reviews: beats, scene briefs, and wardrobe. Switching the beats reviewer
+to grok-4.6 earlier today therefore silently switched the other two as well. The scene
+bake-off (Lab **677 / 680 / 681 / 682**, three judges: sonnet, grok-4.6, gemini-3.1-pro)
+then showed grok is the WORST scene reviewer measured: baseline (no review) 8.6/7.8/9.2,
+grok 8.4/8.0/**8.6** — it rewrites the most and degrades briefs that were already strong.
+
+**Decision:** Split into `outlineReviewModel` (beats → grok-4.6, measured +2.7),
+`sceneReviewModel` (scene → deepseek-v4-pro, best-or-tied under two judges), and
+`clothingReviewModel` (wardrobe → deepseek-v4-pro, **never measured**, pinned to its
+pre-switch model so it cannot inherit a reviewer chosen on beats evidence). The Test Lab's
+`scene_review_replay` default now reads `sceneReviewModel` so the harness mirrors production.
+
+**Rationale:** A reviewer choice is per-stage evidence; one shared key silently applies one
+stage's evidence to three. Measured decisions must not leak into unmeasured stages.
+
+**Also measured (scene):** the deterministic checker found **0 faults** in this story's
+briefs, so no reviewer had anything to fix — every rewrite was optional churn, and the
+scores rank by restraint: minimax-m3 rewrote 0 pages and tied the baseline (9.2 neutral),
+glm rewrote 3 and tied, grok rewrote most and lost 0.6. This experiment therefore measures
+"who does least damage", NOT "who fixes faults best" — ranking a fault-fixer needs a story
+that actually contains contradictions. `gemini-3.7-flash` failed outright as a scene
+reviewer (0 output tokens in 1s), consistent with its bottom placement on beats.
+
+**Touched:** server/config/models.js, server/lib/beatsPipeline.js, server/lib/testlab.js.

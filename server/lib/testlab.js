@@ -5092,7 +5092,9 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
   }
   if (!prompt) throw new Error('scene-review template unavailable');
 
-  const models = String(params.reviewModel || MODEL_DEFAULTS.outlineReviewModel)
+  // Mirror production: the scene review has its own model (sceneReviewModel),
+  // it does not follow the beats reviewer.
+  const models = String(params.reviewModel || MODEL_DEFAULTS.sceneReviewModel || MODEL_DEFAULTS.outlineReviewModel)
     .split(',').map(x => x.trim()).filter(Boolean);
   for (const m of models) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
 

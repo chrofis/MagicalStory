@@ -5,7 +5,7 @@
  * calls, so every stage is reviewable and only the faulted pages get rewritten:
  *
  *   1. beats_plan            Sonnet    per-page BEAT + one-line SCENE
- *   2. beats_review          DeepSeek  structural review, rewrites faulted pages
+ *   2. beats_review          Grok      structural review, rewrites faulted pages
  *   3. beats_story_bible     Sonnet    clothing + Visual Bible + cover hints
  *   4. beats_scene_expansion Sonnet    ONE call over ALL pages (cross-page continuity)
  *   5. beats_scene_review    DeepSeek  ONE call over ALL briefs, rewrites faulted
@@ -197,12 +197,16 @@ async function generateStoryViaBeats(inputData, opts = {}) {
 
   const planModel = modelOverrides.outlineModel || MODEL_DEFAULTS.outline;
   const reviewModel = modelOverrides.outlineReviewModel || MODEL_DEFAULTS.outlineReviewModel;
+  // Scene and wardrobe reviews are their own decisions — see models.js. They
+  // deliberately do NOT follow the beats reviewer.
+  const sceneReviewModel = modelOverrides.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || reviewModel;
+  const clothingReviewModel = modelOverrides.clothingReviewModel || MODEL_DEFAULTS.clothingReviewModel || reviewModel;
   const sceneModel = modelOverrides.sceneDescriptionModel || MODEL_DEFAULTS.sceneDescription;
   const textModel = modelOverrides.textModel || MODEL_DEFAULTS.storyText;
 
-  const meta = { pageCount, models: { planModel, reviewModel, sceneModel, textModel }, timings: {} };
+  const meta = { pageCount, models: { planModel, reviewModel, sceneReviewModel, clothingReviewModel, sceneModel, textModel }, timings: {} };
   const started = Date.now();
-  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} review=${reviewModel} scenes=${sceneModel} text=${textModel}`);
+  log.info(`🪜 [BEATS] job=${jobId} pages=${pageCount} plan=${planModel} review=${reviewModel} sceneReview=${sceneReviewModel} wardrobeReview=${clothingReviewModel} scenes=${sceneModel} text=${textModel}`);
 
   // ── Step 1: beats plan ────────────────────────────────────────────────────
   await checkCancellation();
@@ -360,7 +364,7 @@ SCENE: ${x.scene || ''}`.trim(),
     } else {
       t = Date.now();
       try {
-        const cRes = await textModels.callTextModelStreaming(clothingPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_clothing_review' });
+        const cRes = await textModels.callTextModelStreaming(clothingPrompt, null, onChunk, clothingReviewModel, { usageLabel: 'beats_clothing_review' });
         const parsed = parseClothingReview(cRes.text || '');
         meta.timings.clothingReviewMs = Date.now() - t;
         const rewrites = [];
@@ -401,7 +405,7 @@ SCENE: ${x.scene || ''}`.trim(),
           }
         }
         clothingReviewReport = {
-          model: cRes.modelId || reviewModel,
+          model: cRes.modelId || clothingReviewModel,
           durationMs: meta.timings.clothingReviewMs,
           analysis: parsed.analysis || '',
           changed: rewrites,
@@ -419,14 +423,14 @@ SCENE: ${x.scene || ''}`.trim(),
         if ((cRes.text || '').trim().length === 0) {
           gl.warn('beats_clothing_review_empty', 'Clothing review returned nothing — provider failure, wardrobe shipped unreviewed');
         } else {
-          gl.info('beats_clothing_review', `Wardrobe review by ${cRes.modelId || reviewModel}: ${rewrites.length} outfit(s) rewritten (${(meta.timings.clothingReviewMs / 1000).toFixed(1)}s)`, null, {
-            changed: rewrites.map(r => `${r.name}/${r.category}`), model: cRes.modelId || reviewModel,
+          gl.info('beats_clothing_review', `Wardrobe review by ${cRes.modelId || clothingReviewModel}: ${rewrites.length} outfit(s) rewritten (${(meta.timings.clothingReviewMs / 1000).toFixed(1)}s)`, null, {
+            changed: rewrites.map(r => `${r.name}/${r.category}`), model: cRes.modelId || clothingReviewModel,
           });
         }
       } catch (err) {
         meta.timings.clothingReviewMs = Date.now() - t;
         log.warn(`🚨 [BEATS] Clothing review failed (${err.message}) — wardrobe shipped unreviewed`);
-        gl.warn('beats_clothing_review_failed', `Reviewer ${reviewModel} failed: ${err.message} — wardrobe shipped unreviewed`);
+        gl.warn('beats_clothing_review_failed', `Reviewer ${clothingReviewModel} failed: ${err.message} — wardrobe shipped unreviewed`);
       }
     }
   }
@@ -649,7 +653,7 @@ SCENE: ${x.scene || ''}`.trim(),
       // (job_1786235099497_ytd5c7eek: 3 faults handed over, 0 briefs rewritten).
       const briefsIn = expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
       await stage(6, 'Reviewing scene briefs...');
-      const srRes = await textModels.callTextModelStreaming(srPrompt, null, onChunk, reviewModel, { usageLabel: 'beats_scene_review' });
+      const srRes = await textModels.callTextModelStreaming(srPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review' });
       // "0 briefs rewritten" has meant three different things: a reviewer that
       // genuinely found nothing, a reviewer TRUNCATED at its token cap (this
       // story: out=16000, exactly the old budget), and a provider returning
@@ -738,7 +742,7 @@ SCENE: ${x.scene || ''}`.trim(),
       }
 
       sceneReviewReport = {
-        model: srRes.modelId || reviewModel,
+        model: srRes.modelId || sceneReviewModel,
         durationMs: meta.timings.sceneReviewMs,
         changedPages: sceneDiffs.map(d => d.pageNumber),
         namedButNotRewritten: faultedNotFixed,
@@ -753,12 +757,12 @@ SCENE: ${x.scene || ''}`.trim(),
         briefFindings: briefFindings || null,
         clothingUnfixed: clothingUnfixedList,
       };
-      gl.info('beats_scene_review', `Scene review by ${srRes.modelId || reviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
-        changedPages: changed, model: srRes.modelId || reviewModel,
+      gl.info('beats_scene_review', `Scene review by ${srRes.modelId || sceneReviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
+        changedPages: changed, model: srRes.modelId || sceneReviewModel,
       });
     } catch (err) {
       log.warn(`🚨 [BEATS] Scene review failed (${err.message}) — proceeding with unreviewed briefs`);
-      gl.warn('beats_scene_review_failed', `Reviewer ${reviewModel} failed: ${err.message} — briefs shipped unreviewed`);
+      gl.warn('beats_scene_review_failed', `Reviewer ${sceneReviewModel} failed: ${err.message} — briefs shipped unreviewed`);
     }
   }
 

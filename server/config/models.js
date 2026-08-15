@@ -209,6 +209,17 @@ const MODEL_DEFAULTS = {
   // 672) — neutral judge 8.4 vs raw 5.7, while the previous default landed at
   // 5.8 (flat). See docs/decisions.md. Slower (~277s vs ~90s) for ~$0.03 more.
   outlineReviewModel: process.env.OUTLINE_REVIEW_MODEL || 'grok-4.6',
+  // The three reviews used to share outlineReviewModel, so switching the BEATS
+  // reviewer silently moved the scene and wardrobe reviews too. They are
+  // separate decisions with separate evidence and now separate keys.
+  // Scene: measured on a stored story (Lab 677/680/681/682, three judges) —
+  // reviewers cannot beat leaving good briefs alone (baseline 8.6/7.8/9.2), and
+  // grok was the WORST arm (8.6 neutral) because it rewrites most. deepseek is
+  // best-or-tied under two judges, and is what produced these briefs.
+  sceneReviewModel: process.env.SCENE_REVIEW_MODEL || 'deepseek-v4-pro',
+  // Wardrobe review: never measured. Pinned to the pre-2026-08-15 model so it
+  // does not inherit a reviewer chosen on beats evidence.
+  clothingReviewModel: process.env.CLOTHING_REVIEW_MODEL || 'deepseek-v4-pro',
   // Judge for the model-comparison scorecard. At-least-Sonnet-level on purpose —
   // a cheap judge (Luna, flash) scores too loosely to compare generators fairly.
   scorecardJudge: process.env.SCORECARD_JUDGE || 'claude-sonnet',
