@@ -11176,3 +11176,27 @@ recovery; `_collectNmsBoxes` restored), `tests/manual/occlusionDepth.test.js`.
 
 **Status:** ✅ active — unit-verified and SAM-verified locally; the DINO path itself is not yet
 exercised end-to-end (no local GroundingDINO), so a Lab `bbox` run is still owed.
+
+---
+
+## 2026-08-15 — Trial keeps the cast minimal (soft rule, not a ban)
+
+**Context:** owner asked whether trial idea generation limits the cast.
+It did not: `prompts/trial-idea.txt` (8 lines) said nothing about characters
+at all, and the trial writer `prompts/story-trial.txt` explicitly allowed
+`MAX 4 characters per scene` plus a full `secondaryCharacters` block. A trial
+has exactly ONE real character (one photo, one styled avatar) and runs with
+`skipQualityEval: true` + `enableFullRepair: false` — so every invented figure
+renders with no reference and ships with no eval or repair behind it. Measured
+counter-evidence: the last real production trial (5 pages) happened to stay
+solo on every page and created zero secondary characters, so the model's
+default is already minimal — but nothing required it.
+
+**Decision:** a SOFT rule in both trial prompts — "keep the cast minimal, add
+another person only when the story needs one" — and the idea prompt now
+centers on the main character. Deliberately NOT a ban (owner): trial
+categories include life skills such as making friends, which cannot work with
+a single figure. `MAX 4 characters per scene` stays as the hard ceiling.
+Full stories are unchanged — a large cast is fine there.
+
+**Touched files:** `prompts/trial-idea.txt`, `prompts/story-trial.txt`.
