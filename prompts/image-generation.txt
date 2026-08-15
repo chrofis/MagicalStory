@@ -11,7 +11,7 @@ When the FIRST reference photo shows a real location (architecture, landscape, n
 **Composition:**
 - Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.
 - When the scene description declares a close-up, the bottom frame edge cuts characters at the waist — legs, knees and feet lie below the frame edge and cannot appear. Never widen a close-up into a full-figure or establishing shot.
-- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, wade, float, or fly.
+- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly.
 - Depth: `foreground` is large and dominates the lower half; `midground` sits in the middle band, smaller and further back; `background` is small and distant. Foreground > midground > background in size.
 
 {REQUIRED_OBJECTS}
