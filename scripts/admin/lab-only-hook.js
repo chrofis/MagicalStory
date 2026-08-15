@@ -16,9 +16,9 @@
  * A whole afternoon went into hand-building mask geometry to compensate for an
  * environment gap that does not exist on staging.
  *
- * So this asks for confirmation rather than blocking outright — an override is
- * one keypress, and there are legitimate local runs (a dry pass, a harness
- * against stored images with no model call).
+ * So this REMINDS rather than gates: it is advisory context, never an approval
+ * prompt and never a block. There are legitimate local runs (a dry pass, a
+ * harness against stored images with no model call), and the agent decides.
  *
  * Scope is deliberately narrow: a `node` command running a script under the
  * scratchpad that pulls in server/lib. DB queries, image inspection and HTML
@@ -67,14 +67,20 @@ process.stdin.on('end', () => {
   emit({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
-      permissionDecision: 'ask',
-      permissionDecisionReason:
+      // REMINDER, NEVER A GATE (owner, 2026-08-15). This used to return
+      // permissionDecision:'ask', which stopped the run and demanded a keypress
+      // every time. That is the wrong instrument: the agent is capable of
+      // judging whether a local run is legitimate, and an approval prompt on
+      // every occurrence trains the reflex to approve without reading — so the
+      // one time it matters, it is noise. Advisory context leaves the decision
+      // where it belongs while still putting the fact in front of the agent.
+      additionalContext:
         `${hits.join(', ')} runs the pipeline (server/lib) locally. This machine has no MobileSAM `
         + `(ultralytics is not installed), so repair and composite runs silently take a degraded path: `
         + `rectangular hatch instead of a figure-clipped one, no face blur, whiteout throws, and the blend `
         + `gate rejects everything. Results from here do not reproduce staging. Prefer the Test Lab `
         + `(scene_composite / char repair stages) so the run is visible and the masks are real. `
-        + `Approve to run locally anyway — fine for a dry pass or stored-image inspection.`,
+        + `Running locally is fine for a dry pass or stored-image inspection — judge it.`,
     },
   });
 });
