@@ -764,6 +764,25 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     onPresetApplied();
   }, [preset, onPresetApplied]);
 
+  // Deep link: /admin/test-lab?exp=717 opens that experiment directly, and the
+  // URL tracks whichever one is open, so a run can be shared as a link instead
+  // of "scroll the list and click the third row".
+  useEffect(() => {
+    const id = Number(new URLSearchParams(window.location.search).get('exp'));
+    if (!Number.isFinite(id) || id <= 0) return;
+    (async () => {
+      try { setSelected(await testlabService.getExperiment(id)); }
+      catch { /* gone or not visible to this user — fall through to the list */ }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (selected) url.searchParams.set('exp', String(selected.id));
+    else url.searchParams.delete('exp');
+    window.history.replaceState(null, '', url.toString());
+  }, [selected]);
+
   // Poll while any experiment is running (or the detail view shows a running one).
   useEffect(() => {
     const anyRunning = experiments.some(e => e.status === 'running') || selected?.status === 'running';
