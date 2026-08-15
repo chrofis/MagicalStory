@@ -2497,7 +2497,12 @@ function buildPlateHeadRatio(cast, results, canvasH) {
   }
   if (!rs.length) return { ratio: null, n: 0 };
   rs.sort((a, b) => a - b);
-  return { ratio: rs[Math.floor(rs.length / 2)], n: rs.length };
+  // Upper quartile, not the median. Occlusion only ever SHORTENS a body, so an
+  // occluded figure reads as fewer heads and drags a median down — and this
+  // ratio is the very yardstick used to detect occlusion, so a contaminated one
+  // hides the thing it is supposed to find. The most complete figure on the
+  // plate is the one telling the truth about its proportions.
+  return { ratio: rs[Math.ceil((rs.length - 1) * 0.75)], n: rs.length };
 }
 
 /**
@@ -2607,13 +2612,20 @@ function statureTargetFor(c, bbox, statureModel, canvasW, canvasH, head = null, 
       const paintedFull = Math.round(head.height * plateRatio);
       const shown = bbox.height / paintedFull;
       if (shown < 0.95 && shown > 0.15) {
-        // Correct the painted height to the real-world one at the true foot
-        // line, then show only the visible slice.
-        const s = statureModel.at(bbox.y + paintedFull);
-        const corrected = Number.isFinite(s) && s > 0 ? Math.round(s * _heightCm(c.age)) : paintedFull;
-        const targetFull = Math.max(Math.round(paintedFull * 0.5), Math.min(Math.round(paintedFull * 2), corrected));
+        // Scale to the height Grok PAINTED, and show only the visible slice.
+        //
+        // No ground-plane correction here, deliberately. The plane is fitted
+        // from the figures standing on the main ground surface, and a figure
+        // that scenery hides is usually not on it — on p6 the occluded man
+        // stands on a raised bridge deck while the two anchors are down on the
+        // promenade. Applying their plane to him "corrected" 188px to 151px,
+        // i.e. shorter than the 154px of him that is actually visible, which is
+        // incoherent and silently disabled the clip below (min(151,154)=151):
+        // he was pasted whole, at full size, in front of the railing. Grok
+        // already sized him for the surface he is standing on; the head is the
+        // witness to that size, so take it and do not second-guess it.
         return {
-          targetH: Math.max(20, targetFull),
+          targetH: Math.max(20, paintedFull),
           anchor: 'head',
           clip,
           corrected: true,
@@ -3350,7 +3362,7 @@ module.exports = {
   _internal: {
     findColorBbox,
     findSilhouettesByDiff,
-    subtractFiguresInFront,
+    subtractFiguresInFront,
     buildStatureModel,
     buildPlateHeadRatio,
     statureTargetFor,
