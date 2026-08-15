@@ -1422,8 +1422,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const runGarmentRecolour = async (img, entries, roundNum) => {
     const { fixFigureGarmentColour } = require('./garmentColourFix');
     const { crossCheckFigureIdentity, isIdentityDisputed, resolveIdentityTiebreak } = require('./figureIdentityCheck');
-    const { getNextVersionIndex, saveStoryImage } = require('../services/database');
-    const gcStoryId = storyData?.id || jobId || null;
     const pageNumber = img.pageNumber;
     // Same source and same selection the other repair actions use — the
     // highest-scoring version so far, not merely the newest.
@@ -1539,21 +1537,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         log.info(`🎨 [GARMENT-COLOUR] ${charName} p${pageNumber} ${garmentKey}: no-op (${res.report?.reason || 'unknown'})`);
         continue;
       }
-      if (changed === 0) {
-        // Store the page as it was before ANY recolour this round.
-        try {
-          if (!gcStoryId) throw new Error('no story id in context');
-          const v = await getNextVersionIndex(gcStoryId, 'garment_before', pageNumber);
-          await saveStoryImage(gcStoryId, 'garment_before', pageNumber, before, {
-            versionIndex: v, generatedAt: new Date().toISOString(),
-          });
-          audit.beforeVersion = v;
-        } catch (e) {
-          // The audit image is a debugging aid — never fail the repair for it.
-          audit.beforeSaveError = e.message;
-          log.warn(`⚠️ [GARMENT-COLOUR] ${charName} p${pageNumber}: before-image not stored (${e.message})`);
-        }
-      }
+      // NO SEPARATE 'BEFORE' IMAGE (owner, 2026-08-15). This used to save the
+      // pre-recolour page as image_type 'garment_before'. It never once
+      // succeeded — zero such rows have ever existed — because story_images
+      // .story_id references stories.id and the story row is not inserted until
+      // the end of generation: on job_1786780194082_s980g4s9a the recolour ran
+      // at 08:04:40 and the row appeared at 08:09:43, five minutes later. Every
+      // attempt failed the foreign key and left a beforeSaveError that reads
+      // like a broken repair.
+      //
+      // It was redundant anyway: the version chain already holds before and
+      // after as full images — v0 'original' and v1 'garment-recolour-round-N'
+      // — because a recolour is graded as its own version. A third copy adds
+      // nothing.
       current = res.imageData;
       changed++;
     }
