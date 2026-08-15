@@ -855,7 +855,11 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       const facePhoto = getFacePhoto(char);
       if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
         fallbackPromises.push(
-          getOrCreateStyledAvatar(charName, 'standard', artStyle, originalAvatar, facePhoto, null, addUsage, char, imageModelOverride)
+          // Carry the caller's flag: this fallback sheet is a full 2×4
+          // generation too, and dropping the option here kept the reviews
+          // running for trials even after every prepareStyledAvatars call site
+          // passed skipQualityEval (staging job_1786825477481).
+          getOrCreateStyledAvatar(charName, 'standard', artStyle, originalAvatar, facePhoto, null, addUsage, char, imageModelOverride, { skipQualityEval })
             .then(styledAvatar => {
               if (char) {
                 if (!char.avatars) char.avatars = {};
