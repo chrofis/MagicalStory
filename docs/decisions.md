@@ -10810,3 +10810,23 @@ describes the body grid, not the head grid beside it.
 **Touched:** `server/lib/entityConsistency.js`, `tests/manual/secondaryEntityCheck.test.js`.
 **Status:** ✅ active — not yet exercised by a story run; the next generation with a recurring
 secondary is the test.
+
+## 2026-08-15: Depth splits only when the beat requires them (owner directive)
+
+**Context:** Fore/background splits were being authored as a crowd-management default —
+the AD rule literally said "thin a crowded page by pushing onlookers back". Split pages
+are fragile in direct generation (a distant figure gets pulled into the near group's
+scale: giant-figure render, -100) and were appearing without story need.
+
+**Decision:** Beats keep a page's characters at one depth together; background
+separation only when the beat itself requires it (left behind, watching from afar,
+arriving in the distance), and such pages stay few. Beats-review flags unjustified
+separations. The AD crowd rule now prefers the whole group at one depth in a wider
+shot — pushing back is no longer the default. Scene-review 6c requires the beat to
+justify a background figure. Validated exp #649: the justified case (a watcher on a
+bench per the beat) passes untouched; the unjustified searching-party split is gathered.
+Beat-justified splits that survive are the future composite-dispatch candidates (the
+composite path is the other work stream's; dispatch trigger to be added there once green).
+
+**Touched:** prompts/story-beats.txt, story-beats-review.txt, scene-expansion-all.txt,
+scene-review.txt.
