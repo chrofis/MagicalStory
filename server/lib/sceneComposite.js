@@ -100,12 +100,6 @@ const HEAD_TINTS = {
   '#8B00B0': '#C580D8',
   '#00B0B0': '#80D8D8',
 };
-// A pixel is head-tint rather than body colour when its darkest channel is
-// bright. Measured on a real two-tone plate (2026-08-12): faces land at
-// min-channel 173-185, bodies at 35-71 — so 120 sits in the middle of a wide
-// gap. Note the body figure is NOT always near zero: a mid-green body measured
-// 71, which is why the threshold is not just "above black".
-const HEAD_TINT_MIN_CHANNEL = 120;
 // Saturation floor separating a silhouette BODY from both the pale head tint
 // and from scenery. 0.55 was too strict once Grok renders in watercolor — a
 // mid-green body measures 0.59 at its best and fragments below the floor,
@@ -365,8 +359,16 @@ async function findSilhouettesByDiff(populatedBuf, cleanBgBuf, cast, opts = {}) 
     // the body box, never across the canvas. Grok paints the tint paler than
     // specified — measured 0.22-0.29 where the spec asks 0.47 — so this floor
     // must sit low, and it can afford to because of where it is applied.
+    // Collect every pixel of this character's hue first, WITHOUT deciding yet
+    // whether it is body or head tint. Saturation cannot make that call: the
+    // pale head sits close enough to the body's saturation that a floor either
+    // swallows it into the body or drops it entirely (which is what produced
+    // "head = null" on a plate whose heads were plainly tinted). BRIGHTNESS is
+    // the axis that separates them — the two tones are bimodal in min-channel.
     const colourMask = new Uint8Array(W * H);
     const paleMask = new Uint8Array(W * H);
+    const hueHits = [];
+    const hueMins = [];
     for (let p = 0; p < W * H; p++) {
       if (!diffMask[p]) continue;
       const i = p * 4;
@@ -378,8 +380,30 @@ async function findSilhouettesByDiff(populatedBuf, cleanBgBuf, cast, opts = {}) 
       let dh = Math.abs(rgbToHue(r, g, b) - targetHue);
       if (dh > 180) dh = 360 - dh;
       if (dh > HUE_THRESHOLD) continue;
-      if (sat >= BODY_SAT_FLOOR) colourMask[p] = 1;
-      else if (mn > HEAD_TINT_MIN_CHANNEL) paleMask[p] = 1;
+      hueHits.push(p); hueMins.push(mn);
+    }
+
+    // Where the tint starts is a property of THIS figure, not a constant. The
+    // body's own darkest channel moves with the palette colour — measured on
+    // one plate: red body 21, blue 39, green 59, against head tints at 98-105.
+    // A fixed cut (120) sat above all three and discarded every head.
+    const tintSplit = (() => {
+      if (hueMins.length < 50) return null;
+      const sorted = [...hueMins].sort((a, b2) => a - b2);
+      const bodyMedian = sorted[Math.floor(sorted.length * 0.5)];
+      const brightTail = sorted[Math.floor(sorted.length * 0.97)];
+      // Needs a real gap; without one this figure has only one tone.
+      if (brightTail < bodyMedian + 25) return null;
+      return Math.round((bodyMedian + brightTail) / 2);
+    })();
+    for (let k = 0; k < hueHits.length; k++) {
+      const p = hueHits[k];
+      const i = p * 4;
+      const r = popD[i], g = popD[i + 1], b = popD[i + 2];
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      const sat = (mx - mn) / (mx || 1);
+      if (tintSplit != null && mn > tintSplit) paleMask[p] = 1;
+      else if (sat >= BODY_SAT_FLOOR) colourMask[p] = 1;
     }
 
     // Flood fill — collect EVERY blob of this colour, not just the biggest.
@@ -456,9 +480,13 @@ async function findSilhouettesByDiff(populatedBuf, cleanBgBuf, cast, opts = {}) 
     // neck from the silhouette's outline, which fails whenever a raised hand
     // or hair fills the neck.
     //
-    // Take the LONGEST run of pale rows, not the first: a stray pale pixel in a
-    // highlight opens a one-row band near the crown and a first-run rule then
-    // discards the real face below it.
+    // Take the TOPMOST run that is big enough to be a head, not the longest.
+    // The head is always the highest tinted region on a figure, but it is not
+    // reliably the largest: measured on one plate, the head bands were 905 and
+    // 952 px while the HANDS came to 540 and 468 — only about 2:1, and a raised
+    // hand closes that gap entirely. A minimum-size guard is what makes
+    // "topmost" safe, since a stray pale speck would otherwise open the band at
+    // the crown and end it immediately (that produced a 1px head).
     //
     // Search only the top of the figure — the head cannot be below it — and a
     // little above the body box, because when hair does not overhang, the face
@@ -475,15 +503,24 @@ async function findSilhouettesByDiff(populatedBuf, cleanBgBuf, cast, opts = {}) 
       }
       paleRow[y - scanTop] = n;
     }
-    let bestFrom = -1, bestTo = -1, bestPx = 0, from = -1, px = 0;
-    for (let i = 0; i <= paleRow.length; i++) {
-      const on = i < paleRow.length && paleRow[i] >= 3;
-      if (on) { if (from < 0) { from = i; px = 0; } px += paleRow[i]; }
-      else if (from >= 0) {
-        if (px > bestPx) { bestPx = px; bestFrom = from; bestTo = i - 1; }
-        from = -1;
+    // Collect every run, tolerating a 3-row gap so JPEG speckle inside the face
+    // does not split it, then keep the first run substantial enough to be a
+    // head. The torso between face and hands is many rows of body colour, so
+    // the gap rule separates them cleanly.
+    const runs = [];
+    {
+      let from = -1, px = 0, gap = 0;
+      for (let i = 0; i < paleRow.length; i++) {
+        if (paleRow[i] >= 2) { if (from < 0) { from = i; px = 0; } px += paleRow[i]; gap = 0; }
+        else if (from >= 0 && ++gap > 3) { runs.push({ from, to: i - gap, px }); from = -1; }
       }
+      if (from >= 0) runs.push({ from, to: paleRow.length - 1, px });
     }
+    const minHeadPx = Math.max(12, Math.round((maxX - minX + 1) * bodyH * 0.004));
+    const head0 = runs.find(r => r.px >= minHeadPx) || null;
+    const bestFrom = head0 ? head0.from : -1;
+    const bestTo = head0 ? head0.to : -1;
+    const bestPx = head0 ? head0.px : 0;
     // The head unit in heads-per-body runs crown to chin. The band's bottom is
     // the chin; its top is the hairline, because hair stays in the body colour.
     // So the crown is whichever is higher — the body mask's top (hair) or the
@@ -1200,7 +1237,7 @@ ${lines}
 SILHOUETTE RENDERING DETAILS:
 - Each silhouette is filled with flat solid colour at the exact hexes above — no gradient, no transparency, no watercolor wash, no shading on the silhouette itself.
 - ONLY the human figures are flat colour. Every prop, object and piece of scenery keeps its own natural colours and full rendering, including anything a figure holds, opens, sits on or leans against. Never extend a figure's flat colour onto an object.
-- TWO TONES per figure: the head and neck use the pale hex, the body below the neck uses the saturated hex. The boundary sits where the neck meets the shoulders and must be a hard edge, never a blend. Hair, hats and raised hands that overlap the head stay in the BODY colour — only the head and neck themselves are pale.
+- TWO TONES per figure: the head and neck use the pale hex, everything else uses the saturated hex — torso, arms, hands, legs, feet, hair, hats. The boundary is a hard edge where the neck meets the shoulders, never a blend. The pale tone marks the head, not skin: hands, bare arms and bare legs stay the body colour.
 - Small BLACK eye dot(s) inside the head area per the marker spec above (~5% of head width, pure #000000). Nothing else inside the silhouette.
 - Size scales with depth: foreground largest, midground medium, background small.
 
@@ -1869,8 +1906,14 @@ async function generateSceneComposite(opts) {
   // STATURE, so scaling a cutout to bbox.height reproduces its error. The
   // model (see buildStatureModel) reads the box as a depth probe instead and
   // derives each figure's height from its own real-world height.
-  const statureModel = buildStatureModel(cast, bboxes, detection.canvasWidth, detection.canvasHeight);
+  // Plate proportions first: the median heads-per-body across whole figures is
+  // what lets the stature model recognise (and exclude) an occluded anchor.
   const plate = buildPlateHeadRatio(cast, detection.results, detection.canvasHeight);
+  const headsByName = Object.fromEntries(cast
+    .map(c => [c.name, detection.results[c.name]?.head])
+    .filter(([, h]) => h));
+  const statureModel = buildStatureModel(
+    cast, bboxes, detection.canvasWidth, detection.canvasHeight, 18, headsByName, plate.ratio);
   if (plate.ratio) log.info(`[SCENE COMPOSITE]   plate proportions: ${plate.ratio.toFixed(2)} heads per body (from ${plate.n} whole figure${plate.n === 1 ? '' : 's'})`);
   debug.plateHeadRatio = plate.ratio ? { ratio: Number(plate.ratio.toFixed(3)), fromFigures: plate.n } : null;
   debug.statureModel = { kind: statureModel.kind, anchors: statureModel.n, skippedAsClipped: statureModel.skipped || [] };
@@ -2382,7 +2425,7 @@ function _boxClipping(bbox, canvasW, canvasH, tol = 2) {
  * Only UNCLIPPED adult boxes may anchor the fit. Clipped ones measure a
  * fraction of a body and would drag the whole page down with them.
  */
-function buildStatureModel(cast, bboxes, canvasW, canvasH, ADULT_AGE = 18) {
+function buildStatureModel(cast, bboxes, canvasW, canvasH, ADULT_AGE = 18, heads = null, plateRatio = null) {
   const pts = [];
   const skipped = [];
   for (const c of cast) {
@@ -2392,6 +2435,18 @@ function buildStatureModel(cast, bboxes, canvasW, canvasH, ADULT_AGE = 18) {
     if (!Number.isFinite(age) || age < ADULT_AGE) continue;
     const clip = _boxClipping(b, canvasW, canvasH);
     if (clip.top || clip.bottom) { skipped.push(c.name); continue; }
+    // An OCCLUDED adult must not anchor the plane either, and the reason is
+    // circular: his box is short because scenery hides him, and fitting through
+    // that short box makes the plane agree that his short height is correct.
+    // Measured on job_1786780194082_s980g4s9a p6 — a figure kneeling behind a
+    // bridge railing had a 119px box while his own head implied 209px, and
+    // because he was one of the three anchors the fit "confirmed" 121px for
+    // him. The head is the independent witness, so use it to disqualify him.
+    const h = heads?.[c.name];
+    if (h && plateRatio && b.height / (h.height * plateRatio) < 0.95) {
+      skipped.push(`${c.name} (occluded)`);
+      continue;
+    }
     pts.push({ y: b.y + b.height, s: b.height / _heightCm(age) });
   }
   if (pts.length >= 2) {
@@ -2580,6 +2635,30 @@ function statureTargetFor(c, bbox, statureModel, canvasW, canvasH, head = null, 
   // the two-tone silhouette instruction in `realistic` style, and p6 came back
   // with head = null on all three figures. The ground plane needs no tint.
   if (!clip.bottom && !clip.top) {
+    // The HEAD is the reliable witness. head x the plate's own heads-per-body is
+    // the figure Grok painted; if the box is materially shorter, the rest is
+    // behind scenery. Prefer it over the ground-plane solve, which cannot see
+    // this when the occluded figure is itself one of the plane's anchors.
+    if (head && head.height >= 8 && plateRatio) {
+      const paintedFull = Math.round(head.height * plateRatio);
+      const shown = bbox.height / paintedFull;
+      if (shown < 0.95 && shown > 0.15) {
+        // Correct the painted height to the real-world one at the true foot
+        // line, then show only the visible slice.
+        const s = statureModel.at(bbox.y + paintedFull);
+        const corrected = Number.isFinite(s) && s > 0 ? Math.round(s * _heightCm(c.age)) : paintedFull;
+        const targetFull = Math.max(Math.round(paintedFull * 0.5), Math.min(Math.round(paintedFull * 2), corrected));
+        return {
+          targetH: Math.max(20, targetFull),
+          anchor: 'head',
+          clip,
+          corrected: true,
+          paintedFull,
+          visibleFraction: Math.min(1, shown),
+          via: 'head+occluded',
+        };
+      }
+    }
     const footY = _solveFootY(bbox.y, _heightCm(c.age), statureModel, bbox.height);
     if (footY) {
       const solvedFull = Math.round(footY - bbox.y);
