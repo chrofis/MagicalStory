@@ -2978,7 +2978,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // pass after images would add its full duration to the total.
     // Never blocks and never throws: a failed refinement leaves the original
     // text in place (startBackgroundRefine swallows and logs).
-    const refineEnabled = process.env.TEXT_REFINE !== 'false';
+    // TRIAL SKIPS REFINEMENT (owner 2026-08-15). The "costs no wall-clock"
+    // premise above holds only when images take minutes: a trial renders all 5
+    // pages in ~15s (Grok, no eval, no repair), so a ~184s polish pass can
+    // never finish behind them. Measured on both staging trials: refinement hit
+    // the 90s join cap every time and the refined text was DISCARDED — 90s of a
+    // ~230s run, plus two rounds of tokens, for nothing.
+    const refineEnabled = process.env.TEXT_REFINE !== 'false' && !inputData.trialMode;
     let textRefinePromise = null;
     // Per-page before/after, filled at the join so dev mode can show WHAT the
     // refiner changed rather than only that it ran.
