@@ -5170,13 +5170,15 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   if (!template) throw new Error(`story-scorecard judge template unavailable for evaluator ${version}`);
   const input = sc.buildJudgeInputFromArtifacts(artifacts);
   if (!input.trim()) throw new Error('no artifacts to score');
-  // partial when any rubric artifact is absent from the input
-  const partial = Object.keys(sc.RUBRIC).some(k => !(artifacts[k] != null && String(artifacts[k]).trim()));
+  // The artifacts actually sent — the judge is graded on exactly these, never on
+  // any zero-skeleton it echoes back for the ones it wasn't given.
+  const requested = Object.keys(sc.RUBRIC).filter(k => artifacts[k] != null && String(artifacts[k]).trim());
+  const partial = requested.length < Object.keys(sc.RUBRIC).length;
 
   const t = Date.now();
   const res = await callTextModelStreaming(`${template}\n\n---\n\n${input}`, null, null, judge, { usageLabel: 'testlab_story_scorecard', temperature: 0 });
   if (!res || !res.text || !res.text.trim()) throw new Error(`judge returned empty response (model ${judge})`);
-  const scored = sc.scoreFromDims(sc.parseJudgeJson(res.text), { partial });
+  const scored = sc.scoreFromDims(sc.parseJudgeJson(res.text), { partial, only: requested });
   const scorecard = { ...scored, ...sc.evaluatorStamp(template, version), judgeModel: judge };
   const judgeMs = Date.now() - t;
   const judgeCost = res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {});

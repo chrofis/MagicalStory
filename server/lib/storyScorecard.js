@@ -119,14 +119,19 @@ function provenanceOf(d) {
  * @param {Object} input {beats:{dims:{...},notes?}, scene:{...}, ...}
  * @returns {{artifacts: Object, overall: number}}
  */
-function scoreFromDims(input, { partial = false } = {}) {
+function scoreFromDims(input, { partial = false, only = null } = {}) {
   if (!input || typeof input !== 'object') throw new Error('scorecard input is not an object');
   const artifacts = {};
   const artScores = [];
   for (const [artifact, dims] of Object.entries(RUBRIC)) {
+    // Grade ONLY the artifacts actually sent to the judge. A judge handed just
+    // `beats` often echoes the full JSON skeleton with 0s for the artifacts it
+    // was not given; those must be ignored, not validated (0 is out of 1-10 and
+    // would throw, killing a valid single-artifact score).
+    if (only && !only.includes(artifact)) continue;
     const given = input[artifact];
     if (!given || typeof given.dims !== 'object') {
-      if (partial) continue; // partial: score only the artifacts the judge returned
+      if (partial || only) continue; // score only the artifacts the judge returned
       throw new Error(`missing scores for artifact "${artifact}"`);
     }
     const vals = [];
@@ -141,7 +146,7 @@ function scoreFromDims(input, { partial = false } = {}) {
     artScores.push(score);
     artifacts[artifact] = { dims: given.dims, score, notes: typeof given.notes === 'string' ? given.notes : '' };
   }
-  if (partial && artScores.length === 0) throw new Error('partial scorecard scored no artifacts');
+  if ((partial || only) && artScores.length === 0) throw new Error('partial scorecard scored no artifacts');
   return { artifacts, overall: mean(artScores) };
 }
 
