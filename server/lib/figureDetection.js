@@ -799,7 +799,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   //   body. Hans's face then found no free box and was DROPPED, and the girl's
   //   face was dropped the same way. 5 faces in, 3 pairings out, 2 of them wrong,
   //   and two people invisible to identity and to every repair keyed on it.
-  const facePairing = opts.facePairing || process.env.FACE_PAIRING || 'greedy';
+  const facePairing = opts.facePairing || process.env.FACE_PAIRING || 'mask';
   diag.facePairing = facePairing;
   if (facePairing === 'mask') {
     // MASK-FIRST ASSOCIATION (owner, 2026-08-14). The order was: boxes → guess
@@ -927,7 +927,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   // girls, hence SoM first.
   let nameByDet = null; // detIdx → character name
   try {
-    const badgeAnchor = opts.badgeAnchor || process.env.BADGE_ANCHOR || 'box';
+    const badgeAnchor = opts.badgeAnchor || process.env.BADGE_ANCHOR || 'face';
     diag.badgeAnchor = badgeAnchor;
     const som = await _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel, badgeAnchor);
     if (som) { nameByDet = som.nameByDet; diag.identity = { method: 'som-gemini', answers: som.answers }; }

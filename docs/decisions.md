@@ -10649,3 +10649,82 @@ unification) — a stamped cover face issue surfaces in the report but does not
 auto-repair; reversing that is an owner decision.
 
 **Touched:** prompts/entity-consistency-check.txt, server/lib/repairPipeline.js.
+
+## 2026-08-15 — Figure identity: mask-based face pairing, face-anchored badges, and real descriptions
+
+**Context:** two stories shipped with characters misidentified, and every repair keyed on those
+names inherited the error. `job_1786737619634_d66c7bg9g` p4 put Emma's name on Lira the mermaid;
+p10 swapped Emma and Noah among five people. `job_1786743927715_kcx0p939w` p3 put Emma on the
+mermaid again, and the garment recolour then repainted the mermaid's green top toward Emma's
+yellow (16,127px at hue 162.9). Both recolour versions lost pick-best, so nothing shipped — by
+luck, not by design.
+
+**Four defects, each measured before it was touched:**
+
+1. **The identity call was given bare names.** Every call site built its expected list as
+   `{ name, description: c.description || '' }` from `sceneCharacters`, whose entries are
+   `[id, age, name, gender, photos, traits, avatars, physical, ageCategory, structuredClothing]`
+   — there is no `description` key, so it was ALWAYS `''`. The Set-of-Mark prompt says "match
+   each letter by age, gender, hair, and clothing" and then listed `- Emma: Emma.`
+   **Introduced 2026-04-14 by `eacf77fdc`** ("shared bbox detection step — one call per image"),
+   a PERFORMANCE change: it added the shared pre-detection with bare names AND, in the same
+   commit, the `if (sharedBboxDetection) { allDetections = sharedBboxDetection; }` branch in
+   `enrichWithBoundingBoxes`. Rich descriptions had flowed since 2026-01-31 via
+   `buildExpectedCharactersForBbox`; that builder still runs today — its output is simply
+   discarded when a shared detection exists. Four months, invisible, because nothing errored.
+
+2. **Story-invented characters never reached the call.** A visual-bible secondary declares its
+   own pages (Lira: `pages: [3,5,9]`), but the expected list came only from the photo-backed
+   cast, so the prompt had N names for N+1 figures and its lenient branch assigned a cast name
+   to the invented figure.
+
+3. **Face→body pairing was greedy on the wrong key.** "For each face in score order, take the
+   SMALLEST containing person box that is still free." On p10, Daniel's face (cx 794) sits 6px
+   inside the right edge of Hans's box (573-800), which is smaller (177,968) than Daniel's own
+   body (202,300) — so Daniel's face went to Hans's body, Hans's face found no free box and was
+   DROPPED, and the girl's face was dropped the same way. 5 faces in, 3 pairings out.
+
+4. **Badges were anchored to the person-box centre.** A box spanning two people has its centre
+   in the GAP between them, so badge C sat between the two children and badge E between the boy
+   and the old man.
+
+**Decision:**
+- Identity comes from the character's METADATA (age band, gender, hair, build, face —
+  `buildCastIdentityDescription`); CLOTHING comes from the PAGE, resolved through
+  `buildClothingDescription` (clothingRequirements first). A category label
+  (`costumed:mermaid`, `summer`) is never emitted as a garment — that leak is the same one
+  `isCategoryLabel` guards, and a STALE outfit is worse than none: bboxDetection records a page
+  where "Lukas wearing striped hoodie" on a cowboy page tagged every figure UNKNOWN.
+- Secondaries are included by their own declared `pages`/`appearsInPages`
+  (`buildSecondaryExpectedForPage`) — no prose scanning, no inference.
+- **Faces associate with SAM MASKS, not person boxes** (`facePairing: 'mask'`, now the default).
+  SAM has already run by Stage 3, and a mask is one person where a box may be two: on p10 three
+  of five boxes each swallow a neighbour while all five cutouts are clean. Sampled on a 3x3 grid
+  inside the face box; a face inside no mask falls back to box containment for that face only.
+- **Badges anchor on the paired face** (`badgeAnchor: 'face'`, now the default).
+- `facePairing: 'global'` (best-cost over boxes + a body synthesised for any orphan face) is kept
+  as a selectable alternative; it fixed p4 but left a figure whose face and mask disagree.
+
+**Verified — Lab `bbox` stage, same story, same pinned bytes (`versionIndex: 0`):**
+
+| page | before (greedy + box) | after (mask + face) |
+|---|---|---|
+| `job_1786743927715_kcx0p939w` p3 | Emma → the mermaid, real Emma UNKNOWN | Emma → the girl, Noah → the boy, mermaid unmatched (exp 639) |
+| `job_1786737619634_d66c7bg9g` p10 | Daniel, Sarah, **Noah, Hans, Emma** (children swapped) | Daniel, Sarah, **Emma**, Hans, **Noah** (exp 641) |
+| p10 face→body | 3 of 5 faces placed, 2 wrong, 2 dropped | 5 of 5, cutouts one person each |
+
+p3 also passes on the defaults (exp 638 = exp 639), so `mask` is not what rescued that page —
+most likely the descriptions, but the Lab's bbox stage builds its own expected list and did not
+record it, so the attribution is unproven. p10 is unambiguous: only `mask` produces the right
+answer.
+
+**Not done:** no page rerun through the PIPELINE path (where the description fix lives) —
+the Lab stage does not exercise Phase 5b-pre. Reference images stay unused: text separates these
+figures (brown ponytail vs deep teal hair) and costs nothing; Lira already carries a
+`referenceImageUrl` if that ever changes.
+
+**Touched:** `server/lib/figureDetection.js`, `server/lib/bboxDetection.js`,
+`server/lib/promptBuilders.js`, `server/lib/storyHelpers.js`, `storyJobPipeline.js`,
+`server/lib/testlab.js`, `tests/manual/identityDescriptions.test.js`,
+`tests/manual/secondaryCharacterDetection.test.js`, `tests/manual/garmentMaskModes.test.js`.
+**Status:** ✅ active — `mask` + `face` are the defaults as of this entry.
