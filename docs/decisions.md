@@ -11696,7 +11696,7 @@ the `page-fill` check above already rejects ink landing outside the title strip
 (the wholesale re-layout the cap was built for), and the model eval below
 verifies the words. coverage/spill remain as logged diagnostics.
 
-**2. REVERTED (same day).** A change marking  (so a
+**2. REVERTED (same day).** A change marking `standard.used = !costume` (so a
 trial would wear its costume on every page) was reverted at the owner's
 direction: page 1 may legitimately be standard when the outline asks for it,
 and the standard avatar is what should be sent there. The open question is not
