@@ -51,6 +51,9 @@ function parseArgs() {
     else if (a.startsWith('--topic=')) out.over.storyTopic = a.split('=')[1];
     else if (a.startsWith('--theme=')) out.over.storyTheme = a.split('=')[1];
     else if (a.startsWith('--details=')) out.over.storyDetails = a.slice('--details='.length);
+    // Without this the server geolocates the caller's IP — every run from the
+    // owner's machine landed in Adlikon.
+    else if (a.startsWith('--city=')) out.over.city = a.split('=')[1];
     else if (a === '--dry-run') out.dryRun = true;
     else if (a === '--no-wait') out.wait = false;
     else if (a === '--help' || a === '-h') { console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0]); process.exit(0); }
@@ -174,6 +177,7 @@ function faceDataUri(entry) {
       storyTheme: entry.storyTheme || '',
       storyDetails: entry.storyDetails || '',
       language: entry.language,
+      ...(entry.city ? { userLocation: { city: entry.city, country: 'Switzerland' } } : {}),
     },
   });
   const jobId = started.jobId || started.id;
