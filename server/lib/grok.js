@@ -1125,22 +1125,65 @@ async function packReferences(refs = {}, options = {}) {
     log.info(`🎨 ${tag} Slot ${slots.length}: ${group.length} character${group.length > 1 ? 's' : ''}${vbLabel} composed (${rm.width}x${rm.height})`);
   };
 
-  // Decide char grouping — one per slot when space allows.
+  // SLOT ORDER (owner, 2026-08-15): scene → characters → VB elements.
+  //
+  //   chars | slot 2  | slot 3
+  //   ------|---------|--------------
+  //     1   | A       | VB
+  //     2   | A+B     | VB
+  //     3   | A+B     | C  + VB
+  //     4   | A+B     | C+D + VB
+  //     5   | A+B+C   | D+E + VB
+  //
+  // Up to TWO characters share one slot so the VB elements can own the last
+  // one. From three characters up there is no free slot left, so the overflow
+  // characters and the VB row share slot 3 (the old behaviour). Bundled VB
+  // cells arrive as a bordered thumbnail row inside a character reference and
+  // Grok copies that row into the artwork as corner insets — staging
+  // job_1786815617426 p3 painted the scarf and a secondary character into the
+  // picture's corners while slot 3 sat unused.
+  // Locations never ride a shared slot (they are the scene anchor); when the
+  // grid still holds one, keep the bundling path, which filters them out.
   const availableCharSlots = 3 - slots.length;
+  const vbAvailable = rawVbElements.length > 0
+    && (visualBibleGrid?.rawElements || []).length === rawVbElements.length;
   let charGroups = [];
-  if (charCount > 0 && charCount <= availableCharSlots) {
-    charGroups = rawCharData.map(c => [c]); // each in own slot
-  } else if (charCount > 0 && availableCharSlots >= 2) {
-    const per = Math.ceil(charCount / availableCharSlots);
-    for (let i = 0; i < availableCharSlots; i++) {
-      const start = i * per;
-      if (start < charCount) charGroups.push(rawCharData.slice(start, Math.min(start + per, charCount)));
+  let vbOwnSlot = false;
+
+  if (charCount > 0) {
+    if (vbAvailable && charCount <= 2 && availableCharSlots >= 2) {
+      charGroups = [rawCharData];   // 1–2 characters share slot 2
+      vbOwnSlot = true;             // VB takes slot 3 at full size
+    } else if (charCount <= availableCharSlots) {
+      charGroups = rawCharData.map(c => [c]); // each in own slot
+    } else if (availableCharSlots >= 2) {
+      const per = Math.ceil(charCount / availableCharSlots);
+      for (let i = 0; i < availableCharSlots; i++) {
+        const start = i * per;
+        if (start < charCount) charGroups.push(rawCharData.slice(start, Math.min(start + per, charCount)));
+      }
+    } else {
+      charGroups = [rawCharData]; // cram all into the last slot
     }
-  } else if (charCount > 0 && availableCharSlots === 1) {
-    charGroups = [rawCharData]; // cram all into last slot
+  } else if (vbAvailable && availableCharSlots >= 1) {
+    vbOwnSlot = true;             // no characters — VB still gets a slot
   }
+
   for (let i = 0; i < charGroups.length; i++) {
-    await pushCharSlot(charGroups[i], i === charGroups.length - 1);
+    await pushCharSlot(charGroups[i], !vbOwnSlot && i === charGroups.length - 1);
+  }
+
+  if (vbOwnSlot) {
+    try {
+      const resized = await sharp(visualBibleGrid)
+        .resize({ height: 1024, withoutEnlargement: true })
+        .jpeg({ quality: 90 })
+        .toBuffer();
+      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+      log.info(`🎨 ${tag} Slot ${slots.length}: ${rawVbElements.length} VB element(s) (own slot)`);
+    } catch (e) {
+      log.warn(`⚠️ ${tag} VB own-slot compose failed (${e.message}) — elements not sent this render`);
+    }
   }
 
   // Landmark already inserted above as a top-level scene anchor (slot 1 when

@@ -11228,3 +11228,41 @@ and flat-stamp-only (plainer typography than the rest of the product).
 
 **Touched files:** `storyJobPipeline.js` (trial cover prompt selection),
 `server/lib/coverTypography.js` (paint gate).
+
+---
+
+## 2026-08-15 — Grok reference slots: scene → characters → VB elements
+
+**Context:** trial showcase `job_1786815617426_d6r671gzn` page 3 shipped two
+corner insets — a scarf and a secondary character — painted into the artwork.
+Cause: `packReferences` bundled the visual-bible elements as a bordered
+thumbnail row INTO the character slot ("so the scene stays clean"), and Grok
+copied that row into the output. With a single character only two of the three
+reference slots were used, so a free slot sat unused while the VB row rode
+along with the character.
+
+**Decision (owner):** slot 1 the scene, slot 2 the characters, slot 3 the VB
+elements. Up to two characters now share slot 2 so the VB row can own slot 3
+at full size:
+
+| chars | slot 2 | slot 3 |
+|-------|--------|--------|
+| 1     | A      | VB |
+| 2     | A+B    | VB |
+| 3     | A+B    | C + VB |
+| 4     | A+B    | C+D + VB |
+| 5     | A+B+C  | D+E + VB |
+
+From three characters up there is no free slot, so overflow characters and the
+VB row share slot 3 — the previous behaviour. Stories with no VB elements keep
+the old spread (one character per slot) since nothing needs the extra slot.
+Locations still never ride a shared slot; when the grid still holds one, the
+bundling path (which filters them) is kept.
+
+Trial passes only the main character as a photo reference — secondary
+characters ride as VB elements — so a trial always lands on slot 2 = main
+character alone, slot 3 = VB. Trial cast is capped in the prompt at three per
+scene (main + two others).
+
+**Touched files:** `server/lib/grok.js` (packReferences slot allocation),
+`prompts/story-trial.txt` (cast ceiling 4 → 3).
