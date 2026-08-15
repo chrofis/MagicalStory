@@ -719,7 +719,28 @@ function buildExpectedCharacters(ctx) {
     }
   } catch { /* outlineExtract not JSON */ }
 
-  const clothing = ctx.scene.sceneCharacterClothing || ctx.scene.sceneMetadata?.characterClothing || {};
+  // A COVER GETS THE SAME CLOTHING INFO AS A PAGE (owner, 2026-08-15).
+  //
+  // Covers carry no per-page clothing category — `pageClothing` is keyed by page
+  // number and stops at the last page, and a cover's scene object has neither
+  // sceneCharacterClothing nor sceneMetadata. With an empty map every figure
+  // reached the detector as a bare name, so nothing could read the garment
+  // colours off the identity line and the garment seed points never fired: on
+  // job_1786780194082_s980g4s9a p-2 Sarah's cut-out came back full of holes,
+  // 38,107px against the 73,828px she masks once one dot lands on her blouse.
+  //
+  // The story-level requirement is the canonical source and always knows which
+  // category is in play, so fall back to the one marked `used`. This also
+  // rescues any ordinary page whose per-page metadata is missing.
+  let clothing = ctx.scene.sceneCharacterClothing || ctx.scene.sceneMetadata?.characterClothing || {};
+  if (Object.keys(clothing).length === 0 && ctx.clothingRequirements) {
+    const fromRequirements = {};
+    for (const [name, cats] of Object.entries(ctx.clothingRequirements)) {
+      const used = Object.entries(cats || {}).find(([, v]) => v && v.used);
+      if (used) fromRequirements[name] = used[0];
+    }
+    if (Object.keys(fromRequirements).length > 0) clothing = fromRequirements;
+  }
   if (Object.keys(descriptions).length > 0) {
     return buildExpectedCharactersForBbox(descriptions, positions, clothing);
   }
