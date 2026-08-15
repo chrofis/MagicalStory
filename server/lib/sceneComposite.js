@@ -892,87 +892,6 @@ async function subtractFiguresInFront(placements, silhouetteMasks, canvasW, canv
   return out;
 }
 
-/**
- * Scenery that crosses a figure — a railing at the waist, a wall, an open chest
- * lid — with the figure still visible below it.
- *
- * 3a (the ground-plane solve) cannot see this case: the detector merges the
- * silhouette's fragments, so the box already spans crown to feet and nothing
- * looks short. What gives it away is that a horizontal SLICE of the figure is
- * missing — the plate drew scenery over the whole width of the body at that
- * height, so the silhouette's own row coverage collapses there while the rows
- * above and below stay full.
- *
- * Judged BY ROW, never by column. The column test — "non-silhouette pixel with
- * silhouette above and below in the same column" — was wrong, and measurably
- * so (2026-08-15, Lab exp 675): it cannot tell an occluder from an ordinary
- * CONCAVITY. Every gap beside a neck, between an arm and a torso, and between
- * two legs satisfies it, because the column through the hair also passes the
- * shoulder further down. Those regions were repainted from the background over
- * the pasted avatar, which does not share the ghost's outline, and bit visible
- * wedges out of a character's shoulder, knees and shoes. A real occluder spans
- * the body; a concavity never does.
- *
- * Returns a full-canvas Uint8Array marking pixels to repaint from the clean
- * background, or null when there is nothing to restore.
- */
-// A row counts as hidden when its silhouette coverage falls to this fraction of
-// the figure's typical width, and as solid body at this one. Between the two is
-// the shoulder/hip taper, claimed by neither.
-const OCCLUDED_ROW_MAX = 0.25;
-const BODY_ROW_MIN = 0.5;
-const MIN_BAND_ROWS = 4;   // thinner is detector noise, not a railing
-
-function buildSceneryOccluderMask(placements, silhouetteMasks, canvasW, canvasH) {
-  const restore = new Uint8Array(canvasW * canvasH);
-  let count = 0;
-  const bands = [];
-  for (const p of placements) {
-    const m = silhouetteMasks[p._name];
-    const bb = p._bbox;
-    if (!m || !bb) continue;
-    const x0 = Math.max(0, bb.x), x1 = Math.min(canvasW - 1, bb.x + bb.width - 1);
-    const y0 = Math.max(0, bb.y), y1 = Math.min(canvasH - 1, bb.y + bb.height - 1);
-
-    const cov = new Int32Array(y1 - y0 + 1);
-    for (let y = y0; y <= y1; y++) {
-      let c = 0;
-      for (let x = x0; x <= x1; x++) if (m[y * canvasW + x]) c++;
-      cov[y - y0] = c;
-    }
-    // Reference width = the median of the rows that have any body in them. The
-    // max would be the shoulders or an outstretched arm, which makes every
-    // ordinary row look thin.
-    const nz = Array.from(cov).filter(c => c > 0).sort((a, b) => a - b);
-    if (nz.length < MIN_BAND_ROWS * 3) continue;
-    const ref = nz[Math.floor(nz.length / 2)];
-    if (ref < 6) continue;
-
-    // Walk the rows and keep runs of hidden ones that have solid body on BOTH
-    // sides — body above and nothing below is the bottom occlusion 3a already
-    // handles by clipping, and restoring there would paint over his feet.
-    let i = 0;
-    while (i < cov.length) {
-      if (cov[i] > ref * OCCLUDED_ROW_MAX) { i++; continue; }
-      let j = i;
-      while (j + 1 < cov.length && cov[j + 1] <= ref * OCCLUDED_ROW_MAX) j++;
-      const solidAbove = cov.slice(0, i).some(c => c >= ref * BODY_ROW_MIN);
-      const solidBelow = cov.slice(j + 1).some(c => c >= ref * BODY_ROW_MIN);
-      if (j - i + 1 >= MIN_BAND_ROWS && solidAbove && solidBelow) {
-        for (let y = y0 + i; y <= y0 + j; y++) {
-          for (let x = x0; x <= x1; x++) {
-            const q = y * canvasW + x;
-            if (!m[q] && !restore[q]) { restore[q] = 1; count++; }
-          }
-        }
-        bands.push({ name: p._name, top: y0 + i, height: j - i + 1 });
-      }
-      i = j + 1;
-    }
-  }
-  return count ? { mask: restore, pixels: count, bands } : null;
-}
-
 async function detectZOrderByOcclusion(populatedBuf, placements) {
   if (placements.length < 2) {
     return { order: placements.slice(), scores: {}, decisions: [] };
@@ -2267,38 +2186,7 @@ async function generateSceneComposite(opts) {
   // Strip the auxiliary fields before handing to sharp — it only knows input/left/top.
   const compositeInputs = placements.map(({ input, left, top }) => ({ input, left, top }));
 
-  let composited = await sharp(bgBuf).composite(compositeInputs).png().toBuffer();
-
-  // ── Scenery back in front ─────────────────────────────────────────────────
-  // Figures were just painted over everything, including whatever the plate had
-  // crossing them. Repaint those bands from the clean background so a railing
-  // the character kneels behind stays in front of them.
-  try {
-    const occ = buildSceneryOccluderMask(placements, silhouetteMasks, detection.canvasWidth, detection.canvasHeight);
-    if (occ) {
-      const bgResized = await sharp(bgBuf)
-        .resize(detection.canvasWidth, detection.canvasHeight, { fit: 'fill' })
-        .ensureAlpha().raw().toBuffer();
-      const layer = Buffer.alloc(detection.canvasWidth * detection.canvasHeight * 4, 0);
-      for (let i = 0; i < detection.canvasWidth * detection.canvasHeight; i++) {
-        if (!occ.mask[i]) continue;
-        layer[i * 4] = bgResized[i * 4];
-        layer[i * 4 + 1] = bgResized[i * 4 + 1];
-        layer[i * 4 + 2] = bgResized[i * 4 + 2];
-        layer[i * 4 + 3] = 255;
-      }
-      const layerPng = await sharp(layer, {
-        raw: { width: detection.canvasWidth, height: detection.canvasHeight, channels: 4 },
-      }).png().toBuffer();
-      composited = await sharp(composited).composite([{ input: layerPng, left: 0, top: 0 }]).png().toBuffer();
-      debug.sceneryOccluderPixels = occ.pixels;
-      debug.sceneryOccluderBands = occ.bands;
-      const where = occ.bands.map(b => `${b.name} y=${b.top}..${b.top + b.height - 1}`).join(', ');
-      log.info(`[SCENE COMPOSITE]   scenery restored in front of the figures: ${occ.pixels}px repainted from the clean background (${where})`);
-    }
-  } catch (err) {
-    log.warn(`[SCENE COMPOSITE] scenery-occluder restore failed (${err.message}) — figures stay on top`);
-  }
+  const composited = await sharp(bgBuf).composite(compositeInputs).png().toBuffer();
 
   const compositedData = `data:image/png;base64,${composited.toString('base64')}`;
   debug.composited = compositedData;
@@ -3462,8 +3350,7 @@ module.exports = {
   _internal: {
     findColorBbox,
     findSilhouettesByDiff,
-    subtractFiguresInFront,
-    buildSceneryOccluderMask,
+    subtractFiguresInFront,
     buildStatureModel,
     buildPlateHeadRatio,
     statureTargetFor,
