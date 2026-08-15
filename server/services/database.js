@@ -2137,6 +2137,35 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
 }
 
 /**
+ * Create the stories row EARLY, before any image is written (owner, 2026-08-15).
+ *
+ * story_images.story_id references stories.id, and the row used to appear only
+ * at finalize — so anything written during generation had no parent to point
+ * at and failed the foreign key. On job_1786780194082_s980g4s9a the cover
+ * garment recolour ran at 08:04:40 and the story row was inserted at 08:09:43;
+ * its debug artifact could never be stored, and in fact not one such row has
+ * ever existed for any story.
+ *
+ * The row is deliberately empty (`data = {}`): it exists to satisfy the key,
+ * and the real content arrives via upsertStory at finalize. An unfinished story
+ * is kept out of the library by JOINING story_jobs status, not by a flag here —
+ * the job row already knows whether it is still running, and duplicating that
+ * into a column would go stale the moment a job died.
+ */
+async function ensureStoryRow(storyId, userId, options = {}) {
+  if (!isDatabaseMode()) return false;
+  const crypto = require('crypto');
+  const shareToken = crypto.randomBytes(32).toString('hex');
+  await dbQuery(
+    `INSERT INTO stories (id, user_id, data, metadata, share_token, admin_draft)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (id) DO NOTHING`,
+    [storyId, userId, JSON.stringify({}), JSON.stringify({}), shareToken, options.adminDraft === true]
+  );
+  return true;
+}
+
+/**
  * Insert or update story data with metadata.
  * OPTIMIZED: Extracts images to story_images table for faster queries.
  */
@@ -3321,6 +3350,7 @@ module.exports = {
   stripInlineImagesFromStoryData,
   extractInlineImagesToR2,
   upsertStory,
+  ensureStoryRow,
   // Image functions
   saveStoryImage,
   getNextVersionIndex,

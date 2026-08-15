@@ -354,6 +354,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
+  // The stories row exists from the FIRST moment (owner, 2026-08-15).
+  // story_images.story_id references stories.id, so anything written during
+  // generation — cover repairs, debug artifacts, per-page versions — needs the
+  // parent row to already be there. It used to appear only at finalize, five
+  // minutes after the cover repairs that wanted it. The row is empty; the
+  // content arrives via upsertStory at the end. An unfinished story is kept out
+  // of the library by joining story_jobs status, not by a flag on the row.
+  try {
+    await require('./server/services/database').ensureStoryRow(jobId, userId, {
+      adminDraft: inputData?.adminDraft === true,
+    });
+  } catch (err) {
+    log.warn(`⚠️ [UNIFIED] Could not pre-create the story row for ${jobId}: ${err.message}`);
+  }
+
   // Debug: Log inputData values at start of unified processing
   log.debug(`📝 [UNIFIED INPUT] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"`);
   log.debug(`📝 [UNIFIED INPUT] mainCharacters: ${JSON.stringify(inputData.mainCharacters)}, characters count: ${inputData.characters?.length || 0}`);

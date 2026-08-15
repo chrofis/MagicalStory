@@ -11739,3 +11739,46 @@ silent. It should log when it substitutes, so a missing sheet is visible instead
 of surfacing as a mislabelled reference.
 
 **Touched files:** `storyJobPipeline.js`.
+
+
+## 2026-08-15 - The stories row is created when the job STARTS, not at finalize
+
+**Context:** `story_images.story_id` references `stories.id`, but the story row was inserted only
+at the end of generation (`upsertStory`). Anything written DURING generation therefore had no parent
+row to point at. Measured on `job_1786780194082_s980g4s9a`, in one frame: job created 07:49:54,
+cover garment recolour ran 08:04:40, **stories row inserted 08:09:43** - five minutes too late. Its
+debug artifact failed the foreign key, and in fact **zero** `garment_before` rows had ever existed
+for any story.
+
+**Decision:** `ensureStoryRow(storyId, userId)` inserts an empty row (`data = {}`,
+`ON CONFLICT DO NOTHING`) as `processUnifiedStoryJob` begins. The real content still arrives via
+`upsertStory` at the end; this row exists only so the foreign key can be satisfied from the first
+moment. The INSERT already existed inside `upsertStory` - added originally for this very reason -
+it simply ran too late.
+
+**The part that mattered more than the fix.** The library listing is
+`FROM stories s WHERE s.user_id = $1 AND NOT s.admin_draft`, with nothing excluding an unfinished
+story - so a stub row would have shown up in every user's library as a **blank entry for the whole
+~10 minutes of generation**. That is a live user-visible regression to fix a debug artifact, and it
+had to be solved in the same change.
+
+In-progress stories are excluded by joining the job's own status:
+
+```sql
+AND NOT EXISTS (
+  SELECT 1 FROM story_jobs j WHERE j.id = s.id AND j.status IN ('pending', 'processing')
+)
+```
+
+**Rejected: an `in_progress` column, and a flag inside `metadata`.** Both duplicate state the job row
+already holds, and both go stale the moment a job dies. The job status is the single source of truth,
+and the existing stale-job sweep (fails jobs with no progress for 15 min) already unsticks it.
+
+**Verified against staging before shipping:** 134 stories, 134 kept by the filter, 0 wrongly hidden;
+of the 128 stories with no job row at all (saved outside the job flow, or whose job was purged -
+`story_jobs` keeps only recent rows), **all 128 still list**.
+
+**Touched:** `server/services/database.js` (`ensureStoryRow`), `storyJobPipeline.js` (call at job
+start), `server/routes/stories.js` (listing + count filter).
+
+**Status:** active.

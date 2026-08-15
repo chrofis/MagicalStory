@@ -129,8 +129,20 @@ router.get('/', authenticateToken, async (req, res) => {
       // point: generate, look, regenerate, publish only the good one.
       const showDrafts = req.user.impersonating === true || req.user.role === 'admin';
       const draftFilter = showDrafts ? '' : ' AND NOT s.admin_draft';
+      // A story's row now exists from the moment its job starts, so that images
+      // written DURING generation have a parent to reference (see
+      // ensureStoryRow). Without this, an unfinished story would sit in the
+      // library as a blank entry for the whole ~10 minutes of generation.
+      //
+      // The job's own status is the source of truth — no in_progress column and
+      // no flag on the row, both of which would go stale the moment a job died.
+      // A story saved outside the job flow has no matching job row, so
+      // NOT EXISTS is true and it lists normally.
+      const inProgressFilter = ` AND NOT EXISTS (
+        SELECT 1 FROM story_jobs j WHERE j.id = s.id AND j.status IN ('pending', 'processing')
+      )`;
       const countResult = await dbQuery(
-        `SELECT COUNT(*) as count FROM stories s WHERE s.user_id = $1${draftFilter}`,
+        `SELECT COUNT(*) as count FROM stories s WHERE s.user_id = $1${draftFilter}${inProgressFilter}`,
         [req.user.id]);
       totalCount = parseInt(countResult[0]?.count || 0);
 
@@ -141,7 +153,7 @@ router.get('/', authenticateToken, async (req, res) => {
         `SELECT s.metadata, s.share_token, s.admin_draft, CASE WHEN s.metadata IS NULL THEN s.data ELSE NULL END as data,
          EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'frontCover' AND NOT si.is_test) as has_cover_image,
          EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'scene' AND NOT si.is_test) as has_any_image
-         FROM stories s WHERE s.user_id = $1${draftFilter} ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
+         FROM stories s WHERE s.user_id = $1${draftFilter}${inProgressFilter} ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
         [req.user.id, limit, offset]
       );
 
