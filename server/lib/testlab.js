@@ -187,8 +187,16 @@ async function loadActivePageImage(storyId, pageNumber, versionIndex = null, ima
   const { getActiveVersion, getStoryImage } = require('../services/database');
   const coverKey = pageNumber < 0 ? COVER_KEY_BY_PAGE[String(pageNumber)] : null;
   const pinned = Number.isFinite(Number(versionIndex)) ? Number(versionIndex) : null;
+  // A Lab step image is written with is_test = true, and getStoryImage filters
+  // those out — so an intermediate has to come through loadTestImage, which
+  // does not.
+  if (pinned !== null && imageType) {
+    const img = await loadTestImage(storyId, imageType, pageNumber, pinned);
+    if (!img?.imageData) throw new Error(`No ${imageType} v${pinned} for ${storyId} page ${pageNumber}`);
+    return img.imageData;
+  }
   if (pinned !== null) {
-    const row = await getStoryImage(storyId, imageType || coverKey || 'scene', coverKey && !imageType ? null : pageNumber, pinned);
+    const row = await getStoryImage(storyId, coverKey || 'scene', coverKey ? null : pageNumber, pinned);
     if (!row) throw new Error(`No version ${pinned} for ${storyId} page ${pageNumber}`);
     const bytes = await bytesFor(row);
     if (!bytes) throw new Error(`Bytes unavailable for ${storyId} page ${pageNumber} v${pinned}`);
