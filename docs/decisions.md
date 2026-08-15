@@ -11696,12 +11696,11 @@ the `page-fill` check above already rejects ink landing outside the title strip
 (the wholesale re-layout the cap was built for), and the model eval below
 verifies the words. coverage/spill remain as logged diagnostics.
 
-**2. A trial with a costume wears it on every page.** The trial writer marks
-early pages `clothing: "standard"`, which created a requirement for a second
-2×4 sheet — and the render then painted the costume anyway (job_1786826686448
-p1: declared standard, resolved the standard avatar, rendered the wizard robe).
-`standard.used` is now `!costume`, so the resolver's existing safety net maps
-those pages onto the costume and the standard sheet is never built (~2-4 Grok
-calls plus its evals, ~30s).
+**2. REVERTED (same day).** A change marking  (so a
+trial would wear its costume on every page) was reverted at the owner's
+direction: page 1 may legitimately be standard when the outline asks for it,
+and the standard avatar is what should be sent there. The open question is not
+the requirement but whether the reference actually matches the declared
+category on that page.
 
 **Touched files:** `server/lib/coverTitlePaint.js`, `storyJobPipeline.js`.
