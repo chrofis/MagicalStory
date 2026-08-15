@@ -3936,11 +3936,20 @@ function parseClothingReview(raw) {
   const marks = [];
   let m;
   while ((m = re.exec(body)) !== null) {
-    const [cat, costume] = m[2].toLowerCase().split(':');
+    const [cat, colonCostume] = m[2].toLowerCase().split(':');
+    // The costume name arrives in either notation — `costumed:mermaid` (what
+    // check 9 prescribes) or the echo format `costumed (costume: mermaid)`
+    // that the CURRENT WARDROBE block itself uses and reviewers mirror. A
+    // valid addition was dropped as stray because only the colon form parsed.
+    let costume = colonCostume || null;
+    if (!costume && cat === 'costumed') {
+      const cm = m[0].match(/costume:\s*([\w-]+)/i);
+      if (cm) costume = cm[1].toLowerCase();
+    }
     marks.push({
       name: m[1].replace(/\*/g, '').trim(),
       category: cat,
-      costume: costume || null,
+      costume,
       headStart: m.index,
       bodyStart: m.index + m[0].length,
     });
