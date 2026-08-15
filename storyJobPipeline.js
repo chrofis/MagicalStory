@@ -606,7 +606,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const trialClothingRequirements = {};
       for (const char of (inputData.characters || [])) {
         trialClothingRequirements[char.name] = {
-          standard: { used: true, signature: 'none' },
+          // With a costume configured the trial wears it throughout: the story
+          // is the costume adventure, and the renders already painted it even
+          // on pages the writer marked `standard` (job_1786826686448 p1 —
+          // declared standard, rendered in the costume, having spent a whole
+          // standard 2×4 sheet on the reference). Marking standard unused lets
+          // the existing resolver safety net map those pages onto the costume
+          // and removes the second sheet (~2-4 Grok calls + its evals).
+          standard: { used: !costume, signature: 'none' },
           costumed: costume
             ? { used: true, costume: costume.costumeType, description: costume.description }
             : { used: false }

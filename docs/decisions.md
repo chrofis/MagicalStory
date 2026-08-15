@@ -11679,3 +11679,29 @@ stale consumer note in `server/lib/garmentHueNormalize.js`. The `sheet-row-*-eva
 DIFFERENT feature (per-row Gemini evals) and are untouched.
 
 **Status:** active. Closes task #7.
+
+---
+
+## 2026-08-15 — Cover title paint: no shape cap; trial wears its costume throughout
+
+**1. The title-paint shape cap is gone.** `paintServedCoverTitle` compared the
+painted ink against the FLAT lockup's glyph outlines (`coverage`, `spill`) and
+rejected anything that did not trace them. Two measured false positives on
+staging (`0.37/0.37`, `0.35/0.48`): both were correct, well-placed titles —
+same words, same line breaks, inside the band — repainted in the painter's own
+bolder lettering with watercolour blooms, i.e. penalised for being better
+drawings than the lockup. Owner: "the box we send is 1/3rd so it can fill it
+and we would still be good. Why the cap at all?" The cap is also redundant —
+the `page-fill` check above already rejects ink landing outside the title strip
+(the wholesale re-layout the cap was built for), and the model eval below
+verifies the words. coverage/spill remain as logged diagnostics.
+
+**2. A trial with a costume wears it on every page.** The trial writer marks
+early pages `clothing: "standard"`, which created a requirement for a second
+2×4 sheet — and the render then painted the costume anyway (job_1786826686448
+p1: declared standard, resolved the standard avatar, rendered the wizard robe).
+`standard.used` is now `!costume`, so the resolver's existing safety net maps
+those pages onto the costume and the standard sheet is never built (~2-4 Grok
+calls plus its evals, ~30s).
+
+**Touched files:** `server/lib/coverTitlePaint.js`, `storyJobPipeline.js`.

@@ -381,23 +381,14 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   // Metrics against the rendered mask are exact: low coverage = the lockup was
   // abandoned, high spill = ink far outside any glyph. Reject wholesale; the
   // flat title is always correct.
-  // Thresholds widened 2026-08-15 against two MEASURED cases:
-  //   rejected (bad, kept):  coverage 0.29 / spill 0.66 — title re-laid out
-  //                          across the figures, ink far from any glyph.
-  //   rejected (good, was a false positive): coverage 0.37 / spill 0.37 — a
-  //                          3-line title repainted in the painter's own
-  //                          lettering: same words, same band, same line
-  //                          breaks, just a different face than the flat
-  //                          lockup it is measured against (staging
-  //                          job_1786823576638 — the painted result was
-  //                          correct and better-looking than the flat title).
-  // Spill is the discriminating signal (0.66 vs 0.37); coverage punishes any
-  // restyle. The model eval below still verifies the WORDS, so this gate only
-  // has to catch wholesale re-layouts.
-  if (coverage < 0.30 || spill > 0.45) {
-    log.warn(`🅰️ [TITLE PAINT] shape gate rejected the repaint (coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}) — keeping the flat title`);
-    return { ...flat, coverage, spill, debug: debugOut, reason: `shape: coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}` };
-  }
+  // NO SHAPE CAP (owner 2026-08-15). The plate handed to the painter IS the
+  // title band, so filling it is the goal; the page-fill check above already
+  // rejects ink that lands outside that strip, and the eval below verifies the
+  // WORDS. coverage/spill compare the paint against the FLAT lockup's glyph
+  // outlines, so bolder letters, watercolour blooms or a different face score
+  // worst for being a better drawing — measured 0.37/0.37 and 0.35/0.48 on two
+  // correct, well-placed painted titles that were discarded. Diagnostics only.
+  log.info(`🅰️ [TITLE PAINT] shape diagnostics: coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)} (not gated)`);
   const paintedUri = `data:image/jpeg;base64,${painted.toString('base64')}`;
 
   // FINAL EVAL: the expected text AND the painted cover, one call.
