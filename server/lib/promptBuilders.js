@@ -455,6 +455,73 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
  * @param {{pageLabel?: string, extraNames?: string[]}} [opts]
  * @returns {Array<{name: string, description: string}>}
  */
+
+/**
+ * The identity line for a photo-backed cast member.
+ *
+ * WHY THIS EXISTS (owner, 2026-08-15). Every call site built its expected list as
+ * `{ name, description: c.description || '' }` from `sceneCharacters` — whose
+ * entries are [id, age, name, gender, photos, traits, avatars, physical,
+ * ageCategory, structuredClothing]. There is NO `description` key, so the field
+ * was ALWAYS ''. The Set-of-Mark prompt then asked "match each letter by age,
+ * gender, hair, and clothing" and listed "- Emma: Emma." — a bare name.
+ *
+ * Measured on job_1786743927715_kcx0p939w p3: three figures (a brown-haired girl
+ * in yellow, a teal-haired mermaid in green, a blond boy in blue), two bare
+ * names, and the answer put Emma on the MERMAID. The recolour then repainted the
+ * mermaid's green top toward Emma's yellow. With a description the question is
+ * trivial — "brown wavy ponytail, freckles" separates her from teal hair on
+ * sight, whether or not the mermaid is named at all.
+ *
+ * Same shape buildExpectedCharactersForBbox produces, so both paths describe a
+ * character identically.
+ */
+function buildCastIdentityDescription(char, clothingText = '') {
+  if (!char || typeof char !== 'object') return '';
+  const parts = [];
+  const look = char.ageCategory || char.age || '';
+  const gender = char.gender === 'female' ? 'girl/woman' : char.gender === 'male' ? 'boy/man' : '';
+  if (look || gender) parts.push([look, gender].filter(Boolean).join(' '));
+  const phys = char.physical || {};
+  if (phys.hair) parts.push(`hair: ${phys.hair}`);
+  if (phys.build) parts.push(`build: ${phys.build}`);
+  if (phys.face) parts.push(phys.face);
+  if (Array.isArray(char.traits) && char.traits.length) parts.push(char.traits.filter(t => typeof t === 'string').join(', '));
+  const base = parts.filter(Boolean).join(', ');
+  if (!base) return '';
+  return clothingText ? `${base}. Wearing: ${clothingText}` : base;
+}
+
+/**
+ * Secondary characters that declare THIS page.
+ *
+ * A visual-bible secondary carries `pages` / `appearsInPages` — Lira on
+ * job_1786743927715_kcx0p939w is `pages: [3,5,9]`. That is a stronger signal
+ * than scanning the scene's metadata lists, which omitted her entirely on p3
+ * (sceneCharacters, outlineCharacters and characterClothing all said just
+ * [Emma, Noah] while the PROSE and the image prompt both named her). Her own
+ * declaration is authoritative and needs no inference.
+ */
+function buildSecondaryExpectedForPage(visualBible, pageNumber, knownNames = []) {
+  const vb = visualBible || {};
+  const list = Array.isArray(vb.secondaryCharacters)
+    ? vb.secondaryCharacters
+    : Object.values(vb.secondaryCharacters || {});
+  const known = new Set((knownNames || []).map(n => String(n).toLowerCase()));
+  const out = [];
+  for (const e of list) {
+    if (!e || !e.name || known.has(String(e.name).toLowerCase())) continue;
+    const pages = e.pages || e.appearsInPages;
+    if (!Array.isArray(pages) || !pages.map(Number).includes(Number(pageNumber))) continue;
+    const desc = e.description
+      || [e.age, e.build, e.hair && `hair: ${e.hair}`, e.face, e.signatureLook, e.clothing && `Wearing: ${e.clothing}`]
+        .filter(Boolean).join('. ');
+    if (!desc) continue;
+    out.push({ name: e.name, description: desc });
+  }
+  return out;
+}
+
 function buildSecondaryExpectedCharacters(visualBible, sceneMetadata, knownNames = [], opts = {}) {
   const { pageLabel = '', extraNames = [] } = opts;
   const resolved = buildSecondaryCharacterDescriptions(
@@ -4663,6 +4730,8 @@ module.exports = {
   buildCharacterDescriptionsForBbox,
   buildSecondaryCharacterDescriptions,
   buildSecondaryExpectedCharacters,
+  buildCastIdentityDescription,
+  buildSecondaryExpectedForPage,
   buildTextZoneInstruction,
   buildEraGuard,
   buildLandmarkFidelityBlock,

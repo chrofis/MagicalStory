@@ -4321,17 +4321,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Phase 5b-pre: Shared bbox detection — runs ONCE per image before quality eval
         // and entity consistency. Both consume the same result, avoiding redundant API calls.
         const { detectAllBoundingBoxes } = require('./server/lib/images');
-        const { buildSecondaryExpectedCharacters } = require('./server/lib/storyHelpers');
+        const { buildSecondaryExpectedCharacters, buildCastIdentityDescription, buildSecondaryExpectedForPage } = require('./server/lib/storyHelpers');
         const bboxLimit = pLimit(500); // match quality-eval concurrency; existing retry logic handles 503s
         const bboxStartTime = Date.now();
         log.info(`🔍 [UNIFIED] Phase 5b-pre: Shared bbox detection for ${rawImages.length} images...`);
         await Promise.all(rawImages.filter(img => img.imageData).map(img => bboxLimit(async () => {
           try {
             const sceneMetadata = img.sceneMetadata || {};
-            const expectedCharacters = (img.sceneCharacters || []).map(c => ({
-              name: c.name || c,
-              description: typeof c === 'object' ? (c.description || '') : '',
-            }));
+            // sceneCharacters entries have NO `description` key, so the old
+            // `c.description || ''` sent the identity call bare names — see
+            // buildCastIdentityDescription for the measured consequence.
+            const clothingByName = img.sceneCharacterClothing || sceneMetadata.characterClothing || {};
+            const expectedCharacters = (img.sceneCharacters || []).map(c => {
+              const name = c.name || c;
+              return {
+                name,
+                description: typeof c === 'object'
+                  ? (c.description || buildCastIdentityDescription(c, clothingByName[name] || ''))
+                  : '',
+              };
+            });
             // Story-invented characters live ONLY in the Visual Bible — never in
             // sceneCharacters, which is the user's photo-backed cast. Without them
             // the identity call gets N names for N+1 figures and the SoM prompt's
@@ -4344,6 +4353,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             expectedCharacters.push(...buildSecondaryExpectedCharacters(
               visualBible, sceneMetadata, expectedCharacters.map(c => c.name),
               { pageLabel: `PAGE ${img.pageNumber} `, extraNames: img.scene?.outlineCharacters || [] }
+            ));
+            // …and any secondary that declares THIS page in its own `pages`.
+            // On job_1786743927715_kcx0p939w p3 the scene metadata named only
+            // [Emma, Noah] while Lira (pages [3,5,9]) was in the prose and the
+            // image prompt — so the name-based collector above found nothing and
+            // the identity call again had 2 names for 3 figures.
+            expectedCharacters.push(...buildSecondaryExpectedForPage(
+              visualBible, img.pageNumber, expectedCharacters.map(c => c.name)
             ));
             const expectedObjects = Array.isArray(sceneMetadata.objects)
               ? sceneMetadata.objects.filter(o => typeof o === 'string')
