@@ -2064,10 +2064,33 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         try {
           const sceneChars = r.sceneCharacters || orig?.sceneCharacters || [];
           const meta = r.sceneMetadata || orig?.sceneMetadata || {};
-          const expectedCharacters = sceneChars.map(c => ({
-            name: c.name || c,
-            description: typeof c === 'object' ? (c.description || '') : '',
-          }));
+          // Same identity line the first detection gets (Phase 5b-pre). Without
+          // it this re-detect OVERWRITES a good detection with one made from
+          // bare names: job_1786737619634_d66c7bg9g p4 ran char-fix-round-1 and
+          // its stored expectedCharacters came back [{"name":"Emma",
+          // "description":""},{"name":"Noah","description":""}].
+          // Clothing is the PAGE's, resolved from the category — never the raw
+          // tag ('costumed:mermaid'), never a stale stored outfit.
+          const clothingByName = r.sceneCharacterClothing || orig?.sceneCharacterClothing || meta.characterClothing || {};
+          const expectedCharacters = sceneChars.map(c => {
+            const name = c.name || c;
+            if (typeof c !== 'object') return { name, description: '' };
+            let clothingText = '';
+            const category = clothingByName[name];
+            if (category) {
+              try {
+                clothingText = require('./entityConsistency').buildClothingDescription(
+                  c, category, artStyle, storyData?.clothingRequirements || null) || '';
+              } catch (e) {
+                log.warn(`⚠️ [ROUND-DETECT] p${r.pageNumber} ${name}: clothing "${category}" did not resolve (${e.message})`);
+              }
+            }
+            return {
+              name,
+              description: c.description
+                || getStoryHelpers().buildCastIdentityDescription(c, clothingText),
+            };
+          });
           // Story-invented characters are in the Visual Bible, never in
           // sceneCharacters (the photo-backed cast) — without them the identity
           // call gets N names for N+1 figures and hands a cast name to the

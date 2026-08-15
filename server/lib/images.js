@@ -3699,10 +3699,22 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         // live only in the Visual Bible and must be appended, or the identity
         // call assigns a cast name to the invented figure
         // (job_1786737619634_d66c7bg9g p4).
-        const iterExpectedCharacters = (sceneCharacters || []).map(c => ({
-          name: c.name || c,
-          description: typeof c === 'object' ? (c.description || '') : '',
-        }));
+        // Same identity line the first detection gets. A bare-name re-detect here
+        // OVERWRITES a good detection: job_1786737619634_d66c7bg9g p4 ran a repair
+        // and its stored expectedCharacters came back with empty descriptions.
+        const iterClothing = iterateSceneMetadata?.characterClothing || {};
+        const iterExpectedCharacters = (sceneCharacters || []).map(c => {
+          const cname = c.name || c;
+          if (typeof c !== 'object') return { name: cname, description: '' };
+          let clothingText = '';
+          if (iterClothing[cname]) {
+            try {
+              clothingText = require('./entityConsistency').buildClothingDescription(
+                c, iterClothing[cname], artStyle, storyData?.clothingRequirements || null) || '';
+            } catch { /* identity line goes without clothing */ }
+          }
+          return { name: cname, description: c.description || getStoryHelpers().buildCastIdentityDescription(c, clothingText) };
+        });
         iterExpectedCharacters.push(...getStoryHelpers().buildSecondaryExpectedCharacters(
           visualBible, iterateSceneMetadata, iterExpectedCharacters.map(c => c.name),
           { pageLabel: `${iterLabel} ` }

@@ -173,4 +173,27 @@ t('the call site resolves the category through the canonical source', () => {
     'must NOT pass the raw category through');
 });
 
-console.log(`${pass} passed (incl. clothing resolution)`);
+// ── ALL THREE detection call sites, not just the first ──────────────────────
+t('every detection call site builds a real identity line', () => {
+  // Phase 5b-pre getting it right is not enough: the round re-detect and the
+  // iterate path OVERWRITE the stored detection. On
+  // job_1786737619634_d66c7bg9g p4 (char-fix-round-1) the stored
+  // expectedCharacters came back [{"name":"Emma","description":""},...] —
+  // a good first detection replaced by a bare-name one.
+  const files = ['storyJobPipeline.js', 'server/lib/repairPipeline.js', 'server/lib/images.js'];
+  for (const f of files) {
+    const src = fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8');
+    assert.ok(!/description: typeof c === 'object' \? \(c\.description \|\| ''\) : ''/.test(src),
+      `${f} still sends a bare description`);
+    assert.ok(/buildCastIdentityDescription\(/.test(src), `${f} must build an identity line`);
+  }
+});
+
+t('each site resolves the clothing category rather than passing the tag', () => {
+  for (const f of ['storyJobPipeline.js', 'server/lib/repairPipeline.js', 'server/lib/images.js']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8');
+    assert.ok(/buildClothingDescription\(/.test(src), `${f} must resolve the category to prose`);
+  }
+});
+
+console.log(`${pass} passed (incl. all three call sites)`);
