@@ -32,7 +32,7 @@ Test Lab: `/admin/test-lab`. Stages run via `server/lib/testlab.js` `STAGE_RUNNE
 | Quality eval (bbox fix_targets) | Gemini `2.5-flash` | Page quality | ✅ required for spatial fix_targets | `quality_eval` | CLAUDE.md |
 | **Garment hue normalize** (fix cloth colour drift) | `normalizeGarmentHue` / `normalizeGarmentHueBatch` (garmentHueNormalize.js) — **no model**, masked LAB hue-rotation toward the character's AVATAR garment colour | Runs before EVERY eval in the chain: initial pre-eval (Phase 5b-hue) AND each repair round (before `evaluateImageBatch`), via the shared `normalizeGarmentHueBatch` driver. Corrects only outliers; per-round pass reuses the round's own detection (iterate) and skips redraws without one | ✅ lighting-preserving (rotate a*/b* about origin → L*+chroma exact); illumination-discounted so day/night survives; defers garment-TYPE errors to redraw. Flag `garmentHueNormalize`. **2026-08-06:** the AVATAR side takes NO cast discount (a reference sheet is neutral-lit; discounting it cancelled the signal — hit-rate 3/52 → 10/52), page cast comes from the background, sampling mask is SAM-else-torso-band, and the page hue matches the NEAREST of the avatar's top-K hue clusters (two-garment characters) | `garment_hue` | decisions.md 2026-07-30 + 2026-08-06 |
 | Prompt-compliance eval | qwen `qwen3-max` | Stage-2 compliance | ✅ presence-is-input, never-CRITICAL gate | `quality_eval` | project_unified_call |
-| **Scene composite** (non-cover) | — | — | ❌ **KILLED** 2026-05-16 (style drift, label leak) — don't re-enable without gate | — | scene_composite_killed |
+| **Scene composite** (non-cover, PAGES) | `generateSceneComposite`: colour-silhouette plate (Grok generate) → depopulate (Grok edit) → **GroundingDINO** person+face boxes, palette hue names them → paste avatar cut-outs at measured heights → ONE blend (Grok edit) with a metadata-built prompt, NEVER the page prompt | Pages where `needsScaleRepair()` fires (≥1 declared foreground AND ≥1 background, outdoor, no shared vessel) — it REPLACED scale repair there 2026-08-15 | 🟡 2026-08-15: correct on a page with real depth (Lab 726 — occluded man behind a parapet, standing figures whole). **Aborts and keeps the original render** when a detected box cannot be a person, or when tallest÷shortest figure < 2.0x (no depth to correct). Needs DINO available or it aborts every time — prod runs the Gemini backend. Blend prompt = goal + scene overview + cast (wearing/doing) + interactions + emotions from metadata; sending the page's own prompt RELOCATES characters (3/3). | `scene_composite` (params `figureDetect`, `figureMethod`, `blend`, `replayPasteOf`, `blendMode`) | decisions.md 2026-08-15 ×8, scene_composite_killed (superseded for pages) |
 | **Style-repair** (repaint a style-outlier page/cover toward the dominant style) | `repairPageStyle` (styleRepair.js): **prompt-only** (no style-ref image), **Gemini** `gemini-2.5-flash-image` sent the raw validated prompt (NOT the illustration-edit template), temp 0.7, retry ≤3 on safety no-image (`STYLE_REPAIR_MODEL=grok` for the Lab A/B — Grok no-ops on this edit) | Step-5 audit outliers; **ON by default** (`styleRepairProduction`) | ✅ **RE-ENABLED 2026-08-09** (supersedes same-day disable). The disable rested on two prompt bugs, not a real limit: a 9.5k page-gen prompt + a "match the reference image" instruction with NO ref attached → Gemini text-replied ("no image"). Clean prompt → Gemini restyles fine. Recipe = **character-focused + feature-preserving**: "background already correct; CHARACTERS too realistic → repaint people into {artStyle}; change only style; keep every feature exactly, eyewear if present / none if absent; add nothing, remove nothing." Validated p3/p10/initial page incl. both-ways glasses. **Grok can't restyle** (no-op ~10/255); a content-rich ref leaks the ref's people; "minimal detail/suggest features" DROPS small features (a child's eyes) — all avoided. Refused page keeps its original. | `style_repair` | decisions.md 2026-08-09 (later) |
 
 ---
@@ -97,6 +97,47 @@ Grok Round-1 sometimes renders ONE figure split across the mid-row divider (top 
 - **⚠️ `quickLayoutCheck` is WHITE-BACKGROUND / REALISTIC-sheet only.** It measures gutter *whiteness*, so painterly/textured styles (oil, watercolor) FALSE-POSITIVE even when the layout is correct (verified: Sarah 25.3% + Noah 57.4% oil sheets were structurally fine but flagged). Documented as "over-eager" in `character2x4Sheet.js` (comment ~672, why the Pass1→Pass2 gate was removed 2026-05-17). **Do NOT wire it as a hard gate on Pass-2 / styled sheets.**
 - **Pass-2 has no deterministic layout guard** — only the Gemini styled-sheet eval, which validates layout *preservation* (styled vs anchor), not *correctness*; a bad anchor passes as "faithfully preserved." So the guarantee lives at Round 1 (validate the anchor), not Round 2.
 - **RULE for experiment harnesses:** never reuse a raw one-shot `editWithGrok` anchor — run Round 1 through `generateCharacter2x4Sheet` (validated + retry) or gate the anchor on `quickLayoutCheck`, or you test on broken sheets (this is why the Pixar/oil A/B harness produced a split Emma).
+
+---
+
+### Page composite — what the blend may and may not be told (✅ measured 2026-08-15)
+
+Nine blend variants on ONE fixed pasted canvas (Lab 695–705, replayed with
+`params.replayPasteOf` so only the words changed — a fresh composite re-rolls
+the plate and makes two prompts incomparable):
+
+| variant | result |
+|---|---|
+| the page's own generation prompt | character relocated off the bridge, 3/3 |
+| poses reworded as descriptions of Image 1 | relocated again |
+| page prompt minus Composition / EXACT POSES / EXPRESSIONS | stayed, but sat ON the parapet |
+| a generic line explaining what a clipped figure means | relocated |
+| naming the occluder explicitly | worst — giant figure on a plank that does not exist |
+| retouch-only, no page prompt | DELETED the half-hidden man as an artefact |
+| retouch + a cast census | correct, but blank faces |
+| census + expressions + attention | expressions landed; frame crept in, feet cut |
+
+Rules that follow, and the reason each exists:
+- **Never send the page prompt.** Its `Composition`, `EXACT POSES` and
+  `EXPRESSIONS` sections are orders to arrange a scene; the scene is already
+  arranged, so the model carries them out.
+- **Always send a cast census.** Without it a partly-hidden figure is painted out.
+- **Rewording does not defuse a staging instruction** — deletion does.
+- **Do not add another prohibition.** Four have been overridden; prompt length
+  itself pulls the camera in (1810 chars held the framing, 3063 cut feet).
+- **Eval-then-repair is not an escape hatch.** Feeding the top-3 evaluator
+  findings back as the repair instruction reproduced the same relocation, because
+  the evaluator scores the paste against the same brief and its prescribed fix
+  literally says "Regenerate".
+
+### Page composite — detection (✅ measured 2026-08-15)
+
+DINO for boxes, palette for identity, DINO face box for the head. Colour-only
+detection on the plate was measured and INVERTS the depth verdict on all three
+test pages (bridge timbers read as the red character; lawn as the yellow one),
+so the depopulated background cannot be skipped for the diff detector — and the
+DINO detector does not need it at all. SOM naming is useless on ghosts (UNKNOWN
+for 4 of 5, Lab 723): a flat cartoon figure gives a VLM nothing to recognise.
 
 ---
 

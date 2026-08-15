@@ -670,6 +670,187 @@ original; sanitizer tested on the exact leaked strings.
 `server.js`.
 **Status:** ✅ active.
 
+### Scene composite replaces scale repair on the automatic path (2026-08-15)
+**Context:** `runScaleRepair` edits the rendered page and asks Grok to shrink
+an oversized background figure. Measured 2026-08-13: it fired on 42 pages in
+30 days and left no artefact on any of them — no stored prompt, no pre-repair
+image, and the oversized figures shipped unchanged. It re-costumed characters
+instead of moving them back.
+**Decision:** `needsScaleRepair()` stays as the trigger, unchanged, so the
+composite fires exactly where scale repair fired. The body now calls
+`generateSceneComposite`: a colour-silhouette plate, a depopulated background,
+avatar cut-outs pasted at measured heights, and one blend. A throw anywhere in
+it leaves `genResult` untouched and the page ships as rendered. Scale repair
+remains reachable manually (the repair endpoint, the Lab's `scale_repair`
+stage) but is dead on the automatic path.
+**Rationale:** Three Grok calls (~$0.06) against one, for a pass that produces
+depth where the old one produced none. Keeping the trigger means the change is
+a swap of implementation, not a widening of scope.
+**Touched:**
+- `storyJobPipeline.js` (~3895 — trigger unchanged, body swapped)
+- `server/lib/sceneComposite.js`
+- `server/lib/scaleRepair.js` (still exports `runScaleRepair` for manual use)
+**Status:** ✅ active. Supersedes the automatic half of "Scale-repair is
+verified before promotion"; the verification gate still guards manual runs.
+
+### The composite's blend prompt is NOT the page's generation prompt (2026-08-15)
+**Context:** The obvious idea — hand the blend pass the page's own
+`buildImagePrompt` output so the composite renders what a direct render would
+— was built and measured. It relocated a background character off a bridge and
+onto the promenade in 3 of 3 runs.
+**Decision:** The blend prompt is generated from scene metadata instead, in
+this order: the goal (keep everyone where they are, adjust them on the spot),
+the scene overview capped at 900 chars, every character with depth, clothing
+and what they are doing, then the interactions and emotions to change, then
+the prohibitions, then the retouch jobs and the art style.
+**Rationale:** Nine variants on one fixed pasted canvas (Lab 695–705, replayed
+via `replayPasteOf` so only the words differed):
+- page prompt verbatim → character relocated
+- poses reworded as descriptions of Image 1 (C) → relocated again
+- page prompt minus `Composition` / `EXACT POSES` / `EXPRESSIONS` (B) → stayed,
+  but sat on the parapet instead of behind it
+- a generic line explaining what a clipped figure means (D) → relocated
+- naming the occluder (E) → worst of all, a giant figure on a plank
+- retouch-only, no page prompt (A) → deleted the half-hidden man entirely
+- retouch + a cast census (F) → correct, but blank faces
+- F + expressions and attention (H, I) → expressions landed, frame crept in
+The `Composition`, `EXACT POSES` and `EXPRESSIONS` sections are orders to
+arrange a scene; at blend time the scene is already arranged, so the model
+carries them out. Rewording does not defuse them — deletion does. But some
+context is mandatory: without it a partly-hidden figure reads as an artefact
+and is painted out.
+**Known cost:** the frame creeps in as the prompt grows (1810 chars held the
+framing exactly; 3063 zoomed enough to cut feet). Accepted by the owner in
+exchange for the expressions. Do NOT add another prohibition — four have been
+overridden.
+**Touched:**
+- `server/lib/sceneComposite.js` (`buildBlendEditPrompt`, `buildBlendMetadata`,
+  `blendPastedCanvas`)
+- `server/lib/testlab.js` (`replayPasteOf`, `blendMode: 'evalRepair'`)
+- `storyJobPipeline.js` (passes the metadata, not the page prompt)
+**Status:** ✅ active.
+
+### Interactions: send the `object`, and the `where` only as an on-the-spot adjustment (2026-08-15)
+**Context:** A scene interaction carries `where` ("kneels at the gap in the
+bridge railing and peers down through it") and `object` ("the gap in the
+railing"). `where` is the sentence that moved characters in every prompt that
+contained it as staging.
+**Decision:** `object` is always sent, as the attention target. `where` is sent
+too, but under a heading that frames it as something to perform in place, next
+to "a turn of the body is a change of pose, not a change of place".
+**Rationale:** The owner wants the interactions rendered, not just the gaze;
+the distinction that matters is not which field but whether the model is being
+told to stage or to adjust.
+**Touched:** `server/lib/sceneComposite.js` (`buildBlendMetadata`)
+**Status:** 🟡 conditional — the framing is unverified on a real page.
+
+### GroundingDINO finds the ghosts; the palette names them (2026-08-15)
+**Context:** The composite located its silhouettes by subtracting the clean
+background and matching palette hues. On `job_1786567053374_8ktpkfhec` p4 the
+sunlit lawn (hue 78, sat 0.59) matched the yellow palette entry closely enough
+that a 177x39 strip of grass was returned as a character. It became a
+ground-plane anchor, inverted the plane, and scaled two children to 40% of the
+size Grok had painted them. One bad box, five wrong figures.
+**Decision:** `findSilhouettesWithDino` is the default detector
+(`figureDetect: 'dino'`). DINO answers WHERE the people are; the dominant
+palette hue inside each box answers WHICH person it is; DINO's face box, paired
+to the person box containing it, gives the head. `'diff'` remains only so a Lab
+run can reproduce a pre-2026-08-15 result.
+**Rationale:** DINO looks for figures, so scenery cannot impersonate one — it
+found the p4 man at 102x236 with a face. The palette is needed because DINO
+cannot name anyone and the SOM naming pass returned UNKNOWN for 4 of 5 ghosts
+on a plate (Lab 723): a flat cartoon figure gives a VLM nothing to recognise.
+Colour-only detection on the plate was also measured and is not an option — it
+inverted the depth verdict on all three test pages (bridge timbers read as the
+red character, lawn as the yellow one).
+**Failure mode:** where DINO is unavailable the detector throws, the composite
+aborts, and the page keeps its original render. Deliberate — falling back to
+the hue detector would silently restore the bug this replaces. Production runs
+the Gemini backend, so the composite needs DINO available there before it can
+be enabled.
+**Touched:**
+- `server/lib/sceneComposite.js` (`findSilhouettesWithDino`)
+- `server/lib/figureDetection.js` (exports `_gdinoDetect`, `_collectNmsBoxes`)
+- `server/lib/testlab.js` (`figureDetect` param; `imageType` on the bbox stage
+  so detection can target a plate)
+**Status:** ✅ active. Verified Lab 724–726 (p6) and 725 (p4).
+
+### The composite aborts rather than build a page it cannot trust (2026-08-15)
+**Context:** Two failures where compositing was worse than not compositing.
+**Decision:** Two gates run after detection, before any figure is scaled. Both
+throw, and a throw ships the page as rendered.
+1. **A box that cannot be a person.** Height < 20px, or wider than 2.5:1 with
+   no face in it, or wider than 4:1 with one. Head-aware deliberately: p6's man
+   leaning on a bridge parapet measures 181x133 — wider than tall — and is a
+   legitimate occluded figure; what separates him from p4's 177x39 strip of
+   lawn is that the detector found a head band on the man and none on the grass.
+2. **No depth spread.** Tallest ÷ shortest figure on the plate below 2.0x.
+   Measured: p6 2.77x (a man on a bridge, a woman at the water — real depth),
+   p10 1.73x (five figures in one band, three standing in a river), p4 1.08x
+   (five round one chest, while the metadata declared 3 foreground + 2
+   background).
+**Rationale:** The composite exists for scenes with someone near and someone
+far, and is triggered by the metadata DECLARING that split. The plate shows
+whether the split is real. Below 2x there is nothing to correct and
+compositing can only lose: it removes Grok's own figures and pastes standing
+avatars into spaces where the plate drew people kneeling or waist-deep.
+**Cost:** an aborted page still pays the plate and depopulate calls (~$0.04) —
+the boxes cannot be measured before they exist.
+**Related:** the declaration itself is guarded upstream by `prompts/scene-review.txt`
+check 6c ("depth must be earned").
+**Touched:** `server/lib/sceneComposite.js` (`_isPlausibleFigureBox`,
+`MIN_DEPTH_SPREAD`, the abort block in `generateSceneComposite`)
+**Status:** ✅ active.
+
+### The scenery-restore step was built and deleted the same day (2026-08-15)
+**Context:** After pasting, figures cover whatever the plate drew in front of
+them. A step was added to repaint those bands from the clean background so a
+railing stays in front of a character.
+**Decision:** Removed entirely — function, call site, export, debug fields.
+Scene occlusion is handled by clipping the figure at the occluder line instead.
+**Rationale:** Its test — a background pixel with silhouette above and below it
+in the same column — cannot tell an occluder from an ordinary concavity. Every
+gap beside a neck, between an arm and a torso, and between two legs satisfies
+it. Those regions were repainted over the pasted avatar, whose outline differs
+from the ghost's, so it bit visible wedges out of a character's shoulder, knees
+and shoes. Lab 675: 9932px restored on p6, all of it false. A row-based rewrite
+was written and measured correct on synthetic cases, then scrapped on the
+owner's instruction: the failure mode is destructive and the step earns too
+little to keep.
+**Touched:** `server/lib/sceneComposite.js`
+**Status:** 🗄 removed — do not reintroduce without a new decision.
+
+### Occlusion bar: 0.95 → 0.85 → 0.75 (2026-08-15)
+**Context:** A figure is treated as hidden by scenery when its box is short
+relative to head × the plate's heads-per-body, and is then clipped to what
+shows.
+**Decision:** `MAX_SHOWN_TO_COUNT_AS_OCCLUDED = 0.75`.
+**Rationale:** Two measured misfires: at 0.95 a woman standing in the open read
+as 94% shown and lost 25px of her feet (Lab 684); at 0.85 a man standing in the
+open read as 84% and lost his (Lab 724, 7.63 heads against the plate's 9.08).
+0.75 is safe only because DINO's face boxes made the scale meaningful — on that
+same page the genuinely occluded figure read 3.58 against 9.08, i.e. 39%. Under
+the old colour head-band it would have been impossible: every figure on a plate
+sat between 2.43 and 3.05, occluded and whole alike, with no separation at all.
+**Touched:** `server/lib/sceneComposite.js`
+**Status:** ✅ active.
+
+### A style map that is missing keys answers confidently and wrongly (2026-08-15)
+**Context:** `BLEND_STYLE_LINES` is a second, older copy of the art-style list
+inside `sceneComposite.js`. It is missing `realistic`, so
+`BLEND_STYLE_LINES[artStyle] || BLEND_STYLE_LINES.watercolor` ended every
+photorealistic page's blend prompt with "soft watercolor children's storybook
+illustration style". Found by printing the prompt a Lab run actually sent.
+**Decision:** `_blendStyleLine()` consults `ART_STYLES` (promptBuilders) — the
+canonical list every other prompt path uses — and falls back to the local map
+only for a style neither knows.
+**Rationale:** One source of truth. The bug survived unnoticed because Image 1
+dominates the edit, which is exactly why a wrong style line is worth catching
+by construction rather than by eye.
+**Touched:** `server/lib/sceneComposite.js`
+**Status:** ✅ active.
+
+
 ---
 
 ## Cross-cuts already documented elsewhere
