@@ -11796,12 +11796,3 @@ of the 128 stories with no job row at all (saved outside the job flow, or whose 
 start), `server/routes/stories.js` (listing + count filter).
 
 **Status:** active.
-
-**REVERTED same day (owner):** the preview avatar is NOT style-converted, so
-seeding it as `styledAvatars[artStyle].standard` labelled an unstyled portrait
-as a styled reference — worse than the silent costumed fallback it replaced.
-Both halves (the seeding and the non-costumed requirement filter) are reverted.
-The open design question stands: a standard page needs a reference IN the art
-style, and the choice is between building the standard 2×4 sheet (~30-40s, what
-happens today) or style-converting the cheap preview avatar with a single
-transfer call instead of a full sheet.

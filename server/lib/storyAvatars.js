@@ -195,7 +195,17 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
     if (clothingRaw === 'costumed' || clothingRaw.startsWith('costumed:')) slotKey = 'costumed';
     else if (['standard', 'winter', 'summer'].includes(clothingRaw)) slotKey = `styled-${clothingRaw}`;
     else slotKey = 'costumed';
-    const sheetUri = story[slotKey] || story.costumed;
+    // NEVER swap clothing silently. Falling back to the costumed sheet while
+    // keeping the ref's `standard` label is how a page the outline marked
+    // standard was rendered in costume, invisibly, for three runs
+    // (job_1786826686448 p1). The fallback stays — a reference beats none —
+    // but it says so, and the ref carries the category actually sent.
+    let sheetUri = story[slotKey];
+    if (!sheetUri && story.costumed) {
+      log.warn(`👕 [STORY-CELLS] ${charName}: no "${slotKey}" sheet — falling back to the costumed sheet (ref asked for "${clothingRaw || 'none'}")`);
+      sheetUri = story.costumed;
+      ref.clothingCategory = 'costumed';
+    }
     if (!sheetUri) continue;
     const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', depth: 'foreground' };
     // Foreground → stack head + body into one ref (canvas-large faces need
