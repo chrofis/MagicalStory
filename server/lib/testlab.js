@@ -3553,7 +3553,11 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     // page's own generation prompt or the legacy brief — the difference decides
     // whether the model was even allowed to render occlusion.
     blendPrompt: dbg.blendPrompt || null,
-    blendPromptSource: pagePrompt ? 'page-prompt' : 'legacy-brief',
+    // The blend no longer sends the page prompt — it sends the census + the
+    // metadata expressions (buildBlendEditPrompt). Labelling it 'page-prompt'
+    // made Lab cards claim a prompt source that has not been used since
+    // 2026-08-15.
+    blendPromptSource: 'census+emotions',
     cleanBackgroundPrompt,
   };
 }

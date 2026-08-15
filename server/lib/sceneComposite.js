@@ -1421,6 +1421,26 @@ const BLEND_STYLE_LINES = {
   cyber:        "cyberpunk graphic novel illustration — neon reflections, chrome, dense complexity, high contrast, dark atmosphere, volumetric fog",
 };
 
+/**
+ * The style sentence for a blend prompt.
+ *
+ * ART_STYLES (promptBuilders) is the canonical list every other prompt path
+ * uses, and it is consulted FIRST — because BLEND_STYLE_LINES is a second,
+ * older copy that is missing keys. `realistic` is one of them, so a
+ * photorealistic page was silently told "soft watercolor children's storybook
+ * illustration style" by the `|| watercolor` fallback (found 2026-08-15 by
+ * printing the prompt a Lab run actually sent). A style map that answers
+ * confidently for a style it does not know is worse than one that throws.
+ */
+function _blendStyleLine(artStyle) {
+  const key = String(artStyle || '').trim();
+  try {
+    const { ART_STYLES } = require('./promptBuilders');
+    if (ART_STYLES?.[key]) return ART_STYLES[key];
+  } catch { /* fall through to the local map */ }
+  return BLEND_STYLE_LINES[key] || BLEND_STYLE_LINES.watercolor;
+}
+
 // Grok's edit endpoint caps prompts at 8000 chars. Reserve ~300 char
 // headroom so future tweaks to the boilerplate don't silently re-blow
 // the budget. The boilerplate below is ~2400 chars; that leaves the
@@ -1568,7 +1588,7 @@ function buildBlendEditPrompt(scene, cast = null) {
     const expressions = scene.characterExpressions || {};
     const attention = scene.attentionTargets || {};
     const occluded = scene.occludedBy || {};
-    const artStyle = BLEND_STYLE_LINES[scene.artStyle] || BLEND_STYLE_LINES.watercolor;
+    const artStyle = _blendStyleLine(scene.artStyle);
 
     const census = people.map((c) => {
       const depth = String(c.depth || 'foreground').toLowerCase();
@@ -1613,7 +1633,7 @@ Art style: ${artStyle}.${buildStagedDepthLine(cast)}${textDirective}`;
   }
 
   // Legacy path — no page prompt supplied (older callers, cover dispatcher).
-  const styleLine = BLEND_STYLE_LINES[scene.artStyle] || BLEND_STYLE_LINES.watercolor;
+  const styleLine = _blendStyleLine(scene.artStyle);
   const brief = (scene.pageBrief || '').trim();
   const briefHeader = `\n\nPAGE BRIEF — these blocks define the canonical look of every character, costume, object, and pose in this scene. The composited image (Image 1) is already staged correctly; the brief tells you WHAT each silhouette is supposed to look like once blended. Image 2 (when provided) is the labelled portrait grid — use it as the authoritative face/clothing reference.\n\n`;
   const boilerplate = `Refine Image 1 into a single cohesive children's book illustration in ${styleLine}.
