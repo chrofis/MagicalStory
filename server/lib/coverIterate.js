@@ -914,12 +914,44 @@ async function iterateCover(coverKey, storyData, options = {}) {
       } catch (evalErr) {
         log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: eval failed (${evalErr.message}) — serving unscored render`);
       }
+      // A COVER GETS THE SAME CLOTHING INFO AS A PAGE (owner, 2026-08-15).
+      //
+      // This built `description: c.description || ''` - and a character object
+      // has no `description` key, so every cover figure reached the detector
+      // as a bare name. The three page paths were fixed earlier; this one was
+      // missed, which is why cover cut-outs had no garment colours to seed
+      // SAM with and Sarah's silhouette came back full of holes.
+      //
+      // The information was there all along: coverHints[hintKey]
+      // .characterClothing is the cover's own per-character category map,
+      // exactly analogous to a page's perCharClothing - on
+      // job_1786780194082_s980g4s9a it reads
+      //   {Emma: summer, Hans: summer, Noah: summer, Sarah: summer, Daniel: summer}
+      // It simply was never passed on. Resolution goes through
+      // clothingRequirements, the canonical source, like everywhere else.
+      const coverClothingByName = hintCharClothing || {};
+      const expectedCoverCharacters = (selectedCoverCharacters || []).map(c => {
+        const name = c.name || c;
+        if (typeof c !== 'object') return { name, description: '' };
+        let clothingText = '';
+        const category = coverClothingByName[name];
+        if (category) {
+          try {
+            clothingText = require('./entityConsistency').buildClothingDescription(
+              c, category, artStyleId, storyData.clothingRequirements || null) || '';
+          } catch (e) {
+            log.warn(`⚠️ [COVER-ITERATE] ${coverKey} ${name}: clothing "${category}" did not resolve (${e.message})`);
+          }
+        }
+        return {
+          name,
+          description: c.description
+            || getStoryHelpers().buildCastIdentityDescription(c, clothingText),
+        };
+      });
       try {
         coverBboxDetection = await detectAllBoundingBoxes(genResult.imageData, {
-          expectedCharacters: (selectedCoverCharacters || []).map(c => ({
-            name: c.name || c,
-            description: typeof c === 'object' ? (c.description || '') : '',
-          })),
+          expectedCharacters: expectedCoverCharacters,
           expectedObjects: Array.isArray(coverSceneMetadata?.objects)
             ? coverSceneMetadata.objects.filter(o => typeof o === 'string')
             : [],
@@ -978,10 +1010,10 @@ async function iterateCover(coverKey, storyData, options = {}) {
       }
       try {
         compBbox = await detectAllBoundingBoxes(imageResult.imageData, {
-          expectedCharacters: (selectedCoverCharacters || []).map(c => ({
-            name: c.name || c,
-            description: typeof c === 'object' ? (c.description || '') : '',
-          })),
+          // Same identity lines as the first detection above - a second call
+          // that sends bare names would overwrite a good detection with a blind
+          // one, exactly as the round re-detect used to on the page paths.
+          expectedCharacters: expectedCoverCharacters,
           expectedObjects: Array.isArray(coverSceneMetadata?.objects)
             ? coverSceneMetadata.objects.filter(o => typeof o === 'string')
             : [],

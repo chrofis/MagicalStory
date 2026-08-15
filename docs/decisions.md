@@ -11082,3 +11082,46 @@ Test Lab experiment with real numbers if trial story quality ever becomes the
 constraint.
 
 **Touched files:** `server/lib/beatsPipeline.js` (resolvePipelineMode).
+
+
+## 2026-08-15 — A cover gets the same clothing info as a page
+
+**Context:** Garment-colour seed points (which fix SAM's under-segmentation — Sarah's mask goes
+38,107 → 73,828 px with one dot on her blouse) worked in local tests and did nothing on staging.
+The Lab cut-out strip for `job_1786780194082_s980g4s9a` p−2 still showed Sarah full of holes.
+
+**Cause:** the seeds read the garment colours out of the identity line the detection call receives,
+and on a COVER that line was empty. `coverIterate.js` built its detector input as
+
+```js
+expectedCharacters: (selectedCoverCharacters || []).map(c => ({
+  name: c.name || c,
+  description: typeof c === 'object' ? (c.description || '') : '',
+}))
+```
+
+A character object has no `description` key, so every cover figure reached the detector as a **bare
+name**. This is the same defect fixed on 2026-08-15 for the three PAGE paths (Phase 5b-pre, the
+repair round re-detect, the iterate path) — the cover path was simply missed, and there were **two**
+such calls in the file, the second of which would have overwritten the first's detection.
+
+The information was never missing. `coverHints[hintKey].characterClothing` is the cover's own
+per-character category map, exactly analogous to a page's `perCharClothing`; on that story it reads
+`{Emma: summer, Hans: summer, Noah: summer, Sarah: summer, Daniel: summer}`. Pages resolve their
+category to prose and build an identity line; covers threw theirs away.
+
+**Decision:** both cover detection calls build the identity line the same way a page does —
+category from `coverHints[...].characterClothing`, resolved through `clothingRequirements` (the
+canonical source) via `buildClothingDescription`, then `buildCastIdentityDescription`. Verified on
+the real story: all five characters go from `description: ""` to full lines carrying
+`{top: red, bottom: orange}`, `{top: white, bottom: purple}`, and so on.
+
+**Rationale:** covers and pages depict the same characters in the same wardrobe; any rule that reads
+clothing must see the same thing on both. Special-casing covers is what produced a silent
+whole-class failure that only surfaced because a downstream feature happened to need the colours.
+
+**Touched:** `server/lib/coverIterate.js` (both `detectAllBoundingBoxes` call sites),
+`tests/manual/occlusionDepth.test.js`.
+
+**Status:** ✅ active — unit-verified against stored story data; not yet exercised by a cover
+regeneration.

@@ -276,4 +276,23 @@ t('the seeds are wired into the masker and both call sites', () => {
     'the Gemini path must pass descriptions');
 });
 
+// -- A cover gets the same clothing info as a page ----------------------------
+t('the cover detector builds a real identity line, like every page path', () => {
+  // coverIterate sent `description: c.description || ''` and a character object
+  // has no `description` key, so every cover figure reached the detector as a
+  // bare name - no garment colours, so no seeds, so Sarah's cover cut-out came
+  // back full of holes. The three PAGE paths were fixed earlier; this one was
+  // missed. The data was always there: coverHints[hintKey].characterClothing is
+  // the cover's own category map, exactly analogous to a page's perCharClothing.
+  const cov = fs.readFileSync(path.join(__dirname, '..', '..', 'server', 'lib', 'coverIterate.js'), 'utf8');
+  assert.ok(!/expectedCharacters: \(selectedCoverCharacters \|\| \[\]\)\.map\(c => \(\{[\s\S]{0,120}c\.description \|\| ''/.test(cov),
+    'the cover must not send a bare description any more');
+  assert.ok(/const coverClothingByName = hintCharClothing \|\| \{\}/.test(cov),
+    'the cover must use its own characterClothing map');
+  assert.ok(/buildClothingDescription\(\s*c, category, artStyleId, storyData\.clothingRequirements/.test(cov),
+    'and resolve it through clothingRequirements, the canonical source');
+  assert.ok(/getStoryHelpers\(\)\.buildCastIdentityDescription\(c, clothingText\)/.test(cov),
+    'then build the same identity line the pages build');
+});
+
 console.log(pass + ' passed');
