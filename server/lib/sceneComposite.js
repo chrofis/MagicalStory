@@ -113,6 +113,11 @@ const BODY_SAT_FLOOR = 0.45;
 // she read as "94% on show" and was clipped 25px (Lab exp 684). Below this
 // bar the figure is simply whole; a cut that small is never worth making.
 const MAX_SHOWN_TO_COUNT_AS_OCCLUDED = 0.85;
+// The tallest figure on the plate must be at least this many times the
+// shortest for the scene to have the depth the composite exists to fix.
+// Calibrated on three pages: 2.77 (real depth, keep), 1.73 and 1.08 (no
+// depth, abort). See the abort block in generateSceneComposite.
+const MIN_DEPTH_SPREAD = 2.0;
 
 // ─── Grok aspect preset picker ────────────────────────────────────────────
 //
@@ -1994,6 +1999,49 @@ async function generateSceneComposite(opts) {
   debug.bboxes = bboxes;
   log.info(`[SCENE COMPOSITE]   diff mask: ${detection.diffMaskCount} px (${(100 * detection.diffMaskCount / (detection.canvasWidth * detection.canvasHeight)).toFixed(1)}% of canvas)`);
 
+  // ── Two aborts, before a single figure is scaled ────────────────────────
+  //
+  // Both keep the page that normal generation already produced, which on a
+  // scene like this is better than anything the composite can build. The
+  // pipeline treats a throw here as "ship the rendered page".
+  //
+  // (a) A box that cannot be a person. On p4 the detector keyed sunlit lawn
+  //     into a character's yellow and returned a 177x39 strip. Every number
+  //     downstream is derived from these boxes, so one bogus box is not a
+  //     local error — it inverted the ground plane and shrank two children to
+  //     40%. If detection is wrong about WHO is where, nothing after it is
+  //     worth computing.
+  //
+  // (b) No depth spread. The composite exists for scenes with someone near
+  //     and someone far; it is triggered by the scene metadata DECLARING that
+  //     split. The plate shows whether the split is real. Measured across
+  //     three pages (Lab 707/708/709):
+  //       p6  tallest/shortest 2.77, foot-lines spanning 40% of canvas — real
+  //       p10 1.73, 28% — five figures in one band, three standing in water
+  //       p4  1.08, 14% — five figures round one chest, declared 3 fore + 2 back
+  //     Below 2x there is no depth to correct, so compositing can only lose:
+  //     it removes Grok's own figures and pastes standing avatars into the
+  //     spaces where the plate drew people kneeling or waist-deep in a river.
+  const figureBoxes = cast.map(c => detection.results[c.name]?.bbox).filter(Boolean);
+  const bogus = cast.filter((c) => {
+    const b = detection.results[c.name]?.bbox;
+    return b && !_isPlausibleFigureBox(b, detection.results[c.name]?.head);
+  });
+  if (bogus.length) {
+    throw new Error('[SCENE COMPOSITE] detection returned a box that cannot be a standing figure ('
+      + bogus.map(c => `${c.name} ${detection.results[c.name].bbox.width}x${detection.results[c.name].bbox.height}`).join(', ')
+      + ') — scenery was keyed into a character colour, so the page keeps its original render');
+  }
+  if (figureBoxes.length >= 2) {
+    const hs = figureBoxes.map(b => b.height);
+    const spread = Math.max(...hs) / Math.min(...hs);
+    if (spread < MIN_DEPTH_SPREAD) {
+      throw new Error(`[SCENE COMPOSITE] no depth spread on the plate — tallest/shortest figure is ${spread.toFixed(2)}x `
+        + `(needs ${MIN_DEPTH_SPREAD}x). Every character is at the same distance, so the declared foreground/background `
+        + 'split is not real and there is nothing for the composite to correct — the page keeps its original render');
+    }
+  }
+
   // ── Stature correction ──────────────────────────────────────────────────
   // Grok places figures at the right DEPTH but not reliably at the right
   // STATURE, so scaling a cutout to bbox.height reproduces its error. The
@@ -2531,6 +2579,34 @@ function _boxClipping(bbox, canvasW, canvasH, tol = 2) {
  * Only UNCLIPPED adult boxes may anchor the fit. Clipped ones measure a
  * fraction of a body and would drag the whole page down with them.
  */
+/**
+ * Is this box a standing person at all?
+ *
+ * A standing figure is taller than it is wide. When the detector keys scenery
+ * into a character's colour — a dirt mound, a chest lid, a shadow — it returns
+ * a wide flat blob, and everything downstream believes it.
+ *
+ * Measured on job_1786567053374_8ktpkfhec p4 (Lab exp 708): an adult came back
+ * as 177x39, a 4.5:1 landscape sliver. It became one of the two ground-plane
+ * anchors, and fitting a plane through "an adult is 39px tall down at y=791"
+ * and "an adult is 250px tall up at y=637" INVERTS the plane — apparent size
+ * shrinking as things come nearer. Both children then scaled to 40% of the
+ * size Grok painted them. One bad box, five wrong figures.
+ */
+function _isPlausibleFigureBox(b, head = null) {
+  if (!b || !(b.height > 0) || !(b.width > 0)) return false;
+  if (b.height < 20) return false;
+  // "Taller than wide" is the wrong test on its own, and p6 proves it: a man
+  // leaning on a bridge parapet shows as 181x133 — torso and outstretched arms
+  // above the rail, legs hidden — and rejecting him would throw away exactly
+  // the case the composite is for. What separates him from p4's 177x39 strip
+  // of lawn is the HEAD: the detector found a head band on the man and none on
+  // the grass. So a wide box is allowed when a head sits in it, and only an
+  // extreme, headless sliver is called scenery.
+  if (head && head.height >= 8) return b.width / b.height <= 4;
+  return b.width / b.height <= 2.5;
+}
+
 function buildStatureModel(cast, bboxes, canvasW, canvasH, ADULT_AGE = 18, heads = null, plateRatio = null) {
   const pts = [];
   const skipped = [];
@@ -2539,6 +2615,7 @@ function buildStatureModel(cast, bboxes, canvasW, canvasH, ADULT_AGE = 18, heads
     if (!b) continue;
     const age = parseInt(c.age, 10);
     if (!Number.isFinite(age) || age < ADULT_AGE) continue;
+    if (!_isPlausibleFigureBox(b, heads?.[c.name])) { skipped.push(`${c.name} (not figure-shaped: ${b.width}x${b.height})`); continue; }
     const clip = _boxClipping(b, canvasW, canvasH);
     if (clip.top || clip.bottom) { skipped.push(c.name); continue; }
     // An OCCLUDED adult must not anchor the plane either, and the reason is
@@ -2563,7 +2640,18 @@ function buildStatureModel(cast, bboxes, canvasW, canvasH, ADULT_AGE = 18, heads
     for (const p of pts) { num += (p.y - sy) * (p.s - ss); den += (p.y - sy) ** 2; }
     if (den > 0) {
       const b1 = num / den, b0 = ss - b1 * sy;
-      return { kind: 'fitted', at: (y) => b0 + b1 * y, n, skipped };
+      // A ground plane runs one way only: the further down the frame a figure
+      // stands, the nearer they are and the LARGER they render, so s must grow
+      // with y. A fit that slopes the other way is not a shallow plane, it is
+      // evidence that the anchors disagree — a mismeasured box, or two people
+      // on different surfaces (a promenade and a bridge deck). Extrapolating
+      // off it is how children ended up at 40% size. Drop to the one-anchor
+      // branch using the tallest anchor, which is the least likely to be a
+      // fragment.
+      if (b1 > 0) return { kind: 'fitted', at: (y) => b0 + b1 * y, n, skipped };
+      skipped.push(`inverted fit from ${n} anchors — falling back to one`);
+      pts.sort((a, b) => b.s - a.s);
+      pts.length = 1;
     }
   }
   // One adult only: their s is measured at THEIR depth, so it cannot be
@@ -2635,6 +2723,7 @@ function buildPlateHeadRatio(cast, results, canvasH) {
     const r = results?.[c.name];
     if (!r || !r.head || r.head.height < 8) continue;
     if (r.bbox.y + r.bbox.height >= canvasH - 2) continue; // clipped: height unknown
+    if (!_isPlausibleFigureBox(r.bbox, r.head)) continue;  // scenery keyed into a figure's colour
     rs.push(r.bbox.height / r.head.height);
   }
   if (!rs.length) return { ratio: null, n: 0 };
