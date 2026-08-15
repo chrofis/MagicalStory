@@ -10879,3 +10879,68 @@ replay (pass + branch), scene replay, and text branch; shown in the Scores drill
 prompts/story-scorecard-judge-v1_2.txt, prompts/story-beats-review.txt,
 server/services/prompts.js, migrations/019_story_scores_chain.sql,
 client/src/services/testlabService.ts, client/src/components/testlab/ScorecardsPanel.tsx.
+
+## 2026-08-15 — The figure in front is erased before SAM masks the figure behind
+
+**Context:** On `job_1786780194082_s980g4s9a` page −2 the garment recolour repainted
+**Emma's correct red top olive and her correct orange shorts grey** (20,972 px + 12,510 px),
+while Daniel — the character the fix was filed against — was already dressed correctly and
+was never touched.
+
+The chain: Daniel crouches directly behind Emma, so the DINO person box drawn for him
+**encloses hers** (98.8% of her box lies inside his — unavoidable, since a crouching adult's
+visible pixels wrap around the child on both sides). MobileSAM was prompted with that box
+and nothing else (`_mobilesamMaskFull(imageDataUri, p.box, W, H)`), so it segmented the
+dominant subject inside it: Emma. Every Stage-2 gate passed — the mask was inside the box,
+one connected component, and filled 69.9% of it. Daniel's entity cutout therefore shipped as
+**his head on Emma's body** (visible as cell A of grid 4 in that story's `entityHistory[0]`).
+
+Everything downstream then behaved correctly on a wrong input: the consistency judge
+truthfully reported "top is red, should be yellow"; the recolour ran DINO for "the top worn
+on the chest" inside that crop and got Emma's shirt (the only top there); and the colour gate
+confirmed the pixels really were red before shifting them — they were, they were Emma's
+correctly-red shirt. **The gate protects against the wrong garment; it cannot see the wrong
+person.**
+
+**Decision:** Box→mask now runs through **one shared masker**, `_maskBoxesFrontFirst`, which
+resolves boxes **smallest first**. Before SAM is asked for a figure, any already-resolved
+figure whose box is ≥80% contained in it *and* strictly smaller (<90% of its area) is treated
+as standing in front: that figure's silhouette, dilated 3 px, is painted flat white out of the
+image, and SAM is called on the erased copy. Whatever comes back also has the erased pixels
+subtracted, so the white hole can never return as the figure. The remainder is re-checked
+with a relaxed floor (`SAM_FRONT_MIN_REMAINDER` 0.02 vs the usual `SAM_MIN_BOX_COVERAGE` 0.25)
+and stamped `mask-ok-front-figure-erased`.
+
+**There were TWO box→mask loops, and the failing page ran through the other one.** That page's
+`detectionBackend` is `gemini-second-opinion`: DINO found 4 persons against 5 expected, Gemini
+found 5, arbitration chose Gemini, and the masks were attached by `attachSamMasksToFigures` —
+a separate loop with its own SAM call and its own copy of the carve-out. A fix in the DINO
+Stage 2 alone would never have fired on the page it was written for. Both paths now call the
+shared masker, and a test asserts `_mobilesamMaskFull` has exactly one call site so a third
+loop cannot reappear silently.
+
+The existing **after-the-fact occlusion carve-out** (`figureDetection.js`, "where two masks
+overlap the smaller figure keeps the pixels") is kept, unchanged, as the safety net for
+partial overlaps that the containment test deliberately does not fire on. It is not
+sufficient on its own — it ran on this page and removed only Emma's *head* from Daniel's mask,
+leaving her torso and shorts, which is precisely why the erase happens before SAM rather than
+after.
+
+**Rationale:** Fixing it *after* SAM — subtracting the neighbour from the returned mask — only
+ever yields an eroded leftover of a mask that was aimed at the wrong person. Removing the
+pixels *first* means SAM performs a genuine segmentation of what actually remains. The
+containment test is asymmetric, so the bigger box never hides behind the smaller, and the
+strictly-smaller rule stops a double-detection of one person being treated as its own
+occluder. The relaxed floor is required because what is left of an occluded figure is
+legitimately small and legitimately disconnected (a head above the child, an arm each side);
+the 0.25 floor exists to catch stale-embedding fragments, which is a different failure. If
+nothing survives, the mask is dropped and the tight DINO box is kept — the same fallback as
+before, so the worst case is today's behaviour, never worse.
+
+**Touched:** `server/lib/figureDetection.js` (`SAM_FRONT_*`, `_boxAreaPx`, `_boxContainment`,
+`_unionDilated`, `_erasePixels`, `_maskBoxesFrontFirst` + both call sites — DINO Stage 2 and
+`attachSamMasksToFigures` — and a `minCoverage` option on `_cleanMaskAndCheck`),
+`tests/manual/frontFigureErase.test.js` (21 assertions on the real page-−2 boxes).
+
+**Status:** ✅ active — unit-verified; awaiting a Test Lab `bbox` replay of that page for the
+end-to-end proof.

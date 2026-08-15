@@ -87,6 +87,148 @@ function _pxBoxToNorm(box, W, H) {
   ];
 }
 
+// A figure standing IN FRONT of another (owner, 2026-08-15).
+//
+// When one person box is (nearly) enclosed by another, the enclosed figure is
+// standing in front: a crouching adult behind a child produces a box around the
+// adult that contains the whole child. SAM, prompted with that box and nothing
+// else, returns the dominant subject inside it — the child. Every Stage-2 gate
+// passes (inside the box, connected, fills most of it), so the adult's cutout
+// ships as the child's body with the adult's head on top. Measured on
+// job_1786780194082_s980g4s9a p-2: Daniel's cutout was Emma's red top and
+// orange shorts, the entity judge correctly called it "red, should be yellow",
+// and the garment recolour repainted 20,972 px of Emma's CORRECT red shirt.
+//
+// The front figure's own box is tight and its silhouette trustworthy, so it is
+// resolved first and its pixels are erased from the image before SAM is asked
+// for the figure behind — SAM cannot return what is not there.
+const SAM_FRONT_CONTAINMENT = 0.80;   // inner box this much inside the outer → in front of it
+const SAM_FRONT_MAX_AREA = 0.90;      // and strictly smaller, else it is the same figure twice
+const SAM_FRONT_DILATE_PX = 3;        // erase a small rim too, so no edge sliver re-anchors SAM
+const SAM_FRONT_MIN_REMAINDER = 0.02; // what is left of an occluded figure is legitimately small
+
+function _boxAreaPx(b) { return Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]); }
+
+// Fraction of `inner` that lies inside `outer` (both [x1,y1,x2,y2] px).
+function _boxContainment(inner, outer) {
+  const ix = Math.max(0, Math.min(inner[2], outer[2]) - Math.max(inner[0], outer[0]));
+  const iy = Math.max(0, Math.min(inner[3], outer[3]) - Math.max(inner[1], outer[1]));
+  const a = _boxAreaPx(inner);
+  return a > 0 ? (ix * iy) / a : 0;
+}
+
+// Union of masks, dilated by r px (separable: horizontal then vertical).
+function _unionDilated(masks, W, H, r) {
+  const u = new Uint8Array(W * H);
+  for (const m of masks) {
+    const a = m.alpha;
+    for (let k = 0; k < u.length; k++) if (a[k]) u[k] = 1;
+  }
+  if (r <= 0) return u;
+  const tmp = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const row = y * W;
+    for (let x = 0; x < W; x++) {
+      if (!u[row + x]) continue;
+      for (let d = -r; d <= r; d++) { const nx = x + d; if (nx >= 0 && nx < W) tmp[row + nx] = 1; }
+    }
+  }
+  const out = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (!tmp[y * W + x]) continue;
+      for (let d = -r; d <= r; d++) { const ny = y + d; if (ny >= 0 && ny < H) out[ny * W + x] = 1; }
+    }
+  }
+  return out;
+}
+
+// Paint the given silhouettes out of the page in flat white, so the next SAM
+// call cannot latch onto them.
+async function _erasePixels(imageDataUri, union, W, H) {
+  const rgba = Buffer.alloc(W * H * 4, 0);
+  let any = false;
+  for (let k = 0; k < union.length; k++) {
+    if (!union[k]) continue;
+    const o = k * 4;
+    rgba[o] = 255; rgba[o + 1] = 255; rgba[o + 2] = 255; rgba[o + 3] = 255;
+    any = true;
+  }
+  if (!any) return imageDataUri;
+  const base = Buffer.from(imageDataUri.split(',')[1], 'base64');
+  const out = await sharp(base)
+    .composite([{ input: rgba, raw: { width: W, height: H, channels: 4 } }])
+    .jpeg({ quality: 92 }).toBuffer();
+  return `data:image/jpeg;base64,${out.toString('base64')}`;
+}
+
+/**
+ * Box → silhouette for a whole page, front figure first.
+ *
+ * The ONE place boxes become masks, shared by the DINO path (Stage 2) and the
+ * Gemini second-opinion path (attachSamMasksToFigures) — the page that exposed
+ * this bug ran through the SECOND one, so a fix in either alone is no fix.
+ *
+ * Boxes are px [x1,y1,x2,y2]; the result is index-aligned with the input.
+ */
+async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '') {
+  const out = new Array(boxesPx.length);
+  const order = boxesPx.map((_, i) => i).sort((a, b) => _boxAreaPx(boxesPx[a]) - _boxAreaPx(boxesPx[b]));
+  for (const bi of order) {
+    const box = boxesPx[bi];
+    if (!Array.isArray(box) || box.length !== 4) {
+      out[bi] = { box, mask: null, keptBox: null, coverage: null, verdict: 'no-mask', erasedCount: 0 };
+      continue;
+    }
+    // Already-resolved figures standing in front of this one.
+    const inFront = out.filter(d => d && d.mask
+      && _boxAreaPx(d.box) < SAM_FRONT_MAX_AREA * _boxAreaPx(box)
+      && _boxContainment(d.box, box) >= SAM_FRONT_CONTAINMENT);
+    let samInput = imageDataUri, erased = null;
+    if (inFront.length) {
+      erased = _unionDilated(inFront.map(d => d.mask), W, H, SAM_FRONT_DILATE_PX);
+      samInput = await _erasePixels(imageDataUri, erased, W, H);
+      log.debug(`[SAM] ${pageLabel}erased ${inFront.length} figure(s) standing in front before masking this box`);
+    }
+    let rawMask = await _mobilesamMaskFull(samInput, box, W, H);
+    // Belt and braces: whatever SAM made of the white hole, none of the erased
+    // pixels may come back as this figure's silhouette.
+    if (rawMask && erased) {
+      let removed = 0;
+      for (let k = 0; k < erased.length; k++) if (erased[k] && rawMask.alpha[k]) { rawMask.alpha[k] = 0; removed++; }
+      if (removed) {
+        rawMask.area = Math.max(0, (rawMask.area || 0) - removed);
+        rawMask.pngBuf = await _maskToPng(rawMask);  // the cutout strip reads this
+      }
+      if (!rawMask.area) rawMask = null;  // SAM returned the erased figure and nothing else
+    }
+    let mask = null, keptBox = null, coverage = null, verdict = 'no-mask';
+    if (rawMask) {
+      // Keep mask parts INSIDE the box (occlusion is fine); drop parts outside
+      // it (neighbour-grab / degraded-analyzer garbage). What is left of a
+      // figure standing behind another is legitimately small and legitimately
+      // disconnected (a head above the child, an arm each side), so the
+      // fragment floor does not apply once something was erased.
+      const r = await _cleanMaskAndCheck(rawMask, box, erased ? { minCoverage: SAM_FRONT_MIN_REMAINDER } : {});
+      coverage = +r.coverage.toFixed(3);
+      if (r.keptBox) {
+        mask = rawMask; keptBox = r.keptBox;
+        verdict = erased ? 'mask-ok-front-figure-erased'
+          : r.droppedOutside ? 'mask-clipped-outside-box' : 'mask-ok';
+        if (r.droppedOutside) log.debug(`[SAM] ${pageLabel}dropped ${r.droppedOutside} mask component(s) outside the box`);
+      } else if (r.coverage > 0) {
+        verdict = 'rejected-too-small';
+        log.debug(`[SAM] ${pageLabel}mask fills only ${(r.coverage * 100).toFixed(1)}% of the box — keeping the box`);
+      } else {
+        verdict = 'rejected-all-outside';
+        log.debug(`[SAM] ${pageLabel}mask entirely outside the box — keeping the box`);
+      }
+    }
+    out[bi] = { box, mask, keptBox, coverage, verdict, erasedCount: inFront.length };
+  }
+  return out;
+}
+
 // Decode the MobileSAM mask PNG (figure at alpha=255 on transparent) to a
 // {alpha:Uint8Array(0/1), width, height, area, bbox:[x1,y1,x2,y2]} at W×H.
 async function _binMaskFromBuffer(buf, W, H) {
@@ -129,7 +271,11 @@ async function _binMaskFromBuffer(buf, W, H) {
 // the pre-SAM truth), so the floor sits far below any real silhouette.
 const SAM_MIN_BOX_COVERAGE = 0.25;
 
-async function _cleanMaskAndCheck(mask, gdinoBoxPx) {
+async function _cleanMaskAndCheck(mask, gdinoBoxPx, opts = {}) {
+  // The floor is overridable so Stage 2b can re-check a mask it deliberately
+  // shrank: after an enclosed neighbour is subtracted, low coverage is the
+  // expected outcome, not the stale-embedding symptom the default guards.
+  const minCoverage = opts.minCoverage ?? SAM_MIN_BOX_COVERAGE;
   const { alpha, width: W, height: H } = mask;
   const lab = new Int32Array(W * H); let n = 0; const comps = [];
   for (let i = 0; i < W * H; i++) {
@@ -683,35 +829,21 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   // (grabbed a neighbour / background — disconnected or blown up) and we keep the
   // tight DINO box. _cleanMaskAndCheck also trims the mask to its largest
   // component (drops specks) so an accepted mask is clean for the cutout.
-  const dets = [];
-  for (const p of persons) {
-    const rawMask = await _mobilesamMaskFull(imageDataUri, p.box, W, H);
-    const gdinoNorm = _pxBoxToNorm(p.box, W, H);
-    let bodyBox = gdinoNorm, mask = null, samApplied = false, maskVerdict = 'no-mask';
-    let maskCoverage = null;
-    if (rawMask) {
-      // Keep mask parts INSIDE the DINO box (occlusion is fine); drop parts
-      // outside it (neighbour-grab / degraded-analyzer garbage). bodyBox = the
-      // kept parts; if nothing usable is inside, keep the tight DINO box.
-      const { keptBox, droppedOutside, coverage } = await _cleanMaskAndCheck(rawMask, p.box);
-      maskCoverage = +coverage.toFixed(3);
-      if (keptBox) {
-        mask = rawMask; bodyBox = _pxBoxToNorm(keptBox, W, H); samApplied = true;
-        maskVerdict = droppedOutside ? 'mask-clipped-outside-box' : 'mask-ok';
-        if (droppedOutside) log.debug(`[GDINO-DETECT] ${pageLabel}dropped ${droppedOutside} SAM component(s) outside the DINO box`);
-      } else if (coverage > 0) {
-        // Something survived the inside test but is far too small to be the
-        // figure — a prop beside it, or a fragment of a mask computed against
-        // different pixels. The DINO box is the safer answer.
-        maskVerdict = 'rejected-too-small';
-        log.debug(`[GDINO-DETECT] ${pageLabel}SAM mask fills only ${(coverage * 100).toFixed(1)}% of the DINO box (min ${(SAM_MIN_BOX_COVERAGE * 100).toFixed(0)}%) — keeping DINO box`);
-      } else {
-        maskVerdict = 'rejected-all-outside';
-        log.debug(`[GDINO-DETECT] ${pageLabel}SAM mask entirely outside the DINO box — keeping DINO box`);
-      }
-    }
-    dets.push({ box: p.box, score: p.score, mask, bodyBox, gdinoBox: gdinoNorm, samApplied, maskVerdict, maskCoverage });
-  }
+  //
+  // ORDER MATTERS: smallest box first, so a figure standing in front is always
+  // resolved before the figure it occludes, and its pixels can be erased from
+  // the image the occluded figure's SAM call sees (see SAM_FRONT_* above).
+  const dets = (await _maskBoxesFrontFirst(imageDataUri, persons.map(p => p.box), W, H, pageLabel))
+    .map((m, i) => ({
+      box: persons[i].box,
+      score: persons[i].score,
+      mask: m.mask,
+      bodyBox: m.keptBox ? _pxBoxToNorm(m.keptBox, W, H) : _pxBoxToNorm(persons[i].box, W, H),
+      gdinoBox: _pxBoxToNorm(persons[i].box, W, H),
+      samApplied: !!m.mask,
+      maskVerdict: m.verdict,
+      maskCoverage: m.coverage,
+    }));
   // Persist any SAM mask leak to the STORY log (not just Railway), so a blow-out
   // is always findable later per-story instead of vanishing into container logs.
   const leaks = dets.filter(d => d.maskVerdict === 'rejected-all-outside'
@@ -1069,29 +1201,24 @@ async function attachSamMasksToFigures(imageData, figures, { pageLabel = '' } = 
     : `data:image/jpeg;base64,${r2Lib.stripDataUriPrefix(imageData)}`;
   const meta = await sharp(Buffer.from(r2Lib.stripDataUriPrefix(imageDataUri), 'base64')).metadata();
   const W = meta.width, H = meta.height;
-  const entries = [];
-  for (const f of figures) {
+  // Same front-figure-first masking as the DINO path — and it matters MORE
+  // here: a Gemini box for a crouching adult behind a child encloses the child
+  // completely, which is exactly how job_1786780194082_s980g4s9a p-2 produced a
+  // "Daniel" cutout made of Emma's red top and orange shorts.
+  const boxesPx = figures.map((f) => {
     const bb = f?.bodyBox;
-    if (!Array.isArray(bb) || bb.length !== 4) { entries.push({ f, mask: null }); continue; }
-    const boxPx = [Math.round(bb[1] * W), Math.round(bb[0] * H), Math.round(bb[3] * W), Math.round(bb[2] * H)];
-    const rawMask = await _mobilesamMaskFull(imageDataUri, boxPx, W, H);
-    let mask = null, verdict = 'no-mask', coverage = null;
-    if (rawMask) {
-      const { keptBox, droppedOutside, coverage: cov } = await _cleanMaskAndCheck(rawMask, boxPx);
-      coverage = +cov.toFixed(3);
-      if (keptBox) {
-        mask = rawMask;
-        f.bodyBox = _pxBoxToNorm(keptBox, W, H);
-        f.samApplied = true;
-        verdict = droppedOutside ? 'mask-clipped-outside-box' : 'mask-ok';
-      } else {
-        verdict = cov > 0 ? 'rejected-too-small' : 'rejected-all-outside';
-      }
-    }
-    f.maskVerdict = verdict;
-    f.maskCoverage = coverage;
-    entries.push({ f, mask });
-  }
+    return (Array.isArray(bb) && bb.length === 4)
+      ? [Math.round(bb[1] * W), Math.round(bb[0] * H), Math.round(bb[3] * W), Math.round(bb[2] * H)]
+      : null;
+  });
+  const maskResults = await _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel);
+  const entries = figures.map((f, i) => {
+    const m = maskResults[i];
+    if (m.keptBox) { f.bodyBox = _pxBoxToNorm(m.keptBox, W, H); f.samApplied = true; }
+    f.maskVerdict = m.verdict;
+    f.maskCoverage = m.coverage;
+    return { f, mask: m.mask };
+  });
   // Occlusion carve-out — identical rule to the DINO path: where two masks
   // overlap, the smaller (foreground) figure keeps the pixels.
   for (let i = 0; i < entries.length; i++) {
@@ -1131,6 +1258,13 @@ module.exports = {
   recoverFaceBox,
   attachSamMasksToFigures,
   _cleanMaskAndCheck,
+  _boxAreaPx,
+  _boxContainment,
+  _unionDilated,
+  SAM_FRONT_CONTAINMENT,
+  SAM_FRONT_MAX_AREA,
+  SAM_FRONT_DILATE_PX,
+  SAM_FRONT_MIN_REMAINDER,
   GDINO_OVERLAP_THRESHOLD,
   GDINO_SAME_FIGURE,
   GDINO_LOW_CONFIDENCE,
