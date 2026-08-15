@@ -92,16 +92,20 @@ export function EntityConsistencyView({
     Promise.all(toFetch.map(async ({ gridIndex, key }) => {
       try {
         const result = await storyService.getEntityGridImageByIndex(storyId, gridIndex, runIdxForFetch);
-        return { key, gridImage: result?.gridImage };
+        // Keep the head (face) grid too — this auto-fetch path used to drop it,
+        // and since it fills every grid on mount, the "Load All" button (the
+        // only path that kept heads) never appeared: faces were unreachable.
+        return { key, gridImage: result?.gridImage, headGridImage: (result as any)?.headGridImage };
       } catch (err) {
         console.error(`Failed to load entity grid image for ${key}:`, err);
-        return { key, gridImage: undefined };
+        return { key, gridImage: undefined, headGridImage: undefined };
       }
     })).then(results => {
       setLoadedGrids(prev => {
         const next = { ...prev };
         for (const r of results) {
           if (r.gridImage) next[r.key] = r.gridImage;
+          if (r.headGridImage) next[r.key + ':head'] = r.headGridImage;
         }
         return next;
       });
