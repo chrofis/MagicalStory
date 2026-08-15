@@ -10630,3 +10630,22 @@ from the measured failure (0.29/0.66). The re-fit path reports null metrics and 
 untouched.
 
 **Touched:** `server/lib/coverTitlePaint.js`.
+
+## 2026-08-15: Cover-face miss — facial-hair criterion + entityIssues persistence (F2)
+
+**Context:** The back cover and initial page rendered a main character clean-shaven (his
+identity has a short beard); the run's consistency report showed zero issues. Diagnosis:
+covers ARE checked (their crops sit in the entity grids, pages -1/-2/-3 in the report),
+but (a) the persisted versions carried no entityIssues — buildVersionEntry's whitelist
+dropped the per-image stamps, so the assembled report and any audit read empty — and
+(b) a Lab replay of the same judge (exp #637) DID flag the face ("clean-shaven in cells
+A and B", MAJOR), so the live zero is unauditable without the stamps.
+
+**Decision:** entity-consistency-check.txt gains an explicit Facial Hair criterion
+(beard/mustache/stubble present in the reference must be present in every cell);
+buildVersionEntry persists entityIssues (null = never checked, [] = checked clean).
+NOT changed: covers keep allowCharFix: false (deliberate flag from the cover/page
+unification) — a stamped cover face issue surfaces in the report but does not
+auto-repair; reversing that is an owner decision.
+
+**Touched:** prompts/entity-consistency-check.txt, server/lib/repairPipeline.js.

@@ -29,12 +29,13 @@ Each entry contains:
 Analyze whether this entity (specifically {ENTITY_NAME}) looks consistent across all the cells shown.
 
 ### For CHARACTER entities, check:
-1. **Facial Features**: Eyes, nose, mouth proportions should be consistent
-2. **Hair**: Color, style, length should match across pages
-3. **Skin Tone**: Should be consistent throughout
-4. **Age Appearance**: Should look the same age in all panels
-5. **Body Build**: Proportions should be similar
-6. **Clothing**: Should match the listed category per page (ignore intentional costume changes)
+1. **Facial Features**: Eyes, nose, mouth proportions and face shape should be consistent
+2. **Facial Hair**: A beard, mustache, or stubble present in the reference is present in every cell — a clean-shaven cell of a bearded character is a major mismatch (and the reverse)
+3. **Hair**: Color, style, length should match across pages
+4. **Skin Tone**: Should be consistent throughout
+5. **Age Appearance**: Should look the same age in all panels
+6. **Body Build**: Proportions should be similar
+7. **Clothing**: Should match the listed category per page (ignore intentional costume changes)
 
 ### For OBJECT/PET entities, check:
 1. **Color**: Primary colors should be consistent

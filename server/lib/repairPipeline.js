@@ -2800,6 +2800,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       entityPenalty: v.entityPenalty ?? 0,
       // entityPenaltyRaw says how much entity penalty was capped away.
       entityPenaltyRaw: v.entityPenaltyRaw ?? null,
+      // Per-image entity stamps (2026-08-09 design). Without this whitelist
+      // line the stamps existed only in-memory: every persisted version showed
+      // undefined, so the offline assembled report and any post-run audit read
+      // zero findings regardless of what the round-0 judge saw.
+      // null = never checked; [] = checked and clean.
+      entityIssues: v.entityIssues ?? null,
       // Detailed evaluator outputs — kept verbatim because the dev panel uses
       // the structured detail (visible/expected character lists from semantic,
       // visionInventory from three-stage) that doesn't fit in scoreBreakdown.
