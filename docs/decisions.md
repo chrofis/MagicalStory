@@ -10830,3 +10830,27 @@ composite path is the other work stream's; dispatch trigger to be added there on
 
 **Touched:** prompts/story-beats.txt, story-beats-review.txt, scene-expansion-all.txt,
 scene-review.txt.
+
+## 2026-08-15 — Painted titles work: 20:9 plate + spec-rect strip + edge feather
+
+**Context:** The painted-title feature nearly always failed: Grok recomposes a
+sparse plate, and the shape gate (correctly) rejected relocated lockups. Two
+compounding causes: (1) the strip was cut from the noisy pixel-diff bbox,
+inflating one cover's plate to the 45% cap — a half-empty page the model
+recentred into; (2) the preset list assumed 16:9 is Grok's widest landscape —
+wrong: the documented aspect_ratio enum includes 2:1 and 20:9 (verified
+accepted). A ~3.4-ratio title strip padded to 16:9 doubled its height in
+white slack; padded to 20:9 the letters fill most of the plate and the model
+has nowhere to move them.
+
+**Decision:** strip bounds from the typography spec rect (+3% pad, 45% cap as
+backstop); presets extended with 2:1 and 20:9; a 3-row edge feather kills the
+paper-tint hairline at the strip boundary. No re-fit fallback needed — with
+the tight plate the exact-position gates pass on their own.
+
+**Evidence:** Same cover, same code path: diff-bbox 16:9 plate → coverage
+0.00/spill 1.00 (reject); spec-rect 16:9 → 0.33/0.59 (reject, model reflowed
+2→3 lines); spec-rect 20:9 → 0.52/0.29 PASS with the original 2-line layout
+at the designed position; with feather → 0.47/0.29 PASS, no boundary seam.
+
+**Touched:** `server/lib/coverTitlePaint.js`.

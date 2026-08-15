@@ -163,8 +163,11 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   // Landscape presets ONLY (owner, 2026-08-15): a title strip is wide by
   // construction, and a square or portrait plate hands the model empty page to
   // fill below the letters — the page-fill failure mode. The plate can never
-  // be taller than 3:4-of-width again.
-  const PRESETS = [['4:3', 4 / 3], ['3:2', 3 / 2], ['16:9', 16 / 9]];
+  // be taller than 3:4-of-width again. 2:1 and 20:9 are documented and
+  // verified accepted (docs.x.ai aspect_ratio enum) — a ~3.4-ratio title strip
+  // now pads to 20:9 instead of 16:9, cutting the vertical slack around the
+  // letters roughly in half.
+  const PRESETS = [['4:3', 4 / 3], ['3:2', 3 / 2], ['16:9', 16 / 9], ['2:1', 2], ['20:9', 20 / 9]];
   const stripRatio = W / stripH;
   const [presetName, presetRatio] = PRESETS.reduce((best, p2) =>
     Math.abs(p2[1] - stripRatio) < Math.abs(best[1] - stripRatio) ? p2 : best);
@@ -276,6 +279,24 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     if (a > 0.5) letterPx++;
   }
   if (letterPx < 200) return { ...flat, debug: dbg, reason: 'keyed layer is empty' };
+
+  // EDGE FEATHER. The model paints a faint paper-texture tint right up to the
+  // plate edge; those rows key as barely-inky and pasted back as a full-width
+  // hairline across the cover at the strip boundary. Real letters never sit in
+  // the outermost band rows (the strip carries 3% padding), so fade weak alpha
+  // out over the last few rows and keep only strong ink there.
+  {
+    const FEATHER = Math.max(3, Math.round(ph * 0.03));
+    for (let y = 0; y < ph; y++) {
+      const dEdge = Math.min(y, ph - 1 - y);
+      if (dEdge >= FEATHER) continue;
+      const keep = dEdge / FEATHER;
+      for (let x = 0; x < pw; x++) {
+        const m = (y * pw + x) * 4 + 3;
+        if (rgba[m] < 230) rgba[m] = Math.round(rgba[m] * keep);
+      }
+    }
+  }
 
   // FILL SPECK HOLES. Light paper texture inside a stroke falls under the
   // inkiness threshold and becomes transparent, so the cover artwork shows
