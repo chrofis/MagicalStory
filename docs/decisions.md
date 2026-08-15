@@ -11384,3 +11384,35 @@ during this work.
 (data, not code).
 
 **Status:** active.
+
+---
+
+## 2026-08-15 — Two trial-cover fixes: costumed avatar on the back cover, and the title-paint shape gate
+
+**1. Back cover rendered the everyday avatar, not the costume.** The trial back
+cover (added the same day) passes `characterClothing: { <name>: 'costumed' }`,
+which the cover path turned into a bare `{ _currentClothing: 'costumed' }`.
+That names a category with no costume attached, so the styled-avatar lookup
+found nothing and fell back to the standard avatar — the wizard trial shipped a
+front cover in the purple robe and a back cover in everyday clothes
+(`job_1786823576638`). The builder now spreads the character's stored
+categories (`inputData._trialClothingRequirements[name]`, which carries the
+costume + its description) before applying `_currentClothing`, exactly as the
+trial's front-cover path already did.
+
+**2. The painted title was produced and then discarded.** `paintServedCoverTitle`
+ran, the plate and raw output were stored (`frontCoverTitleIn/Out`), and the
+shape gate rejected it: `coverage 0.37, spill 0.37` against thresholds
+`coverage ≥ 0.45, spill ≤ 0.35`. Inspecting the stored output: the paint was
+CORRECT and better-looking than the flat lockup — same words, same three line
+breaks, same band, in the painter's own lettering. The gate measures painted
+ink against the FLAT lockup's glyph mask, so any restyle scores as a mismatch.
+Thresholds widened to `coverage ≥ 0.30, spill ≤ 0.45` using the two measured
+cases: the wholesale re-layout it was built to catch (0.29 / **0.66**) still
+fails on both counts, this false positive (0.37 / 0.37) passes, and the earlier
+accepted cover (0.63 / 0.02) is unaffected. Spill is the discriminating signal;
+coverage punishes any legitimate restyle. The model eval that verifies the
+WORDS still runs after the gate.
+
+**Touched files:** `storyJobPipeline.js` (cover clothing requirements),
+`server/lib/coverTitlePaint.js` (shape gate).

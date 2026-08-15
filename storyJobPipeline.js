@@ -1343,7 +1343,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const coverClothingRequirements = {};
         if (hint.characterClothing && Object.keys(hint.characterClothing).length > 0) {
           for (const [charName, clothing] of Object.entries(hint.characterClothing)) {
-            coverClothingRequirements[charName] = { _currentClothing: clothing };
+            // Keep the character's category definitions (trial stores the
+            // costume + its description under `costumed`). Without them a bare
+            // `_currentClothing: 'costumed'` names a category that carries no
+            // costume, the styled-avatar lookup finds nothing and the cover
+            // falls back to the standard avatar — the trial back cover shipped
+            // the child in everyday clothes while the front cover wore the
+            // costume (job_1786823576638). Same spread the trial's front-cover
+            // path applies.
+            coverClothingRequirements[charName] = {
+              ...(inputData._trialClothingRequirements?.[charName] || {}),
+              _currentClothing: clothing,
+            };
           }
           log.debug(`🎨 [COVER] ${coverType}: Using per-character clothing: ${JSON.stringify(hint.characterClothing)}`);
         }

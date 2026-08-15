@@ -381,7 +381,20 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   // Metrics against the rendered mask are exact: low coverage = the lockup was
   // abandoned, high spill = ink far outside any glyph. Reject wholesale; the
   // flat title is always correct.
-  if (coverage < 0.45 || spill > 0.35) {
+  // Thresholds widened 2026-08-15 against two MEASURED cases:
+  //   rejected (bad, kept):  coverage 0.29 / spill 0.66 — title re-laid out
+  //                          across the figures, ink far from any glyph.
+  //   rejected (good, was a false positive): coverage 0.37 / spill 0.37 — a
+  //                          3-line title repainted in the painter's own
+  //                          lettering: same words, same band, same line
+  //                          breaks, just a different face than the flat
+  //                          lockup it is measured against (staging
+  //                          job_1786823576638 — the painted result was
+  //                          correct and better-looking than the flat title).
+  // Spill is the discriminating signal (0.66 vs 0.37); coverage punishes any
+  // restyle. The model eval below still verifies the WORDS, so this gate only
+  // has to catch wholesale re-layouts.
+  if (coverage < 0.30 || spill > 0.45) {
     log.warn(`🅰️ [TITLE PAINT] shape gate rejected the repaint (coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}) — keeping the flat title`);
     return { ...flat, coverage, spill, debug: debugOut, reason: `shape: coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}` };
   }
