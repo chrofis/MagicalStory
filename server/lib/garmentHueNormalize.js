@@ -21,7 +21,7 @@
 // rejection and the chroma-weighted hue clustering — kept in one place so the
 // page sampler and the avatar sampler cannot drift apart.
 //
-// Consumers: garmentColourFix.js, sheetRowHarmonize.js.
+// Consumers: garmentColourFix.js.
 
 const sharp = require('sharp');
 const { _rgbToLab } = require('./imageCompositing');

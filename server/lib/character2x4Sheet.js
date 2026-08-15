@@ -29,7 +29,6 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('../config/models');
 const r2 = require('./r2');
 const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
-const { measureRowConsistency, harmonizeSheetRows } = require('./sheetRowHarmonize');
 
 // Minimal Gemini image-edit for the avatar style-transfer pass. Same contract
 // as editWithGrok (prompt + reference images → { imageData, usage, modelId }).
@@ -1373,58 +1372,21 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     }
     trackUsage(result);
 
-    if (!process.env.GEMINI_API_KEY) {
-      log.warn('[CHARACTER 2×4] GEMINI_API_KEY missing — accepting Pass 2 after first attempt');
+    // skipQualityEval covers pass 2 as well: the caller asked for no reviews
+    // (trial has no repair stage and cannot act on a verdict), so accept the
+    // first style transfer instead of scoring and retrying it.
+    if (!process.env.GEMINI_API_KEY || skipQualityEval) {
+      if (!process.env.GEMINI_API_KEY) log.warn('[CHARACTER 2×4] GEMINI_API_KEY missing — accepting Pass 2 after first attempt');
       best = { result, attempt, score: 10, verdict: null };
-      attempts.push({ attempt, stage: 'no-eval-key', score: 10, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
+      attempts.push({ attempt, stage: skipQualityEval ? 'no-eval-requested' : 'no-eval-key', score: 10, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
       break;
     }
 
-    let verdict = null;
-    try {
-      // pass 2 (styled) via the single-source evaluator — holistic styled eval,
-      // no head/body split (style transfer can't lose heads). SAME call the lab makes.
-      ({ verdict } = await evaluateAvatarSheet(result.imageData, {
-        pass: 2, facePhoto, realisticSheet: pass1ImageData, artStyle, declaredAge: characterAge, usageTracker,
-      }));
-      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
-    } catch (err) {
-      // Mirror Pass-1 behaviour (line 414): a Gemini eval failure should NOT
-      // lock in this attempt at the maximum score and break the retry loop.
-      // Score it neutrally and continue so a later attempt that DOES eval
-      // successfully can win the best-of-N comparison.
-      log.warn(`[CHARACTER 2×4] Pass 2 eval error attempt ${attempt}: ${err.message} — counting as neutral (score=5) and continuing retries`);
-      const candidate = { result, attempt, score: 5, verdict: null };
-      attempts.push({ attempt, stage: 'eval-error', score: 5, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
-      if (!best || candidate.score > best.score) best = candidate;
-      continue;
-    }
-    // DETERMINISTIC row-colour gate. The prompt already forbids a sheet whose
-    // bottom row stays photographic while the top row is stylised, and the
-    // Gemini verdict above is meant to catch it — but it demonstrably passes
-    // such sheets (staging: a pink top at chroma 32.8 in the head row and 10.0
-    // in the body row scored valid). Colour agreement between the rows is
-    // measurable without a model, so measure it and override `valid` rather
-    // than trusting the judge on something arithmetic.
-    let rowConsistency = null;
-    try {
-      const { splitY } = await splitSheetRows(result.imageData);
-      rowConsistency = await measureRowConsistency(result.imageData, splitY);
-      if (!rowConsistency.consistent) {
-        verdict.valid = false;
-        verdict.failureReasons = [...(verdict.failureReasons || []), `row colour split: ${rowConsistency.reason}`];
-        log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt}: ${rowConsistency.reason} — forcing retry`);
-      }
-    } catch (err) {
-      // Never let a measurement failure block a sheet that the judge accepted.
-      log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 row-consistency check failed: ${err.message} — ignoring`);
-    }
     const score = verdict.finalScore ?? 0;
     attempts.push({
       attempt,
       stage: verdict.valid ? 'valid' : 'invalid',
       score,
-      rowConsistency,
       layoutScore: verdict.layoutScore,
       identityScore: verdict.identityScore,
       styleScore: verdict.styleScore,
@@ -1441,58 +1403,17 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt} score=${score} (valid=false)`);
   }
 
-  if (!best) {
-    // Every attempt on the configured backend failed (thrown, not just
-    // low-scored). Retry ONCE via the alternate engine before giving up on
-    // style transfer: Gemini refuses photorealistic adult faces
-    // (IMAGE_OTHER), Grok doesn't — and a weakly-stylised Grok sheet still
-    // beats shipping no styled avatar at all. No eval on this last-resort
-    // attempt (score neutral 5); the identity content is Pass 1's, unchanged.
-    const primaryBackend = MODEL_DEFAULTS.avatarStyleTransferBackend === 'gemini' ? 'gemini' : 'grok';
-    const altBackend = primaryBackend === 'gemini' ? 'grok' : 'gemini';
-    log.warn(`[CHARACTER 2×4] ${characterName} Pass 2: all ${totalAttempts} ${primaryBackend} attempts failed — retrying once via alternate backend (${altBackend})`);
-    try {
-      const result = await styleTransferGenerate(prompt, pass1ImageData, altBackend, styleAnchor);
-      trackUsage(result);
-      best = { result, attempt: totalAttempts + 1, score: 5, verdict: null };
-      attempts.push({ attempt: totalAttempts + 1, stage: 'alt-backend', score: 5, backend: altBackend, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
-      log.info(`[CHARACTER 2×4] ${characterName} Pass 2 alternate backend (${altBackend}) succeeded`);
-    } catch (err) {
-      log.error(`[CHARACTER 2×4] ${characterName} Pass 2 alternate backend (${altBackend}) also failed: ${err.message} — returning Pass 1 unchanged`);
-      attempts.push({ attempt: totalAttempts + 1, stage: 'alt-backend-error', score: 0, backend: altBackend, reason: err.message });
-    }
-  }
-  if (!best) {
-    log.error(`[CHARACTER 2×4] ${characterName} Pass 2 produced no image after ${totalAttempts} attempts + alternate backend — returning Pass 1 unchanged`);
-    return { imageData: null, attempts, selectedAttempt: null, finalScore: 0, finalVerdict: null, prompt };
-  }
-  if (attempts.length > 1) {
-    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 best-of-${attempts.length}: attempt ${best.attempt} (score=${best.score})`);
-  }
-  // BACKSTOP (opt-in): every retry may still come back row-split — the gate
-  // forces retries, it cannot make the model comply. Repainting the washed-out
-  // row onto the stylised row's colour is implemented and unit-tested, but it
-  // is OFF by default: separating a pale garment from a pale backdrop by colour
-  // alone is not reliable (see MODEL_DEFAULTS.avatarSheetRowHarmonize). A sheet
-  // that merely disagrees with itself is better than one with pink blotches on
-  // the backdrop, so without a figure mask we ship the sheet and let the
-  // detection above have done its job via the retries.
-  let winningImage = best.result.imageData;
-  let rowHarmonize = null;
-  if (MODEL_DEFAULTS.avatarSheetRowHarmonize) try {
-    const { splitY } = await splitSheetRows(winningImage);
-    const h = await harmonizeSheetRows(winningImage, splitY);
-    rowHarmonize = { changed: h.changed, authority: h.authority, deltaLab: h.deltaLab, measurement: h.measurement };
-    if (h.changed) {
-      winningImage = h.imageData;
-      log.info(`[CHARACTER 2×4] ${characterName} Pass 2 row-harmonize: ${h.authority} is authority, ΔLab (${h.deltaLab.L}, ${h.deltaLab.a}, ${h.deltaLab.b}) — ${h.measurement.reason}`);
-    }
-  } catch (err) {
-    log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 row-harmonize failed: ${err.message} — shipping the sheet unharmonized`);
-  }
+  // A sheet whose two rows disagree on garment colour is caught by the STYLE
+  // EVAL, not by arithmetic here (owner, 2026-08-15): prompts/sheet-2x4-style-eval.txt
+  // task 3 scores partial style transfer 4-6, and task 4 requires the same
+  // colours across cells. A colour-only mechanism used to duplicate that check
+  // and force its own retry; it was removed because it could not separate a
+  // pale garment (chroma 9.8) from JPEG speckle on the white backdrop (4-8),
+  // and both of its failure modes still measured "rows agree".
+  const winningImage = best.result.imageData;
+
   return {
     imageData: winningImage,
-    rowHarmonize,
     selectedAttempt: best.attempt,
     finalScore: best.score,
     finalVerdict: best.verdict,

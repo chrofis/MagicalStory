@@ -11459,3 +11459,42 @@ factor, they bound the observed-colour gate so a cream mask cannot pass as a lit
 **Touched:** `server/lib/garmentColourFix.js`, `tests/manual/garmentNoLighting.test.js`.
 
 **Status:** active. Closes task #3.
+
+
+## 2026-08-15 - Avatar-sheet row harmonise removed; the style eval already covers it
+
+**Context:** `sheetRowHarmonize` existed because Pass 2 sometimes stylises only the TOP row of a
+2x4 styled sheet, leaving the head row and body row disagreeing on garment colour. It had two
+halves: a colour measurement that forced a Pass-2 retry (live), and a repaint of the weaker row
+(permanently OFF behind `MODEL_DEFAULTS.avatarSheetRowHarmonize`).
+
+**Why the repaint never shipped:** it identified garment pixels by colour strength, and a pale
+garment measures chroma ~9.8 against JPEG speckle on the white backdrop at 4-8. No threshold
+separates them - a high floor left the shirt mottled, a low floor bled colour onto the backdrop -
+and **both damaged outputs still measured "rows agree"**, so the metric could not detect its own
+failure. It needed a figure mask, which it never got.
+
+**Decision (owner):** remove the whole mechanism, not just the dead half. A split sheet is already
+caught by `prompts/sheet-2x4-style-eval.txt`, which looks at the actual picture:
+- **Task 3 (style match):** "If style is partially applied ... score 4-6" - a half-stylised sheet
+  is exactly partial application.
+- **Task 4 (costume preserved):** "same garments, same colours ... no swapped colours", plus
+  "Cross-cell consistency: all 4 body cells wear the same outfit".
+
+**Rationale:** the mechanism was a second, weaker detector for something a model already judges
+from the image, and it judged by the one method that provably cannot work here (colour arithmetic
+on a pale garment against a pale backdrop). A half-live feature with a permanently-off branch is
+also a trap for the next reader.
+
+**Known consequence:** the deterministic retry trigger is gone; split sheets now route through the
+eval's own score threshold instead. Not identical plumbing, accepted deliberately. Task 4's colour
+check is scoped to body cells 5-8 and does not explicitly compare head row against body row - Task
+3 covers that failure from the other direction.
+
+**Touched:** deleted `server/lib/sheetRowHarmonize.js` and `tests/manual/sheetRowHarmonize.test.js`;
+removed the import, the forced-retry block and the repaint block from `server/lib/character2x4Sheet.js`;
+removed `MODEL_DEFAULTS.avatarSheetRowHarmonize` (and `AVATAR_SHEET_ROW_HARMONIZE`); corrected the
+stale consumer note in `server/lib/garmentHueNormalize.js`. The `sheet-row-*-eval.txt` prompts are a
+DIFFERENT feature (per-row Gemini evals) and are untouched.
+
+**Status:** active. Closes task #7.
