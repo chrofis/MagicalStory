@@ -324,9 +324,17 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   // mean nothing. Report null rather than a misleading number; the eval decides.
   const coverage = glyphN ? hit / glyphN : 0;
   const spill = inkN ? out / inkN : 0;
-  // Shape metrics are DIAGNOSTIC only — the final eval below is the gate. They
-  // stay because they explain a failure ("letters missing" vs "ink spill") and
-  // cost nothing.
+  // SHAPE GATE — the wholesale rejection the keyed-layer comment promises.
+  // The final eval below only verifies the WORDS, so a model that re-laid the
+  // title out — five giant lines across the figures instead of the rendered
+  // lockup — passed with coverage 0.29 / spill 0.66 (measured, shipped cover).
+  // Metrics against the rendered mask are exact: low coverage = the lockup was
+  // abandoned, high spill = ink far outside any glyph. Reject wholesale; the
+  // flat title is always correct.
+  if (coverage < 0.45 || spill > 0.35) {
+    log.warn(`🅰️ [TITLE PAINT] shape gate rejected the repaint (coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}) — keeping the flat title`);
+    return { ...flat, coverage, spill, debug: debugOut, reason: `shape: coverage ${coverage.toFixed(2)}, spill ${spill.toFixed(2)}` };
+  }
   const paintedUri = `data:image/jpeg;base64,${painted.toString('base64')}`;
 
   // FINAL EVAL: the expected text AND the painted cover, one call.

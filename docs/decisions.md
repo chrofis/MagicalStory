@@ -10608,3 +10608,25 @@ stay distinct (Germany/Austria/South-Tyrol users legitimately use ß). No mechan
 ß→ss guard was added (owner chose remap-only); existing stories were NOT backfilled.
 
 **Touched files:** server/lib/languages.js.
+
+---
+
+## 2026-08-15 — Title paint-in shape gate: the promised wholesale rejection, actually wired
+
+**Context:** a shipped front cover's title filled ~55% of the frame across the characters'
+faces. The flat typography had obeyed the top-band contract (stored rect y 0.045–0.27,
+three lines); the paint-in model re-laid the title out as five giant lines. Stored
+outcome: `ok:true, coverage 0.29, spill 0.66` — both shape metrics screamed, but they had
+been demoted to diagnostics and the only gate was the words-check (`verifyTitleRender`),
+which passed because the words read correctly. The keyed-layer comment has promised since
+2026-08-08 that "a model that paints the page is REJECTED WHOLESALE below" — no code ever
+enforced it.
+
+**Decision:** shape gate before the words-eval: `coverage < 0.45 || spill > 0.35` → keep
+the flat title (reason `shape: …`). Rejection is wholesale, never pixel-clipping — the
+never-clip rule stands. Thresholds sit far from legitimate values (stroke thickening is
+absorbed by the grown mask; a faithful repaint scores coverage ≳0.7, spill ≲0.15) and far
+from the measured failure (0.29/0.66). The re-fit path reports null metrics and is
+untouched.
+
+**Touched:** `server/lib/coverTitlePaint.js`.
