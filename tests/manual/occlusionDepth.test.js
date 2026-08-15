@@ -403,23 +403,29 @@ t('two recovered figures are ordered by face height in frame', () => {
   assert.ok(/return yb - ya;/.test(SRC), 'tie-break among recovered figures');
 });
 
-// -- A figure's own face box is reserved -------------------------------------
-t("a pixel in exactly one figure's face box is reserved for it", () => {
+// -- A face is never taken ---------------------------------------------------
+t('a figure always keeps what lies inside its own face box', () => {
   // Depth alone lets the figure in front eat into the head of the figure
-  // behind, and the face is the one loss that actually costs something: it
-  // identifies the figure, anchors its SAM prompt and drives the identity pass.
-  assert.ok(/const reserved = new Int32Array\(W \* H\)/.test(SRC));
-  assert.ok(/reserved\[k\] = reserved\[k\] === 0 \? i \+ 1 : -1/.test(SRC),
-    'a pixel in two face boxes is contested (-1), not owned');
-  assert.ok(/if \(r > 0 && r !== i \+ 1\) \{ alpha\[k\] = 0; protectedPx\+\+; continue; \}/.test(SRC),
-    'a figure in front must not claim another figure\u2019s face pixels');
+  // behind, and the face is the one loss that costs something: it identifies
+  // the figure, anchors its SAM prompt and drives the identity pass.
+  assert.ok(/if \(myFace && myFace\[k\]\) \{ kept\+\+; keptFace\+\+; continue; \}/.test(SRC),
+    'a pixel already taken by another figure is still kept if it is in this face box');
+  assert.ok(/const faceMask = faces\.map/.test(SRC), 'per-figure face masks are built once');
 });
 
-t('contested face pixels fall back to the depth rule', () => {
-  // Where two face boxes overlap there is no clear owner, so -1 means "no
-  // reservation" and the normal front-most-wins comparison decides.
-  assert.ok(/const r = reserved\[k\];/.test(SRC));
-  assert.ok(/r > 0 &&/.test(SRC), 'only a POSITIVE reservation blocks a claim; -1 does not');
+t('overlapping face boxes go to BOTH figures, not to one', () => {
+  // Duplicating a patch of face harms nothing downstream; deleting one does.
+  // So there is no "contested" state and no owner arbitration for face pixels.
+  assert.ok(!/reserved\[k\] === 0 \? i \+ 1 : -1/.test(SRC),
+    'the earlier single-owner reservation must be gone');
+  assert.ok(!/r > 0 && r !== i \+ 1/.test(SRC),
+    'a face pixel must never be blocked from a figure that owns that face');
 });
+
+t('non-face pixels are still exclusive', () => {
+  assert.ok(/alpha\[k\] = 0;\s*lost\.set\(o - 1/.test(SRC),
+    'outside a face box, the frontmost claimant still wins outright');
+});
+
 
 console.log(pass + ' passed');

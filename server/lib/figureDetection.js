@@ -420,40 +420,43 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
   // --- 3. winner-take-all: a pixel belongs to the FRONTMOST claimant ---------
   // This replaces pairwise dilated subtraction. Nothing is dilated, so no seam
   // fringe is created and no speckle filter is needed to clean one up.
-  // A FIGURE'S OWN FACE IS RESERVED (owner, 2026-08-15). Depth alone lets the
-  // figure in front eat into the head of the figure behind, and of every pixel
-  // on the page that is the one that actually costs something: the face is what
-  // identifies the figure, anchors its SAM prompt and drives the identity pass.
-  // Losing a shoulder is cosmetic; losing a cheek is not. So a pixel inside
-  // exactly one figure's face box is reserved for that figure — nobody in front
-  // may claim it. Where two face boxes overlap there is no clear owner, so the
-  // normal depth rule decides.
-  const reserved = new Int32Array(W * H);   // 0 none, i+1 owner, -1 contested
-  for (let i = 0; i < n; i++) {
-    const f = faces[i];
-    if (!f || !raw[i]) continue;
+  // A FACE IS NEVER TAKEN (owner, 2026-08-15). Depth alone lets the figure in
+  // front eat into the head of the figure behind, and of every pixel on the
+  // page that is the one that actually costs something: the face identifies the
+  // figure, anchors its SAM prompt and drives the identity pass. Losing a
+  // shoulder is cosmetic; losing a cheek is not.
+  //
+  // So face pixels are simply EXEMPT from exclusivity: a figure always keeps
+  // what lies inside its own face box. Where two face boxes overlap, both
+  // figures keep those pixels — duplicating a patch of face does no harm to
+  // anything downstream, whereas deleting one does.
+  const faceMask = faces.map((f, i) => {
+    if (!f || !raw[i]) return null;
+    const m = new Uint8Array(W * H);
     for (let y = Math.max(0, f[1]); y < Math.min(H, f[3]); y++) {
-      for (let x = Math.max(0, f[0]); x < Math.min(W, f[2]); x++) {
-        const k = y * W + x;
-        reserved[k] = reserved[k] === 0 ? i + 1 : -1;
-      }
+      for (let x = Math.max(0, f[0]); x < Math.min(W, f[2]); x++) m[y * W + x] = 1;
     }
-  }
+    return m;
+  });
 
   const owner = new Int32Array(W * H);   // 0 = unclaimed, else figureIndex + 1
   for (const i of depth) {
     const alpha = raw[i].mask.alpha;
     const lost = new Map();              // ownerIdx -> px taken from this figure
-    let kept = 0, protectedPx = 0;
+    const myFace = faceMask[i];
+    let kept = 0, keptFace = 0;
     for (let k = 0; k < W * H; k++) {
       if (!alpha[k]) continue;
-      const r = reserved[k];
-      if (r > 0 && r !== i + 1) { alpha[k] = 0; protectedPx++; continue; }  // someone's face
       const o = owner[k];
-      if (o) { alpha[k] = 0; lost.set(o - 1, (lost.get(o - 1) || 0) + 1); }
-      else { owner[k] = i + 1; kept++; }
+      if (!o) { owner[k] = i + 1; kept++; continue; }
+      if (o === i + 1) { kept++; continue; }
+      // Taken by someone else — unless it is inside THIS figure's own face box,
+      // in which case it stays here too and the other figure keeps it as well.
+      if (myFace && myFace[k]) { kept++; keptFace++; continue; }
+      alpha[k] = 0;
+      lost.set(o - 1, (lost.get(o - 1) || 0) + 1);
     }
-    if (protectedPx) log.debug(`[SAM] ${pageLabel}figure ${i}: ${protectedPx}px left to another figure's face box`);
+    if (keptFace) log.debug(`[SAM] ${pageLabel}figure ${i}: kept ${keptFace}px of its own face that another figure also claims`);
     raw[i].kept = kept;
     raw[i].lost = lost;
   }
