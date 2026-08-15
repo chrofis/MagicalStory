@@ -5578,7 +5578,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // (face → blended for small tight blur, body → fullScene magenta mask on full picture)
           const effectiveMode = grokRepairMode || (useFaceOnly ? 'blended' : 'fullScene');
 
-          log.info(`👤 [CHAR REPAIR] ${characterName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} repair — mode=${effectiveMode} (face:${hasFaceIssue}, clothing:${hasClothingIssue})`);
+          log.info(`👤 [CHAR REPAIR] ${characterName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} repair — mode=${effectiveMode} (treatment:${manualAxes.treatment}, region:${manualAxes.regionSource})`);
           log.info(`👤 [CHAR REPAIR] ${characterName} body:[${bbox.map(v => Math.round(v*100)+'%').join(', ')}] face:[${faceBbox ? faceBbox.map(v => Math.round(v*100)+'%').join(', ') : 'none'}]`);
 
           // Collect face AND body bboxes of OTHER characters from bbox detection.
