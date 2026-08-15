@@ -1373,6 +1373,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
 
+        // TRIAL: every cover wears the story costume when the trial has one.
+        // The front cover reaches this via its own streaming path; the back
+        // cover came through here and rendered the everyday avatar because it
+        // depended on the hint carrying characterClothing (job_1786825477481:
+        // front costumed-wizard, back standard). Resolve it from the costume
+        // itself instead of the hint shape.
+        if (inputData.trialMode && inputData._trialCostumeType) {
+          for (const c of (inputData.characters || [])) {
+            mergedClothingRequirements[c.name] = {
+              ...(inputData._trialClothingRequirements?.[c.name] || {}),
+              ...(mergedClothingRequirements[c.name] || {}),
+              _currentClothing: 'costumed',
+            };
+          }
+        }
+
         // Default clothing category (used if no per-character clothing specified)
         const defaultClothingCategory = 'standard';
 
