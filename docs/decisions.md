@@ -10983,3 +10983,38 @@ figure.
 `_collectNmsBoxes` opts, person call sites), `tests/manual/frontFigureSeparation.test.js`.
 
 **Status:** 🟡 conditional — merged, awaiting the Lab detection re-run.
+
+## 2026-08-15 — Beats reviewer switched to grok-4.6 (measured under three judges)
+
+**Context:** The beats reviewer had never been measured. A bake-off on a stored story
+(`job_1786780194082_s980g4s9a`, Lab experiments **655, 656, 669, 672**) ran 8 candidate
+reviewers over the same raw beats and scored every round with the story scorecard (v1.2,
+10-dim beats). The first ranking used claude-sonnet as judge and put the sonnet reviewer
+first (+0.8). Re-judging the identical frozen text with grok-4.6 and then with a NEUTRAL
+third-vendor judge (gemini-3.1-pro) showed that ranking was a judge artifact:
+**sonnet-as-judge over-rated its own output** (7.5 self vs 6.3 neutral) and under-rated
+grok's (6.8 vs 8.4). grok-as-judge showed no self-preference (rated its own output 6.3,
+lower than the neutral's 8.4) — it is simply strict.
+
+**Decision:** `MODEL_DEFAULTS.outlineReviewModel`: `deepseek-v4-pro` → **`grok-4.6`**,
+one pass (production has always run exactly one beats review pass). Robust across all
+three judges: grok top-2 under every judge, neutral 8.4 vs raw 5.7, while the previous
+default scored 5.8 (flat vs raw). Also settled: **never gemini-3.7-flash as a reviewer**
+(bottom under all three judges, 4.5 vs raw 5.7 — it actively degrades beats), and cheap
+reviewers generally do not lift beats (luna 4.9, glm 5.7, minimax 7.4 the lone exception
+and judge-dependent). Cost ~$0.08 vs ~$0.05 per story; latency ~277s vs ~90s.
+
+**Rationale:** A reviewer must be chosen on evidence a biased judge cannot manufacture.
+Cross-judge agreement is the only ranking worth acting on; single-judge rankings inside
+±0.3 are noise. Kept honest: one story, so the grok-vs-minimax gap (8.4 vs 7.4) is not
+settled.
+
+**Also fixed:** the beats replay published non-reviews as "converged" results — three
+candidates (deepseek-v4-pro-0813, qwen3.8-max, qwen3.8-27b) returned empty responses and
+the stage reported "0 rewrites, converged", one after burning 983s. Ported the scene
+replay's existing guard (`assertReviewerResponded`) into both the beats pass loop and
+branch mode. **Still open:** the PRODUCTION beats review has the same blind spot — an
+empty reviewer response ships beats unreviewed with no warning, which matters more now
+that the reviewer is a slower model.
+
+**Touched:** server/config/models.js, server/lib/testlab.js.

@@ -204,7 +204,11 @@ const MODEL_DEFAULTS = {
   // OpenRouter routing by throughput for exactly that reason. Reviewer failure
   // is already non-fatal, so a bad route degrades to the unpatched draft rather
   // than blocking a story.
-  outlineReviewModel: process.env.OUTLINE_REVIEW_MODEL || 'deepseek-v4-pro',
+  // Beats reviewer. grok-4.6 since 2026-08-15: measured best of 8 candidates on
+  // a stored story under THREE independent judges (Lab experiments 655/656/669/
+  // 672) — neutral judge 8.4 vs raw 5.7, while the previous default landed at
+  // 5.8 (flat). See docs/decisions.md. Slower (~277s vs ~90s) for ~$0.03 more.
+  outlineReviewModel: process.env.OUTLINE_REVIEW_MODEL || 'grok-4.6',
   // Judge for the model-comparison scorecard. At-least-Sonnet-level on purpose —
   // a cheap judge (Luna, flash) scores too loosely to compare generators fairly.
   scorecardJudge: process.env.SCORECARD_JUDGE || 'claude-sonnet',

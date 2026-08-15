@@ -5340,6 +5340,21 @@ async function runStoryScorecardStage(target, { params = {}, promptOverride = nu
  * evaluator scores the beats after each pass, so the coherence score is visible
  * pass-to-pass and comparable across models/prompts.
  */
+/**
+ * AN EMPTY RESPONSE IS A FAILED CALL, NOT A CLEAN REVIEW — the same rule the
+ * scene replay already enforces. Without it the beats replay reported "0 pages
+ * rewritten, converged" for a provider that returned nothing, which is
+ * indistinguishable from a reviewer that read everything and declined. Three
+ * candidates (2026-08-15) published non-reviews as converged results that way,
+ * one of them after burning 983s. Never publish that as a measurement.
+ */
+function assertReviewerResponded(res, model) {
+  const outTok = res?.usage?.output_tokens ?? null;
+  if (!String(res?.text || '').trim() || outTok === 0) {
+    throw new Error(`reviewer ${model} returned an empty response (${outTok} output tokens, ${Math.round((res?.usage?.elapsed_ms || 0) / 1000)}s) — provider failure, not a review`);
+  }
+}
+
 async function runBeatsReviewReplayStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
@@ -5377,6 +5392,7 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
     let res;
     try { res = await callTextModelStreaming(buildBeatsReviewPrompt(storyData, inBeats), null, null, model, { usageLabel: 'testlab_beats_branch', temperature: 0 }); }
     finally { PROMPT_TEMPLATES.storyBeatsReview = orig; }
+    assertReviewerResponded(res, model);
     const out = res.text || '';
     const marker = out.match(/---\s*BEATS\s*---/i);
     const branchAnalysis = (marker ? out.slice(0, marker.index) : out).trim();
@@ -5427,6 +5443,7 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
         const prompt = buildBeatsReviewPrompt(storyData, beats);
         const t = Date.now();
         const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_beats_review_replay', temperature: 0 });
+        assertReviewerResponded(res, model);
         const out = res.text || '';
         const marker = out.match(/---\s*BEATS\s*---/i);
         const analysis = (marker ? out.slice(0, marker.index) : out).trim();
