@@ -10751,3 +10751,18 @@ entries ADDed (distinct colours, moderation-safe wording, secondary character
 correctly exempted), parser extracted them with costume names.
 
 **Touched:** `prompts/clothing-review.txt`.
+
+## 2026-08-15: Real landmarks are used as-is — no invented features (run-3 P6 phantom ledge)
+
+**Context:** A brief had a character "kneeling at a gap in the bridge's railing" — a
+feature the real landmark does not have. The photo-anchored painter could not find the
+gap and fabricated an external ledge over the water with the character crawling on it.
+
+**Decision:** AD rule (both scene-expansion templates): characters interact only with
+features a real landmark actually has (railing, open side, steps) — never an invented
+gap, opening, ledge, or platform. Review drawability gains a matching clause, but the
+AD rule is the load-bearing layer: the reviewer cannot verify real architecture without
+the photo, while the AD authors WITH the landmark description and variants in view
+(validated exp #643 — the page was rewritten to "leaning over the wooden railing").
+
+**Touched:** prompts/scene-expansion-all.txt, scene-expansion.txt, scene-review.txt.
