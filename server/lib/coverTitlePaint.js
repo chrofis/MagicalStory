@@ -177,8 +177,11 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
     const sw = meta.width, sh = meta.height;
     const y0 = Math.round(bandY0 / H * sh), y1 = Math.round((bandY1 + 1) / H * sh);
     const svg = `<svg width="${sw}" height="${sh}"><rect x="3" y="${y0}" width="${sw - 6}" height="${Math.max(4, y1 - y0)}" fill="none" stroke="#ffffff" stroke-width="6"/><rect x="3" y="${y0}" width="${sw - 6}" height="${Math.max(4, y1 - y0)}" fill="none" stroke="#d92222" stroke-width="2"/></svg>`;
-    return sharp(artBuffer).composite([{ input: Buffer.from(svg) }])
-      .resize(1024, 1024, { fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
+    // Composite FIRST, then resize in a second pipeline: sharp applies
+    // composite after resize within one chain, so a native-size overlay on a
+    // shrunk canvas throws "must have same dimensions or smaller".
+    const boxed = await sharp(artBuffer).composite([{ input: Buffer.from(svg) }]).png().toBuffer();
+    return sharp(boxed).resize(1024, 1024, { fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
   })();
   // Evidence is attached to EVERY exit from here on. It used to ride only on the
   // success and eval-rejection paths, so a page-fill rejection — the case you
