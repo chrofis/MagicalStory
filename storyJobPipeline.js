@@ -1923,13 +1923,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               allowedElementIds: trialCoverIds.length > 0 ? trialCoverIds : null,
             });
 
-            let coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
-              TITLE_PAGE_SCENE: sceneDescription,
-              STORY_TITLE: coverTitle,
-              STYLE_DESCRIPTION: styleDescription,
-              CHARACTER_REFERENCE_LIST: characterRefList,
-              VISUAL_BIBLE: visualBibleText
-            });
+            // Textless when covers are typeset app-side — same rule the
+            // full-account cover path applies (line ~1480). This path ignored
+            // the flag, so the model painted the title into the art AND
+            // bakeCoverTypographyPostPersist stamped a second one over it
+            // (job_1786815617426: two titles on the trial cover).
+            let coverPrompt = fillTemplate(
+              MODEL_DEFAULTS.appSideCoverType ? PROMPT_TEMPLATES.frontCoverTextless : PROMPT_TEMPLATES.frontCover,
+              {
+                TITLE_PAGE_SCENE: sceneDescription,
+                STORY_TITLE: coverTitle,
+                STYLE_DESCRIPTION: styleDescription,
+                CHARACTER_REFERENCE_LIST: characterRefList,
+                VISUAL_BIBLE: visualBibleText
+              });
 
             // Final chokepoint — same VB-id protection the full-account cover
             // path applies (streaming cover + coverIterate). The code-fenced

@@ -11200,3 +11200,31 @@ a single figure. `MAX 4 characters per scene` stays as the hard ceiling.
 Full stories are unchanged — a large cast is fine there.
 
 **Touched files:** `prompts/trial-idea.txt`, `prompts/story-trial.txt`.
+
+---
+
+## 2026-08-15 — Trial covers follow the main-path title treatment (textless render + one paint call)
+
+**Context:** the first trial showcase on staging (`job_1786815617426_d6r671gzn`)
+shipped a cover with TWO titles — one painted into the art by the image model,
+one flat lockup stamped over it by `composeCover`. Root cause: the trial's
+streaming cover path (`storyJobPipeline.js`, `onCoverScene`) used
+`PROMPT_TEMPLATES.frontCover` — the variant whose TITLE block says
+"Paint {STORY_TITLE}…" — unconditionally, ignoring
+`MODEL_DEFAULTS.appSideCoverType`, which the full-account cover path honours.
+`bakeCoverTypographyPostPersist` then stamped its own title on top, and the
+persisted `frontCoverArt` "textless" layer was not textless at all.
+
+**Decision (owner: "same as in main path, one call for the title"):**
+1. The trial cover renders **textless** when `appSideCoverType` is on, exactly
+   like every other cover.
+2. `paintServedCoverTitle` no longer skips trials — the front cover gets the
+   same single AI-paint call the main path uses. The `trial` flag still
+   suppresses the dedication (trials store none).
+
+Cost: one image call for the title, matching full stories. Rejected: letting
+the model's generation-time title stand (would keep trial on a divergent path)
+and flat-stamp-only (plainer typography than the rest of the product).
+
+**Touched files:** `storyJobPipeline.js` (trial cover prompt selection),
+`server/lib/coverTypography.js` (paint gate).

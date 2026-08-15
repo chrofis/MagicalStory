@@ -666,7 +666,10 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
       // AUTOMATIC PAINTED TITLE (owner 2026-08-06): every new front cover gets the
       // painted treatment. Non-fatal by construction — paintServedCoverTitle keeps
       // the flat title on any failure, so generation cannot break on it.
-      if (key === 'frontCover' && !trial) {
+      // Trials included (owner 2026-08-15: "same as in main path, one call for
+      // the title"). The trial cover now renders textless like every other
+      // cover, so without this it would ship the flat lockup only.
+      if (key === 'frontCover') {
         await paintServedCoverTitle(storyId, storyData, { coverKey: 'frontCover' });
       }
     } catch (err) {
