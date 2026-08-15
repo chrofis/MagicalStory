@@ -183,24 +183,35 @@ export function EntityConsistencyView({
   // Resolve grid images for a (charName, clothing) cell.
   // Prefers inline bytes; falls back to lazy-loaded cache for the active round.
   const resolveGridImages = (charName: string, clothing: string, clothingResult: any): string[] => {
-    // Always prefer inline if present. The head grid (what the judge reads
-    // faces from) follows its body grid when available.
-    if (clothingResult.gridImages && clothingResult.gridImages.length > 0) return clothingResult.gridImages;
-    if (clothingResult.gridImage) return [clothingResult.gridImage];
-    // Look up via grids[] manifest
-    if (!displayedReport) return [];
-    const grids = (displayedReport as any).grids || [];
+    // BODY grids come from the inline result when it has them; HEAD grids only
+    // ever live on the grids[] manifest, so the manifest is ALWAYS consulted.
+    //
+    // This used to `return` as soon as an inline body grid was found, which is
+    // every character on every story — so the head grid, the one image that
+    // actually shows faces, was never displayed even though it is built, sent
+    // to the judge and persisted. Measured on job_1786780194082_s980g4s9a:
+    // byClothing carries gridImage (and gridImages for multi-grid entities) but
+    // never headGridImage, while every grids[] entry has one.
     const out: string[] = [];
+    if (clothingResult.gridImages && clothingResult.gridImages.length > 0) out.push(...clothingResult.gridImages);
+    else if (clothingResult.gridImage) out.push(clothingResult.gridImage);
+    if (clothingResult.headGridImage) out.push(clothingResult.headGridImage);
+
+    if (!displayedReport) return out;
+    const grids = (displayedReport as any).grids || [];
+    const haveBody = out.length > 0;
     for (let i = 0; i < grids.length; i++) {
       const g = grids[i];
       if (g.entityName !== charName) continue;
       if (g.clothingCategory !== undefined && g.clothingCategory !== clothing) continue;
       const gridIndex = g.gridIndex ?? i;
       const key = `${cacheKeyPrefix}:${gridIndex}`;
-      const img = g.gridImage || loadedGrids[key];
-      if (img) out.push(img);
+      if (!haveBody) {
+        const img = g.gridImage || loadedGrids[key];
+        if (img && !out.includes(img)) out.push(img);
+      }
       const headImg = g.headGridImage || loadedGrids[key + ':head'];
-      if (headImg) out.push(headImg);
+      if (headImg && !out.includes(headImg)) out.push(headImg);
     }
     return out;
   };
