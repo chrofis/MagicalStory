@@ -1110,6 +1110,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       samApplied: !!m.mask,
       maskVerdict: m.verdict,
       maskCoverage: m.coverage,
+      fromFace: persons[i].fromFace || undefined,
       // Free from the joint depth pass — no anatomy, no thresholds: who took
       // pixels from this figure, and how many. Downstream can tell a partial
       // view from a complete one instead of judging a fragment as a whole.
@@ -1371,6 +1372,17 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       // Share of the DINO box filled by the kept mask extent. Real silhouettes
       // measure 0.62-0.99; anything under SAM_MIN_BOX_COVERAGE is rejected.
       maskCoverage: d.maskCoverage,
+      // Occlusion facts from the joint depth pass. These live on the det and
+      // were not being copied onto the figure, so everything downstream — the
+      // Lab included — saw null and a run could only be judged by eye.
+      maskPx: d.maskPx ?? null,
+      pxLostToFront: d.pxLostToFront ?? null,
+      occluded: d.occluded ?? null,
+      occludedBy: (d.occludedByIdx || []).map(k => nameByDet.get(k)).filter(Boolean),
+      garmentSeeds: d.garmentSeeds ?? null,
+      // Set when the figure had no person box and was recovered from its own
+      // unpaired face (see _personBoxFromFace).
+      fromFace: d.fromFace ?? undefined,
       _faceSource: d.face ? 'dino' : undefined,
       _faceScore: d.face ? +d.face.score.toFixed(3) : undefined,
       confidence: name === 'UNKNOWN' ? 'low' : d.score >= 0.6 ? 'high' : d.score >= 0.4 ? 'medium' : 'low',

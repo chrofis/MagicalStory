@@ -365,4 +365,16 @@ t('recovery is wired before masking, and the NMS guard is gone', () => {
     'the NMS size guard was reverted - it fixed a candidate that never existed');
 });
 
+t('the DINO path copies the occlusion facts onto the FIGURE, not just the det', () => {
+  // They were computed on the det and never copied, so the Lab (and anything
+  // else downstream) saw null for all of them and a run could only be judged by
+  // eye off the cut-out strip. Cost three separate conclusions in one day.
+  const push = SRC.slice(SRC.indexOf('figures.push({'), SRC.indexOf('masks.push(d.mask?.pngBuf'));
+  for (const f of ['maskPx:', 'pxLostToFront:', 'occluded:', 'occludedBy:', 'garmentSeeds:']) {
+    assert.ok(push.includes(f), `figures.push must carry ${f}`);
+  }
+  assert.ok(/occludedBy: \(d\.occludedByIdx \|\| \[\]\)\.map\(k => nameByDet\.get\(k\)\)/.test(push),
+    'occluder INDICES must be resolved to names for the figure');
+});
+
 console.log(pass + ' passed');
