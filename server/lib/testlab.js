@@ -5260,6 +5260,52 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   };
 }
 
+/**
+ * SCORE RE-JUDGE — re-score an ALREADY-STORED round's frozen artifact text with a
+ * DIFFERENT judge. Nothing is rewritten: this measures the JUDGE, not a reviewer,
+ * so two judges' opinions of the identical text sit side by side on the Scores
+ * page (the judge column tells them apart).
+ *
+ * params.scoreIds   : story_scores ids to re-judge (array or CSV)
+ * params.judgeModel : the judge under test (required — the whole point)
+ */
+async function runScoreRejudgeStage(target, { params = {} }) {
+  const { getScoresByIds } = require('./scoreStore');
+  const { TEXT_MODELS } = require('../config/models');
+  const judge = String(params.judgeModel || '').trim();
+  if (!judge) throw new Error('params.judgeModel is required (the judge under test)');
+  if (!TEXT_MODELS[judge]) throw new Error(`Unknown judge model "${judge}"`);
+  const ids = (Array.isArray(params.scoreIds) ? params.scoreIds : String(params.scoreIds || '').split(','))
+    .map(x => parseInt(String(x).trim(), 10)).filter(n => Number.isFinite(n));
+  if (!ids.length) throw new Error('params.scoreIds is required');
+  const rows = await getScoresByIds(ids);
+  if (!rows.length) throw new Error('no story_scores rows found for those ids');
+
+  const out = [];
+  for (const row of rows) {
+    // 'full' rows store the joined four-artifact input, not one artifact — a
+    // single-artifact re-judge cannot represent them.
+    if (row.artifact === 'full') { out.push({ id: row.id, error: "'full' rows cannot be re-judged as one artifact" }); continue; }
+    if (!row.artifact_text) { out.push({ id: row.id, model: row.model, round: row.round, error: 'row has no stored artifact_text' }); continue; }
+    const r = await scoreArtifactsWithJudge({ [row.artifact]: row.artifact_text }, {
+      model: judge, evalVersion: row.eval_version,
+      persist: {
+        storyId: row.story_id, title: row.title, language: row.language, artStyle: row.art_style,
+        source: 'score_rejudge', model: row.model, round: row.round,
+        label: `${row.label || 'r' + row.round} · judged by ${judge}`,
+      },
+    });
+    const a = r.scorecard.artifacts[row.artifact] || {};
+    out.push({
+      id: row.id, artifact: row.artifact, model: row.model, round: row.round, sourceLabel: row.label,
+      previousJudge: row.judge_model, previousScore: row.score,
+      newJudge: judge, newScore: a.score ?? null, dims: a.dims || null, notes: a.notes || '',
+      judgeCost: r.cost, judgeMs: r.elapsedMs,
+    });
+  }
+  return { storyId: target.storyId, judge, count: out.length, rejudged: out };
+}
+
 async function runStoryScorecardStage(target, { params = {}, promptOverride = null }) {
   const sc = require('./storyScorecard');
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
@@ -5865,6 +5911,7 @@ const STORY_STAGES = {
   writer_compare: runWriterCompareStage,
   clothing_review: runClothingReviewStage,
   story_scorecard: runStoryScorecardStage,
+  score_rejudge: runScoreRejudgeStage,
   beats_review_replay: runBeatsReviewReplayStage,
 };
 

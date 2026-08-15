@@ -438,6 +438,10 @@ export const TESTLAB_STAGES = [
   // models (params.reviewModel CSV), iterate params.passes times, and with
   // params.scoreOutput the one evaluator scores the beats after each pass.
   { id: 'beats_review_replay', label: 'Beats review replay (prompt/model A/B, multi-pass, scored)', producesImage: false, overridable: true, storyLevel: true },
+  // Re-judge stored rounds with a DIFFERENT judge (params.scoreIds + params.judgeModel).
+  // Nothing is rewritten — it measures the judge, so two judges' scores of the
+  // identical text sit side by side on the Scores page.
+  { id: 'score_rejudge', label: 'Re-judge stored scores with another judge (params.scoreIds, judgeModel)', producesImage: false, overridable: false, storyLevel: true },
   // Both runners existed server-side but were absent from this list, so the
   // dropdown could never select them — unreachable except by hand-posting.
   { id: 'garment_colour_fix', label: 'Garment colour fix (DINO+SAM mask → L*a*b* match)', producesImage: true, overridable: false },

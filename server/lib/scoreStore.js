@@ -100,6 +100,17 @@ async function queryScores({ storyId = null, limit = 2000 } = {}) {
   return rows;
 }
 
+/** Specific rows by id — used to re-judge a stored round's frozen artifact text. */
+async function getScoresByIds(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return [];
+  return dbQuery(
+    `SELECT id, story_id, title, language, art_style, artifact, model, judge_model,
+            eval_version, score, artifact_text, round, label
+     FROM story_scores WHERE id = ANY($1::int[]) ORDER BY id`,
+    [ids]
+  );
+}
+
 /** Archive a judge prompt for a version so the page can show it (click a version). */
 async function upsertEvalVersion(version, hash, promptText) {
   try {
@@ -122,4 +133,4 @@ async function getEvalVersion(version) {
   return rows[0] || null;
 }
 
-module.exports = { persistScore, persistScorecard, queryScores, upsertEvalVersion, getEvalVersion };
+module.exports = { persistScore, persistScorecard, queryScores, getScoresByIds, upsertEvalVersion, getEvalVersion };
