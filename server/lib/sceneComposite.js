@@ -107,12 +107,18 @@ const HEAD_TINTS = {
 // scenery that shares a red hue, measure ~0.23, so 0.45 clears both.
 const BODY_SAT_FLOOR = 0.45;
 // How much of a figure has to be missing before we believe scenery is hiding
-// it. Everything feeding this judgement is a measurement — the head band, the
-// plate's heads-per-body, the box — so a few percent either way is noise, not
-// a railing. At 0.95 that noise cost a woman standing in the open her feet:
-// she read as "94% on show" and was clipped 25px (Lab exp 684). Below this
-// bar the figure is simply whole; a cut that small is never worth making.
-const MAX_SHOWN_TO_COUNT_AS_OCCLUDED = 0.85;
+// it. Everything feeding this judgement is a measurement, so a few percent
+// either way is noise, not a railing. Two measured misfires set the bar: at
+// 0.95 a woman standing in the open read as "94% on show" and lost 25px of her
+// feet (Lab exp 684), and at 0.85 a man standing in the open read as 84% and
+// lost his (Lab exp 724, 7.63 heads against the plate's 9.08).
+//
+// 0.75 is comfortable because DINO's face boxes made the scale meaningful: on
+// that same page the genuinely occluded figure read 3.58 against 9.08 — 39% —
+// so real occlusion clears this bar by a mile while measurement noise on a
+// whole figure does not come near it. The old colour head-band could never
+// have supported it: there, every figure on a plate sat between 2.43 and 3.05.
+const MAX_SHOWN_TO_COUNT_AS_OCCLUDED = 0.75;
 // The tallest figure on the plate must be at least this many times the
 // shortest for the scene to have the depth the composite exists to fix.
 // Calibrated on three pages: 2.77 (real depth, keep), 1.73 and 1.08 (no
