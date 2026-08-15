@@ -128,16 +128,22 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   //    re-fitting, no offsets we did not choose. Padding to a Grok preset grows
   //    the canvas around the strip and is removed again on return.
   const bandPad = Math.round(H * 0.03);
-  const bandY0 = Math.max(0, miny - bandPad);
-  // HARD BAND CAP (owner, 2026-08-15). The strip is cut from the glyph-diff
-  // mask, and diff noise below the lockup once stretched maxy deep into the
-  // page — the "strip" became a near-square plate, the model got a page to
-  // fill, and five giant lines shipped over the figures. Typography places the
-  // title inside the top band by contract, so anything past 45% of the page is
-  // noise, never letters: clamp the strip, and the plate stays landscape.
+  // BAND FROM THE TYPOGRAPHY SPEC, not the pixel diff (owner, 2026-08-15,
+  // second iteration). The diff bbox inflates with compression noise — one
+  // cover's "strip" reached the 45% cap, so the model got a half-empty plate
+  // and recomposed the lockup into its centre (coverage 0.00). spec.rect is
+  // where the lockup was RENDERED — exact by construction, ~20% of the page —
+  // and a tight strip padded to 16:9 holds the letters centered, so the
+  // model's recentring tendency lands them where they already are. The diff
+  // mask stays as the glyph mask; the noisy rows outside the band are simply
+  // never part of the strip.
+  const specY0 = spec?.rect?.y0 != null ? Math.floor(spec.rect.y0 * H) : miny;
+  const specY1 = spec?.rect?.y1 != null ? Math.ceil(spec.rect.y1 * H) : maxy;
+  // HARD BAND CAP kept as the backstop for a spec-less legacy path.
   const BAND_CAP = Math.round(H * 0.45);
-  if (maxy > BAND_CAP) log.warn(`🅰️ [TITLE PAINT] glyph mask reached y=${(maxy / H * 100).toFixed(0)}% — clamped to the 45% title band (diff noise below the lockup)`);
-  const bandY1 = Math.min(H - 1, Math.min(maxy, BAND_CAP) + bandPad);
+  if (Math.min(maxy, specY1) > BAND_CAP) log.warn(`🅰️ [TITLE PAINT] band reached y=${(Math.min(maxy, specY1) / H * 100).toFixed(0)}% — clamped to the 45% title band`);
+  const bandY0 = Math.max(0, specY0 - bandPad);
+  const bandY1 = Math.min(H - 1, Math.min(specY1, BAND_CAP) + bandPad);
   const stripH = bandY1 - bandY0 + 1;
   const bandPct = Math.max(10, Math.min(60, Math.round((bandY1 + 1) / H * 100)));
 
