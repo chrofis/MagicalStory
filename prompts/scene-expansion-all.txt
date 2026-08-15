@@ -136,7 +136,7 @@ Then a single-line JSON object:
 - One entry per main or primary character in the scene. Secondary characters never appear here.
 - Every character from CHARACTER DETAILS the prose describes as present gets an entry here, including a figure standing in the background or named only in passing. Never route one of them to `objects[]` instead.
 - Always `name`, `clothing`, `position`.
-- `clothing` is one of `standard | winter | summer | costumed`, taken from AVAILABLE CLOTHING PER CHARACTER. That list covers main and primary characters only — a secondary character never carries a clothing category, because they have no avatar for a category to select. One costume per character per story; when a character is `costumed`, also describe the costume in the prose.
+- `clothing` is copied EXACTLY from AVAILABLE CLOTHING PER CHARACTER — `standard`, `winter`, `summer`, or `costumed:<costume>` as that list spells it. That list covers main and primary characters only — a secondary character never carries a clothing category, because they have no avatar for a category to select. One costume per character per story; when a character is `costumed`, also describe the costume in the prose.
 - `position` is a short phrase matching the prose ("right foreground", "center", "left background", "behind the desk") — the bbox detector reads it structurally.
 - Only add `perspective` for back view or side profile.
 - `era` is the story's time period in 2-4 words (medieval, 1920s, present day). It feeds the anachronism guard — omit only if the story has no defined era.

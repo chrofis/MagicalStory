@@ -103,6 +103,12 @@ Only the three blocks below. No preamble, no commentary.
       "standard": { "used": true, "description": "[full final outfit]" },
       "winter": { "used": false },
       "summer": { "used": false },
+      "costumed": { "used": true, "costume": "[costume name, e.g. wizard]", "description": "[full costumed outfit]" }
+    },
+    "[AnotherCharacter]": {
+      "standard": { "used": true, "description": "[full final outfit]" },
+      "winter": { "used": false },
+      "summer": { "used": false },
       "costumed": { "used": false }
     }
   }
