@@ -31,7 +31,7 @@ Characters: {CHARACTER_NAMES}
 7. Style world — only when a world is named below. Name any character wearing nothing from that world, and any character whose whole outfit has been replaced by it rather than accented.
 8. Sex — name any character wearing a garment made for the other sex. A costume with a male and a female form uses the form matching that character; replace the garment with that character's form of it, never by removing the slot.
 9. Coverage — name any character a beat costumes or transforms (a tail, wings, an animal form, a disguise) whose wardrobe has no category covering that appearance. Add the missing entry under the heading `## <CharacterName> / costumed:<costume>` with the full outfit describing the transformed or costumed appearance.
-9. Child coverage — name any child wearing a `bikini`, a bare chest, or a bare midriff; replace with a modest full-coverage form of the same garment (`swim shirt`, `swim top`, a one-piece).
+10. Child coverage — name any child wearing a `bikini`, a bare chest, or a bare midriff; replace with a modest full-coverage form of the same garment (`swim shirt`, `swim top`, a one-piece).
 
 Fixing check 1 outranks fixing check 3: a character in the right costume sharing a colour with someone else is better than a distinct colour on a garment that does not read as the costume. Two characters of different age or sex may wear the same headwear.
 
@@ -44,11 +44,13 @@ A rewrite must not create a fault of its own. Before writing a corrected outfit,
 Both blocks, in this order, nothing before or after.
 
 ---ANALYSIS---
-<your answers to checks 1-9>
+<your answers to checks 1-10>
 
 ---CLOTHING---
 ## <CharacterName> / <category>
 <corrected full outfit — every slot the character wears, each with colour and material, as one self-contained description>
+
+Every fault a check names must produce a corrected or added entry below — naming a fault and answering NONE leaves it in the book.
 
 Under a heading write the outfit and nothing else: no reasoning, no commentary, no correction of what you just wrote. Rework it before you write it. One heading per character and category.
 

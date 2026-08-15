@@ -10728,3 +10728,26 @@ figures (brown ponytail vs deep teal hair) and costs nothing; Lira already carri
 `server/lib/testlab.js`, `tests/manual/identityDescriptions.test.js`,
 `tests/manual/secondaryCharacterDetection.test.js`, `tests/manual/garmentMaskModes.test.js`.
 **Status:** ✅ active — `mask` + `face` are the defaults as of this entry.
+
+## 2026-08-15 — Wardrobe coverage check unblocked (duplicate check number swallowed the fault)
+
+**Context:** The transformation-coverage check (added 2026-08-14) detected the
+missing costumed entries on its first production run — its analysis reads
+"Emma and Noah transform into merfolk... wardrobe has no category" — yet the
+review returned zero entries and the contract shipped costume-less
+(job_1786780194082: every transformed page's tails flagged MAJOR against a
+summer contract). Cause: BOTH coverage checks were numbered "9.", the model
+merged them into one answer slot and the second check's "No issue" verdict
+closed the paragraph, so no entry was written; the output contract also still
+said "checks 1-9".
+
+**Decision:** Child coverage renumbered to 10; "checks 1-10"; plus the scene
+review's must-rewrite rule ported: every fault a check names must produce a
+corrected or added entry — naming a fault and answering NONE leaves it in the
+book.
+
+**Evidence:** Replay on the same contract + beats: both `costumed:mermaid`
+entries ADDed (distinct colours, moderation-safe wording, secondary character
+correctly exempted), parser extracted them with costume names.
+
+**Touched:** `prompts/clothing-review.txt`.
