@@ -5098,6 +5098,12 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
 
   const runs = [];
   for (const model of models) {
+    // ONE ARM'S FAILURE MUST NOT DESTROY THE OTHERS. A multi-model fan-out is a
+    // comparison: if a provider returns nothing for arm 3, arms 1-2 are still
+    // valid measurements and arms 4-7 still have to run. Letting the throw
+    // propagate discarded a whole 7-arm run (2026-08-15) over one empty
+    // response, including the faults-in/faults-out numbers already computed.
+    try {
     const t = Date.now();
     const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_scene_review_replay' });
     // AN EMPTY RESPONSE IS A FAILED CALL, NOT A CLEAN REVIEW. Run #450 came back
@@ -5160,6 +5166,10 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
       faultsFixed: sentBefore.length - leftAfter.length,
       unfixed: leftAfter,
     });
+    } catch (err) {
+      log.warn(`⚠️ [scene replay] arm ${model} failed: ${err.message}`);
+      runs.push({ model, ok: false, error: err.message });
+    }
   }
 
   return {
@@ -5287,21 +5297,28 @@ async function runScoreRejudgeStage(target, { params = {} }) {
     // single-artifact re-judge cannot represent them.
     if (row.artifact === 'full') { out.push({ id: row.id, error: "'full' rows cannot be re-judged as one artifact" }); continue; }
     if (!row.artifact_text) { out.push({ id: row.id, model: row.model, round: row.round, error: 'row has no stored artifact_text' }); continue; }
-    const r = await scoreArtifactsWithJudge({ [row.artifact]: row.artifact_text }, {
-      model: judge, evalVersion: row.eval_version,
-      persist: {
-        storyId: row.story_id, title: row.title, language: row.language, artStyle: row.art_style,
-        source: 'score_rejudge', model: row.model, round: row.round,
-        label: `${row.label || 'r' + row.round} · judged by ${judge}`,
-      },
-    });
-    const a = r.scorecard.artifacts[row.artifact] || {};
-    out.push({
-      id: row.id, artifact: row.artifact, model: row.model, round: row.round, sourceLabel: row.label,
-      previousJudge: row.judge_model, previousScore: row.score,
-      newJudge: judge, newScore: a.score ?? null, dims: a.dims || null, notes: a.notes || '',
-      judgeCost: r.cost, judgeMs: r.elapsedMs,
-    });
+    // One flaky judge response must not abort the batch — a re-judge run is a
+    // comparison across rows, so a failure is recorded per row and the rest
+    // still get scored (a provider returning empty lost 3 of 5 rows once).
+    try {
+      const r = await scoreArtifactsWithJudge({ [row.artifact]: row.artifact_text }, {
+        model: judge, evalVersion: row.eval_version,
+        persist: {
+          storyId: row.story_id, title: row.title, language: row.language, artStyle: row.art_style,
+          source: 'score_rejudge', model: row.model, round: row.round,
+          label: `${row.label || 'r' + row.round} · judged by ${judge}`,
+        },
+      });
+      const a = r.scorecard.artifacts[row.artifact] || {};
+      out.push({
+        id: row.id, artifact: row.artifact, model: row.model, round: row.round, sourceLabel: row.label,
+        previousJudge: row.judge_model, previousScore: row.score,
+        newJudge: judge, newScore: a.score ?? null, dims: a.dims || null, notes: a.notes || '',
+        judgeCost: r.cost, judgeMs: r.elapsedMs,
+      });
+    } catch (err) {
+      out.push({ id: row.id, model: row.model, round: row.round, error: err.message });
+    }
   }
   return { storyId: target.storyId, judge, count: out.length, rejudged: out };
 }
@@ -5436,6 +5453,9 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
 
   try {
     for (const model of models) {
+      // Per-arm isolation, same reason as the scene fan-out: one provider's
+      // empty response must not discard the arms that already succeeded.
+      try {
       let beats = beats0;
       const passes = [];
       let convergedAtPass = null;
@@ -5485,6 +5505,10 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
         if (entry.converged) { convergedAtPass = p; break; }
       }
       arms.push({ model, passes, convergedAtPass });
+      } catch (err) {
+        require('../utils/logger').log.warn(`⚠️ [beats replay] arm ${model} failed: ${err.message}`);
+        arms.push({ model, ok: false, error: err.message, passes: [] });
+      }
     }
   } finally {
     PROMPT_TEMPLATES.storyBeatsReview = orig;
