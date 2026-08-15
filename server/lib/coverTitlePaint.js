@@ -26,7 +26,7 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 
 const PLATE_PROMPT = (styleTxt, strictEmptyPage = true, _bandPct = 30) => `The image is a book title on a strip of white paper. Repaint the lettering so it looks hand-painted: visible brush and paper texture in every stroke, pigment pooling darker at the stroke edges, slightly irregular hand-made contours. You may change the lettering colour and refine the letterforms and weight.
-The second image is a colour and style reference only - take the palette and the medium from it. Nothing from it may appear in the output.
+The second image is a colour and style reference only - take the palette and the medium from it; the outlined rectangle on it marks where this strip sits on the cover. Nothing from it may appear in the output.
 Keep the same words, letters, line breaks and positions.${strictEmptyPage ? ' The background stays plain white; add nothing else - no scenery, no border, no frame, no second copy of the title.' : ''}${styleTxt ? ` Medium to imitate: ${styleTxt}` : ''}`;
 
 
@@ -130,7 +130,15 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   //    the canvas around the strip and is removed again on return.
   const bandPad = Math.round(H * 0.03);
   const bandY0 = Math.max(0, miny - bandPad);
-  const bandY1 = Math.min(H - 1, maxy + bandPad);
+  // HARD BAND CAP (owner, 2026-08-15). The strip is cut from the glyph-diff
+  // mask, and diff noise below the lockup once stretched maxy deep into the
+  // page — the "strip" became a near-square plate, the model got a page to
+  // fill, and five giant lines shipped over the figures. Typography places the
+  // title inside the top band by contract, so anything past 45% of the page is
+  // noise, never letters: clamp the strip, and the plate stays landscape.
+  const BAND_CAP = Math.round(H * 0.45);
+  if (maxy > BAND_CAP) log.warn(`🅰️ [TITLE PAINT] glyph mask reached y=${(maxy / H * 100).toFixed(0)}% — clamped to the 45% title band (diff noise below the lockup)`);
+  const bandY1 = Math.min(H - 1, Math.min(maxy, BAND_CAP) + bandPad);
   const stripH = bandY1 - bandY0 + 1;
   const bandPct = Math.max(10, Math.min(60, Math.round((bandY1 + 1) / H * 100)));
 
@@ -147,8 +155,11 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   }
   const stripPng = await sharp(stripRgba, { raw: { width: W, height: stripH, channels: 4 } }).png().toBuffer();
 
-  const PRESETS = [['9:16', 9 / 16], ['2:3', 2 / 3], ['3:4', 3 / 4], ['4:5', 4 / 5],
-    ['1:1', 1], ['5:4', 5 / 4], ['4:3', 4 / 3], ['3:2', 3 / 2], ['16:9', 16 / 9]];
+  // Landscape presets ONLY (owner, 2026-08-15): a title strip is wide by
+  // construction, and a square or portrait plate hands the model empty page to
+  // fill below the letters — the page-fill failure mode. The plate can never
+  // be taller than 3:4-of-width again.
+  const PRESETS = [['4:3', 4 / 3], ['3:2', 3 / 2], ['16:9', 16 / 9]];
   const stripRatio = W / stripH;
   const [presetName, presetRatio] = PRESETS.reduce((best, p2) =>
     Math.abs(p2[1] - stripRatio) < Math.abs(best[1] - stripRatio) ? p2 : best);
@@ -158,7 +169,17 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
   const offX = Math.round((cw - W) / 2), offY = Math.round((chh - stripH) / 2);
   const plateBuf = await sharp({ create: { width: cw, height: chh, channels: 3, background: { r: 255, g: 255, b: 255 } } })
     .composite([{ input: stripPng, left: offX, top: offY }]).jpeg({ quality: 96 }).toBuffer();
-  const sceneBuf = await sharp(artBuffer).resize(1024, 1024, { fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
+  // The cover reference carries the BAND BOX (owner, 2026-08-15): a drawn
+  // rectangle marking where the strip sits, so the model sees the title's real
+  // footprint on the page instead of inferring free space to fill.
+  const sceneBuf = await (async () => {
+    const meta = await sharp(artBuffer).metadata();
+    const sw = meta.width, sh = meta.height;
+    const y0 = Math.round(bandY0 / H * sh), y1 = Math.round((bandY1 + 1) / H * sh);
+    const svg = `<svg width="${sw}" height="${sh}"><rect x="3" y="${y0}" width="${sw - 6}" height="${Math.max(4, y1 - y0)}" fill="none" stroke="#ffffff" stroke-width="6"/><rect x="3" y="${y0}" width="${sw - 6}" height="${Math.max(4, y1 - y0)}" fill="none" stroke="#d92222" stroke-width="2"/></svg>`;
+    return sharp(artBuffer).composite([{ input: Buffer.from(svg) }])
+      .resize(1024, 1024, { fit: 'inside' }).jpeg({ quality: 90 }).toBuffer();
+  })();
   // Evidence is attached to EVERY exit from here on. It used to ride only on the
   // success and eval-rejection paths, so a page-fill rejection — the case you
   // most want to look at — saved no plate and no model output at all.
