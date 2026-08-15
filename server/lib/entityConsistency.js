@@ -912,7 +912,10 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
               : gridLabel;
 
             const gridResult = await createEntityGrid(batchCrops, batchLabel, refAvatar);
-            const headGrid = gridsOnly ? null : await createEntityHeadGrid(batchCrops, batchLabel);
+            // Built in gridsOnly mode too: the final stored report (the panel's
+            // source) is a gridsOnly rebuild over the shipped versions, and the
+            // head grid is pure sharp work — no model call.
+            const headGrid = await createEntityHeadGrid(batchCrops, batchLabel);
             const evalResult = gridsOnly
               ? { consistent: true, score: null, issues: [], summary: 'grids-only (no eval)' }
               : await evaluateEntityConsistency(
