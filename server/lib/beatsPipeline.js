@@ -72,6 +72,17 @@ const PIPELINE_MODES = ['unified', 'beats'];
  * so the default behaviour is never changed by accident.
  */
 function resolvePipelineMode(inputData = {}) {
+  // TRIAL IS NEVER BEATS (owner decision 2026-08-15). The trial writes its
+  // whole story in ONE call (buildTrialStoryPrompt / story-trial.txt) because
+  // the funnel depends on speed: the last real production trial finished in
+  // 123s end-to-end for 5 pages. The beats chain is seven sequential LLM calls
+  // whose cost is mostly FIXED, not per-page — measured on staging: 326/350/382s
+  // of text for a 4-page story, 520/631s for 10 pages, before any image work.
+  // Beats for a trial would therefore spend ~3x the entire current trial budget
+  // on text alone. Nothing excluded trial from beats before this, so promoting
+  // PIPELINE_MODE=beats to production would have silently switched every trial
+  // onto the slow path and made story-trial.txt dead code.
+  if (inputData?.trialMode) return 'unified';
   const raw = inputData?.pipelineMode || process.env.PIPELINE_MODE || 'unified';
   const mode = String(raw).trim().toLowerCase();
   if (!PIPELINE_MODES.includes(mode)) {

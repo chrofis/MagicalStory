@@ -11046,3 +11046,39 @@ that actually contains contradictions. `gemini-3.7-flash` failed outright as a s
 reviewer (0 output tokens in 1s), consistent with its bottom placement on beats.
 
 **Touched:** server/config/models.js, server/lib/beatsPipeline.js, server/lib/testlab.js.
+
+---
+
+## 2026-08-15 — The trial is never beats (speed is the trial's product requirement)
+
+**Context:** `resolvePipelineMode` read only `inputData.pipelineMode ||
+process.env.PIPELINE_MODE`, and the `if (beatsMode)` branch in
+storyJobPipeline did not check `trialMode`. Production still runs unified, so
+trial currently uses its intended single-call writer
+(`buildTrialStoryPrompt` / `prompts/story-trial.txt`). Staging runs beats and
+has never had a trial job (0 rows) — so trial-under-beats was never exercised.
+Promoting PIPELINE_MODE=beats to production would have switched every trial
+onto the beats chain by accident.
+
+**Measured (staging generationLog, text phase = job start → images/avatars stage):**
+- 4-page stories: 326 s / 350 s / 382 s
+- 10-page stories: 520 s / 631 s
+- 4-page breakdown: beat plan 17 s, **beat review (DeepSeek) 103 s**, story
+  bible 42 s, wardrobe review 33 s, scene expansion 73 s, **scene review
+  (DeepSeek) 83 s**, page text 31 s. The three review passes are 219 s = 57%.
+- Cost is mostly FIXED (7 sequential calls), so fewer pages barely helps.
+- Reference: last real production trial = **123 s end-to-end**, 5 pages,
+  text + images + cover.
+
+**Decision:** `resolvePipelineMode` returns `'unified'` whenever
+`inputData.trialMode` is set — regardless of env or explicit input. One guard,
+in the resolver itself, so both call sites (including the settings log line)
+report the effective mode. Beats for trial would spend ~3× the entire current
+trial budget on text alone.
+
+**Rejected alternative:** "beats-lite" for trial (skip the three review passes,
+~163 s of text). Still above today's whole-trial budget; can be revisited as a
+Test Lab experiment with real numbers if trial story quality ever becomes the
+constraint.
+
+**Touched files:** `server/lib/beatsPipeline.js` (resolvePipelineMode).
