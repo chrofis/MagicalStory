@@ -1347,23 +1347,47 @@ function buildTextOverlayDirective(textOverlay, fallbackArtStyle) {
  * railing and peers down through it"). The plate had the occlusion right and
  * the old prompt forbade keeping it.
  */
-const BLEND_STAGING_CLAUSE = `STAGING — Image 1 already places every character: who they are, where they stand, and how big they are. Keep each character in that spot at that size, and render the page described above around them.
+const BLEND_STAGING_CLAUSE = `STAGING — Image 1 already places every character: who they are, where they stand, and how big they are. Keep each character at that position and that size, keep the camera and framing of Image 1, and render the page described above around them.
 
-- A character the scene places behind something — a railing, a wall, a chest, another character — is drawn BEHIND it: paint that element over them so it passes in front.
+- A character the scene places behind something — a railing, a wall, a chest, another character — is drawn BEHIND it: paint that element over them so it passes in front. This is the one change to Image 1's staging you may make.
+- Do not resize, move, rotate or re-pose any character. Do not re-frame the shot, change the viewpoint, or rebuild the architecture and landscape.
 - Match each character to the scene's light, and soften pasted cutout edges so they read as painted rather than stickered.
 - Paint over any solid red, blue, green, yellow, purple or cyan outline or fringe left around a character by the staging step. No solid-colour outlines survive.
 - Add no character who is not already in Image 1, remove none, and substitute none.
 - Keep each character's face, hair, age and clothing as Image 1 and the labelled portrait grid show them.
 - No text, captions, numbers or signatures anywhere.`;
 
-function buildBlendEditPrompt(scene) {
+/**
+ * Name each staged figure's depth.
+ *
+ * The page prompt carries the generic rule ("`background` is small and distant.
+ * Foreground > midground > background in size") but never says WHICH character
+ * is which — that lives in scene metadata the prompt does not surface. So the
+ * model has to infer it from prose while another line describes the same person
+ * as "a full adult-height man", and on p6 it rendered him at foreground size.
+ */
+function buildStagedDepthLine(cast) {
+  if (!Array.isArray(cast) || !cast.length) return '';
+  const byDepth = { foreground: [], midground: [], background: [] };
+  for (const c of cast) {
+    const d = String(c.depth || 'foreground').toLowerCase();
+    if (byDepth[d]) byDepth[d].push(c.name);
+  }
+  const parts = [];
+  if (byDepth.background.length) parts.push(`${byDepth.background.join(' and ')} ${byDepth.background.length > 1 ? 'are' : 'is'} in the background — small and distant`);
+  if (byDepth.midground.length) parts.push(`${byDepth.midground.join(' and ')} ${byDepth.midground.length > 1 ? 'are' : 'is'} midground`);
+  if (byDepth.foreground.length) parts.push(`${byDepth.foreground.join(' and ')} ${byDepth.foreground.length > 1 ? 'are' : 'is'} foreground — largest`);
+  return parts.length ? `\n\nDepths as staged: ${parts.join('; ')}.` : '';
+}
+
+function buildBlendEditPrompt(scene, cast = null) {
   // Preferred: the page's OWN generation prompt, so the blend renders the scene
   // the way normal page generation would rather than being told to leave a
   // staged canvas alone. Caller shrinks to the model budget (shrinkPromptForModel).
   const pagePrompt = String(scene.pagePrompt || '').trim();
   if (pagePrompt) {
     const textDirectiveForPage = buildTextOverlayDirective(scene.textOverlay, scene.artStyle);
-    return `${pagePrompt}\n\n${BLEND_STAGING_CLAUSE}${textDirectiveForPage}`;
+    return `${pagePrompt}\n\n${BLEND_STAGING_CLAUSE}${buildStagedDepthLine(cast)}${textDirectiveForPage}`;
   }
 
   // Legacy path — no page prompt supplied (older callers, cover dispatcher).
@@ -2247,7 +2271,7 @@ async function generateSceneComposite(opts) {
 
   // ── Step 5/5: Grok edit blend pass
   log.info('[SCENE COMPOSITE] step 5/5 — blend pass');
-  let blendPrompt = buildBlendEditPrompt(scene);
+  let blendPrompt = buildBlendEditPrompt(scene, cast);
   // The page's own prompt runs to ~7.5k on a busy page, so it can pass Grok's
   // budget once the staging clause is added. Shrink with the SAME helper page
   // generation uses: it holds the REQUIRED OBJECTS + ART STYLE tail back and
