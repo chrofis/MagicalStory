@@ -311,7 +311,7 @@ const _boxCentre = (b) => [Math.round((b[0] + b[2]) / 2), Math.round((b[1] + b[3
  * Each entry: {box, mask, keptBox, coverage, verdict, occluded, occludedByIdx,
  *              pxLostToFront, maskPx}
  */
-async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '', faceBoxesPx = null, descriptions = null) {
+async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '', faceBoxesPx = null, descriptions = null, fromFaceFlags = null) {
   const faces = _assignFacesToBoxes(boxesPx, faceBoxesPx);
   const n = boxesPx.length;
   const out = new Array(n);
@@ -379,6 +379,21 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
   const depth = [];
   for (let i = 0; i < n; i++) if (raw[i]) depth.push(i);
   depth.sort((a, b) => {
+    // A figure RECOVERED FROM A FACE has no ground cue: its box is synthesised
+    // as faceBottom + 6.5 face-heights, which overshoots and clamps to the page
+    // edge, so "lower bottom = nearer" would rank it in FRONT of everyone. That
+    // is backwards — DINO failed to detect it as a person precisely because it
+    // is heavily occluded. Measured on exp #711: Daniel's clamped bottom of 1222
+    // beat Noah's 1184 and Emma's 1180, and he took 3,087 px off Emma.
+    // So: real person boxes first, recovered ones behind them, tie-broken among
+    // themselves by face height in frame (higher up = further away).
+    const fa = fromFaceFlags?.[a] ? 1 : 0, fb = fromFaceFlags?.[b] ? 1 : 0;
+    if (fa !== fb) return fa - fb;
+    if (fa && fb) {
+      const ya = faces[a] ? (faces[a][1] + faces[a][3]) / 2 : 0;
+      const yb = faces[b] ? (faces[b][1] + faces[b][3]) / 2 : 0;
+      return yb - ya;
+    }
     const ba = boxesPx[a][3], bb = boxesPx[b][3];
     if (Math.abs(ba - bb) > SAM_GROUND_TIE_PX) return bb - ba;      // lower bottom first
     // Same height: the box CONTAINED by the other is the one in front.
@@ -1100,7 +1115,8 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   // resolved before the figure it occludes, and its pixels can be erased from
   // the image the occluded figure's SAM call sees (see SAM_FRONT_* above).
   const dets = (await _maskBoxesFrontFirst(imageDataUri, persons.map(p => p.box), W, H, pageLabel,
-    faces.map(f => f.box), expectedCharacters.map(c => (typeof c === 'object' ? c.description : '') || '')))
+    faces.map(f => f.box), expectedCharacters.map(c => (typeof c === 'object' ? c.description : '') || ''),
+    persons.map(p => !!p.fromFace)))
     .map((m, i) => ({
       box: persons[i].box,
       score: persons[i].score,

@@ -377,4 +377,30 @@ t('the DINO path copies the occlusion facts onto the FIGURE, not just the det', 
     'occluder INDICES must be resolved to names for the figure');
 });
 
+// -- A face-recovered figure has no ground cue -------------------------------
+t('a recovered figure sorts BEHIND every real person box', () => {
+  // Its box is synthesised as faceBottom + 6.5 face-heights, which overshoots
+  // and clamps to the page edge — so the plain "lower bottom = nearer" rule
+  // ranks it in FRONT of everyone, the exact opposite of the truth. Measured on
+  // exp #711: Daniel's clamped bottom 1222 beat Noah 1184 and Emma 1180, and he
+  // took 3,087px off Emma. DINO missed him as a person BECAUSE he is occluded.
+  const daniel = _personBoxFromFace([211, 380, 361, 602], 864, 1222);
+  assert.strictEqual(daniel[3], 1222, 'the synthesised bottom does clamp to the page');
+  const realBottoms = [BOX.Noah[3], BOX.Emma[3], BOX.Sarah[3], BOX.Hans[3]];
+  assert.ok(realBottoms.every(b => b < daniel[3]),
+    'and it beats every real box on the naive rule — which is why the flag exists');
+});
+
+t('the flag is the PRIMARY depth key, ahead of the ground rule', () => {
+  // NB \s* not \n\s* — the source is CRLF, so a bare \n anchor never matches.
+  assert.ok(/const fa = fromFaceFlags\?\.\[a\] \? 1 : 0, fb = fromFaceFlags\?\.\[b\] \? 1 : 0;\s*if \(fa !== fb\) return fa - fb;/.test(SRC),
+    'recovered figures must sort behind before box bottoms are even compared');
+  assert.ok(/persons\.map\(p => !!p\.fromFace\)/.test(SRC), 'the DINO path must pass the flags');
+});
+
+t('two recovered figures are ordered by face height in frame', () => {
+  // Higher face = further away, for figures standing on a common ground plane.
+  assert.ok(/return yb - ya;/.test(SRC), 'tie-break among recovered figures');
+});
+
 console.log(pass + ' passed');
