@@ -231,6 +231,42 @@ function _rgbToLabPx(r, g, b) {
 const _deltaE = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const getGarmentColour = () => require('./garmentColourFix');
 
+// A detected face with no person box is a MISSING FIGURE (owner, 2026-08-15).
+//
+// On job_1786780194082_s980g4s9a p-2 GroundingDINO returned FIVE faces and only
+// FOUR persons. The unpaired one is Daniel, the crouching man behind Emma, and
+// his face scored 0.528 - the HIGHEST on the page, above Hans standing in full
+// view. Face detection never had trouble with him; the generic "person" query
+// simply never proposed a box, so the whole figure was lost and the identity
+// pass had no body to attach his name to.
+//
+// The box does NOT need to be tight. SAM is prompted with the figure's own face
+// as a positive and every other face as a negative, and the depth pass then
+// takes back whatever belongs to figures in front - so a generous box that
+// CONTAINS the person is enough. Measured on that face, box + points:
+//   w3.0 h6.5 t0.25 -> [194,388,410,1194] -> 29,744 px   <- chosen
+//   w4.0 h5.0 t0.30 -> [158,383,446,1038] -> 12,304 px   cuts him off
+//   w2.5 h4.0 t0.20 -> [212,393,392, 934] -> 13,159 px   cuts him off
+// For reference the Gemini second-opinion box gave 30,464 px, so the
+// synthesised box reproduces it to within 2.4%.
+const FACE_TO_BODY_W = 3.0;    // shoulders+arms, in face widths
+const FACE_TO_BODY_H = 6.5;    // body below the chin, in face heights
+const FACE_TO_BODY_TOP = 0.25; // headroom above the face box
+
+function _personBoxFromFace(faceBox, W, H) {
+  const [x1, y1, x2, y2] = faceBox;
+  const fw = x2 - x1, fh = y2 - y1;
+  if (!(fw > 0 && fh > 0)) return null;
+  const cx = Math.round((x1 + x2) / 2);
+  const halfW = Math.round((FACE_TO_BODY_W * fw) / 2);
+  return [
+    Math.max(0, cx - halfW),
+    Math.max(0, Math.round(y1 - FACE_TO_BODY_TOP * fh)),
+    Math.min(W, cx + halfW),
+    Math.min(H, Math.round(y2 + FACE_TO_BODY_H * fh)),
+  ];
+}
+
 function _boxAreaPx(b) { return Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]); }
 
 // Fraction of `inner` that lies inside `outer` (both [x1,y1,x2,y2] px).
@@ -601,7 +637,7 @@ async function detectPersonBoxInCrop(cropJpegBuffer, faceBoxInCrop = null, pageL
     const uri = `data:image/jpeg;base64,${cropJpegBuffer.toString('base64')}`;
     const det = await _gdinoDetect(uri, [{ name: 'person', text: 'person' }]);
     if (!det?.figures?.[0]) return null;
-    const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU, { keepOccluded: true });
+    const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU);
     if (!persons.length) return null;
     // The crop often contains OTHER people (neighbours in the scene). Pick the
     // person whose box overlaps the FACE box (the target head) the most — NOT
@@ -883,45 +919,33 @@ function _boxIouXyxy(a, b) {
 }
 
 // Best box + candidates from one _gdinoDetect figure, NMS-deduped, score-desc.
-// A figure standing BEHIND another must survive NMS (owner, 2026-08-15).
+// NMS is NOT what loses an occluded figure (owner, 2026-08-15 — reverted).
 //
-// NMS assumes high overlap means "the same person detected twice". That is false
-// when one person stands behind another: the rear figure's box CONTAINS the
-// front one, so the pair scores a high IoU while being two different people, and
-// the rear figure — always the lower-scoring one, because it is half hidden —
-// gets deleted.
+// A size-ratio guard was added here on the theory that NMS deleted the figure
+// standing behind another: Daniel's box vs Emma's is IoU 0.653 against a 0.5
+// threshold, so a lower-scoring candidate on him would have been suppressed.
 //
-// Measured on job_1786780194082_s980g4s9a p-2: Daniel (crouching behind Emma)
-// vs Emma is IoU 0.653 against a 0.5 threshold, and it is the ONLY pair on that
-// page above the threshold. DINO returned 4 persons for 5 expected, the
-// undercount handed the page to Gemini's boxes, and Gemini's box for Daniel is
-// the oversized one that started the whole Emma-repaint failure.
+// The stored detection diag then showed the theory was arithmetic about a
+// candidate that never existed. On job_1786780194082_s980g4s9a p-2 DINO's
+// "person" query returned FOUR boxes and none of them is Daniel — he was never
+// proposed, so there was nothing for NMS to suppress. What the guard actually
+// did was admit a LOOSE DUPLICATE around Sarah (her box sits 100% inside it,
+// area ratio 0.696 against the 0.70 floor), which the identity pass then had to
+// name and called "Daniel" because that name was unassigned. It manufactured a
+// phantom and, by removing the undercount, it also removed the Gemini
+// second-opinion fallback that had been supplying a usable box for him.
 //
-// Two detections of ONE person are also similar in SIZE, so that is the
-// discriminator: suppress only when the boxes overlap AND are comparable in
-// area. A box that swallows another is a different figure, one behind the other.
-const GDINO_NMS_SIZE_RATIO = 0.70;
-
-function _sameFigureSize(a, b) {
-  const aa = _boxAreaPx(a), ab = _boxAreaPx(b);
-  if (aa <= 0 || ab <= 0) return true;
-  return Math.min(aa, ab) / Math.max(aa, ab) >= GDINO_NMS_SIZE_RATIO;
-}
-
-function _collectNmsBoxes(fig, nmsIou, opts = {}) {
-  // Faces keep plain IoU NMS: two face boxes of very different sizes on the same
-  // spot ARE a duplicate, not one face behind another.
-  const keepOccluded = opts.keepOccluded === true;
+// The real signal is that DINO found FIVE FACES and only four persons: Daniel's
+// face scored 0.528, the HIGHEST on the page, and had no person box to attach
+// to. That unpaired face is what now synthesises his box (see
+// _personBoxFromFace) — a missing person box, not a suppressed one.
+function _collectNmsBoxes(fig, nmsIou) {
   const all = [];
   if (fig?.box) all.push({ box: fig.box, score: fig.score });
   for (const c of (fig?.candidates || [])) if (c.box) all.push({ box: c.box, score: c.score });
   all.sort((a, b) => b.score - a.score);
   const out = [];
-  for (const p of all) {
-    const dup = out.some(k => _boxIouXyxy(k.box, p.box) > nmsIou
-      && (!keepOccluded || _sameFigureSize(k.box, p.box)));
-    if (!dup) out.push(p);
-  }
+  for (const p of all) if (!out.some(k => _boxIouXyxy(k.box, p.box) > nmsIou)) out.push(p);
   return out;
 }
 
@@ -1018,7 +1042,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   const det = await _gdinoDetect(imageDataUri, [{ name: 'person', text: 'person' }]);
   if (!det || !Array.isArray(det.figures)) return null;
   const W = det.width, H = det.height;
-  const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU, { keepOccluded: true });
+  const persons = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU);
   diag.persons = persons.map(p => ({ box: p.box.map(Math.round), score: +p.score.toFixed(3) }));
   if (persons.length === 0) {
     diag.fellBack = true; diag.reason = 'no person boxes';
@@ -1036,6 +1060,18 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       .filter(f => !persons.some(p => _boxIouXyxy(f.box, p.box) > GDINO_FACE_LEAK_IOU));
   }
   diag.faces = faces.map(f => ({ box: f.box.map(Math.round), score: +f.score.toFixed(3) }));
+
+  // Stage 1b-2 — a face nobody's person box claims IS a person we missed.
+  // Checked geometrically here rather than after the Stage-3 pairing, so the
+  // recovered figure flows through masking and identity like any other.
+  for (const f of faces) {
+    if (persons.some(p => _boxContainment(f.box, p.box) >= SAM_FACE_CONTAINMENT)) continue;
+    const box = _personBoxFromFace(f.box, W, H);
+    if (!box) continue;
+    persons.push({ box, score: f.score, fromFace: true });
+    diag.persons.push({ box: box.map(Math.round), score: +f.score.toFixed(3), fromFace: true });
+    log.info(`🦖 [GDINO-DETECT] ${pageLabel}recovered a figure from an unpaired face (score ${f.score.toFixed(3)}) — DINO found the face but no person box`);
+  }
 
   // Stage 1c — femaleness pass is LAZY (owner, 2026-08-10): it only feeds the
   // layout-fallback tiebreaker, and SoM identity succeeds on virtually every
@@ -1458,6 +1494,9 @@ module.exports = {
   _boxAreaPx,
   _boxContainment,
   _assignFacesToBoxes,
+  _personBoxFromFace,
+  FACE_TO_BODY_W,
+  FACE_TO_BODY_H,
   _garmentColourWords,
   _colourSeedPoints,
   NEUTRAL_COLOURS,

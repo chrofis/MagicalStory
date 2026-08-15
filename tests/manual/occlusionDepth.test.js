@@ -28,6 +28,7 @@ const fs = require('fs');
 const path = require('path');
 const {
   _boxAreaPx, _boxContainment, _assignFacesToBoxes, _garmentColourWords, NEUTRAL_COLOURS,
+  _personBoxFromFace,
   SAM_FACE_CONTAINMENT, SAM_FACE_IN_MASK, SAM_FRONT_CONTAINMENT, SAM_GROUND_TIE_PX,
 } = require('../../server/lib/figureDetection');
 
@@ -190,33 +191,49 @@ t('the verdicts say what happened, so a lab run can see it', () => {
   }
 });
 
-// ── NMS: the figure behind must survive detection at all ────────────────────
-t('the occluded figure survives NMS on the real page', () => {
-  const iou = (a, b) => {
-    const ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0]));
-    const iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
-    const i = ix * iy;
-    return i / (_boxAreaPx(a) + _boxAreaPx(b) - i);
-  };
-  const v = iou(BOX.Daniel, BOX.Emma);
-  assert.ok(v > 0.5, `plain NMS would suppress: IoU ${v.toFixed(3)}`);
-  const ratio = Math.min(_boxAreaPx(BOX.Emma), _boxAreaPx(BOX.Daniel))
-    / Math.max(_boxAreaPx(BOX.Emma), _boxAreaPx(BOX.Daniel));
-  assert.ok(ratio < 0.70, `sizes differ too much to be one person: ${ratio.toFixed(2)}`);
+// The real stored detection for that page: FIVE faces, FOUR persons.
+const DINO_FACES = [
+  { box: [266, 414, 338, 518], score: 0.528 },   // Daniel - UNPAIRED, highest score on the page
+  { box: [463, 462, 532, 561], score: 0.520 },   // Sarah
+  { box: [595, 280, 667, 382], score: 0.509 },   // Hans
+  { box: [377, 532, 447, 619], score: 0.479 },   // Noah
+  { box: [199, 498, 272, 590], score: 0.471 },   // Emma
+];
+const DINO_PERSONS = [
+  [543, 268, 772, 1040], [315, 502, 508, 1112], [132, 468, 326, 1096], [430, 439, 612, 1043],
+];
+const isUnpaired = (face) => !DINO_PERSONS.some(p => _boxContainment(face, p) >= SAM_FACE_CONTAINMENT);
+
+
+// -- NMS is NOT what loses an occluded figure (guard reverted) ---------------
+t('DINO never proposed a box for the occluded figure at all', () => {
+  // A size-ratio guard was added on the theory that NMS suppressed a Daniel
+  // candidate (his box vs Emma's is IoU 0.653 against a 0.5 threshold). The
+  // stored diag disproved it: the "person" query returned FOUR boxes and not
+  // one of them claims his FACE. There was nothing to suppress - the theory was
+  // arithmetic about a candidate that never existed.
+  const danielFace = [266, 414, 338, 518];
+  for (const p of DINO_PERSONS) {
+    assert.ok(_boxContainment(danielFace, p) < SAM_FACE_CONTAINMENT,
+      `person box ${JSON.stringify(p)} must not claim Daniel's face`);
+  }
+  // The one box that overlaps his column is EMMA's - she stands in front of
+  // him - and it is hers because it holds her face, not his.
+  const emma = [132, 468, 326, 1096];
+  assert.ok(_boxContainment([199, 498, 272, 590], emma) > 0.99, "it holds Emma's face");
 });
 
-t('a genuine duplicate detection stays suppressed', () => {
-  const a = [100, 100, 300, 800], b = [104, 106, 296, 792];
-  const ratio = Math.min(_boxAreaPx(a), _boxAreaPx(b)) / Math.max(_boxAreaPx(a), _boxAreaPx(b));
-  assert.ok(ratio >= 0.70, `a duplicate must stay a duplicate: ${ratio.toFixed(2)}`);
+t('what the guard actually admitted was a duplicate of Sarah', () => {
+  // The raw box it let through, [302,405,621,1119], CONTAINS Sarah's whole box
+  // [395,407,618,1118] - the classic duplicate NMS exists to kill. It survived
+  // on an area ratio of 0.696 against the 0.70 floor, four thousandths under,
+  // and the identity pass then had to name it, calling it "Daniel".
+  const phantom = [302, 405, 621, 1119], sarah = [395, 407, 618, 1118];
+  assert.ok(_boxContainment(sarah, phantom) > 0.99, 'Sarah sits entirely inside it');
+  const ratio = _boxAreaPx(sarah) / _boxAreaPx(phantom);
+  assert.ok(ratio > 0.69 && ratio < 0.70, `ratio ${ratio.toFixed(3)} slipped under a 0.70 floor`);
 });
 
-t('the size guard is wired for PERSONS and not for faces', () => {
-  assert.ok(/const GDINO_NMS_SIZE_RATIO = 0\.70/.test(SRC));
-  assert.ok(/_collectNmsBoxes\(det\.figures\[0\], GDINO_PERSON_NMS_IOU, \{ keepOccluded: true \}\)/.test(SRC));
-  assert.ok(/_collectNmsBoxes\(fdet\.figures\[0\], GDINO_FACE_NMS_IOU\)/.test(SRC),
-    'two face boxes of different sizes on one spot ARE a duplicate');
-});
 
 // -- Garment seed points ------------------------------------------------------
 // A single face point UNDER-SEGMENTS a multi-garment figure: SAM reads blouse,
@@ -293,6 +310,59 @@ t('the cover detector builds a real identity line, like every page path', () => 
     'and resolve it through clothingRequirements, the canonical source');
   assert.ok(/getStoryHelpers\(\)\.buildCastIdentityDescription\(c, clothingText\)/.test(cov),
     'then build the same identity line the pages build');
+});
+
+// -- A face with no person box is a missing figure ---------------------------
+t('exactly one of the five faces is unpaired, and it is Daniel', () => {
+  const unpaired = DINO_FACES.filter(f => isUnpaired(f.box));
+  assert.strictEqual(unpaired.length, 1, 'four faces have a person box, one does not');
+  assert.deepStrictEqual(unpaired[0].box, [266, 414, 338, 518]);
+});
+
+t('the unpaired face scored HIGHEST of all five', () => {
+  // Face detection never had trouble with him - only the "person" query did.
+  const top = DINO_FACES.slice().sort((a, b) => b.score - a.score)[0];
+  assert.deepStrictEqual(top.box, [266, 414, 338, 518], 'Daniel outscores Hans standing in full view');
+});
+
+t('the synthesised person box reproduces the Gemini box result', () => {
+  const box = _personBoxFromFace([266, 414, 338, 518], 864, 1222);
+  assert.deepStrictEqual(box, [194, 388, 410, 1194]);
+  // Measured with SAM: this box + face points -> 29,744px, against 30,464px
+  // from the Gemini second-opinion box. Within 2.4%.
+  const gemini = [124, 344, 396, 1169];
+  const iou = (() => {
+    const ix = Math.max(0, Math.min(box[2], gemini[2]) - Math.max(box[0], gemini[0]));
+    const iy = Math.max(0, Math.min(box[3], gemini[3]) - Math.max(box[1], gemini[1]));
+    const i = ix * iy;
+    return i / (_boxAreaPx(box) + _boxAreaPx(gemini) - i);
+  })();
+  assert.ok(iou > 0.6, `synthesised box should resemble the Gemini one, IoU ${iou.toFixed(2)}`);
+});
+
+t('it CONTAINS the figure rather than hugging it', () => {
+  // The box need not be tight: SAM gets the face as a positive and every other
+  // face as a negative, and the depth pass reclaims what belongs to the front.
+  // Tighter variants measured far worse: w4.0/h5.0 -> 12,304px, w2.5/h4.0 -> 13,159px.
+  const box = _personBoxFromFace([266, 414, 338, 518], 864, 1222);
+  assert.ok(box[3] - box[1] > 700, 'must reach down to the feet');
+  assert.ok(box[2] - box[0] >= 3 * 72 - 2, 'must be about three face widths wide');
+});
+
+t('a face box is clamped to the page and junk yields null', () => {
+  const b = _personBoxFromFace([10, 10, 60, 70], 200, 300);
+  assert.ok(b[0] >= 0 && b[1] >= 0 && b[2] <= 200 && b[3] <= 300, JSON.stringify(b));
+  assert.strictEqual(_personBoxFromFace([50, 50, 50, 50], 864, 1222), null, 'zero-size face');
+  assert.strictEqual(_personBoxFromFace([90, 90, 10, 10], 864, 1222), null, 'inverted face');
+});
+
+t('recovery is wired before masking, and the NMS guard is gone', () => {
+  assert.ok(/persons\.push\(\{ box, score: f\.score, fromFace: true \}\)/.test(SRC),
+    'an unpaired face must append a person BEFORE Stage 2 masking');
+  assert.ok(/if \(persons\.some\(p => _boxContainment\(f\.box, p\.box\) >= SAM_FACE_CONTAINMENT\)\) continue/.test(SRC),
+    'a face already claimed by a person box is not re-added');
+  assert.ok(!/GDINO_NMS_SIZE_RATIO|_sameFigureSize|keepOccluded/.test(SRC),
+    'the NMS size guard was reverted - it fixed a candidate that never existed');
 });
 
 console.log(pass + ' passed');

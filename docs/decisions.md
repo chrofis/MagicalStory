@@ -11125,3 +11125,54 @@ whole-class failure that only surfaced because a downstream feature happened to 
 
 **Status:** ✅ active — unit-verified against stored story data; not yet exercised by a cover
 regeneration.
+
+
+## 2026-08-15 — A detected face with no person box IS a missing figure (NMS guard reverted)
+
+**Context / correction:** the 2026-08-15 entry above added a size-ratio guard to person NMS, on the
+theory that NMS was deleting the figure standing behind another — Daniel vs Emma is IoU 0.653
+against a 0.5 threshold. **That theory was wrong**, and the stored detection diag proves it:
+
+```
+faces   DINO returned 5:   [266,414,338,518] 0.528   <- Daniel, UNPAIRED, highest score on the page
+                           [463,462,532,561] 0.520   -> Sarah
+                           [595,280,667,382] 0.509   -> Hans
+                           [377,532,447,619] 0.479   -> Noah
+                           [199,498,272,590] 0.471   -> Emma
+persons DINO returned 4:   none of them claims Daniel's face
+```
+
+DINO's `"person"` query **never proposed a box on him**, so there was nothing for NMS to suppress.
+What the guard actually did was admit a **loose duplicate around Sarah** — her box `[395,407,618,1118]`
+sits 100% inside the admitted `[302,405,621,1119]`, area ratio **0.696** against the 0.70 floor — which
+the identity pass then had to name, calling it "Daniel". It manufactured a phantom, and by removing
+the undercount it also removed the Gemini second-opinion fallback that had been supplying a usable
+box for him.
+
+**Decision:** the NMS guard is reverted. Instead, after the face pass, any face that **no person box
+claims** (`_boxContainment(face, person) < 0.70`) synthesises a person box from itself and is appended
+before Stage-2 masking, so the recovered figure flows through masking and identity like any other.
+
+The box does not need to be tight — SAM gets the figure's own face as a positive and every other face
+as a negative, and the depth pass reclaims what belongs to figures in front. Measured with SAM on
+Daniel's face:
+
+| box from face | result |
+|---|---|
+| **w3.0 h6.5 t0.25 → `[194,388,410,1194]`** | **29,744 px — chosen** |
+| w4.0 h5.0 t0.30 → `[158,383,446,1038]` | 12,304 px, cuts him off |
+| w2.5 h4.0 t0.20 → `[212,393,392,934]` | 13,159 px, cuts him off |
+
+For reference the Gemini second-opinion box gave 30,464 px, so the synthesised box reproduces it to
+within **2.4%** — from nothing but a face box.
+
+**Rationale:** face detection was never the weak link; it found the occluded man with the *highest*
+confidence on the page. Only the generic `"person"` query failed. Recovering from the signal that
+worked is cheaper and more reliable than making the query that failed work harder (per-character
+prompts cost one DINO forward pass each), and it needs no external call, unlike the Gemini fallback.
+
+**Touched:** `server/lib/figureDetection.js` (`_personBoxFromFace`, `FACE_TO_BODY_*`, Stage 1b-2
+recovery; `_collectNmsBoxes` restored), `tests/manual/occlusionDepth.test.js`.
+
+**Status:** ✅ active — unit-verified and SAM-verified locally; the DINO path itself is not yet
+exercised end-to-end (no local GroundingDINO), so a Lab `bbox` run is still owed.
