@@ -435,7 +435,6 @@ async function findSilhouettesWithDino(populatedBuf, cast, opts = {}) {
     if (maxX < 0) continue;
 
     // The face box belonging to this figure: most contained, and highest up.
-    let head = null;
     let best = null;
     for (const f of faces) {
       const [fx0, fy0, fx1, fy1] = f.box.map(Math.round);
@@ -444,11 +443,53 @@ async function findSilhouettesWithDino(populatedBuf, cast, opts = {}) {
       if (ix1 <= ix0 || iy1 <= iy0) continue;
       const inter = (ix1 - ix0) * (iy1 - iy0);
       const fArea = Math.max(1, (fx1 - fx0) * (fy1 - fy0));
-      const containment = inter / fArea;
-      if (containment < 0.6) continue;
-      if (!best || fy0 < best.top) best = { top: fy0, height: fy1 - fy0, containment };
+      if (inter / fArea < 0.6) continue;
+      if (!best || fy0 < best.top) best = { top: fy0, bottom: fy1, left: fx0, right: fx1 };
     }
-    if (best && best.height >= 8) head = { y: best.top, height: best.height, source: 'dino-face' };
+
+    // MEASURE THE HEAD FROM THE PALE TINT, NOT FROM THE BOX (owner, 2026-08-15).
+    // DINO's face box is a guess and its tightness varies: across two runs of
+    // the same page the same woman's box came back 101px and 53px. The head
+    // tint is painted by us and does not move. Measured on p6: the two whole
+    // figures agree to 3% on the tint (4.19 and 4.07 heads) against 10% on the
+    // raw boxes — and that box noise is what pushed the occlusion bar down and
+    // still cost a standing man his feet.
+    //
+    // The box is still needed: it is the only thing that says WHERE to look.
+    // Pale pixels of a character's hue are everywhere in a scene — sky for
+    // blue, water for blue-green, sunlit grass for yellow — so searching the
+    // person box, or the canvas, returns the sky. Searching the face box
+    // returns the face.
+    let head = null;
+    if (best) {
+      const tint = HEAD_TINTS[c.color];
+      const tintHue2 = tint ? hueOf(tint) : bodyHue;
+      let hy0 = 1e9, hy1 = -1, hn = 0;
+      for (let y = Math.max(0, best.top); y <= Math.min(H - 1, best.bottom); y++) {
+        for (let x = Math.max(0, best.left); x <= Math.min(W - 1, best.right); x++) {
+          const k = (y * W + x) * ch;
+          const r = data[k], g = data[k + 1], b = data[k + 2];
+          const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+          if (mx < 90) continue;
+          const sat = (mx - mn) / (mx || 1);
+          if (sat >= BODY_SAT_FLOOR + 0.10) continue;   // hair and body inside the face box
+          if (sat < 0.12) continue;                      // white/grey: not a tinted head
+          const hh = rgbToHue(r, g, b);
+          let dh = Math.abs(hh - tintHue2); if (dh > 180) dh = 360 - dh;
+          if (dh > HUE_THRESHOLD) continue;
+          hn++; if (y < hy0) hy0 = y; if (y > hy1) hy1 = y;
+        }
+      }
+      const tintH = hy1 >= 0 ? hy1 - hy0 + 1 : 0;
+      const boxH = best.bottom - best.top;
+      // A tint that fills almost none of the box means the box landed on hair
+      // or missed — fall back to the box rather than invent a tiny head.
+      if (tintH >= 8 && hn >= 30 && tintH >= boxH * 0.4) {
+        head = { y: hy0, height: tintH, source: 'tint-in-face-box' };
+      } else if (boxH >= 8) {
+        head = { y: best.top, height: boxH, source: 'dino-face-box' };
+      }
+    }
 
     results[s.name] = {
       bbox: { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1, pixels: count },
@@ -457,7 +498,7 @@ async function findSilhouettesWithDino(populatedBuf, cast, opts = {}) {
       dinoBox: { x: x0, y: y0, width: x1 - x0 + 1, height: y1 - y0 + 1, score: +persons[s.boxIdx].score.toFixed(3) },
     };
     log.info(`[SCENE COMPOSITE]   ${s.name}: DINO box ${x1 - x0 + 1}x${y1 - y0 + 1} (${s.n}px of its colour), `
-      + `outline ${maxX - minX + 1}x${maxY - minY + 1}${head ? `, face ${head.height}px` : ', no face'}`);
+      + `outline ${maxX - minX + 1}x${maxY - minY + 1}${head ? `, head ${head.height}px (${head.source})` : ', no head'}`);
   }
 
   const missing = cast.filter(c => !results[c.name]).map(c => c.name);
