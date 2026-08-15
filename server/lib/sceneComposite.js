@@ -2321,17 +2321,18 @@ async function generateSceneComposite(opts) {
   const headsByName = Object.fromEntries(cast
     .map(c => [c.name, detection.results[c.name]?.head])
     .filter(([, h]) => h));
-  const statureModel = buildStatureModel(
-    cast, bboxes, detection.canvasWidth, detection.canvasHeight, 18, headsByName, plate.ratio);
+  // Age sizing replaces the ground plane (owner, 2026-08-15): a child is sized
+  // against the adults actually painted on this plate, never converted through
+  // centimetres and back. buildStatureModel and its foot-solve are gone here.
+  const ageTargets = buildAgeTargets(cast, detection.results, detection.canvasHeight);
   if (plate.ratio) log.info(`[SCENE COMPOSITE]   plate proportions: ${plate.ratio.toFixed(2)} heads per body (from ${plate.n} whole figure${plate.n === 1 ? '' : 's'})`);
   debug.plateHeadRatio = plate.ratio ? { ratio: Number(plate.ratio.toFixed(3)), fromFigures: plate.n } : null;
-  debug.statureModel = { kind: statureModel.kind, anchors: statureModel.n, skippedAsClipped: statureModel.skipped || [] };
+  debug.ageTargets = ageTargets;
   debug.heads = Object.fromEntries(cast
     .map(c => [c.name, detection.results[c.name]?.head || null])
     .filter(([, h]) => h));
-  log.info(`[SCENE COMPOSITE]   stature model: ${statureModel.kind} (from ${statureModel.n} unclipped adult box${statureModel.n === 1 ? '' : 'es'})`);
-  if (statureModel.skipped?.length) {
-    log.info(`[SCENE COMPOSITE]   not usable as anchors (clipped by the frame): ${statureModel.skipped.join(', ')}`);
+  for (const [n, t] of Object.entries(ageTargets)) {
+    log.info(`[SCENE COMPOSITE]   age sizing: ${n} ${detection.results[n].bbox.height}px -> ${t}px, measured against the adults on the plate`);
   }
 
   // ── Step 4 alternative: hand each silhouette to character repair.
@@ -2493,10 +2494,10 @@ async function generateSceneComposite(opts) {
     }
     // Height + vertical anchor from the stature model. The box still supplies
     // the horizontal position; whether its BOTTOM is a ground line or just the
-    // edge of the frame is decided by statureTargetFor.
-    const { targetH, anchor, clip, via, paintedFull, visibleFraction } = statureTargetFor(
-      c, bbox, statureModel, detection.canvasWidth, detection.canvasHeight,
-      detection.results[c.name]?.head, plate.ratio);
+    // edge of the frame is decided by sizeFigure.
+    const { targetH, anchor, clip, via, paintedFull, visibleFraction } = sizeFigure(
+      c, bbox, detection.canvasWidth, detection.canvasHeight,
+      detection.results[c.name]?.head, plate.ratio, ageTargets[c.name]);
     if (targetH !== bbox.height) {
       log.info(`[SCENE COMPOSITE]   ${c.name} (age ${c.age}): box h=${bbox.height}${clip.bottom ? ' (clipped)' : ''} → ${targetH} (${((targetH / bbox.height - 1) * 100).toFixed(0)}%), anchored by ${anchor}, via ${via}${visibleFraction ? `, ${Math.round(visibleFraction * 100)}% on show` : ''}`);
     }
@@ -2861,6 +2862,88 @@ function _boxClipping(bbox, canvasW, canvasH, tol = 2) {
  * shrinking as things come nearer. Both children then scaled to 40% of the
  * size Grok painted them. One bad box, five wrong figures.
  */
+/**
+ * How tall a person of this age is, as a fraction of an adult (owner, 2026-08-15).
+ *
+ * These are the owner's numbers and they match growth charts closely enough:
+ * a 4-year-old is ~103cm against an adult's ~175cm (0.59), a 7-year-old ~122cm
+ * (0.70), a 10-year-old ~138cm (0.79), a 13-year-old ~156cm (0.89).
+ *
+ * 0.6 is the floor on purpose. Whatever the geometry claims, no figure is ever
+ * scaled below 40% of the adult it is measured against — the ground plane that
+ * this replaces once decided a five-year-old should be 40% of her PAINTED size
+ * (p4, Lab 708), and a hard floor makes that class of failure impossible
+ * instead of merely unlikely.
+ */
+const AGE_FLOOR = 0.6;
+function _ageHeightFactor(age) {
+  const n = parseInt(age, 10);
+  if (!Number.isFinite(n) || n >= 18) return 1.0;
+  if (n >= 13) return 0.9;
+  if (n >= 10) return 0.8;
+  if (n >= 6) return 0.7;
+  return AGE_FLOOR;
+}
+
+/**
+ * Size every non-adult against the adults actually painted on this plate.
+ *
+ * The rule the owner asked for, and it is a comparison rather than a model:
+ * a child is always smaller than an adult, so a child's height is the adult's
+ * height times the age factor. What it replaces — buildStatureModel and the
+ * pixels → centimetres → pixels round trip — is what turned two ghosts drawn
+ * 4% apart (257 and 268px) into figures 3x apart (323 and 108px), because each
+ * figure was converted separately through its own real-world height.
+ *
+ * Which adult: the nearest one by foot line. When two or more adults stand at
+ * different depths they also say how size changes with depth, so the
+ * comparison is carried to the child's own foot line through them — two
+ * measured points, never extrapolated beyond what the cap allows.
+ *
+ * Corrections only ever SHRINK, and never past AGE_FLOOR. No adult on the
+ * plate means no correction: there is nothing to be smaller than.
+ */
+function buildAgeTargets(cast, results, canvasH) {
+  const seen = [];
+  for (const c of cast) {
+    const r = results[c.name];
+    if (!r?.bbox || !_isPlausibleFigureBox(r.bbox, r.head)) continue;
+    seen.push({ name: c.name, age: parseInt(c.age, 10), h: r.bbox.height, foot: r.bbox.y + r.bbox.height });
+  }
+  const adults = seen.filter(s => !Number.isFinite(s.age) || s.age >= 18);
+  const out = {};
+  if (!adults.length) return out;
+
+  // Adult height as a function of foot line: a straight line through two or
+  // more adults, otherwise the single adult's height everywhere.
+  let adultHeightAt;
+  if (adults.length >= 2) {
+    const sy = adults.reduce((a, s) => a + s.foot, 0) / adults.length;
+    const sh = adults.reduce((a, s) => a + s.h, 0) / adults.length;
+    let num = 0, den = 0;
+    for (const s of adults) { num += (s.foot - sy) * (s.h - sh); den += (s.foot - sy) ** 2; }
+    const slope = den > 0 ? num / den : 0;
+    // A negative slope means the adults disagree about which way depth runs
+    // (one of them is kneeling, or they stand on different surfaces). Fall back
+    // to the tallest adult rather than trust the direction.
+    adultHeightAt = slope > 0
+      ? (y) => sh + slope * (y - sy)
+      : () => Math.max(...adults.map(s => s.h));
+  } else {
+    adultHeightAt = () => adults[0].h;
+  }
+
+  for (const s of seen) {
+    const factor = _ageHeightFactor(s.age);
+    if (factor >= 1) continue;                       // adults keep what was painted
+    const expected = Math.round(adultHeightAt(s.foot) * factor);
+    // Shrink only, and never below the floor of the painted height.
+    const target = Math.max(Math.round(s.h * AGE_FLOOR), Math.min(s.h, expected));
+    if (target !== s.h) out[s.name] = target;
+  }
+  return out;
+}
+
 function _isPlausibleFigureBox(b, head = null) {
   if (!b || !(b.height > 0) || !(b.width > 0)) return false;
   if (b.height < 20) return false;
@@ -2873,78 +2956,6 @@ function _isPlausibleFigureBox(b, head = null) {
   // extreme, headless sliver is called scenery.
   if (head && head.height >= 8) return b.width / b.height <= 4;
   return b.width / b.height <= 2.5;
-}
-
-function buildStatureModel(cast, bboxes, canvasW, canvasH, ADULT_AGE = 18, heads = null, plateRatio = null) {
-  const pts = [];
-  const skipped = [];
-  for (const c of cast) {
-    const b = bboxes[c.name];
-    if (!b) continue;
-    const age = parseInt(c.age, 10);
-    if (!Number.isFinite(age) || age < ADULT_AGE) continue;
-    if (!_isPlausibleFigureBox(b, heads?.[c.name])) { skipped.push(`${c.name} (not figure-shaped: ${b.width}x${b.height})`); continue; }
-    const clip = _boxClipping(b, canvasW, canvasH);
-    if (clip.top || clip.bottom) { skipped.push(c.name); continue; }
-    // An OCCLUDED adult must not anchor the plane either, and the reason is
-    // circular: his box is short because scenery hides him, and fitting through
-    // that short box makes the plane agree that his short height is correct.
-    // Measured on job_1786780194082_s980g4s9a p6 — a figure kneeling behind a
-    // bridge railing had a 119px box while his own head implied 209px, and
-    // because he was one of the three anchors the fit "confirmed" 121px for
-    // him. The head is the independent witness, so use it to disqualify him.
-    const h = heads?.[c.name];
-    if (h && plateRatio && b.height / (h.height * plateRatio) < 0.95) {
-      skipped.push(`${c.name} (occluded)`);
-      continue;
-    }
-    pts.push({ y: b.y + b.height, s: b.height / _heightCm(age) });
-  }
-  if (pts.length >= 2) {
-    const n = pts.length;
-    const sy = pts.reduce((a, p) => a + p.y, 0) / n;
-    const ss = pts.reduce((a, p) => a + p.s, 0) / n;
-    let num = 0, den = 0;
-    for (const p of pts) { num += (p.y - sy) * (p.s - ss); den += (p.y - sy) ** 2; }
-    if (den > 0) {
-      const b1 = num / den, b0 = ss - b1 * sy;
-      // A ground plane runs one way only: the further down the frame a figure
-      // stands, the nearer they are and the LARGER they render, so s must grow
-      // with y. A fit that slopes the other way is not a shallow plane, it is
-      // evidence that the anchors disagree — a mismeasured box, or two people
-      // on different surfaces (a promenade and a bridge deck). Extrapolating
-      // off it is how children ended up at 40% size. Drop to the one-anchor
-      // branch using the tallest anchor, which is the least likely to be a
-      // fragment.
-      if (b1 > 0) return { kind: 'fitted', at: (y) => b0 + b1 * y, n, skipped };
-      skipped.push(`inverted fit from ${n} anchors — falling back to one`);
-      pts.sort((a, b) => b.s - a.s);
-      pts.length = 1;
-    }
-  }
-  // One adult only: their s is measured at THEIR depth, so it cannot be
-  // applied unchanged to a figure standing nearer or further away. The
-  // declared depth tier is NOT a usable substitute — measured on p4, the
-  // scene called the children "foreground" and the adult "midground" while
-  // Grok painted all three feet on nearly the same floor line, so a
-  // tier-ratio correction inflated both children by a third for a depth
-  // difference that did not exist.
-  //
-  // Use the geometry instead: on a ground plane apparent size grows linearly
-  // with distance below the horizon, so
-  //   s(y) = s_adult × (y − yHorizon) / (yAdult − yHorizon).
-  // One figure cannot locate the horizon, so assume mid-canvas. This is the
-  // weakest branch in the model and it shows: on an ultra-wide exterior whose
-  // true horizon sat near 0.55·H the assumption alone produced a spurious
-  // 40% shrink. Two unclipped adults remove the guess entirely.
-  if (pts.length === 1) {
-    const yH = 0.45 * (canvasH || 720);
-    const p0 = pts[0];
-    const base = p0.y - yH;
-    if (base <= 1) return { kind: 'constant', at: () => p0.s, n: 1, skipped };
-    return { kind: 'horizon', at: (y) => p0.s * Math.max(0.2, (y - yH) / base), n: 1, skipped };
-  }
-  return { kind: 'none', at: () => null, n: 0, skipped };
 }
 
 /**
@@ -3005,161 +3016,65 @@ function buildPlateHeadRatio(cast, results, canvasH) {
 }
 
 /**
- * Solve where a figure's feet are, given where its crown is.
+ * How tall to paste this figure, and whether to cut it.
  *
- * On a ground plane a figure's pixel height is s(footY) x its real height, so
- *   footY - headY = s(footY) * heightCm
- * is one equation in one unknown. s() can slope either way — its gradient is
- * (1 - a*heightCm), which a steep plane or a tall character flips negative — so
- * bisect on the sign change rather than assuming a direction.
+ * Three inputs, in this order (owner, 2026-08-15):
+ *   1. THE PLATE. The height Grok painted is the answer unless something
+ *      specific says otherwise. Every version of this function that started
+ *      from a real-world height in centimetres instead produced a figure the
+ *      plate never asked for — two ghosts drawn 4% apart came out 3x apart.
+ *   2. THE HEAD, measured from the tint inside the face box. head x the
+ *      plate's own heads-per-body is the figure Grok painted; if the box is
+ *      materially shorter than that, scenery hides the rest. Scale to the
+ *      full height and report the fraction that shows, so the paste site can
+ *      clip at the occluder line and leave the occluder visible.
+ *   3. THE AGE TARGET, when one was computed: a child measured against the
+ *      adults on this plate (buildAgeTargets). Only ever shrinks, never past
+ *      40%.
  *
- * Returns null when there is no crossing: the ground plane is too shallow to
- * seat this figure (a*heightCm >= 1) and the horizon estimate has broken down.
- * Callers fall back to the painted span rather than extrapolate off a bad
- * gradient.
+ * A frame-clipped figure (box running off the bottom edge) is anchored by the
+ * head so its legs run off canvas, which is the framing the plate asked for.
  */
-function _solveFootY(headY, heightCm, statureModel, spanGuess) {
-  const f = (y) => y - headY - (statureModel.at(y) || 0) * heightCm;
-  let lo = headY + spanGuess, hi = headY + spanGuess * 4;
-  const fLo = f(lo), fHi = f(hi);
-  if (fLo === 0) return lo;
-  if (!(fLo * fHi < 0)) return null;
-  const rising = fLo < 0;
-  for (let i = 0; i < 50; i++) {
-    const mid = (lo + hi) / 2;
-    if ((f(mid) < 0) === rising) lo = mid; else hi = mid;
-  }
-  return (lo + hi) / 2;
-}
-
-function statureTargetFor(c, bbox, statureModel, canvasW, canvasH, head = null, plateRatio = null) {
+function sizeFigure(c, bbox, canvasW, canvasH, head = null, plateRatio = null, ageTarget = null) {
   const clip = _boxClipping(bbox, canvasW, canvasH);
   const anchor = clip.bottom && !clip.top ? 'head' : 'feet';
 
-  // A clipped figure hides its own foot line, which is the one input the
-  // ground plane needs. The head band recovers it: head × the plate's own
-  // heads-per-body gives the height Grok PAINTED, so footY follows, and the
-  // stature correction can then run exactly as it does for a whole figure.
-  if (anchor === 'head' && head && head.height >= 8) {
-    const visible = canvasH - bbox.y;
-    const ratio = plateRatio || _headsPerBody(c.age);
-    const paintedFull = Math.round(head.height * ratio);
-    // Sanity band: the painted figure cannot be shorter than what is already
-    // visible, and Grok does not crop above the chest.
-    if (paintedFull >= visible && paintedFull <= visible / 0.35) {
-      const s = statureModel.at(bbox.y + paintedFull);
-      const corrected = Number.isFinite(s) && s > 0
-        ? Math.round(s * _heightCm(c.age))
-        : paintedFull;
-      // Keep the same 0.4–1.6× guard a whole figure gets, now against the
-      // recovered painted height rather than the visible fragment.
-      const targetH = Math.max(Math.round(paintedFull * 0.4), Math.min(Math.round(paintedFull * 1.6), corrected));
-      return { targetH, anchor, clip, corrected: true, visible, paintedFull, ratio, via: 'head+ground-plane' };
+  // Hidden by scenery: the head says the painted figure is taller than the box.
+  if (head && head.height >= 8 && plateRatio && !clip.top) {
+    const paintedFull = Math.round(head.height * plateRatio);
+    const shown = bbox.height / paintedFull;
+    if (shown < MAX_SHOWN_TO_COUNT_AS_OCCLUDED && shown > 0.15) {
+      const full = ageTarget ? Math.max(bbox.height, Math.round(paintedFull * (ageTarget / bbox.height))) : paintedFull;
+      return {
+        targetH: Math.max(20, full),
+        anchor: 'head',
+        clip,
+        corrected: true,
+        paintedFull,
+        visibleFraction: Math.min(1, shown),
+        via: ageTarget ? 'head+occluded+age' : 'head+occluded',
+      };
     }
   }
-  const s = statureModel.at(bbox.y + bbox.height);
-  if (!Number.isFinite(s) || s <= 0) return { targetH: bbox.height, anchor, clip, corrected: false, via: 'painted-box' };
-  const wanted = Math.round(s * _heightCm(c.age));
+
+  // Cut off by the frame, not by scenery: the box bottom is the frame edge, so
+  // the head pins the figure and the legs run off canvas. The head gives the
+  // full height; without one, keep what was painted and let it be short.
   if (anchor === 'head') {
-    // A bottom-clipped silhouette shows only the TOP of the body — Grok frames
-    // foreground characters knee-up as a matter of course. Two things follow:
-    // the head position pins the figure, and the visible span is a fraction of
-    // the body, not the body. Scaling a whole head-to-feet avatar into that
-    // span makes the character too small and fully visible; the legs have to
-    // run off the canvas and be cut instead.
-    //
-    // The feet are below the frame, so solve for them: on a ground plane the
-    // figure's height in pixels is s(footY) × its real height, giving
-    //   footY − headY = s(footY) × heightCm
-    // one equation in one unknown. s() is monotone increasing in y, so bisect.
-    const headY = bbox.y;
-    const visible = canvasH - headY;
-    const cm = _heightCm(c.age);
-    const footY = _solveFootY(headY, cm, statureModel, visible);
-    // No crossing means the ground plane is too shallow to seat this figure
-    // (a·heightCm ≥ 1) — the horizon estimate has broken down. Fall back to the
-    // painted span rather than extrapolating off a bad gradient.
-    // Cap the extrapolation either way: Grok crops at the knees or the hips,
-    // never above the chest, so at least 55% of the body stays in frame.
-    const solved = footY ? Math.round(footY - headY) : visible;
-    const targetH = Math.min(Math.round(visible / 0.55), Math.max(visible, solved));
-    return { targetH, anchor, clip, corrected: true, visible, solved, via: footY ? 'ground-plane' : 'painted-span' };
+    const visible = canvasH - bbox.y;
+    const full = head && head.height >= 8 && plateRatio
+      ? Math.max(visible, Math.round(head.height * plateRatio))
+      : Math.max(visible, bbox.height);
+    const target = ageTarget ? Math.max(visible, Math.min(full, ageTarget)) : full;
+    return { targetH: Math.max(20, target), anchor, clip, corrected: true, visible, via: 'frame-clipped' };
   }
-  // OCCLUDED BY SCENERY. A box can end because the figure ends, or because
-  // something in the scene hides the rest — a railing, a wall, an open chest.
-  // The box cannot tell them apart, but the ground plane can: solve where the
-  // feet would be for a crown at bbox.y, and if that figure is materially
-  // taller than the box, the missing part is behind scenery.
-  //
-  // Measured on job_1786780194082_s980g4s9a p6: a character the brief has
-  // "kneel at the gap in the bridge railing and peer down through it" had an
-  // 83px box that was only his torso. Scaling a whole figure to 83px made him
-  // tiny AND painted over the railing that was meant to hide his legs.
-  //
-  // So scale to the FULL height and report the visible fraction; the paste site
-  // draws only that top slice, and the occluder is never covered.
-  //
-  // The head band would answer this too, but it is not dependable: Grok ignores
-  // the two-tone silhouette instruction in `realistic` style, and p6 came back
-  // with head = null on all three figures. The ground plane needs no tint.
-  if (!clip.bottom && !clip.top) {
-    // The HEAD is the reliable witness. head x the plate's own heads-per-body is
-    // the figure Grok painted; if the box is materially shorter, the rest is
-    // behind scenery. Prefer it over the ground-plane solve, which cannot see
-    // this when the occluded figure is itself one of the plane's anchors.
-    if (head && head.height >= 8 && plateRatio) {
-      const paintedFull = Math.round(head.height * plateRatio);
-      const shown = bbox.height / paintedFull;
-      if (shown < MAX_SHOWN_TO_COUNT_AS_OCCLUDED && shown > 0.15) {
-        // Scale to the height Grok PAINTED, and show only the visible slice.
-        //
-        // No ground-plane correction here, deliberately. The plane is fitted
-        // from the figures standing on the main ground surface, and a figure
-        // that scenery hides is usually not on it — on p6 the occluded man
-        // stands on a raised bridge deck while the two anchors are down on the
-        // promenade. Applying their plane to him "corrected" 188px to 151px,
-        // i.e. shorter than the 154px of him that is actually visible, which is
-        // incoherent and silently disabled the clip below (min(151,154)=151):
-        // he was pasted whole, at full size, in front of the railing. Grok
-        // already sized him for the surface he is standing on; the head is the
-        // witness to that size, so take it and do not second-guess it.
-        return {
-          targetH: Math.max(20, paintedFull),
-          anchor: 'head',
-          clip,
-          corrected: true,
-          paintedFull,
-          visibleFraction: Math.min(1, shown),
-          via: 'head+occluded',
-        };
-      }
-    }
-    const footY = _solveFootY(bbox.y, _heightCm(c.age), statureModel, bbox.height);
-    if (footY) {
-      const solvedFull = Math.round(footY - bbox.y);
-      const ratio = solvedFull / bbox.height;
-      // 1.15 keeps normal measurement noise out; 4x is the sanity ceiling — a
-      // figure showing less than a quarter of itself is a mismeasured box, not
-      // a person behind a railing. footY must also stay on-canvas, otherwise
-      // this is frame clipping and the branch above owns it.
-      if (ratio > 1 / MAX_SHOWN_TO_COUNT_AS_OCCLUDED && ratio <= 4 && footY < canvasH) {
-        return {
-          targetH: Math.max(20, solvedFull),
-          anchor: 'head',
-          clip,
-          corrected: true,
-          visibleFraction: Math.min(1, bbox.height / solvedFull),
-          via: 'ground-plane+occluded',
-        };
-      }
-    }
+
+  // Whole figure standing on visible ground: the plate is right, apart from a
+  // child drawn adult-sized.
+  if (ageTarget && ageTarget !== bbox.height) {
+    return { targetH: Math.max(20, ageTarget), anchor, clip, corrected: true, via: 'age' };
   }
-  // Whole figure: clamp to 0.4–1.6× the painted box so a bad fit can never
-  // produce an absurd result.
-  const targetH = clip.top
-    ? Math.max(20, wanted)
-    : Math.max(Math.round(bbox.height * 0.4), Math.min(Math.round(bbox.height * 1.6), wanted));
-  return { targetH, anchor, clip, corrected: true, via: 'ground-plane' };
+  return { targetH: bbox.height, anchor, clip, corrected: false, via: 'as-painted' };
 }
 
 // Parse a position phrase ("left foreground", "right midground", "in the
@@ -3864,10 +3779,9 @@ module.exports = {
   _internal: {
     findColorBbox,
     findSilhouettesByDiff,
-    subtractFiguresInFront,
-    buildStatureModel,
-    buildPlateHeadRatio,
-    statureTargetFor,
+    subtractFiguresInFront,    buildPlateHeadRatio,
+    sizeFigure,
+    buildAgeTargets,
     cropSheetCell,
     removeBackground,
     trimTransparent,
