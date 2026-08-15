@@ -4018,7 +4018,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       // generation prompt is deliberately NOT sent — measured
                       // across nine Lab variants, its staging sections make the
                       // model re-arrange the scene it was asked to preserve.
-                      ...buildBlendMetadata(fdMeta, pageData),
+                      ...buildBlendMetadata(fdMeta, pageData, inputData.clothingRequirements || inputData.outline?.clothingRequirements || null),
                     },
                     cleanBackgroundPrompt: String(pageData.emptyScenePrompt || fdMeta.emptyScenePrompt || ''),
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,

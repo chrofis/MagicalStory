@@ -1517,18 +1517,41 @@ const BLEND_STAGING_CLAUSE = `STAGING — Image 1 already places every character
  * `object` is just the target their eyes go to. One field apart, opposite
  * outcomes — see buildBlendEditPrompt's note.
  */
-function buildBlendMetadata(fullData, scene = null) {
+function buildBlendMetadata(fullData, scene = null, clothingRequirements = null) {
   const fd = fullData || {};
   const chars = fd.characters || scene?.sceneCharacters || [];
+
+  // Clothing comes from clothingRequirements — the canonical per-story source —
+  // and never from a saved avatar's wardrobe, which legitimately differs from
+  // what a character wears in this story. The scene character carries the
+  // CATEGORY ('summer', 'costumed:pirate'); the requirement holds the prose.
+  const characterClothing = {};
+  for (const c of chars) {
+    if (!c?.name) continue;
+    const reqs = clothingRequirements?.[c.name];
+    if (!reqs) continue;
+    const cat = String(c.clothing || '').toLowerCase();
+    const key = cat.startsWith('costumed') ? 'costumed' : cat;
+    const entry = reqs[key] || Object.values(reqs).find(v => v?.used && v.description);
+    if (entry?.description) characterClothing[c.name] = String(entry.description).trim().slice(0, 400);
+  }
   const characterExpressions = {};
   for (const c of chars) {
     if (c?.name && c.expression) characterExpressions[c.name] = String(c.expression).trim();
   }
   const attentionTargets = {};
+  const characterActions = {};
   for (const it of (fd.interactions || [])) {
-    if (it?.character && it.object) attentionTargets[it.character] = String(it.object).trim();
+    if (!it?.character) continue;
+    if (it.object) attentionTargets[it.character] = String(it.object).trim();
+    // `where` is the interaction itself ("kneels at the gap in the railing and
+    // peers down through it"). It is sent as something to perform ON THE SPOT,
+    // never as a placement — the prompt's own wording carries that distinction,
+    // because the same sentence inside a scene-staging prompt is what moved
+    // characters across the frame in every earlier attempt.
+    if (it.where) characterActions[it.character] = String(it.where).trim();
   }
-  return { characterExpressions, attentionTargets };
+  return { characterExpressions, attentionTargets, characterActions, characterClothing };
 }
 
 // Age as the census words it. Kept coarse on purpose: the blend needs to know
@@ -1587,47 +1610,70 @@ function buildBlendEditPrompt(scene, cast = null) {
   if (people.length) {
     const expressions = scene.characterExpressions || {};
     const attention = scene.attentionTargets || {};
+    const actions = scene.characterActions || {};
+    const clothing = scene.characterClothing || {};
     const occluded = scene.occludedBy || {};
     const artStyle = _blendStyleLine(scene.artStyle);
 
-    const census = people.map((c) => {
-      const depth = String(c.depth || 'foreground').toLowerCase();
-      const where = depth === 'background' ? 'in the distance'
-        : depth === 'midground' ? 'in the middle distance' : 'close to the camera';
-      const hidden = occluded[c.name]
-        ? ` ${c.name} is partly hidden: what crosses them passes IN FRONT of them, and they stand behind it at full height — never sitting on it, never shrunk to a small figure.`
-        : '';
-      return `- ${c.name}, ${_ageWord(c.age)}, ${where}${c.position ? ` (${c.position})` : ''}.${hidden}`;
+    // The scene's own overview. Capped: this is context for a picture that
+    // already exists, not a brief for one to be built, and a long brief invites
+    // re-staging.
+    const overview = String(scene.description || scene.pageBrief || '').trim().slice(0, 900);
+
+    const depthWord = (c) => {
+      const d = String(c.depth || 'foreground').toLowerCase();
+      return d === 'background' ? 'in the distance'
+        : d === 'midground' ? 'in the middle distance' : 'close to the camera';
+    };
+
+    // Who is in the picture: where they stand, what they wear, what they are
+    // doing. Everything here describes Image 1 as it already IS.
+    const whoIsThere = people.map((c) => {
+      const bits = [`${c.name} — ${_ageWord(c.age)}, ${depthWord(c)}${c.position ? ` (${c.position})` : ''}`];
+      if (clothing[c.name]) bits.push(`  wearing: ${clothing[c.name]}`);
+      if (actions[c.name]) bits.push(`  doing: ${actions[c.name]}`);
+      if (occluded[c.name]) {
+        bits.push('  partly hidden: whatever crosses them passes IN FRONT of them. They stand behind it at full height —'
+          + ' never sitting on it, never shrunk to a small figure.');
+      }
+      return bits.join('\n');
     }).join('\n');
 
-    const faces = people.filter(c => expressions[c.name])
+    const emotionLines = people.filter(c => expressions[c.name])
       .map(c => `- ${c.name}: ${expressions[c.name]}`).join('\n');
-    const looks = people.filter(c => attention[c.name])
-      .map(c => `- ${c.name} looks at ${attention[c.name]}.`).join('\n');
+    const interactionLines = people.filter(c => actions[c.name] || attention[c.name])
+      .map((c) => {
+        const what = actions[c.name] || `engages with ${attention[c.name]}`;
+        const look = attention[c.name] ? ` Their eyes go to ${attention[c.name]}.` : '';
+        return `- ${c.name}: ${what}.${look}`;
+      }).join('\n');
 
     const textDirective = buildTextOverlayDirective(scene.textOverlay, scene.artStyle);
-    return `THE PEOPLE IN IMAGE 1 — all of them belong in the picture and all of them must survive:
-${census}
 
-Image 1 is a finished illustration whose figures were pasted in. They are in the right places but they look stiff, flat and blank. Settle them into the scene.
+    return `YOUR TASK. Image 1 is a finished illustration. Every character is already in the right place, at the right size, on the right surface — that part is done and must not change. What is wrong is that they were pasted in: they stand stiff, blank-faced and disengaged from what is happening around them. Turn them, adjust their heads, arms and hands, and repaint their faces so that each one is doing what the scene asks and feeling what the scene asks — WITHOUT moving anyone. Then settle them into the picture so they read as painted rather than pasted.
 
-KEEP WHERE THEY ARE — this is absolute:
-- Each person keeps their exact position on the canvas, their exact size, and the surface they stand on. Nobody moves nearer, further, left, right, up or down.
-- Keep the framing of Image 1 exactly: same camera distance, same borders, same crop, feet included.
-- Keep the background exactly as it is — architecture, landscape, water, sky and light.
+THE SCENE
+${overview}
 
-MAKE THEM NATURAL — they were cut out and pasted, and it shows:
-- Soften the cut-out edges and paint over any solid red, blue, green, yellow, purple or cyan fringe so they read as painted into the picture.
+WHO IS IN THE PICTURE
+${whoIsThere}
+
+CHANGE THESE — the interactions. Turn and adjust each character on the spot; their feet stay where they are:
+${interactionLines || '- (none declared)'}
+
+CHANGE THESE — the emotions. The faces are blank and must not stay blank:
+${emotionLines || '- (none declared)'}
+
+DO NOT
+- Do not move anyone nearer, further, left, right, up or down, and do not change anyone's size. A turn of the body is a change of pose, not a change of place.
+- Do not re-frame: same camera distance, same borders, same crop, feet included.
+- Do not rebuild the background — architecture, landscape, water, sky and light stay as they are.
+- Do not add, remove or substitute a character. Faces, hair, age and clothing stay as Image 1 and the labelled portrait grid show them.
+- No text, captions, numbers or signatures.
+
+ALSO BLEND THEM IN
+- Soften the cut-out edges and paint over any solid red, blue, green, yellow, purple or cyan fringe.
 - Match each person to the scene light and colour, and give each one a contact shadow where they meet the ground.
-- Let the body language relax — weight settled on the feet, shoulders natural. Their feet stay on the same spot while you do it.
-${faces ? `
-ADD THE EMOTIONS — the faces are blank and must not stay blank:
-${faces}
-` : ''}${looks ? `
-WHO IS LOOKING AT WHAT — turn the head and eyes only:
-${looks}
-` : ''}
-Nothing else changes. No one is added, removed or substituted; faces, hair, age and clothing stay as Image 1 and the labelled portrait grid show them. No text, captions, numbers or signatures.
 
 Art style: ${artStyle}.${buildStagedDepthLine(cast)}${textDirective}`;
   }

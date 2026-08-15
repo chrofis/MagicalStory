@@ -3365,7 +3365,7 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     pageBrief: String(scene.compositeBrief || fd.pageBrief || scene.sceneDescription || '').slice(0, 2000),
     interactions: fd.interactions || [],
     pagePrompt,
-    ...buildBlendMetadata(fd, scene),
+    ...buildBlendMetadata(fd, scene, storyData.clothingRequirements || storyData.outline?.clothingRequirements || null),
   };
   // Pass the stored emptyScenePrompt WHOLE. It runs ~4000 chars: a leading ART
   // STYLE block, then **LOCATION:** around char 1350. Cutting either end has
