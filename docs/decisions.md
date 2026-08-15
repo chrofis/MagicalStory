@@ -11796,3 +11796,21 @@ of the 128 stories with no job row at all (saved outside the job flow, or whose 
 start), `server/routes/stories.js` (listing + count filter).
 
 **Status:** active.
+
+**Addendum (same day).** Two corrections to the entry above:
+
+1. *Why reusing the preview avatar is legitimate:* it needs no style pass. A
+   trial is always `watercolor`, and the preview is generated AS a full-body
+   watercolour illustration (`server/routes/trial.js` — "Create a full-body
+   watercolor illustration … STYLE: Soft watercolor illustration style"), so it
+   is already in the story's art style. The costumed avatar is unaffected and
+   keeps its own style-transfer pass (it is a real 2×4 sheet). An intermediate
+   revert, made on the wrong assumption that the preview was unstyled, was
+   itself reverted.
+2. *The silent fallback is closed:* `applyStoryCellRefs` no longer substitutes
+   the costumed sheet for a missing styled sheet in silence — it logs a warning
+   AND rewrites `ref.clothingCategory` to `costumed`, so a reference reports the
+   category it actually sent. That silence is what hid a standard-labelled page
+   rendering in costume across three runs.
+
+**Touched files (addendum):** `server/lib/storyAvatars.js`.
