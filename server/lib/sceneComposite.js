@@ -778,6 +778,123 @@ async function cropAvatarCell(sheet, opts = {}) {
  *   scores — per-name occlusion score (higher = more in front).
  *   decisions — per-pair audit: [{ a, b, aPx, bPx, winner }] for log lines.
  */
+/**
+ * Figure-figure occlusion. `placements` arrives back-to-front, so for each
+ * figure every LATER entry is one the plate says stands in front of it —
+ * subtract those silhouettes from this figure's alpha, in place on `p.input`.
+ *
+ * Paint order alone cannot do this: a cutout is a rectangle, so the front
+ * figure covers the back one and the back figure's own outline disappears.
+ *
+ * The masks cost nothing — findSilhouettesByDiff already returns a full-canvas
+ * per-character mask (face and interior holes included) that the composite has
+ * been discarding. More accurate than a segmenter, too: we painted these
+ * silhouettes, so their extent is known rather than inferred.
+ *
+ * Guarded the same way as the two existing subtract implementations
+ * (faceRepair.js occluder-subtract, samBlend.js round-2): a subtract that
+ * erases more than 70% of the target means the labels are crossed — keep the
+ * original alpha instead of a figure eaten by its neighbour.
+ *
+ * Returns a log array; mutates `placements[i].input`.
+ */
+async function subtractFiguresInFront(placements, silhouetteMasks, canvasW, canvasH) {
+  const out = [];
+  for (let i = 0; i < placements.length; i++) {
+    const p = placements[i];
+    const inFront = placements.slice(i + 1).filter(q => silhouetteMasks[q._name]);
+    if (!inFront.length) continue;
+    try {
+      const meta = await sharp(p.input).metadata();
+      // One cut-mask over this figure's rectangle: 255 where a figure in front
+      // owns the pixel. Canvas coords → placement-local coords.
+      const cut = Buffer.alloc(meta.width * meta.height, 0);
+      let cutPixels = 0;
+      for (const q of inFront) {
+        const qm = silhouetteMasks[q._name];
+        for (let y = 0; y < meta.height; y++) {
+          const cy = p.top + y;
+          if (cy < 0 || cy >= canvasH) continue;
+          for (let x = 0; x < meta.width; x++) {
+            const cx = p.left + x;
+            if (cx < 0 || cx >= canvasW) continue;
+            if (qm[cy * canvasW + cx] && !cut[y * meta.width + x]) {
+              cut[y * meta.width + x] = 255; cutPixels++;
+            }
+          }
+        }
+      }
+      if (!cutPixels) continue;
+      const alphaMean = async (buf) => {
+        const s = await sharp(buf).ensureAlpha().stats();
+        return s?.channels?.[3] ? s.channels[3].mean / 255 : null;
+      };
+      const fracBefore = await alphaMean(p.input);
+      const cutPng = await sharp(Buffer.alloc(meta.width * meta.height * 3, 255), {
+        raw: { width: meta.width, height: meta.height, channels: 3 },
+      }).ensureAlpha()
+        .joinChannel(cut, { raw: { width: meta.width, height: meta.height, channels: 1 } })
+        .png().toBuffer();
+      const trial = await sharp(p.input).ensureAlpha()
+        .composite([{ input: cutPng, blend: 'dest-out' }]).png().toBuffer();
+      const fracAfter = await alphaMean(trial);
+      const behind = inFront.map(q => q._name);
+      if (fracBefore != null && fracBefore > 0 && fracAfter != null && fracAfter < fracBefore * 0.30) {
+        log.warn(`[SCENE COMPOSITE]   ${p._name}: occlusion by ${behind.join(', ')} would remove ${Math.round((1 - fracAfter / fracBefore) * 100)}% — reverting (label mismatch)`);
+        out.push({ name: p._name, behind, reverted: true });
+        continue;
+      }
+      p.input = trial;
+      const removedPct = fracBefore ? Math.round((1 - fracAfter / fracBefore) * 100) : 0;
+      log.info(`[SCENE COMPOSITE]   ${p._name}: occluded by ${behind.join(', ')} — ${removedPct}% hidden`);
+      out.push({ name: p._name, behind, removedPct });
+    } catch (err) {
+      log.warn(`[SCENE COMPOSITE]   ${p._name}: figure-figure occlusion failed (${err.message}) — pasting unoccluded`);
+    }
+  }
+  return out;
+}
+
+/**
+ * Scenery that crosses a figure — a railing at the waist, a wall, an open chest
+ * lid — with the figure still visible below it.
+ *
+ * 3a (the ground-plane solve) cannot see this case: the detector merges the
+ * silhouette's fragments, so the box already spans crown to feet and nothing
+ * looks short. What gives it away is the SHAPE — a band of non-silhouette
+ * pixels with silhouette both above and below in the same column. Those bands
+ * are exactly where the plate drew scenery in front of the character.
+ *
+ * Note this relies on the hole fill NOT having closed them: it floods inward
+ * from the bbox border, so a face or an eye (enclosed) is filled while a
+ * railing band (which reaches the box edges) is left open. That is the
+ * distinction between "interior detail" and "something passing in front".
+ *
+ * Returns a full-canvas Uint8Array marking pixels to repaint from the clean
+ * background, or null when there is nothing to restore.
+ */
+function buildSceneryOccluderMask(placements, silhouetteMasks, canvasW, canvasH) {
+  const restore = new Uint8Array(canvasW * canvasH);
+  let count = 0;
+  for (const p of placements) {
+    const m = silhouetteMasks[p._name];
+    const bb = p._bbox;
+    if (!m || !bb) continue;
+    const x0 = Math.max(0, bb.x), x1 = Math.min(canvasW - 1, bb.x + bb.width - 1);
+    const y0 = Math.max(0, bb.y), y1 = Math.min(canvasH - 1, bb.y + bb.height - 1);
+    for (let x = x0; x <= x1; x++) {
+      let top = -1, bot = -1;
+      for (let y = y0; y <= y1; y++) { if (m[y * canvasW + x]) { if (top < 0) top = y; bot = y; } }
+      if (top < 0 || bot <= top) continue;
+      for (let y = top + 1; y < bot; y++) {
+        const q = y * canvasW + x;
+        if (!m[q] && !restore[q]) { restore[q] = 1; count++; }
+      }
+    }
+  }
+  return count ? { mask: restore, pixels: count } : null;
+}
+
 async function detectZOrderByOcclusion(populatedBuf, placements) {
   if (placements.length < 2) {
     return { order: placements.slice(), scores: {}, decisions: [] };
@@ -1181,7 +1298,38 @@ function buildTextOverlayDirective(textOverlay, fallbackArtStyle) {
   return `\n\n═══ TEXT RENDERING ═══\n${directive}`;
 }
 
+/**
+ * The staging clause appended to the page's own prompt.
+ *
+ * Everything above it is what we would send to CREATE this page, so the model
+ * renders the scene on its own terms; this block only says what Image 1 already
+ * fixes. It deliberately does NOT say "positions and sizes are already correct"
+ * or forbid restructuring the scenery — those three lines are what stopped the
+ * model putting a character behind a railing the brief explicitly placed him
+ * behind (job_1786780194082_s980g4s9a p6: "kneels at the gap in the bridge
+ * railing and peers down through it"). The plate had the occlusion right and
+ * the old prompt forbade keeping it.
+ */
+const BLEND_STAGING_CLAUSE = `STAGING — Image 1 already places every character: who they are, where they stand, and how big they are. Keep each character in that spot at that size, and render the page described above around them.
+
+- A character the scene places behind something — a railing, a wall, a chest, another character — is drawn BEHIND it: paint that element over them so it passes in front.
+- Match each character to the scene's light, and soften pasted cutout edges so they read as painted rather than stickered.
+- Paint over any solid red, blue, green, yellow, purple or cyan outline or fringe left around a character by the staging step. No solid-colour outlines survive.
+- Add no character who is not already in Image 1, remove none, and substitute none.
+- Keep each character's face, hair, age and clothing as Image 1 and the labelled portrait grid show them.
+- No text, captions, numbers or signatures anywhere.`;
+
 function buildBlendEditPrompt(scene) {
+  // Preferred: the page's OWN generation prompt, so the blend renders the scene
+  // the way normal page generation would rather than being told to leave a
+  // staged canvas alone. Caller shrinks to the model budget (shrinkPromptForModel).
+  const pagePrompt = String(scene.pagePrompt || '').trim();
+  if (pagePrompt) {
+    const textDirectiveForPage = buildTextOverlayDirective(scene.textOverlay, scene.artStyle);
+    return `${pagePrompt}\n\n${BLEND_STAGING_CLAUSE}${textDirectiveForPage}`;
+  }
+
+  // Legacy path — no page prompt supplied (older callers, cover dispatcher).
   const styleLine = BLEND_STYLE_LINES[scene.artStyle] || BLEND_STYLE_LINES.watercolor;
   const brief = (scene.pageBrief || '').trim();
   const briefHeader = `\n\nPAGE BRIEF — these blocks define the canonical look of every character, costume, object, and pose in this scene. The composited image (Image 1) is already staged correctly; the brief tells you WHAT each silhouette is supposed to look like once blended. Image 2 (when provided) is the labelled portrait grid — use it as the authoritative face/clothing reference.\n\n`;
@@ -1893,13 +2041,26 @@ async function generateSceneComposite(opts) {
     // Height + vertical anchor from the stature model. The box still supplies
     // the horizontal position; whether its BOTTOM is a ground line or just the
     // edge of the frame is decided by statureTargetFor.
-    const { targetH, anchor, clip, via, paintedFull } = statureTargetFor(
+    const { targetH, anchor, clip, via, paintedFull, visibleFraction } = statureTargetFor(
       c, bbox, statureModel, detection.canvasWidth, detection.canvasHeight,
       detection.results[c.name]?.head, plate.ratio);
     if (targetH !== bbox.height) {
-      log.info(`[SCENE COMPOSITE]   ${c.name} (age ${c.age}): box h=${bbox.height}${clip.bottom ? ' (clipped)' : ''} → ${targetH} (${((targetH / bbox.height - 1) * 100).toFixed(0)}%), anchored by ${anchor}, via ${via}`);
+      log.info(`[SCENE COMPOSITE]   ${c.name} (age ${c.age}): box h=${bbox.height}${clip.bottom ? ' (clipped)' : ''} → ${targetH} (${((targetH / bbox.height - 1) * 100).toFixed(0)}%), anchored by ${anchor}, via ${via}${visibleFraction ? `, ${Math.round(visibleFraction * 100)}% on show` : ''}`);
     }
     let scaled = await scaleToHeight(cutBuf, Math.max(20, targetH));
+
+    // Scenery hides the rest of this figure, so paste only the part that shows.
+    // Drawing the whole body would paint over the very thing doing the hiding,
+    // and the scene interaction the brief asked for disappears with it.
+    if (visibleFraction && visibleFraction < 1) {
+      const m0 = await sharp(scaled).metadata();
+      const keep = Math.max(8, Math.round(m0.height * visibleFraction));
+      if (keep < m0.height) {
+        scaled = await sharp(scaled)
+          .extract({ left: 0, top: 0, width: m0.width, height: keep }).png().toBuffer();
+        log.info(`[SCENE COMPOSITE]   ${c.name}: clipped to the visible ${Math.round(visibleFraction * 100)}% (${m0.height}px → ${keep}px) so the occluder survives`);
+      }
+    }
 
     let sMeta = await sharp(scaled).metadata();
     const cx = bbox.x + Math.floor(bbox.width / 2);
@@ -1967,10 +2128,59 @@ async function generateSceneComposite(opts) {
     log.info(`[SCENE COMPOSITE]   occlusion ${d.a} vs ${d.b}: ${d.a}=${d.aPx}px ${d.b}=${d.bPx}px → ${d.winner} in front`);
   }
   log.info(`[SCENE COMPOSITE]   z-order (back → front): ${placements.map(p => `${p._name}[score=${zResult.scores[p._name]},foot=${p._footY}]`).join(' → ')}`);
+
+  // ── Figure-figure occlusion ───────────────────────────────────────────────
+  // Paint order alone does not occlude: the front figure is a whole rectangular
+  // cutout, so it covers the one behind and the back figure's own outline is
+  // lost. Subtract, from each figure's alpha, the silhouettes of every figure
+  // painted AFTER it — the ones the plate says stand in front.
+  //
+  // The masks are free: findSilhouettesByDiff already returns a full-canvas,
+  // per-character mask (face and interior holes included) that this path has
+  // been discarding. No SAM call, and more accurate than one, because we
+  // painted these silhouettes ourselves.
+  //
+  // Guarded like the two existing subtract implementations (faceRepair.js:345,
+  // samBlend.js:551): if removing a neighbour would erase more than 70% of the
+  // target, the labels are crossed — keep the unsubtracted alpha.
+  const occlusionLog = await subtractFiguresInFront(
+    placements, silhouetteMasks, detection.canvasWidth, detection.canvasHeight);
+  if (occlusionLog.length) debug.figureOcclusion = occlusionLog;
+
   // Strip the auxiliary fields before handing to sharp — it only knows input/left/top.
   const compositeInputs = placements.map(({ input, left, top }) => ({ input, left, top }));
 
-  const composited = await sharp(bgBuf).composite(compositeInputs).png().toBuffer();
+  let composited = await sharp(bgBuf).composite(compositeInputs).png().toBuffer();
+
+  // ── Scenery back in front ─────────────────────────────────────────────────
+  // Figures were just painted over everything, including whatever the plate had
+  // crossing them. Repaint those bands from the clean background so a railing
+  // the character kneels behind stays in front of them.
+  try {
+    const occ = buildSceneryOccluderMask(placements, silhouetteMasks, detection.canvasWidth, detection.canvasHeight);
+    if (occ) {
+      const bgResized = await sharp(bgBuf)
+        .resize(detection.canvasWidth, detection.canvasHeight, { fit: 'fill' })
+        .ensureAlpha().raw().toBuffer();
+      const layer = Buffer.alloc(detection.canvasWidth * detection.canvasHeight * 4, 0);
+      for (let i = 0; i < detection.canvasWidth * detection.canvasHeight; i++) {
+        if (!occ.mask[i]) continue;
+        layer[i * 4] = bgResized[i * 4];
+        layer[i * 4 + 1] = bgResized[i * 4 + 1];
+        layer[i * 4 + 2] = bgResized[i * 4 + 2];
+        layer[i * 4 + 3] = 255;
+      }
+      const layerPng = await sharp(layer, {
+        raw: { width: detection.canvasWidth, height: detection.canvasHeight, channels: 4 },
+      }).png().toBuffer();
+      composited = await sharp(composited).composite([{ input: layerPng, left: 0, top: 0 }]).png().toBuffer();
+      debug.sceneryOccluderPixels = occ.pixels;
+      log.info(`[SCENE COMPOSITE]   scenery restored in front of the figures: ${occ.pixels}px repainted from the clean background`);
+    }
+  } catch (err) {
+    log.warn(`[SCENE COMPOSITE] scenery-occluder restore failed (${err.message}) — figures stay on top`);
+  }
+
   const compositedData = `data:image/png;base64,${composited.toString('base64')}`;
   debug.composited = compositedData;
 
@@ -1985,7 +2195,22 @@ async function generateSceneComposite(opts) {
 
   // ── Step 5/5: Grok edit blend pass
   log.info('[SCENE COMPOSITE] step 5/5 — blend pass');
-  const blendPrompt = buildBlendEditPrompt(scene);
+  let blendPrompt = buildBlendEditPrompt(scene);
+  // The page's own prompt runs to ~7.5k on a busy page, so it can pass Grok's
+  // budget once the staging clause is added. Shrink with the SAME helper page
+  // generation uses: it holds the REQUIRED OBJECTS + ART STYLE tail back and
+  // reattaches it verbatim. A blind cut is not an option — one measured at 7.5k
+  // dropped the whole ART STYLE block and rendered photographic 3 times out of 3.
+  if (blendPrompt.length > BLEND_PROMPT_HARD_CAP) {
+    try {
+      const { shrinkPromptForModel } = require('./images');
+      const before = blendPrompt.length;
+      blendPrompt = await shrinkPromptForModel(blendPrompt, BLEND_PROMPT_HARD_CAP, 'SCENE COMPOSITE BLEND', GROK_MODELS.STANDARD);
+      log.info(`[SCENE COMPOSITE]   blend prompt ${before} → ${blendPrompt.length} chars (budget ${BLEND_PROMPT_HARD_CAP})`);
+    } catch (err) {
+      log.warn(`[SCENE COMPOSITE] blend prompt shrink failed (${err.message}) — sending as built at ${blendPrompt.length} chars`);
+    }
+  }
   debug.blendPrompt = blendPrompt;
   // VB grid as Image 2 — labelled portrait grid serves as the authoritative face /
   // clothing reference. The composited image stays as Image 1 (the canvas to refine).
@@ -2256,6 +2481,34 @@ function buildPlateHeadRatio(cast, results, canvasH) {
   return { ratio: rs[Math.floor(rs.length / 2)], n: rs.length };
 }
 
+/**
+ * Solve where a figure's feet are, given where its crown is.
+ *
+ * On a ground plane a figure's pixel height is s(footY) x its real height, so
+ *   footY - headY = s(footY) * heightCm
+ * is one equation in one unknown. s() can slope either way — its gradient is
+ * (1 - a*heightCm), which a steep plane or a tall character flips negative — so
+ * bisect on the sign change rather than assuming a direction.
+ *
+ * Returns null when there is no crossing: the ground plane is too shallow to
+ * seat this figure (a*heightCm >= 1) and the horizon estimate has broken down.
+ * Callers fall back to the painted span rather than extrapolate off a bad
+ * gradient.
+ */
+function _solveFootY(headY, heightCm, statureModel, spanGuess) {
+  const f = (y) => y - headY - (statureModel.at(y) || 0) * heightCm;
+  let lo = headY + spanGuess, hi = headY + spanGuess * 4;
+  const fLo = f(lo), fHi = f(hi);
+  if (fLo === 0) return lo;
+  if (!(fLo * fHi < 0)) return null;
+  const rising = fLo < 0;
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2;
+    if ((f(mid) < 0) === rising) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
 function statureTargetFor(c, bbox, statureModel, canvasW, canvasH, head = null, plateRatio = null) {
   const clip = _boxClipping(bbox, canvasW, canvasH);
   const anchor = clip.bottom && !clip.top ? 'head' : 'feet';
@@ -2299,21 +2552,7 @@ function statureTargetFor(c, bbox, statureModel, canvasW, canvasH, head = null, 
     const headY = bbox.y;
     const visible = canvasH - headY;
     const cm = _heightCm(c.age);
-    const f = (y) => y - headY - (statureModel.at(y) || 0) * cm;
-    // f can run either way: its slope is (1 − a·heightCm), so a steep ground
-    // plane (or a tall character) flips it negative. Bisect on the sign change
-    // rather than assuming a direction.
-    let lo = headY + visible, hi = headY + visible * 4, footY = null;
-    const fLo = f(lo), fHi = f(hi);
-    if (fLo === 0) footY = lo;
-    else if (fLo * fHi < 0) {
-      const rising = fLo < 0;
-      for (let i = 0; i < 50; i++) {
-        const mid = (lo + hi) / 2;
-        if ((f(mid) < 0) === rising) lo = mid; else hi = mid;
-      }
-      footY = (lo + hi) / 2;
-    }
+    const footY = _solveFootY(headY, cm, statureModel, visible);
     // No crossing means the ground plane is too shallow to seat this figure
     // (a·heightCm ≥ 1) — the horizon estimate has broken down. Fall back to the
     // painted span rather than extrapolating off a bad gradient.
@@ -2322,6 +2561,44 @@ function statureTargetFor(c, bbox, statureModel, canvasW, canvasH, head = null, 
     const solved = footY ? Math.round(footY - headY) : visible;
     const targetH = Math.min(Math.round(visible / 0.55), Math.max(visible, solved));
     return { targetH, anchor, clip, corrected: true, visible, solved, via: footY ? 'ground-plane' : 'painted-span' };
+  }
+  // OCCLUDED BY SCENERY. A box can end because the figure ends, or because
+  // something in the scene hides the rest — a railing, a wall, an open chest.
+  // The box cannot tell them apart, but the ground plane can: solve where the
+  // feet would be for a crown at bbox.y, and if that figure is materially
+  // taller than the box, the missing part is behind scenery.
+  //
+  // Measured on job_1786780194082_s980g4s9a p6: a character the brief has
+  // "kneel at the gap in the bridge railing and peer down through it" had an
+  // 83px box that was only his torso. Scaling a whole figure to 83px made him
+  // tiny AND painted over the railing that was meant to hide his legs.
+  //
+  // So scale to the FULL height and report the visible fraction; the paste site
+  // draws only that top slice, and the occluder is never covered.
+  //
+  // The head band would answer this too, but it is not dependable: Grok ignores
+  // the two-tone silhouette instruction in `realistic` style, and p6 came back
+  // with head = null on all three figures. The ground plane needs no tint.
+  if (!clip.bottom && !clip.top) {
+    const footY = _solveFootY(bbox.y, _heightCm(c.age), statureModel, bbox.height);
+    if (footY) {
+      const solvedFull = Math.round(footY - bbox.y);
+      const ratio = solvedFull / bbox.height;
+      // 1.15 keeps normal measurement noise out; 4x is the sanity ceiling — a
+      // figure showing less than a quarter of itself is a mismeasured box, not
+      // a person behind a railing. footY must also stay on-canvas, otherwise
+      // this is frame clipping and the branch above owns it.
+      if (ratio > 1.15 && ratio <= 4 && footY < canvasH) {
+        return {
+          targetH: Math.max(20, solvedFull),
+          anchor: 'head',
+          clip,
+          corrected: true,
+          visibleFraction: Math.min(1, bbox.height / solvedFull),
+          via: 'ground-plane+occluded',
+        };
+      }
+    }
   }
   // Whole figure: clamp to 0.4–1.6× the painted box so a bad fit can never
   // produce an absurd result.
@@ -3030,6 +3307,8 @@ module.exports = {
   _internal: {
     findColorBbox,
     findSilhouettesByDiff,
+    subtractFiguresInFront,
+    buildSceneryOccluderMask,
     buildStatureModel,
     buildPlateHeadRatio,
     statureTargetFor,

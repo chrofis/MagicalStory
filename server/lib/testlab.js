@@ -3291,11 +3291,37 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   }
 
   const { backCast, frontCast } = splitCastByStratum(cast);
+  // The page's OWN generation prompt, rebuilt exactly as preparePageData builds
+  // it, so a Lab run sends the blend pass what production sends it. Without this
+  // the Lab would exercise a different prompt than the pipeline and its verdicts
+  // would not transfer.
+  let pagePrompt = null;
+  try {
+    const { buildImagePrompt } = require('./storyHelpers');
+    pagePrompt = buildImagePrompt(
+      scene.sceneDescription || fd.description || '',
+      {
+        artStyle: ctx.artStyle || storyData.artStyle,
+        language: ctx.language || storyData.language,
+        languageLevel: ctx.languageLevel || storyData.languageLevel,
+        layout: ctx.layout || storyData.layout || {},
+        characters: storyData.characters || [],
+      },
+      fd.characters || scene.sceneCharacters || null,
+      ctx.visualBible || null,
+      ctx.pageNumber,
+      ctx.referencePhotos || null,
+      { skipVisualBible: true },
+    );
+  } catch (err) {
+    log.warn(`[TESTLAB] could not rebuild the page prompt (${err.message}) — blend falls back to the legacy brief`);
+  }
   const compositeScene = {
     description: String(fd.description || scene.sceneDescription || '').slice(0, 2500),
     artStyle: ctx.artStyle || storyData.artStyle || 'watercolor',
     pageBrief: String(scene.compositeBrief || fd.pageBrief || scene.sceneDescription || '').slice(0, 2000),
     interactions: fd.interactions || [],
+    pagePrompt,
   };
   // Pass the stored emptyScenePrompt WHOLE. It runs ~4000 chars: a leading ART
   // STYLE block, then **LOCATION:** around char 1350. Cutting either end has
@@ -3388,6 +3414,11 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     plateHeadRatio: dbg.plateHeadRatio || null,
     statureModel: dbg.statureModel || null,
     promptUsed: dbg.populatedPlatePrompt || null,
+    // The blend prompt as SENT (after any shrink), plus whether it was the
+    // page's own generation prompt or the legacy brief — the difference decides
+    // whether the model was even allowed to render occlusion.
+    blendPrompt: dbg.blendPrompt || null,
+    blendPromptSource: pagePrompt ? 'page-prompt' : 'legacy-brief',
     cleanBackgroundPrompt,
   };
 }

@@ -3930,9 +3930,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       artStyle: inputData.artStyle || 'watercolor',
                       pageBrief: String(fdMeta.pageBrief || pageData.sceneDescription || ''),
                       interactions: fdMeta.interactions || [],
+                      // The page's OWN generation prompt (built at preparePageData
+                      // via buildImagePrompt). The blend pass sends this, so the
+                      // composite renders the page the way a direct render would —
+                      // same scene, same composition rules, same required objects,
+                      // same art style — instead of being told to leave a staged
+                      // canvas untouched.
+                      pagePrompt: pageData.prompt || null,
                     },
                     cleanBackgroundPrompt: String(pageData.emptyScenePrompt || fdMeta.emptyScenePrompt || ''),
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+                    // Labelled portrait grid as Image 2 — the blend prompt calls it
+                    // the authoritative face/clothing reference, and this path was
+                    // passing nothing, leaving identity to the pasted pixels alone.
+                    visualBibleGridImage: pageData.visualBibleGrid || null,
                     usageTracker: addUsage,
                   });
                   scaleRepairResult = compRes?.imageData
