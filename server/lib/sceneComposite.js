@@ -2214,7 +2214,37 @@ async function generateSceneComposite(opts) {
 
   // ── Step 5/5: Grok edit blend pass
   log.info('[SCENE COMPOSITE] step 5/5 — blend pass');
-  let blendPrompt = buildBlendEditPrompt(scene, cast);
+  const blended = await blendPastedCanvas({
+    compositedData, scene, cast, aspectRatio, visualBibleGridImage, usageTracker, debug,
+  });
+  totalCost += blended.cost;
+
+  log.info(`[SCENE COMPOSITE] complete — total cost $${totalCost.toFixed(4)}, ${placements.length}/${cast.length} characters placed`);
+
+  return {
+    imageData: blended.imageData,
+    usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite' },
+    debug,
+  };
+}
+
+/**
+ * The blend pass on its own: take a pasted canvas and hand it to Grok with the
+ * page's prompt plus the staging clause.
+ *
+ * Split out so it can be replayed. Every blend variant we want to compare runs
+ * against the SAME pasted canvas — the plate, the depopulate and the paste are
+ * already correct and re-rolling them changes the staging under the comparison,
+ * which is how three earlier "the prompt is better now" readings turned out to
+ * be a different plate rather than a different prompt. One Grok call per try.
+ *
+ * `promptOverride` replaces the built prompt outright (Lab A/B arms).
+ */
+async function blendPastedCanvas({
+  compositedData, scene, cast, aspectRatio, visualBibleGridImage,
+  usageTracker, promptOverride = null, debug = {},
+}) {
+  let blendPrompt = promptOverride || buildBlendEditPrompt(scene, cast);
   // The page's own prompt runs to ~7.5k on a busy page, so it can pass Grok's
   // budget once the staging clause is added. Shrink with the SAME helper page
   // generation uses: it holds the REQUIRED OBJECTS + ART STYLE tail back and
@@ -2239,16 +2269,9 @@ async function generateSceneComposite(opts) {
   debug.blendRefCount = blendRefs.length;
   const pass1 = await editWithGrok(blendPrompt, blendRefs, { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', pass1.usage, 'scene_composite_blend', pass1.modelId);
-  totalCost += pass1.usage?.cost || 0;
   debug.blendSentToGrok = pass1.sentToGrok || null;
 
-  log.info(`[SCENE COMPOSITE] complete — total cost $${totalCost.toFixed(4)}, ${placements.length}/${cast.length} characters placed`);
-
-  return {
-    imageData: pass1.imageData,
-    usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite' },
-    debug,
-  };
+  return { imageData: pass1.imageData, cost: pass1.usage?.cost || 0, blendPrompt };
 }
 
 // ─── Stratified composite pipeline ────────────────────────────────────────
@@ -3366,6 +3389,8 @@ async function _stratifiedBody(ctx) {
 module.exports = {
   generateSceneComposite,
   generateStratifiedComposite,
+  blendPastedCanvas,
+  buildBlendEditPrompt,
   POSE_CELL,
   FACE_CELL,
   DEFAULT_PALETTE,

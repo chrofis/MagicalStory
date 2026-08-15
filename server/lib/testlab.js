@@ -3336,6 +3336,53 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
 
   const usage = [];
   const t0 = Date.now();
+
+  // ── BLEND REPLAY ──────────────────────────────────────────────────────────
+  // params.replayPasteOf = {experimentId, resultIndex} re-blends a PAST run's
+  // pasted canvas instead of building a new one. Every blend variant then runs
+  // against identical staging, which is the only way to read a prompt change:
+  // a fresh composite re-rolls the plate, so a "better" result can just be a
+  // different plate. One Grok call per try (~$0.02) instead of three.
+  if (params.replayPasteOf) {
+    const { blendPastedCanvas } = require('./sceneComposite');
+    const { dbQuery } = require('../services/database');
+    const expId = Number(params.replayPasteOf.experimentId);
+    const idx = Number(params.replayPasteOf.resultIndex || 0);
+    const rows = await dbQuery('SELECT results FROM testlab_experiments WHERE id = $1', [expId]);
+    if (!rows.length) throw new Error(`replayPasteOf: experiment #${expId} not found`);
+    const src = (rows[0].results || [])[idx];
+    if (!src) throw new Error(`replayPasteOf: experiment #${expId} has no result #${idx}`);
+    if (src.storyId !== ctx.storyId || src.pageNumber !== ctx.pageNumber) {
+      throw new Error(`replayPasteOf: result #${idx} is ${src.storyId} P${src.pageNumber}, not this target`);
+    }
+    const pasteStep = (src.steps || []).find(s => /pre-blend/i.test(s.label || ''));
+    if (!pasteStep) throw new Error(`replayPasteOf: result #${idx} stored no pre-blend step`);
+    const img = await loadTestImage(ctx.storyId, 'tl_step', ctx.pageNumber, Number(pasteStep.versionIndex));
+    if (!img?.imageData) throw new Error(`replayPasteOf: tl_step v${pasteStep.versionIndex} not found`);
+
+    const dbg = {};
+    const out = await blendPastedCanvas({
+      compositedData: img.imageData,
+      scene: compositeScene,
+      cast,
+      aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
+      visualBibleGridImage: ctx.visualBibleGrid || null,
+      promptOverride: params.blendPrompt || null,
+      usageTracker: (provider, u, fnName, modelId) => usage.push({ provider, fn: fnName, modelId, cost: u?.cost || 0 }),
+      debug: dbg,
+    });
+    const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, out.imageData, experimentId);
+    return {
+      imageType: 'scene', versionIndex, elapsedMs: Date.now() - t0,
+      replayOf: { experimentId: expId, resultIndex: idx, pasteVersion: pasteStep.versionIndex },
+      blended: true,
+      blendPrompt: out.blendPrompt,
+      blendPromptSource: params.blendPrompt ? 'override' : (pagePrompt ? 'page-prompt' : 'legacy-brief'),
+      modelCalls: usage.length,
+      cost: usage.reduce((a, u) => a + (u.cost || 0), 0),
+    };
+  }
+
   const fn = strategy === 'stratified' ? generateStratifiedComposite : generateSceneComposite;
   const res = await fn({
     compositeStrategy: strategy,
