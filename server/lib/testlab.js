@@ -3272,7 +3272,7 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { buildCompositeCast, splitCastByStratum } = require('./compositeCastBuilder');
-  const { generateSceneComposite, generateStratifiedComposite, POSE_CELL } = require('./sceneComposite');
+  const { generateSceneComposite, generateStratifiedComposite, POSE_CELL, buildBlendMetadata } = require('./sceneComposite');
   const { MODEL_DEFAULTS } = require('../config/models');
   const { storyData, userId } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
 
@@ -3343,6 +3343,7 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     pageBrief: String(scene.compositeBrief || fd.pageBrief || scene.sceneDescription || '').slice(0, 2000),
     interactions: fd.interactions || [],
     pagePrompt,
+    ...buildBlendMetadata(fd, scene),
   };
   // Pass the stored emptyScenePrompt WHOLE. It runs ~4000 chars: a leading ART
   // STYLE block, then **LOCATION:** around char 1350. Cutting either end has

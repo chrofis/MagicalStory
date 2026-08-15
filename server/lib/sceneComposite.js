@@ -1333,6 +1333,43 @@ const BLEND_STAGING_CLAUSE = `STAGING — Image 1 already places every character
  * model has to infer it from prose while another line describes the same person
  * as "a full adult-height man", and on p6 it rendered him at foreground size.
  */
+/**
+ * The two things the blend needs from scene metadata that a pasted avatar
+ * cannot supply: what each face is feeling, and what each person is attending
+ * to.
+ *
+ * Takes the interaction's `object` and deliberately NOT its `where`. `where`
+ * is the staging sentence ("kneels at the gap in the bridge railing") and
+ * sending it is what relocated characters in every run that included it;
+ * `object` is just the target their eyes go to. One field apart, opposite
+ * outcomes — see buildBlendEditPrompt's note.
+ */
+function buildBlendMetadata(fullData, scene = null) {
+  const fd = fullData || {};
+  const chars = fd.characters || scene?.sceneCharacters || [];
+  const characterExpressions = {};
+  for (const c of chars) {
+    if (c?.name && c.expression) characterExpressions[c.name] = String(c.expression).trim();
+  }
+  const attentionTargets = {};
+  for (const it of (fd.interactions || [])) {
+    if (it?.character && it.object) attentionTargets[it.character] = String(it.object).trim();
+  }
+  return { characterExpressions, attentionTargets };
+}
+
+// Age as the census words it. Kept coarse on purpose: the blend needs to know
+// a figure is a child rather than a shrunk adult, and nothing finer.
+function _ageWord(age) {
+  const n = Number(age);
+  if (!Number.isFinite(n)) return 'a person';
+  if (n < 4) return 'a toddler';
+  if (n < 13) return 'a child';
+  if (n < 20) return 'a teenager';
+  if (n < 60) return 'an adult';
+  return 'an elderly person';
+}
+
 function buildStagedDepthLine(cast) {
   if (!Array.isArray(cast) || !cast.length) return '';
   const byDepth = { foreground: [], midground: [], background: [] };
@@ -1347,14 +1384,79 @@ function buildStagedDepthLine(cast) {
   return parts.length ? `\n\nDepths as staged: ${parts.join('; ')}.` : '';
 }
 
+/**
+ * The blend prompt for a composited page.
+ *
+ * MEASURED, nine variants on one fixed canvas (Lab 695-705, 2026-08-15). The
+ * page's own generation prompt is NOT usable here, even though sending it was
+ * the obvious idea: its `Composition`, `EXACT POSES` and `EXPRESSIONS` sections
+ * are orders to arrange a scene, and at blend time the scene is already
+ * arranged, so the model carries them out — it relocated a character from a
+ * bridge down onto the promenade in 3 of 3 runs that included them. Rewording
+ * them as descriptions of Image 1 did not help (run C). Naming the occluder
+ * made it worse (run E). Deleting them is what worked.
+ *
+ * What is sent instead, and why each part earns its place:
+ *   - a CENSUS of who is in the picture. Without it a half-hidden figure is
+ *     read as an artefact and painted out (run A deleted a man entirely).
+ *   - KEEP WHERE THEY ARE, since position and size are already correct.
+ *   - MAKE THEM NATURAL — the two jobs the blend actually exists for.
+ *   - the EXPRESSIONS and ATTENTION targets from the scene metadata, because
+ *     pasted avatar cut-outs are blank-faced and looking at the camera.
+ *
+ * Known cost of the expression block: the frame creeps in as the prompt grows
+ * (1810 chars held the framing exactly, 3063 zoomed enough to cut feet). The
+ * owner chose to keep the expressions and accept that. Do not "fix" it by
+ * adding another prohibition — four different ones have been overridden.
+ */
 function buildBlendEditPrompt(scene, cast = null) {
-  // Preferred: the page's OWN generation prompt, so the blend renders the scene
-  // the way normal page generation would rather than being told to leave a
-  // staged canvas alone. Caller shrinks to the model budget (shrinkPromptForModel).
-  const pagePrompt = String(scene.pagePrompt || '').trim();
-  if (pagePrompt) {
-    const textDirectiveForPage = buildTextOverlayDirective(scene.textOverlay, scene.artStyle);
-    return `${pagePrompt}\n\n${BLEND_STAGING_CLAUSE}${buildStagedDepthLine(cast)}${textDirectiveForPage}`;
+  const people = Array.isArray(cast) ? cast : [];
+  if (people.length) {
+    const expressions = scene.characterExpressions || {};
+    const attention = scene.attentionTargets || {};
+    const occluded = scene.occludedBy || {};
+    const artStyle = BLEND_STYLE_LINES[scene.artStyle] || BLEND_STYLE_LINES.watercolor;
+
+    const census = people.map((c) => {
+      const depth = String(c.depth || 'foreground').toLowerCase();
+      const where = depth === 'background' ? 'in the distance'
+        : depth === 'midground' ? 'in the middle distance' : 'close to the camera';
+      const hidden = occluded[c.name]
+        ? ` ${c.name} is partly hidden: what crosses them passes IN FRONT of them, and they stand behind it at full height — never sitting on it, never shrunk to a small figure.`
+        : '';
+      return `- ${c.name}, ${_ageWord(c.age)}, ${where}${c.position ? ` (${c.position})` : ''}.${hidden}`;
+    }).join('\n');
+
+    const faces = people.filter(c => expressions[c.name])
+      .map(c => `- ${c.name}: ${expressions[c.name]}`).join('\n');
+    const looks = people.filter(c => attention[c.name])
+      .map(c => `- ${c.name} looks at ${attention[c.name]}.`).join('\n');
+
+    const textDirective = buildTextOverlayDirective(scene.textOverlay, scene.artStyle);
+    return `THE PEOPLE IN IMAGE 1 — all of them belong in the picture and all of them must survive:
+${census}
+
+Image 1 is a finished illustration whose figures were pasted in. They are in the right places but they look stiff, flat and blank. Settle them into the scene.
+
+KEEP WHERE THEY ARE — this is absolute:
+- Each person keeps their exact position on the canvas, their exact size, and the surface they stand on. Nobody moves nearer, further, left, right, up or down.
+- Keep the framing of Image 1 exactly: same camera distance, same borders, same crop, feet included.
+- Keep the background exactly as it is — architecture, landscape, water, sky and light.
+
+MAKE THEM NATURAL — they were cut out and pasted, and it shows:
+- Soften the cut-out edges and paint over any solid red, blue, green, yellow, purple or cyan fringe so they read as painted into the picture.
+- Match each person to the scene light and colour, and give each one a contact shadow where they meet the ground.
+- Let the body language relax — weight settled on the feet, shoulders natural. Their feet stay on the same spot while you do it.
+${faces ? `
+ADD THE EMOTIONS — the faces are blank and must not stay blank:
+${faces}
+` : ''}${looks ? `
+WHO IS LOOKING AT WHAT — turn the head and eyes only:
+${looks}
+` : ''}
+Nothing else changes. No one is added, removed or substituted; faces, hair, age and clothing stay as Image 1 and the labelled portrait grid show them. No text, captions, numbers or signatures.
+
+Art style: ${artStyle}.${buildStagedDepthLine(cast)}${textDirective}`;
   }
 
   // Legacy path — no page prompt supplied (older callers, cover dispatcher).
@@ -2019,6 +2121,7 @@ async function generateSceneComposite(opts) {
   const placements = [];
   const placementLog = [];
   const cutoutDebug = {};
+  const occludedBy = {};   // name → true when scenery hid part of them and we clipped
   const phantomPoseRenders = {};
   for (const c of cast) {
     const bbox = bboxes[c.name];
@@ -2107,6 +2210,9 @@ async function generateSceneComposite(opts) {
         scaled = await sharp(scaled)
           .extract({ left: 0, top: 0, width: m0.width, height: keep }).png().toBuffer();
         log.info(`[SCENE COMPOSITE]   ${c.name}: clipped at the occluder line (${m0.height}px → ${keep}px, matching the ${bbox.height}px visible silhouette)`);
+        // The blend census tells the model this figure is partly hidden, so it
+        // does not read a half-body as an artefact and paint it out.
+        occludedBy[c.name] = true;
       }
     }
 
@@ -2215,7 +2321,8 @@ async function generateSceneComposite(opts) {
   // ── Step 5/5: Grok edit blend pass
   log.info('[SCENE COMPOSITE] step 5/5 — blend pass');
   const blended = await blendPastedCanvas({
-    compositedData, scene, cast, aspectRatio, visualBibleGridImage, usageTracker, debug,
+    compositedData, scene: { ...scene, occludedBy }, cast,
+    aspectRatio, visualBibleGridImage, usageTracker, debug,
   });
   totalCost += blended.cost;
 
@@ -3391,6 +3498,7 @@ module.exports = {
   generateStratifiedComposite,
   blendPastedCanvas,
   buildBlendEditPrompt,
+  buildBlendMetadata,
   POSE_CELL,
   FACE_CELL,
   DEFAULT_PALETTE,

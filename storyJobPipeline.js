@@ -3913,7 +3913,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   // scale repair fired. A throw leaves genResult untouched and
                   // the page ships as rendered.
                   const { buildCompositeCast, splitCastByStratum } = require('./server/lib/compositeCastBuilder');
-                  const { generateSceneComposite } = require('./server/lib/sceneComposite');
+                  const { generateSceneComposite, buildBlendMetadata } = require('./server/lib/sceneComposite');
                   const compositeCast = await buildCompositeCast(pageData, inputData, {
                     userId, log, storyCharacterAvatars,
                   });
@@ -3930,13 +3930,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       artStyle: inputData.artStyle || 'watercolor',
                       pageBrief: String(fdMeta.pageBrief || pageData.sceneDescription || ''),
                       interactions: fdMeta.interactions || [],
-                      // The page's OWN generation prompt (built at preparePageData
-                      // via buildImagePrompt). The blend pass sends this, so the
-                      // composite renders the page the way a direct render would —
-                      // same scene, same composition rules, same required objects,
-                      // same art style — instead of being told to leave a staged
-                      // canvas untouched.
-                      pagePrompt: pageData.prompt || null,
+                      // Per-character expression + attention target, the two
+                      // things a pasted avatar cut-out cannot supply (it is
+                      // blank-faced and looking at the camera). The page's own
+                      // generation prompt is deliberately NOT sent — measured
+                      // across nine Lab variants, its staging sections make the
+                      // model re-arrange the scene it was asked to preserve.
+                      ...buildBlendMetadata(fdMeta, pageData),
                     },
                     cleanBackgroundPrompt: String(pageData.emptyScenePrompt || fdMeta.emptyScenePrompt || ''),
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
