@@ -741,8 +741,22 @@ to "a turn of the body is a change of pose, not a change of place".
 **Rationale:** The owner wants the interactions rendered, not just the gaze;
 the distinction that matters is not which field but whether the model is being
 told to stage or to adjust.
+**Measured (Lab 727, p6):** the framing does NOT hold. Sent "kneels at the gap
+in the bridge railing", the model kneels — on the promenade, where there is
+room to. Everything else in that run was correct: Sarah and Hans held position
+and gained their expressions, the frame held, feet intact. So the trade is:
+send the interaction and the character acts it out somewhere else; withhold it
+(exp 726) and they stay put looking blank. Three framings have now failed — as
+staging, as a description of Image 1, and as an on-the-spot adjustment.
+**Owner's call 2026-08-15:** ship as is. On this page the "interaction" is a
+man peering through a railing, which is barely an interaction at all, so the
+cost of getting it wrong is small. Revisit only with real interactions.
+**Not yet tried:** pose and expression on each figure's own crop BEFORE
+pasting, where there is no scene to walk into, leaving the blend nothing but
+edges and light.
 **Touched:** `server/lib/sceneComposite.js` (`buildBlendMetadata`)
-**Status:** 🟡 conditional — the framing is unverified on a real page.
+**Status:** 🟡 conditional — shipped with a known relocation risk on any page
+whose interaction implies a different pose or place.
 
 ### GroundingDINO finds the ghosts; the palette names them (2026-08-15)
 **Context:** The composite located its silhouettes by subtracting the clean
