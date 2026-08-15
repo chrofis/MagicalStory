@@ -10766,3 +10766,47 @@ the photo, while the AD authors WITH the landmark description and variants in vi
 (validated exp #643 — the page was rewritten to "leaning over the wooden railing").
 
 **Touched:** prompts/scene-expansion-all.txt, scene-expansion.txt, scene-review.txt.
+
+## 2026-08-15 — Visual-bible secondary characters are entity-checked too
+
+**Context:** the entity consistency check covered only the photo-backed roster. On
+`job_1786780194082_s980g4s9a` the report listed `[Emma, Hans, Noah, Sarah, Daniel]` across all
+three rounds while **Lira** — a mermaid on pages 3, 4, 7 and 9, correctly detected and named on
+every one of them since the identity fixes — had nothing watching her. Her hair, tail or top
+could drift page to page with no signal at all.
+
+**Decision:** secondary characters from `visualBible.secondaryCharacters` that appear on **more
+than one page** join the entity roster. One appearance cannot drift, so two is the floor.
+Detected pages (from `bboxDetection.figures`) win over the entry's declared `pages`, which are
+the fallback for `gridsOnly` rebuilds that run without detection.
+
+They are judged against their **visual-bible entry and nothing else**:
+- expected text = the entry's `description`, which already carries hair, build, signature look
+  AND clothing;
+- reference cell = `referenceImageUrl`, the generated bible image.
+
+**No clothing category is involved.** The roster's category system does not dress them
+("Clothing categories are roster-only; secondary characters are described, never dressed") and
+they have no `clothingRequirements` row — asking for one would log an error and then compare
+against nothing. So all of a secondary's appearances form a single `visual-bible` group rather
+than being split by category, and both `getStyledAvatarForClothing` and
+`buildClothingDescription` are bypassed for them.
+
+An entry with no resolvable description is skipped rather than checked against nothing. A
+missing `referenceImageUrl` is NOT disqualifying — the grid simply runs without a reference cell.
+
+**Rationale:** the pseudo-character is shaped like a roster entry (`name` plus `__vbSecondary`
+markers), so collection, cropping and grid building need no special case; only the three
+judging points branch.
+
+**Correction recorded here because it was asserted wrongly during this work:** the entity check
+DOES send faces. `createEntityHeadGrid` builds a head grid per grid, it is passed as a second
+image to `evaluateEntityConsistency` (the prompt has a `{HEAD_GRID_INFO}` block), it is persisted
+as `headGridImage`, and the panel renders it (`EntityConsistencyView.tsx:202`). All 7 grids on
+all 3 rounds of the story above carry one. The claim that there were "zero face crops" came from
+reading `cropType: "body"` in the MAIN grid's manifest and over-generalising — that field
+describes the body grid, not the head grid beside it.
+
+**Touched:** `server/lib/entityConsistency.js`, `tests/manual/secondaryEntityCheck.test.js`.
+**Status:** ✅ active — not yet exercised by a story run; the next generation with a recurring
+secondary is the test.

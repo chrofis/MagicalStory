@@ -775,9 +775,19 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     // artStyle = ...` line above it.
     const artStyle = storyData.artStyle || 'pixar';
 
+    // Story-invented characters are checked too, when they appear more than
+    // once. They are not in `characters` (the photo-backed roster) but they do
+    // drift, and until now nothing watched them: on job_1786780194082_s980g4s9a
+    // Lira was named on 4 pages with no consistency check at all.
+    const secondaryEntities = collectSecondaryEntities(storyData.visualBible || null, allImages);
+    if (secondaryEntities.length) {
+      log.info(`🔍 [ENTITY-CHECK] + ${secondaryEntities.length} visual-bible secondary character(s): ${secondaryEntities.map(e => `${e.name} (p${e.__vbPages.join('/')})`).join(', ')}`);
+    }
+    const entityRoster = [...characters, ...secondaryEntities];
+
     // Collect entity appearances from bbox detection data
     log.info('🔍 [ENTITY-CHECK] Collecting entity appearances from scene images...');
-    const entityAppearances = await collectEntityAppearances(allImages, characters, sceneDescriptions, {
+    const entityAppearances = await collectEntityAppearances(allImages, entityRoster, sceneDescriptions, {
       storyCharacters: characters,
       clothingRequirements: storyData.clothingRequirements || null,
       visualBible: storyData.visualBible || null,
@@ -820,7 +830,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
       // Phase 1: Collect all character×clothing tasks
       const tasks = [];
-      for (const character of characters) {
+      for (const character of entityRoster) {
         const charName = character.name;
         const appearances = entityAppearances.get(charName);
         if (!appearances || appearances.length === 0) {
@@ -841,7 +851,12 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           totalIssues: 0
         };
 
-        const byClothing = groupAppearancesByClothing(appearances);
+        // A secondary has no clothing CATEGORIES — the roster system does not
+        // dress them — so all of their appearances form one group judged against
+        // the visual bible.
+        const byClothing = character.__vbSecondary
+          ? new Map([['visual-bible', appearances]])
+          : groupAppearancesByClothing(appearances);
         log.info(`🔍 [ENTITY-CHECK] ${charName}: ${appearances.length} appearances, ${byClothing.size} clothing categories: ${[...byClothing.keys()].join(', ')}`);
 
         for (const [clothingCategory, groupAppearances] of byClothing) {
@@ -870,14 +885,23 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             return null;
           }
 
-          const refAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
+          // A secondary is judged against its VISUAL BIBLE entry: the generated
+          // reference image as the comparison cell, the bible description as the
+          // expected text. It has no styled avatar and no clothingRequirements
+          // row, and asking for either would log an error and compare against
+          // nothing.
+          const refAvatar = character.__vbSecondary
+            ? (character.__vbReferenceUrl || null)
+            : await getStyledAvatarForClothing(character, artStyle, clothingCategory);
           // Expected clothing as TEXT from this story's clothingRequirements.
           // The grid prompt judges clothing against this description, not against
           // the reference avatar's pixels — style transfer can mutate the avatar's
           // outfit, and avatars.clothing can be stale across stories.
-          const expectedClothing = buildClothingDescription(
-            character, clothingCategory, artStyle, storyData.clothingRequirements || null
-          );
+          const expectedClothing = character.__vbSecondary
+            ? character.__vbDescription
+            : buildClothingDescription(
+              character, clothingCategory, artStyle, storyData.clothingRequirements || null
+            );
           const gridLabel = `${charName} (${clothingCategory})`;
 
           // Split crops into batches for multiple 3x3 grids (8 crops + 1 ref per grid)
@@ -1341,6 +1365,63 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
  * @param {Array<object>} sceneDescriptions - Scene descriptions for extracting clothing metadata
  * @returns {Map<string, Array>} Map of entityName -> appearances
  */
+
+/**
+ * Visual-bible secondary characters that appear on MORE THAN ONE page
+ * (owner, 2026-08-15).
+ *
+ * They were never checked. On job_1786780194082_s980g4s9a the entity report
+ * covered [Emma, Hans, Noah, Sarah, Daniel] while Lira — a mermaid on pages
+ * 3, 4, 7 and 9, correctly detected and named on every one — had nothing
+ * watching her for drift. One appearance cannot drift, so two is the floor.
+ *
+ * They are judged against their VISUAL BIBLE entry and nothing else: the
+ * `description` (which already carries hair, build, signature look AND
+ * clothing) as the expected text, and `referenceImageUrl` as the comparison
+ * cell. This is why they need no clothing category — the roster's
+ * category system does not apply to them ("secondary characters are described,
+ * never dressed", decisions.md), and asking clothingRequirements for an entry
+ * that cannot exist would only log an error and compare against nothing.
+ *
+ * The returned object is shaped like a roster character so the existing
+ * collection, cropping and grid code needs no special case: `name` for the
+ * figure-name match, plus a marker the three judging points branch on.
+ */
+function collectSecondaryEntities(visualBible, sceneImages = []) {
+  const vb = visualBible || {};
+  const list = Array.isArray(vb.secondaryCharacters)
+    ? vb.secondaryCharacters
+    : Object.values(vb.secondaryCharacters || {});
+  const out = [];
+  for (const e of list) {
+    if (!e || !e.name) continue;
+    // Prefer pages we ACTUALLY detected them on; fall back to their own
+    // declaration when detection has not run yet (gridsOnly rebuilds).
+    const detected = new Set();
+    for (const img of sceneImages) {
+      const figs = img?.bboxDetection?.figures || [];
+      if (figs.some(f => (f?.name || '').toLowerCase() === String(e.name).toLowerCase())) {
+        detected.add(img.pageNumber);
+      }
+    }
+    const declared = Array.isArray(e.pages) ? e.pages : (Array.isArray(e.appearsInPages) ? e.appearsInPages : []);
+    const pages = detected.size ? [...detected] : declared.map(Number);
+    if (pages.length < 2) continue;
+    const description = e.description
+      || [e.age, e.build, e.hair && `hair: ${e.hair}`, e.face, e.signatureLook, e.clothing && `Clothing: ${e.clothing}`]
+        .filter(Boolean).join('. ');
+    if (!description) continue;
+    out.push({
+      name: e.name,
+      __vbSecondary: true,
+      __vbDescription: description,
+      __vbReferenceUrl: e.referenceImageUrl || null,
+      __vbPages: pages,
+    });
+  }
+  return out;
+}
+
 async function collectEntityAppearances(sceneImages, characters = [], sceneDescriptions = [], options = {}) {
   const { skipMinAppearancesFilter = false, storyCharacters = null, clothingRequirements = null, visualBible = null, artStyle = 'watercolor' } = options;
   const pagesWithNewBbox = [];
