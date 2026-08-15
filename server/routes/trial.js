@@ -2339,6 +2339,12 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     characters: [trialCharacter],
     mainCharacters: [trialCharacter.id],
     skipCovers: false,
+    // Square pages, A4 covers — the layout the trial story is stored with.
+    // Without it the job fell back to MODEL_DEFAULTS.pageAspect (3:4), so
+    // pages AND their empty-scene plates rendered portrait and were then
+    // padded into the square canvas: white bars or a mirrored blur down both
+    // sides (job_1786823576638 p2/p3).
+    layout: { mode: 'square-below', imageAspect: '1:1', textInImage: false },
     // Title page + back cover, no dedication page (trials store no dedication).
     // Covers render concurrently (streamCoverLimit = 3), so the back cover
     // costs one Grok call and ~no wall clock.

@@ -1833,7 +1833,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   });
                   const result = await generateImageOnly(emptyPrompt, [], {
                     landmarkPhotos: emptySceneLandmarkPhotos,
-                    skipCache: true
+                    skipCache: true,
+                    // The plate IS the page's scene slot, and Grok edit inherits
+                    // its input's aspect — a portrait plate under a square page
+                    // came back portrait and got padded (white bars / mirrored
+                    // blur). Same resolution the page render uses.
+                    aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                   });
                   if (result?.imageData) {
                     sceneBackgrounds[pageNum] = { imageData: result.imageData, prompt: emptyPrompt };
