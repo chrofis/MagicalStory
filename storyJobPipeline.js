@@ -1699,7 +1699,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   characterNames: [char.name]
                 }));
               });
-              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage, modelOverrides.storyAvatarModel || null);
+              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode });
               earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
               log.debug(`✅ [STREAM] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
             } catch (error) {
@@ -2585,7 +2585,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               characterNames: [char.name]
             }));
           });
-          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null);
+          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode });
           log.debug(`✅ [UNIFIED] Pre-cover styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
           log.warn(`⚠️ [UNIFIED] Pre-cover styled avatar prep failed: ${error.message}`);
@@ -2656,7 +2656,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         ? `coverage top-up (${getStyledAvatarCacheStats().size} already cached)`
         : 'early styling did not run';
       log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled-avatar reqs for ${artStyle} (${mode})`);
-      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null);
+      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode });
     }
 
     // Start cover generation NOW that avatars are ready (covers need avatars as reference photos)
