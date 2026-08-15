@@ -1007,6 +1007,12 @@ async function iterateCover(coverKey, storyData, options = {}) {
         servedImageData = stamped.titledData;
         artImageData = stamped.textlessData;
         typographySpec = stamped.spec;
+        // The detection ran on the textless render; the served bytes are the
+        // stamped ones. Re-point the fp (the ONLY sanctioned fp restamp — see
+        // restampDetectionForCoverText) so the stored boxes stay pairable.
+        if (imageResult.bboxDetection) {
+          require('./images').restampDetectionForCoverText(imageResult.bboxDetection, servedImageData);
+        }
         log.info(`🅰️ [COVER-ITERATE] ${coverKey}: re-composited text (${typographySpec?.fontId || '?'}/${typographySpec?.layout || '?'})`);
       } catch (e) {
         log.warn(`⚠️ [COVER-ITERATE] ${coverKey}: restamp failed (${e.message}) — serving textless render`);

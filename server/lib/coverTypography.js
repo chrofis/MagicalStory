@@ -578,6 +578,39 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
       if (storyData?.coverImages?.[key]) storyData.coverImages[key].typography = spec;
       log.info(`🅰️ [COVER TYPO POST] ${key}: baked title${ded ? '+dedication' : ''} onto served v${activeIdx} (${spec.fontId || '?'}/${spec.layout || '?'})`);
 
+      // Re-point stored detection fingerprints at the STAMPED bytes — the ONLY
+      // sanctioned fp restamp (restampDetectionForCoverText). Text overlay
+      // moves no figure; without this every stamped cover fails bboxPairsWith
+      // and character repair re-detects figures it already has (observed:
+      // job_1786743927715 backCover, Daniel repair fell back to entity report).
+      try {
+        const { restampDetectionForCoverText, imageFingerprint } = require('./images');
+        const titledUri = 'data:image/jpeg;base64,' + buffer.toString('base64');
+        if (storyData?.coverImages?.[key]?.bboxDetection) {
+          restampDetectionForCoverText(storyData.coverImages[key].bboxDetection, titledUri);
+        }
+        const fpNew = imageFingerprint(titledUri);
+        if (fpNew) {
+          const covRows = await dbQuery("SELECT data->'coverImages'->$2 AS c FROM stories WHERE id=$1", [storyId, key]);
+          const cov = covRows[0]?.c;
+          if (cov?.bboxDetection?.sourceImageFp) {
+            await dbQuery(
+              `UPDATE stories SET data = jsonb_set(data, ARRAY['coverImages',$2,'bboxDetection','sourceImageFp'], to_jsonb($3::text)) WHERE id = $1`,
+              [storyId, key, fpNew]);
+          }
+          const ivs = Array.isArray(cov?.imageVersions) ? cov.imageVersions : [];
+          let ai = ivs.findIndex(v => v?.dbVersionIndex === activeIdx);
+          if (ai < 0 && activeIdx < ivs.length) ai = activeIdx;
+          if (ai >= 0 && ivs[ai]?.bboxDetection?.sourceImageFp) {
+            await dbQuery(
+              `UPDATE stories SET data = jsonb_set(data, ARRAY['coverImages',$2,'imageVersions',$3::text,'bboxDetection','sourceImageFp'], to_jsonb($4::text)) WHERE id = $1`,
+              [storyId, key, String(ai), fpNew]);
+          }
+        }
+      } catch (fpErr) {
+        log.warn(`[COVER TYPO POST] ${key}: detection fp restamp failed: ${fpErr.message}`);
+      }
+
       // Stamp the NON-ACTIVE versions too. Only the active one used to get text,
       // so switching version in the picker showed a bare, untitled cover — every
       // alternative render looked broken. These are separate generations, not
@@ -593,6 +626,22 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
           if (!obytes) continue;
           const { buffer: obuf } = await composeCover({ artBuffer: obytes, kind, title: title || '', dedication: ded, seed: seed || title, figures });
           await saveStoryImage(storyId, key, null, 'data:image/jpeg;base64,' + obuf.toString('base64'), { versionIndex: o.version_index, cacheBust: true, preserveScore: true });
+          // Same fp re-point as the active version above (cover-text exception).
+          try {
+            const { imageFingerprint: fpOf } = require('./images');
+            const ofp = fpOf('data:image/jpeg;base64,' + obuf.toString('base64'));
+            const covRows2 = await dbQuery("SELECT data->'coverImages'->$2->'imageVersions' AS ivs FROM stories WHERE id=$1", [storyId, key]);
+            const ivs2 = Array.isArray(covRows2[0]?.ivs) ? covRows2[0].ivs : [];
+            let oi = ivs2.findIndex(v => v?.dbVersionIndex === o.version_index);
+            if (oi < 0 && o.version_index < ivs2.length) oi = o.version_index;
+            if (ofp && oi >= 0 && ivs2[oi]?.bboxDetection?.sourceImageFp) {
+              await dbQuery(
+                `UPDATE stories SET data = jsonb_set(data, ARRAY['coverImages',$2,'imageVersions',$3::text,'bboxDetection','sourceImageFp'], to_jsonb($4::text)) WHERE id = $1`,
+                [storyId, key, String(oi), ofp]);
+            }
+          } catch (ofpErr) {
+            log.warn(`[COVER TYPO POST] ${key} v${o.version_index}: fp restamp failed: ${ofpErr.message}`);
+          }
         } catch (oerr) {
           log.warn(`[COVER TYPO POST] ${key} v${o.version_index}: ${oerr.message}`);
         }
@@ -693,6 +742,35 @@ async function restampServedCover(storyId, storyData, coverKey, { style } = {}) 
   // fresh R2 key the immutable-cached old render survives every reload.
   await saveStoryImage(storyId, coverKey, null, stamped.titledData, { versionIndex: activeIdx, cacheBust: true, preserveScore: true });
   if (storyData?.coverImages?.[coverKey]) storyData.coverImages[coverKey].typography = stamped.spec;
+  // Re-point detection fps at the stamped bytes (cover-text exception — the
+  // ONLY sanctioned fp restamp; see restampDetectionForCoverText).
+  try {
+    const { restampDetectionForCoverText, imageFingerprint } = require('./images');
+    if (storyData?.coverImages?.[coverKey]?.bboxDetection) {
+      restampDetectionForCoverText(storyData.coverImages[coverKey].bboxDetection, stamped.titledData);
+    }
+    const fpNew = imageFingerprint(stamped.titledData);
+    if (fpNew) {
+      const covRows = await dbQuery("SELECT data->'coverImages'->$2 AS c FROM stories WHERE id=$1", [storyId, coverKey]);
+      const cov = covRows[0]?.c;
+      if (cov?.bboxDetection?.sourceImageFp) {
+        await dbQuery(
+          `UPDATE stories SET data = jsonb_set(data, ARRAY['coverImages',$2,'bboxDetection','sourceImageFp'], to_jsonb($3::text)) WHERE id = $1`,
+          [storyId, coverKey, fpNew]);
+      }
+      const ivs = Array.isArray(cov?.imageVersions) ? cov.imageVersions : [];
+      let ai = ivs.findIndex(v => v?.dbVersionIndex === activeIdx);
+      if (ai < 0 && activeIdx < ivs.length) ai = activeIdx;
+      if (ai >= 0 && ivs[ai]?.bboxDetection?.sourceImageFp) {
+        await dbQuery(
+          `UPDATE stories SET data = jsonb_set(data, ARRAY['coverImages',$2,'imageVersions',$3::text,'bboxDetection','sourceImageFp'], to_jsonb($4::text)) WHERE id = $1`,
+          [storyId, coverKey, String(ai), fpNew]);
+      }
+    }
+  } catch (fpErr) {
+    const { log } = require('../utils/logger');
+    log.warn(`[COVER RESTAMP] ${coverKey}: detection fp restamp failed: ${fpErr.message}`);
+  }
   return { imageData: stamped.titledData, spec: stamped.spec, versionIndex: activeIdx };
 }
 

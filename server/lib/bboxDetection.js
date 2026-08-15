@@ -276,6 +276,24 @@ function imageFingerprint(imageData) {
 }
 
 /**
+ * COVER-TEXT RESTAMP EXCEPTION — the ONLY sanctioned mutation of a
+ * detection's sourceImageFp to different bytes (owner decision 2026-08-15).
+ * Cover typography (composeCover / restampCover / restampServedCover)
+ * overlays title, dedication and branding text on the art; no figure moves,
+ * so the boxes stay geometrically valid for the stamped bytes. Without this
+ * re-point, every stamped cover fails bboxPairsWith and character repair
+ * falls back to fresh detection on covers whose boxes we already have.
+ * NEVER call this after anything that can change figure geometry — crop,
+ * repaint, regenerate, aspect change — those need a fresh detection.
+ */
+function restampDetectionForCoverText(detection, stampedImageData) {
+  if (!detection || !stampedImageData) return detection;
+  const fp = imageFingerprint(stampedImageData);
+  if (fp) detection.sourceImageFp = fp;
+  return detection;
+}
+
+/**
  * True when a stored detection may be paired with these image bytes.
  * Legacy detections (no sourceImageFp stamp) are trusted — they predate the
  * invariant and are usually stored alongside the bytes they ran on.
@@ -1825,6 +1843,7 @@ module.exports = {
   getBboxCacheStats,
   imageFingerprint,
   bboxPairsWith,
+  restampDetectionForCoverText,
   detectionForVersion,
   detectAllBoundingBoxes,
   // _detectAllBoundingBoxesImpl deliberately NOT exported — the stamping
