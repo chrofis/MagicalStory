@@ -148,6 +148,10 @@ const TEXT_MODELS = {
   'deepseek-v4-pro-0813': { provider: 'openrouter', modelId: 'deepseek/deepseek-v4-pro-0813', maxOutputTokens: 16384, description: 'DeepSeek V4 Pro 0813 rev via OpenRouter (~$0.43/$0.87 per 1M)' },
   'glm-5.2': { provider: 'openrouter', modelId: 'z-ai/glm-5.2', maxOutputTokens: 16384, description: 'GLM 5.2 (Z-ai) via OpenRouter (~$0.49/$1.54 per 1M)' },
   'minimax-m3': { provider: 'openrouter', modelId: 'minimax/minimax-m3', maxOutputTokens: 16384, description: 'MiniMax M3 via OpenRouter (~$0.30/$1.20 per 1M)' },
+  // Neutral judge for reviewer bake-offs: third vendor, so it has no
+  // self-preference stake when comparing Anthropic/xAI/DeepSeek reviewers.
+  // Pinned to the explicit id, not the '-latest' alias, so scores stay comparable.
+  'gemini-3.1-pro': { provider: 'openrouter', modelId: 'google/gemini-3.1-pro-preview', maxOutputTokens: 16384, description: 'Gemini 3.1 Pro (Google) via OpenRouter (~$2.00/$12.00 per 1M) — neutral judge' },
   'qwen3.8-max': { provider: 'openrouter', modelId: 'qwen/qwen3.8-max', maxOutputTokens: 16384, description: 'Qwen3.8 Max (Alibaba flagship) via OpenRouter (~$2.00/$6.00 per 1M)' },
   'qwen3.8-27b': { provider: 'openrouter', modelId: 'qwen/qwen3.8-27b', maxOutputTokens: 16384, description: 'Qwen3.8 27B (2026-08-14) via OpenRouter (~$0.45/$3.20 per 1M)' },
   'gpt-5.6-luna-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna-pro', maxOutputTokens: 16384, description: 'GPT-5.6 Luna Pro (OpenAI) via OpenRouter (~$0.10/$0.60 per 1M)' },
