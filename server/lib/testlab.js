@@ -3360,6 +3360,46 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     const img = await loadTestImage(ctx.storyId, 'tl_step', ctx.pageNumber, Number(pasteStep.versionIndex));
     if (!img?.imageData) throw new Error(`replayPasteOf: tl_step v${pasteStep.versionIndex} not found`);
 
+    // EVAL → REPAIR arm. Instead of describing the page to the model and hoping
+    // it only changes what is wrong, ask the production evaluator what IS wrong
+    // and hand back the worst few as the entire instruction. One pass, no
+    // iteration: the repair call never sees its own output.
+    let evalReport = null;
+    let promptOverride = params.blendPrompt || null;
+    if (params.blendMode === 'evalRepair') {
+      const { evaluateImageQuality } = require('./evalPipeline');
+      const ev = await evaluateImageQuality(
+        img.imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), 'scene',
+        null, `testlab-exp${experimentId}-P${ctx.pageNumber}-composite`,
+        ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
+        { artStyle: require('../services/prompts').resolveEvalArtStyle(ctx.artStyle, ctx.scene.prompt || null) },
+      );
+      if (!ev) throw new Error('evalRepair: the evaluator returned nothing');
+      const RANK = { CATASTROPHIC: 5, CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1 };
+      const all = (ev.fixableIssues || [])
+        .map(i => ({ ...i, _r: RANK[String(i.severity || '').toUpperCase()] || 2 }))
+        .sort((a, b) => b._r - a._r);
+      const top = all.slice(0, Number(params.topIssues) || 3);
+      evalReport = {
+        score: ev.score, verdict: ev.verdict, issueCount: all.length,
+        used: top.map(i => ({ severity: i.severity, type: i.type, description: i.description, fix: i.fix })),
+        dropped: all.slice(top.length).map(i => `${i.severity}: ${i.description}`),
+      };
+      if (!top.length) {
+        log.info('[TESTLAB] evalRepair: the evaluator found nothing to fix — returning the pasted canvas unchanged');
+        const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, img.imageData, experimentId);
+        return {
+          imageType: 'scene', versionIndex, elapsedMs: Date.now() - t0,
+          blended: false, evalReport, modelCalls: 0, cost: 0,
+        };
+      }
+      const artStyle = String(compositeScene.artStyle || '');
+      promptOverride = `Image 1 is a finished illustration with a small number of specific defects. Repair exactly these and nothing else.\n\n`
+        + top.map((i, n) => `${n + 1}. ${i.description}\n   Correction: ${i.fix}`).join('\n')
+        + `\n\nEverything not listed above is correct and must survive untouched: every person stays at their exact position, size, pose, facing, face, hair, age and clothing; the camera, framing, architecture, landscape and light do not change; no one is added, removed or substituted. No text, captions, numbers or signatures.\n\nArt style: ${artStyle}.`;
+      log.info(`[TESTLAB] evalRepair: score ${ev.score}, ${all.length} issues, repairing the top ${top.length}`);
+    }
+
     const dbg = {};
     const out = await blendPastedCanvas({
       compositedData: img.imageData,
@@ -3367,7 +3407,7 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
       cast,
       aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
       visualBibleGridImage: ctx.visualBibleGrid || null,
-      promptOverride: params.blendPrompt || null,
+      promptOverride,
       usageTracker: (provider, u, fnName, modelId) => usage.push({ provider, fn: fnName, modelId, cost: u?.cost || 0 }),
       debug: dbg,
     });
@@ -3377,7 +3417,9 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
       replayOf: { experimentId: expId, resultIndex: idx, pasteVersion: pasteStep.versionIndex },
       blended: true,
       blendPrompt: out.blendPrompt,
-      blendPromptSource: params.blendPrompt ? 'override' : (pagePrompt ? 'page-prompt' : 'legacy-brief'),
+      blendPromptSource: params.blendMode === 'evalRepair' ? 'eval-repair'
+        : (params.blendPrompt ? 'override' : (pagePrompt ? 'page-prompt' : 'legacy-brief')),
+      evalReport,
       modelCalls: usage.length,
       cost: usage.reduce((a, u) => a + (u.cost || 0), 0),
     };
