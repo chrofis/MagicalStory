@@ -764,24 +764,42 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     onPresetApplied();
   }, [preset, onPresetApplied]);
 
-  // Deep link: /admin/test-lab?exp=717 opens that experiment directly, and the
-  // URL tracks whichever one is open, so a run can be shared as a link instead
-  // of "scroll the list and click the third row".
-  useEffect(() => {
-    const id = Number(new URLSearchParams(window.location.search).get('exp'));
-    if (!Number.isFinite(id) || id <= 0) return;
-    (async () => {
-      try { setSelected(await testlabService.getExperiment(id)); }
-      catch { /* gone or not visible to this user — fall through to the list */ }
-    })();
-  }, []);
+  // Deep link: /admin/test-lab?exp=717 opens that experiment directly.
+  //
+  // The id is read ONCE at first render, not inside an effect: this page sits
+  // behind an auth gate that renders a spinner first, so the component can
+  // mount more than once per page load. An earlier version also cleared the
+  // param from the URL whenever `selected` was null — which is true on every
+  // mount — so the first mount deleted the id and any later mount found
+  // nothing. Hence: never strip it implicitly, only on an explicit close.
+  const [deepLinkId] = useState(() => {
+    const raw = Number(new URLSearchParams(window.location.search).get('exp'));
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  });
 
   useEffect(() => {
+    if (!deepLinkId) return;
+    (async () => {
+      try { setSelected(await testlabService.getExperiment(deepLinkId)); }
+      catch (e) { setError(`Experiment ${deepLinkId} could not be opened: ${(e as Error).message}`); }
+    })();
+  }, [deepLinkId]);
+
+  // Keep the URL pointing at whatever is open, so any run is shareable as a
+  // link. Only ever ADDS — clearing happens where the detail is closed.
+  useEffect(() => {
+    if (!selected) return;
     const url = new URL(window.location.href);
-    if (selected) url.searchParams.set('exp', String(selected.id));
-    else url.searchParams.delete('exp');
+    url.searchParams.set('exp', String(selected.id));
     window.history.replaceState(null, '', url.toString());
   }, [selected]);
+
+  const closeDetail = useCallback(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('exp');
+    window.history.replaceState(null, '', url.toString());
+    setSelected(null);
+  }, []);
 
   // Poll while any experiment is running (or the detail view shows a running one).
   useEffect(() => {
@@ -1026,12 +1044,12 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
     const leftover = Object.fromEntries(Object.entries(p).filter(([k]) => !WIDGET_PARAM_KEYS.has(k)));
     setParamsJson(Object.keys(leftover).length ? JSON.stringify(leftover, null, 2) : '');
 
-    setSelected(null);
+    closeDetail();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (selected) {
-    return <ExperimentDetailView detail={selected} onBack={() => { setSelected(null); load(); }} onRefresh={async () => setSelected(await testlabService.getExperiment(selected.id))} onReuse={reuseExperiment} />;
+    return <ExperimentDetailView detail={selected} onBack={() => { closeDetail(); load(); }} onRefresh={async () => setSelected(await testlabService.getExperiment(selected.id))} onReuse={reuseExperiment} />;
   }
 
   return (
