@@ -112,7 +112,12 @@ function NewVersionBanner() {
 
 export default function TestLab() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>('stories');
+  // ?exp=<id> must land on the EXPERIMENTS tab. The deep-link handler lives in
+  // ExperimentsTab, and that component is only mounted while its tab is active
+  // — so with the default 'stories' tab the handler never ran and the link
+  // silently opened the story list instead.
+  const [tab, setTab] = useState<Tab>(() =>
+    new URLSearchParams(window.location.search).has('exp') ? 'experiments' : 'stories');
   // One-tap "Review" from the Stories tab hands a story to the Experiments tab
   // (prefills the outline_review stage + story ID) — no window.prompt / no
   // benchmark detour / no typing IDs on mobile. {} bumps to force a re-apply
