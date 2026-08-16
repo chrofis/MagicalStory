@@ -153,6 +153,49 @@ function projectStoryCostumeDescriptions(clothingRequirements) {
  *   to data-URI cell crops where applicable.
  */
 /**
+ * Seed `styledAvatars[artStyle].standard` from each character's cheap preview
+ * avatar, marked as NOT a 2×4 sheet.
+ *
+ * Used by the trial, which builds only the costumed sheet: its preview avatar
+ * is already a full-body watercolour illustration (the trial art style is
+ * always watercolour), so it is a valid standard reference and saves a second
+ * sheet generation. Without it, `standard` pages fall back to the costumed
+ * sheet and the child wears the costume in bed.
+ *
+ * Reads `previewAvatar` first: by the time the pipeline runs, characters have
+ * been reloaded from the DB (processStoryJob replaces inputData.characters
+ * whenever input_data carries a characterId), and the stored row keeps the
+ * preview at top level — `avatars.standard` exists only on the pre-reload
+ * payload. Getting this backwards made the whole thing a silent no-op.
+ *
+ * Skips characters that already have a standard entry. Mutates in place.
+ *
+ * @param {Array<Object>} characters - inputData.characters[]
+ * @param {string} artStyle
+ * @returns {Array<{name: string, preview: string}>} what was seeded
+ */
+function seedStandardFromPreview(characters, artStyle) {
+  const seeded = [];
+  if (!Array.isArray(characters) || !artStyle) return seeded;
+
+  for (const char of characters) {
+    const preview = (typeof char?.previewAvatar === 'string' && char.previewAvatar)
+      || (typeof char?.avatars?.standard === 'string' && char.avatars.standard)
+      || null;
+    if (!preview || !char.name) continue;
+
+    char.avatars = char.avatars || {};
+    char.avatars.styledAvatars = char.avatars.styledAvatars || {};
+    const styled = (char.avatars.styledAvatars[artStyle] = char.avatars.styledAvatars[artStyle] || {});
+    if (styled.standard) continue;
+
+    styled.standard = { imageData: preview, isSheet: false };
+    seeded.push({ name: char.name, preview });
+  }
+  return seeded;
+}
+
+/**
  * SINGLE resolver for which 2×4 sheet cell a scene character should get.
  * Beats metadata never carries `pose` — it declares `perspective` in natural
  * language ("back view", "profile"). Every cell-picker that read only `pose`
@@ -410,6 +453,7 @@ module.exports = {
   applyStoryCellRefs,
   resolveCellPose,
   resolveSheetForRef,
+  seedStandardFromPreview,
   appendStoryHistory,
   extractUrl,
 };

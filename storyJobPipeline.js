@@ -675,49 +675,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (seeded > 0) log.info(`♻️ [TRIAL] Seeded ${seeded} styled avatars from prepare-title cache`);
       }
 
-      // The trial deliberately builds NO standard 2×4 sheet (see the costumed-
-      // only requirements below): the cheap preview avatar is the standard
-      // reference. It has to be projectable as one, though — storyAvatars reads
-      // `styledAvatars[artStyle].standard` and applyStoryCellRefs falls back to
-      // the COSTUMED sheet when that key is missing, silently, while still
-      // labelling the ref `standard`. That is how a page the outline marked
-      // standard was sent the costume (job_1786826686448 p1).
-      // The preview avatar is a legitimate styled reference here: trial art
-      // style is always `watercolor` and the preview is generated as a
-      // full-body WATERCOLOR illustration (trial.js — "Create a full-body
-      // watercolor illustration … STYLE: Soft watercolor illustration style").
-      // No conversion pass is needed, so it can be reused as the standard
-      // styled avatar instead of building a second 2×4 sheet.
-      // It must be written onto the CHARACTER, not just the styled-avatar
-      // cache: the reference path reads
-      // projectStoryCharacterAvatars(inputData.characters) →
-      // `char.avatars.styledAvatars[artStyle].standard`, which setStyledAvatar
-      // (cache-only) never populates. Seeding the cache alone left the slot
-      // empty and every `standard` page still took the costumed fallback
-      // (job_1786868241158 p1 + p6, verified in stored referencePhotos).
-      // `isSheet: false` marks it as a plain full-body avatar rather than a
-      // 2×4 grid, so the cell croppers send it whole instead of slicing a
-      // quarter out of one figure.
-      // Read `previewAvatar` FIRST, not `avatars.standard`. processStoryJob
-      // reloads the full character rows from the DB whenever input_data carries
-      // a characterId (always, for a trial) and REPLACES inputData.characters
-      // with them — so the `avatars.standard` that the trial route put in
-      // input_data is gone by the time this runs. The stored row keeps the
-      // preview at top-level `previewAvatar`. Reading only `avatars.standard`
-      // made this whole block a no-op on every real run (job_1786868241158 and
-      // job_1786907999098, both verified: no standard slot, costumed fallback).
-      for (const char of (inputData.characters || [])) {
-        const preview = (typeof char?.previewAvatar === 'string' && char.previewAvatar)
-          || (typeof char?.avatars?.standard === 'string' && char.avatars.standard)
-          || null;
-        if (!preview) continue;
-        char.avatars = char.avatars || {};
-        char.avatars.styledAvatars = char.avatars.styledAvatars || {};
-        const styled = (char.avatars.styledAvatars[artStyle] = char.avatars.styledAvatars[artStyle] || {});
-        if (styled.standard) continue;
-        styled.standard = { imageData: preview, isSheet: false };
-        setStyledAvatar(char.name, 'standard', artStyle, preview);
-        log.info(`♻️ [TRIAL] ${char.name}: standard reference seeded from the preview avatar (full-image ref, no standard sheet is generated)`);
+      // The trial builds only the costumed sheet (see the requirements above);
+      // the preview avatar serves as the `standard` reference. Two writes, two
+      // jobs: the character record feeds the projection that the cell-ref path
+      // reads, and the cache feeds applyStyledAvatars. Rationale and the three
+      // bugs this went through: docs/decisions.md, 2026-08-16.
+      const { seedStandardFromPreview } = require('./server/lib/storyAvatars');
+      for (const { name, preview } of seedStandardFromPreview(inputData.characters || [], artStyle)) {
+        setStyledAvatar(name, 'standard', artStyle, preview);
+        log.info(`♻️ [TRIAL] ${name}: standard reference seeded from the preview avatar (full image, no standard sheet is generated)`);
       }
 
       log.info(`🎨 [TRIAL] Starting immediate avatar styling (${trialAvatarRequirements.length} variants)...`);

@@ -13,10 +13,14 @@
  *
  *   node tests/manual/trial-standard-fullimage-ref.test.js
  */
+// The REAL seeding function, not a copy of it. An earlier version of this test
+// re-implemented the loop inline and passed while the shipped code was a no-op
+// on every run — the copy read the pre-DB-reload character shape.
 const {
   projectStoryCharacterAvatars,
   resolveSheetForRef,
   applyStoryCellRefs,
+  seedStandardFromPreview,
 } = require('../../server/lib/storyAvatars');
 
 let failures = 0;
@@ -25,28 +29,6 @@ const check = (label, ok, detail = '') => {
   if (!ok) failures++;
 };
 
-// The seeding source, mirrored from storyJobPipeline. The runtime character is
-// the DB-RELOADED row (processStoryJob replaces inputData.characters whenever
-// input_data carries a characterId — always, for a trial), and that row keeps
-// the preview at top-level `previewAvatar`. Reading only `avatars.standard`
-// made the seeding a no-op on two full runs before this was caught.
-function seedStandardFromPreview(characters, artStyle) {
-  let seeded = 0;
-  for (const char of characters) {
-    const preview = (typeof char?.previewAvatar === 'string' && char.previewAvatar)
-      || (typeof char?.avatars?.standard === 'string' && char.avatars.standard)
-      || null;
-    if (!preview) continue;
-    char.avatars = char.avatars || {};
-    char.avatars.styledAvatars = char.avatars.styledAvatars || {};
-    const styled = (char.avatars.styledAvatars[artStyle] = char.avatars.styledAvatars[artStyle] || {});
-    if (styled.standard) continue;
-    styled.standard = { imageData: preview, isSheet: false };
-    seeded++;
-  }
-  return seeded;
-}
-
 // Exactly the shape a trial character has after the DB reload: previewAvatar at
 // top level, avatars carrying only storyHistory/styledAvatars.
 const dbShaped = [{
@@ -54,7 +36,11 @@ const dbShaped = [{
   previewAvatar: 'data:image/jpeg;base64,PREVIEW',
   avatars: { storyHistory: [], styledAvatars: {} },
 }];
-check('seeds from the DB-reloaded shape (previewAvatar)', seedStandardFromPreview(dbShaped, 'watercolor') === 1);
+check('seeds from the DB-reloaded shape (previewAvatar)', seedStandardFromPreview(dbShaped, 'watercolor').length === 1);
+check('a character with neither preview nor avatars.standard is skipped',
+  seedStandardFromPreview([{ name: 'Felix', avatars: {} }], 'watercolor').length === 0);
+check('an existing standard entry is not overwritten',
+  seedStandardFromPreview(dbShaped, 'watercolor').length === 0);
 check('seeded slot is marked non-sheet',
   dbShaped[0].avatars.styledAvatars.watercolor.standard.isSheet === false);
 const dbProjected = projectStoryCharacterAvatars(dbShaped, 'watercolor');
