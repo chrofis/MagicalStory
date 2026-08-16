@@ -84,7 +84,6 @@ Return a JSON object with this EXACT structure:
     "skinTone": "<MUST be one of: porcelain | fair | light | medium | olive | tan | caramel | brown | dark brown | deep>",
     "skinToneHex": "<skin tone as HEX code, e.g. '#E8BEAC'>",
     "eyeColor": "<MUST be one of: blue | green | brown | hazel | gray | amber>",
-    "eyeColorHex": "<iris color as HEX code, e.g. '#6B4423'>",
     "hairColor": "<MUST be one of: black | dark brown | brown | light brown | chestnut | auburn | red | strawberry blonde | dark blonde | blonde | light blonde | platinum blonde | gray | silver | white | salt and pepper>",
     "hairColorHex": "<primary hair color as HEX code, e.g. '#3B2314'>",
     "facialHair": "<MUST be one of: none | clean-shaven | stubble | mustache | goatee | short beard | full beard | long beard> (use 'none' for females/children)",

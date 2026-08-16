@@ -626,7 +626,31 @@ SCENE: ${x.scene || ''}`.trim(),
   let briefFindings = '';
   try {
     const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
-    const castNames = (inputData.characters || []).map(c => c && c.name).filter(Boolean);
+    // Secondary characters belong in this list too. `inputData.characters` is the
+    // UPLOADED main cast, so a figure the story invents (a mermaid, a shopkeeper)
+    // could never trigger cast_unlisted, and briefFindings came back empty on
+    // every story we looked at. Verified on staging job_1786743927715_kcx0p939w:
+    // the brief's prose describes Lira in full on p3/p4/p9 while its own
+    // characters[] lists only Emma and Noah — three findings the review never saw.
+    // Secondaries are the likeliest omission, since no avatar pipeline forces
+    // them into metadata. Characters only — animals stay out (owner call
+    // 2026-08-16). NOTE: this does not cover the OTHER shape of the same
+    // symptom — job_1786737619634_d66c7bg9g p4 declared Lira correctly in the
+    // brief, and she was dropped later from the stored per-page cast — so the
+    // visual-bible `pages` fallback is still load-bearing for that case.
+    const secondaryList = Array.isArray(visualBible?.secondaryCharacters)
+      ? visualBible.secondaryCharacters
+      : Object.values(visualBible?.secondaryCharacters || {});
+    const seenCast = new Set();
+    const castNames = [
+      ...(inputData.characters || []).map(c => c && c.name),
+      ...secondaryList.map(c => c && c.name),
+    ].filter(Boolean).filter((n) => {
+      const k = String(n).trim().toLowerCase();
+      if (!k || seenCast.has(k)) return false;
+      seenCast.add(k);
+      return true;
+    });
     const res = checkBriefs(
       expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
       castNames,

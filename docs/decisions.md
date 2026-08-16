@@ -12209,3 +12209,31 @@ a surface photo.
 **Touched:** prompts/empty-scene.txt, scene-expansion-all.txt, scene-expansion.txt,
 server/lib/promptBuilders.js, landmarkPhotos.js, storyHelpers.js, sceneMetadata.js,
 migrations/020_landmark_photo_type.sql.
+
+## 2026-08-16 — cast_unlisted now covers secondary characters
+
+**Context:** `sceneBriefCheck`'s `cast_unlisted` check (prose describes a cast member that
+the brief's own `characters[]` omits) was fed `castNames` from `inputData.characters` only —
+the UPLOADED main cast. A figure the story invents (a mermaid, a shopkeeper) is never in
+that list, so the check could not fire for exactly the characters most likely to be omitted:
+no avatar pipeline forces a secondary into the metadata. Measured: `briefFindings` was empty
+on all three stories inspected, while staging `job_1786743927715_kcx0p939w` had Lira fully
+described in the brief prose on p3/p4/p9 with `characters[]` listing only Emma and Noah.
+
+**Decision:** `castNames` = uploaded main cast + `visualBible.secondaryCharacters` names
+(de-duplicated, case-insensitive). Characters only; animals deliberately excluded (owner
+call). The module still REPORTS and never fixes — the 2026-08-11 decision stands, because
+inventing a `characters[]` entry would put a person in the book nobody wrote. Dry-run over
+the 12 most recent stories: 0 → 3 findings, all three the verified Lira pages, no false
+positives introduced.
+
+**Related but NOT fixed — two shapes of one symptom.** The identity-call misnaming that
+motivated the visual-bible `pages` fallback has two distinct causes:
+  1. the brief itself omits the secondary from `characters[]` (kcx0p939w) — now reported;
+  2. the brief DECLARES the secondary correctly and she is dropped from the stored per-page
+     cast later (`job_1786737619634_d66c7bg9g` p4: brief metadata lists Emma, Noah, Lira;
+     stored `sceneCharacters` lists Emma, Noah).
+Cause 2 means the VB `pages` fallback is still load-bearing, so removing `pages` from the
+visual bible is NOT yet safe — it would reopen the misnaming for that shape.
+
+**Touched:** server/lib/beatsPipeline.js.
