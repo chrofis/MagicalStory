@@ -230,6 +230,9 @@ function _rgbToLabPx(r, g, b) {
 }
 const _deltaE = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const getGarmentColour = () => require('./garmentColourFix');
+// Lazy: evalPipeline pulls in the image stack, and this module is loaded from
+// inside it. sanitizeForGemini is the project's one age-wording sanitiser.
+const getSanitizeForGemini = () => require('./evalPipeline').sanitizeForGemini;
 
 // A detected face with no person box is a MISSING FIGURE (owner, 2026-08-15).
 //
@@ -968,18 +971,42 @@ async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H,
   const sceneBuf = Buffer.from(r2Lib.stripDataUriPrefix(imageDataUri), 'base64');
   const marked = await sharp(sceneBuf).composite([{ input: Buffer.from(svg) }]).jpeg({ quality: 88 }).toBuffer();
 
+  // IDENTITY LINES ARE SANITISED *AND* SHORT (owner, 2026-08-16 — measured).
+  //
+  // Gemini's minor-safety filter is not adjustable through safetySettings: when
+  // it fires the call returns HTTP 200 with an EMPTY body and
+  // promptFeedback.blockReason = PROHIBITED_CONTENT. The page then loses its
+  // identity entirely and drops to the layout fallback — which on
+  // job_1786829555599_rgzoyoprx p9 named the preschooler as the adult woman and
+  // the woman as the preschooler, identically every run, because that fallback
+  // is deterministic geometry.
+  //
+  // What trips it is a child's age wording and a full wardrobe paragraph
+  // TOGETHER. Measured on that page, 5 calls per variant, image attached:
+  //
+  //   baseline (as it was)                 5/5 blocked
+  //   sanitizeForGemini('light') alone     5/5 blocked
+  //   short garment phrase alone           5/5 blocked
+  //   BOTH                                 0/5 blocked, and the answer is right
+  //
+  // Neither half is enough alone, so this does both. Text-only probes are not a
+  // substitute for the real call: with the image attached the threshold moves,
+  // and variants that pass without it block with it.
+  const sanitizeForGemini = getSanitizeForGemini();
   const charLines = expectedCharacters.map(c => {
-    // gdinoPrompt already ends in "wearing <garment>" (built via
-    // _shortGarmentPhrase); only add clothing when it isn't there yet.
-    const identity = c.gdinoPrompt || c.description || c.name;
-    const garment = /\bwearing\b/i.test(identity) ? '' : _shortGarmentPhrase(c.clothing);
+    // The wardrobe paragraph is STRIPPED from the identity prose and replaced by
+    // the short phrase, rather than the short phrase being appended only when
+    // "wearing" is absent — the prose nearly always carries a "Wearing:" section
+    // already, so the short phrase was in practice never used here.
+    const identity = String(c.gdinoPrompt || c.description || c.name).replace(/\bWearing:[\s\S]*$/i, '').trim();
+    const garment = _shortGarmentPhrase(c.clothing);
     // Expected position/action from the scene plan ("center-right background
     // being led away") — often the only usable cue for occluded or partially
     // visible figures whose clothing/hair the badge crop doesn't show. Hint
     // only: repairs sometimes run BECAUSE a figure was painted in the wrong
     // spot, so identity cues stay primary.
     const posHint = c.position ? ` Expected position/action (hint from the scene plan; the image may differ): ${c.position}.` : '';
-    return `- ${c.name}: ${identity}.${garment ? ` Wearing: ${garment}.` : ''}${posHint}`;
+    return sanitizeForGemini(`- ${c.name}: ${identity}.${garment ? ` Wearing: ${garment}.` : ''}${posHint}`, 'light');
   }).join('\n');
   const nBadges = badges.length;
   const nChars = expectedCharacters.length;
@@ -1020,15 +1047,18 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
   // promptFeedback are the fields that say which.
   const finish = j?.candidates?.[0]?.finishReason || null;
   const blocked = j?.promptFeedback?.blockReason || null;
-  if (!text) {
-    const why = blocked ? `prompt blocked (${blocked})` : finish ? `no text, finishReason=${finish}` : `no text and no reason: ${JSON.stringify(j).slice(0, 300)}`;
+  // .trim(): the first version of this guard tested `!text` and a whitespace-only
+  // body walked past it into JSON.parse, which reported it as a parse failure
+  // with nothing after the colon — the same misleading message it replaced.
+  if (!text.trim()) {
+    const why = blocked ? `prompt blocked (${blocked})` : finish ? `empty answer, finishReason=${finish}` : `empty answer and no reason: ${JSON.stringify(j).slice(0, 300)}`;
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM returned ${why}`);
     return evidence(why);
   }
   let answers;
   // Tolerate prose/fence wrapping around the JSON ("Here is the JSON…").
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  try { answers = JSON.parse(jsonMatch ? jsonMatch[0] : text); } catch { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM answer not JSON: ${text.slice(0, 120)}`); return evidence(`answer was not JSON: ${text.slice(0, 200)}`); }
+  try { answers = JSON.parse(jsonMatch ? jsonMatch[0] : text); } catch { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM answer not JSON (finishReason=${finish}): ${JSON.stringify(text.slice(0, 120))}`); return evidence(`answer was not JSON (finishReason=${finish}): ${JSON.stringify(text.slice(0, 200))}`); }
   if (!answers || typeof answers !== 'object') {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM answer was not an object: ${text.slice(0, 120)}`);
     return evidence(`answer was not an object: ${text.slice(0, 200)}`);
