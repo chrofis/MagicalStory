@@ -7,6 +7,11 @@ const PART_LABEL: Record<string, string> = {
   full: 'Full story (overall)', beats: 'Beats', scene: 'Scenes', storyText: 'Story text', visualBible: 'Visual bible',
 };
 // part → the rerun stage. Passing both model + reviewModel covers all stages.
+// Scorer names mirror server/lib/storyScorecard.js EVALUATORS. From v2 the
+// version pins the judge: 2.1 Anna (Sonnet), 2.2 Bruno (Grok), 2.3 Cora (Gemini).
+const SCORER_NAMES: Record<string, string> = { '2.1': 'Anna', '2.2': 'Bruno', '2.3': 'Cora' };
+const scorerLabel = (v: string) => (SCORER_NAMES[v] ? `${v} ${SCORER_NAMES[v]}` : `v${v}`);
+
 const PART_STAGE: Record<string, string> = {
   full: 'story_scorecard', beats: 'beats_review_replay', scene: 'scene_review_replay',
   storyText: 'story_text_replay', visualBible: 'story_bible_replay',
@@ -20,7 +25,7 @@ const secs = (ms: number | null | undefined) => (ms == null ? '—' : `${(ms / 1
 export default function ScorecardsPanel() {
   const [rows, setRows] = useState<ScoreRow[]>([]);
   const [models, setModels] = useState<TextModelInfo[]>([]);
-  const [evalSel, setEvalSel] = useState<'all' | '1.0' | '1.1' | '1.2'>('all');
+  const [evalSel, setEvalSel] = useState<string>('all');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [modal, setModal] = useState<CellModal>(null);
@@ -43,7 +48,7 @@ export default function ScorecardsPanel() {
   }, []);
 
   const visible = useMemo(() => rows.filter(r => evalSel === 'all' || r.eval_version === evalSel), [rows, evalSel]);
-  const allVersions = [...new Set(rows.map(r => r.eval_version))];
+  const allVersions = [...new Set(rows.map(r => r.eval_version))].sort();
 
   // Per part: group by (story, model); within a group the rounds ordered.
   const sections = useMemo(() => PARTS.map(part => {
@@ -95,8 +100,8 @@ export default function ScorecardsPanel() {
         <div className="text-sm font-semibold">Model-comparison scorecards</div>
         <div className="flex items-center gap-3 text-xs text-gray-600">
           <div className="flex rounded overflow-hidden border border-gray-300">
-            {(['all', '1.0', '1.1', '1.2'] as const).map(v => (
-              <button key={v} className={`px-2 py-1 ${evalSel === v ? 'bg-indigo-600 text-white' : 'bg-white'}`} onClick={() => setEvalSel(v)}>{v === 'all' ? 'all evals' : `v${v}`}</button>
+            {['all', ...allVersions].map(v => (
+              <button key={v} className={`px-2 py-1 ${evalSel === v ? 'bg-indigo-600 text-white' : 'bg-white'}`} onClick={() => setEvalSel(v)}>{v === 'all' ? 'all scorers' : scorerLabel(v)}</button>
             ))}
           </div>
           {running && <span className="inline-flex items-center gap-1 text-indigo-600 font-medium"><span className="inline-block w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" /> running {running}…</span>}
@@ -129,7 +134,7 @@ export default function ScorecardsPanel() {
                     </td>
                     <td className="pr-3 font-mono opacity-70">${fmt(ln.rounds.reduce((s, r) => s + (Number(r.gen_cost_usd) || 0) + (Number(r.judge_cost_usd) || 0), 0))} · {secs(ln.rounds.reduce((s, r) => s + (Number(r.gen_ms) || 0) + (Number(r.judge_ms) || 0), 0))}</td>
                     <td className="pr-3 font-mono opacity-70">{[...new Set(ln.rounds.map(r => r.judge_model).filter(Boolean))].join(', ') || '—'}</td>
-                    <td className="pr-3"><button className="text-indigo-600 hover:underline font-mono" onClick={() => openPrompt(ln.version)}>v{ln.version}</button></td>
+                    <td className="pr-3"><button className="text-indigo-600 hover:underline font-mono" onClick={() => openPrompt(ln.version)}>{scorerLabel(ln.version)}</button></td>
                     <td><button className="text-indigo-600 hover:underline whitespace-nowrap" title={`continue from round ${ln.maxRound} → round ${ln.maxRound + 1} with a model you pick`}
                       onClick={() => { const fin = ln.rounds.find(r => r.round === ln.maxRound)!; setNr({ storyId: ln.storyId, part: sec.part, version: ln.version, row: fin }); setNrModel(''); setNrMsg(null); }}>＋ next round ▾</button></td>
                   </tr>
@@ -157,11 +162,11 @@ export default function ScorecardsPanel() {
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setModal(null)}>
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[85vh] overflow-auto p-4 text-xs" onClick={e => e.stopPropagation()}>
             {modal.kind === 'prompt' && (<>
-              <div className="font-semibold mb-2">Evaluator v{modal.version} — judge prompt</div>
+              <div className="font-semibold mb-2">Evaluator {scorerLabel(modal.version)} — judge prompt</div>
               <pre className="whitespace-pre-wrap bg-gray-50 p-3 rounded">{modal.prompt}</pre>
             </>)}
             {modal.kind === 'cell' && (<>
-              <div className="font-semibold mb-1">{PART_LABEL[modal.row.artifact] || modal.row.artifact} · round {modal.row.round} · {modal.row.model} · v{modal.row.eval_version}</div>
+              <div className="font-semibold mb-1">{PART_LABEL[modal.row.artifact] || modal.row.artifact} · round {modal.row.round} · {modal.row.model} · {scorerLabel(modal.row.eval_version)}</div>
               <div className="mb-1">score <b>{modal.row.score}</b> · judge <span className="font-mono">{modal.row.judge_model}</span> · {modal.row.source}</div>
               <div className="mb-2 opacity-70">generation: ${fmt(modal.row.gen_cost_usd)} · {secs(modal.row.gen_ms)} &nbsp;|&nbsp; judge: ${fmt(modal.row.judge_cost_usd)} · {secs(modal.row.judge_ms)}</div>
               <div className="font-semibold">Dimensions</div>

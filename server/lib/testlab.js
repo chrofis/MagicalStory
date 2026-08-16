@@ -5351,13 +5351,20 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
   const sc = require('./storyScorecard');
 
-  // Default judge is at-least-Sonnet-level (scorecardJudge), not the pipeline's
-  // cheap reviewer — a weak judge scores too loosely to compare generators.
-  const judge = String(model || MODEL_DEFAULTS.scorecardJudge || MODEL_DEFAULTS.outlineReviewModel).trim();
+  // From version 2 on the evaluator version PINS the judge (2.1 Anna/Sonnet,
+  // 2.2 Bruno/Grok, 2.3 Cora/Gemini), so a stored eval_version identifies both
+  // the rubric and who scored it. When a caller names a judge instead (re-judging
+  // a stored row), resolve the version that means "this prompt + that judge" so
+  // the stamp can never claim a judge that did not produce the score.
+  let ev = sc.resolveEvaluator(evalVersion);
+  if (model && ev.judge && model !== ev.judge) {
+    const match = sc.findEvaluatorForJudge(model, ev.promptKey);
+    if (!match) throw new Error(`No evaluator version pins judge "${model}" for prompt ${ev.promptKey} — add one to EVALUATORS instead of mixing judge and version`);
+    ev = sc.resolveEvaluator(match.version);
+  }
+  const judge = String(model || ev.judge || MODEL_DEFAULTS.scorecardJudge || MODEL_DEFAULTS.outlineReviewModel).trim();
   if (!TEXT_MODELS[judge]) throw new Error(`Unknown judge model "${judge}"`);
-  // Pick the evaluator version's prompt (v1.0 default; v1.1 = harsher). An
-  // explicit promptOverride still wins (Test Lab A/B of the rubric itself).
-  const { version, promptKey, rubric } = sc.resolveEvaluator(evalVersion);
+  const { version, promptKey, rubric } = ev;
   const template = promptOverride || PROMPT_TEMPLATES[promptKey];
   if (!template) throw new Error(`story-scorecard judge template unavailable for evaluator ${version}`);
   const input = sc.buildJudgeInputFromArtifacts(artifacts);
@@ -5371,7 +5378,7 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   const res = await callTextModelStreaming(`${template}\n\n---\n\n${input}`, null, null, judge, { usageLabel: 'testlab_story_scorecard', temperature: 0 });
   if (!res || !res.text || !res.text.trim()) throw new Error(`judge returned empty response (model ${judge})`);
   const scored = sc.scoreFromDims(sc.parseJudgeJson(res.text), { partial, only: requested, rubric });
-  const scorecard = { ...scored, ...sc.evaluatorStamp(template, version), judgeModel: judge };
+  const scorecard = { ...scored, ...sc.evaluatorStamp(template, version), judgeModel: judge, scorerName: ev.name };
   const judgeMs = Date.now() - t;
   const judgeCost = res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {});
 
@@ -5443,7 +5450,7 @@ async function runScoreRejudgeStage(target, { params = {} }) {
     // still get scored (a provider returning empty lost 3 of 5 rows once).
     try {
       const r = await scoreArtifactsWithJudge({ [row.artifact]: row.artifact_text }, {
-        model: judge, evalVersion: row.eval_version,
+        model: judge, evalVersion: params.evalVersion || row.eval_version,
         persist: {
           storyId: row.story_id, title: row.title, language: row.language, artStyle: row.art_style,
           source: 'score_rejudge', model: row.model, round: row.round,

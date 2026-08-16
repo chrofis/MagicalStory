@@ -38,16 +38,50 @@ const RUBRIC_V1 = {
 // bump the semver still shows a changed hash. Every score record carries both.
 // version → PROMPT_TEMPLATES key. Add a row + a prompts/*.txt file to ship a new
 // evaluator; RUBRIC (the dimensions) stays fixed so versions stay comparable.
-const EVALUATOR_PROMPT_KEYS = { '1.0': 'storyScorecardJudge', '1.1': 'storyScorecardJudgeV1_1', '1.2': 'storyScorecardJudgeV1_2' };
-const EVALUATOR_RUBRICS = { '1.0': RUBRIC_V1, '1.1': RUBRIC_V1, '1.2': RUBRIC };
-const DEFAULT_EVALUATOR_VERSION = '1.2'; // 10-dim beats (superset of the reviewer) + harsh calibration
+// SCORER REGISTRY. From version 2 on, the version number identifies BOTH halves
+// of a score: the MAJOR is the rubric/prompt generation, the MINOR is which
+// model judged it (2.1 Sonnet, 2.2 Grok, 2.3 Gemini, .4 next…). Before this, the
+// judge lived only in a separate column, so "v1.2" meant three different things
+// depending on who ran it — and a Sonnet-judged table was silently compared
+// against a Gemini-judged one. Each scorer also carries a NAME, because "Anna
+// says 8.4, Cora says 6.6" is how these get discussed.
+// 1.x are frozen legacy rows (judge not pinned) — kept so old scores stay readable.
+const EVALUATORS = {
+  '1.0': { name: 'legacy 1.0', promptKey: 'storyScorecardJudge', rubric: RUBRIC_V1, judge: null },
+  '1.1': { name: 'legacy 1.1 (harsh)', promptKey: 'storyScorecardJudgeV1_1', rubric: RUBRIC_V1, judge: null },
+  '1.2': { name: 'legacy 1.2 (10-dim beats)', promptKey: 'storyScorecardJudgeV1_2', rubric: RUBRIC, judge: null },
+  '2.1': { name: 'Anna', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'claude-sonnet' },
+  '2.2': { name: 'Bruno', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'grok-4.6' },
+  '2.3': { name: 'Cora', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'gemini-3.1-pro' },
+};
+// back-compat shapes for anything that read these directly
+const EVALUATOR_PROMPT_KEYS = Object.fromEntries(Object.entries(EVALUATORS).map(([v, e]) => [v, e.promptKey]));
+const EVALUATOR_RUBRICS = Object.fromEntries(Object.entries(EVALUATORS).map(([v, e]) => [v, e.rubric]));
+const DEFAULT_EVALUATOR_VERSION = '2.1'; // prompt gen 2, judged by Anna (Sonnet)
 const EVALUATOR_VERSION = DEFAULT_EVALUATOR_VERSION; // back-compat export
 
 function resolveEvaluator(version) {
   const v = version || DEFAULT_EVALUATOR_VERSION;
-  const promptKey = EVALUATOR_PROMPT_KEYS[v];
-  if (!promptKey) throw new Error(`Unknown evaluator version "${v}" (have ${Object.keys(EVALUATOR_PROMPT_KEYS).join(', ')})`);
-  return { version: v, promptKey, rubric: EVALUATOR_RUBRICS[v] || RUBRIC };
+  const e = EVALUATORS[v];
+  if (!e) throw new Error(`Unknown evaluator version "${v}" (have ${Object.keys(EVALUATORS).join(', ')})`);
+  return { version: v, name: e.name, promptKey: e.promptKey, rubric: e.rubric, judge: e.judge };
+}
+
+/**
+ * Which version means "this prompt generation, judged by THIS model". Used when a
+ * caller names a judge instead of a version (re-judging a stored row), so the
+ * stamped version never claims a judge that did not produce the score.
+ */
+function findEvaluatorForJudge(judge, promptKey) {
+  const hit = Object.entries(EVALUATORS).find(([, e]) => e.judge === judge && (!promptKey || e.promptKey === promptKey));
+  return hit ? { version: hit[0], ...hit[1] } : null;
+}
+
+/** Scorers a UI can offer: only the ones with a pinned judge. */
+function listScorers() {
+  return Object.entries(EVALUATORS)
+    .filter(([, e]) => e.judge)
+    .map(([version, e]) => ({ version, name: e.name, judge: e.judge }));
 }
 
 function evaluatorStamp(judgePromptText, version) {
@@ -177,6 +211,6 @@ module.exports = {
   RUBRIC, RUBRIC_V1, EVALUATOR_RUBRICS, mean, finalBeats, finalScenes, extractArtifacts,
   buildJudgeInput, buildJudgeInputFromArtifacts, provenanceOf,
   scoreFromDims, parseJudgeJson,
-  EVALUATOR_VERSION, DEFAULT_EVALUATOR_VERSION, EVALUATOR_PROMPT_KEYS,
-  resolveEvaluator, evaluatorStamp,
+  EVALUATOR_VERSION, DEFAULT_EVALUATOR_VERSION, EVALUATOR_PROMPT_KEYS, EVALUATORS,
+  resolveEvaluator, findEvaluatorForJudge, listScorers, evaluatorStamp,
 };

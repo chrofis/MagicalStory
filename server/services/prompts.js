@@ -146,6 +146,7 @@ async function loadPromptTemplates() {
     ['storyScorecardJudge', 'story-scorecard-judge.txt'],
     ['storyScorecardJudgeV1_1', 'story-scorecard-judge-v1_1.txt'],
     ['storyScorecardJudgeV1_2', 'story-scorecard-judge-v1_2.txt'],
+    ['storyScorecardJudgeV2', 'story-scorecard-judge-v2.txt'],
   ];
 
   await Promise.all(FILES.map(([k, f]) => load(k, f)));

@@ -11850,3 +11850,27 @@ per-IP abuse, and admin runs should count against them.
 - `tests/manual/trial-admin-bypass-limiter.test.js` (regression: admins pass,
   forged/expired tokens still capped)
 **Status:** ✅ active
+
+## 2026-08-16 — Scorer version 2.x pins the judge, and each scorer has a name
+
+**Context:** `eval_version` described only the rubric/prompt, while the judge lived in a
+separate `judge_model` column. So "v1.2" meant three different things depending on who ran
+it, and this session compared a Sonnet-judged table against a Gemini-judged one — twice
+producing a wrong conclusion (Sonnet ranked its own reviewer output +1.2 too high on beats,
+and its own prose 2.2 too high on text).
+
+**Decision:** From prompt generation 2 the version identifies BOTH halves: MAJOR = rubric/
+prompt generation, MINOR = the judging model. `2.1 Anna` (claude-sonnet), `2.2 Bruno`
+(grok-4.6), `2.3 Cora` (gemini-3.1-pro); the next judge is 2.4, and a rubric change makes
+3.x. Each scorer has a NAME because that is how results get discussed. `prompts/
+story-scorecard-judge-v2.txt` is generation 2 (content promoted from v1_2, 10-dim beats).
+1.0/1.1/1.2 stay as frozen legacy rows with no pinned judge so old scores remain readable.
+`DEFAULT_EVALUATOR_VERSION` = 2.1.
+
+**Enforcement:** naming a judge that contradicts the version now throws unless a version
+exists meaning "this prompt + that judge" (`findEvaluatorForJudge`), so a stamped version
+can never claim a judge that did not produce the score. `score_rejudge` maps a named judge
+to its version automatically.
+
+**Touched:** server/lib/storyScorecard.js, server/lib/testlab.js, server/services/prompts.js,
+prompts/story-scorecard-judge-v2.txt, client/src/components/testlab/ScorecardsPanel.tsx.
