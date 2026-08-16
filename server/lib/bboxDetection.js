@@ -1339,7 +1339,12 @@ async function createSamInputOverlayImage(imageData, bboxDetection) {
       if (ew < 8 || eh < 8) continue;
 
       const svg = [`<svg width="${ew}" height="${eh}" xmlns="http://www.w3.org/2000/svg">`];
-      // Everything outside the box dimmed, so the box IS the frame.
+      // Everything outside the box dimmed so the box reads as a frame. This is
+      // a READING AID ONLY and must be labelled as one: SAM is sent the WHOLE
+      // PAGE, unmodified — `{image, box, points, point_labels}` — and no figure
+      // is ever erased before the call. Separation between neighbours comes
+      // from the negative points, nothing else. The first version of this view
+      // left that ambiguous and read as "the others were cut out first".
       svg.push(`<path d="M0,0 H${ew} V${eh} H0 Z M${x1 - ex},${y1 - ey} H${x2 - ex} V${y2 - ey} H${x1 - ex} Z" fill="#000" fill-rule="evenodd" opacity="0.45"/>`);
       svg.push(`<rect x="${x1 - ex}" y="${y1 - ey}" width="${x2 - x1}" height="${y2 - y1}" fill="none" stroke="#ffffff" stroke-width="3"/>`);
       for (const p of f.samPoints) {

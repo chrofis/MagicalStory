@@ -340,7 +340,49 @@ const _boxCentre = (b) => [Math.round((b[0] + b[2]) / 2), Math.round((b[1] + b[3
  * Mutates each person with `.face`, appends any synthesised figure, returns a
  * diag summary.
  */
-function _pairFacesGlobally(persons, faces, W, H, pageLabel = '') {
+async function _bodyBoxFromFaceCrop(imageDataUri, faceBoxPx, W, H, pageLabel = '') {
+  // A GENEROUS crop around where the body must be, then DINO on the crop
+  // (owner, 2026-08-16). DINO missed this person on the full page — usually
+  // because neighbours crowd it — but inside a crop centred on it, with the
+  // competition mostly outside the frame, it is findable. detectPersonBoxInCrop
+  // is reused rather than reimplemented: it already picks the SMALLEST person
+  // box containing the face, which is the rule that keeps a bigger neighbour
+  // from being returned instead.
+  //
+  // A real box also restores the ground cue. A synthesised box is faceBottom +
+  // 6.5 face-heights, which overshoots and clamps to the page edge, so the
+  // figure has to be forced behind everyone (fromFace) rather than placed by
+  // its own bottom edge.
+  try {
+    const rough = _personBoxFromFace(faceBoxPx, W, H);
+    if (!rough) return null;
+    // Wider than the synthesised guess: it is a crop to search in, not a claim.
+    const mx = (rough[2] - rough[0]) * 0.25, my = (rough[3] - rough[1]) * 0.10;
+    const cx = Math.max(0, Math.round(rough[0] - mx)), cy = Math.max(0, Math.round(rough[1] - my));
+    const cw = Math.min(W - cx, Math.round(rough[2] - rough[0] + 2 * mx));
+    const ch = Math.min(H - cy, Math.round(rough[3] - rough[1] + 2 * my));
+    if (cw < 32 || ch < 32) return null;
+    const buf = Buffer.from(r2Lib.stripDataUriPrefix(imageDataUri), 'base64');
+    const scale = cw < 640 ? 640 / cw : 1;
+    const crop = await sharp(buf).extract({ left: cx, top: cy, width: cw, height: ch })
+      .resize(Math.round(cw * scale), Math.round(ch * scale), { fit: 'fill' }).jpeg({ quality: 92 }).toBuffer();
+    const faceInCrop = [
+      (faceBoxPx[0] - cx) * scale, (faceBoxPx[1] - cy) * scale,
+      (faceBoxPx[2] - cx) * scale, (faceBoxPx[3] - cy) * scale,
+    ];
+    const box = await detectPersonBoxInCrop(crop, faceInCrop, pageLabel);
+    if (!box) return null;
+    const back = [cx + box[0] / scale, cy + box[1] / scale, cx + box[2] / scale, cy + box[3] / scale]
+      .map((v, i) => Math.round(Math.max(0, Math.min(i % 2 ? H : W, v))));
+    if (back[2] - back[0] < 8 || back[3] - back[1] < 8) return null;
+    return back;
+  } catch (e) {
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}body-from-face-crop failed: ${e.message}`);
+    return null;
+  }
+}
+
+async function _pairFacesGlobally(persons, faces, W, H, pageLabel = '', imageDataUri = null) {
   const pairCost = (f, d) => {
     const fcx = (f.box[0] + f.box[2]) / 2;
     const bw = Math.max(1, d.box[2] - d.box[0]), bh = Math.max(1, d.box[3] - d.box[1]);
@@ -363,15 +405,22 @@ function _pairFacesGlobally(persons, faces, W, H, pageLabel = '') {
     c.d.face = c.f; takenFaces.add(c.f);
   }
   const orphans = faces.filter(f => !takenFaces.has(f));
-  let recovered = 0;
+  let recovered = 0, redetected = 0;
   for (const f of orphans) {
-    const box = _personBoxFromFace(f.box, W, H);
+    // DINO on a crop first; the synthesised box is the fallback, not the plan.
+    const fromCrop = imageDataUri ? await _bodyBoxFromFaceCrop(imageDataUri, f.box, W, H, pageLabel) : null;
+    const box = fromCrop || _personBoxFromFace(f.box, W, H);
     if (!box) continue;
-    persons.push({ box, score: f.score, face: f, fromFace: true });
+    // fromFace marks a SYNTHESISED box, which has no ground cue and must sort
+    // behind everyone. A box DINO found on the crop has a real bottom edge, so
+    // it is a normal figure and takes its place by depth like the rest.
+    persons.push({ box, score: f.score, face: f, fromFace: !fromCrop, bodyFromCrop: !!fromCrop });
     recovered++;
-    log.info(`🦖 [GDINO-DETECT] ${pageLabel}recovered a figure from an unpaired face (score ${f.score.toFixed(3)}) — DINO found the face but no person box`);
+    if (fromCrop) redetected++;
+    log.info(`🦖 [GDINO-DETECT] ${pageLabel}recovered a figure from an unpaired face (score ${f.score.toFixed(3)}) — `
+      + (fromCrop ? `body re-detected by DINO on a crop [${box.join(',')}]` : 'no body found even on a crop; using the synthesised box'));
   }
-  return { method: 'global-once', faces: faces.length, persons: persons.length, paired: takenFaces.size, recovered };
+  return { method: 'global-once', faces: faces.length, persons: persons.length, paired: takenFaces.size, recovered, redetected };
 }
 
 /**
@@ -526,11 +575,23 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
   // what lies inside its own face box. Where two face boxes overlap, both
   // figures keep those pixels — duplicating a patch of face does no harm to
   // anything downstream, whereas deleting one does.
+  //
+  // The exemption covers the PADDED face box, not the raw detector one (owner,
+  // 2026-08-16). The raw box is eyes-to-chin; the head — hair, jaw, neck, the
+  // outer cheek — is four times its area under the shared _padFaceBoxPx rule.
+  // Protecting only the raw box left three quarters of the head exposed, and on
+  // job_1786829555599_rgzoyoprx p10 that is exactly what happened: Sarah's head
+  // sits 54% inside Daniel's box, Daniel is nearer, and 1,934 px of her head
+  // went to him — visible as stripes cut across her face in the cutout strip.
+  // Same mechanism, larger, on Noah (75% inside Emma's box, 3,068 px).
+  // The SAM point still comes from the RAW box's centre; only the protected
+  // region grows, so nothing about the prompt changes.
   const faceMask = faces.map((f, i) => {
     if (!f || !raw[i]) return null;
+    const head = _padFaceBoxPx(f, W, H, boxesPx[i]);
     const m = new Uint8Array(W * H);
-    for (let y = Math.max(0, f[1]); y < Math.min(H, f[3]); y++) {
-      for (let x = Math.max(0, f[0]); x < Math.min(W, f[2]); x++) m[y * W + x] = 1;
+    for (let y = Math.max(0, head[1]); y < Math.min(H, head[3]); y++) {
+      for (let x = Math.max(0, head[0]); x < Math.min(W, head[2]); x++) m[y * W + x] = 1;
     }
     return m;
   });
@@ -841,19 +902,26 @@ function _maskOverlapFrac(a, b) {
 // proportions, lying poses, close-ups) the full pad balloons the box to
 // half the figure — the whiteout stops reading as "a face to fill in" and
 // the edit model draws a floating portrait instead. Large faces get 40%.
-function _padDinoFaceBox(facePxBox, W, H, bodyBoxNorm = null) {
+function _padFaceBoxPx(facePxBox, W, H, bodyBoxPx = null) {
   const [x1, y1, x2, y2] = facePxBox;
   let padFrac = 0.5;
-  if (bodyBoxNorm?.length === 4) {
-    const faceArea = ((x2 - x1) / W) * ((y2 - y1) / H);
-    const bodyArea = (bodyBoxNorm[3] - bodyBoxNorm[1]) * (bodyBoxNorm[2] - bodyBoxNorm[0]);
+  if (bodyBoxPx?.length === 4) {
+    const faceArea = (x2 - x1) * (y2 - y1);
+    const bodyArea = (bodyBoxPx[2] - bodyBoxPx[0]) * (bodyBoxPx[3] - bodyBoxPx[1]);
     if (bodyArea > 0 && faceArea / bodyArea > 0.18) padFrac = 0.2;
   }
   const pw = (x2 - x1) * padFrac, ph = (y2 - y1) * padFrac;
-  return _pxBoxToNorm([
-    Math.max(0, x1 - pw), Math.max(0, y1 - ph),
-    Math.min(W, x2 + pw), Math.min(H, y2 + ph),
-  ], W, H);
+  return [
+    Math.max(0, Math.round(x1 - pw)), Math.max(0, Math.round(y1 - ph)),
+    Math.min(W, Math.round(x2 + pw)), Math.min(H, Math.round(y2 + ph)),
+  ];
+}
+
+function _padDinoFaceBox(facePxBox, W, H, bodyBoxNorm = null) {
+  const bodyPx = bodyBoxNorm?.length === 4
+    ? [bodyBoxNorm[1] * W, bodyBoxNorm[0] * H, bodyBoxNorm[3] * W, bodyBoxNorm[2] * H]
+    : null;
+  return _pxBoxToNorm(_padFaceBoxPx(facePxBox, W, H, bodyPx), W, H);
 }
 
 /**
@@ -1281,8 +1349,8 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   // This link decides which figure SAM segments, where the identity badge goes
   // and which character a figure IS; it used to be computed twice by two
   // different methods with nothing comparing them.
-  diag.pairing = _pairFacesGlobally(persons, faces, W, H, pageLabel);
-  diag.persons = persons.map(p => ({ box: p.box.map(Math.round), score: +p.score.toFixed(3), fromFace: p.fromFace || undefined }));
+  diag.pairing = await _pairFacesGlobally(persons, faces, W, H, pageLabel, imageDataUri);
+  diag.persons = persons.map(p => ({ box: p.box.map(Math.round), score: +p.score.toFixed(3), fromFace: p.fromFace || undefined, bodyFromCrop: p.bodyFromCrop || undefined }));
 
   // Stage 1c — femaleness pass is LAZY (owner, 2026-08-10): it only feeds the
   // layout-fallback tiebreaker, and SoM identity succeeds on virtually every

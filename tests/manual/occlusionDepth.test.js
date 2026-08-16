@@ -372,11 +372,19 @@ t('a face box is clamped to the page and junk yields null', () => {
 });
 
 t('recovery happens inside the ONE pairing pass, and the NMS guard is gone', () => {
-  // A face left unpaired by the global assignment gets a body synthesised from
-  // itself, in the same pass - not by a separate containment scan that would be
-  // a second answer to the same question.
-  assert.ok(/persons\.push\(\{ box, score: f\.score, face: f, fromFace: true \}\)/.test(SRC),
-    'an orphan face appends a person, carrying the face that produced it');
+  // A face left unpaired by the global assignment gets a body, in the same pass
+  // - not by a separate containment scan that would be a second answer to the
+  // same question. DINO on a crop is tried FIRST (2026-08-16): the full-page
+  // pass missed the body because neighbours crowd it, and a crop centred on the
+  // face mostly excludes them. The synthesised box is the fallback.
+  assert.ok(/const fromCrop = imageDataUri \? await _bodyBoxFromFaceCrop\(/.test(SRC),
+    'an orphan face is re-detected on a crop before anything is synthesised');
+  assert.ok(/const box = fromCrop \|\| _personBoxFromFace\(f\.box, W, H\)/.test(SRC),
+    'and the synthesised box is the fallback, not the plan');
+  assert.ok(/persons\.push\(\{ box, score: f\.score, face: f, fromFace: !fromCrop, bodyFromCrop: !!fromCrop \}\)/.test(SRC),
+    'fromFace marks a SYNTHESISED box only - a crop-detected box has a real ground cue');
+  assert.ok(/detectPersonBoxInCrop\(crop, faceInCrop, pageLabel\)/.test(SRC),
+    'and it reuses the existing crop detector, which picks the smallest person box containing the face');
   assert.ok(/const orphans = faces\.filter\(f => !takenFaces\.has\(f\)\)/.test(SRC),
     'orphans come from the global assignment, not from a box-containment scan');
   assert.ok(!/GDINO_NMS_SIZE_RATIO|_sameFigureSize|keepOccluded/.test(SRC),
@@ -394,8 +402,8 @@ t('faces are paired GLOBALLY, not by smallest containing box', () => {
     'every possible pair is scored and taken best-first');
   assert.ok(/return dx \* 2 \+ dy;/.test(SRC),
     'cost = horizontal offset from the box centre (weighted) + drop below its top');
-  assert.ok(/diag\.pairing = _pairFacesGlobally\(persons, faces, W, H, pageLabel\)/.test(SRC),
-    'and it runs ONCE, before masking');
+  assert.ok(/diag\.pairing = await _pairFacesGlobally\(persons, faces, W, H, pageLabel, imageDataUri\)/.test(SRC),
+    'and it runs ONCE, before masking (async since it may re-detect an orphan body on a crop)');
 });
 
 t('the masker uses the pairing it is GIVEN, never re-deriving one', () => {

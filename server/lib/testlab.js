@@ -843,7 +843,7 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
     const samIn = await createSamInputOverlayImage(imageData, result);
     if (samIn) {
       const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, samIn, experimentId);
-      steps.push({ label: 'SENT TO SAM — one cell per call: box + points (green face, blue garment, red = not me)', imageType: 'tl_step', versionIndex: v });
+      steps.push({ label: 'SENT TO SAM — the FULL PAGE + this box + these points (green face, blue garment, red = not me). Nothing is erased; the dimming is only so the box reads as a frame', imageType: 'tl_step', versionIndex: v });
     }
   } catch (err) {
     log.warn(`[TESTLAB] bbox overlay failed (${err.message}) — entry has numeric boxes only`);
