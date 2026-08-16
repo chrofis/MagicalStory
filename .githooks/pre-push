@@ -19,5 +19,12 @@ HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # test-story names in prompts, eszett in German strings).
 node "$HOOK_DIR/../scripts/admin/check-settled.js" || exit 1
 
-# Gate 2: target environment must be idle (see check-push-idle.js).
+# Gate 2: crash guard — no undefined variables in the server code being pushed.
+# Three ReferenceErrors shipped in one day (manual character repair, cover
+# iterate, and the Pass-2 style transfer, which lost every story's art-style
+# conversion). All three were wrapped in try/catch, so they surfaced as
+# plausible degraded output instead of an error. ~1s, committed content only.
+node "$HOOK_DIR/../scripts/admin/check-no-undef.js" || exit 1
+
+# Gate 3: target environment must be idle (see check-push-idle.js).
 exec node "$HOOK_DIR/../scripts/admin/check-push-idle.js" "$@"
