@@ -2158,12 +2158,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // though the backend is happily streaming text. Long stories can take
     // 15+ minutes for the Sonnet response alone.
     const unifiedHeartbeat = createJobHeartbeat(jobId, dbPool);
+    // WALL-CLOCK heartbeat for the whole text phase. The per-chunk heartbeat
+    // only fires once tokens arrive: a provider that queues a request for 10+
+    // minutes (two stories competing for the same model) emits nothing, so
+    // updated_at goes stale and the status route's 10-minute watchdog fails a
+    // perfectly healthy job mid-call (job_1786916653164, killed at 2% during
+    // beats planning). The image phase already guards this way; the text phase
+    // — the longest in the run — did not.
+    const textPhaseHeartbeat = setInterval(() => {
+      dbPool.query(
+        'UPDATE story_jobs SET updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND status = $2',
+        [jobId, 'processing']
+      ).catch(err => log.debug(`[HEARTBEAT] text phase job ${jobId}: ${err.message}`));
+    }, 60000);
     let unifiedResponse;
     let unifiedModelId;
     let unifiedUsage;
     // beatsResult carries the parsed pages + already-expanded scenes when the
     // beats pipeline ran; null on the unified path.
     let beatsResult = null;
+    try {
     if (beatsMode) {
       beatsResult = await generateStoryViaBeats(inputData, {
         jobId,
@@ -2202,6 +2216,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       unifiedResponse = unifiedResult.text;
       unifiedModelId = unifiedResult.modelId;
       unifiedUsage = unifiedResult.usage || { input_tokens: 0, output_tokens: 0 };
+    }
+    } finally {
+      clearInterval(textPhaseHeartbeat);
     }
     timing.storyGenEnd = Date.now();
     // Determine provider from model ID since streaming doesn't return provider

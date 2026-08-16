@@ -12334,3 +12334,24 @@ that already exists in `prompts/avatar-evaluation.txt:89`
 (`none | clean-shaven | stubble | mustache | goatee | short/full/long beard`),
 not a single exemplar.
 **Touched:** the same four prompt files.
+
+## 2026-08-16: Wall-clock heartbeat for the text phase (healthy jobs were being reaped)
+
+**Context:** job_1786916653164 was failed by the status route's watchdog at 2% —
+"no progress for 10 minutes" — while the beats planner's LLM call was still running.
+Nothing was wrong with the job: a second story was generating concurrently, the provider
+queued the request, and the text phase's ONLY liveness signal is a per-chunk heartbeat
+(`callTextModelStreaming(onChunk)`). No tokens for 10 minutes = no `updated_at` bump =
+the job looks dead. The image phase has had a `setInterval` heartbeat since the same
+class of bug; the text phase — the longest stretch of the run (~50% of wall clock) —
+never got one.
+
+**Decision:** the whole text phase (beats and unified) runs inside a 60s wall-clock
+heartbeat that bumps `updated_at` regardless of token flow, cleared in a `finally` so a
+throwing phase cannot leave it running and keep a dead job looking alive. Per-chunk
+heartbeats stay (they also drive progressive parsing).
+
+**Not changed:** HEARTBEAT_TIMEOUT_MINUTES stays 10. The watchdog is right to exist;
+it was reading a signal the text phase never sent.
+
+**Touched:** storyJobPipeline.js.
