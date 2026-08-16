@@ -1231,7 +1231,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         includeDebug: true,
       });
     } catch (err) {
-      return { pageNumber, imageData: null, method, error: err.message };
+      // Literal, not a bare `method`: this closure has no such binding (the
+      // round runner destructures one from pageStrategies, a different scope),
+      // so the reference threw a ReferenceError from inside the catch that was
+      // meant to REPORT the failure — turning a handled repair error into an
+      // unhandled one. executeCharFixAction is always the char-fix method.
+      return { pageNumber, imageData: null, method: 'char-fix', error: err.message };
     }
 
     if (!repairResult?.imageData || repairResult.imageData.length < 1000) {

@@ -371,7 +371,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, {
         pageLabel, expectedObjects, objectGroundingHints,
         // Lab knobs — see figureDetection Stage 3 / badge anchor.
-        facePairing: options.facePairing, badgeAnchor: options.badgeAnchor,
+        badgeAnchor: options.badgeAnchor,
       });
       gdinoDiag = gd?.diag || null;
       if (gd && Array.isArray(gd.figures) && gd.figures.length > 0) {
@@ -700,7 +700,12 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
           // Close in correct order: inner brackets first, then braces
           truncated += ']'.repeat(Math.max(0, openBrackets)) + '}'.repeat(Math.max(0, openBraces));
           parsedResult = JSON.parse(truncated);
-          log.info(`🔧 [BBOX-DETECT] Repaired truncated JSON (finishReason: ${finishReason || 'STOP'})`);
+          // Re-read from `data` — the `finishReason` const lives inside the
+          // retry loop above and is out of scope here. Referencing it threw a
+          // ReferenceError that the enclosing `catch (repairError)` swallowed,
+          // so a SUCCESSFULLY repaired JSON was reported as "repair failed"
+          // and thrown away.
+          log.info(`🔧 [BBOX-DETECT] Repaired truncated JSON (finishReason: ${data?.candidates?.[0]?.finishReason || 'STOP'})`);
         }
       } catch (repairError) {
         log.warn(`⚠️  [BBOX-DETECT] JSON repair failed: ${repairError.message}`);

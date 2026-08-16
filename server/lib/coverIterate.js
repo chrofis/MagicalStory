@@ -545,6 +545,36 @@ async function iterateCover(coverKey, storyData, options = {}) {
     }
   }
 
+    // Identity lines for the detector, built once and used by BOTH detection
+    // calls below (gen-time and the composite re-detect). It used to be a const
+    // inside the `if (!skipEval ...)` block, so the second call referenced an
+    // out-of-scope name and threw a ReferenceError — swallowed by its own
+    // try/catch, which logged "detection failed" and served the cover with no
+    // bboxes at all. A function keeps one definition without hoisting the work
+    // itself: it only runs where it is called.
+    const buildExpectedCoverCharacters = () => {
+      const coverClothingByName = hintCharClothing || {};
+      return (selectedCoverCharacters || []).map(c => {
+        const name = c.name || c;
+        if (typeof c !== 'object') return { name, description: '' };
+        let clothingText = '';
+        const category = coverClothingByName[name];
+        if (category) {
+          try {
+            clothingText = require('./entityConsistency').buildClothingDescription(
+              c, category, artStyleId, storyData.clothingRequirements || null) || '';
+          } catch (e) {
+            log.warn(`⚠️ [COVER-ITERATE] ${coverKey} ${name}: clothing "${category}" did not resolve (${e.message})`);
+          }
+        }
+        return {
+          name,
+          description: c.description
+            || getStoryHelpers().buildCastIdentityDescription(c, clothingText),
+        };
+      });
+    };
+
   // Back cover main-only narrowing — FALLBACK casts only. A hint-derived cast
   // is authoritative: every hint-listed character's avatar must be packed
   // (owner rule 2026-07-31 — see narrowCoverCastToMains).
@@ -895,6 +925,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
     let evalReasoning = skipEval ? 'no gen-time eval (pipeline scores versions)' : null;
     let coverBboxDetection = null;
     let coverBboxOverlay = null;
+
     if (!skipEval && genResult?.imageData) {
       try {
         // evalOptions empty on purpose: the cover prompt carries the full ART
@@ -929,26 +960,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
       //   {Emma: summer, Hans: summer, Noah: summer, Sarah: summer, Daniel: summer}
       // It simply was never passed on. Resolution goes through
       // clothingRequirements, the canonical source, like everywhere else.
-      const coverClothingByName = hintCharClothing || {};
-      const expectedCoverCharacters = (selectedCoverCharacters || []).map(c => {
-        const name = c.name || c;
-        if (typeof c !== 'object') return { name, description: '' };
-        let clothingText = '';
-        const category = coverClothingByName[name];
-        if (category) {
-          try {
-            clothingText = require('./entityConsistency').buildClothingDescription(
-              c, category, artStyleId, storyData.clothingRequirements || null) || '';
-          } catch (e) {
-            log.warn(`⚠️ [COVER-ITERATE] ${coverKey} ${name}: clothing "${category}" did not resolve (${e.message})`);
-          }
-        }
-        return {
-          name,
-          description: c.description
-            || getStoryHelpers().buildCastIdentityDescription(c, clothingText),
-        };
-      });
+      const expectedCoverCharacters = buildExpectedCoverCharacters();
       try {
         coverBboxDetection = await detectAllBoundingBoxes(genResult.imageData, {
           expectedCharacters: expectedCoverCharacters,
@@ -1013,7 +1025,7 @@ async function iterateCover(coverKey, storyData, options = {}) {
           // Same identity lines as the first detection above - a second call
           // that sends bare names would overwrite a good detection with a blind
           // one, exactly as the round re-detect used to on the page paths.
-          expectedCharacters: expectedCoverCharacters,
+          expectedCharacters: buildExpectedCoverCharacters(),
           expectedObjects: Array.isArray(coverSceneMetadata?.objects)
             ? coverSceneMetadata.objects.filter(o => typeof o === 'string')
             : [],
