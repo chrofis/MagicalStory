@@ -142,7 +142,15 @@ function faceDataUri(entry) {
   //    the trial writer needs (hair/eyes/skin) plus the face box.
   const analysis = await api(args.base, '/api/trial/analyze-photo', { body: { imageData: facePhoto, adminToken } });
   const traits = analysis.traits || analysis.physical || {};
-  console.log(`[${chTime(new Date())}] photo analysed — faces: ${analysis.faces?.length ?? 'n/a'}, traits: ${Object.keys(traits).join(',') || 'none'}`);
+  // MIRROR THE WIZARD (TrialCharacterStep.tsx:562): `photos.face` is the
+  // analyzer's faceThumbnail — a CROP — not the raw upload. Sending the full
+  // photo made every scripted run generate its avatar from an 800×800 shot
+  // where the head is ~9% of the frame (measured: faceBox width 9.0), a far
+  // weaker identity anchor than any real trial user gets. Runs before
+  // 2026-08-16 have this defect and should not be read as trial quality.
+  const faceCrop = analysis.faceThumbnail || facePhoto;
+  if (!analysis.faceThumbnail) console.warn(`[${chTime(new Date())}] no faceThumbnail returned — falling back to the full photo (identity anchor will be weak)`);
+  console.log(`[${chTime(new Date())}] photo analysed — faceCount: ${analysis.faceCount ?? 'n/a'}, faceCrop: ${analysis.faceThumbnail ? 'yes' : 'NO'}, traits: ${Object.keys(traits).join(',') || 'none'}`);
 
   // 2. Preview avatar — the wizard generates one before account creation, and
   //    the pipeline seeds avatars.standard from it. Skipping it would diverge
@@ -150,7 +158,7 @@ function faceDataUri(entry) {
   let previewAvatar = null;
   try {
     const av = await api(args.base, '/api/trial/generate-preview-avatar', {
-      body: { name: entry.name, age: entry.age, gender: entry.gender, facePhoto, adminToken },
+      body: { name: entry.name, age: entry.age, gender: entry.gender, facePhoto: faceCrop, adminToken },
     });
     previewAvatar = av.avatarImage || null;
     console.log(`[${chTime(new Date())}] preview avatar generated`);
@@ -163,7 +171,13 @@ function faceDataUri(entry) {
   const acct = await api(args.base, '/api/trial/create-anonymous-account', {
     body: {
       name: entry.name, age: entry.age, gender: entry.gender,
-      traits, facePhoto, previewAvatar, adminToken,
+      traits,
+      // Same four photo fields the wizard posts, from the same analyzer call.
+      facePhoto: faceCrop,
+      bodyPhoto: analysis.bodyCrop || null,
+      bodyNoBgPhoto: analysis.bodyNoBg || null,
+      faceBox: analysis.faceBox || null,
+      previewAvatar, adminToken,
     },
   });
   console.log(`[${chTime(new Date())}] trial account ${acct.userId} created`);
