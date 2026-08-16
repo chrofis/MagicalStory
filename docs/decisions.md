@@ -11960,3 +11960,48 @@ check whether it runs before or after the DB reload — the two shapes differ
 (`avatars.standard` vs `previewAvatar`), and the reload wipes `styledAvatars`.
 **Touched:** `storyJobPipeline.js` (read `previewAvatar` first),
 `tests/manual/trial-standard-fullimage-ref.test.js` (pins the DB-reloaded shape).
+
+---
+
+## 2026-08-16 — Art-style conversion: two separate bugs, both silent
+**Context:** The owner noticed trial pages looked "not as watercolour as other
+ones". Two independent defects were suppressing the Pass-2 style transfer, each
+failing silently into "ship the realistic Pass-1 sheet".
+
+**Bug 1 — `skipQualityEval` also disabled style transfer.**
+`wantStyleTransfer = !skipQualityEval && artStyle !== 'realistic'` conflated two
+unrelated concerns: "don't spend Gemini calls GRADING this sheet" and "don't
+convert the art style". The gate predates this session (9c01d90f5, 2026-05-16),
+but forwarding `skipQualityEval: true` from the trial (47cc94108, this session)
+activated it — so the trial shipped photographic sheets into a watercolour
+story. Evidence: `job_1786909179342` recorded `passes.pass2 = null` and no
+`character_2x4_style_transfer` in api_usage. The comment directly above the gate
+warned about exactly this outcome.
+
+**Bug 2 — `verdict` was read but never assigned (full-story path).**
+`5bb2c3423` (row-harmonise removal, 2026-08-15) deleted `let verdict = null;`
+and the `({ verdict } = await evaluateAvatarSheet(...))` call together with the
+harmonise code, but left all eleven readers of `verdict` in place. With reviews
+ON — i.e. every full story — Pass 2 generated (and PAID for) the styled sheet,
+then threw `ReferenceError: verdict is not defined`. The outer catch in
+`generateCharacter2x4Sheet` downgraded that to "shipping realistic Pass 1 sheet
+unstyled", so every character in every full story silently shipped as a
+photograph in a painted story. **Never reached master** — staging only.
+
+**Decision:** `wantStyleTransfer` drops the `skipQualityEval` term (Pass 2 always
+runs for a non-realistic style; the flag is forwarded so the pass itself takes
+1 attempt and skips its own review). The Pass-2 eval block is restored verbatim
+minus the deliberately-removed row-harmonise gate. Additionally the trial's
+`standard` reference — the preview avatar, which trial.js generates with
+"biometric precision / ultra-sharp focus" against a two-line watercolour hint —
+now gets the same Pass-2 conversion via `styleConvertSeededStandards()`, run in
+parallel with the costumed sheet inside the outline window; the raw preview
+stays seeded as the fallback.
+**Rationale:** Both bugs were invisible because each failure path was a
+*graceful* downgrade that logged at warn level and produced a usable-looking
+image. Cost of the fix: one extra image call per trial standard reference
+(~$0.02), wall-clock hidden behind the ~95s outline stage.
+**Touched:**
+- `server/lib/character2x4Sheet.js` (gate + restored eval)
+- `storyJobPipeline.js` (`styleConvertSeededStandards`)
+**Status:** ✅ active

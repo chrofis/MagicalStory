@@ -1269,7 +1269,16 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   // a watercolour story. The outer Face/Clothing eval still gates the
   // final selection, so a truly broken sheet won't ship either way. Every
   // non-realistic art style now gets style transfer applied.
-  const wantStyleTransfer = !skipQualityEval && artStyle && artStyle !== 'realistic';
+  // `skipQualityEval` means "don't spend Gemini calls GRADING this sheet". It
+  // must NOT mean "don't convert the art style" — those are unrelated, and
+  // conflating them reproduced the exact failure the comment above warns
+  // about: the trial (which sets skipQualityEval) shipped realistic Pass-1
+  // photo sheets as references into a watercolour story, so `standard` and
+  // costumed pages alike rendered as painted photographs
+  // (job_1786909179342: pass2 recorded as null, no character_2x4_style_transfer
+  // in api_usage). Pass 2 always runs for a non-realistic style; the flag is
+  // forwarded so the pass itself takes 1 attempt and skips its own reviews.
+  const wantStyleTransfer = artStyle && artStyle !== 'realistic';
   let pass2 = null;
   if (wantStyleTransfer) {
     // Pass-2 failure must NEVER destroy the avatar: the Pass-1 realistic
@@ -1381,6 +1390,31 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       best = { result, attempt, score: 10, verdict: null };
       attempts.push({ attempt, stage: skipQualityEval ? 'no-eval-requested' : 'no-eval-key', score: 10, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
       break;
+    }
+
+    // Pass-2 eval via the single-source evaluator — holistic styled eval, no
+    // head/body split (style transfer can't lose heads). SAME call the lab
+    // makes. Restored after the row-harmonise removal (5bb2c3423) deleted the
+    // assignment but left every reader of `verdict` in place: with reviews ON
+    // this threw ReferenceError right after paying for the style transfer, the
+    // outer catch downgraded it to "ship Pass 1 unstyled", and every full-story
+    // character silently shipped as a realistic photo in a painted story.
+    let verdict = null;
+    try {
+      ({ verdict } = await evaluateAvatarSheet(result.imageData, {
+        pass: 2, facePhoto, realisticSheet: pass1ImageData, artStyle, declaredAge: characterAge, usageTracker,
+      }));
+      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
+    } catch (err) {
+      // Mirror Pass-1 behaviour: a Gemini eval failure must NOT lock in this
+      // attempt at the maximum score and break the retry loop. Score it
+      // neutrally and continue so a later attempt that DOES eval successfully
+      // can win the best-of-N comparison.
+      log.warn(`[CHARACTER 2×4] Pass 2 eval error attempt ${attempt}: ${err.message} — counting as neutral (score=5) and continuing retries`);
+      const candidate = { result, attempt, score: 5, verdict: null };
+      attempts.push({ attempt, stage: 'eval-error', score: 5, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null });
+      if (!best || candidate.score > best.score) best = candidate;
+      continue;
     }
 
     const score = verdict.finalScore ?? 0;
