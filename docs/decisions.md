@@ -12117,11 +12117,16 @@ pure waste when it happens.
 **Rationale:** Prompt-side, per the eval-logic rule (classification belongs to
 the prompt). No code and no parser change: clothing vocabulary is still
 `standard | costumed`, which the metadata parsers substring-match.
-**Not done:** `story-unified.txt` has the same page-level gap for full stories —
-it mandates costumed on covers (line 762) and requires `costumed.used` when the
-theme implies it (line 456), but never says to wear it on a page. Left alone
-pending owner sign-off; full-story clothing is governed by the settled
-`clothingRequirements` contract.
+**Scope — the costume rule is TRIAL-ONLY (owner, 2026-08-16, asked and answered).**
+`story-unified.txt` has the same page-level gap (it mandates costumed on covers
+at line 762 and requires `costumed.used` when the theme implies it at line 456,
+but never says to wear it on a page) and is deliberately left that way: full
+stories choose clothing per page through the settled `clothingRequirements`
+contract, and the writer there has real cast and wardrobe to work with. Do not
+propose extending this rule to the full-story prompts again.
+The facial-hair line above is NOT scoped this way — it is in all four schema
+sites on purpose, since an invented adult with no photo drifts identically in a
+full story.
 **Efficacy is UNVERIFIED** — both are writer-behaviour changes and no story has
 been generated since. The corpus numbers above establish the gap, not the fix.
 **Touched:** the four prompt files above.
