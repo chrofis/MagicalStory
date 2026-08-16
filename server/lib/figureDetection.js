@@ -1003,16 +1003,24 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
     }),
     signal: AbortSignal.timeout(30_000),
   });
-  if (!res.ok) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM Gemini HTTP ${res.status}`); return null; }
+  // FAILURES RETURN THE EVIDENCE, NOT null (owner, 2026-08-16). Returning null
+  // from here threw away the badged image and the prompt — on the one page where
+  // identity got it wrong, the Lab had nothing to show. `nameByDet` being null
+  // is the failure signal; everything else still comes back.
+  const evidence = (reason) => ({
+    nameByDet: null, reason, prompt, badges: badges.map(b => ({ letter: b.letter, detIdx: b.detIdx, at: [b.x, b.y] })),
+    markedImage: `data:image/jpeg;base64,${marked.toString('base64')}`,
+  });
+  if (!res.ok) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM Gemini HTTP ${res.status}`); return evidence(`Gemini HTTP ${res.status}`); }
   const j = await res.json();
   const text = (j?.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('') || '';
   let answers;
   // Tolerate prose/fence wrapping around the JSON ("Here is the JSON…").
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  try { answers = JSON.parse(jsonMatch ? jsonMatch[0] : text); } catch { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM answer not JSON: ${text.slice(0, 120)}`); return null; }
+  try { answers = JSON.parse(jsonMatch ? jsonMatch[0] : text); } catch { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM answer not JSON: ${text.slice(0, 120)}`); return evidence(`answer was not JSON: ${text.slice(0, 200)}`); }
   if (!answers || typeof answers !== 'object') {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM answer was not an object: ${text.slice(0, 120)}`);
-    return null;
+    return evidence(`answer was not an object: ${text.slice(0, 200)}`);
   }
 
   const validNames = new Set(expectedCharacters.map(c => c.name));
@@ -1023,13 +1031,13 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
     if (!raw || /^unknown$/i.test(raw)) continue;
     const name = [...validNames].find(n => n.toLowerCase() === raw.toLowerCase());
     if (!name) continue;
-    if (claimed.has(name)) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM named "${name}" twice — whole answer discarded, falling back to layout: ${JSON.stringify(answers)}`); return null; }
+    if (claimed.has(name)) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM named "${name}" twice — whole answer discarded, falling back to layout: ${JSON.stringify(answers)}`); return { ...evidence(`named "${name}" twice: ${JSON.stringify(answers)}`), answers }; }
     claimed.add(name);
     nameByDet.set(b.detIdx, name);
   }
   if (nameByDet.size === 0) {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM matched no badge to an expected character — answer ${JSON.stringify(answers)} vs [${[...validNames].join(', ')}]`);
-    return null;
+    return { ...evidence(`no badge matched an expected character — answered ${JSON.stringify(answers)}, expected [${[...validNames].join(', ')}]`), answers };
   }
   const letterByDet = new Map(badges.map(b => [b.detIdx, b.letter]));
   log.info(`🔤 [GDINO-DETECT] ${pageLabel}SoM identity: ${[...nameByDet.entries()].map(([i, n]) => `${letterByDet.get(i)}=${n}`).join(' ')}${dets.length > nameByDet.size ? ` (${dets.length - nameByDet.size} unknown)` : ''}`);
@@ -1270,18 +1278,20 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     const badgeAnchor = opts.badgeAnchor || process.env.BADGE_ANCHOR || 'face';
     diag.badgeAnchor = badgeAnchor;
     const som = await _somIdentifyFigures(imageDataUri, persons, expectedCharacters, W, H, pageLabel, badgeAnchor);
-    if (som) {
+    // The badged image and prompt come back on FAILURE too, and are kept there:
+    // the page where identity went wrong is the page that needs them shown.
+    if (som?.markedImage) {
+      Object.defineProperty(diag, '_som', { value: { image: som.markedImage, prompt: som.prompt }, enumerable: false });
+    }
+    if (som?.nameByDet) {
       nameByDet = som.nameByDet;
       diag.identity = { method: 'som-gemini', answers: som.answers, badges: som.badges };
-      // The badged image and the prompt ride NON-ENUMERABLY: bytes must never
-      // reach stories.data JSONB, and a ~1KB prompt per page is dead weight
-      // there too. In-process consumers (the Lab) read them off the object.
-      Object.defineProperty(diag, '_som', { value: { image: som.markedImage, prompt: som.prompt }, enumerable: false });
     } else {
-      diag.identity = { method: 'layout-fallback', reason: 'SoM returned no usable answer (see the SoM warning above)' };
+      diag.identity = { method: 'layout-fallback', somFailure: som?.reason || 'SoM produced no answer', answers: som?.answers, badges: som?.badges };
     }
   } catch (e) {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM identity failed (${e.message}) — masks run unseeded; layout fallback below`);
+    diag.identity = { method: 'layout-fallback', somFailure: `threw: ${e.message}` };
   }
 
   // Each figure's OWN character description, aligned by person index. Empty
@@ -1457,7 +1467,9 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     const asg = _assignFiguresByLayout(chars, geo);
     nameByDet = new Map();
     chars.forEach((c, i) => { if (asg.map[i] != null) nameByDet.set(asg.map[i], c.name); });
-    diag.identity = { method: 'layout-fallback' };
+    // Keep whatever the SoM stage recorded about WHY it is running — this line
+    // used to overwrite it, so a fallback page said only "layout-fallback".
+    diag.identity = { method: 'layout-fallback', ...(diag.identity?.method === 'layout-fallback' ? diag.identity : {}) };
     diag.assignment = chars.map((c, i) => ({ name: c.name, boxIdx: asg.map[i], xTarget: c.xTarget, depthRank: c.depthRank, isChild: c.isChild, gender: c.gender, femaleNorm: asg.map[i] != null ? +(geo[asg.map[i]]?.femaleNorm ?? 0).toFixed(2) : null }));
     diag.assignmentCost = Number.isFinite(asg.cost) ? +asg.cost.toFixed(3) : null;
     diag.assignmentMargin = Number.isFinite(asg.margin) ? +asg.margin.toFixed(3) : null;

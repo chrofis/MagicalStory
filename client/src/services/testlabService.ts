@@ -139,7 +139,7 @@ export interface ExperimentResult {
   figures?: { name?: string; bbox?: number[]; match?: unknown; confidence?: number }[];
   objects?: { name?: string; bbox?: number[] }[];
   detectionBackend?: string | null;
-  identity?: { method?: string; answers?: Record<string, string>; reason?: string } | null;
+  identity?: { method?: string; answers?: Record<string, string>; somFailure?: string } | null;
   somPrompt?: string | null;
   report?: unknown;
   storedBaseline?: { qualityScore?: number | null; semanticScore?: number | null };

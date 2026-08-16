@@ -2729,7 +2729,7 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                         <div className={`text-xs rounded-lg px-3 py-2 ${result.identity.method === 'som-gemini' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
                           <b>identity: {result.identity.method}</b>
                           {result.identity.answers ? ` — ${JSON.stringify(result.identity.answers)}` : ''}
-                          {result.identity.reason ? ` — ${result.identity.reason}` : ''}
+                          {result.identity.somFailure ? ` — SoM failed: ${result.identity.somFailure}` : ''}
                         </div>
                       )}
                       {result.somPrompt && (
