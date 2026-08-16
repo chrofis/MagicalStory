@@ -864,6 +864,10 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
       occluded: f.occluded ?? null,
       occludedBy: f.occludedBy || null,
       garmentSeeds: f.garmentSeeds ?? null,
+      // WHERE each seed landed and why one was not placed — the count alone
+      // could not explain a figure coming back with its clothing erased.
+      seedTrace: f.seedTrace || null,
+      facePoint: f.facePoint || null,
     })),
     objects: (result.objects || []).map(o => ({ name: o.name, bbox: o.bodyBox || o.bbox || o.box_2d })),
   };

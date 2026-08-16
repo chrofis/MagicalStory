@@ -347,6 +347,12 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
     const own = faces[i];
     const points = [], labels = [];
     let seeds = 0;
+    // WHERE each point landed, not just how many. The count alone was stored on
+    // the first real story and could not answer why a figure came back with its
+    // clothing erased: seeds=0 says a seed was not placed, but not whether the
+    // colour was never found, or found outside the box, or rejected as a
+    // neighbour's garment. Coordinates make that readable from a Lab run.
+    const seedTrace = [];
     if (own) {
       points.push(_boxCentre(own)); labels.push(1);
       // Garment seeds. The stored faceBox is NOT a tight face - it runs to the
@@ -354,19 +360,30 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
       // bottom edge would reject every real top dot.
       if (rgb && descriptions && descriptions[i]) {
         const { top, bottom } = _garmentColourWords(descriptions[i]);
+        if (!top && !bottom) {
+          seedTrace.push({ none: 'no garment colour in the identity line', description: String(descriptions[i] || '').slice(0, 120) });
+        } else if (bottom && NEUTRAL_COLOURS.has(bottom)) {
+          seedTrace.push({ garment: 'bottom', colour: bottom, none: 'neutral colour, skipped by design' });
+        }
         const headRef = Math.round((own[1] + own[3]) / 2);
         let topY = null;
         if (top) {
-          for (const b of _colourSeedPoints(rgb, W, H, box, top, headRef)) {
+          const found = _colourSeedPoints(rgb, W, H, box, top, headRef);
+          for (const b of found) {
             points.push([b.cx, b.cy]); labels.push(1); seeds++;
+            seedTrace.push({ garment: 'top', colour: top, at: [b.cx, b.cy], px: b.a });
             if (topY === null) topY = b.cy;   // order against the MAIN piece
           }
+          if (!found.length) seedTrace.push({ garment: 'top', colour: top, none: 'no blob of that colour below the head' });
         }
         // Bottoms only when the colour is not the colour of the ground.
         if (bottom && topY !== null && !NEUTRAL_COLOURS.has(bottom)) {
-          for (const b of _colourSeedPoints(rgb, W, H, box, bottom, topY)) {
+          const foundB = _colourSeedPoints(rgb, W, H, box, bottom, topY);
+          for (const b of foundB) {
             points.push([b.cx, b.cy]); labels.push(1); seeds++;
+            seedTrace.push({ garment: 'bottom', colour: bottom, at: [b.cx, b.cy], px: b.a });
           }
+          if (!foundB.length) seedTrace.push({ garment: 'bottom', colour: bottom, none: 'no blob of that colour below the top' });
         }
       }
       for (let j = 0; j < n; j++) {
@@ -385,7 +402,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
     // garbage). No coverage floor here: an occluded figure is legitimately
     // small, and step 4 judges it on its FACE instead.
     const r = await _cleanMaskAndCheck(m, box, { minCoverage: 0 });
-    if (r.keptBox) raw[i] = { mask: m, separated: points.length > 1, seeds };
+    if (r.keptBox) raw[i] = { mask: m, separated: points.length > 1, seeds, seedTrace, facePoint: own ? _boxCentre(own) : null };
   }
 
   // --- 2. depth order: lower box bottom = nearer the camera ------------------
@@ -472,7 +489,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
       occluded: false, occludedByIdx: [], pxLostToFront: 0, maskPx: 0,
     };
     if (!raw[i]) { out[i] = base; continue; }
-    const { mask, separated, kept, lost, seeds } = raw[i];
+    const { mask, separated, kept, lost, seeds, seedTrace, facePoint } = raw[i];
     const pxLost = [...lost.values()].reduce((a, b) => a + b, 0);
     const occludedByIdx = [...lost.keys()].filter(k => lost.get(k) > 0);
 
@@ -507,6 +524,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
         : separated ? 'mask-ok-face-separated' : 'mask-ok',
       occluded: occludedByIdx.length > 0,
       occludedByIdx, pxLostToFront: pxLost, maskPx: kept, garmentSeeds: seeds || 0,
+      seedTrace: seedTrace || [], facePoint: facePoint || null,
     };
   }
   return out;
@@ -1174,6 +1192,8 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       pxLostToFront: m.pxLostToFront,
       maskPx: m.maskPx,
       garmentSeeds: m.garmentSeeds,
+      seedTrace: m.seedTrace,
+      facePoint: m.facePoint,
     }));
   // Persist any SAM mask leak to the STORY log (not just Railway), so a blow-out
   // is always findable later per-story instead of vanishing into container logs.
@@ -1435,6 +1455,8 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       occluded: d.occluded ?? null,
       occludedBy: (d.occludedByIdx || []).map(k => nameByDet.get(k)).filter(Boolean),
       garmentSeeds: d.garmentSeeds ?? null,
+      seedTrace: d.seedTrace || null,
+      facePoint: d.facePoint || null,
       // Set when the figure had no person box and was recovered from its own
       // unpaired face (see _personBoxFromFace).
       fromFace: d.fromFace ?? undefined,
@@ -1544,6 +1566,8 @@ async function attachSamMasksToFigures(imageData, figures, { pageLabel = '' } = 
     f.pxLostToFront = m.pxLostToFront;
     f.maskPx = m.maskPx;
     f.garmentSeeds = m.garmentSeeds;
+    f.seedTrace = m.seedTrace;
+    f.facePoint = m.facePoint;
     return { f, mask: m.mask };
   });
   const masked = entries.filter(e => e.mask).length;
