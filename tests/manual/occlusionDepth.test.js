@@ -287,8 +287,15 @@ t('the seeds are wired into the masker and both call sites', () => {
     'the top is searched BELOW the head reference');
   assert.ok(/_colourSeedPoints\(rgb, W, H, box, bottom, topY\)/.test(SRC),
     'the bottom is searched BELOW the top - a constraint, not a filter');
-  assert.ok(/expectedCharacters\.map\(c => \(typeof c === 'object' \? c\.description : ''\)/.test(SRC),
-    'the DINO path must pass descriptions');
+  // The DINO path must NOT pass descriptions: `i` indexes person boxes in
+  // detection order, while expectedCharacters is in story order, so every
+  // figure was seeded with an arbitrary character's colours. Measured on
+  // job_1786829555599_rgzoyoprx p10 - the figure at Emma hunted BLUE (Noah's)
+  // and seeded on his shirt. Seeding returns once SoM resolves identity first.
+  assert.ok(!/expectedCharacters\.map\(c => \(typeof c === 'object' \? c\.description : ''\)/.test(SRC),
+    'the DINO path must NOT pass mis-indexed descriptions');
+  assert.ok(/faces\.map\(f => f\.box\), null,/.test(SRC),
+    'it passes null descriptions until identity comes first');
   assert.ok(/figures\.map\(f => f\.description \|\| f\.clothing \|\| ''\)/.test(SRC),
     'the Gemini path must pass descriptions');
 });

@@ -1171,8 +1171,24 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   // ORDER MATTERS: smallest box first, so a figure standing in front is always
   // resolved before the figure it occludes, and its pixels can be erased from
   // the image the occluded figure's SAM call sees (see SAM_FRONT_* above).
+  // NO GARMENT SEEDS HERE (owner, 2026-08-16). This passed
+  // `expectedCharacters.map(c => c.description)` as the per-figure descriptions,
+  // but that array is in EXPECTED-CHARACTER order while `i` indexes the PERSON
+  // boxes in DINO detection order. The two are unrelated, so every figure was
+  // seeded with an arbitrary character's garment colours.
+  //
+  // Measured on job_1786829555599_rgzoyoprx p10: the figure correctly
+  // face-pointed at Emma was told to hunt BLUE (Noah's colour) and its seeds
+  // landed on his shirt at rgb(1,78,146); the figure at Noah was told YELLOW
+  // (Sarah's) and seeded on her blouse. Masks grew onto the neighbour, which is
+  // what erased clothing to white and merged figures in the entity grids.
+  //
+  // It cannot simply be re-ordered: names come from the SoM pass, which today
+  // runs AFTER masking. Seeding returns here once identity is resolved first.
+  // The Gemini path (attachSamMasksToFigures) is unaffected — there `figures`
+  // carry name and description together, so its descriptions are aligned.
   const dets = (await _maskBoxesFrontFirst(imageDataUri, persons.map(p => p.box), W, H, pageLabel,
-    faces.map(f => f.box), expectedCharacters.map(c => (typeof c === 'object' ? c.description : '') || ''),
+    faces.map(f => f.box), null,
     persons.map(p => !!p.fromFace)))
     .map((m, i) => ({
       box: persons[i].box,
