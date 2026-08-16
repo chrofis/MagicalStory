@@ -2550,7 +2550,12 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         previousImage: previousImageData,
         previousScore: previousScore,
         // Blackout image
-        blackoutImage: (blackoutIssues && previousImage !== existingCover.imageData) ? previousImage : null,
+        // `previousImageData` (from imageResult.previousImage above) — the bare
+        // name `previousImage` was never in scope here, so this line threw a
+        // ReferenceError and killed the whole cover-iterate response whenever
+        // blackout mode was on. Same null-guard as the page path
+        // (images.js → buildIterateResult).
+        blackoutImage: (blackoutIssues && previousImageData && previousImageData !== existingCover.imageData) ? previousImageData : null,
         // Image versions for history display
         imageVersions,
         // Credits
