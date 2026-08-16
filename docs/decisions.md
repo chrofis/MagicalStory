@@ -12131,3 +12131,39 @@ full story.
 been generated since. The corpus numbers above establish the gap, not the fix.
 **Touched:** the four prompt files above.
 **Status:** ✅ active
+
+---
+
+## 2026-08-16 — Phantom-character detection matches names by whole-word containment
+**Context:** `job_1786913768533_guwptcbkx` ended with TWO Visual Bible entries
+for one character: `CHR001 "Zauberer Silvio"` (written by the story writer) and
+`CHR002 "Silvio"` (added by the phantom patcher), with contradictory face
+descriptions — CHR001 states "long white beard", CHR002 states no facial hair.
+`findPhantomNames` built its `known` set from bible names and compared with an
+exact normalized string match, so the scene metadata's "Silvio" did not match
+the bible's "Zauberer Silvio", the name looked undeclared, and a Haiku call was
+spent inventing an entry for a character that was already there. Nothing was
+missing from the bible — the failure was a name FORM mismatch, and bibles
+routinely carry a title or honorific ("Zauberer X", "Doktor Y", "Grossvater X")
+that the prose then drops. Corpus: 1 of 39 recent stories (this one) — rare, but
+it plants exactly the contradictory-description drift that the facial-hair rule
+was added to remove. No visible damage in this run: every page referenced
+CHR001 by id, so the bearded entry drove the renders.
+**Decision:** `isKnownName()` treats a name as declared when its words are a
+whole-word subset of a known name, or vice versa. Whole-word only — "ida" does
+not match "freida", and "Herr Müller" does not match "Frau Müller". Applied at
+the single detection gate; the other `normalizeName` comparisons in the file
+match a phantom against page keys (same string source) and stay exact.
+**Rationale:** Owner call 2026-08-16, chosen over passing the bible into the
+Haiku prompt and letting the model reconcile: a string rule costs nothing at
+runtime and keeps the judgement out of a model. Accepted cost — two genuinely
+different characters whose names nest (a "Felix" and a separate "Grossvater
+Felix") merge into one. That is rarer than the duplicate it prevents, and it
+fails toward fewer invented entries rather than more.
+**Verified:** replayed the real pre-patch bible + page names from
+job_1786913768533 → zero phantoms detected (CHR002 would not be created), plus
+`tests/manual/phantom-name-containment.test.js` covering both directions, the
+still-must-fire case, and the two over-merge guards.
+**Touched:** `server/lib/phantomCharacters.js`,
+`tests/manual/phantom-name-containment.test.js`
+**Status:** ✅ active

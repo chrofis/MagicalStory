@@ -29,6 +29,35 @@ function normalizeName(name) {
 }
 
 /**
+ * True when `norm` names an already-declared entity, allowing for the bible
+ * and the prose using different forms of the same name.
+ *
+ * Exact matching alone treated "Silvio" in the scene metadata as undeclared
+ * while the bible held "Zauberer Silvio" (job_1786913768533) — so the patcher
+ * paid for a Haiku call and wrote a SECOND entry for him, with a contradictory
+ * face description. Bibles routinely carry a title or honorific that the prose
+ * then drops, and the reverse happens too.
+ *
+ * Match is whole-word subset in either direction, never substring: "silvio" ⊂
+ * "zauberer silvio" matches, "ida" ⊄ "freida" does not. The accepted cost is
+ * that two genuinely different characters whose names nest (a "Felix" and a
+ * separate "Grossvater Felix") merge into one — rarer than the duplicate it
+ * prevents, and it fails toward fewer invented entries rather than more.
+ */
+function isKnownName(norm, known) {
+  if (!norm) return true;
+  if (known.has(norm)) return true;
+  const words = norm.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  for (const k of known) {
+    const kw = k.split(/\s+/).filter(Boolean);
+    if (kw.length === 0) continue;
+    if (words.every(w => kw.includes(w)) || kw.every(w => words.includes(w))) return true;
+  }
+  return false;
+}
+
+/**
  * Find names that appear in scene hints but aren't declared anywhere.
  *
  * Checks every named-entity list in the Visual Bible — not just secondary
@@ -67,7 +96,7 @@ function findPhantomNames(storyPages, visualBible, inputCharacters) {
     const names = Object.keys(page.characterClothing || {});
     for (const name of names) {
       const norm = normalizeName(name);
-      if (!norm || known.has(norm)) continue;
+      if (isKnownName(norm, known)) continue;
       if (!phantoms.has(norm)) phantoms.set(norm, name.trim());
     }
   }
