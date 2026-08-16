@@ -87,7 +87,11 @@ function extractTraitsShared(photoStr, photoDataUri, extractFn) {
 
 // Rate limiters for unauthenticated trial endpoints
 // Explicit MemoryStore refs so admin can call resetAll()
+// `skip: isAdminRequest` on every limiter that fronts an adminToken-accepting
+// route — a limiter rejects before the handler runs, so without it the admin
+// bypass is invisible to the abuse guards it was built to skip.
 const { MemoryStore } = rateLimit;
+const { isAdminRequest } = require('../middleware/trialAdminBypass');
 const trialPhotoStore = new MemoryStore();
 const trialPhotoLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -96,6 +100,7 @@ const trialPhotoLimiter = rateLimit({
   message: { error: 'Too many photo uploads. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: isAdminRequest,
 });
 
 const trialIdeasStore = new MemoryStore();
@@ -106,6 +111,7 @@ const trialIdeasLimiter = rateLimit({
   message: { error: 'Too many idea generations. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: isAdminRequest,
 });
 
 const titlePageStore = new MemoryStore();
@@ -129,32 +135,9 @@ const inFlightTitlePagePromises = new Map(); // userId -> Promise
 // Admin bypass uses a short-lived HMAC token instead of the primary JWT.
 // The frontend creates this via /api/trial/admin-bypass-token (authenticated),
 // and the trial endpoint verifies the HMAC without ever seeing the admin JWT.
-const BYPASS_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-function isAdminRequest(req) {
-  const token = req.body?.adminToken;
-  if (!token) return false;
-  try {
-    const crypto = require('crypto');
-    const secret = process.env.JWT_SECRET;
-    if (!secret) return false;
-    // Token format: "timestamp:hmac"
-    const [ts, sig] = token.split(':');
-    if (!ts || !sig) return false;
-    const timestamp = Number(ts);
-    if (!Number.isFinite(timestamp) || Date.now() - timestamp > BYPASS_TTL_MS) return false;
-    const expected = crypto.createHmac('sha256', secret).update(`trial-bypass:${ts}`).digest('hex');
-    // Constant-time comparison. The old `sig === expected` short-circuits
-    // on the first mismatched byte, leaking timing information that lets a
-    // network-positioned attacker brute-force the HMAC one byte at a time.
-    // Both buffers must be the same length for timingSafeEqual; if not,
-    // bail out fast (the length itself is not secret).
-    const sigBuf = Buffer.from(sig, 'hex');
-    const expBuf = Buffer.from(expected, 'hex');
-    if (sigBuf.length !== expBuf.length) return false;
-    return crypto.timingSafeEqual(sigBuf, expBuf);
-  } catch { return false; }
-}
+// Verifier lives in middleware/trialAdminBypass.js (required above, next to the
+// limiters) so the per-IP limiters — which run BEFORE any handler code — can
+// skip on it too.
 
 // Authenticated endpoint: admin gets a short-lived HMAC token for trial bypass.
 // This token is NOT the JWT — it's a purpose-scoped, 5-minute HMAC.

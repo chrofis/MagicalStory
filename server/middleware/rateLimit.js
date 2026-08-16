@@ -1,6 +1,7 @@
 // Rate Limiting Middleware
 const rateLimit = require('express-rate-limit');
 const { MemoryStore } = rateLimit;
+const { isAdminRequest } = require('./trialAdminBypass');
 
 // Rate limiting for authentication endpoints (prevent brute force attacks)
 const authLimiter = rateLimit({
@@ -115,6 +116,11 @@ const imageRegenerationLimiter = rateLimit({
 });
 
 // Trial avatar preview rate limiter (prevent abuse of free avatar generation)
+// Fronts /generate-preview-avatar AND /create-anonymous-account. Admin bypass
+// tokens skip it: the handlers already skip Turnstile/fingerprint for admins,
+// but this middleware answered 429 first, capping admin trial testing at 2 runs
+// per day per IP. The global daily caps (DAILY_TRIAL_*_CAP in routes/trial.js)
+// still apply to admins — those bound real spend, this one only bounds abuse.
 const trialAvatarStore = new MemoryStore();
 const trialAvatarLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
@@ -123,6 +129,7 @@ const trialAvatarLimiter = rateLimit({
   message: { error: 'Too many attempts. Please try again tomorrow.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: isAdminRequest,
 });
 
 // Story-ideas limiter (BILL-3): these endpoints call Claude but cost no credits,

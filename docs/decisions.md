@@ -11814,3 +11814,39 @@ start), `server/routes/stories.js` (listing + count filter).
    rendering in costume across three runs.
 
 **Touched files (addendum):** `server/lib/storyAvatars.js`.
+
+---
+
+## 2026-08-16 — The trial admin bypass also skips the per-IP limiters
+**Context:** A trial showcase run on 2026-08-15 23:23 CH died with
+`429 {"error":"Too many attempts. Please try again tomorrow."}` on
+`/api/trial/create-anonymous-account`, even though it carried a valid admin
+bypass token (Turnstile and fingerprint were being skipped correctly). The
+token was verified by `isAdminRequest()` *inside the route handler*, but
+`trialAvatarLimiter` (2 per IP per 24 h) is mounted as **middleware** in front
+of both `/generate-preview-avatar` and `/create-anonymous-account` — it
+answered 429 before handler code ever ran. Net effect: admin trial testing was
+capped at two runs per day per IP, which the bypass was explicitly built to
+avoid. The limiter and the handler check disagreed because they lived in
+different modules and only one knew about admins.
+**Decision:** The bypass verifier moved out of `routes/trial.js` into a leaf
+module, `server/middleware/trialAdminBypass.js`, and every trial limiter that
+fronts an `adminToken`-accepting route now passes it as express-rate-limit's
+`skip`: `trialAvatarLimiter` (rateLimit.js), `trialPhotoLimiter` and
+`trialIdeasLimiter` (trial.js). The limits themselves are unchanged for real
+users — 2/day/IP still stands.
+**Rationale:** Raising the cap would have weakened the abuse guard for
+everyone to serve an admin use case, and would have merely postponed the next
+block. One verifier, one source of truth, used by both the guard and the
+handler. The token is a purpose-scoped 5-minute HMAC over `JWT_SECRET`, so
+skipping on it is no weaker than the Turnstile/fingerprint skip it already
+authorises. Deliberately NOT bypassed: the global `DAILY_TRIAL_STORY_CAP` /
+`DAILY_TRIAL_AVATAR_CAP` counters — those bound real daily spend rather than
+per-IP abuse, and admin runs should count against them.
+**Touched:**
+- `server/middleware/trialAdminBypass.js` (new — `isAdminRequest`, moved verbatim)
+- `server/middleware/rateLimit.js` (`trialAvatarLimiter.skip`)
+- `server/routes/trial.js` (local copy deleted, two `skip:` additions)
+- `tests/manual/trial-admin-bypass-limiter.test.js` (regression: admins pass,
+  forged/expired tokens still capped)
+**Status:** ✅ active
