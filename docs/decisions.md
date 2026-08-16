@@ -12005,3 +12005,55 @@ image. Cost of the fix: one extra image call per trial standard reference
 - `server/lib/character2x4Sheet.js` (gate + restored eval)
 - `storyJobPipeline.js` (`styleConvertSeededStandards`)
 **Status:** ✅ active
+
+
+## 2026-08-16 - Face->figure is solved ONCE, globally, before masking (supersedes the 2026-08-14 mask-pairing entry)
+
+**Context:** the first real story since the mask rework came back with cut-outs whose clothing was
+erased to white and figures merged into their neighbours, and an average page score of 18.4 with six
+negative scores. Cause, measured on `job_1786829555599_rgzoyoprx` p10: the garment seeds were wired
+into the DINO path as
+
+```js
+_maskBoxesFrontFirst(..., persons.map(p => p.box), ...,        // detection order
+                     expectedCharacters.map(c => c.description))    // story order
+```
+
+`i` indexes the person boxes; the descriptions were in expected-character order. Every figure was
+therefore seeded with an arbitrary character's colours - the figure correctly face-pointed at Emma
+was told to hunt BLUE (Noah's) and its seeds landed on his shirt at `rgb(1,78,146)`, dE 8.3 to blue
+against 96.2 to red. Masks grew onto the neighbour. Never caught locally because every local run went
+through the GEMINI path, where figures carry name and description together.
+
+**The deeper fault it exposed:** face->figure was being computed TWICE, by two different methods,
+for two different consumers, with nothing comparing them. `_assignFacesToBoxes` (smallest containing
+box) picked the positive point that tells SAM which figure to segment; a later mask pass re-derived
+the link for the badge and identity. A figure could be segmented from one face and named from
+another.
+
+**Decision:** one pairing, once, before anything consumes it.
+
+1. `_pairFacesGlobally` scores every geometrically possible (face, box) pair and takes them
+   best-first (`cost = 2*|dx| + dy`, head at the top-centre of its body). A face no box can claim
+   gets a body synthesised from itself (`_personBoxFromFace`) rather than being dropped.
+2. **Identity runs before masking.** SoM composites badges onto the SCENE image and never reads a
+   mask - it only ran late because its badge anchor came from the mask-based pairing.
+3. Masks are then seeded with **that figure's own** character colours (`descByPerson`), or with none
+   at all when identity is unknown - never a guess.
+4. The mask insight is kept as a **check**: a figure whose own face does not sit in its own
+   silhouette is reported in `diag.pairingCheck`, not silently re-paired.
+
+**This supersedes** the 2026-08-14 entry "Faces associate with SAM MASKS, not person boxes". That
+entry's evidence stands and is why the naive rule is not used: "smallest containing box" gave
+Daniel's face to Hans's smaller box on `job_1786737619634_d66c7bg9g` p10 and dropped two faces
+entirely. The replacement is not that naive rule - it is the GLOBAL assignment, which the same entry
+already credited with fixing p4. Mask pairing is demoted from computing the answer to verifying it.
+
+**Removed:** the `facePairing` Lab knob ('greedy'|'global'|'mask'), which would otherwise have
+quietly done nothing. `badgeAnchor` remains.
+
+**Status:** active, NOT yet verified on a story. Lab set #12 "Hard to segment" (6 members) is the
+gate.
+
+**Touched:** `server/lib/figureDetection.js`, `server/lib/testlab.js`, `server/lib/bboxDetection.js`,
+`tests/manual/occlusionDepth.test.js` (42 assertions).

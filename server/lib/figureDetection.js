@@ -314,6 +314,64 @@ function _assignFacesToBoxes(boxesPx, faceBoxesPx) {
 const _boxCentre = (b) => [Math.round((b[0] + b[2]) / 2), Math.round((b[1] + b[3]) / 2)];
 
 /**
+ * FACE -> FIGURE, GLOBALLY, ONCE (owner, 2026-08-16).
+ *
+ * With N bodies and N faces this is an assignment problem and must be solved as
+ * one: score every geometrically possible pair and take them best-first, so a
+ * marginal pair can never poison a better one that would only have been
+ * considered later.
+ *
+ * "Smallest containing box" - the rule this replaces - is measurably wrong on a
+ * crowded page. On job_1786737619634_d66c7bg9g p10 Daniel's face sat 6px inside
+ * the RIGHT EDGE of Hans's box, and that box was SMALLER than Daniel's own, so
+ * Daniel's face went to Hans's body; Hans's face then found no free box and was
+ * DROPPED, and the girl's went the same way. Five faces in, three pairings out,
+ * two of them wrong.
+ *
+ * A head sits at the TOP-CENTRE of its body, so cost = horizontal offset from
+ * the box centre (weighted heaviest) + how far below the box top the face
+ * starts. A face no box can claim gets a body synthesised from itself rather
+ * than being dropped: DINO finds faces it finds no body for, and a dropped face
+ * is a person made invisible to identity and to every repair keyed on it.
+ *
+ * Mutates each person with `.face`, appends any synthesised figure, returns a
+ * diag summary.
+ */
+function _pairFacesGlobally(persons, faces, W, H, pageLabel = '') {
+  const pairCost = (f, d) => {
+    const fcx = (f.box[0] + f.box[2]) / 2;
+    const bw = Math.max(1, d.box[2] - d.box[0]), bh = Math.max(1, d.box[3] - d.box[1]);
+    const dx = Math.abs(fcx - (d.box[0] + d.box[2]) / 2) / bw;
+    const dy = Math.max(0, f.box[1] - d.box[1]) / bh;
+    return dx * 2 + dy;
+  };
+  const candidates = [];
+  for (const f of faces) {
+    const cx = (f.box[0] + f.box[2]) / 2, cy = (f.box[1] + f.box[3]) / 2;
+    for (const d of persons) {
+      if (cx < d.box[0] || cx > d.box[2] || cy < d.box[1] || cy > d.box[3]) continue;
+      candidates.push({ f, d, cost: pairCost(f, d) });
+    }
+  }
+  candidates.sort((a, b) => a.cost - b.cost);
+  const takenFaces = new Set();
+  for (const c of candidates) {
+    if (c.d.face || takenFaces.has(c.f)) continue;
+    c.d.face = c.f; takenFaces.add(c.f);
+  }
+  const orphans = faces.filter(f => !takenFaces.has(f));
+  let recovered = 0;
+  for (const f of orphans) {
+    const box = _personBoxFromFace(f.box, W, H);
+    if (!box) continue;
+    persons.push({ box, score: f.score, face: f, fromFace: true });
+    recovered++;
+    log.info(`🦖 [GDINO-DETECT] ${pageLabel}recovered a figure from an unpaired face (score ${f.score.toFixed(3)}) — DINO found the face but no person box`);
+  }
+  return { method: 'global-once', faces: faces.length, persons: persons.length, paired: takenFaces.size, recovered };
+}
+
+/**
  * Box -> silhouette for a WHOLE PAGE, as one joint assignment.
  *
  * The ONE place boxes become masks, shared by the DINO path (Stage 2) and the
@@ -325,7 +383,14 @@ const _boxCentre = (b) => [Math.round((b[0] + b[2]) / 2), Math.round((b[1] + b[3
  *              pxLostToFront, maskPx}
  */
 async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '', faceBoxesPx = null, descriptions = null, fromFaceFlags = null) {
-  const faces = _assignFacesToBoxes(boxesPx, faceBoxesPx);
+  // `faceBoxesPx` is PER BOX and index-aligned (null where a figure has no
+  // face). It used to be the raw face list, which this function then paired by
+  // "smallest containing box" — a third, weaker answer to a question already
+  // settled globally by the caller. Re-deriving it here is what let a figure be
+  // segmented from one face and named from another.
+  const faces = (Array.isArray(faceBoxesPx) && faceBoxesPx.length === boxesPx.length)
+    ? faceBoxesPx
+    : _assignFacesToBoxes(boxesPx, faceBoxesPx);
   const n = boxesPx.length;
   const out = new Array(n);
   // Raw pixels once, for the garment-colour seed points.
@@ -1133,17 +1198,12 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   }
   diag.faces = faces.map(f => ({ box: f.box.map(Math.round), score: +f.score.toFixed(3) }));
 
-  // Stage 1b-2 — a face nobody's person box claims IS a person we missed.
-  // Checked geometrically here rather than after the Stage-3 pairing, so the
-  // recovered figure flows through masking and identity like any other.
-  for (const f of faces) {
-    if (persons.some(p => _boxContainment(f.box, p.box) >= SAM_FACE_CONTAINMENT)) continue;
-    const box = _personBoxFromFace(f.box, W, H);
-    if (!box) continue;
-    persons.push({ box, score: f.score, fromFace: true });
-    diag.persons.push({ box: box.map(Math.round), score: +f.score.toFixed(3), fromFace: true });
-    log.info(`🦖 [GDINO-DETECT] ${pageLabel}recovered a figure from an unpaired face (score ${f.score.toFixed(3)}) — DINO found the face but no person box`);
-  }
+  // Stage 1b-2 — pair faces to bodies GLOBALLY, once, before anything uses it.
+  // This link decides which figure SAM segments, where the identity badge goes
+  // and which character a figure IS; it used to be computed twice by two
+  // different methods with nothing comparing them.
+  diag.pairing = _pairFacesGlobally(persons, faces, W, H, pageLabel);
+  diag.persons = persons.map(p => ({ box: p.box.map(Math.round), score: +p.score.toFixed(3), fromFace: p.fromFace || undefined }));
 
   // Stage 1c — femaleness pass is LAZY (owner, 2026-08-10): it only feeds the
   // layout-fallback tiebreaker, and SoM identity succeeds on virtually every
@@ -1159,6 +1219,42 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     const s = Math.max(0, ...femaleBoxes.filter(f => _boxIouXyxy(f.box, personBox) > 0.6).map(f => f.score));
     return Math.min(1, s / 0.45);
   };
+
+  // Stage 1d — IDENTITY BEFORE MASKING (owner, 2026-08-16).
+  //
+  // SoM composites letter badges onto the SCENE image and reads only boxes and
+  // face boxes — it never touches a mask. It ran after masking only because its
+  // badge anchor came from a second, mask-based pairing; with the pairing now
+  // resolved once in Stage 1b-2 that reason is gone.
+  //
+  // Order matters because the garment seeds need to know which character a
+  // figure IS. The previous wiring guessed by array position — descriptions
+  // indexed by expected-character order against boxes in detection order — and
+  // seeded every figure with a stranger's colours. Measured on
+  // job_1786829555599_rgzoyoprx p10: the figure correctly face-pointed at Emma
+  // was told to hunt BLUE (Noah's) and its seeds landed on his shirt at
+  // rgb(1,78,146), dE 8.3 to blue against 96.2 to red. Masks then grew onto the
+  // neighbour, erasing clothing to white and merging figures.
+  let nameByDet = null; // index into `persons` -> character name
+  try {
+    const badgeAnchor = opts.badgeAnchor || process.env.BADGE_ANCHOR || 'face';
+    diag.badgeAnchor = badgeAnchor;
+    const som = await _somIdentifyFigures(imageDataUri, persons, expectedCharacters, W, H, pageLabel, badgeAnchor);
+    if (som) { nameByDet = som.nameByDet; diag.identity = { method: 'som-gemini', answers: som.answers }; }
+  } catch (e) {
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM identity failed (${e.message}) — masks run unseeded; layout fallback below`);
+  }
+
+  // Each figure's OWN character description, aligned by person index. Empty
+  // when identity is unknown, which simply means that figure gets no seed —
+  // never a guess.
+  const descByPerson = persons.map((_, i) => {
+    const name = nameByDet ? nameByDet.get(i) : null;
+    if (!name) return '';
+    const ec = expectedCharacters.find(c => (typeof c === 'object' ? c.name : c) === name);
+    return (ec && typeof ec === 'object' ? ec.description : '') || '';
+  });
+  diag.seededFigures = descByPerson.filter(Boolean).length;
 
   // Stage 2 — MobileSAM silhouette per person box, VALIDATED against the DINO
   // box. The DINO box is tight/accurate; SAM only refines it to a silhouette.
@@ -1188,7 +1284,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   // The Gemini path (attachSamMasksToFigures) is unaffected — there `figures`
   // carry name and description together, so its descriptions are aligned.
   const dets = (await _maskBoxesFrontFirst(imageDataUri, persons.map(p => p.box), W, H, pageLabel,
-    faces.map(f => f.box), null,
+    persons.map(p => (p.face ? p.face.box : null)), descByPerson,
     persons.map(p => !!p.fromFace)))
     .map((m, i) => ({
       box: persons[i].box,
@@ -1200,6 +1296,7 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       maskVerdict: m.verdict,
       maskCoverage: m.coverage,
       fromFace: persons[i].fromFace || undefined,
+      face: persons[i].face || null,     // resolved once in Stage 1b-2
       // Free from the joint depth pass — no anatomy, no thresholds: who took
       // pixels from this figure, and how many. Downstream can tell a partial
       // view from a complete one instead of judging a fragment as a whole.
@@ -1253,158 +1350,49 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${diag.undercount} — completing detection; orchestrator will get a Gemini second opinion`);
   }
 
-  // Stage 3 — face → figure pairing. Two strategies, selectable so the Lab can
-  // run them against the same page (opts.facePairing / FACE_PAIRING env).
+  // Stage 3 — VERIFY the pairing against the silhouettes (owner, 2026-08-16).
   //
-  //   'greedy' (default, unchanged): for each face in SCORE order, take the
-  //     SMALLEST containing person box that has no face yet.
-  //   'global': score every geometrically possible (face, box) pair and take
-  //     the best pairs best-first, then give any left-over face a body box
-  //     synthesised from the face.
+  // This used to COMPUTE the face->figure link a second time, by a different
+  // method, after Stage 1b-2 had already computed the one the SAM prompt used.
+  // Two answers, never compared: a figure could be segmented from one face and
+  // named from another.
   //
-  // Why 'global' exists — measured on job_1786737619634_d66c7bg9g p10 (5 people,
-  // 5 faces, 5 person boxes, three of which each span two people):
-  //   Daniel's face (cx 794) sits 6px inside the RIGHT EDGE of Hans's box
-  //   (573-800), and that box is SMALLER (177,968) than Daniel's own body box
-  //   (202,300) — so "smallest containing box" gave Daniel's face to Hans's
-  //   body. Hans's face then found no free box and was DROPPED, and the girl's
-  //   face was dropped the same way. 5 faces in, 3 pairings out, 2 of them wrong,
-  //   and two people invisible to identity and to every repair keyed on it.
-  const facePairing = opts.facePairing || process.env.FACE_PAIRING || 'mask';
-  diag.facePairing = facePairing;
-  if (facePairing === 'mask') {
-    // MASK-FIRST ASSOCIATION (owner, 2026-08-14). The order was: boxes → guess
-    // which face belongs to which box → badge → segment. But SAM has ALREADY
-    // run by this point (Stage 2), and a MASK is one person where a BOX may be
-    // two. Measured on job_1786737619634_d66c7bg9g p10: three of the five
-    // person boxes each swallow a neighbour, yet all five SAM cutouts are clean
-    // single people. So the separation problem is already solved — it was just
-    // being ignored by the step that needed it most.
-    //
-    // A face belongs to the figure whose SILHOUETTE it sits in. Sample a 3x3
-    // grid inside the face box rather than the centre alone: the centre can
-    // land on a gap in the mask (an eye, a hair parting), and the grid also
-    // breaks ties by how much of the face the mask actually covers.
-    const hitsIn = (det, f) => {
-      if (!det.mask || !det.mask.alpha) return 0;
-      const { alpha, width: mw, height: mh } = det.mask;
-      let hits = 0;
-      for (let gy = 1; gy <= 3; gy++) {
-        for (let gx = 1; gx <= 3; gx++) {
-          const x = Math.round(f.box[0] + (f.box[2] - f.box[0]) * gx / 4);
-          const y = Math.round(f.box[1] + (f.box[3] - f.box[1]) * gy / 4);
-          if (x < 0 || y < 0 || x >= mw || y >= mh) continue;
-          if (alpha[y * mw + x]) hits++;
-        }
-      }
-      return hits;
-    };
-    const claimed = new Set();
-    const unplaced = [];
-    for (const f of faces) {
-      const scored = dets
-        .map(d => ({ d, hits: hitsIn(d, f) }))
-        .filter(x => x.hits > 0 && !claimed.has(x.d))
-        .sort((a, b) => b.hits - a.hits);
-      if (scored.length && !scored[0].d.face) {
-        scored[0].d.face = f;
-        claimed.add(scored[0].d);
-      } else {
-        unplaced.push(f);
+  // The mask insight is kept, as a CHECK rather than a competing answer — a
+  // mask is one person where a box may be two, so a figure whose own face does
+  // not sit in its own silhouette is reported. Sampled on a 3x3 grid inside the
+  // face box, since the centre alone can land on a gap (an eye, a hair parting).
+  const hitsIn = (det, f) => {
+    if (!det.mask || !det.mask.alpha || !f) return 0;
+    const { alpha, width: mw, height: mh } = det.mask;
+    let hits = 0;
+    for (let gy = 1; gy <= 3; gy++) {
+      for (let gx = 1; gx <= 3; gx++) {
+        const x = Math.round(f.box[0] + (f.box[2] - f.box[0]) * gx / 4);
+        const y = Math.round(f.box[1] + (f.box[3] - f.box[1]) * gy / 4);
+        if (x < 0 || y < 0 || x >= mw || y >= mh) continue;
+        if (alpha[y * mw + x]) hits++;
       }
     }
-    // A face inside no mask at all — a silhouette clipped at the chin, or a
-    // figure SAM never masked. Fall back to box containment for those only, so
-    // one odd figure cannot cost the whole page its associations.
-    for (const f of unplaced) {
-      const cx = (f.box[0] + f.box[2]) / 2, cy = (f.box[1] + f.box[3]) / 2;
-      const holder = dets
-        .filter(d => !d.face && cx >= d.box[0] && cx <= d.box[2] && cy >= d.box[1] && cy <= d.box[3])
-        .sort((a, b) => (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]) - (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]))[0];
-      if (holder) { holder.face = f; log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}face at x${Math.round(cx)} sits in no SAM mask — fell back to box containment`); }
-      else log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}face at x${Math.round(cx)} matched no mask and no box — left unassigned`);
-    }
-    diag.maskPairing = { faces: faces.length, placedByMask: claimed.size, fellBackToBox: unplaced.length };
-  } else if (facePairing === 'global') {
-    // A head sits at the TOP-CENTRE of its body, so cost = horizontal offset
-    // from the box centre (weighted heaviest) + how far below the box top the
-    // face starts. Global ordering means one marginal pair can no longer poison
-    // a better pair that would only have been considered later.
-    const pairCost = (f, d) => {
-      const fcx = (f.box[0] + f.box[2]) / 2;
-      const bw = Math.max(1, d.box[2] - d.box[0]), bh = Math.max(1, d.box[3] - d.box[1]);
-      const dx = Math.abs(fcx - (d.box[0] + d.box[2]) / 2) / bw;
-      const dy = Math.max(0, f.box[1] - d.box[1]) / bh;
-      return dx * 2 + dy;
-    };
-    const candidates = [];
-    for (const f of faces) {
-      const cx = (f.box[0] + f.box[2]) / 2, cy = (f.box[1] + f.box[3]) / 2;
-      for (const d of dets) {
-        if (cx < d.box[0] || cx > d.box[2] || cy < d.box[1] || cy > d.box[3]) continue;
-        candidates.push({ f, d, cost: pairCost(f, d) });
-      }
-    }
-    candidates.sort((a, b) => a.cost - b.cost);
-    const takenFaces = new Set();
-    for (const c of candidates) {
-      if (c.d.face || takenFaces.has(c.f)) continue;
-      c.d.face = c.f; takenFaces.add(c.f);
-    }
-    // ONE FIGURE PER FACE. A left-over face has no body box that is plausibly
-    // its own; dropping it is what made two people invisible above. Synthesise
-    // a body from the face (a head is ~1/7 of a standing figure, a body ~3 face
-    // widths across) and mark it so downstream knows it was derived.
-    const orphans = faces.filter(f => !takenFaces.has(f));
-    for (const f of orphans) {
-      const fw = f.box[2] - f.box[0], fh = f.box[3] - f.box[1];
-      const fcx = (f.box[0] + f.box[2]) / 2;
-      const box = [
-        Math.max(0, Math.round(fcx - fw * 1.5)),
-        Math.max(0, Math.round(f.box[1] - fh * 0.3)),
-        Math.min(W, Math.round(fcx + fw * 1.5)),
-        Math.min(H, Math.round(f.box[1] + fh * 7)),
-      ];
-      dets.push({ box, score: f.score, face: f, synthesizedFromFace: true, bodyBox: _pxBoxToNorm(box, W, H) });
-      log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}face at x${Math.round(fcx)} had no body box of its own — synthesised one from the face`);
-    }
-    if (orphans.length) diag.synthesizedFigures = orphans.length;
-  } else {
-    for (const f of faces) {
-      const cx = (f.box[0] + f.box[2]) / 2, cy = (f.box[1] + f.box[3]) / 2;
-      const holders = dets
-        .filter(d => cx >= d.box[0] && cx <= d.box[2] && cy >= d.box[1] && cy <= d.box[3])
-        .sort((a, b) => (a.box[2] - a.box[0]) * (a.box[3] - a.box[1]) - (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]));
-      const holder = holders.find(h => !h.face);
-      if (holder) holder.face = f;
-    }
+    return hits;
+  };
+  let agree = 0; const disputed = [];
+  dets.forEach((d, i) => {
+    if (!d.face || !d.mask) return;
+    if (hitsIn(d, d.face) > 0) { agree++; return; }
+    const better = dets
+      .map((o, oi) => ({ oi, hits: hitsIn(o, d.face) }))
+      .filter(x => x.hits > 0 && x.oi !== i)
+      .sort((a2, b2) => b2.hits - a2.hits)[0];
+    disputed.push({ det: i, name: (nameByDet && nameByDet.get(i)) || null, faceSitsInDet: better ? better.oi : null });
+  });
+  diag.pairingCheck = { agree, disputed };
+  if (disputed.length) {
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${disputed.length}/${dets.length} figure(s) hold a face outside their own silhouette — `
+      + disputed.map(x => `det${x.det}${x.name ? '(' + x.name + ')' : ''}→${x.faceSitsInDet != null ? 'det' + x.faceSitsInDet : 'no mask'}`).join(', '));
   }
-  diag.assignment = dets.map((d, i) => ({
-    det: i, box: d.box.map(Math.round),
-    face: d.face ? d.face.box.map(Math.round) : null,
-    synthesized: !!d.synthesizedFromFace,
-  }));
 
-  // NOTE: blow-out handling moved UPSTREAM to Stage 2 (_cleanMaskAndCheck) —
-  // a SAM mask that is disconnected or >10% larger than its DINO box is rejected
-  // at creation and the tight DINO box is used, so no box ever reaches here
-  // blown. (Replaced the earlier point-prompt guard, 2026-07-20.)
-
-  // Stage 4 — identity. Primary: Set-of-Mark — letter badges are drawn on the
-  // detected figures and Gemini Flash answers WHICH letter is WHICH character
-  // (pure recognition by age/gender/hair/clothing; no coordinates ever come
-  // back, so Gemini's spatial sloppiness cannot corrupt the boxes). Fallback:
-  // deterministic layout+gender matching — which cannot separate e.g. three
-  // girls, hence SoM first.
-  let nameByDet = null; // detIdx → character name
-  try {
-    const badgeAnchor = opts.badgeAnchor || process.env.BADGE_ANCHOR || 'face';
-    diag.badgeAnchor = badgeAnchor;
-    const som = await _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel, badgeAnchor);
-    if (som) { nameByDet = som.nameByDet; diag.identity = { method: 'som-gemini', answers: som.answers }; }
-  } catch (e) {
-    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM identity failed (${e.message}) — layout fallback`);
-  }
+  // Stage 4 — identity already ran in Stage 1d (SoM needs no mask). What is
+  // left is the deterministic fallback for when SoM returned nothing.
   if (!nameByDet) {
     require('./runMetrics').forJob(_metricsJobId()).count('som_identity_fallback');
     await loadFemaleBoxes(); // gender tiebreaker only needed here (lazy)
@@ -1562,12 +1550,16 @@ async function attachSamMasksToFigures(imageData, figures, { pageLabel = '' } = 
       ? [Math.round(bb[1] * W), Math.round(bb[0] * H), Math.round(bb[3] * W), Math.round(bb[2] * H)]
       : null;
   });
+  // Index-aligned with `figures`, null where a figure has no face. A
+  // .filter(Boolean) here used to drop the nulls and shift every later figure
+  // onto the wrong face; it only ever worked because the masker re-paired
+  // geometrically, which it no longer does.
   const faceBoxesPx = figures.map((f) => {
     const fb = f?.faceBox;
     return (Array.isArray(fb) && fb.length === 4)
       ? [Math.round(fb[1] * W), Math.round(fb[0] * H), Math.round(fb[3] * W), Math.round(fb[2] * H)]
       : null;
-  }).filter(Boolean);
+  });
   const maskResults = await _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel, faceBoxesPx,
     figures.map(f => f.description || f.clothing || ''));
   const entries = figures.map((f, i) => {

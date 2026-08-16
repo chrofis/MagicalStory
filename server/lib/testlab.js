@@ -796,8 +796,10 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
       artStyle: ctx.artStyle,
       skipCache: true,
       pageContext: `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-      // Detection knobs under test: 'greedy'|'global' pairing, 'box'|'face' badge.
-      facePairing: params.facePairing,
+      // Detection knob under test: 'box'|'face' badge anchor. `facePairing` is
+      // gone — face->figure is now solved ONCE, globally, before masking
+      // (_pairFacesGlobally), rather than by two competing strategies chosen
+      // here. Passing it would have quietly done nothing.
       badgeAnchor: params.badgeAnchor,
     });
     // 'gemini-second-opinion' is a DELIBERATE arbitration verdict (DINO ran,

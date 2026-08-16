@@ -161,7 +161,13 @@ t('there is exactly ONE box->mask loop, shared by both paths', () => {
 
 t('winner-take-all replaces pairwise subtraction', () => {
   assert.ok(/const owner = new Int32Array\(W \* H\)/.test(SRC), 'one owner per pixel');
-  assert.ok(/if \(o\) \{ alpha\[k\] = 0;/.test(SRC), 'a claimed pixel is taken from the figure behind');
+  // A pixel already owned by a nearer figure is dropped from this one and
+  // counted as lost — unless it lies in this figure's own face box, which is
+  // shared rather than surrendered.
+  assert.ok(/alpha\[k\] = 0;\s*lost\.set\(o - 1/.test(SRC),
+    'a claimed pixel is taken from the figure behind and counted');
+  assert.ok(/if \(o === i \+ 1\) \{ kept\+\+; continue; \}/.test(SRC),
+    'a figure keeps what it already owns');
   assert.ok(!/_unionDilated/.test(SRC), 'no dilation — it was the source of the seam fringe');
   assert.ok(!/_dropSmallComponents/.test(SRC), 'and therefore no speckle filter is needed');
 });
@@ -287,15 +293,17 @@ t('the seeds are wired into the masker and both call sites', () => {
     'the top is searched BELOW the head reference');
   assert.ok(/_colourSeedPoints\(rgb, W, H, box, bottom, topY\)/.test(SRC),
     'the bottom is searched BELOW the top - a constraint, not a filter');
-  // The DINO path must NOT pass descriptions: `i` indexes person boxes in
-  // detection order, while expectedCharacters is in story order, so every
-  // figure was seeded with an arbitrary character's colours. Measured on
-  // job_1786829555599_rgzoyoprx p10 - the figure at Emma hunted BLUE (Noah's)
-  // and seeded on his shirt. Seeding returns once SoM resolves identity first.
+  // Descriptions must be PER PERSON, resolved from the identity SoM assigned
+  // before masking. The old wiring indexed expectedCharacters (story order)
+  // with a person index (detection order), so every figure was seeded with an
+  // arbitrary character's colours: on job_1786829555599_rgzoyoprx p10 the
+  // figure at Emma hunted BLUE, Noah's, and seeded on his shirt.
   assert.ok(!/expectedCharacters\.map\(c => \(typeof c === 'object' \? c\.description : ''\)/.test(SRC),
-    'the DINO path must NOT pass mis-indexed descriptions');
-  assert.ok(/faces\.map\(f => f\.box\), null,/.test(SRC),
-    'it passes null descriptions until identity comes first');
+    'never index expectedCharacters with a person index');
+  assert.ok(/const descByPerson = persons\.map\(\(_, i\) => \{/.test(SRC),
+    'descriptions are resolved per person from nameByDet');
+  assert.ok(/persons\.map\(p => \(p\.face \? p\.face\.box : null\)\), descByPerson,/.test(SRC),
+    'the masker receives the ONE resolved pairing, index-aligned');
   assert.ok(/figures\.map\(f => f\.description \|\| f\.clothing \|\| ''\)/.test(SRC),
     'the Gemini path must pass descriptions');
 });
@@ -363,13 +371,56 @@ t('a face box is clamped to the page and junk yields null', () => {
   assert.strictEqual(_personBoxFromFace([90, 90, 10, 10], 864, 1222), null, 'inverted face');
 });
 
-t('recovery is wired before masking, and the NMS guard is gone', () => {
-  assert.ok(/persons\.push\(\{ box, score: f\.score, fromFace: true \}\)/.test(SRC),
-    'an unpaired face must append a person BEFORE Stage 2 masking');
-  assert.ok(/if \(persons\.some\(p => _boxContainment\(f\.box, p\.box\) >= SAM_FACE_CONTAINMENT\)\) continue/.test(SRC),
-    'a face already claimed by a person box is not re-added');
+t('recovery happens inside the ONE pairing pass, and the NMS guard is gone', () => {
+  // A face left unpaired by the global assignment gets a body synthesised from
+  // itself, in the same pass - not by a separate containment scan that would be
+  // a second answer to the same question.
+  assert.ok(/persons\.push\(\{ box, score: f\.score, face: f, fromFace: true \}\)/.test(SRC),
+    'an orphan face appends a person, carrying the face that produced it');
+  assert.ok(/const orphans = faces\.filter\(f => !takenFaces\.has\(f\)\)/.test(SRC),
+    'orphans come from the global assignment, not from a box-containment scan');
   assert.ok(!/GDINO_NMS_SIZE_RATIO|_sameFigureSize|keepOccluded/.test(SRC),
     'the NMS size guard was reverted - it fixed a candidate that never existed');
+});
+
+t('faces are paired GLOBALLY, not by smallest containing box', () => {
+  // "Smallest containing box" is measurably wrong on a crowded page: on
+  // job_1786737619634_d66c7bg9g p10 Daniel's face sat 6px inside the right edge
+  // of Hans's SMALLER box, so it went to Hans; Hans's own face then found no
+  // free box and was dropped, and the girl's went the same way. 5 faces in,
+  // 3 pairings out, 2 wrong.
+  assert.ok(/function _pairFacesGlobally/.test(SRC));
+  assert.ok(/candidates\.sort\(\(a, b\) => a\.cost - b\.cost\)/.test(SRC),
+    'every possible pair is scored and taken best-first');
+  assert.ok(/return dx \* 2 \+ dy;/.test(SRC),
+    'cost = horizontal offset from the box centre (weighted) + drop below its top');
+  assert.ok(/diag\.pairing = _pairFacesGlobally\(persons, faces, W, H, pageLabel\)/.test(SRC),
+    'and it runs ONCE, before masking');
+});
+
+t('the masker uses the pairing it is GIVEN, never re-deriving one', () => {
+  assert.ok(/\(Array\.isArray\(faceBoxesPx\) && faceBoxesPx\.length === boxesPx\.length\)\s*\?\s*faceBoxesPx/.test(SRC),
+    'a per-box, index-aligned face list is used directly');
+  assert.ok(!/\}\)\.filter\(Boolean\);/.test(SRC),
+    'the Gemini path must not filter nulls out of the face list - it shifts every later figure');
+});
+
+t('identity runs BEFORE masking and needs no mask', () => {
+  const som = SRC.slice(SRC.indexOf('async function _somIdentifyFigures'));
+  const body = som.slice(0, som.indexOf('\nasync function ', 10));
+  assert.ok(!/\.mask/.test(body), 'SoM must not read a mask - it badges the scene image');
+  assert.ok(/_somIdentifyFigures\(imageDataUri, persons, expectedCharacters/.test(SRC),
+    'it is called on the persons, before dets exist');
+  const idIdx = SRC.indexOf('Stage 1d — IDENTITY BEFORE MASKING');
+  const maskIdx = SRC.indexOf('const dets = (await _maskBoxesFrontFirst');
+  assert.ok(idIdx > 0 && idIdx < maskIdx, 'identity must precede masking in the file');
+});
+
+t('Stage 3 VERIFIES the pairing instead of computing a rival one', () => {
+  assert.ok(/diag\.pairingCheck = \{ agree, disputed \}/.test(SRC));
+  assert.ok(/hold a face outside their own silhouette/.test(SRC),
+    'a disagreement is reported, not silently overwritten');
+  assert.ok(!/facePairing/.test(SRC), 'the old two-strategy pairing block is gone');
 });
 
 t('the DINO path copies the occlusion facts onto the FIGURE, not just the det', () => {
