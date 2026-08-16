@@ -688,13 +688,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // watercolor illustration … STYLE: Soft watercolor illustration style").
       // No conversion pass is needed, so it can be reused as the standard
       // styled avatar instead of building a second 2×4 sheet.
+      // It must be written onto the CHARACTER, not just the styled-avatar
+      // cache: the reference path reads
+      // projectStoryCharacterAvatars(inputData.characters) →
+      // `char.avatars.styledAvatars[artStyle].standard`, which setStyledAvatar
+      // (cache-only) never populates. Seeding the cache alone left the slot
+      // empty and every `standard` page still took the costumed fallback
+      // (job_1786868241158 p1 + p6, verified in stored referencePhotos).
+      // `isSheet: false` marks it as a plain full-body avatar rather than a
+      // 2×4 grid, so the cell croppers send it whole instead of slicing a
+      // quarter out of one figure.
       for (const char of (inputData.characters || [])) {
         const preview = char?.avatars?.standard;
         if (typeof preview !== 'string' || !preview) continue;
-        const styled = char.avatars?.styledAvatars?.[artStyle];
-        if (styled && styled.standard) continue;
+        char.avatars.styledAvatars = char.avatars.styledAvatars || {};
+        const styled = (char.avatars.styledAvatars[artStyle] = char.avatars.styledAvatars[artStyle] || {});
+        if (styled.standard) continue;
+        styled.standard = { imageData: preview, isSheet: false };
         setStyledAvatar(char.name, 'standard', artStyle, preview);
-        log.info(`♻️ [TRIAL] ${char.name}: standard styled reference seeded from the preview avatar (no standard sheet is generated)`);
+        log.info(`♻️ [TRIAL] ${char.name}: standard reference seeded from the preview avatar (full-image ref, no standard sheet is generated)`);
       }
 
       log.info(`🎨 [TRIAL] Starting immediate avatar styling (${trialAvatarRequirements.length} variants)...`);

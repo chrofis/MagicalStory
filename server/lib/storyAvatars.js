@@ -86,7 +86,17 @@ function projectStoryCharacterAvatars(characters, artStyle) {
     // costume in art style"). Each is keyed as `styled-<clothing>`.
     for (const clothing of ['standard', 'winter', 'summer']) {
       const url = extractUrl(styled[clothing]);
-      if (url) entry[`styled-${clothing}`] = url;
+      if (!url) continue;
+      entry[`styled-${clothing}`] = url;
+      // Not every entry is a 2×4 sheet. The trial seeds its cheap full-body
+      // preview avatar as `standard` (it is already watercolour, so it needs
+      // no style pass and saves a whole sheet generation). Cropping a "cell"
+      // out of that would slice a vertical quarter of one figure, so the slot
+      // is recorded here and the cell croppers send the image whole instead.
+      const slot = styled[clothing];
+      if (slot && typeof slot === 'object' && slot.isSheet === false) {
+        (entry.nonSheetSlots || (entry.nonSheetSlots = [])).push(`styled-${clothing}`);
+      }
     }
 
     if (Object.keys(entry).length > 0) {
@@ -169,6 +179,51 @@ function resolveCellPose(sc) {
   return { pose, depth, flip: sc?.flip === true };
 }
 
+/**
+ * SINGLE resolver for "which stored image does this reference get, is it a
+ * 2×4 sheet, and what is it actually wearing?"
+ *
+ * Three call sites crop cells (applyStoryCellRefs here, the iterate path in
+ * images.js, the regeneration route) and each had its own inline copy of the
+ * slot-key mapping. They drifted: only this one warned about the costumed
+ * fallback and corrected the ref's label, so the other two could silently
+ * render a `standard` page in costume — the bug this resolver exists to make
+ * impossible. Never inline a fourth copy.
+ *
+ * Mutates `ref.clothingCategory` when it falls back, so the reference always
+ * reports the clothing it actually carries.
+ *
+ * @param {Object} story - one character's entry from story.data.characterAvatars
+ * @param {Object} ref - reference photo ({ name, clothingCategory, ... })
+ * @returns {{uri: string, slotKey: string, isSheet: boolean}|null} null when
+ *   the character has nothing usable stored.
+ */
+function resolveSheetForRef(story, ref) {
+  if (!story || !ref) return null;
+  const clothingRaw = String(ref.clothingCategory || '').toLowerCase();
+  let slotKey;
+  if (clothingRaw.startsWith('costumed')) slotKey = 'costumed';
+  else if (['standard', 'winter', 'summer'].includes(clothingRaw)) slotKey = `styled-${clothingRaw}`;
+  else slotKey = 'costumed';
+
+  let uri = story[slotKey];
+  // NEVER swap clothing silently. Falling back to the costumed sheet while
+  // keeping the ref's `standard` label is how a page the outline marked
+  // standard was rendered in costume, invisibly, for three runs
+  // (job_1786826686448 p1). The fallback stays — a reference beats none —
+  // but it says so, and the ref carries the category actually sent.
+  if (!uri && story.costumed) {
+    log.warn(`👕 [STORY-CELLS] ${ref.name || '?'}: no "${slotKey}" entry — falling back to the costumed sheet (ref asked for "${clothingRaw || 'none'}")`);
+    uri = story.costumed;
+    ref.clothingCategory = 'costumed';
+    slotKey = 'costumed';
+  }
+  if (!uri) return null;
+
+  const isSheet = !(story.nonSheetSlots || []).includes(slotKey);
+  return { uri, slotKey, isSheet };
+}
+
 async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneCharacters, opts = {}) {
   if (!Array.isArray(referencePhotos) || referencePhotos.length === 0) return referencePhotos;
   if (!storyCharacterAvatars || typeof storyCharacterAvatars !== 'object') return referencePhotos;
@@ -190,23 +245,18 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
     if (!charName) continue;
     const story = storyCharacterAvatars[charName];
     if (!story) continue;
-    const clothingRaw = String(ref.clothingCategory || '').toLowerCase();
-    let slotKey;
-    if (clothingRaw === 'costumed' || clothingRaw.startsWith('costumed:')) slotKey = 'costumed';
-    else if (['standard', 'winter', 'summer'].includes(clothingRaw)) slotKey = `styled-${clothingRaw}`;
-    else slotKey = 'costumed';
-    // NEVER swap clothing silently. Falling back to the costumed sheet while
-    // keeping the ref's `standard` label is how a page the outline marked
-    // standard was rendered in costume, invisibly, for three runs
-    // (job_1786826686448 p1). The fallback stays — a reference beats none —
-    // but it says so, and the ref carries the category actually sent.
-    let sheetUri = story[slotKey];
-    if (!sheetUri && story.costumed) {
-      log.warn(`👕 [STORY-CELLS] ${charName}: no "${slotKey}" sheet — falling back to the costumed sheet (ref asked for "${clothingRaw || 'none'}")`);
-      sheetUri = story.costumed;
-      ref.clothingCategory = 'costumed';
+    const resolved = resolveSheetForRef(story, ref);
+    if (!resolved) continue;
+    const { uri: sheetUri, slotKey, isSheet } = resolved;
+    // A plain avatar (trial's seeded preview) has no cells to crop — send it
+    // whole. Costs the pose/facing control the cell picker gives, which is
+    // the accepted trade for not building a second 2×4 sheet in the trial.
+    if (!isSheet) {
+      ref.photoUrl = sheetUri;
+      ref.photoType = 'full-avatar';
+      ref.cellSkipped = 'not-a-sheet';
+      continue;
     }
-    if (!sheetUri) continue;
     const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', depth: 'foreground' };
     // Foreground → stack head + body into one ref (canvas-large faces need
     // a tight head anchor). Midground / background → body cell only.
@@ -359,6 +409,7 @@ module.exports = {
   projectStoryCostumeDescriptions,
   applyStoryCellRefs,
   resolveCellPose,
+  resolveSheetForRef,
   appendStoryHistory,
   extractUrl,
 };

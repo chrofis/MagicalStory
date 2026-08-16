@@ -3441,7 +3441,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // Pose + depth resolution is shared with applyStoryCellRefs — beats
     // metadata carries `perspective` prose, not `pose`, and the inline copy
     // here served threeQuarter to every declared back-view figure.
-    const { resolveCellPose } = require('./storyAvatars');
+    const { resolveCellPose, resolveSheetForRef } = require('./storyAvatars');
     const poseByName = new Map();
     for (const sc of metaChars) {
       const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
@@ -3453,13 +3453,18 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       if (!charName) continue;
       const story = storyData.characterAvatars[charName];
       if (!story) continue;
-      const clothingRaw = String(ref.clothingCategory || '').toLowerCase();
-      let slotKey;
-      if (clothingRaw.startsWith('costumed')) slotKey = 'costumed';
-      else if (clothingRaw === 'standard' || clothingRaw === 'winter' || clothingRaw === 'summer') slotKey = `styled-${clothingRaw}`;
-      else slotKey = 'costumed';
-      const sheetUri = story[slotKey] || story.costumed;
-      if (!sheetUri) continue;
+      // Shared resolver: slot mapping, the loud costumed fallback (which also
+      // corrects ref.clothingCategory) and the not-a-sheet case all live in
+      // storyAvatars.js. The inline copy here fell back silently.
+      const resolved = resolveSheetForRef(story, ref);
+      if (!resolved) continue;
+      const { uri: sheetUri, slotKey, isSheet } = resolved;
+      if (!isSheet) {
+        ref.photoUrl = sheetUri;
+        ref.photoType = 'full-avatar';
+        ref.cellSkipped = 'not-a-sheet';
+        continue;
+      }
       const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', depth: 'foreground' };
       const includeFace = pf.depth === 'foreground';
       try {

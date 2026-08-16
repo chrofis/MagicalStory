@@ -1207,7 +1207,7 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       // Shared resolver — beats metadata carries `perspective` prose, not
       // `pose`; the inline copy here served threeQuarter to every declared
       // back-view figure.
-      const { resolveCellPose } = require('../lib/storyAvatars');
+      const { resolveCellPose, resolveSheetForRef } = require('../lib/storyAvatars');
       const poseByName = new Map();
       for (const sc of metaChars) {
         const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
@@ -1219,13 +1219,16 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
         if (!charName) continue;
         const story = storyData.characterAvatars[charName];
         if (!story) continue;
-        const clothingRaw = String(ref.clothingCategory || '').toLowerCase();
-        let slotKey;
-        if (clothingRaw.startsWith('costumed')) slotKey = 'costumed';
-        else if (['standard', 'winter', 'summer'].includes(clothingRaw)) slotKey = `styled-${clothingRaw}`;
-        else slotKey = 'costumed';
-        const sheetUri = story[slotKey] || story.costumed;
-        if (!sheetUri) continue;
+        // Shared resolver (slot mapping + loud costumed fallback + not-a-sheet).
+        const resolved = resolveSheetForRef(story, ref);
+        if (!resolved) continue;
+        const { uri: sheetUri, slotKey, isSheet } = resolved;
+        if (!isSheet) {
+          ref.photoUrl = sheetUri;
+          ref.photoType = 'full-avatar';
+          ref.cellSkipped = 'not-a-sheet';
+          continue;
+        }
         const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false, depth: 'foreground' };
         const includeFace = pf.depth === 'foreground';
         try {

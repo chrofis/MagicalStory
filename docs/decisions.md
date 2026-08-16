@@ -11900,3 +11900,44 @@ rendered as painted concept art (visible brushwork, painterly sky and water)
 vs the shipped photograph.
 
 **Touched:** `server/lib/promptBuilders.js` (ART_STYLES.concept).
+
+---
+
+## 2026-08-16 — The trial's standard reference is a full image, not a cropped cell
+**Context:** The trial builds only the costumed 2×4 sheet and seeds its cheap
+watercolour preview avatar as the `standard` look. Verified on
+`job_1786868241158_mpq31txfg` (Luzern wizard trial): pages 1 and 6 asked for
+`standard` and rendered Emma in the wizard robe in her bedroom. Two causes.
+(1) The seeding called `setStyledAvatar()`, which writes ONLY the module-level
+styled-avatar cache — but the reference path reads
+`projectStoryCharacterAvatars(inputData.characters)` →
+`char.avatars.styledAvatars[artStyle].standard`. Nothing wrote that, so the
+slot was empty and every `standard` page took the costumed fallback.
+(2) Even pointed at the right store it could not work: `cropAvatarCell` →
+`cropSheetCell` slices a 4-column grid (`meta.width / 4`) with a
+variance-detected head/body row split. The preview avatar is ONE full-body
+illustration, so "cropping a cell" would hand the model a vertical
+quarter-slice of a single figure.
+**Decision:** The seeded entry is stored as `{ imageData, isSheet: false }` on
+the character. `projectStoryCharacterAvatars` propagates that as
+`entry.nonSheetSlots` (values stay plain strings — no consumer sees a changed
+type), and a new SINGLE resolver `resolveSheetForRef(story, ref)` in
+`storyAvatars.js` returns `{ uri, slotKey, isSheet }`. Non-sheet entries are
+sent WHOLE as the reference (`photoType: 'full-avatar'`, `cellSkipped:
+'not-a-sheet'`); real sheets are cropped exactly as before. Owner picked this
+over building the standard sheet on demand (+12–30s) or forcing the costume
+onto every trial page.
+**Rationale:** Costs nothing in wall-clock — the whole point of the
+costumed-only trial policy. The trade accepted knowingly: those pages lose the
+cell picker's pose/facing control and get a full-body ref instead of a tight
+head+body stack. All THREE cell-crop sites (`applyStoryCellRefs`, the iterate
+path in `images.js`, the regeneration route) now go through the one resolver —
+they had drifted inline copies, and only `applyStoryCellRefs` warned about the
+costumed fallback and corrected `ref.clothingCategory`, so the other two could
+still swap clothing silently. Never inline a fourth copy.
+**Touched:**
+- `server/lib/storyAvatars.js` (`resolveSheetForRef`, `nonSheetSlots`, exported)
+- `server/lib/images.js`, `server/routes/regeneration.js` (use the resolver)
+- `storyJobPipeline.js` (seed the CHARACTER, not just the cache)
+- `tests/manual/trial-standard-fullimage-ref.test.js`
+**Status:** ✅ active
