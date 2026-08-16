@@ -40,24 +40,23 @@ const RUBRIC_V1 = {
 // evaluator; RUBRIC (the dimensions) stays fixed so versions stay comparable.
 // SCORER REGISTRY. From version 2 on, the version number identifies BOTH halves
 // of a score: the MAJOR is the rubric/prompt generation, the MINOR is which
-// model judged it (2.1 Sonnet, 2.2 Grok, 2.3 Gemini, .4 next…). Before this, the
+// model judged it (2.1 sonnet, 2.2 grok, 2.3 gemini, .4 next…). Before this, the
 // judge lived only in a separate column, so "v1.2" meant three different things
-// depending on who ran it — and a Sonnet-judged table was silently compared
-// against a Gemini-judged one. Each scorer also carries a NAME, because "Anna
-// says 8.4, Cora says 6.6" is how these get discussed.
+// depending on who ran it — and a sonnet-judged table was silently compared
+// against a gemini-judged one. Each scorer is named after its judge.
 // 1.x are frozen legacy rows (judge not pinned) — kept so old scores stay readable.
 const EVALUATORS = {
   '1.0': { name: 'legacy 1.0', promptKey: 'storyScorecardJudge', rubric: RUBRIC_V1, judge: null },
   '1.1': { name: 'legacy 1.1 (harsh)', promptKey: 'storyScorecardJudgeV1_1', rubric: RUBRIC_V1, judge: null },
   '1.2': { name: 'legacy 1.2 (10-dim beats)', promptKey: 'storyScorecardJudgeV1_2', rubric: RUBRIC, judge: null },
-  '2.1': { name: 'Anna', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'claude-sonnet' },
-  '2.2': { name: 'Bruno', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'grok-4.6' },
-  '2.3': { name: 'Cora', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'gemini-3.1-pro' },
+  '2.1': { name: 'sonnet', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'claude-sonnet' },
+  '2.2': { name: 'grok', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'grok-4.6' },
+  '2.3': { name: 'gemini', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'gemini-3.1-pro' },
 };
 // back-compat shapes for anything that read these directly
 const EVALUATOR_PROMPT_KEYS = Object.fromEntries(Object.entries(EVALUATORS).map(([v, e]) => [v, e.promptKey]));
 const EVALUATOR_RUBRICS = Object.fromEntries(Object.entries(EVALUATORS).map(([v, e]) => [v, e.rubric]));
-const DEFAULT_EVALUATOR_VERSION = '2.1'; // prompt gen 2, judged by Anna (Sonnet)
+const DEFAULT_EVALUATOR_VERSION = '2.1'; // prompt gen 2, judged by sonnet
 const EVALUATOR_VERSION = DEFAULT_EVALUATOR_VERSION; // back-compat export
 
 function resolveEvaluator(version) {
