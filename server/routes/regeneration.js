@@ -1219,16 +1219,10 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
         if (!charName) continue;
         const story = storyData.characterAvatars[charName];
         if (!story) continue;
-        // Shared resolver (slot mapping + loud costumed fallback + not-a-sheet).
+        // Shared resolver (slot mapping + loud costumed fallback).
         const resolved = resolveSheetForRef(story, ref);
         if (!resolved) continue;
-        const { uri: sheetUri, slotKey, isSheet } = resolved;
-        if (!isSheet) {
-          ref.photoUrl = sheetUri;
-          ref.photoType = 'full-avatar';
-          ref.cellSkipped = 'not-a-sheet';
-          continue;
-        }
+        const { uri: sheetUri, slotKey } = resolved;
         const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false, depth: 'foreground' };
         const includeFace = pf.depth === 'foreground';
         try {

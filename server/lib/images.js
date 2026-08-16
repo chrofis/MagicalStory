@@ -3454,17 +3454,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       const story = storyData.characterAvatars[charName];
       if (!story) continue;
       // Shared resolver: slot mapping, the loud costumed fallback (which also
-      // corrects ref.clothingCategory) and the not-a-sheet case all live in
-      // storyAvatars.js. The inline copy here fell back silently.
+      // corrects ref.clothingCategory) lives in storyAvatars.js. The inline
+      // copy here fell back silently.
       const resolved = resolveSheetForRef(story, ref);
       if (!resolved) continue;
-      const { uri: sheetUri, slotKey, isSheet } = resolved;
-      if (!isSheet) {
-        ref.photoUrl = sheetUri;
-        ref.photoType = 'full-avatar';
-        ref.cellSkipped = 'not-a-sheet';
-        continue;
-      }
+      const { uri: sheetUri, slotKey } = resolved;
       const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', depth: 'foreground' };
       const includeFace = pf.depth === 'foreground';
       try {

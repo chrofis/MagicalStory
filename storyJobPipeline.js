@@ -346,55 +346,6 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
 // Exports: ART_STYLES, LANGUAGE_LEVELS, getReadingLevel, getTokensPerPage,
 // extractCoverScenes, buildSceneDescriptionPrompt, parseStoryPages, extractShortSceneDescriptions
 
-/**
- * Apply the Pass-2 art-style transfer to trial `standard` references seeded
- * from the preview avatar, in place.
- *
- * The preview avatar (routes/trial.js) is generated as a Pass-1 identity
- * anchor — "biometric precision", "ultra-sharp focus on facial features" —
- * with only a two-line watercolour hint that those clauses actively fight. The
- * costumed sheet gets the real conversion (buildStyleTransferPrompt + the
- * per-style anchor image); without the same pass, `standard` pages render as
- * painted photographs next to properly painted costumed pages.
- *
- * Never throws and never blocks the story: on any failure the already-seeded
- * raw preview stays in place, which is exactly the previous behaviour.
- *
- * @param {Array<{name: string, preview: string}>} seeded - seedStandardFromPreview() output
- * @param {Array<Object>} characters - inputData.characters[] (mutated)
- * @param {string} artStyle
- * @param {Function} addUsage - usage tracker
- */
-async function styleConvertSeededStandards(seeded, characters, artStyle, addUsage) {
-  if (!Array.isArray(seeded) || seeded.length === 0) return;
-  const { runStyleTransferPass, resolveFacePhoto } = require('./server/lib/character2x4Sheet');
-
-  await Promise.all(seeded.map(async ({ name, preview }) => {
-    const char = characters.find(c => c?.name === name);
-    if (!char) return;
-    try {
-      const styled = await runStyleTransferPass({
-        pass1ImageData: preview,
-        facePhoto: await resolveFacePhoto(char),
-        artStyle,
-        characterName: name,
-        characterAge: char.age || null,
-        usageTracker: addUsage,
-        skipQualityEval: true, // 1 attempt, no reviews — same budget the trial gives the costumed sheet
-      });
-      if (!styled?.imageData) {
-        log.warn(`🎨 [TRIAL] ${name}: standard style transfer returned nothing — keeping the unstyled preview`);
-        return;
-      }
-      char.avatars.styledAvatars[artStyle].standard = { imageData: styled.imageData, isSheet: false };
-      setStyledAvatar(name, 'standard', artStyle, styled.imageData);
-      log.info(`🎨 [TRIAL] ${name}: standard reference converted to ${artStyle}`);
-    } catch (err) {
-      log.warn(`🎨 [TRIAL] ${name}: standard style transfer failed (${err.message}) — keeping the unstyled preview`);
-    }
-  }));
-}
-
 // ============================================================================
 // UNIFIED STORY GENERATION
 // Single prompt generates complete story, Art Director expands scenes, then images
@@ -683,20 +634,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.debug(`🎭 [TRIAL] _trialCostumeType set to: ${inputData._trialCostumeType} (costume: ${costume ? costume.costumeType : 'null'}, mainChar gender: ${mainChar?.gender})`);
       log.debug(`🎭 [TRIAL] Characters isMainCharacter: ${(inputData.characters || []).map(c => `${c.name}=${c.isMainCharacter}`).join(', ')}`);
 
-      // Trial policy: when a costume is configured, generate ONLY the
-      // costumed 2×4 sheet. The 'standard' look is seeded from the cheap
-      // preview avatar generated during the wizard (see trial.js:2056
-      // _seedStandardFromPreview) and lives in the styled-avatar cache as
-      // the 'standard' entry — applyStyledAvatars finds it without us
-      // having to spend another ~30s + Grok call on a standard 2×4 sheet
-      // that's only used on rare non-costumed scenes anyway. The previous
-      // code requested BOTH 'standard' AND 'costumed:X' here, contradicting
-      // the prepare-title intent (trial.js builds only costumed in its own
-      // requirements list) and producing a Lukas-watercolor-standard log
-      // entry the user explicitly objected to. Only fall back to 'standard'
-      // when no costume is configured (rare in trial, but supported).
+      // Trial builds BOTH sheets, through the same 2-pass pipeline a full story
+      // uses (Pass 1 realistic anchor → Pass 2 style transfer). A costumed-only
+      // policy was tried and reverted (owner, 2026-08-16): the `standard` pages
+      // it left behind had to fall back to something, and every stand-in was
+      // worse than the real sheet — the costumed sheet (child in costume in
+      // bed), or the raw preview avatar (a Pass-1 realistic anchor, so painted
+      // photographs), or a separately-converted preview (a 3×3 grid, because
+      // the style-transfer pass converts SHEETS). Both sheets are built here in
+      // parallel, inside the ~100s outline window, so the wall-clock cost is
+      // near zero — the saving was never worth a trial-only avatar path.
       const trialAvatarRequirements = (inputData.characters || []).flatMap(char => {
-        const cats = costume ? [`costumed:${costume.costumeType}`] : ['standard'];
+        const cats = costume ? [`costumed:${costume.costumeType}`, 'standard'] : ['standard'];
         return cats.map(cat => ({
           pageNumber: 'pre-cover',
           clothingCategory: cat,
@@ -724,18 +673,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (seeded > 0) log.info(`♻️ [TRIAL] Seeded ${seeded} styled avatars from prepare-title cache`);
       }
 
-      // The trial builds only the costumed sheet (see the requirements above);
-      // the preview avatar serves as the `standard` reference. Two writes, two
-      // jobs: the character record feeds the projection that the cell-ref path
-      // reads, and the cache feeds applyStyledAvatars. Rationale and the three
-      // bugs this went through: docs/decisions.md, 2026-08-16.
-      const { seedStandardFromPreview } = require('./server/lib/storyAvatars');
-      const seededStandards = seedStandardFromPreview(inputData.characters || [], artStyle);
-      for (const { name, preview } of seededStandards) {
-        setStyledAvatar(name, 'standard', artStyle, preview);
-        log.info(`♻️ [TRIAL] ${name}: standard reference seeded from the preview avatar (full image, no standard sheet is generated)`);
-      }
-
       log.info(`🎨 [TRIAL] Starting immediate avatar styling (${trialAvatarRequirements.length} variants)...`);
       streamingAvatarStylingPromise = (async () => {
         try {
@@ -744,17 +681,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // bodies/heads/identity/style eval. Measured on job_1786818831439:
           // 4 Gemini evals plus a body-row retry the trial cannot act on
           // anyway (no repair stage).
-          // The preview avatar is a Pass-1 style anchor, not a styled asset:
-          // trial.js generates it with "biometric precision / ultra-sharp
-          // focus", which fights the watercolour brief it also carries. Give
-          // it the SAME Pass-2 style transfer the costumed sheet gets, so the
-          // `standard` pages are painted rather than photographic. Runs
-          // alongside prepareStyledAvatars (inside the ~95s outline window),
-          // and the raw preview stays seeded as the fallback if it fails.
-          await Promise.all([
-            prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: true }),
-            styleConvertSeededStandards(seededStandards, inputData.characters || [], artStyle, addUsage),
-          ]);
+          await prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: true });
           earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
           log.info(`✅ [TRIAL] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
@@ -2734,7 +2661,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
     });
 
-    let avatarRequirements = collectAvatarRequirements(
+    const avatarRequirements = collectAvatarRequirements(
       sceneDescriptions,
       inputData.characters || [],
       pageClothing,
@@ -2742,20 +2669,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       clothingRequirements
     );
 
-    // TRIAL: never build the standard 2×4 sheet. The costumed-only decision
-    // above is the whole point (saves ~30-40s and a Grok call), but a page the
-    // writer marked `standard` re-introduced the requirement here and the sheet
-    // got built anyway — after page 1 had already rendered, so it cost the time
-    // without ever being used. The preview avatar seeded as `styled-standard`
-    // is the standard reference.
-    if (inputData.trialMode && inputData._trialCostumeType) {
-      const before = avatarRequirements.length;
-      avatarRequirements = avatarRequirements.filter(r =>
-        String(r.clothingCategory || '').toLowerCase().startsWith('costumed'));
-      if (before !== avatarRequirements.length) {
-        log.info(`🎭 [TRIAL] Dropped ${before - avatarRequirements.length} non-costumed avatar requirement(s) — the preview avatar is the standard reference`);
-      }
-    }
+    // A page the writer marks `standard` gets a real standard 2×4 sheet, built
+    // by the SAME pipeline a full story uses. This used to be filtered out for
+    // the trial (costumed-only, to save ~30-40s) with the raw preview avatar
+    // standing in — but the preview is a Pass-1 realistic anchor, so those
+    // pages rendered as painted photographs, and converting it separately just
+    // produced a trial-only avatar path parallel to the working one (a 3×3
+    // grid, since the style-transfer pass converts SHEETS). Owner call
+    // 2026-08-16: no trial-only avatar path. See docs/decisions.md.
 
     // NOTE: Avatar generation removed from story processing.
     // Base avatars should already exist from character creation.

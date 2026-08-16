@@ -88,15 +88,6 @@ function projectStoryCharacterAvatars(characters, artStyle) {
       const url = extractUrl(styled[clothing]);
       if (!url) continue;
       entry[`styled-${clothing}`] = url;
-      // Not every entry is a 2×4 sheet. The trial seeds its cheap full-body
-      // preview avatar as `standard` (it is already watercolour, so it needs
-      // no style pass and saves a whole sheet generation). Cropping a "cell"
-      // out of that would slice a vertical quarter of one figure, so the slot
-      // is recorded here and the cell croppers send the image whole instead.
-      const slot = styled[clothing];
-      if (slot && typeof slot === 'object' && slot.isSheet === false) {
-        (entry.nonSheetSlots || (entry.nonSheetSlots = [])).push(`styled-${clothing}`);
-      }
     }
 
     if (Object.keys(entry).length > 0) {
@@ -153,49 +144,6 @@ function projectStoryCostumeDescriptions(clothingRequirements) {
  *   to data-URI cell crops where applicable.
  */
 /**
- * Seed `styledAvatars[artStyle].standard` from each character's cheap preview
- * avatar, marked as NOT a 2×4 sheet.
- *
- * Used by the trial, which builds only the costumed sheet: its preview avatar
- * is already a full-body watercolour illustration (the trial art style is
- * always watercolour), so it is a valid standard reference and saves a second
- * sheet generation. Without it, `standard` pages fall back to the costumed
- * sheet and the child wears the costume in bed.
- *
- * Reads `previewAvatar` first: by the time the pipeline runs, characters have
- * been reloaded from the DB (processStoryJob replaces inputData.characters
- * whenever input_data carries a characterId), and the stored row keeps the
- * preview at top level — `avatars.standard` exists only on the pre-reload
- * payload. Getting this backwards made the whole thing a silent no-op.
- *
- * Skips characters that already have a standard entry. Mutates in place.
- *
- * @param {Array<Object>} characters - inputData.characters[]
- * @param {string} artStyle
- * @returns {Array<{name: string, preview: string}>} what was seeded
- */
-function seedStandardFromPreview(characters, artStyle) {
-  const seeded = [];
-  if (!Array.isArray(characters) || !artStyle) return seeded;
-
-  for (const char of characters) {
-    const preview = (typeof char?.previewAvatar === 'string' && char.previewAvatar)
-      || (typeof char?.avatars?.standard === 'string' && char.avatars.standard)
-      || null;
-    if (!preview || !char.name) continue;
-
-    char.avatars = char.avatars || {};
-    char.avatars.styledAvatars = char.avatars.styledAvatars || {};
-    const styled = (char.avatars.styledAvatars[artStyle] = char.avatars.styledAvatars[artStyle] || {});
-    if (styled.standard) continue;
-
-    styled.standard = { imageData: preview, isSheet: false };
-    seeded.push({ name: char.name, preview });
-  }
-  return seeded;
-}
-
-/**
  * SINGLE resolver for which 2×4 sheet cell a scene character should get.
  * Beats metadata never carries `pose` — it declares `perspective` in natural
  * language ("back view", "profile"). Every cell-picker that read only `pose`
@@ -238,7 +186,7 @@ function resolveCellPose(sc) {
  *
  * @param {Object} story - one character's entry from story.data.characterAvatars
  * @param {Object} ref - reference photo ({ name, clothingCategory, ... })
- * @returns {{uri: string, slotKey: string, isSheet: boolean}|null} null when
+ * @returns {{uri: string, slotKey: string}|null} null when
  *   the character has nothing usable stored.
  */
 function resolveSheetForRef(story, ref) {
@@ -263,8 +211,7 @@ function resolveSheetForRef(story, ref) {
   }
   if (!uri) return null;
 
-  const isSheet = !(story.nonSheetSlots || []).includes(slotKey);
-  return { uri, slotKey, isSheet };
+  return { uri, slotKey };
 }
 
 async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneCharacters, opts = {}) {
@@ -290,16 +237,7 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
     if (!story) continue;
     const resolved = resolveSheetForRef(story, ref);
     if (!resolved) continue;
-    const { uri: sheetUri, slotKey, isSheet } = resolved;
-    // A plain avatar (trial's seeded preview) has no cells to crop — send it
-    // whole. Costs the pose/facing control the cell picker gives, which is
-    // the accepted trade for not building a second 2×4 sheet in the trial.
-    if (!isSheet) {
-      ref.photoUrl = sheetUri;
-      ref.photoType = 'full-avatar';
-      ref.cellSkipped = 'not-a-sheet';
-      continue;
-    }
+    const { uri: sheetUri, slotKey } = resolved;
     const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', depth: 'foreground' };
     // Foreground → stack head + body into one ref (canvas-large faces need
     // a tight head anchor). Midground / background → body cell only.
@@ -453,7 +391,6 @@ module.exports = {
   applyStoryCellRefs,
   resolveCellPose,
   resolveSheetForRef,
-  seedStandardFromPreview,
   appendStoryHistory,
   extractUrl,
 };

@@ -12057,3 +12057,29 @@ gate.
 
 **Touched:** `server/lib/figureDetection.js`, `server/lib/testlab.js`, `server/lib/bboxDetection.js`,
 `tests/manual/occlusionDepth.test.js` (42 assertions).
+
+### Reversal (2026-08-16) — no trial-only avatar path; the trial builds both sheets
+**Context:** The costumed-only trial policy (save ~30-40s by skipping the
+standard 2×4 sheet) forced a stand-in for `standard` pages, and every stand-in
+was worse than the real sheet: the costumed sheet (child in costume in bed), the
+raw preview avatar (a Pass-1 realistic anchor → painted photographs), and
+finally a separately style-converted preview — which came back as a 3×3 GRID,
+because `runStyleTransferPass` converts SHEETS and its prompt asks for a grid.
+Three attempts, each a trial-only path parallel to the working main one.
+**Decision (owner, 2026-08-16):** Delete the trial-only avatar path. The trial's
+`trialAvatarRequirements` now requests `costumed:<type>` AND `standard`, both
+built by the same two-pass pipeline a full story uses, in parallel inside the
+~100s outline window. Removed: `styleConvertSeededStandards()`,
+`seedStandardFromPreview()`, the `isSheet`/`nonSheetSlots` plumbing and the
+non-sheet branches at all three cell-crop sites, and the requirement filter that
+dropped non-costumed requirements.
+**Kept:** `resolveSheetForRef()` — the single resolver that replaced three
+drifted inline copies and made the costumed fallback loud (it corrects
+`ref.clothingCategory` instead of swapping clothing silently). That fixed a real
+bug and is unrelated to the reverted approach.
+**Rationale:** The saving was never worth a parallel path. Both sheets are built
+during text generation, so wall-clock cost is near zero.
+**Touched:** `storyJobPipeline.js`, `server/lib/storyAvatars.js`,
+`server/lib/images.js`, `server/routes/regeneration.js`,
+`tests/manual/story-cell-ref-resolver.test.js`
+**Status:** ✅ active (supersedes the two 2026-08-16 entries above it)
