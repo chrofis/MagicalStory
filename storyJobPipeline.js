@@ -3954,10 +3954,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // prompt + the bg character's avatar attached.
             // No threshold, no eval — outline intent is the trigger.
             let scaleRepairResult = null;
+            // Why the composite did or did not produce a page. An abort
+            // leaves NO artefact, so "ran and bailed" and "never triggered"
+            // looked identical in the database, and the only record was a
+            // log line that had rolled out of the buffer within hours
+            // (asked about job_1786829555599_rgzoyoprx, 2026-08-16, and the
+            // answer had to be reconstructed from scene metadata).
+            let compositeOutcome = null;
             if (genResult.imageData && pageData.sceneMetadata) {
               try {
-                const { needsScaleRepair, runScaleRepair } = require('./server/lib/scaleRepair');
+                // Only the trigger is used here — the composite replaced
+                // runScaleRepair on this path (decisions.md 2026-08-15).
+                const { needsScaleRepair } = require('./server/lib/scaleRepair');
                 if (needsScaleRepair(pageData.sceneMetadata)) {
+                  compositeOutcome = { status: 'triggered' };
                   // Resolve avatar refs only for the background characters.
                   const helpers = require('./server/lib/storyHelpers');
                   const { applyStyledAvatars } = require('./server/lib/styledAvatars');
@@ -4095,8 +4105,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   scaleRepairResult = compRes?.imageData
                     ? { imageData: compRes.imageData, modelId: 'scene-composite', prompt: compRes.debug?.populatedPlatePrompt || null, grokRefImages: null, debug: compRes.debug || null }
                     : null;
+                  compositeOutcome = scaleRepairResult
+                    ? { status: 'composited', detector: compRes.debug?.detector || null, placed: (compRes.debug?.placements || []).length }
+                    : { status: 'no-image', reason: 'the composite returned no image' };
                 }
               } catch (e) {
+                compositeOutcome = { status: 'aborted', reason: String(e.message || e).slice(0, 300) };
                 log.warn(`⚠️ [SCALE-REPAIR] Page ${pageData.pageNumber} failed: ${e.message}`);
               }
             }
@@ -4143,6 +4157,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               preScaleRepairModelId: scaleRepairResult ? genResult.modelId : null,
               scaleRepairPrompt: scaleRepairResult ? scaleRepairResult.prompt : null,
               scaleRepairGrokRefImages: scaleRepairResult ? scaleRepairResult.grokRefImages : null,
+              compositeOutcome,
               thinkingText: genResult.thinkingText || null,
               usage: genResult.usage,
               prompt: pageData.prompt,
