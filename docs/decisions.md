@@ -12237,3 +12237,84 @@ Cause 2 means the VB `pages` fallback is still load-bearing, so removing `pages`
 visual bible is NOT yet safe — it would reopen the misnaming for that shape.
 
 **Touched:** server/lib/beatsPipeline.js.
+
+## 2026-08-16 — The SoM identity prompt is sanitised AND short, because Gemini was refusing it outright
+
+**Context:** Page 9 of `job_1786829555599_rgzoyoprx` named the preschooler as
+the adult woman and the woman as the preschooler, identically on every run.
+It looked like a face→figure pairing bug for a day. It was not: the identity
+call (`_somIdentifyFigures`) was being **refused**. Gemini returns HTTP 200
+with an empty body and `promptFeedback.blockReason = PROHIBITED_CONTENT` —
+its minor-safety filter, which `safetySettings` cannot relax. With no answer,
+the page fell through to the layout+gender fallback, and that fallback is
+deterministic geometry, so it produced the same wrong assignment every time.
+
+**Decision:** The character lines in the SoM prompt are built by stripping the
+`Wearing:` wardrobe paragraph out of the identity prose, substituting
+`_shortGarmentPhrase(c.clothing)`, and running the finished line through
+`sanitizeForGemini(line, 'light')`. Both halves, always.
+
+**Rationale:** The trigger is a child's age wording and a full wardrobe
+paragraph appearing TOGETHER. Measured on that page, 5 calls per variant with
+the badged image attached (Test Lab exps #732-#737, set #12):
+
+```
+baseline (as shipped)              5/5 blocked
+sanitizeForGemini('light') alone   5/5 blocked
+short garment phrase alone         5/5 blocked
+BOTH                               0/5 blocked, answers {"A":"Emma",
+                                   "B":"Lira","C":"Noah"} — correct
+```
+
+Neither half clears it alone. `_shortGarmentPhrase` was dead code at this call
+site before: it was used only when the identity prose lacked the word
+"wearing", and the prose nearly always carries a `Wearing:` section.
+
+Two measurement traps this cost a session, worth repeating for whoever revisits
+it. **Text-only probes do not predict the real call** — with the image attached
+the threshold moves, and several variants that pass without it block with it.
+**Single calls near the threshold are noise** — one variant passed twice and
+then blocked 6/6 on repeat, and a conclusion was drawn and published off those
+two lucky calls. Claim rates, never calls.
+
+Not done, deliberately: `sanitizeForGemini` was NOT taught "preschooler" /
+"kindergartner". Softening the age words while keeping the wardrobe still
+blocked 5/5, so it would have been a change with no measured effect.
+
+**Touched:** `server/lib/figureDetection.js` (`_somIdentifyFigures`),
+`server/lib/evalPipeline.js` (`sanitizeForGemini`, reused unchanged)
+**Status:** ✅ active
+
+## 2026-08-16 — A failed identity call returns its evidence, and every null exit logs why
+
+**Context:** The above took a day to find because the failure was silent. Four
+of `_somIdentifyFigures`'s exits returned a bare `null` with no log line, and
+the badged image and prompt it had just built were discarded on failure — so
+the one page where identity went wrong was the one page with no evidence for
+why. The Lab could show what SAM returned and what identity decided, never
+what either was given.
+
+**Decision:** Failures return `{nameByDet: null, reason, prompt, markedImage,
+badges}`; `nameByDet` is the success signal. Every exit logs its reason (no
+key, no figures, empty body with its `finishReason`/`blockReason`, non-JSON,
+duplicate name, no badge matching an expected character). `diag.identity`
+carries `method: 'layout-fallback'` plus `somFailure`, and the Stage-4 fallback
+merges rather than overwrites it. The badged image and prompt ride
+NON-ENUMERABLY on the diag (`diag._som`), like `_gdinoMasks` — no bytes and no
+per-page prompt reach `stories.data` JSONB.
+
+Alongside it, `_maskBoxesFrontFirst` records `samPoints` (the labelled point
+list) and `samBox`, and `createSamInputOverlayImage` renders one cell per SAM
+call: box as the frame, green = this figure's face, blue = a garment seed with
+its colour, red cross = a neighbour's face at label 0.
+
+**Rationale:** A merged cut-out looks identical whether the face point was
+missing, the garment dot landed on the neighbour's shirt, or the neighbour's
+negative was never placed. Without the input those three need a local re-run
+with print statements to tell apart; with it they are one look.
+
+**Touched:** `server/lib/figureDetection.js`, `server/lib/bboxDetection.js`
+(`createSamInputOverlayImage`), `server/lib/images.js` (facade),
+`server/lib/testlab.js` (two step images + `identity`/`somPrompt` in the
+payload), `client/src/pages/TestLab.tsx`
+**Status:** ✅ active
