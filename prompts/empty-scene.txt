@@ -12,7 +12,7 @@ Generate a SINGLE illustration of the background environment. Paint only what th
 
 {ERA_GUARD}
 
-**ABOUT THE LANDMARK REFERENCE PHOTO (when provided):** It is a real-world photograph, often taken recently. Take only geometry from it — shape, proportions, architecture, **camera angle, camera elevation, AND camera distance**. Never take its rendering: the photo is not a style reference, and the result is drawn in the ART STYLE above. The landmark must occupy approximately the same fraction of the rendered frame as in the photo — if the photo crops in, you crop in; if it is a wide shot, you keep the wide shot. Do NOT zoom out to add city context the photo does not show. Exclude modern-era elements visible in the photo per the STORY ERA rule above. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure.
+**ABOUT THE LANDMARK REFERENCE PHOTO (when provided):** It is a real-world photograph and it defines the STRUCTURE only — silhouette, proportions, materials, roof and window shapes, and its signature details. Everything else comes from the scene description above: camera angle, distance and framing, season, time of day, weather and light. Repaint the structure into the scene's conditions — a photo taken in summer daylight still renders as the described night, winter or storm, with the building unchanged. Never take the photo's rendering: it is not a style reference, and the result is drawn in the ART STYLE above. Exclude modern-era elements visible in the photo per the STORY ERA rule above. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure.
 
 {LANDMARK_FIDELITY}
 

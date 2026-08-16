@@ -12167,3 +12167,45 @@ still-must-fire case, and the two over-merge guards.
 **Touched:** `server/lib/phantomCharacters.js`,
 `tests/manual/phantom-name-containment.test.js`
 **Status:** ✅ active
+
+## 2026-08-16: The landmark photo owns the building; the scene owns the conditions — and it only attaches where it fits
+
+**Context:** A mermaid story set in Luzern attached a sunset SURFACE photo of the
+Kapellbrücke to four underwater pages (job_1786829555599). Two causes: (a) the plate
+prompt made the photo authoritative for composition — "take shape, proportions,
+**camera angle, camera elevation, AND camera distance**… the landmark must occupy
+approximately the same fraction of the frame as in the photo"; (b) a bare `LOC001`
+citation silently defaults to variant 1, so any cited landmark attaches a photo
+regardless of whether the scene's world could contain it. The `.0` escape existed but
+was used zero times in ten pages — an edge case the writer has to remember.
+
+**Decisions (owner):**
+- The photo defines the STRUCTURE only (silhouette, proportions, materials, signature
+  details). Camera, framing, season, time of day, weather and light come from the scene
+  description, and the structure is repainted into them — a summer-daylight photo
+  renders as the described winter night, building unchanged. No per-condition photo
+  indexing is ever needed. (`empty-scene.txt` + `buildLandmarkFidelityBlock`, whose
+  FRAMING section is replaced by CONDITIONS; the anti-"tiny speck" guard survives.)
+- Attachment matches KIND, not a slot number. The index already classifies every photo
+  slot (`photo_type`, 7,100+ classified: exterior | distant | close | interior |
+  view-from, plus 'bad' rejects). The AD declares the page's `landmarkView` in the same
+  vocabulary plus `underwater` / `none`; `pickVariantForView` returns the matching photo
+  or NULL, and NULL attaches nothing — prose carries the place. The dotted `.N` form
+  stays as a manual override, `.0` still means none.
+- Rejected: demoting the photo out of the plate's reference slot. The photo feeds the
+  empty scene, the page render consumes the plate (page renders already drop landmarks
+  when a plate exists) — the plate is exactly where it belongs.
+
+**Schema:** migration 020 adds `photo_type[_2..6]` to `landmark_index` on staging
+(prod has carried them since the index was built — this was live schema drift that made
+a prod→staging row copy fail). 337 staging rows backfilled from prod by wikidata_qid.
+
+**Validated:** offline against the story's own visual bible — Kapellbrücke (3 exterior +
+1 interior) serves variant 4 for `interior`, variant 1 for exterior/distant/close, and
+NOTHING for `view-from`/`underwater`; the invented "Wasserturm at the Riverbed" entry
+(exteriors only) attaches nothing for `interior`/`underwater` where it previously served
+a surface photo.
+
+**Touched:** prompts/empty-scene.txt, scene-expansion-all.txt, scene-expansion.txt,
+server/lib/promptBuilders.js, landmarkPhotos.js, storyHelpers.js, sceneMetadata.js,
+migrations/020_landmark_photo_type.sql.

@@ -625,16 +625,11 @@ function buildLandmarkFidelityBlock(landmark) {
     ? landmark.trim()
     : String(landmark?.name || '').trim();
   if (!name) return '';
-  return `**LANDMARK IN THIS SCENE: ${name}.** The attached reference photo shows this exact real-world landmark. The scene MUST depict this specific building (or part of it), not a generic version.
+  return `**LANDMARK IN THIS SCENE: ${name}.** The attached reference photo shows this exact real-world landmark. The scene depicts this specific building (or part of it), not a generic version.
 
-**FRAMING (must match the photo):**
-- Match the camera distance and framing of the reference photo. If the photo is a close-up of the landmark filling 60-80% of the frame, your scene shows the landmark filling 60-80% of the frame at the same elevation and angle. DO NOT zoom out to show the surrounding city or wide context unless the reference photo itself is a wide shot.
-- Match the camera elevation (ground-level / low / eye-level / high / aerial) shown in the photo.
-- Match the viewing angle (front / three-quarter / side / oblique) shown in the photo.
-- The landmark must occupy approximately the same fraction of the rendered frame as it does in the reference photo. A common failure is rendering the landmark tiny in the distance against a wide cityscape — DO NOT do this. If the photo crops in, you crop in.
+**IDENTITY (from the photo):** Preserve the silhouette, architectural details, distinctive features and overall proportions exactly as in the photo. Someone who has seen the real building must immediately recognise it.
 
-**IDENTITY:**
-- Preserve the silhouette, architectural details, distinctive features, and overall proportions exactly as in the photo. Do NOT stylize away its identity. Someone who has seen the real building must immediately recognise it.
+**CONDITIONS (from the scene):** Camera angle, distance and framing, season, time of day, weather and light all come from the scene description — repaint the structure into them. The landmark still reads at page size: never a tiny speck against a wide cityscape.
 
 **EXCLUDE:** modern-era elements visible in the photo per the STORY ERA rule. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure. Keep the landmark itself unchanged; only remove the modern surroundings.`;
 }

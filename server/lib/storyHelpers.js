@@ -16,7 +16,7 @@
  */
 
 const { log } = require('../utils/logger');
-const { loadLandmarkPhotoVariant } = require('./landmarkPhotos');
+const { loadLandmarkPhotoVariant, pickVariantForView } = require('./landmarkPhotos');
 const { parseClothingCategory, parseCharacterClothing, resolveClothingForPage, buildSceneClothingRequirements, buildAvailableAvatarsForPrompt, convertClothingToCurrentFormat, getCharacterPhotos, getCharacterPhotoDetails, prefetchAvatarBytesForCharacters, applyReferenceMode } = require('./clothingResolve');
 const { wrapUserInput, stripAgeWords, buildHairDescription, buildCharacterDescriptionsForBbox, buildSecondaryCharacterDescriptions, buildSecondaryExpectedCharacters, buildCastIdentityDescription, buildSecondaryExpectedForPage, buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, getAgeCategory, getAgeCategoryLabel, AGE_CATEGORY_ORDER, getAgeCategoryIndex, clampApparentAge, getTeachingGuide, preloadHistoricalLocations, getHistoricalLocations, preloadHistoricalObjects, getHistoricalObjects, getAdventureGuide, getSceneComplexityGuide, ART_STYLES, WORLD_ART_STYLES, buildStyleWardrobeBlock, resolveArtStyle, resolveArtStyleForEmptyScene, resolveArtStyleForSheet, LANGUAGE_LEVELS, getReadingLevel, getTokensPerPage, extractCharacterVisualProfile, buildCharacterPhysicalDescription, buildGroundingPrompt, buildCharacterPromptBlock, buildRelativeHeightDescription, buildCharacterRestriction, buildCharacterReferenceList, buildBasePrompt, buildSceneExpansionAllPrompt, buildSceneExpansionPrompt, buildSceneDescriptionPrompt, textDeclaresNonWornPlacement, sceneDeclaresNonWornState, stripWornStateFromDescription, buildImagePrompt, sanitizeVbIdsInPrompt, buildOutlineReviewPrompt, buildTextRefinePrompt, parseRefinedText, buildBeatsPrompt, buildBeatsReviewPrompt, buildClothingReviewPrompt, parseClothingReview, parseBeats, buildSceneReviewPrompt, buildDoNotWriteSection, buildStoryTextFromBeatsPrompt, buildStoryBibleFromBeatsPrompt, buildUnifiedStoryPrompt, buildTrialStoryPrompt, buildAvailableLandmarksSection, buildPreviousScenesContext } = require('./promptBuilders');
 const { extractJsonFromText, parseProseMetadataFormat, POSITION_ABBREVIATIONS, expandPositionAbbreviations, stripEntityIds, stripSceneMetadata, parseCharacterDescriptions, enforceSpreadTextPosition, mirrorLeftRight, extractSceneMetadata, collectSceneCharacterNames, findCastMissingFromMetadata, getCharactersInScene, parseSceneHintMetadata, parseStoryPages, parseSceneDescriptions, extractShortSceneDescriptions, extractCoverScenes, extractPageClothing, getPrimaryVantageForPage, groupPagesByVantage, normalizePositionToLCR, getPageText, updatePageText } = require('./sceneMetadata');
@@ -134,9 +134,16 @@ async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
       // and no interior variant exists — attaching an exterior photo to an
       // interior scene anchors the model to the wrong view (P6-P8 bridge:
       // exterior photo, walkway action). Prose carries the setting instead.
-      const requestedVariant = perLandmarkVariants[loc.id] ?? 1;
-      if (requestedVariant === 0) {
-        log.info(`📍 [LANDMARK-SCENE] ${loc.name}: variant .0 — no photo attached (no variant matches the scene's vantage)`);
+      // Explicit `.N` from the brief wins (`.0` = attach nothing). Without one,
+      // the scene's declared landmark view picks the photo by KIND — and a view
+      // the index has no photo for (underwater, an unphotographed interior)
+      // attaches nothing rather than falling back to slot 1, which is how a
+      // surface photo ended up anchoring underwater scenes.
+      const explicitVariant = perLandmarkVariants[loc.id];
+      const sceneView = sceneMetadata?.landmarkView || sceneMetadata?.fullData?.landmarkView || null;
+      const requestedVariant = explicitVariant ?? pickVariantForView(loc, sceneView);
+      if (requestedVariant === 0 || requestedVariant == null) {
+        log.info(`📍 [LANDMARK-SCENE] ${loc.name}: no photo attached (view=${sceneView || 'unset'}${explicitVariant === 0 ? ', explicit .0' : ''}) — prose carries the setting`);
         continue;
       }
       const variant = await loadLandmarkPhotoVariant(visualBible, loc.id, requestedVariant);

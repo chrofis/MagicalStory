@@ -2851,6 +2851,49 @@ async function indexLandmarksForCity(city, country, options = {}) {
  * @param {Object} visualBible - Visual Bible with locations array
  * @returns {Promise<Object>} Updated Visual Bible
  */
+/**
+ * The index classifies every photo slot; the values drifted slightly over time
+ * (`view_from` vs `view-from`). One vocabulary downstream:
+ * exterior | distant | close | interior | view-from | bad.
+ */
+function normalizePhotoKind(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const k = raw.trim().toLowerCase().replace(/_/g, '-');
+  return ['exterior', 'distant', 'close', 'interior', 'view-from', 'bad'].includes(k) ? k : null;
+}
+
+/**
+ * Which photo (if any) fits a scene's view of the landmark.
+ *
+ * The scene declares HOW it sees the landmark in the same vocabulary the index
+ * classifies photos with. A view the index has no photo for — a world state
+ * like `underwater`, or an interior nobody photographed — returns null, and the
+ * caller attaches nothing: prose carries the place. Silently serving slot 1
+ * instead is how a sunset exterior ended up anchoring riverbed scenes.
+ *
+ * @param {Object} location - VB location with photoVariants[] carrying `kind`
+ * @param {string|null} view - scene's landmark view
+ * @returns {number|null} variantNumber to attach, or null for "no photo"
+ */
+function pickVariantForView(location, view) {
+  const variants = (location?.photoVariants || []).filter(v => v?.url && v.kind !== 'bad');
+  if (variants.length === 0) return null;
+  const v = normalizePhotoKind(view) || (String(view || '').trim().toLowerCase() || null);
+  if (v === 'underwater' || v === 'none') return null;
+  const ACCEPTS = {
+    exterior: ['exterior', 'distant', 'close'],
+    distant: ['distant', 'exterior'],
+    close: ['close', 'exterior'],
+    interior: ['interior'],
+    'view-from': ['view-from'],
+  };
+  for (const kind of (ACCEPTS[v] || ACCEPTS.exterior)) {
+    const hit = variants.find(x => x.kind === kind);
+    if (hit) return hit.variantNumber;
+  }
+  return null;
+}
+
 async function loadLandmarkPhotoDescriptions(visualBible) {
   if (!visualBible?.locations) return visualBible;
 
@@ -2879,12 +2922,12 @@ async function loadLandmarkPhotoDescriptions(visualBible) {
     // Query all photo descriptions for these landmarks (6 variants)
     const result = await pool.query(`
       SELECT id, name,
-        photo_url, photo_description, photo_attribution,
-        photo_url_2, photo_description_2, photo_attribution_2,
-        photo_url_3, photo_description_3, photo_attribution_3,
-        photo_url_4, photo_description_4, photo_attribution_4,
-        photo_url_5, photo_description_5, photo_attribution_5,
-        photo_url_6, photo_description_6, photo_attribution_6
+        photo_url, photo_description, photo_attribution, photo_type,
+        photo_url_2, photo_description_2, photo_attribution_2, photo_type_2,
+        photo_url_3, photo_description_3, photo_attribution_3, photo_type_3,
+        photo_url_4, photo_description_4, photo_attribution_4, photo_type_4,
+        photo_url_5, photo_description_5, photo_attribution_5, photo_type_5,
+        photo_url_6, photo_description_6, photo_attribution_6, photo_type_6
       FROM landmark_index
       WHERE id = ANY($1)
     `, [ids]);
@@ -2896,20 +2939,27 @@ async function loadLandmarkPhotoDescriptions(visualBible) {
 
       // Add variants 1-6 if they exist
       const variantConfigs = [
-        { num: 1, url: row.photo_url, desc: row.photo_description, attr: row.photo_attribution },
-        { num: 2, url: row.photo_url_2, desc: row.photo_description_2, attr: row.photo_attribution_2 },
-        { num: 3, url: row.photo_url_3, desc: row.photo_description_3, attr: row.photo_attribution_3 },
-        { num: 4, url: row.photo_url_4, desc: row.photo_description_4, attr: row.photo_attribution_4 },
-        { num: 5, url: row.photo_url_5, desc: row.photo_description_5, attr: row.photo_attribution_5 },
-        { num: 6, url: row.photo_url_6, desc: row.photo_description_6, attr: row.photo_attribution_6 }
+        { num: 1, url: row.photo_url, desc: row.photo_description, attr: row.photo_attribution, kind: row.photo_type },
+        { num: 2, url: row.photo_url_2, desc: row.photo_description_2, attr: row.photo_attribution_2, kind: row.photo_type_2 },
+        { num: 3, url: row.photo_url_3, desc: row.photo_description_3, attr: row.photo_attribution_3, kind: row.photo_type_3 },
+        { num: 4, url: row.photo_url_4, desc: row.photo_description_4, attr: row.photo_attribution_4, kind: row.photo_type_4 },
+        { num: 5, url: row.photo_url_5, desc: row.photo_description_5, attr: row.photo_attribution_5, kind: row.photo_type_5 },
+        { num: 6, url: row.photo_url_6, desc: row.photo_description_6, attr: row.photo_attribution_6, kind: row.photo_type_6 }
       ];
 
       for (const cfg of variantConfigs) {
         if (cfg.url) {
+          // kind = the indexer's own classification of this photo
+          // (exterior | distant | close | interior | view-from; 'bad' = reject).
+          // Slot position is only a fallback for rows indexed before the
+          // classification existed — the slot convention (1-3 exterior,
+          // 4-6 interior) is a guess, the column is data.
+          const kind = normalizePhotoKind(cfg.kind) || (cfg.num >= 4 ? 'interior' : 'exterior');
+          if (kind === 'bad') continue;
           variants.push({
             variantNumber: cfg.num,
-            // Slot convention: 1-3 exterior, 4-6 interior (indexLandmarksForCities).
-            vantage: cfg.num >= 4 ? 'interior' : 'exterior',
+            kind,
+            vantage: kind === 'interior' ? 'interior' : 'exterior',
             url: cfg.url,
             description: cfg.desc || null,
             attribution: cfg.attr || null
@@ -3241,5 +3291,6 @@ module.exports = {
 
   // Lazy photo variant loading
   loadLandmarkPhotoDescriptions,
+  pickVariantForView,
   loadLandmarkPhotoVariant
 };

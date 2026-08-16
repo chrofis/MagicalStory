@@ -790,6 +790,9 @@ function extractSceneMetadata(sceneDescription) {
       // Story era for buildEraGuard (anachronism guard) — restored 2026-08-11;
       // lost in the metadata-format migration like `shot`.
       era: metadata.era || null,
+      // Which view of a cited real landmark this page shows — selects the
+      // reference photo by kind (landmarkPhotos.pickVariantForView).
+      landmarkView: metadata.landmarkView || null,
       imageSummary: prose,
       landmarkVariants: Object.keys(landmarkVariants).length > 0 ? landmarkVariants : null,
       setting: null, // Setting details are in the prose, not structured
@@ -799,6 +802,9 @@ function extractSceneMetadata(sceneDescription) {
       textPosition: metadata.textPosition || null,
       textZoneDescription: metadata.textZoneDescription || null,
       era: metadata.era || null,
+      // Which view of a cited real landmark this page shows — selects the
+      // reference photo by kind (landmarkPhotos.pickVariantForView).
+      landmarkView: metadata.landmarkView || null,
       framingPattern: metadata.framingPattern || null,
       sceneIntent: metadata.sceneIntent || null,
       background: metadata.background || null,
