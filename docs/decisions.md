@@ -11851,7 +11851,7 @@ per-IP abuse, and admin runs should count against them.
   forged/expired tokens still capped)
 **Status:** ✅ active
 
-## 2026-08-16 — Scorer version 2.x pins the judge, and each scorer has a name
+## 2026-08-16 — Scorer version 2.x pins the judge
 
 **Context:** `eval_version` described only the rubric/prompt, while the judge lived in a
 separate `judge_model` column. So "v1.2" meant three different things depending on who ran
@@ -11860,9 +11860,9 @@ producing a wrong conclusion (Sonnet ranked its own reviewer output +1.2 too hig
 and its own prose 2.2 too high on text).
 
 **Decision:** From prompt generation 2 the version identifies BOTH halves: MAJOR = rubric/
-prompt generation, MINOR = the judging model. `2.1 Anna` (claude-sonnet), `2.2 Bruno`
-(grok-4.6), `2.3 Cora` (gemini-3.1-pro); the next judge is 2.4, and a rubric change makes
-3.x. Each scorer has a NAME because that is how results get discussed. `prompts/
+prompt generation, MINOR = the judging model. `2.1 sonnet` (claude-sonnet), `2.2 grok`
+(grok-4.6), `2.3 gemini` (gemini-3.1-pro); the next judge is 2.4, and a rubric change makes
+3.x. Each scorer is named after its judge family (sonnet / grok / gemini). `prompts/
 story-scorecard-judge-v2.txt` is generation 2 (content promoted from v1_2, 10-dim beats).
 1.0/1.1/1.2 stay as frozen legacy rows with no pinned judge so old scores remain readable.
 `DEFAULT_EVALUATOR_VERSION` = 2.1.
@@ -11874,3 +11874,29 @@ to its version automatically.
 
 **Touched:** server/lib/storyScorecard.js, server/lib/testlab.js, server/services/prompts.js,
 prompts/story-scorecard-judge-v2.txt, client/src/components/testlab/ScorecardsPanel.tsx.
+
+## 2026-08-16 — concept style: painted-first descriptor (the last weak anti-photo guard)
+
+**Context:** A whole concept-art book shipped photographic
+(job_1786829555599: style check `wrong_medium`, all 13 images flagged as major
+outliers, per-page evals reading "the image is photographic but the
+commissioned style is digital concept art", scores down to 3). Same defect
+class as oil (2026-08-14): the descriptor's only negation ("detailed but not
+photographic") sat inside the Faces clause while the lead — "Realistic human
+proportions", "smooth rendering", "matte painting aesthetic" (a photo-bashed
+idiom) — pulled toward photography. The 2026-08-14 claim that the other twelve
+styles were "audited clean" was too shallow: it checked that a negation
+EXISTS, not whether it is medium-level and positioned before the photo-leaning
+tokens.
+
+**Decision:** concept leads with "A digitally PAINTED concept-art
+illustration" and carries the watercolor/steampunk-strength clause (visible
+brushwork on every surface, never photographic, no camera-real skin, no lens
+depth-of-field). Re-audited all 14 with the stricter criterion: every other
+style already has a medium-level negation ahead of its photo-leaning tokens.
+
+**Evidence:** Same page prompt, same refs, descriptor swapped: 2/2 rolls
+rendered as painted concept art (visible brushwork, painterly sky and water)
+vs the shipped photograph.
+
+**Touched:** `server/lib/promptBuilders.js` (ART_STYLES.concept).
