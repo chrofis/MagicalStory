@@ -11941,3 +11941,22 @@ still swap clothing silently. Never inline a fourth copy.
 - `storyJobPipeline.js` (seed the CHARACTER, not just the cache)
 - `tests/manual/trial-standard-fullimage-ref.test.js`
 **Status:** ✅ active
+
+### Addendum (2026-08-16) — the seeding source is `previewAvatar`, not `avatars.standard`
+The fix above shipped and still did nothing: `job_1786907999098_thz7p72rs`
+(second verification trial) again rendered page 1 in costume, with
+`cellSkipped` unset — the not-a-sheet branch never ran because the slot was
+never seeded. Cause: `processStoryJob` reloads the full character rows from the
+DB whenever `input_data.characterId` is present (always, for a trial) and
+REPLACES `inputData.characters` with them (`storyJobPipeline.js` ~6055, which
+also clears `styledAvatars`). The `avatars.standard` that `routes/trial.js`
+put into `input_data` is discarded with the original array; the stored row
+carries the preview at top-level `previewAvatar`. The guard
+`if (typeof char?.avatars?.standard !== 'string') continue;` therefore skipped
+every character on every real run — the block only ever worked against the
+pre-reload payload, which is what the isolated test used.
+**Lesson for this file:** when a pipeline block reads off `inputData.characters`,
+check whether it runs before or after the DB reload — the two shapes differ
+(`avatars.standard` vs `previewAvatar`), and the reload wipes `styledAvatars`.
+**Touched:** `storyJobPipeline.js` (read `previewAvatar` first),
+`tests/manual/trial-standard-fullimage-ref.test.js` (pins the DB-reloaded shape).

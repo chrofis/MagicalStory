@@ -698,9 +698,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // `isSheet: false` marks it as a plain full-body avatar rather than a
       // 2×4 grid, so the cell croppers send it whole instead of slicing a
       // quarter out of one figure.
+      // Read `previewAvatar` FIRST, not `avatars.standard`. processStoryJob
+      // reloads the full character rows from the DB whenever input_data carries
+      // a characterId (always, for a trial) and REPLACES inputData.characters
+      // with them — so the `avatars.standard` that the trial route put in
+      // input_data is gone by the time this runs. The stored row keeps the
+      // preview at top-level `previewAvatar`. Reading only `avatars.standard`
+      // made this whole block a no-op on every real run (job_1786868241158 and
+      // job_1786907999098, both verified: no standard slot, costumed fallback).
       for (const char of (inputData.characters || [])) {
-        const preview = char?.avatars?.standard;
-        if (typeof preview !== 'string' || !preview) continue;
+        const preview = (typeof char?.previewAvatar === 'string' && char.previewAvatar)
+          || (typeof char?.avatars?.standard === 'string' && char.avatars.standard)
+          || null;
+        if (!preview) continue;
+        char.avatars = char.avatars || {};
         char.avatars.styledAvatars = char.avatars.styledAvatars || {};
         const styled = (char.avatars.styledAvatars[artStyle] = char.avatars.styledAvatars[artStyle] || {});
         if (styled.standard) continue;
