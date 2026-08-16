@@ -2721,7 +2721,25 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify(result.fixableIssues, null, 2)}</pre>
                   )}
                   {(stage === 'bbox' || result.detectionBackend) && (result.figures || result.objects) && (
-                    <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ backend: result.detectionBackend, figures: result.figures, objects: result.objects }, null, 2)}</pre>
+                    <>
+                      {/* Names come either from the SoM call or, when it fails, from
+                          layout+gender guesses — which on a page of two women and a
+                          child is a coin toss. Say which, before the figure list. */}
+                      {result.identity && (
+                        <div className={`text-xs rounded-lg px-3 py-2 ${result.identity.method === 'som-gemini' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
+                          <b>identity: {result.identity.method}</b>
+                          {result.identity.answers ? ` — ${JSON.stringify(result.identity.answers)}` : ''}
+                          {result.identity.reason ? ` — ${result.identity.reason}` : ''}
+                        </div>
+                      )}
+                      {result.somPrompt && (
+                        <details className="text-xs">
+                          <summary className="cursor-pointer text-gray-500">identity prompt (sent with the badged scene)</summary>
+                          <pre className="bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64 whitespace-pre-wrap">{result.somPrompt}</pre>
+                        </details>
+                      )}
+                      <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ backend: result.detectionBackend, figures: result.figures, objects: result.objects }, null, 2)}</pre>
+                    </>
                   )}
                   {result.storyId && (
                     <Button variant="secondary" size="sm" onClick={async () => {

@@ -822,11 +822,28 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
   // entry, not reconstructed by hand when something looks off.
   const steps = [];
   try {
-    const { createBboxOverlayImage } = require('./images');
+    const { createBboxOverlayImage, createSamInputOverlayImage } = require('./images');
     const overlay = await createBboxOverlayImage(imageData, result);
     if (overlay) {
       const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, overlay, experimentId);
       steps.push({ label: `detected boxes (${result.detectionBackend || 'gemini'}): body solid, face dashed`, imageType: 'tl_step', versionIndex: v });
+    }
+    // The SAM PROMPT, one cell per call. Output without input made every
+    // segmentation failure a re-run: a merged figure looks the same whether its
+    // face dot was missing, its garment dot landed on the neighbour, or the
+    // neighbour's negative was never placed.
+    // What the identity call SAW and was ASKED. A wrong name is otherwise an
+    // argument; with the badged image it is one look (a badge sitting in the gap
+    // between two people names the wrong one every time).
+    const som = result.gdinoDiag?._som;
+    if (som?.image) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, som.image, experimentId);
+      steps.push({ label: 'SENT FOR IDENTITY — badged scene (SoM)', imageType: 'tl_step', versionIndex: v });
+    }
+    const samIn = await createSamInputOverlayImage(imageData, result);
+    if (samIn) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, samIn, experimentId);
+      steps.push({ label: 'SENT TO SAM — one cell per call: box + points (green face, blue garment, red = not me)', imageType: 'tl_step', versionIndex: v });
     }
   } catch (err) {
     log.warn(`[TESTLAB] bbox overlay failed (${err.message}) — entry has numeric boxes only`);
@@ -836,6 +853,11 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
     elapsedMs,
     steps: steps.length ? steps : undefined,
     detectionBackend: result.detectionBackend || null,
+    // How the figures got their names, and — when SoM ran — the exact prompt and
+    // its raw answer. 'layout-fallback' here means the names are geometry and
+    // gender guesses, which is worth seeing before trusting any of them.
+    identity: result.gdinoDiag?.identity || null,
+    somPrompt: result.gdinoDiag?._som?.prompt || null,
     figures: (result.figures || []).map(f => ({
       name: f.name,
       bbox: f.bodyBox || f.bbox || f.box_2d,
@@ -870,6 +892,10 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
       // could not explain a figure coming back with its clothing erased.
       seedTrace: f.seedTrace || null,
       facePoint: f.facePoint || null,
+      // The prompt SAM was actually given for this figure (px box + labelled
+      // points), so the rendered cell above can be checked against numbers.
+      samBox: f.samBox || null,
+      samPoints: f.samPoints || null,
     })),
     objects: (result.objects || []).map(o => ({ name: o.name, bbox: o.bodyBox || o.bbox || o.box_2d })),
   };

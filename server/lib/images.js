@@ -114,6 +114,7 @@ const {
   detectSubRegion,
   buildExpectedCharactersForBbox,
   createBboxOverlayImage,
+  createSamInputOverlayImage,
   escapeXml,
   enrichWithBoundingBoxes,
   FIGURE_COLORS,
@@ -4516,6 +4517,7 @@ module.exports = {
   closestGrokAspect,
   detectSubRegion,  // Sub-region detection for targeted repairs (shoes, shirt, hands, etc.)
   createBboxOverlayImage,  // Create overlay image with boxes drawn
+  createSamInputOverlayImage,  // Per-figure SAM prompt: box + labelled points
   getBboxCacheStats, // Telemetry for the content-hashed bbox cache
   FIGURE_COLORS,  // Color palette for bbox overlay (shared with prompt building)
   callGrokVisionAPI,  // Grok vision API for bbox/quality eval

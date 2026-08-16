@@ -418,8 +418,16 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
     // colour was never found, or found outside the box, or rejected as a
     // neighbour's garment. Coordinates make that readable from a Lab run.
     const seedTrace = [];
+    // THE PROMPT ITSELF, point by point (owner, 2026-08-16). seedTrace explains
+    // the garment dots only; SAM is also given the face dot and one negative per
+    // neighbouring face inside this box, and those are what decide whether a
+    // figure comes back whole or merged with its neighbour. A Lab run could show
+    // SAM's OUTPUT and not its INPUT, so "why did this cut-out grab the person in
+    // front" was unanswerable without re-running locally.
+    const samPoints = [];
     if (own) {
       points.push(_boxCentre(own)); labels.push(1);
+      samPoints.push({ at: _boxCentre(own), label: 1, role: 'face' });
       // Garment seeds. The stored faceBox is NOT a tight face - it runs to the
       // chest - so its CENTRE is the usable "the head is here" reference; its
       // bottom edge would reject every real top dot.
@@ -437,6 +445,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
           for (const b of found) {
             points.push([b.cx, b.cy]); labels.push(1); seeds++;
             seedTrace.push({ garment: 'top', colour: top, at: [b.cx, b.cy], px: b.a });
+            samPoints.push({ at: [b.cx, b.cy], label: 1, role: 'garment', garment: 'top', colour: top });
             if (topY === null) topY = b.cy;   // order against the MAIN piece
           }
           if (!found.length) seedTrace.push({ garment: 'top', colour: top, none: 'no blob of that colour below the head' });
@@ -447,6 +456,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
           for (const b of foundB) {
             points.push([b.cx, b.cy]); labels.push(1); seeds++;
             seedTrace.push({ garment: 'bottom', colour: bottom, at: [b.cx, b.cy], px: b.a });
+            samPoints.push({ at: [b.cx, b.cy], label: 1, role: 'garment', garment: 'bottom', colour: bottom });
           }
           if (!foundB.length) seedTrace.push({ garment: 'bottom', colour: bottom, none: 'no blob of that colour below the top' });
         }
@@ -456,6 +466,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
         const c = _boxCentre(faces[j]);
         if (c[0] >= box[0] && c[0] <= box[2] && c[1] >= box[1] && c[1] <= box[3]) {
           points.push(c); labels.push(0);
+          samPoints.push({ at: c, label: 0, role: 'other-face', figure: j });
         }
       }
     }
@@ -467,7 +478,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
     // garbage). No coverage floor here: an occluded figure is legitimately
     // small, and step 4 judges it on its FACE instead.
     const r = await _cleanMaskAndCheck(m, box, { minCoverage: 0 });
-    if (r.keptBox) raw[i] = { mask: m, separated: points.length > 1, seeds, seedTrace, facePoint: own ? _boxCentre(own) : null };
+    if (r.keptBox) raw[i] = { mask: m, separated: points.length > 1, seeds, seedTrace, samPoints, samBox: box, facePoint: own ? _boxCentre(own) : null };
   }
 
   // --- 2. depth order: lower box bottom = nearer the camera ------------------
@@ -554,7 +565,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
       occluded: false, occludedByIdx: [], pxLostToFront: 0, maskPx: 0,
     };
     if (!raw[i]) { out[i] = base; continue; }
-    const { mask, separated, kept, lost, seeds, seedTrace, facePoint } = raw[i];
+    const { mask, separated, kept, lost, seeds, seedTrace, samPoints, samBox, facePoint } = raw[i];
     const pxLost = [...lost.values()].reduce((a, b) => a + b, 0);
     const occludedByIdx = [...lost.keys()].filter(k => lost.get(k) > 0);
 
@@ -590,6 +601,7 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
       occluded: occludedByIdx.length > 0,
       occludedByIdx, pxLostToFront: pxLost, maskPx: kept, garmentSeeds: seeds || 0,
       seedTrace: seedTrace || [], facePoint: facePoint || null,
+      samPoints: samPoints || [], samBox: samBox || box,
     };
   }
   return out;
@@ -909,7 +921,12 @@ async function recoverFaceBox(imageDataUri, bodyBoxNorm, pageLabel = '') {
  */
 async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel = '', badgeAnchor = 'box') {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || dets.length === 0) return null;
+  // EVERY EXIT FROM HERE IS LOGGED (owner, 2026-08-16). Returning null silently
+  // drops the page to the layout+gender fallback, which on a page of two women
+  // and a child is a coin toss — and the run showed no line at all saying
+  // identity had failed, so the swap looked like a pairing bug for a day.
+  if (!apiKey) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM skipped — GEMINI_API_KEY not set`); return null; }
+  if (dets.length === 0) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM skipped — no figures to badge`); return null; }
   const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   // More detections than letters (extreme crowd): badge the largest figures —
   // expected characters are essentially never tiny background crowd. The
@@ -993,7 +1010,10 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
   // Tolerate prose/fence wrapping around the JSON ("Here is the JSON…").
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   try { answers = JSON.parse(jsonMatch ? jsonMatch[0] : text); } catch { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM answer not JSON: ${text.slice(0, 120)}`); return null; }
-  if (!answers || typeof answers !== 'object') return null;
+  if (!answers || typeof answers !== 'object') {
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM answer was not an object: ${text.slice(0, 120)}`);
+    return null;
+  }
 
   const validNames = new Set(expectedCharacters.map(c => c.name));
   const nameByDet = new Map();
@@ -1003,14 +1023,24 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
     if (!raw || /^unknown$/i.test(raw)) continue;
     const name = [...validNames].find(n => n.toLowerCase() === raw.toLowerCase());
     if (!name) continue;
-    if (claimed.has(name)) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM duplicate name "${name}" — answer invalid`); return null; }
+    if (claimed.has(name)) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM named "${name}" twice — whole answer discarded, falling back to layout: ${JSON.stringify(answers)}`); return null; }
     claimed.add(name);
     nameByDet.set(b.detIdx, name);
   }
-  if (nameByDet.size === 0) return null;
+  if (nameByDet.size === 0) {
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM matched no badge to an expected character — answer ${JSON.stringify(answers)} vs [${[...validNames].join(', ')}]`);
+    return null;
+  }
   const letterByDet = new Map(badges.map(b => [b.detIdx, b.letter]));
   log.info(`🔤 [GDINO-DETECT] ${pageLabel}SoM identity: ${[...nameByDet.entries()].map(([i, n]) => `${letterByDet.get(i)}=${n}`).join(' ')}${dets.length > nameByDet.size ? ` (${dets.length - nameByDet.size} unknown)` : ''}`);
-  return { nameByDet, answers };
+  return {
+    nameByDet, answers, prompt,
+    // The badged image and the prompt ARE the identity decision. Without them a
+    // wrong name can only be argued about; with them it is visible in one look
+    // (a badge in the gap between two people, a badge on the wrong figure).
+    markedImage: `data:image/jpeg;base64,${marked.toString('base64')}`,
+    badges: badges.map(b => ({ letter: b.letter, detIdx: b.detIdx, at: [b.x, b.y] })),
+  };
 }
 
 // Binary mask → white-on-transparent PNG (same encoding /figure-mask returns).
@@ -1240,7 +1270,16 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     const badgeAnchor = opts.badgeAnchor || process.env.BADGE_ANCHOR || 'face';
     diag.badgeAnchor = badgeAnchor;
     const som = await _somIdentifyFigures(imageDataUri, persons, expectedCharacters, W, H, pageLabel, badgeAnchor);
-    if (som) { nameByDet = som.nameByDet; diag.identity = { method: 'som-gemini', answers: som.answers }; }
+    if (som) {
+      nameByDet = som.nameByDet;
+      diag.identity = { method: 'som-gemini', answers: som.answers, badges: som.badges };
+      // The badged image and the prompt ride NON-ENUMERABLY: bytes must never
+      // reach stories.data JSONB, and a ~1KB prompt per page is dead weight
+      // there too. In-process consumers (the Lab) read them off the object.
+      Object.defineProperty(diag, '_som', { value: { image: som.markedImage, prompt: som.prompt }, enumerable: false });
+    } else {
+      diag.identity = { method: 'layout-fallback', reason: 'SoM returned no usable answer (see the SoM warning above)' };
+    }
   } catch (e) {
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM identity failed (${e.message}) — masks run unseeded; layout fallback below`);
   }
@@ -1307,6 +1346,8 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       garmentSeeds: m.garmentSeeds,
       seedTrace: m.seedTrace,
       facePoint: m.facePoint,
+      samPoints: m.samPoints,
+      samBox: m.samBox,
     }));
   // Persist any SAM mask leak to the STORY log (not just Railway), so a blow-out
   // is always findable later per-story instead of vanishing into container logs.
@@ -1461,6 +1502,8 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
       garmentSeeds: d.garmentSeeds ?? null,
       seedTrace: d.seedTrace || null,
       facePoint: d.facePoint || null,
+      samPoints: d.samPoints || null,
+      samBox: d.samBox || null,
       // Set when the figure had no person box and was recovered from its own
       // unpaired face (see _personBoxFromFace).
       fromFace: d.fromFace ?? undefined,
@@ -1576,6 +1619,8 @@ async function attachSamMasksToFigures(imageData, figures, { pageLabel = '' } = 
     f.garmentSeeds = m.garmentSeeds;
     f.seedTrace = m.seedTrace;
     f.facePoint = m.facePoint;
+    f.samPoints = m.samPoints;
+    f.samBox = m.samBox;
     return { f, mask: m.mask };
   });
   const masked = entries.filter(e => e.mask).length;

@@ -1303,6 +1303,113 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
 }
 
 /**
+ * WHAT WAS SENT TO SAM, one cell per call (owner, 2026-08-16).
+ *
+ * The Lab could show SAM's OUTPUT — the cut-out strip — but never its INPUT, so
+ * "why did this cut-out grab the person in front of it" could only be answered
+ * by re-running the detection locally with print statements. SAM is prompted per
+ * figure with a box and a point list, and the point list is the whole story: a
+ * positive on this figure's face, a positive on each garment blob found in its
+ * colour, and a NEGATIVE on every neighbouring face that falls inside the box.
+ * A missing face dot, a garment dot that landed on the neighbour's shirt, or a
+ * negative that was never placed each produce a different, recognisable failure.
+ *
+ * Reads `samBox` (px) and `samPoints` from each figure, so it renders exactly
+ * the arguments the call was made with rather than re-deriving them.
+ */
+async function createSamInputOverlayImage(imageData, bboxDetection) {
+  const figs = (bboxDetection?.figures || []).filter(f => f.samBox && f.samPoints);
+  if (!figs.length) return null;
+  try {
+    const base64Match = imageData.match(/^data:image\/\w+;base64,(.+)$/);
+    const imageBuffer = Buffer.from(base64Match ? base64Match[1] : imageData, 'base64');
+    const { width, height } = await sharp(imageBuffer).metadata();
+
+    const CELL_H = 620, HEAD_H = 46, GAP = 10;
+    const tiles = [];
+    for (let i = 0; i < figs.length; i++) {
+      const f = figs[i];
+      const [x1, y1, x2, y2] = f.samBox.map(Math.round);
+      // Context margin — a point can legitimately land outside the box (it
+      // never does for garments, which are searched inside it, but a stale
+      // face point would, and that is exactly the bug worth seeing).
+      const padX = Math.round((x2 - x1) * 0.10), padY = Math.round((y2 - y1) * 0.06);
+      const ex = Math.max(0, x1 - padX), ey = Math.max(0, y1 - padY);
+      const ew = Math.min(width, x2 + padX) - ex, eh = Math.min(height, y2 + padY) - ey;
+      if (ew < 8 || eh < 8) continue;
+
+      const svg = [`<svg width="${ew}" height="${eh}" xmlns="http://www.w3.org/2000/svg">`];
+      // Everything outside the box dimmed, so the box IS the frame.
+      svg.push(`<path d="M0,0 H${ew} V${eh} H0 Z M${x1 - ex},${y1 - ey} H${x2 - ex} V${y2 - ey} H${x1 - ex} Z" fill="#000" fill-rule="evenodd" opacity="0.45"/>`);
+      svg.push(`<rect x="${x1 - ex}" y="${y1 - ey}" width="${x2 - x1}" height="${y2 - y1}" fill="none" stroke="#ffffff" stroke-width="3"/>`);
+      for (const p of f.samPoints) {
+        const px = Math.round(p.at[0]) - ex, py = Math.round(p.at[1]) - ey;
+        if (p.label === 0) {
+          // Negative — "this is NOT me". Drawn as a cross, never a dot, so a
+          // glance can never confuse it with a positive.
+          svg.push(`<circle cx="${px}" cy="${py}" r="13" fill="none" stroke="#ff3b30" stroke-width="4"/>`);
+          svg.push(`<path d="M${px - 8},${py - 8} L${px + 8},${py + 8} M${px + 8},${py - 8} L${px - 8},${py + 8}" stroke="#ff3b30" stroke-width="4"/>`);
+          svg.push(`<text x="${px + 17}" y="${py + 5}" font-family="Arial" font-size="15" font-weight="bold" fill="#ff3b30">not me</text>`);
+        } else {
+          const col = p.role === 'face' ? '#00e05a' : '#00c8ff';
+          svg.push(`<circle cx="${px}" cy="${py}" r="10" fill="${col}" stroke="#ffffff" stroke-width="3"/>`);
+          const lbl = p.role === 'face' ? 'face' : `${p.garment || 'garment'} ${p.colour || ''}`.trim();
+          svg.push(`<rect x="${px + 15}" y="${py - 13}" width="${lbl.length * 8 + 10}" height="21" rx="3" fill="${col}" opacity="0.92"/>`);
+          svg.push(`<text x="${px + 20}" y="${py + 3}" font-family="Arial" font-size="14" font-weight="bold" fill="#00202a">${escapeXml(lbl)}</text>`);
+        }
+      }
+      svg.push('</svg>');
+
+      // Two pipelines on purpose: sharp runs extract AND resize before
+      // composite whatever the call order, so a one-liner would shrink the crop
+      // and then try to paste a full-size overlay onto it.
+      const annotated = await sharp(imageBuffer)
+        .extract({ left: ex, top: ey, width: ew, height: eh })
+        .composite([{ input: Buffer.from(svg.join('')), top: 0, left: 0 }])
+        .jpeg({ quality: 92 }).toBuffer();
+      const cell = await sharp(annotated).resize({ height: CELL_H - HEAD_H }).jpeg({ quality: 88 }).toBuffer();
+      const cw = (await sharp(cell).metadata()).width;
+      const pos = f.samPoints.filter(p => p.label === 1).length;
+      const neg = f.samPoints.length - pos;
+      tiles.push({
+        png: cell, w: cw,
+        head: `${i}· ${f.name || 'UNKNOWN'}${f.fromFace ? ' (from face)' : ''}  box ${x2 - x1}×${y2 - y1}px  ${pos}+ / ${neg}−`,
+        sub: f.samPoints.some(p => p.role === 'face') ? '' : 'NO FACE POINT — box only',
+      });
+    }
+    if (!tiles.length) return null;
+
+    const totalW = tiles.reduce((s, x) => s + x.w, 0) + GAP * (tiles.length + 1);
+    const stripW = Math.min(totalW, 3600);
+    const scale = Math.min(1, (stripW - GAP * (tiles.length + 1)) / Math.max(1, totalW - GAP * (tiles.length + 1)));
+    if (scale < 1) {
+      for (const x of tiles) {
+        x.png = await sharp(x.png).resize({ height: Math.max(80, Math.round((CELL_H - HEAD_H) * scale)) }).jpeg({ quality: 88 }).toBuffer();
+        x.w = (await sharp(x.png).metadata()).width;
+      }
+    }
+    const H = Math.round((CELL_H - HEAD_H) * scale) + HEAD_H + GAP;
+    const comps = []; const heads = [`<svg width="${stripW}" height="${H}" xmlns="http://www.w3.org/2000/svg">`];
+    let cursor = GAP;
+    for (const x of tiles) {
+      comps.push({ input: x.png, left: cursor, top: HEAD_H });
+      heads.push(`<text x="${cursor + 2}" y="20" font-family="Arial" font-size="16" font-weight="bold" fill="#ffffff">${escapeXml(x.head)}</text>`);
+      if (x.sub) heads.push(`<text x="${cursor + 2}" y="39" font-family="Arial" font-size="14" font-weight="bold" fill="#ff8f8f">${escapeXml(x.sub)}</text>`);
+      cursor += x.w + GAP;
+    }
+    heads.push('</svg>');
+    const out = await sharp({ create: { width: stripW, height: H, channels: 3, background: { r: 20, g: 22, b: 26 } } })
+      .composite([...comps, { input: Buffer.from(heads.join('')), top: 0, left: 0 }])
+      .jpeg({ quality: 86 }).toBuffer();
+    return 'data:image/jpeg;base64,' + out.toString('base64');
+  } catch (e) {
+    log.warn(`📦 [SAM-INPUT] overlay failed: ${e.message}`);
+    log.debug(e.stack);
+    return null;
+  }
+}
+
+/**
  * Create an overlay image with bounding boxes drawn on it
  * @param {string} imageData - Base64 image data
  * @param {Object} bboxDetection - Result from detectAllBoundingBoxes (includes qualityMatches, objectMatches)
@@ -1856,6 +1963,7 @@ module.exports = {
   detectSubRegion,
   buildExpectedCharactersForBbox,
   createBboxOverlayImage,
+  createSamInputOverlayImage,
   escapeXml,
   enrichWithBoundingBoxes,
   FIGURE_COLORS,
