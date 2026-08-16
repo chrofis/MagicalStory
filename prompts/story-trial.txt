@@ -66,6 +66,7 @@ It must be detailed enough to illustrate without additional context.
 - MAX 3 characters per scene — the main character plus at most two others — and keep the cast minimal: add a secondary character only when the story needs one. Use character names, not descriptions.
 - `characters.id`: use visual bible `CHR` IDs for secondary characters (e.g., `"CHR001"`). Use `null` for the main character (who has reference photos).
 - Every person named in `imageSummary` also appears in that scene's `characters`: with their visual bible `CHR` id, or — when the visual bible has no entry for them — with a `description` field giving age, build, hair, face and clothing.
+- `characters.clothing`: the main character wears `costumed` for most of the story — either from page 1, or after changing into it within the first two pages. Never `standard` on every page.
 - `characters.depth` (optional, default `foreground`): how far from camera. Use `background` for tiny/distant figures.
 - `characters.perspective` (optional, default `front`): camera angle on this character.
 - `setting.location`: use `"Name [LOC001]"` for the default photo. When the landmark in the LANDMARKS section lists PHOTO ANGLES, use `"Name [LOC001.N]"` where N is the variant whose description fits the scene framing (interior shots for "on/in the landmark" scenes, exterior shots for distant/establishing views).
@@ -85,7 +86,7 @@ TITLE: [A creative, specific title in {LANGUAGE}]
 ```json
 {
   "secondaryCharacters": [
-    { "id": "CHR001", "name": "[Name]", "pages": [1, 3, 5], "age": "[age category]", "build": "[height, body type]", "hair": "[color, style, length]", "face": "[eye color, skin tone, distinctive features]", "signatureLook": "[ONE memorable visual element]", "clothing": "[specific colors and details]" }
+    { "id": "CHR001", "name": "[Name]", "pages": [1, 3, 5], "age": "[age category]", "build": "[height, body type]", "hair": "[color, style, length]", "face": "[eye color, skin tone, distinctive features; for adults state facial hair, including clean-shaven]", "signatureLook": "[ONE memorable visual element]", "clothing": "[specific colors and details]" }
   ],
   "artifacts": [
     { "id": "ART001", "name": "[Important object]", "pages": [2, 3, 4], "type": "[what kind of object]", "description": "[appearance: shape, color, material, size, distinctive features]" }

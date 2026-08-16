@@ -126,7 +126,7 @@ Only the three blocks below. No preamble, no commentary.
       "age": "[age category]",
       "build": "[height, body type]",
       "hair": "[colour, style, length]",
-      "face": "[eye colour, skin tone, distinctive features]",
+      "face": "[eye colour, skin tone, distinctive features; for adults state facial hair, including clean-shaven]",
       "signatureLook": "[one memorable visual element]",
       "clothing": "[specific colours and details]"
     }

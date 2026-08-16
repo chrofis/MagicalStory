@@ -12083,3 +12083,46 @@ during text generation, so wall-clock cost is near zero.
 `server/lib/images.js`, `server/routes/regeneration.js`,
 `tests/manual/story-cell-ref-resolver.test.js`
 **Status:** ✅ active (supersedes the two 2026-08-16 entries above it)
+
+---
+
+## 2026-08-16 — VB adults must state facial hair; the trial costume must be worn
+**Context:** In `job_1786911642311_9i07aogk4` an invented adult ("elderly wizard")
+appeared bearded on two pages and clean-shaven on another. His VB entry reads
+`hair: "long silver-white, wavy…"`, `face: "pale blue eyes, fair wrinkled skin,
+long straight nose, warm smile"` — no facial hair either way. An invented
+character has no photo and no 2×4 sheet, so prose is the only anchor; whatever
+the prose omits is free to drift, and the trial has no repair stage to catch it.
+Corpus (30 recent stories): **1 of 17 adult VB characters states facial hair
+(6%)** — the gap is systemic, not one story, and it applies to full stories too.
+
+Separately, the same run declared a costume that no page used: the writer
+expressed the "wizard" theme as a secondary character instead of dressing the
+main character, so the costumed 2×4 sheet was generated and used only on the
+covers. `prompts/story-trial.txt` mandated `costumed` for the cover only; page
+`clothing` was a free `[standard | costumed]` choice with no guidance. Corpus:
+**1 of 22 stories with a declared costume never wore it (4.5%)** — rare, but
+pure waste when it happens.
+**Decision:**
+- The VB `face` field now reads `…distinctive features; for adults state facial
+  hair, including clean-shaven` in all four schema sites (`story-trial.txt`,
+  `story-unified.txt`, `story-unified-imagefirst.txt`,
+  `story-bible-from-beats.txt`). It flows to renders unchanged —
+  `buildCastIdentityDescription` already appends `phys.face` verbatim.
+- `story-trial.txt` page rule: the main character wears `costumed` for most of
+  the story, either from page 1 or after changing into it within the first two
+  pages; never `standard` on every page. Owner (2026-08-16): "start normally and
+  then costume up, or full story costumed — generating a costume and not using
+  it is stupid."
+**Rationale:** Prompt-side, per the eval-logic rule (classification belongs to
+the prompt). No code and no parser change: clothing vocabulary is still
+`standard | costumed`, which the metadata parsers substring-match.
+**Not done:** `story-unified.txt` has the same page-level gap for full stories —
+it mandates costumed on covers (line 762) and requires `costumed.used` when the
+theme implies it (line 456), but never says to wear it on a page. Left alone
+pending owner sign-off; full-story clothing is governed by the settled
+`clothingRequirements` contract.
+**Efficacy is UNVERIFIED** — both are writer-behaviour changes and no story has
+been generated since. The corpus numbers above establish the gap, not the fix.
+**Touched:** the four prompt files above.
+**Status:** ✅ active
