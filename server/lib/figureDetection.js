@@ -1014,6 +1014,17 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
   if (!res.ok) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM Gemini HTTP ${res.status}`); return evidence(`Gemini HTTP ${res.status}`); }
   const j = await res.json();
   const text = (j?.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('') || '';
+  // WHY the text is empty, when it is. A 200 with no text is a REFUSAL or a
+  // truncation, not a parse problem, and reporting it as "answer was not JSON:"
+  // sent the p9 investigation after the wrong thing. finishReason and
+  // promptFeedback are the fields that say which.
+  const finish = j?.candidates?.[0]?.finishReason || null;
+  const blocked = j?.promptFeedback?.blockReason || null;
+  if (!text) {
+    const why = blocked ? `prompt blocked (${blocked})` : finish ? `no text, finishReason=${finish}` : `no text and no reason: ${JSON.stringify(j).slice(0, 300)}`;
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM returned ${why}`);
+    return evidence(why);
+  }
   let answers;
   // Tolerate prose/fence wrapping around the JSON ("Here is the JSON…").
   const jsonMatch = text.match(/\{[\s\S]*\}/);
