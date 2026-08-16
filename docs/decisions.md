@@ -12105,7 +12105,7 @@ covers. `prompts/story-trial.txt` mandated `costumed` for the cover only; page
 pure waste when it happens.
 **Decision:**
 - The VB `face` field now reads `…distinctive features; for adults state facial
-  hair, including clean-shaven` in all four schema sites (`story-trial.txt`,
+  hair` in all four schema sites (`story-trial.txt`,
   `story-unified.txt`, `story-unified-imagefirst.txt`,
   `story-bible-from-beats.txt`). It flows to renders unchanged —
   `buildCastIdentityDescription` already appends `phys.face` verbatim.
@@ -12318,3 +12318,19 @@ with print statements to tell apart; with it they are one look.
 `server/lib/testlab.js` (two step images + `identity`/`somPrompt` in the
 payload), `client/src/pages/TestLab.tsx`
 **Status:** ✅ active
+
+### Correction (2026-08-16) — the instruction must not supply a value
+The first wording was `…for adults state facial hair, including clean-shaven`.
+"clean-shaven" was the only concrete value anywhere in the instruction, so it
+read as an exemplar rather than as "don't skip the attribute": in
+`job_1786916390871_rilbv75a5` the writer specced an elderly wizard as
+`bushy white eyebrows, clean-shaven`, and the render gave him a full white beard
+anyway — the archetype prior beats an explicit negative, so that value is the
+one setting that cannot be satisfied. (Two runs carried the first wording:
+`long white beard` and `clean-shaven`, so anchoring is plausible, not proven.)
+Owner call: ask for the attribute and supply NO example — `for adults state
+facial hair`. If omission returns, the next step is the controlled vocabulary
+that already exists in `prompts/avatar-evaluation.txt:89`
+(`none | clean-shaven | stubble | mustache | goatee | short/full/long beard`),
+not a single exemplar.
+**Touched:** the same four prompt files.

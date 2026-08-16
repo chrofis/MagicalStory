@@ -86,7 +86,7 @@ TITLE: [A creative, specific title in {LANGUAGE}]
 ```json
 {
   "secondaryCharacters": [
-    { "id": "CHR001", "name": "[Name]", "pages": [1, 3, 5], "age": "[age category]", "build": "[height, body type]", "hair": "[color, style, length]", "face": "[eye color, skin tone, distinctive features; for adults state facial hair, including clean-shaven]", "signatureLook": "[ONE memorable visual element]", "clothing": "[specific colors and details]" }
+    { "id": "CHR001", "name": "[Name]", "pages": [1, 3, 5], "age": "[age category]", "build": "[height, body type]", "hair": "[color, style, length]", "face": "[eye color, skin tone, distinctive features; for adults state facial hair]", "signatureLook": "[ONE memorable visual element]", "clothing": "[specific colors and details]" }
   ],
   "artifacts": [
     { "id": "ART001", "name": "[Important object]", "pages": [2, 3, 4], "type": "[what kind of object]", "description": "[appearance: shape, color, material, size, distinctive features]" }
