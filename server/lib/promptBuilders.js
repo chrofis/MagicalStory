@@ -3832,6 +3832,24 @@ function buildStoryContextFields(inputData) {
     ].filter(Boolean).join('\n');
   }).join('\n\n') || '(no character details available)';
 
+  // The topic guide (historical event, educational subject, adventure setting).
+  // The unified writer path has always had this (see the storyCategory branches
+  // below); the beats prompts never did, so a historical plan could only be
+  // reviewed for SHAPE — the reviewer had no dates, figures or event sequence to
+  // check the beats against. Capped because some guides run long and this rides
+  // on every beats call. `storyDetails` (which carries the ROLES casting) is
+  // already in STORY_BRIEF above; this adds the facts behind it.
+  const guideKey = inputData.storyCategory === 'adventure'
+    ? (inputData.storyTheme || inputData.storyTopic)
+    : (inputData.storyTopic || inputData.storyTheme);
+  let guideSection = '';
+  try {
+    const guide = getTeachingGuide(inputData.storyCategory, guideKey);
+    if (guide) guideSection = `# TOPIC GUIDE (facts and context for ${guideKey})\n\n${String(guide).slice(0, 4000)}`;
+  } catch (err) {
+    log.warn(`[PROMPT] topic guide unavailable for ${inputData.storyCategory}/${guideKey}: ${err.message}`);
+  }
+
   const imageModelKey = inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage;
   return {
     LANGUAGE: getLanguageNameEnglish(language),
@@ -3840,6 +3858,7 @@ function buildStoryContextFields(inputData) {
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
     CHARACTER_NAMES: (inputData.characters || []).map(c => c.name).join(', '),
     STORY_BRIEF: brief,
+    STORY_GUIDE_SECTION: guideSection,
     CHARACTER_DETAILS: characterDetails,
     MAX_CHARACTERS_PER_SCENE: IMAGE_MODELS[imageModelKey]?.maxCharactersPerScene || 3,
   };

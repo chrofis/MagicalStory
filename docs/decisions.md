@@ -12407,3 +12407,32 @@ the mask the wrong way. The Lab's SAM-input view draws these green and labelled
 `server/lib/bboxDetection.js` (`createSamInputOverlayImage` labels),
 `tests/manual/occlusionDepth.test.js`
 **Status:** ✅ active
+
+## 2026-08-17 — The beats reviewer gets the topic guide (it already had the premise)
+
+**Context:** On the prod moon-landing story two judges independently flagged "children acting
+as the actual Apollo 11 crew" as a defect (grok: *"kids-as-Apollo-crew … wreck causality"*;
+gemini: *"bizarre … without an 'imagination' frame"*). That casting is the PRODUCT CONCEPT,
+and it is stated explicitly in `input_data.storyDetails`:
+`ROLES:\nEthan: Neil Armstrong…\nLily: Buzz Aldrin…`.
+
+**Measured, before changing anything:** the beats reviewer was NOT premise-blind —
+`buildBeatsReviewPrompt` spreads `buildStoryContextFields`, whose `{STORY_BRIEF}` already
+carries `storyDetails` verbatim. The genuinely missing piece was the **topic guide**: the
+`historical`/`educational`/`adventure` guide is injected only on the unified writer path
+(`promptBuilders.js` storyCategory branches), and `story-beats.txt` / `story-beats-review.txt`
+had no guide placeholder at all — so a historical plan could be reviewed for SHAPE only, with
+no dates, figures or event sequence to check the beats against.
+
+**Decision:** `buildStoryContextFields` now resolves the topic guide (`getTeachingGuide`,
+adventure keyed on `storyTheme`, everything else on `storyTopic`) and exposes it as
+`{STORY_GUIDE_SECTION}`, capped at 4000 chars since it rides on every beats call. The
+placeholder is added to `story-beats-review.txt` only — the reviewer is the stage that checks
+facts. Renders verified both ways: historical → guide present (key figures appear), no-guide
+topic → section absent, no unfilled placeholders either way.
+
+**Still open:** the SCORECARD JUDGE receives no brief and no guide at all (its input is the
+four artifacts only), which is what produced the two false premise findings. Fixing that
+changes what judges see, so it needs a new evaluator generation (3.x) — not done here.
+
+**Touched:** server/lib/promptBuilders.js, prompts/story-beats-review.txt.
