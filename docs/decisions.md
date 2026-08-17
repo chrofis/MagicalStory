@@ -12727,3 +12727,41 @@ run.
 
 **Touched:** server/lib/beatsPipeline.js, storyJobPipeline.js, server/lib/repairPipeline.js,
 server/lib/landmarkPhotos.js, scripts/lib/deployGate.js, scripts/test-scene-composite-smoke.js.
+
+## 2026-08-17 — Backfilled: three decisions shipped without an entry (2026-08-15)
+
+Found while auditing this session's commits against docs/decisions.md. All three
+shipped and are live; only the record was missing.
+
+**A. Scene simplicity: no partial immersion, and same goal = same place.**
+(commits 1ee80a959, 6f905ab40 — prompts/scene-expansion-all.txt, scene-expansion.txt,
+scene-review.txt, story-beats.txt, story-beats-review.txt, image-generation.txt)
+Two owner rules from watching the same page fail repeatedly:
+- A character is either on standable ground or fully swimming. Wading / ankle-deep /
+  knee-deep renders as standing ON the water surface and buys nothing compositionally
+  ("Sarah wades ankle-deep is shit… why so complicated"). The AD restages such beats at
+  the water's edge or as swimming; review 7d faults them; the image-prompt footing
+  exception dropped "wade" so the painter layer agrees.
+- Characters with the same goal do the same thing in the same place: a searching group
+  stands together scanning, never split across separate spots with roles. Evidence: a
+  three-way search split produced a phantom ledge, then — when only the landmark was
+  fixed — a giant figure looming over a bridge roof (-100). Keeping one figure distant
+  while others stand close is structurally fragile; the model resolves it by breaking
+  scale. Validated exp #645: the split page was rewritten into one grouped tableau.
+
+**B. Close-up pages send a costumed-panel head crop.** (commit 332a193f3 —
+sceneComposite.js cropAvatarCell(headOnly), storyAvatars.js applyStoryCellRefs(opts.closeUp),
+storyJobPipeline.js + regeneration.js call sites, testlab refCrop knob)
+A full-body reference pulls close-up pages toward full-figure present-to-camera poses.
+Cropping the stored stack's top is wrong — that panel is the HATLESS face cell, so a
+naive crop loses hats and bandanas (exp #520: a tricorn vanished). The crop is taken
+from the COSTUMED body cell's head region and stacked with the face cell, so headwear
+survives (exp #590: tricorn preserved, and the contract outfit came along). No costumed
+sheet → full ref, carried by the waist-cut prompt rule alone (that fallback page still
+scored 90/100). Covers and trial are untouched.
+
+**C. Test Lab image A/B evaluates against the override contract.** (commit da184e2e7 —
+server/lib/testlab.js) A run with `sceneDescriptionOverride` generated FROM the override
+but was judged against the STORED brief, so three P6 A/B renders scored semantic 0 for
+lacking exactly the defects the override had removed. The image stage now passes the
+override to the evaluator; same render re-scored -140 → -60, remainder legitimate.
