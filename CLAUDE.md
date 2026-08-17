@@ -280,6 +280,7 @@ before touching that code:
 - `server/config/models.js` - AI model configuration, aspect ratios, repair defaults
 - `server/config/credits.js` - Credit costs, packages, referral config
 - `server/lib/images.js` - Image generation, quality eval, cutout repair, VB grid
+<!-- ASSERT models.figureDetectionBackend === 'grounding-dino' -->
 - `server/lib/figureDetection.js` - GroundingDINO → MobileSAM figure detection (DEFAULT everywhere incl. prod since 2026-08-17): global face↔body pairing, SoM identity, per-figure SAM prompts, joint occlusion by depth
 - `server/lib/bboxDetection.js` - Bbox detection cluster (VB-object grounding, bbox cache, fingerprint pairing, overlay, enrichment) — moved verbatim from images.js, which re-exports every name (facade)
 - `server/lib/evalPipeline.js` - Image evaluation cluster (visual inventory P1, empty-scene QC, three-stage compliance, evaluateImageQuality core, sanitizeForGemini) — moved verbatim from images.js, which re-exports every name (facade)

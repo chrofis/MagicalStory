@@ -533,7 +533,9 @@ page + cover and repainted the cover back into stored clothes (see
 
 <h2 id="detection">10. Figure detection, identity &amp; repair routing (2026-07-17/18; DEFAULT everywhere 2026-08-17)</h2>
 
-<p><b>Default figure-detection path in every environment, production included, since 2026-08-17.</b> <code>FIGURE_DETECTION_BACKEND=gemini</code> reverts one environment — it disables the analyzer's DINO warmup too, since both read that one variable. Gated to styles in <code>MODEL_DEFAULTS.figureDetectionEligibleStyles</code>. Code lives in <code>server/lib/figureDetection.js</code> (split out of images.js 2026-08-09; images.js re-exports every name, so old imports still work).</p>
+<!-- ASSERT models.figureDetectionBackend === 'grounding-dino' -->
+<p><b>Default figure-detection path in every environment, production included, since 2026-08-17.</b> Set in <code>server/config/runtime.js</code> (behaviour lives in code; <code>runtime()</code> has no env override), and the analyzer is TOLD which models to preload by <code>ensureWarm</code> rather than guessing from an env var of its own. Gated to styles in <code>MODEL_DEFAULTS.figureDetectionEligibleStyles</code> — chibi, pixel and lowpoly are excluded and keep using Gemini.
+<!-- ASSERT models.figureDetectionEligibleStyles includes 'watercolor' --> Code lives in <code>server/lib/figureDetection.js</code> (split out of images.js 2026-08-09; images.js re-exports every name, so old imports still work).</p>
 
 <table>
 <thead><tr><th>Step</th><th>How</th><th>Entry point</th></tr></thead>

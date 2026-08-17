@@ -26,5 +26,18 @@ node "$HOOK_DIR/../scripts/admin/check-settled.js" || exit 1
 # plausible degraded output instead of an error. ~1s, committed content only.
 node "$HOOK_DIR/../scripts/admin/check-no-undef.js" || exit 1
 
-# Gate 3: target environment must be idle (see check-push-idle.js).
+# Gate 3: documentation that asserts a code value must still be true.
+# 2026-08-17: figureDetectionBackend flipped to grounding-dino and FIVE documents
+# kept saying "prod stays gemini" — including one that implied a feature always
+# aborts in production, which had stopped being true. Prose cannot be diffed
+# against code, so the claims that matter carry <!-- ASSERT ... --> markers.
+node "$HOOK_DIR/../scripts/admin/check-doc-drift.js" || exit 1
+
+# Gate 4: a push that changes behaviour must touch a doc. The companion to
+# gate 3: that one catches a claim gone stale, this one catches the change
+# nobody wrote down at all. Narrow on purpose — a gate that cries wolf gets
+# bypassed, and a bypassed gate is worse than none.
+node "$HOOK_DIR/../scripts/admin/check-doc-coupling.js" || exit 1
+
+# Gate 5: target environment must be idle (see check-push-idle.js).
 exec node "$HOOK_DIR/../scripts/admin/check-push-idle.js" "$@"

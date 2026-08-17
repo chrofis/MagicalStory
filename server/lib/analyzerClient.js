@@ -71,7 +71,21 @@ function ensureWarm(reason = 'user-active', { force = false } = {}) {
   // force a concurrent story's recent warm could skip the one that matters.
   if (!force && now - lastWarmMs < WARM_INTERVAL_MS) return;
   lastWarmMs = now;
-  analyzerFetch('/warmup', { method: 'POST', signal: AbortSignal.timeout(8000) }, { retries: 1, retryDelayMs: 3000 })
+  // WHICH models to preload is the CALLER's answer, not the analyzer's guess
+  // (owner, 2026-08-17). The analyzer used to decide from its own
+  // FIGURE_DETECTION_BACKEND env var, which meant two places had to agree; when
+  // the Node default flipped to grounding-dino the analyzer's copy still said
+  // "empty" and skipped loading DINO, so the ~90s load landed on the first real
+  // detection call. Since behaviour now lives in server/config/runtime.js and
+  // runtime() has no env override, that env var is dead on this side — the
+  // analyzer cannot read the truth even in principle. So we send it.
+  const wantDino = require('../config/runtime').runtime('figureDetectionBackend') === 'grounding-dino';
+  analyzerFetch('/warmup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dino: wantDino }),
+    signal: AbortSignal.timeout(8000),
+  }, { retries: 1, retryDelayMs: 3000 })
     .then(() => log.debug(`[ANALYZER] warmup requested (${reason})`))
     .catch((err) => log.debug(`[ANALYZER] warmup skipped: ${err.message}`));
 }

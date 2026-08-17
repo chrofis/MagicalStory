@@ -2123,16 +2123,25 @@ def warmup_endpoint():
     if _warmup_thread is not None and _warmup_thread.is_alive():
         return jsonify({"success": True, "status": "already warming"})
 
-    # Default GROUNDING-DINO, matching MODEL_DEFAULTS.figureDetectionBackend on
-    # the Node side (2026-08-17). This gate used to default to empty, so when
-    # that default flipped the pipeline started ASKING for DINO detection while
-    # the warmup still skipped loading it — the ~90s load then landed on the
-    # first real detection call, which falls back to the Gemini bbox rather than
-    # wait. Warmup exists precisely so a model load happens while the user is in
-    # the wizard and the opening Claude calls run; a gate that has to be set
-    # separately from the backend it warms will drift out of sync again.
-    # FIGURE_DETECTION_BACKEND=gemini disables both, in one place.
-    want_dino = os.environ.get('FIGURE_DETECTION_BACKEND', 'grounding-dino') == 'grounding-dino'
+    # WHAT TO PRELOAD IS THE CALLER'S ANSWER (owner, 2026-08-17).
+    #
+    # This used to be read from the analyzer's own FIGURE_DETECTION_BACKEND env
+    # var, defaulting to empty. So two places had to agree, and when the Node
+    # default flipped to grounding-dino this copy still said "empty" and skipped
+    # loading DINO — putting the ~90s load on the first real detection call,
+    # which falls back to the Gemini bbox rather than wait for it. That defeats
+    # the point of warmup, which exists so a load happens while the user is in
+    # the wizard.
+    #
+    # The pipeline now keeps behaviour in server/config/runtime.js with no env
+    # override, so this process cannot read the truth even in principle: it is
+    # told. Body {"dino": true|false}; the env var remains only as a local-dev
+    # override for running this service standalone, and defaults to loading.
+    body = request.get_json(silent=True) or {}
+    if 'dino' in body:
+        want_dino = bool(body['dino'])
+    else:
+        want_dino = os.environ.get('FIGURE_DETECTION_BACKEND', 'grounding-dino') == 'grounding-dino'
 
     def _warm():
         t0 = time.time()

@@ -12586,3 +12586,74 @@ same worst-case pages: oil still renders as an unmistakable impasto painting,
 concept 2/2 painted on the page that had shipped as a photograph.
 
 **Touched:** `server/lib/promptBuilders.js` (AGE_LINE, NOT_A_PHOTOGRAPH, ART_STYLES).
+
+## 2026-08-17 — Two pre-push gates for documentation: drift, and silence
+
+**Context:** `figureDetectionBackend` flipped to `grounding-dino` and FIVE
+documents kept asserting the old value — `image-routing.md` ("prod runs the
+Gemini backend"), `image-generation-methods.html` ("staging; prod stays
+gemini"), `research-log.html` ("shipped behind flag"), a `decisions.md` entry,
+and `CLAUDE.md`'s key-file list, which never mentioned `figureDetection.js` at
+all. One of them implied the scene-composite path always aborts in production,
+which had stopped being true. Any of them would have sent a future session down
+a wrong path with confidence.
+
+The existing rule ("log every architectural decision") did NOT fail: the
+decisions entries were written. What had no owner is the opposite direction —
+prose that a later code change quietly falsifies. Prose cannot be diffed against
+code, so nothing noticed.
+
+**Decision:** Two gates in `.githooks/pre-push`, alongside settled-verdict and
+no-undef.
+
+1. `check-doc-drift.js` — documents carry machine-checkable claims:
+   `<!-- ASSERT models.figureDetectionBackend === 'grounding-dino' -->`
+   The gate resolves the left side through a fixed NAMESPACE map (never `eval`,
+   so a document can never execute anything), compares, and on failure names the
+   file, the line, the claim and the actual value. Verified by flipping the real
+   setting: it named all three files and exited 1.
+2. `check-doc-coupling.js` — if a push changes a WATCHED behaviour file
+   (`server/config/*`, `prompts/*`, `migrations/*`, the detection/eval/scoring
+   modules, `storyJobPipeline.js`, `photo_analyzer.py`) and touches no doc, it
+   refuses.
+
+**Rationale and honest limits.** The two catch different failures: drift catches
+a claim gone stale, coupling catches the change nobody wrote down. Coupling
+cannot tell whether the doc you touched is the right one or says anything true —
+it catches "I forgot entirely", not "I wrote it badly". It is deliberately
+narrow for that reason: a gate that fires on changes genuinely needing no docs
+trains people to bypass it, and a bypassed gate is worse than none. Only marked
+claims are protected by the drift gate; marking is a judgement call about which
+facts a future session would be misled by.
+
+**Touched:** `.githooks/pre-push`, `scripts/admin/check-doc-drift.js`,
+`scripts/admin/check-doc-coupling.js`, first assertions in `docs/image-routing.md`,
+`docs/image-generation-methods.html`, `CLAUDE.md`
+**Status:** ✅ active
+
+## 2026-08-17 — The analyzer is TOLD which models to preload; it stops guessing
+
+**Context:** `/warmup` decided whether to preload GroundingDINO from its own
+`FIGURE_DETECTION_BACKEND` env var, defaulting to empty. Two places had to agree
+about one fact. When the pipeline default flipped to `grounding-dino` the
+analyzer's copy still said "empty", so it skipped loading DINO while detection
+asked for it — putting the ~90s load on the first real detection call, which
+falls back to the Gemini bbox rather than wait. That defeats the entire point of
+warmup, which exists so a load happens while the user is in the wizard
+(`ensureWarm` fires at photo-upload, at story-start, and forced before repair).
+
+It then got worse: `server/config/runtime.js` (same day) moved behaviour into
+code with NO env override, so `FIGURE_DETECTION_BACKEND` is dead on the Node
+side. The analyzer could no longer read the truth even in principle.
+
+**Decision:** `ensureWarm` sends `{"dino": <bool>}` derived from
+`runtime('figureDetectionBackend')`. The analyzer honours the body; its env var
+survives only as a local-dev override for running the service standalone, and
+defaults to loading.
+
+**Rationale:** One source of truth, in the file that now owns behaviour. A gate
+that has to be set separately from the setting it serves drifts out of sync —
+which is precisely what happened here, within hours.
+
+**Touched:** `server/lib/analyzerClient.js`, `photo_analyzer.py`
+**Status:** ✅ active
