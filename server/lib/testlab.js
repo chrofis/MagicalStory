@@ -676,8 +676,15 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
  * reference photos, same templates — so every difference between repeats is
  * judge nondeterminism, measured rather than argued about.
  *
- * The score reproduced per repeat is the production one: composeDeductions →
- * 100 − Σ SEVERITY_POINTS over the quality / semantic / compliance buckets.
+ * The score reproduced per repeat is the production one, through the WHOLE
+ * chain a repair round uses: 4 evaluators → feedback consolidator →
+ * applyScore over the deduped issues. Scoring the raw buckets instead would
+ * measure a number the pipeline never uses, and would miss the consolidator's
+ * own contribution — merging two evaluators' reports of one defect, or failing
+ * to, moves the score without any evaluator changing its mind. Both numbers
+ * are reported per run (rawScore vs finalScore) so that contribution is
+ * readable rather than assumed.
+ *
  * ENTITY IS EXCLUDED — it is a separate cross-page evaluator that
  * evaluateImageQuality does not run, so its own variance is out of scope here.
  *
@@ -690,18 +697,22 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
  *
  * target.versionIndex pins a stored version (the two versions of one page are
  * two members of the set); omitted → the page's active version.
- * params.repeats — 2..5, default 3.
+ * params.repeats     — 2..5, default 3.
+ * params.consolidate — default true (the production chain). false measures the
+ *                      raw evaluator buckets only, to separate the two layers.
  */
 async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { evaluateImageQuality } = require('./images');
+  const { consolidateEvaluation } = require('./feedbackConsolidator');
   const {
     composeDeductions, computeMathFinalScore, deductionPoints,
     significantWords, sameConcept,
   } = require('./scoring');
 
   const repeats = Math.max(2, Math.min(5, parseInt(params.repeats, 10) || 3));
+  const useConsolidator = params.consolidate !== false;
   const versionIndex = Number.isFinite(Number(ctx.target?.versionIndex))
     ? Number(ctx.target.versionIndex) : null;
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, versionIndex);
@@ -735,29 +746,54 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
       continue;
     }
 
-    const deductions = composeDeductions({ evalResult });
+    // RAW layer — what the four evaluators said, before any deduping. The
+    // findings measured for stability come from here: the consolidator's
+    // deduped list is a summary, and attributing a flip to a judge needs the
+    // judge's own words.
+    const raw = composeDeductions({ evalResult });
     const findings = [];
     for (const bucket of ['quality', 'semantic', 'compliance']) {
-      for (const d of (deductions[bucket] || [])) {
+      for (const d of (raw[bucket] || [])) {
         findings.push({
           source: bucket, type: d.type || null, severity: d.severity,
           points: deductionPoints(d), description: d.description || '',
         });
       }
     }
-    const pointsBy = (b) => (deductions[b] || []).reduce((s, d) => s + deductionPoints(d), 0);
+    const pointsBy = (b) => (raw[b] || []).reduce((s, d) => s + deductionPoints(d), 0);
+
+    // CONSOLIDATED layer — the production score. Same call the repair round
+    // makes, against the same scene contract.
+    let plan = null;
+    let consolidateError = null;
+    if (useConsolidator) {
+      try {
+        const res = await consolidateEvaluation({
+          evalResult, entityIssues: [],
+          sceneDescription, characters: ctx.characters || [],
+          storyId: ctx.storyId, pageNumber: ctx.pageNumber, round: i,
+        });
+        plan = res.plan || null;
+        if (res.error) consolidateError = res.error;
+      } catch (err) { consolidateError = err.message; }
+    }
+    const scored = plan ? composeDeductions({ evalResult, consolidated: plan.deduped_issues }) : raw;
+
     runs.push({
       run: i, ok: true, elapsedMs,
-      finalScore: computeMathFinalScore(deductions),
+      finalScore: computeMathFinalScore(scored),
+      rawScore: computeMathFinalScore(raw),
+      dedupedCount: plan ? (plan.deduped_issues || []).length : null,
+      ...(consolidateError ? { consolidateError } : {}),
       points: {
         quality: pointsBy('quality'), semantic: pointsBy('semantic'),
         compliance: pointsBy('compliance'),
         total: pointsBy('quality') + pointsBy('semantic') + pointsBy('compliance'),
       },
       counts: {
-        quality: (deductions.quality || []).length,
-        semantic: (deductions.semantic || []).length,
-        compliance: (deductions.compliance || []).length,
+        quality: (raw.quality || []).length,
+        semantic: (raw.semantic || []).length,
+        compliance: (raw.compliance || []).length,
       },
       findings,
       issuesSummary: evalResult.issuesSummary || null,
@@ -836,8 +872,14 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
 
   return {
     storyId: ctx.storyId, pageNumber: ctx.pageNumber,
-    versionIndex, repeats, okRuns: ok.length,
+    versionIndex, repeats, okRuns: ok.length, consolidated: useConsolidator,
+    // The production number …
     scoreSpread: stat(ok.map(r => r.finalScore)),
+    // … and the same runs scored WITHOUT the consolidator. A rawSpread that is
+    // tight while scoreSpread is wide means the evaluators agreed and the
+    // consolidator did not; the reverse means the consolidator is absorbing
+    // evaluator noise.
+    rawSpread: stat(ok.map(r => r.rawScore)),
     countSpread: stat(ok.map(r => r.findings.length)),
     pointSpread: {
       quality: stat(ok.map(r => r.points.quality)),

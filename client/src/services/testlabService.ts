@@ -163,7 +163,9 @@ export interface ExperimentResult {
   // eval_variance: the same image scored N times, nothing else changed.
   repeats?: number;
   okRuns?: number;
+  consolidated?: boolean;
   scoreSpread?: EvalSpread;
+  rawSpread?: EvalSpread;
   countSpread?: EvalSpread;
   pointSpread?: { quality: EvalSpread; semantic: EvalSpread; compliance: EvalSpread };
   attribution?: {

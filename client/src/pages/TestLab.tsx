@@ -2766,6 +2766,11 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                         {result.versionIndex != null && <> · version v{result.versionIndex}</>}
                         {' '}— scores {result.scoreSpread.values.join(' · ')} (mean {result.scoreSpread.mean}, σ {result.scoreSpread.stdev})
                       </div>
+                      {result.rawSpread && (
+                        <div className="text-xs text-gray-600">
+                          <b>Without the consolidator:</b> {result.rawSpread.values.join(' · ')} (range {result.rawSpread.range}) — the gap to the row above is what the consolidator's deduping adds or absorbs
+                        </div>
+                      )}
                       <div className="text-xs text-gray-600">
                         <b>Findings per run:</b> {result.countSpread?.values.join(' · ')} ·{' '}
                         <b>points by judge (range):</b> quality {result.pointSpread?.quality.range} · semantic {result.pointSpread?.semantic.range} · compliance {result.pointSpread?.compliance.range}
