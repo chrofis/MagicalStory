@@ -635,6 +635,21 @@ function SetsTab() {
                 <Button variant="secondary" size="sm" onClick={() => del(s.id)}><Trash2 size={14} /></Button>
               </div>
             </div>
+            {/* Run history — the bridge from a remembered NAME to the images.
+                Without it the only way back to a result is an experiment number
+                nobody retains. */}
+            {!!s.runs?.length && (
+              <div className="mt-1.5 flex items-center gap-2 flex-wrap text-xs">
+                <span className="text-gray-400">runs:</span>
+                {s.runs.map(r => (
+                  <a key={r.id} href={`/admin/test-lab?exp=${r.id}`}
+                    className={`px-2 py-0.5 rounded-full border hover:bg-indigo-50 ${r.status === 'completed' ? 'border-emerald-200 text-emerald-700' : r.status === 'failed' ? 'border-red-200 text-red-600' : 'border-amber-200 text-amber-700'}`}
+                    title={`${r.label || ''} — ${new Date(r.createdAt).toLocaleString('de-CH')}`}>
+                    #{r.id}{r.label && !/^Set: /.test(r.label) ? ` · ${r.label.slice(0, 38)}` : ''}
+                  </a>
+                ))}
+              </div>
+            )}
             {expanded[s.id] && (
               <ul className="mt-2 space-y-1">
                 {expanded[s.id].length === 0 && <li className="text-xs text-gray-400">Empty — pin cases from a {s.stage} result.</li>}

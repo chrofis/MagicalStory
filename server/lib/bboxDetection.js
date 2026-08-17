@@ -1303,6 +1303,91 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
 }
 
 /**
+ * THE CUT-OUTS, AS THEIR OWN IMAGE (owner, 2026-08-17).
+ *
+ * These are the RESULT of the whole detection chain — the thing every downstream
+ * eval, repair and garment fix actually consumes. They existed only as a 260px
+ * strip glued under the annotated page, where each figure is a couple of hundred
+ * pixels tall and a hole in a face is invisible. Sarah's missing forehead on
+ * job_1786829555599_rgzoyoprx p10 was undetectable at that size and obvious at
+ * this one.
+ *
+ * Full height per figure, on the dark ground the masks are judged against, with
+ * the numbers that explain each one: how much survived, how much a nearer figure
+ * took, and from whom.
+ */
+async function createCutoutSheetImage(imageData, bboxDetection) {
+  const masks = bboxDetection?._gdinoMasks;
+  const figs = bboxDetection?.figures || [];
+  if (!Array.isArray(masks) || !masks.some(Boolean)) return null;
+  try {
+    const base64Match = imageData.match(/^data:image\/\w+;base64,(.+)$/);
+    const imageBuffer = Buffer.from(base64Match ? base64Match[1] : imageData, 'base64');
+    const { width, height } = await sharp(imageBuffer).metadata();
+
+    const CELL_H = 760, HEAD_H = 54, GAP = 14, PAD = 10;
+    const tiles = [];
+    for (let i = 0; i < figs.length; i++) {
+      const f = figs[i], maskPng = masks[i];
+      if (!maskPng || !f?.bodyBox) continue;
+      const [ymin, xmin, ymax, xmax] = f.bodyBox;
+      const ex = Math.max(0, Math.round(xmin * width) - PAD);
+      const ey = Math.max(0, Math.round(ymin * height) - PAD);
+      const ew = Math.min(width, Math.round(xmax * width) + PAD) - ex;
+      const eh = Math.min(height, Math.round(ymax * height) + PAD) - ey;
+      if (ew < 4 || eh < 4) continue;
+      // Two pipelines: sharp runs extract before composite whatever the order.
+      const masked = await sharp(imageBuffer).ensureAlpha()
+        .composite([{ input: maskPng, blend: 'dest-in' }]).png().toBuffer();
+      const cut = await sharp(masked).extract({ left: ex, top: ey, width: ew, height: eh })
+        .resize({ height: CELL_H - HEAD_H }).png().toBuffer();
+      const cw = (await sharp(cut).metadata()).width;
+      const took = (f.occludedBy || []).join(', ');
+      tiles.push({
+        png: cut, w: cw,
+        name: f.name || `Figure ${i + 1}`,
+        stat: `${(f.maskPx || 0).toLocaleString()} px${f.pxLostToFront ? ` · −${f.pxLostToFront.toLocaleString()} to ${took || 'a nearer figure'}` : ''}`,
+        clean: !f.pxLostToFront,
+      });
+    }
+    if (!tiles.length) return null;
+
+    // Shrink to fit one row rather than dropping anyone: a missing figure is the
+    // exact thing this view exists to make visible.
+    const sumW = tiles.reduce((s, x) => s + x.w, 0);
+    const MAXW = 3400;
+    const avail = MAXW - GAP * (tiles.length + 1);
+    const scale = Math.min(1, avail / Math.max(1, sumW));
+    if (scale < 1) {
+      for (const x of tiles) {
+        x.png = await sharp(x.png).resize({ height: Math.max(90, Math.round((CELL_H - HEAD_H) * scale)) }).png().toBuffer();
+        x.w = (await sharp(x.png).metadata()).width;
+      }
+    }
+    const rowH = Math.round((CELL_H - HEAD_H) * scale);
+    const W2 = tiles.reduce((s, x) => s + x.w, 0) + GAP * (tiles.length + 1);
+    const H2 = rowH + HEAD_H + GAP;
+    const comps = [];
+    const svg = [`<svg width="${W2}" height="${H2}" xmlns="http://www.w3.org/2000/svg">`];
+    let cursor = GAP;
+    for (const x of tiles) {
+      comps.push({ input: x.png, left: cursor, top: GAP });
+      svg.push(`<text x="${cursor + 2}" y="${GAP + rowH + 22}" font-family="Arial" font-size="19" font-weight="bold" fill="#ffffff">${escapeXml(x.name)}</text>`);
+      svg.push(`<text x="${cursor + 2}" y="${GAP + rowH + 42}" font-family="Arial" font-size="14" fill="${x.clean ? '#79dfa4' : '#e8c46a'}">${escapeXml(x.stat)}</text>`);
+      cursor += x.w + GAP;
+    }
+    svg.push('</svg>');
+    const out = await sharp({ create: { width: W2, height: H2, channels: 3, background: { r: 26, g: 28, b: 32 } } })
+      .composite([...comps, { input: Buffer.from(svg.join('')), top: 0, left: 0 }])
+      .jpeg({ quality: 88 }).toBuffer();
+    return 'data:image/jpeg;base64,' + out.toString('base64');
+  } catch (e) {
+    log.warn(`📦 [CUTOUT-SHEET] failed: ${e.message}`);
+    return null;
+  }
+}
+
+/**
  * WHAT WAS SENT TO SAM, one cell per call (owner, 2026-08-16).
  *
  * The Lab could show SAM's OUTPUT — the cut-out strip — but never its INPUT, so
@@ -1972,6 +2057,7 @@ module.exports = {
   buildExpectedCharactersForBbox,
   createBboxOverlayImage,
   createSamInputOverlayImage,
+  createCutoutSheetImage,
   escapeXml,
   enrichWithBoundingBoxes,
   FIGURE_COLORS,

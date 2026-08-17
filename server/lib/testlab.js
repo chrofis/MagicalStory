@@ -822,7 +822,7 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
   // entry, not reconstructed by hand when something looks off.
   const steps = [];
   try {
-    const { createBboxOverlayImage, createSamInputOverlayImage } = require('./images');
+    const { createBboxOverlayImage, createSamInputOverlayImage, createCutoutSheetImage } = require('./images');
     const overlay = await createBboxOverlayImage(imageData, result);
     if (overlay) {
       const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, overlay, experimentId);
@@ -839,6 +839,14 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
     if (som?.image) {
       const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, som.image, experimentId);
       steps.push({ label: 'SENT FOR IDENTITY — badged scene (SoM)', imageType: 'tl_step', versionIndex: v });
+    }
+    // THE RESULT, first in the list and full size. Everything downstream —
+    // eval, repair, garment fix — consumes these cut-outs, so they are not a
+    // footnote under the annotated page.
+    const sheet = await createCutoutSheetImage(imageData, result);
+    if (sheet) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, sheet, experimentId);
+      steps.unshift({ label: 'CUT-OUTS — the result: what every eval and repair downstream actually sees', imageType: 'tl_step', versionIndex: v });
     }
     const samIn = await createSamInputOverlayImage(imageData, result);
     if (samIn) {

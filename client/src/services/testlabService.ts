@@ -594,6 +594,9 @@ export interface TestLabSet {
   createdBy: string | null;
   createdAt: string;
   memberCount: number;
+  // Recent runs of THIS set. The set is what anyone remembers three months on
+  // ("the hard-to-segment cases"); an experiment number is not.
+  runs?: { id: number; label: string | null; status: string; createdAt: string }[];
 }
 
 export interface TestLabSetMember {

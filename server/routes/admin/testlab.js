@@ -338,7 +338,21 @@ router.get('/sets', async (req, res) => {
        FROM testlab_sets s LEFT JOIN testlab_set_members m ON m.set_id = s.id
        GROUP BY s.id ORDER BY s.created_at DESC`
     );
-    res.json({ sets: rows.map(r => ({ id: r.id, name: r.name, stage: r.stage, createdBy: r.created_by, createdAt: r.created_at, memberCount: r.member_count })) });
+    // Each set's recent runs travel with it. The set is the thing anyone
+    // remembers ("the hard-to-segment cases"); an experiment number is not.
+    const runs = await dbQuery(
+      `SELECT id, set_id, label, status, created_at
+       FROM (SELECT id, set_id, label, status, created_at,
+                    ROW_NUMBER() OVER (PARTITION BY set_id ORDER BY created_at DESC) AS rn
+             FROM testlab_experiments WHERE set_id IS NOT NULL) x
+       WHERE rn <= 8`
+    );
+    const bySet = new Map();
+    for (const r of runs) {
+      if (!bySet.has(r.set_id)) bySet.set(r.set_id, []);
+      bySet.get(r.set_id).push({ id: r.id, label: r.label, status: r.status, createdAt: r.created_at });
+    }
+    res.json({ sets: rows.map(r => ({ id: r.id, name: r.name, stage: r.stage, createdBy: r.created_by, createdAt: r.created_at, memberCount: r.member_count, runs: bySet.get(r.id) || [] })) });
   } catch (err) { res.status(500).json({ error: 'Failed to list sets', details: err.message }); }
 });
 
@@ -424,10 +438,10 @@ router.post('/sets/:id/run', async (req, res) => {
     const targets = members.map(m => ({ ...(m.target || {}), _params: { ...setParams, ...(m.params || {}), ...override } }));
     experimentRunning = true;
     const rows = await dbQuery(
-      `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by)
-       VALUES ($1, $2, $3, $4, 'running', $5, $6) RETURNING id`,
+      `INSERT INTO testlab_experiments (stage, label, prompt_override, params, status, targets, created_by, set_id)
+       VALUES ($1, $2, $3, $4, 'running', $5, $6, $7) RETURNING id`,
       [stage, req.body?.label || `Set: ${name} (${members.length})`, promptOverride,
-       JSON.stringify({ autoEval: true }), JSON.stringify(targets), req.user.username || String(req.user.id)]
+       JSON.stringify({ autoEval: true }), JSON.stringify(targets), req.user.username || String(req.user.id), setId]
     );
     const experimentId = rows[0].id;
     executeExperiment(experimentId, stage, targets, { promptOverride, params: { autoEval: true } });
