@@ -390,8 +390,8 @@
 </tr>
 <tr>
   <td>Grok generate (text-to-image)</td>
-  <td>Honours the <code>aspect_ratio</code> param.</td>
-  <td><code>generateWithGrok</code> passes it through directly.</td>
+  <td>Honours the <code>aspect_ratio</code> param. The accepted enum is wider than people assume — <code>1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3, <strong>2:1, 1:2, 19.5:9, 9:19.5, 20:9, 9:20</strong>, auto</code> (<a href="https://docs.x.ai/developers/model-capabilities/images/generation">docs.x.ai</a>; 2:1 and 20:9 verified against our key 2026-08-17). Anything outside the enum is a hard <code>422</code>, so probe-by-rejection tells you nothing about what exists — read the enum.</td>
+  <td><code>generateWithGrok</code> passes it through directly. The ultra-wide presets matter for the painted title plate: a title strip padded to 16:9 leaves white slack the model recomposes into, 20:9 does not.</td>
 </tr>
 <tr>
   <td>Gemini imagen</td>
