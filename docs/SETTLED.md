@@ -36,13 +36,8 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
 
 ## Pipeline & models
 
-- **The 2026-05 scene composite is DEAD** (hardcoded kill-switch in server.js). Don't propose re-enabling THAT path without fixing style-drift, label leakage, aspect coercion AND an end-to-end gate.
-  **Not a reversal:** a rebuilt page composite went live 2026-08-15 on the
-  `needsScaleRepair` trigger only, replacing scale repair there. It is a
-  different entry point (`storyJobPipeline` → `generateSceneComposite`), the
-  kill-switch it never used is untouched, and it carries its own aborts —
-  a non-figure box or a depth spread under 2× keeps the original render.
-  Owner-directed, evidence in decisions.md 2026-08-15 (Lab 695–727).
+- **The 2026-05 scene composite is DEAD** (hardcoded kill-switch in server.js). Don't propose re-enabling THAT path — route-level composite for every page — without fixing style-drift, label leakage, aspect coercion AND an end-to-end gate.
+- **The page composite IS enabled — for foreground+background scenes only** (owner, 2026-08-15). Grok gets depth wrong on those pages, and a scale-repair pass normally does not fix it: measured, scale repair fired on 42 pages in 30 days and left no artefact on any of them. The composite still has known issues — chiefly that the blend can relocate a character when the interaction text implies a different pose (Lab 727) — **but it is better than scale repair, which is the bar it has to clear.** Different entry point from the killed one (`storyJobPipeline` → `generateSceneComposite`, on the `needsScaleRepair` trigger); the kill-switch is untouched; two aborts keep the original render when detection or depth look wrong. Don't propose going back to scale repair without new evidence. Full rationale + Lab 653–727: decisions.md 2026-08-15.
 - **FLUX Dev/Schnell: rejected for page images.**
 - **Avatar passes 1 AND 2 default to Grok.** Gemini refuses realistic adult faces; the 2026-07-19 "Gemini stylises better" verdict was reversed 2026-08-06.
 - **The unified writer call is NOT overloaded** — measured; don't split it without new measurements.

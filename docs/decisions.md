@@ -683,9 +683,17 @@ avatar cut-outs pasted at measured heights, and one blend. A throw anywhere in
 it leaves `genResult` untouched and the page ships as rendered. Scale repair
 remains reachable manually (the repair endpoint, the Lab's `scale_repair`
 stage) but is dead on the automatic path.
-**Rationale:** Three Grok calls (~$0.06) against one, for a pass that produces
-depth where the old one produced none. Keeping the trigger means the change is
-a swap of implementation, not a widening of scope.
+**Rationale (owner, in his words):** on a scene with a foreground AND a
+background character, Grok gets the depth wrong, and a scale-repair pass
+normally does not fix it. The composite path still has issues — chiefly that
+the blend can relocate a character when the interaction text implies a
+different pose (Lab 727) — **but it is better than scale repair, and that is
+the bar it has to clear.** It is not being held to "flawless"; it is being held
+to "beats a pass that measurably did nothing on 42 pages in 30 days".
+
+Three Grok calls (~$0.06) against one. Keeping the trigger unchanged means this
+is a swap of implementation, not a widening of scope: it fires on the same
+pages scale repair fired on, and nowhere else.
 **Touched:**
 - `storyJobPipeline.js` (~3895 — trigger unchanged, body swapped)
 - `server/lib/sceneComposite.js`
