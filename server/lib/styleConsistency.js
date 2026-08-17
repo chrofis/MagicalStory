@@ -163,9 +163,22 @@ async function checkStoryStyleConsistency(storyData, opts = {}) {
   // Prompt: cluster by style, return strict JSON.
   // pageNumber values: -1 front cover, -2 initial page, -3 back cover,
   // 1+ for pages. The model returns the same numbers so we can act on them.
-  const prompt = `You are a visual-style auditor for a children's storybook.
+  // PER-CELL VERDICT, CODE-SIDE AGGREGATION (2026-08-17). "Judge each page
+  // independently" was already in this prompt and the model still answered for
+  // the whole grid at once — one batch declared "every character across all
+  // pages is rendered photographically" while a plainly painted page sat in
+  // that same grid, inflating the outlier list and charging real page scores
+  // for it. A free-form outlier list lets the model summarise; an entry PER
+  // CODE does not. The codes in this batch are injected below, the model must
+  // return exactly those, and dominantCluster/outliers are derived here from
+  // its per-cell answers instead of from its own aggregation.
+  const buildPrompt = (batch) => {
+    const codes = batch.map(c => c.page);
+    return `You are a visual-style auditor for a children's storybook.
 
 The image is a grid of pages from one storybook. Each cell has a small RED code in its top-left corner identifying it: -1 = front cover, -2 = initial page, -3 = back cover, and the page number (1, 2, 3, …) for every other page. Return these exact code numbers.
+
+This grid contains exactly ${batch.length} cell(s), with these codes: ${codes.join(', ')}.
 ${requestedStyle ? `
 The book was commissioned in this art style:
 """
@@ -173,7 +186,7 @@ ${requestedStyle}
 """
 ` : ''}
 
-Judge EACH page INDEPENDENTLY against the COMMISSIONED art style above. Do NOT cluster the pages or compare them to each other — a majority rendered in the wrong style is still wrong, so "consistent with the other pages" is NOT the test. The test is: is THIS page rendered in the commissioned MEDIUM?
+Judge EACH cell INDEPENDENTLY against the COMMISSIONED art style above, looking only at that cell's own pixels. Do NOT cluster the cells or compare them to each other — a majority rendered in the wrong style is still wrong, so "consistent with the other pages" is NOT the test. The test is: is THIS cell rendered in the commissioned MEDIUM? Never carry a verdict from one cell to another, and never write a statement about "all pages" or "every character" — each cell gets its own answer, and cells in one grid regularly differ.
 
 Be TOLERANT. Flag a page ONLY when it is CLEARLY and unmistakably in the WRONG art medium — it looks like a real photograph (or a photo with a light filter over it): camera-real skin with visible pores, real fabric and lighting, photographic eyes — when a painted or illustrated style was commissioned. The mismatch must be obvious at a glance.
 
@@ -184,31 +197,24 @@ For each flagged page, name 2-4 SPECIFIC differences. Severity:
 - "moderate" — the commissioned medium, but a defining property named in the style is clearly absent
 - "minor"    — subtle inconsistency (slight colour cast, small edge-style variation)
 
-${requestedStyle ? `Separately from the clustering, classify the dominant cluster's RENDERING MEDIUM against the commissioned art style above:
+${requestedStyle ? `Separately from the per-cell verdicts, classify this grid's RENDERING MEDIUM against the commissioned art style above. Base it on the cells you judged as departing: only call it wrong for the whole grid when MOST cells departed.
 - "matches" — the same medium as commissioned. Use this even when the execution is imperfect: weaker brushwork, smoother shading, less texture, a missing named-artist mannerism, or any other fidelity shortfall is still "matches".
 - "drifted" — recognisably the commissioned medium, but a defining property named in the style is largely absent.
 - "wrong_medium" — a different medium altogether. The clearest case: photographic rendering (camera-real skin, fabric and light) when the commissioned style is an illustration style or says it is not photorealistic.
 Judge only how it is DRAWN, never whether a scene suits its subject. A majority is not evidence of correctness.
 
-` : ''}Return ONLY this JSON, no prose:
+` : ''}Return ONLY this JSON, no prose. \`cells\` carries ONE entry per code listed above, in that order — never fewer, never merged, never a shared verdict:
 {
-  "verdict": "consistent" | "mixed" | "fragmented",
-  "dominantCluster": [<page numbers that MATCH the commissioned style>],
-  "anchorPage": <a page number that matches the commissioned style>,
-  "outliers": [
-    { "page": <number>, "severity": "major"|"moderate"|"minor", "differences": ["...", "..."] }
+  "cells": [
+    { "page": <code>, "matchesStyle": true|false, "severity": "major"|"moderate"|"minor", "differences": ["<2-4 specifics; omit when matchesStyle is true>"] }
   ],${requestedStyle ? `
   "dominantStyleVerdict": "matches" | "drifted" | "wrong_medium",
-  "requestedStyleDifferences": ["<how the majority of the pages depart from the commissioned medium; empty when they match>"],` : ''}
-  "reasoning": "<2-3 sentences: is the book in the commissioned style, and which pages depart>"
+  "requestedStyleDifferences": ["<how the departing cells depart; empty when they match>"],` : ''}
+  "reasoning": "<2-3 sentences naming which of THESE cells depart and how; never a claim about pages you cannot see in this grid>"
 }
 
-Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3 back cover, the page number otherwise.
-
-Verdict rule (against the COMMISSIONED style, not the majority):
-- "consistent" if ≥90% of pages match the commissioned style and outliers are all "minor"
-- "mixed" if 60-90% match, or any "moderate"+ outliers
-- "fragmented" if <60% match the commissioned style`;
+Use the red corner code as the "page" value: -1 front cover, -2 initial page, -3 back cover, the page number otherwise.`;
+  };
 
   const evalTemperature = process.env.EVAL_TEMPERATURE != null ? Number(process.env.EVAL_TEMPERATURE) : 0;
   const model = genAI.getGenerativeModel({ model: modelId, generationConfig: { temperature: evalTemperature } });
@@ -217,7 +223,7 @@ Verdict rule (against the COMMISSIONED style, not the majority):
     const gridBuffer = await buildStyleGrid(batch);
     const result = await model.generateContent([
       { inlineData: { mimeType: 'image/jpeg', data: gridBuffer.toString('base64') } },
-      prompt,
+      buildPrompt(batch),
     ]);
     const usage = result.response.usageMetadata || {};
     if (usageTracker && (usage.promptTokenCount || usage.candidatesTokenCount)) {
@@ -237,8 +243,34 @@ Verdict rule (against the COMMISSIONED style, not the majority):
     } catch (err) {
       throw new Error(`style-check JSON parse failed: ${err.message}. Raw: ${raw.slice(s, s + 300)}`);
     }
+    // Outliers are DERIVED from the per-cell verdicts — the model states a
+    // verdict per code, the aggregation happens here. A cell it forgot to
+    // answer counts as matching (never invent an outlier), and a code it
+    // invented is dropped (it can only judge what is in this grid).
+    const inBatch = new Set(batch.map(c => c.page));
+    // Fail-safe: a model that answers in the OLD shape (a bare `outliers` list)
+    // must not read as "every cell matched" — map it onto the per-cell shape.
+    const cellVerdicts = Array.isArray(parsed.cells) && parsed.cells.length > 0
+      ? parsed.cells
+      : (Array.isArray(parsed.outliers) ? parsed.outliers.map(o => ({ ...o, matchesStyle: false })) : []);
+    const answered = new Set();
+    const outliers = [];
+    for (const c of cellVerdicts) {
+      if (typeof c?.page !== 'number' || !inBatch.has(c.page) || answered.has(c.page)) continue;
+      answered.add(c.page);
+      if (c.matchesStyle === false) {
+        outliers.push({
+          page: c.page,
+          severity: ['major', 'moderate', 'minor'].includes(c.severity) ? c.severity : 'moderate',
+          differences: Array.isArray(c.differences) ? c.differences : [],
+        });
+      }
+    }
+    if (answered.size !== batch.length) {
+      log.warn(`🎨 [STYLE-CHECK] batch answered ${answered.size}/${batch.length} cells — unanswered cells counted as on-style`);
+    }
     return {
-      outliers: Array.isArray(parsed.outliers) ? parsed.outliers : [],
+      outliers,
       dominantStyleVerdict: ['matches', 'drifted', 'wrong_medium'].includes(parsed.dominantStyleVerdict) ? parsed.dominantStyleVerdict : 'matches',
       requestedStyleDifferences: Array.isArray(parsed.requestedStyleDifferences) ? parsed.requestedStyleDifferences : [],
       reasoning: parsed.reasoning || '',
@@ -281,6 +313,16 @@ Verdict rule (against the COMMISSIONED style, not the majority):
   let mediumDiffs = [];
   for (const r of results) {
     if ((RANK[r.dominantStyleVerdict] || 0) > (RANK[medium] || 0)) { medium = r.dominantStyleVerdict; mediumDiffs = r.requestedStyleDifferences; }
+  }
+  // A batch's wholesale verdict only condemns the BOOK when the book's own
+  // per-cell verdicts agree. `wrong_medium` makes the repair pipeline skip
+  // per-page repair (a whole-book miss is a generation problem), so a single
+  // sweeping batch must not trigger that while most pages are on-style —
+  // exactly what happened when one grid declared "every character across all
+  // pages is photographic" with painted pages sitting in it.
+  if (medium === 'wrong_medium' && ratio < 0.5) {
+    log.info(`🎨 [STYLE-CHECK] a batch called the medium wrong, but only ${outliers.length}/${cells.length} cells departed — recording 'drifted' and keeping per-page repair enabled`);
+    medium = 'drifted';
   }
 
   const out = {

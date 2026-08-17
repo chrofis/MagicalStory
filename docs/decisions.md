@@ -12657,3 +12657,32 @@ which is precisely what happened here, within hours.
 
 **Touched:** `server/lib/analyzerClient.js`, `photo_analyzer.py`
 **Status:** ✅ active
+
+## 2026-08-17 — Style check: one verdict PER CELL, aggregation in code
+
+**Context:** The style judge answered for a whole grid at once — one batch
+declared "every character across all pages is rendered photographically" for
+nine cells — so a single sweeping sentence set the outlier list and the book's
+medium verdict. "Judge each page independently" was already in the prompt and
+did not hold: nothing in the OUTPUT forced a per-cell answer, and a free-form
+`outliers` list lets the model summarise.
+
+**Decision:** the prompt injects the codes present in THIS batch and requires a
+`cells[]` entry per code (matchesStyle + severity + differences); the model no
+longer returns `outliers`/`dominantCluster`/`verdict` at all — those are derived
+in code from the per-cell answers. Unanswered cells count as on-style (never
+invent an outlier), invented codes are dropped, and an old-shape response is
+mapped onto the new one so it cannot fail open. A batch's `wrong_medium` is
+downgraded to `drifted` unless ≥50% of the book's cells actually departed —
+that verdict makes the repair pipeline skip per-page repair, and one sweeping
+batch must not disable repair for a mostly-on-style book.
+
+**Evidence:** replayed on the story that produced the sweeping verdict: batch 2
+now differentiates correctly (cells 7-9 on-style, cell 10 photographic) and the
+aggregate is built from per-cell answers. Batch 1 still flags all nine of its
+cells — on inspection that is defensible and precise: those pages have painted
+ENVIRONMENTS with near-photographic FACES, which the new descriptor's "visible
+brushwork, faces included" forbids. Face-level drift is now the open item, not
+judge over-generalisation.
+
+**Touched:** `server/lib/styleConsistency.js`.
