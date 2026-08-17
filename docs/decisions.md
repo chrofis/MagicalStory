@@ -12560,3 +12560,29 @@ into the file would silently flip whatever production actually sets. Read
 `server/lib/beatsPipeline.js`, `server/lib/testlab.js`,
 `server/routes/health.js`, `CLAUDE.md`, `docs/SETTLED.md`
 **Status:** ✅ active
+
+## 2026-08-17 — Art-style descriptors compressed and evened out
+
+**Context:** The 14 ART_STYLES strings had drifted to 429-1249 chars (mean 723,
+10.1k total) as fixes were appended over months. They ride in EVERY page prompt,
+so the longest ones were pushing pages through the prompt-shrink pipeline for
+no benefit, and the spread meant some styles were argued three times as hard as
+others.
+
+**Decision:** two shared constants — AGE_LINE (the age-preservation sentence,
+previously duplicated verbatim in 13 of 14) and NOT_A_PHOTOGRAPH (the camera-
+fingerprint denial, used by watercolor/oil/concept) — plus one terse rewrite per
+style in a fixed shape: medium first, then the faces rule, then the shared
+lines. Every embedded rule was preserved verbatim in meaning (asserted by a
+per-style regex check: pixar no-pores, cartoon never-3D, anime 30-40% eyes,
+chibi blush-marks, steampunk mechanisms-never-on-people, comic no-halftone,
+manga screentones, watercolor fully-opaque, oil alla prima, lowpoly isometric,
+concept STAGED light, pixel no-anti-aliasing, cyber never-add-rain, realistic
+subsurface).
+
+**Evidence:** 386-755 chars, mean 559, total 7.8k — 2.3k saved across the set,
+~160 fewer chars in every page prompt. Re-validated after compression on the
+same worst-case pages: oil still renders as an unmistakable impasto painting,
+concept 2/2 painted on the page that had shipped as a photograph.
+
+**Touched:** `server/lib/promptBuilders.js` (AGE_LINE, NOT_A_PHOTOGRAPH, ART_STYLES).
