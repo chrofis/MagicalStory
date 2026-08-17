@@ -220,6 +220,15 @@ const MODEL_DEFAULTS = {
   // Wardrobe review: never measured. Pinned to the pre-2026-08-15 model so it
   // does not inherit a reviewer chosen on beats evidence.
   clothingReviewModel: process.env.CLOTHING_REVIEW_MODEL || 'deepseek-v4-pro',
+  // Text refinement: its own key for the same reason as the two above, plus a
+  // hard operational constraint. The refiner runs in PARALLEL with images and is
+  // joined with a 90s cap (storyJobPipeline JOIN_TIMEOUT_MS); a slow model does
+  // not merely score worse, its output is DISCARDED and the tokens are wasted.
+  // Measured on staging job_1786998860057_o6deqtv5s: with grok inherited from
+  // outlineReviewModel the two rounds ran >12 min against an 11-min image phase
+  // and were thrown away after charging $0.16. deepseek is the pre-switch model
+  // and the fastest of the arms that measured best on text.
+  textRefineModel: process.env.TEXT_REFINE_MODEL || 'deepseek-v4-pro',
   // Judge for the model-comparison scorecard. At-least-Sonnet-level on purpose —
   // a cheap judge (Luna, flash) scores too loosely to compare generators fairly.
   scorecardJudge: process.env.SCORECARD_JUDGE || 'claude-sonnet',

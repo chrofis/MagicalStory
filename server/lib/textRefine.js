@@ -44,7 +44,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
 
   const roundCount = Math.max(1, Math.min(8, parseInt(opts.rounds, 10) || 4));
   const perRound = Array.isArray(opts.roundModels) ? opts.roundModels : [];
-  const defaultModel = opts.model || MODEL_DEFAULTS.outlineReviewModel;
+  // opts.model still wins (Lab A/B). Default is the dedicated text key — NOT the
+  // beats reviewer: this stage is time-boxed against the image phase.
+  const defaultModel = opts.model || MODEL_DEFAULTS.textRefineModel || MODEL_DEFAULTS.outlineReviewModel;
   const usageLabel = opts.usageLabel || 'text_refine';
 
   const original = pages.map(p => ({ ...p }));

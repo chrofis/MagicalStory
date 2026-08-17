@@ -12858,3 +12858,33 @@ fingerprint.
 `server/lib/faceRepair.js`, `server/routes/regeneration.js`,
 `server/lib/entityConsistency.js`, `server/routes/admin.js`
 **Status:** ✅ active
+
+## 2026-08-17 — Text refinement gets its own model key (regression fix)
+
+**Context:** `textRefine.js` defaulted to `MODEL_DEFAULTS.outlineReviewModel`, the FOURTH
+consumer of that one key (beats review, scene review, wardrobe review, text refine). Switching
+the beats reviewer to grok-4.6 therefore also made grok the text refiner. Measured on staging
+`job_1786998860057_o6deqtv5s`: `text_refine_start` 20:48:54 → `text_refine_join_timeout`
+21:00:05, *"did not finish within 90s of images completing — original text kept"*, after one
+call charging **$0.1634** (12,009 in / 23,268 out). `textRefineReport` = null: the refine ran,
+was paid for, and was DISCARDED.
+
+**Why it timed out:** two compounding factors. grok needs ~250s+ per round and emitted 23k
+output tokens for 2 rounds; and the image phase finished in ~11 min instead of the ~25 min the
+"costs no wall-clock" design assumes (the demo account's avatars were pre-built, so the long
+pole was gone). The refiner is time-boxed against images (`JOIN_TIMEOUT_MS`, 90s), so a slow
+model does not merely score worse — its work is thrown away and the tokens are wasted. The code
+already documented this exact failure for trials (owner 2026-08-15); the model switch
+reproduced it on full stories.
+
+**Decision:** `MODEL_DEFAULTS.textRefineModel` (env `TEXT_REFINE_MODEL`), default
+**deepseek-v4-pro** — the pre-switch model, and the arm that measured best on story text in the
+2026-08-15 bake-off (neutral judge 8.8 vs an unrefined baseline of 6.6). `opts.model` still
+wins so Lab A/B is unaffected. This completes the split: beats → grok, scene → deepseek,
+wardrobe → deepseek, text refine → deepseek.
+
+**Lesson recorded:** one shared model key had four consumers with different constraints; a
+change justified by evidence from ONE of them silently reconfigured the other three, and the
+fourth failure mode was operational (timeout + wasted spend), not qualitative.
+
+**Touched:** server/config/models.js, server/lib/textRefine.js.
