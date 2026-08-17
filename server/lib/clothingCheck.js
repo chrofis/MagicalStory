@@ -53,12 +53,58 @@ const GARMENT_NOUNS = new Set([
   'loafers', 'plimsolls', 'slippers', 'hat', 'cap', 'tricorn', 'bandana', 'headscarf',
   'scarf', 'gloves', 'mittens', 'belt', 'sash', 'apron', 'cloak', 'cape', 'parka', 'blazer',
   'shirts', 'boots', 'socks', 'tights', 'glasses', 'earrings', 'buckle', 'lapels', 'cuffs',
+  // Added 2026-08-17: a wizard's robe was invisible to every rule in this file
+  // because the list never had the word (job_1786484554633 shipped five
+  // identical purple robes past all three checks). Costume staples + the
+  // leg-replacing forms.
+  'robe', 'robes', 'gown', 'poncho', 'kilt', 'sari', 'kimono', 'pinafore', 'romper', 'jumpsuit',
+  'swimsuit', 'trunks', 'shawl', 'headband', 'tiara', 'crown', 'helmet', 'tail', 'fin', 'fins',
 ]);
+
+// The wardrobe writer is restricted to these colour words (story-bible rule),
+// so the contract side of a comparison is always one of them. A shade is not a
+// mismatch: "deep purple" and "purple" both resolve to purple.
+const COLOUR_WORDS = new Set([
+  'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'brown', 'black', 'white', 'grey', 'gray',
+]);
+
+/**
+ * The colour that belongs to the garment at index i. Materials, cuts and
+ * shades sit between them ("blue short-sleeved linen robe", "deep purple
+ * robe"), so scan back a few words rather than requiring adjacency — but stop
+ * at another garment noun, whose colour is its own ("blue robe over white
+ * collared shirt": the shirt is white, not blue).
+ */
+function colourBefore(words, i) {
+  for (let k = i - 1; k >= 0 && k >= i - 4; k--) {
+    const w = words[k];
+    if (COLOUR_WORDS.has(w)) return w === 'gray' ? 'grey' : w;
+    if (GARMENT_NOUNS.has(w)) return null;
+  }
+  return null;
+}
+
+/** Every (garment, colour) pair a contract slot states. */
+function contractPairs(parts) {
+  const pairs = new Map();   // garment -> Set(colours)
+  for (const part of parts) {
+    const words = String(part.text || '').toLowerCase().split(/[^a-z-]+/).filter(Boolean);
+    for (let i = 0; i < words.length; i++) {
+      const g = words[i];
+      if (!GARMENT_NOUNS.has(g)) continue;
+      const c = colourBefore(words, i);
+      if (!c) continue;
+      if (!pairs.has(g)) pairs.set(g, new Set());
+      pairs.get(g).add(c);
+    }
+  }
+  return pairs;
+}
 
 // The sentence must ATTACH the clothing to the character, not merely mention
 // their name. "To Hans's right sits Noah — in his white linen shirt" describes
 // Noah; Hans is only a landmark.
-const ATTACHES = /(wearing|wears|dressed in|clad in|in (?:his|her|their|a|an|the))/i;
+const ATTACHES = /\b(wearing|wears|dressed in|clad in|in (?:his|her|their|a|an|the))/i;
 
 /** Significant lowercase tokens (≥4 chars, not stopwords). */
 function tokens(text) {
@@ -214,6 +260,41 @@ function checkPage(page, clothingRequirements, opts = {}) {
     }
   }
 
+  // 3. garment_colour_wrong — the prose gives a character's garment a colour
+  // their contract gives the SAME garment differently. The five-identical-robes
+  // failure (job_1786484554633) passed every check above: the prose was verbose
+  // (so nothing was "missing") and every character shared "robe"/"hat"/"shoes"
+  // (so no token was distinctive enough to misattribute). Colour was the only
+  // signal, and nothing read it. Compared PER GARMENT, never per character: a
+  // colour the contract never attaches to that garment — a prop, a wall, a
+  // slot the contract leaves colourless — is not a finding.
+  for (const [name, { parts }] of outfits) {
+    const pairs = contractPairs(parts);
+    if (pairs.size === 0) continue;
+    // Window = from this character's name to the next cast member's name (or
+    // 400 chars), across sentence boundaries: the clothing usually sits AFTER
+    // the em-dash physical block, which is why characterProse() is wrong here.
+    const own = characterWindow(prose, name, cast);
+    if (!own || !ATTACHES.test(own)) continue;
+    const words = own.toLowerCase().split(/[^a-z-]+/).filter(Boolean);
+    const seen = new Set();
+    for (let i = 0; i < words.length; i++) {
+      const g = words[i];
+      const expected = pairs.get(g);
+      if (!expected) continue;                 // garment the contract never colours
+      const c = colourBefore(words, i);
+      if (!c || expected.has(c)) continue;     // no colour stated, or it matches
+      const key = `${g}/${c}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      findings.push({
+        pageNumber: page.pageNumber, type: 'garment_colour_wrong', character: name, slot: g,
+        detail: `${name}'s ${g} is described as ${c}; their outfit gives it ${[...expected].join(' / ')}. `
+          + `Rewrite the ${g} in ${name}'s own colour — never move another character's colour onto them.`,
+      });
+    }
+  }
+
   // 3. removal_unstated — a prop that is also a costume slot (`wornAs`) is
   // named in the prose while the wearer is still described wearing it, with no
   // statement that they are WITHOUT it. story-unified.txt requires that
@@ -320,6 +401,27 @@ function characterProse(prose, characterName) {
 }
 
 /**
+ * The stretch of prose that describes ONE character: from their name up to the
+ * next cast member's name. Unlike characterProse() this deliberately spans the
+ * em-dash block AND the clothing clause that follows it, because a brief reads
+ * "Name — age, hair, eyes — in his blue robe and green sash": the colours live
+ * outside the dashes.
+ */
+function characterWindow(prose, name, cast = []) {
+  const text = String(prose || '');
+  const esc = (n) => String(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const start = text.search(new RegExp(`\\b${esc(name)}\\b`, 'i'));
+  if (start < 0) return '';
+  let end = Math.min(text.length, start + 400);
+  for (const other of cast) {
+    if (!other || other.toLowerCase() === String(name).toLowerCase()) continue;
+    const i = text.slice(start + name.length).search(new RegExp(`\\b${esc(other)}\\b`, 'i'));
+    if (i >= 0) end = Math.min(end, start + name.length + i);
+  }
+  return text.slice(start, end);
+}
+
+/**
  * Which garments of an outfit the prose fails to state.
  *
  * Outfit descriptions arrive in two shapes and BOTH must be handled here, in
@@ -368,4 +470,4 @@ function missingGarments(clothingDescription, prose, requiredSlots = ['top', 'bo
 // slotStated + missingGarments are exported so the image-prompt clothing check
 // (storyHelpers buildImagePrompt) uses THIS definition of "is this garment in
 // the prose" rather than growing a second one.
-module.exports = { checkPage, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, tokens };
+module.exports = { checkPage, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };
