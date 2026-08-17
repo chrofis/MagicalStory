@@ -325,8 +325,22 @@ const MODEL_DEFAULTS = {
   // 5-figure page incl. an occluded figure (docs/research-log.html). Free/local
   // but ~15s/figure CPU + ~1.9GB RAM. Fully local — on a collision it retries
   // in DINO, else falls back to today's Gemini 2-pass bbox (no external API).
-  // Env override for staged rollout; prod stays 'gemini'.
-  figureDetectionBackend: process.env.FIGURE_DETECTION_BACKEND || 'gemini',
+  //
+  // DEFAULT EVERYWHERE, INCLUDING PRODUCTION (owner, 2026-08-17). The staged
+  // rollout is over: Test Lab set #12 ("Hard to segment", 6 pages / 27 figures)
+  // comes back clean on 5 of 6 pages, and the sixth is a man ~80% hidden behind
+  // two children — what is occluded cannot be extracted, and the owner has
+  // accepted that as the ceiling. Verified at exp #739; the set's run history is
+  // linked from the Sets tab, so this is re-checkable without an experiment id.
+  //
+  // Two operational facts that come with the flip, neither a defect:
+  //   - The analyzer loads GroundingDINO lazily (~90s) and unloads it when idle,
+  //     so the first pages after a deploy fall back to the Gemini bbox. That
+  //     fallback is deliberate resilience in production and stays silent.
+  //   - Cost is CPU and RAM on the analyzer (~15s/figure, ~1.9GB), not an API
+  //     bill. Detection itself becomes free.
+  // Set FIGURE_DETECTION_BACKEND=gemini to revert an environment.
+  figureDetectionBackend: process.env.FIGURE_DETECTION_BACKEND || 'grounding-dino',
 
   // Art styles GroundingDINO detection is allowed on. GDINO grounds on the
   // clothed-figure shape + clothing colour (via the concise buildGroundingPrompt),

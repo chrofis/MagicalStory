@@ -12436,3 +12436,39 @@ four artifacts only), which is what produced the two false premise findings. Fix
 changes what judges see, so it needs a new evaluator generation (3.x) — not done here.
 
 **Touched:** server/lib/promptBuilders.js, prompts/story-beats-review.txt.
+
+## 2026-08-17 — GroundingDINO + MobileSAM becomes the DEFAULT figure detection, in production too
+
+**Context:** `figureDetectionBackend` shipped as `'gemini'` with the comment
+"env override for staged rollout; prod stays 'gemini'". The rollout has been on
+staging since 2026-08-09 and the remaining defects were closed this week:
+face→figure solved once and globally, the identity call unblocked (it was being
+refused outright by Gemini's minor-safety filter), the head exempted from the
+occlusion pass at its padded size, and three positive points on the head instead
+of one.
+
+**Decision:** Default is `'grounding-dino'` everywhere, production included.
+`FIGURE_DETECTION_BACKEND=gemini` reverts a single environment.
+
+**Rationale:** Test Lab set #12 ("Hard to segment" — 6 pages, 27 figures) comes
+back clean on 5 of 6 pages at exp #739. The sixth is a man roughly 80% hidden
+behind two children; what is occluded cannot be extracted, and the owner has
+accepted that as the ceiling rather than a defect. Detection also stops being an
+API call: cost moves to analyzer CPU/RAM (~15s/figure, ~1.9GB) and the Gemini
+bbox spend disappears.
+
+Two operational facts that come with the flip, neither a defect:
+- The analyzer loads GroundingDINO lazily (~90s) and unloads it when idle, so
+  the first pages after a deploy fall back to the Gemini bbox. That fallback is
+  deliberate resilience in production and stays silent — the Lab is the place
+  that refuses to run on a fallback, because comparability is its whole point.
+- Art styles that break the human-figure assumption (chibi, pixel, lowpoly) are
+  already excluded by `figureDetectionEligibleStyles` and keep using Gemini.
+
+**Verification, without needing an experiment id:** set #12 is the durable
+handle — Test Lab → Sets → "Hard to segment" → its run history (migration 021
+links runs to their set). Pin any new failing page to that set and every
+existing case plus all four step visualisations come along unchanged.
+
+**Touched:** `server/config/models.js`
+**Status:** ✅ active
