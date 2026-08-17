@@ -334,9 +334,14 @@ const MODEL_DEFAULTS = {
   // linked from the Sets tab, so this is re-checkable without an experiment id.
   //
   // Two operational facts that come with the flip, neither a defect:
-  //   - The analyzer loads GroundingDINO lazily (~90s) and unloads it when idle,
-  //     so the first pages after a deploy fall back to the Gemini bbox. That
-  //     fallback is deliberate resilience in production and stays silent.
+  //   - The analyzer loads GroundingDINO lazily (~90s) and unloads it after
+  //     600s idle, but that load is not meant to land on a story: /warmup
+  //     preloads it while the user is still in the wizard, and `ensureWarm`
+  //     TELLS it to (`{dino: …}` from runtime()) rather than letting it guess
+  //     from an env var of its own — that guess is what made it skip DINO while
+  //     detection asked for it. A Gemini fallback is resilience if it happens,
+  //     not the expected path; EVERY story falling back means the model cannot
+  //     load there at all (RAM), which is a different failure.
   //   - Cost is CPU and RAM on the analyzer (~15s/figure, ~1.9GB), not an API
   //     bill. Detection itself becomes free.
   // Value lives in server/config/runtime.js — same in every environment, so
