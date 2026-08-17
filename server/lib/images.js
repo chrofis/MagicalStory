@@ -663,9 +663,20 @@ function dedupeIdenticalBullets(prompt) {
   return lines.filter(l => l !== null).join('\n').replace(/\n{3,}/g, '\n\n');
 }
 
+// Blocks this cut may drop, least load-bearing first. The scene prose and the
+// reference-card colour map are NOT on the list: the prose IS the page, and the
+// colour map is what pairs each baked card with a name.
+const CUT_DROP_ORDER = [
+  '**Composition:**',
+  '**HEIGHT ORDER',
+  'AGE & PROPORTIONS',
+  'When the FIRST reference photo',
+  'Generate a SINGLE illustration',
+];
+const CUT_BLOCK_MARKERS = [...CUT_DROP_ORDER, 'REFERENCE CARD COLOURS', '**THIS IMAGE DEPICTS'];
+
 function sectionAwareCut(prompt, maxLen, logLabel) {
-  // Keep the tail sections (REQUIRED OBJECTS + ART STYLE) whole; cut the
-  // excess from the end of the head prose instead.
+  // Keep the tail sections (REQUIRED OBJECTS + ART STYLE) whole.
   const objIdx = prompt.indexOf('**REQUIRED OBJECTS');
   const styleIdx = prompt.indexOf('**ART STYLE');
   const tailStart = objIdx >= 0 ? objIdx : styleIdx;
@@ -673,8 +684,51 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
   const tail = prompt.slice(tailStart);
   const headBudget = maxLen - tail.length - 5;
   if (headBudget < 500) return truncatePromptForModel(prompt, maxLen, logLabel); // tail alone ~fills the budget
-  log.warn(`✂️ [${logLabel}] Section-aware cut: head ${tailStart}→${headBudget} chars, tail sections kept whole`);
-  return prompt.slice(0, headBudget) + '\n...\n' + tail;
+
+  // DROP WHOLE BLOCKS, NEVER A CHARACTER INDEX (owner, 2026-08-17). The head is
+  // written in reading order — the scene prose describes character 1, then 2,
+  // then 3 — so slicing at a byte offset deletes the LAST-described characters
+  // outright: outfit, position and action gone, while the evaluator still scores
+  // the render against a contract they were cut out of. Measured on a real page:
+  // a 5,000-char budget removed a whole character mid-sentence. Dropping ranked
+  // blocks costs generic guidance instead of a person.
+  let head = prompt.slice(0, tailStart);
+  const dropped = [];
+  const blockRange = (text, marker) => {
+    const start = text.indexOf(marker);
+    if (start < 0) return null;
+    let end = text.length;
+    for (const m of CUT_BLOCK_MARKERS) {
+      if (m === marker) continue;
+      const i = text.indexOf(m, start + marker.length);
+      if (i >= 0 && i < end) end = i;
+    }
+    return { start, end };
+  };
+  for (const marker of CUT_DROP_ORDER) {
+    if (head.length <= headBudget) break;
+    const r = blockRange(head, marker);
+    if (!r) continue;
+    head = (head.slice(0, r.start) + head.slice(r.end)).replace(/\n{3,}/g, '\n\n');
+    dropped.push(marker.replace(/\*|:/g, '').trim());
+  }
+
+  // Still over: trim the prose at a SENTENCE boundary rather than mid-word, so
+  // whatever survives is at least a complete statement.
+  let proseCut = 0;
+  if (head.length > headBudget) {
+    const keep = head.slice(0, headBudget);
+    const lastStop = Math.max(keep.lastIndexOf('. '), keep.lastIndexOf('.\n'));
+    const cut = lastStop > headBudget * 0.5 ? lastStop + 1 : headBudget;
+    proseCut = head.length - cut;
+    head = head.slice(0, cut);
+  }
+
+  log.warn(`✂️ [${logLabel}] Section-aware cut: ${tailStart}→${head.length} chars`
+    + (dropped.length ? `, dropped ${dropped.join(' + ')}` : '')
+    + (proseCut ? `, AND ${proseCut} chars of scene prose — a character may be missing` : '')
+    + ', tail sections kept whole');
+  return head.trimEnd() + '\n' + tail;
 }
 
 async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName = null) {
