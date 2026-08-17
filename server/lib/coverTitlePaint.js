@@ -406,7 +406,14 @@ async function paintCoverTitle(artBuffer, title, opts = {}) {
       log.warn(`🅰️ [TITLE PAINT] final eval rejected the repaint: ${verdict.problem} (${m}) — keeping the flat title`);
       return { ...flat, coverage, spill, debug: debugOut, reason: `eval: ${verdict.problem || 'title does not match'}` };
     }
-    return { imageData: paintedUri, spec, ok: true, coverage, spill, debug: debugOut, cost: result.cost ?? null };
+    // The keyed strip + its offset travel with the result: sibling cover
+    // versions share this cover's lockup (composeCover lockSpec), so the SAME
+    // painted lettering can be composited onto each of them without a second
+    // model call (owner, 2026-08-17).
+    return {
+      imageData: paintedUri, spec, ok: true, coverage, spill, debug: debugOut, cost: result.cost ?? null,
+      layer: { pngBase64: layer.toString('base64'), top: bandY0, width: W, height: stripH },
+    };
   } catch (e) {
     // The eval itself failing is not evidence the repaint is bad, but we do not
     // ship an unverified title either — fall back, and say why.

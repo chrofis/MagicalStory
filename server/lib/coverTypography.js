@@ -369,15 +369,21 @@ async function fitRender(innerGroup, W, H, box, anchor) {
 // ---------------------------------------------------------------------------
 // public API
 // ---------------------------------------------------------------------------
-async function composeFrontTitle(artBuffer, title, figures, seed, style) {
+// lockSpec: reuse a lockup already computed for ANOTHER version of this cover
+// (owner, 2026-08-17). Placement normally searches each artwork's own free
+// pocket, so sibling versions get different rects and line counts — and one
+// painted title strip then fits only the version it was painted for. Reusing
+// the active version's rect/lines/font gives the whole set one geometry, which
+// is what lets a single paint call be stamped on every version.
+async function composeFrontTitle(artBuffer, title, figures, seed, style, lockSpec = null) {
   const meta = await sharp(artBuffer).metadata(); const W = meta.width, H = meta.height;
   const occ = occupancyFromFigures(figures);
   const hero = (figures || []).slice().sort((a, b) => boxArea(b.bodyBox) - boxArea(a.bodyBox))[0];
   const chars = hero ? await garmentColors(artBuffer, hero.bodyBox) : [];
   const styleOv = sanitizeTitleStyle(style);
   const [autoFontId, autoLayout] = DEAL[hash(seed || title, 7) % DEAL.length];
-  const fontId = styleOv?.fontId || autoFontId;
-  const layout = styleOv?.layout || autoLayout;
+  const fontId = lockSpec?.fontId || styleOv?.fontId || autoFontId;
+  const layout = lockSpec?.layout || styleOv?.layout || autoLayout;
   const font = FONTS[fontId];
   const C = String(title).length;
   // The title lives in the TOP band, by contract — the cover prompt reserves
@@ -388,8 +394,10 @@ async function composeFrontTitle(artBuffer, title, figures, seed, style) {
   // title up top; if even the band is blocked, the fixed top rect wins anyway.
   const TITLE_BAND = 0.42;
   const bandGrid = occ.grid.map((row, gy) => ((gy + 0.5) / occ.gh > TITLE_BAND ? row.map(() => 1) : row.slice()));
-  const rect = bestRect(bandGrid, occ.gw, occ.gh, W, H, C, font.adv) || { x0: 0.06, x1: 0.94, y0: 0.05, y1: 0.26, N: C <= 22 ? 1 : 2 };
-  const lines = splitLinesN(title, rect.N);
+  const rect = (lockSpec?.rect && Number.isFinite(lockSpec.rect.y0))
+    ? lockSpec.rect
+    : (bestRect(bandGrid, occ.gw, occ.gh, W, H, C, font.adv) || { x0: 0.06, x1: 0.94, y0: 0.05, y1: 0.26, N: C <= 22 ? 1 : 2 });
+  const lines = (Array.isArray(lockSpec?.lines) && lockSpec.lines.length) ? lockSpec.lines : splitLinesN(title, rect.N);
   const place = { align: 'center', x0: rect.x0, x1: rect.x1, yt: rect.y0, yb: rect.y1, hFrac: rect.y1 - rect.y0 };
   const bg = await boxDominant(artBuffer, place.x0, place.yt, place.x1, Math.min(0.95, place.yb));
   const pal = await palette(artBuffer);
@@ -475,9 +483,9 @@ async function composeBrand(artBuffer, figures, seed) {
 // dispatch: kind = 'front' | 'initial' | 'back'
 // style (optional): user typography overrides — front: { fontId, layout, color },
 // initial: { font, color }. Invalid fields are dropped; back ignores style.
-async function composeCover({ artBuffer, kind, title, dedication, seed, figures, style }) {
+async function composeCover({ artBuffer, kind, title, dedication, seed, figures, style, lockSpec }) {
   const figs = (figures || []).filter(f => f && (f.bodyBox || f.faceBox));
-  if (kind === 'front') return composeFrontTitle(artBuffer, title || '', figs, seed, style);
+  if (kind === 'front') return composeFrontTitle(artBuffer, title || '', figs, seed, style, lockSpec);
   if (kind === 'initial') return composeDedication(artBuffer, dedication || '', figs, seed, style);
   if (kind === 'back') return composeBrand(artBuffer, figs, title || seed);
   throw new Error(`composeCover: unknown kind ${kind}`);
@@ -624,7 +632,15 @@ async function bakeCoverTypographyPostPersist(storyId, storyData, { title, dedic
           const osrc = o.image_url || (o.image_data ? 'data:image/jpeg;base64,' + o.image_data.toString('base64') : null);
           const obytes = await r2.bytesFromAnyImage(osrc);
           if (!obytes) continue;
-          const { buffer: obuf } = await composeCover({ artBuffer: obytes, kind, title: title || '', dedication: ded, seed: seed || title, figures });
+          // KEEP THE TEXTLESS ORIGINAL (owner, 2026-08-17). Stamping overwrites
+          // this version's row, so without an Art copy the clean bytes are gone
+          // and the painted title can never be applied here — only the active
+          // version could ever carry it. One row per version, same convention
+          // as the active version's ${key}Art v0.
+          await saveStoryImage(storyId, `${key}Art`, null, 'data:image/jpeg;base64,' + obytes.toString('base64'), { versionIndex: o.version_index });
+          // Same lockup as the active version: one geometry story-wide is what
+          // lets a single painted strip be stamped on every version.
+          const { buffer: obuf } = await composeCover({ artBuffer: obytes, kind, title: title || '', dedication: ded, seed: seed || title, figures, lockSpec: spec });
           await saveStoryImage(storyId, key, null, 'data:image/jpeg;base64,' + obuf.toString('base64'), { versionIndex: o.version_index, cacheBust: true, preserveScore: true });
           // Same fp re-point as the active version above (cover-text exception).
           try {
@@ -862,6 +878,42 @@ async function paintServedCoverTitle(storyId, storyData, { coverKey = 'frontCove
       log.warn(`[TITLE PAINT] ${coverKey}: marker persist failed: ${mErr.message}`);
     }
     log.info(`🅰️ [TITLE PAINT] ${coverKey}: painted title baked onto served v${activeIdx}`);
+
+    // STAMP THE SAME STRIP ON EVERY OTHER VERSION (owner, 2026-08-17). One AI
+    // call, one lettering, all candidates: the picker used to compare a painted
+    // active version against flat siblings, so the painted one always looked
+    // best regardless of the artwork under it. Every version shares this
+    // cover's lockup (composeCover lockSpec above), so the keyed strip lands at
+    // the same coordinates. Each sibling is repainted from its OWN textless
+    // ${coverKey}Art row — never from its stamped bytes, which would double-bake.
+    try {
+      const sharp = require('sharp');
+      const layer = res.layer;
+      if (layer?.pngBase64) {
+        const siblings = await dbQuery(
+          "SELECT version_index FROM story_images WHERE story_id=$1 AND image_type=$2 AND NOT is_test AND version_index <> $3",
+          [storyId, coverKey, activeIdx]);
+        let done = 0;
+        for (const sib of siblings) {
+          const artRow = await dbQuery(
+            "SELECT image_url, image_data FROM story_images WHERE story_id=$1 AND image_type=$2 AND version_index=$3 AND NOT is_test LIMIT 1",
+            [storyId, `${coverKey}Art`, sib.version_index]);
+          const asrc = artRow[0]?.image_url || (artRow[0]?.image_data ? 'data:image/jpeg;base64,' + artRow[0].image_data.toString('base64') : null);
+          const abytes = asrc ? await r2.bytesFromAnyImage(asrc) : null;
+          if (!abytes) { log.debug(`[TITLE PAINT] ${coverKey} v${sib.version_index}: no textless art row — left flat`); continue; }
+          const base = await sharp(abytes).resize(layer.width, null, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
+          const stamped = await sharp(base)
+            .composite([{ input: Buffer.from(layer.pngBase64, 'base64'), left: 0, top: layer.top }])
+            .jpeg({ quality: 92 }).toBuffer();
+          await saveStoryImage(storyId, coverKey, null, 'data:image/jpeg;base64,' + stamped.toString('base64'),
+            { versionIndex: sib.version_index, cacheBust: true, preserveScore: true });
+          done++;
+        }
+        if (done) log.info(`🅰️ [TITLE PAINT] ${coverKey}: same painted title stamped on ${done} other version(s) — no extra model call`);
+      }
+    } catch (sErr) {
+      log.warn(`[TITLE PAINT] ${coverKey}: sibling stamp failed (${sErr.message}) — other versions keep the flat title`);
+    }
     return { painted: true, imageData: res.imageData, spec: res.spec, coverage: res.coverage, spill: res.spill };
   } catch (err) {
     log.warn(`⚠️ [TITLE PAINT] ${coverKey}: ${err.message} — flat title kept`);
