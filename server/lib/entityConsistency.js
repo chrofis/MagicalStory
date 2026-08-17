@@ -2991,7 +2991,20 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
     );
 
     if (!grokResult?.imageData) {
-      return { success: false, error: 'Grok repair returned no image' };
+      // A no-image return is a GATE decision, never a missing response: the
+      // spine returns rejectedReason + gateMessage (style drift / blend-gate
+      // IoU / blurred figure) and carries the rejected images with it. Reporting
+      // it as "no image" sent an investigation after a Grok outage that never
+      // happened. See the same fix in routes/regeneration.js.
+      const why = grokResult?.gateMessage
+        || (grokResult?.rejectedReason ? `rejected by the ${grokResult.rejectedReason.replace(/_/g, ' ')}` : null);
+      log.warn(`🚫 [SINGLE-PAGE-REPAIR] ${charName} p${pageNumber}: ${why || 'no image and no reason reported'}`);
+      return {
+        success: false,
+        error: why ? `Repair rejected — ${why}` : 'Grok repair returned no image (no reason reported)',
+        rejectedReason: grokResult?.rejectedReason || null,
+        gateMessage: grokResult?.gateMessage || null,
+      };
     }
 
     const repairedPageData = grokResult.imageData;

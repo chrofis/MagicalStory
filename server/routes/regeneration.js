@@ -5655,7 +5655,23 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               },
             };
           } else {
-            return { task, error: true, failReason: 'Grok repair returned no image' };
+            // WHY, not "no image" (owner, 2026-08-17). Every no-image return
+            // from the repair spine is a GATE decision carrying rejectedReason
+            // + gateMessage — style drift, blend-gate IoU, or the blur gate —
+            // and this line used to flatten all three into one sentence that
+            // reads like a Grok outage. Measured cost: a face repair of Noah on
+            // p6 of job_1786917840874_rur4nskfv reported "Grok repair returned
+            // no image" three times; the real answer ("painted figure barely
+            // overlaps the original, mask IoU 34% — redo instead of blending")
+            // existed only in a Railway log line that had already rolled.
+            const why = grokResult?.gateMessage
+              || (grokResult?.rejectedReason ? `rejected by the ${grokResult.rejectedReason.replace(/_/g, ' ')}` : null);
+            return {
+              task, error: true,
+              failReason: why ? `Repair rejected — ${why}` : 'Grok repair returned no image (no reason reported)',
+              rejectedReason: grokResult?.rejectedReason || null,
+              gateMessage: grokResult?.gateMessage || null,
+            };
           }
         } else {
           // Fallback to Gemini when Grok not configured
@@ -5711,14 +5727,18 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
     for (const apiResult of apiResults) {
       if (!apiResult) continue;
-      const { task, repairResult, error, failReason } = apiResult;
+      const { task, repairResult, error, failReason, rejectedReason, gateMessage } = apiResult;
       const { characterName, pageNumber } = task;
       const charResult = resultsByChar.get(characterName);
       if (!charResult) continue;
 
       if (error) {
-        charResult.pagesFailed.push({ pageNumber, reason: failReason });
-        recordRepairFailure(pageNumber, characterName, { reason: failReason });
+        charResult.pagesFailed.push({ pageNumber, reason: failReason, rejectedReason, gateMessage });
+        // Persisted on the page, not only returned: the Railway log window is
+        // hours, and the question "why did my repair do nothing" is asked days
+        // later. Without this the answer lives only in a log line that has
+        // rolled (measured: Noah p6, the IoU-34% rejection was unrecoverable).
+        recordRepairFailure(pageNumber, characterName, { reason: failReason, rejectedReason, gateMessage });
         continue;
       }
 
