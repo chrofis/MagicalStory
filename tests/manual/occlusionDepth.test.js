@@ -143,7 +143,16 @@ t('the face-in-mask floor admits a heavily occluded figure', () => {
 const SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'server', 'lib', 'figureDetection.js'), 'utf8');
 
 t('SAM is told WHICH figure in the box is the target', () => {
-  assert.ok(/points\.push\(_boxCentre\(own\)\); labels\.push\(1\)/.test(SRC), 'positive on its own face');
+  assert.ok(/const faceC = _boxCentre\(own\);\s+points\.push\(faceC\); labels\.push\(1\)/.test(SRC),
+    'positive on its own face');
+  // One head point cannot hold a head that glasses or a hat brim cut in two:
+  // p10 Sarah's forehead was missing from the mask entirely.
+  assert.ok(/for \(const dy of \[-0\.2 \* faceH, 0\.2 \* faceH\]\)/.test(SRC),
+    'plus two more at +/-20% of the RAW face box height');
+  assert.ok(/const faceH = own\[3\] - own\[1\]/.test(SRC),
+    'measured on the raw box - the padded one reaches into hair and background');
+  assert.ok(/if \(p\[1\] <= own\[1\] \|\| p\[1\] >= own\[3\]\) continue/.test(SRC),
+    'and they never leave the raw face box');
   assert.ok(/points\.push\(c\); labels\.push\(0\)/.test(SRC), 'negative on every other face in the box');
   assert.ok(/point_labels: labels/.test(SRC), 'the endpoint reads `point_labels`');
 });

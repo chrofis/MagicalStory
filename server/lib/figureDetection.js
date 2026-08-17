@@ -478,8 +478,34 @@ async function _maskBoxesFrontFirst(imageDataUri, boxesPx, W, H, pageLabel = '',
     // front" was unanswerable without re-running locally.
     const samPoints = [];
     if (own) {
-      points.push(_boxCentre(own)); labels.push(1);
-      samPoints.push({ at: _boxCentre(own), label: 1, role: 'face' });
+      // THREE POSITIVES ON THE HEAD, NOT ONE (owner, 2026-08-17).
+      //
+      // A single point cannot hold a head that a strong horizontal edge cuts in
+      // two — glasses, a hat brim, a fringe. Measured on
+      // job_1786829555599_rgzoyoprx p10: Sarah's only head point sits just below
+      // her glasses, and SAM returned her hair, her lower face and her glasses
+      // but NOT the band between hairline and eyebrows. Her forehead was simply
+      // missing from the mask.
+      //
+      // It is under-segmentation, not a stolen pixel, and the numbers say so:
+      // the head-protection change added 357 px to Noah and 385 to Daniel on the
+      // same page while leaving Sarah bit-identical at 66,980 px. Protection only
+      // ever ADDS pixels back, so zero gain means nothing was contested there —
+      // the forehead was never in the mask for anyone to take.
+      //
+      // The offsets are ±20% of the RAW face box height, not the padded one:
+      // the padded box is 4x the area and reaches into hair and background,
+      // where a positive point would claim the wrong thing.
+      const faceC = _boxCentre(own);
+      points.push(faceC); labels.push(1);
+      samPoints.push({ at: faceC, label: 1, role: 'face' });
+      const faceH = own[3] - own[1];
+      for (const dy of [-0.2 * faceH, 0.2 * faceH]) {
+        const p = [faceC[0], Math.round(faceC[1] + dy)];
+        if (p[1] <= own[1] || p[1] >= own[3]) continue;   // stays inside the raw box
+        points.push(p); labels.push(1);
+        samPoints.push({ at: p, label: 1, role: 'face-extra', offset: dy < 0 ? '-20%' : '+20%' });
+      }
       // Garment seeds. The stored faceBox is NOT a tight face - it runs to the
       // chest - so its CENTRE is the usable "the head is here" reference; its
       // bottom edge would reject every real top dot.

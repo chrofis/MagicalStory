@@ -1356,9 +1356,12 @@ async function createSamInputOverlayImage(imageData, bboxDetection) {
           svg.push(`<path d="M${px - 8},${py - 8} L${px + 8},${py + 8} M${px + 8},${py - 8} L${px - 8},${py + 8}" stroke="#ff3b30" stroke-width="4"/>`);
           svg.push(`<text x="${px + 17}" y="${py + 5}" font-family="Arial" font-size="15" font-weight="bold" fill="#ff3b30">not me</text>`);
         } else {
-          const col = p.role === 'face' ? '#00e05a' : '#00c8ff';
+          const isHead = p.role === 'face' || p.role === 'face-extra';
+          const col = isHead ? '#00e05a' : '#00c8ff';
           svg.push(`<circle cx="${px}" cy="${py}" r="10" fill="${col}" stroke="#ffffff" stroke-width="3"/>`);
-          const lbl = p.role === 'face' ? 'face' : `${p.garment || 'garment'} ${p.colour || ''}`.trim();
+          const lbl = p.role === 'face' ? 'face'
+            : p.role === 'face-extra' ? `head ${p.offset || ''}`.trim()
+              : `${p.garment || 'garment'} ${p.colour || ''}`.trim();
           svg.push(`<rect x="${px + 15}" y="${py - 13}" width="${lbl.length * 8 + 10}" height="21" rx="3" fill="${col}" opacity="0.92"/>`);
           svg.push(`<text x="${px + 20}" y="${py + 3}" font-family="Arial" font-size="14" font-weight="bold" fill="#00202a">${escapeXml(lbl)}</text>`);
         }
