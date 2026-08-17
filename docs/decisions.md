@@ -12514,3 +12514,49 @@ real-world subject matter, not a reference problem. Descriptors kept ~1k chars
 
 **Touched:** `server/lib/promptBuilders.js` (NOT_A_PHOTOGRAPH, ART_STYLES.oil,
 ART_STYLES.concept).
+
+---
+
+## 2026-08-17 — Behaviour is code (server/config/runtime.js); only secrets are env vars
+**Context:** Every behavioural switch was a Railway env var — 60 of them across
+the server — with no endpoint reporting effective values. Consequence, found
+while planning a beats rerun of a customer story: **staging ran the beats
+pipeline while production still ran `unified`**, and had done for weeks. Every
+prompt fix validated on staging was validated against a pipeline no paying
+customer was on. The owner's mental model was that repair rounds were the only
+difference. Nobody could check, because checking meant opening two dashboards.
+A second latent case sat next to it: `figureDetectionBackend` defaults to
+`grounding-dino` in code while the decision log said production stays on
+`gemini` — true only if production explicitly set it, which nothing could
+confirm.
+**Decision (owner, 2026-08-17):**
+- `server/config/runtime.js` is the single source of truth for behavioural
+  settings. Values are CODE, reviewed and diffed like any other change.
+- Secrets and infrastructure (API keys, DB URLs, bucket credentials) stay in the
+  environment — they cannot live in git.
+- A setting carries a per-environment map ONLY when the difference is
+  deliberate, and its comment must say why. Today there is exactly one:
+  `repairMaxPasses` (production 3, staging/local 1).
+- Consumers call `runtime(name)`. Adding `process.env.X || default` in a
+  consumer is the pattern that caused this and is not to be reintroduced.
+- `GET /api/health/config` reports the resolved snapshot, unauthenticated and
+  secret-free by invariant, so diffing two environments is two curls.
+**Settings moved:** `pipelineMode` → `beats` everywhere (trials forced to
+`unified` in code; `inputData.pipelineMode` still overrides per job, which the
+Test Lab needs), `figureDetectionBackend` → `grounding-dino` everywhere,
+`figureDetectionEligibleStyles`, `repairMaxPasses`.
+**Consequence to expect:** production now runs beats for real customer stories.
+Beats text generation measured 520–631s for 10 pages on staging before any
+image work, so customer-facing generation gets materially slower. That is the
+owner's call, made knowingly.
+**Not yet migrated:** the remaining behavioural flags (`STORY_PROMPT_VARIANT`,
+`SPLIT_OUTLINE_REVIEW`, `TEXT_REFINE*`, `IMAGE_GEN_MODE`, `EVAL_*`,
+`STORAGE_MODE`, `GARMENT_COLOUR_FIX`, `STYLE_REPAIR_PRODUCTION`,
+`STORY_BATCH_SIZE`, `IMAGE_QUALITY_THRESHOLD`, `SCORECARD_JUDGE`, …). Moving
+them safely needs the CURRENT production values — writing a guessed default
+into the file would silently flip whatever production actually sets. Read
+`/api/health/config` on both environments after this ships, then migrate.
+**Touched:** `server/config/runtime.js` (new), `server/config/models.js`,
+`server/lib/beatsPipeline.js`, `server/lib/testlab.js`,
+`server/routes/health.js`, `CLAUDE.md`, `docs/SETTLED.md`
+**Status:** ✅ active

@@ -40,7 +40,9 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
 - **FLUX Dev/Schnell: rejected for page images.**
 - **Avatar passes 1 AND 2 default to Grok.** Gemini refuses realistic adult faces; the 2026-07-19 "Gemini stylises better" verdict was reversed 2026-08-06.
 - **The unified writer call is NOT overloaded** — measured; don't split it without new measurements.
-- **PIPELINE_MODE=beats on staging is the intended target**, not a defect. It decides which prompt file is live.
+- **Beats is the pipeline, in every environment** — the value is a code constant in
+  `server/config/runtime.js`, no longer a `PIPELINE_MODE` env var (2026-08-17). It decides which
+  prompt file is live. Trials are always `unified` (speed); `inputData.pipelineMode` still overrides per job.
 - **Grok inpaint handles structural changes** (pose, gaze, body rotation) — don't route facing-direction issues to iterate.
 - **Repaired versions are evaluated against their OWN scene contract; finalScore is the one score everywhere.**
 - **Cover gaze is code-owned: always at the viewer**; `gazes at:` is banned from cover hints.

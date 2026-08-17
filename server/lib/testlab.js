@@ -785,7 +785,7 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
   // the configured backend: retry until DINO answers, fail loudly if it
   // never does. Production keeps its silent fallback (resilience there is
   // deliberate); comparability is the lab's whole point.
-  const wantDino = (process.env.FIGURE_DETECTION_BACKEND || MODEL_DEFAULTS.figureDetectionBackend) === 'grounding-dino';
+  const wantDino = MODEL_DEFAULTS.figureDetectionBackend === 'grounding-dino';
   const t0 = Date.now();
   let result = null;
   const ATTEMPTS = 5;

@@ -236,7 +236,10 @@ Tests check: homepage images, character photos, API health, auth, no JS errors, 
 | Face Detection | Python service (MediaPipe/Haar) | Cascade face detection for illustrations |
 
 ### Story Generation Pipeline (Unified Mode)
-`PIPELINE_MODE=beats` (staging) is the intended target pipeline — it decides which story prompt file is live; treat it as deliberate, not an open defect.
+Beats is the pipeline in EVERY environment (trials excepted — always unified). The value is a code
+constant in `server/config/runtime.js`, which is also where every other behavioural setting lives:
+behaviour is code, only secrets are env vars. `GET /api/health/config` reports what an environment
+is actually running.
 
 ```
 POST /api/jobs/create-story → Background Job:

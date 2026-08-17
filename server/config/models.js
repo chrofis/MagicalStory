@@ -339,8 +339,10 @@ const MODEL_DEFAULTS = {
   //     fallback is deliberate resilience in production and stays silent.
   //   - Cost is CPU and RAM on the analyzer (~15s/figure, ~1.9GB), not an API
   //     bill. Detection itself becomes free.
-  // Set FIGURE_DETECTION_BACKEND=gemini to revert an environment.
-  figureDetectionBackend: process.env.FIGURE_DETECTION_BACKEND || 'grounding-dino',
+  // Value lives in server/config/runtime.js — same in every environment, so
+  // staging tests what production runs. No env override: that is how prod and
+  // staging silently diverged on the pipeline mode.
+  figureDetectionBackend: require('./runtime').runtime('figureDetectionBackend'),
 
   // Art styles GroundingDINO detection is allowed on. GDINO grounds on the
   // clothed-figure shape + clothing colour (via the concise buildGroundingPrompt),
@@ -349,10 +351,8 @@ const MODEL_DEFAULTS = {
   // The ONLY exclusions are styles that break the human-figure assumption:
   // chibi (super-deformed head/body), pixel (blocky low-res), lowpoly (geometric
   // faceted). steampunk/cyber/comic/cartoon/manga/concept/oil/pixar all render a
-  // clothed human and are eligible. Env override: FIGURE_DETECTION_STYLES=a,b,c.
-  figureDetectionEligibleStyles: (process.env.FIGURE_DETECTION_STYLES
-    ? process.env.FIGURE_DETECTION_STYLES.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
-    : ['realistic', 'anime', 'watercolor', 'steampunk', 'cyber', 'pixar', 'comic', 'cartoon', 'manga', 'concept', 'oil']),
+  // clothed human and are eligible. The list lives in config/runtime.js.
+  figureDetectionEligibleStyles: require('./runtime').runtime('figureDetectionEligibleStyles'),
 
   // Image generation backend (can be overridden in dev mode)
   // 'grok' = Grok Imagine (default — $0.02/image, half of Gemini)
@@ -675,13 +675,9 @@ const EVAL_TEMPERATURE = process.env.EVAL_TEMPERATURE != null ? Number(process.e
 // so a showcase finishes in a reviewable time: rounds 2 and 3 of the Berger run
 // (job_1786193650012_7baiaeftb) cost ~15 minutes of a 50-minute story and the
 // owner is watching the result, not the convergence.
-// Deliberately keyed on RAILWAY_ENVIRONMENT_NAME, the same signal /api/health
-// reports, so the value the log prints is the value the environment ran.
-// REPAIR_MAX_PASSES overrides both, for a local or one-off experiment.
-const _envPasses = Number(process.env.REPAIR_MAX_PASSES);
-const REPAIR_MAX_PASSES = Number.isFinite(_envPasses) && _envPasses >= 0
-  ? _envPasses
-  : (process.env.RAILWAY_ENVIRONMENT_NAME === 'staging' ? 1 : 3);
+// The per-environment values live in server/config/runtime.js, where every
+// deliberate prod/staging difference is declared in one place.
+const REPAIR_MAX_PASSES = require('./runtime').runtime('repairMaxPasses');
 
 const REPAIR_DEFAULTS = {
   scoreThreshold: 50,       // Pages scoring below this need redo (0-100). Lowered

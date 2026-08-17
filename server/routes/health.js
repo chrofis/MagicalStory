@@ -15,6 +15,26 @@ router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// GET /api/health/config — what behaviour is this environment actually running?
+//
+// Exists because there was no way to answer that question from outside. Every
+// behavioural setting was a Railway env var, one dashboard per environment, so
+// staging and production silently disagreed about the generation pipeline for
+// weeks and nobody could see it. Diffing the two environments is now:
+//   curl https://magicalstory.ch/api/health/config
+//   curl https://staging.magicalstory.ch/api/health/config
+//
+// Reports the resolved values from server/config/runtime.js only. It must NEVER
+// include secrets, keys or connection strings — that invariant is what lets it
+// stay unauthenticated, which is what makes it actually get used.
+router.get('/health/config', (req, res) => {
+  const { runtimeSnapshot } = require('../config/runtime');
+  res.json({
+    ...runtimeSnapshot(),
+    commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 8) || '(unset)',
+  });
+});
+
 // POST /api/health/release-memory - reclaim RAM now, without a restart.
 //
 // The Python idle reapers only fire after 10-15 min of no use. That is correct

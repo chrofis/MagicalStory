@@ -67,9 +67,9 @@ const { log } = require('../utils/logger');
 const PIPELINE_MODES = ['unified', 'beats'];
 
 /**
- * Which generation pipeline a job runs. inputData wins over the PIPELINE_MODE
- * env default; anything unrecognised (including unset) falls back to 'unified',
- * so the default behaviour is never changed by accident.
+ * Which generation pipeline a job runs. `inputData.pipelineMode` overrides per
+ * job (Test Lab A/B and one-off reruns need that); anything unrecognised falls
+ * back to DEFAULT_PIPELINE_MODE.
  */
 function resolvePipelineMode(inputData = {}) {
   // TRIAL IS NEVER BEATS (owner decision 2026-08-15). The trial writes its
@@ -83,7 +83,7 @@ function resolvePipelineMode(inputData = {}) {
   // PIPELINE_MODE=beats to production would have silently switched every trial
   // onto the slow path and made story-trial.txt dead code.
   if (inputData?.trialMode) return 'unified';
-  const raw = inputData?.pipelineMode || process.env.PIPELINE_MODE || 'unified';
+  const raw = inputData?.pipelineMode || require('../config/runtime').runtime('pipelineMode');
   const mode = String(raw).trim().toLowerCase();
   if (!PIPELINE_MODES.includes(mode)) {
     log.warn(`[BEATS] Unknown pipelineMode "${raw}" — falling back to 'unified'`);

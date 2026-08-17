@@ -1,0 +1,98 @@
+/**
+ * RUNTIME BEHAVIOUR — one file, values in CODE.
+ *
+ * WHY THIS EXISTS: behaviour used to be configured with Railway env vars, one
+ * dashboard per environment, with no way to see the effective values from
+ * outside. Staging and production silently disagreed for weeks — staging ran
+ * the beats pipeline while production still ran unified, so every prompt fix
+ * was validated against a pipeline no customer was on, and nobody could tell
+ * because there was no list and no endpoint (owner, 2026-08-17).
+ *
+ * THE RULE:
+ *   - Behaviour lives here, in code, reviewed and diffed like any other change.
+ *   - Secrets and infrastructure (API keys, DB URLs, bucket credentials) stay
+ *     in the environment — they cannot live in git.
+ *   - A setting gets a per-environment value ONLY when the difference is
+ *     deliberate, and the comment must say why. Everything else is one value
+ *     for every environment, which is the point: staging tests what production
+ *     runs.
+ *
+ * Adding a setting: put it here, state its reason, and read it through
+ * `runtime()`. Do not add `process.env.X || default` in a consumer — that is
+ * exactly the pattern that produced the divergence.
+ */
+'use strict';
+
+/** Same signal /api/health reports, so the logged value is the value that ran. */
+function environmentName() {
+  return process.env.RAILWAY_ENVIRONMENT_NAME || 'local';
+}
+
+/**
+ * A setting that deliberately differs. Any key not listed falls to `default`.
+ * Keeping the shape explicit makes a per-environment difference visible in
+ * review — you cannot introduce one without writing it down.
+ */
+const perEnvironment = (map) => ({ __perEnv: true, ...map });
+
+const SETTINGS = {
+  // ── Generation pipeline ────────────────────────────────────────────────
+  // Beats everywhere. The trial is forced to `unified` in code regardless
+  // (resolvePipelineMode) — the funnel depends on speed and the beats chain is
+  // seven sequential LLM calls. Per-job `inputData.pipelineMode` still wins,
+  // which is what the Test Lab A/B and one-off reruns use.
+  pipelineMode: 'beats',
+
+  // ── Figure detection ───────────────────────────────────────────────────
+  // GroundingDINO everywhere (owner, 2026-08-17). Runs on the analyzer's CPU,
+  // so detection costs no API spend; the analyzer loads it lazily (~90s) and
+  // falls back to the Gemini bbox while cold, which is deliberate resilience.
+  figureDetectionBackend: 'grounding-dino',
+
+  // Styles GDINO is allowed on. It grounds on clothed-figure shape + clothing
+  // colour, so any style rendering a recognisable human works (measured
+  // 2026-07-15: realistic 0.69, anime 0.59, watercolor 0.63). The exclusions
+  // are styles that break the human-figure assumption: chibi (super-deformed),
+  // pixel (blocky), lowpoly (faceted).
+  figureDetectionEligibleStyles: [
+    'realistic', 'anime', 'watercolor', 'steampunk', 'cyber',
+    'pixar', 'comic', 'cartoon', 'manga', 'concept', 'oil',
+  ],
+
+  // ── Repair ─────────────────────────────────────────────────────────────
+  // The ONE deliberate environment difference. A paying customer's book gets
+  // every recovery attempt; staging runs a single pass so a showcase finishes
+  // in reviewable time — rounds 2 and 3 of the Berger run
+  // (job_1786193650012_7baiaeftb) cost ~15 of its 50 minutes, and the owner is
+  // watching the result, not the convergence.
+  repairMaxPasses: perEnvironment({ default: 3, staging: 1, local: 1 }),
+};
+
+/**
+ * Effective value of a setting for this environment.
+ * Throws on an unknown name — a typo must fail loudly, not read as undefined.
+ */
+function runtime(name) {
+  if (!(name in SETTINGS)) {
+    throw new Error(`[RUNTIME] Unknown setting "${name}". Declare it in server/config/runtime.js.`);
+  }
+  const value = SETTINGS[name];
+  if (value && typeof value === 'object' && value.__perEnv) {
+    const env = environmentName();
+    return env in value ? value[env] : value.default;
+  }
+  return value;
+}
+
+/**
+ * Every effective value, for the admin config endpoint and boot logging —
+ * so "what is this environment actually running" is one call, not two
+ * dashboards and a guess.
+ */
+function runtimeSnapshot() {
+  const out = { environment: environmentName() };
+  for (const name of Object.keys(SETTINGS)) out[name] = runtime(name);
+  return out;
+}
+
+module.exports = { runtime, runtimeSnapshot, environmentName, SETTINGS };
