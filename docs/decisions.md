@@ -2046,7 +2046,11 @@ painterly-watercolor). comic..oil untested but structurally identical to what pa
 genuinely differ. Still fails open (GDINO error → Gemini). Backend still env-gated to grounding-dino
 (prod stays gemini).
 **Touched:** `server/config/models.js` (figureDetectionEligibleStyles), `server/lib/images.js` (gate).
-**Status:** ✅ active (staging). Latency unchanged (~15s/figure CPU) — only widens where GDINO may run.
+**Status:** ✅ active. Latency unchanged (~15s/figure CPU) — only widens where GDINO may run.
+**Update 2026-08-17:** the "prod stays gemini" clause above is no longer true —
+grounding-dino is the default in every environment. See "GroundingDINO + MobileSAM
+becomes the DEFAULT figure detection, in production too" at the end of this file.
+The STYLE gate itself is unchanged: chibi/pixel/lowpoly still fall back to Gemini.
 
 ## DINO goes generic: "person"/"face" prompts for geometry, identity resolved separately (2026-07-17)
 **Context:** Even the concise identity prompt (age+gender+hair+clothing) produced bad production
@@ -12458,10 +12462,18 @@ API call: cost moves to analyzer CPU/RAM (~15s/figure, ~1.9GB) and the Gemini
 bbox spend disappears.
 
 Two operational facts that come with the flip, neither a defect:
-- The analyzer loads GroundingDINO lazily (~90s) and unloads it when idle, so
-  the first pages after a deploy fall back to the Gemini bbox. That fallback is
-  deliberate resilience in production and stays silent — the Lab is the place
-  that refuses to run on a fallback, because comparability is its whole point.
+- The analyzer loads GroundingDINO lazily (~90s) and unloads it after 600s idle,
+  but that load is NOT supposed to land on a story: /warmup preloads it while the
+  user is still in the wizard, fired by ensureWarm at photo-upload, at story-start
+  and again (forced) before the repair phase.
+  CORRECTION to the first version of this entry, which said the first pages after
+  a deploy fall back to the Gemini bbox: that was true only because this flip was
+  INCOMPLETE. The warmup gate read the same env var with an EMPTY default, so it
+  skipped DINO while detection asked for it (fixed same day in photo_analyzer.py
+  warmup_endpoint - both sides now default to 'grounding-dino'). A silent Gemini
+  fallback in production is resilience if it happens, not the expected path. If
+  EVERY prod story returns detectionBackend: null the model cannot load there at
+  all (RAM) - a different failure, not a cold start.
 - Art styles that break the human-figure assumption (chibi, pixel, lowpoly) are
   already excluded by `figureDetectionEligibleStyles` and keep using Gemini.
 
