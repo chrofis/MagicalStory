@@ -1165,6 +1165,15 @@ function getSceneComplexityGuide(sceneCount) {
 /**
  * Art styles definitions (matches index.html)
  */
+// The camera-artifact denial shared by the two painterly styles whose subject
+// matter (real people, real places, realistic anatomy) sits closest to
+// photography and therefore drifts into it. Denying "photorealistic" alone does
+// not work — the model needs the CAMERA's fingerprints named, because those are
+// what it reproduces: optical blur, pores, grain, flare. Positive painterly
+// markers ride alongside, since a negation without a target leaves nothing to
+// paint instead.
+const NOT_A_PHOTOGRAPH = 'PAINTED by an artist, never captured by a camera: no lens depth-of-field or bokeh, no blurred background, no lens flare, no photographic grain, no skin pores, no camera-real fabric. Depth comes from atmospheric haze, never optical blur; edges are lost and found by choice; every surface, skin and faces included, carries visible brushwork.';
+
 const ART_STYLES = {
   // Sentence-based style descriptions — work well with both Gemini and Grok Imagine.
   // Each includes artist/studio references where helpful for style anchoring.
@@ -1180,14 +1189,14 @@ const ART_STYLES = {
   // WITHOUT the "never photographic" clause watercolor/steampunk carry, and an
   // oil cover rendered its figures as photographs pasted onto a painted
   // background (job_1786653013328 front cover).
-  oil: 'A classic oil painting in the style of John Singer Sargent. Realistic human proportions, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, and canvas texture. Museum quality fine art. Clearly hand-painted — never photographic and never a photo with a filter: no camera-real skin, no photographic fabric or lighting; visible brushstrokes on every surface, including faces and figures. Faces: painterly realism with visible brushstrokes, natural proportions, defined bone structure, warm skin tones from impasto technique. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
+  oil: 'A classic oil painting on canvas in the style of John Singer Sargent — worked alla prima, each stroke left visible instead of blended away, impasto ridges catching the light, canvas weave showing through thin passages, a limited mixed palette, backgrounds in broad loose strokes while the face carries the finish. ' + NOT_A_PHOTOGRAPH + ' Proportions and anatomy are true to life; the execution is unmistakably paint. Faces: built from visible strokes of warm mixed pigment, defined bone structure, alive but painted. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   lowpoly: 'A low-poly 3D illustration in the style of Monument Valley. Geometric characters, isometric perspective, minimalist shapes, vibrant solid colors, and clean edges with a retro video game aesthetic. Not realistic. Faces: geometric faceted surfaces, minimal detail, flat-shaded polygonal features. No smooth skin — everything is angular. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   // Anti-photo guard added 2026-08-16: concept was the last style whose only
   // negation ("detailed but not photographic") sat inside the Faces clause,
   // while its lead ("realistic proportions", "smooth rendering", "matte
   // painting" — a photo-bashed idiom) pulled toward photography. A whole book
   // shipped as photographs (job_1786829555599, every page flagged wrong_medium).
-  concept: 'A digitally PAINTED concept-art illustration in the style of Craig Mullins and Karla Ortiz. Every surface carries visible brushwork and painterly edges — clearly hand-painted, never photographic and never a photo with a filter: no camera-real skin or pores, no photographic fabric, no lens depth-of-field. Realistic human proportions, dramatic lighting, epic composition, mood and atmosphere. Matte painting aesthetic. Faces: painted with visible brushstrokes, realistic proportions, defined bone structure, natural eyes — an illustrated face, never a photographic one. Consistent painterly quality across all characters. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
+  concept: 'A digital concept-art painting in the style of Craig Mullins and Karla Ortiz — film production art made with broad digital brushes: big simple shapes read first, brush marks stay visible in sky, water, ground and clothing, and the light is STAGED for the moment (a shaft, a rim light, a silhouette against brightness), not whatever light happened to be there. ' + NOT_A_PHOTOGRAPH + ' Proportions, anatomy and perspective are true to life; the execution is unmistakably painted. Faces: painted planes and strokes, defined bone structure, natural eyes — an illustrated face, never a photographed one. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   pixel: 'A 16-bit pixel art illustration in the style of Final Fantasy VI. Low resolution, limited color palette, detailed sprite work with a retro video game aesthetic. Not realistic. Faces: pixel-art rendering, limited color palette per face, clear pixel grid visible. No anti-aliasing on features. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   cyber: 'A cyberpunk anime illustration. Every figure is drawn in bold cel-shaded anime style: clean ink outlines, flat shaded skin, stylized features, never photographic. Render the scene at the story\'s own time of day, weather, and location — never switch daytime to night, never add rain. Add cyberpunk elements that read in daylight: glowing neon signs mounted on the scene\'s own fixtures — roadside sign posts, billboards, poles, shopfronts, walls (bright glowing shapes and colour only, no readable text or letters) — plus holographic glows and sleek neon-lit tech and cybernetic details. Neon-accented palette. Faces: cel-shaded anime rendering with crisp outlines and neon rim light. Preserve each character\'s actual age: babies, kindergartners, teenagers, adults, and grandparents each look their real age in this style.',
   // Photography-first wording (2026-08-14): the old text opened with

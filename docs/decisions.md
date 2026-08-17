@@ -12472,3 +12472,33 @@ existing case plus all four step visualisations come along unchanged.
 
 **Touched:** `server/config/models.js`
 **Status:** ✅ active
+
+## 2026-08-17 — NOT_A_PHOTOGRAPH: camera fingerprints named, shared by oil + concept
+
+**Context:** Concept still drifted photographic on real-world scenes after the
+2026-08-16 painted-first rewrite (job_1786917840874: fantasy pages painted,
+land pages photographic). Denying "photorealistic" is too abstract — the model
+reproduces the CAMERA's fingerprints, so those must be named, and a negation
+needs a positive target to paint instead.
+
+**Decision:** one shared `NOT_A_PHOTOGRAPH` constant used by the two painterly
+styles closest to photography (oil, concept): no lens depth-of-field/bokeh, no
+blurred background, no lens flare, no photographic grain, no skin pores, no
+camera-real fabric; depth from atmospheric haze not optical blur; lost-and-found
+edges; visible brushwork on every surface including skin and faces. Each style
+keeps its own medium sentence (oil: alla prima strokes, impasto ridges, canvas
+weave, loose backgrounds; concept: broad digital brushes, big shapes first,
+STAGED light). "Realistic proportions" reworded to "proportions are true to
+life; the execution is unmistakably paint" so realism no longer reads as
+"make it photographic".
+
+**Evidence:** worst known pages, prompts otherwise unchanged, run through the
+production shrink: oil 2/2 unmistakable oil paintings (impasto + canvas) vs a
+previously photoreal-figure cover; concept 3/4 painted on the exact page that
+had shipped as a photograph (roll 2 still showed bokeh). Styled avatar sheets
+verified already painted, so the residual drift is per-roll model variance on
+real-world subject matter, not a reference problem. Descriptors kept ~1k chars
+(they ride in every page prompt; the first draft blew the 8k Grok cap).
+
+**Touched:** `server/lib/promptBuilders.js` (NOT_A_PHOTOGRAPH, ART_STYLES.oil,
+ART_STYLES.concept).
