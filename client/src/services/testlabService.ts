@@ -103,6 +103,24 @@ export interface StoryScorecard {
   evaluatorHash?: string;
 }
 
+export interface EvalSpread {
+  values: number[]; min: number; max: number; range: number; mean: number; stdev: number;
+}
+
+export interface EvalConcept {
+  label: string;
+  sources: string[];
+  types: string[];
+  seenIn: number[];
+  of: number;
+  severities: Record<string, number>;
+  minPoints: number;
+  maxPoints: number;
+  swing: number;
+  verdict: 'detection-flip' | 'severity-flip' | 'stable';
+  duplicatesWithinRun?: number;
+}
+
 export interface ExperimentResult {
   storyId: string;
   pageNumber: number;
@@ -142,7 +160,29 @@ export interface ExperimentResult {
   identity?: { method?: string; answers?: Record<string, string>; somFailure?: string } | null;
   somPrompt?: string | null;
   report?: unknown;
-  storedBaseline?: { qualityScore?: number | null; semanticScore?: number | null };
+  // eval_variance: the same image scored N times, nothing else changed.
+  repeats?: number;
+  okRuns?: number;
+  scoreSpread?: EvalSpread;
+  countSpread?: EvalSpread;
+  pointSpread?: { quality: EvalSpread; semantic: EvalSpread; compliance: EvalSpread };
+  attribution?: {
+    stablePoints: number;
+    detectionFlipCount: number;
+    severityFlipCount: number;
+    stableCount: number;
+    potentialSwing: number;
+    bySource: Record<string, { pointRange: number; detectionFlips: number; severityFlips: number }>;
+  };
+  concepts?: EvalConcept[];
+  runs?: Array<{
+    run: number; ok: boolean; error?: string; elapsedMs?: number; finalScore?: number;
+    points?: { quality: number; semantic: number; compliance: number; total: number };
+    counts?: { quality: number; semantic: number; compliance: number };
+    findings?: Array<{ source: string; type: string | null; severity: string; points: number; description: string }>;
+    issuesSummary?: string | null;
+  }>;
+  storedBaseline?: { qualityScore?: number | null; semanticScore?: number | null; finalScore?: number | null };
   characterName?: string;
   qc?: { pass?: boolean; issues?: string[]; visionFeedback?: string | null; error?: string };
   method?: string | null;
@@ -384,6 +424,7 @@ export const TESTLAB_STAGES = [
   { id: 'image', label: 'Page image', producesImage: true, overridable: true },
   { id: 'empty_scene', label: 'Empty scene', producesImage: true, overridable: true },
   { id: 'quality_eval', label: 'Quality eval', producesImage: false, overridable: true },
+  { id: 'eval_variance', label: 'Eval variance (same image × N)', producesImage: false, overridable: false },
   { id: 'semantic_eval', label: 'Semantic eval', producesImage: false, overridable: true },
   { id: 'bbox', label: 'Bbox detection', producesImage: false, overridable: false },
   { id: 'char_repair', label: 'Character repair', producesImage: true, overridable: false },

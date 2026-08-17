@@ -667,6 +667,200 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
   };
 }
 
+/**
+ * EVAL VARIANCE — the same image, scored N times, nothing else changed.
+ *
+ * The question this answers: when two near-identical versions of a page score
+ * 28 and 85, how much of that gap is the IMAGE and how much is the JUDGE?
+ * Everything the judges see here is frozen — same bytes, same brief, same
+ * reference photos, same templates — so every difference between repeats is
+ * judge nondeterminism, measured rather than argued about.
+ *
+ * The score reproduced per repeat is the production one: composeDeductions →
+ * 100 − Σ SEVERITY_POINTS over the quality / semantic / compliance buckets.
+ * ENTITY IS EXCLUDED — it is a separate cross-page evaluator that
+ * evaluateImageQuality does not run, so its own variance is out of scope here.
+ *
+ * Attribution: findings are matched across repeats with the SAME rule the
+ * ranker uses to merge findings across evaluators (scoring.sameConcept), which
+ * splits the variance into the two mechanisms that behave differently:
+ *   - DETECTION flips: a concept present in some repeats and absent in others
+ *   - SEVERITY flips: a concept present in every repeat at different severities
+ * Anything left is the deterministic floor — the findings all repeats agree on.
+ *
+ * target.versionIndex pins a stored version (the two versions of one page are
+ * two members of the set); omitted → the page's active version.
+ * params.repeats — 2..5, default 3.
+ */
+async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { evaluateImageQuality } = require('./images');
+  const {
+    composeDeductions, computeMathFinalScore, deductionPoints,
+    significantWords, sameConcept,
+  } = require('./scoring');
+
+  const repeats = Math.max(2, Math.min(5, parseInt(params.repeats, 10) || 3));
+  const versionIndex = Number.isFinite(Number(ctx.target?.versionIndex))
+    ? Number(ctx.target.versionIndex) : null;
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, versionIndex);
+
+  // Frozen inputs, resolved ONCE and reused by every repeat — re-deriving them
+  // per run would let an input drift and be mistaken for judge variance.
+  const sceneDescription = evalSceneDescription(ctx);
+  const referencePhotos = evalReferencePhotos(ctx);
+  const artStyle = require('../services/prompts').resolveEvalArtStyle(ctx.artStyle, ctx.scene.prompt || null);
+
+  const runs = [];
+  for (let i = 1; i <= repeats; i++) {
+    const t0 = Date.now();
+    let evalResult = null;
+    let error = null;
+    try {
+      evalResult = await evaluateImageQuality(
+        imageData, sceneDescription, referencePhotos, 'scene',
+        null, `testlab-var${experimentId}-P${ctx.pageNumber}-r${i}`,
+        ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
+        { artStyle }
+      );
+    } catch (err) { error = err.message; }
+    const elapsedMs = Date.now() - t0;
+
+    if (!evalResult) {
+      // A null eval is itself a variance datum (a safety block or a truncated
+      // response IS a way the eval differs run to run) — recorded, not thrown,
+      // so the remaining repeats still produce a measurement.
+      runs.push({ run: i, ok: false, error: error || 'evaluateImageQuality returned null', elapsedMs });
+      continue;
+    }
+
+    const deductions = composeDeductions({ evalResult });
+    const findings = [];
+    for (const bucket of ['quality', 'semantic', 'compliance']) {
+      for (const d of (deductions[bucket] || [])) {
+        findings.push({
+          source: bucket, type: d.type || null, severity: d.severity,
+          points: deductionPoints(d), description: d.description || '',
+        });
+      }
+    }
+    const pointsBy = (b) => (deductions[b] || []).reduce((s, d) => s + deductionPoints(d), 0);
+    runs.push({
+      run: i, ok: true, elapsedMs,
+      finalScore: computeMathFinalScore(deductions),
+      points: {
+        quality: pointsBy('quality'), semantic: pointsBy('semantic'),
+        compliance: pointsBy('compliance'),
+        total: pointsBy('quality') + pointsBy('semantic') + pointsBy('compliance'),
+      },
+      counts: {
+        quality: (deductions.quality || []).length,
+        semantic: (deductions.semantic || []).length,
+        compliance: (deductions.compliance || []).length,
+      },
+      findings,
+      issuesSummary: evalResult.issuesSummary || null,
+    });
+  }
+
+  const ok = runs.filter(r => r.ok);
+  if (ok.length < 2) throw new Error(`Only ${ok.length}/${repeats} evaluations returned a result — cannot measure variance`);
+
+  const stat = (values) => {
+    const n = values.length;
+    const mean = values.reduce((s, v) => s + v, 0) / n;
+    const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+    return {
+      values, min: Math.min(...values), max: Math.max(...values),
+      range: Math.max(...values) - Math.min(...values),
+      mean: Math.round(mean * 10) / 10, stdev: Math.round(Math.sqrt(variance) * 10) / 10,
+    };
+  };
+
+  // Cluster every finding from every repeat into concepts. A concept records
+  // WHICH repeats saw it and at what severity/cost — that pair is the whole
+  // attribution.
+  const concepts = [];
+  for (const r of ok) {
+    for (const f of r.findings) {
+      const words = significantWords(f.description);
+      // A concept may only be hit ONCE per repeat, or one repeat reporting the
+      // same defect twice would read as agreement across repeats.
+      let c = concepts.find(x => sameConcept(x.words, words) && !x.runs.includes(r.run));
+      if (!c) {
+        c = concepts.find(x => sameConcept(x.words, words));
+        if (c && c.runs.includes(r.run)) { c.duplicatesWithinRun = (c.duplicatesWithinRun || 0) + 1; continue; }
+      }
+      if (!c) {
+        c = { words, label: f.description.slice(0, 160), sources: [], types: [], severities: {}, points: [], runs: [] };
+        concepts.push(c);
+      }
+      for (const w of words) c.words.add(w);
+      if (!c.sources.includes(f.source)) c.sources.push(f.source);
+      if (f.type && !c.types.includes(f.type)) c.types.push(f.type);
+      c.severities[f.severity] = (c.severities[f.severity] || 0) + 1;
+      c.points.push(f.points);
+      c.runs.push(r.run);
+    }
+  }
+
+  const conceptOut = concepts.map(c => {
+    const detectionStable = c.runs.length === ok.length;
+    const severityStable = Object.keys(c.severities).length === 1;
+    return {
+      label: c.label, sources: c.sources, types: c.types,
+      seenIn: c.runs.sort((a, b) => a - b), of: ok.length,
+      severities: c.severities,
+      minPoints: Math.min(...c.points), maxPoints: Math.max(...c.points),
+      // Cost swing this ONE concept can put on the score: absent-vs-worst for a
+      // detection flip, cheapest-vs-dearest severity for a severity flip.
+      swing: detectionStable ? Math.max(...c.points) - Math.min(...c.points) : Math.max(...c.points),
+      verdict: !detectionStable ? 'detection-flip' : (!severityStable ? 'severity-flip' : 'stable'),
+      ...(c.duplicatesWithinRun ? { duplicatesWithinRun: c.duplicatesWithinRun } : {}),
+    };
+  }).sort((a, b) => b.swing - a.swing || a.verdict.localeCompare(b.verdict));
+
+  const detectionFlips = conceptOut.filter(c => c.verdict === 'detection-flip');
+  const severityFlips = conceptOut.filter(c => c.verdict === 'severity-flip');
+  const stable = conceptOut.filter(c => c.verdict === 'stable');
+
+  const bySource = {};
+  for (const src of ['quality', 'semantic', 'compliance']) {
+    bySource[src] = {
+      pointRange: stat(ok.map(r => r.points[src])).range,
+      detectionFlips: detectionFlips.filter(c => c.sources.includes(src)).length,
+      severityFlips: severityFlips.filter(c => c.sources.includes(src)).length,
+    };
+  }
+
+  return {
+    storyId: ctx.storyId, pageNumber: ctx.pageNumber,
+    versionIndex, repeats, okRuns: ok.length,
+    scoreSpread: stat(ok.map(r => r.finalScore)),
+    countSpread: stat(ok.map(r => r.findings.length)),
+    pointSpread: {
+      quality: stat(ok.map(r => r.points.quality)),
+      semantic: stat(ok.map(r => r.points.semantic)),
+      compliance: stat(ok.map(r => r.points.compliance)),
+    },
+    attribution: {
+      // Points every repeat charges — the deterministic floor of this page.
+      stablePoints: stable.reduce((s, c) => s + c.maxPoints, 0),
+      detectionFlipCount: detectionFlips.length,
+      severityFlipCount: severityFlips.length,
+      stableCount: stable.length,
+      // Worst-case score gap two runs of THIS eval could produce on this image
+      // if every flip landed the same way. The observed range is a sample of it.
+      potentialSwing: conceptOut.reduce((s, c) => s + c.swing, 0),
+      bySource,
+    },
+    concepts: conceptOut,
+    runs,
+    storedBaseline: { qualityScore: ctx.scene.qualityScore ?? null, finalScore: ctx.scene.finalScore ?? null },
+  };
+}
+
 async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
@@ -5155,6 +5349,7 @@ const STAGE_RUNNERS = {
   image: runImageStage,
   empty_scene: runEmptySceneStage,
   quality_eval: runQualityEvalStage,
+  eval_variance: runEvalVarianceStage,
   semantic_eval: runSemanticEvalStage,
   bbox: runBboxStage,
   char_repair: runCharRepairStage,
@@ -6192,6 +6387,12 @@ async function runStageOnTarget(stage, target, opts) {
       const runner = STAGE_RUNNERS[stage];
       if (!runner) throw new Error(`Unknown stage: ${stage}. Valid: ${[...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES), ...Object.keys(STORY_STAGES)].join(', ')}`);
       const ctx = await loadSceneContext(target.storyId, target.pageNumber);
+      // The target itself, so a stage can read target-level fields that are not
+      // scene context (e.g. eval_variance's pinned versionIndex). It lives on
+      // the target rather than in params because a set's UNIQUE key is the
+      // target JSON — that is what lets two versions of ONE page be two
+      // separate members of the same set.
+      ctx.target = target;
       return await runner(ctx, opts);
     });
     result = captureRun.result;

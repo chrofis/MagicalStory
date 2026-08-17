@@ -1343,6 +1343,8 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
               ? 'Params JSON — e.g. {"model":"claude-sonnet"} · also: qwen-plus, qwen3-max, gemini-2.5-flash, deepseek-v4-pro, grok-4-fast'
               : stage === 'quality_eval'
               ? 'Params JSON — e.g. {"complianceModel":"claude-sonnet"} · compliancePrompt overrides the stage-2 template'
+              : stage === 'eval_variance'
+              ? 'Params JSON — {"repeats":3} (2–5). Pin a stored version by adding versionIndex to the set member\'s target.'
               : 'Params JSON (optional — extra stage parameters)'}
             value={paramsJson}
             onChange={e => setParamsJson(e.target.value)}
@@ -2756,6 +2758,55 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                       <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ backend: result.detectionBackend, figures: result.figures, objects: result.objects }, null, 2)}</pre>
                     </>
                   )}
+                  {stage === 'eval_variance' && result.scoreSpread && (
+                    <div className="space-y-2">
+                      {/* The headline IS the range — one number the owner can act on. */}
+                      <div className={`rounded-lg px-3 py-2 text-sm ${result.scoreSpread.range >= 20 ? 'bg-red-50 text-red-800' : result.scoreSpread.range >= 8 ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'}`}>
+                        <b>Score range {result.scoreSpread.range} pts</b> over {result.okRuns} identical runs
+                        {result.versionIndex != null && <> · version v{result.versionIndex}</>}
+                        {' '}— scores {result.scoreSpread.values.join(' · ')} (mean {result.scoreSpread.mean}, σ {result.scoreSpread.stdev})
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        <b>Findings per run:</b> {result.countSpread?.values.join(' · ')} ·{' '}
+                        <b>points by judge (range):</b> quality {result.pointSpread?.quality.range} · semantic {result.pointSpread?.semantic.range} · compliance {result.pointSpread?.compliance.range}
+                      </div>
+                      {result.attribution && (
+                        <div className="text-xs text-gray-700">
+                          <b>Where it comes from:</b> {result.attribution.stableCount} stable finding(s) costing a fixed {result.attribution.stablePoints} pts ·{' '}
+                          <span className="text-red-700">{result.attribution.detectionFlipCount} detection flip(s)</span> (seen in some runs, missed in others) ·{' '}
+                          <span className="text-amber-700">{result.attribution.severityFlipCount} severity flip(s)</span> (always seen, graded differently) ·{' '}
+                          worst-case swing {result.attribution.potentialSwing} pts
+                        </div>
+                      )}
+                      {!!result.concepts?.length && (
+                        <div className="overflow-x-auto">
+                          <table className="text-xs w-full">
+                            <thead><tr className="text-left text-gray-500">
+                              <th className="pr-2 py-1">verdict</th><th className="pr-2">seen in</th><th className="pr-2">judge</th>
+                              <th className="pr-2">type</th><th className="pr-2">severity</th><th className="pr-2">swing</th><th>finding</th>
+                            </tr></thead>
+                            <tbody>
+                              {result.concepts.map((c, ci) => (
+                                <tr key={ci} className="border-t border-gray-100 align-top">
+                                  <td className={`pr-2 py-1 font-medium whitespace-nowrap ${c.verdict === 'detection-flip' ? 'text-red-700' : c.verdict === 'severity-flip' ? 'text-amber-700' : 'text-gray-400'}`}>{c.verdict}</td>
+                                  <td className="pr-2 whitespace-nowrap">{c.seenIn.length}/{c.of}<span className="text-gray-400"> [{c.seenIn.join(',')}]</span></td>
+                                  <td className="pr-2 whitespace-nowrap">{c.sources.join('+')}</td>
+                                  <td className="pr-2 whitespace-nowrap">{c.types.join('/') || '—'}</td>
+                                  <td className="pr-2 whitespace-nowrap">{Object.entries(c.severities).map(([s, n]) => `${s}×${n}`).join(' ')}</td>
+                                  <td className="pr-2 whitespace-nowrap">{c.swing}</td>
+                                  <td className="text-gray-600">{c.label}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                      <details className="text-xs">
+                        <summary className="cursor-pointer text-gray-500">per-run detail (findings each run produced)</summary>
+                        <pre className="bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-96 whitespace-pre-wrap">{JSON.stringify(result.runs, null, 2)}</pre>
+                      </details>
+                    </div>
+                  )}
                   {result.storyId && (
                     <Button variant="secondary" size="sm" onClick={async () => {
                       const name = window.prompt(`Pin this ${stage} case to which set? (existing name or a new one)`);
@@ -2765,6 +2816,9 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                       if (result.pageNumber != null) target.pageNumber = result.pageNumber;
                       if (result.character) target.character = result.character;
                       if (result.coverType) target.coverType = result.coverType;
+                      // eval_variance pins the exact VERSION — the whole point of
+                      // the set is that two versions of one page are two cases.
+                      if (stage === 'eval_variance' && result.versionIndex != null) target.versionIndex = result.versionIndex;
                       const params: Record<string, unknown> = {};
                       if (stage === 'avatar_eval') { if ((result as { pass?: number }).pass != null) params.pass = (result as { pass?: number }).pass; params.splitRows = true; }
                       if (stage === 'char_repair') { params.characterName = result.character || result.characterName; if (result.backend) params.backend = result.backend; if (result.repairMode) params.repairMode = result.repairMode; }

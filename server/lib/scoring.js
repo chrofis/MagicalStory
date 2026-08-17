@@ -266,18 +266,20 @@ function composeDeductions({ evalResult = null, entityResult = null, consolidate
  * Sum severity points across every category (entity capped). This is the
  * total deduction; `100 − total` is the raw (un-clamped) score.
  */
+function deductionPoints(d) {
+  const type = String(d?.type || '').toLowerCase();
+  if (ZERO_POINT_TYPES.has(type)) return 0;
+  const raw = SEVERITY_POINTS[String(d?.severity || '').toLowerCase()] || 0;
+  // Ceiling by type — charge the lower of what was claimed and what the type
+  // is allowed to cost. Never raises a severity, only bounds it.
+  const ceiling = MAX_SEVERITY_TYPES[type];
+  return ceiling ? Math.min(raw, SEVERITY_POINTS[ceiling] || raw) : raw;
+}
+
 function sumDeductionPoints(deductions) {
   if (!deductions || typeof deductions !== 'object') return 0;
   let total = 0;
-  const points = (d) => {
-    const type = String(d?.type || '').toLowerCase();
-    if (ZERO_POINT_TYPES.has(type)) return 0;
-    const raw = SEVERITY_POINTS[String(d.severity || '').toLowerCase()] || 0;
-    // Ceiling by type — charge the lower of what was claimed and what the type
-    // is allowed to cost. Never raises a severity, only bounds it.
-    const ceiling = MAX_SEVERITY_TYPES[type];
-    return ceiling ? Math.min(raw, SEVERITY_POINTS[ceiling] || raw) : raw;
-  };
+  const points = deductionPoints;
   // `consolidated` is the deduped cross-evaluator list (one entry per unique
   // defect) — mutually exclusive with the raw buckets by construction in
   // composeDeductions, so summing all four never double-counts.
@@ -479,6 +481,24 @@ function significantWords(desc) {
 }
 
 /**
+ * Do two issue descriptions (as significant-word sets) describe the SAME
+ * conceptual defect? shared ≥ 2 significant words OR Jaccard ≥ 0.4.
+ *
+ * This is identity matching for aggregation — never classification of what a
+ * finding MEANS (that belongs to the evaluator prompts). Extracted from
+ * versionDeductionTotal's clusterer so the Test Lab's eval-variance stage
+ * matches findings ACROSS RUNS by exactly the same rule the ranker uses
+ * across evaluators; two calibrations of "same issue" would make the
+ * variance measurement disagree with the thing it measures.
+ */
+function sameConcept(wordsA, wordsB) {
+  let shared = 0;
+  for (const word of wordsB) if (wordsA.has(word)) shared++;
+  const union = wordsA.size + wordsB.size - shared;
+  return shared >= 2 || (union > 0 && shared / union >= 0.4);
+}
+
+/**
  * Un-clamped total weighted deduction for a version. This is the RANKING
  * signal the clamped 0–100 finalScore throws away: once a page accrues >100
  * deduction points its finalScore pins to 0, and several failing candidates
@@ -527,11 +547,7 @@ function versionDeductionTotal(version) {
     const wt = weightOf(issue);
     let merged = false;
     for (const c of clusters) {
-      // shared ≥ 2 significant words OR Jaccard ≥ 0.4 → same conceptual issue
-      let shared = 0;
-      for (const word of w) if (c.words.has(word)) shared++;
-      const union = c.words.size + w.size - shared;
-      if (shared >= 2 || (union > 0 && shared / union >= 0.4)) {
+      if (sameConcept(c.words, w)) {
         for (const word of w) c.words.add(word);
         c.weight = Math.max(c.weight, wt);
         merged = true;
@@ -740,6 +756,11 @@ module.exports = {
   // Legacy helpers (still used by some readers/writers — to be migrated)
   computeFinalScore,
   versionDeductionTotal,
+  // Issue-identity primitives (read by the Lab's eval_variance stage)
+  significantWords,
+  sameConcept,
+  sumDeductionPoints,
+  deductionPoints,
   pickBestVersionIndex,
   recomputeActiveVersion,
   recomputeAllActiveVersions,

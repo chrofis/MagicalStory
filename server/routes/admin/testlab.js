@@ -573,7 +573,14 @@ router.post('/experiments', async (req, res) => {
         .filter(t => t.storyId && (stage !== 'cover' || t.coverType));
     } else {
       targets = targets
-        .map(t => ({ storyId: String(t.storyId), pageNumber: parseInt(t.pageNumber, 10) }))
+        .map(t => ({
+          storyId: String(t.storyId),
+          pageNumber: parseInt(t.pageNumber, 10),
+          // A page target may pin a stored version. Kept because it identifies
+          // the CASE (two versions of one page are two different cases), which
+          // is also what makes them distinct members of a set.
+          ...(Number.isFinite(Number(t.versionIndex)) ? { versionIndex: Number(t.versionIndex) } : {}),
+        }))
         .filter(t => t.storyId && Number.isFinite(t.pageNumber));
     }
     if (targets.length === 0) { experimentRunning = false; return res.status(400).json({ error: 'No valid targets' }); }
