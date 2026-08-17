@@ -52,11 +52,21 @@ const EVALUATORS = {
   '2.1': { name: 'sonnet', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'claude-sonnet' },
   '2.2': { name: 'grok', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'grok-4.6' },
   '2.3': { name: 'gemini', promptKey: 'storyScorecardJudgeV2', rubric: RUBRIC, judge: 'gemini-3.1-pro' },
+  // Generation 3 = premise-aware. 2.x judged the artifacts with no brief, so a
+  // judge could not tell a commissioned premise from a plot hole: on the
+  // moon-landing stories two judges independently reported the child-crew
+  // casting as a defect when it is the product concept, stated verbatim in
+  // storyDetails ("ROLES: <child>: <historical figure>"). A new generation
+  // rather than an edit to 2.x, because changing what a judge sees changes every
+  // score it produces — 2.x rows stay comparable among themselves.
+  '3.1': { name: 'sonnet', promptKey: 'storyScorecardJudgeV3', rubric: RUBRIC, judge: 'claude-sonnet' },
+  '3.2': { name: 'grok', promptKey: 'storyScorecardJudgeV3', rubric: RUBRIC, judge: 'grok-4.6' },
+  '3.3': { name: 'gemini', promptKey: 'storyScorecardJudgeV3', rubric: RUBRIC, judge: 'gemini-3.1-pro' },
 };
 // back-compat shapes for anything that read these directly
 const EVALUATOR_PROMPT_KEYS = Object.fromEntries(Object.entries(EVALUATORS).map(([v, e]) => [v, e.promptKey]));
 const EVALUATOR_RUBRICS = Object.fromEntries(Object.entries(EVALUATORS).map(([v, e]) => [v, e.rubric]));
-const DEFAULT_EVALUATOR_VERSION = '2.1'; // prompt gen 2, judged by sonnet
+const DEFAULT_EVALUATOR_VERSION = '3.1'; // prompt gen 3 (premise-aware), judged by sonnet
 const EVALUATOR_VERSION = DEFAULT_EVALUATOR_VERSION; // back-compat export
 
 function resolveEvaluator(version) {
@@ -136,11 +146,39 @@ const SECTION_TITLES = {
 // actually present. A full-story score passes all four; a single-stage rerun
 // (e.g. just the beats, just the text) passes one — the judge then scores only
 // that subset, and scoreFromDims({partial:true}) grades whatever came back.
-function buildJudgeInputFromArtifacts(artifacts) {
-  return Object.keys(RUBRIC)
+function buildJudgeInputFromArtifacts(artifacts, context = null) {
+  const body = Object.keys(RUBRIC)
     .filter(k => artifacts[k] != null && String(artifacts[k]).trim())
     .map(k => `${SECTION_TITLES[k]}\n${artifacts[k]}`)
     .join('\n\n===\n\n');
+  // The brief goes FIRST and is never a rubric key, so it can never be scored as
+  // an artifact — it only stops a judge reporting the commission as a defect.
+  return context && String(context).trim()
+    ? `# BRIEF (the commission — context only, not scored)\n${String(context).trim()}\n\n===\n\n${body}`
+    : body;
+}
+
+/**
+ * The commission, as the judge should see it: what the story was asked to be.
+ * `storyDetails` is the payload — it carries the role casting for historical
+ * stories ("ROLES: <child>: <historical figure>"), which a premise-blind judge
+ * reads as a plot hole. Everything here comes from the stored story row.
+ */
+function buildBriefContext(d = {}) {
+  const lines = [
+    d.title ? `Title: ${d.title}` : null,
+    d.storyCategory ? `Category: ${d.storyCategory}` : null,
+    d.storyTypeName || d.storyType ? `Type: ${d.storyTypeName || d.storyType}` : null,
+    d.storyTopic ? `Topic: ${d.storyTopic}` : null,
+    d.storyTheme ? `Theme: ${d.storyTheme}` : null,
+    d.language ? `Language: ${d.language}` : null,
+    d.languageLevel ? `Reading level: ${d.languageLevel}` : null,
+    d.pages ? `Pages: ${d.pages}` : null,
+    Array.isArray(d.characters) && d.characters.length
+      ? `Cast: ${d.characters.map(c => c && c.name).filter(Boolean).join(', ')}` : null,
+    d.storyDetails ? `\nCommissioned idea:\n${String(d.storyDetails).slice(0, 3000)}` : null,
+  ].filter(Boolean);
+  return lines.length ? lines.join('\n') : '';
 }
 
 // The single-message input handed to the judge for a full stored story.
@@ -208,7 +246,7 @@ function parseJudgeJson(text) {
 
 module.exports = {
   RUBRIC, RUBRIC_V1, EVALUATOR_RUBRICS, mean, finalBeats, finalScenes, extractArtifacts,
-  buildJudgeInput, buildJudgeInputFromArtifacts, provenanceOf,
+  buildJudgeInput, buildJudgeInputFromArtifacts, buildBriefContext, provenanceOf,
   scoreFromDims, parseJudgeJson,
   EVALUATOR_VERSION, DEFAULT_EVALUATOR_VERSION, EVALUATOR_PROMPT_KEYS, EVALUATORS,
   resolveEvaluator, findEvaluatorForJudge, listScorers, evaluatorStamp,

@@ -8,8 +8,8 @@ const PART_LABEL: Record<string, string> = {
 };
 // part → the rerun stage. Passing both model + reviewModel covers all stages.
 // Scorer names mirror server/lib/storyScorecard.js EVALUATORS. From v2 the
-// version pins the judge: 2.1 sonnet, 2.2 grok, 2.3 gemini.
-const SCORER_NAMES: Record<string, string> = { '2.1': 'sonnet', '2.2': 'grok', '2.3': 'gemini' };
+// version pins the judge: x.1 sonnet, x.2 grok, x.3 gemini. Gen 3 = premise-aware.
+const SCORER_NAMES: Record<string, string> = { '2.1': 'sonnet', '2.2': 'grok', '2.3': 'gemini', '3.1': 'sonnet', '3.2': 'grok', '3.3': 'gemini' };
 const scorerLabel = (v: string) => (SCORER_NAMES[v] ? `${v} ${SCORER_NAMES[v]}` : `v${v}`);
 
 const PART_STAGE: Record<string, string> = {

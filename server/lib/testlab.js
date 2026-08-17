@@ -5384,7 +5384,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
  * way. The returned scorecard carries evaluatorVersion + evaluatorHash — scores
  * are only ever comparable within one evaluator.
  */
-async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null, persist = null, evalVersion = null } = {}) {
+async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null, persist = null, evalVersion = null, context = null } = {}) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
   const { callTextModelStreaming } = require('./textModels');
@@ -5407,7 +5407,7 @@ async function scoreArtifactsWithJudge(artifacts, { model, promptOverride = null
   const { version, promptKey, rubric } = ev;
   const template = promptOverride || PROMPT_TEMPLATES[promptKey];
   if (!template) throw new Error(`story-scorecard judge template unavailable for evaluator ${version}`);
-  const input = sc.buildJudgeInputFromArtifacts(artifacts);
+  const input = sc.buildJudgeInputFromArtifacts(artifacts, context);
   if (!input.trim()) throw new Error('no artifacts to score');
   // The artifacts actually sent — the judge is graded on exactly these, never on
   // any zero-skeleton it echoes back for the ones it wasn't given.
@@ -5519,6 +5519,8 @@ async function runStoryScorecardStage(target, { params = {}, promptOverride = nu
   }
   const r = await scoreArtifactsWithJudge(sc.extractArtifacts(storyData), {
     model: params.model, promptOverride, evalVersion: params.evalVersion,
+    // The commission, so a judge does not report the requested premise as a fault.
+    context: sc.buildBriefContext(storyData),
     persist: { storyId: target.storyId, title: storyData.title, language: storyData.language, artStyle: storyData.artStyle, source: 'story_scorecard', model: sc.provenanceOf(storyData).writer },
   });
   return {

@@ -12773,3 +12773,29 @@ server/lib/testlab.js) A run with `sceneDescriptionOverride` generated FROM the 
 but was judged against the STORED brief, so three P6 A/B renders scored semantic 0 for
 lacking exactly the defects the override had removed. The image stage now passes the
 override to the evaluator; same render re-scored -140 → -60, remainder legitimate.
+
+## 2026-08-17 — Evaluator generation 3: the judge sees the commission
+
+**Context:** 2.x judge input was the four artifacts and nothing else, so a judge could not
+distinguish a commissioned premise from a plot hole. On both moon-landing stories two judges
+independently scored the child-crew casting as a defect — grok: *"James and the child-crew
+conceit drop in unlicensed"*; gemini: *"bizarre … without an 'imagination' frame"* — when that
+casting IS the product concept, stated verbatim in `stories.data.storyDetails`
+(`ROLES: <child>: <historical figure>`). Two false findings, one of them repeated across runs.
+
+**Decision:** Generation 3 prepends a `# BRIEF (the commission — context only, not scored)`
+section built by `buildBriefContext(storyData)` (title, category, type, topic, theme, language,
+reading level, pages, cast, and the commissioned idea capped at 3k). The v3 prompt states that
+anything the brief asks for is intended by design and must not be reported as a defect. Scorers:
+**3.1 sonnet / 3.2 grok / 3.3 gemini**, and `DEFAULT_EVALUATOR_VERSION` = 3.1.
+
+A NEW GENERATION, not an edit to 2.x: changing what a judge sees changes every score it
+produces, so 2.x rows stay internally comparable and the premise-blind scores remain on record.
+The brief is deliberately not a rubric key, so it can never be scored as an artifact.
+
+**Also fixed earlier the same day (reviewer side):** the beats reviewer already had the premise
+via `{STORY_BRIEF}`; what it lacked was the topic guide, now passed as `{STORY_GUIDE_SECTION}`.
+
+**Touched:** prompts/story-scorecard-judge-v3.txt, server/services/prompts.js,
+server/lib/storyScorecard.js, server/lib/testlab.js,
+client/src/components/testlab/ScorecardsPanel.tsx.
