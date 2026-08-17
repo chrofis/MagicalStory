@@ -390,7 +390,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // =========================================================================
   // Step 1: Evaluate all images + entity consistency (parallel)
   // =========================================================================
-  await updateProgress(32, 'Evaluating image quality...');  // 32 = eval start
+  await updateProgress(64, 'Evaluating image quality...');  // 64 = eval start (repair phase = ~36% of wall clock, 64-95)
   log.info(`🔍 [UNIFIED PIPELINE] Step 1: Evaluating ${imagesWithData.length} images + entity consistency...`);
   const step1Start = Date.now();
 
@@ -1664,7 +1664,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     require('./runMetrics').forJob(storyData?.id || jobId).add('redo_trigger', badPages.length);
 
     // Progress: spread rounds across 35-60% range
-    const progressBase = 35 + Math.floor((round - 1) / maxRegenAttempts * 25);
+    const progressBase = 68 + Math.floor((round - 1) / maxRegenAttempts * 20);
     await updateProgress(progressBase, `Round ${round}/${maxRegenAttempts}: Repairing ${badPages.length} pages...`);
 
     // Per-page decision: ONE method per page per round.
@@ -2131,7 +2131,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const freshEntityCheckData = buildEntityCheckData(repairedEntries);
       const roundEvalInputs = buildEvalInputs(roundSuccess);
 
-      const evalProgressPct = progressBase + 8;
+      const evalProgressPct = progressBase + 6;
       await updateProgress(evalProgressPct, `Round ${round}: Evaluating + entity check ${roundSuccess.length} repaired images...`);
       log.info(`🔍 [UNIFIED PIPELINE] Round ${round}: Running entity consistency + eval in parallel on ${roundSuccess.length} images...`);
 
@@ -2279,7 +2279,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // two-stage Step 3 → Step 7 picks; the round loop now handles char-fix
   // inline so there's no need for a second pick after a separate
   // character-repair stage.
-  await updateProgress(63, 'Selecting best versions...');
+  await updateProgress(89, 'Selecting best versions...');
   log.info(`📊 [UNIFIED PIPELINE] Step 3: Selecting best version per page...`);
 
   const finalBestPerPage = new Map();
@@ -2506,7 +2506,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // scores charged), grid images = a grids-only rebuild of the picked crops
   // (pure compositing, no model call).
   try {
-    await updateProgress(71, 'Assembling final entity report from picked versions...');
+    await updateProgress(92, 'Assembling final entity report from picked versions...');
     const pickedEntries = rawImages.filter(img => img.imageData && img.pageNumber != null).map(img => {
       const best = finalBestPerPage.get(img.pageNumber);
       if (!best?.imageData) return null;
@@ -2586,7 +2586,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // The dedicated /api/stories/:id/style-check endpoint still exists for
   // ad-hoc reruns, but auto-running it here avoids the user having to click
   // a button to discover that page 4 is in a different art style.
-  await updateProgress(72, 'Style consistency audit...');
+  await updateProgress(94, 'Style consistency audit...');
   let styleConsistency = null;
   try {
     const { checkStoryStyleConsistency } = require('./styleConsistency');
@@ -2719,7 +2719,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     styleConsistency = null;
   }
 
-  await updateProgress(73, 'Finalizing repair results...');
+  await updateProgress(96, 'Finalizing repair results...');
 
   // =========================================================================
   // Build final results

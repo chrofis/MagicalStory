@@ -78,6 +78,9 @@ const SKIP_EVAL = arg('skipEval', 'true').toLowerCase() !== 'false';
 const ART_STYLE = arg('artStyle', 'watercolor');
 const CATEGORY = arg('category', 'adventure');
 const TOPIC = arg('topic', 'pirate');
+// --city=Luzern → payload.userLocation, which drives landmark resolution
+// (beats + AD get the city's indexed landmarks). Omit for no landmarks.
+const CITY = arg('city', null);
 const DETAILS = arg('details', 'Eine kurze Piratengeschichte für einen Pipeline-Smoke-Test.');
 const SKIP_COVERS = arg('skipCovers', 'true').toLowerCase() !== 'false';
 const REPAIR = arg('repair', 'false').toLowerCase() === 'true';
@@ -132,6 +135,19 @@ async function api(pathSegment, { method = 'GET', body = null, token = null, con
     }, null, 2));
     console.log('\nNo API calls made. Remove --dryRun to launch.');
     return;
+  }
+
+  // 0. Deploy window — a run launched while a build is in flight dies when the
+  //    container swaps ("Server restarted during generation"). --force skips.
+  {
+    const { checkDeployWindow } = require('./lib/deployGate');
+    const branch = BASE_URL.includes('staging') ? 'staging' : 'master';
+    const gate = await checkDeployWindow(BASE_URL, branch);
+    console.log(`\n0. Deploy window: ${gate.reason}`);
+    if (!gate.ok && arg('force', 'false') !== 'true') {
+      console.error('\n❌ Refusing to launch. Re-run once the deploy has landed, or pass --force=true.');
+      process.exit(3);
+    }
   }
 
   // 1. Login
@@ -193,6 +209,7 @@ async function api(pathSegment, { method = 'GET', body = null, token = null, con
     skipQualityEval: SKIP_EVAL,
     idempotencyKey,
   };
+  if (CITY) payload.userLocation = { city: CITY, country: 'Switzerland' };
   if (COMPOSITE_MODE === 'true') payload.composite = true;
   else if (COMPOSITE_MODE === 'false') payload.composite = false;
   if (PHANTOM_MODE === 'true') payload.phantomPoseRender = true;

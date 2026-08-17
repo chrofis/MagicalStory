@@ -12686,3 +12686,44 @@ brushwork, faces included" forbids. Face-level drift is now the open item, not
 judge over-generalisation.
 
 **Touched:** `server/lib/styleConsistency.js`.
+
+## 2026-08-17: Progress bar re-budgeted from measured medians; launch gate for the deploy window; the indexer persists photo kinds
+
+Three fixes, one theme — the system knew things it never wrote down.
+
+**1. Progress percent is now time-proportional.** Measured medians over three
+completed runs of the same story: text 765s (58% of wall clock), images 50s (4%),
+repair 468s (36%). The bar gave them 10, 19 and 43 points — so it sat at 6% for 15
+minutes of a 25-minute run, then jumped 19 points for 50 seconds of work. New axis:
+text 1→56 (per-stage checkpoints placed at their cumulative median: beats 1, beats
+review 3, bible 18, wardrobe 23, briefs 30, scene review 42, page text 51), handoff
+57-59, images 60→64, repair rounds 68→88, pick-best 89, entity assembly 92, style
+audit 94, finalize 96, done 100. Checkpoints alone still freeze the bar during a
+200s+ LLM call, so the text-phase heartbeat (added the same day for liveness) now
+also INTERPOLATES: each stage reports its expected duration and the next checkpoint,
+and the bar eases toward it, capped at the boundary — a slow stage stalls at the next
+checkpoint instead of lying. Writes use GREATEST(progress, …) so the bar cannot go
+backwards. The unified/trial path keeps its arrival-ordered checkpoints (a trial runs
+~2 minutes; the distortion does not exist there).
+
+**2. Launch gate for the deploy window (scripts/lib/deployGate.js).** The pre-push
+idle gate protects the moment of pushing; the container swap happens 1-3 minutes
+later, and a run launched into that window dies with "Server restarted during
+generation" (job_1786917705204, killed at 3% — both agents had truthfully seen
+"idle"). Nothing reports a pending build: /api/health shows the RUNNING commit. The
+launcher can see the gap, though — deployed commit vs origin tip — so the smoke
+runner now refuses to start when they differ (--force=true overrides). Unknown state
+(no network, no git) does not block: this gate exists to catch one known failure, not
+to editorialise about uncertainty.
+
+**3. The landmark indexer never persisted photo_type.** The kind-matching attach path
+shipped a day earlier reads photo_type[_2..6]; prod carried values from an older
+classification pass, but saveLandmarkToIndex's INSERT/UPSERT did not include the
+columns at all — so every newly indexed landmark got NULL kinds and fell back to the
+slot-position guess. Added to both the column list and the ON CONFLICT update.
+Remaining unclassified: 17 staging-only rows with photos (Naaldwijk/Baden test data,
+absent from prod by qid or name) — the slot fallback covers them; not worth an API
+run.
+
+**Touched:** server/lib/beatsPipeline.js, storyJobPipeline.js, server/lib/repairPipeline.js,
+server/lib/landmarkPhotos.js, scripts/lib/deployGate.js, scripts/test-scene-composite-smoke.js.

@@ -2165,12 +2165,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // perfectly healthy job mid-call (job_1786916653164, killed at 2% during
     // beats planning). The image phase already guards this way; the text phase
     // — the longest in the run — did not.
+    // The same interval also INTERPOLATES the bar between stage checkpoints.
+    // Stages here are single LLM calls of 25s-220s; without interpolation the
+    // percent freezes on one number for minutes (measured: 6% held for 15 of a
+    // 25-minute run). `textStage` is set by onStage below and carries the
+    // measured budget for the running stage; progress eases toward the next
+    // checkpoint and never passes it, so a slow stage stalls at the boundary
+    // rather than lying about being finished.
+    let textStage = null;
     const textPhaseHeartbeat = setInterval(() => {
-      dbPool.query(
-        'UPDATE story_jobs SET updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND status = $2',
-        [jobId, 'processing']
-      ).catch(err => log.debug(`[HEARTBEAT] text phase job ${jobId}: ${err.message}`));
-    }, 60000);
+      let sql = 'UPDATE story_jobs SET updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND status = $2';
+      let params = [jobId, 'processing'];
+      if (textStage && textStage.next > textStage.pct && textStage.ms > 0) {
+        const frac = Math.min(1, (Date.now() - textStage.startedAt) / textStage.ms);
+        const eased = Math.floor(textStage.pct + (textStage.next - textStage.pct) * frac);
+        if (eased > textStage.pct) {
+          sql = 'UPDATE story_jobs SET progress = GREATEST(progress, $3), updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND status = $2';
+          params = [jobId, 'processing', eased];
+        }
+      }
+      dbPool.query(sql, params)
+        .catch(err => log.debug(`[HEARTBEAT] text phase job ${jobId}: ${err.message}`));
+    }, 20000);
     let unifiedResponse;
     let unifiedModelId;
     let unifiedUsage;
@@ -2194,10 +2210,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         onClothingRequirements: onClothingRequirementsReady,
         // Per-stage progress (2-7%): without it the bar sits at 1% for the
         // whole ~10-minute text phase; heartbeat never moves the percent.
-        onStage: async (pct, msg) => {
+        onStage: async (pct, msg, hint = null) => {
+          // Record the running stage so the heartbeat can ease the bar toward
+          // the next checkpoint while this call is in flight.
+          textStage = hint ? { pct, next: hint.next ?? pct, ms: hint.ms ?? 0, startedAt: Date.now() } : null;
           try {
             await dbPool.query(
-              'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+              'UPDATE story_jobs SET progress = GREATEST(progress, $1), progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
               [pct, msg, jobId]
             );
           } catch { /* progress only */ }
@@ -2607,7 +2626,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const scenesStarted = streamingSceneExpansionPromises.size;
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [8, `Story complete: "${title}" (${scenesStarted} scenes in parallel)`, jobId]  // 8 = text complete
+      [57, `Story complete: "${title}" (${scenesStarted} scenes in parallel)`, jobId]  // 57 = text complete (text phase = ~58% of wall clock)
     );
 
     // Wait for early avatar styling (started during streaming when clothing requirements detected)
@@ -2662,7 +2681,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     genLog.setStage('avatars');
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [9, `Preparing styled avatars...`, jobId]  // 9 = avatar styling
+      [58, `Preparing styled avatars...`, jobId]  // 58 = avatar styling
     );
 
     // Collect avatar requirements and prepare styled avatars
@@ -2806,7 +2825,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       genLog.setStage('scenes');
       await dbPool.query(
         'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-        [10, `Finalizing ${streamingSceneExpansionPromises.size} scene expansions...`, jobId]  // 10 = scenes expanded
+        [59, `Finalizing ${streamingSceneExpansionPromises.size} scene expansions...`, jobId]  // 59 = scenes expanded
       );
 
       // Start any missing scene expansions
@@ -3073,7 +3092,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     genLog.setStage('images');
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [11, 'Generating page illustrations...', jobId]  // 11 = images start
+      [60, 'Generating page illustrations...', jobId]  // 60 = images start (images are only ~4% of wall clock)
     );
 
     timing.pagesStart = Date.now();
@@ -3821,7 +3840,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       let pagesDone = 0;
       const bumpProgress = () => {
         pagesDone++;
-        const pct = 11 + Math.min(19, Math.floor((pagesDone / expandedScenes.length) * 19));
+        const pct = 60 + Math.min(4, Math.floor((pagesDone / expandedScenes.length) * 4));
         dbPool.query(
           'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND status = $4',
           [pct, `Illustration ${pagesDone}/${expandedScenes.length} done...`, jobId, 'processing']
