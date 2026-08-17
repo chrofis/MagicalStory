@@ -12355,3 +12355,55 @@ heartbeats stay (they also drive progressive parsing).
 it was reading a signal the text phase never sent.
 
 **Touched:** storyJobPipeline.js.
+
+## 2026-08-17 — Three positives on the head, not one (SAM was dropping foreheads)
+
+**Context:** p10 of `job_1786829555599_rgzoyoprx`: Sarah's cut-out had a hole
+where her forehead is. SAM returned her hair, her glasses and her lower face,
+and nothing between hairline and eyebrows. Her only head point sat just below
+the lens rim, so nothing anchored the region above the glasses.
+
+Two wrong diagnoses were published before the right one, both from reasoning
+instead of measuring. First "her head pixels go to Daniel, who is nearer" — the
+padded-head protection (same day) refuted it: protection only ever ADDS pixels
+back, and it added 385 px to Daniel and 357 to Noah on that same page while
+leaving Sarah bit-identical at 66,980. Zero gain means nothing of hers was
+contested. Second "the glasses" and "the unseeded white trousers" — both
+refuted by p−3, where the same character with the same glasses and the same
+skipped neutral-colour seed comes out clean.
+
+**Decision:** Alongside the face-box centre, two more positive points at ±20% of
+the RAW face box height, clamped to stay inside that box. Raw and not padded
+deliberately: the padded box is 4x the area and reaches into hair and
+background, where a positive point claims the wrong thing.
+
+**Rationale:** A single point cannot hold a head that a strong horizontal edge
+cuts in two — glasses, a hat brim, a fringe. This is the mechanism the codebase
+already relies on for garments (one dot on a blouse took a figure from 38,107
+to 73,828 px). Points are free: SAM's prompt encoder has no count limit, the
+analyzer imposes none, and it is still ONE call per figure. Sarah was being sent
+5 points of which 3 were negatives — two positives for her whole body.
+
+Measured, Test Lab set #12, exp #738 → #739 (27 figures over 6 pages):
+
+```
+Sarah p10          66,980 -> 73,154  (+6,174)  forehead present
+total maskPx    2,336,660 -> 2,342,621 (+5,961 — i.e. almost all of it Sarah)
+total lostToFront  22,363 -> 29,808  (+33%)
+avg points/figure     2.9 -> 4.8
+```
+
+11 figures shrank and 8 grew, so the cut-outs were inspected rather than
+trusted: on p−2, p1 and p10 the shrinkage is stray scraps and ankle-level noise
+at the water/shadow boundary, not body parts.
+
+**The cost to watch:** contested pixels rose a third. Every mask that grows
+overlaps its neighbours more, so the winner-take-all pass has more to settle. It
+netted out invisibly here, but a head point landing on a NEIGHBOUR would grow
+the mask the wrong way. The Lab's SAM-input view draws these green and labelled
+`head -20%` / `head +20%` so that is visible rather than inferred.
+
+**Touched:** `server/lib/figureDetection.js` (`_maskBoxesFrontFirst`),
+`server/lib/bboxDetection.js` (`createSamInputOverlayImage` labels),
+`tests/manual/occlusionDepth.test.js`
+**Status:** ✅ active
