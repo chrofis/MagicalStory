@@ -225,11 +225,19 @@
 </tr>
 
 <tr>
-  <td><strong>Scene composite</strong> (multiple Grok calls) — <strong>🗄 KILLED 2026-05-16</strong></td>
-  <td><code>server/lib/sceneComposite.js</code> (in tree, unreachable)</td>
+  <td><strong>Scene composite — the 2026-05 build</strong> (multiple Grok calls) — <strong>🗄 KILLED 2026-05-16</strong></td>
+  <td><code>server/lib/sceneComposite.js</code> (that entry point still unreachable)</td>
   <td>Grok generate ×1 + edit ×2 (+N for phantom-pose); stratified variant flat 4 calls</td>
   <td>2×4 character sheet + scene metadata + optional VB grid.</td>
   <td>Five-step uniform: <em>populated plate</em> → bbox detect → <em>depopulate</em> → sharp-composite cutouts → blend. Stratified variant (2026-05-16, killed same day): cast depth-split, back native in anchor plate, front silhouettes → front-figure plate → diff-crop → composite → blend. <strong>Both killed by the hardcoded <code>compositeEnabled = false</code> kill-switch at <code>server.js:5668</code></strong> after producing score-0 outputs that always fell back to the direct path anyway. Re-enable only after fixing style-drift, identity-pack label leakage, Grok input-aspect coercion, and passing an end-to-end staging gate. See <code>docs/decisions.md</code> → "Scene composite pipeline killed".</td>
+</tr>
+
+<tr>
+  <td><strong>Page composite</strong> (3 Grok calls, ~$0.06) — <strong>✅ LIVE 2026-08-15</strong></td>
+  <td><code>storyJobPipeline.js</code> ~3960 → <code>generateSceneComposite</code> (<code>server/lib/sceneComposite.js</code>)</td>
+  <td>Grok generate ×1 (plate) + edit ×1 (depopulate) + edit ×1 (blend). Detection is local (GroundingDINO), not a paid call.</td>
+  <td>2×4 character sheets, scene metadata (depths, expressions, interactions), clothingRequirements, optional VB grid.</td>
+  <td>Replaces <code>runScaleRepair</code> on the <code>needsScaleRepair</code> trigger — <strong>only</strong> pages declaring ≥1 foreground AND ≥1 background, outdoor, no shared vessel. Steps: coloured-silhouette plate → depopulate → <code>findSilhouettesWithDino</code> (DINO person+face boxes; palette hue names each box; head measured from the pale tint INSIDE the face box) → <code>sizeFigure</code> (painted height, unless the head says scenery hides part of them, the frame cuts them, or <code>buildAgeTargets</code> says a child is drawn adult-sized) → paste with figure-figure occlusion → <code>blendPastedCanvas</code>. <strong>Two aborts keep the original render:</strong> a box that cannot be a person, or a depth spread under 2×. <strong>Never send the page prompt to the blend</strong> — its staging sections relocate characters (measured 9 variants, Lab 695–705); it gets a census + metadata emotions/interactions instead (<code>buildBlendEditPrompt</code>). Outcome per page in <code>sceneImages[].compositeOutcome</code>. Needs DINO reachable or it aborts by design. See <code>docs/decisions.md</code> 2026-08-15 (8 entries) and <code>docs/image-routing.md</code>.</td>
 </tr>
 
 <tr>

@@ -180,3 +180,6 @@ These act like templates but can only be edited in code:
 | `grok.js` (~313) | Magenta-padding outpaint instruction prefix |
 | `coverIterate.js` (`feedbackParts`, ~331) | Cover feedback block + visual-bible prose assembly |
 | `sceneComposite.js` (~893), `character2x4Sheet.js` (~395) | Duplicated art-style descriptor tables — comments require alignment with `prompts/art-styles.txt` |
+| `sceneComposite.js` `buildPopulatedPlatePrompt` | Coloured-silhouette plate for the page composite (hardcoded, not a template) |
+| `sceneComposite.js` `buildDepopulatePrompt` | Removes the silhouettes to leave a clean background plate (hardcoded) |
+| `sceneComposite.js` `buildBlendEditPrompt` | The composite BLEND prompt: goal + scene overview + cast (clothing/action) + interactions + emotions from metadata. **Never the page prompt** — that relocates characters (decisions.md 2026-08-15). Built from `buildBlendMetadata` (hardcoded) |
