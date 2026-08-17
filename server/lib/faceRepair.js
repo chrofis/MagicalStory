@@ -666,7 +666,63 @@ async function buildPrompt({ treatment, faceOnly, charName, opts, sceneBuffer, f
 // ===========================================================================
 // THE unified entry point.
 // ===========================================================================
+// Gate rejections a RE-DRAW can plausibly fix. Each is the model producing
+// something unusable, not a wrong instruction — so the same prompt drawn again
+// is a genuine new roll of the dice, and measurably a different one.
+//   blend_gate           the figure was re-posed / moved (registration already
+//                        shifts and rescales; if it is still under the IoU floor
+//                        the pose changed, which a shift cannot rescue)
+//   style_drift          the redraw came back in a different art style
+//   repaired_figure_blurred  the redraw lost its edge detail
+// NOT retried: invalid bbox, missing avatar, SAM unavailable — a second call
+// fails identically and costs another $0.02.
+const RETRYABLE_REJECTIONS = new Set(['blend_gate', 'style_drift', 'repaired_figure_blurred']);
+const REPAIR_ATTEMPTS = 3;
+
+/**
+ * Up to REPAIR_ATTEMPTS draws before giving up (owner, 2026-08-17).
+ *
+ * A user pressing "repair face" and seeing NOTHING happen is the worst outcome
+ * this code can produce, and it is what shipped: Noah on p6 of
+ * job_1786917840874_rur4nskfv was rejected at mask IoU 34% and the endpoint
+ * returned "Grok repair returned no image" with no retry, no reason, and no
+ * record. The gate was right — blending a re-posed figure would have smeared
+ * him — but "the gate was right" is not an outcome for the person who clicked.
+ *
+ * The last attempt's rejection is what comes back, so the caller reports a real
+ * gate reason rather than a generic failure, and `attempts` says how hard we
+ * tried. Every rejection is counted (see runMetrics) — before this, the blend
+ * and style gates were not counted at all and manual repairs counted nothing,
+ * so nobody could say how often users hit it.
+ */
 async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
+  const metrics = () => require('./runMetrics').forJob(require('./styledAvatars')._cacheContext?.getStore?.());
+  let last = null;
+  for (let attempt = 1; attempt <= REPAIR_ATTEMPTS; attempt++) {
+    last = await _repairCharacterFaceOnce(sceneInput, avatarInput, opts);
+    if (last?.imageData) {
+      if (attempt > 1) {
+        metrics().count('char_repair_retry_saved');
+        log.info(`✅ [FACE REPAIR] ${opts.charName || 'character'}: accepted on attempt ${attempt}/${REPAIR_ATTEMPTS}`);
+      }
+      return { ...last, attempts: attempt };
+    }
+    const reason = last?.rejectedReason || null;
+    if (reason) metrics().count(`repair_reject_${reason}`);
+    if (!reason || !RETRYABLE_REJECTIONS.has(reason)) break;
+    if (attempt < REPAIR_ATTEMPTS) {
+      log.info(`🔁 [FACE REPAIR] ${opts.charName || 'character'}: ${reason} on attempt ${attempt}/${REPAIR_ATTEMPTS} — redrawing`);
+    }
+  }
+  const reason = last?.rejectedReason || null;
+  if (reason && RETRYABLE_REJECTIONS.has(reason)) {
+    metrics().count('char_repair_exhausted');
+    log.warn(`🚫 [FACE REPAIR] ${opts.charName || 'character'}: ${REPAIR_ATTEMPTS} attempts all rejected (${reason}) — giving up`);
+  }
+  return { ...(last || {}), attempts: REPAIR_ATTEMPTS, exhausted: !!(reason && RETRYABLE_REJECTIONS.has(reason)) };
+}
+
+async function _repairCharacterFaceOnce(sceneInput, avatarInput, opts = {}) {
   const sharp = require('sharp');
   const { samUnionBlend, fetchMaskWithRetry } = require('./samBlend');
   const {
@@ -828,6 +884,7 @@ async function repairCharacterFace(sceneInput, avatarInput, opts = {}) {
       );
       if (sm && sm.sameStyle === false) {
         log.warn(`🚫 [FACE REPAIR] ${descriptor} for ${charName} REJECTED: style drift (${sm.styleB} vs ${sm.styleA})`);
+        // rejectedReason below is 'style_drift' — the retry loop classifies on it.
         // Carry the images, same as the blend gate does — a rejected run is
         // exactly the one you need to look at, and a style verdict with no
         // picture behind it cannot be judged or argued with.

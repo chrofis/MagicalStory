@@ -5668,9 +5668,22 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               || (grokResult?.rejectedReason ? `rejected by the ${grokResult.rejectedReason.replace(/_/g, ' ')}` : null);
             return {
               task, error: true,
-              failReason: why ? `Repair rejected — ${why}` : 'Grok repair returned no image (no reason reported)',
+              // TWO audiences, deliberately separate. `failReason` is the
+              // engineering answer and goes to the log, the page record and the
+              // daily report. `userMessage` is what the person who pressed the
+              // button reads: they asked for a face to be fixed, not for a gate
+              // verdict, and "Grok repair returned no image" told them nothing.
+              // ONE string, readable and accurate. The panel renders
+              // `page.reason` verbatim next to the rejected images, so this is
+              // what the person who pressed the button actually reads — it must
+              // say how hard we tried and what stopped it, not "no image".
+              failReason: why
+                ? `Repair rejected after ${grokResult?.attempts ?? 1} attempt(s) — ${why}`
+                : 'Repair produced no image and reported no reason',
               rejectedReason: grokResult?.rejectedReason || null,
               gateMessage: grokResult?.gateMessage || null,
+              attempts: grokResult?.attempts ?? null,
+              exhausted: !!grokResult?.exhausted,
             };
           }
         } else {
@@ -5727,18 +5740,30 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
     for (const apiResult of apiResults) {
       if (!apiResult) continue;
-      const { task, repairResult, error, failReason, rejectedReason, gateMessage } = apiResult;
+      const { task, repairResult, error, failReason, rejectedReason, gateMessage, attempts, exhausted } = apiResult;
       const { characterName, pageNumber } = task;
       const charResult = resultsByChar.get(characterName);
       if (!charResult) continue;
 
       if (error) {
-        charResult.pagesFailed.push({ pageNumber, reason: failReason, rejectedReason, gateMessage });
+        charResult.pagesFailed.push({ pageNumber, reason: failReason, rejectedReason, gateMessage, attempts });
         // Persisted on the page, not only returned: the Railway log window is
         // hours, and the question "why did my repair do nothing" is asked days
         // later. Without this the answer lives only in a log line that has
         // rolled (measured: Noah p6, the IoU-34% rejection was unrecoverable).
-        recordRepairFailure(pageNumber, characterName, { reason: failReason, rejectedReason, gateMessage });
+        recordRepairFailure(pageNumber, characterName, { reason: failReason, rejectedReason, gateMessage, attempts, exhausted });
+        // CUSTOMER-VISIBLE: someone pressed a button and got nothing. The
+        // fingerprint is the GATE, not the message — "IoU 34%" and "IoU 51%"
+        // must collapse into one line in the daily report, or a hundred rows
+        // say a hundred different things about one bug.
+        require('../lib/failureLog').recordFailure({
+          kind: 'char_repair_rejected',
+          severity: 'customer',
+          fingerprint: rejectedReason || 'unknown',
+          storyId: id, pageNumber, character: characterName, userId: req.user?.id,
+          summary: failReason,
+          detail: { gateMessage, attempts, exhausted },
+        });
         continue;
       }
 

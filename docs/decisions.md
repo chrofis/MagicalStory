@@ -12799,3 +12799,62 @@ via `{STORY_BRIEF}`; what it lacked was the topic guide, now passed as `{STORY_G
 **Touched:** prompts/story-scorecard-judge-v3.txt, server/services/prompts.js,
 server/lib/storyScorecard.js, server/lib/testlab.js,
 client/src/components/testlab/ScorecardsPanel.tsx.
+
+## 2026-08-17 — ONE failure log, and a face repair retries 3× before giving up
+
+**Context:** A customer pressed "repair face" on p6 of
+`job_1786917840874_rur4nskfv` and nothing happened. Three separate defects sat
+behind that:
+
+1. The repair spine rejected the redraw — correctly: Grok re-posed Noah's head,
+   leaving 34% overlap with where he actually is, and blending that would have
+   smeared him. Registration (which shifts and rescales the candidate) had
+   already run; a shift cannot rescue a re-pose.
+2. Both callers reported it as **"Grok repair returned no image"**, flattening
+   three distinct gate decisions (style drift / blend IoU / blur) into one
+   sentence that reads like a provider outage. The spine returns
+   `rejectedReason` + `gateMessage` and deliberately carries the rejected images
+   with a comment saying "a rejected run is exactly the one you need to LOOK
+   at". All of it was discarded.
+3. Nothing was counted. `blur_gate_reject` had a counter; the blend and style
+   gates had none, and every counter is `forJob()`-scoped, which no-ops for
+   manual repairs. So the answer to "how often does this happen to customers"
+   was unobtainable.
+
+Recovering one sentence we already had cost a fourth paid call, because the
+Railway log window is hours and the question arrived a day later.
+
+**Decision:**
+- `repairCharacterFace` draws up to **3** times when the rejection is one a
+  re-draw can plausibly fix (`blend_gate`, `style_drift`,
+  `repaired_figure_blurred`). Not retried: invalid bbox, missing avatar, SAM
+  down — a second call fails identically and costs another $0.02.
+- The last rejection's real reason reaches the API response, the panel (which
+  already renders `page.reason`) and the page's `retryHistory`.
+- **One failure log**: `failure_log` (migration 022), written through
+  `recordFailure()` — fire-and-forget, never throws, strips data URIs, deduped
+  per fingerprint per 10 min with a 200/hour backstop.
+  `severity: 'customer'` means somebody was waiting on it.
+- `api_health_events` is FOLDED IN as `kind='provider_limit'`; its rows are
+  migrated and the table dropped. `apiHealth.js` keeps what is genuinely its own
+  (which provider, and whether an error means limit/overload) and loses only its
+  storage. Its `getApiHealth()` shape is preserved so the daily summary needed
+  no change there.
+- The daily email gains a Fehler block, customer-visible first, fed through
+  `buildActivityFeed` — the path the report already reads, so a new failure kind
+  needs no second delivery route. `GET /api/admin/failures?hours=` returns the
+  same summary as JSON + text.
+
+**Rationale for one table over two:** `api_health_events` could describe exactly
+one failure family (provider + HTTP status) and nothing else — a rejected repair
+has neither field. Leaving it and adding a second log would have guaranteed a
+third. Verified end-to-end against a scratch schema: migration runs, history
+carries over, the old table drops, and two rejections differing only in IoU
+percentage collapse into ONE grouped line, which is the whole point of the
+fingerprint.
+
+**Touched:** `migrations/022_failure_log.sql`, `server/lib/failureLog.js`,
+`server/lib/apiHealth.js`, `server/lib/adminActivity.js`, `email.js`,
+`server/lib/faceRepair.js`, `server/routes/regeneration.js`,
+`server/lib/entityConsistency.js`, `server/routes/admin.js`
+**Status:** ✅ active

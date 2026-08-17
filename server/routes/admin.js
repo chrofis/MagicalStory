@@ -47,6 +47,22 @@ const adminSubroutes = require('./admin/index');
 // HEALTH REPORT (remote story-doctor routine)
 // =============================================
 
+// GET /api/admin/failures?hours=24
+// What failed, grouped by kind+fingerprint, customer-visible first. Exists so
+// the daily report is assembled from DATA rather than from whoever read Railway
+// that morning — its log window is hours, and these questions arrive days later.
+router.get('/failures', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const hours = Math.min(24 * 14, Math.max(1, parseInt(req.query.hours, 10) || 24));
+    const { summariseFailures, formatFailureReport } = require('../lib/failureLog');
+    const summary = await summariseFailures({ hours });
+    res.json({ ...summary, text: formatFailureReport(summary) });
+  } catch (error) {
+    log.error('Failure summary failed:', error.message);
+    res.status(500).json({ error: 'Failed to summarise failures' });
+  }
+});
+
 // POST /api/admin/health-report { subject, report }
 // Emails a plain-text/markdown diagnostic report to ADMIN_EMAIL via Resend.
 // Used by the scheduled remote story-doctor session (docs/decisions.md,

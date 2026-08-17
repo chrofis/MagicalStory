@@ -124,6 +124,14 @@ async function buildActivityFeed(dbPool, hours = 24) {
   const count = (t) => events.filter(e => e.type === t).length;
   const { getApiHealth } = require('./apiHealth');
   const health = await getApiHealth(dbPool, h); // AI provider rate-limit/overload hits
+  // EVERY failure, grouped, customer-visible first. Provider limits above are one
+  // kind among them and stay broken out for continuity; this is the rest —
+  // rejected repairs, failed stages, anything that called recordFailure. It rides
+  // the summary the daily report already reads, so a new failure kind needs no
+  // second delivery path.
+  let failures = null;
+  try { failures = await require('./failureLog').summariseFailures({ hours: h }); }
+  catch (e) { require('../utils/logger').log.debug(`[ADMIN ACTIVITY] failure summary unavailable: ${e.message}`); }
 
   return {
     since: new Date(Date.now() - h * 3600 * 1000).toISOString(),
@@ -137,7 +145,10 @@ async function buildActivityFeed(dbPool, hours = 24) {
       failedJobs: count('job_failed'),
       orders: count('order'),
       creditTopUps: count('credits'),
+      customerFailures: failures?.totals.customer ?? 0,
+      internalFailures: failures?.totals.internal ?? 0,
     },
+    failures,
     health,
     events,
   };

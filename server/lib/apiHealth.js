@@ -1,27 +1,22 @@
 /**
  * API health tracking — persists rate-limit / overload responses from the AI
- * providers (Anthropic, xAI, Gemini) so they can surface in the daily summary.
- * Previously these errors only threw + retried and were never recorded, so a
- * sustained Anthropic limit-hit was invisible. Recording is best-effort and
- * fire-and-forget: it must never break or slow down generation.
+ * providers (Anthropic, xAI, Gemini, Runware) so they can surface in the daily
+ * summary. Previously these errors only threw + retried and were never recorded,
+ * so a sustained Anthropic limit-hit was invisible.
+ *
+ * STORAGE MOVED 2026-08-17: rows live in `failure_log` as kind='provider_limit',
+ * not in a table of their own. This file used to own `api_health_events`, whose
+ * shape (provider + HTTP status) could describe exactly this one failure family
+ * and nothing else — a rejected face repair has neither. Rather than keep two
+ * half-logs and grow a third, there is now ONE failure log and this module keeps
+ * what is genuinely its own: which provider an error came from, and whether the
+ * error means "limit/overload" at all. Migration 022 moved the history and
+ * dropped the old table.
+ *
+ * Recording is best-effort and fire-and-forget: it must never break or slow down
+ * generation.
  */
 'use strict';
-
-const { getPool } = require('../services/database');
-
-let ensured = false;
-async function ensure(pool) {
-  if (ensured) return;
-  await pool.query(`CREATE TABLE IF NOT EXISTS api_health_events (
-    id SERIAL PRIMARY KEY,
-    provider TEXT,
-    status INTEGER,
-    message TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-  )`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_health_created ON api_health_events(created_at)`);
-  ensured = true;
-}
 
 function providerFrom(msg) {
   if (/anthropic/i.test(msg)) return 'Anthropic';
@@ -39,33 +34,51 @@ function isLimitError(err) {
   return s === 429 || s === 529 || /overloaded|rate.?limit|usage limit|quota/i.test(m);
 }
 
-// Fire-and-forget. Never throws.
+/**
+ * Record a provider limit/overload response. INTERNAL severity: the call is
+ * retried, so a customer only feels it if the retries also fail — and that
+ * failure records itself, where it happens, as its own kind.
+ */
 function recordApiError(err) {
-  (async () => {
-    try {
-      const pool = getPool();
-      await ensure(pool);
-      await pool.query(
-        'INSERT INTO api_health_events (provider, status, message) VALUES ($1, $2, $3)',
-        [providerFrom((err && err.message) || ''), (err && err.status) || null, String((err && err.message) || '').slice(0, 300)]
-      );
-    } catch { /* monitoring must never break generation */ }
-  })();
+  const message = String((err && err.message) || '').slice(0, 300);
+  const provider = providerFrom(message);
+  require('./failureLog').recordFailure({
+    kind: 'provider_limit',
+    severity: 'internal',
+    // Grouped per provider+status: "Anthropic 429" is one line however many
+    // times it fires, which is the only useful shape in a daily digest.
+    fingerprint: `${provider}${(err && err.status) ? ` ${err.status}` : ''}`,
+    summary: message || 'provider limit',
+    detail: { status: (err && err.status) || null, provider },
+  });
 }
 
-// [{ provider, status, count, last }] for the window, busiest first.
+/**
+ * [{ provider, status, count, last }] for the window, busiest first.
+ * Shape preserved for adminActivity's daily summary — only the source changed.
+ */
 async function getApiHealth(pool, hours = 24) {
   try {
-    await ensure(pool);
     const r = await pool.query(
-      `SELECT provider, status, COUNT(*)::int AS n, MAX(created_at) AS last
-         FROM api_health_events
-        WHERE created_at > NOW() - make_interval(hours => $1::int)
-        GROUP BY provider, status ORDER BY n DESC`,
+      `SELECT fingerprint,
+              (detail->>'provider')          AS provider,
+              (detail->>'status')::int       AS status,
+              COUNT(*)::int                  AS n,
+              MAX(occurred_at)               AS last
+         FROM failure_log
+        WHERE kind = 'provider_limit'
+          AND occurred_at > NOW() - make_interval(hours => $1::int)
+        GROUP BY fingerprint, provider, status
+        ORDER BY n DESC`,
       [hours]
     );
-    return r.rows.map(x => ({ provider: x.provider, status: x.status, count: x.n, last: x.last }));
+    return r.rows.map(x => ({
+      provider: x.provider || x.fingerprint || 'unknown',
+      status: x.status,
+      count: x.n,
+      last: x.last,
+    }));
   } catch { return []; }
 }
 
-module.exports = { recordApiError, getApiHealth, isLimitError };
+module.exports = { recordApiError, getApiHealth, isLimitError, providerFrom };

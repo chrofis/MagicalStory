@@ -1046,11 +1046,32 @@ async function sendAdminDailySummary(feed, dateLabel) {
             <div style="font-size:13px; color:#7f1d1d; margin-top:4px;">${health.map(x => `${esc(x.provider)} ${x.status || ''} × ${x.count} (zuletzt ${fmtTime(x.last)})`).join(' · ')}</div>
           </div>` : '';
 
+  // FAILURES (failure_log). Customer-visible first and in its own colour: a
+  // rejected face repair means someone pressed a button and got nothing, which
+  // is not the same class of event as a retried rate limit. Provider limits are
+  // one kind in this log and keep their own banner above, so this block excludes
+  // them rather than saying the same thing twice.
+  const failures = feed.failures || null;
+  const fCustomer = (failures?.customer || []);
+  const fInternal = (failures?.internal || []).filter(r => r.kind !== 'provider_limit');
+  const fRow = (r) => `
+            <div style="margin-top:6px;">
+              <div style="font-size:13px; color:#1f2937;"><b>${r.occurrences}×</b> ${esc(r.kind)}${r.fingerprint && r.fingerprint !== r.kind ? ` <span style="color:#6b7280;">/ ${esc(r.fingerprint)}</span>` : ''}</div>
+              <div style="font-size:12px; color:#6b7280;">${esc(String(r.example || '').slice(0, 180))}</div>
+              <div style="font-size:11px; color:#9ca3af;">zuletzt ${fmtTime(r.last_seen)}${r.example_story ? ` · ${esc(r.example_story)}${r.example_page != null ? ` S.${r.example_page}` : ''}` : ''}</div>
+            </div>`;
+  const failureBlock = (fCustomer.length || fInternal.length) ? `
+          <div style="margin-top:14px; padding:12px 14px; background:${fCustomer.length ? '#fff7ed' : '#f8fafc'}; border:1px solid ${fCustomer.length ? '#fed7aa' : '#e5e7eb'}; border-radius:8px;">
+            <div style="font-weight:bold; color:${fCustomer.length ? '#c2410c' : '#374151'};">Fehler (24h): ${failures.totals.customer} kundenrelevant, ${failures.totals.internal} intern</div>
+            ${fCustomer.length ? `<div style="font-size:12px; color:#7c2d12; margin-top:8px; font-weight:bold;">KUNDENRELEVANT — jemand hat darauf gewartet</div>${fCustomer.map(fRow).join('')}` : ''}
+            ${fInternal.length ? `<div style="font-size:12px; color:#6b7280; margin-top:10px; font-weight:bold;">INTERN</div>${fInternal.slice(0, 8).map(fRow).join('')}${fInternal.length > 8 ? `<div style="font-size:11px; color:#9ca3af; margin-top:4px;">… und ${fInternal.length - 8} weitere Arten</div>` : ''}` : ''}
+          </div>` : '';
+
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
-      subject: `[MagicalStory] Tagesbericht ${dateLabel} — ${s.stories + (s.trialStories || 0) || 0} Stories, ${s.newUsers || 0} Signups${s.failedJobs ? `, ${s.failedJobs} FAILED` : ''}${limitHits ? `, ⚠️${limitHits} API-Limits` : ''}`,
+      subject: `[MagicalStory] Tagesbericht ${dateLabel} — ${s.stories + (s.trialStories || 0) || 0} Stories, ${s.newUsers || 0} Signups${s.failedJobs ? `, ${s.failedJobs} FAILED` : ''}${limitHits ? `, ⚠️${limitHits} API-Limits` : ''}${failures?.totals.customer ? `, ${failures.totals.customer} Kundenfehler` : ''}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 720px; margin: 0 auto;">
           <h2 style="color:#4f46e5;">MagicalStory Tagesbericht — ${dateLabel}</h2>
@@ -1063,6 +1084,7 @@ async function sendAdminDailySummary(feed, dateLabel) {
             ${stat('Orders', s.orders || 0)}
           </tr></table>
           ${healthBanner}
+          ${failureBlock}
           ${rows ? `
           <table style="border-collapse:collapse; width:100%; margin-top:16px; font-size:13px;">
             <tr style="background:#f1f5f9; text-align:left;">
