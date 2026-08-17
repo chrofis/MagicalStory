@@ -2123,7 +2123,16 @@ def warmup_endpoint():
     if _warmup_thread is not None and _warmup_thread.is_alive():
         return jsonify({"success": True, "status": "already warming"})
 
-    want_dino = os.environ.get('FIGURE_DETECTION_BACKEND', '') == 'grounding-dino'
+    # Default GROUNDING-DINO, matching MODEL_DEFAULTS.figureDetectionBackend on
+    # the Node side (2026-08-17). This gate used to default to empty, so when
+    # that default flipped the pipeline started ASKING for DINO detection while
+    # the warmup still skipped loading it — the ~90s load then landed on the
+    # first real detection call, which falls back to the Gemini bbox rather than
+    # wait. Warmup exists precisely so a model load happens while the user is in
+    # the wizard and the opening Claude calls run; a gate that has to be set
+    # separately from the backend it warms will drift out of sync again.
+    # FIGURE_DETECTION_BACKEND=gemini disables both, in one place.
+    want_dino = os.environ.get('FIGURE_DETECTION_BACKEND', 'grounding-dino') == 'grounding-dino'
 
     def _warm():
         t0 = time.time()
