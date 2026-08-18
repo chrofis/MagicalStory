@@ -668,6 +668,29 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
 }
 
 /**
+ * The stored score of the image eval_variance actually loaded. A pinned
+ * versionIndex is a DB index, so it is resolved through arrayIndexForDb rather
+ * than used as an array offset (the two diverge as soon as a version is
+ * dropped — see the version-pinning contract).
+ */
+function storedBaselineFor(ctx, versionIndex) {
+  if (versionIndex == null) {
+    return { source: 'active version', finalScore: ctx.scene.finalScore ?? null, qualityScore: ctx.scene.qualityScore ?? null };
+  }
+  const versions = ctx.scene.imageVersions || [];
+  const { arrayIndexForDb } = require('./versionManager');
+  const v = versions[arrayIndexForDb(versions, versionIndex, 'scene')] || null;
+  return {
+    source: `v${versionIndex}`,
+    finalScore: v?.finalScore ?? null,
+    qualityScore: v?.qualityScore ?? null,
+    // The page-level number too, so a member that resolved to nothing is
+    // obvious rather than silently reading as an unscored version.
+    pageActiveFinalScore: ctx.scene.finalScore ?? null,
+  };
+}
+
+/**
  * EVAL VARIANCE — the same image, scored N times, nothing else changed.
  *
  * The question this answers: when two near-identical versions of a page score
@@ -899,7 +922,12 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
     },
     concepts: conceptOut,
     runs,
-    storedBaseline: { qualityScore: ctx.scene.qualityScore ?? null, finalScore: ctx.scene.finalScore ?? null },
+    // The score this exact image already carries, which is what the repeats are
+    // compared against. For a PINNED version that is the version's own stored
+    // score — ctx.scene.finalScore is the page's ACTIVE version, so on a set
+    // holding two versions of one page both members would otherwise report the
+    // winner's score and the comparison would read backwards.
+    storedBaseline: storedBaselineFor(ctx, versionIndex),
   };
 }
 

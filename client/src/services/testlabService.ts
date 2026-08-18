@@ -184,7 +184,10 @@ export interface ExperimentResult {
     findings?: Array<{ source: string; type: string | null; severity: string; points: number; description: string }>;
     issuesSummary?: string | null;
   }>;
-  storedBaseline?: { qualityScore?: number | null; semanticScore?: number | null; finalScore?: number | null };
+  storedBaseline?: {
+    qualityScore?: number | null; semanticScore?: number | null; finalScore?: number | null;
+    source?: string; pageActiveFinalScore?: number | null;
+  };
   characterName?: string;
   qc?: { pass?: boolean; issues?: string[]; visionFeedback?: string | null; error?: string };
   method?: string | null;

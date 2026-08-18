@@ -2765,6 +2765,9 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                         <b>Score range {result.scoreSpread.range} pts</b> over {result.okRuns} identical runs
                         {result.versionIndex != null && <> · version v{result.versionIndex}</>}
                         {' '}— scores {result.scoreSpread.values.join(' · ')} (mean {result.scoreSpread.mean}, σ {result.scoreSpread.stdev})
+                        {result.storedBaseline?.finalScore != null && (
+                          <> · the score this image already carries is <b>{result.storedBaseline.finalScore}</b>{result.storedBaseline.source ? ` (${result.storedBaseline.source})` : ''}</>
+                        )}
                       </div>
                       {result.rawSpread && (
                         <div className="text-xs text-gray-600">
