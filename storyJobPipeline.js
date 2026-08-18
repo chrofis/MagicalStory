@@ -4812,7 +4812,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // still running at this point is anomalous. Refinement is a polish pass —
     // shipping the unrefined text is always better than not shipping.
     if (textRefinePromise) {
-      const JOIN_TIMEOUT_MS = Number(process.env.TEXT_REFINE_JOIN_TIMEOUT_MS) || 90000;
+      // 300s, not 90s (owner 2026-08-17). The cap exists so a slow refiner cannot
+      // add its full duration to a story, but 90s was shorter than the refiner's
+      // own runtime: deepseek needs ~2-4 min for two rounds, so a fast image phase
+      // meant the pass was DISCARDED after being paid for (staging
+      // job_1786998860057_o6deqtv5s: $0.16 and 23k output tokens thrown away).
+      // Worst case now adds up to 5 min on a run whose images finished early.
+      const JOIN_TIMEOUT_MS = Number(process.env.TEXT_REFINE_JOIN_TIMEOUT_MS) || 300000;
       const TIMED_OUT = Symbol('text-refine-join-timeout');
       let joinTimer = null;
       const refined = await Promise.race([
