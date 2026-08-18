@@ -12942,3 +12942,48 @@ bridges. Enforcement is the beats reviewer's new check 7b (name pages that could
 staged at a real landmark and are not).
 
 **Touched:** server/lib/promptBuilders.js (buildAvailableLandmarksSection).
+
+## 2026-08-18 — The DINO undercount check counts PEOPLE, not the whole cast
+
+**Context:** `job_1787001865052_lehb1p64c` (4 boys, a dog called Nia, a dragon)
+routed four pages through the Gemini second opinion, and every one of them was
+a false alarm. The check was a bare count:
+
+```js
+if (dets.length < expectedCharacters.length)   // persons vs the WHOLE cast
+```
+
+DINO's prompt is `person`. A dog and a dragon are in `expectedCharacters`
+because they are characters, but a person prompt can never match them:
+
+```
+p9   "1 persons < 2 expected"   DINO found Max, alone with the dog. Correct.
+p7   "4 persons < 5 expected"   4 boys + Nia — all four found, 4/4 faces paired.
+p18  "4 persons < 5 expected"   4 boys + Nia (0 faces: every child is drawn from
+                                behind on that page, which is correct, not a miss).
+p16  "4 persons < 6 expected"   4 boys + Nia + Dragon.
+```
+
+The damage is not the wasted Gemini call. The arbitration rule is "Gemini wins
+if it finds MORE figures", and the extra figure IS the animal — so on any page
+with a pet, the fallback both triggers and wins, discarding a correct DINO
+result. The Gemini figures that replace it carry no `description` and no
+`clothing`, so `attachSamMasksToFigures` places no garment seeds and the masks
+collapse to skin. That is 15 of the 32 seed failures in that story, and the
+direct cause of cut-outs showing a face and limbs with no shirt or trousers.
+
+**Decision:** compare the person count against the HUMAN expected characters.
+`nonHumanNames` is an option on `detectAllBoundingBoxes` /
+`detectFiguresWithGroundingDino`; `enrichWithBoundingBoxes` derives it from
+`visualBible.animals` + `.creatures` and the page path hands over the Visual
+Bible it already holds. Callers that pass no VB behave exactly as before.
+
+**Rationale:** the Visual Bible is the only non-fuzzy source for which cast
+member is an animal (`animals: ANI001 Nia | ANI002 Dragon`). Matching on
+description text was rejected — recognising "dog" in prose does not generalise,
+and this repo has a standing rule against it. Replayed against the four pages:
+all four stop falling back, and p11 (which never fell back) is unchanged.
+
+**Touched:** `server/lib/figureDetection.js`, `server/lib/bboxDetection.js`,
+`server/lib/images.js`
+**Status:** ✅ active

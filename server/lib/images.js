@@ -2358,7 +2358,8 @@ async function evaluateImageBatch(images, options = {}) {
           `PAGE ${img.pageNumber}`,
           img.sharedBboxDetection || null, // Reuse pre-detected bbox if available
           artStyle,
-          buildObjectGroundingHints(allExpectedObjects, visualBible)
+          buildObjectGroundingHints(allExpectedObjects, visualBible),
+          visualBible
         );
         bboxDetection = enrichResult.detectionHistory;
         enrichedFixTargets = enrichResult.targets || [];

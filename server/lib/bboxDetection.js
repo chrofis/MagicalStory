@@ -333,7 +333,7 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
 }
 
 async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
-  const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '', skipCache = false, artStyle = null, objectGroundingHints = null } = options;
+  const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '', skipCache = false, artStyle = null, objectGroundingHints = null, nonHumanNames = [] } = options;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
   // Cache check — content-hashed by image bytes + expected names. Hits skip
@@ -369,7 +369,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
   if (gdinoEligible && expectedCharacters.length > 0) {
     try {
       const gd = await detectFiguresWithGroundingDino(imageData, expectedCharacters, {
-        pageLabel, expectedObjects, objectGroundingHints,
+        pageLabel, expectedObjects, objectGroundingHints, nonHumanNames,
         // Lab knobs — see figureDetection Stage 3 / badge anchor.
         badgeAnchor: options.badgeAnchor,
       });
@@ -1726,7 +1726,16 @@ function escapeXml(str) {
  * @param {Array<{reference: string, type: string, position: string, appearance: string, confidence: number}>} objectMatches - Object/animal/landmark matches from quality eval (legacy, not used)
  * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
-async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null, bboxModelOverride = null, pageContext = '', sharedBboxDetection = null, artStyle = null, objectGroundingHints = null) {
+async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null, bboxModelOverride = null, pageContext = '', sharedBboxDetection = null, artStyle = null, objectGroundingHints = null, visualBible = null) {
+  // The cast can contain animals and creatures (a dog, a dragon). They are in
+  // expectedCharacters because they are characters, but DINO's "person" prompt
+  // cannot match them — so the undercount check must not count them. The Visual
+  // Bible is the only non-fuzzy source for which is which; callers that pass no
+  // VB behave exactly as before.
+  const nonHumanNames = [
+    ...((visualBible?.animals) || []),
+    ...((visualBible?.creatures) || []),
+  ].map(a => String(a?.name || '').toLowerCase()).filter(Boolean);
   // Build expected characters for bbox detection (AI will identify by name)
   const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing);
 
@@ -1750,7 +1759,8 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
       bboxModelOverride,
       pageContext,
       artStyle,
-      objectGroundingHints
+      objectGroundingHints,
+      nonHumanNames,
     });
   }
 

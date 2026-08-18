@@ -1333,7 +1333,10 @@ function _assignFiguresByLayout(chars, dets) {
 }
 
 async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opts = {}) {
-  const { pageLabel = '', expectedObjects = [], objectGroundingHints = null } = opts;
+  const { pageLabel = '', expectedObjects = [], objectGroundingHints = null, nonHumanNames = [] } = opts;
+  // Names in the cast that a "person" prompt can NEVER match — the story's
+  // animals and creatures. See the undercount check below for why this matters.
+  const _nonHuman = new Set((nonHumanNames || []).map(n => String(n).toLowerCase()));
   if (!Array.isArray(expectedCharacters) || expectedCharacters.length === 0) return null;
 
   // The endpoints need base64 bytes — resolve http(s)/data/base64 to a data URI.
@@ -1525,14 +1528,35 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
   // depth. The old rule gave shared pixels to the SMALLER mask, which is
   // backwards for an occluded figure — Daniel's mask is smaller than Noah's, yet
   // Daniel stands behind him, so Noah's sandal ended up in Daniel's cut-out.
-  if (dets.length < expectedCharacters.length) {
+  // COUNT PEOPLE AGAINST PEOPLE (owner, 2026-08-18).
+  //
+  // DINO's prompt is "person". Comparing its count to the WHOLE cast counts the
+  // story's dog and dragon as persons it failed to find, so every page with an
+  // animal reported an undercount and was handed to the Gemini second opinion —
+  // which then wins the arbitration by "finding more figures", the extra figure
+  // being the animal. Measured on job_1787001865052_lehb1p64c (4 boys, a dog
+  // called Nia, a dragon):
+  //
+  //   p9   "1 persons < 2 expected"   DINO found Max, alone with the dog. Right.
+  //   p7   "4 persons < 5 expected"   4 boys + Nia. All four found and paired.
+  //   p18  "4 persons < 5 expected"   4 boys + Nia.
+  //   p16  "4 persons < 6 expected"   4 boys + Nia + Dragon.
+  //
+  // DINO was correct on every one, and its correct, garment-seeded result was
+  // discarded. The Gemini figures that replaced it carry no description, so
+  // attachSamMasksToFigures places no garment seeds and the masks collapse to
+  // skin — that is 15 of the 32 seed failures in that story, and the reason
+  // cut-outs came back as a face and limbs with no shirt or trousers.
+  const humanExpected = expectedCharacters.filter(c => !_nonHuman.has(String(c?.name || c).toLowerCase()));
+  if (_nonHuman.size) diag.nonHumanExpected = [...(_nonHuman)];
+  if (dets.length < humanExpected.length) {
     // Undercount is NOT an automatic fallback anymore (owner, 2026-08-09):
     // fewer persons than expected has two causes with opposite fixes — the
     // painter really painted fewer (DINO is RIGHT, e.g. a redraw dropped a
     // character), or DINO merged two overlapping figures into one box. The
     // orchestrator resolves this with a Gemini second opinion; here we finish
     // the full pipeline (SAM + SoM) on the persons we DID find and flag it.
-    diag.undercount = `${dets.length} persons < ${expectedCharacters.length} expected`;
+    diag.undercount = `${dets.length} persons < ${humanExpected.length} expected people`;
     log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}${diag.undercount} — completing detection; orchestrator will get a Gemini second opinion`);
   }
 
