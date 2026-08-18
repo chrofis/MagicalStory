@@ -357,6 +357,33 @@ class UnifiedStoryParser {
       backCover: extractCover('Back Cover')
     };
 
+    // ONE backdrop per cover, and the title page's is a real landmark when the
+    // story has one. Enforced here, not left to the writer: no reviewer sees
+    // cover hints in the beats pipeline, so a skipped rule shipped unnoticed
+    // (job_1787001865052 — title page backdropped on an invented cave while two
+    // real Zurich landmarks sat unused, and the initial page listed three
+    // backdrops and pulled two photos).
+    const vb = this.extractVisualBible?.();
+    const locs = (vb?.locations || []);
+    const realLandmarkIds = locs.filter(l => l.isRealLandmark).map(l => l.id.toUpperCase());
+    const isLoc = (id) => /^LOC\d+/i.test(id);
+    for (const key of ['titlePage', 'initialPage', 'backCover']) {
+      const cover = this._cache.coverHints[key];
+      if (!cover) continue;
+      const locIds = cover.objects.filter(isLoc);
+      const nonLoc = cover.objects.filter(id => !isLoc(id));
+      let backdrop = locIds[0] || null;
+      if (key === 'titlePage' && realLandmarkIds.length > 0 && !realLandmarkIds.includes((backdrop || '').split('.')[0])) {
+        const swapped = locIds.find(id => realLandmarkIds.includes(id.split('.')[0])) || realLandmarkIds[0];
+        log.info(`🏛️ [UNIFIED-PARSER] Title page backdrop ${backdrop || '(none)'} is not a real landmark — using ${swapped}`);
+        backdrop = swapped;
+      }
+      if (locIds.length > 1) {
+        log.info(`🏛️ [UNIFIED-PARSER] ${key} listed ${locIds.length} backdrops (${locIds.join(', ')}) — keeping ${backdrop}`);
+      }
+      cover.objects = [backdrop, ...nonLoc].filter(Boolean);
+    }
+
     log.debug(`[UNIFIED-PARSER] Cover hints extracted: title=${this._cache.coverHints.titlePage.hint.length > 0}, initial=${this._cache.coverHints.initialPage.hint.length > 0}, back=${this._cache.coverHints.backCover.hint.length > 0}`);
     return this._cache.coverHints;
   }

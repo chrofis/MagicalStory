@@ -3894,6 +3894,7 @@ function buildBeatsReviewPrompt(inputData, beats) {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
     CURRENT_BEATS: current,
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
   });
 }
 

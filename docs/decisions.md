@@ -12888,3 +12888,41 @@ change justified by evidence from ONE of them silently reconfigured the other th
 fourth failure mode was operational (timeout + wasted spend), not qualitative.
 
 **Touched:** server/config/models.js, server/lib/textRefine.js.
+
+## 2026-08-18 — Cover backdrops enforced in code; landmarks never enter the VB grid; the beats reviewer must justify unused landmarks
+
+Triggered by job_1787001865052 (production): the title page — the ONE cover where a real
+landmark is mandatory — was backdropped on an invented cave while two real Zurich
+landmarks sat unused in the visual bible, and the initial page listed three backdrops
+and pulled two landmark photos.
+
+**Why no review caught it.** Audit of what each reviewer sees in the beats pipeline
+(= production): beats review → beats; clothing review → wardrobe; scene review → page
+briefs (15 checks). Cover hints are reviewed by outline-review.txt, which is wired
+`if (!beatsMode && !trialMode && splitOutlineReview)` — i.e. never on the production
+path. Cover hints were the only structured artifact with NO reviewer at all. Also
+unreviewed in production: the visual bible itself, and empty-scene prompts (measured
+only by the Lab's empty_scene_adherence stage).
+
+**Decisions:**
+- Cover backdrops are enforced in `UnifiedStoryParser.extractCoverHints()`, not left to
+  the writer: exactly one LOC per cover (extras dropped from the backdrop role, props
+  kept), and the title page's backdrop is swapped to a real landmark whenever the VB has
+  one. Deterministic, applies to every pipeline, logged when it fires. Verified against
+  the failing story's own raw outline: LOC002 → LOC010, initial page 3 → 1.
+- The prompt rule was one sentence carrying three covers and two obligations; split into
+  two plain lines (exactly one LOC as backdrop; title page takes a real landmark when one
+  exists, other covers prefer one).
+- The beats reviewer now RECEIVES the available-landmarks list (only the planner had it)
+  and check 7b makes it name pages that could plausibly be staged at a real landmark and
+  are not — or say explicitly that the story cannot reach one.
+- **A landmark photo never enters the Visual Bible grid** (owner): the grid is a
+  composite of style-rendered element cells, and pasting a real photograph among them
+  feeds photographic pixels into a stylised render — worst in realistic/concept styles.
+  Both builders changed: `buildEmptySceneVbGrid` and `buildPageCompositeRefs` no longer
+  place `landmarkPhotos.slice(1)` into the grid. Landmarks travel only as their own
+  reference photos on the empty-scene call; with a plate set the page render already
+  drops them (unchanged).
+
+**Touched:** server/lib/outlineParser/unified.js, server/lib/referenceSheets.js,
+server/lib/promptBuilders.js, prompts/story-bible-from-beats.txt, prompts/story-beats-review.txt.

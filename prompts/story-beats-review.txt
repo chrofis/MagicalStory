@@ -17,6 +17,8 @@ Characters: {CHARACTER_NAMES}
 
 {STORY_GUIDE_SECTION}
 
+{AVAILABLE_LANDMARKS_SECTION}
+
 # CURRENT PLAN
 
 {CURRENT_BEATS}
@@ -34,6 +36,7 @@ Answer each check, naming pages. Then rewrite only the pages that a check found 
 5. Repetition — name any two pages whose scenes would produce near-identical pictures (same place, same grouping, same action).
 6. Cast & variety — name any scene with more than {MAX_CHARACTERS_PER_SCENE} named characters, or any page where someone forces or blocks something without being in the scene. Do most pages keep to three or fewer named characters, and does the cast vary page to page — the main character on most pages, the others in changing combinations? When the whole cast appears, is it a wide or distant view rather than a close full-cast line-up? Does the book include some framing variety — a characterless establishing view, a distant-small-figures page, a single-character close-up? A close-up beat's moment must work waist-up (holding, reading, reacting) — flag one built on kneeling or floor action. Flag any page separating a figure into the background without the beat requiring the separation — bring them to the group. Name what's missing.
 7. Pacing — name the page carrying the most beats and the one carrying the least.
+7b. Local landmarks — when an AVAILABLE LANDMARKS list is present, name the pages that could plausibly be staged at one of those real places and are not. Rewrite the fewest beats to move that action there; say so explicitly when the story genuinely cannot reach any of them.
 8. Loose threads & unearned turns — name any question a beat explicitly raises about the plot (who took it, why, where it came from) that no later beat answers. Name any object, clue, ally, or rescue that resolves the conflict but appears with no stated origin or in-world licence — a rule, a legend, or an earlier setup. Name any character singled out ("the only one who can", "was waited for", "chosen") with no reason given. Rewrite the fewest beats needed to close each — add the answering line, the origin, or the reason.
 9. Emotion — name any beat where a character's mistake, loss, or triumph passes without a felt reaction (a look, a word, a gesture in the scene). Name the page where the lesson is stated or shown without a character visibly feeling it. Rewrite those beats so the feeling is a drawable moment, not a summary.
 10. Theme — does the story's stated life-skill or topic drive the climax, and does the character who most needs the lesson visibly act on it by the end? Name the page where the lesson is earned; if it is only implied, rewrite the fewest beats to make one character acknowledge or apply it.

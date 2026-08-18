@@ -395,9 +395,14 @@ async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos
   if (!visualBible) return null;
   const { getEmptySceneElementReferences } = require('./visualBible');
   const vehicleAndLocationRefs = getEmptySceneElementReferences(visualBible, pageNumber, 9);
-  const secondaryLandmarks = (pageLandmarkPhotos || []).slice(1);
-  if (vehicleAndLocationRefs.length === 0 && secondaryLandmarks.length === 0) return null;
-  return buildVisualBibleGrid(vehicleAndLocationRefs, secondaryLandmarks);
+  // A landmark photo NEVER enters the grid (owner, 2026-08-18). The grid is a
+  // composite of style-rendered element cells; pasting a real photograph among
+  // them feeds photographic pixels into a stylised render and corrupts it —
+  // worst in realistic/concept styles, where the model cannot tell the cell
+  // from the target style. Every landmark travels as its own reference photo
+  // on the empty-scene call, which is the one place a real photo belongs.
+  if (vehicleAndLocationRefs.length === 0) return null;
+  return buildVisualBibleGrid(vehicleAndLocationRefs, []);
 }
 
 /**
@@ -414,19 +419,21 @@ async function buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos
 async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = [], { hasBackground = false, hasOtherRefs = false, logTag = 'PAGE-REFS' } = {}) {
   const { getElementReferenceImagesForPage } = require('./visualBible');
   let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
-  let secondaryLandmarks = (landmarkPhotos || []).slice(1);
+  // Landmarks never ride in the grid — a real photograph composited among
+  // style-rendered cells corrupts a stylised render (owner, 2026-08-18). A
+  // landmark reaches the image only as its own reference photo, and when a
+  // plate is set it is already painted into the plate.
   let finalLandmarkPhotos = landmarkPhotos || [];
   if (hasBackground) {
     elementReferences = elementReferences.filter(e => e.type !== 'vehicle' && e.type !== 'location');
-    secondaryLandmarks = [];
     finalLandmarkPhotos = [];
     log.debug(`🔲 [${logTag}] Page ${pageNumber}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs`);
   } else if (hasOtherRefs || (landmarkPhotos || []).length > 0) {
     elementReferences = elementReferences.filter(e => e.type !== 'location');
   }
   let visualBibleGrid = null;
-  if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-    visualBibleGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+  if (elementReferences.length > 0) {
+    visualBibleGrid = await buildVisualBibleGrid(elementReferences, []);
   }
   return { visualBibleGrid, landmarkPhotos: finalLandmarkPhotos };
 }

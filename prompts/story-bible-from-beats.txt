@@ -80,7 +80,8 @@ A location shown from one viewpoint needs no `vantages[]`. Give it `vantages[]` 
 
 Each cover is a structured spec, not prose. The fields are the spec.
 
-- The first entry in `Objects:` is the backdrop and must be a LOC### from the Visual Bible. The Title Page backdrop must be a real landmark whenever the Visual Bible holds one; Initial Page and Back Cover prefer one. Never invent a LOC for a cover.
+- Each cover lists EXACTLY ONE LOC### in `Objects:`, first, as its backdrop — never two, never a LOC you did not put in the Visual Bible.
+- Title Page backdrop: a LOC with `isRealLandmark: true` whenever the Visual Bible has one. Initial Page and Back Cover: a real landmark too if one fits, otherwise any Visual Bible LOC.
 - List every character by name. Never "the family", "everyone", "the group".
 - Clothing is one of `standard | winter | summer | costumed` and must be a category that character marked `used: true`.
 - `holds` is exactly one ART### from `Objects:`, or the word `nothing`.
