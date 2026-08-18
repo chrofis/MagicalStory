@@ -263,6 +263,54 @@ router.post('/:jobId/rerun-text', authenticateToken, requireAdmin, async (req, r
   }
 });
 
+// POST /api/admin/jobs/:jobId/rerun-full
+// Rerun a job through the WHOLE pipeline — text, images, covers and repair — from
+// a source job's stored input. `/retry` refuses anything that is not `failed` and
+// `/rerun-text` forces skipImages, so neither can re-run a COMPLETED story to see
+// the effect of a prompt or model change end to end. Reuses the source user (the
+// characters and avatars live on that account) and reserves 0 credits: this is an
+// admin measurement, not a purchase.
+// Body (all optional): { inputOverrides } — shallow-merged over the source input.
+router.post('/:jobId/rerun-full', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) return res.status(501).json({ error: 'Database mode required' });
+    if (typeof deps.processStoryJob !== 'function') {
+      return res.status(500).json({ error: 'Job runner not wired (initJobsRoutes not called)' });
+    }
+    const { jobId } = req.params;
+    const pool = getPool();
+    const jobResult = await pool.query('SELECT * FROM story_jobs WHERE id = $1', [jobId]);
+    if (jobResult.rows.length === 0) return res.status(404).json({ error: 'Job not found' });
+    const sourceJob = jobResult.rows[0];
+
+    const overrides = (req.body && typeof req.body.inputOverrides === 'object' && req.body.inputOverrides)
+      ? req.body.inputOverrides : {};
+    const inputData = { ...(sourceJob.input_data || {}), ...overrides };
+    delete inputData.idempotencyKey;
+    // The point of this endpoint is the FULL pipeline, so the skip flags are
+    // cleared even when the source job set them.
+    inputData.skipImages = false;
+    inputData.skipCovers = false;
+    inputData.skipText = false;
+    if (inputData.enableFullRepair === undefined) inputData.enableFullRepair = true;
+
+    const newJobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    await pool.query(
+      `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved)
+       VALUES ($1, $2, 'pending', $3, 0, 'Admin full rerun', 0)`,
+      [newJobId, sourceJob.user_id, JSON.stringify(inputData)]
+    );
+    deps.processStoryJob(newJobId).catch(err => {
+      log.error(`❌ [ADMIN] Full rerun job ${newJobId} failed:`, err);
+    });
+    log.info(`[ADMIN] Full rerun ${newJobId} from ${jobId} (user ${sourceJob.user_id}, images+covers+repair on)`);
+    res.json({ success: true, jobId: newJobId, sourceJobId: jobId, pages: inputData.pages });
+  } catch (err) {
+    log.error('Error starting full rerun:', err);
+    res.status(500).json({ error: 'Failed to start full rerun', details: err.message });
+  }
+});
+
 // POST /api/admin/jobs/:jobId/judge-text
 // Load a COMPLETED text-only job's result_data (title + pages[].text), score the
 // text via the cross-model judge, persist the score back into result_data, and
