@@ -552,26 +552,32 @@ async function iterateCover(coverKey, storyData, options = {}) {
     // try/catch, which logged "detection failed" and served the cover with no
     // bboxes at all. A function keeps one definition without hoisting the work
     // itself: it only runs where it is called.
+    // A COVER FIGURE MUST ARRIVE DRESSED (owner, 2026-08-18).
+    //
+    // Every figure on all three covers of job_1787001865052_lehb1p64c came back
+    // with seedTrace "no garment colour in the identity line" and seeds=0, so
+    // MobileSAM had nothing but a face point and the cut-outs were a face and
+    // limbs with no shirt or trousers. The pages of the same story were fine:
+    // they say "Wearing: A blue short-sleeved cotton t-shirt" and their seeds
+    // land. The clothing existed all along — clothingRequirements holds a full
+    // description per character, and every coverHint carries
+    // characterClothing {Max: standard, ...}. One empty lookup dropped it, and
+    // nothing downstream noticed because an unclothed identity line is
+    // indistinguishable from a character who happens to have no clothing.
+    //
+    // So: resolve through the hint, fall back to the category the story marked
+    // `used`, then to the character's own wardrobe — and SAY SO when all three
+    // fail, instead of silently shipping a naked prompt.
     const buildExpectedCoverCharacters = () => {
       const coverClothingByName = hintCharClothing || {};
+      const sh = getStoryHelpers();
       return (selectedCoverCharacters || []).map(c => {
         const name = c.name || c;
         if (typeof c !== 'object') return { name, description: '' };
-        let clothingText = '';
-        const category = coverClothingByName[name];
-        if (category) {
-          try {
-            clothingText = require('./entityConsistency').buildClothingDescription(
-              c, category, artStyleId, storyData.clothingRequirements || null) || '';
-          } catch (e) {
-            log.warn(`⚠️ [COVER-ITERATE] ${coverKey} ${name}: clothing "${category}" did not resolve (${e.message})`);
-          }
-        }
-        return {
-          name,
-          description: c.description
-            || getStoryHelpers().buildCastIdentityDescription(c, clothingText),
-        };
+        const clothingText = sh.buildIdentityClothingText(
+          c, coverClothingByName[name], artStyleId, storyData.clothingRequirements || null,
+          { label: `${coverKey} ` });
+        return { name, description: sh.buildIdentityLine(c, clothingText) };
       });
     };
 

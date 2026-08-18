@@ -12987,3 +12987,49 @@ all four stop falling back, and p11 (which never fell back) is unchanged.
 **Touched:** `server/lib/figureDetection.js`, `server/lib/bboxDetection.js`,
 `server/lib/images.js`
 **Status:** ✅ active
+
+## 2026-08-18 — Detector identity lines resolve clothing through ONE chain, and never drop it
+
+**Context:** Every figure on all three covers of `job_1787001865052_lehb1p64c`
+came back with `seedTrace: "no garment colour in the identity line"` and
+`seeds=0`. MobileSAM therefore had a face point and nothing else, and the
+cut-outs were a face and limbs with no shirt or trousers. The pages of the same
+story were fine.
+
+The clothing was never missing: `clothingRequirements` holds a full description
+per character ("A blue short-sleeved cotton t-shirt, dark green cargo shorts…"),
+and every coverHint carries `characterClothing {Max: standard, …}`.
+
+Three sites built a detector identity line independently, all with the same
+shape, and all with the same two flaws:
+
+```js
+const category = someMap[name];
+if (category) { …resolve… }                       // empty map -> no clothing, silently
+description: c.description || build(c, clothingText)   // a description discards the outfit
+```
+
+The failing site is the ROUND RE-DETECT in `repairPipeline.js`, whose map is
+`r.sceneCharacterClothing || … || {}`. Covers have no `sceneCharacterClothing`,
+so the map is `{}` — and that detection runs LAST, overwriting the dressed one
+`coverIterate` had already produced. Replaying it on this story reproduces the
+stored line character-for-character ("…medium cheekbones, medium lips", no
+"Wearing:"), and the new chain yields the full outfit for all four characters.
+
+**Decision:** `buildIdentityClothingText()` + `buildIdentityLine()` in
+`promptBuilders.js` (re-exported through `storyHelpers`), used by all three
+sites. The chain is: given category → the category the story marked `used` →
+`standard` → the character's own wardrobe. It returns '' only when a character
+has no clothing anywhere, and logs that at ERROR, because a silent naked
+identity line costs every garment seed and only surfaces much later as a
+cut-out with no clothes in it.
+
+**Rationale:** the first empty map used to end the search. Nothing downstream
+can tell an unclothed identity line from a character who genuinely has no
+clothing, so the failure was invisible from generation until someone looked at a
+cut-out.
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/storyHelpers.js`,
+`server/lib/repairPipeline.js`, `server/lib/coverIterate.js`,
+`server/lib/images.js`
+**Status:** ✅ active

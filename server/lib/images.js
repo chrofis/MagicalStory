@@ -3779,7 +3779,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
                 c, iterClothing[cname], artStyle, storyData?.clothingRequirements || null) || '';
             } catch { /* identity line goes without clothing */ }
           }
-          return { name: cname, description: c.description || getStoryHelpers().buildCastIdentityDescription(c, clothingText) };
+          return { name: cname, description: getStoryHelpers().buildIdentityLine(c, clothingText) };
         });
         iterExpectedCharacters.push(...getStoryHelpers().buildSecondaryExpectedCharacters(
           visualBible, iterateSceneMetadata, iterExpectedCharacters.map(c => c.name),

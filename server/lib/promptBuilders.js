@@ -476,6 +476,69 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
  * Same shape buildExpectedCharactersForBbox produces, so both paths describe a
  * character identically.
  */
+/**
+ * The clothing text for a DETECTOR identity line — one chain, used by every
+ * call site that builds one (owner, 2026-08-18).
+ *
+ * Three sites built this independently and all three had the same shape:
+ *   const category = someMap[name];
+ *   if (category) { ...resolve... }        // no category -> no clothing, silently
+ *
+ * That "if" is the whole bug. On job_1787001865052_lehb1p64c every figure on all
+ * three covers came back with seedTrace "no garment colour in the identity line"
+ * and seeds=0, so MobileSAM had a face point and nothing else and the cut-outs
+ * were a face and limbs with no shirt or trousers. The map was simply empty:
+ * covers have no sceneCharacterClothing, and the round re-detect
+ * (repairPipeline) writes the LAST detection, overwriting the dressed one that
+ * coverIterate had produced.
+ *
+ * The clothing was never missing — clothingRequirements held a full description
+ * per character the whole time. So the lookup no longer gives up at the first
+ * empty map: hinted category -> the category the story marked `used` ->
+ * 'standard' -> the character's own wardrobe. Returns '' only when the character
+ * genuinely has no clothing anywhere, which the caller should treat as an error.
+ */
+function buildIdentityClothingText(character, category, artStyle, clothingRequirements, { label = '' } = {}) {
+  if (!character || typeof character !== 'object') return '';
+  const { log } = require('../utils/logger');
+  const usedCategory = () => {
+    const reqs = clothingRequirements?.[character.name]
+      || clothingRequirements?.[String(character.name || '').toLowerCase()];
+    if (!reqs || typeof reqs !== 'object') return null;
+    const hit = Object.entries(reqs).find(([, v]) => v && v.used === true);
+    return hit ? hit[0] : null;
+  };
+  for (const [cat, why] of [[category, 'given'], [usedCategory(), 'used'], ['standard', 'default']]) {
+    if (!cat) continue;
+    try {
+      const txt = require('./entityConsistency').buildClothingDescription(
+        character, cat, artStyle, clothingRequirements || null) || '';
+      if (txt) {
+        if (why !== 'given') log.debug(`👕 [IDENTITY] ${label}${character.name}: clothing via ${why}:${cat}`);
+        return txt;
+      }
+    } catch (e) {
+      log.warn(`⚠️ [IDENTITY] ${label}${character.name}: clothing "${cat}" did not resolve (${e.message})`);
+    }
+  }
+  const worn = character.avatars?.clothing?.standard || character.structuredClothing?.upperBody || '';
+  if (worn) { log.debug(`👕 [IDENTITY] ${label}${character.name}: clothing via avatar wardrobe`); return worn; }
+  log.error(`❌ [IDENTITY] ${label}${character.name}: NO clothing resolved — the detector gets no garment colour, SAM places no garment seed, and the cut-out loses its clothes`);
+  return '';
+}
+
+/**
+ * Identity line + clothing, never dropping the clothing. `c.description ||
+ * build(...)` discarded a resolved outfit the moment a character carried its own
+ * description, which is the second half of the same bug.
+ */
+function buildIdentityLine(character, clothingText) {
+  const base = character?.description
+    || buildCastIdentityDescription(character, clothingText);
+  if (!clothingText || /\bwearing\b/i.test(String(base))) return base;
+  return `${base}. Wearing: ${clothingText}`;
+}
+
 function buildCastIdentityDescription(char, clothingText = '') {
   if (!char || typeof char !== 'object') return '';
   const parts = [];
@@ -4771,6 +4834,8 @@ module.exports = {
   buildSecondaryCharacterDescriptions,
   buildSecondaryExpectedCharacters,
   buildCastIdentityDescription,
+  buildIdentityClothingText,
+  buildIdentityLine,
   buildSecondaryExpectedForPage,
   buildTextZoneInstruction,
   buildEraGuard,

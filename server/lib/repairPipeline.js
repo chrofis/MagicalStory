@@ -2076,21 +2076,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const expectedCharacters = sceneChars.map(c => {
             const name = c.name || c;
             if (typeof c !== 'object') return { name, description: '' };
-            let clothingText = '';
-            const category = clothingByName[name];
-            if (category) {
-              try {
-                clothingText = require('./entityConsistency').buildClothingDescription(
-                  c, category, artStyle, storyData?.clothingRequirements || null) || '';
-              } catch (e) {
-                log.warn(`⚠️ [ROUND-DETECT] p${r.pageNumber} ${name}: clothing "${category}" did not resolve (${e.message})`);
-              }
-            }
-            return {
-              name,
-              description: c.description
-                || getStoryHelpers().buildCastIdentityDescription(c, clothingText),
-            };
+            // Covers carry no sceneCharacterClothing, so clothingByName is {} and
+            // this used to produce an identity line with no garment colour at all —
+            // and THIS detection is the one that lands on coverImages, overwriting
+            // the dressed one coverIterate built.
+            const sh = getStoryHelpers();
+            const clothingText = sh.buildIdentityClothingText(
+              c, clothingByName[name], artStyle, storyData?.clothingRequirements || null,
+              { label: `p${r.pageNumber} r${round} ` });
+            return { name, description: sh.buildIdentityLine(c, clothingText) };
           });
           // Story-invented characters are in the Visual Bible, never in
           // sceneCharacters (the photo-backed cast) — without them the identity
