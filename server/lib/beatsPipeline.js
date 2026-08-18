@@ -299,6 +299,23 @@ SCENE: ${x.scene || ''}`.trim(),
         })),
       };
       if (stray.length > 0) log.warn(`⚠️ [BEATS] Review returned page(s) ${stray.join(', ')} that are not in the plan — ignored`);
+      // A reviewer may CUT a page and shift the later ones up (the prompt licenses
+      // it; the page total is fixed because the merge is keyed by pageNumber). The
+      // failure mode of a shift is a page it forgot to rewrite at the end, which
+      // leaves the pre-shift text behind and duplicates its neighbour. Report it —
+      // a duplicated beat is the one restructure error the merge cannot detect.
+      const seenBeat = new Map();
+      const dupes = [];
+      for (const b of merged) {
+        const key = String(b.beat || '').trim().toLowerCase();
+        if (!key) continue;
+        if (seenBeat.has(key)) dupes.push(`${seenBeat.get(key)}+${b.pageNumber}`);
+        else seenBeat.set(key, b.pageNumber);
+      }
+      if (dupes.length > 0) {
+        log.warn(`⚠️ [BEATS] Duplicate beat text after review on page pair(s) ${dupes.join(', ')} — a page shift left an un-rewritten page behind`);
+        gl.warn('beats_review_duplicate_beat', `Duplicate beat text on page pair(s) ${dupes.join(', ')} after the review`, null, { pairs: dupes });
+      }
       gl.info('beats_review', `Beat review by ${revRes.modelId || reviewModel}: ${changed.length} page(s) rewritten (${(meta.timings.beatsReviewMs / 1000).toFixed(1)}s)`, null, {
         changedPages: changed, model: revRes.modelId || reviewModel,
       });

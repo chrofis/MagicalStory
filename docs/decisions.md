@@ -13080,3 +13080,48 @@ evolink.ai "Gemini 3.6 Flash Migration Guide".
 
 **Touched:** none (documentation of a constraint + a pending decision)
 **Status:** 🟡 conditional — applies the moment a call site moves to Gemini 3.x
+
+## 2026-08-19 — Beats writer + reviewer: seven rules that lift a weak plan over 7
+
+**Context:** A production story (`job_1787001865052_lehb1p64c`, dragon/adventure, cast aged
+3–5) scored beats 6.8 / 6.1 / 7.3 (sonnet / grok / gemini, gen-3 premise-aware). The owner
+listed eight concrete faults; the judges caught three. Root cause: the commissioned idea
+itself contained the faults (an object both found and sought, friends arriving by
+coincidence, a cast split with no reason, a raging stream, two guards where one suffices),
+and the beats writer transcribed the idea instead of realising it coherently.
+
+**Decision — seven rules, all generic, added to `story-beats.txt` (writer) and folded into
+checks 3/6/8 of `story-beats-review.txt` (reviewer):**
+1. the idea is a loose wish, not a specification — resolve what it conflates;
+2. every arrival has a cause;
+3. the group stays together unless a beat gives a reason to part AND to meet again;
+4. peril fits the youngest named child — never drowning/falling/being lost;
+5. fewest characters the STORY needs and the fewest any BEAT needs;
+6. a trait is not an introduction — a prop appears with its owner before it solves anything;
+7. an obstacle exists for its own reasons — never shaped around a thing a character carries,
+   and softened peril takes its replacement from the established setting.
+
+**Measured, same commission, single review pass:** 7.2 / 7.2 / 8.4 — all three judges above
+7 (+0.4 / +1.1 / +1.1 vs shipped). Rule 7 was decisive: with rules 1-6 only, grok sat at 5.9
+because rule 4 had made the reviewer replace the stream with a gate that Julian's ball
+happened to unlock — a lock built for the key. With rule 7 the reviewer produced a
+stepping-stone crossing instead, and gemini credited exactly that.
+
+**Also learned:** the same rule text works as a reviewer CHECK and fails as a writer
+INSTRUCTION — the fresh writer plan alone scored 6.5/6.0/6.0, below the shipped baseline; the
+lift comes from the review pass. A numbered check that forces a per-page answer changes
+behaviour where a bullet in a long requirements list does not.
+
+**Second passes remain negative even on a weak story** (owner asked, since the earlier
+verdict came from an 8.4 story and could have been a ceiling effect): review 2 on this plan
+scored 6.8 / 5.8 / 6.2 versus 7.2 / 6.4 / 8.0 after review 1 — down on all three judges,
+17 of 18 pages rewritten. That is 5-for-5 against second passes (deepseek, sol, opus, grok
+twice), at both ends of the quality range. A ">40% of pages rewritten → review again" trigger
+would therefore fire exactly where it does damage.
+
+**Reviewers may now cut a page** (prompt licence + duplicate-beat guard in beatsPipeline):
+drop a page that earns nothing, shift the later pages up, give the freed last page new work.
+The page TOTAL is fixed — the merge is keyed by pageNumber, so a page can never be added or
+removed, only re-purposed.
+
+**Touched:** prompts/story-beats.txt, prompts/story-beats-review.txt, server/lib/beatsPipeline.js.
