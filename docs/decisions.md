@@ -12926,3 +12926,19 @@ only by the Lab's empty_scene_adherence stage).
 
 **Touched:** server/lib/outlineParser/unified.js, server/lib/referenceSheets.js,
 server/lib/promptBuilders.js, prompts/story-bible-from-beats.txt, prompts/story-beats-review.txt.
+
+## 2026-08-18 — "At least 2 landmarks" was read as "exactly 2"
+
+A Zurich story used 2 real landmarks across 18 pages. Nothing capped it: the index
+holds 77 Zurich entries and the resolver offered 30 to both the beats planner and the
+bible writer. The cap was the instruction heading that list — "You must use at least 2
+landmarks from below list" — a floor the writer delivered as a ceiling.
+
+**Decision:** the heading now asks for what the owner wants — "use every one the story
+plausibly passes (at least 2, and more when it stays in or near that place). Never bend
+the plot to fit one in." The floor survives, the ceiling reading does not, and the
+"never bend the plot" clause keeps a mountain-hike story from being stuffed with city
+bridges. Enforcement is the beats reviewer's new check 7b (name pages that could be
+staged at a real landmark and are not).
+
+**Touched:** server/lib/promptBuilders.js (buildAvailableLandmarksSection).

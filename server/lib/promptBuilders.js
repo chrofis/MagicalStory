@@ -4709,7 +4709,7 @@ function buildAvailableLandmarksSection(landmarks) {
 
   const hasDescriptions = landmarks.some(l => l.wikipediaExtract || l.wikipedia_extract);
 
-  return `**REAL LANDMARKS - You must use at least 2 landmarks from below list:**
+  return `**REAL LANDMARKS — use every one the story plausibly passes (at least 2, and more when it stays in or near that place). Never bend the plot to fit one in:**
 
 ${landmarkList}
 
