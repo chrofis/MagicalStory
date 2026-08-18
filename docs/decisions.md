@@ -13033,3 +13033,50 @@ cut-out.
 `server/lib/repairPipeline.js`, `server/lib/coverIterate.js`,
 `server/lib/images.js`
 **Status:** ✅ active
+
+## 2026-08-19 — `temperature: 0` is not determinism, and it BREAKS on Gemini 3.x
+
+**Context:** p11 of `job_1787001865052_lehb1p64c` was identified wrongly in
+production (box 0 named "Kiaan" — it is Levin, the boy in red), which cost Levin
+78% of his cut-out and put a red-shirted blond into Kiaan's consistency grid.
+Ten replays with the exact badged image and prompt returned the correct answer
+every time, byte-identical — five with the current short prompt, five with the
+older long-wardrobe prompt. The DINO boxes, their order, the badge positions and
+`badgeAnchor: "face"` are identical between the production run and the replays.
+
+Two explanations were floated and BOTH are refuted:
+- *"Gemini Flash is unreliable here"* — 10/10 correct. Not supported.
+- *"The model behind `gemini-2.5-flash` moved on 17 August"* — the Gemini API
+  changelog does not mention `gemini-2.5-flash` in July or August 2026 at all:
+  no repoint, no deprecation, no shutdown date. Refuted, not merely unproven.
+
+What remains is the unglamorous fact: **`temperature: 0` has never been a
+determinism guarantee.** No provider promises reproducible sampling, and ten
+identical answers bound the error rate only loosely — one production failure is
+consistent with a model that is right 95-99% of the time.
+
+**Decision (recorded, not yet acted on):** identity answers need a deterministic
+cross-check rather than trust. The garment colours are already stated per
+character, unique per child in practice, and already searched for per figure —
+a figure named Kiaan whose box contains red and no orange is provably
+mislabelled by machinery that already runs.
+
+**MIGRATION HAZARD — the reason this is logged now.** Google deprecated
+`temperature`, `top_p` and `top_k` on **2026-07-21**, starting with Gemini 3.6
+Flash and 3.5 Flash-Lite. On those models the parameters are **silently
+ignored**, and a future model generation returns **HTTP 400** for supplying
+them. Their guidance is to strip the parameters and steer determinism through
+system instructions instead.
+
+This repo has **61 `temperature:` settings** across `server/` and **12 direct
+`gemini-2.5-flash` call sites**. 2.5 Flash still honours them, so nothing is
+broken today — but the moment any call site is pointed at a 3.x model, its
+`temperature: 0` stops doing anything, with no error and no log line. Anyone
+swapping a model id must strip the sampling parameters in the same change.
+
+**Sources:** ai.google.dev/gemini-api/docs/changelog (2026-07-21 entry);
+developers.googleblog.com "Continuing to bring you our latest models";
+evolink.ai "Gemini 3.6 Flash Migration Guide".
+
+**Touched:** none (documentation of a constraint + a pending decision)
+**Status:** 🟡 conditional — applies the moment a call site moves to Gemini 3.x
