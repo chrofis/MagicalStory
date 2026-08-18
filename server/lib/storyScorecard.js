@@ -107,16 +107,27 @@ const mean = (nums) => (nums.length ? Math.round((nums.reduce((a, b) => a + b, 0
 // Final beats = the per-page outlineExtract that fed scene expansion (the
 // complete, post-review set). beatsReviewReport stores only CHANGED pages, so
 // it is not the full artifact. Falls back to the ---BEATS--- outline section.
+// `outlineExtract` means different things per pipeline: in beats mode it holds
+// "BEAT: …/SCENE: …" (a narrative plan), in unified mode it holds the scene
+// expansion's own JSON ({"sceneIntent": …}). The old fallback chain never checked,
+// so a unified story was scored on scene-intent JSON under the header "# BEATS
+// (narrative skeleton)" and rated for arc, pacing and loose threads — grading the
+// wrong artifact and making beats scores look comparable across pipelines when
+// they were not. Return null instead: a missing artifact is omitted by
+// scoreFromDims({partial}), which reports honestly that this story has no beats.
 function finalBeats(d) {
+  const looksLikeBeats = (t) => /(^|\n)\s*BEAT\s*:/i.test(String(t || ''));
   const scenes = (d.sceneDescriptions || []).filter(s => s && s.outlineExtract);
   if (scenes.length) {
-    return scenes
+    const text = scenes
       .sort((a, b) => (a.pageNumber || 0) - (b.pageNumber || 0))
       .map(s => `--- Page ${s.pageNumber} ---\n${String(s.outlineExtract).trim()}`)
       .join('\n\n');
+    if (looksLikeBeats(text)) return text;
   }
   const m = (d.outline || '').match(/---\s*BEATS\s*---([\s\S]*?)(?:\n---|$)/i);
-  return m ? m[1].trim() : (d.outline || '(no beats found)');
+  if (m && looksLikeBeats(m[1])) return m[1].trim();
+  return null;
 }
 
 function finalScenes(d) {
