@@ -599,6 +599,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let resolveLandmarksReady;
     const landmarksReady = new Promise((r) => { resolveLandmarksReady = r; });
 
+    // Same gate for VB ELEMENT REFERENCE SHEETS. Covers stream early (they only
+    // waited for the Visual Bible TEXT and the landmark photos), while element
+    // sheets are generated much later in the flow — so a cover built its VB grid
+    // while entries still had no referenceImageUrl, and getElementReferenceImages*
+    // silently dropped them for lack of a ref. The dragon on a dragon story's
+    // cover therefore had only its TEXT description and came out a different
+    // colour than on the pages, which do get the picture (job_1787001865052).
+    // Resolved right after the sheets are awaited; the main flow always reaches
+    // that block, so this cannot deadlock, and the covers are awaited later still.
+    let resolveRefSheetsReady;
+    const refSheetsReady = new Promise((r) => { resolveRefSheetsReady = r; });
+
     // TRIAL MODE: Start avatar styling immediately using pre-defined costumes
     // This runs in parallel with story generation (no need to wait for outline clothing)
     if (inputData.trialMode && !skipImages && artStyle !== 'realistic') {
@@ -1198,6 +1210,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // landmarksReady declaration: covers otherwise race the landmark fetch
         // and the composite path silently skips for lack of a landmark buffer.
         await landmarksReady;
+        // …and for the element reference sheets, so a dominant VB element (a
+        // creature, a vehicle, a secondary character) reaches the cover as a
+        // PICTURE, not only as prose.
+        await refSheetsReady;
 
         // Build per-character clothing requirements from hint.characterClothing
         // hint.characterClothing = { 'Manuel': 'winter', 'Sophie': 'standard', 'Roger': 'costumed:knight' }
@@ -3069,6 +3085,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let referenceSheetBatchMeta = null;
     if (referenceSheetPromise) {
       const refResult = await referenceSheetPromise;
+      resolveRefSheetsReady();
       if (refResult.generated > 0) {
         log.info(`🖼️ [UNIFIED] Reference images ready: ${refResult.generated} generated for secondary elements`);
       }
@@ -3085,6 +3102,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }));
       }
     }
+    // ALWAYS release the gate, including the no-sheets paths (nothing to
+    // generate, generation failed, skipImages). A cover awaiting a promise that
+    // never resolves would hang the whole job.
+    resolveRefSheetsReady();
 
     // PHASE 5: Generate page images
     // Sequential mode when incremental consistency is enabled, parallel otherwise
