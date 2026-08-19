@@ -13266,10 +13266,27 @@ layer from **52.2 to 16.9**.
 
 **Decision (owner, interviewed 2026-08-19):** a class is charged ONCE, at its
 worst severity. The finding list is untouched — only the bill.
-- **Per character, per category:** `clothing` (clothing + clothing_detail +
-  accessory + accessory_missing + garment_colour — "a character can only get
-  penalized for clothing once"), `identity` (character_identity + hair + scale +
-  anatomy + figure_completeness), `action` (action_interaction).
+- **Per character, per category:** `clothing` (clothing + accessory +
+  clothing_detail + garment_colour — "a character can only get penalized for
+  clothing once"), `character_identity`, `build` (anatomy +
+  figure_completeness), `action_interaction`.
+
+  **IDENTITY AND BUILD ARE SEPARATE (owner, same day, correcting a first draft
+  that merged them):** *"does this figure look like the photo? If not, repair
+  can not work. We can make a figure bigger or smaller and add or remove an arm.
+  But if the face is wrong, we can not say look more like the real life
+  figure."* `evalBuckets.js` already encoded exactly that split by REPAIR ROUTE
+  — `character_identity` → `grok_face`, `anatomy`/`figure_completeness` →
+  `regen` — so two different repair mechanisms must never share one charge.
+  `hair` and `age` alias into character_identity and stay there. `scale` is in
+  NEITHER group: it aliases to `composition_textzone` (repair:
+  `iterate_placement`), a placement concern, not a body one.
+
+  **Billing keys on the BUCKET from `evalBuckets.js`, never on the raw type.**
+  The first draft added a second type→category map inside scoring.js — a
+  parallel taxonomy beside the one the repair router uses, which would drift.
+  evalBuckets owns the taxonomy (closed bucket set, aliases, compound-type
+  splitter, repair route); scoring.js owns only what a thing costs.
 - **Page-scoped, subject ignored:** style_consistency, setting (owner: the place
   and the light are one charge), missing_element (owner: "one class, we deduct
   only once"), image_coherence, rendered_text.

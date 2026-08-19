@@ -312,50 +312,69 @@ function deductionPoints(d) {
 // one. Until then the error is lopsided in our favour: where merging is wrong
 // the discarded findings are MINOR/MODERATE (2-5 pts) against a MAJOR survivor,
 // so a bad merge costs ~7 points, while a right one saves up to 45.
-const PAGE_SCOPED_TYPES = new Set([
+// Buckets charged ONCE for the whole image, subject ignored: they are
+// properties of the picture, not of anyone in it. Bucket names, not raw types —
+// see deductionClassKey.
+const PAGE_SCOPED_BUCKETS = new Set([
   'style_consistency',  // a property of the render, never of a figure
   'setting',            // owner's call: the place and the light are one charge
-  'missing_element',    // owner: "one class, we deduct only once for missing elements"
   'image_coherence',    // the CATASTROPHIC whole-picture gate — one per page by construction
   'rendered_text',      // text baked into the art is a page defect
+  'object_presence',    // owner: "missing element is one class and we deduct only
+                        // once for missing elements". NOTE: `missing_element`
+                        // aliases INTO object_presence in evalBuckets, so this
+                        // also merges "the object is wrong" with "the object is
+                        // absent", and merges two different objects on one page.
 ]);
 
-// PER-CHARACTER BILLING CATEGORIES (owner, 2026-08-19). Several emitted types
-// bill as ONE category, so a character is charged once for their wardrobe
-// however many ways it is wrong. This maps a type to what it COSTS UNDER —
-// it never reinterprets what a finding means (the type still comes from the
-// evaluator, off the closed list in the prompts).
-const DEDUCTION_CATEGORY = {
-  // "A character can only get penalized for clothing once."
+// PER-CHARACTER BILLING CATEGORIES (owner, 2026-08-19).
+//
+// Keyed on the BUCKET from evalBuckets.js, never on the raw emitted type.
+// evalBuckets owns the taxonomy — the closed bucket set, every type alias, the
+// compound-type splitter and the repair route per bucket — and says so at the
+// top of that file; scoring.js owns only what a thing COSTS. A second
+// type->category map here would be a parallel taxonomy that silently drifts
+// from the one the repair router uses (it briefly was one, 2026-08-19).
+//
+// Only buckets that MERGE with another appear below. Anything absent bills
+// under its own bucket name, which is the correct default.
+const BUCKET_BILLING_CATEGORY = {
+  // "A character can only get penalized for clothing once." The four wardrobe
+  // buckets share a repair route (grok_blended / garment_colour_fix) and are
+  // one wardrobe to a reader.
   clothing: 'clothing',
-  clothing_detail: 'clothing',
   accessory: 'clothing',
-  accessory_missing: 'clothing',
+  clothing_detail: 'clothing',
   garment_colour: 'clothing',
-  garment_color: 'clothing',
-  // Who this is, and how they are built.
-  character_identity: 'identity',
-  hair: 'identity',
-  scale: 'identity',
-  anatomy: 'identity',
-  figure_completeness: 'identity',
-  // What they are doing.
-  action_interaction: 'action',
-  // RESERVED — no evaluator emits these yet; the codes have to be added to the
-  // prompts' closed list first. Mapped here so that the day they are emitted
-  // they bill per character instead of silently falling back to their own name.
-  //   emotion        — the beat's feeling contradicted
-  //   viewer_address — posing for the camera instead of engaging the task.
-  // The second is the owner's "position / facing": measured over the last 40
-  // stories, 89 findings across 43 pages in 19 stories describe a figure
-  // smiling at the viewer during the scene's action, filed inconsistently as
-  // action_interaction (often CRITICAL) or naturalness (MAJOR/MODERATE).
-  // NOT the pose-mirror rule on SETTLED.md — that is left/right, which stays a
-  // non-deduction. And it must never fire on covers, where gaze at the viewer
-  // is code-owned and intended (SETTLED: "Cover gaze is always at the viewer").
-  emotion: 'emotion',
-  viewer_address: 'facing',
+  // IDENTITY IS ITS OWN CLASS, SEPARATE FROM BUILD (owner, 2026-08-19):
+  // "does this figure look like the photo? If not, repair can not work. We can
+  // make a figure bigger or smaller and add or remove an arm. But if the face
+  // is wrong, we can not say look more like the real life figure."
+  // The bucket table already encodes exactly that split by repair route:
+  //   character_identity  -> grok_face  (face repaired against the reference)
+  //   anatomy             -> regen      (a full redo fixes a limb)
+  //   figure_completeness -> regen
+  // So they must never share a charge. `hair` and `age` alias into
+  // character_identity in evalBuckets and stay there — both are "does this read
+  // as the right person", and neither is repairable by repainting a garment.
+  // `scale` is NOT in this group at all: it aliases to composition_textzone
+  // (repair: iterate_placement), a placement concern, not a body one.
+  anatomy: 'build',
+  figure_completeness: 'build',
 };
+
+// Billing categories the evaluators cannot yet emit. Listed so the intent is
+// recorded and so the day a prompt starts emitting the code, it bills per
+// character instead of silently landing in `naturalness`:
+//   emotion        — currently aliased to naturalness in evalBuckets.
+//   viewer_address — the owner's "position / facing": posing for the camera
+//     instead of engaging the task. Measured over the last 40 stories, 89
+//     findings across 43 pages in 19 stories describe exactly this, filed
+//     inconsistently as action_interaction (often CRITICAL) or naturalness.
+//     NOT the pose-mirror rule on SETTLED.md — that is left/right and stays a
+//     non-deduction — and it must never fire on covers, where gaze at the
+//     viewer is code-owned and intended.
+// Adding either means a new bucket in evalBuckets.js FIRST, then a line above.
 
 /**
  * The billing identity of a finding: what class of defect, on whom.
@@ -368,9 +387,14 @@ const DEDUCTION_CATEGORY = {
  * matters (see the note on sumDeductionPoints).
  */
 function deductionClassKey(d) {
-  const type = String(d?.type || '').toLowerCase() || '(untyped)';
-  if (PAGE_SCOPED_TYPES.has(type)) return `page:${type}`;
-  const category = DEDUCTION_CATEGORY[type] || type;
+  // Resolve through the canonical taxonomy — it owns the aliases (hair, age and
+  // face all mean character_identity) and the compound-type splitter, so a
+  // finding typed `pose_clothing_age` lands somewhere real instead of under its
+  // own literal string.
+  const { bucketForType } = require('./evalBuckets');
+  const bucket = bucketForType(d?.type) || 'other';
+  if (PAGE_SCOPED_BUCKETS.has(bucket)) return `page:${bucket}`;
+  const category = BUCKET_BILLING_CATEGORY[bucket] || bucket;
   const subject = String(d?.name || '').trim().toLowerCase();
   return subject ? `${category}|${subject}` : category;
 }
@@ -868,8 +892,8 @@ module.exports = {
   sumDeductionPoints,
   deductionPoints,
   deductionClassKey,
-  PAGE_SCOPED_TYPES,
-  DEDUCTION_CATEGORY,
+  PAGE_SCOPED_BUCKETS,
+  BUCKET_BILLING_CATEGORY,
   pickBestVersionIndex,
   recomputeActiveVersion,
   recomputeAllActiveVersions,
