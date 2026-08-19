@@ -205,11 +205,25 @@ async function loadActivePageImage(storyId, pageNumber, versionIndex = null, ima
   // Cover rows live in story_images as image_type=<coverKey> with NULL
   // page_number; active-version meta is keyed by the cover key string.
   const activeIdx = await getActiveVersion(storyId, coverKey || pageNumber);
-  const img = coverKey
-    ? (await getStoryImage(storyId, coverKey, null, activeIdx)
-      || await getStoryImage(storyId, coverKey, null, 0))
-    : (await getStoryImage(storyId, 'scene', pageNumber, activeIdx)
-      || await getStoryImage(storyId, 'scene', pageNumber, 0));
+  const atActive = coverKey
+    ? await getStoryImage(storyId, coverKey, null, activeIdx)
+    : await getStoryImage(storyId, 'scene', pageNumber, activeIdx);
+  const img = atActive || (coverKey
+    ? await getStoryImage(storyId, coverKey, null, 0)
+    : await getStoryImage(storyId, 'scene', pageNumber, 0));
+  // OBSERVABLE, ALWAYS (owner, 2026-08-19). Three unpinned Lab runs on
+  // job_1787120984020_pg71z58ba9 p7 detected on v0 content although
+  // image_version_meta says activeVersion=2 and the pinned load of v2 works —
+  // and nothing logged which version was actually served, so the mismatch was
+  // only provable by eyeballing shirt colours in the step image. Every unpinned
+  // load now states what it asked for and what it got; a fallback to v0 is a
+  // WARNING, not a silent shrug.
+  loadActivePageImage._last = { storyId, pageNumber, activeIdx, loadedVersion: img?.version_index ?? (atActive ? activeIdx : 0), fellBackToV0: !atActive };
+  if (!atActive) {
+    log.warn(`⚠️ [TESTLAB] ${storyId} p${pageNumber}: active version v${activeIdx} did not load — FELL BACK to v0. Whatever runs next is NOT testing the reader-facing image.`);
+  } else {
+    log.info(`[TESTLAB] ${storyId} p${pageNumber}: loaded active version v${activeIdx}`);
+  }
   if (!img) throw new Error(`No image for ${storyId} page ${pageNumber}`);
   const data = await bytesFor(img);
   if (!data) throw new Error(`Image bytes unavailable for ${storyId} page ${pageNumber}`);
@@ -1047,6 +1061,12 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
   // params.versionIndex pins the exact bytes so an A/B of the detection knobs
   // compares the same picture, not whatever won pick-best in between.
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, params.versionIndex, params.imageType);
+  // Which bytes this run actually tested — exp #7/#9 could not answer that.
+  const loadedFrom = Number.isFinite(Number(params.versionIndex))
+    ? { pinned: Number(params.versionIndex) }
+    : (loadActivePageImage._last && loadActivePageImage._last.storyId === ctx.storyId
+        && loadActivePageImage._last.pageNumber === ctx.pageNumber
+      ? { ...loadActivePageImage._last } : null);
   const expectedCharacters = buildExpectedCharacters(ctx);
 
   // When grounding-dino is the configured backend, a cold analyzer (every
@@ -1076,7 +1096,7 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
     });
     // 'gemini-second-opinion' is a DELIBERATE arbitration verdict (DINO ran,
     // undercounted, Gemini found more figures) — not a cold-analyzer fallback.
-    const okBackends = ['grounding-dino', 'gemini-second-opinion'];
+    const okBackends = ['grounding-dino', 'gemini-second-opinion', 'dino+gemini-extra'];
     if (!wantDino || okBackends.includes(result?.detectionBackend)) break;
     if (attempt < ATTEMPTS) {
       log.info(`[TESTLAB] detection fell back to ${result?.detectionBackend || 'gemini'} (DINO cold after deploy?) — retry ${attempt}/${ATTEMPTS - 1} in 45s`);
@@ -1085,7 +1105,7 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
   }
   const elapsedMs = Date.now() - t0;
   if (!result) throw new Error('Bbox detection returned null');
-  if (wantDino && !['grounding-dino', 'gemini-second-opinion'].includes(result.detectionBackend)) {
+  if (wantDino && !['grounding-dino', 'gemini-second-opinion', 'dino+gemini-extra'].includes(result.detectionBackend)) {
     throw new Error(`Detection fell back to ${result.detectionBackend || 'gemini'} on every attempt — GroundingDINO unreachable (cold analyzer after deploy?). Rerun when the service is warm; refusing to chain repairs onto fallback boxes.`);
   }
 
@@ -1133,6 +1153,9 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
     elapsedMs,
     steps: steps.length ? steps : undefined,
     detectionBackend: result.detectionBackend || null,
+    // Which stored version this run detected on (pinned, or the active-version
+    // resolution incl. whether the v0 fallback fired).
+    loadedFrom,
     // How the figures got their names, and — when SoM ran — the exact prompt and
     // its raw answer. 'layout-fallback' here means the names are geometry and
     // gender guesses, which is worth seeing before trusting any of them.

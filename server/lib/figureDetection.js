@@ -1439,7 +1439,28 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     const name = nameByDet ? nameByDet.get(i) : null;
     if (!name) return '';
     const ec = expectedCharacters.find(c => (typeof c === 'object' ? c.name : c) === name);
-    return (ec && typeof ec === 'object' ? ec.description : '') || '';
+    if (!ec || typeof ec !== 'object') {
+      // SoM only answers with names from expectedCharacters, so a miss here is
+      // a shape bug, not a naming one — say so instead of silently unseeding.
+      log.error(`❌ [GDINO-DETECT] ${pageLabel}figure ${i} named "${name}" has no expectedCharacters entry — garment seeds impossible`);
+      return '';
+    }
+    // Description first; fall back to the clothing prose alone (it carries the
+    // colour words the seeds need), then the concise grounding prompt. On
+    // job_1787120984020_pg71z58ba9 p7 every figure had a correct SoM name and
+    // an EMPTY seedTrace — descriptions never reached the masker, nothing
+    // logged, and the cut-outs lost their clothes. Empty is never silent now.
+    const desc = ec.description || ec.clothing || ec.gdinoPrompt || '';
+    if (!desc) {
+      log.error(`❌ [GDINO-DETECT] ${pageLabel}"${name}": empty identity line (no description, no clothing, no gdinoPrompt) — SAM gets no garment seed for a named figure`);
+      try {
+        require('./failureLog').recordFailure({
+          kind: 'named_figure_without_identity_line', severity: 'internal',
+          fingerprint: 'empty-desc', summary: `${pageLabel}${name}: named figure reached the masker with an empty identity line`,
+        });
+      } catch { /* logging must never break detection */ }
+    }
+    return desc;
   });
   diag.seededFigures = descByPerson.filter(Boolean).length;
 

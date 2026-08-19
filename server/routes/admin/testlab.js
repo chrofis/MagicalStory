@@ -500,6 +500,10 @@ async function executeExperiment(experimentId, stage, targets, opts) {
 
       for (const variant of (variants || [null])) {
         const unitParams = { ...baseParams, ...(memberParams || {}), ...(variant?.params || {}) };
+        // A target-level versionIndex is a pin: the stage reads
+        // params.versionIndex, so without this line the sanitizer kept the pin
+        // on the target where nothing ever read it.
+        if (target.versionIndex != null && unitParams.versionIndex == null) unitParams.versionIndex = target.versionIndex;
         if (detection) unitParams.detection = detection;
         let entry;
         const startedAt = new Date().toISOString();
@@ -580,6 +584,10 @@ router.post('/experiments', async (req, res) => {
           // the CASE (two versions of one page are two different cases), which
           // is also what makes them distinct members of a set.
           ...(Number.isFinite(Number(t.versionIndex)) ? { versionIndex: Number(t.versionIndex) } : {}),
+          // Per-target params (the set-run mechanism) work on direct POSTs too.
+          // This sanitizer silently dropped them — exp #9 stored the target as
+          // {storyId,pageNumber} and the "pinned" run tested the wrong bytes.
+          ...(t._params && typeof t._params === 'object' ? { _params: t._params } : {}),
         }))
         .filter(t => t.storyId && Number.isFinite(t.pageNumber));
     }

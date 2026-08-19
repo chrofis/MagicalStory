@@ -158,6 +158,9 @@ export interface ExperimentResult {
   objects?: { name?: string; bbox?: number[] }[];
   detectionBackend?: string | null;
   identity?: { method?: string; answers?: Record<string, string>; somFailure?: string } | null;
+  // Which stored version the bbox stage actually detected on (pinned, or the
+  // active-version resolution incl. whether the v0 fallback fired).
+  loadedFrom?: { pinned?: number; activeIdx?: number; loadedVersion?: number; fellBackToV0?: boolean } | null;
   somPrompt?: string | null;
   report?: unknown;
   // eval_variance: the same image scored N times, nothing else changed.

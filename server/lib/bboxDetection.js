@@ -950,32 +950,70 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       gdinoDiag: gdinoDiag || undefined,
     };
 
-    // ── Second-opinion arbitration (owner, 2026-08-09) ─────────────────────
-    // A stashed undercounted DINO result means Gemini just ran as the second
-    // opinion. More Gemini figures than DINO persons → DINO merged overlapping
-    // figures (e.g. a child standing in front of an adult) → Gemini's boxes
-    // win, and SAM masks are attached to THEM so cutouts/carve-out still work.
-    // Same-or-fewer → the painter really painted fewer people; DINO's tight
-    // boxes + masks + SoM names stand, and the undercount stays visible to the
-    // evals as genuinely missing characters.
+    // ── Second-opinion arbitration: MERGE, never replace (owner, 2026-08-19) ──
+    // The old rule was winner-take-all: more Gemini figures than DINO persons →
+    // ALL of DINO's boxes, masks, names and garment seeds were discarded and
+    // every figure was rebuilt from Gemini boxes — which carry no description,
+    // so attachSamMasksToFigures placed no garment seeds and the cut-outs came
+    // back as a face and limbs with no shirt (job_1787120984020_pg71z58ba9
+    // p6/p8: every figure seeds=0). The owner's rule: "where gemini and dino box
+    // overlap use the dino one. Just the missing box is what we take from
+    // gemini." A false-positive undercount now costs one Gemini call and adds
+    // nothing, instead of destroying a correct seeded detection.
     if (dinoUndercountResult) {
       const dinoN = dinoUndercountResult.figures.length;
       const gemN = (finalResult.figures || []).length;
-      if (gemN > dinoN) {
-        try {
-          const masks = await attachSamMasksToFigures(imageData, finalResult.figures, { pageLabel });
-          Object.defineProperty(finalResult, '_gdinoMasks', { value: masks, enumerable: false });
-        } catch (maskErr) {
-          log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}SAM mask attach on Gemini boxes failed (${maskErr.message}) — boxes stay maskless`);
+      // A Gemini figure is COVERED when its box overlaps a DINO figure — centre
+      // inside the DINO box, or IoU above threshold. Covered → DINO's version
+      // of that figure stands. Uncovered → it is the missing figure; take it.
+      const iou = (a, b) => {
+        const yA = Math.max(a[0], b[0]), xA = Math.max(a[1], b[1]);
+        const yB = Math.min(a[2], b[2]), xB = Math.min(a[3], b[3]);
+        const inter = Math.max(0, yB - yA) * Math.max(0, xB - xA);
+        const areaA = Math.max(0, a[2] - a[0]) * Math.max(0, a[3] - a[1]);
+        const areaB = Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
+        return inter / Math.max(1e-9, areaA + areaB - inter);
+      };
+      const dinoBoxes = dinoUndercountResult.figures.map(f => f.bodyBox || f.bbox).filter(Boolean);
+      const covered = (gf) => {
+        const gb = gf.bodyBox || gf.bbox;
+        if (!gb) return true; // no box → nothing usable to add
+        const cy = (gb[0] + gb[2]) / 2, cx = (gb[1] + gb[3]) / 2;
+        return dinoBoxes.some(db =>
+          (cy >= db[0] && cy <= db[2] && cx >= db[1] && cx <= db[3]) || iou(gb, db) > 0.30);
+      };
+      const extras = (finalResult.figures || []).filter(gf => !covered(gf));
+      if (extras.length > 0) {
+        // Masks + garment seeds for the ADDED figures only. Their identity line
+        // comes from expectedCharacters by name so the seeds know the colours —
+        // a bare Gemini box carries neither description nor clothing.
+        for (const ex of extras) {
+          const ec = expectedCharacters.find(c => (c?.name || '') === (ex.name || ''));
+          if (ec && !ex.description) ex.description = ec.description || '';
+          ex._source = 'gemini-extra';
         }
-        finalResult.detectionBackend = 'gemini-second-opinion';
-        finalResult.gdinoDiag = { ...(dinoUndercountResult.gdinoDiag || {}), secondOpinion: { dino: dinoN, gemini: gemN, chose: 'gemini' } };
-        log.info(`⚖️ [BBOX-DETECT] ${pageLabel}second opinion: Gemini ${gemN} > DINO ${dinoN} figures — DINO merged; using Gemini boxes + SAM masks`);
-        if (!skipCache) _bboxCacheSet(cacheKey, finalResult);
-        return finalResult;
+        try {
+          const extraMasks = await attachSamMasksToFigures(imageData, extras, { pageLabel });
+          const dinoMasks = dinoUndercountResult._gdinoMasks || [];
+          Object.defineProperty(dinoUndercountResult, '_gdinoMasks',
+            { value: [...dinoMasks, ...extraMasks], enumerable: false });
+        } catch (maskErr) {
+          log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}SAM mask attach on Gemini extras failed (${maskErr.message}) — extras stay maskless`);
+        }
+        dinoUndercountResult.figures.push(...extras);
+        dinoUndercountResult.detectionBackend = 'dino+gemini-extra';
+        dinoUndercountResult.gdinoDiag = {
+          ...(dinoUndercountResult.gdinoDiag || {}),
+          secondOpinion: { dino: dinoN, gemini: gemN, chose: 'merge', added: extras.map(e => e.name || 'UNKNOWN') },
+        };
+        log.info(`⚖️ [BBOX-DETECT] ${pageLabel}second opinion MERGE: DINO keeps its ${dinoN}, Gemini adds ${extras.length} uncovered figure(s): ${extras.map(e => e.name || 'UNKNOWN').join(', ')}`);
+      } else {
+        dinoUndercountResult.gdinoDiag = {
+          ...(dinoUndercountResult.gdinoDiag || {}),
+          secondOpinion: { dino: dinoN, gemini: gemN, chose: 'dino', added: [] },
+        };
+        log.info(`⚖️ [BBOX-DETECT] ${pageLabel}second opinion: Gemini ${gemN} vs DINO ${dinoN}, no uncovered extra box — DINO stands as-is`);
       }
-      dinoUndercountResult.gdinoDiag = { ...(dinoUndercountResult.gdinoDiag || {}), secondOpinion: { dino: dinoN, gemini: gemN, chose: 'dino' } };
-      log.info(`⚖️ [BBOX-DETECT] ${pageLabel}second opinion: Gemini ${gemN} ≤ DINO ${dinoN} figures — painter painted fewer; keeping DINO boxes+masks`);
       if (!skipCache) _bboxCacheSet(cacheKey, dinoUndercountResult);
       return dinoUndercountResult;
     }

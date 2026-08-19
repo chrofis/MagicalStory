@@ -389,9 +389,16 @@ function buildCharacterDescriptionsForBbox(storyData, expectedPositions) {
 function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames = [], pageLabel = '') {
   const out = {};
   const vb = visualBible || {};
+  // ANIMALS ARE NOT EXPECTED CHARACTERS (owner, 2026-08-19). DINO detects
+  // `person`; a dog or a dragon can never satisfy it, so every animal in the
+  // expected list is a guaranteed "missing person": it fires the undercount,
+  // routes the page to the Gemini second opinion, and hands the identity call
+  // a name no person badge can carry. Animals stay fully detectable through
+  // the OBJECT pass (buildObjectGroundingHints pools vb.animals). Human-shaped
+  // story-invented characters (vb.secondaryCharacters — the Lira-the-mermaid
+  // case this function exists for) keep flowing.
   const lists = [
     { list: vb.secondaryCharacters, kind: 'secondary character' },
-    { list: vb.animals, kind: 'creature' },
   ];
   // A malformed Visual Bible (object instead of array, missing entirely) must
   // not throw — the page still renders, it just has no secondary to add.

@@ -171,7 +171,10 @@ function StoriesTab({ onReviewStory }: { onReviewStory: (storyId: string) => voi
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [artStyle, setArtStyle] = useState('');
-  const [days, setDays] = useState('');
+  // Default to the last 7 days: unfiltered, the query extracts JSON fields and
+  // counts every story ever written, which made the picker slow to open. "All
+  // time" is still one click away for hunting an older run.
+  const [days, setDays] = useState('7');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -704,6 +707,21 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
   const [stories, setStories] = useState<TestLabStory[]>([]);
   const [selectedStoryIds, setSelectedStoryIds] = useState<string[]>([]);
   const [storySearch, setStorySearch] = useState('');
+  // The list loads the last 7 days; the box below filters what is loaded, so on
+  // its own it could never find an older story. A typed query therefore re-asks
+  // the server with NO day window — search means all time, browsing means recent.
+  useEffect(() => {
+    const q = storySearch.trim();
+    if (q.length < 2) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await testlabService.getStories({ limit: 50, search: q });
+        if (!cancelled) setStories(res.stories);
+      } catch { /* keep whatever is already listed */ }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [storySearch]);
   const [textModels, setTextModels] = useState<TextModelInfo[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [writerModel, setWriterModel] = useState('');
@@ -747,7 +765,10 @@ function ExperimentsTab({ preset, onPresetApplied }: { preset: { storyId: string
         // an older run needs to be found (server caps at 200).
         testlabService.getExperiments(expLimit >= 100 ? { limit: expLimit, all: true } : { limit: expLimit }),
         testlabService.getBenchmarks(),
-        testlabService.getStories({ limit: 50 }),
+        // Last 7 days, like the experiments list above it — the story dropdown
+        // is for "run a stage on something I just generated", and scanning the
+        // whole table for that is what made this page slow to open.
+        testlabService.getStories({ limit: 50, days: 7 }),
       ]);
       setExperiments(exps.experiments);
       setBenchmarks(bench.benchmarks);
@@ -2755,7 +2776,7 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                           <pre className="bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64 whitespace-pre-wrap">{result.somPrompt}</pre>
                         </details>
                       )}
-                      <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ backend: result.detectionBackend, figures: result.figures, objects: result.objects }, null, 2)}</pre>
+                      <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-48">{JSON.stringify({ backend: result.detectionBackend, loadedFrom: result.loadedFrom, figures: result.figures, objects: result.objects }, null, 2)}</pre>
                     </>
                   )}
                   {stage === 'eval_variance' && result.scoreSpread && (
