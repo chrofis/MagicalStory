@@ -457,9 +457,23 @@ router.post('/sets/:id/run', async (req, res) => {
 // In-process guard: one experiment at a time (bounded cost; template swaps stay serialized).
 let experimentRunning = false;
 
+// How often a running experiment says "still alive", and how long a silence has
+// to last before the row is treated as dead. A single stage call can legitimately
+// take minutes (vision + compliance + image gen), so the stale window is well
+// clear of that; what it catches is a process that is GONE, which never comes
+// back and otherwise blocks every push until the old 2h bound expired.
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const HEARTBEAT_STALE = '5 minutes';
+
 async function executeExperiment(experimentId, stage, targets, opts) {
   const { runStageOnTarget } = require('../../lib/testlab');
   experimentRunning = true;
+  // Beat immediately, then on a timer — a run that dies inside its FIRST stage
+  // call (the exp747 case: 1 target, 0 results, dead for an hour) must still
+  // have a heartbeat to go stale, or it looks like a row that never started.
+  const beat = () => dbQuery('UPDATE testlab_experiments SET heartbeat_at = NOW() WHERE id = $1', [experimentId]).catch(() => {});
+  await beat();
+  const heartbeat = setInterval(beat, HEARTBEAT_INTERVAL_MS);
   const appendEntry = async (entry) => {
     // Cap stored prompt size so results stay listable.
     if (entry.promptUsed && entry.promptUsed.length > 30000) {
@@ -533,6 +547,7 @@ async function executeExperiment(experimentId, stage, targets, opts) {
       [experimentId, err.message]
     ).catch(() => {});
   } finally {
+    clearInterval(heartbeat);
     experimentRunning = false;
   }
 }
@@ -675,12 +690,17 @@ router.get('/eval-version/:version', async (req, res) => {
 router.get('/experiments', async (req, res) => {
   try {
     // Reap zombies: 'running' rows survive a server restart forever (the
-    // single-flight flag is in-process). If nothing is running in THIS
-    // process, anything still 'running' after 2h died with a previous one.
+    // single-flight flag is in-process). A live run beats every 30s, so a row
+    // whose heartbeat has gone quiet died with a previous process — reap in
+    // minutes instead of the old blanket 2h, which both blocked pushes for an
+    // hour (exp747) and could reap a genuinely long run out from under itself.
+    // Rows predating the heartbeat column have NULL and keep the 2h rule.
     if (!experimentRunning) {
       await dbQuery(
         `UPDATE testlab_experiments SET status = 'failed', error = 'server restarted mid-run', completed_at = NOW()
-         WHERE status = 'running' AND created_at < NOW() - INTERVAL '2 hours'`
+         WHERE status = 'running'
+           AND (heartbeat_at < NOW() - INTERVAL '${HEARTBEAT_STALE}'
+             OR (heartbeat_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'))`
       ).catch(() => {});
     }
     // Bounded by default. The old query took the newest 100 unconditionally AND

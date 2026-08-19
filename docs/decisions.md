@@ -13712,3 +13712,45 @@ rule live: "Gemini 6 vs DINO 4, no uncovered extra box — DINO stands as-is".
 **Touched:** `server/lib/repairPipeline.js`, `server/lib/bboxDetection.js`,
 `server/lib/testlab.js`, `tasks/bugs.json`
 **Status:** ✅ active
+
+## 2026-08-19 — A dead Test Lab run must not block every push (heartbeat)
+
+**Context:** Test Lab experiments run as an in-process loop with no `story_jobs`
+row, so a container restart — deploy, idle-shutdown, crash — leaves
+`status='running'` forever. `idleShutdown`'s busy probe counts those rows, so
+`GET /api/health/busy` reports busy and the pre-push hook refuses **every** push,
+staging and production alike, until a 2-hour bound expires.
+
+Observed 2026-08-19: experiment **747** (story_scorecard, 1 target, 0 results)
+sat 'running' for over an hour and blocked all work, while a LATER experiment
+started and finished normally around it — which is what proved it was dead.
+
+**Decision:** a running experiment writes `heartbeat_at` every 30s, starting
+BEFORE its first stage call (a run that dies inside that call must still have a
+heartbeat to go stale, or it looks like a row that never started). The reaper and
+the busy probe both count only rows whose heartbeat is fresh within 5 minutes.
+
+**Rationale:** the 2h bound was both too slow — an hour of blocked pushes for a
+run that was already dead — and unsound, since it reaps a *genuinely* long run
+out from under itself. A heartbeat answers the real question (is a process still
+working on this?) in seconds, and never reaps a live run however long it takes.
+5 minutes is well clear of a single slow stage call (vision + compliance + image
+generation can each take minutes); what it detects is a process that is GONE.
+
+**Deploy-order safety — deliberate.** Migrations here are applied BY HAND; there
+is no runner (`scripts/run-migration.js` is hardcoded to one old file). So this
+code can reach an environment whose DB lacks the column. A throwing busy probe
+counts as BUSY, which would block every push to that environment permanently —
+the same failure this change removes, made worse and unfixable without a manual
+DB edit. The probe therefore catches `undefined_column` (42703) **only** and
+falls back to the old 2h rule with a warning naming the migration. Rows written
+before the column exists have NULL and keep the 2h rule either way.
+
+Migration 023 is applied to **staging** (column + partial index verified via
+information_schema). **Production still needs it** — the fallback keeps prod
+correct until then, at the cost of prod keeping the old 2h behaviour.
+
+**Touched:** `migrations/023_testlab_experiment_heartbeat.sql`,
+`server/routes/admin/testlab.js` (heartbeat writer + reaper),
+`server/lib/idleShutdown.js` (busy probe)
+**Status:** ✅ active on staging / 🟡 pending the production migration

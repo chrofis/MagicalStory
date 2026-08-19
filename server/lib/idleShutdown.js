@@ -84,11 +84,36 @@ function ensureDefaultProbes() {
   // forever. to_regclass keeps a missing table (fresh DB) from reading as busy.
   registerBusyProbe('testlab', async () => {
     const { dbQuery } = require('../services/database');
-    const r = await dbQuery(
-      `SELECT COUNT(*)::int AS n FROM testlab_experiments
+    // A live experiment beats every 30s (routes/admin/testlab.js). Counting only
+    // rows with a FRESH heartbeat means a run that died with its process stops
+    // blocking pushes within minutes instead of the 2h bound — which once held
+    // every push, staging and production, for an hour (exp747, 2026-08-19).
+    // Rows predating the heartbeat column have NULL and keep the 2h rule, so a
+    // pre-migration run is never mistaken for dead.
+    //
+    // DEPLOY-ORDER SAFE. Migrations are applied by hand (there is no runner), so
+    // this code can reach an environment whose DB lacks heartbeat_at. A throwing
+    // probe counts as BUSY — see firstBusyProbe — which would block every push
+    // to that environment indefinitely: the exact failure this gate exists to
+    // prevent, but permanent. So a missing column falls back to the old rule
+    // instead of throwing. Remove the fallback once 023 is applied everywhere.
+    const LEGACY = `SELECT COUNT(*)::int AS n FROM testlab_experiments
         WHERE status = 'running' AND created_at > NOW() - INTERVAL '2 hours'
-          AND to_regclass('public.testlab_experiments') IS NOT NULL`
-    );
+          AND to_regclass('public.testlab_experiments') IS NOT NULL`;
+    let r;
+    try {
+      r = await dbQuery(
+        `SELECT COUNT(*)::int AS n FROM testlab_experiments
+          WHERE status = 'running'
+            AND (heartbeat_at > NOW() - INTERVAL '5 minutes'
+              OR (heartbeat_at IS NULL AND created_at > NOW() - INTERVAL '2 hours'))
+            AND to_regclass('public.testlab_experiments') IS NOT NULL`
+      );
+    } catch (err) {
+      if (err.code !== '42703') throw err; // undefined_column only; anything else is real
+      log.warn('[IDLE-SHUTDOWN] testlab_experiments.heartbeat_at missing — apply migrations/023; using the 2h fallback');
+      r = await dbQuery(LEGACY);
+    }
     const n = r[0]?.n || 0;
     return n > 0 ? `${n} experiment(s) running` : false;
   });
