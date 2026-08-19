@@ -13125,3 +13125,36 @@ The page TOTAL is fixed — the merge is keyed by pageNumber, so a page can neve
 removed, only re-purposed.
 
 **Touched:** prompts/story-beats.txt, prompts/story-beats-review.txt, server/lib/beatsPipeline.js.
+
+## 2026-08-19 — Two gaps the production rerun exposed (planted props, vocabulary)
+
+**Context:** The dragon story was rerun end to end on production with the seven new beats
+rules (`job_1787120984020_pg71z58ba9`, 56 min, 18 pages). Beats improved on two judges
+(sonnet 6.8→7.2, gemini 6.7→7.8) but grok fell 6.8→6.2, and STORY TEXT regressed on two
+judges (sonnet 7.4→6.6, gemini 7.0→5.6). The local trial had produced 7.2/7.2/8.4, so the
+prompts do not reproduce that in the live pipeline.
+
+**Two causes, both real:**
+1. **Planted-but-unpaid props.** "A prop must be introduced before it solves anything"
+   (rule 6) and "an obstacle is never shaped around a carried prop" (rule 7) combined into a
+   third fault: the reviewer introduced the prop early AND removed its use, leaving it
+   dangling. gemini: *"a dangling prop introduced on page 1 but explicitly left in the bag"*;
+   grok: *"the planted ball … stay unpaid"*. Rule 6 now closes the loop: anything introduced
+   that way must later do work, and the introduction is dropped when its purpose is dropped.
+   The reviewer's check 8 flags an introduced prop that never does work.
+2. **Reading level was a label, not a constraint.** `story-text-from-beats.txt` printed
+   `Reading level: {READING_LEVEL}` and said nothing about word choice, so a first-grade book
+   shipped *Sockel, Inschrift, untersetzt, bernsteinfarben, ockerfarbig* — flagged by sonnet
+   AND gemini. Added an explicit rule: every word must be one a child at that level already
+   uses; name a thing plainly rather than reaching for a rare compound or an unusual colour or
+   material word.
+
+**Note on the peril rule:** it works — the reviewer named the drowning beat again
+(*"page 9, Julian in a reissender Bach with a ball as Schwimmhilfe — that is drowning"*) and
+replaced it. The regression was in what replaced it, not in the detection.
+
+**Also measured:** 16 of 18 pages needed image repair (rounds 17 → 12 → 5 → 4), ~25 of the
+56 minutes. Unrelated to prompts; the largest single cost in a full run.
+
+**Touched:** prompts/story-beats.txt, prompts/story-beats-review.txt,
+prompts/story-text-from-beats.txt.
