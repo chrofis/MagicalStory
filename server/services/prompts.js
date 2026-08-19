@@ -240,6 +240,10 @@ function fillTemplate(template, replacements) {
  * @param {string} [opts.textAreaInstruction] - Optional text-zone instruction
  * @param {string} [opts.eraGuard]         - Optional era-guard guidance
  * @param {string} [opts.landmarkFidelity] - Optional landmark-fidelity block
+ * @param {Object} [opts.visualBible]      - Visual Bible, used to resolve VB ids
+ *   (ART008 → "carved stone trail marker") before the prompt reaches the model.
+ *   ALWAYS pass it — see the sanitizer note in the body.
+ * @param {number} [opts.pageNumber]       - Page number, for sanitizer logging
  * @returns {string} Filled prompt ready for the image model.
  */
 function buildEmptyScenePrompt(opts = {}) {
@@ -256,7 +260,7 @@ function buildEmptyScenePrompt(opts = {}) {
   if (!/\*\*SHOT:\*\*|\*\*CAMERA:\*\*/i.test(description)) {
     description = `**SHOT:** wide\n\n${description}`;
   }
-  return fillTemplate(opts.template || PROMPT_TEMPLATES.emptyScene, {
+  const filled = fillTemplate(opts.template || PROMPT_TEMPLATES.emptyScene, {
     STYLE_DESCRIPTION: opts.style || '',
     EMPTY_SCENE_DESCRIPTION: description,
     CHARACTER_SPACE: opts.characterSpace || '',
@@ -264,6 +268,23 @@ function buildEmptyScenePrompt(opts = {}) {
     ERA_GUARD: opts.eraGuard || '',
     LANDMARK_FIDELITY: opts.landmarkFidelity || '',
   });
+
+  // Resolve VB ids to their English refs before the model sees them. The
+  // description is assembled from Visual Bible prose, and the writer routinely
+  // embeds ids in it ("the carved stone marker ART008 sits at the fork"), so
+  // an unsanitized empty-scene prompt gets the token PAINTED onto the object —
+  // observed on a shipped story: "ART008" lettered twice on a trail stone,
+  // "ART007" on a chest, the VB entity name on a signpost. The empty scene is
+  // the style/layout anchor the populated page is rendered from, so whatever
+  // it paints carries into the final image.
+  //
+  // Sanitizing here rather than at each call site: this builder is the single
+  // gate every empty-scene prompt passes through (page, vantage plate, cover
+  // plate, QC retry, iterate, Test Lab). Lazy require — promptBuilders.js
+  // requires this module at load, so a top-level import would close a cycle.
+  if (!opts.visualBible) return filled;
+  const { sanitizeVbIdsInPrompt } = require('../lib/promptBuilders');
+  return sanitizeVbIdsInPrompt(filled, opts.visualBible, opts.pageNumber ?? null);
 }
 
 /**

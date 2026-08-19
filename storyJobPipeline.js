@@ -1886,6 +1886,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     style: artStyleDesc,
                     description: bg.description,
                     landmarkFidelity: landmarkFidelityBlock,
+                    visualBible: streamingVisualBible,
+                    pageNumber: pageNum,
                   });
                   const result = await generateImageOnly(emptyPrompt, [], {
                     landmarkPhotos: emptySceneLandmarkPhotos,
@@ -3495,6 +3497,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // below — '' otherwise (was trial-only; paid stories shipped
               // the generic unnamed plate prompt).
               landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos[0]),
+              visualBible,
+              pageNumber: repPageData.pageNumber,
             });
             try {
               const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, repPageNum, landmarkPhotos);
@@ -3686,6 +3690,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               textAreaInstruction: emptyTextAreaInstr,
               eraGuard,
               landmarkFidelity: pageLandmarkFidelity,
+              visualBible,
+              pageNumber: pageData.pageNumber,
             });
 
             try {
@@ -3775,6 +3781,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     textAreaInstruction: retryTextInstr,
                     eraGuard,
                     landmarkFidelity: pageLandmarkFidelity,
+                    visualBible,
+                    pageNumber: pageData.pageNumber,
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,

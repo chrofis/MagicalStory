@@ -1312,6 +1312,8 @@ async function buildCoverReferences({
         // Named landmark-fidelity block when a landmark photo is attached
         // below — '' otherwise (was trial-only).
         landmarkFidelity: getStoryHelpers().buildLandmarkFidelityBlock(landmarkPhotos?.[0]),
+        visualBible,
+        pageNumber: coverPageNumber,
       });
       const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, coverPageNumber, landmarkPhotos);
       const emptyOptions = {

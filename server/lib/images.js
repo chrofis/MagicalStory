@@ -3605,6 +3605,8 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           textAreaInstruction: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
           eraGuard: buildEraGuard(iterateEra),
           landmarkFidelity: buildLandmarkFidelityBlock(pageLandmarkPhotos?.[0]),
+          visualBible,
+          pageNumber,
         });
         const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos);
         const isCoverPage = pageNumber < 0;

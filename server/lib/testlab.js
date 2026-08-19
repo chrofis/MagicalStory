@@ -589,6 +589,8 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
       : '',
     eraGuard: buildEraGuard(meta.era),
     landmarkFidelity: buildLandmarkFidelityBlock(ctx.landmarkPhotos[0] || null),
+    visualBible: ctx.visualBible,
+    pageNumber: ctx.pageNumber ?? null,
   });
 
   const t0 = Date.now();
