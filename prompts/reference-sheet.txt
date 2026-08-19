@@ -26,6 +26,8 @@ Generate one image laid out as a {GRID_SHAPE_PHRASE}. Cells are separated by thi
 - Show the complete object at a good size
 - Include key identifying details
 - Simple angle that shows the object clearly
+- A comparison in the description gives size or shape only. Draw the named object, never the thing it is compared to, and never a blend of the two
+- One object per cell, even when the description mentions its parts or what it is made of
 
 **FOR ANIMALS:**
 - Full body visible in a natural pose

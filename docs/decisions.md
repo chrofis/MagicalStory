@@ -501,6 +501,38 @@ at that size; the presence call is what the rule keys on.
 - `prompts/scene-expansion.txt` — rule 12c
 **Status:** ✅ active.
 
+### Visual Bible object descriptions are drawn literally — no shape similes, no handling clauses
+**Context:** A story's central prop rendered differently on nearly every page.
+Its VB entry read "a single whole dragon scale roughly the size of a dinner
+plate, gently curved like a shallow bowl, ridged underside, heavy enough that
+a child holds it with both hands flat beneath it". That string is copied
+VERBATIM into the reference-sheet cell line (`referenceSheets.js`), so the
+canonical reference image came out as a green BOWL with two disembodied hands
+under it — and the page that used the reference copied it faithfully. The
+model was obeying a wrong reference, not ignoring a right one.
+**Decision:** artifact/vehicle/clothing `description` gives material, colour,
+size and shape in plain terms. A SIZE comparison is allowed ("about as wide as
+a coin" renders correctly — the small-scale entry in the same story used one
+and its reference was right). A SHAPE comparison to another object, and any
+clause naming who holds/carries/wears the item, are not.
+**Evidence (3 renders, same object, Grok, watercolour):**
+1. Original description + old reference-sheet prompt → a literal bowl with hands.
+2. Original description + a reference-sheet rule saying not to draw the compared
+   object → still a bowl. **The downstream rule alone does not work**; kept, but
+   it is not the fix.
+3. Description rewritten per this rule → a single fan-shaped scale, correct
+   colour and shimmer, no bowl, no hands.
+**Touched:**
+- `prompts/story-bible-from-beats.txt` — the live beats-pipeline authoring site
+- `prompts/story-unified.txt` — sibling authoring site, same rule
+- `prompts/reference-sheet.txt` — defensive: draw the named object, not the
+  compared one; one object per cell
+**Open, not fixed here:** the same story shipped pages carrying unresolved
+CRITICAL findings (a page scored -15 with "holds a spiky green seed-pod-like
+object instead of the <prop>" and still published, best of 4 versions). The
+missing ship-gate is tracked separately.
+**Status:** ✅ active.
+
 ### Scene composite pipeline killed — every page goes direct
 **Context:** Two scene-composite variants were built between 2026-05-08
 and 2026-05-16: (1) the **uniform composite** (populated plate with ALL
