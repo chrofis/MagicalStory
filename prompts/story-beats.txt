@@ -19,7 +19,9 @@ Characters: {CHARACTER_NAMES}
 
 # YOUR TASK
 
-Plan {PAGE_COUNT} pages. Each page gets one BEAT and one SCENE.
+First write the ARC: where the story turns, and what each character goes through. Then plan {PAGE_COUNT} pages that deliver it. Each page gets one BEAT and one SCENE.
+
+The arc is the contract the pages have to satisfy. Every page number it names carries that turn, and no main character reaches the end without the change the arc gives them.
 
 BEAT is what happens on that page: the event, and what changes because of it. One or two sentences.
 
@@ -48,7 +50,22 @@ Requirements:
 
 # OUTPUT FORMAT
 
-Only the block below. No preamble, no commentary.
+Only the blocks below, in this order. No preamble, no commentary.
+
+---ARC---
+Inciting incident: p<N> — what starts it
+Rising action: p<N>-<N> — what escalates, and what each step costs
+Climax: p<N> — where the goal is won or lost
+Resolution: p<N> — what is different
+
+### <each main character>
+Starts: <how they are on their first page>
+Turning point: p<N> — <what they do or admit that they could not before>
+Ends: <what changed>
+
+### <each other named character>
+Enters: p<N> — <why they arrive then>
+Role: <what they do for the story that no one already present could>
 
 ---BEATS---
 ## Page 1

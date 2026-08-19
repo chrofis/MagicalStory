@@ -13418,3 +13418,57 @@ push is blocked again.
 **Touched:** `tasks/bugs.json`, `scripts/admin/check-open-bugs.js`,
 `.githooks/pre-push`, `CLAUDE.md`
 **Status:** ✅ active
+
+
+## 2026-08-19 — The beats planner authors an ---ARC--- before the pages (measured: 7.7 / 7.6 / 8.3)
+
+**Context:** `story-unified.txt` requires `---CHARACTER ARCS---` (starting point, key
+challenges, turning points, end state, per character) and `---PLOT STRUCTURE---` (inciting
+incident, rising action, climax, falling action, resolution) to be authored BEFORE any page
+content, plus a `---SCENE PLAN---`. `story-beats.txt` had none of it: its entire output was N
+numbered BEAT/SCENE pairs, so the pages were the first and only artifact and had nothing to fail
+against. Owner's question — "in the unified prompt we write a clear arc and what each character
+will experience first; do we not do this for beats?" — the answer was no.
+
+**Decision:** the beats planner now emits `---ARC---` before `---BEATS---`: inciting incident /
+rising action (with what each step costs) / climax / resolution with page numbers, then per main
+character Starts / Turning point (page) / Ends, and per other named character Enters (page, why
+then) / Role (what no one already present could do). The arc is passed to the reviewer as
+`{CURRENT_ARC}`, and review check 2 now reads the pages AGAINST it — naming every page the arc
+claims carries a turn that the beat does not deliver, and every character whose stated turning
+point never happens.
+
+**Measured** (Test Lab experiment **#11**, `beats_scenes` on `job_1787001865052_lehb1p64c`,
+plan sonnet-4.6 → review grok-4.6, evaluators 3.1/3.2/3.3, temperature 0):
+
+| | initial plan | reviewed |
+|---|---|---|
+| sonnet | 6.8 | **7.7** |
+| grok | 5.2 | **7.6** |
+| gemini | 5.6 | **8.3** |
+
+First time beats cleared 7 on all three judges; the previous best across three full production
+runs was 7.2 / 6.4 / 6.1 and the same-story baseline was 6.6 / 6.4 / 5.7. The review pass is now
+worth +0.9 / +2.4 / +2.7 instead of being tension-reducing. Judge notes name the intended
+mechanism: *"the ball loss on p12 is a small, honest cost that avoids easy comfort"* (sonnet),
+*"planted payoffs … and a real emotional line"* (grok), *"emotional beats … ground the adventure"*
+(gemini) — versus the previous run's *"path trials are toothless … the climax is a polite
+handoff"*.
+
+**Parser safety:** `parseBeats` slices at the first `---BEATS---` marker and parses only what
+follows, so a block ahead of that marker is invisible to every beats extractor. Verified both
+directions — a planner response with `---ARC---` parses 2/2 pages with the arc captured, and a
+reviewer response (`---ANALYSIS---` + `---BEATS---`) still parses with `arc` empty. Anything
+placed AFTER the last `## Page` would instead be swallowed into that page's SCENE, which is why
+the section goes first. The stored `data.outline` transcript is rebuilt from parsed beats, so it
+gains an explicit `---ARC---` section for the dev outline view rather than inheriting raw text.
+
+**Still open:** grok flags p4/p15 as rule-and-talk dumps and the three-path gate as
+underspecified; sonnet flags the guardians' motivation as thin. Validated on ONE story so far —
+the 3-story corpus check has not been run.
+
+**Touched:** prompts/story-beats.txt, prompts/story-beats-review.txt,
+server/lib/promptBuilders.js (parseBeats returns `arc`; buildBeatsReviewPrompt takes it),
+server/lib/beatsPipeline.js (threads plan.arc into the review, stores it on beatsReviewReport
+and in the outline), server/lib/testlab.js (beats_scenes + both replay modes thread the arc).
+**Status:** ✅ active on staging.

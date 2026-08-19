@@ -19,6 +19,10 @@ Characters: {CHARACTER_NAMES}
 
 {AVAILABLE_LANDMARKS_SECTION}
 
+# THE ARC THE PLANNER COMMITTED TO
+
+{CURRENT_ARC}
+
 # CURRENT PLAN
 
 {CURRENT_BEATS}
@@ -30,7 +34,7 @@ Judge the plan as a reader who sees only these pages. The brief and character de
 Answer each check, naming pages. Then rewrite only the pages that a check found wrong.
 
 1. Causality — for each page, does its beat follow from the page before? Name the most arbitrary transition.
-2. Arc — does the main character want something by page 1, and is their situation different by the last page? Name the page where the want first meets something that will not simply move, the page where a try fails or costs them something and the goal sits further away, and the page where the change is earned. Rewrite the fewest beats to supply any of the three that is missing.
+2. Arc — read the committed arc against the pages. Name every page it claims carries a turn that the beat there does not deliver, and every main character whose stated turning point or change never happens on the page. Name the page where the want first meets something that will not simply move, the page where a try fails or costs them something and the goal sits further away, and the page where the change is earned; when the arc itself names none of these, say so. Rewrite the fewest beats to deliver the arc, or to supply what neither the arc nor the pages contain.
 3. Stakes — name the page where the least is at risk and rewrite it so something is at risk. Name every obstacle removed in the beat that introduces it, and every blocker who yields without wanting something of their own; rewrite them so passing costs something the beat names. Name any peril beyond the youngest named child's age — drowning, falling or being lost as the real threat — and rewrite it to a cost that is not to the body: a refusal, a loss, a delay, a promise broken.
 4. Illustratable — name any scene that cannot be one drawn moment: a montage, a passage of time, an internal state with nothing to see, or an empty stage where a beat needs a character present. Also name any scene that is one moment but a HARD one — synchronized hands of two characters on one object, a realization or decision as the visual, an acrobatic/climbing pose with occluded limbs, fine mechanism manipulation, or several characters running parallel unrelated actions instead of reacting to one focal event, or a group with one shared goal split across separate spots with separate mini-actions — they do the same thing in the same place. Rewrite those into their nearest simple tableau (the visible result of the action, or one character holding/showing the object). Name any scene that shows the aftermath of its beat's action rather than the action itself, and any scene that composes the frame — what fills it, how large something looks, where it sits. A shot type is allowed.
 5. Repetition — name any two pages whose scenes would produce near-identical pictures (same place, same grouping, same action).

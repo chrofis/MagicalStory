@@ -3057,7 +3057,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   let review = null;
   let finalBeats = planParsed.pages;
   if (!params.skipReview) {
-    const reviewPrompt = buildBeatsReviewPrompt(storyData, planParsed.pages);
+    const reviewPrompt = buildBeatsReviewPrompt(storyData, planParsed.pages, planParsed.arc);
     if (!reviewPrompt) throw new Error('story-beats-review template unavailable');
     const t1 = Date.now();
     const revRes = await callTextModelStreaming(reviewPrompt, null, null, reviewModel, { usageLabel: 'testlab_beats_review' });
@@ -5846,6 +5846,10 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
   const beatsSection = (String(storyData.outline || '').match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
   const beats0 = parseBeats(beatsSection).pages;
   if (!beats0.length) throw new Error('story has no beats to replay');
+  // A replay reviews stored beats, so the arc comes from the run that produced
+  // them. Stories planned before the arc stage existed have none — the review
+  // prompt then says so rather than pretending one was committed.
+  const storedArc = parseBeats(String(storyData.outline || '')).arc || storyData.beatsReviewReport?.arc || '';
 
   const models = String(params.reviewModel || params.model || MODEL_DEFAULTS.outlineReviewModel)
     .split(',').map(x => x.trim()).filter(Boolean);
@@ -5870,7 +5874,7 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
     if (promptOverride) PROMPT_TEMPLATES.storyBeatsReview = promptOverride;
     const t = Date.now();
     let res;
-    try { res = await callTextModelStreaming(buildBeatsReviewPrompt(storyData, inBeats), null, null, model, { usageLabel: 'testlab_beats_branch', temperature: 0 }); }
+    try { res = await callTextModelStreaming(buildBeatsReviewPrompt(storyData, inBeats, storedArc), null, null, model, { usageLabel: 'testlab_beats_branch', temperature: 0 }); }
     finally { PROMPT_TEMPLATES.storyBeatsReview = orig; }
     assertReviewerResponded(res, model);
     const out = res.text || '';
@@ -5923,7 +5927,7 @@ async function runBeatsReviewReplayStage(target, { params = {}, promptOverride =
       const passes = [];
       let convergedAtPass = null;
       for (let p = 1; p <= passCount; p++) {
-        const prompt = buildBeatsReviewPrompt(storyData, beats);
+        const prompt = buildBeatsReviewPrompt(storyData, beats, storedArc);
         const t = Date.now();
         const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_beats_review_replay', temperature: 0 });
         assertReviewerResponded(res, model);

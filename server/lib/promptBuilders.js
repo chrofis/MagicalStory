@@ -3944,7 +3944,7 @@ function buildBeatsPrompt(inputData, pageCount) {
 }
 
 /** Fast structural review of a beat plan. Returns analysis + rewritten pages. */
-function buildBeatsReviewPrompt(inputData, beats) {
+function buildBeatsReviewPrompt(inputData, beats, arc = '') {
   const template = PROMPT_TEMPLATES.storyBeatsReview;
   if (!template) {
     log.error('[PROMPT] storyBeatsReview template not loaded — beats review unavailable');
@@ -3957,6 +3957,7 @@ function buildBeatsReviewPrompt(inputData, beats) {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
     CURRENT_BEATS: current,
+    CURRENT_ARC: String(arc || '').trim() || '(the planner authored no arc)',
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks),
   });
 }
@@ -4087,7 +4088,12 @@ function parseBeats(raw, expectedPages = []) {
   }
 
   const got = new Set(pages.map(p => p.pageNumber));
-  return { pages, missing: expectedPages.filter(n => !got.has(n)), analysis };
+  // The planner authors ---ARC--- before ---BEATS---; the reviewer puts its
+  // ---ANALYSIS--- in the same place. Both land in the pre-marker text, so the
+  // arc is whatever sits under an explicit ---ARC--- marker and nothing else.
+  const arcMatch = full.match(/---\s*ARC\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i);
+  const arc = arcMatch ? arcMatch[1].trim() : '';
+  return { pages, missing: expectedPages.filter(n => !got.has(n)), analysis, arc };
 }
 
 /**

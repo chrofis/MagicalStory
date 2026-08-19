@@ -254,7 +254,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // unmeasurable: the log says "3 pages rewritten" and nothing says WHAT.
   // Stays null only when the review never ran (missing template or a throw).
   let beatsReviewReport = null;
-  const reviewPrompt = buildBeatsReviewPrompt(inputData, plan.pages);
+  const reviewPrompt = buildBeatsReviewPrompt(inputData, plan.pages, plan.arc);
   if (!reviewPrompt) {
     log.warn('⚠️ [BEATS] story-beats-review template unavailable — beats shipped unreviewed');
     gl.warn('beats_review_failed', 'Review template unavailable — beats shipped unreviewed');
@@ -287,6 +287,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         durationMs: meta.timings.beatsReviewMs,
         changedPages: beatsDiffs.map(r => r.pageNumber),
         analysis: beatsReviewAnalysis,
+        // The arc the planner committed to, and the contract this review judged
+        // the pages against. Stored so a plan can be read back against it.
+        arc: plan.arc || '',
         pages: beatsDiffs,
         // Same dev-mode inspection as the scene review (owner request
         // 2026-08-09): the exact prompt, and EVERY beat as sent — not only the
@@ -943,6 +946,10 @@ SCENE: ${x.scene || ''}`.trim(),
     '---TITLE---',
     `TITLE: ${title || '(none)'}`,
     '',
+    // Before ---BEATS--- on purpose: every beats extractor keys on that marker
+    // with a lookahead to the next section, so a block ahead of it is invisible
+    // to them and readable in the outline view.
+    ...(plan.arc ? ['---ARC---', plan.arc, ''] : []),
     '---BEATS---',
     beats.map(b => `## Page ${b.pageNumber}\nBEAT: ${b.beat}\nSCENE: ${b.scene}`).join('\n\n'),
     '',
