@@ -13188,3 +13188,57 @@ replaced it. The regression was in what replaced it, not in the detection.
 
 **Touched:** prompts/story-beats.txt, prompts/story-beats-review.txt,
 prompts/story-text-from-beats.txt.
+
+
+## 2026-08-19 — The beats ruleset had no arc and accepted asserted reasons (why every plan came out flat)
+
+**Context:** Three full runs of the same commission scored beats at ~6.2–6.6 mean across
+sonnet/grok/gemini and never moved, while STORY TEXT climbed 6.7 → 7.6 and SCENE BRIEFS sat at
+8.6/8.0/9.4. Judge complaint was identical every time — grok: *"path trials are toothless, the
+open gate and the unused three-path rule are weakly paid off, and the climax is a polite
+handoff."* The owner read the shipped plan and said nothing makes sense: the split into three
+paths is mysterious, the guardians' existence and their possession of the object unexplained.
+
+**Diagnosis — the ruleset produced it, not the model:**
+1. **No arc spec existed anywhere in the beats stage.** The whole arc requirement was one
+   sentence ("wants something by page 1, situation different by the last page") plus a reviewer
+   check that verified exactly that. No midpoint, no complication, no low point, no requirement
+   that the goal ever recede. A chain of N uninterrupted successes satisfies it. The legacy
+   unified writer *did* carry an arc template (`story-unified.txt:416`, "Rising Action:
+   [Building tension, obstacles, challenges]"); the beats rewrite never inherited it.
+2. **The writer prompt was almost entirely subtractive.** 15 requirement bullets, 14 of them
+   prohibitions or reductions (never / no / drop / merge / fewest / keep to). Exactly one asked
+   for anything to happen. Nothing asked for a setback, a cost, or a refusal, so the ruleset
+   could not detect a story in which nothing goes wrong.
+3. **"Obstacles are solved, not survived" had no floor.** Stated as a universal, it licensed
+   every obstacle being solved on contact. Measured on the shipped plan: three consecutive
+   "trial" pages each introduced and removed their obstacle in the same beat (shoe-deep brook
+   crossed, loose rock shoved aside, gate already standing open). Because the rule banned only
+   *bodily* peril and named no permitted replacement, risk went to zero.
+4. **Review check 3 was asymmetric, so a review round could only de-escalate.** It said "*Say*
+   what would raise it" for low stakes but "*rewrite it*" for excess peril. Observed exactly:
+   the reviewer commented "raise it by making the peak look far and the grounded dragon the cost
+   of failure" and rewrote the rushing stream to shoe-deep water and the boulder to "a loose rock
+   one child can shift". This is why adding reviewer checks never moved the beats score.
+5. **"Stated reason" was satisfiable by fiat.** Checks 6/8 demanded a "stated reason" / "stated
+   origin", and the cheapest compliance is a sign or an inscription that announces the rule. In
+   the shipped plan the three-way split is licensed by a wooden sign and the guardians by text
+   cut into a cave wall. Requirement met, nothing explained — which is precisely the "total
+   mystery" the reader experiences.
+
+**Decision:** four generative rules added to the writer (arc shape with a middle where a try
+fails or is refused and the goal recedes; no obstacle removed in the beat that introduces it,
+passing costs something the beat names; a blocker wants something of its own and does not yield
+on request; reasons are grounded in who someone is / what a place is for / what someone needs,
+never announced by a sign). The peril rule keeps its age-safety half and now names the permitted
+replacement (refusal, loss, running out of the day, a promise broken) instead of leaving a
+vacuum. Reviewer check 2 must name — and supply — the resistance page, the failed-try page and
+the earned-change page; check 3's raise-clause now carries the same rewrite force as its
+lower-clause; check 8 rejects an asserted reason as a grounded one.
+
+**Rationale:** every previous prompt round added more subtractive rules, which is measurably why
+the score never moved. The judge rubric already scores "stakes: something is genuinely at risk;
+risk rises toward the climax" — the writer prompt simply never asked for it.
+
+**Touched:** prompts/story-beats.txt, prompts/story-beats-review.txt.
+**Status:** ✅ active — pending corpus validation (3 stories, `beats_scenes` stage).

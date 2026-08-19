@@ -28,6 +28,10 @@ SCENE is what the illustration shows: who is present, where they are, what they 
 Requirements:
 - Each page follows causally from the one before it.
 - The main character wants something by page 1 and their situation is different by the last page.
+- Early on the want meets something that will not simply move; in the middle one try fails, costs them something or is refused, and the goal sits further away than it did; the last third earns the change.
+- No obstacle is removed in the beat that introduces it. Passing one costs something the beat names — time, a possession, a plan, help asked for, someone's comfort.
+- Whoever or whatever stands in the way wants something of their own, and the plan says what; they do not yield on request.
+- Reasons are grounded, not announced. A sign, an inscription or a rule stated once to license a turn is not a reason: it comes from who someone is, what a place is for, or what someone needs.
 - Every beat is visible: something happens that a picture can show. A page of pure reflection cannot be illustrated.
 - No more than {MAX_CHARACTERS_PER_SCENE} named characters in any one scene.
 - Any character who forces or blocks something must be present in the scene where it happens.
@@ -35,7 +39,7 @@ Requirements:
 - When an AVAILABLE LANDMARKS list is present, set key scenes AT those places — the action happens on, in, or under the landmark, not with it as distant backdrop. Pick landmarks whose real character fits the beats.
 - A page keeps its characters at one depth together. Separate a figure into the background only when the beat itself requires the separation (left behind, watching from afar, arriving in the distance) — keep such pages to the few the story needs.
 - Treat the story idea as a loose wish, not a specification: resolve what it conflates or leaves to coincidence — distinguish two things it treats as one, give every arrival a cause — and drop what earns nothing.
-- Match peril to the youngest named child in the cast: never make drowning, falling or being lost the real threat. Obstacles are solved, not survived.
+- Match peril to the youngest named child in the cast: never make drowning, falling or being lost the real threat. What is at risk is the goal, never the child's body — being refused, losing what was found, running out of the day, breaking a promise or letting someone down carry the tension instead.
 - An obstacle exists for its own reasons: never shape one around a thing a character happens to carry, and never give a barrier exactly one solution that a character already holds. Where peril has to be softened, take the replacement from what the setting already contains.
 - A trait in the character details is not an introduction. A prop, pet or skill that solves a problem appears in an earlier scene with its owner, before it does the work — and anything introduced that way must later do work. Drop the introduction when you drop its purpose.
 - Use the fewest characters the STORY needs and the fewest any BEAT needs: invent no figure an existing character could be, merge two roles into one where the plot allows, and stage a beat with two people rather than three when two carry it.
