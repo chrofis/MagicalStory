@@ -460,6 +460,47 @@ differences that the pixel constant silently rendered at different sizes.
 - `server/lib/textOverlayRenderer.js` — `STORY_TEXT_PT`, `bookFormat` option
 **Status:** ✅ active.
 
+### Painted lettering: the inventory reports it, scene expansion must name it
+**Context:** A shipped page carried the caption "<names> at <place>" painted
+across its bottom-left corner and scored **100 / PASS**. Two other pages
+carried invented letterforms on a cave wall, and a signpost rendered a VB
+entity's own name. The DO-NOT-WRITE rule was present in the page prompt
+(`image-generation.txt:3`) and `D-23 rendered_text → CATASTROPHIC` was present
+in the evaluator — the defect shipped anyway.
+**Why it shipped:** the three-stage evaluator's Stage 1
+(`image-vision-inventory.txt`) is the only stage that SEES the image, and it
+was never asked about lettering; Stage 2 (`image-prompt-compliance.txt`) is
+text-only and says so in its own rules ("you have not seen the image"). So
+`D-23` was unreachable for painted text: the seeing stage did not look and the
+judging stage was blind. Version history showed the caption entered at
+`iterate-round-2`, i.e. a repair pass, and the eval then blessed it.
+**Decision (two parts, owner-approved 2026-08-19):**
+1. Stage 1 gains a `Lettering:` section — quote every visible string, name its
+   surface and position, say whether it spells real words or scribble,
+   `none visible` when there is none. Stage 2 gains the matching rule: report
+   `rendered_text` for captions/watermarks, scribble letterforms, or words
+   neither the prompt nor the ART STYLE asked for; a prompt-quoted string and
+   style-borne lettering are correct.
+2. `scene-expansion.txt` rule 12c — writing on a surface must either quote an
+   exact string under three words, or be described as pictorial marks. Never
+   ask for unnamed words. Evidence for the split: where the prompt named a
+   short string the model spelled it correctly; where it asked for unnamed
+   "words carved in stone" the model invented nonsense.
+**No code change.** `rendered_text` is already page-scoped in
+`scoring.js:322`, carries no `MAX_SEVERITY_TYPES` ceiling and is not in
+`ZERO_POINT_TYPES`, so a finding costs points as-is.
+**Validation:** modified Stage 1 run against 4 stored pages — caption page
+(caught, plus unrequested lettering on two props that human review had
+missed), invented-inscription page (caught, correctly called invented),
+legitimately-lettered signpost (caught, correctly called a real word), clean
+page (`none visible`). Note the quoted strings on small props are unreliable
+at that size; the presence call is what the rule keys on.
+**Touched:**
+- `prompts/image-vision-inventory.txt` — Lettering section
+- `prompts/image-prompt-compliance.txt` — Lettering rule before the severity list
+- `prompts/scene-expansion.txt` — rule 12c
+**Status:** ✅ active.
+
 ### Scene composite pipeline killed — every page goes direct
 **Context:** Two scene-composite variants were built between 2026-05-08
 and 2026-05-16: (1) the **uniform composite** (populated plate with ALL

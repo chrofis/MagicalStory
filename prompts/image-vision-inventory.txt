@@ -28,6 +28,9 @@ Setting:
 - Lighting direction and quality
 - Camera angle (low/eye-level/high, close/medium/wide)
 
+Lettering:
+- Any visible letters, numbers, words or symbols painted anywhere in the image — on signs, walls, stone, paper, garments, banners, or as a caption or watermark over the art. Quote each one exactly as it reads, name the surface it sits on and its position in frame, and say whether the letterforms spell real words or are unreadable scribble. Answer `none visible` when there is no lettering at all.
+
 Physics check:
 - Does any figure have more than 2 arms or 2 legs?
 - Are all figures and objects grounded on surfaces (not floating)?
