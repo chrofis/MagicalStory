@@ -691,6 +691,20 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
         severity: i.severity || 'MODERATE',
         type: i.type || 'default',
         fix: i.fix || `Fix: ${i.description}`,
+        // WHO the finding is about. The compliance template has always emitted
+        // this (its fixable_issues example leads with `"character"`), and this
+        // mapper silently dropped it — measured, 0 of 308 stored compliance
+        // findings carried a subject against ~68% for quality and semantic,
+        // which pass theirs through.
+        //
+        // It is not cosmetic. scoring.deductionClassKey bills per (class,
+        // subject), so a subjectless finding falls back to ONE charge per class
+        // for the whole page: every character's clothing collapsed into a single
+        // charge for the judge that produces the most findings of all (308 of
+        // 819) and has the widest per-page point range (28.9). bboxDetection
+        // also matches `issue.character` to a figure to aim a repair, so the
+        // loss cost targeted repairs too.
+        character: i.character || i.name || null,
         source: 'three-stage'
       }));
     // Never-CRITICAL gate on identity-absence findings (see helper above):
@@ -1530,6 +1544,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
               description: m.description,
               severity: String(m.severity).toUpperCase(),
               type: m.type,
+              // KNOWN LOSS, latent while EVAL_JUDGES=gemini (single judge, this
+              // branch never runs). The jury merges by BUCKET, so several
+              // characters' findings of one class collapse to a single entry and
+              // the subject cannot survive. Under per-(class, subject) billing
+              // that silently reverts every finding to one charge per page.
+              // Enabling the jury therefore requires merging per (bucket,
+              // subject), not per bucket.
               character: null,
               fix: `Fix: ${m.description}`,
               agreement: m.agreement,
