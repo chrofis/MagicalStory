@@ -280,8 +280,35 @@ router.post('/:jobId/rerun-full', authenticateToken, requireAdmin, async (req, r
     const { jobId } = req.params;
     const pool = getPool();
     const jobResult = await pool.query('SELECT * FROM story_jobs WHERE id = $1', [jobId]);
-    if (jobResult.rows.length === 0) return res.status(404).json({ error: 'Job not found' });
-    const sourceJob = jobResult.rows[0];
+
+    // story_jobs is pruned (it keeps only recent rows) while `stories` is the
+    // permanent record, so any story worth re-running is usually PAST its job
+    // row. Rebuild the commission from the story itself in that case — every
+    // field the pipeline reads survives there, and characters are hydrated from
+    // the characters table by id anyway.
+    let sourceJob;
+    if (jobResult.rows.length > 0) {
+      sourceJob = jobResult.rows[0];
+    } else {
+      const st = await pool.query('SELECT id, user_id, data FROM stories WHERE id = $1', [jobId]);
+      if (st.rows.length === 0) return res.status(404).json({ error: 'Neither a job nor a story with that id' });
+      const d = st.rows[0].data || {};
+      sourceJob = {
+        user_id: st.rows[0].user_id,
+        input_data: {
+          pages: d.pages || (d.sceneImages || []).length || undefined,
+          language: d.language, languageLevel: d.languageLevel, artStyle: d.artStyle, season: d.season,
+          storyType: d.storyType, storyTypeName: d.storyTypeName, storyCategory: d.storyCategory,
+          storyTopic: d.storyTopic, storyTheme: d.storyTheme, storyDetails: d.storyDetails,
+          dedication: d.dedication, mainCharacters: d.mainCharacters,
+          characters: (d.characters || []).map(c => ({ id: c.id, name: c.name })),
+          relationships: d.relationships, relationshipTexts: d.relationshipTexts,
+          userLocation: d.userLocation,
+        },
+        _rebuiltFromStory: true,
+      };
+      log.info(`[ADMIN] Full rerun: job row for ${jobId} is gone — commission rebuilt from the story record`);
+    }
 
     const overrides = (req.body && typeof req.body.inputOverrides === 'object' && req.body.inputOverrides)
       ? req.body.inputOverrides : {};
@@ -304,7 +331,7 @@ router.post('/:jobId/rerun-full', authenticateToken, requireAdmin, async (req, r
       log.error(`❌ [ADMIN] Full rerun job ${newJobId} failed:`, err);
     });
     log.info(`[ADMIN] Full rerun ${newJobId} from ${jobId} (user ${sourceJob.user_id}, images+covers+repair on)`);
-    res.json({ success: true, jobId: newJobId, sourceJobId: jobId, pages: inputData.pages });
+    res.json({ success: true, jobId: newJobId, sourceJobId: jobId, pages: inputData.pages, rebuiltFromStory: !!sourceJob._rebuiltFromStory });
   } catch (err) {
     log.error('Error starting full rerun:', err);
     res.status(500).json({ error: 'Failed to start full rerun', details: err.message });
