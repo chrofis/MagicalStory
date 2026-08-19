@@ -428,6 +428,36 @@ glitch.
 - `server/lib/textRegion.js` — calmness map + safe-area expansion
 - `server/lib/storyHelpers.js` `buildImagePrompt()` — COPY SPACE
   instruction the model uses to keep the chosen corner light
+**Status:** ✅ active — superseded in part by the point-size entry below
+(the never-shrink rule stands; the size is now defined in points, not pixels).
+
+### Story text is sized in POINTS, not canvas pixels (12pt)
+**Context:** The overlay font was `FIXED_FONT_PX = 11` applied to the page
+image's own canvas. A user reported that the shared viewer's print preview
+"does not show the text at all" and that the text should be bigger. Both are
+the same defect: the page image is scaled to fill the printed interior page
+(A4 trim 210×280mm + 3mm bleed = 810.7pt tall), so 11px on an 1152px canvas
+prints at **~7.7pt** — about two thirds of Word's 11pt, in a first-grade
+picture book. On screen, where the page renders ~500px wide, it is ~5px tall
+and reads as absent. Pixels were never a stable size either: canvases vary
+within one story (1152px scenes, 1184px re-rendered page, 1222px covers), so
+"the same 11px" already printed at three different physical sizes.
+**Decision:** `server/lib/textOverlayRenderer.js` — `STORY_TEXT_PT = 12`,
+converted per canvas via `px = round(pt × imageHeightPx / interiorPageHeightPt)`.
+Owner picked 12pt from rendered 11/14/18pt candidates. The physical size is
+what's fixed now, exactly like choosing 12pt in Word; the never-shrink rule
+above is unchanged (only the polygon grows or contracts).
+**Rationale:** Sizing in points is resolution-independent — it survives a
+change in image-model output resolution and equalises the per-page canvas
+differences that the pixel constant silently rendered at different sizes.
+**Touched:**
+- `server/config/print.js` — NEW. `BOOK_FORMATS` / `DEFAULT_FORMAT` /
+  `interiorPageHeightPt()` moved here from `pdf.js` so both the PDF writer and
+  the overlay renderer read one source of truth. It cannot live in `pdf.js`:
+  `pdf.js` requires `textOverlayRenderer`, so importing back would close a cycle.
+- `server/lib/pdf.js` — imports the format table; threads `bookFormat` through
+  `addPictureBookPages` opts to both `generateTextOverlay` call sites
+- `server/lib/textOverlayRenderer.js` — `STORY_TEXT_PT`, `bookFormat` option
 **Status:** ✅ active.
 
 ### Scene composite pipeline killed — every page goes direct

@@ -9,6 +9,7 @@
 const { createCanvas } = require('canvas');
 const sharp = require('sharp');
 const { getTextZonePolygon } = require('./textMasks');
+const { interiorPageHeightPt, DEFAULT_FORMAT } = require('../config/print');
 
 const VALID_POSITIONS = ['top-left', 'top-right', 'top-full', 'bottom-left', 'bottom-right', 'bottom-full'];
 
@@ -33,13 +34,28 @@ function renderTextOverlay(width, height, text, polygon, options = {}) {
     fontSize: fontSizeOverride,
     fontFamily = 'Georgia',
     pageNumber = null,
+    bookFormat = DEFAULT_FORMAT,
   } = options;
 
   // FIXED font size — the printed book must be visually consistent across
-  // pages. Same px on every page, regardless of image dimensions or text
-  // length. Text never shrinks; only the polygon area grows or contracts.
-  const FIXED_FONT_PX = 11;
-  const baseFontSize = fontSizeOverride || FIXED_FONT_PX;
+  // pages. Text never shrinks; only the polygon area grows or contracts.
+  //
+  // The size is defined in POINTS, exactly like picking 12pt in Word: the
+  // physical size on the printed page is what's fixed, and the pixel value
+  // follows from how tall this particular canvas is. A page image is scaled
+  // to fill the interior page (trim + bleed), so:
+  //
+  //   px = pt × imageHeightPx / interiorPageHeightPt
+  //
+  // Pixels alone are NOT a stable size. Page canvases already vary within a
+  // single story (1152px scenes, 1184px on a re-rendered page, 1222px covers),
+  // so a hard-coded px constant silently prints at a different size per page
+  // and would shrink again if the image model's output resolution ever
+  // changed. The previous constant of 11px worked out to ~7.7pt on the A4
+  // trim — around two thirds of Word's 11pt, in a first-grade picture book.
+  const STORY_TEXT_PT = 12;
+  const baseFontSize = fontSizeOverride
+    || Math.round(STORY_TEXT_PT * height / interiorPageHeightPt(bookFormat));
   const font = `${fontFamily}, serif`;
 
   // Polygon-area stages, smallest → largest. Same shape (rectangle for
@@ -198,6 +214,7 @@ async function generateTextOverlay(imageBuffer, text, textPosition, options = {}
     fontSize: options.fontSize,
     fontFamily: options.fontFamily,
     pageNumber: options.pageNumber,
+    bookFormat: options.bookFormat,
   });
 
   // No frosted-glass halo — the text already carries a 0.85-alpha black stroke

@@ -8,35 +8,10 @@ const PDFDocument = require('pdfkit');
 const { log } = require('../utils/logger');
 const { generateTextOverlay } = require('./textOverlayRenderer');
 
-// Convert millimeters to PDF points
-const mmToPoints = (mm) => mm * 2.83465;
-
-// PDF dimensions for different book formats
-// Gelato cover spread layout: Back Cover (left) + Spine (center) + Front Cover (right)
-const BOOK_FORMATS = {
-  // 20x20cm square format (original)
-  'square': {
-    pageWidth: mmToPoints(200),
-    pageHeight: mmToPoints(200),
-    coverWidth: mmToPoints(416),   // back + spine + front with bleed
-    coverHeight: mmToPoints(206),
-    bleed: mmToPoints(3),          // 3mm bleed
-    spineWidth: mmToPoints(10),    // 10mm spine (adjusts based on page count in practice)
-  },
-  // A4-based format: 21x28cm (more text space)
-  'A4': {
-    pageWidth: mmToPoints(210),
-    pageHeight: mmToPoints(280),
-    coverWidth: mmToPoints(436),   // back + spine + front with bleed (210*2 + spine + bleed)
-    coverHeight: mmToPoints(286),
-    bleed: mmToPoints(3),          // 3mm bleed
-    spineWidth: mmToPoints(10),    // 10mm spine
-  }
-};
-
-// Default to A4 (21×28cm portrait). 'square' (20×20cm) is legacy and only
-// used for orders that explicitly request it via bookFormat: 'square'.
-const DEFAULT_FORMAT = 'A4';
+// PDF dimensions for different book formats live in server/config/print.js —
+// the text-overlay renderer needs the same trim geometry to size the story
+// font, and importing it from here would close a require cycle.
+const { mmToPoints, BOOK_FORMATS, DEFAULT_FORMAT } = require('../config/print');
 
 // Legacy constants (for backwards compatibility)
 const COVER_WIDTH = BOOK_FORMATS.square.coverWidth;
@@ -423,6 +398,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize, bleed, textRatio, textInImage, {
       lineGap: fontResult.lineGap,
       textPadding: { top: padTop, bottom: padBottom },
+      bookFormat,
     });
   } else {
     // Standard 2-page layout (square format only). Text page on left, image on right.
@@ -601,7 +577,7 @@ async function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_
 
         const imageBuffer = await resolveImageBuffer(image.imageData);
         if (!imageBuffer) throw new Error('image source unresolvable');
-        const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber });
+        const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber, bookFormat: opts.bookFormat });
 
         // Crop the opposite side of the text so the text is never in the
         // cropped zone. Image aspect rarely matches the page aspect exactly —
@@ -838,7 +814,7 @@ async function generateCombinedBookPdf(stories, bookFormat = DEFAULT_FORMAT, opt
 
           const imageBuffer = await resolveImageBuffer(image.imageData);
         if (!imageBuffer) throw new Error('image source unresolvable');
-          const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber });
+          const { compositedImage } = await generateTextOverlay(imageBuffer, cleanText, textPos, { pageNumber, bookFormat });
           // Fill the full interior page incl. top AND bottom bleed. Crop the
           // opposite side from the text so the scale-to-fill overflow never
           // eats into the text zone.
@@ -1133,6 +1109,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT, options =
     await addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, fontResult.fontSize, 0, textRatio, useTextOverlay, {
       lineGap: fontResult.lineGap,
       textPadding: { top: padTop, bottom: padBottom },
+      bookFormat,
     });
   } else {
     const marginOuter = 20;
