@@ -112,7 +112,7 @@ async function splitGridIntoReferences(gridImage, count) {
  * @param {string} styleDescription - Art style description
  * @returns {string} Complete prompt for reference sheet generation
  */
-function buildReferenceSheetPrompt(elements, styleDescription) {
+function buildReferenceSheetPrompt(elements, styleDescription, visualBible = null) {
   const count = elements.length;
   // Only use 2x2 for exactly 4 elements. Everything else uses a single column
   // to avoid partial rows (e.g. 3 elements in a 2x2 leaves an empty cell that
@@ -153,7 +153,14 @@ function buildReferenceSheetPrompt(elements, styleDescription) {
     GRID_LAYOUT: gridLayoutLines.join('\n'),
   });
 
-  return prompt;
+  // VB descriptions cross-reference each other by id ("shimmer matching
+  // ART001"), and those ids land in the cell line verbatim. An unsanitized id
+  // reaching an image model gets painted as lettering — the same setup on the
+  // empty-scene path lettered "ART008" onto a stone in a shipped story. Lazy
+  // require: promptBuilders pulls in services/prompts at load.
+  if (!visualBible) return prompt;
+  const { sanitizeVbIdsInPrompt } = require('./promptBuilders');
+  return sanitizeVbIdsInPrompt(prompt, visualBible, null);
 }
 
 /**
@@ -276,7 +283,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
 
     try {
       // Build the prompt for this batch
-      const prompt = buildReferenceSheetPrompt(batch, styleDescription);
+      const prompt = buildReferenceSheetPrompt(batch, styleDescription, visualBible);
 
       // Generate the grid image using the configured image model (Gemini, Grok, etc.)
       const imageModelOverride = imageModel || null;
