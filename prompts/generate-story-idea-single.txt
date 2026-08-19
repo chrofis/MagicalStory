@@ -68,7 +68,7 @@ Be concise. Don't exceed these limits - quality over quantity.
 RULES:
 - No adjectives allowed. Do not describe things as "magical", "brave", "beautiful", "exciting", etc.
 - Focus only on actions and events: who goes where, what they do, what happens next.
-- Match danger to the youngest character: nothing that could kill or injure them — no drowning, no dangerous fall. Being lost, separated, late or frightened is fine.
+- Match danger to the youngest character: frightening is the right level, and nothing may be able to kill or injure them — no drowning, no fall from a height.
 - Be specific about locations and time periods.
 - The outline should focus on the main characters
 - All the characters must be mentioned
@@ -110,7 +110,7 @@ Check and critique:
 4. **Characters**: Do all characters appear and have a role? Anyone missing or passive?
 5. **Complexity**: Does it match the scene count guide? Too simple or too complex?
 6. **Premise, not walkthrough**: does it name an object, code or trick that solves an obstacle, or march through the obstacles in order? Cut those and leave the situation and the stakes.
-7. **Peril**: could the threat kill or injure a child — drowning, a fall from a height? Replace it with something they can lose. Being lost or frightened is fine.
+7. **Peril**: could the threat kill or injure a child — drowning, a fall from a height? Replace it with something they can lose.
 
 List your 5 improvements (be specific):
 1. [improvement]

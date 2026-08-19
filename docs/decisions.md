@@ -13628,19 +13628,21 @@ rule) — but 10 sentences where an 18-page story caps at 8 (`storyIdeas.js:201-
    obstacle, and does not march through the obstacles in order. The worked examples were rewritten
    too: they previously modelled exactly the banned shape ("must solve three riddles to open it",
    "a map hidden in a bottle"), which would have overridden the rule.
-2. **Peril matched to the youngest character — deadly, not scary, is the line.** Nothing that
-   could kill or injure a child (no drowning, no fall from a height); being lost, separated, late
-   or frightened is explicitly allowed. The generator had NO peril rule at all, which is how a
+2. **Peril matched to the youngest character — frightening is the level, injury is the line.**
+   Nothing may be able to kill or injure a child (no drowning, no fall from a height). The rules
+   deliberately do NOT enumerate what is allowed: naming "being lost" as fine reads as an
+   invitation, and it is neither banned nor encouraged. The generator had NO peril rule at all, which is how a
    3-year-old got a rushing brook and a ball as a flotation aid — the exact peril the beats stage
    must then remove, which is what orphaned the prop.
 
    **Correction to the same-day beats rules:** the version committed earlier in `story-beats.txt`
    and check 3 of `story-beats-review.txt` banned "drowning, falling **or being lost** as the real
-   threat". Owner: *"A child can be lost, but not falling to his death."* Being lost is a normal
-   children's-story stake, and banning it removed one of the few age-appropriate sources of
-   tension the beats stage had left — which contributed directly to the flatness diagnosed in the
-   entry above. All four sites now draw the line at what could kill or injure, not at what is
-   frightening.
+   threat". Owner: *"A child can be lost, but not falling to his death"*, then *"why mention being
+   lost is fine, remove that — it is not banned but it is also not encouraged. Something
+   frightening is the correct level."* Banning being-lost removed one of the few age-appropriate
+   sources of tension the beats stage had left, which fed the flatness diagnosed in the entry
+   above; listing it as permitted swings too far the other way. All four sites now state the level
+   (frightening) and the hard line (nothing that can kill or injure), and enumerate neither.
 
 Both prompts' self-review lists gained matching checks 6 and 7.
 
