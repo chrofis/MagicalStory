@@ -23,7 +23,7 @@ First write the ARC: where the story turns, and what each character goes through
 
 The arc is the contract the pages have to satisfy. Every page number it names carries that turn, and no main character reaches the end without the change the arc gives them.
 
-BEAT is what happens on that page: the event, and what changes because of it. One or two sentences.
+BEAT is what happens on that page: the event, and what changes because of it. One or two sentences. One change per beat — never a sequence of actions inside one page; move the next step to the next page.
 
 SCENE is what the illustration shows: who is present, where they are, what they are doing. One or two sentences. Every scene must be a single moment that can be drawn — no montages, no before-and-after, no passage of time inside one picture. And it must be a SIMPLE moment: one primary action, at most one character touching one object. When several characters are present they share that one moment — the others watch or react to the same action; never parallel unrelated activities. Characters with the same goal do the same thing in the same place: a group searching stands together scanning, never split across separate spots with separate mini-actions. The scene is that action at the moment it happens, never the state that follows it. Name the one condition that causes the action when the beat depends on it, and nothing else about the setting. Never compose the frame — what fills it, how large something looks, where it sits; a shot type is enough. Never synchronized hand mechanics between characters, a thought or realization as the visual, or a climbing/stretching pose with hidden limbs. When the beat's event is internal or mechanical, the scene shows its visible result instead (the box open, the found object held up).
 
@@ -32,6 +32,8 @@ Requirements:
 - The main character wants something by page 1 and their situation is different by the last page.
 - Early on the want meets something that will not simply move; in the middle one try fails, costs them something or is refused, and the goal sits further away than it did; the last third earns the change.
 - No obstacle is removed in the beat that introduces it. Passing one costs something the beat names — time, a possession, a plan, help asked for, someone's comfort.
+- A deadline or cost the arc names is visible on a page: something has changed because time ran on or the price was paid, not only mentioned in passing.
+- Consecutive pages do not stage the same place with the same grouping, and one gathering is not split across two pages.
 - Whoever or whatever stands in the way wants something of their own, and the plan says what; they do not yield on request.
 - Reasons are grounded, not announced. A sign, an inscription or a rule stated once to license a turn is not a reason: it comes from who someone is, what a place is for, or what someone needs.
 - Every beat is visible: something happens that a picture can show. A page of pure reflection cannot be illustrated.

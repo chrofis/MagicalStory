@@ -13754,3 +13754,53 @@ correct until then, at the cost of prod keeping the old 2h behaviour.
 `server/routes/admin/testlab.js` (heartbeat writer + reaper),
 `server/lib/idleShutdown.js` (busy probe)
 **Status:** ✅ active on staging / 🟡 pending the production migration
+
+
+## 2026-08-19 — New idea + three pacing/repetition/stake rules clear 7 on all three judges (exp 15 → 16)
+
+**Context:** With the arc stage in place, beats from the ORIGINAL customer idea scored
+7.7 / 7.6 / 8.3 (exp 11). The idea generator was then rewritten to produce a premise rather than a
+walkthrough, so the next question was whether a freshly generated idea plans better than the
+transcribed one. `beats_scenes` gained `params.storyDetails` for exactly this: same cast, same
+setting, a different idea — the only way to measure an idea-generator change downstream.
+
+**Measured, same commission and cast, 18 pages, plan sonnet-4.6 → review grok-4.6, judges
+3.1/3.2/3.3 at temperature 0:**
+
+| run | idea | initial plan | reviewed |
+|---|---|---|---|
+| exp 11 | original (transcribed walkthrough) | 6.8 / 5.2 / 5.6 | 7.7 / 7.6 / 8.3 |
+| exp 15 | newly generated premise | 7.5 / 6.3 / 8.6 | 7.6 / 6.4 / 8.2 |
+| exp 16 | same premise + 3 new rules | 8.0 / 5.8 / 7.3 | **7.7 / 7.3 / 8.5** |
+
+The generator fix shows up where it should — in the INITIAL plan, which went from 6.8/5.2/5.6 to
+7.5/6.3/8.6 before any review ran. A premise the planner has to interpret beats a walkthrough it
+only transcribes.
+
+exp 15 still failed the bar at grok 6.4, with three specific and generic complaints: *"several
+beats pack sequences"* (pacing 6), *"p13–14 split one huddle"* plus a chamber staged twice
+(repetition **5** — the reviewer's own rewrites caused it, since the initial plan scored 6), and
+*"the autumn stake stays atmospheric rather than felt"* (stakes 6).
+
+**Decision — three rules, writer and reviewer:**
+1. **One change per beat.** No sequence of actions inside one page; the next step moves to the next
+   page. Reviewer check 7 names every beat that packs a sequence and rewrites it down.
+2. **A deadline or cost the arc names must be visible on a page** — something has changed because
+   time ran on or the price was paid, not mentioned in passing. Reviewer check 7 names any stated
+   deadline no page ever shows.
+3. **Consecutive pages don't restage the same place with the same grouping, and one gathering is
+   not split across two pages.** Reviewer check 5 now applies this to the pages it is REWRITING,
+   not only the ones it leaves — that was the actual source of the regression.
+
+Result: grok 6.4 → 7.3 (stakes 6→7, repetition 5→7), sonnet 7.6 → 7.7, gemini 8.2 → 8.5. First
+configuration where every judge clears 7 on a freshly generated idea.
+
+**Still open:** grok holds pacing at 6 ("the long tunnel run clusters similar corridor pictures")
+and looseThreads at 6 (a relation referred to before it is established). Both judges also flagged
+a convenience prop in the INITIAL plan ("the glowing stone is an unearned convenience") that the
+review removed — the introduce-before-use rule catches it at review, not at planning. Validated on
+ONE commission; the 3-story corpus check is still not run.
+
+**Touched:** prompts/story-beats.txt, prompts/story-beats-review.txt,
+server/lib/testlab.js (`params.storyDetails` on beats_scenes).
+**Status:** ✅ active on staging.
