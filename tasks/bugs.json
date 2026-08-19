@@ -47,7 +47,7 @@
       "reportedAt": "2026-08-19",
       "source": "job_1787120984020_pg71z58ba9 p7: v1 detection identical to v0's; runGarmentRecolour returned stale detection by design",
       "status": "fixed",
-      "fixedIn": "98641b7b7",
+      "fixedIn": "1dcdb3c09",
       "task": 23
     }
   ]
