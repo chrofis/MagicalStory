@@ -533,6 +533,26 @@ object instead of the <prop>" and still published, best of 4 versions). The
 missing ship-gate is tracked separately.
 **Status:** ✅ active.
 
+### A page that fails repair ships anyway — best-effort, no gate
+**Context:** Pages can finish the repair loop still carrying an unresolved
+CRITICAL finding, or a score below the pipeline's own redo threshold of 50 —
+in one measured case a final score of **-15** ("holds a spiky green
+seed-pod-like object instead of the <prop>") after four repair attempts, where
+`bestSource` fell back to the original because every repair scored worse.
+Measured over 120 days of production stories: **46 of 52 stories (88%) ship at
+least one page scoring below 50**, 165 of 595 pages (28%) are below it, and 3
+pages shipped with a negative score. Nothing records or surfaces this —
+`minQualityScore` is computed at the end of `storyJobPipeline.js` for analytics
+only, and the job is marked `completed` unconditionally.
+**Decision (owner, 2026-08-19):** leave as is. The pipeline attempts repair;
+when repair does not succeed it ships the best version available. No blocking
+gate, no needs-review hold, no extra escalation pass, no flag.
+**Rationale:** delivering the best available story beats holding a paid
+generation for manual review. Proposals to add a gate here have been
+considered and declined — do not re-propose without new evidence.
+**Touched:** none — this documents deliberate existing behaviour.
+**Status:** ✅ active (by design).
+
 ### Scene composite pipeline killed — every page goes direct
 **Context:** Two scene-composite variants were built between 2026-05-08
 and 2026-05-16: (1) the **uniform composite** (populated plate with ALL
