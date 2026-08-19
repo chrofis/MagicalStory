@@ -66,7 +66,7 @@ List exactly 5 improvements. Never say "no issues" - always find ways to make it
 
 First check - language: Is the entire draft written in the correct language as specified at the top? If you wrote in English but the language should be German/French/etc, this is an error that must be fixed.
 
-Check: (1) Is entire output in correct language (not just terminology)? (2) Format: no bold/italic, plain paragraphs, no adjectives, sentence limits? (3) Logic: events follow naturally, no plot holes, timeline coherent? (4) All characters appear with a role? (5) Complexity matches scene count?
+Check: (1) Is entire output in correct language (not just terminology)? (2) Format: no bold/italic, plain paragraphs, no adjectives, sentence limits? (3) Logic: events follow naturally, no plot holes, timeline coherent? (4) All characters appear with a role? (5) Complexity matches scene count? (6) Premise, not walkthrough: no named object/code/trick that solves an obstacle, no march through the obstacles in order? (7) Peril: could the threat kill or injure a child — drowning, a fall from a height? Being lost or frightened is fine.
 
 5 improvements:
 1. [specific improvement]
@@ -110,6 +110,8 @@ Each story idea must be PLAIN TEXT PARAGRAPHS:
 - Plain flowing paragraphs only
 - All characters must appear
 - Focus on actions: who goes where, what they do, what happens
+- A premise, not a walkthrough: name the situation and what is at stake, and stop before listing each obstacle in order. Never name the object, code or trick that solves one — the story stage decides how they get through.
+- Match danger to the youngest character: nothing that could kill or injure them — no drowning, no fall from a height. A child may be lost, separated, late or frightened.
 
 **LENGTH:** {STORY_LENGTH_CATEGORY}
 - Short (1-10 pages): 5-6 sentences
@@ -121,12 +123,12 @@ Each story idea must be PLAIN TEXT PARAGRAPHS:
 [DRAFT_1]
 The story takes place on the high seas, traveling from the North Pole to Africa during summer.
 
-Pirates discover a map hidden in a bottle floating in icy waters. The crew follows the map to an underwater cave where they find a locked chest. They must solve three riddles carved into the cave walls to open the chest and claim the treasure inside.
+Pirates are hunting a chest that sits in an underwater cave, and the cave does not open for anyone who cannot answer for what is inside. Another crew is looking for the same chest. They want to reach it first.
 
 [DRAFT_2]
 The story is set in a medieval castle during a cold winter when snow covers the land.
 
-The kitchen runs out of firewood and the cook sends her daughter to the forest to gather more. In the forest, the daughter meets a wolf who offers to help carry the heavy wood in exchange for a bowl of hot soup. She must decide whether to trust the wolf or find another way to bring the wood home.
+The kitchen runs out of firewood and the cook sends her daughter to the forest to bring some back before dark. A wolf there wants something in return for his help. She has to decide what she is willing to give, and the castle is cold until she is back.
 
 ---
 

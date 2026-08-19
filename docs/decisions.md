@@ -13605,3 +13605,55 @@ code-owned and intended.
 **Touched:** none yet — the prompt edit is approved and pending (evalBuckets.js
 bucket first, then BUCKET_BILLING_CATEGORY, then the three evaluator templates).
 **Status:** ✅ active (decision 1) / 🟡 pending implementation (decision 2)
+
+
+## 2026-08-19 — The idea generator writes a premise, not a walkthrough (and matches peril to the youngest child)
+
+**Context:** A customer's dragon story kept producing contrived obstacles — a ball pulled from a
+rucksack to cross a stream, a gate code, a boulder — and the beats stage was blamed for it. The
+props are not the beats stage's invention: they are in the customer's `storyDetails` verbatim
+("Levin und Julian … müssen einen reissenden Bach überqueren, dabei hilft Julian mit einem Ball
+aus seinem Rucksack als Schwimmhilfe … Kiaan liest auf einem Schild den richtigen Code"). The idea
+text names the *solution* to every obstacle, so the plan was transcribing, not planning.
+
+No provenance is recorded for an idea — `activity_log` does not exist on production, there is no
+token ledger table, and the story row keeps only the final `storyDetails`. Shape evidence says
+generated-then-possibly-edited: one event per sentence in strict plot order, no interiority, every
+character named including the dog (the generator's own "All the characters must be mentioned"
+rule) — but 10 sentences where an 18-page story caps at 8 (`storyIdeas.js:201-203`).
+
+**Decision (owner picked two of four options):**
+1. **Premise, not a walkthrough.** The idea names the setup, the want, what stands in the way and
+   what failing costs — then stops. It never names the object, code or trick that solves an
+   obstacle, and does not march through the obstacles in order. The worked examples were rewritten
+   too: they previously modelled exactly the banned shape ("must solve three riddles to open it",
+   "a map hidden in a bottle"), which would have overridden the rule.
+2. **Peril matched to the youngest character — deadly, not scary, is the line.** Nothing that
+   could kill or injure a child (no drowning, no fall from a height); being lost, separated, late
+   or frightened is explicitly allowed. The generator had NO peril rule at all, which is how a
+   3-year-old got a rushing brook and a ball as a flotation aid — the exact peril the beats stage
+   must then remove, which is what orphaned the prop.
+
+   **Correction to the same-day beats rules:** the version committed earlier in `story-beats.txt`
+   and check 3 of `story-beats-review.txt` banned "drowning, falling **or being lost** as the real
+   threat". Owner: *"A child can be lost, but not falling to his death."* Being lost is a normal
+   children's-story stake, and banning it removed one of the few age-appropriate sources of
+   tension the beats stage had left — which contributed directly to the flatness diagnosed in the
+   entry above. All four sites now draw the line at what could kill or injure, not at what is
+   frightening.
+
+Both prompts' self-review lists gained matching checks 6 and 7.
+
+**Deliberately NOT changed** (owner declined): a blanket "obstacles yes, solutions no" rule beyond
+the premise clause, and the "All characters must be mentioned" requirement — a customer may
+reasonably expect every uploaded child to appear, even though that requirement is what manufactures
+arrivals for cast completeness.
+
+**Sites checked for the same instruction** (per validating-prompt-changes): `trial-idea.txt` is 40
+words and prescribes nothing; `story-idea-requirements-adventure-{1,2}.txt` and the historical pair
+carry no peril or solution language. The two generator prompts were the only sites.
+
+**Touched:** prompts/generate-story-idea-single.txt, prompts/generate-story-ideas.txt,
+prompts/story-beats.txt, prompts/story-beats-review.txt (the peril-line correction).
+**Status:** ✅ active — not yet validated against generated output; no idea has been generated
+under the new rules.

@@ -50,8 +50,11 @@ Your entire output must be in the language specified above.
 
 Generate a story idea that includes:
 1. LOCATION and TIME: Where and when does the story take place?
-2. ACTIONS: What happens? Who does what? Focus on the plot events.
-3. OUTLINE: The main conflict and how it gets resolved.
+2. THE SETUP: who is there and what they want.
+3. WHAT STANDS IN THE WAY and what it costs them to fail.
+4. HOW IT ENDS: what is different.
+
+This is a premise, not a walkthrough. Name the situation and what is at stake; stop before listing each obstacle in order, and never name the object, code or trick that solves one — the story stage decides how the characters get through.
 
 STORY LENGTH: {STORY_LENGTH_CATEGORY}
 
@@ -60,12 +63,12 @@ MAXIMUM LENGTH:
 - Medium stories (11-20 pages): 8 sentences maximum
 - Long stories (21+ pages): 10 sentences maximum
 
-Each sentence should describe ONE key event or plot point. Be concise.
-Don't exceed these limits - quality over quantity.
+Be concise. Don't exceed these limits - quality over quantity.
 
 RULES:
 - No adjectives allowed. Do not describe things as "magical", "brave", "beautiful", "exciting", etc.
 - Focus only on actions and events: who goes where, what they do, what happens next.
+- Match danger to the youngest character: nothing that could kill or injure them — no drowning, no dangerous fall. Being lost, separated, late or frightened is fine.
 - Be specific about locations and time periods.
 - The outline should focus on the main characters
 - All the characters must be mentioned
@@ -73,11 +76,11 @@ RULES:
 
 EXAMPLES of good story ideas:
 
-Example 1: "Pirates sail from the North Pole through icy waters to reach Africa. On the way, they discover a map hidden in a bottle. The crew follows the map to an underwater cave where they find a chest. They must solve three riddles to open it."
+Example 1: "Pirates sail from the North Pole toward Africa in summer. A chest in an underwater cave holds what they came for, and the cave will not open to anyone who cannot answer for it. They want the treasure before another crew reaches it."
 
-Example 2: "In a castle during winter in medieval times, the kitchen runs out of firewood. The cook sends her daughter to the forest to gather wood. The daughter meets a wolf who offers to help carry the wood in exchange for a bowl of soup."
+Example 2: "In a castle in medieval times, in the middle of winter, the kitchen runs out of firewood. The cook's daughter goes to the forest to bring some back before dark. A wolf there wants something in return for his help, and she has to decide what she is willing to give."
 
-Example 3: "In a forest where animals can talk, a rabbit loses her way home. She asks an owl for directions, but the owl speaks in riddles. A fox offers to guide her, but leads her in circles. The rabbit must figure out the owl's riddle to find the path."
+Example 3: "In a forest where animals talk, a rabbit cannot find her way home. The owl who knows the path will not simply say it, and the fox who offers to lead her wants her to keep following him. She needs to get home before the light goes."
 
 ---
 
@@ -106,6 +109,8 @@ Check and critique:
    - Is the timeline coherent?
 4. **Characters**: Do all characters appear and have a role? Anyone missing or passive?
 5. **Complexity**: Does it match the scene count guide? Too simple or too complex?
+6. **Premise, not walkthrough**: does it name an object, code or trick that solves an obstacle, or march through the obstacles in order? Cut those and leave the situation and the stakes.
+7. **Peril**: could the threat kill or injure a child — drowning, a fall from a height? Replace it with something they can lose. Being lost or frightened is fine.
 
 List your 5 improvements (be specific):
 1. [improvement]
