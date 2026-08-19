@@ -13562,3 +13562,46 @@ own look if Lab log attribution ever matters.
 `server/lib/testlab.js`, `server/routes/admin/testlab.js`,
 `server/lib/figureDetection.js`, client testlab types/panel, `tasks/bugs.json`
 **Status:** ✅ active
+
+## 2026-08-19 — False-clean pages are an ACCEPTED RISK, and viewer_address's firing rule
+
+Two owner decisions taken after the eval-variance measurement (exp 768/769/770).
+
+### 1. A page that scores 100 skips repair, and ~18% of them are clean only by luck
+
+Measured over 22 page-runs x 3 identical evals: **4 of 22 (18%)** produced zero
+findings from EVERY judge in some repeats and findings in others. Only 1 of 22
+was genuinely clean on every pass. Since a page scoring 100 never enters repair,
+roughly one page in five can bypass the repair pipeline on a coin toss, carrying
+whatever defect the judges happened not to mention that pass.
+
+  exp768 rur4nskfv p7  clean 2/3  100/100/100  (one pass DID emit findings that cost nothing)
+  exp768 yhzn4dv5q p5  clean 1/3   40/75/100
+  exp769 0sgrd0f4g p1  clean 2/3   45/100/100
+  exp769 yhzn4dv5q p5  clean 2/3   85/100/100
+
+Judge flakiness at the "emitted anything at all" level: quality 0%, semantic
+14%, compliance 23%. Note a stable 100 is not proof of a clean page — one of the
+above emitted findings that were all zero-point or consolidated away.
+
+**Decision: LEAVE IT** (owner: "a clean-looking page is good enough"). Confirming
+every 100 with a second eval was offered and declined. Logged so this is not
+rediscovered later as a bug: it is a known, priced-in behaviour, not an
+oversight. Revisit only if false-clean pages surface as user-visible defects.
+
+### 2. When `viewer_address` deducts
+
+Owner: *"If the emotion is not happy. Or if they have a declared interaction
+that needs their attention."* So the new type fires when EITHER the beat's
+emotion is not happy and a figure is smiling at the viewer, OR a declared
+interaction needs that figure's attention and they address the camera instead.
+
+This narrows — does not delete — the never-deduct line in `image-semantic.txt`
+(per-figure gaze drift). Outside those two conditions gaze drift remains a
+non-deduction. Unchanged: left/right pose mirrors stay a non-deduction
+(SETTLED), and this must never fire on covers, where gaze at the viewer is
+code-owned and intended.
+
+**Touched:** none yet — the prompt edit is approved and pending (evalBuckets.js
+bucket first, then BUCKET_BILLING_CATEGORY, then the three evaluator templates).
+**Status:** ✅ active (decision 1) / 🟡 pending implementation (decision 2)
