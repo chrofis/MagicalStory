@@ -1535,7 +1535,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           const extra = await runExtraJudges({ parts, judges });
           if (extra.length) {
             const { mapIssuesToBuckets, mergeJudges, bucketsToIssues } = require('./evalBuckets');
-            const vectors = [mapIssuesToBuckets(fixableIssues), ...extra.map(e => mapIssuesToBuckets(e.fixableIssues))];
+            // bySubject: merge per (bucket, SUBJECT). Merging per bucket alone
+            // collapses two characters' findings of one class into one entry,
+            // and scoring bills per (class, subject) — so a plain bucket merge
+            // silently reverts every page to a single charge per class.
+            const opts = { bySubject: true };
+            const vectors = [mapIssuesToBuckets(fixableIssues, opts), ...extra.map(e => mapIssuesToBuckets(e.fixableIssues, opts))];
             const merged = mergeJudges(vectors);
             const mergedIssues = bucketsToIssues(merged);
             const lowConf = Object.values(merged).filter(m => m.lowConfidence).length;
@@ -1544,14 +1549,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
               description: m.description,
               severity: String(m.severity).toUpperCase(),
               type: m.type,
-              // KNOWN LOSS, latent while EVAL_JUDGES=gemini (single judge, this
-              // branch never runs). The jury merges by BUCKET, so several
-              // characters' findings of one class collapse to a single entry and
-              // the subject cannot survive. Under per-(class, subject) billing
-              // that silently reverts every finding to one charge per page.
-              // Enabling the jury therefore requires merging per (bucket,
-              // subject), not per bucket.
-              character: null,
+              // Survives the merge now that the vectors are keyed by
+              // (bucket, subject) — see the bySubject note above.
+              character: m.character || null,
               fix: `Fix: ${m.description}`,
               agreement: m.agreement,
             }));

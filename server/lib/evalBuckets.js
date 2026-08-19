@@ -195,15 +195,29 @@ function bucketForType(type) {
  * a couple of descriptions for the audit trail. Missing buckets are absent
  * (treated as severity 0 downstream).
  */
-function mapIssuesToBuckets(fixableIssues = []) {
+/**
+ * @param {object} [opts]
+ * @param {boolean} [opts.bySubject=false] key by (bucket, subject) instead of
+ *   bucket alone. OPT-IN because the two callers need different shapes: the
+ *   eval_findings stats writer groups per bucket for a plain GROUP BY, while the
+ *   multi-judge jury must NOT collapse two characters' findings of one class into
+ *   one entry — scoring bills per (class, subject), so collapsing them silently
+ *   reverts every page to a single charge per class. Entries always carry
+ *   `bucket` and `subject`, so a caller never has to parse the key back apart.
+ */
+function mapIssuesToBuckets(fixableIssues = [], { bySubject = false } = {}) {
   const vec = {};
   for (const issue of Array.isArray(fixableIssues) ? fixableIssues : []) {
     const bucket = bucketForType(issue.type);
+    const subject = bySubject
+      ? String(issue.character || issue.name || issue.element || '').trim().toLowerCase()
+      : '';
+    const key = subject ? `${bucket}|${subject}` : bucket;
     const rank = sevRank(issue.severity);
-    if (!vec[bucket]) vec[bucket] = { severity: 'none', rank: 0, count: 0, samples: [] };
-    vec[bucket].count++;
-    if (issue.description && vec[bucket].samples.length < 3) vec[bucket].samples.push(issue.description);
-    if (rank > vec[bucket].rank) { vec[bucket].rank = rank; vec[bucket].severity = RANK_TO_SEVERITY[rank]; }
+    if (!vec[key]) vec[key] = { bucket, subject: subject || null, severity: 'none', rank: 0, count: 0, samples: [] };
+    vec[key].count++;
+    if (issue.description && vec[key].samples.length < 3) vec[key].samples.push(issue.description);
+    if (rank > vec[key].rank) { vec[key].rank = rank; vec[key].severity = RANK_TO_SEVERITY[rank]; }
   }
   return vec;
 }
@@ -237,7 +251,13 @@ function mergeJudges(judgeVectors = []) {
     const agreeCount = ranks.filter(r => r === mRank).length;
     const samples = [];
     for (const v of judges) if (v[bucket]?.samples) for (const s of v[bucket].samples) if (samples.length < 3) samples.push(s);
+    // `bucket` here is the VECTOR KEY, which is `${bucket}|${subject}` when the
+    // vectors were built with bySubject. Carry the entry's own bucket/subject
+    // through so bucketsToIssues never has to parse the key apart.
+    const first = judges.find(v => v[bucket])?.[bucket] || {};
     merged[bucket] = {
+      bucket: first.bucket || bucket,
+      subject: first.subject || null,
       severity,
       votes: ranks.map(r => RANK_TO_SEVERITY[r]),
       agreement: `${agreeCount}/${n}`,
@@ -257,15 +277,23 @@ function mergeJudges(judgeVectors = []) {
  * math stays in scoring.js.
  */
 function bucketsToIssues(merged = {}) {
-  return Object.entries(merged).map(([bucket, m]) => ({
-    type: bucket,
-    severity: m.severity,
-    description: m.samples[0] || bucket,
-    repair: BUCKETS[bucket]?.repair || 'regen',
-    owner: BUCKETS[bucket]?.owner || 'quality',
-    agreement: m.agreement,
-    votes: m.votes,
-  }));
+  return Object.entries(merged).map(([key, m]) => {
+    const bucket = m.bucket || key;
+    return {
+      type: bucket,
+      // WHO the merged defect is about. Null when the vectors were built without
+      // bySubject. Without this the jury hands scoring.js a subjectless finding,
+      // which bills one charge per class for the whole page, and hands
+      // bboxDetection nothing to aim a repair at.
+      character: m.subject || null,
+      severity: m.severity,
+      description: m.samples[0] || bucket,
+      repair: BUCKETS[bucket]?.repair || 'regen',
+      owner: BUCKETS[bucket]?.owner || 'quality',
+      agreement: m.agreement,
+      votes: m.votes,
+    };
+  });
 }
 
 module.exports = {
