@@ -13242,3 +13242,76 @@ risk rises toward the climax" — the writer prompt simply never asked for it.
 
 **Touched:** prompts/story-beats.txt, prompts/story-beats-review.txt.
 **Status:** ✅ active — pending corpus validation (3 stories, `beats_scenes` stage).
+
+## 2026-08-19 — One deduction per class: the eval's 36.8-point run-to-run swing
+
+**Context:** the owner read two versions of page 9 of `job_1786998860057_o6deqtv5s`
+as near-identical while they scored 28 and 85. Test Lab experiment **768**
+(set #13, 12 images x 3 identical evals, `eval_variance` stage) measured what
+the eval actually does when nothing changes: **mean score range 36.8 points**,
+median 26, worst page 105. Only 1 of 12 images was fully reproducible, and 63%
+of all findings were unstable (21 detection flips, 19 severity flips, 23 stable).
+
+The two page-9 versions rerun at 23/50/33 and 60/60/85 — a real ~33-point gap,
+not the 57 the stored pair implied. The style gate is stable per image (v0 reads
+photographic 3/3, v1 never does), so that difference is real; the stored numbers
+were the unlucky and lucky draws either side of it.
+
+**Root cause: enumeration, not disagreement.** A steampunk page's treasure map
+was billed as four separate MAJORs (missing bridge, missing X, missing irregular
+edges, missing curling corners) in two runs of three and zero in the third — 60
+points riding on how finely the judge chose to itemise one defect. Simulated on
+768's stored findings, charging each class once cuts the mean range on the raw
+layer from **52.2 to 16.9**.
+
+**Decision (owner, interviewed 2026-08-19):** a class is charged ONCE, at its
+worst severity. The finding list is untouched — only the bill.
+- **Per character, per category:** `clothing` (clothing + clothing_detail +
+  accessory + accessory_missing + garment_colour — "a character can only get
+  penalized for clothing once"), `identity` (character_identity + hair + scale +
+  anatomy + figure_completeness), `action` (action_interaction).
+- **Page-scoped, subject ignored:** style_consistency, setting (owner: the place
+  and the light are one charge), missing_element (owner: "one class, we deduct
+  only once"), image_coherence, rendered_text.
+- **Counting survives without a special case:** three missing characters are
+  three subjects, so `missing_character` still bills three times.
+
+This is the sanctioned shape — the evaluator emits a type, code bounds what the
+type may cost — and being arithmetic it holds, unlike a prompt rule. Precedent:
+the accessory ceiling of 2026-08-09 exists because the prompts asked for MODERATE
+since July and were ignored 67 times.
+
+**Known gap:** the compliance evaluator emits NO character field (0 of 308
+findings measured); quality and semantic populate one ~68% of the time. A
+subject-less finding falls back to one charge per class per page, which
+under-charges a page whose defects sit on two different objects. Measured, the
+error is lopsided in our favour: a wrong merge discards MINOR/MODERATE findings
+(2-5 pts) against a MAJOR survivor (~7 pts lost), while a right one saves up to
+45. Closing it means adding a `subject` to the evaluator schemas — a prompt
+change, logged as pending below.
+
+**Pending, not built:** two billing categories the owner asked for have no type
+on the prompts' closed list yet.
+- `emotion` — currently absorbed by `naturalness`.
+- `viewer_address` — the owner's "position / facing": a figure smiling at the
+  camera instead of engaging a dangerous task. Measured over the last 40
+  stories, **89 findings across 43 pages in 19 stories** describe exactly this,
+  filed inconsistently as `action_interaction` (often CRITICAL) or `naturalness`
+  (MAJOR/MODERATE). It already deducts; it has no name. Splitting it out also
+  helps variance, since `action_interaction` is the largest single flip source
+  (199 mergeable extras) precisely because it is a catch-all.
+  NOT the pose-mirror rule on SETTLED.md — that is left/right and stays a
+  non-deduction. Must never fire on covers, where gaze at the viewer is
+  code-owned and intended.
+Both keys are already mapped in `DEDUCTION_CATEGORY` so they bill per character
+the day the prompts emit them.
+
+**Validation:** set #14 "Eval variance - 5 styles" (concept, pixar, oil,
+steampunk, realistic; all five already measured by 768, so before/after needs
+one run). It includes a deliberately STABLE control page — a change that buys
+quiet by going blind would show up as the control getting quieter too.
+
+**Touched:** `server/lib/scoring.js` (PAGE_SCOPED_TYPES, DEDUCTION_CATEGORY,
+deductionClassKey, sumDeductionPoints), `server/lib/testlab.js` (eval_variance
+stage records each finding's subject + billing key)
+**Status:** ✅ active

@@ -732,7 +732,7 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
   const { evaluateImageQuality } = require('./images');
   const { consolidateEvaluation } = require('./feedbackConsolidator');
   const {
-    composeDeductions, computeMathFinalScore, deductionPoints,
+    composeDeductions, computeMathFinalScore, deductionPoints, deductionClassKey,
     significantWords, sameConcept,
   } = require('./scoring');
 
@@ -781,6 +781,12 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
       for (const d of (raw[bucket] || [])) {
         findings.push({
           source: bucket, type: d.type || null, severity: d.severity,
+          // The subject (character/object) and the billing key it produces.
+          // Without these a variance run cannot tell whether two findings of
+          // one type are one defect or two on different characters — which is
+          // exactly the question the per-character grouping turns on.
+          name: d.name || null,
+          classKey: deductionClassKey(d),
           points: deductionPoints(d), description: d.description || '',
         });
       }

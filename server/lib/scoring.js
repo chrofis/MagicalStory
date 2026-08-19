@@ -276,17 +276,123 @@ function deductionPoints(d) {
   return ceiling ? Math.min(raw, SEVERITY_POINTS[ceiling] || raw) : raw;
 }
 
+// ONE DEDUCTION PER CLASS (owner, 2026-08-19). A class is charged once, at its
+// worst severity — the finding list is untouched, only the bill is.
+//
+// WHY: measured on Test Lab experiment 768 (set #13, 12 images x 3 identical
+// evals), the same image scored a MEAN RANGE OF 36.8 POINTS run to run, worst
+// page 105. The dominant driver was not the judges disagreeing about the
+// picture — it was how finely they chose to itemise ONE defect. A steampunk
+// page's treasure map was billed as four separate MAJORs (missing bridge,
+// missing X, missing irregular edges, missing curling corners) in two runs of
+// three and zero in the third: 60 points riding on an enumeration choice.
+// Charging each class once cut the simulated mean range to 17.1 with no page
+// above 30. This is the sanctioned shape — the evaluator emits a TYPE, code
+// bounds what that type may COST (see MAX_SEVERITY_TYPES above) — and it is
+// arithmetic, so unlike a prompt rule it holds.
+//
+// PAGE-SCOPED classes are charged once for the whole image, subject ignored:
+// they are properties of the picture, not of anyone in it. Style was already
+// behaving (28 style findings across 6 stories, none carrying a character, no
+// evaluation ever emitting two) — this makes that structural instead of lucky.
+// `setting` is owner's call: the place and the light are one charge, accepting
+// that a page with both wrong bills as one problem.
+//
+// EVERYTHING ELSE is charged once per (class, subject), so a character can be
+// penalised for clothing once — and three missing characters are three
+// subjects, so they still cost three. Subject comes from the evaluator's own
+// `character`/`name` field, never from reading the description (see the
+// NO TEXT MATCHING note above).
+//
+// KNOWN GAP: the compliance evaluator emits no character field at all (0 of 308
+// findings measured), and quality/semantic populate one only ~68% of the time,
+// so a subject-less finding falls back to one charge per class per page. That
+// under-charges a page whose defects are on two different objects. Closing it
+// means adding a subject to the evaluator schemas — a prompt change, not a code
+// one. Until then the error is lopsided in our favour: where merging is wrong
+// the discarded findings are MINOR/MODERATE (2-5 pts) against a MAJOR survivor,
+// so a bad merge costs ~7 points, while a right one saves up to 45.
+const PAGE_SCOPED_TYPES = new Set([
+  'style_consistency',  // a property of the render, never of a figure
+  'setting',            // owner's call: the place and the light are one charge
+  'missing_element',    // owner: "one class, we deduct only once for missing elements"
+  'image_coherence',    // the CATASTROPHIC whole-picture gate — one per page by construction
+  'rendered_text',      // text baked into the art is a page defect
+]);
+
+// PER-CHARACTER BILLING CATEGORIES (owner, 2026-08-19). Several emitted types
+// bill as ONE category, so a character is charged once for their wardrobe
+// however many ways it is wrong. This maps a type to what it COSTS UNDER —
+// it never reinterprets what a finding means (the type still comes from the
+// evaluator, off the closed list in the prompts).
+const DEDUCTION_CATEGORY = {
+  // "A character can only get penalized for clothing once."
+  clothing: 'clothing',
+  clothing_detail: 'clothing',
+  accessory: 'clothing',
+  accessory_missing: 'clothing',
+  garment_colour: 'clothing',
+  garment_color: 'clothing',
+  // Who this is, and how they are built.
+  character_identity: 'identity',
+  hair: 'identity',
+  scale: 'identity',
+  anatomy: 'identity',
+  figure_completeness: 'identity',
+  // What they are doing.
+  action_interaction: 'action',
+  // RESERVED — no evaluator emits these yet; the codes have to be added to the
+  // prompts' closed list first. Mapped here so that the day they are emitted
+  // they bill per character instead of silently falling back to their own name.
+  //   emotion        — the beat's feeling contradicted
+  //   viewer_address — posing for the camera instead of engaging the task.
+  // The second is the owner's "position / facing": measured over the last 40
+  // stories, 89 findings across 43 pages in 19 stories describe a figure
+  // smiling at the viewer during the scene's action, filed inconsistently as
+  // action_interaction (often CRITICAL) or naturalness (MAJOR/MODERATE).
+  // NOT the pose-mirror rule on SETTLED.md — that is left/right, which stays a
+  // non-deduction. And it must never fire on covers, where gaze at the viewer
+  // is code-owned and intended (SETTLED: "Cover gaze is always at the viewer").
+  emotion: 'emotion',
+  viewer_address: 'facing',
+};
+
+/**
+ * The billing identity of a finding: what class of defect, on whom.
+ * Two findings sharing a key are one charge, at the worse severity.
+ *
+ * Subject comes from the evaluator's own character/name field (normalizeIssues
+ * maps character || name || element into `name`) — NEVER from reading the
+ * description. A subject-less finding falls back to one charge per category
+ * per page, which is why the compliance evaluator's missing character field
+ * matters (see the note on sumDeductionPoints).
+ */
+function deductionClassKey(d) {
+  const type = String(d?.type || '').toLowerCase() || '(untyped)';
+  if (PAGE_SCOPED_TYPES.has(type)) return `page:${type}`;
+  const category = DEDUCTION_CATEGORY[type] || type;
+  const subject = String(d?.name || '').trim().toLowerCase();
+  return subject ? `${category}|${subject}` : category;
+}
+
 function sumDeductionPoints(deductions) {
   if (!deductions || typeof deductions !== 'object') return 0;
   let total = 0;
   const points = deductionPoints;
-  // `consolidated` is the deduped cross-evaluator list (one entry per unique
-  // defect) — mutually exclusive with the raw buckets by construction in
-  // composeDeductions, so summing all four never double-counts.
+  // Grouped ACROSS the four categories, not within each: the same clothing
+  // defect reported by quality and by compliance is one defect and one charge.
+  // (`consolidated` is the deduped cross-evaluator list and is mutually
+  // exclusive with the raw buckets by construction in composeDeductions, so
+  // whichever path ran, only one of them is populated.)
+  const worstPerClass = new Map();
   for (const cat of ['quality', 'semantic', 'compliance', 'consolidated']) {
-    const list = deductions[cat] || [];
-    for (const d of list) total += points(d);
+    for (const d of (deductions[cat] || [])) {
+      const key = deductionClassKey(d);
+      const p = points(d);
+      if (p > (worstPerClass.get(key) ?? -1)) worstPerClass.set(key, p);
+    }
   }
+  for (const p of worstPerClass.values()) total += p;
   // Entity penalty capped (see capEntityPenalty): an uncapped −70/−90 entity
   // sum zeroed otherwise-good versions on flags the consolidator itself
   // marked not-actionable. capEntityPenalty is idempotent, so it's safe to
@@ -761,6 +867,9 @@ module.exports = {
   sameConcept,
   sumDeductionPoints,
   deductionPoints,
+  deductionClassKey,
+  PAGE_SCOPED_TYPES,
+  DEDUCTION_CATEGORY,
   pickBestVersionIndex,
   recomputeActiveVersion,
   recomputeAllActiveVersions,
