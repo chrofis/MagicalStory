@@ -6,40 +6,50 @@
       "title": "Animal in cast counts as a missing person -> false undercount -> Gemini fallback",
       "reportedAt": "2026-08-19",
       "source": "owner + job_1787120984020_pg71z58ba9 p6/p8 (diag nonHumanExpected: null)",
-      "status": "open",
-      "task": 19
+      "status": "fixed",
+      "task": 19,
+      "fixedIn": "4268015a8",
+      "note": "vb.animals removed from buildSecondaryCharacterDescriptions; animals stay in the object pass. nonHumanNames plumbing kept as belt-and-braces."
     },
     {
       "id": "fallback-replaces-instead-of-merging",
       "title": "Gemini second opinion discards ALL of DINO's boxes/masks/seeds instead of adding only the missing box",
       "reportedAt": "2026-08-19",
       "source": "owner instruction + Lab exp #7 (p6/p8: every figure seeds=0)",
-      "status": "open",
-      "task": 21
+      "status": "fixed",
+      "task": 21,
+      "fixedIn": "4268015a8",
+      "note": "merge arbitration: DINO keeps everything; only uncovered Gemini boxes appended, dressed + SAM-masked; backend 'dino+gemini-extra'."
     },
     {
       "id": "lab-unpinned-loads-v0",
       "title": "Unpinned Lab bbox run loads scene v0 although image_version_meta says activeVersion=2",
       "reportedAt": "2026-08-19",
       "source": "Lab exps #9 (unpinned -> v0 content) vs #10 (pinned v2 -> byte-exact match with production)",
-      "status": "open",
-      "task": 23
+      "status": "fixed",
+      "task": 23,
+      "fixedIn": "4268015a8",
+      "note": "load is now observable: ask/got logged, v0 fallback WARNs, payload carries loadedFrom. Root cause still to be caught in the act — instrumentation makes the next occurrence data."
     },
     {
       "id": "experiments-route-strips-target-params",
       "title": "POST /api/admin/testlab/experiments drops target._params, so per-target version pinning silently does nothing",
       "reportedAt": "2026-08-19",
       "source": "exp #9 stored target {storyId,pageNumber} only",
-      "status": "open",
-      "task": 23
+      "status": "fixed",
+      "task": 23,
+      "fixedIn": "4268015a8",
+      "note": "route passes _params through; target-level versionIndex reaches params.versionIndex."
     },
     {
       "id": "garment-seeds-missing-empty-description",
       "title": "Figures with correct SoM names still get zero garment seeds (empty descByPerson)",
       "reportedAt": "2026-08-19",
       "source": "Lab exp #7 p7: production seeded 1/4, Lab 0/4, seedTrace empty",
-      "status": "open",
-      "task": 24
+      "status": "fixed",
+      "task": 24,
+      "fixedIn": "4268015a8",
+      "note": "descByPerson falls back description->clothing->gdinoPrompt; empty line for a named figure = ERROR + failure_log, never silent."
     },
     {
       "id": "recolour-version-not-redetected",

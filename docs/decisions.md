@@ -13504,3 +13504,41 @@ server/lib/promptBuilders.js (parseBeats returns `arc`; buildBeatsReviewPrompt t
 server/lib/beatsPipeline.js (threads plan.arc into the review, stores it on beatsReviewReport
 and in the outline), server/lib/testlab.js (beats_scenes + both replay modes thread the arc).
 **Status:** ✅ active on staging.
+
+## 2026-08-19 — Five registry bugs fixed in one pass (animals, merge, lab load, pins, silent unseeding)
+
+**Context:** the new check-open-bugs gate blocked all pushes while five
+confirmed bugs sat open; the owner said fix them. All five were reproduced in
+Lab exps #7–#10 on `job_1787120984020_pg71z58ba9` first.
+
+**Decisions:**
+1. **Animals are not expected characters.** `buildSecondaryCharacterDescriptions`
+   no longer pools `vb.animals` — DINO detects `person`; a dog in the expected
+   list is a guaranteed false undercount. Animals remain detectable via the
+   object grounding pass. `nonHumanNames` stays as belt-and-braces.
+2. **Second opinion merges.** Owner's rule verbatim: DINO keeps every figure;
+   only Gemini boxes uncovered by any DINO box (centre + IoU≤0.30) are appended,
+   dressed from expectedCharacters and SAM-masked. Backend label
+   `dino+gemini-extra`. Winner-take-all had discarded correct seeded detections
+   for clothing-less boxes (p6/p8: all figures seeds=0).
+3. **The unpinned Lab load is observable.** Unpinned runs provably detected on
+   v0 while meta said activeVersion=2 (exps #7/#9 vs #10 byte-proof); the load
+   now logs ask/got, WARNs on the v0 fallback, and the payload carries
+   `loadedFrom`. The root cause is not yet caught in the act — next occurrence
+   is data, not forensics.
+4. **Per-target pins work on direct POST /experiments.** `_params` passes the
+   sanitizer; a target-level `versionIndex` reaches `params.versionIndex`.
+5. **A named figure never reaches SAM undressed silently.**
+   `descByPerson` falls back description → clothing → gdinoPrompt; a still-empty
+   identity line is an ERROR + `failure_log` entry (p7 had correct names, empty
+   traces, zero seeds, zero log lines).
+
+**Also observed, not yet acted on:** exp #7's log capture recorded SoM lines
+from a CONCURRENT story generation (`[PAGE 7 r3]` etc.) — the Lab shares the
+process with live generation, so captured logLines can interleave. Worth its
+own look if Lab log attribution ever matters.
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/bboxDetection.js`,
+`server/lib/testlab.js`, `server/routes/admin/testlab.js`,
+`server/lib/figureDetection.js`, client testlab types/panel, `tasks/bugs.json`
+**Status:** ✅ active
