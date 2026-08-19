@@ -67,7 +67,7 @@
       "reportedAt": "2026-08-19",
       "source": "owner (\"same-bytes recomputes are a bug\") + _hashBboxKey reading raw input",
       "status": "fixed",
-      "fixedIn": "pending",
+      "fixedIn": "329170a3e",
       "task": null,
       "note": "detectAllBoundingBoxes now normalises http(s) input to bytes before the cache key, the detection and the fp stamp — one fetch, one keyspace."
     },
@@ -77,7 +77,7 @@
       "reportedAt": "2026-08-19",
       "source": "prod exp #13: merge log line proves new code, loadedFrom still null",
       "status": "fixed",
-      "fixedIn": "pending",
+      "fixedIn": "329170a3e",
       "task": null,
       "note": "function-property state replaced with module-level slot + getter; unrecorded loads now surface as {unrecorded:true}, never null."
     }
