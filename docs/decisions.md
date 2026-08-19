@@ -13681,3 +13681,34 @@ carry no peril or solution language. The two generator prompts were the only sit
 prompts/story-beats.txt, prompts/story-beats-review.txt (the peril-line correction).
 **Status:** ✅ active — not yet validated against generated output; no idea has been generated
 under the new rules.
+
+## 2026-08-19 — Recolour carries geometry BY DESIGN; cache keys on bytes; loadedFrom can never be null
+
+**Owner correction:** a garment recolour repaints pixels inside existing
+silhouettes — it cannot move a box or a mask, so the parent's geometry is valid
+for the new bytes by construction and the fresh DINO+SAM added earlier today was
+same-bytes waste. What a recolour can get wrong is colour, which the fresh EVAL
+catches. The carry is now explicit instead of silent: shallow copy (parent's
+record never mutated), `_gdinoMasks` re-attached, `sourceImageFp` re-stamped to
+the NEW bytes via the same `imageFingerprint` the stamping wrapper uses, and
+`gdinoDiag.recolourCarried = {fromFp, round}` so the carry is data. The original
+bug was never the carry — it was the fp-nulled, unmarked carry.
+
+**Same-bytes recomputes:** `_hashBboxKey` hashed whatever string it was given,
+so an https URL was hashed as TEXT while another caller passed identical bytes
+as a data URI — the cache could never connect them and detection re-ran.
+`detectAllBoundingBoxes` now normalises http(s) input to bytes first; the key,
+the detection and the fp stamp all speak about the same bytes.
+
+**loadedFrom:** exp #13 proved the function-property slot came back null even on
+the fixed deploy. Module-level slot + getter now; an unrecorded load surfaces as
+`{unrecorded: true}` — absence is itself a reading, never a null.
+
+**Verified on production before this entry:** p6 (dog page) redone on the
+deployed fixes — backend `grounding-dino` (was `gemini-second-opinion`), all
+four boys seeded (4/4/1/2, was 0/0/0/0), and the merge log shows the owner's
+rule live: "Gemini 6 vs DINO 4, no uncovered extra box — DINO stands as-is".
+
+**Touched:** `server/lib/repairPipeline.js`, `server/lib/bboxDetection.js`,
+`server/lib/testlab.js`, `tasks/bugs.json`
+**Status:** ✅ active

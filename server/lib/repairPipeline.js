@@ -1603,12 +1603,31 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
     if (!changed) return null;
     log.info(`🎨 [GARMENT-COLOUR] p${pageNumber} round ${roundNum}: ${changed}/${attempted} garment(s) recoloured`);
-    // NO detection returned: the bytes just changed, so the detection used for
-    // the repair is stale by construction. The caller runs a fresh DINO+SoM on
-    // the new bytes (redetectVersionImage) -- passing the old one along, even
-    // with its fp nulled, is how a recolour version shipped pre-recolour
-    // identity against post-recolour pixels.
-    return { imageData: current, detection: null, changed };
+    // CARRY THE GEOMETRY, RE-STAMP THE FP (owner, 2026-08-19). A recolour
+    // repaints pixels INSIDE existing silhouettes — it cannot move a box or a
+    // mask, so the parent's geometry is valid for the new bytes by
+    // construction and a fresh DINO+SAM here is pure same-bytes waste. What a
+    // recolour CAN get wrong is colour, and the fresh EVAL catches that.
+    // The carry is explicit: shallow copy (never mutate the parent's record),
+    // masks re-attached, sourceImageFp re-stamped to the NEW bytes, and
+    // recolourCarried on the diag so this is data — the previous version of
+    // this carry nulled the fp and said nothing, which is how a swap went
+    // undiagnosable for a day.
+    let carried = null;
+    if (detection) {
+      carried = { ...detection };
+      if (detection._gdinoMasks) {
+        Object.defineProperty(carried, '_gdinoMasks', { value: detection._gdinoMasks, enumerable: false });
+      }
+      // Same fingerprint function the stamping wrapper uses (imageFingerprint)
+      // — hashImageData is a different keyspace and would never match a verify.
+      try { carried.sourceImageFp = images().imageFingerprint(current); } catch { carried.sourceImageFp = null; }
+      carried.gdinoDiag = {
+        ...(detection.gdinoDiag || {}),
+        recolourCarried: { fromFp: detection.sourceImageFp || null, round: roundNum },
+      };
+    }
+    return { imageData: current, detection: carried, changed };
   };
 
   const { decideRepairMethod } = require('./repairLogic');
@@ -1855,18 +1874,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
         for (const rc of recolourResults) recolourBytes.set(rc.pageNumber, rc.imageData);
 
-        // Fresh DINO+SoM on the recoloured bytes -- same helper the round-repair
-        // results use, so a recolour version carries ITS OWN boxes, names and
-        // sourceImageFp, never its parent's.
-        const recolourDetectLimit = pLimit(4);
-        await Promise.all(recolourResults.filter(rc => !rc.bboxDetection).map(rc => recolourDetectLimit(async () => {
-          try {
-            rc.bboxDetection = await redetectVersionImage(rc, `recolour-r${round}`);
-          } catch (err) {
-            log.warn(`⚠️ [GARMENT-COLOUR] p${rc.pageNumber}: post-recolour re-detect failed (${err.message}) -- version stores no detection rather than a stale one`);
-            rc.bboxDetection = null;
-          }
-        })));
+        // No re-detect for recolours (owner, 2026-08-19): a recolour cannot move
+        // geometry, so runGarmentRecolour carries the parent's boxes/masks with
+        // the fp re-stamped to the new bytes. Only the EVAL re-runs.
 
         if (recolourResults.length > 0) {
           log.info(`🎨 [GARMENT-COLOUR] Round ${round}: ${recolourResults.length} page(s) recoloured — evaluating as their own version(s)`);

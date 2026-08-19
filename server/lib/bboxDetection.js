@@ -336,6 +336,19 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
   const { expectedCharacters = [], expectedObjects = [], sceneContext = null, bboxModelOverride = null, pageContext = '', skipCache = false, artStyle = null, objectGroundingHints = null, nonHumanNames = [] } = options;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
+  // NORMALISE TO BYTES BEFORE ANYTHING KEYS ON THE IMAGE (owner, 2026-08-19:
+  // "same-bytes recomputes are a bug"). _hashBboxKey hashes the string it is
+  // given — an https URL hashed as TEXT while another caller passed the same
+  // picture as a data URI, so two calls about identical bytes could never share
+  // a cache entry and the whole detection re-ran. The bytes get fetched
+  // downstream anyway; fetching once here makes the key, the detection and the
+  // sourceImageFp stamp all speak about the same bytes.
+  if (typeof imageData === 'string' && /^https?:\/\//i.test(imageData)) {
+    const buf = await r2Lib.fetchImageBytes(imageData);
+    if (buf) imageData = `data:image/jpeg;base64,${buf.toString('base64')}`;
+    else log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}could not fetch image URL for cache normalisation — caching on the URL string`);
+  }
+
   // Cache check — content-hashed by image bytes + expected names. Hits skip
   // the full Gemini round-trip; misses fall through to the API and populate.
   const cacheKey = _hashBboxKey(imageData, expectedCharacters, expectedObjects);

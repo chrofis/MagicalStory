@@ -183,7 +183,16 @@ async function loadEmptyScene(storyId, pageNumber) {
 // 'tl_step' holds the composite's plate, depopulated background and pasted
 // canvas, so detection can be run on the ghosts rather than on the finished
 // illustration. Only meaningful together with a pinned versionIndex.
+// Which bytes the last loadActivePageImage call served — module-level on
+// purpose: a property hung off the function object came back null in the
+// payload on the very first production run (exp #13), so absence itself was
+// unreadable. One experiment runs at a time (route guard), so a single slot
+// cannot be raced.
+let _lastPageLoad = null;
+function getLastPageLoad() { return _lastPageLoad; }
+
 async function loadActivePageImage(storyId, pageNumber, versionIndex = null, imageType = null) {
+  _lastPageLoad = null;
   const { getActiveVersion, getStoryImage } = require('../services/database');
   const coverKey = pageNumber < 0 ? COVER_KEY_BY_PAGE[String(pageNumber)] : null;
   const pinned = Number.isFinite(Number(versionIndex)) ? Number(versionIndex) : null;
@@ -218,7 +227,7 @@ async function loadActivePageImage(storyId, pageNumber, versionIndex = null, ima
   // only provable by eyeballing shirt colours in the step image. Every unpinned
   // load now states what it asked for and what it got; a fallback to v0 is a
   // WARNING, not a silent shrug.
-  loadActivePageImage._last = { storyId, pageNumber, activeIdx, loadedVersion: img?.version_index ?? (atActive ? activeIdx : 0), fellBackToV0: !atActive };
+  _lastPageLoad = { storyId, pageNumber, activeIdx, loadedVersion: img?.version_index ?? (atActive ? activeIdx : 0), fellBackToV0: !atActive };
   if (!atActive) {
     log.warn(`⚠️ [TESTLAB] ${storyId} p${pageNumber}: active version v${activeIdx} did not load — FELL BACK to v0. Whatever runs next is NOT testing the reader-facing image.`);
   } else {
@@ -1061,12 +1070,13 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
   // params.versionIndex pins the exact bytes so an A/B of the detection knobs
   // compares the same picture, not whatever won pick-best in between.
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, params.versionIndex, params.imageType);
-  // Which bytes this run actually tested — exp #7/#9 could not answer that.
+  // Which bytes this run actually tested — exp #7/#9 could not answer that,
+  // and 'null' must be impossible: an unrecorded load is itself a finding.
+  const _load = getLastPageLoad();
   const loadedFrom = Number.isFinite(Number(params.versionIndex))
     ? { pinned: Number(params.versionIndex) }
-    : (loadActivePageImage._last && loadActivePageImage._last.storyId === ctx.storyId
-        && loadActivePageImage._last.pageNumber === ctx.pageNumber
-      ? { ...loadActivePageImage._last } : null);
+    : (_load && _load.storyId === ctx.storyId && String(_load.pageNumber) === String(ctx.pageNumber)
+      ? { ..._load } : { unrecorded: true });
   const expectedCharacters = buildExpectedCharacters(ctx);
 
   // When grounding-dino is the configured backend, a cold analyzer (every
@@ -3029,6 +3039,9 @@ async function runOutlineReviewStage(target, { params = {} }) {
  * params.reviewModel : fast reviewer (default MODEL_DEFAULTS.outlineReviewModel)
  * params.pages       : page count (default: the story's own)
  * params.skipReview  : plan only, to isolate planner cost
+ * params.storyDetails : replace the story's own idea text. The idea is an input
+ *   to the plan, so a change to the idea GENERATOR can only be measured by
+ *   planning the same cast and setting from a different idea.
  */
 async function runBeatsScenesStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
@@ -3037,7 +3050,12 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   const { callTextModelStreaming } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
 
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const { storyData: loaded } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  // Same cast, same setting, different idea — the only way to measure a change
+  // to the idea generator downstream of it.
+  const storyData = params.storyDetails
+    ? { ...loaded, storyDetails: String(params.storyDetails) }
+    : loaded;
   const pageCount = parseInt(params.pages, 10) || (storyData.sceneImages || []).length || storyData.pages || 10;
   const expected = Array.from({ length: pageCount }, (_, i) => i + 1);
 

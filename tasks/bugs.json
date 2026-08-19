@@ -53,12 +53,33 @@
     },
     {
       "id": "recolour-version-not-redetected",
-      "title": "Garment-recolour version inherited its parent's detection (fp nulled, boxes copied) instead of a fresh DINO+SoM",
+      "title": "Recolour version carried a stale, fp-nulled detection with no marker",
       "reportedAt": "2026-08-19",
       "source": "job_1787120984020_pg71z58ba9 p7: v1 detection identical to v0's; runGarmentRecolour returned stale detection by design",
       "status": "fixed",
       "fixedIn": "1dcdb3c09",
-      "task": 23
+      "task": 23,
+      "note": "OWNER DESIGN 2026-08-19: a recolour cannot move geometry, so carrying the parent boxes/masks is CORRECT and a fresh DINO+SAM is waste. The bug was the silent, fp-nulled carry. Fix: explicit carry — shallow copy, masks re-attached, sourceImageFp re-stamped to the NEW bytes (imageFingerprint), diag.recolourCarried marker. Only the EVAL re-runs."
+    },
+    {
+      "id": "bbox-cache-keys-on-url-text",
+      "title": "Detection cache hashed URL strings as text — same bytes never shared an entry across callers",
+      "reportedAt": "2026-08-19",
+      "source": "owner (\"same-bytes recomputes are a bug\") + _hashBboxKey reading raw input",
+      "status": "fixed",
+      "fixedIn": "pending",
+      "task": null,
+      "note": "detectAllBoundingBoxes now normalises http(s) input to bytes before the cache key, the detection and the fp stamp — one fetch, one keyspace."
+    },
+    {
+      "id": "loadedfrom-null-on-new-code",
+      "title": "bbox payload loadedFrom came back null even on the fixed deploy (exp #13)",
+      "reportedAt": "2026-08-19",
+      "source": "prod exp #13: merge log line proves new code, loadedFrom still null",
+      "status": "fixed",
+      "fixedIn": "pending",
+      "task": null,
+      "note": "function-property state replaced with module-level slot + getter; unrecorded loads now surface as {unrecorded:true}, never null."
     }
   ]
 }
