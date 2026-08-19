@@ -2785,7 +2785,13 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                       <div className={`rounded-lg px-3 py-2 text-sm ${result.scoreSpread.range >= 20 ? 'bg-red-50 text-red-800' : result.scoreSpread.range >= 8 ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'}`}>
                         <b>Score range {result.scoreSpread.range} pts</b> over {result.okRuns} identical runs
                         {result.versionIndex != null && <> · version v{result.versionIndex}</>}
-                        {' '}— scores {result.scoreSpread.values.join(' · ')} (mean {result.scoreSpread.mean}, σ {result.scoreSpread.stdev})
+                        {' '}— scores {result.scoreSpread.values.join(' · ')} (mean {result.scoreSpread.mean}, σ {result.scoreSpread.stdev}
+                        {result.scoreSpread.mad != null && <>, MAD {result.scoreSpread.mad}</>})
+                        {result.scoreSpread.reliability === 'low' && (
+                          <div className="mt-1 text-xs font-normal opacity-80">
+                            ⚠ {result.scoreSpread.reliabilityNote} — range keys on the two most extreme draws, so one unlucky repeat moves it by its full amount.
+                          </div>
+                        )}
                         {result.storedBaseline?.finalScore != null && (
                           <> · the score this image already carries is <b>{result.storedBaseline.finalScore}</b>{result.storedBaseline.source ? ` (${result.storedBaseline.source})` : ''}</>
                         )}

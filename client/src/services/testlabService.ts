@@ -105,6 +105,12 @@ export interface StoryScorecard {
 
 export interface EvalSpread {
   values: number[]; min: number; max: number; range: number; mean: number; stdev: number;
+  median?: number;
+  /** Median absolute deviation — unmoved by a single outlying repeat, unlike range. */
+  mad?: number;
+  /** 'low' below 5 repeats: read the set aggregate, not this page's range alone. */
+  reliability?: 'ok' | 'low';
+  reliabilityNote?: string;
 }
 
 export interface EvalConcept {

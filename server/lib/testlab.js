@@ -857,14 +857,38 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
   const ok = runs.filter(r => r.ok);
   if (ok.length < 2) throw new Error(`Only ${ok.length}/${repeats} evaluations returned a result — cannot measure variance`);
 
+  // MIN-MAX RANGE IS A BAD ESTIMATOR AT n=3, and it is the headline number on
+  // every card — so it also reports the statistics that degrade more gracefully
+  // and flags its own unreliability.
+  //
+  // This is not theoretical. Comparing exp769 against the exp768 baseline, two
+  // pages appeared to REGRESS (pixar 40->55, and the deliberately-stable control
+  // 10->40) and both were reported to the owner as real. Re-running the same 5
+  // pages against the shipped rule (exp770) put them at 40 and 0 — the
+  // "regressions" were sampling. Range keys on the two most extreme draws, so one
+  // unlucky repeat moves it by its full amount; MAD and stdev do not.
+  //
+  // Read the AGGREGATE across a set, not a single page's range, when n < 5.
   const stat = (values) => {
     const n = values.length;
     const mean = values.reduce((s, v) => s + v, 0) / n;
     const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+    const sorted = [...values].sort((a, b) => a - b);
+    const median = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+    const devs = values.map(v => Math.abs(v - median)).sort((a, b) => a - b);
+    const mad = devs.length % 2 ? devs[(devs.length - 1) / 2] : (devs[devs.length / 2 - 1] + devs[devs.length / 2]) / 2;
+    const r1 = (x) => Math.round(x * 10) / 10;
     return {
       values, min: Math.min(...values), max: Math.max(...values),
       range: Math.max(...values) - Math.min(...values),
-      mean: Math.round(mean * 10) / 10, stdev: Math.round(Math.sqrt(variance) * 10) / 10,
+      mean: r1(mean), median: r1(median),
+      stdev: r1(Math.sqrt(variance)),
+      // Median absolute deviation — unmoved by one outlying repeat, which is
+      // exactly the failure mode that produced the false regressions above.
+      mad: r1(mad),
+      // Honest label for how much weight this page's number can carry alone.
+      reliability: n >= 5 ? 'ok' : 'low',
+      ...(n < 5 ? { reliabilityNote: `range over ${n} samples is noisy — compare the set aggregate, not this page alone` } : {}),
     };
   };
 
